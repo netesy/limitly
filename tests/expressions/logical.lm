@@ -6,20 +6,46 @@ var f = false;
 
 // Basic logical operations
 print("AND operations:");
-print("{t} and {t}: {t and t}");
-print("{t} and {f}: {t and f}");
-print("{f} and {t}: {f and t}");
-print("{f} and {f}: {f and f}");
+var and1 = t and t;
+var and2 = t and f;
+var and3 = f and t;
+var and4 = f and f;
+
+print("{t} and {t}: {and1}");
+print("{t} and {f}: {and2}");
+print("{f} and {t}: {and3}");
+print("{f} and {f}: {and4}");
+
+assert(and1 == true, "true and true should be true");
+assert(and2 == false, "true and false should be false");
+assert(and3 == false, "false and true should be false");
+assert(and4 == false, "false and false should be false");
 
 print("OR operations:");
-print("{t} or {t}: {t or t}");
-print("{t} or {f}: {t or f}");
-print("{f} or {t}: {f or t}");
-print("{f} or {f}: {f or f}");
+var or1 = t or t;
+var or2 = t or f;
+var or3 = f or t;
+var or4 = f or f;
+
+print("{t} or {t}: {or1}");
+print("{t} or {f}: {or2}");
+print("{f} or {t}: {or3}");
+print("{f} or {f}: {or4}");
+
+assert(or1 == true, "true or true should be true");
+assert(or2 == true, "true or false should be true");
+assert(or3 == true, "false or true should be true");
+assert(or4 == false, "false or false should be false");
 
 print("NOT operations:");
-print("!{t}: {!t}");
-print("!{f}: {!f}");
+var not1 = !t;
+var not2 = !f;
+
+print("!{t}: {not1}");
+print("!{f}: {not2}");
+
+assert(not1 == false, "!true should be false");
+assert(not2 == true, "!false should be true");
 
 // Complex logical expressions
 var a = 5;
@@ -29,8 +55,15 @@ var result2 = (a > b) or (a == 5);
 print("Complex: ({a} < {b}) and ({b} > 0) = {result1}");
 print("Complex: ({a} > {b}) or ({a} == 5) = {result2}");
 
+assert(result1 == true, "(5 < 10) and (10 > 0) should be true");
+assert(result2 == true, "(5 > 10) or (5 == 5) should be true");
+
 // Short-circuit evaluation
 print("Short-circuit tests:");
 var x = 0;
 var result3 = (x != 0) and (10 / x > 1);
 print("Safe division with and: {result3}");
+
+assert(result3 == false, "Short-circuit should prevent division by zero");
+
+print("=== Logical Expression Tests Complete ===");

@@ -12,11 +12,14 @@ concurrent(ch = output_results, cores = 2) {
         }
     }
 
+    var result_count = 0;
     iter (result in output_results) {
         print("Received result: {result}");
+        result_count = result_count + 1;
     }
 
     print("Concurrent block finished");
+    assert(result_count == 3, "Concurrent block should execute 3 tasks");
 
     // ==========================================
     //  Multiple workers, same stream input
@@ -36,9 +39,13 @@ concurrent(ch = output_results, cores = 2) {
             }
         }
 
+        var final_result_count = 0;
         iter (result in results) {
             print("Final result: {result}");
+            final_result_count = final_result_count + 1;
         }
+        
+        assert(final_result_count == 3, "Worker should process 3 jobs");
 
         // ==========================================
         //  Tasks seeding a worker stream
@@ -60,9 +67,13 @@ concurrent(ch = output_results, cores = 2) {
                 }
             }
 
+            var seeded_result_count = 0;
             iter (msg in seeded_results) {
                 print("Seeded result: {msg}");
+                seeded_result_count = seeded_result_count + 1;
             }
+            
+            assert(seeded_result_count == 2, "Seeded worker should process 2 items");
             // ==========================================
             //  Tasks seeding a worker stream
             // ==========================================
@@ -83,6 +94,10 @@ concurrent(ch = output_results, cores = 2) {
                     }
                 }
 
+                var seeded_result_count2 = 0;
                 iter (msg in seeded_results) {
                     print("Seeded result: {msg}");
+                    seeded_result_count2 = seeded_result_count2 + 1;
                 }
+                
+                assert(seeded_result_count2 == 2, "Second seeded worker should process 2 items");

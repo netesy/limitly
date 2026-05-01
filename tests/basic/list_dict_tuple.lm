@@ -1,19 +1,45 @@
 // List-based loop with explicit string list type
+print("=== List, Dict, Tuple Tests ===");
+
 var fruits = ["Apple", "Banana", "Cherrys"];
+assert(fruits[0] == "Apple", "First fruit should be Apple");
+assert(fruits[1] == "Banana", "Second fruit should be Banana");
+assert(fruits[2] == "Cherrys", "Third fruit should be Cherrys");
+
+var fruitCount = 0;
 iter (fruit in fruits) {
     print(fruit);
+    fruitCount += 1;
 }
+assert(fruitCount == 3, "Loop should iterate 3 times");
 
 // Tuple-based loop with explicit string list type
 var fruites = ("Apples", "Bananas", "Cherries");
+assert(fruites[0] == "Apples", "First tuple element should be Apples");
+assert(fruites[1] == "Bananas", "Second tuple element should be Bananas");
+assert(fruites[2] == "Cherries", "Third tuple element should be Cherries");
+
+var tupleCount = 0;
 iter (fruit in fruites) {
     print(fruit);
+    tupleCount += 1;
 }
+assert(tupleCount == 3, "Tuple loop should iterate 3 times");
 
 // Dictionary-based loop with defined key/value type
 //type DictOfStrToInt = {str: int};
 var my_dict = { "at": 1, "bi": 12, "ce": 78, "de": 28 };
+assert(my_dict["at"] == 1, "Key 'at' should map to 1");
+assert(my_dict["bi"] == 12, "Key 'bi' should map to 12");
+assert(my_dict["ce"] == 78, "Key 'ce' should map to 78");
+assert(my_dict["de"] == 28, "Key 'de' should map to 28");
+
+var dictCount = 0;
 iter (entry in my_dict) {
     print("{entry.key}: {entry.value}");
+    dictCount += 1;
 }
+assert(dictCount == 4, "Dictionary loop should iterate 4 times");
+
+print("=== List, Dict, Tuple Tests Complete ===");
 

@@ -346,7 +346,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
     
     // Main execution loop using switch statement
     while (pc < end) {
-        std::cout << "[VM TRACE] " << function.name << " PC=" << (pc - function.instructions.data()) << " " << pc->to_string() << std::endl;
+        // std::cout << "[VM TRACE] " << function.name << " PC=" << (pc - function.instructions.data()) << " " << pc->to_string() << std::endl;
         instruction_count++;
         if (instruction_count > MAX_INSTRUCTIONS) {
             std::cerr << "Error: Instruction limit exceeded (" << MAX_INSTRUCTIONS << ") - possible infinite loop" << std::endl;

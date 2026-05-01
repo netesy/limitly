@@ -39,6 +39,10 @@ fn run_test() {
     {
         var o = Outer();
         o.test();
+        
+        // Assert composition functionality
+        // Note: o.comp.value should NOT be accessible from external code (private field)
+        // Composition should work through public methods only
     }
     print("End");
 }

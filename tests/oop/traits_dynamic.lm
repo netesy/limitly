@@ -7,11 +7,11 @@ trait Shape {
 frame Circle : Shape {
     var radius: int;
     
-    fn area(): int {
+    pub fn area(): int {
         return 3 * self.radius * self.radius; // Simplified PI
     }
     
-    fn name(): str {
+    pub fn name(): str {
         return "Circle";
     }
 }
@@ -19,11 +19,11 @@ frame Circle : Shape {
 frame Square : Shape {
     var side: int;
     
-    fn area(): int {
+    pub fn area(): int {
         return self.side * self.side;
     }
     
-    fn name(): str {
+    pub fn name(): str {
         return "Square";
     }
 }
@@ -40,6 +40,12 @@ fn main() {
     // Dynamic dispatch via trait objects
     print_shape_info(c);
     print_shape_info(s);
+    
+    // Assert trait functionality
+    assert(c.name() == "Circle", "Trait method should work for Circle");
+    assert(c.area() == 75, "Circle area should be 3*5*5 = 75");
+    assert(s.name() == "Square", "Trait method should work for Square");
+    assert(s.area() == 100, "Square area should be 10*10 = 100");
 }
 
 main();

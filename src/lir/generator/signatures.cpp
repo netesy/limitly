@@ -75,6 +75,16 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         for (const auto& stmt : module->ast->statements) {
             if (auto func_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
                 std::string original_name = func_stmt->name;
+                {
+                    FunctionInfo info;
+                    info.name = path + "." + original_name;
+                    info.param_count = func_stmt->params.size();
+                    info.optional_param_count = func_stmt->optionalParams.size();
+                    info.has_closure = false;
+                    info.visibility = func_stmt->visibility;
+                    info.lir_function = nullptr;
+                    function_table_[info.name] = std::move(info);
+                }
                 func_stmt->name = path + "." + original_name;
                 generate_function(*func_stmt);
                 func_stmt->name = original_name;

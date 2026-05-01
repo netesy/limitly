@@ -7,16 +7,19 @@ print("Test 1: Function call with parameters");
 print("Expected: Function should be called with parameters");
 var result = math.add(5, 3);
 print("5 + 3 = " + result);
+assert(result == 8, "Module function with parameters should work: 5 + 3 = 8");
 
 print("Test 2: Function call with return value");
 print("Expected: Function should return a value");
 var squared = math.square(4);
 print("4 squared = " + squared);
+assert(squared == 16, "Module function with return value should work: 4 squared = 16");
 
 print("Test 3: Nested function calls ");
 print("Expected: Functions should be callable in expressions");
 var result = math.add(math.square(2), math.cube(2));
 print("square(2) + cube(2) = " + result);
+assert(result == 12, "Nested function calls should work: square(2) + cube(2) = 4 + 8 = 12");
 
 print("=== Function Parameters Test Complete ===");
 print("NOTE: All tests are currently skipped due to known limitations");

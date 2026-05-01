@@ -5,34 +5,72 @@ var name = "World";
 var age = 25;
 var pi = 3.14159;
 
+assert(name == "World", "Variable name should be 'World'");
+assert(age == 25, "Variable age should be 25");
+assert(pi == 3.14159, "Variable pi should be 3.14159");
+
 // Basic interpolation
-print("Hello, {name}!");
-print("Age: {age}");
-print("Pi: {pi}");
+var greeting1 = "Hello, {name}!";
+var ageStr = "Age: {age}";
+var piStr = "Pi: {pi}";
+
+print(greeting1);
+print(ageStr);
+print(piStr);
+
+assert(greeting1 == "Hello, World!", "Basic interpolation should work");
+assert(ageStr == "Age: 25", "Integer interpolation should work");
+assert(piStr == "Pi: 3.14159", "Float interpolation should work");
 
 // Expression interpolation
-print("Next year: {age + 1}");
+var nextYear = "Next year: {age + 1}";
+print(nextYear);
+assert(nextYear == "Next year: 26", "Expression interpolation should work");
 
-//!fix here
-print("Area of circle: {pi * 2 * 2}");
+var area = "Area of circle: {pi * 2 * 2}";
+print(area);
+assert(area == "Area of circle: 12.5664", "Math expression interpolation should work");
 
 // Multiple interpolations
-print("Name: {name}, Age: {age}");
-print("{name} is {age} years old");
+var multi1 = "Name: {name}, Age: {age}";
+var multi2 = "{name} is {age} years old";
+
+print(multi1);
+print(multi2);
+
+assert(multi1 == "Name: World, Age: 25", "Multiple interpolation should work");
+assert(multi2 == "World is 25 years old", "Multiple interpolation should work");
 
 // Interpolation at start
-print("{name} says hello");
-print("{age} is the age");
+var start1 = "{name} says hello";
+var start2 = "{age} is the age";
+
+print(start1);
+print(start2);
+
+assert(start1 == "World says hello", "Start interpolation should work");
+assert(start2 == "25 is the age", "Start interpolation should work");
 
 // Complex expressions
 var x = 10;
 var y = 5;
-print("Math: {x} + {y} = {x + y}");
-print("Comparison: {x} > {y} is {x > y}");
+var mathStr = "Math: {x} + {y} = {x + y}";
+var compStr = "Comparison: {x} > {y} is {x > y}";
+
+print(mathStr);
+print(compStr);
+
+assert(mathStr == "Math: 10 + 5 = 15", "Complex math interpolation should work");
+assert(compStr == "Comparison: 10 > 5 is true", "Comparison interpolation should work");
 
 // Nested expressions
-print("Complex: {(x + y) * 2 - 1}");
+var nested = "Complex: {(x + y) * 2 - 1}";
+print(nested);
+assert(nested == "Complex: 29", "Nested expression interpolation should work");
 
 // String concatenation with interpolation
 var greeting = "Hello, {name}! You are {age}.";
 print(greeting);
+assert(greeting == "Hello, World! You are 25.", "String with interpolation should work");
+
+print("=== String Interpolation Tests Complete ===");

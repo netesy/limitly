@@ -1290,7 +1290,12 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 return result;
             }
         }
-        
+        if (!current_module_.empty()) {
+            std::string qualified_func_name = current_module_ + "." + func_name;
+            if (function_table_.find(qualified_func_name) != function_table_.end()) {
+                func_name = qualified_func_name;
+            }
+        }
         if (function_table_.find(func_name) != function_table_.end()) {
            // std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
             

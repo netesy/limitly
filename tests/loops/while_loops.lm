@@ -1,37 +1,59 @@
-// Test while loops (if implemented)
+// Test while loops
 print("=== While Loop Tests ===");
 
 // Basic while loop
 print("Basic while loop:");
 var i = 0;
+var basicCount = 0;
+var basicSum = 0;
 while (i < 5) {
     print("i = {i}");
+    basicCount += 1;
+    basicSum += i;
     i += 1;
 }
+assert(basicCount == 5, "Basic while loop should iterate 5 times");
+assert(basicSum == 10, "Sum of 0+1+2+3+4 should be 10");
+assert(i == 5, "Loop variable should end at 5");
 
 // While loop with complex condition
 print("While with complex condition:");
 var x = 1;
+var complexCount = 0;
+var complexSum = 0;
 while (x * x < 100) {
     print("x = {x}, x² = {x * x}");
+    complexCount += 1;
+    complexSum += x;
     x += 1;
 }
+assert(complexCount == 9, "Complex while should iterate 9 times (1-9)");
+assert(complexSum == 45, "Sum of 1+2+...+9 should be 45");
+assert(x == 10, "x should end at 10 (10² = 100 >= 100)");
 
 // Nested while loops
 print("Nested while loops:");
 var outer = 0;
+var nestedCount = 0;
+var totalPairs = 0;
 while (outer < 2) {
     var inner = 0;
     while (inner < 3) {
         print("({outer}, {inner})");
+        nestedCount += 1;
+        totalPairs += outer * 10 + inner;
         inner += 1;
     }
     outer += 1;
 }
+assert(nestedCount == 6, "Nested while should iterate 6 times (2x3)");
+assert(outer == 2, "Outer should end at 2");
+assert(totalPairs == 9, "Sum of pairs should be 9");
 
-// While loop with break/continue (if implemented)
+// While loop with break/continue
 print("While with early termination:");
 var count = 0;
+var breakCount = 0;
 while (count < 10) {
     if (count == 3) {
         count += 1;
@@ -41,5 +63,41 @@ while (count < 10) {
         break;
     }
     print("count = {count}");
+    breakCount += 1;
     count += 1;
 }
+assert(breakCount == 6, "While loop should execute 6 times (skip 3, break at 7)");
+assert(count == 7, "Count should be 7 when loop breaks");
+
+// While loop with decrement
+print("While loop with decrement:");
+var countdown = 5;
+var countdownCount = 0;
+var countdownSum = 0;
+while (countdown > 0) {
+    print("countdown = {countdown}");
+    countdownCount += 1;
+    countdownSum += countdown;
+    countdown -= 1;
+}
+assert(countdownCount == 5, "Countdown while should iterate 5 times");
+assert(countdownSum == 15, "Sum of 5+4+3+2+1 should be 15");
+assert(countdown == 0, "Countdown should end at 0");
+
+// While loop with boolean condition
+print("While with boolean condition:");
+var flag = true;
+var boolCount = 0;
+var toggle = 0;
+while (flag) {
+    boolCount += 1;
+    toggle += 1;
+    if (toggle >= 4) {
+        flag = false;
+    }
+    print("Boolean iteration: {boolCount}");
+}
+assert(boolCount == 4, "Boolean while should iterate 4 times");
+assert(flag == false, "Flag should be false at end");
+
+print("=== While Loop Tests Complete ===");

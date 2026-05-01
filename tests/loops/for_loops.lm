@@ -3,40 +3,94 @@ print("=== For Loop Tests ===");
 
 // Basic for loop
 print("Basic for loop (0 to 4):");
+var basicCount = 0;
+var basicSum = 0;
 for (var i = 0; i < 5; i += 1) {
     print("i = {i}");
+    basicCount += 1;
+    basicSum += i;
 }
+assert(basicCount == 5, "Basic for loop should iterate 5 times");
+assert(basicSum == 10, "Sum of 0+1+2+3+4 should be 10");
 
 // For loop with different increment
 print("For loop with increment 2:");
+var incCount = 0;
+var incSum = 0;
 for (var j = 0; j < 10; j += 2) {
     print("j = {j}");
+    incCount += 1;
+    incSum += j;
 }
+assert(incCount == 5, "Increment loop should iterate 5 times (0,2,4,6,8)");
+assert(incSum == 20, "Sum of 0+2+4+6+8 should be 20");
 
 // Countdown loop
 print("Countdown loop:");
+var countdownCount = 0;
+var countdownSum = 0;
 for (var k = 5; k > 0; k -= 1) {
     print("k = {k}");
+    countdownCount += 1;
+    countdownSum += k;
 }
+assert(countdownCount == 5, "Countdown should iterate 5 times (5,4,3,2,1)");
+assert(countdownSum == 15, "Sum of 5+4+3+2+1 should be 15");
 
 // For loop with complex condition
 print("Complex condition:");
+var complexCount = 0;
+var complexSum = 0;
 for (var x = 1; x * x < 20; x += 1) {
     print("x = {x}, x² = {x * x}");
+    complexCount += 1;
+    complexSum += x;
 }
+assert(complexCount == 4, "Complex condition should iterate 4 times (1,2,3,4)");
+assert(complexSum == 10, "Sum of 1+2+3+4 should be 10");
 
 // Nested for loops
-// print("Nested for loops (2x3 grid):");
-// for (var row = 0; row <= 2; row += 1) {
-//     for (var col = 0; col < 3; col += 1) {
-//         print("({row}, {col})");
-//     }
-// }
+print("Nested for loops (2x3 grid):");
+var nestedCount = 0;
+var totalPairs = 0;
+for (var row = 0; row <= 2; row += 1) {
+    for (var col = 0; col < 3; col += 1) {
+        print("({row}, {col})");
+        nestedCount += 1;
+        totalPairs += row * 10 + col;
+    }
+}
+assert(nestedCount == 9, "Nested loops should iterate 9 times (3x3)");
 
 // For loop with variable scope
-print("Variable scope test: new Issue");
+print("Variable scope test:");
 var outer:int = 100;
+var scopeCount = 0;
+var scopeSum = 0;
 for (var i = 0; i < 4; i += 1) {
     var inner = i * 10;
     print("outer: {outer}, inner: {inner}");
+    scopeCount += 1;
+    scopeSum += inner;
+    assert(outer == 100, "Outer variable should remain constant");
+    assert(inner == i * 10, "Inner variable should be calculated correctly");
 }
+assert(scopeCount == 4, "Scope loop should iterate 4 times");
+assert(scopeSum == 60, "Sum of inner values should be 0+10+20+30");
+
+// For loop with break and continue
+print("Break and continue test:");
+var breakCount = 0;
+for (var i = 0; i < 10; i += 1) {
+    if (i == 3) {
+        continue;
+    }
+    if (i == 7) {
+        break;
+    }
+    print("Loop value: {i}");
+    breakCount += 1;
+}
+assert(breakCount == 6, "Loop should execute 6 times (skip 3, break at 7)");
+
+print("=== For Loop Tests Complete ===");
