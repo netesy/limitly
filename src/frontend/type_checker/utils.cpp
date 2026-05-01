@@ -279,11 +279,5 @@ TypePtr TypeChecker::infer_literal_type(const std::shared_ptr<LM::Frontend::AST:
     return type_system.ANY_TYPE;
 }
 
-bool TypeChecker::should_capture_variable(const std::string& name) {
-    // Check if variable should be captured in lambda
-    // For now, capture all non-local variables
-    return lookup_variable(name) != nullptr;
-}
-
 } // namespace Frontend
 } // namespace LM

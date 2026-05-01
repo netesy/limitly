@@ -327,7 +327,7 @@ private:
     // Enhanced type inference
     TypePtr infer_lambda_return_type(const std::shared_ptr<LM::Frontend::AST::Statement>& body);
     TypePtr infer_literal_type(const std::shared_ptr<LM::Frontend::AST::LiteralExpr>& expr, TypePtr expected_type = nullptr);
-    bool should_capture_variable(const std::string& name);
+    bool should_capture_variable(const std::string& name) const;
     
     // Scope management
     struct Scope {
