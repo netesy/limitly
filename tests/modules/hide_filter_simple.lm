@@ -1,0 +1,13 @@
+// Simple Hide Filter Test
+print("=== Simple Hide Filter Test ===");
+
+import tests.modules.math_module as math1 hide E;
+
+print("Test 1: Access pi");
+print(math1.pi);
+
+print("Test 2: Call factorial");
+var result = math1.factorial(5);
+print("5! = " + result);
+
+print("=== Test Complete ===");

@@ -1,0 +1,51 @@
+// Simple Match Tests with Assertions
+
+print("=== Simple Match Tests ===");
+
+// Test 1: Literal integer matching
+print("\nTest 1: Literal integer matching");
+var x = 10;
+
+match (x) {
+    5 => { assert(false, "Should not match 5"); },
+    10 => { assert(true, "Correctly matched 10"); },
+    _ => { assert(false, "Should not reach wildcard"); }
+}
+
+// Test 2: Variable binding
+print("\nTest 2: Variable binding");
+var value = 42;
+
+match (value) {
+    n => { 
+        assert(n == 42, "Variable binding should capture value");
+        print("Captured value: {n}");
+    }
+}
+
+// Test 3: Wildcard pattern
+print("\nTest 3: Wildcard pattern");
+var anything = "hello";
+
+match (anything) {
+    _ => { 
+        assert(true, "Wildcard should always match");
+        print("Matched with wildcard");
+    }
+}
+
+// Test 4: Enum matching
+print("\nTest 4: Enum matching");
+enum Status {
+    Active,
+    Inactive
+}
+
+var status = Status.Active;
+
+match (status) {
+    Status.Active => { assert(true, "Should match Active"); },
+    Status.Inactive => { assert(false, "Should not match Inactive"); }
+}
+
+print("\n=== All tests passed ===");

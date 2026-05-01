@@ -1626,7 +1626,10 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
                 
                 emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, next_case_pattern->id));
                 add_block_edge(pattern_block, next_case_pattern);
-                // Success falls through to body or guard
+                
+                // Success: jump to body or guard
+                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
+                add_block_edge(pattern_block, body_block);
             }
         } else if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(match_case.pattern.get())) {
             if (var_expr->name != "_") {
