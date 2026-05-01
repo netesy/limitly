@@ -42,7 +42,7 @@ bin/
 *.exe
 
 # Vendored dependencies (keep the structure but ignore generated files within)
-vendor/
+vendor/fyra/
 vendor/fyra/build/
 vendor/fyra/*.a
 vendor/fyra/*.so
