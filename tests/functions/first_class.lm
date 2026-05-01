@@ -22,6 +22,9 @@ var result2 = multFunc(3, 4);
 print("addFunc(3, 4) = {result1}");
 print("multFunc(3, 4) = {result2}");
 
+assert(result1 == 7, "Function stored in variable should work correctly");
+assert(result2 == 12, "Function stored in variable should work correctly");
+
 // Test 2: Functions as parameters
 print("\n --- Test 2: Functions as Parameters --- ");
 fn applyOperation(x: int, y: int, operation: fn(int, int): int): int {
@@ -32,6 +35,9 @@ var opResult1 = applyOperation(6, 7, add);
 var opResult2 = applyOperation(6, 7, multiply);
 print("applyOperation(6, 7, add) = {opResult1}");
 print("applyOperation(6, 7, multiply) = {opResult2}");
+
+assert(opResult1 == 13, "Function passed as parameter should work correctly");
+assert(opResult2 == 42, "Function passed as parameter should work correctly");
 
 // Test 3: Functions returning functions
 print("\n --- Test 3: Functions Returning Functions --- ");
@@ -49,6 +55,9 @@ fn createAdder(increment: int): fn(int): int {
     print("addFive(3) = {add5_result}");
     print("addTen(7) = {add10_result}");
 
+    assert(add5_result == 8, "Function returning function should work correctly");
+    assert(add10_result == 17, "Function returning function should work correctly");
+
     // Test 4: Lambda expressions
     print("\n --- Test 4: Lambda Expressions --- ");
     var doubler = fn(x: int): int {
@@ -63,6 +72,9 @@ fn createAdder(increment: int): fn(int): int {
     var triple_result = tripler(5);
     print("doubler(5) = {double_result}");
     print("tripler(5) = {triple_result}");
+
+    assert(double_result == 10, "Lambda expression should work correctly");
+    assert(triple_result == 15, "Lambda expression should work correctly");
 
     // Test 5: Higher-order function composition
     print("\n --- Test 5: Function Composition --- ");
@@ -88,6 +100,9 @@ fn createAdder(increment: int): fn(int): int {
         print("squareThenIncrement(4) = {comp1}");
         print("incrementThenSquare(4) = {comp2}");
 
+        assert(comp1 == 17, "Function composition should work: (4^2)+1 = 17");
+        assert(comp2 == 25, "Function composition should work: (4+1)^2 = 25");
+
         // Test 6: Function arrays simulation
         print("\n --- Test 6: Function Collections --- ");
         fn createFunctionSet(): (fn(int): int, fn(int): int, fn(int): int) {
@@ -104,6 +119,10 @@ fn createAdder(increment: int): fn(int): int {
         print("func1(5) = {f1_result}");
         print("func2(5) = {f2_result}");
         print("func3(5) = {f3_result}");
+
+        assert(f1_result == 6, "Function from tuple should work: 5+1 = 6");
+        assert(f2_result == 10, "Function from tuple should work: 5*2 = 10");
+        assert(f3_result == 25, "Function from tuple should work: 5*5 = 25");
 
         // Test 7: Conditional function selection
         print("\n --- Test 7: Conditional Function Selection --- ");
@@ -127,6 +146,9 @@ fn createAdder(increment: int): fn(int): int {
                         print("addOp(3, 4) = {sel1}");
                         print("multOp(3, 4) = {sel2}");
 
+                        assert(sel1 == 7, "Conditional function selection should return add function");
+                        assert(sel2 == 12, "Conditional function selection should return multiply function");
+
                         // Test 8: Function factory with parameters
                         print("\n --- Test 8: Function Factory --- ");
                         fn createProcessor(prefix: str, multiplier: int): fn(int): str {
@@ -143,5 +165,8 @@ fn createAdder(increment: int): fn(int): int {
                             var proc2_result = processor2(3);
                             print(proc1_result);
                             print(proc2_result);
+
+                            assert(proc1_result == "Result: 20", "Function factory should work correctly");
+                            assert(proc2_result == "Value: 15", "Function factory should work correctly");
 
                             print("\n === First - Class Function Tests Complete === ");

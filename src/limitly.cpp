@@ -75,7 +75,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             std::cout << "\n";
         }
 
-        std::cout << "[DEBUG] Starting LIR generation..." << std::endl;
+      //  std::cout << "[DEBUG] Starting LIR generation..." << std::endl;
         LIR::Generator lir_generator;
         lir_generator.set_import_aliases(post_opt_type_check.import_aliases);
         lir_generator.set_registered_modules(post_opt_type_check.registered_modules);
@@ -85,7 +85,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             std::cerr << "[ERROR] LIR generation failed" << std::endl;
             return 1;
         }
-        std::cout << "[DEBUG] LIR generation complete. Instructions: " << lir_function->instructions.size() << std::endl;
+        // std::cout << "[DEBUG] LIR generation complete. Instructions: " << lir_function->instructions.size() << std::endl;
 
         if (options.print_lir) {
              std::cout << "\n=== Final LIR ===\n";
@@ -117,10 +117,10 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             auto result = fyra.compile(*lir_function, fyra_options);
             return result.success ? 0 : 1;
         } else {
-            std::cout << "[DEBUG] Starting VM execution..." << std::endl;
+            // std::cout << "[DEBUG] Starting VM execution..." << std::endl;
             LM::Backend::VM::Register::RegisterVM register_vm;
             register_vm.execute_function(*lir_function);
-            std::cout << "[DEBUG] VM execution complete." << std::endl;
+            // std::cout << "[DEBUG] VM execution complete." << std::endl;
         }
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

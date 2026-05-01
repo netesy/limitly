@@ -23,6 +23,12 @@ print("User Age: {userAge}");
 print("User Score: {userScore}");
 print("Is Active: {isUserActive}");
 
+assert(userId == 12345, "Type alias should work for uint");
+assert(userName == "Alice", "Type alias should work for str");
+assert(userAge == 25, "Type alias should work for int");
+assert(userScore == 95.5, "Type alias should work for float");
+assert(isUserActive == true, "Type alias should work for bool");
+
 // Test 2: All primitive type aliases
 print("\n--- Test 2: Primitive Type Aliases ---");
 type MyInt = int;
@@ -43,6 +49,12 @@ print("String: {strVal}");
 print("Bool: {boolVal}");
 print("Float: {floatVal}");
 
+assert(intVal == 42, "Primitive type alias should work for int");
+assert(uintVal == 100, "Primitive type alias should work for uint");
+assert(strVal == "hello", "Primitive type alias should work for str");
+assert(boolVal == true, "Primitive type alias should work for bool");
+assert(floatVal == 3.14, "Primitive type alias should work for float");
+
 // Test 3: Type alias compatibility
 print("\n--- Test 3: Type Alias Compatibility ---");
 type UserId = int;
@@ -53,6 +65,9 @@ var product: ProductId = 2002;
 
 print("User ID: {user}");
 print("Product ID: {product}");
+
+assert(user == 1001, "Type alias compatibility should work");
+assert(product == 2002, "Type alias compatibility should work");
 
 // Test 4: Type aliases in function signatures
 print("\n--- Test 4: Type Aliases in Functions ---");
@@ -76,6 +91,8 @@ print("Distance: {dist}");
 print("Time: {duration}");
 print("Speed: {velocity}");
 
+assert(velocity == 50.0, "Function with type aliases should work: 100.0/2.0 = 50.0");
+
 // Test 5: Nested type usage
 print("\n--- Test 5: Nested Type Usage ---");
 type FirstName = str;
@@ -94,6 +111,8 @@ print("First Name: {firstName}");
 print("Last Name: {lastName}");
 print("Full Name: {fullName}");
 
+assert(fullName == "John Doe", "Function with type aliases should work correctly");
+
 // Test 6: Type aliases with different scopes
 print("\n--- Test 6: Type Alias Scopes ---");
 type GlobalType = int;
@@ -105,7 +124,12 @@ type GlobalType = int;
     print("Local variable: {localVar}");
 }
 
+assert(globalVar == 999, "Global type alias should work in local scope");
+assert(localVar == "local", "Local variable should work correctly");
+
 var anotherGlobal: GlobalType = 888;
 print("Another global: {anotherGlobal}");
+
+assert(anotherGlobal == 888, "Global type alias should work outside local scope");
 
 print("\n=== Basic Type Tests Complete ===");

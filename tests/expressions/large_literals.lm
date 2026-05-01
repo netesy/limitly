@@ -1,4 +1,5 @@
 // Test very large numeric literals
+print("=== Large Literal Tests ===");
 
 // Test maximum values for different types
 var maxI64: i64 = 9223372036854775807;
@@ -10,6 +11,10 @@ print("Max I64:", maxI64);
 print("Max U64:", maxU64);
 print("Large Float:", largeFloat);
 
+assert(maxI64 == 9223372036854775807, "Max i64 should be 9223372036854775807");
+assert(maxU64 == 18446744073709551615, "Max u64 should be 18446744073709551615");
+assert(largeFloat == 1.7976931348623157e+308, "Large float should be 1.7976931348623157e+308");
+
 // Test very small values
 var smallFloat: f64 = 2.2250738585072014e-308;
 var tinyFloat: f64 = 1e-100;
@@ -17,6 +22,9 @@ var tinyFloat: f64 = 1e-100;
 print("-------Small literal test:-----------");
 print("Small Float:", smallFloat);
 print("Tiny Float:", tinyFloat);
+
+assert(smallFloat == 2.2250738585072014e-308, "Small float should be 2.2250738585072014e-308");
+assert(tinyFloat == 1e-100, "Tiny float should be 1e-100");
 
 // Test negative large values  
 var posLarge: i64 = 123456789;   // Positive integer
@@ -26,3 +34,36 @@ var negFloat: f64 = -1.7976931348623157e+308;
 print("------Negative large literal test: -------");
 print("Negative Large I64:", negLarge);
 print("Negative Large Float:", negFloat);
+
+assert(posLarge == 123456789, "Positive large integer should be 123456789");
+assert(negLarge == -123456789, "Negative large integer should be -123456789");
+assert(negFloat == -1.7976931348623157e+308, "Negative large float should be -1.7976931348623157e+308");
+
+// Test arithmetic with large literals
+var sumLarge = maxI64 + posLarge;
+var diffLarge = maxU64 - posLarge;
+var productLarge = posLarge * 1000;
+
+print("------Arithmetic with large literals:------");
+print("Sum large:", sumLarge);
+print("Diff large:", diffLarge);
+print("Product large:", productLarge);
+
+assert(sumLarge == 9223372036854775807 + 123456789, "Sum of large integers should work");
+assert(productLarge == 123456789000, "Product of large integers should work");
+
+// Test comparison with large literals
+var comp1 = maxI64 > posLarge;
+var comp2 = negLarge < posLarge;
+var comp3 = largeFloat > 0.0;
+
+print("------Comparisons with large literals:----");
+print("maxI64 > posLarge:", comp1);
+print("negLarge < posLarge:", comp2);
+print("largeFloat > 0.0:", comp3);
+
+assert(comp1 == true, "maxI64 should be greater than posLarge");
+assert(comp2 == true, "negLarge should be less than posLarge");
+assert(comp3 == true, "largeFloat should be greater than 0.0");
+
+print("=== Large Literal Tests Complete ===");

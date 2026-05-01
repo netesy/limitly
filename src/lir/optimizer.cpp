@@ -140,39 +140,86 @@ bool Optimizer::dead_code_elimination() {
 bool Optimizer::remove_unreachable_code() {
     if (func_.instructions.empty()) return false;
 
-    bool changed = false;
-    std::vector<bool> to_remove(func_.instructions.size(), false);
-    
-    // Forward pass: mark unreachable code
-    bool reachable = true;
-    for (size_t i = 0; i < func_.instructions.size(); ++i) {
+    const size_t n = func_.instructions.size();
+    std::vector<bool> reachable(n, false);
+    std::queue<size_t> worklist;
+
+    auto push_if_valid = [&](size_t idx) {
+        if (idx < n && !reachable[idx]) {
+            reachable[idx] = true;
+            worklist.push(idx);
+        }
+    };
+
+    // Entry point
+    push_if_valid(0);
+
+    // Graph traversal over instruction indices (CFG-aware over jump targets,
+    // with linear fallthrough when control continues).
+    while (!worklist.empty()) {
+        size_t i = worklist.front();
+        worklist.pop();
         const auto& inst = func_.instructions[i];
-        
-        // If we're in unreachable code, mark for removal
-        if (!reachable) {
-            // Labels make code reachable again (they can be jump targets)
-            if (inst.op == LIR_Op::Label) {
-                reachable = true;
-            } else {
-                to_remove[i] = true;
-                changed = true;
-                continue;
+
+        switch (inst.op) {
+            case LIR_Op::Jump: {
+                if (inst.imm >= 0) {
+                    push_if_valid(static_cast<size_t>(inst.imm));
+                }
+                break;
+            }
+            case LIR_Op::JumpIf:
+            case LIR_Op::JumpIfFalse: {
+                if (inst.imm >= 0) {
+                    push_if_valid(static_cast<size_t>(inst.imm));
+                }
+                if (i + 1 < n) push_if_valid(i + 1);  // fallthrough
+                break;
+            }
+            case LIR_Op::Return:
+            case LIR_Op::Ret: {
+                // terminal
+                break;
+            }
+            default: {
+                if (i + 1 < n) push_if_valid(i + 1);  // linear reachability
+                break;
             }
         }
-        
-        // Check if this instruction makes subsequent code unreachable
-        if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::Return || inst.op == LIR_Op::Ret) {
-            reachable = false;
+    }
+
+    bool changed = false;
+    std::vector<LIR_Inst> compacted;
+    compacted.reserve(n);
+    for (size_t i = 0; i < n; ++i) {
+        if (reachable[i]) {
+            compacted.push_back(func_.instructions[i]);
+        } else {
+            changed = true;
         }
     }
-    
-    // Remove marked instructions in reverse order
-    for (int i = static_cast<int>(func_.instructions.size()) - 1; i >= 0; --i) {
-        if (to_remove[i]) {
-            func_.instructions.erase(func_.instructions.begin() + i);
+
+    if (changed) {
+        // Build old->new index map so jump targets remain valid after compaction.
+        std::vector<size_t> remap(n, static_cast<size_t>(-1));
+        size_t next = 0;
+        for (size_t i = 0; i < n; ++i) {
+            if (reachable[i]) remap[i] = next++;
         }
+
+        for (auto& inst : compacted) {
+            if ((inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) &&
+                inst.imm >= 0) {
+                size_t old_target = static_cast<size_t>(inst.imm);
+                if (old_target < n && remap[old_target] != static_cast<size_t>(-1)) {
+                    inst.imm = static_cast<int64_t>(remap[old_target]);
+                }
+            }
+        }
+
+        func_.instructions = std::move(compacted);
     }
-    
+
     return changed;
 }
 

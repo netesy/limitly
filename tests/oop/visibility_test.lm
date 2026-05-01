@@ -21,3 +21,8 @@ frame Resource {
 var r = Resource("MyResource", 123, "shhh");
 //r.secret_method(); //should raise error
 r.print_all();
+
+// Assert visibility functionality
+assert(r.name == "MyResource", "Public field should be accessible");
+// Note: r.id and r.secret should NOT be accessible from external code
+// These are private/protected and should cause compile-time errors if accessed

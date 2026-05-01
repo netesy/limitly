@@ -20,4 +20,10 @@ print("Test 1.5: Call function that returns module variable ");
 var moduleVarResult = basic.getModuleVar();
 print("Module variable via function: " + moduleVarResult);
 
+// Assert module import functionality
+assert(basic.moduleVar == "Hello from module", "Module variable should be accessible");
+assert(basic.number == 42, "Module number should be accessible");
+assert(result == 8, "Module function should work: 5 + 3 = 8");
+assert(moduleVarResult == "Hello from module", "Module function should return correct variable");
+
 print("=== Basic Import Test Complete ===");

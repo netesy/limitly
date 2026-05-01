@@ -3,43 +3,80 @@ print("=== Range Expression Tests ===");
 
 // Basic ranges
 print("Range 1..5:");
+var range1Count = 0;
+var range1Sum = 0;
 iter (i in 1..5) {
     print(i);
+    range1Count += 1;
+    range1Sum += i;
 }
+assert(range1Count == 4, "Range 1..5 should iterate 4 times (1,2,3,4)");
+assert(range1Sum == 10, "Sum of 1+2+3+4 should be 10");
 
 print("Range 0..3:");
+var range2Count = 0;
+var range2Sum = 0;
 iter (j in 0..3) {
     print(j);
+    range2Count += 1;
+    range2Sum += j;
 }
+assert(range2Count == 3, "Range 0..3 should iterate 3 times (0,1,2)");
+assert(range2Sum == 3, "Sum of 0+1+2 should be 3");
 
 // Range with variables
 var start = 5;
 var end = 8;
 print("Variable range {start}..{end}:");
+var range3Count = 0;
+var range3Sum = 0;
 iter (k in start..end) {
     print(k);
+    range3Count += 1;
+    range3Sum += k;
 }
+assert(range3Count == 3, "Range 5..8 should iterate 3 times (5,6,7)");
+assert(range3Sum == 18, "Sum of 5+6+7 should be 18");
 
 // Range with expressions
 var base = 2;
 print("Expression range {base}..{base + 3}:");
+var range4Count = 0;
+var range4Sum = 0;
 iter (x in base..(base + 3)) {
     print(x);
+    range4Count += 1;
+    range4Sum += x;
 }
+assert(range4Count == 3, "Range 2..5 should iterate 3 times (2,3,4)");
+assert(range4Sum == 9, "Sum of 2+3+4 should be 9");
 
 // Nested ranges
 print("Nested ranges:");
+var outerCount = 0;
+var totalInnerCount = 0;
 iter (i in 1..3) {
     print("Outer: {i}");
-    //!fix here
+    outerCount += 1;
+    var innerCount = 0;
     iter (j in (i * 10)..(i * 10 + 2)) {
         print("  Inner: {j}");
+        innerCount += 1;
+        totalInnerCount += 1;
     }
+    assert(innerCount == 2, "Each inner range should iterate 2 times");
 }
+assert(outerCount == 2, "Outer range should iterate 2 times (1,2)");
+assert(totalInnerCount == 4, "Total inner iterations should be 4");
 
 // Empty range
 print("Empty range (5..5):");
+var emptyCount = 0;
 iter (empty in 5..5) {
     print("This should not print: {empty}");
+    emptyCount += 1;
 }
+assert(emptyCount == 0, "Empty range should not iterate");
 print("Empty range test complete");
+
+print("=== Range Expression Tests Complete ===");

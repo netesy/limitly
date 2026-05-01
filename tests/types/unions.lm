@@ -18,6 +18,11 @@ print("NumberOrString (str): {numStr2}");
 print("BoolOrFloat (bool): {boolFloat1}");
 print("BoolOrFloat (float): {boolFloat2}");
 
+assert(numStr1 == 42, "Union type should accept int value");
+assert(numStr2 == "hello", "Union type should accept str value");
+assert(boolFloat1 == true, "Union type should accept bool value");
+assert(boolFloat2 == 3.14, "Union type should accept float value");
+
 // Test 2: Multi-variant union types
 print("\n--- Test 2: Multi-variant Union Types ---");
 type Color = str;  // Base type for color variants
@@ -37,6 +42,13 @@ var error: StatusVariant = "Error";
 print("Colors: {red}, {green}, {blue}");
 print("Statuses: {success}, {warning}, {error}");
 
+assert(red == "Red", "Union type alias should work for colors");
+assert(green == "Green", "Union type alias should work for colors");
+assert(blue == "Blue", "Union type alias should work for colors");
+assert(success == "Success", "Union type alias should work for statuses");
+assert(warning == "Warning", "Union type alias should work for statuses");
+assert(error == "Error", "Union type alias should work for statuses");
+
 // Test 3: Union with primitive types
 print("\n--- Test 3: Primitive Union Types ---");
 type Value = int | float | str | bool;
@@ -51,6 +63,11 @@ print("Value (float): {val2}");
 print("Value (str): {val3}");
 print("Value (bool): {val4}");
 
+assert(val1 == 123, "Multi-variant union should accept int");
+assert(val2 == 3.14, "Multi-variant union should accept float");
+assert(val3 == "test", "Multi-variant union should accept str");
+assert(val4 == true, "Multi-variant union should accept bool");
+
 // Test 4: Nested union types (flattening)
 print("\n--- Test 4: Nested Union Types ---");
 type InnerUnion = int | str;
@@ -64,6 +81,10 @@ print("Nested (int): {nested1}");
 print("Nested (str): {nested2}");
 print("Nested (bool): {nested3}");
 
+assert(nested1 == 42, "Nested union should accept int");
+assert(nested2 == "text", "Nested union should accept str");
+assert(nested3 == false, "Nested union should accept bool");
+
 // Test 5: Union type compatibility
 print("\n--- Test 5: Union Type Compatibility ---");
 type IntOrStr = int | str;
@@ -74,6 +95,9 @@ var strBool: StrOrBool = "shared";
 
 print("IntOrStr: {intStr}");
 print("StrOrBool: {strBool}");
+
+assert(intStr == 100, "Union compatibility should work");
+assert(strBool == "shared", "Union compatibility should work");
 
 // Test 6: Union types in functions
 print("\n--- Test 6: Union Types in Functions ---");
@@ -93,6 +117,9 @@ var result2: Result = processValue(-1);
 print("Process result 1: {result1}");
 print("Process result 2: {result2}");
 
+assert(result1 == 10, "Function with union return should work: 5*2 = 10");
+assert(result2 == "Invalid input", "Function with union return should work for negative input");
+
 // Test 7: Complex union combinations
 print("\n--- Test 7: Complex Union Combinations ---");
 type NumberType = int | float;
@@ -108,5 +135,10 @@ print("Data 1 (int): {data1}");
 print("Data 2 (float): {data2}");
 print("Data 3 (str): {data3}");
 print("Data 4 (bool): {data4}");
+
+assert(data1 == 42, "Complex union should accept int");
+assert(data2 == 3.14, "Complex union should accept float");
+assert(data3 == "data", "Complex union should accept str");
+assert(data4 == true, "Complex union should accept bool");
 
 print("\n=== Union Type Tests Complete ===");

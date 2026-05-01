@@ -5,12 +5,15 @@ print("Test 1: Show single identifier");
 import tests.modules.math_module as math1 show PI;
 print("✓ Imported with show filter");
 print("✓ Shown variable accessible: PI = " + math1.PI);
+assert(math1.PI == 3.14159, "Show filter should make PI accessible");
 
 print("Test 2: Show multiple identifiers");
 import tests.modules.math_module as math2 show PI, E;
 print("✓ Imported with show multiple filter");
 print("✓ First shown variable: PI = " + math2.PI);
+assert(math2.PI == 3.14159, "Show filter should make PI accessible");
 print("✓ Second shown variable: E = " + math2.E);
+assert(math2.E == 2.71828, "Show filter should make E accessible");
 
 print("Test 3: Access hidden variable (should fail)");
 print("Expected: Error about missing property");

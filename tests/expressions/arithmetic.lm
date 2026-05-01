@@ -5,27 +5,56 @@ var a = 10;
 var b = 3;
 
 // Basic arithmetic
-print("Addition: {a} + {b} = {a + b}");
-print("Subtraction: {a} - {b} = {a - b}");
-print("Multiplication: {a} * {b} = {a * b}");
-print("Division: {a} / {b} = {a / b}");
-print("Modulo: {a} % {b} = {a % b}");
+var sum = a + b;
+var diff = a - b;
+var product = a * b;
+var quotient = a / b;
+var remainder = a % b;
+
+print("Addition: {a} + {b} = {sum}");
+print("Subtraction: {a} - {b} = {diff}");
+print("Multiplication: {a} * {b} = {product}");
+print("Division: {a} / {b} = {quotient}");
+print("Modulo: {a} % {b} = {remainder}");
+
+assert(sum == 13, "10 + 3 should equal 13");
+assert(diff == 7, "10 - 3 should equal 7");
+assert(product == 30, "10 * 3 should equal 30");
+assert(quotient == 3, "10 / 3 should equal 3");
+assert(remainder == 1, "10 % 3 should equal 1");
 
 // Unary operations
-print("Negation: -{a} = {-a}");
-print("Positive: +{a} = {+a}");
+var neg = -a;
+var pos = +a;
+
+print("Negation: -{a} = {neg}");
+print("Positive: +{a} = {pos}");
+
+assert(neg == -10, "-10 should equal -10");
+assert(pos == 10, "+10 should equal 10");
 
 // Complex expressions
 var result = (a + b) * 2 - a / b;
 print("Complex: ({a} + {b}) * 2 - {a} / {b} = {result}");
 
+assert(result == 23, "(10 + 3) * 2 - 10 / 3 should equal 23");
+
 // Operator precedence
 var precedence = a + b * 2;
 print("Precedence: {a} + {b} * 2 = {precedence}");
 
+assert(precedence == 16, "10 + 3 * 2 should equal 16 (multiplication first)");
+
 // Float arithmetic 
-//!fix here
 var x = 3.14;
 var y = 2.0;
-print("Float arithmetic: {x} + {y} = {x + y}");
-print("Float division: {x} / {y} = {x / y}");
+var floatSum = x + y;
+var floatDiv = x / y;
+
+print("Float arithmetic: {x} + {y} = {floatSum}");
+print("Float division: {x} / {y} = {floatDiv}");
+
+assert(floatSum > 5.13 and floatSum < 5.15, "3.14 + 2.0 should equal approximately 5.14");
+assert(floatDiv > 1.56 and floatDiv < 1.58, "3.14 / 2.0 should equal approximately 1.57");
+
+print("=== Arithmetic Expression Tests Complete ===");

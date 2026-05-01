@@ -31,6 +31,11 @@ fn main() {
     
     // Test default implementation from trait
     print(f.greet());
+    
+    // Assert trait inheritance functionality
+    assert(f.name() == "MyFrame", "Frame should implement trait method");
+    assert(f.version() == 1, "Frame should implement extended trait method");
+    assert(f.greet() == "Hello from Base", "Frame should inherit default trait implementation");
 }
 
 // Top-level entry point

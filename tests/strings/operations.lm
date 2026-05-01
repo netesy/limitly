@@ -5,29 +5,59 @@ var str1 = "Hello";
 var str2 = "World";
 var space = " ";
 
+assert(str1 == "Hello", "str1 should be 'Hello'");
+assert(str2 == "World", "str2 should be 'World'");
+assert(space == " ", "space should be a single space");
+
 // String concatenation 
-// print("Concatenation: {str1} + {str2} = {str1 + str2}");
+var concat = str1 + space + str2;
+print("Concatenation: {str1} + {space} + {str2} = {concat}");
+assert(concat == "Hello World", "String concatenation should work");
 
 // String comparison
 print("String comparisons:");
-print("{str1} == {str2}: {str1 == str2}");
-print("{str1} != {str2}: {str1 != str2}");
+var eqResult = str1 == str2;
+var neResult = str1 != str2;
+
+print("{str1} == {str2}: {eqResult}");
+print("{str1} != {str2}: {neResult}");
+
+assert(eqResult == false, "'Hello' should not equal 'World'");
+assert(neResult == true, "'Hello' should not equal 'World' (not equal)");
 
 // String with numbers
 var numStr = "42";
 var num = 42;
-print("String vs number: {numStr} == {num}: {numStr == num}");
+var strNumEq = numStr == num;
+
+print("String vs number: {numStr} == {num}: {strNumEq}");
+assert(strNumEq == false, "String '42' should not equal number 42");
 
 // Empty strings
 var empty = "";
-print("Empty string: '{empty}'");
 var emptyStr = "";
-print("Empty length check: {empty == emptyStr}");
+var emptyEq = empty == emptyStr;
+
+print("Empty string: '{empty}'");
+print("Empty length check: {emptyEq}");
+assert(empty == "", "Empty string should be empty");
+assert(emptyEq == true, "Two empty strings should be equal");
 
 // Special characters
 var special = "Line 1\nLine 2\tTabbed";
 print("Special chars: {special}");
+assert(special == "Line 1\nLine 2\tTabbed", "Special characters should be preserved");
 
 // Quotes in strings
 var quoted = "He said \"Hello\"";
 print("Quoted: {quoted}");
+assert(quoted == "He said \"Hello\"", "Quoted strings should work");
+
+// String indexing
+var testStr = "Limit";
+assert(testStr[0] == "L", "First character should be 'L'");
+assert(testStr[4] == "t", "Last character should be 't'");
+
+print("String 'Limit' first char: {testStr[0]}, last char: {testStr[4]}");
+
+print("=== String Operations Tests Complete ===");

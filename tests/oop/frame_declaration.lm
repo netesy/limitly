@@ -95,3 +95,11 @@ var calc = Calculator();
 print(calc.add(5, 3));
 
 var res = Resource(123);
+
+// Assert frame functionality
+assert(person.greet() == "Hello, Alice", "Frame method should work correctly");
+assert(point.distance() == 30, "Frame method should work: 10 + 20 = 30");
+assert(config.debug == false, "Frame default value should work");
+assert(config.timeout == 30, "Frame default value should work");
+assert(calc.add(5, 3) == 8, "Frame method should work: 5 + 3 = 8");
+assert(res.id == 123, "Frame init should work correctly");

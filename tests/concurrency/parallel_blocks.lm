@@ -34,6 +34,11 @@ print("Results collected: {result_count}");
 print("First result: {first_result}");
 print("Last result: {last_result}");
 
+assert(counter == 100, "Parallel block should execute 100 iterations");
+assert(result_count == 100, "All results should be collected");
+assert(first_result == 0, "First result should be 0*2 = 0");
+assert(last_result == 198, "Last result should be 99*2 = 198");
+
 // ==========================================
 //  Parallel block with multiple cores
 // ==========================================
@@ -58,6 +63,9 @@ iter (result in results2) {
 
 print("Sum of results: {sum}");
 
+assert(task_count == 200, "Second parallel block should execute 200 iterations");
+assert(sum == 59700, "Sum should be sum of i*3 for i=0..199 = 3*sum(0..199) = 3*19900 = 59700");
+
 // ==========================================
 //  Parallel block with smaller range
 // ==========================================
@@ -72,6 +80,10 @@ parallel(cores=2) {
 print("Third parallel block complete");
 
 // Display results
+var result_count3 = 0;
 iter (result in results3) {
     print("  Result: {result}");
+    result_count3 = result_count3 + 1;
 }
+
+assert(result_count3 == 10, "Third parallel block should execute 10 iterations");

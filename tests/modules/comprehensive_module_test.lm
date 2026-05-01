@@ -13,6 +13,8 @@ import tests.modules.basic_module as basic;
 print("✓ Module imported successfully");
 print("✓ Module variable access: " + basic.moduleVar);
 print("✓ Module number access: " + basic.number);
+assert(basic.moduleVar == "Hello from module", "Module variable should be accessible");
+assert(basic.number == 42, "Module number should be accessible");
 print("");
 
 // Test 2: Simple Function Calls (no parameters)
@@ -20,6 +22,7 @@ print("Test 2: Simple Function Calls");
 print("------------------------------");
 basic.greet();
 print("✓ Simple function call successful");
+assert(true, "Module function call should work");
 print("");
 
 // Test 3: Module Aliasing
@@ -28,6 +31,7 @@ print("-----------------------");
 import tests.modules.math_module as math;
 print("✓ Module imported with alias");
 print("✓ Aliased variable access: PI = " + math.PI);
+assert(math.PI == 3.14159, "Module alias should work correctly");
 print("");
 
 // Test 4: Multiple Module Imports
@@ -38,6 +42,9 @@ print("✓ Multiple modules imported");
 print("✓ First module still accessible: " + basic.moduleVar);
 print("✓ Second module accessible: PI = " + math.PI);
 print("✓ Third module accessible: " + strS.greeting);
+assert(basic.moduleVar == "Hello from module", "Multiple imports should preserve access");
+assert(math.PI == 3.14159, "Multiple imports should preserve access");
+assert(strS.greeting == "Hello from strings", "Multiple imports should preserve access");
 print("");
 
 // Test 5: Nested Directory Import
@@ -46,6 +53,7 @@ print("-------------------------------");
 import tests.modules.nested.deep_module as deep;
 print("✓ Nested module imported");
 print("✓ Nested module variable: " + deep.deep_value);
+assert(deep.deep_value == "Deep value", "Nested module import should work");
 print("");
 
 // Test 6: Show Filter (Basic)
@@ -54,6 +62,7 @@ print("-------------------");
 import tests.modules.string_module as str_filtered show greeting;
 print("✓ Module imported with show filter");
 print("✓ Shown variable accessible: " + str_filtered.greeting);
+assert(str_filtered.greeting == "Hello from strings", "Show filter should work");
 print("");
 
 // Test 7: Hide Filter (Basic)
@@ -62,6 +71,7 @@ print("-------------------");
 import tests.modules.string_module as str_hidden hide farewell;
 print("✓ Module imported with hide filter");
 print("✓ Non-hidden variable accessible: " + str_hidden.greeting);
+assert(str_hidden.greeting == "Hello from strings", "Hide filter should work");
 print("");
 
 
