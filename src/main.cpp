@@ -13,11 +13,15 @@ void printUsage(const char* programName) {
     std::cout << "      Options:\n";
     std::cout << "        -debug                Enable debug output\n";
     std::cout << "\n  Compilation (AOT/WASM):\n";
+#ifdef FYRA_AVAILABLE
     std::cout << "    " << programName << " build [options] <source_file>\n";
     std::cout << "      Options:\n";
     std::cout << "        -target <target>      Target platform (windows, linux, macos, wasm)\n";
     std::cout << "        -o <output>           Output file name\n";
     std::cout << "        -O <level>            Optimization level (0, 1, 2, 3)\n";
+#else
+    std::cout << "    (AOT/WASM compilation disabled - Fyra backend not available)\n";
+#endif
     std::cout << "\n  Tooling:\n";
     std::cout << "    " << programName << " -lsp                 Start LSP server\n";
     std::cout << "    " << programName << " -format <file>       Format a source file\n";
@@ -25,7 +29,10 @@ void printUsage(const char* programName) {
     std::cout << "    " << programName << " -ast <source_file>      Print the AST\n";
     std::cout << "    " << programName << " -cst <source_file>      Print the CST\n";
     std::cout << "    " << programName << " -tokens <source_file>   Print tokens\n";
+    std::cout << "    " << programName << " -lir <source_file>      Print the LIR (Low-level IR)\n";
+#ifdef FYRA_AVAILABLE
     std::cout << "    " << programName << " -fyra-ir <source_file>  Print the Fyra IR\n";
+#endif
 }
 
 int main(int argc, char* argv[]) {
@@ -55,7 +62,10 @@ int main(int argc, char* argv[]) {
     if (command == "-ast" && argc >= 3) { options.print_ast = true; return LM::Compiler::executeFile(argv[2], options); }
     if (command == "-cst" && argc >= 3) { options.print_cst = true; return LM::Compiler::executeFile(argv[2], options); }
     if (command == "-tokens" && argc >= 3) { options.print_tokens = true; return LM::Compiler::executeFile(argv[2], options); }
+    if (command == "-lir" && argc >= 3) { options.print_lir = true; return LM::Compiler::executeFile(argv[2], options); }
+#ifdef FYRA_AVAILABLE
     if (command == "-fyra-ir" && argc >= 3) { options.print_fyra_ir = true; return LM::Compiler::executeFile(argv[2], options); }
+#endif
 
     if (command == "run") {
         for (int i = 2; i < argc; i++) {
@@ -68,6 +78,7 @@ int main(int argc, char* argv[]) {
     }
 
     if (command == "build") {
+#ifdef FYRA_AVAILABLE
         options.use_aot = true;
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
@@ -84,6 +95,11 @@ int main(int argc, char* argv[]) {
             if (options.target == "windows") options.output_file += ".exe";
         }
         return LM::Compiler::executeFile(source_file, options);
+#else
+        std::cerr << "Error: 'build' command requires Fyra backend (not available).\n";
+        std::cerr << "Please use 'run' command with the register VM instead.\n";
+        return 1;
+#endif
     }
 
     if (command[0] != '-') return LM::Compiler::executeFile(command, options);

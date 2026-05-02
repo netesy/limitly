@@ -1,0 +1,11 @@
+print("Before function");
+
+fn getInt(): int {
+    print("Inside function");
+    return 42;
+}
+
+print("After function declaration");
+var i = getInt();
+print("After function call");
+print("Got: {i}");

@@ -179,4 +179,54 @@ match_example("Hello, Luminar!");
 match_example([1, 2, 3]);
 match_example({ "a": 1, "b": 2 });
 
+
+// Test simple guards without function calls
+var value = 5;
+match(value) {
+    x where x > 10 => { print("{x} is greater than 10"); },
+    x where x < 10 => { print("{x} is less than 10"); },
+    x => { print("{x} is exactly 10"); }
+}
+
+var value2 = 15;
+match(value2) {
+    x where x > 10 => { print("{x} is greater than 10"); },
+    x where x < 10 => { print("{x} is less than 10"); },
+    x => { print("{x} is exactly 10"); }
+}
+
+var value3 = 10;
+match(value3) {
+    x where x > 10 => { print("{x} is greater than 10"); },
+    x where x < 10 => { print("{x} is less than 10"); },
+    x => { print("{x} is exactly 10"); }
+}
+
+
+// Test case 1: Record destructuring (NOT YET IMPLEMENTED - requires advanced pattern matching)
+// fn test_record_destructuring(value) {
+//     match(value) {
+//         {name, age} => { print("Name: {name}, Age: {age}"); },
+//         {name, age, city} => { print("Name: {name}, Age: {age}, City: {city}"); }
+//     }
+// }
+// test_record_destructuring({name: "John", age: 30});
+// test_record_destructuring({name: "Joan", age: 26, city: "New York"});
+
+
+// Test case 2: List destructuring (NOT YET IMPLEMENTED - requires advanced pattern matching)
+// fn test_list_destructuring(value) {
+//     match(value) {
+//         [] => { print("Empty list"); },
+//         [x] => { print("One element: {x}"); },
+//         [x, y] => { print("Two elements: {x}, {y}"); },
+//         [head, ...tail] => { print("Head: {head}, Tail: {tail}"); }
+//     }
+// }
+
+// test_list_destructuring([]);
+// test_list_destructuring([1]);
+// test_list_destructuring([1, 2]);
+// test_list_destructuring([1, 2, 3]);
+
 print("\n=== Match Statement Tests Complete ===");

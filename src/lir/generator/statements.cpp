@@ -1593,50 +1593,56 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
     Reg value_reg = emit_expr(*stmt.value);
     LIR_BasicBlock* match_exit = create_basic_block("match_exit");
     
-    LIR_BasicBlock* current_case_pattern = nullptr;
     auto i64_type = std::make_shared<::Type>(::TypeTag::Int64);
 
+    // Create blocks in execution order: pattern0, body0, pattern1, body1, ...
+    std::vector<LIR_BasicBlock*> pattern_blocks;
+    std::vector<LIR_BasicBlock*> body_blocks;
+    
+    for (size_t i = 0; i < stmt.cases.size(); ++i) {
+        pattern_blocks.push_back(create_basic_block("match_pattern_" + std::to_string(i)));
+        body_blocks.push_back(create_basic_block("match_body_" + std::to_string(i)));
+    }
+
+    // Jump to first pattern block
+    if (get_current_block() && !get_current_block()->has_terminator()) {
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, pattern_blocks[0]->id));
+        add_block_edge(get_current_block(), pattern_blocks[0]);
+    }
+
+    // Generate pattern matching and body for each case
     for (size_t i = 0; i < stmt.cases.size(); ++i) {
         const auto& match_case = stmt.cases[i];
-        
-        LIR_BasicBlock* pattern_block = current_case_pattern ? current_case_pattern : create_basic_block("match_pattern_" + std::to_string(i));
-        LIR_BasicBlock* body_block = create_basic_block("match_body_" + std::to_string(i));
-        LIR_BasicBlock* next_case_pattern = (i + 1 < stmt.cases.size()) ? create_basic_block("match_pattern_" + std::to_string(i+1)) : match_exit;
+        LIR_BasicBlock* pattern_block = pattern_blocks[i];
+        LIR_BasicBlock* body_block = body_blocks[i];
+        LIR_BasicBlock* next_pattern = (i + 1 < stmt.cases.size()) ? pattern_blocks[i + 1] : match_exit;
 
-        // Connect current block to pattern block
-        if (get_current_block() && get_current_block() != pattern_block && !get_current_block()->has_terminator()) {
-            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, pattern_block->id));
-            add_block_edge(get_current_block(), pattern_block);
-        }
-        
         set_current_block(pattern_block);
         enter_scope();
 
         // 1. Pattern Matching Logic
+        bool pattern_always_matches = false;
+        
         if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(match_case.pattern.get())) {
             if (std::holds_alternative<std::nullptr_t>(literal->value)) {
                 // Wildcard _ or nil pattern that matches anything
-                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
-                add_block_edge(pattern_block, body_block);
+                pattern_always_matches = true;
             } else {
                 Reg literal_reg = emit_expr(*literal);
                 Reg cmp = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, value_reg, literal_reg));
                 set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
                 
-                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, next_case_pattern->id));
-                add_block_edge(pattern_block, next_case_pattern);
-                
-                // Success: jump to body or guard
-                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
-                add_block_edge(pattern_block, body_block);
+                // If comparison is false, jump to next pattern
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, next_pattern->id));
+                add_block_edge(pattern_block, next_pattern);
+                add_block_edge(pattern_block, body_block);  // Fall-through if true
             }
         } else if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(match_case.pattern.get())) {
             if (var_expr->name != "_") {
                 bind_variable(var_expr->name, value_reg);
             }
-            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
-            add_block_edge(pattern_block, body_block);
+            pattern_always_matches = true;
         } else if (auto binding = dynamic_cast<LM::Frontend::AST::BindingPatternExpr*>(match_case.pattern.get())) {
             int64_t tag = 0; size_t arity = 0;
             TypePtr m_type = stmt.value->inferred_type;
@@ -1649,8 +1655,9 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
                 emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, tag_reg, expected));
                 set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
 
-                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, next_case_pattern->id));
-                add_block_edge(pattern_block, next_case_pattern);
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, next_pattern->id));
+                add_block_edge(pattern_block, next_pattern);
+                add_block_edge(pattern_block, body_block);  // Fall-through if true
                 
                 // Payload extraction
                 if (!binding->variableNames.empty()) {
@@ -1668,27 +1675,26 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
                         }
                     }
                 }
-                // Falls through to body or guard
             } else {
-                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, next_case_pattern->id));
-                add_block_edge(pattern_block, next_case_pattern);
+                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, next_pattern->id));
+                add_block_edge(pattern_block, next_pattern);
             }
         }
 
         // 2. Guard Logic
-        if (match_case.guard) {
-            // Success of pattern (not wildcard) might fall through here
+        if (match_case.guard && !pattern_always_matches) {
             if (get_current_block() && !get_current_block()->has_terminator()) {
                 Reg guard_res = emit_expr(*match_case.guard);
-                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, guard_res, 0, next_case_pattern->id));
-                add_block_edge(get_current_block(), next_case_pattern);
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, guard_res, 0, next_pattern->id));
+                add_block_edge(get_current_block(), next_pattern);
+                add_block_edge(get_current_block(), body_block);  // Fall-through if guard true
             }
         }
 
-        // Success of pattern (and guard) -> Body
-        if (get_current_block() && !get_current_block()->has_terminator()) {
+        // Jump to body if pattern always matches
+        if (pattern_always_matches) {
             emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
-            add_block_edge(get_current_block(), body_block);
+            add_block_edge(pattern_block, body_block);
         }
 
         // 3. Body Logic
@@ -1703,7 +1709,6 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
         }
         
         exit_scope();
-        current_case_pattern = next_case_pattern;
     }
 
     set_current_block(match_exit);

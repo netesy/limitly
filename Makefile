@@ -26,10 +26,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Ivendor/fyra/include -Ivendor/fyra/src  $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(shell [ -d "vendor/fyra" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I.
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Ivendor/fyra/include -Ivendor/fyra/src  $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(shell [ -d "vendor/fyra" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I.
 endif
 
@@ -62,10 +62,11 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp
 
-BACK_SRCS := src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp
+BACK_SRCS := $(if $(shell [ -d "vendor/fyra" ] && echo yes),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp,)
 
 FYRA_DIR := vendor/fyra
-FYRA_SRCS := $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
+FYRA_SRCS := $(if $(shell [ -d "$(FYRA_DIR)" ] && echo yes),\
+             $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/*.cpp) \
 			 $(wildcard $(FYRA_DIR)/src/codegen/abi/*.cpp) \
 			 $(wildcard $(FYRA_DIR)/src/codegen/asm/*.cpp) \
@@ -92,7 +93,7 @@ FYRA_SRCS := $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/target/os/wasi/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/target/os/windows/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/transforms/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/parser/*.cpp)
+             $(wildcard $(FYRA_DIR)/src/parser/*.cpp),)
 
 FYRA_OBJS := $(patsubst vendor/fyra/src/%.cpp,$(OBJ_DIR)/fyra/%.o,$(FYRA_SRCS))
 FYRA_LIB := $(OBJ_DIR)/libfyra.a
@@ -208,15 +209,26 @@ $(RUNTIME_LIB): $(RUNTIME_OBJS)
 # =============================
 # Fyra library configuration
 # =============================
-FYRA_DIR := src/backend/fyra
+FYRA_DIR := vendor/fyra
 FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
+# Check if Fyra is available
+FYRA_AVAILABLE := $(shell if [ -d "$(FYRA_DIR)" ]; then echo "yes"; else echo "no"; fi)
+
+ifeq ($(FYRA_AVAILABLE),yes)
 # Build Fyra using Makefile (excluding problematic debug files)
 $(FYRA_LIB): $(FYRA_OBJS)
 	@echo "🔨 Building Fyra library with Makefile..."
 	@mkdir -p $(dir $@)
 	$(AR) rcs $@ $^
 	@echo "✅ Fyra library built: $@"
+else
+# Fyra not available - create empty library
+$(FYRA_LIB):
+	@echo "⚠️  Fyra not found at $(FYRA_DIR) - AOT/WASM compilation disabled"
+	@mkdir -p $(dir $@)
+	@touch $@
+endif
 
 # =============================
 # Lyra Package Manager

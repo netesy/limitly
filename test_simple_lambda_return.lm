@@ -1,0 +1,8 @@
+fn makeLambda(): fn(int): int {
+    return fn(x: int): int {
+        return x + 1;
+    };
+}
+
+var f = makeLambda();
+print("Got function");

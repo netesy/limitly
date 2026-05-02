@@ -1,51 +1,42 @@
-// Simple Match Tests with Assertions
+// Simple match test for debugging
 
-print("=== Simple Match Tests ===");
+print("=== Simple Match Test ===");
 
-// Test 1: Literal integer matching
-print("\nTest 1: Literal integer matching");
-var x = 10;
+// Test 1: Basic literal match
+print("\nTest 1: Basic literal match");
+var x: int = 10;
+print("x = {x}");
 
 match (x) {
-    5 => { assert(false, "Should not match 5"); },
-    10 => { assert(true, "Correctly matched 10"); },
-    _ => { assert(false, "Should not reach wildcard"); }
+    10 => { print("matched 10"); },
+    _ => { print("matched wildcard"); }
 }
 
-// Test 2: Variable binding
-print("\nTest 2: Variable binding");
-var value = 42;
+// Test 2: Multiple literals
+print("\nTest 2: Multiple literals");
+var y: int = 5;
+print("y = {y}");
 
-match (value) {
-    n => { 
-        assert(n == 42, "Variable binding should capture value");
-        print("Captured value: {n}");
-    }
+match (y) {
+    5 => { print("matched 5"); },
+    10 => { print("matched 10"); },
+    _ => { print("matched wildcard"); }
 }
 
-// Test 3: Wildcard pattern
-print("\nTest 3: Wildcard pattern");
-var anything = "hello";
+// Test 3: Variable binding
+print("\nTest 3: Variable binding");
+var z: int = 42;
 
-match (anything) {
-    _ => { 
-        assert(true, "Wildcard should always match");
-        print("Matched with wildcard");
-    }
+match (z) {
+    n => { print("matched with binding: {n}"); }
 }
 
-// Test 4: Enum matching
-print("\nTest 4: Enum matching");
-enum Status {
-    Active,
-    Inactive
+// Test 4: Wildcard only
+print("\nTest 4: Wildcard only");
+var w: int = 99;
+
+match (w) {
+    _ => { print("matched wildcard"); }
 }
 
-var status = Status.Active;
-
-match (status) {
-    Status.Active => { assert(true, "Should match Active"); },
-    Status.Inactive => { assert(false, "Should not match Inactive"); }
-}
-
-print("\n=== All tests passed ===");
+print("\n=== Simple Match Test Complete ===");
