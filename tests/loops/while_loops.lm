@@ -41,7 +41,7 @@ while (outer < 2) {
     while (inner < 3) {
         print("({outer}, {inner})");
         nestedCount += 1;
-        totalPairs += outer * 10 + inner;
+        totalPairs += outer + inner;
         inner += 1;
     }
     outer += 1;

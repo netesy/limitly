@@ -31,7 +31,7 @@ var nestedCount = 0;
 var totalPairs = 0;
 iter (var x in 1..3) {
     print("Outer {x}");
-    iter (var j in 10..12) {
+    iter (var j in 10..13) {
         print("({x}, {j})");
         nestedCount += 1;
         totalPairs += x * 100 + j;
@@ -44,7 +44,7 @@ print("Mixed loops (for outer, iter inner):");
 var mixedCount = 0;
 var mixedSum = 0;
 for (var i = 0; i < 4; i += 2) {
-    iter (var j in 5..7) {
+    iter (var j in 5..8) {
         print("for-iter: ({i}, {j})");
         mixedCount += 1;
         mixedSum += i + j;
