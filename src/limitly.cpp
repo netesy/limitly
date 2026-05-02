@@ -9,12 +9,17 @@
 #include "lir/generator.hh"
 #include "lir/functions.hh"
 #include "backend/vm/register.hh"
+#include "error/debugger.hh"
+
+// Fyra backend - conditionally compiled if available
+#ifdef FYRA_AVAILABLE
 #include "backend/fyra/fyra.hh"
 #include "backend/fyra/builder.hh"
-#include "error/debugger.hh"
 #include "ir/IRContext.h"
 #include "ir/Module.h"
 #include "ir/Function.h"
+#endif
+
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -95,6 +100,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
         }
 
         if (options.use_aot || options.use_wasm || options.use_wasi || options.print_fyra_ir) {
+#ifdef FYRA_AVAILABLE
             auto ir_context = std::make_shared<ir::IRContext>();
             LM::Backend::Fyra::LIRToFyraIRBuilder builder(ir_context);
             auto fyra_ir_module = builder.build(*lir_function);
@@ -116,6 +122,11 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
 
             auto result = fyra.compile(*lir_function, fyra_options);
             return result.success ? 0 : 1;
+#else
+            std::cerr << "Error: Fyra backend not available. AOT/WASM compilation is disabled.\n";
+            std::cerr << "Please install Fyra or use the register VM instead.\n";
+            return 1;
+#endif
         } else {
             // std::cout << "[DEBUG] Starting VM execution..." << std::endl;
             LM::Backend::VM::Register::RegisterVM register_vm;

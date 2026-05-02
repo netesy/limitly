@@ -1,0 +1,6 @@
+fn getString(): str {
+    return "hello";
+}
+
+var s = getString();
+print("Got: {s}");

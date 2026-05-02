@@ -1,0 +1,6 @@
+fn getInt(): int {
+    return 42;
+}
+
+var i = getInt();
+print("Got: {i}");

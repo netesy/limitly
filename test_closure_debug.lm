@@ -1,0 +1,18 @@
+fn makeAdder(x: int): fn(int): int {
+    print("makeAdder called with x={x}");
+    var closure = fn(y: int): int {
+        print("Closure called with y={y}");
+        var result = x + y;
+        print("Closure result={result}");
+        return result;
+    };
+    print("Closure created");
+    return closure;
+}
+
+print("Creating add5...");
+var add5 = makeAdder(5);
+print("add5 created");
+print("Calling add5(3)...");
+var result = add5(3);
+print("Result: {result}");
