@@ -508,8 +508,13 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         try {
                             registers[pc->dst] = static_cast<int64_t>(std::stoll(cv->data));
                         } catch (const std::exception& e) {
-                            std::cerr << "Error parsing int64: " << cv->data << " - " << e.what() << std::endl;
-                            registers[pc->dst] = 0;
+                            // If parsing as signed fails, try unsigned
+                            try {
+                                registers[pc->dst] = static_cast<int64_t>(std::stoull(cv->data));
+                            } catch (const std::exception& e2) {
+                                std::cerr << "Error parsing int64: " << cv->data << " - " << e.what() << std::endl;
+                                registers[pc->dst] = 0;
+                            }
                         }
                     } else if (target_type->tag == TypeTag::UInt32 || target_type->tag == TypeTag::UInt64) {
                         try {

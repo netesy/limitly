@@ -1,4 +1,0 @@
-print("Starting test");
-var maxU64: u64 = 18446744073709551615;
-print("maxU64: {maxU64}");
-print("Done");

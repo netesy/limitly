@@ -46,6 +46,7 @@ while (outer < 2) {
     }
     outer += 1;
 }
+print("pair of Sum should be {totalPairs}");
 assert(nestedCount == 6, "Nested while should iterate 6 times (2x3)");
 assert(outer == 2, "Outer should end at 2");
 assert(totalPairs == 9, "Sum of pairs should be 9");

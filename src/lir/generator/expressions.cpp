@@ -926,6 +926,45 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
                op == LIR_Op::CmpLE || op == LIR_Op::CmpGT || op == LIR_Op::CmpGE) {
         // Comparison operations return bool
         result_type = std::make_shared<::Type>(::TypeTag::Bool);
+        
+        // For comparisons, ensure operands have compatible types
+        // This is important for comparing literals with variables of specific types
+        if (left_type && right_type && !types_match(left_type, right_type)) {
+            int left_rank = get_type_rank(left_type);
+            int right_rank = get_type_rank(right_type);
+            
+            // Re-emit the smaller/lower rank operand to match the larger one
+            if (left_rank < right_rank) {
+                if (auto left_literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.left.get())) {
+                    left = emit_literal_expr(*left_literal, right_type);
+                    left_type = right_type;
+                }
+            } else if (right_rank < left_rank) {
+                if (auto right_literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.right.get())) {
+                    right = emit_literal_expr(*right_literal, left_type);
+                    right_type = left_type;
+                }
+            }
+            // If ranks are equal but types differ, prefer unsigned to avoid signed/unsigned issues
+            else if (left_rank == right_rank && !types_match(left_type, right_type)) {
+                bool left_is_signed = is_signed_integer_type(left_type);
+                bool right_is_signed = is_signed_integer_type(right_type);
+                
+                if (left_is_signed && !right_is_signed) {
+                    auto left_literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.left.get());
+                    if (left_literal) {
+                        left = emit_literal_expr(*left_literal, right_type);
+                        left_type = right_type;
+                    }
+                } else if (!left_is_signed && right_is_signed) {
+                    auto right_literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(expr.right.get());
+                    if (right_literal) {
+                        right = emit_literal_expr(*right_literal, left_type);
+                        right_type = left_type;
+                    }
+                }
+            }
+        }
     } else if (op == LIR_Op::And || op == LIR_Op::Or) {
         // Logical operations return bool
         result_type = std::make_shared<::Type>(::TypeTag::Bool);
