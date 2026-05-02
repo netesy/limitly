@@ -1243,6 +1243,14 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
              add_error("String index must be an integer, got " + index_type->toString(), expr->line);
         }
         return type_system.NIL_TYPE;
+    } else if (object_type->tag == TypeTag::Tuple) {
+        if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
+             add_error("Tuple index must be an integer, got " + index_type->toString(), expr->line);
+        }
+        if (auto tt = std::get_if<TupleType>(&object_type->extra)) {
+            // Return the type of the indexed element (simplified - could add bounds checking)
+            return type_system.ANY_TYPE;
+        }
     }
 
     add_error("Cannot index type '" + object_type->toString() + "'", expr->line);

@@ -122,10 +122,10 @@ type GlobalType = int;
     var localVar: str = "local";
     print("Global in local scope: {globalVar}");
     print("Local variable: {localVar}");
+    
+    assert(globalVar == 999, "Global type alias should work in local scope");
+    assert(localVar == "local", "Local variable should work correctly");
 }
-
-assert(globalVar == 999, "Global type alias should work in local scope");
-assert(localVar == "local", "Local variable should work correctly");
 
 var anotherGlobal: GlobalType = 888;
 print("Another global: {anotherGlobal}");

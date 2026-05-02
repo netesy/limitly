@@ -26,8 +26,8 @@ assert(eqResult == false, "'Hello' should not equal 'World'");
 assert(neResult == true, "'Hello' should not equal 'World' (not equal)");
 
 // String with numbers
-var numStr = "42";
-var num = 42;
+var numStr:str = "42";
+var num:int = 42;
 var strNumEq = numStr == num;
 
 print("String vs number: {numStr} == {num}: {strNumEq}");

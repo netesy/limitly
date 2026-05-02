@@ -63,6 +63,9 @@ enum class LIR_Op : uint8_t {
     CmpGT,      // Compare Greater Than (reg = reg1 > reg2)
     CmpGE,      // Compare Greater Than or Equal (reg = reg1 >= reg2)
     
+    // Collection indexing operations
+    StringIndex, // Index into string (reg = string[index])
+    
     // Control flow
     Jump,       // Unconditional jump (jump to label)
     JumpIfFalse,// Jump if condition is false

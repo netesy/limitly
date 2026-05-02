@@ -2019,7 +2019,7 @@ Reg Generator::emit_ternary_expr(LM::Frontend::AST::TernaryExpr& expr) {
 
 
 Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
-    // Evaluate the object (list/dict/tuple)
+    // Evaluate the object (list/dict/tuple/string)
     Reg object_reg = emit_expr(*expr.object);
     
     // Evaluate the index
@@ -2048,6 +2048,14 @@ Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
         Reg result_reg = allocate_register();
         Type abi_type = language_type_to_abi_type(result_type);
         emit_instruction(LIR_Inst(LIR_Op::DictGet, abi_type, result_reg, object_reg, index_reg));
+        set_register_type(result_reg, result_type);
+        set_register_language_type(result_reg, result_type);  // Ensure language type is set
+        return result_reg;
+    } else if (object_type && object_type->tag == ::TypeTag::String) {
+        // Use StringIndex for strings
+        Reg result_reg = allocate_register();
+        Type abi_type = language_type_to_abi_type(result_type);
+        emit_instruction(LIR_Inst(LIR_Op::StringIndex, abi_type, result_reg, object_reg, index_reg));
         set_register_type(result_reg, result_type);
         set_register_language_type(result_reg, result_type);  // Ensure language type is set
         return result_reg;
