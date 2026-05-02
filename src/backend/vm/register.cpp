@@ -2,7 +2,6 @@
 #include "../../lir/functions.hh"
 #include "../../lir/function_registry.hh"
 #include "../../lir/builtin_functions.hh"
-#include "../types.hh"
 #include "register.hh"
 #include "../../lir/lir.hh"
 #include "../../runtime/runtime.h"
@@ -11,10 +10,10 @@
 #include "../../runtime/runtime_tuple.h"
 #include "../../runtime/runtime_value.h"
 #include <iostream>
-#include <variant>
 #include <memory>
 #include <cstring>
 #include <cstdint>
+#include <string>
 
 namespace LM {
 namespace Backend {
@@ -506,13 +505,33 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     
                     // Convert to register value representation
                     if (target_type->tag == TypeTag::Int32 || target_type->tag == TypeTag::Int64) {
-                        registers[pc->dst] = static_cast<int64_t>(std::stoll(cv->data));
+                        try {
+                            registers[pc->dst] = static_cast<int64_t>(std::stoll(cv->data));
+                        } catch (const std::exception& e) {
+                            std::cerr << "Error parsing int64: " << cv->data << " - " << e.what() << std::endl;
+                            registers[pc->dst] = 0;
+                        }
                     } else if (target_type->tag == TypeTag::UInt32 || target_type->tag == TypeTag::UInt64) {
-                        registers[pc->dst] = static_cast<uint64_t>(std::stoull(cv->data));
+                        try {
+                            registers[pc->dst] = static_cast<uint64_t>(std::stoull(cv->data));
+                        } catch (const std::exception& e) {
+                            std::cerr << "Error parsing uint64: " << cv->data << " - " << e.what() << std::endl;
+                            registers[pc->dst] = 0;
+                        }
                     } else if (target_type->tag == TypeTag::Float32) {
-                        registers[pc->dst] = std::stof(cv->data);
+                        try {
+                            registers[pc->dst] = std::stof(cv->data);
+                        } catch (const std::exception& e) {
+                            std::cerr << "Error parsing float32: " << cv->data << " - " << e.what() << std::endl;
+                            registers[pc->dst] = 0.0f;
+                        }
                     } else if (target_type->tag == TypeTag::Float64) {
-                        registers[pc->dst] = std::stod(cv->data);
+                        try {
+                            registers[pc->dst] = std::stod(cv->data);
+                        } catch (const std::exception& e) {
+                            std::cerr << "Error parsing float64: " << cv->data << " - " << e.what() << std::endl;
+                            registers[pc->dst] = 0.0;
+                        }
                     } else if (target_type->tag == TypeTag::Bool) {
                         registers[pc->dst] = static_cast<bool>(cv->data == "true");
                     } else if (target_type->tag == TypeTag::String) {
@@ -711,28 +730,66 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::CmpEQ: {
                 const RegisterValue* temp_a = &registers[pc->a];
                 const RegisterValue* temp_b = &registers[pc->b];
+                
+                // Check if both are numeric
                 if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-                    if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
+                    // Handle uint64 comparisons
+                    if (std::holds_alternative<uint64_t>(*temp_a) && std::holds_alternative<uint64_t>(*temp_b)) {
+                        registers[pc->dst] = std::get<uint64_t>(*temp_a) == std::get<uint64_t>(*temp_b);
+                    } else if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
                         registers[pc->dst] = to_float(*temp_a) == to_float(*temp_b);
                     } else {
                         registers[pc->dst] = to_int(*temp_a) == to_int(*temp_b);
                     }
-                } else {
-                    registers[pc->dst] = to_string(*temp_a) == to_string(*temp_b);
+                }
+                // Check if both are strings
+                else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
+                    registers[pc->dst] = std::get<std::string>(*temp_a) == std::get<std::string>(*temp_b);
+                }
+                // Check if both are booleans
+                else if (std::holds_alternative<bool>(*temp_a) && std::holds_alternative<bool>(*temp_b)) {
+                    registers[pc->dst] = std::get<bool>(*temp_a) == std::get<bool>(*temp_b);
+                }
+                // Check if both are nullptr
+                else if (std::holds_alternative<std::nullptr_t>(*temp_a) && std::holds_alternative<std::nullptr_t>(*temp_b)) {
+                    registers[pc->dst] = true;
+                }
+                // Different types - not equal
+                else {
+                    registers[pc->dst] = false;
                 }
                 break;
             }
             case LIR::LIR_Op::CmpNEQ: {
                 const RegisterValue* temp_a = &registers[pc->a];
                 const RegisterValue* temp_b = &registers[pc->b];
+                
+                // Check if both are numeric
                 if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-                    if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
+                    // Handle uint64 comparisons
+                    if (std::holds_alternative<uint64_t>(*temp_a) && std::holds_alternative<uint64_t>(*temp_b)) {
+                        registers[pc->dst] = std::get<uint64_t>(*temp_a) != std::get<uint64_t>(*temp_b);
+                    } else if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
                         registers[pc->dst] = to_float(*temp_a) != to_float(*temp_b);
                     } else {
                         registers[pc->dst] = to_int(*temp_a) != to_int(*temp_b);
                     }
-                } else {
-                    registers[pc->dst] = to_string(*temp_a) != to_string(*temp_b);
+                }
+                // Check if both are strings
+                else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
+                    registers[pc->dst] = std::get<std::string>(*temp_a) != std::get<std::string>(*temp_b);
+                }
+                // Check if both are booleans
+                else if (std::holds_alternative<bool>(*temp_a) && std::holds_alternative<bool>(*temp_b)) {
+                    registers[pc->dst] = std::get<bool>(*temp_a) != std::get<bool>(*temp_b);
+                }
+                // Check if both are nullptr
+                else if (std::holds_alternative<std::nullptr_t>(*temp_a) && std::holds_alternative<std::nullptr_t>(*temp_b)) {
+                    registers[pc->dst] = false;
+                }
+                // Different types - not equal
+                else {
+                    registers[pc->dst] = true;
                 }
                 break;
             }
@@ -857,7 +914,8 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             }
             case LIR::LIR_Op::PrintString: {
-                std::cout << to_string(registers[pc->a]) << std::endl;
+                const auto& val = registers[pc->a];
+                std::cout << to_string(val) << std::endl;
                 break;
             }
             case LIR::LIR_Op::ToString: {
@@ -971,6 +1029,27 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         }
                     } else {
                         registers[pc->dst] = nullptr; // Invalid list pointer
+                    }
+                } else {
+                    registers[pc->dst] = nullptr; // Invalid registers
+                }
+                break;
+                }
+            case LIR::LIR_Op::StringIndex: {
+                // Get character from string using C runtime
+                auto& string_reg = registers[pc->a];
+                auto& index_reg = registers[pc->b];
+                
+                if (std::holds_alternative<std::string>(string_reg) && is_numeric(index_reg)) {
+                    const std::string& str = std::get<std::string>(string_reg);
+                    int64_t index = to_int(index_reg);
+                    if (index >= 0 && index < static_cast<int64_t>(str.length())) {
+                        // Return single character as string
+                        std::string result(1, str.at(static_cast<size_t>(index)));
+                        void* boxed = lm_box_string(result.c_str());
+                        registers[pc->dst] = unbox_register_value(boxed);
+                    } else {
+                        registers[pc->dst] = nullptr; // Index out of bounds
                     }
                 } else {
                     registers[pc->dst] = nullptr; // Invalid registers
