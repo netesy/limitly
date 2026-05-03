@@ -1,0 +1,250 @@
+// Advanced Match Statement Tests
+// Tests record destructuring, list destructuring, tuple destructuring, and other advanced features
+
+print("=== Advanced Match Statement Tests ===");
+
+// Test 1: Record/Destructuring with dictionaries
+print("\n--- Test 1: Record Destructuring (Dictionaries) ---");
+fn testRecordDestructuring(value): str {
+    match(value) {
+        {name, age} => { return "Name: {name}, Age: {age}"; },
+        {name, age, city} => { return "Name: {name}, Age: {age}, City: {city}"; }
+    }
+}
+
+var result1 = testRecordDestructuring({name: "John", age: 30});
+var result2 = testRecordDestructuring({name: "Joan", age: 26, city: "New York"});
+
+assert(result1 == "Name: John, Age: 30", "Record destructuring with 2 fields failed");
+assert(result2 == "Name: Joan, Age: 26, City: New York", "Record destructuring with 3 fields failed");
+
+print("Result 1: {result1}");
+print("Result 2: {result2}");
+
+// Test 2: List destructuring
+print("\n--- Test 2: List Destructuring ---");
+fn testListDestructuring(value): str {
+    match(value) {
+        [] => { return "Empty list"; },
+        [x] => { return "One element: {x}"; },
+        [x, y] => { return "Two elements: {x}, {y}"; },
+        [head, ...tail] => { return "Head: {head}, Tail: {tail}"; }
+    }
+}
+
+var list1 = testListDestructuring([]);
+var list2 = testListDestructuring([1]);
+var list3 = testListDestructuring([1, 2]);
+var list4 = testListDestructuring([1, 2, 3, 4, 5]);
+
+assert(list1 == "Empty list", "Empty list destructuring failed");
+assert(list2 == "One element: 1", "Single element list destructuring failed");
+assert(list3 == "Two elements: 1, 2", "Two element list destructuring failed");
+assert(list4 == "Head: 1, Tail: [2,3,4,5]", "List with spread destructuring failed");
+
+print("Empty: {list1}");
+print("One: {list2}");
+print("Two: {list3}");
+print("Many: {list4}");
+
+// Test 3: Tuple destructuring
+print("\n--- Test 3: Tuple Destructuring ---");
+fn testTupleDestructuring(value): str {
+    match(value) {
+        (a, b) => { return "Tuple: ({a}, {b})"; },
+        (x, y, z) => { return "3-tuple: ({x}, {y}, {z})"; }
+    }
+}
+
+var tuple2 = testTupleDestructuring((10, 20));
+var tuple3 = testTupleDestructuring((1, 2, 3));
+
+assert(tuple2 == "Tuple: (10, 20)", "2-tuple destructuring failed");
+assert(tuple3 == "3-tuple: (1, 2, 3)", "3-tuple destructuring failed");
+
+print("2-tuple: {tuple2}");
+print("3-tuple: {tuple3}");
+
+// Test 4: Nested destructuring
+print("\n--- Test 4: Nested Destructuring ---");
+fn testNestedDestructuring(value): str {
+    match(value) {
+        (x, [a, b]) => { return "Nested: x={x}, a={a}, b={b}"; },
+        {name, scores: [s1, s2]} => { return "Record with list: {name}, scores: {s1}, {s2}"; }
+    }
+}
+
+var nested1 = testNestedDestructuring((100, [10, 20]));
+var nested2 = testNestedDestructuring({name: "Alice", scores: [95, 87]});
+
+assert(nested1 == "Nested: x=100, a=10, b=20", "Tuple+List nested destructuring failed");
+assert(nested2 == "Record with list: Alice, scores: 95, 87", "Record with list destructuring failed");
+
+print("Nested 1: {nested1}");
+print("Nested 2: {nested2}");
+
+// Test 5: Mixed pattern types
+print("\n--- Test 5: Mixed Pattern Types ---");
+enum Shape {
+    Circle(float),
+    Rectangle(float, float),
+    Point(float, float)
+}
+
+fn describeShape(s: Shape): str {
+    match(s) {
+        Shape.Circle(r) => { return "Circle with radius {r}"; },
+        Shape.Rectangle(w, h) => { return "Rectangle {w}x{h}"; },
+        Shape.Point(x, y) => { return "Point at ({x}, {y})"; }
+    }
+}
+
+var circle = describeShape(Shape.Circle(5.0));
+var rect = describeShape(Shape.Rectangle(10, 20));
+var point = describeShape(Shape.Point(3, 4));
+
+assert(circle == "Circle with radius 5", "Circle shape description failed");
+assert(rect == "Rectangle 10x20", "Rectangle shape description failed");
+assert(point == "Point at (3, 4)", "Point shape description failed");
+
+print("Circle: {circle}");
+print("Rectangle: {rect}");
+print("Point: {point}");
+
+// Test 6: Destructuring with guards
+print("\n--- Test 6: Destructuring with Guards ---");
+fn testDestructuringWithGuards(value): str {
+    match(value) {
+        {name, age} where age > 18 => { return "{name} is an adult ({age})"; },
+        {name, age} where age < 18 => { return "{name} is a minor ({age})"; }
+    }
+}
+
+var adult = testDestructuringWithGuards({name: "Alice", age: 25});
+var minor = testDestructuringWithGuards({name: "Bob", age: 16});
+
+assert(adult == "Alice is an adult (25)", "Adult guard test failed");
+assert(minor == "Bob is a minor (16)", "Minor guard test failed");
+
+print("Adult: {adult}");
+print("Minor: {minor}");
+
+// Test 7: List destructuring with spread
+print("\n--- Test 7: List Destructuring with Spread ---");
+fn testSpreadDestructuring(value): str {
+    match(value) {
+        [first, ...rest] => { return "First: {first}, Rest: {rest}"; },
+        [] => { return "Empty list"; }
+    }
+}
+
+var spread1 = testSpreadDestructuring([1, 2, 3, 4, 5]);
+var spread2 = testSpreadDestructuring([100]);
+
+assert(spread1 == "First: 1, Rest: [2,3,4,5]", "Spread destructuring with multiple elements failed");
+assert(spread2 == "First: 100, Rest: []", "Spread destructuring with single element failed");
+
+print("Spread 1: {spread1}");
+print("Spread 2: {spread2}");
+
+// Test 8: Tuple destructuring with nested structures
+print("\n--- Test 8: Tuple with Nested List ---");
+fn testNestedTupleList(value): str {
+    match(value) {
+        (x, [a, b, c]) => { return "Tuple+List: x={x}, [a,b,c]=[{a},{b},{c}]"; }
+    }
+}
+
+var nestedTuple = testNestedTupleList((99, [1, 2, 3]));
+
+assert(nestedTuple == "Tuple+List: x=99, [a,b,c]=[1,2,3]", "Nested tuple+list destructuring failed");
+
+print("Nested: {nestedTuple}");
+
+// Test 9: Record destructuring with optional fields
+print("\n--- Test 9: Record with Optional Fields ---");
+fn testOptionalFields(value): str {
+    match(value) {
+        {name, age, city} => { return "{name}, {age}, {city}"; },
+        {name, age} => { return "{name}, {age} (no city)"; }
+    }
+}
+
+var withCity = testOptionalFields({name: "John", age: 30, city: "NYC"});
+var withoutCity = testOptionalFields({name: "Jane", age: 25});
+
+assert(withCity == "John, 30, NYC", "Record with city failed");
+assert(withoutCity == "Jane, 25 (no city)", "Record without city failed");
+
+print("With city: {withCity}");
+print("Without city: {withoutCity}");
+
+// Test 10: Complex nested patterns
+print("\n--- Test 10: Complex Nested Patterns ---");
+fn testComplexNested(value): str {
+    match(value) {
+        (x, {name, values: [a, b]}) => { return "Complex: x={x}, name={name}, values=[{a},{b}]"; }
+    }
+}
+
+var complex = testComplexNested((42, {name: "test", values: [10, 20]}));
+
+assert(complex == "Complex: x=42, name=test, values=[10,20]", "Complex nested pattern failed");
+
+print("Complex: {complex}");
+
+// Test 11: Enum with multiple payloads
+print("\n--- Test 11: Enum with Multiple Payloads ---");
+enum Command {
+    Move(int, int),
+    Resize(int, int),
+    Color(int, int, int)
+}
+
+fn processCommand(cmd: Command): str {
+    match(cmd) {
+        Command.Move(x, y) => { return "Move to ({x}, {y})"; },
+        Command.Resize(w, h) => { return "Resize to {w}x{h}"; },
+        Command.Color(r, g, b) => { return "Color RGB({r}, {g}, {b})"; }
+    }
+}
+
+var move = processCommand(Command.Move(10, 20));
+var resize = processCommand(Command.Resize(100, 200));
+var color = processCommand(Command.Color(255, 128, 64));
+
+assert(move == "Move to (10, 20)", "Move command failed");
+assert(resize == "Resize to 100x200", "Resize command failed");
+assert(color == "Color RGB(255, 128, 64)", "Color command failed");
+
+print("Move: {move}");
+print("Resize: {resize}");
+print("Color: {color}");
+
+// Test 12: Destructuring in nested match
+print("\n--- Test 12: Destructuring in Nested Match ---");
+fn testNestedDestructure(value): str {
+    match(value) {
+        (x, [a, b]) => {
+            match(a) {
+                1 => { return "Nested: x={x}, a=1, b={b}"; },
+                2 => { return "Nested: x={x}, a=2, b={b}"; },
+                _ => { return "Nested: x={x}, a={a}, b={b}"; }
+            }
+        }
+    }
+}
+
+var nested1 = testNestedDestructure((100, [1, 20]));
+var nested2 = testNestedDestructure((200, [2, 30]));
+var nested3 = testNestedDestructure((300, [5, 40]));
+
+assert(nested1 == "Nested: x=100, a=1, b=20", "Nested match with a=1 failed");
+assert(nested2 == "Nested: x=200, a=2, b=30", "Nested match with a=2 failed");
+assert(nested3 == "Nested: x=300, a=5, b=40", "Nested match with a=5 failed");
+
+print("Nested 1: {nested1}");
+print("Nested 2: {nested2}");
+print("Nested 3: {nested3}");
+
+print("\n=== Advanced Match Statement Tests Complete ===");

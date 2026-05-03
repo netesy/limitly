@@ -37,6 +37,7 @@ call :run_test_with_error_check "tests\loops\for_loops.lm"
 call :run_test_with_error_check "tests\loops\iter_loops.lm"
 call :run_test_with_error_check "tests\loops\while_loops.lm"
 call :run_test_with_error_check "tests\loops\match.lm"
+call :run_test_with_error_check "tests\loops\match_advanced.lm"
 
 echo.
 echo === FUNCTION TESTS ===

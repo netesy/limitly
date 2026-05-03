@@ -82,7 +82,9 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
         // Look ahead for potential qualified binding pattern: Type.Variant(args)
         int lookahead = 1;
         const auto& tokens = scanner.getTokens();
+        int maxLookahead = 10; // Prevent infinite loop
         while (current + lookahead < tokens.size() && 
+               lookahead < maxLookahead &&
                (tokens[current + lookahead].type == TokenType::DOT || 
                 tokens[current + lookahead].type == TokenType::IDENTIFIER)) {
             lookahead++;
@@ -111,6 +113,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
         // Also handle qualified patterns like Status.Active => by looking past DOT and second IDENTIFIER
         auto varLookahead = 1;
         const auto& patternTokens = scanner.getTokens();
+        int maxVarLookahead = 10; // Prevent infinite loop
         bool isVariablePattern = false;
         
         if (current + varLookahead < patternTokens.size()) {
@@ -120,7 +123,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
                 current + varLookahead + 1 < patternTokens.size() &&
                 patternTokens[current + varLookahead + 1].type == TokenType::IDENTIFIER) {
                 varLookahead += 2; // Skip DOT and the second IDENTIFIER
-                if (current + varLookahead < patternTokens.size()) {
+                if (current + varLookahead < patternTokens.size() && varLookahead < maxVarLookahead) {
                     nextToken = patternTokens[current + varLookahead];
                 }
             }
@@ -176,12 +179,19 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseListPattern() {
     auto pattern = std::make_shared<LM::Frontend::AST::ListPatternExpr>();
     pattern->line = previous().line;
     if (!check(TokenType::RIGHT_BRACKET)) {
+        int maxElements = 100; // Prevent infinite loop
+        int elementCount = 0;
         do {
             if (match({TokenType::ELLIPSIS})) {
                 if (check(TokenType::IDENTIFIER)) pattern->restElement = consume(TokenType::IDENTIFIER, "Expected identifier after '...'.").lexeme;
                 break;
             }
             pattern->elements.push_back(parsePattern());
+            elementCount++;
+            if (elementCount >= maxElements) {
+                error("Too many elements in list pattern");
+                break;
+            }
         } while (match({TokenType::COMMA}));
     }
     consume(TokenType::RIGHT_BRACKET, "Expected ']' after list pattern.");
@@ -192,6 +202,8 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseDictPattern() {
     auto pattern = std::make_shared<LM::Frontend::AST::DictPatternExpr>();
     pattern->line = previous().line;
     if (!check(TokenType::RIGHT_BRACE)) {
+        int maxFields = 100; // Prevent infinite loop
+        int fieldCount = 0;
         do {
             if (match({TokenType::ELLIPSIS})) {
                 pattern->hasRestElement = true;
@@ -202,8 +214,16 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseDictPattern() {
             std::optional<std::string> binding;
             if (match({TokenType::COLON})) {
                 binding = consume(TokenType::IDENTIFIER, "Expected binding name after ':'.") .lexeme;
+            } else {
+                // Record destructuring shorthand: {name} means {name: name}
+                binding = key;
             }
             pattern->fields.push_back({key, binding});
+            fieldCount++;
+            if (fieldCount >= maxFields) {
+                error("Too many fields in dict pattern");
+                break;
+            }
         } while (match({TokenType::COMMA}));
     }
     consume(TokenType::RIGHT_BRACE, "Expected '}' after dict pattern.");
@@ -214,8 +234,15 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseTuplePattern() {
     auto pattern = std::make_shared<LM::Frontend::AST::TuplePatternExpr>();
     pattern->line = previous().line;
     if (!check(TokenType::RIGHT_PAREN)) {
+        int maxElements = 100; // Prevent infinite loop
+        int elementCount = 0;
         do {
             pattern->elements.push_back(parsePattern());
+            elementCount++;
+            if (elementCount >= maxElements) {
+                error("Too many elements in tuple pattern");
+                break;
+            }
         } while (match({TokenType::COMMA}));
     }
     consume(TokenType::RIGHT_PAREN, "Expected ')' after tuple pattern.");
