@@ -47,6 +47,7 @@ TESTS=(
 "tests/loops/iter_loops.lm"
 "tests/loops/while_loops.lm"
 "tests/loops/match.lm"
+"tests/loops/match_advanced.lm"
 "tests/functions/basic.lm"
 "tests/functions/advanced.lm"
 "tests/functions/closures.lm"

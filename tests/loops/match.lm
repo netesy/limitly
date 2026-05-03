@@ -52,7 +52,7 @@ var result2 = Result.Error("Something went wrong");
 fn describeResult(r: Result) {
     match (r) {
         Result.Success(msg) => { print("Success: {msg}"); },
-        Result.Error(msg) => { print("Error REsult: {msg}"); },
+        Result.Error(msg) => { print("Error Result: {msg}"); },
         Result.Pending => { print("Operation is pending"); }
     }
 }
@@ -130,9 +130,17 @@ fn getDayName(dayNum: int): str {
     }
 }
 
-print("Day 1: {getDayName(1)}");
-print("Day 5: {getDayName(5)}");
-print("Day 10: {getDayName(10)}");
+var day1 = getDayName(1);
+var day5 = getDayName(5);
+var day10 = getDayName(10);
+
+assert(day1 == "Monday", "Day 1 should be Monday");
+assert(day5 == "Friday", "Day 5 should be Friday");
+assert(day10 == "Invalid day", "Day 10 should be Invalid day");
+
+print("Day 1: {day1}");
+print("Day 5: {day5}");
+print("Day 10: {day10}");
 
 // Test 9: Match with multiple cases
 print("\n--- Test 9: Multiple Match Cases ---");
@@ -142,89 +150,48 @@ enum Message {
     Write(str)
 }
 
-fn processMessage(msg: Message) {
+fn processMessage(msg: Message): str {
     match (msg) {
-        Message.Quit => { print("Quitting application..."); },
-        Message.Move(x, y) => { print("Moving to position ({x}, {y})"); },
-        Message.Write(text) => { print("Writing message: {text}"); }
+        Message.Quit => { return "Quitting application..."; },
+        Message.Move(x, y) => { return "Moving to position ({x}, {y})"; },
+        Message.Write(text) => { return "Writing message: {text}"; }
     }
 }
 
-processMessage(Message.Quit);
-processMessage(Message.Move(10, 20));
-processMessage(Message.Write("Hello, World!"));
+var msg1 = processMessage(Message.Quit);
+var msg2 = processMessage(Message.Move(10, 20));
+var msg3 = processMessage(Message.Write("Hello, World!"));
+
+assert(msg1 == "Quitting application...", "Quit message failed");
+assert(msg2 == "Moving to position (10, 20)", "Move message failed");
+assert(msg3 == "Writing message: Hello, World!", "Write message failed");
+
+print("Message 1: {msg1}");
+print("Message 2: {msg2}");
+print("Message 3: {msg3}");
 
 // Test 10: Guard clauses
 print("\n--- Test 10: Guard Clauses ---");
-match(10) {
-    x where x > 10 => { print("{x} is greater than 10"); },
-    x where x < 10 => { print("{x} is less than 10"); },
-    x => { print("{x} is 10"); }
+fn getGuard(ans: int): str {
+match(ans) {
+    x where x > 10 => { return "greater than 10"; },
+    x where x < 10 => { return "less than 10"; },
+    x => { return "exactly 10"; }
 }
-
-// Test 11: Type patterns
-print("\n--- Test 11: Type Patterns ---");
-fn match_example(value) {
-    match (value) {
-        int => { print("Integer: {value}"); },
-        str => { print("String: {value}"); },
-        list => { print("List of integers: {value}"); },
-        dict => { print("Dictionary: {value}"); },
-        _ => { print("Unknown type"); }
-    }
 }
+var result10 =  getGuard(10);
+assert(result10 == "exactly 10", "Guard clause test for 10 failed");
 
-match_example(42);
-match_example("Hello, Luminar!");
-match_example([1, 2, 3]);
-match_example({ "a": 1, "b": 2 });
+var result15 = getGuard(15);
 
+assert(result15 == "greater than 10", "Guard clause test for 15 failed");
 
-// Test simple guards without function calls
-var value = 5;
-match(value) {
-    x where x > 10 => { print("{x} is greater than 10"); },
-    x where x < 10 => { print("{x} is less than 10"); },
-    x => { print("{x} is exactly 10"); }
-}
+var result5 = getGuard(5);
 
-var value2 = 15;
-match(value2) {
-    x where x > 10 => { print("{x} is greater than 10"); },
-    x where x < 10 => { print("{x} is less than 10"); },
-    x => { print("{x} is exactly 10"); }
-}
+assert(result5 == "less than 10", "Guard clause test for 5 failed");
 
-var value3 = 10;
-match(value3) {
-    x where x > 10 => { print("{x} is greater than 10"); },
-    x where x < 10 => { print("{x} is less than 10"); },
-    x => { print("{x} is exactly 10"); }
-}
+print("Value 10: {result10}");
+print("Value 15: {result15}");
+print("Value 5: {result5}");
 
-// Test case 1: Record destructuring (NOT YET IMPLEMENTED - requires advanced pattern matching)
-// fn test_record_destructuring(value) {
-//     match(value) {
-//         {name, age} => { print("Name: {name}, Age: {age}"); },
-//         {name, age, city} => { print("Name: {name}, Age: {age}, City: {city}"); }
-//     }
-// }
-// test_record_destructuring({name: "John", age: 30});
-// test_record_destructuring({name: "Joan", age: 26, city: "New York"});
-
-
-// Test case 2: List destructuring (NOT YET IMPLEMENTED - requires advanced pattern matching)
-// fn test_list_destructuring(value) {
-//     match(value) {
-//         [] => { print("Empty list"); },
-//         [x] => { print("One element: {x}"); },
-//         [x, y] => { print("Two elements: {x}, {y}"); },
-//         [head, ...tail] => { print("Head: {head}, Tail: {tail}"); }
-//     }
-// }
-
-// test_list_destructuring([]);
-// test_list_destructuring([1]);
-// test_list_destructuring([1, 2]);
-// test_list_destructuring([1, 2, 3]);
 print("\n=== Match Statement Tests Complete ===");
