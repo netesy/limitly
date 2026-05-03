@@ -1622,12 +1622,14 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
 
         // 1. Pattern Matching Logic
         bool pattern_always_matches = false;
+        bool needs_pattern_check = false;
         
         if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(match_case.pattern.get())) {
             if (std::holds_alternative<std::nullptr_t>(literal->value)) {
                 // Wildcard _ or nil pattern that matches anything
                 pattern_always_matches = true;
             } else {
+                needs_pattern_check = true;
                 Reg literal_reg = emit_expr(*literal);
                 Reg cmp = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, value_reg, literal_reg));
@@ -1635,8 +1637,8 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
                 
                 // If comparison is false, jump to next pattern
                 emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, next_pattern->id));
-                add_block_edge(pattern_block, next_pattern);
-                add_block_edge(pattern_block, body_block);  // Fall-through if true
+                add_block_edge(pattern_block, body_block);  // Fall-through if true (add first)
+                add_block_edge(pattern_block, next_pattern);  // Jump if false (add second)
             }
         } else if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(match_case.pattern.get())) {
             if (var_expr->name != "_") {
@@ -1647,6 +1649,7 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
             int64_t tag = 0; size_t arity = 0;
             TypePtr m_type = stmt.value->inferred_type;
             if (m_type && resolve_match_variant_info(type_system_.get(), m_type, binding->typeName, tag, arity)) {
+                needs_pattern_check = true;
                 Reg tag_reg = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::GetTag, Type::I64, tag_reg, value_reg));
                 Reg expected = allocate_register();
@@ -1656,15 +1659,17 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
                 set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
 
                 emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, next_pattern->id));
-                add_block_edge(pattern_block, next_pattern);
-                add_block_edge(pattern_block, body_block);  // Fall-through if true
+                add_block_edge(pattern_block, body_block);  // Fall-through if true (add first)
+                add_block_edge(pattern_block, next_pattern);  // Jump if false (add second)
                 
                 // Payload extraction
                 if (!binding->variableNames.empty()) {
                     Reg payload = allocate_register();
                     emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, value_reg));
                     if (binding->variableNames.size() == 1) {
-                        if (binding->variableNames[0] != "_") bind_variable(binding->variableNames[0], payload);
+                        if (binding->variableNames[0] != "_") {
+                            bind_variable(binding->variableNames[0], payload);
+                        }
                     } else {
                         for (size_t v_idx = 0; v_idx < binding->variableNames.size(); ++v_idx) {
                             Reg idx_reg = allocate_register();
@@ -1682,16 +1687,16 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
         }
 
         // 2. Guard Logic
-        if (match_case.guard && !pattern_always_matches) {
+        if (match_case.guard) {
             if (get_current_block() && !get_current_block()->has_terminator()) {
                 Reg guard_res = emit_expr(*match_case.guard);
                 emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, guard_res, 0, next_pattern->id));
-                add_block_edge(get_current_block(), next_pattern);
-                add_block_edge(get_current_block(), body_block);  // Fall-through if guard true
+                add_block_edge(get_current_block(), body_block);  // Fall-through if guard true (add first)
+                add_block_edge(get_current_block(), next_pattern);  // Jump if false (add second)
             }
         }
 
-        // Jump to body if pattern always matches
+        // Jump to body if pattern always matches (no pattern check needed)
         if (pattern_always_matches) {
             emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
             add_block_edge(pattern_block, body_block);

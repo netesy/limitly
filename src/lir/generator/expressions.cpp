@@ -1454,8 +1454,31 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             if (resolve_enum_variant_info(type_system_.get(), enum_hint, qualified_variant, tag, expected_arity)) {
                 Reg result = allocate_register();
                 Reg payload = 0;
+                
                 if (!expr.arguments.empty()) {
-                    payload = emit_expr(*expr.arguments[0]);
+                    if (expr.arguments.size() == 1) {
+                        // Single argument - use directly as payload
+                        payload = emit_expr(*expr.arguments[0]);
+                    } else {
+                        // Multiple arguments - create a tuple
+                        std::vector<Reg> arg_regs;
+                        for (const auto& arg : expr.arguments) {
+                            arg_regs.push_back(emit_expr(*arg));
+                        }
+                        
+                        // Create tuple from arguments
+                        Reg tuple_reg = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::TupleCreate, Type::Ptr, tuple_reg, 0, 0, static_cast<uint32_t>(arg_regs.size())));
+                        
+                        // Store each argument in the tuple
+                        for (size_t i = 0; i < arg_regs.size(); ++i) {
+                            Reg idx_reg = allocate_register();
+                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(i))));
+                            emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Ptr, tuple_reg, idx_reg, arg_regs[i]));
+                        }
+                        
+                        payload = tuple_reg;
+                    }
                 }
 
                 emit_instruction(LIR_Inst(LIR_Op::MakeEnum, Type::Ptr, result, payload, 0, static_cast<uint32_t>(tag)));
