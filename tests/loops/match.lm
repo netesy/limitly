@@ -52,7 +52,7 @@ var result2 = Result.Error("Something went wrong");
 fn describeResult(r: Result) {
     match (r) {
         Result.Success(msg) => { print("Success: {msg}"); },
-        Result.Error(msg) => { print("Error: {msg}"); },
+        Result.Error(msg) => { print("Error REsult: {msg}"); },
         Result.Pending => { print("Operation is pending"); }
     }
 }
@@ -202,7 +202,6 @@ match(value3) {
     x => { print("{x} is exactly 10"); }
 }
 
-
 // Test case 1: Record destructuring (NOT YET IMPLEMENTED - requires advanced pattern matching)
 // fn test_record_destructuring(value) {
 //     match(value) {
@@ -228,5 +227,4 @@ match(value3) {
 // test_list_destructuring([1]);
 // test_list_destructuring([1, 2]);
 // test_list_destructuring([1, 2, 3]);
-
 print("\n=== Match Statement Tests Complete ===");
