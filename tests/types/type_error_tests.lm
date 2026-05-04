@@ -24,8 +24,8 @@ var y: string = 42;  // ERROR: Type mismatch
 // Test 5: Binary operation type mismatch
 var invalid_op = "hello" * 5;  // ERROR: Invalid operation
 
-// Test 6: Logical operation with non-boolean - disabled (&& not supported)
-// var invalid_logic = "true" && false;  // ERROR: Non-boolean in logical operation
+// Test 6: Logical operation with non-boolean (and not supported)
+var invalid_logic = "true" and false;  // ERROR: Non-boolean in logical operation
 
 // Test 7: Comparison with incompatible types
 var invalid_comparison = "hello" > 42;  // ERROR: Incompatible comparison

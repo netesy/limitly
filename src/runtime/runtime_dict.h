@@ -20,7 +20,11 @@ typedef struct LmDictEntry {
     struct LmDictEntry* next;
 } LmDictEntry;
 
+// Magic number for dict detection
+#define LM_DICT_MAGIC  0x4C6D4469ULL  // "LmDi" in hex
+
 typedef struct {
+    uint64_t magic;
     LmDictEntry** buckets;
     uint64_t bucket_count;
     uint64_t size;

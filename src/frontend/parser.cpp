@@ -46,6 +46,9 @@ Token Parser::consume(TokenType type, const std::string &message) {
     // Report error but don't throw - let parser continue
     error(message);
     
+    // Advance to ensure progress and avoid infinite loops
+    if (!isAtEnd()) advance();
+
     // Return a dummy token to allow parsing to continue
     Token dummy;
     dummy.type = type;

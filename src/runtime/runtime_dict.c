@@ -11,6 +11,7 @@ RUNTIME_API LmDict* lm_dict_new(uint64_t (*hash_fn)(void*),
     LmDict* dict = (LmDict*)malloc(sizeof(LmDict));
     if (!dict) return NULL;
     
+    dict->magic = LM_DICT_MAGIC;
     dict->bucket_count = INITIAL_BUCKET_COUNT;
     dict->size = 0;
     dict->hash_fn = hash_fn;

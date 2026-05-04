@@ -13,8 +13,12 @@
 extern "C" {
 #endif
 
+// Magic number for list detection
+#define LM_LIST_MAGIC  0x4C6D4C69ULL  // "LmLi" in hex
+
 // Generic list structure (stores void pointers)
 typedef struct {
+    uint64_t magic;
     void** data;
     uint64_t size;
     uint64_t capacity;

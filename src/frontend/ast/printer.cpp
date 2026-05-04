@@ -854,11 +854,11 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
     }
     else if (auto bindingPatternExpr = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(node)) {
         std::cout << indentation << "BindingPattern: " << bindingPatternExpr->typeName;
-        if (!bindingPatternExpr->variableNames.empty()) {
+        if (!bindingPatternExpr->patterns.empty()) {
             std::cout << "(";
-            for (size_t i = 0; i < bindingPatternExpr->variableNames.size(); ++i) {
+            for (size_t i = 0; i < bindingPatternExpr->patterns.size(); ++i) {
                 if (i > 0) std::cout << ", ";
-                std::cout << bindingPatternExpr->variableNames[i];
+                printNode(bindingPatternExpr->patterns[i], 0);
             }
             std::cout << ")";
         }
@@ -887,8 +887,8 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
         
         for (const auto& field : dictPatternExpr->fields) {
             std::cout << indentation << "  Field: " << field.key;
-            if (field.binding && field.binding != field.key) {
-                std::cout << " -> " << *field.binding;
+            if (field.pattern) {
+                printNode(field.pattern, 0);
             }
             std::cout << std::endl;
         }

@@ -1,0 +1,32 @@
+[1;31m[1merror[E000]: Use-after-move: Variable 'original' used after being moved[0m
+  [1m-->[0m tests\memory\memory_error_tests.lm:18:0
+     17 | var first_move: int = original;   // original is moved
+     18 | var second_move: int = original;  // ERROR: Double move
+     19 | 
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E000]: Use-after-move: Variable 'linear_value' used after being moved[0m
+  [1m-->[0m tests\memory\memory_error_tests.lm:31:0
+     30 | var reference = linear_value;  // Creates reference
+     31 | var moved_value: int = linear_value;  // linear_value is moved, invalidating reference
+     32 | print(reference);  // ERROR: Reference to moved value
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E000]: Use-before-init: Variable 'uninit_a' used before initialization[0m
+  [1m-->[0m tests\memory\memory_error_tests.lm:98:0
+     97 | var uninit_b: int;
+     98 | var result: int = uninit_a + uninit_b;  // ERROR: Use of uninitialized variables
+     99 | 
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E000]: Use-before-init: Variable 'uninit_b' used before initialization[0m
+  [1m-->[0m tests\memory\memory_error_tests.lm:98:0
+     97 | var uninit_b: int;
+     98 | var result: int = uninit_a + uninit_b;  // ERROR: Use of uninitialized variables
+     99 | 
+       | ^
+   [1mhelp:[0m Check your code for errors.
+

@@ -245,7 +245,28 @@ void RegisterVM::execute_lir_function(const LIR::LIRFunction& function) {
 std::string RegisterVM::to_string(const RegisterValue& value) const {
     return std::visit(overloaded{
         [](std::nullptr_t) -> std::string { return "nil"; },
-        [](int64_t v) -> std::string { return std::to_string(v); },
+        [](int64_t v) -> std::string {
+            // Check if it's a potential pointer to a collection
+            if (v > 4096 || v < -4096) {
+                void* ptr = reinterpret_cast<void*>(static_cast<uintptr_t>(v));
+                
+                // Heuristic: check if it matches magic numbers or looks like a valid pointer
+                // LmTuple has a magic number. LmList/LmDict don't have one in a consistent place,
+                // but lm_value_to_string is safe enough.
+                
+                LmString result = lm_value_to_string(ptr);
+                if (result.data) {
+                    std::string str(result.data, result.len);
+                    lm_string_free(result);
+                    
+                    // If it looks like a collection, return it.
+                    if (str.find_first_of("[{(") != std::string::npos) {
+                        return str;
+                    }
+                }
+            }
+            return std::to_string(v);
+        },
         [](uint64_t v) -> std::string { return std::to_string(v); },
         [](double v) -> std::string {
             std::ostringstream oss;
@@ -1151,7 +1172,15 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 // Get the value from the dict
                 void* result = lm_dict_get(static_cast<LmDict*>(dict_ptr), boxed_key);
                 if (result) {
-                    registers[pc->dst] = unbox_register_value(result);
+                    // Check if result is a boxed value or a raw pointer (like a collection)
+                    LmBox* box = static_cast<LmBox*>(result);
+                    if (box && box->type >= 0 && box->type <= 4) {
+                        // It's a boxed value
+                        registers[pc->dst] = unbox_register_value(result);
+                    } else {
+                        // It's a raw pointer (like a collection), store as int64
+                        registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(result));
+                    }
                 } else {
                     registers[pc->dst] = nullptr;
                 }
@@ -1235,7 +1264,15 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         uint64_t index = static_cast<uint64_t>(to_int(index_reg));
                         void* result = lm_tuple_get(static_cast<LmTuple*>(tuple), index);
                         if (result) {
-                            registers[pc->dst] = unbox_register_value(result);
+                            // Check if result is a boxed value or a raw pointer (like a collection)
+                            LmBox* box = static_cast<LmBox*>(result);
+                            if (box && box->type >= 0 && box->type <= 4) {
+                                // It's a boxed value
+                                registers[pc->dst] = unbox_register_value(result);
+                            } else {
+                                // It's a raw pointer (like a collection), store as int64
+                                registers[pc->dst] = static_cast<int64_t>(reinterpret_cast<uintptr_t>(result));
+                            }
                         } else {
                             registers[pc->dst] = nullptr; // Index out of bounds
                         }

@@ -1,4 +1,4 @@
-# Limit Programming Language - TODO & Implementation Status
+# Limit Programming Language - TODO and Implementation Status
 
 ## 🎯 Current Development Phase: **Backend Development (Phase 2)**
 
@@ -55,7 +55,7 @@
 - **✅ Error Detection**: Use-after-move, double-move, uninitialized use - **FULLY WORKING**
 - **✅ Reference Tracking**: Generation-based reference validation - **FULLY WORKING**
 
-#### Module System (Parser & AST Only)
+#### Module System (Parser and AST Only)
 - **✅ Import/Export Parsing**: `import module as alias` syntax - **PARSER COMPLETE**
 - **✅ Module Filtering Parsing**: `show`, `hide` filters syntax - **PARSER COMPLETE**
 - **✅ AST Support**: Full AST representation for modules - **AST COMPLETE**
@@ -133,10 +133,10 @@ var name = person.name;
 - **❌ Function Composition**: `compose(f, g)` patterns - **NOT STARTED**
 
 #### Advanced Type Features
-- **❌ Generics**: `type List<T> = ...` - **NOT STARTED**
+- **❌ Type Constraints**: `type List<T> = ...` - **NOT STARTED**
 - **❌ Constraints**: `type PositiveInt = int where value > 0;` - **NOT STARTED**
 - **❌ Structural Subtyping**: Duck typing support - **NOT STARTED**
-- **❌ Intersection Types**: `HasName & HasAge` - **NOT STARTED**
+- **❌ Intersection Types**: `HasName and HasAge` - **NOT STARTED**
 
 #### Pattern Matching
 - **❌ Match Expressions**: `match value { ... }` - **NOT STARTED**
@@ -182,12 +182,12 @@ var name = person.name;
 ### Short Term (Phase 3)
 1. **First-Class Functions**: Complete function-as-values system
 2. **Pattern Matching**: Implement match expressions
-3. **Generics**: Basic generic type support
+3. **Type Constraints**: Basic Type Constraints type support
 4. **Standard Library**: Core collections and utilities
 
 ### Long Term (Phase 4+)
 1. **Async/Await**: Asynchronous programming support
-2. **Advanced Generics**: Constraints and advanced features
+2. **Advanced Type Constraints**: Constraints and advanced features
 3. **Tooling**: IDE integration and debugging
 4. **Optimization**: JIT compilation and performance
 
@@ -212,7 +212,7 @@ var name = person.name;
 - **Structural Types**: Parsing done, type system needed
 
 ### Not Started (Future Work)
-- **Generics**: Complete type system extension needed
+- **Type constriants**: Complete type system extension needed
 - **Pattern Matching**: New language feature
 - **Async/Await**: Runtime and syntax support needed
 
@@ -231,7 +231,7 @@ var name = person.name;
 ### Phase 3 Goals (Next)
 - [ ] Complete first-class function system
 - [ ] Pattern matching implementation
-- [ ] Basic generics
+- [ ] Type Constraints
 - [ ] Standard library foundation
 
 ## 📝 **NOTES**

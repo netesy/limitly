@@ -191,13 +191,13 @@ static LmString format_value(int64_t value) {
     
     // Try as list
     LmList* list = (LmList*)ptr;
-    if (list && list->data && list->size < 1000000 && list->capacity >= list->size) {
+    if (list && list->magic == LM_LIST_MAGIC && list->data && list->size < 1000000 && list->capacity >= list->size) {
         return format_list(list);
     }
     
     // Try as dict
     LmDict* dict = (LmDict*)ptr;
-    if (dict && dict->buckets && dict->bucket_count > 0 && dict->bucket_count < 1000000) {
+    if (dict && dict->magic == LM_DICT_MAGIC && dict->buckets && dict->bucket_count > 0 && dict->bucket_count < 1000000) {
         return format_dict(dict);
     }
     

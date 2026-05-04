@@ -563,7 +563,12 @@ void TypeChecker::declare_variable(const std::string& name, TypePtr type) {
 }
 
 TypePtr TypeChecker::lookup_variable(const std::string& name) {
-    return current_scope ? current_scope->lookup(name) : nullptr;
+    TypePtr res = current_scope ? current_scope->lookup(name) : nullptr;
+    if (!res) {
+        auto it = variable_types.find(name);
+        if (it != variable_types.end()) res = it->second;
+    }
+    return res;
 }
 
 // =============================================================================

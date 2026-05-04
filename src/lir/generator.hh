@@ -88,10 +88,12 @@ private:
     void lower_task_bodies_recursive(const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& statements);
     
     // Helper methods
+public:
     Reg allocate_register();
     void enter_scope();
     void exit_scope();
     void bind_variable(const std::string& name, Reg reg);
+private:
     void update_variable_binding(const std::string& name, Reg reg);
     Reg resolve_variable(const std::string& name);
     void set_register_type(Reg reg, TypePtr type);
@@ -107,7 +109,9 @@ private:
     Type language_type_to_abi_type(TypePtr lang_type);
     Type get_expression_abi_type(LM::Frontend::AST::Expression& expr);
     
+public:
     void emit_instruction(const LIR_Inst& inst);
+private:
     void emit_typed_instruction(const LIR_Inst& inst);
     
     // Register value management
@@ -240,6 +244,7 @@ private:
     void emit_trait_stmt(LM::Frontend::AST::TraitDeclaration& stmt);
     void emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt);
     void emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt);
+    void emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg, LIR_BasicBlock* failure_target);
     void emit_module_stmt(LM::Frontend::AST::ModuleDeclaration& stmt);
     
     // Helper functions

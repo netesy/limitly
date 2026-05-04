@@ -589,7 +589,26 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
         std::vector<std::pair<std::shared_ptr<LM::Frontend::AST::Expression>, std::shared_ptr<LM::Frontend::AST::Expression>>> entries;
         if (!check(TokenType::RIGHT_BRACE)) {
             do {
-                auto key = expression(); consume(TokenType::COLON, "Expected ':' after dictionary key.");
+                std::shared_ptr<LM::Frontend::AST::Expression> key;
+                if (check(TokenType::IDENTIFIER)) {
+                    // Peek ahead to see if it's followed by a colon
+                    // This allows bare identifiers as string keys in dictionaries: {name: "John"}
+                    const auto& tokens = scanner.getTokens();
+                    if (current + 1 < tokens.size() && tokens[current+1].type == TokenType::COLON) {
+                        auto token = advance();
+                        auto literal = std::make_shared<LM::Frontend::AST::LiteralExpr>();
+                        literal->line = token.line;
+                        literal->value = token.lexeme;
+                        literal->literalType = TokenType::STRING;
+                        key = literal;
+                    } else {
+                        key = expression();
+                    }
+                } else {
+                    key = expression();
+                }
+
+                consume(TokenType::COLON, "Expected ':' after dictionary key.");
                 auto value = expression(); entries.push_back({key, value});
             } while (match({TokenType::COMMA}));
         }

@@ -13,32 +13,6 @@ This report documents all test failures found when running the Limitly language 
 
 ## 🚨 Critical Failures (Compile-Time Errors)
 
-### 7. **Range Iteration Semantics**
-**File**: `tests/loops/iter_loops.lm`
-**Error**: `Assertion failed: Nested iter should iterate 6 times (2x3)`
-```limit
-// Expected: 6 iterations (2 outer × 3 inner)
-// Actual: 4 iterations (2 outer × 2 inner)
-```
-**VM Component**: Range Operations/Loop Execution
-**Priority**: HIGH
-**Impact**: Range behavior inconsistent with expectations
-
-### 8. **Nested Loop Calculations**
-**File**: `tests/loops/while_loops.lm`
-**Error**: `Assertion failed: Sum of pairs should be 9`
-```limit
-// Expected sum: (0,0)+(0,1)+(0,2)+(1,0)+(1,1)+(1,2) = 9
-// Actual sum: 6 (missing some iterations)
-```
-**VM Component**: Loop Execution/Variable Management
-**Priority**: MEDIUM
-**Impact**: Nested loop logic incorrect
-
----
-
-## 🔧 Function System Failures
-
 ### 9. **Closure Return Values**
 **File**: `tests/functions/closures.lm`
 **Error**: All closure functions return `nil` instead of expected values
@@ -78,22 +52,6 @@ var comp1 = squareThenIncrement(4);
 
 ---
 
-## 📦 Module System Issues
-
-### 12. **Module Variable Access**
-**File**: `tests/modules/basic_import_test.lm`
-**Error**: `Assertion failed: Module variable should be accessible`
-```limit
-assert(basic.moduleVar == "Hello from module");
-// Expected: "Hello from module"
-// Actual: nil
-```
-**VM Component**: Module System/Variable Resolution
-**Priority**: HIGH
-**Impact**: Basic module functionality broken
-
----
-
 ## 🚀 Concurrency System Failures
 
 ### 13. **Parallel Block Execution**
@@ -122,48 +80,16 @@ assert(basic.moduleVar == "Hello from module");
 
 ---
 
-## 🔄 Union Type Issues
-
-### 15. **Union Return Values**
-**File**: `tests/types/unions.lm`
-**Error**: Union function returns `nil` for string branch
-```limit
-var result2: Result = processValue(-1);
-// Expected: "Invalid input"
-// Actual: nil
-```
-**VM Component**: Union Type System
-**Priority**: MEDIUM
-**Impact**: Type system partially broken
-
----
-
-## 🧪 Large Literal Parsing
-
-### 16. **Large Number Handling**
-**File**: `tests/expressions/large_literals.lm`
-**Error**: Test exits early (likely assertion failure or crash)
-**VM Component**: Literal Parser/Numeric Handling
-**Priority**: MEDIUM
-**Impact**: Large number support uncertain
-
----
-
 ## 📊 Impact Assessment
 
 ### **Critical VM Components (Need Immediate Fix)**
-1. **Parser** - Tuple indexing, complex expressions
-2. **String Operations** - Indexing, type comparison
-3. **Closure System** - Return values, variable capture
-4. **Function System** - Return values, composition
-5. **Parallel Execution** - Thread management, result collection
-6. **Module System** - Variable resolution
+1. **Closure System** - Return values, variable capture
+2. **Function System** - Return values, composition
+3. **Parallel Execution** - Thread management, result collection
 
 ### **Medium Priority Issues**
 1. **Range Semantics** - Iteration behavior
 2. **Type System** - Union returns, access control
-3. **Loop Execution** - Nested calculations
-4. **Large Literals** - Numeric parsing
 
 ---
 
@@ -183,11 +109,8 @@ var result2: Result = processValue(-1);
 4. Fix union type returns
 
 ### **Phase 3: Advanced Features**
-1. Fix range iteration semantics
-2. Fix parallel execution engine
-3. Fix channel communication
-4. Fix module variable resolution
-5. Fix large literal parsing
+1. Fix parallel execution engine
+2. Fix channel communication
 
 ---
 

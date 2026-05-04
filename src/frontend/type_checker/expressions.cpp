@@ -1274,14 +1274,17 @@ TypePtr TypeChecker::check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr
     
     // Enforce strict homogeneous element typing with no implicit widening.
     TypePtr commonElementType = elementTypes[0];
+    bool consistent = true;
     for (size_t i = 1; i < elementTypes.size(); ++i) {
         if (!commonElementType || !elementTypes[i] ||
             commonElementType->toString() != elementTypes[i]->toString()) {
-            add_error("Inconsistent element types in list literal: expected all elements to be '" +
-                    (commonElementType ? commonElementType->toString() : "unknown") +
-                    "', found '" + (elementTypes[i] ? elementTypes[i]->toString() : "unknown") + "'", expr->line);
-            return type_system.createTypedListType(type_system.ANY_TYPE);
+            consistent = false;
+            break;
         }
+    }
+    
+    if (!consistent) {
+        commonElementType = type_system.ANY_TYPE;
     }
     
     TypePtr listType = type_system.createTypedListType(commonElementType);
@@ -1338,14 +1341,17 @@ TypePtr TypeChecker::check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr
         }
     }
     
+    bool valuesConsistent = true;
     for (size_t i = 1; i < valueTypes.size(); ++i) {
         if (!commonValueType || !valueTypes[i] ||
             commonValueType->toString() != valueTypes[i]->toString()) {
-            add_error("Inconsistent value types in dictionary literal: expected all values to be '" +
-                    (commonValueType ? commonValueType->toString() : "unknown") +
-                    "', found '" + (valueTypes[i] ? valueTypes[i]->toString() : "unknown") + "'", expr->line);
-            return type_system.createTypedDictType(commonKeyType, type_system.ANY_TYPE);
+            valuesConsistent = false;
+            break;
         }
+    }
+    
+    if (!valuesConsistent) {
+        commonValueType = type_system.ANY_TYPE;
     }
     
     TypePtr dictType = type_system.createTypedDictType(commonKeyType, commonValueType);

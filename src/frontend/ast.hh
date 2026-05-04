@@ -648,7 +648,7 @@ namespace AST {
     // Binding pattern in a match statement (e.g., Some(x))
     struct BindingPatternExpr : public Expression {
         std::string typeName;
-        std::vector<std::string> variableNames;
+        std::vector<std::shared_ptr<Expression>> patterns;
     };
 
     // List pattern in a match statement (e.g., [x, ...xs])
@@ -661,7 +661,7 @@ namespace AST {
     struct DictPatternExpr : public Expression {
         struct Field {
             std::string key;
-            std::optional<std::string> binding; // If empty, use key as binding name
+            std::shared_ptr<Expression> pattern; // If empty, use key as binding name
         };
         std::vector<Field> fields;
         bool hasRestElement = false;
