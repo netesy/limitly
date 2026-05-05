@@ -81,19 +81,25 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
             gen->bind_variable(dict_p->restBinding.value(), val_reg);
         }
     } else if (auto binding = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(pattern)) {
-         Reg payload = gen->allocate_register();
-         gen->emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, val_reg));
-         if (binding->patterns.size() == 1) {
-             bind_all_vars(gen, binding->patterns[0], payload);
-         } else {
-             for (size_t i = 0; i < binding->patterns.size(); ++i) {
-                 Reg idx_reg = gen->allocate_register();
-                 gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(i))));
-                 Reg elem = gen->allocate_register();
-                 gen->emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, payload, idx_reg));
-                 bind_all_vars(gen, binding->patterns[i], elem);
-             }
-         }
+        // Treat unresolved bare binding patterns as variable bindings.
+        if (binding->patterns.empty() && binding->typeName != "_" &&
+            binding->typeName != "val" && binding->typeName != "err") {
+            gen->bind_variable(binding->typeName, val_reg);
+            return;
+        }
+        Reg payload = gen->allocate_register();
+        gen->emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, val_reg));
+        if (binding->patterns.size() == 1) {
+            bind_all_vars(gen, binding->patterns[0], payload);
+        } else {
+            for (size_t i = 0; i < binding->patterns.size(); ++i) {
+                Reg idx_reg = gen->allocate_register();
+                gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(i))));
+                Reg elem = gen->allocate_register();
+                gen->emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, payload, idx_reg));
+                bind_all_vars(gen, binding->patterns[i], elem);
+            }
+        }
     }
 }
 }
@@ -877,10 +883,12 @@ void Generator::emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt) {
         if (stmt.value) {
             Reg value = emit_expr(*stmt.value);
             // Move the value to the result register
-            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::I64, else_context_.result_register, value, 0));
+            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Ptr, else_context_.result_register, value, 0));
         } else {
             // No value - store a default value (0)
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, else_context_.result_register, 0, 0));
+            auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, else_context_.result_register,
+                                      std::make_shared<Value>(nil_type, "")));
         }
         // Don't emit a return instruction - let the else block continue
     } else {
@@ -1757,9 +1765,15 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
                 }
             }
         } else {
-            // Unresolved variant - should be caught by type checker, but here we just fail
-            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, failure_target->id));
-            add_block_edge(get_current_block(), failure_target);
+            // Bare binding pattern: treat as variable match (always succeeds).
+            if (binding->patterns.empty() && binding->typeName != "_" &&
+                binding->typeName != "val" && binding->typeName != "err") {
+                bind_variable(binding->typeName, val_reg);
+            } else {
+                // Unresolved constructor pattern should fail this case.
+                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, failure_target->id));
+                add_block_edge(get_current_block(), failure_target);
+            }
         }
     } else if (auto list_p = dynamic_cast<LM::Frontend::AST::ListPatternExpr*>(pattern.get())) {
         // Match list length (at least as many as elements)

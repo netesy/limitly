@@ -61,31 +61,38 @@ extern "C" {
 
 RegisterValue unbox_register_value(void* boxed_value) {
     if (!boxed_value) {
-        return nullptr;
-    }
-    
-    // Safety check: if the pointer is very small, it's not a valid object
-    if (reinterpret_cast<uintptr_t>(boxed_value) < 4096) {
-        return nullptr;
+        return (int64_t)VAL_NIL;
     }
 
-    // Use the runtime unboxing functions
-    LmBox* box = static_cast<LmBox*>(boxed_value);
-    
-    switch (box->type) {
-        case LM_BOX_INT:
-            return box->value.as_int;
-        case LM_BOX_FLOAT:
-            return box->value.as_float;
-        case LM_BOX_BOOL:
-            return box->value.as_bool ? true : false;
-        case LM_BOX_STRING:
-            return std::string(lm_unbox_string(box));
-        case LM_BOX_NULLPTR:
-            return nullptr;
-        default:
-            return nullptr;
+    // Treat runtime objects (list/dict/tuple/frame/box) via ObjHeader first.
+    ObjHeader* header = static_cast<ObjHeader*>(boxed_value);
+    if (!header) return (int64_t)VAL_NIL;
+
+    if (header->type_id == TYPE_BOX) {
+        LmBox* box = static_cast<LmBox*>(boxed_value);
+        switch (box->type) {
+            case LM_BOX_INT:
+                return (int64_t)BOX_INT(box->value.as_int);
+            case LM_BOX_FLOAT:
+                return box->value.as_float;
+            case LM_BOX_BOOL:
+                return (int64_t)(box->value.as_bool ? VAL_TRUE : VAL_FALSE);
+            case LM_BOX_STRING:
+                return std::string(lm_unbox_string(box));
+            case LM_BOX_NULLPTR:
+                return (int64_t)VAL_NIL;
+            default:
+                return (int64_t)VAL_NIL;
+        }
     }
+
+    // Non-box runtime objects are returned as tagged pointers.
+    if (header->type_id == TYPE_LIST || header->type_id == TYPE_DICT ||
+        header->type_id == TYPE_TUPLE || header->type_id == TYPE_FRAME) {
+        return (int64_t)BOX_PTR(boxed_value);
+    }
+
+    return (int64_t)VAL_NIL;
 }
 
 // Helper functions
@@ -643,6 +650,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     } else {
                         registers[pc->dst] = (int64_t)BOX_INT(to_int(val_a) + to_int(val_b));
                     }
+                } else if (std::holds_alternative<std::string>(val_a) || std::holds_alternative<std::string>(val_b)) {
+                    // String concatenation fallback for mixed/string operands.
+                    registers[pc->dst] = to_string(val_a) + to_string(val_b);
                 } else {
                     registers[pc->dst] = (int64_t)VAL_NIL;
                 }
@@ -1075,7 +1085,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     if (list) {
                         void* result = lm_list_get(static_cast<LmList*>(list), static_cast<uint64_t>(to_int(index_reg)));
                         if (result) {
-                            registers[pc->dst] = (int64_t)BOX_PTR(result);
+                            registers[pc->dst] = unbox_register_value(result);
                         } else {
                             registers[pc->dst] = (int64_t)VAL_NIL;
                         }
@@ -1213,7 +1223,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 // Get the value from the dict
                 void* result = lm_dict_get(static_cast<LmDict*>(dict_ptr), boxed_key);
                 if (result) {
-                    registers[pc->dst] = (int64_t)BOX_PTR(result);
+                    registers[pc->dst] = unbox_register_value(result);
                 } else {
                     registers[pc->dst] = (int64_t)VAL_NIL;
                 }
@@ -1297,7 +1307,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                         uint64_t index = static_cast<uint64_t>(to_int(index_reg));
                         void* result = lm_tuple_get(static_cast<LmTuple*>(tuple), index);
                         if (result) {
-                            registers[pc->dst] = (int64_t)BOX_PTR(result);
+                            registers[pc->dst] = unbox_register_value(result);
                         } else {
                             registers[pc->dst] = (int64_t)VAL_NIL;
                         }
