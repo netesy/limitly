@@ -9,6 +9,7 @@ namespace Frontend {
 void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::AST::Expression> pattern_node, TypePtr match_type, int line) {
     if (!pattern_node) return;
     if (!match_type) match_type = type_system.ANY_TYPE;
+    pattern_node->inferred_type = match_type;
 
     if (auto bindingPattern = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(pattern_node)) {
         if (bindingPattern->typeName == "val") {
@@ -63,6 +64,17 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
                                       std::to_string(funcType->paramTypes.size()) + " values, but found " +
                                       std::to_string(bindingPattern->patterns.size()), line);
                         } else {
+                            if (funcType->paramTypes.size() == 1) {
+                                bindingPattern->patterns[0]->inferred_type = funcType->paramTypes[0];
+                            } else if (!funcType->paramTypes.empty()) {
+                                auto payload_tuple = std::make_shared<::Type>(::TypeTag::Tuple);
+                                TupleType tuple_extra;
+                                tuple_extra.elementTypes = funcType->paramTypes;
+                                payload_tuple->extra = tuple_extra;
+                                for (auto& nested : bindingPattern->patterns) {
+                                    nested->inferred_type = payload_tuple;
+                                }
+                            }
                             for (size_t i = 0; i < bindingPattern->patterns.size(); ++i) {
                                 validate_pattern_compatibility(bindingPattern->patterns[i], funcType->paramTypes[i], line);
                             }
