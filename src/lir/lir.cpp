@@ -129,6 +129,7 @@ std::string LIR_Inst::to_string() const {
             oss << " r" << dst << ", r" << a << ", r" << b;
             break;
         case LIR_Op::DictGet:
+        case LIR_Op::DictLen:
             oss << " r" << dst << ", r" << a << ", r" << b;
             break;
         case LIR_Op::DictItems:
@@ -138,6 +139,7 @@ std::string LIR_Inst::to_string() const {
             oss << " r" << dst << ", " << imm;
             break;
         case LIR_Op::TupleGet:
+        case LIR_Op::TupleLen:
             oss << " r" << dst << ", r" << a << ", r" << b;
             break;
         case LIR_Op::TupleSet:
@@ -318,10 +320,12 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::DictCreate: return "dict_create";
         case LIR_Op::DictSet: return "dict_set";
         case LIR_Op::DictGet: return "dict_get";
+        case LIR_Op::DictLen: return "dict_len";
         case LIR_Op::DictItems: return "dict_items";
         case LIR_Op::TupleCreate: return "tuple_create";
         case LIR_Op::TupleGet: return "tuple_get";
         case LIR_Op::TupleSet: return "tuple_set";
+        case LIR_Op::TupleLen: return "tuple_len";
         case LIR_Op::NewFrame: return "new_frame";
         case LIR_Op::FrameGetField: return "frame_get_field";
         case LIR_Op::FrameSetField: return "frame_set_field";

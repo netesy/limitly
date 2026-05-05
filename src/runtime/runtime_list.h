@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include "runtime_value_base.h"
 
 // For static linking, define as empty
 #ifndef RUNTIME_API
@@ -18,7 +19,7 @@ extern "C" {
 
 // Generic list structure (stores void pointers)
 typedef struct {
-    uint64_t magic;
+    ObjHeader header;
     void** data;
     uint64_t size;
     uint64_t capacity;

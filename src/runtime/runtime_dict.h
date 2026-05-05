@@ -2,6 +2,7 @@
 #define RUNTIME_DICT_H
 
 #include <stdint.h>
+#include "runtime_value_base.h"
 
 
 // For static linking, define as empty
@@ -24,7 +25,7 @@ typedef struct LmDictEntry {
 #define LM_DICT_MAGIC  0x4C6D4469ULL  // "LmDi" in hex
 
 typedef struct {
-    uint64_t magic;
+    ObjHeader header;
     LmDictEntry** buckets;
     uint64_t bucket_count;
     uint64_t size;

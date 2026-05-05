@@ -58,6 +58,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
             bind_all_vars(gen, list_p->elements[i], elem);
         }
         if (list_p->restElement.has_value() && list_p->restElement.value() != "_") {
+            // TODO: Proper list slicing for rest element. For now we bind whole list.
             gen->bind_variable(list_p->restElement.value(), val_reg);
         }
     } else if (auto tuple_p = std::dynamic_pointer_cast<LM::Frontend::AST::TuplePatternExpr>(pattern)) {
@@ -1783,16 +1784,24 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(i64_type, static_cast<int64_t>(i))));
             Reg elem = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem, val_reg, idx_reg));
+            
+            // If it's a wildcard variable, we don't need to match it, just bind (handled by bind_all_vars)
+            // But we might need to recursively match if it's a nested pattern.
             emit_pattern_match(list_p->elements[i], elem, failure_target);
         }
-        
-        // Handle rest element
-        if (list_p->restElement.has_value() && list_p->restElement.value() != "_") {
-            // Slice the list (simulated by creating a new list for now)
-            // In a full implementation we'd have a ListSlice op
-            bind_variable(list_p->restElement.value(), val_reg); // Simplified: bind whole list for now
-        }
     } else if (auto tuple_p = dynamic_cast<LM::Frontend::AST::TuplePatternExpr*>(pattern.get())) {
+        // Match tuple length
+        Reg len_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::TupleLen, Type::I64, len_reg, val_reg));
+        Reg expected_len = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_len, std::make_shared<Value>(i64_type, static_cast<int64_t>(tuple_p->elements.size()))));
+        
+        Reg cmp = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, len_reg, expected_len));
+        set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
+        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, failure_target->id));
+        add_block_edge(get_current_block(), failure_target);
+
         // Match tuple elements
         for (size_t i = 0; i < tuple_p->elements.size(); ++i) {
             Reg idx_reg = allocate_register();
@@ -1802,6 +1811,20 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             emit_pattern_match(tuple_p->elements[i], elem, failure_target);
         }
     } else if (auto dict_p = dynamic_cast<LM::Frontend::AST::DictPatternExpr*>(pattern.get())) {
+        // Match dictionary length (if no rest binding)
+        if (!dict_p->restBinding.has_value()) {
+            Reg len_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::DictLen, Type::I64, len_reg, val_reg));
+            Reg expected_len = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_len, std::make_shared<Value>(i64_type, static_cast<int64_t>(dict_p->fields.size()))));
+            
+            Reg cmp = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::CmpEQ, cmp, len_reg, expected_len));
+            set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
+            emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, failure_target->id));
+            add_block_edge(get_current_block(), failure_target);
+        }
+
         // Match dictionary fields
         for (const auto& field : dict_p->fields) {
             Reg key_reg = allocate_register();
@@ -1821,9 +1844,6 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             add_block_edge(get_current_block(), failure_target);
             
             emit_pattern_match(field.pattern, elem, failure_target);
-        }
-        if (dict_p->restBinding.has_value() && dict_p->restBinding.value() != "_") {
-            bind_variable(dict_p->restBinding.value(), val_reg);
         }
     }
 }
