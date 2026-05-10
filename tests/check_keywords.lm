@@ -1,0 +1,5 @@
+var a: d2 = 10.25;
+var b: d4 = 1.2345;
+var c: d6 = 0.000001;
+var d: decimal = 1.0000;
+var e = a as d4;

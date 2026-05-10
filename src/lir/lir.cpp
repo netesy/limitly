@@ -269,6 +269,12 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::ToString: return "to_string";
         case LIR_Op::STR_CONCAT: return "str_concat";
         case LIR_Op::STR_FORMAT: return "str_format";
+        case LIR_Op::DecAdd: return "dec_add";
+        case LIR_Op::DecSub: return "dec_sub";
+        case LIR_Op::DecMul: return "dec_mul";
+        case LIR_Op::DecDiv: return "dec_div";
+        case LIR_Op::DecMod: return "dec_mod";
+        case LIR_Op::DecNeg: return "dec_neg";
         case LIR_Op::ConstructError: return "error";
         case LIR_Op::ConstructOk: return "ok";
         case LIR_Op::IsError: return "is_error";

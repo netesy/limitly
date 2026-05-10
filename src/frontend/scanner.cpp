@@ -747,6 +747,10 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "float") return TokenType::FLOAT_TYPE;
     if (rest == "f32") return TokenType::FLOAT32_TYPE;
     if (rest == "f64") return TokenType::FLOAT64_TYPE;
+    if (rest == "d2") return TokenType::D2_TYPE;
+    if (rest == "d4") return TokenType::D4_TYPE;
+    if (rest == "d6") return TokenType::D6_TYPE;
+    if (rest == "decimal") return TokenType::DECIMAL_TYPE;
     if (rest == "any") return TokenType::ANY_TYPE;
     if (rest == "nil") return TokenType::NIL;
     if (rest == "str") return TokenType::STR_TYPE;
@@ -1058,6 +1062,14 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "FLOAT32_TYPE";
     case TokenType::FLOAT64_TYPE:
         return "FLOAT64_TYPE";
+    case TokenType::D2_TYPE:
+        return "D2_TYPE";
+    case TokenType::D4_TYPE:
+        return "D4_TYPE";
+    case TokenType::D6_TYPE:
+        return "D6_TYPE";
+    case TokenType::DECIMAL_TYPE:
+        return "DECIMAL_TYPE";
     case TokenType::SUM_TYPE:
         return "SUM_TYPE";
     case TokenType::UNION_TYPE:

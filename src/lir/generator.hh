@@ -121,6 +121,8 @@ private:
     // Type inference helpers
     TypePtr get_promoted_numeric_type(TypePtr left_type, TypePtr right_type);
     bool is_signed_integer_type(TypePtr type);
+    bool is_decimal_type(TypePtr type);
+    int get_decimal_scale(TypePtr type);
     TypePtr get_wider_integer_type(TypePtr left_type, TypePtr right_type);
     TypePtr get_unsigned_version(TypePtr type);
     TypePtr get_best_integer_type(const std::string& value_str, bool prefer_signed = true);
@@ -169,6 +171,7 @@ private:
     Reg emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr);
     Reg emit_grouping_expr(LM::Frontend::AST::GroupingExpr& expr);
     Reg emit_call_expr(LM::Frontend::AST::CallExpr& expr);
+    Reg emit_cast_expr(LM::Frontend::AST::CastExpr& expr);
     Reg emit_assign_expr(LM::Frontend::AST::AssignExpr& expr);
     Reg emit_list_expr(LM::Frontend::AST::ListExpr& expr);
     Reg emit_call_closure_expr(LM::Frontend::AST::CallClosureExpr& expr);

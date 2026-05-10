@@ -26,6 +26,15 @@ uint64_t to_uint(const RegisterValue& value);
 double to_float(const RegisterValue& value);
 bool to_bool(const RegisterValue& value);
 
+int get_decimal_scale(TypeTag tag) {
+    switch (tag) {
+        case TypeTag::Decimal2: return 2;
+        case TypeTag::Decimal4: return 4;
+        case TypeTag::Decimal6: return 6;
+        default: return 0;
+    }
+}
+
 constexpr const char* INTERNAL_ENUM_FRAME_TYPE = "__lir_internal_enum__";
 
 // Boxing/Unboxing functions for C runtime integration
@@ -1044,8 +1053,120 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 registers[pc->dst] = format;
                 break;
             }
+            case LIR::LIR_Op::DecAdd: {
+                int64_t a = to_int(registers[pc->a]);
+                int64_t b = to_int(registers[pc->b]);
+                int64_t res;
+                if (__builtin_add_overflow(a, b, &res)) {
+                    std::cerr << "Decimal Overflow Trap!" << std::endl;
+                    exit(1);
+                }
+                registers[pc->dst] = (int64_t)BOX_INT(res);
+                break;
+            }
+            case LIR::LIR_Op::DecSub: {
+                int64_t a = to_int(registers[pc->a]);
+                int64_t b = to_int(registers[pc->b]);
+                int64_t res;
+                if (__builtin_sub_overflow(a, b, &res)) {
+                    std::cerr << "Decimal Overflow Trap!" << std::endl;
+                    exit(1);
+                }
+                registers[pc->dst] = (int64_t)BOX_INT(res);
+                break;
+            }
+            case LIR::LIR_Op::DecMul: {
+                int64_t a = to_int(registers[pc->a]);
+                int64_t b = to_int(registers[pc->b]);
+                TypePtr target_type = current_function_->get_register_language_type(pc->dst);
+                int scale = get_decimal_scale(target_type ? target_type->tag : TypeTag::Decimal4);
+
+                __int128 res128 = (__int128)a * b;
+                res128 /= static_cast<int64_t>(std::pow(10, scale));
+
+                if (res128 > std::numeric_limits<int64_t>::max() || res128 < std::numeric_limits<int64_t>::min()) {
+                    std::cerr << "Decimal Overflow Trap!" << std::endl;
+                    exit(1);
+                }
+                registers[pc->dst] = (int64_t)BOX_INT((int64_t)res128);
+                break;
+            }
+            case LIR::LIR_Op::DecDiv: {
+                int64_t a = to_int(registers[pc->a]);
+                int64_t b = to_int(registers[pc->b]);
+                if (b == 0) {
+                    std::cerr << "Decimal Division by Zero Trap!" << std::endl;
+                    exit(1);
+                }
+                TypePtr target_type = current_function_->get_register_language_type(pc->dst);
+                int scale = get_decimal_scale(target_type ? target_type->tag : TypeTag::Decimal4);
+
+                __int128 res128 = (__int128)a * static_cast<int64_t>(std::pow(10, scale));
+                res128 /= b;
+
+                if (res128 > std::numeric_limits<int64_t>::max() || res128 < std::numeric_limits<int64_t>::min()) {
+                    std::cerr << "Decimal Overflow Trap!" << std::endl;
+                    exit(1);
+                }
+                registers[pc->dst] = (int64_t)BOX_INT((int64_t)res128);
+                break;
+            }
+            case LIR::LIR_Op::DecMod: {
+                int64_t a = to_int(registers[pc->a]);
+                int64_t b = to_int(registers[pc->b]);
+                if (b == 0) {
+                    std::cerr << "Decimal Modulo by Zero Trap!" << std::endl;
+                    exit(1);
+                }
+                registers[pc->dst] = (int64_t)BOX_INT(a % b);
+                break;
+            }
+            case LIR::LIR_Op::DecNeg: {
+                int64_t a = to_int(registers[pc->a]);
+                registers[pc->dst] = (int64_t)BOX_INT(-a);
+                break;
+            }
             case LIR::LIR_Op::Cast: {
-                registers[pc->dst] = registers[pc->a];
+                // Decimal rescaling
+                TypePtr src_type = current_function_->get_register_language_type(pc->a);
+                TypePtr dst_type = current_function_->get_register_language_type(pc->dst);
+
+                if (src_type && dst_type &&
+                    (type_system->isDecimalType(src_type) || type_system->isDecimalType(dst_type))) {
+                    int src_scale = 0;
+                    if (src_type->tag == TypeTag::Decimal2) src_scale = 2;
+                    else if (src_type->tag == TypeTag::Decimal4) src_scale = 4;
+                    else if (src_type->tag == TypeTag::Decimal6) src_scale = 6;
+
+                    int dst_scale = 0;
+                    if (dst_type->tag == TypeTag::Decimal2) dst_scale = 2;
+                    else if (dst_type->tag == TypeTag::Decimal4) dst_scale = 4;
+                    else if (dst_type->tag == TypeTag::Decimal6) dst_scale = 6;
+
+                    int64_t val = to_int(registers[pc->a]);
+                    if (src_scale < dst_scale) {
+                        // Widening
+                        int64_t factor = static_cast<int64_t>(std::pow(10, dst_scale - src_scale));
+                        int64_t res;
+                        if (__builtin_mul_overflow(val, factor, &res)) {
+                            std::cerr << "Decimal Overflow Trap!" << std::endl;
+                            exit(1);
+                        }
+                        registers[pc->dst] = (int64_t)BOX_INT(res);
+                    } else if (src_scale > dst_scale) {
+                        // Narrowing
+                        int64_t divisor = static_cast<int64_t>(std::pow(10, src_scale - dst_scale));
+                        if (val % divisor != 0) {
+                            std::cerr << "Decimal Precision Loss Trap!" << std::endl;
+                            exit(1);
+                        }
+                        registers[pc->dst] = (int64_t)BOX_INT(val / divisor);
+                    } else {
+                        registers[pc->dst] = registers[pc->a];
+                    }
+                } else {
+                    registers[pc->dst] = registers[pc->a];
+                }
                 break;
             }
             case LIR::LIR_Op::ListCreate: {

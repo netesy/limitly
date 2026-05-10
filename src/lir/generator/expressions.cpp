@@ -90,6 +90,8 @@ Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
         return emit_ok_construct_expr(*ok_construct);
     } else if (auto fallible = dynamic_cast<LM::Frontend::AST::FallibleExpr*>(&expr)) {
         return emit_fallible_expr(*fallible);
+    } else if (auto cast = dynamic_cast<LM::Frontend::AST::CastExpr*>(&expr)) {
+        return emit_cast_expr(*cast);
     } else if (auto frame_inst = dynamic_cast<LM::Frontend::AST::FrameInstantiationExpr*>(&expr)) {
         return emit_frame_instantiation_expr(*frame_inst);
     } else if (auto this_expr = dynamic_cast<LM::Frontend::AST::ThisExpr*>(&expr)) {
@@ -188,6 +190,22 @@ bool Generator::is_signed_integer_type(TypePtr type) {
     return (type->tag == ::TypeTag::Int || type->tag == ::TypeTag::Int8 || 
             type->tag == ::TypeTag::Int16 || type->tag == ::TypeTag::Int32 || 
             type->tag == ::TypeTag::Int64 || type->tag == ::TypeTag::Int128);
+}
+
+
+bool Generator::is_decimal_type(TypePtr type) {
+    return type && (type->tag == ::TypeTag::Decimal2 || type->tag == ::TypeTag::Decimal4 || type->tag == ::TypeTag::Decimal6);
+}
+
+
+int Generator::get_decimal_scale(TypePtr type) {
+    if (!type) return 0;
+    switch (type->tag) {
+        case ::TypeTag::Decimal2: return 2;
+        case ::TypeTag::Decimal4: return 4;
+        case ::TypeTag::Decimal6: return 6;
+        default: return 0;
+    }
 }
 
 
@@ -328,6 +346,28 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
     
     if (std::holds_alternative<std::string>(expr.value)) {
         std::string stringValue = std::get<std::string>(expr.value);
+
+        if (target_type && is_decimal_type(target_type)) {
+            // Context-typed decimal literal parsing
+            int scale = get_decimal_scale(target_type);
+            size_t dot_pos = stringValue.find('.');
+            int64_t scaled_val = 0;
+            if (dot_pos == std::string::npos) {
+                scaled_val = std::stoll(stringValue) * static_cast<int64_t>(std::pow(10, scale));
+            } else {
+                std::string integer_part = stringValue.substr(0, dot_pos);
+                std::string fractional_part = stringValue.substr(dot_pos + 1);
+                while (fractional_part.length() < (size_t)scale) fractional_part += '0';
+                if (fractional_part.length() > (size_t)scale) fractional_part = fractional_part.substr(0, scale);
+                scaled_val = std::stoll(integer_part) * static_cast<int64_t>(std::pow(10, scale)) + std::stoll(fractional_part);
+            }
+            const_val = std::make_shared<Value>(target_type, scaled_val);
+            Type abi_type = Type::I64;
+            set_register_language_type(dst, target_type);
+            set_register_type(dst, target_type);
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, const_val));
+            return dst;
+        }
         
         // Try to determine if this string represents a pure number
         bool isNumeric = false;
@@ -872,6 +912,47 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     
     // For arithmetic operations, determine result type
     if (op == LIR_Op::Add || op == LIR_Op::Sub || op == LIR_Op::Mul || op == LIR_Op::Div || op == LIR_Op::Mod) {
+        if (is_decimal_type(left_type) || is_decimal_type(right_type)) {
+            // Decimal arithmetic
+            int left_scale = get_decimal_scale(left_type);
+            int right_scale = get_decimal_scale(right_type);
+            int max_scale = std::max(left_scale, right_scale);
+
+            // Map common arithmetic to decimal opcodes
+            if (op == LIR_Op::Add) op = LIR_Op::DecAdd;
+            else if (op == LIR_Op::Sub) op = LIR_Op::DecSub;
+            else if (op == LIR_Op::Mul) op = LIR_Op::DecMul;
+            else if (op == LIR_Op::Div) op = LIR_Op::DecDiv;
+            else if (op == LIR_Op::Mod) op = LIR_Op::DecMod;
+
+            // Handle implicit rescaling
+            if (left_scale < max_scale) {
+                Reg rescaled_left = allocate_register();
+                Type target_abi = Type::I64;
+                TypePtr target_type = (max_scale == 4) ? type_system_->getType("d4") : (max_scale == 6 ? type_system_->getType("d6") : type_system_->getType("d2"));
+                emit_instruction(LIR_Inst(LIR_Op::Cast, target_abi, rescaled_left, left, 0));
+                set_register_language_type(rescaled_left, target_type);
+                set_register_type(rescaled_left, target_type);
+                left = rescaled_left;
+                left_type = target_type;
+            }
+            if (right_scale < max_scale) {
+                Reg rescaled_right = allocate_register();
+                Type target_abi = Type::I64;
+                TypePtr target_type = (max_scale == 4) ? type_system_->getType("d4") : (max_scale == 6 ? type_system_->getType("d6") : type_system_->getType("d2"));
+                emit_instruction(LIR_Inst(LIR_Op::Cast, target_abi, rescaled_right, right, 0));
+                set_register_language_type(rescaled_right, target_type);
+                set_register_type(rescaled_right, target_type);
+                right = rescaled_right;
+                right_type = target_type;
+            }
+
+            result_type = left_type; // Both now have max_scale
+            set_register_type(dst, result_type);
+            emit_instruction(LIR_Inst(op, Type::I64, dst, left, right));
+            return dst;
+        }
+
         // If either operand is float, result is float
         if ((left_type && left_type->tag == ::TypeTag::Float64) || 
             (right_type && right_type->tag == ::TypeTag::Float64)) {
@@ -2700,6 +2781,31 @@ Reg Generator::emit_channel_recv_expr(LM::Frontend::AST::ChannelRecvExpr& expr) 
     return result;
 }
 // Frame system implementations
+
+Reg Generator::emit_cast_expr(LM::Frontend::AST::CastExpr& expr) {
+    Reg source = emit_expr(*expr.expression);
+    Reg dst = allocate_register();
+
+    TypePtr source_type = get_register_language_type(source);
+    TypePtr target_type = expr.inferred_type;
+
+    if (is_decimal_type(source_type) || is_decimal_type(target_type)) {
+        // Use Cast opcode for decimal rescaling
+        Type abi_type = language_type_to_abi_type(target_type);
+        emit_instruction(LIR_Inst(LIR_Op::Cast, abi_type, dst, source, 0));
+        set_register_language_type(dst, target_type);
+        set_register_type(dst, target_type);
+        return dst;
+    }
+
+    // Default fallback to Mov for other casts (already handled by type checker)
+    Type abi_type = language_type_to_abi_type(target_type);
+    emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, dst, source, 0));
+    set_register_language_type(dst, target_type);
+    set_register_type(dst, target_type);
+    return dst;
+}
+
 
 Reg Generator::emit_frame_instantiation_expr(LM::Frontend::AST::FrameInstantiationExpr& expr) {
     // Reuse the same logic as emit_call_expr for frame instantiation

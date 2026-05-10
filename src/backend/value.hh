@@ -372,7 +372,13 @@ enum class TypeTag {
 
     Refined,
 
-    Structural
+    Structural,
+
+    Decimal2,
+
+    Decimal4,
+
+    Decimal6
 
 };
 
@@ -968,6 +974,18 @@ struct Type
 
             return "Float64";
 
+        case TypeTag::Decimal2:
+
+            return "d2";
+
+        case TypeTag::Decimal4:
+
+            return "d4";
+
+        case TypeTag::Decimal6:
+
+            return "d6";
+
         case TypeTag::String:
 
             return "String";
@@ -1195,6 +1213,14 @@ struct Type
         
 
         switch (tag) {
+
+            case TypeTag::Decimal2:
+
+            case TypeTag::Decimal4:
+
+            case TypeTag::Decimal6:
+
+                return true;
 
             case TypeTag::Enum: {
 

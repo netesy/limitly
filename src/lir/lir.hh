@@ -114,6 +114,14 @@ enum class LIR_Op : uint8_t {
     STR_CONCAT, // Explicit string concatenation (+)
     STR_FORMAT, // String formatting (interpolation)
     
+    // Decimal operations
+    DecAdd,     // Decimal addition
+    DecSub,     // Decimal subtraction
+    DecMul,     // Decimal multiplication
+    DecDiv,     // Decimal division
+    DecMod,     // Decimal modulo
+    DecNeg,     // Decimal negation
+
     // Error handling
     ConstructError,
     ConstructOk,

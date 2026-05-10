@@ -143,8 +143,19 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::comparison() {
         return rangeExpr;
     }
 
-    while (match({TokenType::GREATER, TokenType::GREATER_EQUAL, TokenType::LESS, TokenType::LESS_EQUAL})) {
+    while (match({TokenType::GREATER, TokenType::GREATER_EQUAL, TokenType::LESS, TokenType::LESS_EQUAL, TokenType::AS})) {
         auto op = previous();
+
+        if (op.type == TokenType::AS) {
+            auto targetType = parseTypeAnnotation();
+            auto castExpr = createNodeWithContext<LM::Frontend::AST::CastExpr>();
+            castExpr->line = op.line;
+            castExpr->expression = expr;
+            castExpr->targetType = targetType;
+            expr = castExpr;
+            continue;
+        }
+
         auto right = term();
 
         auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();

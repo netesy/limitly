@@ -34,6 +34,7 @@ namespace AST {
     struct SuperExpr;
     struct CallExpr;
     struct CallClosureExpr;
+    struct CastExpr;
     struct AssignExpr;
     struct TernaryExpr;
     struct GroupingExpr;
@@ -345,6 +346,12 @@ namespace AST {
         std::shared_ptr<Expression> closure;  // The closure expression to call
         std::vector<std::shared_ptr<Expression>> arguments;
         std::unordered_map<std::string, std::shared_ptr<Expression>> namedArgs;
+    };
+
+    // Cast expression (e.g., x as int)
+    struct CastExpr : public Expression {
+        std::shared_ptr<Expression> expression;
+        std::shared_ptr<TypeAnnotation> targetType;
     };
 
     // Assignment expression

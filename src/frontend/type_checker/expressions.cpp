@@ -31,7 +31,7 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
     } else if (auto assign = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(expr)) {
         type = check_assign_expr(assign);
     } else if (auto grouping = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
-        type = check_grouping_expr(grouping);
+        type = check_grouping_expr(grouping, expected_type);
     } else if (auto member = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr)) {
         type = check_member_expr(member);
     } else if (auto index = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
@@ -54,6 +54,8 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
         type = check_ok_construct_expr(ok_construct);
     } else if (auto fallible = std::dynamic_pointer_cast<LM::Frontend::AST::FallibleExpr>(expr)) {
         type = check_fallible_expr(fallible);
+    } else if (auto cast = std::dynamic_pointer_cast<LM::Frontend::AST::CastExpr>(expr)) {
+        type = check_cast_expr(cast);
     } else if (auto frame_inst = std::dynamic_pointer_cast<LM::Frontend::AST::FrameInstantiationExpr>(expr)) {
         type = check_frame_instantiation_expr(frame_inst);
     } else {
@@ -79,13 +81,13 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
     } else if (auto variable = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
         type = check_variable_expr(variable, expected_type);
     } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
-        type = check_binary_expr(binary);
+        type = check_binary_expr(binary, expected_type);
     } else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
-        type = check_unary_expr(unary);
+        type = check_unary_expr(unary, expected_type);
     } else if (auto assign = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(expr)) {
         type = check_assign_expr(assign);
     } else if (auto grouping = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
-        type = check_grouping_expr(grouping);
+        type = check_grouping_expr(grouping, expected_type);
     } else if (auto member = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr)) {
         type = check_member_expr(member);
     } else if (auto index = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
@@ -108,6 +110,8 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
         type = check_ok_construct_expr(ok_construct);
     } else if (auto fallible = std::dynamic_pointer_cast<LM::Frontend::AST::FallibleExpr>(expr)) {
         type = check_fallible_expr(fallible);
+    } else if (auto cast = std::dynamic_pointer_cast<LM::Frontend::AST::CastExpr>(expr)) {
+        type = check_cast_expr(cast);
     } else if (auto frame_inst = std::dynamic_pointer_cast<LM::Frontend::AST::FrameInstantiationExpr>(expr)) {
         type = check_frame_instantiation_expr(frame_inst);
     } else {
@@ -131,11 +135,19 @@ TypePtr TypeChecker::check_literal_expr(std::shared_ptr<LM::Frontend::AST::Liter
         // Use the token type to determine the correct type
         switch (expr->literalType) {
             case TokenType::INT_LITERAL:
+                if (expected_type && is_decimal_type(expected_type)) {
+                    expr->inferred_type = expected_type;
+                    return expected_type;
+                }
                 expr->inferred_type = type_system.INT64_TYPE;
                 return type_system.INT64_TYPE;
                 
             case TokenType::FLOAT_LITERAL:
             case TokenType::SCIENTIFIC_LITERAL:
+                if (expected_type && is_decimal_type(expected_type)) {
+                    expr->inferred_type = expected_type;
+                    return expected_type;
+                }
                 expr->inferred_type = type_system.FLOAT64_TYPE;
                 return type_system.FLOAT64_TYPE;
                 
@@ -166,8 +178,8 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::F
         // Use the token type to determine the correct type
         switch (expr->literalType) {
             case TokenType::INT_LITERAL: {
-                // If we have an expected type and it's an integer type, use it
-                if (expected_type && is_integer_type(expected_type)) {
+                // If we have an expected type and it's an integer type or decimal type, use it
+                if (expected_type && (is_integer_type(expected_type) || is_decimal_type(expected_type))) {
                     expr->inferred_type = expected_type;
                     return expected_type;
                 }
@@ -178,8 +190,8 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::F
                 
             case TokenType::FLOAT_LITERAL:
             case TokenType::SCIENTIFIC_LITERAL: {
-                // If we have an expected type and it's a float type, use it
-                if (expected_type && is_float_type(expected_type)) {
+                // If we have an expected type and it's a float type or decimal type, use it
+                if (expected_type && (is_float_type(expected_type) || is_decimal_type(expected_type))) {
                     expr->inferred_type = expected_type;
                     return expected_type;
                 }
@@ -349,7 +361,21 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
             if (left_base->tag == TypeTag::Any || right_base->tag == TypeTag::Any) {
                 return type_system.ANY_TYPE;
             }
+
+            if (is_decimal_type(left_base) && is_decimal_type(right_base)) {
+                // If both are decimals, promote to largest scale
+                int left_scale = get_decimal_scale(left_base);
+                int right_scale = get_decimal_scale(right_base);
+                if (left_scale >= right_scale) return left_base;
+                return right_base;
+            }
+
             if (is_numeric_type(left_base) && is_numeric_type(right_base)) {
+                // Mixed decimal/non-decimal arithmetic is disallowed
+                if (is_decimal_type(left_base) || is_decimal_type(right_base)) {
+                    add_error("Mixed decimal and non-decimal arithmetic is not allowed", expr->line);
+                    return type_system.D4_TYPE;
+                }
                 return promote_numeric_types(left_base, right_base);
             } else if (expr->op == TokenType::PLUS && 
                       (is_string_type(left_base) || is_string_type(right_base))) {
@@ -365,6 +391,12 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
         case TokenType::GREATER:
         case TokenType::GREATER_EQUAL:
             // Comparison operations
+            if (is_decimal_type(left_base) || is_decimal_type(right_base)) {
+                if (left_base->tag != right_base->tag) {
+                    add_error("Decimal comparisons require EXACT scale match. Got " +
+                             left_base->toString() + " and " + right_base->toString(), expr->line);
+                }
+            }
             return type_system.BOOL_TYPE;
             
         case TokenType::AND:
@@ -381,7 +413,20 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
             if (left_base->tag == TypeTag::Any || right_base->tag == TypeTag::Any) {
                 return type_system.ANY_TYPE;
             }
+
+            if (expr->op == TokenType::MODULUS && (is_decimal_type(left_base) || is_decimal_type(right_base))) {
+                if (left_base->tag != right_base->tag) {
+                    add_error("Decimal modulo requires EXACT scale match. Got " +
+                             left_base->toString() + " and " + right_base->toString(), expr->line);
+                }
+                return left_base;
+            }
+
             if (is_numeric_type(left_base) && is_numeric_type(right_base)) {
+                if (is_decimal_type(left_base) || is_decimal_type(right_base)) {
+                    add_error("Mixed decimal and non-decimal arithmetic is not allowed", expr->line);
+                    return type_system.D4_TYPE;
+                }
                 return promote_numeric_types(left_base, right_base);
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
@@ -395,7 +440,7 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
 TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
-    TypePtr right_type = check_expression(expr->right);
+    TypePtr right_type = check_expression(expr->right, expected_type);
     TypePtr right_base = type_system.unwrapRefined(right_type);
 
     switch (expr->op) {
@@ -458,6 +503,10 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
                     }
                 }
             }
+            if (is_decimal_type(right_base)) {
+                expr->inferred_type = right_base;
+                return right_base;
+            }
             expr->inferred_type = right_type;
             return right_type;
             
@@ -470,10 +519,28 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
 TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
+    // Handle assert() specially to allow decimal comparisons
+    if (auto var_callee = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+        if (var_callee->name == "assert" && !expr->arguments.empty()) {
+            if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr->arguments[0])) {
+                // If the first argument is a comparison, check_binary_expr will handle it.
+                // We need to re-check it but without special expected type yet,
+                // binary checker will use LHS as expected type for RHS.
+            }
+        }
+    }
+
     // Check positional arguments first
     std::vector<TypePtr> arg_types;
-    for (const auto& arg : expr->arguments) {
-        arg_types.push_back(check_expression(arg));
+    for (size_t i = 0; i < expr->arguments.size(); ++i) {
+        TypePtr arg_expected = nullptr;
+        if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+            auto it = function_signatures.find(var_expr->name);
+            if (it != function_signatures.end() && i < it->second.param_types.size()) {
+                arg_expected = it->second.param_types[i];
+            }
+        }
+        arg_types.push_back(check_expression(expr->arguments[i], arg_expected));
     }
     
     // Check if callee is a variable (could be function or frame name)
@@ -997,9 +1064,9 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
     return value_type;
 }
 
-TypePtr TypeChecker::check_grouping_expr(std::shared_ptr<LM::Frontend::AST::GroupingExpr> expr) {
+TypePtr TypeChecker::check_grouping_expr(std::shared_ptr<LM::Frontend::AST::GroupingExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
-    return check_expression(expr->expression);
+    return check_expression(expr->expression, expected_type);
 }
 
 TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::MemberExpr> expr) {
@@ -1555,6 +1622,24 @@ TypePtr TypeChecker::check_fallible_expr(std::shared_ptr<LM::Frontend::AST::Fall
     
     expr->inferred_type = success_type;
     return success_type;
+}
+
+TypePtr TypeChecker::check_cast_expr(std::shared_ptr<LM::Frontend::AST::CastExpr> expr) {
+    if (!expr) return nullptr;
+
+    TypePtr source_type = check_expression(expr->expression);
+    TypePtr target_type = resolve_type_annotation(expr->targetType);
+
+    // Strict rules for decimals
+    if (is_decimal_type(source_type) || is_decimal_type(target_type)) {
+        // Only allow decimal to decimal or other numeric to decimal (with caution)
+        if (!is_numeric_type(source_type)) {
+            add_error("Cannot cast non-numeric type " + source_type->toString() + " to decimal", expr->line);
+        }
+    }
+
+    expr->inferred_type = target_type;
+    return target_type;
 }
 
 } // namespace Frontend

@@ -249,8 +249,9 @@ private:
     TypePtr check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type = nullptr);
+    TypePtr check_cast_expr(std::shared_ptr<LM::Frontend::AST::CastExpr> expr);
     TypePtr check_assign_expr(std::shared_ptr<LM::Frontend::AST::AssignExpr> expr);
-    TypePtr check_grouping_expr(std::shared_ptr<LM::Frontend::AST::GroupingExpr> expr);
+    TypePtr check_grouping_expr(std::shared_ptr<LM::Frontend::AST::GroupingExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_member_expr(std::shared_ptr<LM::Frontend::AST::MemberExpr> expr);
     TypePtr check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexExpr> expr);
     TypePtr check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr);
@@ -299,6 +300,8 @@ private:
     bool is_numeric_type(TypePtr type);
     bool is_integer_type(TypePtr type);
     bool is_float_type(TypePtr type);
+    bool is_decimal_type(TypePtr type);
+    int get_decimal_scale(TypePtr type);
     bool is_boolean_type(TypePtr type);
     bool is_string_type(TypePtr type);
     bool is_optional_type(TypePtr type);

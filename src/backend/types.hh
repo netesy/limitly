@@ -111,6 +111,12 @@ private:
         if (from == to || to->tag == TypeTag::Any)
             return true;
 
+        // Decimal types have strict conversion: only same-scale or to Any
+        if (from->tag == TypeTag::Decimal2 || from->tag == TypeTag::Decimal4 || from->tag == TypeTag::Decimal6 ||
+            to->tag == TypeTag::Decimal2 || to->tag == TypeTag::Decimal4 || to->tag == TypeTag::Decimal6) {
+            return from->tag == to->tag;
+        }
+
     // Handle boolean type conversions
     if (from->tag == TypeTag::Bool && to->tag == TypeTag::Bool) {
         return true;
@@ -557,6 +563,9 @@ public:
     const TypePtr UINT128_TYPE = std::make_shared<Type>(TypeTag::UInt128);
     const TypePtr FLOAT32_TYPE = std::make_shared<Type>(TypeTag::Float32);
     const TypePtr FLOAT64_TYPE = std::make_shared<Type>(TypeTag::Float64);
+    const TypePtr D2_TYPE = std::make_shared<Type>(TypeTag::Decimal2);
+    const TypePtr D4_TYPE = std::make_shared<Type>(TypeTag::Decimal4);
+    const TypePtr D6_TYPE = std::make_shared<Type>(TypeTag::Decimal6);
     const TypePtr STRING_TYPE = std::make_shared<Type>(TypeTag::String);
     const TypePtr ANY_TYPE = std::make_shared<Type>(TypeTag::Any);
     const TypePtr LIST_TYPE = std::make_shared<Type>(TypeTag::List);
@@ -644,7 +653,8 @@ public:
         if (name == "bigint" || name == "int" || name == "i64" || name == "u64" || 
             name == "i32" || name == "u32" || name == "i16" || name == "u16" ||
             name == "i8" || name == "u8" || name == "i128" || name == "u128" ||
-            name == "uint" || name == "f32" || name == "f64" || name == "float") {
+            name == "uint" || name == "f32" || name == "f64" || name == "float" ||
+            name == "d2" || name == "d4" || name == "d6" || name == "decimal") {
             // Map type names to appropriate types
             if (name == "i8") return INT8_TYPE;
             if (name == "u8") return UINT8_TYPE;
@@ -658,6 +668,9 @@ public:
             if (name == "u128") return UINT128_TYPE;
             if (name == "f32" || name == "float") return FLOAT32_TYPE;
             if (name == "f64") return FLOAT64_TYPE;
+            if (name == "d2") return D2_TYPE;
+            if (name == "d4" || name == "decimal") return D4_TYPE;
+            if (name == "d6") return D6_TYPE;
             return INT64_TYPE; // Default fallback
         }
         if (name == "string") return STRING_TYPE;
@@ -706,6 +719,11 @@ public:
         case TypeTag::UInt32:
         case TypeTag::UInt64:
         case TypeTag::UInt128:
+            value->data = std::to_string(0);
+            break;
+        case TypeTag::Decimal2:
+        case TypeTag::Decimal4:
+        case TypeTag::Decimal6:
             value->data = std::to_string(0);
             break;
         case TypeTag::Float32:
@@ -818,8 +836,11 @@ public:
     bool isFloatType(TypePtr type) {
         return type && (type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64);
     }
+    bool isDecimalType(TypePtr type) {
+        return type && (type->tag == TypeTag::Decimal2 || type->tag == TypeTag::Decimal4 || type->tag == TypeTag::Decimal6);
+    }
     bool isNumericType(TypePtr type) {
-        return isIntegerType(type) || isFloatType(type);
+        return isIntegerType(type) || isFloatType(type) || isDecimalType(type);
     }
 
     double stringToNumber(const std::string& str) {
@@ -861,6 +882,27 @@ public:
         bool bIsFloat = (b->tag == TypeTag::Float32 || b->tag == TypeTag::Float64);
         bool aIsInt = isIntegerType(a);
         bool bIsInt = isIntegerType(b);
+
+        if (a->tag == TypeTag::Decimal2 || a->tag == TypeTag::Decimal4 || a->tag == TypeTag::Decimal6 ||
+            b->tag == TypeTag::Decimal2 || b->tag == TypeTag::Decimal4 || b->tag == TypeTag::Decimal6) {
+            if (a->tag == b->tag) return a;
+            // Mixed scale: promote to largest scale
+            int a_scale = 0;
+            if (a->tag == TypeTag::Decimal2) a_scale = 2;
+            else if (a->tag == TypeTag::Decimal4) a_scale = 4;
+            else if (a->tag == TypeTag::Decimal6) a_scale = 6;
+
+            int b_scale = 0;
+            if (b->tag == TypeTag::Decimal2) b_scale = 2;
+            else if (b->tag == TypeTag::Decimal4) b_scale = 4;
+            else if (b->tag == TypeTag::Decimal6) b_scale = 6;
+
+            int max_scale = std::max(a_scale, b_scale);
+            if (max_scale == 6) return D6_TYPE;
+            if (max_scale == 4) return D4_TYPE;
+            if (max_scale == 2) return D2_TYPE;
+            throw std::runtime_error("Mixed decimal and non-decimal arithmetic is not allowed");
+        }
 
         if (aIsFloat || bIsFloat) {
             if ((aIsFloat || aIsInt) && (bIsFloat || bIsInt)) return FLOAT64_TYPE;
