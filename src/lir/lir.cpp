@@ -275,6 +275,7 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::DecDiv: return "dec_div";
         case LIR_Op::DecMod: return "dec_mod";
         case LIR_Op::DecNeg: return "dec_neg";
+        case LIR_Op::DecRescale: return "dec_rescale";
         case LIR_Op::ConstructError: return "error";
         case LIR_Op::ConstructOk: return "ok";
         case LIR_Op::IsError: return "is_error";

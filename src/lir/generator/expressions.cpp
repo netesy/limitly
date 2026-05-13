@@ -930,7 +930,7 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
                 Reg rescaled_left = allocate_register();
                 Type target_abi = Type::I64;
                 TypePtr target_type = (max_scale == 4) ? type_system_->getType("d4") : (max_scale == 6 ? type_system_->getType("d6") : type_system_->getType("d2"));
-                emit_instruction(LIR_Inst(LIR_Op::Cast, target_abi, rescaled_left, left, 0));
+                emit_instruction(LIR_Inst(LIR_Op::DecRescale, target_abi, rescaled_left, left, 0));
                 set_register_language_type(rescaled_left, target_type);
                 set_register_type(rescaled_left, target_type);
                 left = rescaled_left;
@@ -940,7 +940,7 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
                 Reg rescaled_right = allocate_register();
                 Type target_abi = Type::I64;
                 TypePtr target_type = (max_scale == 4) ? type_system_->getType("d4") : (max_scale == 6 ? type_system_->getType("d6") : type_system_->getType("d2"));
-                emit_instruction(LIR_Inst(LIR_Op::Cast, target_abi, rescaled_right, right, 0));
+                emit_instruction(LIR_Inst(LIR_Op::DecRescale, target_abi, rescaled_right, right, 0));
                 set_register_language_type(rescaled_right, target_type);
                 set_register_type(rescaled_right, target_type);
                 right = rescaled_right;
@@ -2790,9 +2790,9 @@ Reg Generator::emit_cast_expr(LM::Frontend::AST::CastExpr& expr) {
     TypePtr target_type = expr.inferred_type;
 
     if (is_decimal_type(source_type) || is_decimal_type(target_type)) {
-        // Use Cast opcode for decimal rescaling
+        // Use DecRescale opcode for decimal rescaling
         Type abi_type = language_type_to_abi_type(target_type);
-        emit_instruction(LIR_Inst(LIR_Op::Cast, abi_type, dst, source, 0));
+        emit_instruction(LIR_Inst(LIR_Op::DecRescale, abi_type, dst, source, 0));
         set_register_language_type(dst, target_type);
         set_register_type(dst, target_type);
         return dst;

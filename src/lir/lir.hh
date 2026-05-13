@@ -121,6 +121,7 @@ enum class LIR_Op : uint8_t {
     DecDiv,     // Decimal division
     DecMod,     // Decimal modulo
     DecNeg,     // Decimal negation
+    DecRescale, // Decimal rescaling (narrowing/widening)
 
     // Error handling
     ConstructError,

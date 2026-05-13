@@ -274,14 +274,19 @@ void RegisterVM::execute_task_body(TaskContext* task, const LIR::LIR_Function& f
 }
 
 void RegisterVM::execute_function(const LIR::LIR_Function& function) {
+    current_function_ = &function;
     execute_instructions(function, 0, function.instructions.size());
+    current_function_ = nullptr;
 }
 
 void RegisterVM::execute_lir_function(const LIR::LIRFunction& function) {
     // Create a temporary LIR_Function wrapper to reuse existing execution logic
     LIR::LIR_Function temp_wrapper(function.getName(), function.getParameters().size());
     temp_wrapper.instructions = function.getInstructions();
+
+    current_function_ = &temp_wrapper;
     execute_instructions(temp_wrapper, 0, function.getInstructions().size());
+    current_function_ = nullptr;
 }
 
 std::string RegisterVM::to_string(const RegisterValue& value) const {
@@ -1126,47 +1131,50 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 registers[pc->dst] = (int64_t)BOX_INT(-a);
                 break;
             }
-            case LIR::LIR_Op::Cast: {
+            case LIR::LIR_Op::DecRescale: {
                 // Decimal rescaling
                 TypePtr src_type = current_function_->get_register_language_type(pc->a);
                 TypePtr dst_type = current_function_->get_register_language_type(pc->dst);
 
-                if (src_type && dst_type &&
-                    (type_system->isDecimalType(src_type) || type_system->isDecimalType(dst_type))) {
-                    int src_scale = 0;
+                int src_scale = 0;
+                if (src_type) {
                     if (src_type->tag == TypeTag::Decimal2) src_scale = 2;
                     else if (src_type->tag == TypeTag::Decimal4) src_scale = 4;
                     else if (src_type->tag == TypeTag::Decimal6) src_scale = 6;
+                }
 
-                    int dst_scale = 0;
+                int dst_scale = 0;
+                if (dst_type) {
                     if (dst_type->tag == TypeTag::Decimal2) dst_scale = 2;
                     else if (dst_type->tag == TypeTag::Decimal4) dst_scale = 4;
                     else if (dst_type->tag == TypeTag::Decimal6) dst_scale = 6;
+                }
 
-                    int64_t val = to_int(registers[pc->a]);
-                    if (src_scale < dst_scale) {
-                        // Widening
-                        int64_t factor = static_cast<int64_t>(std::pow(10, dst_scale - src_scale));
-                        int64_t res;
-                        if (__builtin_mul_overflow(val, factor, &res)) {
-                            std::cerr << "Decimal Overflow Trap!" << std::endl;
-                            exit(1);
-                        }
-                        registers[pc->dst] = (int64_t)BOX_INT(res);
-                    } else if (src_scale > dst_scale) {
-                        // Narrowing
-                        int64_t divisor = static_cast<int64_t>(std::pow(10, src_scale - dst_scale));
-                        if (val % divisor != 0) {
-                            std::cerr << "Decimal Precision Loss Trap!" << std::endl;
-                            exit(1);
-                        }
-                        registers[pc->dst] = (int64_t)BOX_INT(val / divisor);
-                    } else {
-                        registers[pc->dst] = registers[pc->a];
+                int64_t val = to_int(registers[pc->a]);
+                if (src_scale < dst_scale) {
+                    // Widening
+                    int64_t factor = static_cast<int64_t>(std::pow(10, dst_scale - src_scale));
+                    int64_t res;
+                    if (__builtin_mul_overflow(val, factor, &res)) {
+                        std::cerr << "Decimal Overflow Trap!" << std::endl;
+                        exit(1);
                     }
+                    registers[pc->dst] = (int64_t)BOX_INT(res);
+                } else if (src_scale > dst_scale) {
+                    // Narrowing
+                    int64_t divisor = static_cast<int64_t>(std::pow(10, src_scale - dst_scale));
+                    if (val % divisor != 0) {
+                        std::cerr << "Decimal Precision Loss Trap!" << std::endl;
+                        exit(1);
+                    }
+                    registers[pc->dst] = (int64_t)BOX_INT(val / divisor);
                 } else {
                     registers[pc->dst] = registers[pc->a];
                 }
+                break;
+            }
+            case LIR::LIR_Op::Cast: {
+                registers[pc->dst] = registers[pc->a];
                 break;
             }
             case LIR::LIR_Op::ListCreate: {

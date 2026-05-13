@@ -341,8 +341,31 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
 TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
-    TypePtr left_type = check_expression(expr->left);
-    TypePtr right_type = check_expression(expr->right);
+    TypePtr left_expected = nullptr;
+    switch (expr->op) {
+        case TokenType::PLUS:
+        case TokenType::MINUS:
+        case TokenType::STAR:
+        case TokenType::SLASH:
+        case TokenType::MODULUS:
+            left_expected = expected_type;
+            break;
+        case TokenType::AND:
+        case TokenType::OR:
+            left_expected = type_system.BOOL_TYPE;
+            break;
+        default:
+            break;
+    }
+
+    TypePtr left_type = check_expression(expr->left, left_expected);
+
+    TypePtr right_expected = left_type;
+    if (expr->op == TokenType::AND || expr->op == TokenType::OR) {
+        right_expected = type_system.BOOL_TYPE;
+    }
+
+    TypePtr right_type = check_expression(expr->right, right_expected);
     
     // Mandate 7: Automatically unwrap refined types for operations
     TypePtr left_base = type_system.unwrapRefined(left_type);
@@ -522,11 +545,8 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     // Handle assert() specially to allow decimal comparisons
     if (auto var_callee = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
         if (var_callee->name == "assert" && !expr->arguments.empty()) {
-            if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr->arguments[0])) {
-                // If the first argument is a comparison, check_binary_expr will handle it.
-                // We need to re-check it but without special expected type yet,
-                // binary checker will use LHS as expected type for RHS.
-            }
+            // Re-check the first argument with awareness it's a condition
+            check_expression(expr->arguments[0], type_system.BOOL_TYPE);
         }
     }
 

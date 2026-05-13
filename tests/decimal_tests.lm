@@ -62,6 +62,7 @@ fn test_arithmetic() {
 }
 
 fn main() {
+    print("Running decimal tests...");
     test_same_scale();
     test_mixed_scale();
     test_comparison();
