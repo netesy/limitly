@@ -11,6 +11,8 @@ RUNTIME_API LmDict* lm_dict_new(uint64_t (*hash_fn)(void*),
     LmDict* dict = (LmDict*)malloc(sizeof(LmDict));
     if (!dict) return NULL;
     
+    dict->header.type_id = TYPE_DICT;
+    dict->header.metadata = 0;
     dict->bucket_count = INITIAL_BUCKET_COUNT;
     dict->size = 0;
     dict->hash_fn = hash_fn;
@@ -148,57 +150,80 @@ RUNTIME_API int lm_cmp_string(void* k1, void* k2) {
 #include "runtime.h"
 
 // Hash function for boxed values (used by both VM and JIT)
+// Now tag-aware: handles both immediate tagged values and boxed objects
 RUNTIME_API uint64_t hash_boxed_value(void* key) {
-    if (!key) return 0;
-    LmBox* box = (LmBox*)key;
+    int64_t v = (int64_t)(uintptr_t)key;
+    if (IS_INT(v)) return lm_hash_int((void*)(intptr_t)UNBOX_INT(v));
+    if (IS_BOOL(v)) return lm_hash_int((void*)(intptr_t)UNBOX_BOOL(v));
+    if (IS_NIL(v)) return 0;
     
-    switch (box->type) {
-        case LM_BOX_INT:
-            return lm_hash_int((void*)(intptr_t)box->value.as_int);
-        case LM_BOX_STRING: {
-            const char* str = lm_unbox_string(box);
-            return lm_hash_string((void*)str);
+    if (IS_PTR(v)) {
+        void* ptr = UNBOX_PTR(v);
+        if (!ptr) return 0;
+        ObjHeader* header = (ObjHeader*)ptr;
+        if (header->type_id == TYPE_BOX) {
+            LmBox* box = (LmBox*)ptr;
+            switch (box->type) {
+                case LM_BOX_INT:
+                    return lm_hash_int((void*)(intptr_t)box->value.as_int);
+                case LM_BOX_STRING:
+                    return lm_hash_string((void*)box->value.as_ptr);
+                case LM_BOX_FLOAT: {
+                    int64_t int_val = (int64_t)box->value.as_float;
+                    return lm_hash_int((void*)(intptr_t)int_val);
+                }
+                case LM_BOX_BOOL:
+                    return lm_hash_int((void*)(intptr_t)box->value.as_bool);
+                default:
+                    return 0;
+            }
         }
-        case LM_BOX_FLOAT: {
-            int64_t int_val = (int64_t)box->value.as_float;
-            return lm_hash_int((void*)(intptr_t)int_val);
-        }
-        case LM_BOX_BOOL:
-            return lm_hash_int((void*)(intptr_t)box->value.as_bool);
-        default:
-            return 0;
+        // For other objects (List, Dict, etc.), hash by address
+        return lm_hash_int(ptr);
     }
+    
+    return lm_hash_int(key);
 }
 
 // Compare function for boxed values (used by both VM and JIT)
+// Now tag-aware
 RUNTIME_API int cmp_boxed_value(void* k1, void* k2) {
-    if (!k1 || !k2) return (k1 != k2) ? 1 : 0;
+    if (k1 == k2) return 0;
     
-    LmBox* box1 = (LmBox*)k1;
-    LmBox* box2 = (LmBox*)k2;
+    int64_t v1 = (int64_t)(uintptr_t)k1;
+    int64_t v2 = (int64_t)(uintptr_t)k2;
     
-    // Different types are not equal
-    if (box1->type != box2->type) return 1;
-    
-    switch (box1->type) {
-        case LM_BOX_INT:
-            return lm_cmp_int((void*)(intptr_t)box1->value.as_int,
-                            (void*)(intptr_t)box2->value.as_int);
-        case LM_BOX_STRING: {
-            const char* str1 = lm_unbox_string(box1);
-            const char* str2 = lm_unbox_string(box2);
-            return lm_cmp_string((void*)str1, (void*)str2);
-        }
-        case LM_BOX_FLOAT: {
-            double diff = box1->value.as_float - box2->value.as_float;
-            return (diff > 0) - (diff < 0);
-        }
-        case LM_BOX_BOOL:
-            return (box1->value.as_bool > box2->value.as_bool) - 
-                   (box1->value.as_bool < box2->value.as_bool);
-        default:
-            return 0;
+    if (IS_INT(v1) && IS_INT(v2)) {
+        int64_t i1 = UNBOX_INT(v1);
+        int64_t i2 = UNBOX_INT(v2);
+        return (i1 > i2) - (i1 < i2);
     }
+    
+    if (IS_PTR(v1) && IS_PTR(v2)) {
+        void* p1 = UNBOX_PTR(v1);
+        void* p2 = UNBOX_PTR(v2);
+        ObjHeader* h1 = (ObjHeader*)p1;
+        ObjHeader* h2 = (ObjHeader*)p2;
+        
+        if (h1->type_id == TYPE_BOX && h2->type_id == TYPE_BOX) {
+            LmBox* b1 = (LmBox*)p1;
+            LmBox* b2 = (LmBox*)p2;
+            if (b1->type != b2->type) return 1;
+            
+            switch (b1->type) {
+                case LM_BOX_INT: return (b1->value.as_int > b2->value.as_int) - (b1->value.as_int < b2->value.as_int);
+                case LM_BOX_FLOAT: {
+                    double diff = b1->value.as_float - b2->value.as_float;
+                    return (diff > 0) - (diff < 0);
+                }
+                case LM_BOX_BOOL: return (b1->value.as_bool > b2->value.as_bool) - (b1->value.as_bool < b2->value.as_bool);
+                case LM_BOX_STRING: return strcmp((const char*)b1->value.as_ptr, (const char*)b2->value.as_ptr);
+                default: return 1;
+            }
+        }
+    }
+
+    return (v1 > v2) - (v1 < v2);
 }
 
 // Wrapper function for JIT to create dicts with proper hash/compare functions

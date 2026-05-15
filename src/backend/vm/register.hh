@@ -134,16 +134,28 @@ private:
     }
     
     inline int64_t to_int(const RegisterValue& value) const {
-        if (std::holds_alternative<int64_t>(value)) return std::get<int64_t>(value);
-        if (std::holds_alternative<uint64_t>(value)) return static_cast<int64_t>(std::get<uint64_t>(value));
+        if (std::holds_alternative<int64_t>(value) || std::holds_alternative<uint64_t>(value)) {
+            uint64_t val = std::holds_alternative<int64_t>(value) ? 
+                          static_cast<uint64_t>(std::get<int64_t>(value)) : 
+                          std::get<uint64_t>(value);
+            if (IS_INT(val)) return UNBOX_INT(val);
+            if (((val) & TAG_MASK) == TAG_IMMEDIATE) return (int64_t)((val) >> 3);
+            return (int64_t)val;
+        }
         if (std::holds_alternative<double>(value)) return static_cast<int64_t>(std::get<double>(value));
         if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? 1 : 0;
         return 0;
     }
     
     inline uint64_t to_uint(const RegisterValue& value) const {
-        if (std::holds_alternative<uint64_t>(value)) return std::get<uint64_t>(value);
-        if (std::holds_alternative<int64_t>(value)) return static_cast<uint64_t>(std::get<int64_t>(value));
+        if (std::holds_alternative<uint64_t>(value) || std::holds_alternative<int64_t>(value)) {
+            uint64_t val = std::holds_alternative<uint64_t>(value) ? 
+                          std::get<uint64_t>(value) : 
+                          static_cast<uint64_t>(std::get<int64_t>(value));
+            if (IS_INT(val)) return (uint64_t)UNBOX_INT(val);
+            if (((val) & TAG_MASK) == TAG_IMMEDIATE) return (uint64_t)((val) >> 3);
+            return val;
+        }
         if (std::holds_alternative<double>(value)) return static_cast<uint64_t>(std::get<double>(value));
         if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? 1 : 0;
         return 0;
@@ -151,16 +163,33 @@ private:
     
     inline double to_float(const RegisterValue& value) const {
         if (std::holds_alternative<double>(value)) return std::get<double>(value);
-        if (std::holds_alternative<int64_t>(value)) return static_cast<double>(std::get<int64_t>(value));
-        if (std::holds_alternative<uint64_t>(value)) return static_cast<double>(std::get<uint64_t>(value));
+        if (std::holds_alternative<int64_t>(value) || std::holds_alternative<uint64_t>(value)) {
+            uint64_t val = std::holds_alternative<int64_t>(value) ? 
+                          static_cast<uint64_t>(std::get<int64_t>(value)) : 
+                          std::get<uint64_t>(value);
+            if (IS_INT(val)) return static_cast<double>(UNBOX_INT(val));
+            if (((val) & TAG_MASK) == TAG_IMMEDIATE) return static_cast<double>((val) >> 3);
+            return static_cast<double>(val);
+        }
         if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? 1.0 : 0.0;
         return 0.0;
     }
     
     inline bool to_bool(const RegisterValue& value) const {
         if (std::holds_alternative<bool>(value)) return std::get<bool>(value);
-        if (std::holds_alternative<int64_t>(value)) return std::get<int64_t>(value) != 0;
-        if (std::holds_alternative<uint64_t>(value)) return std::get<uint64_t>(value) != 0;
+        if (std::holds_alternative<int64_t>(value) || std::holds_alternative<uint64_t>(value)) {
+            uint64_t val = std::holds_alternative<int64_t>(value) ? 
+                          static_cast<uint64_t>(std::get<int64_t>(value)) : 
+                          std::get<uint64_t>(value);
+            if (((val) & TAG_MASK) == TAG_IMMEDIATE) {
+                if (val == VAL_TRUE) return true;
+                if (val == VAL_FALSE) return false;
+                if (val == VAL_NIL) return false;
+                return ((val) >> 3) != 0;
+            }
+            if (IS_INT(val)) return UNBOX_INT(val) != 0;
+            return val != 0;
+        }
         if (std::holds_alternative<double>(value)) return std::get<double>(value) != 0.0;
         if (std::holds_alternative<std::string>(value)) return !std::get<std::string>(value).empty();
         return false;

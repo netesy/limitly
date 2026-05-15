@@ -88,10 +88,12 @@ private:
     void lower_task_bodies_recursive(const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& statements);
     
     // Helper methods
+public:
     Reg allocate_register();
     void enter_scope();
     void exit_scope();
     void bind_variable(const std::string& name, Reg reg);
+private:
     void update_variable_binding(const std::string& name, Reg reg);
     Reg resolve_variable(const std::string& name);
     void set_register_type(Reg reg, TypePtr type);
@@ -107,7 +109,9 @@ private:
     Type language_type_to_abi_type(TypePtr lang_type);
     Type get_expression_abi_type(LM::Frontend::AST::Expression& expr);
     
+public:
     void emit_instruction(const LIR_Inst& inst);
+private:
     void emit_typed_instruction(const LIR_Inst& inst);
     
     // Register value management
@@ -117,6 +121,8 @@ private:
     // Type inference helpers
     TypePtr get_promoted_numeric_type(TypePtr left_type, TypePtr right_type);
     bool is_signed_integer_type(TypePtr type);
+    bool is_decimal_type(TypePtr type);
+    int get_decimal_scale(TypePtr type);
     TypePtr get_wider_integer_type(TypePtr left_type, TypePtr right_type);
     TypePtr get_unsigned_version(TypePtr type);
     TypePtr get_best_integer_type(const std::string& value_str, bool prefer_signed = true);
@@ -165,6 +171,7 @@ private:
     Reg emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr);
     Reg emit_grouping_expr(LM::Frontend::AST::GroupingExpr& expr);
     Reg emit_call_expr(LM::Frontend::AST::CallExpr& expr);
+    Reg emit_cast_expr(LM::Frontend::AST::CastExpr& expr);
     Reg emit_assign_expr(LM::Frontend::AST::AssignExpr& expr);
     Reg emit_list_expr(LM::Frontend::AST::ListExpr& expr);
     Reg emit_call_closure_expr(LM::Frontend::AST::CallClosureExpr& expr);
@@ -240,6 +247,7 @@ private:
     void emit_trait_stmt(LM::Frontend::AST::TraitDeclaration& stmt);
     void emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt);
     void emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt);
+    void emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg, LIR_BasicBlock* failure_target);
     void emit_module_stmt(LM::Frontend::AST::ModuleDeclaration& stmt);
     
     // Helper functions

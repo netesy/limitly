@@ -2,6 +2,7 @@
 #define RUNTIME_TUPLE_H
 
 #include <stdint.h>
+#include "runtime_value_base.h"
 
 // For static linking, define as empty
 #ifndef RUNTIME_API
@@ -14,7 +15,7 @@ extern "C" {
 
 // Complete tuple structure - fixed size array of boxed values
 typedef struct {
-    uint64_t magic;      // Magic number for safe type detection: 0x4C6D5475 ("LmTu")
+    ObjHeader header;
     void** elements;
     uint64_t size;
     uint64_t capacity;

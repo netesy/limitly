@@ -140,12 +140,38 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             case LIR::LIR_Op::Copy:
                 store_reg(inst.dst, load_reg(inst.a, inst.type_a), inst.result_type);
                 break;
-            case LIR::LIR_Op::Add: store_reg(inst.dst, builder_->createAdd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::Sub: store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::Mul: store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::Div: store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::Mod: store_reg(inst.dst, builder_->createRem(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::Neg: store_reg(inst.dst, builder_->createNeg(load_reg(inst.a, inst.type_a)), inst.result_type); break;
+            case LIR::LIR_Op::Add:
+            case LIR::LIR_Op::DecAdd:
+                store_reg(inst.dst, builder_->createAdd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::Sub:
+            case LIR::LIR_Op::DecSub:
+                store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::Mul:
+                store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::DecMul: {
+                // Fyra-level multiplication for decimals is more complex due to scaling
+                // For now, use simple MUL but this needs proper scaling in AOT later
+                store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::Div:
+                store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::DecDiv: {
+                store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::Mod:
+            case LIR::LIR_Op::DecMod:
+                store_reg(inst.dst, builder_->createRem(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::Neg:
+            case LIR::LIR_Op::DecNeg:
+                store_reg(inst.dst, builder_->createNeg(load_reg(inst.a, inst.type_a)), inst.result_type);
+                break;
             case LIR::LIR_Op::And: store_reg(inst.dst, builder_->createAnd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Or: store_reg(inst.dst, builder_->createOr(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Xor: store_reg(inst.dst, builder_->createXor(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
@@ -202,7 +228,10 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             }
             case LIR::LIR_Op::Load: store_reg(inst.dst, builder_->createLoad(load_reg(inst.a, inst.type_a)), inst.result_type); break;
             case LIR::LIR_Op::Store: builder_->createStore(load_reg(inst.b, inst.type_b), load_reg(inst.a, inst.type_a)); break;
-            case LIR::LIR_Op::Cast: store_reg(inst.dst, builder_->createCast(load_reg(inst.a, inst.type_a), lir_type_to_fyra_type(inst.result_type)), inst.result_type); break;
+            case LIR::LIR_Op::Cast:
+            case LIR::LIR_Op::DecRescale:
+                store_reg(inst.dst, builder_->createCast(load_reg(inst.a, inst.type_a), lir_type_to_fyra_type(inst.result_type)), inst.result_type);
+                break;
             case LIR::LIR_Op::ToString: {
                 used_builtins_.insert("lm_to_string");
                 ir::Function* fn = current_module_->getFunction("lm_to_string");

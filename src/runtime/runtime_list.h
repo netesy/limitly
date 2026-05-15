@@ -3,6 +3,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include "runtime_value_base.h"
 
 // For static linking, define as empty
 #ifndef RUNTIME_API
@@ -13,8 +14,12 @@
 extern "C" {
 #endif
 
+// Magic number for list detection
+#define LM_LIST_MAGIC  0x4C6D4C69ULL  // "LmLi" in hex
+
 // Generic list structure (stores void pointers)
 typedef struct {
+    ObjHeader header;
     void** data;
     uint64_t size;
     uint64_t capacity;

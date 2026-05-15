@@ -81,6 +81,10 @@ enum class TokenType {
     FLOAT_TYPE,    // float
     FLOAT32_TYPE,  // f32
     FLOAT64_TYPE,  // f64
+    D2_TYPE,       // d2
+    D4_TYPE,       // d4
+    D6_TYPE,       // d6
+    DECIMAL_TYPE,  // decimal
     STR_TYPE,      // str
     BOOL_TYPE,     // bool
     USER_TYPE,     // user-defined types

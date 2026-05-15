@@ -34,6 +34,7 @@ namespace AST {
     struct SuperExpr;
     struct CallExpr;
     struct CallClosureExpr;
+    struct CastExpr;
     struct AssignExpr;
     struct TernaryExpr;
     struct GroupingExpr;
@@ -347,6 +348,12 @@ namespace AST {
         std::unordered_map<std::string, std::shared_ptr<Expression>> namedArgs;
     };
 
+    // Cast expression (e.g., x as int)
+    struct CastExpr : public Expression {
+        std::shared_ptr<Expression> expression;
+        std::shared_ptr<TypeAnnotation> targetType;
+    };
+
     // Assignment expression
     struct AssignExpr : public Expression {
         std::string name;
@@ -648,7 +655,7 @@ namespace AST {
     // Binding pattern in a match statement (e.g., Some(x))
     struct BindingPatternExpr : public Expression {
         std::string typeName;
-        std::vector<std::string> variableNames;
+        std::vector<std::shared_ptr<Expression>> patterns;
     };
 
     // List pattern in a match statement (e.g., [x, ...xs])
@@ -661,7 +668,7 @@ namespace AST {
     struct DictPatternExpr : public Expression {
         struct Field {
             std::string key;
-            std::optional<std::string> binding; // If empty, use key as binding name
+            std::shared_ptr<Expression> pattern; // If empty, use key as binding name
         };
         std::vector<Field> fields;
         bool hasRestElement = false;

@@ -6,6 +6,8 @@ RUNTIME_API LmList* lm_list_new(void) {
     LmList* list = (LmList*)malloc(sizeof(LmList));
     if (!list) return NULL;
     
+    list->header.type_id = TYPE_LIST;
+    list->header.metadata = 0;
     list->capacity = 8;
     list->size = 0;
     list->data = (void**)malloc(sizeof(void*) * list->capacity);

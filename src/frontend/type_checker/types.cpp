@@ -168,7 +168,12 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
 bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
     if (!expected || !actual) return false;
     if (expected->tag == TypeTag::Any || actual->tag == TypeTag::Any) return true;
-    if (is_numeric_type(expected) && is_numeric_type(actual)) return true;
+    if (is_numeric_type(expected) && is_numeric_type(actual)) {
+        if (is_decimal_type(expected) || is_decimal_type(actual)) {
+            return expected->tag == actual->tag;
+        }
+        return true;
+    }
 
     auto get_base = [](const std::string& s) {
         size_t dot = s.find_last_of(".");
@@ -356,7 +361,8 @@ bool TypeChecker::is_numeric_type(TypePtr type) {
                    type->tag == TypeTag::UInt || type->tag == TypeTag::UInt8 || 
                    type->tag == TypeTag::UInt16 || type->tag == TypeTag::UInt32 || 
                    type->tag == TypeTag::UInt64 || type->tag == TypeTag::UInt128 ||
-                   type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64);
+                   type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64 ||
+                   type->tag == TypeTag::Decimal2 || type->tag == TypeTag::Decimal4 || type->tag == TypeTag::Decimal6);
 }
 
 bool TypeChecker::is_integer_type(TypePtr type) {
@@ -370,6 +376,20 @@ bool TypeChecker::is_integer_type(TypePtr type) {
 
 bool TypeChecker::is_float_type(TypePtr type) {
     return type && (type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64);
+}
+
+bool TypeChecker::is_decimal_type(TypePtr type) {
+    return type && (type->tag == TypeTag::Decimal2 || type->tag == TypeTag::Decimal4 || type->tag == TypeTag::Decimal6);
+}
+
+int TypeChecker::get_decimal_scale(TypePtr type) {
+    if (!type) return 0;
+    switch (type->tag) {
+        case TypeTag::Decimal2: return 2;
+        case TypeTag::Decimal4: return 4;
+        case TypeTag::Decimal6: return 6;
+        default: return 0;
+    }
 }
 
 bool TypeChecker::is_boolean_type(TypePtr type) {

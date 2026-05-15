@@ -19,6 +19,9 @@ extern "C" {
 // Note: Accepts void* pointer which is interpreted as int64_t internally
 RUNTIME_API LmString lm_value_to_string(void* value);
 
+// Unified equality comparison for any two tagged values
+RUNTIME_API int lm_value_eq(void* v1, void* v2);
+
 #ifdef __cplusplus
 }
 #endif

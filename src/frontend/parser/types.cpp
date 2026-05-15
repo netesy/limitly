@@ -33,7 +33,9 @@ bool Parser::isPrimitiveType(TokenType type) {
            type == TokenType::INT32_TYPE || type == TokenType::INT64_TYPE || type == TokenType::INT128_TYPE ||
            type == TokenType::UINT_TYPE || type == TokenType::UINT8_TYPE || type == TokenType::UINT16_TYPE || type == TokenType::UINT32_TYPE ||
            type == TokenType::UINT64_TYPE || type == TokenType::UINT128_TYPE || type == TokenType::FLOAT_TYPE || type == TokenType::FLOAT32_TYPE ||
-           type == TokenType::FLOAT64_TYPE || type == TokenType::STR_TYPE || type == TokenType::BOOL_TYPE ||
+           type == TokenType::FLOAT64_TYPE ||
+           type == TokenType::D2_TYPE || type == TokenType::D4_TYPE || type == TokenType::D6_TYPE || type == TokenType::DECIMAL_TYPE ||
+           type == TokenType::STR_TYPE || type == TokenType::BOOL_TYPE ||
            type == TokenType::ANY_TYPE || type == TokenType::NIL_TYPE;
 }
 
@@ -54,6 +56,10 @@ std::string Parser::tokenTypeToString(TokenType type) {
         case TokenType::FLOAT_TYPE: return "float";
         case TokenType::FLOAT32_TYPE: return "f32";
         case TokenType::FLOAT64_TYPE: return "f64";
+        case TokenType::D2_TYPE: return "d2";
+        case TokenType::D4_TYPE: return "d4";
+        case TokenType::D6_TYPE: return "d6";
+        case TokenType::DECIMAL_TYPE: return "decimal";
         case TokenType::STR_TYPE: return "str";
         case TokenType::BOOL_TYPE: return "bool";
         case TokenType::ANY_TYPE: return "any";
@@ -107,6 +113,10 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
     else if (match({TokenType::FLOAT_TYPE})) { type->typeName = "float"; type->isPrimitive = true; }
     else if (match({TokenType::FLOAT32_TYPE})) { type->typeName = "f32"; type->isPrimitive = true; }
     else if (match({TokenType::FLOAT64_TYPE})) { type->typeName = "f64"; type->isPrimitive = true; }
+    else if (match({TokenType::D2_TYPE})) { type->typeName = "d2"; type->isPrimitive = true; }
+    else if (match({TokenType::D4_TYPE})) { type->typeName = "d4"; type->isPrimitive = true; }
+    else if (match({TokenType::D6_TYPE})) { type->typeName = "d6"; type->isPrimitive = true; }
+    else if (match({TokenType::DECIMAL_TYPE})) { type->typeName = "decimal"; type->isPrimitive = true; }
     else if (match({TokenType::STR_TYPE})) { type->typeName = "str"; type->isPrimitive = true; }
     else if (match({TokenType::BOOL_TYPE})) { type->typeName = "bool"; type->isPrimitive = true; }
     else if (match({TokenType::ANY_TYPE})) { type->typeName = "any"; type->isPrimitive = true; }
