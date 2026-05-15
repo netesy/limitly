@@ -2,6 +2,7 @@
 #define RUNTIME_H
 
 #include <stdint.h>
+#include "runtime_value_base.h"
 
 // For static linking, define as empty
 #ifndef RUNTIME_API
@@ -20,6 +21,7 @@ extern "C" {
 
 // Boxing/Unboxing for primitive types
 typedef struct {
+    ObjHeader header;
     uint8_t type;  // 0=int, 1=float, 2=bool, 3=string, 4=nullptr
     union {
         int64_t as_int;
@@ -55,6 +57,7 @@ RUNTIME_API void lm_box_free(LmBox* box);
 
 // Frame runtime support
 typedef struct {
+    ObjHeader header;
     char* name;
     void** fields;
     int field_count;

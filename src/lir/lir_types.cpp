@@ -34,6 +34,9 @@ Type language_type_to_abi_type(TypePtr lang_type) {
         case TypeTag::Int128:
         case TypeTag::UInt64:
         case TypeTag::UInt128:
+        case TypeTag::Decimal2:
+        case TypeTag::Decimal4:
+        case TypeTag::Decimal6:
             return Type::I64;
             
         // Other integer types

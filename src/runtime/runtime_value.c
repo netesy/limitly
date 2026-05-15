@@ -1,13 +1,14 @@
 #define BUILDING_RUNTIME
-#include <stdint.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
-#include "runtime_string.h"
+#include "runtime_value.h"
+#include "runtime_value_base.h"
 #include "runtime_list.h"
 #include "runtime_dict.h"
 #include "runtime_tuple.h"
+#include "runtime_string.h"
 #include "runtime.h"
+#include <stdlib.h>
+#include <string.h>
+#include <stdio.h>
 
 // Forward declarations for helper functions
 static LmString format_list(LmList* list);
@@ -38,14 +39,7 @@ static LmString format_value(int64_t value);
 
 // Format list as string: [elem1, elem2, ...]
 static LmString format_list(LmList* list) {
-    if (!list) {
-        return lm_string_from_cstr("[]");
-    }
-    
-    // Safety check: verify list structure looks valid
-    if (!list->data || list->size > 1000000 || list->capacity < list->size) {
-        return lm_string_from_cstr("[]");
-    }
+    if (!list) return lm_string_from_cstr("[]");
     
     uint64_t capacity = 256;
     char* buf = (char*)malloc(capacity);
@@ -141,8 +135,10 @@ static LmString format_tuple(LmTuple* tuple) {
         // Format element
         int64_t elem = (int64_t)(uintptr_t)tuple->elements[i];
         LmString elem_str = format_value(elem);
-        append_to_buffer(&buf, &pos, &capacity, elem_str.data);
-        lm_string_free(elem_str);
+        if (elem_str.data) {
+            append_to_buffer(&buf, &pos, &capacity, elem_str.data);
+            lm_string_free(elem_str);
+        }
     }
     
     append_to_buffer(&buf, &pos, &capacity, ")");
@@ -151,62 +147,100 @@ static LmString format_tuple(LmTuple* tuple) {
     return (LmString){ buf, pos };
 }
 
-// Format a single value (handles primitives and collections)
+// Format a single value using Low-Bit Tagging
 static LmString format_value(int64_t value) {
-    // Since we now have explicit type information in LIR instructions,
-    // we should only reach this function when we know the value is a pointer
-    // to a collection. We trust the type system and don't do pointer range detection.
-    
-    void* ptr = (void*)(uintptr_t)value;
-    
-    // Try as boxed value FIRST (for elements in collections)
-    // Boxed values have a type field at the beginning
-    LmBox* box = (LmBox*)ptr;
-    if (box && box->type >= 0 && box->type <= 4) {
-        // It's a boxed value, format it
-        switch (box->type) {
-            case LM_BOX_INT:
-                return lm_int_to_string(box->value.as_int);
-            case LM_BOX_FLOAT: {
-                return lm_double_to_string(box->value.as_float);
+    if (IS_INT(value)) {
+        return lm_int_to_string(UNBOX_INT(value));
+    }
+    if (IS_NIL(value)) {
+        return lm_string_from_cstr("nil");
+    }
+    if (IS_BOOL(value)) {
+        return lm_bool_to_string(UNBOX_BOOL(value) ? 1 : 0);
+    }
+
+    if (IS_PTR(value)) {
+        void* ptr = UNBOX_PTR(value);
+        if (!ptr) return lm_string_from_cstr("nil");
+
+        ObjHeader* header = (ObjHeader*)ptr;
+        switch (header->type_id) {
+            case TYPE_LIST:
+                return format_list((LmList*)ptr);
+            case TYPE_DICT:
+                return format_dict((LmDict*)ptr);
+            case TYPE_TUPLE:
+                return format_tuple((LmTuple*)ptr);
+            case TYPE_FRAME: {
+                LmFrame* frame = (LmFrame*)ptr;
+                return lm_string_from_cstr(frame->name ? frame->name : "frame");
             }
-            case LM_BOX_BOOL:
-                return lm_bool_to_string(box->value.as_bool ? 1 : 0);
-            case LM_BOX_STRING: {
-                const char* str = lm_unbox_string(box);
-                return lm_string_from_cstr(str);
+            case TYPE_BOX: {
+                LmBox* box = (LmBox*)ptr;
+                switch (box->type) {
+                    case LM_BOX_INT: return lm_int_to_string(box->value.as_int);
+                    case LM_BOX_FLOAT: {
+                        char b[64];
+                        snprintf(b, sizeof(b), "%g", box->value.as_float);
+                        return lm_string_from_cstr(b);
+                    }
+                    case LM_BOX_BOOL: return lm_bool_to_string(box->value.as_bool);
+                    case LM_BOX_STRING: return lm_string_from_cstr((char*)box->value.as_ptr);
+                    case LM_BOX_NULLPTR: return lm_string_from_cstr("nil");
+                    default: return lm_string_from_cstr("<box>");
+                }
             }
-            case LM_BOX_NULLPTR:
-                return lm_string_from_cstr("nil");
             default:
-                return lm_string_from_cstr("?");
+                break;
         }
     }
     
-    // Try as tuple (has magic number - most reliable)
-    LmTuple* tuple = (LmTuple*)ptr;
-    if (tuple && tuple->magic == LM_TUPLE_MAGIC && tuple->elements && tuple->size < 1000000) {
-        return format_tuple(tuple);
-    }
-    
-    // Try as list
-    LmList* list = (LmList*)ptr;
-    if (list && list->data && list->size < 1000000 && list->capacity >= list->size) {
-        return format_list(list);
-    }
-    
-    // Try as dict
-    LmDict* dict = (LmDict*)ptr;
-    if (dict && dict->buckets && dict->bucket_count > 0 && dict->bucket_count < 1000000) {
-        return format_dict(dict);
-    }
-    
-    // If none of the above, fall back to integer representation
+    // Fallback for unhandled or raw values
     return lm_int_to_string(value);
 }
 
 // Main API: Convert any value to a printable string
-// This is the function called by both JIT and Register VM
 RUNTIME_API LmString lm_value_to_string(void* value) {
     return format_value((int64_t)(uintptr_t)value);
+}
+
+// Unified equality comparison for any two tagged values
+RUNTIME_API int lm_value_eq(void* v1, void* v2) {
+    if (v1 == v2) return 1;
+    
+    int64_t val1 = (int64_t)(uintptr_t)v1;
+    int64_t val2 = (int64_t)(uintptr_t)v2;
+    
+    if (IS_INT(val1) && IS_INT(val2)) return UNBOX_INT(val1) == UNBOX_INT(val2);
+    if (IS_BOOL(val1) && IS_BOOL(val2)) return val1 == val2;
+    if (IS_NIL(val1) || IS_NIL(val2)) return val1 == val2;
+    
+    if (IS_PTR(val1) && IS_PTR(val2)) {
+        void* p1 = UNBOX_PTR(val1);
+        void* p2 = UNBOX_PTR(val2);
+        ObjHeader* h1 = (ObjHeader*)p1;
+        ObjHeader* h2 = (ObjHeader*)p2;
+        
+        if (h1->type_id != h2->type_id) return 0;
+        
+        switch (h1->type_id) {
+            case TYPE_BOX: {
+                LmBox* b1 = (LmBox*)p1;
+                LmBox* b2 = (LmBox*)p2;
+                if (b1->type != b2->type) return 0;
+                switch (b1->type) {
+                    case LM_BOX_INT: return b1->value.as_int == b2->value.as_int;
+                    case LM_BOX_FLOAT: return b1->value.as_float == b2->value.as_float;
+                    case LM_BOX_BOOL: return b1->value.as_bool == b2->value.as_bool;
+                    case LM_BOX_STRING: return strcmp((const char*)b1->value.as_ptr, (const char*)b2->value.as_ptr) == 0;
+                    case LM_BOX_NULLPTR: return 1;
+                    default: return 0;
+                }
+            }
+            // For collections, we currently only support identity equality unless deep comparison is implemented
+            default: return p1 == p2;
+        }
+    }
+    
+    return val1 == val2;
 }

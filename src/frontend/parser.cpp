@@ -46,6 +46,9 @@ Token Parser::consume(TokenType type, const std::string &message) {
     // Report error but don't throw - let parser continue
     error(message);
     
+    // Advance to ensure progress and avoid infinite loops
+    if (!isAtEnd()) advance();
+
     // Return a dummy token to allow parsing to continue
     Token dummy;
     dummy.type = type;
@@ -366,6 +369,7 @@ CST::NodeKind Parser::mapASTNodeKind(const std::string& astNodeType) {
     if (className.find("BinaryExpr") != std::string::npos) return CST::NodeKind::BINARY_EXPR;
     if (className.find("UnaryExpr") != std::string::npos) return CST::NodeKind::UNARY_EXPR;
     if (className.find("CallExpr") != std::string::npos) return CST::NodeKind::CALL_EXPR;
+    if (className.find("CastExpr") != std::string::npos) return CST::NodeKind::BINARY_EXPR; // Treat cast as binary for CST
     if (className.find("MemberExpr") != std::string::npos) return CST::NodeKind::MEMBER_EXPR;
     if (className.find("IndexExpr") != std::string::npos) return CST::NodeKind::INDEX_EXPR;
     if (className.find("LiteralExpr") != std::string::npos) return CST::NodeKind::LITERAL_EXPR;
@@ -497,6 +501,7 @@ template auto Parser::createNode<LM::Frontend::AST::LiteralExpr>() -> std::share
 template auto Parser::createNode<LM::Frontend::AST::ObjectLiteralExpr>() -> std::shared_ptr<LM::Frontend::AST::ObjectLiteralExpr>;
 template auto Parser::createNode<LM::Frontend::AST::VariableExpr>() -> std::shared_ptr<LM::Frontend::AST::VariableExpr>;
 template auto Parser::createNode<LM::Frontend::AST::CallExpr>() -> std::shared_ptr<LM::Frontend::AST::CallExpr>;
+template auto Parser::createNode<LM::Frontend::AST::CastExpr>() -> std::shared_ptr<LM::Frontend::AST::CastExpr>;
 template auto Parser::createNode<LM::Frontend::AST::AssignExpr>() -> std::shared_ptr<LM::Frontend::AST::AssignExpr>;
 template auto Parser::createNode<LM::Frontend::AST::GroupingExpr>() -> std::shared_ptr<LM::Frontend::AST::GroupingExpr>;
 template auto Parser::createNode<LM::Frontend::AST::MemberExpr>() -> std::shared_ptr<LM::Frontend::AST::MemberExpr>;
@@ -527,6 +532,7 @@ template auto Parser::createNodeWithContext<LM::Frontend::AST::GroupingExpr>() -
 template auto Parser::createNodeWithContext<LM::Frontend::AST::BinaryExpr>() -> std::shared_ptr<LM::Frontend::AST::BinaryExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::UnaryExpr>() -> std::shared_ptr<LM::Frontend::AST::UnaryExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::CallExpr>() -> std::shared_ptr<LM::Frontend::AST::CallExpr>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::CastExpr>() -> std::shared_ptr<LM::Frontend::AST::CastExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::MemberExpr>() -> std::shared_ptr<LM::Frontend::AST::MemberExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::IndexExpr>() -> std::shared_ptr<LM::Frontend::AST::IndexExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::AssignExpr>() -> std::shared_ptr<LM::Frontend::AST::AssignExpr>;

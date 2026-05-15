@@ -54,7 +54,7 @@ if (r6 == 2) { print("✅ PASS\n"); } else { print("❌ FAIL: expected 2, got {r
 // Test 7: Boolean folding
 print("Test 7: Boolean folding");
 fn test_bool_fold(): bool {
-    return true && true;  // Should fold to true
+    return true and true;  // Should fold to true
 }
 var r7 = test_bool_fold();
 if (r7 == true) { print("✅ PASS\n"); } else { print("❌ FAIL: expected true, got {r7}\n"); }

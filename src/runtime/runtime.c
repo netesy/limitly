@@ -39,6 +39,8 @@ RUNTIME_API LmBox* lm_box_int(int64_t value) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
     
+    box->header.type_id = TYPE_BOX; 
+    box->header.metadata = 0;
     box->type = LM_BOX_INT;
     box->value.as_int = value;
     return box;
@@ -48,6 +50,8 @@ RUNTIME_API LmBox* lm_box_float(double value) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
     
+    box->header.type_id = TYPE_BOX;
+    box->header.metadata = 0;
     box->type = LM_BOX_FLOAT;
     box->value.as_float = value;
     return box;
@@ -57,6 +61,8 @@ RUNTIME_API LmBox* lm_box_bool(uint8_t value) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
     
+    box->header.type_id = TYPE_BOX;
+    box->header.metadata = 0;
     box->type = LM_BOX_BOOL;
     box->value.as_bool = value;
     return box;
@@ -66,8 +72,10 @@ RUNTIME_API LmBox* lm_box_string(const char* value) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
     
+    box->header.type_id = TYPE_BOX;
+    box->header.metadata = 0;
     box->type = LM_BOX_STRING;
-    box->value.as_ptr = (void*)value;
+    box->value.as_ptr = value ? strdup(value) : NULL;
     return box;
 }
 
@@ -75,6 +83,8 @@ RUNTIME_API LmBox* lm_box_nullptr(void) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
     
+    box->header.type_id = TYPE_BOX;
+    box->header.metadata = 0;
     box->type = LM_BOX_NULLPTR;
     box->value.as_ptr = NULL;
     return box;
@@ -122,6 +132,8 @@ RUNTIME_API void* lm_frame_alloc(const char* name, int fields) {
     LmFrame* frame = (LmFrame*)malloc(sizeof(LmFrame));
     if (!frame) return NULL;
     
+    frame->header.type_id = TYPE_FRAME;
+    frame->header.metadata = 0;
     frame->name = strdup(name);
     frame->field_count = fields;
     frame->fields = (void**)calloc(fields, sizeof(void*));

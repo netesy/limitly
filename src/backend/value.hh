@@ -372,7 +372,13 @@ enum class TypeTag {
 
     Refined,
 
-    Structural
+    Structural,
+
+    Decimal2,
+
+    Decimal4,
+
+    Decimal6
 
 };
 
@@ -888,6 +894,21 @@ struct Type
 
 
 
+    int getDecimalScale() const {
+        switch (tag) {
+            case TypeTag::Decimal2: return 2;
+            case TypeTag::Decimal4: return 4;
+            case TypeTag::Decimal6: return 6;
+            default: return 0;
+        }
+    }
+
+    static int64_t getDecimalPower(int scale) {
+        static const int64_t powers[] = {1, 10, 100, 1000, 10000, 100000, 1000000};
+        if (scale >= 0 && scale <= 6) return powers[scale];
+        return 1;
+    }
+
     std::string toString() const
 
     {
@@ -967,6 +988,18 @@ struct Type
         case TypeTag::Float64:
 
             return "Float64";
+
+        case TypeTag::Decimal2:
+
+            return "d2";
+
+        case TypeTag::Decimal4:
+
+            return "d4";
+
+        case TypeTag::Decimal6:
+
+            return "d6";
 
         case TypeTag::String:
 
@@ -1195,6 +1228,14 @@ struct Type
         
 
         switch (tag) {
+
+            case TypeTag::Decimal2:
+
+            case TypeTag::Decimal4:
+
+            case TypeTag::Decimal6:
+
+                return true;
 
             case TypeTag::Enum: {
 

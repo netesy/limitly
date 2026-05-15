@@ -1,5 +1,18 @@
-var x: int = 10;
-match (x) {
-    10 => { print("matched 10"); },
-    _ => { print("matched wildcard"); }
+fn testListDestructuring(value): str {
+    match(value) {
+        [] => { return "Empty list"; },
+        [x] => { return "One element: {x}"; },
+        [x, y] => { return "Two elements: {x}, {y}"; },
+        [head, ...tail] => { return "Head: {head}, Tail: {tail}"; }
+    }
 }
+
+var list1 = testListDestructuring([]);
+var list2 = testListDestructuring([1]);
+var list3 = testListDestructuring([1, 2]);
+var list4 = testListDestructuring([1, 2, 3, 4, 5]);
+
+print("Empty: [{list1}]");
+print("One: [{list2}]");
+print("Two: [{list3}]");
+print("Many: [{list4}]");

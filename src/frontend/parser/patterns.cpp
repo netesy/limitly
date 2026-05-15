@@ -79,77 +79,32 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
     if (match({TokenType::LEFT_BRACE})) return parseDictPattern();
     if (match({TokenType::LEFT_PAREN})) return parseTuplePattern();
     if (check(TokenType::IDENTIFIER)) {
-        // Look ahead for potential qualified binding pattern: Type.Variant(args)
-        int lookahead = 1;
+        if (isErrorType(peek().lexeme)) return parseErrorTypePattern();
+
         const auto& tokens = scanner.getTokens();
-        int maxLookahead = 10; // Prevent infinite loop
-        while (current + lookahead < tokens.size() && 
-               lookahead < maxLookahead &&
-               (tokens[current + lookahead].type == TokenType::DOT || 
-                tokens[current + lookahead].type == TokenType::IDENTIFIER)) {
-            lookahead++;
-        }
-        if (current + lookahead < tokens.size() && tokens[current + lookahead].type == TokenType::LEFT_PAREN) {
-            return parseBindingPattern();
-        }
         
-        // Check for qualified enum pattern without parentheses: Status.Active => or Status.Active where ...
-        // Pattern: IDENTIFIER DOT IDENTIFIER followed by ARROW or WHERE
-        if (current + 2 < tokens.size() &&
-            tokens[current + 1].type == TokenType::DOT &&
-            tokens[current + 2].type == TokenType::IDENTIFIER) {
-            // Check if followed by ARROW or WHERE (indicating a pattern, not a type)
-            size_t afterQualified = current + 3;
-            if (afterQualified < tokens.size() &&
-                (tokens[afterQualified].type == TokenType::ARROW ||
-                 tokens[afterQualified].type == TokenType::WHERE)) {
-                return parseBindingPattern();
-            }
+        // Peek ahead to see if it's qualified or has args
+        bool isQualified = (current + 1 < tokens.size() && tokens[current + 1].type == TokenType::DOT);
+        bool hasArgs = (current + 1 < tokens.size() && tokens[current + 1].type == TokenType::LEFT_PAREN);
+        
+        if (isQualified || hasArgs) {
+             return parseBindingPattern();
         }
 
-        if (isErrorType(peek().lexeme)) return parseErrorTypePattern();
-        
-        // Check if this is a variable pattern (followed by WHERE or => without parentheses)
-        // Also handle qualified patterns like Status.Active => by looking past DOT and second IDENTIFIER
-        auto varLookahead = 1;
-        const auto& patternTokens = scanner.getTokens();
-        int maxVarLookahead = 10; // Prevent infinite loop
-        bool isVariablePattern = false;
-        
-        if (current + varLookahead < patternTokens.size()) {
-            auto nextToken = patternTokens[current + varLookahead];
-            // Skip past DOT.IDENTIFIER for qualified patterns (e.g., Status.Active)
-            if (nextToken.type == TokenType::DOT &&
-                current + varLookahead + 1 < patternTokens.size() &&
-                patternTokens[current + varLookahead + 1].type == TokenType::IDENTIFIER) {
-                varLookahead += 2; // Skip DOT and the second IDENTIFIER
-                if (current + varLookahead < patternTokens.size() && varLookahead < maxVarLookahead) {
-                    nextToken = patternTokens[current + varLookahead];
-                }
-            }
-            if (nextToken.type == TokenType::WHERE || nextToken.type == TokenType::ARROW) {
-                isVariablePattern = true;
-            }
+        if (isKnownTypeName(peek().lexeme)) {
+             auto token = advance();
+             auto typePattern = std::make_shared<LM::Frontend::AST::TypePatternExpr>();
+             typePattern->line = token.line;
+             typePattern->type = createTypeAnnotationFromToken(token);
+             return typePattern;
         }
         
-        if (isVariablePattern) {
-            // This is a variable pattern, not a type alias
-            auto token = advance();
-            auto varExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
-            varExpr->line = token.line;
-            varExpr->name = token.lexeme;
-            return varExpr;
-        } else {
-            // Handle potential type aliases - treat IDENTIFIER as type pattern
-            auto token = advance();
-            auto typePattern = std::make_shared<LM::Frontend::AST::TypePatternExpr>();
-            typePattern->line = token.line;
-            auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
-            type->typeName = token.lexeme;
-            type->isUserDefined = true; // Mark as potentially user-defined type alias
-            typePattern->type = type;
-            return typePattern;
-        }
+        // Otherwise, it's a variable binding
+        auto token = advance();
+        auto varExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
+        varExpr->line = token.line;
+        varExpr->name = token.lexeme;
+        return varExpr;
     }
     return expression();
 }
@@ -167,7 +122,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseBindingPattern() {
     if (match({TokenType::LEFT_PAREN})) {
         if (!check(TokenType::RIGHT_PAREN)) {
             do {
-                pattern->variableNames.push_back(consume(TokenType::IDENTIFIER, "Expected variable name in binding pattern.").lexeme);
+                pattern->patterns.push_back(parsePattern());
             } while (match({TokenType::COMMA}));
         }
         consume(TokenType::RIGHT_PAREN, "Expected ')' after binding variables.");
@@ -211,14 +166,17 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseDictPattern() {
                 break;
             }
             auto key = consume(TokenType::IDENTIFIER, "Expected key in dict pattern.").lexeme;
-            std::optional<std::string> binding;
+            std::shared_ptr<LM::Frontend::AST::Expression> nestedPattern;
             if (match({TokenType::COLON})) {
-                binding = consume(TokenType::IDENTIFIER, "Expected binding name after ':'.") .lexeme;
+                nestedPattern = parsePattern();
             } else {
                 // Record destructuring shorthand: {name} means {name: name}
-                binding = key;
+                auto varExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
+                varExpr->line = previous().line;
+                varExpr->name = key;
+                nestedPattern = varExpr;
             }
-            pattern->fields.push_back({key, binding});
+            pattern->fields.push_back({key, nestedPattern});
             fieldCount++;
             if (fieldCount >= maxFields) {
                 error("Too many fields in dict pattern");
