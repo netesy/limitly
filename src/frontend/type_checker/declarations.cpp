@@ -51,6 +51,7 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
         enter_scope();
 
         // Validate pattern compatibility and register bindings
+        matchCase.pattern->inferred_type = matchType;
         validate_pattern_compatibility(matchCase.pattern, matchType, match_stmt->line);
 
         // Check guard if present

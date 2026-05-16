@@ -23,29 +23,50 @@ bool resolve_enum_variant_info(TypeSystem* type_system,
     TypePtr enum_type = enum_type_hint;
     std::string variant_name = variant_ref;
 
+    // 1. Try directly in enum_type_hint
+    if (enum_type && (enum_type->tag == TypeTag::Enum || enum_type->tag == TypeTag::UserDefined || enum_type->tag == TypeTag::Frame)) {
+        if (auto* enum_info = std::get_if<EnumType>(&enum_type->extra)) {
+            // Try as is (qualified or not)
+            auto it = std::find(enum_info->values.begin(), enum_info->values.end(), variant_name);
+            
+            // Try unqualified
+            if (it == enum_info->values.end()) {
+                std::string unqualified = variant_name;
+                if (unqualified.find('.') != std::string::npos) unqualified = unqualified.substr(unqualified.find('.') + 1);
+                it = std::find(enum_info->values.begin(), enum_info->values.end(), unqualified);
+            }
+            
+            if (it != enum_info->values.end()) {
+                out_tag = static_cast<int64_t>(std::distance(enum_info->values.begin(), it));
+                auto arity_it = enum_info->variantTypes.find(*it);
+                out_arity = (arity_it != enum_info->variantTypes.end()) ? arity_it->second.size() : 0;
+                return true;
+            }
+        }
+    }
+
+    // 2. Try via qualified name
     auto dot_pos = variant_ref.find('.');
     if (dot_pos != std::string::npos) {
         std::string enum_name = variant_ref.substr(0, dot_pos);
         variant_name = variant_ref.substr(dot_pos + 1);
         if (type_system) {
-            enum_type = type_system->getType(enum_name);
+            auto found = type_system->getType(enum_name);
+            if (found && (found->tag == TypeTag::Enum || found->tag == TypeTag::UserDefined || found->tag == TypeTag::Frame)) {
+                if (auto* enum_info = std::get_if<EnumType>(&found->extra)) {
+                    auto it = std::find(enum_info->values.begin(), enum_info->values.end(), variant_name);
+                    if (it != enum_info->values.end()) {
+                        out_tag = static_cast<int64_t>(std::distance(enum_info->values.begin(), it));
+                        auto arity_it = enum_info->variantTypes.find(*it);
+                        out_arity = (arity_it != enum_info->variantTypes.end()) ? arity_it->second.size() : 0;
+                        return true;
+                    }
+                }
+            }
         }
     }
 
-    if (!enum_type || enum_type->tag != TypeTag::Enum) {
-        return false;
-    }
-
-    auto* enum_info = std::get_if<EnumType>(&enum_type->extra);
-    if (!enum_info) return false;
-
-    auto it = std::find(enum_info->values.begin(), enum_info->values.end(), variant_name);
-    if (it == enum_info->values.end()) return false;
-
-    out_tag = static_cast<int64_t>(std::distance(enum_info->values.begin(), it));
-    auto arity_it = enum_info->variantTypes.find(variant_name);
-    out_arity = (arity_it != enum_info->variantTypes.end()) ? arity_it->second.size() : 0;
-    return true;
+    return false;
 }
 }
 
@@ -1223,13 +1244,48 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             func_name = ft.name;
         }
 
-        // Check if it's a frame instantiation
+                // Check if it is a frame instantiation
         auto frame_it = frame_table_.find(func_name);
         if (frame_it == frame_table_.end()) {
-            // Fallback for namespaced functions if not a frame
-            if (expr.inferred_type && expr.inferred_type->tag == ::TypeTag::Function) {
-                // We might need to check if the function name is qualified
-                // For now, if we found it in TypeChecker, it should be in our table under some name
+             // Check for enum constructor call: EnumName.Variant(payload)
+            int64_t tag = 0; size_t expected_arity = 0;
+            TypePtr enum_hint = expr.inferred_type;
+            
+            if (func_name.find('.') != std::string::npos && type_system_) {
+                 auto name = func_name.substr(0, func_name.find('.'));
+                 auto found = type_system_->getType(name);
+                 if (found && (found->tag == TypeTag::Enum || found->tag == TypeTag::UserDefined)) enum_hint = found;
+            }
+
+            // Try resolving directly or via TypeChecker inferred type
+            bool resolved = resolve_enum_variant_info(type_system_.get(), enum_hint, func_name, tag, expected_arity);
+            if (!resolved && enum_hint && (enum_hint->tag == TypeTag::Enum || enum_hint->tag == TypeTag::UserDefined || enum_hint->tag == TypeTag::Frame)) {
+                if (auto* et = std::get_if<EnumType>(&enum_hint->extra)) {
+                    resolved = resolve_enum_variant_info(type_system_.get(), enum_hint, et->name + "." + func_name, tag, expected_arity);
+                }
+            }
+
+            if (resolved) {
+                Reg payload_reg = UINT32_MAX;
+                if (expr.arguments.size() == 1) {
+                    payload_reg = emit_expr(*expr.arguments[0]);
+                } else if (expr.arguments.size() > 1) {
+                    // Create tuple for multiple payloads
+                    payload_reg = allocate_register();
+                    emit_instruction(LIR_Inst(LIR_Op::TupleCreate, Type::Ptr, payload_reg, 0, 0, (uint32_t)expr.arguments.size()));
+                    for (size_t i = 0; i < expr.arguments.size(); ++i) {
+                        Reg arg_reg = emit_expr(*expr.arguments[i]);
+                        Reg idx_reg = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)i)));
+                        emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, payload_reg, idx_reg, arg_reg));
+                    }
+                }
+                
+                Reg result = allocate_register();
+                LIR_Inst make_enum_inst(LIR_Op::MakeEnum, Type::Ptr, result, payload_reg, 0, (uint32_t)tag);
+                emit_instruction(make_enum_inst);
+                if (expr.inferred_type) set_register_language_type(result, expr.inferred_type);
+                return result;
             }
         }
 

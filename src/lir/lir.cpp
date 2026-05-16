@@ -129,6 +129,7 @@ std::string LIR_Inst::to_string() const {
             oss << " r" << dst << ", r" << a << ", r" << b;
             break;
         case LIR_Op::DictGet:
+        case LIR_Op::DictHas:
         case LIR_Op::DictLen:
             oss << " r" << dst << ", r" << a << ", r" << b;
             break;
@@ -327,6 +328,7 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::DictCreate: return "dict_create";
         case LIR_Op::DictSet: return "dict_set";
         case LIR_Op::DictGet: return "dict_get";
+        case LIR_Op::DictHas: return "dict_has";
         case LIR_Op::DictLen: return "dict_len";
         case LIR_Op::DictItems: return "dict_items";
         case LIR_Op::TupleCreate: return "tuple_create";

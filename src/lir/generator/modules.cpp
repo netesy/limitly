@@ -49,6 +49,14 @@ Generator::ModuleSymbolInfo* Generator::resolve_module_symbol(const std::string&
     if (it != module_symbol_table_.end()) {
         return &it->second;
     }
+    // Try converting . to ::
+    std::string alt = qualified_name;
+    size_t last_dot = alt.find_last_of('.');
+    if (last_dot != std::string::npos) {
+        alt.replace(last_dot, 1, "::");
+        it = module_symbol_table_.find(alt);
+        if (it != module_symbol_table_.end()) return &it->second;
+    }
     return nullptr;
 }
 

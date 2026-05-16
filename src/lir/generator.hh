@@ -111,6 +111,16 @@ private:
     
 public:
     void emit_instruction(const LIR_Inst& inst);
+    
+    // CFG building methods (needed by generator code)
+    LIR_BasicBlock* create_basic_block(const std::string& label = "");
+    void set_current_block(LIR_BasicBlock* block);
+    void add_block_edge(LIR_BasicBlock* from, LIR_BasicBlock* to);
+    LIR_BasicBlock* get_current_block() const;
+    
+    // Type system access
+    std::shared_ptr<TypeSystem> get_type_system() const { return type_system_; }
+    
 private:
     void emit_typed_instruction(const LIR_Inst& inst);
     
@@ -137,10 +147,6 @@ private:
     void remove_unreachable_blocks();
     void flatten_cfg_to_instructions();
     bool validate_cfg(); // CFG validator
-    LIR_BasicBlock* create_basic_block(const std::string& label = "");
-    void set_current_block(LIR_BasicBlock* block);
-    void add_block_edge(LIR_BasicBlock* from, LIR_BasicBlock* to);
-    LIR_BasicBlock* get_current_block() const;
     
     // Loop management methods
     uint32_t generate_label();

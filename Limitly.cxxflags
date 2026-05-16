@@ -1,5 +1,1 @@
 -std=c++17
--lws2_32
--lgccjit
--static-libgcc
--static-libstdc++
