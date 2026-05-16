@@ -355,6 +355,7 @@ TypePtr TypeChecker::check_enum_declaration(std::shared_ptr<LM::Frontend::AST::E
         if (associatedTypes.empty()) {
             // Unit variant
             variable_types[qualified] = enumType;
+            variable_types[variantName] = enumType; // Also register unqualified
 
             FunctionSignature sig;
             sig.name = variantName;
@@ -369,6 +370,7 @@ TypePtr TypeChecker::check_enum_declaration(std::shared_ptr<LM::Frontend::AST::E
 
             TypePtr constructorType = type_system.createFunctionType(paramTypes, enumType);
             variable_types[qualified] = constructorType;
+            variable_types[variantName] = constructorType; // Also register unqualified
 
             FunctionSignature sig;
             sig.name = variantName;

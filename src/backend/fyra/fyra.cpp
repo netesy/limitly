@@ -95,8 +95,8 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
             default: target_os = ::target::OS::Linux; break;
         }
 
-        std::unique_ptr<::codegen::target::TargetInfo> targetInfo = 
-            ::codegen::target::TargetResolver::resolve({target_arch, target_os, std::nullopt});
+        std::unique_ptr<::target::TargetInfo> targetInfo = 
+            ::target::TargetResolver::resolve({target_arch, target_os, std::nullopt});
 
         if (!targetInfo) {
             result.success = false;

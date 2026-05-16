@@ -1640,6 +1640,9 @@ public:
         case TypeTag::Bool:
         case TypeTag::String:
         case TypeTag::Nil:
+        case TypeTag::Decimal2:
+        case TypeTag::Decimal4:
+        case TypeTag::Decimal6:
             return true; // Simple types match by tag alone
 
         case TypeTag::List: {

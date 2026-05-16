@@ -2,73 +2,41 @@
 
 #pragma once
 
-
-
-#include <algorithm>
-
-#include <cstdint>
-
-#include <map>
-
-#include <memory>
-
-#include <string>
-
-#include <variant>
-
-#include <vector>
-
-#include <stdexcept>
-
-#include <sstream>
-
-#include <iomanip>
-
-#include <optional>
-
-#include <charconv>
-
 #include "channel.hh"
-
+#include <algorithm>
 #include <atomic>
-
+#include <charconv>
+#include <cstdint>
+#include <iomanip>
 #include <iostream>
-
-
+#include <map>
+#include <memory>
+#include <optional>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <variant>
+#include <vector>
 
 // Forward declaration for Register::Channel
 
 namespace LM {
-
 namespace Backend {
-
-    struct Channel;
-
-}
+struct Channel;
 
 }
-
-
+} // namespace LM
 
 // Forward declarations for AST types
 
 namespace LM {
-
-    namespace Frontend {
-
-        namespace AST {
-
-            struct Expression;
-
-            struct FunctionDeclaration;
-
-        }
-
-    }
-
-}
-
-
+namespace Frontend {
+namespace AST {
+struct Expression;
+struct FunctionDeclaration;
+} // namespace AST
+} // namespace Frontend
+} // namespace LM
 
 namespace AST {
 
@@ -76,21 +44,15 @@ class FunctionDeclaration;
 
 }
 
-
-
 // Forward declarations
 
 struct Value;
 
 using ValuePtr = std::shared_ptr<Value>;
 
-
-
 struct Type;
 
 using TypePtr = std::shared_ptr<Type>;
-
-
 
 // Forward declare ListValue and DictValue
 
@@ -98,15 +60,11 @@ struct ListValue;
 
 struct DictValue;
 
-
-
 // Forward declare IteratorValue
 
 struct IteratorValue;
 
 using IteratorValuePtr = std::shared_ptr<IteratorValue>;
-
-
 
 // Forward declare ObjectInstance from classes
 
@@ -118,17 +76,15 @@ class ClassDefinition;
 
 class UserDefinedFunction;
 
-
-
 // Function definition for user-defined functions
 
-struct Function {
-
+struct Function
+{
     std::string name;
 
     std::shared_ptr<AST::FunctionDeclaration> declaration;
 
-    std::vector<std::pair<std::string, TypePtr>> parameters;  // name and type
+    std::vector<std::pair<std::string, TypePtr>> parameters; // name and type
 
     std::vector<std::pair<std::string, TypePtr>> optionalParameters;
 
@@ -140,151 +96,117 @@ struct Function {
 
     TypePtr returnType;
 
-    bool isLambda = false;  // Flag to indicate if this is a lambda function
+    bool isLambda = false; // Flag to indicate if this is a lambda function
 
+    Function()
+        : startAddress(0)
+        , endAddress(0)
+        , returnType(nullptr)
+        , isLambda(false)
+    {}
 
+    Function(const std::string &n, size_t start)
 
-    Function() : startAddress(0), endAddress(0), returnType(nullptr), isLambda(false) {}
-
-
-
-    Function(const std::string& n, size_t start)
-
-        : name(n), startAddress(start), endAddress(0), returnType(nullptr), isLambda(false) {}
-
+        : name(n)
+        , startAddress(start)
+        , endAddress(0)
+        , returnType(nullptr)
+        , isLambda(false)
+    {}
 };
 
-}
+} // namespace backend
 
 using ObjectInstancePtr = std::shared_ptr<backend::ObjectInstance>;
-
-
 
 // Forward declare Environment
 
 class Environment;
 
-
-
-struct ModuleValue {
-
+struct ModuleValue
+{
     std::shared_ptr<Environment> env;
 
     //std::vector<Instruction> bytecode;
-
 };
-
-
 
 // Closure value for capturing variables from enclosing scope
 
-struct ClosureValue {
+struct ClosureValue
+{
+    std::string functionName; // Name of the lambda function
 
-    std::string functionName;                                // Name of the lambda function
+    size_t startAddress; // Bytecode start address
 
-    size_t startAddress;                                     // Bytecode start address
+    size_t endAddress; // Bytecode end address
 
-    size_t endAddress;                                       // Bytecode end address
+    std::shared_ptr<::Environment> capturedEnvironment; // Environment with captured variables
 
-    std::shared_ptr<::Environment> capturedEnvironment;        // Environment with captured variables
-
-    std::vector<std::string> capturedVariables;             // Names of captured variables
-
-    
+    std::vector<std::string> capturedVariables; // Names of captured variables
 
     // Constructor
 
     ClosureValue();
 
-    
-
-    ClosureValue(const std::string& funcName, size_t start, size_t end,
+    ClosureValue(const std::string &funcName,
+                 size_t start,
+                 size_t end,
 
                  std::shared_ptr<::Environment> capturedEnv,
 
-                 const std::vector<std::string>& capturedVars);
-
-    
+                 const std::vector<std::string> &capturedVars);
 
     // Copy constructor
 
-    ClosureValue(const ClosureValue& other);
-
-    
+    ClosureValue(const ClosureValue &other);
 
     // Move constructor
 
-    ClosureValue(ClosureValue&& other) noexcept;
-
-    
+    ClosureValue(ClosureValue &&other) noexcept;
 
     // Assignment operators
 
-    ClosureValue& operator=(const ClosureValue& other);
+    ClosureValue &operator=(const ClosureValue &other);
 
-    
-
-    ClosureValue& operator=(ClosureValue&& other) noexcept;
-
-    
+    ClosureValue &operator=(ClosureValue &&other) noexcept;
 
     // Utility methods
 
     bool isValid() const;
 
-    
-
     // Execute the closure with given arguments
 
-    ValuePtr execute(const std::vector<ValuePtr>& args);
-
-    
+    ValuePtr execute(const std::vector<ValuePtr> &args);
 
     // Get captured variable count
 
     size_t getCapturedVariableCount() const;
 
-    
-
     // Check if variable is captured
 
-    bool isVariableCaptured(const std::string& varName) const;
-
-    
+    bool isVariableCaptured(const std::string &varName) const;
 
     // Get function name
 
     std::string getFunctionName() const;
 
-    
-
     // Memory management methods
 
     std::string getClosureId() const;
 
-    
-
     void cleanup();
-
-    
 
     // Check for potential memory leaks
 
     bool hasMemoryLeaks() const;
 
-    
-
     // Get memory usage estimate
 
     size_t getMemoryUsage() const;
 
-    
-
     // String representation
 
     std::string toString() const;
-
-    
 
     // Static factory method for creating closures (defined later after factory namespace)
 
@@ -292,11 +214,8 @@ struct ClosureValue {
 
                            std::shared_ptr<::Environment> capturedEnv,
 
-                           const std::vector<std::string>& capturedVars);
-
+                           const std::vector<std::string> &capturedVars);
 };
-
-
 
 enum class TypeTag {
 
@@ -382,8 +301,6 @@ enum class TypeTag {
 
 };
 
-
-
 // Forward declaration for ClosureValue factory method with proper TypePtr
 
 namespace ClosureValueFactory {
@@ -392,373 +309,290 @@ ValuePtr createClosure(std::shared_ptr<backend::UserDefinedFunction> func,
 
                        std::shared_ptr<::Environment> capturedEnv,
 
-                       const std::vector<std::string>& capturedVars,
+                       const std::vector<std::string> &capturedVars,
 
                        TypePtr closureType = nullptr);
 
 }
 
-
-
 struct ListType
 
 {
-
     TypePtr elementType;
-
 };
-
-
 
 struct DictType
 
 {
-
     TypePtr keyType;
 
     TypePtr valueType;
-
 };
-
-
 
 struct TupleType
 
 {
-
     std::vector<TypePtr> elementTypes;
-
-    
 
     TupleType() = default;
 
-    TupleType(const std::vector<TypePtr>& types) : elementTypes(types) {}
-
-    
+    TupleType(const std::vector<TypePtr> &types)
+        : elementTypes(types)
+    {}
 
     size_t size() const { return elementTypes.size(); }
 
-    
-
     std::string toString() const; // Implementation moved to avoid forward declaration issues
-
 };
-
-
 
 struct EnumType
 
 {
-
     std::string name;
 
     std::vector<std::string> values;
 
     std::map<std::string, std::vector<TypePtr>> variantTypes;
 
-
-
-    void addVariant(const std::string& name, const std::vector<TypePtr>& types = {}) {
-
+    void addVariant(const std::string &name, const std::vector<TypePtr> &types = {})
+    {
         if (std::find(values.begin(), values.end(), name) != values.end()) {
-
             throw std::runtime_error("Enum variant already exists: " + name);
-
         }
 
         values.push_back(name);
 
         variantTypes[name] = types;
-
     }
 
-
-
-    std::string toString() const {
-
+    std::string toString() const
+    {
         std::ostringstream oss;
 
         oss << "Enum(";
 
         for (auto it = values.begin(); it != values.end(); ++it) {
-
-            if (it != values.begin()) oss << ", ";
+            if (it != values.begin())
+                oss << ", ";
 
             oss << *it;
-
         }
 
         oss << ")";
 
         return oss.str();
-
     }
-
 };
-
-
 
 struct FunctionType
 
 {
+    std::vector<TypePtr> paramTypes; // Parameter types (legacy)
 
-    std::vector<TypePtr> paramTypes;                         // Parameter types (legacy)
-
-    TypePtr returnType;                                      // Return type
-
-    
+    TypePtr returnType; // Return type
 
     // Enhanced function signature support
 
-    std::vector<std::string> paramNames;                     // Parameter names (optional)
+    std::vector<std::string> paramNames; // Parameter names (optional)
 
-    std::vector<bool> hasDefaultValues;                      // Which parameters have defaults
+    std::vector<bool> hasDefaultValues; // Which parameters have defaults
 
-    bool isVariadic = false;                                 // Whether function accepts variable arguments
-
-    
+    bool isVariadic = false; // Whether function accepts variable arguments
 
     // Generic function type support
 
-    std::vector<std::string> typeParameters;                 // Generic type parameter names (e.g., T, U)
+    std::vector<std::string> typeParameters; // Generic type parameter names (e.g., T, U)
 
-    bool isGeneric = false;                                  // Whether this is a generic function
-
-    
+    bool isGeneric = false; // Whether this is a generic function
 
     // Constructors
 
     FunctionType() = default;
 
-    
+    FunctionType(const std::vector<TypePtr> &params, TypePtr ret)
 
-    FunctionType(const std::vector<TypePtr>& params, TypePtr ret)
-
-        : paramTypes(params), returnType(ret) {
-
+        : paramTypes(params)
+        , returnType(ret)
+    {
         // Initialize default values tracking
 
         hasDefaultValues.resize(params.size(), false);
-
     }
 
-    
+    FunctionType(const std::vector<std::string> &names,
 
-    FunctionType(const std::vector<std::string>& names, 
-
-                 const std::vector<TypePtr>& params, 
+                 const std::vector<TypePtr> &params,
 
                  TypePtr ret,
 
-                 const std::vector<bool>& defaults = {},
+                 const std::vector<bool> &defaults = {},
 
-                 const std::vector<std::string>& typeParams = {})
+                 const std::vector<std::string> &typeParams = {})
 
-        : paramTypes(params), returnType(ret), paramNames(names), hasDefaultValues(defaults), 
+        : paramTypes(params)
+        , returnType(ret)
+        , paramNames(names)
+        , hasDefaultValues(defaults)
+        ,
 
-        typeParameters(typeParams), isGeneric(!typeParams.empty()) {
-
+        typeParameters(typeParams)
+        , isGeneric(!typeParams.empty())
+    {
         // Ensure consistent sizes
 
         if (hasDefaultValues.empty()) {
-
             hasDefaultValues.resize(params.size(), false);
-
         }
-
     }
-
-    
 
     // Helper methods
 
     size_t getParameterCount() const { return paramTypes.size(); }
 
-    
+    bool hasNamedParameters() const
+    {
+        return !paramNames.empty() &&
 
-    bool hasNamedParameters() const { 
+               std::any_of(paramNames.begin(),
+                           paramNames.end(),
 
-        return !paramNames.empty() && 
-
-               std::any_of(paramNames.begin(), paramNames.end(), 
-
-                           [](const std::string& name) { return !name.empty(); });
-
+                           [](const std::string &name) { return !name.empty(); });
     }
 
-    
-
-    std::string getParameterName(size_t index) const {
-
+    std::string getParameterName(size_t index) const
+    {
         return (index < paramNames.size()) ? paramNames[index] : "";
-
     }
 
-    
-
-    TypePtr getParameterType(size_t index) const {
-
+    TypePtr getParameterType(size_t index) const
+    {
         return (index < paramTypes.size()) ? paramTypes[index] : nullptr;
-
     }
 
-    
-
-    bool parameterHasDefault(size_t index) const {
-
+    bool parameterHasDefault(size_t index) const
+    {
         return (index < hasDefaultValues.size()) ? hasDefaultValues[index] : false;
-
     }
-
-    
 
     // Type compatibility checking (contravariance for parameters, covariance for return)
 
-    bool isCompatibleWith(const FunctionType& other) const;
-
-    
+    bool isCompatibleWith(const FunctionType &other) const;
 
     // String representation
 
     std::string toString() const;
-
 };
-
-
 
 struct UserDefinedType
 
 {
-
     std::string name;
 
     std::vector<std::pair<std::string, std::map<std::string, TypePtr>>> fields;
-
 };
-
-
 
 struct SumType
 
 {
-
     std::vector<TypePtr> variants;
 
     std::vector<std::string> variantNames;
-
 };
-
-
 
 struct UnionType
 
 {
-
     std::vector<TypePtr> types;
 
     std::vector<std::string> variantNames;
-
 };
-
-
 
 struct ErrorUnionType
 
 {
+    TypePtr successType; // The success value type
 
-    TypePtr successType;                     // The success value type
+    std::vector<std::string> errorTypes; // Allowed error type names
 
-    std::vector<std::string> errorTypes;     // Allowed error type names
-
-    bool isGenericError = false;             // True for Type?, false for Type?Error1, Error2
-
+    bool isGenericError = false; // True for Type?, false for Type?Error1, Error2
 };
 
-
-
-struct RefinedType {
-
+struct RefinedType
+{
     TypePtr baseType;
 
     std::shared_ptr<LM::Frontend::AST::Expression> condition;
-
 };
-
-
 
 struct FrameType
 
 {
+    std::string name; // Frame type name
 
-    std::string name;                        // Frame type name
+    std::vector<std::pair<std::string, TypePtr>> fields; // Field names and types
 
-    std::vector<std::pair<std::string, TypePtr>> fields;  // Field names and types
+    std::vector<std::string> implements; // Trait names this frame implements
 
-    std::vector<std::string> implements;     // Trait names this frame implements
+    std::map<std::string, TypePtr> methodSignatures; // Method name to return type
 
-    std::map<std::string, TypePtr> methodSignatures;  // Method name to return type
+    bool hasInit = false; // Whether frame has init() method
 
-    bool hasInit = false;                    // Whether frame has init() method
-
-    bool hasDeinit = false;                  // Whether frame has deinit() method
-
+    bool hasDeinit = false; // Whether frame has deinit() method
 };
 
-
-
-struct StructuralType {
-
+struct StructuralType
+{
     std::vector<std::pair<std::string, TypePtr>> fields;
 
     bool hasRest = false;
-
 };
-
-
 
 struct TraitType
 
 {
+    std::string name; // Trait name
 
-    std::string name;                        // Trait name
+    std::vector<std::pair<std::string, TypePtr>> methodSignatures; // Method name to function type
 
-    std::vector<std::pair<std::string, TypePtr>> methodSignatures;  // Method name to function type
-
-    std::vector<std::string> extends;        // Trait inheritance
-
+    std::vector<std::string> extends; // Trait inheritance
 };
-
-
 
 struct TraitObjectType
 
 {
+    std::string traitName; // Name of the trait
 
-    std::string traitName;                   // Name of the trait
-
-    TypePtr underlyingType;                  // The concrete frame type (for static dispatch)
+    TypePtr underlyingType; // The concrete frame type (for static dispatch)
 
     // For dynamic dispatch, this will be resolved at runtime via vtable
-
 };
-
-
 
 struct Type
 
 {
-
     TypeTag tag;
 
     bool isList = false;
 
     bool isDict = false;
 
-    std::variant<std::monostate, ListType, DictType, TupleType, EnumType, FunctionType, SumType, UnionType, ErrorUnionType, UserDefinedType, FrameType, TraitType, TraitObjectType, RefinedType, StructuralType>
+    std::variant<std::monostate,
+                 ListType,
+                 DictType,
+                 TupleType,
+                 EnumType,
+                 FunctionType,
+                 SumType,
+                 UnionType,
+                 ErrorUnionType,
+                 UserDefinedType,
+                 FrameType,
+                 TraitType,
+                 TraitObjectType,
+                 RefinedType,
+                 StructuralType>
 
         extra;
-
-
 
     Type(TypeTag t)
 
@@ -766,165 +600,142 @@ struct Type
 
     {}
 
-    
+    Type(TypeTag t, const ListType &listType)
 
-    Type(TypeTag t, const ListType& listType)
-
-        : tag(t), extra(listType)
-
-    {}
-
-    
-
-    Type(TypeTag t, const DictType& dictType)
-
-        : tag(t), extra(dictType)
-
-    {
-
-    }
-
-    
-
-    Type(TypeTag t, const TupleType& tupleType)
-
-        : tag(t), extra(tupleType)
+        : tag(t)
+        , extra(listType)
 
     {}
 
-    
+    Type(TypeTag t, const DictType &dictType)
 
-    Type(TypeTag t, const EnumType& enumType)
-
-        : tag(t), extra(enumType)
-
-    {}
-
-    
-
-    Type(TypeTag t, const FunctionType& functionType)
-
-        : tag(t), extra(functionType)
-
-    {
-
-    }
-
-    
-
-    Type(TypeTag t, const SumType& sumType)
-
-        : tag(t), extra(sumType)
+        : tag(t)
+        , extra(dictType)
 
     {}
 
-    
+    Type(TypeTag t, const TupleType &tupleType)
 
-    Type(TypeTag t, const UnionType& unionType)
-
-        : tag(t), extra(unionType)
-
-    {}
-
-    
-
-    Type(TypeTag t, const ErrorUnionType& errorUnionType)
-
-        : tag(t), extra(errorUnionType)
+        : tag(t)
+        , extra(tupleType)
 
     {}
 
-    
+    Type(TypeTag t, const EnumType &enumType)
 
-    Type(TypeTag t, const UserDefinedType& userDefinedType)
-
-        : tag(t), extra(userDefinedType)
-
-    {}
-
-    
-
-    Type(TypeTag t, const FrameType& frameType)
-
-        : tag(t), extra(frameType)
+        : tag(t)
+        , extra(enumType)
 
     {}
 
-    
+    Type(TypeTag t, const FunctionType &functionType)
 
-    Type(TypeTag t, const TraitType& traitType)
-
-        : tag(t), extra(traitType)
-
-    {}
-
-    
-
-    Type(TypeTag t, const TraitObjectType& traitObjectType)
-
-        : tag(t), extra(traitObjectType)
+        : tag(t)
+        , extra(functionType)
 
     {}
 
-    
+    Type(TypeTag t, const SumType &sumType)
 
-    Type(TypeTag t, const RefinedType& refinedType)
-
-        : tag(t), extra(refinedType)
-
-    {}
-
-    
-
-    Type(TypeTag t, const StructuralType& structuralType)
-
-        : tag(t), extra(structuralType)
+        : tag(t)
+        , extra(sumType)
 
     {}
 
+    Type(TypeTag t, const UnionType &unionType)
 
+        : tag(t)
+        , extra(unionType)
+
+    {}
+
+    Type(TypeTag t, const ErrorUnionType &errorUnionType)
+
+        : tag(t)
+        , extra(errorUnionType)
+
+    {}
+
+    Type(TypeTag t, const UserDefinedType &userDefinedType)
+
+        : tag(t)
+        , extra(userDefinedType)
+
+    {}
+
+    Type(TypeTag t, const FrameType &frameType)
+
+        : tag(t)
+        , extra(frameType)
+
+    {}
+
+    Type(TypeTag t, const TraitType &traitType)
+
+        : tag(t)
+        , extra(traitType)
+
+    {}
+
+    Type(TypeTag t, const TraitObjectType &traitObjectType)
+
+        : tag(t)
+        , extra(traitObjectType)
+
+    {}
+
+    Type(TypeTag t, const RefinedType &refinedType)
+
+        : tag(t)
+        , extra(refinedType)
+
+    {}
+
+    Type(TypeTag t, const StructuralType &structuralType)
+
+        : tag(t)
+        , extra(structuralType)
+
+    {}
 
     // In value.hh, add this inside the Type struct
 
-    Type(const Type& other)
+    Type(const Type &other)
 
-        : tag(other.tag), isList(other.isList), isDict(other.isDict), extra(other.extra) {
+        : tag(other.tag)
+        , isList(other.isList)
+        , isDict(other.isDict)
+        , extra(other.extra)
+    {}
 
-    }
-
-
-
-    int getDecimalScale() const {
+    int getDecimalScale() const
+    {
         switch (tag) {
-            case TypeTag::Decimal2: return 2;
-            case TypeTag::Decimal4: return 4;
-            case TypeTag::Decimal6: return 6;
-            default: return 0;
+        case TypeTag::Decimal2:
+            return 2;
+        case TypeTag::Decimal4:
+            return 4;
+        case TypeTag::Decimal6:
+            return 6;
+        default:
+            return 0;
         }
     }
 
-    static int64_t getDecimalPower(int scale) {
+    static int64_t getDecimalPower(int scale)
+    {
         static const int64_t powers[] = {1, 10, 100, 1000, 10000, 100000, 1000000};
-        if (scale >= 0 && scale <= 6) return powers[scale];
+        if (scale >= 0 && scale <= 6)
+            return powers[scale];
         return 1;
     }
 
-    std::string toString() const
-
-    {
-
-        return toString_internal();
-
-    }
-
-
+    std::string toString() const { return toString_internal(); }
 
     std::string toString_internal() const
 
     {
-
         switch (tag) {
-
         case TypeTag::Nil:
 
             return "Nil";
@@ -1006,23 +817,18 @@ struct Type
             return "String";
 
         case TypeTag::List: {
-
-            if (const auto* listType = std::get_if<ListType>(&extra)) {
-
-                return "List<" + (listType->elementType ? listType->elementType->toString() : "Any") + ">";
-
+            if (const auto *listType = std::get_if<ListType>(&extra)) {
+                return "List<" + (listType->elementType ? listType->elementType->toString() : "Any")
+                       + ">";
             }
 
             return "List";
-
         }
 
         case TypeTag::Dict: {
-
-            if (const auto* dictType = std::get_if<DictType>(&extra)) {
-
-                return "Dict<" + (dictType->keyType ? dictType->keyType->toString() : "Any") + ", " + (dictType->valueType ? dictType->valueType->toString() : "Any") + ">";
-
+            if (const auto *dictType = std::get_if<DictType>(&extra)) {
+                return "Dict<" + (dictType->keyType ? dictType->keyType->toString() : "Any") + ", "
+                       + (dictType->valueType ? dictType->valueType->toString() : "Any") + ">";
             }
 
             std::ostringstream oss;
@@ -1030,39 +836,27 @@ struct Type
             oss << "Dict(failed get_if, index=" << extra.index() << ")";
 
             return oss.str();
-
         }
 
         case TypeTag::Tuple: {
-
-            if (const auto* tupleType = std::get_if<TupleType>(&extra)) {
-
+            if (const auto *tupleType = std::get_if<TupleType>(&extra)) {
                 return tupleType->toString();
-
             }
 
             return "Tuple";
-
         }
 
         case TypeTag::Enum: {
-
-            if (const auto* enumType = std::get_if<EnumType>(&extra)) {
-
+            if (const auto *enumType = std::get_if<EnumType>(&extra)) {
                 return "Enum<" + enumType->name + ">";
-
             }
 
             return "Enum";
-
         }
 
         case TypeTag::Function: {
-
-            if (const auto* funcType = std::get_if<FunctionType>(&extra)) {
-
+            if (const auto *funcType = std::get_if<FunctionType>(&extra)) {
                 return funcType->toString();
-
             }
 
             std::ostringstream oss;
@@ -1070,7 +864,6 @@ struct Type
             oss << "Function(failed get_if, index=" << extra.index() << ")";
 
             return oss.str();
-
         }
 
         case TypeTag::Closure:
@@ -1090,33 +883,26 @@ struct Type
             return "Union";
 
         case TypeTag::ErrorUnion: {
-
-            if (const auto* errorUnion = std::get_if<ErrorUnionType>(&extra)) {
-
+            if (const auto *errorUnion = std::get_if<ErrorUnionType>(&extra)) {
                 std::string result = errorUnion->successType->toString() + "?";
 
                 if (!errorUnion->isGenericError && !errorUnion->errorTypes.empty()) {
-
                     result += "{";
 
                     for (size_t i = 0; i < errorUnion->errorTypes.size(); ++i) {
-
-                        if (i > 0) result += ", ";
+                        if (i > 0)
+                            result += ", ";
 
                         result += errorUnion->errorTypes[i];
-
                     }
 
                     result += "}";
-
                 }
 
                 return result;
-
             }
 
             return "ErrorUnion";
-
         }
 
         case TypeTag::UserDefined:
@@ -1132,291 +918,237 @@ struct Type
             return "Module";
 
         case TypeTag::Frame: {
-
-            if (const auto* frameType = std::get_if<FrameType>(&extra)) {
-
+            if (const auto *frameType = std::get_if<FrameType>(&extra)) {
                 return "Frame<" + frameType->name + ">";
-
             }
 
             return "Frame";
-
         }
 
         case TypeTag::Trait: {
-
-            if (const auto* traitType = std::get_if<TraitType>(&extra)) {
-
+            if (const auto *traitType = std::get_if<TraitType>(&extra)) {
                 return "Trait<" + traitType->name + ">";
-
             }
 
             return "Trait";
-
         }
 
         case TypeTag::TraitObject: {
-
-            if (const auto* traitObjType = std::get_if<TraitObjectType>(&extra)) {
-
+            if (const auto *traitObjType = std::get_if<TraitObjectType>(&extra)) {
                 return "&" + traitObjType->traitName;
-
             }
 
             return "TraitObject";
-
         }
 
         case TypeTag::Refined: {
-
-            if (const auto* refinedType = std::get_if<RefinedType>(&extra)) {
-
+            if (const auto *refinedType = std::get_if<RefinedType>(&extra)) {
                 return refinedType->baseType->toString() + " where condition";
-
             }
 
             return "RefinedType";
-
         }
 
         case TypeTag::Structural: {
-
-            if (const auto* structuralType = std::get_if<StructuralType>(&extra)) {
-
+            if (const auto *structuralType = std::get_if<StructuralType>(&extra)) {
                 std::string result = "{ ";
 
                 for (size_t i = 0; i < structuralType->fields.size(); ++i) {
+                    if (i > 0)
+                        result += ", ";
 
-                    if (i > 0) result += ", ";
-
-                    result += structuralType->fields[i].first + ": " + structuralType->fields[i].second->toString();
-
+                    result += structuralType->fields[i].first + ": "
+                              + structuralType->fields[i].second->toString();
                 }
 
                 if (structuralType->hasRest) {
-
-                    if (!structuralType->fields.empty()) result += ", ";
+                    if (!structuralType->fields.empty())
+                        result += ", ";
 
                     result += "...";
-
                 }
 
                 result += " }";
 
                 return result;
-
             }
 
             return "Structural";
-
         }
 
         default:
 
             return "Unknown Type";
-
         }
-
     }
 
-
-
-    bool operator==(const Type &other) const {
-
-        if (tag != other.tag) return false;
-
-        
+    bool operator==(const Type &other) const
+    {
+        if (tag != other.tag)
+            return false;
 
         switch (tag) {
+        case TypeTag::Decimal2:
 
-            case TypeTag::Decimal2:
+        case TypeTag::Decimal4:
 
-            case TypeTag::Decimal4:
+        case TypeTag::Decimal6:
 
-            case TypeTag::Decimal6:
+            return true;
 
-                return true;
+        case TypeTag::Enum: {
+            auto *enumThis = std::get_if<EnumType>(&extra);
 
-            case TypeTag::Enum: {
+            auto *enumOther = std::get_if<EnumType>(&other.extra);
 
-                auto* enumThis = std::get_if<EnumType>(&extra);
+            if (enumThis && enumOther)
+                return enumThis->name == enumOther->name;
 
-                auto* enumOther = std::get_if<EnumType>(&other.extra);
-
-                if (enumThis && enumOther) return enumThis->name == enumOther->name;
-
-                return enumThis == enumOther;
-
-            }
-
-            case TypeTag::Frame: {
-
-                auto* frameThis = std::get_if<FrameType>(&extra);
-
-                auto* frameOther = std::get_if<FrameType>(&other.extra);
-
-                if (frameThis && frameOther) return frameThis->name == frameOther->name;
-
-                return frameThis == frameOther;
-
-            }
-
-            case TypeTag::List: {
-
-                auto* listThis = std::get_if<ListType>(&extra);
-
-                auto* listOther = std::get_if<ListType>(&other.extra);
-
-                if (listThis && listOther) {
-
-                    if (!listThis->elementType || !listOther->elementType) return listThis->elementType == listOther->elementType;
-
-                    return *listThis->elementType == *listOther->elementType;
-
-                }
-
-                return listThis == listOther;
-
-            }
-
-            case TypeTag::Dict: {
-
-                auto* dictThis = std::get_if<DictType>(&extra);
-
-                auto* dictOther = std::get_if<DictType>(&other.extra);
-
-                if (dictThis && dictOther) {
-
-                    bool keysMatch = false;
-
-                    if (!dictThis->keyType || !dictOther->keyType) keysMatch = (dictThis->keyType == dictOther->keyType);
-
-                    else keysMatch = (*dictThis->keyType == *dictOther->keyType);
-
-                    
-
-                    bool valuesMatch = false;
-
-                    if (!dictThis->valueType || !dictOther->valueType) valuesMatch = (dictThis->valueType == dictOther->valueType);
-
-                    else valuesMatch = (*dictThis->valueType == *dictOther->valueType);
-
-                    
-
-                    return keysMatch && valuesMatch;
-
-                }
-
-                return dictThis == dictOther;
-
-            }
-
-            case TypeTag::Tuple: {
-
-                auto* tupleThis = std::get_if<TupleType>(&extra);
-
-                auto* tupleOther = std::get_if<TupleType>(&other.extra);
-
-                if (tupleThis && tupleOther) {
-
-                    if (tupleThis->elementTypes.size() != tupleOther->elementTypes.size()) return false;
-
-                    for (size_t i = 0; i < tupleThis->elementTypes.size(); ++i) {
-
-                        if (!tupleThis->elementTypes[i] || !tupleOther->elementTypes[i]) {
-
-                            if (tupleThis->elementTypes[i] != tupleOther->elementTypes[i]) return false;
-
-                        } else if (*tupleThis->elementTypes[i] != *tupleOther->elementTypes[i]) return false;
-
-                    }
-
-                    return true;
-
-                }
-
-                return tupleThis == tupleOther;
-
-            }
-
-            case TypeTag::Union: {
-
-                auto* unionThis = std::get_if<UnionType>(&extra);
-
-                auto* unionOther = std::get_if<UnionType>(&other.extra);
-
-                if (unionThis && unionOther) {
-
-                    if (unionThis->types.size() != unionOther->types.size()) return false;
-
-                    for (size_t i = 0; i < unionThis->types.size(); ++i) {
-
-                         if (!unionThis->types[i] || !unionOther->types[i]) {
-
-                            if (unionThis->types[i] != unionOther->types[i]) return false;
-
-                        } else if (*unionThis->types[i] != *unionOther->types[i]) return false;
-
-                    }
-
-                    return true;
-
-                }
-
-                return unionThis == unionOther;
-
-            }
-
-             case TypeTag::Function: {
-
-                auto* funcThis = std::get_if<FunctionType>(&extra);
-
-                auto* funcOther = std::get_if<FunctionType>(&other.extra);
-
-                if (funcThis && funcOther) {
-
-                    if (funcThis->paramTypes.size() != funcOther->paramTypes.size()) return false;
-
-                    for (size_t i = 0; i < funcThis->paramTypes.size(); ++i) {
-
-                         if (!funcThis->paramTypes[i] || !funcOther->paramTypes[i]) {
-
-                            if (funcThis->paramTypes[i] != funcOther->paramTypes[i]) return false;
-
-                        } else if (*funcThis->paramTypes[i] != *funcOther->paramTypes[i]) return false;
-
-                    }
-
-                    if (!funcThis->returnType || !funcOther->returnType) return funcThis->returnType == funcOther->returnType;
-
-                    return *funcThis->returnType == *funcOther->returnType;
-
-                }
-
-                return funcThis == funcOther;
-
-            }
-
-            default:
-
-                return true;
-
+            return enumThis == enumOther;
         }
 
+        case TypeTag::Frame: {
+            auto *frameThis = std::get_if<FrameType>(&extra);
+
+            auto *frameOther = std::get_if<FrameType>(&other.extra);
+
+            if (frameThis && frameOther)
+                return frameThis->name == frameOther->name;
+
+            return frameThis == frameOther;
+        }
+
+        case TypeTag::List: {
+            auto *listThis = std::get_if<ListType>(&extra);
+
+            auto *listOther = std::get_if<ListType>(&other.extra);
+
+            if (listThis && listOther) {
+                if (!listThis->elementType || !listOther->elementType)
+                    return listThis->elementType == listOther->elementType;
+
+                return *listThis->elementType == *listOther->elementType;
+            }
+
+            return listThis == listOther;
+        }
+
+        case TypeTag::Dict: {
+            auto *dictThis = std::get_if<DictType>(&extra);
+
+            auto *dictOther = std::get_if<DictType>(&other.extra);
+
+            if (dictThis && dictOther) {
+                bool keysMatch = false;
+
+                if (!dictThis->keyType || !dictOther->keyType)
+                    keysMatch = (dictThis->keyType == dictOther->keyType);
+
+                else
+                    keysMatch = (*dictThis->keyType == *dictOther->keyType);
+
+                bool valuesMatch = false;
+
+                if (!dictThis->valueType || !dictOther->valueType)
+                    valuesMatch = (dictThis->valueType == dictOther->valueType);
+
+                else
+                    valuesMatch = (*dictThis->valueType == *dictOther->valueType);
+
+                return keysMatch && valuesMatch;
+            }
+
+            return dictThis == dictOther;
+        }
+
+        case TypeTag::Tuple: {
+            auto *tupleThis = std::get_if<TupleType>(&extra);
+
+            auto *tupleOther = std::get_if<TupleType>(&other.extra);
+
+            if (tupleThis && tupleOther) {
+                if (tupleThis->elementTypes.size() != tupleOther->elementTypes.size())
+                    return false;
+
+                for (size_t i = 0; i < tupleThis->elementTypes.size(); ++i) {
+                    if (!tupleThis->elementTypes[i] || !tupleOther->elementTypes[i]) {
+                        if (tupleThis->elementTypes[i] != tupleOther->elementTypes[i])
+                            return false;
+
+                    } else if (*tupleThis->elementTypes[i] != *tupleOther->elementTypes[i])
+                        return false;
+                }
+
+                return true;
+            }
+
+            return tupleThis == tupleOther;
+        }
+
+        case TypeTag::Union: {
+            auto *unionThis = std::get_if<UnionType>(&extra);
+
+            auto *unionOther = std::get_if<UnionType>(&other.extra);
+
+            if (unionThis && unionOther) {
+                if (unionThis->types.size() != unionOther->types.size())
+                    return false;
+
+                for (size_t i = 0; i < unionThis->types.size(); ++i) {
+                    if (!unionThis->types[i] || !unionOther->types[i]) {
+                        if (unionThis->types[i] != unionOther->types[i])
+                            return false;
+
+                    } else if (*unionThis->types[i] != *unionOther->types[i])
+                        return false;
+                }
+
+                return true;
+            }
+
+            return unionThis == unionOther;
+        }
+
+        case TypeTag::Function: {
+            auto *funcThis = std::get_if<FunctionType>(&extra);
+
+            auto *funcOther = std::get_if<FunctionType>(&other.extra);
+
+            if (funcThis && funcOther) {
+                if (funcThis->paramTypes.size() != funcOther->paramTypes.size())
+                    return false;
+
+                for (size_t i = 0; i < funcThis->paramTypes.size(); ++i) {
+                    if (!funcThis->paramTypes[i] || !funcOther->paramTypes[i]) {
+                        if (funcThis->paramTypes[i] != funcOther->paramTypes[i])
+                            return false;
+
+                    } else if (*funcThis->paramTypes[i] != *funcOther->paramTypes[i])
+                        return false;
+                }
+
+                if (!funcThis->returnType || !funcOther->returnType)
+                    return funcThis->returnType == funcOther->returnType;
+
+                return *funcThis->returnType == *funcOther->returnType;
+            }
+
+            return funcThis == funcOther;
+        }
+
+        default:
+
+            return true;
+        }
     }
 
     bool operator!=(const Type &other) const { return !(*this == other); }
-
 };
-
-
 
 constexpr int getSizeInBits(TypeTag tag)
 
 {
-
     switch (tag) {
-
     case TypeTag::Int8:
 
     case TypeTag::UInt8:
@@ -1454,143 +1186,102 @@ constexpr int getSizeInBits(TypeTag tag)
     default:
 
         return 0;
-
     }
-
 }
-
-
 
 class OverflowException : public std::runtime_error
 
 {
-
 public:
-
     OverflowException(const std::string &msg)
 
         : std::runtime_error(msg)
 
     {}
-
 };
-
-
 
 template<typename To, typename From>
 
 To safe_cast(From value)
 
 {
-
     To result = static_cast<To>(value);
 
     if (static_cast<From>(result) != value || (value > 0 && result < 0)
 
         || (value < 0 && result > 0)) {
-
         throw OverflowException("Overflow detected in integer conversion");
-
     }
 
     return result;
-
 }
-
-
 
 template<class... Ts>
 
 struct overloaded : Ts...
 
 {
-
     using Ts::operator()...;
-
 };
 
 template<class... Ts>
 
 overloaded(Ts...) -> overloaded<Ts...>;
 
-
-
 struct Value;
 
 using ValuePtr = std::shared_ptr<Value>;
 
-
-
 struct UserDefinedValue
 
 {
-
     std::string variantName;
 
     std::map<std::string, ValuePtr> fields;
-
 };
-
-
 
 struct SumValue
 
 {
-
     size_t activeVariant;
 
     ValuePtr value;
-
 };
 
-
-
-struct EnumValue {
-
+struct EnumValue
+{
     std::string variantName;
 
     ValuePtr associatedValue;
 
-
-
     EnumValue() = default;
 
+    EnumValue(const std::string &name, const TypePtr &enumType, ValuePtr value = nullptr)
 
-
-    EnumValue(const std::string& name, const TypePtr& enumType, ValuePtr value = nullptr)
-
-        : variantName(name), associatedValue(value) {
-
+        : variantName(name)
+        , associatedValue(value)
+    {
         // Validate variant name
 
-        const auto* enumTypeDetails = std::get_if<EnumType>(&enumType->extra);
+        const auto *enumTypeDetails = std::get_if<EnumType>(&enumType->extra);
 
         if (!enumTypeDetails) {
-
             throw std::runtime_error("Invalid enum type");
-
         }
-
-
 
         auto it = std::find(enumTypeDetails->values.begin(), enumTypeDetails->values.end(), name);
 
         if (it == enumTypeDetails->values.end()) {
-
             throw std::runtime_error("Unknown enum variant: " + name);
-
         }
-
     }
 
+    static ValuePtr create(const std::string &variantName,
+                           const TypePtr &enumType,
+                           ValuePtr associatedValue = nullptr);
 
-
-    static ValuePtr create(const std::string& variantName, const TypePtr& enumType, ValuePtr associatedValue = nullptr);
-
-
-
-    std::string toString() const {
-
+    std::string toString() const
+    {
         // if (associatedValue) {
 
         //     return "Enum(" + variantName + ", " + associatedValue->toString() + ")";
@@ -1599,373 +1290,283 @@ struct EnumValue {
 
         // return "Enum(" + variantName + ")";
 
-
-
         if (associatedValue) {
-
             // Use a generic representation if toString() is not available
 
             return "Enum(" + variantName + ", <associated value>)";
-
         }
 
         return "Enum(" + variantName + ")";
-
     }
-
 };
 
-
-
-struct ErrorValue {
-
+struct ErrorValue
+{
     std::string errorType;
 
     std::string message;
 
     std::vector<ValuePtr> arguments;
 
-    size_t sourceLocation = 0;      // For stack traces
-
-
+    size_t sourceLocation = 0; // For stack traces
 
     ErrorValue() = default;
 
+    ErrorValue(const std::string &type,
+               const std::string &msg = "",
 
+               const std::vector<ValuePtr> &args = {},
+               size_t location = 0)
 
-    ErrorValue(const std::string& type, const std::string& msg = "", 
+        : errorType(type)
+        , message(msg)
+        , arguments(args)
+        , sourceLocation(location)
+    {}
 
-               const std::vector<ValuePtr>& args = {}, size_t location = 0)
-
-        : errorType(type), message(msg), arguments(args), sourceLocation(location) {}
-
-
-
-    std::string toString() const;  // Declaration only, definition after Value struct
-
+    std::string toString() const; // Declaration only, definition after Value struct
 };
-
-
 
 // Conversion helper functions for string-based values
 
 namespace ValueConverters {
 
-    // Fast integer conversion using std::from_chars
+// Fast integer conversion using std::from_chars
 
-    inline std::optional<int64_t> toInt64(const std::string& str) {
+inline std::optional<int64_t> toInt64(const std::string &str)
+{
+    int64_t result = 0;
 
-        int64_t result = 0;
+    auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
 
-        auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
-
-        if (ec == std::errc()) {
-
-            return result;
-
-        }
-
-        return std::nullopt;
-
+    if (ec == std::errc()) {
+        return result;
     }
 
-    
-
-    // Fast unsigned integer conversion using std::from_chars
-
-    inline std::optional<uint64_t> toUInt64(const std::string& str) {
-
-        uint64_t result = 0;
-
-        auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
-
-        if (ec == std::errc()) {
-
-            return result;
-
-        }
-
-        return std::nullopt;
-
-    }
-
-    
-
-    // Fast double conversion using std::from_chars
-
-    inline std::optional<double> toDouble(const std::string& str) {
-
-        double result = 0.0;
-
-        auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
-
-        if (ec == std::errc()) {
-
-            return result;
-
-        }
-
-        return std::nullopt;
-
-    }
-
-    
-
-    // Fast bool conversion
-
-    inline bool toBool(const std::string& str) {
-
-        return !str.empty() && str != "0" && str != "false";
-
-    }
-
-    
-
-    // Safe conversion with fallback
-
-    template<typename T>
-
-    inline T safeConvert(const std::string& str, T defaultValue = T{}) {
-
-        if constexpr (std::is_same_v<T, int64_t>) {
-
-            if (auto val = toInt64(str)) return *val;
-
-        } else if constexpr (std::is_same_v<T, uint64_t>) {
-
-            if (auto val = toUInt64(str)) return *val;
-
-        } else if constexpr (std::is_same_v<T, double>) {
-
-            if (auto val = toDouble(str)) return *val;
-
-        } else if constexpr (std::is_same_v<T, bool>) {
-
-            return toBool(str);
-
-        } else if constexpr (std::is_same_v<T, std::string>) {
-
-            return str;
-
-        }
-
-        return defaultValue;
-
-    }
-
+    return std::nullopt;
 }
 
+// Fast unsigned integer conversion using std::from_chars
 
+inline std::optional<uint64_t> toUInt64(const std::string &str)
+{
+    uint64_t result = 0;
+
+    auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
+
+    if (ec == std::errc()) {
+        return result;
+    }
+
+    return std::nullopt;
+}
+
+// Fast double conversion using std::from_chars
+
+inline std::optional<double> toDouble(const std::string &str)
+{
+    double result = 0.0;
+
+    auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), result);
+
+    if (ec == std::errc()) {
+        return result;
+    }
+
+    return std::nullopt;
+}
+
+// Fast bool conversion
+
+inline bool toBool(const std::string &str)
+{
+    return !str.empty() && str != "0" && str != "false";
+}
+
+// Safe conversion with fallback
+
+template<typename T>
+
+inline T safeConvert(const std::string &str, T defaultValue = T{})
+{
+    if constexpr (std::is_same_v<T, int64_t>) {
+        if (auto val = toInt64(str))
+            return *val;
+
+    } else if constexpr (std::is_same_v<T, uint64_t>) {
+        if (auto val = toUInt64(str))
+            return *val;
+
+    } else if constexpr (std::is_same_v<T, double>) {
+        if (auto val = toDouble(str))
+            return *val;
+
+    } else if constexpr (std::is_same_v<T, bool>) {
+        return toBool(str);
+
+    } else if constexpr (std::is_same_v<T, std::string>) {
+        return str;
+    }
+
+    return defaultValue;
+}
+
+} // namespace ValueConverters
 
 // Atomic wrapper for integer primitives
 
-struct AtomicValue {
-
+struct AtomicValue
+{
     std::shared_ptr<std::atomic<int64_t>> inner;
 
-    AtomicValue() : inner(std::make_shared<std::atomic<int64_t>>(0)) {}
+    AtomicValue()
+        : inner(std::make_shared<std::atomic<int64_t>>(0))
+    {}
 
-    AtomicValue(int64_t v) : inner(std::make_shared<std::atomic<int64_t>>(v)) {}
-
-    
+    AtomicValue(int64_t v)
+        : inner(std::make_shared<std::atomic<int64_t>>(v))
+    {}
 
     // Constructor for string values - convert to int64_t
 
-    AtomicValue(const std::string& v) : inner(std::make_shared<std::atomic<int64_t>>(0)) {
-
+    AtomicValue(const std::string &v)
+        : inner(std::make_shared<std::atomic<int64_t>>(0))
+    {
         if (auto val = ValueConverters::toInt64(v)) {
-
             inner->store(*val);
-
         }
-
     }
-
 };
-
-
 
 // ErrorUnion helper class for efficient tagged union operations - optimized for cache efficiency
 
-class ErrorUnion {
-
+class ErrorUnion
+{
 public:
-
     enum class Tag : uint8_t { SUCCESS, ERROR };
 
-
-
 private:
-
     // Optimize memory layout for cache efficiency
 
-    alignas(8) Tag tag_;  // Align to 8 bytes for better cache performance
-
-    
+    alignas(8) Tag tag_; // Align to 8 bytes for better cache performance
 
     // Use a more cache-friendly layout
 
     union alignas(8) {
-
         ValuePtr successValue_;
 
         ErrorValue errorValue_;
-
     };
 
-
-
 public:
-
     // Constructors - optimized for common cases
 
-    ErrorUnion(ValuePtr success) noexcept : tag_(Tag::SUCCESS), successValue_(success) {}
+    ErrorUnion(ValuePtr success) noexcept
+        : tag_(Tag::SUCCESS)
+        , successValue_(success)
+    {}
 
-    
-
-    ErrorUnion(const ErrorValue& error) : tag_(Tag::ERROR) {
-
+    ErrorUnion(const ErrorValue &error)
+        : tag_(Tag::ERROR)
+    {
         new (&errorValue_) ErrorValue(error);
-
     }
 
-    
+    ErrorUnion(const std::string &errorType,
+               const std::string &message = "",
 
-    ErrorUnion(const std::string& errorType, const std::string& message = "", 
+               const std::vector<ValuePtr> &args = {},
+               size_t location = 0)
 
-               const std::vector<ValuePtr>& args = {}, size_t location = 0) 
-
-        : tag_(Tag::ERROR) {
-
+        : tag_(Tag::ERROR)
+    {
         new (&errorValue_) ErrorValue(errorType, message, args, location);
-
     }
-
-
 
     // Copy constructor - optimized for success path
 
-    ErrorUnion(const ErrorUnion& other) : tag_(other.tag_) {
-
+    ErrorUnion(const ErrorUnion &other)
+        : tag_(other.tag_)
+    {
         if (tag_ == Tag::SUCCESS) [[likely]] {
-
             successValue_ = other.successValue_;
 
         } else {
-
             new (&errorValue_) ErrorValue(other.errorValue_);
-
         }
-
     }
-
-
 
     // Move constructor - optimized for success path
 
-    ErrorUnion(ErrorUnion&& other) noexcept : tag_(other.tag_) {
-
+    ErrorUnion(ErrorUnion &&other) noexcept
+        : tag_(other.tag_)
+    {
         if (tag_ == Tag::SUCCESS) [[likely]] {
-
             successValue_ = std::move(other.successValue_);
 
         } else {
-
             new (&errorValue_) ErrorValue(std::move(other.errorValue_));
-
         }
-
     }
-
-
 
     // Assignment operators - optimized with likely/unlikely hints
 
-    ErrorUnion& operator=(const ErrorUnion& other) {
-
+    ErrorUnion &operator=(const ErrorUnion &other)
+    {
         if (this != &other) [[likely]] {
-
             // Destroy current content
 
             if (tag_ == Tag::ERROR) [[unlikely]] {
-
                 errorValue_.~ErrorValue();
-
             }
-
-            
 
             // Copy new content
 
             tag_ = other.tag_;
 
             if (tag_ == Tag::SUCCESS) [[likely]] {
-
                 successValue_ = other.successValue_;
 
             } else {
-
                 new (&errorValue_) ErrorValue(other.errorValue_);
-
             }
-
         }
 
         return *this;
-
     }
 
-
-
-    ErrorUnion& operator=(ErrorUnion&& other) noexcept {
-
+    ErrorUnion &operator=(ErrorUnion &&other) noexcept
+    {
         if (this != &other) [[likely]] {
-
             // Destroy current content
 
             if (tag_ == Tag::ERROR) [[unlikely]] {
-
                 errorValue_.~ErrorValue();
-
             }
-
-            
 
             // Move new content
 
             tag_ = other.tag_;
 
             if (tag_ == Tag::SUCCESS) [[likely]] {
-
                 successValue_ = std::move(other.successValue_);
 
             } else {
-
                 new (&errorValue_) ErrorValue(std::move(other.errorValue_));
-
             }
-
         }
 
         return *this;
-
     }
-
-
 
     // Destructor - optimized for success path
 
-    ~ErrorUnion() {
-
+    ~ErrorUnion()
+    {
         if (tag_ == Tag::ERROR) [[unlikely]] {
-
             errorValue_.~ErrorValue();
-
         }
-
     }
-
-
 
     // Inspection methods - inlined for performance
 
@@ -1975,125 +1576,88 @@ public:
 
     [[nodiscard]] inline Tag getTag() const noexcept { return tag_; }
 
-
-
     // Value access methods - optimized with likely/unlikely hints
 
-    [[nodiscard]] ValuePtr getSuccessValue() const {
-
+    [[nodiscard]] ValuePtr getSuccessValue() const
+    {
         if (tag_ != Tag::SUCCESS) [[unlikely]] {
-
             throw std::runtime_error("Attempted to get success value from error union");
-
         }
 
         return successValue_;
-
     }
 
-
-
-    [[nodiscard]] const ErrorValue& getErrorValue() const {
-
+    const ErrorValue &getErrorValue() const
+    {
         if (tag_ != Tag::ERROR) [[unlikely]] {
-
             throw std::runtime_error("Attempted to get error value from success union");
-
         }
 
         return errorValue_;
-
     }
-
-
 
     // Safe access methods - optimized for success path
 
-    [[nodiscard]] ValuePtr getSuccessValueOr(ValuePtr defaultValue) const noexcept {
-
+    [[nodiscard]] ValuePtr getSuccessValueOr(ValuePtr defaultValue) const noexcept
+    {
         return isSuccess() ? successValue_ : defaultValue;
-
     }
 
-
-
-    [[nodiscard]] std::string getErrorType() const {
-
+    [[nodiscard]] std::string getErrorType() const
+    {
         return isError() ? errorValue_.errorType : "";
-
     }
 
-
-
-    [[nodiscard]] std::string getErrorMessage() const {
-
+    [[nodiscard]] std::string getErrorMessage() const
+    {
         return isError() ? errorValue_.message : "";
-
     }
-
-
 
     // Conversion to Value
 
-    ValuePtr toValue(TypePtr errorUnionType) const;  // Declaration, definition after Value struct
-
-
+    ValuePtr toValue(TypePtr errorUnionType) const; // Declaration, definition after Value struct
 
     // Static factory methods - optimized for common patterns
 
-    [[nodiscard]] static ErrorUnion success(ValuePtr value) noexcept {
+    [[nodiscard]] static ErrorUnion success(ValuePtr value) noexcept { return ErrorUnion(value); }
 
-        return ErrorUnion(value);
+    [[nodiscard]] static ErrorUnion error(const std::string &errorType,
+                                          const std::string &message = "",
 
-    }
-
-
-
-    [[nodiscard]] static ErrorUnion error(const std::string& errorType, const std::string& message = "", 
-
-                                          const std::vector<ValuePtr>& args = {}, size_t location = 0) {
-
+                                          const std::vector<ValuePtr> &args = {},
+                                          size_t location = 0)
+    {
         return ErrorUnion(errorType, message, args, location);
-
     }
 
-
-
-    [[nodiscard]] static ErrorUnion error(const ErrorValue& errorValue) {
-
+    [[nodiscard]] static ErrorUnion error(const ErrorValue &errorValue)
+    {
         return ErrorUnion(errorValue);
-
     }
-
-
 
     // String representation
 
-    std::string toString() const;  // Declaration only, definition after Value struct
-
+    std::string toString() const; // Declaration only, definition after Value struct
 };
 
-
-
-struct ListValue {
-
+struct ListValue
+{
     std::vector<ValuePtr> elements;
-
-
 
     void append(ValuePtr value) { elements.push_back(value); }
 
-    void extend(const ListValue& other) {
-
+    void extend(const ListValue &other)
+    {
         elements.insert(elements.end(), other.elements.begin(), other.elements.end());
-
     }
 
-    ValuePtr pop(int index = -1) {
+    ValuePtr pop(int index = -1)
+    {
+        if (elements.empty())
+            throw std::runtime_error("pop from empty list");
 
-        if (elements.empty()) throw std::runtime_error("pop from empty list");
-
-        if (index < 0) index = elements.size() + index;
+        if (index < 0)
+            index = elements.size() + index;
 
         if (index < 0 || static_cast<size_t>(index) >= elements.size())
 
@@ -2104,131 +1668,99 @@ struct ListValue {
         elements.erase(elements.begin() + index);
 
         return value;
-
     }
 
-    void insert(int index, ValuePtr value) {
-
-        if (index < 0) index = elements.size() + index;
+    void insert(int index, ValuePtr value)
+    {
+        if (index < 0)
+            index = elements.size() + index;
 
         if (index < 0 || static_cast<size_t>(index) > elements.size())
 
             throw std::runtime_error("insert index out of range");
 
         elements.insert(elements.begin() + index, value);
-
     }
 
     void clear() { elements.clear(); }
 
-
-
     size_t len() const { return elements.size(); }
 
-
-
-    ValuePtr at(int index) const {
-
-        if (index < 0) index = elements.size() + index;
+    ValuePtr at(int index) const
+    {
+        if (index < 0)
+            index = elements.size() + index;
 
         if (index < 0 || static_cast<size_t>(index) >= elements.size())
 
             throw std::runtime_error("index out of range");
 
         return elements[index];
-
     }
-
 };
-
-
 
 // Add these method declarations to DictValue struct
 
-struct TupleValue {
-
+struct TupleValue
+{
     std::vector<ValuePtr> elements;
-
-    
 
     TupleValue() = default;
 
-    TupleValue(const std::vector<ValuePtr>& elems) : elements(elems) {}
-
-    
+    TupleValue(const std::vector<ValuePtr> &elems)
+        : elements(elems)
+    {}
 
     size_t size() const { return elements.size(); }
 
-    
-
-    ValuePtr get(size_t index) const {
-
+    ValuePtr get(size_t index) const
+    {
         if (index >= elements.size()) {
-
             throw std::runtime_error("Tuple index out of bounds: " + std::to_string(index));
-
         }
 
         return elements[index];
-
     }
 
-    
-
-    void set(size_t index, ValuePtr value) {
-
+    void set(size_t index, ValuePtr value)
+    {
         if (index >= elements.size()) {
-
             throw std::runtime_error("Tuple index out of bounds: " + std::to_string(index));
-
         }
 
         elements[index] = value;
-
     }
 
-    
-
     std::string toString() const; // Implementation moved to avoid forward declaration issues
-
 };
 
-
-
-struct DictValue {
-
+struct DictValue
+{
     std::map<ValuePtr, ValuePtr> elements;
 
-
-
-    ValuePtr get(const ValuePtr& key, const ValuePtr& defaultValue = nullptr) const {
-
+    ValuePtr get(const ValuePtr &key, const ValuePtr &defaultValue = nullptr) const
+    {
         auto it = elements.find(key);
 
         return it != elements.end() ? it->second : defaultValue;
-
     }
 
-    void setdefault(const ValuePtr& key, const ValuePtr& defaultValue) {
-
+    void setdefault(const ValuePtr &key, const ValuePtr &defaultValue)
+    {
         if (elements.find(key) == elements.end()) {
-
             elements[key] = defaultValue;
-
         }
-
     }
 
-    ValuePtr pop(const ValuePtr& key, const ValuePtr& defaultValue = nullptr) {
-
+    ValuePtr pop(const ValuePtr &key, const ValuePtr &defaultValue = nullptr)
+    {
         auto it = elements.find(key);
 
         if (it == elements.end()) {
-
-            if (defaultValue == nullptr) throw std::runtime_error("key not found");
+            if (defaultValue == nullptr)
+                throw std::runtime_error("key not found");
 
             return defaultValue;
-
         }
 
         ValuePtr value = it->second;
@@ -2236,74 +1768,53 @@ struct DictValue {
         elements.erase(it);
 
         return value;
-
     }
 
-    void update(const DictValue& other) {
-
-        for (const auto& [key, value] : other.elements) {
-
+    void update(const DictValue &other)
+    {
+        for (const auto &[key, value] : other.elements) {
             elements[key] = value;
-
         }
-
     }
 
     void clear() { elements.clear(); }
 
-
-
     size_t len() const { return elements.size(); }
 
-
-
-    std::vector<ValuePtr> keys() const {
-
+    std::vector<ValuePtr> keys() const
+    {
         std::vector<ValuePtr> result;
 
-        for (const auto& [key, _] : elements) {
-
+        for (const auto &[key, _] : elements) {
             result.push_back(key);
-
         }
 
         return result;
-
     }
 
-    std::vector<ValuePtr> values() const {
-
+    std::vector<ValuePtr> values() const
+    {
         std::vector<ValuePtr> result;
 
-        for (const auto& [_, value] : elements) {
-
+        for (const auto &[_, value] : elements) {
             result.push_back(value);
-
         }
 
         return result;
-
     }
-
 };
-
-
 
 // Add toString method to Value struct
 
-struct Value {
-
+struct Value
+{
     TypePtr type;
 
-    std::string data;  // Unified string storage for all primitive types
-
-    
+    std::string data; // Unified string storage for all primitive types
 
     // Union type runtime support
 
-    size_t activeUnionVariant = 0;  // Which variant is active in union types
-
-    
+    size_t activeUnionVariant = 0; // Which variant is active in union types
 
     // Complex types still use variant storage
 
@@ -2339,68 +1850,101 @@ struct Value {
 
                  ClosureValue
 
-                 > complexData;
-
-
+                 >
+        complexData;
 
     // Default constructor
 
-    Value() : type(nullptr), data("") {}
-
-
+    Value()
+        : type(nullptr)
+        , data("")
+    {}
 
     // Constructor with type only
 
-    explicit Value(TypePtr t) : type(std::move(t)), data("") {}
-
-
+    explicit Value(TypePtr t)
+        : type(std::move(t))
+        , data("")
+    {}
 
     // String constructors
 
-    Value(TypePtr t, const std::string& str) : type(std::move(t)), data(str) {}
-
-
+    Value(TypePtr t, const std::string &str)
+        : type(std::move(t))
+        , data(str)
+    {}
 
     // String literal constructor
 
-    Value(TypePtr t, const char* str) : type(std::move(t)), data(std::string(str)) {}
-
-
+    Value(TypePtr t, const char *str)
+        : type(std::move(t))
+        , data(std::string(str))
+    {}
 
     // Boolean constructor
 
-    Value(TypePtr t, bool val) : type(std::move(t)), data(val ? "true" : "false") {}
-
-
+    Value(TypePtr t, bool val)
+        : type(std::move(t))
+        , data(val ? "true" : "false")
+    {}
 
     // Numeric constructors - store as string
 
-    Value(TypePtr t, int64_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, int64_t val)
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
-    Value(TypePtr t, int32_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, int32_t val)
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
-    Value(TypePtr t, int16_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, int16_t val)
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
-    Value(TypePtr t, int8_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, int8_t val)
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
-    Value(TypePtr t, uint64_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, uint64_t val)
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
-    Value(TypePtr t, uint32_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, uint32_t val)
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
-    Value(TypePtr t, uint16_t val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, uint16_t val)
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
-    Value(TypePtr t, uint8_t val) : type(std::move(t)), data(std::to_string(val)) {}
-
-    
+    Value(TypePtr t, uint8_t val)
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
     // Float constructors
 
-    Value(TypePtr t, float val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, float val)
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
-    Value(TypePtr t, double val) : type(std::move(t)), data(std::to_string(val)) {}
+    Value(TypePtr t, double val)
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
-    Value(TypePtr t, long double val) : type(std::move(t)) {
-
+    Value(TypePtr t, long double val)
+        : type(std::move(t))
+    {
         // Use higher precision formatting for long double to preserve very small/large numbers
 
         std::ostringstream oss;
@@ -2408,405 +1952,311 @@ struct Value {
         oss << std::setprecision(17) << std::scientific << val;
 
         data = oss.str();
-
     }
-
-
 
     // Template constructor for integer types
 
     template<typename T>
 
-    Value(TypePtr t, T val,
+    Value(TypePtr t,
+          T val,
 
-          typename std::enable_if_t<std::is_integral_v<T> && !std::is_same_v<T, bool>>* = nullptr)
+          typename std::enable_if_t<std::is_integral_v<T> && !std::is_same_v<T, bool>> * = nullptr)
 
-        : type(std::move(t)), data(std::to_string(val)) {}
-
-
+        : type(std::move(t))
+        , data(std::to_string(val))
+    {}
 
     // Move constructor
 
-    Value(Value&& other) noexcept
+    Value(Value &&other) noexcept
 
-        : type(std::move(other.type)),
+        : type(std::move(other.type))
+        ,
 
-        data(std::move(other.data)),
+        data(std::move(other.data))
+        ,
 
-        complexData(std::move(other.complexData)) {
-
-        
-
-    }
-
-
+        complexData(std::move(other.complexData))
+    {}
 
     // Copy constructor
 
-    Value(const Value& other)
+    Value(const Value &other)
 
-        : type(other.type),
+        : type(other.type)
+        ,
 
-        data(other.data),
+        data(other.data)
+        ,
 
-        complexData(other.complexData) {
-
-
-
-    }
-
-
+        complexData(other.complexData)
+    {}
 
     // Destructor
 
-    ~Value() {
-
-
-
-    }
-
-    
+    ~Value() {}
 
     // Constructor for complex types
 
-    Value(TypePtr t, const ListValue& lv) : type(std::move(t)), data(""), complexData(lv) {}
+    Value(TypePtr t, const ListValue &lv)
+        : type(std::move(t))
+        , data("")
+        , complexData(lv)
+    {}
 
+    Value(TypePtr t, const TupleValue &tv)
+        : type(std::move(t))
+        , data("")
+        , complexData(tv)
+    {}
 
+    Value(TypePtr t, const DictValue &dv)
+        : type(std::move(t))
+        , data("")
+        , complexData(dv)
+    {}
 
-    Value(TypePtr t, const TupleValue& tv) : type(std::move(t)), data(""), complexData(tv) {}
+    Value(TypePtr t, const EnumValue &ev)
+        : type(std::move(t))
+        , data("")
+        , complexData(ev)
+    {}
 
+    Value(TypePtr t, const ErrorValue &erv)
+        : type(std::move(t))
+        , data("")
+        , complexData(erv)
+    {}
 
+    Value(TypePtr t, const SumValue &sv)
+        : type(std::move(t))
+        , data("")
+        , complexData(sv)
+    {}
 
-    Value(TypePtr t, const DictValue& dv) : type(std::move(t)), data(""), complexData(dv) {}
+    Value(TypePtr t, const UserDefinedValue &udv)
+        : type(std::move(t))
+        , data("")
+        , complexData(udv)
+    {}
 
+    Value(TypePtr t, const IteratorValuePtr &iter)
+        : type(std::move(t))
+        , data("")
+        , complexData(iter)
+    {}
 
+    Value(TypePtr t, const std::shared_ptr<LM::Backend::Channel> &ch)
+        : type(std::move(t))
+        , data("")
+        , complexData(ch)
+    {}
 
-    Value(TypePtr t, const EnumValue& ev) : type(std::move(t)), data(""), complexData(ev) {}
+    Value(TypePtr t, const AtomicValue &av)
+        : type(std::move(t))
+        , data("")
+        , complexData(av)
+    {}
 
+    Value(TypePtr t, const ObjectInstancePtr &obj)
+        : type(std::move(t))
+        , data("")
+        , complexData(obj)
+    {}
 
+    Value(TypePtr t, const std::shared_ptr<backend::UserDefinedFunction> &func)
+        : type(std::move(t))
+        , data("")
+        , complexData(func)
+    {}
 
-    Value(TypePtr t, const ErrorValue& erv) : type(std::move(t)), data(""), complexData(erv) {}
+    Value(TypePtr t, const backend::Function &func)
+        : type(std::move(t))
+        , data("")
+        , complexData(func)
+    {}
 
-
-
-    Value(TypePtr t, const SumValue& sv) : type(std::move(t)), data(""), complexData(sv) {}
-
-
-
-    Value(TypePtr t, const UserDefinedValue& udv) : type(std::move(t)), data(""), complexData(udv) {}
-
-
-
-    Value(TypePtr t, const IteratorValuePtr& iter) : type(std::move(t)), data(""), complexData(iter) {}
-
-
-
-    Value(TypePtr t, const std::shared_ptr<LM::Backend::Channel>& ch) : type(std::move(t)), data(""), complexData(ch) {}
-
-
-
-    Value(TypePtr t, const AtomicValue& av) : type(std::move(t)), data(""), complexData(av) {}
-
-
-
-    Value(TypePtr t, const ObjectInstancePtr& obj) : type(std::move(t)), data(""), complexData(obj) {}
-
-
-
-    Value(TypePtr t, const std::shared_ptr<backend::UserDefinedFunction>& func) : type(std::move(t)), data(""), complexData(func) {}
-
-
-
-    Value(TypePtr t, const backend::Function& func) : type(std::move(t)), data(""), complexData(func) {}
-
-
-
-    Value(TypePtr t, const ClosureValue& closure) : type(std::move(t)), data(""), complexData(closure) {}
-
-
+    Value(TypePtr t, const ClosureValue &closure)
+        : type(std::move(t))
+        , data("")
+        , complexData(closure)
+    {}
 
     // Type-safe factory methods
 
-    static ValuePtr createInt64(int64_t val, TypePtr type) {
-
+    static ValuePtr createInt64(int64_t val, TypePtr type)
+    {
         return std::make_shared<Value>(type, std::to_string(val));
-
     }
 
-    
-
-    static ValuePtr createFloat64(double val, TypePtr type) {
-
+    static ValuePtr createFloat64(double val, TypePtr type)
+    {
         return std::make_shared<Value>(type, std::to_string(val));
-
     }
 
-    
-
-    static ValuePtr createBool(bool val, TypePtr type) {
-
+    static ValuePtr createBool(bool val, TypePtr type)
+    {
         return std::make_shared<Value>(type, val ? "true" : "false");
-
     }
 
-    
-
-    static ValuePtr createString(const std::string& val, TypePtr type) {
-
+    static ValuePtr createString(const std::string &val, TypePtr type)
+    {
         return std::make_shared<Value>(type, val);
-
     }
-
-    
 
     // Efficient conversion methods for VM/JIT
 
     template<typename T>
 
-    T as() const {
-
+    T as() const
+    {
         if constexpr (std::is_same_v<T, int64_t>) {
-
             return ValueConverters::safeConvert<int64_t>(data, 0);
 
         } else if constexpr (std::is_same_v<T, uint64_t>) {
-
             return ValueConverters::safeConvert<uint64_t>(data, 0);
 
         } else if constexpr (std::is_same_v<T, double>) {
-
             return ValueConverters::safeConvert<double>(data, 0.0);
 
         } else if constexpr (std::is_same_v<T, bool>) {
-
             return ValueConverters::toBool(data);
 
         } else if constexpr (std::is_same_v<T, std::string>) {
-
             return data;
-
         }
 
         throw std::runtime_error("Unsupported type conversion");
-
     }
-
-    
 
     // Safe conversion with error handling
 
     template<typename T>
 
-    std::optional<T> tryAs() const {
-
+    std::optional<T> tryAs() const
+    {
         try {
-
             return as<T>();
 
         } catch (...) {
-
             return std::nullopt;
-
         }
-
     }
 
-
-
-    bool isError() const {
-
+    bool isError() const
+    {
         // An error can be a direct ErrorValue or an ErrorUnion holding an ErrorValue.
 
         if (type && type->tag == TypeTag::ErrorUnion) {
-
             return std::holds_alternative<ErrorValue>(complexData);
-
         }
 
         return std::holds_alternative<ErrorValue>(complexData);
-
     }
 
-
-
-    const ErrorValue* getErrorValue() const {
-
+    const ErrorValue *getErrorValue() const
+    {
         if (isError()) {
-
             return std::get_if<ErrorValue>(&complexData);
-
         }
 
         return nullptr;
-
     }
-
-
 
     // Union type helper methods
 
-    bool isUnionType() const {
+    bool isUnionType() const { return type && type->tag == TypeTag::Union; }
 
-        return type && type->tag == TypeTag::Union;
+    size_t getActiveUnionVariant() const { return activeUnionVariant; }
 
-    }
-
-
-
-    size_t getActiveUnionVariant() const {
-
-        return activeUnionVariant;
-
-    }
-
-
-
-    void setActiveUnionVariant(size_t variantIndex) {
-
-        activeUnionVariant = variantIndex;
-
-    }
-
-
+    void setActiveUnionVariant(size_t variantIndex) { activeUnionVariant = variantIndex; }
 
     // Get the type of the currently active union variant
 
-    TypePtr getActiveUnionVariantType() const {
-
+    TypePtr getActiveUnionVariantType() const
+    {
         if (!isUnionType()) {
-
             return type; // Not a union, return the type itself
-
         }
 
-        
-
-        if (const auto* unionType = std::get_if<UnionType>(&type->extra)) {
-
+        if (const auto *unionType = std::get_if<UnionType>(&type->extra)) {
             if (activeUnionVariant < unionType->types.size()) {
-
                 return unionType->types[activeUnionVariant];
-
             }
-
         }
-
-        
 
         return nullptr; // Invalid variant index
-
     }
-
-
 
     // Get the name of the currently active variant (for Union or Sum types)
 
-    std::string getActiveVariantName() const {
-
-        if (!type) return "";
-
-
+    std::string getActiveVariantName() const
+    {
+        if (!type)
+            return "";
 
         if (type->tag == TypeTag::Union) {
-
-            if (const auto* unionType = std::get_if<UnionType>(&type->extra)) {
-
+            if (const auto *unionType = std::get_if<UnionType>(&type->extra)) {
                 if (activeUnionVariant < unionType->variantNames.size()) {
-
                     return unionType->variantNames[activeUnionVariant];
-
                 }
-
             }
 
         } else if (type->tag == TypeTag::Sum) {
-
-            if (const auto* sumValue = std::get_if<SumValue>(&complexData)) {
-
-                if (const auto* sumType = std::get_if<SumType>(&type->extra)) {
-
+            if (const auto *sumValue = std::get_if<SumValue>(&complexData)) {
+                if (const auto *sumType = std::get_if<SumType>(&type->extra)) {
                     if (sumValue->activeVariant < sumType->variantNames.size()) {
-
                         return sumType->variantNames[sumValue->activeVariant];
-
                     }
-
                 }
-
             }
-
         }
 
         return "";
-
     }
-
-
 
     // Check if union value matches a specific variant type
 
-    bool matchesUnionVariant(TypePtr variantType) const {
-
+    bool matchesUnionVariant(TypePtr variantType) const
+    {
         if (!isUnionType() || !variantType) {
-
             return false;
-
         }
-
-        
 
         TypePtr activeType = getActiveUnionVariantType();
 
         return activeType && activeType->tag == variantType->tag;
-
     }
 
-
-
     friend std::ostream &operator<<(std::ostream &os, const Value &value);
-
-
 
     // Get raw string representation for interpolation/concatenation (no quotes)
 
     std::string getRawString() const;
 
-    
-
     std::string toString() const;
-
-    
-
 };
-
-
 
 // FunctionType method implementations
 
-inline bool FunctionType::isCompatibleWith(const FunctionType& other) const {
-
+inline bool FunctionType::isCompatibleWith(const FunctionType &other) const
+{
     // Check parameter count
 
     if (paramTypes.size() != other.paramTypes.size()) {
-
         return false;
-
     }
-
-    
 
     // Check parameter types (contravariant - parameters can be more general in target)
 
     for (size_t i = 0; i < paramTypes.size(); ++i) {
-
         // For function parameters, the target type should accept what the source provides
 
         // This means other.paramTypes[i] should be assignable from paramTypes[i]
 
         if (!paramTypes[i] || !other.paramTypes[i]) {
-
             return false;
-
         }
 
         // Note: This would need access to TypeSystem for proper compatibility checking
@@ -2814,142 +2264,90 @@ inline bool FunctionType::isCompatibleWith(const FunctionType& other) const {
         // For now, we'll do a simple type tag comparison
 
         if (paramTypes[i]->tag != other.paramTypes[i]->tag) {
-
             return false;
-
         }
-
     }
-
-    
 
     // Check return type (covariant - return type can be more specific in source)
 
     if (returnType && other.returnType) {
-
         if (returnType->tag != other.returnType->tag) {
-
             return false;
-
         }
 
     } else if (returnType != other.returnType) {
-
         return false; // One has return type, other doesn't
-
     }
 
-    
-
     return true;
-
 }
 
-
-
-inline std::string FunctionType::toString() const {
-
+inline std::string FunctionType::toString() const
+{
     std::ostringstream oss;
 
     oss << "fn";
 
-    
-
     // Add generic type parameters if present
 
     if (isGeneric && !typeParameters.empty()) {
-
         oss << "<";
 
         for (size_t i = 0; i < typeParameters.size(); ++i) {
-
-            if (i > 0) oss << ", ";
+            if (i > 0)
+                oss << ", ";
 
             oss << typeParameters[i];
-
         }
 
         oss << ">";
-
     }
-
-    
 
     oss << "(";
 
-    
-
     for (size_t i = 0; i < paramTypes.size(); ++i) {
-
-        if (i > 0) oss << ", ";
-
-        
+        if (i > 0)
+            oss << ", ";
 
         // Add parameter name if available
 
         if (i < paramNames.size() && !paramNames[i].empty()) {
-
             oss << paramNames[i] << ": ";
-
         }
-
-        
 
         // Add parameter type
 
         if (paramTypes[i]) {
-
             oss << paramTypes[i]->toString();
 
         } else {
-
             oss << "unknown";
-
         }
-
-        
 
         // Add default indicator if applicable
 
         if (i < hasDefaultValues.size() && hasDefaultValues[i]) {
-
             oss << "?";
-
         }
-
     }
-
-    
 
     if (isVariadic) {
-
-        if (!paramTypes.empty()) oss << ", ";
+        if (!paramTypes.empty())
+            oss << ", ";
 
         oss << "...";
-
     }
 
-    
-
     oss << ")";
-
-    
 
     // Add return type
 
     if (returnType) {
-
         oss << ": " << returnType->toString();
-
     }
 
-    
-
     return oss.str();
-
 }
-
-
 
 // Error value construction and inspection utility functions
 
@@ -2957,10 +2355,12 @@ namespace ErrorUtils {
 
 // Create an error value
 
-inline ValuePtr createError(const std::string& errorType, const std::string& message = "",
+inline ValuePtr createError(const std::string &errorType,
+                            const std::string &message = "",
 
-                            const std::vector<ValuePtr>& args = {}, size_t location = 0) {
-
+                            const std::vector<ValuePtr> &args = {},
+                            size_t location = 0)
+{
     auto errorValue = std::make_shared<Value>();
 
     errorValue->type = std::make_shared<Type>(TypeTag::UserDefined); // Error types are user-defined
@@ -2968,15 +2368,12 @@ inline ValuePtr createError(const std::string& errorType, const std::string& mes
     errorValue->complexData = ErrorValue(errorType, message, args, location);
 
     return errorValue;
-
 }
-
-
 
 // Create a success value wrapped in an error union
 
-inline ValuePtr createSuccess(ValuePtr successValue, TypePtr errorUnionType) {
-
+inline ValuePtr createSuccess(ValuePtr successValue, TypePtr errorUnionType)
+{
     auto value = std::make_shared<Value>(errorUnionType);
 
     value->data = successValue->data;
@@ -2986,141 +2383,99 @@ inline ValuePtr createSuccess(ValuePtr successValue, TypePtr errorUnionType) {
         std::holds_alternative<DictValue>(successValue->complexData) ||
 
         std::holds_alternative<TupleValue>(successValue->complexData)) {
-
         value->complexData = successValue->complexData;
-
     }
 
     return value;
-
 }
-
-
 
 // Create an error union value from ErrorUnion helper
 
-inline ValuePtr createErrorUnionValue(const ErrorUnion& errorUnion, TypePtr errorUnionType) {
-
+inline ValuePtr createErrorUnionValue(const ErrorUnion &errorUnion, TypePtr errorUnionType)
+{
     return errorUnion.toValue(errorUnionType);
-
 }
-
-
 
 // Check if a value is an error
 
-inline bool isError(const ValuePtr& value) {
-
+inline bool isError(const ValuePtr &value)
+{
     return std::holds_alternative<ErrorValue>(value->complexData);
-
 }
-
-
 
 // Check if a value is a success value (not an error)
 
-inline bool isSuccess(const ValuePtr& value) {
-
+inline bool isSuccess(const ValuePtr &value)
+{
     return !isError(value);
-
 }
-
-
 
 // Extract error value from a Value (throws if not an error)
 
-inline const ErrorValue& getError(const ValuePtr& value) {
-
+inline const ErrorValue &getError(const ValuePtr &value)
+{
     if (auto errorValue = std::get_if<ErrorValue>(&value->complexData)) {
-
         return *errorValue;
-
     }
 
     throw std::runtime_error("Value is not an error");
-
 }
-
-
 
 // Extract error value safely (returns nullptr if not an error)
 
-inline const ErrorValue* getErrorSafe(const ValuePtr& value) {
-
+inline const ErrorValue *getErrorSafe(const ValuePtr &value)
+{
     return std::get_if<ErrorValue>(&value->complexData);
-
 }
-
-
 
 // Get error type from a value (empty string if not an error)
 
-inline std::string getErrorType(const ValuePtr& value) {
-
+inline std::string getErrorType(const ValuePtr &value)
+{
     if (auto errorValue = std::get_if<ErrorValue>(&value->complexData)) {
-
         return errorValue->errorType;
-
     }
 
     return "";
-
 }
-
-
 
 // Get error message from a value (empty string if not an error)
 
-inline std::string getErrorMessage(const ValuePtr& value) {
-
+inline std::string getErrorMessage(const ValuePtr &value)
+{
     if (auto errorValue = std::get_if<ErrorValue>(&value->complexData)) {
-
         return errorValue->message;
-
     }
 
     return "";
-
 }
-
-
 
 // Get error arguments from a value (empty vector if not an error)
 
-inline std::vector<ValuePtr> getErrorArguments(const ValuePtr& value) {
-
+inline std::vector<ValuePtr> getErrorArguments(const ValuePtr &value)
+{
     if (auto errorValue = std::get_if<ErrorValue>(&value->complexData)) {
-
         return errorValue->arguments;
-
     }
 
     return {};
-
 }
-
-
 
 // Get error source location from a value (0 if not an error)
 
-inline size_t getErrorLocation(const ValuePtr& value) {
-
+inline size_t getErrorLocation(const ValuePtr &value)
+{
     if (auto errorValue = std::get_if<ErrorValue>(&value->complexData)) {
-
         return errorValue->sourceLocation;
-
     }
 
     return 0;
-
 }
-
-
 
 // Wrap a success value in an error union type
 
-inline ValuePtr wrapAsSuccess(ValuePtr successValue, TypePtr errorUnionType) {
-
+inline ValuePtr wrapAsSuccess(ValuePtr successValue, TypePtr errorUnionType)
+{
     auto value = std::make_shared<Value>(errorUnionType);
 
     value->data = successValue->data;
@@ -3130,125 +2485,88 @@ inline ValuePtr wrapAsSuccess(ValuePtr successValue, TypePtr errorUnionType) {
         std::holds_alternative<DictValue>(successValue->complexData) ||
 
         std::holds_alternative<TupleValue>(successValue->complexData)) {
-
         value->complexData = successValue->complexData;
-
     }
 
     return value;
-
 }
-
-
 
 // Wrap an error value in an error union type
 
-inline ValuePtr wrapAsError(const ErrorValue& errorValue, TypePtr errorUnionType) {
-
+inline ValuePtr wrapAsError(const ErrorValue &errorValue, TypePtr errorUnionType)
+{
     auto value = std::make_shared<Value>(errorUnionType);
 
     value->complexData = errorValue;
 
     return value;
-
 }
-
-
 
 // Create an error union value from ErrorUnion helper
 
-inline ValuePtr createErrorUnion(const ErrorUnion& errorUnion, TypePtr errorUnionType) {
-
+inline ValuePtr createErrorUnion(const ErrorUnion &errorUnion, TypePtr errorUnionType)
+{
     return errorUnion.toValue(errorUnionType);
-
 }
-
-
 
 // Unwrap success value (throws if error)
 
-inline ValuePtr unwrapSuccess(const ValuePtr& value) {
-
+inline ValuePtr unwrapSuccess(const ValuePtr &value)
+{
     if (isError(value)) {
-
         throw std::runtime_error("Attempted to unwrap error as success");
-
     }
 
     return value;
-
 }
-
-
 
 // Unwrap success value safely (returns nullptr if error)
 
-inline ValuePtr unwrapSuccessSafe(const ValuePtr& value) {
-
+inline ValuePtr unwrapSuccessSafe(const ValuePtr &value)
+{
     return isError(value) ? nullptr : value;
-
 }
-
-
 
 // Built-in error creation functions
 
-inline ValuePtr createDivisionByZeroError(const std::string& message = "Division by zero") {
-
+inline ValuePtr createDivisionByZeroError(const std::string &message = "Division by zero")
+{
     return createError("DivisionByZero", message);
-
 }
 
-
-
-inline ValuePtr createIndexOutOfBoundsError(const std::string& message = "Index out of bounds") {
-
+inline ValuePtr createIndexOutOfBoundsError(const std::string &message = "Index out of bounds")
+{
     return createError("IndexOutOfBounds", message);
-
 }
 
-
-
-inline ValuePtr createNullReferenceError(const std::string& message = "Null reference access") {
-
+inline ValuePtr createNullReferenceError(const std::string &message = "Null reference access")
+{
     return createError("NullReference", message);
-
 }
 
-
-
-inline ValuePtr createTypeConversionError(const std::string& message = "Type conversion failed") {
-
+inline ValuePtr createTypeConversionError(const std::string &message = "Type conversion failed")
+{
     return createError("TypeConversion", message);
-
 }
 
-
-
-inline ValuePtr createIOError(const std::string& message = "I/O operation failed") {
-
+inline ValuePtr createIOError(const std::string &message = "I/O operation failed")
+{
     return createError("IOError", message);
-
 }
-
-
 
 // Error type compatibility checking
 
-inline bool areErrorTypesCompatible(const std::string& errorType1, const std::string& errorType2) {
-
+inline bool areErrorTypesCompatible(const std::string &errorType1, const std::string &errorType2)
+{
     return errorType1 == errorType2;
-
 }
 
-}
-
-
+} // namespace ErrorUtils
 
 // Iterator for list and range values
 
-struct IteratorValue {
-
+struct IteratorValue
+{
     enum class IteratorType {
 
         LIST,
@@ -3261,15 +2579,11 @@ struct IteratorValue {
 
     };
 
-
-
     IteratorType type;
 
     ValuePtr iterable;
 
     size_t currentIndex;
-
-    
 
     // For lazy ranges
 
@@ -3281,8 +2595,6 @@ struct IteratorValue {
 
     std::string rangeCurrent;
 
-    
-
     // For channel iterators: a buffered value received by hasNext()
 
     // Marked mutable because hasNext() needs to modify these while being logically const
@@ -3291,100 +2603,96 @@ struct IteratorValue {
 
     mutable ValuePtr bufferedValue;
 
-    
-
     // Constructor for general iterators (list, dict, channel)
 
     IteratorValue(IteratorType type, ValuePtr iterable)
 
-        : type(type), iterable(std::move(iterable)), currentIndex(0),
+        : type(type)
+        , iterable(std::move(iterable))
+        , currentIndex(0)
+        ,
 
-        rangeStart("0"), rangeEnd("0"), rangeStep("0"), rangeCurrent("0"),
+        rangeStart("0")
+        , rangeEnd("0")
+        , rangeStep("0")
+        , rangeCurrent("0")
+        ,
 
-        hasBuffered(false), bufferedValue(nullptr) {}
-
-    
+        hasBuffered(false)
+        , bufferedValue(nullptr)
+    {}
 
     // Constructor for lazy ranges
 
-    IteratorValue(IteratorType type, ValuePtr iterable, const std::string& start, const std::string& end, const std::string& step)
+    IteratorValue(IteratorType type,
+                  ValuePtr iterable,
+                  const std::string &start,
+                  const std::string &end,
+                  const std::string &step)
 
-        : type(type), iterable(std::move(iterable)), currentIndex(0),
+        : type(type)
+        , iterable(std::move(iterable))
+        , currentIndex(0)
+        ,
 
-        rangeStart(start), rangeEnd(end), rangeStep(step), rangeCurrent(start),
+        rangeStart(start)
+        , rangeEnd(end)
+        , rangeStep(step)
+        , rangeCurrent(start)
+        ,
 
-        hasBuffered(false), bufferedValue(nullptr) {}
-
-    
+        hasBuffered(false)
+        , bufferedValue(nullptr)
+    {}
 
     bool hasNext() const;
 
-    
-
     ValuePtr next();
 
-    
-
     std::string toString() const;
-
 };
-
-
 
 // Implementation of operator<< for Value
 
-inline std::ostream &operator<<(std::ostream &os, const Value &value) {
-
+inline std::ostream &operator<<(std::ostream &os, const Value &value)
+{
     os << value.toString();
 
     return os;
-
 }
 
-
-
 // Forward declare the rest of the Value class to fix circular dependency
-
-
 
 // Define the operator<< for ListValue
 
 inline std::ostream &operator<<(std::ostream &os, const ListValue &lv)
 
 {
-
     os << "[";
 
     for (size_t i = 0; i < lv.elements.size(); ++i) {
-
         if (i > 0)
 
             os << ", ";
 
         os << lv.elements[i];
-
     }
 
     os << "]";
 
     return os;
-
 }
-
-
 
 // Define the operator<< for DictValue
 
 inline std::ostream &operator<<(std::ostream &os, const DictValue &dv)
 
 {
-
     os << "{";
 
     bool first = true;
 
     for (const auto &[key, value] : dv.elements) {
-
         if (!first)
 
             os << ", ";
@@ -3392,29 +2700,23 @@ inline std::ostream &operator<<(std::ostream &os, const DictValue &dv)
         first = false;
 
         os << key << ": " << value;
-
     }
 
     os << "}";
 
     return os;
-
 }
-
-
 
 // Define the operator<< for UserDefinedValue
 
 inline std::ostream &operator<<(std::ostream &os, const UserDefinedValue &udv)
 
 {
-
     os << udv.variantName << "{";
 
     bool first = true;
 
     for (const auto &[field, value] : udv.fields) {
-
         if (!first)
 
             os << ", ";
@@ -3422,23 +2724,18 @@ inline std::ostream &operator<<(std::ostream &os, const UserDefinedValue &udv)
         first = false;
 
         os << field << ": " << value;
-
     }
 
     os << "}";
 
     return os;
-
 }
-
-
 
 // Define the operator<< for SumValue
 
 inline std::ostream &operator<<(std::ostream &os, const SumValue &udv)
 
 {
-
     os << "Variant" << udv.activeVariant << "(";
 
     os << *udv.value;
@@ -3446,41 +2743,30 @@ inline std::ostream &operator<<(std::ostream &os, const SumValue &udv)
     os << ")";
 
     return os;
-
 }
-
-
 
 inline std::ostream &operator<<(std::ostream &os, const std::monostate &)
 
 {
-
     return os << "Nil";
-
 }
-
-
 
 // Update the operator<< for EnumValue
 
-inline std::ostream &operator<<(std::ostream &os, const EnumValue &ev) {
-
+inline std::ostream &operator<<(std::ostream &os, const EnumValue &ev)
+{
     os << ev.toString();
 
     return os;
-
 }
-
-
 
 // Define the operator<< for ErrorValue
 
-inline std::ostream &operator<<(std::ostream &os, const ErrorValue &erv) {
-
+inline std::ostream &operator<<(std::ostream &os, const ErrorValue &erv)
+{
     os << erv.toString();
 
     return os;
-
 }
 
 // Define the operator<< for ValuePtr
@@ -3488,19 +2774,14 @@ inline std::ostream &operator<<(std::ostream &os, const ErrorValue &erv) {
 inline std::ostream &operator<<(std::ostream &os, const ValuePtr &valuePtr)
 
 {
-
     if (valuePtr) {
-
         os << *valuePtr;
 
     } else {
-
         os << "nullptr";
-
     }
 
     return os;
-
 }
 
 // ClosureValue factory method implementation
@@ -3511,27 +2792,19 @@ inline ValuePtr createClosure(std::shared_ptr<backend::UserDefinedFunction> func
 
                               std::shared_ptr<::Environment> capturedEnv,
 
-                              const std::vector<std::string>& capturedVars,
+                              const std::vector<std::string> &capturedVars,
 
-                              TypePtr closureType) {
-
+                              TypePtr closureType)
+{
     if (!func) {
-
         throw std::runtime_error("Cannot create closure: function is null");
-
     }
-
-
 
     // Create closure type if not provided
 
     if (!closureType) {
-
         closureType = std::make_shared<Type>(TypeTag::Closure);
-
     }
-
-
 
     // Create the closure value - for now use placeholder values since this factory
 
@@ -3539,21 +2812,12 @@ inline ValuePtr createClosure(std::shared_ptr<backend::UserDefinedFunction> func
 
     ClosureValue closure("closure", 0, 0, capturedEnv, capturedVars);
 
-
-
     // Return as ValuePtr
 
     return std::make_shared<Value>(closureType, closure);
-
 }
 
-}
-
-
-
-
-
-
+} // namespace ClosureValueFactory
 
 // ClosureValue::create implementation
 
@@ -3561,11 +2825,9 @@ inline ValuePtr ClosureValue::create(std::shared_ptr<backend::UserDefinedFunctio
 
                                      std::shared_ptr<Environment> capturedEnv,
 
-                                     const std::vector<std::string>& capturedVars) {
-
+                                     const std::vector<std::string> &capturedVars)
+{
     TypePtr closureType = std::make_shared<Type>(TypeTag::Closure);
 
     return ClosureValueFactory::createClosure(func, capturedEnv, capturedVars, closureType);
-
 }
-

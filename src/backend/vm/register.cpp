@@ -341,8 +341,11 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
             if (!frame) return "nil";
             if (frame->frame_type == INTERNAL_ENUM_FRAME_TYPE && frame->fields.size() >= 2) {
                 int64_t tag = to_int(frame->fields[0]);
-                // Simplified enum formatting for debugging
-                return "Enum(tag=" + std::to_string(tag) + ", payload=" + this->to_string(frame->fields[1]) + ")";
+                RegisterValue payload = frame->fields[1];
+                if (std::holds_alternative<int64_t>(payload) && IS_NIL(std::get<int64_t>(payload))) {
+                     return "Enum(tag=" + std::to_string(tag) + ", payload=nil)";
+                }
+                return "Enum(tag=" + std::to_string(tag) + ", payload=" + this->to_string(payload) + ")";
             }
             std::string result = frame->frame_type + "{";
             for (size_t i = 0; i < frame->fields.size(); ++i) {
@@ -841,38 +844,27 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 registers[pc->dst] = (int64_t)(res ? VAL_TRUE : VAL_FALSE);
                 break;
             }
-            case LIR::LIR_Op::CmpEQ: {
+                        case LIR::LIR_Op::CmpEQ: {
                 const RegisterValue* temp_a = &registers[pc->a];
                 const RegisterValue* temp_b = &registers[pc->b];
                 bool res;
-                
-                if (std::holds_alternative<int64_t>(*temp_a) && std::holds_alternative<int64_t>(*temp_b)) {
-                    void* v1 = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(*temp_a)));
-                    void* v2 = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(*temp_b)));
-                    res = lm_value_eq(v1, v2) != 0;
-                }
-                // Check if both are numeric
-                else if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
+                if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
                     if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
                         res = to_float(*temp_a) == to_float(*temp_b);
                     } else {
                         res = to_int(*temp_a) == to_int(*temp_b);
                     }
-                }
-                // Check if both are strings
-                else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
+                } else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
                     res = std::get<std::string>(*temp_a) == std::get<std::string>(*temp_b);
-                }
-                // Check if both are booleans
-                else if (std::holds_alternative<bool>(*temp_a) && std::holds_alternative<bool>(*temp_b)) {
+                } else if (std::holds_alternative<bool>(*temp_a) && std::holds_alternative<bool>(*temp_b)) {
                     res = std::get<bool>(*temp_a) == std::get<bool>(*temp_b);
-                }
-                // Check if both are nullptr
-                else if (std::holds_alternative<std::nullptr_t>(*temp_a) && std::holds_alternative<std::nullptr_t>(*temp_b)) {
+                } else if (std::holds_alternative<std::nullptr_t>(*temp_a) && std::holds_alternative<std::nullptr_t>(*temp_b)) {
                     res = true;
-                }
-                // Different types - not equal
-                else {
+                } else if (std::holds_alternative<int64_t>(*temp_a) && std::holds_alternative<int64_t>(*temp_b)) {
+                    void* v1 = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(*temp_a)));
+                    void* v2 = reinterpret_cast<void*>(static_cast<uintptr_t>(std::get<int64_t>(*temp_b)));
+                    res = lm_value_eq(v1, v2) != 0;
+                } else {
                     res = false;
                 }
                 registers[pc->dst] = (int64_t)(res ? VAL_TRUE : VAL_FALSE);
@@ -882,32 +874,19 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 const RegisterValue* temp_a = &registers[pc->a];
                 const RegisterValue* temp_b = &registers[pc->b];
                 bool res;
-                
-                // Check if both are numeric
                 if (is_numeric(*temp_a) && is_numeric(*temp_b)) {
-                    // Handle uint64 comparisons
-                    if (std::holds_alternative<uint64_t>(*temp_a) && std::holds_alternative<uint64_t>(*temp_b)) {
-                        res = std::get<uint64_t>(*temp_a) != std::get<uint64_t>(*temp_b);
-                    } else if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
+                    if (std::holds_alternative<double>(*temp_a) || std::holds_alternative<double>(*temp_b)) {
                         res = to_float(*temp_a) != to_float(*temp_b);
                     } else {
                         res = to_int(*temp_a) != to_int(*temp_b);
                     }
-                }
-                // Check if both are strings
-                else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
+                } else if (std::holds_alternative<std::string>(*temp_a) && std::holds_alternative<std::string>(*temp_b)) {
                     res = std::get<std::string>(*temp_a) != std::get<std::string>(*temp_b);
-                }
-                // Check if both are booleans
-                else if (std::holds_alternative<bool>(*temp_a) && std::holds_alternative<bool>(*temp_b)) {
+                } else if (std::holds_alternative<bool>(*temp_a) && std::holds_alternative<bool>(*temp_b)) {
                     res = std::get<bool>(*temp_a) != std::get<bool>(*temp_b);
-                }
-                // Check if both are nullptr
-                else if (std::holds_alternative<std::nullptr_t>(*temp_a) && std::holds_alternative<std::nullptr_t>(*temp_b)) {
+                } else if (std::holds_alternative<std::nullptr_t>(*temp_a) && std::holds_alternative<std::nullptr_t>(*temp_b)) {
                     res = false;
-                }
-                // Different types - not equal
-                else {
+                } else {
                     res = true;
                 }
                 registers[pc->dst] = (int64_t)(res ? VAL_TRUE : VAL_FALSE);
@@ -2147,6 +2126,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                     } else {
                         registers[pc->dst] = (int64_t)VAL_NIL;
                     }
+                } else if (std::holds_alternative<int64_t>(registers[pc->a]) || std::holds_alternative<uint64_t>(registers[pc->a])) {
+                    // Try to treat as Result and unwrap Success
+                    registers[pc->dst] = registers[pc->a];
                 } else {
                     registers[pc->dst] = (int64_t)VAL_NIL;
                 }

@@ -35,21 +35,35 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
             bool variant_resolved = false;
             TypePtr constructorType = lookup_variable(bindingPattern->typeName);
 
-            if (!constructorType && match_type && match_type->tag == TypeTag::Enum) {
-                if (auto* et = std::get_if<EnumType>(&match_type->extra)) {
-                    std::string qualified = et->name + "." + bindingPattern->typeName;
-                    constructorType = lookup_variable(qualified);
+                        if (!constructorType && bindingPattern->typeName.find('.') == std::string::npos) {
+                if (match_type && (match_type->tag == TypeTag::Enum || match_type->tag == TypeTag::UserDefined || match_type->tag == TypeTag::Frame)) {
+                    if (auto* et = std::get_if<EnumType>(&match_type->extra)) {
+                        std::string qualified = et->name + "." + bindingPattern->typeName;
+                        constructorType = lookup_variable(qualified);
+                    }
                 }
-            }
-            
-            if (!constructorType && bindingPattern->typeName.find('.') == std::string::npos) {
-                auto it = variant_owners.find(bindingPattern->typeName);
-                if (it != variant_owners.end() && !it->second.empty()) {
-                    TypePtr owner = it->second[0];
-                    if (owner) {
-                        if (auto* enumInfoPtr = std::get_if<EnumType>(&owner->extra)) {
-                            std::string qualified = enumInfoPtr->name + "." + bindingPattern->typeName;
-                            constructorType = lookup_variable(qualified);
+                
+                if (!constructorType) {
+                    auto it = variant_owners.find(bindingPattern->typeName);
+                    if (it != variant_owners.end() && !it->second.empty()) {
+                        TypePtr owner = it->second[0];
+                        if (owner) {
+                            if (auto* enumInfoPtr = std::get_if<EnumType>(&owner->extra)) {
+                                std::string qualified = enumInfoPtr->name + "." + bindingPattern->typeName;
+                                constructorType = lookup_variable(qualified);
+                            }
+                        }
+                    }
+                }
+
+                if (!constructorType) {
+                    for (const auto& pair : variable_types) {
+                        const std::string& name = pair.first;
+                        if (name.length() > bindingPattern->typeName.length() && 
+                            name.substr(name.length() - bindingPattern->typeName.length()) == bindingPattern->typeName &&
+                            name[name.length() - bindingPattern->typeName.length() - 1] == '.') {
+                            constructorType = pair.second;
+                            break;
                         }
                     }
                 }
@@ -76,6 +90,7 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
                                 }
                             }
                             for (size_t i = 0; i < bindingPattern->patterns.size(); ++i) {
+                                bindingPattern->patterns[i]->inferred_type = funcType->paramTypes[i];
                                 validate_pattern_compatibility(bindingPattern->patterns[i], funcType->paramTypes[i], line);
                             }
                         }

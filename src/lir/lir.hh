@@ -190,6 +190,7 @@ enum class LIR_Op : uint8_t {
     DictCreate,
     DictSet,
     DictGet,
+    DictHas,
     DictLen,
     DictItems,  // Get dict items as flat array of (key, value) pairs
     

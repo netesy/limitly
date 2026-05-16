@@ -1,8 +1,0 @@
-fn makeTuple(): (int, str) {
-    var t = (42, "hello");
-    print("Returning tuple");
-    return t;
-}
-
-var result = makeTuple();
-print("Result: {result}");
