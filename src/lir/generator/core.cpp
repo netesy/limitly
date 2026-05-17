@@ -220,7 +220,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     lir_func->setInstructions(result->instructions);
     
     // Optimize the generated LIR for this function
-    if (Generator::is_optimization_enabled()) {
+    if (false && Generator::is_optimization_enabled()) {
         Optimizer optimizer(*result);
         optimizer.optimize();
         lir_func->setInstructions(result->instructions);
