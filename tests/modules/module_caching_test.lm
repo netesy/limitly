@@ -7,8 +7,8 @@ import tests.modules.basic_module as basic2;
 print("✓ Same module imported twice with different aliases");
 print("✓ First alias access: " + basic1.moduleVar);
 print("✓ Second alias access: " + basic2.moduleVar);
-assert(basic1.moduleVar == "Hello from module", "First alias should work");
-assert(basic2.moduleVar == "Hello from module", "Second alias should work");
+assert(basic1.moduleVar == "Hello from basic module", "First alias should work");
+assert(basic2.moduleVar == "Hello from basic module", "Second alias should work");
 
 print("Test 2: Verify module state is shared");
 print("✓ Both aliases should access the same module instance");

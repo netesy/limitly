@@ -40,7 +40,7 @@ var list4 = testListDestructuring([1, 2, 3, 4, 5]);
 assert(list1 == "Empty list", "Empty list destructuring failed");
 assert(list2 == "One element: 1", "Single element list destructuring failed");
 assert(list3 == "Two elements: 1, 2", "Two element list destructuring failed");
-assert(list4 == "Head: 1, Tail: [2,3,4,5]", "List with spread destructuring failed");
+assert(list4 == "Head: 1, Tail: [2, 3, 4, 5]", "List with spread destructuring failed");
 
 print("Empty: {list1}");
 print("One: {list2}");
@@ -141,7 +141,7 @@ fn testSpreadDestructuring(value): str {
 var spread1 = testSpreadDestructuring([1, 2, 3, 4, 5]);
 var spread2 = testSpreadDestructuring([100]);
 
-assert(spread1 == "First: 1, Rest: [2,3,4,5]", "Spread destructuring with multiple elements failed");
+assert(spread1 == "First: 1, Rest: [2, 3, 4, 5]", "Spread destructuring with multiple elements failed");
 assert(spread2 == "First: 100, Rest: []", "Spread destructuring with single element failed");
 
 print("Spread 1: {spread1}");

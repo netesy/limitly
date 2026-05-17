@@ -1,0 +1,103 @@
+﻿./bin/limitly.exe : [DEBUG getType] Shape found in 
+userDefinedTypes, tag=20
+At line:1 char:1
++ ./bin/limitly.exe tests/loops/match_advanced.lm > 
+match_adv_out.txt 2 ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([DEBUG ge 
+   tType]...edTypes, tag=20:String) [], RemoteExcepti  
+  on
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+=== Advanced Match Statement Tests ===
+
+--- Test 1: Record Destructuring (Dictionaries) ---
+Error: Unknown LIR operation: 97
+Error: Unknown LIR operation: 97
+Error calling builtin function assert: Assertion 
+failed: Record destructuring with 2 fields failed
+Error calling builtin function assert: Assertion 
+failed: Record destructuring with 3 fields failed
+Result 1: {age: 30, name: John}
+Result 2: {age: 26, name: Joan, city: New York}
+
+--- Test 2: List Destructuring ---
+Empty: Empty list
+One: One element: 1
+Two: Two elements: 1, 2
+Many: Head: 1, Tail: nil
+
+--- Test 3: Tuple Destructuring ---
+Error calling builtin function assert: Assertion 
+failed: List with spread destructuring failed
+2-tuple: Tuple: (10, 20)
+3-tuple: 3-tuple: (1, 2, 3)
+
+--- Test 4: Nested Destructuring ---
+Error: Unknown LIR operation: 97
+Error calling builtin function assert: Assertion 
+failed: Record with list destructuring failed
+Nested 1: Nested: x=100, a=10, b=20
+Nested 2: {scores: [95, 87], name: Alice}
+
+--- Test 5: Mixed Pattern Types ---
+Circle: Circle with radius 5
+Error: Unknown LIR operation: 97
+Rectangle: Rectangle 10x20
+Point: Point at (3, 4)
+
+--- Test 6: Destructuring with Guards ---
+Error: Unknown LIR operation: 97
+Error calling builtin function assert: Assertion 
+failed: Adult guard test failed
+Error calling builtin function assert: Assertion 
+failed: Minor guard test failed
+Adult: {age: 25, name: Alice}
+Minor: {age: 16, name: Bob}
+
+--- Test 7: List Destructuring with Spread ---
+Error calling builtin function assert: Assertion 
+failed: Spread destructuring with multiple elements 
+failed
+Spread 1: First: 1, Rest: nil
+Spread 2: First: 100, Rest: []
+
+--- Test 8: Tuple with Nested List ---
+Nested: Tuple+List: x=99, [a,b,c]=[1,2,3]
+
+--- Test 9: Record with Optional Fields ---
+Error: Unknown LIR operation: 97
+Error: Unknown LIR operation: 97
+Error calling builtin function assert: Assertion 
+failed: Record with city failed
+Error calling builtin function assert: Assertion 
+failed: Record without city failed
+With city: {age: 30, name: John, city: NYC}
+Without city: {age: 25, name: Jane}
+
+--- Test 10: Complex Nested Patterns ---
+Error: Unknown LIR operation: 97
+Error calling builtin function assert: Assertion 
+failed: Complex nested pattern failed
+Complex: (42, {values: [10, 20], name: test})
+
+--- Test 11: Enum with Multiple Payloads ---
+Move: Move to (10, 20)
+Resize: Resize to 100x200
+Color: Color RGB(255, 128, 64)
+
+--- Test 12: Destructuring in Nested Match ---
+Nested 1: Nested: x=100, a=1, b=20
+Nested 2: Nested: x=200, a=2, b=30
+Nested 3: Nested: x=300, a=5, b=40
+
+=== Advanced Match Statement Tests Complete ===
