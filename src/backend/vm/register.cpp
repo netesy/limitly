@@ -2108,8 +2108,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 if (std::holds_alternative<FrameInstancePtr>(registers[pc->a])) {
                     auto enum_value = std::get<FrameInstancePtr>(registers[pc->a]);
                     if (enum_value && enum_value->frame_type == INTERNAL_ENUM_FRAME_TYPE && enum_value->fields.size() >= 2) {
-                        const auto& tag = enum_value->getField(0);
-                        registers[pc->dst] = to_int(tag);
+                        registers[pc->dst] = enum_value->getField(0);
                     } else {
                         registers[pc->dst] = (int64_t)0;
                     }

@@ -208,6 +208,31 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
                 add_error("Type pattern type " + patternType->toString() + " does not match match type " + match_type->toString(), line);
             }
         }
+    } else if (auto valPattern = std::dynamic_pointer_cast<LM::Frontend::AST::ValPatternExpr>(pattern_node)) {
+        if (is_error_union_type(match_type)) {
+            auto* errorUnionPtr = std::get_if<ErrorUnionType>(&match_type->extra);
+            if (errorUnionPtr) {
+                declare_variable(valPattern->variableName, errorUnionPtr->successType);
+            }
+        } else if (match_type->tag == TypeTag::Any) {
+            declare_variable(valPattern->variableName, type_system.ANY_TYPE);
+        } else {
+            add_error("val pattern can only be used with error union types " + match_type->toString(), line);
+        }
+    } else if (auto errPattern = std::dynamic_pointer_cast<LM::Frontend::AST::ErrPatternExpr>(pattern_node)) {
+        if (!is_error_union_type(match_type) && match_type->tag != TypeTag::Any) {
+            add_error("err pattern can only be used with error union types " + match_type->toString(), line);
+        } else {
+            declare_variable(errPattern->variableName, type_system.NIL_TYPE);
+        }
+    } else if (auto errTypePattern = std::dynamic_pointer_cast<LM::Frontend::AST::ErrorTypePatternExpr>(pattern_node)) {
+         if (!is_error_union_type(match_type) && match_type->tag != TypeTag::Any) {
+            add_error("error type pattern can only be used with error union types " + match_type->toString(), line);
+        } else {
+            for (const auto& paramName : errTypePattern->parameterNames) {
+                declare_variable(paramName, type_system.ANY_TYPE);
+            }
+        }
     } else if (auto literalPattern = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(pattern_node)) {
         if (std::holds_alternative<std::nullptr_t>(literalPattern->value)) return;
         TypePtr literalType = check_literal_expr(literalPattern);
