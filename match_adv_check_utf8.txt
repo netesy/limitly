@@ -1,0 +1,79 @@
+﻿./bin/limitly.exe : [DEBUG getType] Shape found in 
+userDefinedTypes, tag=20
+At line:1 char:8
++ make ; ./bin/limitly.exe 
+tests/loops/match_advanced.lm > match_adv_ch ...
++        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([DEBUG ge 
+   tType]...edTypes, tag=20:String) [], RemoteExcepti  
+  on
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+[DEBUG getType] Shape found in userDefinedTypes, tag=20
+=== Advanced Match Statement Tests ===
+
+--- Test 1: Record Destructuring (Dictionaries) ---
+Result 1: Name: John, Age: 30
+Result 2: Name: Joan, Age: 26, City: New York
+
+--- Test 2: List Destructuring ---
+Error calling builtin function assert: Assertion 
+failed: List with spread destructuring failed
+Empty: Empty list
+One: One element: 1
+Two: Two elements: 1, 2
+Many: Head: 1, Tail: [2, 3, 4, 5]
+
+--- Test 3: Tuple Destructuring ---
+2-tuple: Tuple: (10, 20)
+3-tuple: 3-tuple: (1, 2, 3)
+
+--- Test 4: Nested Destructuring ---
+Nested 1: Nested: x=100, a=10, b=20
+Nested 2: Record with list: Alice, scores: 95, 87
+
+--- Test 5: Mixed Pattern Types ---
+Circle: Circle with radius 5
+Rectangle: Rectangle 10x20
+Point: Point at (3, 4)
+
+--- Test 6: Destructuring with Guards ---
+Adult: Alice is an adult (25)
+Minor: Bob is a minor (16)
+
+--- Test 7: List Destructuring with Spread ---
+Error calling builtin function assert: Assertion 
+failed: Spread destructuring with multiple elements 
+failed
+Spread 1: First: 1, Rest: [2, 3, 4, 5]
+Spread 2: First: 100, Rest: []
+
+--- Test 8: Tuple with Nested List ---
+Nested: Tuple+List: x=99, [a,b,c]=[1,2,3]
+
+--- Test 9: Record with Optional Fields ---
+With city: John, 30, NYC
+Without city: Jane, 25 (no city)
+
+--- Test 10: Complex Nested Patterns ---
+Complex: Complex: x=42, name=test, values=[10,20]
+
+--- Test 11: Enum with Multiple Payloads ---
+Move: Move to (10, 20)
+Resize: Resize to 100x200
+Color: Color RGB(255, 128, 64)
+
+--- Test 12: Destructuring in Nested Match ---
+Nested 1: Nested: x=100, a=1, b=20
+Nested 2: Nested: x=200, a=2, b=30
+Nested 3: Nested: x=300, a=5, b=40
+
+=== Advanced Match Statement Tests Complete ===

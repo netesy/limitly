@@ -1,0 +1,90 @@
+// Reproduction script for match statement payload binding bugs
+// Uses verified Limitly syntax from tests/loops/match.lm
+
+// --- Test 1: Enum with associated values (single payload) ---
+enum Result {
+    Success(str),
+    Error(str)
+}
+
+fn describeResult(r: Result): str {
+    match (r) {
+        Result.Success(msg) => { return "Success: " + msg; },
+        Result.Error(e) => { return "Error: " + e; }
+    }
+}
+
+// --- Test 2: Enum with tuple payload (multiple values) ---
+enum Message {
+    Quit,
+    Move(int, int),
+    Write(str)
+}
+
+fn processMessage(msg: Message): str {
+    match (msg) {
+        Message.Quit => { return "Quitting application..."; },
+        Message.Move(x, y) => { return "Moving to position ({x}, {y})"; },
+        Message.Write(text) => { return "Writing message: " + text; }
+    }
+}
+
+// --- Test 3: Nested enum dispatch ---
+enum Color { Red, Green, Blue }
+
+enum Shape {
+    Circle(Color),
+    Square(Color)
+}
+
+fn describeShape(s: Shape): str {
+    match (s) {
+        Shape.Circle(color) => {
+            match (color) {
+                Color.Red => { return "Red circle"; },
+                Color.Green => { return "Green circle"; },
+                Color.Blue => { return "Blue circle"; },
+                _ => { return "Unknown color circle"; }
+            }
+        },
+        Shape.Square(color) => {
+            match (color) {
+                Color.Red => { return "Red square"; },
+                _ => { return "Other square"; }
+            }
+        }
+    }
+}
+
+fn test() {
+    print("--- Test 1: Enum with associated values ---");
+    var r1 = Result.Success("Operation completed");
+    var r2 = Result.Error("Something went wrong");
+    print(describeResult(r1));
+    print(describeResult(r2));
+    assert(describeResult(r1) == "Success: Operation completed", "describeResult(Success) failed");
+    assert(describeResult(r2) == "Error: Something went wrong", "describeResult(Error) failed");
+
+    print("\n--- Test 2: Enum with tuple payload ---");
+    var m1 = processMessage(Message.Quit);
+    var m2 = processMessage(Message.Move(10, 20));
+    var m3 = processMessage(Message.Write("Hello"));
+    print(m1);
+    print(m2);
+    print(m3);
+    assert(m1 == "Quitting application...", "Quit failed");
+    assert(m2 == "Moving to position (10, 20)", "Move failed");
+    assert(m3 == "Writing message: Hello", "Write failed");
+
+    print("\n--- Test 3: Nested enum dispatch ---");
+    var s1 = describeShape(Shape.Circle(Color.Red));
+    var s2 = describeShape(Shape.Square(Color.Red));
+    print(s1);
+    print(s2);
+    assert(s1 == "Red circle", "Circle(Red) failed");
+    assert(s2 == "Red square", "Square(Red) failed");
+
+    print("\n=== All tests passed ===");
+}
+
+test();

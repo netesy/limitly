@@ -116,7 +116,8 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
             gen->set_current_block(loop_body);
             Reg elem = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem, val_reg, cur_idx));
-            gen->emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, rest_list, elem, 0));
+            Reg dummy_res = gen->allocate_register();
+            gen->emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, dummy_res, rest_list, elem));
             Reg next_idx = gen->allocate_register();
             Reg one_reg = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)1)));

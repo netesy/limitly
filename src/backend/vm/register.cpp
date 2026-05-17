@@ -1337,6 +1337,35 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 }
                 break;
             }
+            case LIR::LIR_Op::DictHas: {
+                // DictHas: dst=result, a=dict, b=key
+                // Instruction format: DictHas result_reg, dict_reg, key_reg
+                const RegisterValue& dict_val = registers[pc->a];
+                const RegisterValue& key_val = registers[pc->b];
+                
+                // Validate dict register contains a pointer
+                if (!std::holds_alternative<int64_t>(dict_val) || !IS_PTR(to_int(dict_val))) {
+                    registers[pc->dst] = (int64_t)VAL_FALSE;
+                    break;
+                }
+                
+                void* dict_ptr = UNBOX_PTR(to_int(dict_val));
+                if (!dict_ptr) {
+                    registers[pc->dst] = (int64_t)VAL_FALSE;
+                    break;
+                }
+                
+                // Box key for C runtime lookup
+                void* boxed_key = box_register_value(key_val);
+                if (!boxed_key) {
+                    registers[pc->dst] = (int64_t)VAL_FALSE;
+                    break;
+                }
+                
+                int result = lm_dict_contains(static_cast<LmDict*>(dict_ptr), boxed_key);
+                registers[pc->dst] = (int64_t)(result ? VAL_TRUE : VAL_FALSE);
+                break;
+            }
             case LIR::LIR_Op::DictItems: {
                 // DictItems: dst=result_list, a=dict
                 // Instruction format: DictItems result_reg, dict_reg
