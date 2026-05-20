@@ -235,7 +235,7 @@ endif
 # =============================
 $(LYRA_BIN): $(LYRA_OBJS) | $(BIN_DIR)
 	@echo "🔨 Building Lyra package manager..."
-	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include $(LYRA_OBJS) -o $@
+	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include $(LYRA_OBJS) -o $@ -lssl -lcrypto
 	@echo "✅ Lyra built: $@"
 
 # Lyra object compilation
