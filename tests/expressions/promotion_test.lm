@@ -1,0 +1,24 @@
+fn main() {
+    print("--- Promotion Test ---");
+    // SMI range is 61-bit signed.
+    // MAX_SMI = 2^60 - 1 = 1152921504606846975
+    var s1: i64 = 1152921504606846975;
+    var s2: i64 = 1;
+    var res = s1 + s2;
+    print("MAX_SMI + 1 =", res);
+    // Should be boxed i64 now.
+
+    var big1: i64 = 9223372036854775807; // MAX_I64
+    var big2: i64 = 1;
+    var res2 = big1 + big2;
+    print("MAX_I64 + 1 =", res2);
+    // Should be boxed i128 now.
+
+    var ubig1: u64 = 18446744073709551615; // MAX_U64
+    var ures = ubig1 + 1;
+    print("MAX_U64 + 1 =", ures);
+    // Should be boxed u128.
+
+    print("--- Promotion Test Complete ---");
+}
+main();

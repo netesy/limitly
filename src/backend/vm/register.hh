@@ -12,9 +12,10 @@
 #include "../scheduler.hh"
 #include "../fiber.hh"
 #include "../register_value.hh"
+#include "../../runtime/runtime.h"
+#include "../../runtime/runtime_value.h"
 #include <vector>
 #include <string>
-#include <variant>
 #include <cstdint>
 #include <queue>
 #include <unordered_map>
@@ -26,18 +27,17 @@ namespace Backend {
 namespace VM {
 namespace Register {
 
+    // Forward declaration of the helper
+    ValuePtr register_to_value_ptr(RegisterValue rv);
+
     class RegisterVM {
 public:
     RegisterVM();
     
     void execute_instructions(const LIR::LIR_Function& function, size_t start_pc, size_t end_pc);
-    // Main execution method
     void execute_function(const LIR::LIR_Function& function);
-    
-    // Execute LIRFunction (new method)
     void execute_lir_function(const LIR::LIRFunction& function);
     
-    // Register access
     inline const RegisterValue& get_register(LIR::Reg reg) const {
         return registers[reg];
     }
@@ -49,10 +49,8 @@ public:
     void reset();
     std::string to_string(const RegisterValue& value) const;
     
-    // Execute task body using instruction range
     void execute_task_body(TaskContext* task, const LIR::LIR_Function& function);
     
-    // Fiber management methods
     uint64_t create_fiber(std::unique_ptr<TaskContext> task);
     void suspend_fiber(uint64_t fiber_id);
     void resume_fiber(uint64_t fiber_id);
@@ -60,13 +58,26 @@ public:
     bool has_active_fibers() const;
     Fiber* get_current_fiber();
     
-    // Set current function for task execution
     void set_current_function(const LIR::LIR_Function* func) { current_function_ = func; }
 
 private:
+    // Opcode execution modules
+    void execute_arithmetic(const LIR::LIR_Inst* pc);
+    void execute_comparison(const LIR::LIR_Inst* pc);
+    void execute_collections(const LIR::LIR_Inst* pc);
+    void execute_frames(const LIR::LIR_Inst* pc);
+    void execute_control_flow(const LIR::LIR_Inst*& pc, const LIR::LIR_Function& function);
+    void execute_io(const LIR::LIR_Inst* pc);
+    void execute_concurrency(const LIR::LIR_Inst* pc);
+    void execute_bitwise(const LIR::LIR_Inst* pc);
+    void execute_modules(const LIR::LIR_Inst* pc);
+    void execute_objects(const LIR::LIR_Inst* pc);
+    void execute_strings(const LIR::LIR_Inst* pc);
+    void execute_calls(const LIR::LIR_Inst* pc);
+    void execute_cast(const LIR::LIR_Inst* pc);
+
     std::vector<RegisterValue> registers;
     
-    // Error information structure for primitive error handling
     struct ErrorInfo {
         std::string errorType;
         std::string message;
@@ -77,50 +88,33 @@ private:
             : errorType(type), message(msg), isError(error) {}
     };
     
-    // Error table mapping error IDs to error information
     std::unordered_map<int64_t, ErrorInfo> error_table;
-    
-    // Error storage for proper error handling (legacy compatibility)
     std::unordered_map<LIR::Reg, std::shared_ptr<ErrorValue>> error_storage;
     
-    // Current function for task execution
     const LIR::LIR_Function* current_function_ = nullptr;
-    
-    // Global variable storage
     std::unordered_map<std::string, RegisterValue> globals_;
-    
-    // Type system instance
     std::unique_ptr<TypeSystem> type_system;
     
-    // Concurrency management
     std::vector<std::unique_ptr<TaskContext>> task_contexts;
     std::vector<std::unique_ptr<LM::Backend::Channel>> channels;
     std::unique_ptr<Scheduler> scheduler;
     uint64_t current_time;
     
-    // Shared atomic variables for true shared state across tasks
     std::unordered_map<std::string, std::atomic<int64_t>> shared_variables;
-    
-    // SharedCell operations for parallel execution
     std::unordered_map<uint32_t, std::unique_ptr<SharedCell>> shared_cells;
     
-    // Frame instance storage for VM execution
     std::unordered_map<uint64_t, FrameInstancePtr> frame_instances;
     uint64_t next_frame_id = 1;
     
-    // Atomic variables and work queues for lock-free parallel operations
     std::atomic<int64_t> default_atomic{0};
     std::vector<std::queue<uint64_t>> work_queues;
     std::atomic<uint64_t> work_queue_counter{0};
     
-    // Argument stack for indirect calls and parameter passing
     std::vector<RegisterValue> argument_stack;
 
-    // Instruction count limit to prevent infinite loops
-    static constexpr uint64_t MAX_INSTRUCTIONS = 100000;
+    static constexpr uint64_t MAX_INSTRUCTIONS = 1000000000;
     uint64_t instruction_count = 0;
     
-    // Helper methods - all inlined for performance
     inline LIR::Type get_register_type(LIR::Reg reg) const {
         if (!current_function_) return LIR::Type::Void;
         auto it = current_function_->register_types.find(reg);
@@ -128,84 +122,44 @@ private:
     }
     
     inline bool is_numeric(const RegisterValue& value) const {
-        return std::holds_alternative<int64_t>(value) || 
-               std::holds_alternative<uint64_t>(value) ||
-               std::holds_alternative<double>(value);
+        return is_integer(value) || is_float(value);
     }
     
     inline int64_t to_int(const RegisterValue& value) const {
-        if (std::holds_alternative<int64_t>(value) || std::holds_alternative<uint64_t>(value)) {
-            uint64_t val = std::holds_alternative<int64_t>(value) ? 
-                          static_cast<uint64_t>(std::get<int64_t>(value)) : 
-                          std::get<uint64_t>(value);
-            if (IS_INT(val)) return UNBOX_INT(val);
-            if (((val) & TAG_MASK) == TAG_IMMEDIATE) return (int64_t)((val) >> 3);
-            return (int64_t)val;
-        }
-        if (std::holds_alternative<double>(value)) return static_cast<int64_t>(std::get<double>(value));
-        if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? 1 : 0;
-        return 0;
+        return as_i64(value);
     }
     
     inline uint64_t to_uint(const RegisterValue& value) const {
-        if (std::holds_alternative<uint64_t>(value) || std::holds_alternative<int64_t>(value)) {
-            uint64_t val = std::holds_alternative<uint64_t>(value) ? 
-                          std::get<uint64_t>(value) : 
-                          static_cast<uint64_t>(std::get<int64_t>(value));
-            if (IS_INT(val)) return (uint64_t)UNBOX_INT(val);
-            if (((val) & TAG_MASK) == TAG_IMMEDIATE) return (uint64_t)((val) >> 3);
-            return val;
-        }
-        if (std::holds_alternative<double>(value)) return static_cast<uint64_t>(std::get<double>(value));
-        if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? 1 : 0;
-        return 0;
+        return as_u64(value);
     }
     
     inline double to_float(const RegisterValue& value) const {
-        if (std::holds_alternative<double>(value)) return std::get<double>(value);
-        if (std::holds_alternative<int64_t>(value) || std::holds_alternative<uint64_t>(value)) {
-            uint64_t val = std::holds_alternative<int64_t>(value) ? 
-                          static_cast<uint64_t>(std::get<int64_t>(value)) : 
-                          std::get<uint64_t>(value);
-            if (IS_INT(val)) return static_cast<double>(UNBOX_INT(val));
-            if (((val) & TAG_MASK) == TAG_IMMEDIATE) return static_cast<double>((val) >> 3);
-            return static_cast<double>(val);
-        }
-        if (std::holds_alternative<bool>(value)) return std::get<bool>(value) ? 1.0 : 0.0;
-        return 0.0;
+        return as_float(value);
     }
     
     inline bool to_bool(const RegisterValue& value) const {
-        if (std::holds_alternative<bool>(value)) return std::get<bool>(value);
-        if (std::holds_alternative<int64_t>(value) || std::holds_alternative<uint64_t>(value)) {
-            uint64_t val = std::holds_alternative<int64_t>(value) ? 
-                          static_cast<uint64_t>(std::get<int64_t>(value)) : 
-                          std::get<uint64_t>(value);
-            if (((val) & TAG_MASK) == TAG_IMMEDIATE) {
-                if (val == VAL_TRUE) return true;
-                if (val == VAL_FALSE) return false;
-                if (val == VAL_NIL) return false;
-                return ((val) >> 3) != 0;
+        if (IS_BOOL(value)) return UNBOX_BOOL(value);
+        if (IS_NIL(value)) return false;
+        if (is_integer(value)) return as_i128(value) != 0;
+        if (IS_PTR(value)) {
+            ObjHeader* h = (ObjHeader*)UNBOX_PTR(value);
+            if (h->type_id == TYPE_FLOAT) return ((ObjFloat*)h)->value != 0.0;
+            if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                LmBox* box = (LmBox*)h;
+                return box->value.as_ptr && ((char*)box->value.as_ptr)[0] != '\0';
             }
-            if (IS_INT(val)) return UNBOX_INT(val) != 0;
-            return val != 0;
+            return true;
         }
-        if (std::holds_alternative<double>(value)) return std::get<double>(value) != 0.0;
-        if (std::holds_alternative<std::string>(value)) return !std::get<std::string>(value).empty();
         return false;
     }
     
-    // Error handling methods
     ValuePtr createErrorValue(const std::string& errorType, const std::string& message = "");
     ValuePtr createSuccessValue(const RegisterValue& value);
     bool isErrorValue(LIR::Reg reg) const;
     
-    // Frame management methods
     FrameInstancePtr createFrameInstance(const std::string& frame_type);
     void setFrameField(FrameInstancePtr frame, size_t index, const RegisterValue& value);
     RegisterValue getFrameField(FrameInstancePtr frame, size_t index) const;
-    
-
 };
 
 } // namespace Register

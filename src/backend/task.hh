@@ -31,7 +31,7 @@ struct TaskContext {
     
     TaskContext() 
         : state(TaskState::INIT), task_id(0), sleep_until(0), 
-          counter(0), channel_ptr(nullptr),
+          counter(0), channel_ptr(VAL_NIL),
           body_start_pc(-1), body_end_pc(-1) {}
     
     TaskContext(const TaskContext& other) 

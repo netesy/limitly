@@ -19,7 +19,42 @@ extern "C" {
 #include "runtime_string.h"
 #include "runtime_tuple.h"
 
-// Boxing/Unboxing for primitive types
+// Boxed Numeric Objects with proper alignment for 128-bit
+typedef struct {
+    ObjHeader header;
+    int64_t value;
+} ObjI64;
+
+typedef struct {
+    ObjHeader header;
+    uint64_t value;
+} ObjU64;
+
+typedef struct {
+    ObjHeader header;
+    uint64_t _padding;
+    __int128 value;
+} ObjI128;
+
+typedef struct {
+    ObjHeader header;
+    uint64_t _padding;
+    unsigned __int128 value;
+} ObjU128;
+
+typedef struct {
+    ObjHeader header;
+    double value;
+} ObjFloat;
+
+typedef struct {
+    ObjHeader header;
+    // For now simple representation
+    int64_t high;
+    uint64_t low;
+} ObjDecimal;
+
+// Legacy LmBox (Keeping for compatibility for now, but will transition)
 typedef struct {
     ObjHeader header;
     uint8_t type;  // 0=int, 1=float, 2=bool, 3=string, 4=nullptr
@@ -38,14 +73,21 @@ typedef struct {
 #define LM_BOX_STRING 3
 #define LM_BOX_NULLPTR 4
 
-// Boxing operations
+// Runtime Object Allocation Helpers
+RUNTIME_API LmValue lm_alloc_i64(int64_t value);
+RUNTIME_API LmValue lm_alloc_u64(uint64_t value);
+RUNTIME_API LmValue lm_alloc_i128(__int128 value);
+RUNTIME_API LmValue lm_alloc_u128(unsigned __int128 value);
+RUNTIME_API LmValue lm_alloc_float(double value);
+
+// Boxing operations (legacy)
 RUNTIME_API LmBox* lm_box_int(int64_t value);
 RUNTIME_API LmBox* lm_box_float(double value);
 RUNTIME_API LmBox* lm_box_bool(uint8_t value);
 RUNTIME_API LmBox* lm_box_string(const char* value);
 RUNTIME_API LmBox* lm_box_nullptr(void);
 
-// Unboxing operations
+// Unboxing operations (legacy)
 RUNTIME_API int64_t lm_unbox_int(LmBox* box);
 RUNTIME_API double lm_unbox_float(LmBox* box);
 RUNTIME_API uint8_t lm_unbox_bool(LmBox* box);
@@ -59,18 +101,25 @@ RUNTIME_API void lm_box_free(LmBox* box);
 typedef struct {
     ObjHeader header;
     char* name;
-    void** fields;
+    LmValue* fields;
     int field_count;
-    void* mutex; // Used for atomic operations in concurrency contexts
+    void* mutex;
 } LmFrame;
 
+typedef struct {
+    ObjHeader header;
+    LmValue function;
+    LmValue captured_env;
+    uint32_t captured_count;
+} LmClosure;
+
 RUNTIME_API void* lm_frame_alloc(const char* name, int fields);
-RUNTIME_API void* lm_frame_get_field(void* frame, int offset);
-RUNTIME_API void lm_frame_set_field(void* frame, int offset, void* value);
-RUNTIME_API void* lm_frame_get_field_atomic(void* frame, int offset);
-RUNTIME_API void lm_frame_set_field_atomic(void* frame, int offset, void* value);
-RUNTIME_API void lm_frame_field_atomic_add(void* frame, int offset, void* value);
-RUNTIME_API void lm_frame_field_atomic_sub(void* frame, int offset, void* value);
+RUNTIME_API LmValue lm_frame_get_field(void* frame, int offset);
+RUNTIME_API void lm_frame_set_field(void* frame, int offset, LmValue value);
+RUNTIME_API LmValue lm_frame_get_field_atomic(void* frame, int offset);
+RUNTIME_API void lm_frame_set_field_atomic(void* frame, int offset, LmValue value);
+RUNTIME_API void lm_frame_field_atomic_add(void* frame, int offset, LmValue value);
+RUNTIME_API void lm_frame_field_atomic_sub(void* frame, int offset, LmValue value);
 RUNTIME_API void* lm_trait_dispatch(void* trait_obj, const char* trait_name, const char* method_name);
 
 #ifdef __cplusplus

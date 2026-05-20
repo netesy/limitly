@@ -1,6 +1,7 @@
 #include "value.hh"
 #include "types.hh"
 #include "env.hh"
+#include "vm/register.hh"
 #include <sstream>
 
 // Helper function to check if a type is an integer type
@@ -195,11 +196,9 @@ std::string TupleValue::toString() const {
 
 bool IteratorValue::hasNext() const {
     if (type == IteratorType::RANGE) {
-        // Convert strings to int64 for comparisons
         int64_t step = ValueConverters::toInt64(rangeStep).value_or(1);
         int64_t current = ValueConverters::toInt64(rangeCurrent).value_or(0);
         int64_t end = ValueConverters::toInt64(rangeEnd).value_or(0);
-        
         return (step > 0) ? (current < end) : (current > end);
     } else if (iterable) {
         if (type == IteratorType::LIST) {
@@ -207,47 +206,18 @@ bool IteratorValue::hasNext() const {
                 return currentIndex < list->elements.size();
             }
         } else if (type == IteratorType::CHANNEL) {
-            // If we already buffered a value, we have next
             if (hasBuffered) return true;
-
-            // Attempt to receive from the channel (this will block until value or closed)
-            try {
-                if (auto chPtr = std::get_if<std::shared_ptr<LM::Backend::Channel>>(&iterable->complexData)) {
-                    LM::Backend::RegisterValue rv;
-                    bool ok = (*chPtr)->poll(rv);
-                    if (ok) {
-                        // Convert LM::Backend::RegisterValue to ValuePtr with proper types
-                        if (auto valPtr = std::get_if<std::string>(&rv)) {
-                            auto stringType = std::make_shared<Type>(TypeTag::String);
-                            bufferedValue = std::make_shared<Value>(stringType, *valPtr);
-                        } else if (auto valPtr = std::get_if<int64_t>(&rv)) {
-                            auto intType = std::make_shared<Type>(TypeTag::Int64);
-                            bufferedValue = std::make_shared<Value>(intType, *valPtr);
-                        } else if (auto valPtr = std::get_if<uint64_t>(&rv)) {
-                            auto uintType = std::make_shared<Type>(TypeTag::UInt64);
-                            bufferedValue = std::make_shared<Value>(uintType, *valPtr);
-                        } else if (auto valPtr = std::get_if<double>(&rv)) {
-                            auto floatType = std::make_shared<Type>(TypeTag::Float64);
-                            bufferedValue = std::make_shared<Value>(floatType, *valPtr);
-                        } else if (auto valPtr = std::get_if<bool>(&rv)) {
-                            auto boolType = std::make_shared<Type>(TypeTag::Bool);
-                            bufferedValue = std::make_shared<Value>(boolType, *valPtr);
-                        } else {
-                            auto nullType = std::make_shared<Type>(TypeTag::Nil);
-                            bufferedValue = std::make_shared<Value>(nullType);
-                        }
-                        hasBuffered = true;
-                        return true;
-                    }
-                    return false; // channel closed and no value
+            if (auto chPtr = std::get_if<std::shared_ptr<LM::Backend::Channel>>(&iterable->complexData)) {
+                LM::Backend::RegisterValue rv;
+                if ((*chPtr)->poll(rv)) {
+                    bufferedValue = LM::Backend::VM::Register::register_to_value_ptr(rv);
+                    hasBuffered = true;
+                    return true;
                 }
-            } catch (...) {
-                return false;
             }
+            return false;
         }
     }
-    // Add DICT handling here if needed
-
     return false;
 }
 
@@ -255,80 +225,38 @@ ValuePtr IteratorValue::next() {
     if (!hasNext()) {
         throw std::runtime_error("No more elements in iterator");
     }
-
     if (type == IteratorType::RANGE) {
-        // Create value on-demand
         int64_t value = ValueConverters::toInt64(rangeCurrent).value_or(0);
-        
-        // Increment current by step (convert to int64, add, convert back to string)
         int64_t step = ValueConverters::toInt64(rangeStep).value_or(1);
-        int64_t newCurrent = value + step;
-        rangeCurrent = std::to_string(newCurrent);
-
-        // OPTIMIZATION: Reuse a single Value object per thread
-        // Note: This is safe because the value is immediately consumed by the VM
+        rangeCurrent = std::to_string(value + step);
         static thread_local ValuePtr cachedRangeValue = nullptr;
-
         if (!cachedRangeValue) {
-            // Create initial cached value with correct type
             auto int64Type = std::make_shared<Type>(TypeTag::Int64);
             cachedRangeValue = std::make_shared<Value>(int64Type, value);
         } else {
-            // Reuse existing value by updating data
             cachedRangeValue->data = value;
         }
-
         return cachedRangeValue;
     }
-
-
     if (type == IteratorType::LIST) {
         if (auto list = std::get_if<ListValue>(&iterable->complexData)) {
             if (currentIndex < list->elements.size()) {
                 return list->elements[currentIndex++];
             }
         }
-        throw std::runtime_error("Invalid list iterator state");
     } else if (type == IteratorType::CHANNEL) {
         if (hasBuffered) {
+            hasBuffered = false;
             auto res = bufferedValue;
             bufferedValue = nullptr;
-            hasBuffered = false;
             return res;
         }
-        // As a fallback, try to receive directly
         if (auto chPtr = std::get_if<std::shared_ptr<LM::Backend::Channel>>(&iterable->complexData)) {
             LM::Backend::RegisterValue rv;
-            bool ok = (*chPtr)->poll(rv);
-            if (ok) {
-                // Convert LM::Backend::RegisterValue to ValuePtr with proper types
-                if (auto valPtr = std::get_if<std::string>(&rv)) {
-                    auto stringType = std::make_shared<Type>(TypeTag::String);
-                    return std::make_shared<Value>(stringType, *valPtr);
-                } else if (auto valPtr = std::get_if<int64_t>(&rv)) {
-                    auto intType = std::make_shared<Type>(TypeTag::Int64);
-                    return std::make_shared<Value>(intType, *valPtr);
-                } else if (auto valPtr = std::get_if<uint64_t>(&rv)) {
-                    auto uintType = std::make_shared<Type>(TypeTag::UInt64);
-                    return std::make_shared<Value>(uintType, *valPtr);
-                } else if (auto valPtr = std::get_if<double>(&rv)) {
-                    auto floatType = std::make_shared<Type>(TypeTag::Float64);
-                    return std::make_shared<Value>(floatType, *valPtr);
-                } else if (auto valPtr = std::get_if<bool>(&rv)) {
-                    auto boolType = std::make_shared<Type>(TypeTag::Bool);
-                    return std::make_shared<Value>(boolType, *valPtr);
-                } else {
-                    auto nullType = std::make_shared<Type>(TypeTag::Nil);
-                    return std::make_shared<Value>(nullType);
-                }
-            }
-            throw std::runtime_error("No more elements in iterator");
+            if ((*chPtr)->poll(rv)) return LM::Backend::VM::Register::register_to_value_ptr(rv);
         }
-        throw std::runtime_error("Invalid channel iterator state");
     }
-    // Add DICT handling here if needed
-
-    throw std::runtime_error("Invalid iterator type");
+    throw std::runtime_error("Invalid iterator state");
 }
 
 std::string IteratorValue::toString() const {
@@ -416,29 +344,29 @@ std::string Value::toString() const {
     } else if (type->tag == TypeTag::String) {
         oss << '"' << data << '"'; // Add quotes for string representation
     } else if (isIntegerType(type)) {
-        // Handle all integer types - check if it's unsigned
-        try {
-            if (type->tag == TypeTag::UInt || type->tag == TypeTag::UInt8 || 
-                type->tag == TypeTag::UInt16 || type->tag == TypeTag::UInt32 || 
-                type->tag == TypeTag::UInt64 || type->tag == TypeTag::UInt128) {
-                // For unsigned types, use uint64_t conversion
-                uint64_t val = as<uint64_t>();
-                oss << val;
-            } else {
-                // For signed types, use int64_t conversion
-                int64_t val = as<int64_t>();
-                oss << val;
+        // Handle all integer types
+        if (type->tag == TypeTag::Int128 || type->tag == TypeTag::UInt128) {
+            oss << data;
+        } else {
+            try {
+                if (type->tag == TypeTag::UInt || type->tag == TypeTag::UInt8 ||
+                    type->tag == TypeTag::UInt16 || type->tag == TypeTag::UInt32 ||
+                    type->tag == TypeTag::UInt64) {
+                    // For unsigned types, use uint64_t conversion
+                    uint64_t val = as<uint64_t>();
+                    oss << val;
+                } else {
+                    // For signed types, use int64_t conversion
+                    int64_t val = as<int64_t>();
+                    oss << val;
+                }
+            } catch (const std::exception& e) {
+                oss << data; // Fallback to raw data
             }
-        } catch (const std::exception& e) {
-            oss << "<error>";
         }
     } else if (type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64) {
         // Handle all float types
-        try {
-            oss << as<double>();
-        } catch (...) {
-            oss << "<error>";
-        }
+        oss << as<double>();
     } else {
         // Handle complex types using complexData
         std::visit(overloaded{
@@ -461,110 +389,15 @@ std::string Value::toString() const {
                        oss << "}";
                    },
                    [&](const TupleValue& tv) {
-                       oss << tv.toString();
-                   },
-                   [&](const SumValue& sv) {
-                       oss << "Sum(" << sv.activeVariant << ", " << sv.value->toString() << ")";
-                   },
-                   [&](const EnumValue& ev) { oss << ev.toString(); },
-                   [&](const ErrorValue& erv) { oss << erv.toString(); },
-                   [&](const UserDefinedValue& udv) {
-                       oss << udv.variantName << "{";
-                       bool first = true;
-                       for (const auto& [field, value] : udv.fields) {
-                           if (!first) oss << ", ";
-                           first = false;
-                           oss << field << ": " << value->toString();
-                       }
-                       oss << "}";
-                   },
-                   [&](const IteratorValuePtr& iter) {
-                       if (iter) {
-                           oss << iter->toString();
-                       } else {
-                           oss << "<null iterator>";
-                       }
-                   },
-                   [&](const std::shared_ptr<LM::Backend::Channel>&){
-                       oss << "<channel>";
-                   },
-                   [&](const AtomicValue& av) {
-                       if (av.inner) {
-                           oss << av.inner->load();
-                       } else {
-                           oss << "<atomic(nil)>";
-                       }
-                   },
-                   [&](const ObjectInstancePtr& obj) {
-                       oss << "<object>";
-                   },
-                   [&](const ModuleValue&) {
-                       oss << "<module>";
-                   },
-                   [&](const std::shared_ptr<backend::UserDefinedFunction>&) {
-                       oss << "<function>";
-                   },
-                   [&](const backend::Function& func) {
-                       oss << "<function:" << func.name << ">";
-                   },
-                   [&](const ClosureValue& closure) {
-                       oss << closure.toString();
-                   },
-                   [&](const auto&) {
-                       oss << "<unknown>";
-                   }
-               }, complexData);
-    }
-    return oss.str();
-}
-
-std::string Value::getRawString() const {
-    std::ostringstream oss;
-    
-    // Handle primitive types using the data string member
-    if (type->tag == TypeTag::Nil) {
-        oss << "nil";
-    } else if (type->tag == TypeTag::Bool) {
-        oss << (as<bool>() ? "true" : "false");
-    } else if (type->tag == TypeTag::String) {
-        oss << data; // No quotes for raw string
-    } else if (isIntegerType(type)) {
-        // Handle all integer types
-        oss << as<int64_t>();
-    } else if (type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64) {
-        // Handle all float types
-        oss << as<double>();
-    } else {
-        // Handle complex types using complexData
-        std::visit(overloaded{
-                   [&](const ListValue& lv) {
-                       oss << "[";
-                       for (size_t i = 0; i < lv.elements.size(); ++i) {
-                           if (i > 0) oss << ", ";
-                           oss << lv.elements[i]->getRawString();
-                       }
-                       oss << "]";
-                   },
-                   [&](const DictValue& dv) {
-                       oss << "{";
-                       bool first = true;
-                       for (const auto& [key, value] : dv.elements) {
-                           if (!first) oss << ", ";
-                           first = false;
-                           oss << key->getRawString() << ": " << value->getRawString();
-                       }
-                       oss << "}";
-                   },
-                   [&](const TupleValue& tv) {
                        oss << "(";
                        for (size_t i = 0; i < tv.elements.size(); ++i) {
                            if (i > 0) oss << ", ";
-                           oss << tv.elements[i]->getRawString();
+                           oss << tv.elements[i]->toString();
                        }
                        oss << ")";
                    },
                    [&](const SumValue& sv) {
-                       oss << "Sum(" << sv.activeVariant << ", " << sv.value->getRawString() << ")";
+                       oss << "Sum(" << sv.activeVariant << ", " << sv.value->toString() << ")";
                    },
                    [&](const EnumValue& ev) {
                        oss << ev.toString(); // Use existing enum toString
@@ -578,7 +411,7 @@ std::string Value::getRawString() const {
                        for (const auto& [field, value] : udv.fields) {
                            if (!first) oss << ", ";
                            first = false;
-                           oss << field << ": " << value->getRawString();
+                           oss << field << ": " << value->toString();
                        }
                        oss << "}";
                    },

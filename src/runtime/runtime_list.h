@@ -14,22 +14,19 @@
 extern "C" {
 #endif
 
-// Magic number for list detection
-#define LM_LIST_MAGIC  0x4C6D4C69ULL  // "LmLi" in hex
-
-// Generic list structure (stores void pointers)
+// Generic list structure (stores Values)
 typedef struct {
     ObjHeader header;
-    void** data;
+    LmValue* data;
     uint64_t size;
     uint64_t capacity;
 } LmList;
 
 // List operations
 RUNTIME_API LmList* lm_list_new(void);
-RUNTIME_API void lm_list_append(LmList* list, void* element);
-RUNTIME_API void* lm_list_get(LmList* list, uint64_t index);
-RUNTIME_API void lm_list_set(LmList* list, uint64_t index, void* element);
+RUNTIME_API void lm_list_append(LmList* list, LmValue element);
+RUNTIME_API LmValue lm_list_get(LmList* list, uint64_t index);
+RUNTIME_API void lm_list_set(LmList* list, uint64_t index, LmValue element);
 RUNTIME_API uint64_t lm_list_len(LmList* list);
 RUNTIME_API void lm_list_free(LmList* list);
 
