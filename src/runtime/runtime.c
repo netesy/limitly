@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <pthread.h>
 
 RUNTIME_API void lm_print_int(int64_t val) {
     printf("%ld\n", val);
@@ -38,7 +39,6 @@ RUNTIME_API void lm_assert(int condition, const char* message) {
 RUNTIME_API LmBox* lm_box_int(int64_t value) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
-    
     box->header.type_id = TYPE_BOX; 
     box->header.metadata = 0;
     box->type = LM_BOX_INT;
@@ -49,7 +49,6 @@ RUNTIME_API LmBox* lm_box_int(int64_t value) {
 RUNTIME_API LmBox* lm_box_float(double value) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
-    
     box->header.type_id = TYPE_BOX;
     box->header.metadata = 0;
     box->type = LM_BOX_FLOAT;
@@ -60,7 +59,6 @@ RUNTIME_API LmBox* lm_box_float(double value) {
 RUNTIME_API LmBox* lm_box_bool(uint8_t value) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
-    
     box->header.type_id = TYPE_BOX;
     box->header.metadata = 0;
     box->type = LM_BOX_BOOL;
@@ -71,7 +69,6 @@ RUNTIME_API LmBox* lm_box_bool(uint8_t value) {
 RUNTIME_API LmBox* lm_box_string(const char* value) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
-    
     box->header.type_id = TYPE_BOX;
     box->header.metadata = 0;
     box->type = LM_BOX_STRING;
@@ -82,7 +79,6 @@ RUNTIME_API LmBox* lm_box_string(const char* value) {
 RUNTIME_API LmBox* lm_box_nullptr(void) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
-    
     box->header.type_id = TYPE_BOX;
     box->header.metadata = 0;
     box->type = LM_BOX_NULLPTR;
@@ -117,106 +113,97 @@ RUNTIME_API void* lm_unbox_ptr(LmBox* box) {
 
 RUNTIME_API void lm_box_free(LmBox* box) {
     if (!box) return;
-    
-    // Free string data if it's a string
     if (box->type == LM_BOX_STRING && box->value.as_ptr) {
         free(box->value.as_ptr);
     }
-    
     free(box);
 }
 
-#include <pthread.h>
+RUNTIME_API LmValue lm_alloc_i64(int64_t value) {
+    ObjI64* obj = (ObjI64*)malloc(sizeof(ObjI64));
+    if (!obj) return VAL_NIL;
+    obj->header.type_id = TYPE_I64;
+    obj->header.metadata = 0;
+    obj->value = value;
+    return BOX_PTR(obj);
+}
+
+RUNTIME_API LmValue lm_alloc_u64(uint64_t value) {
+    ObjU64* obj = (ObjU64*)malloc(sizeof(ObjU64));
+    if (!obj) return VAL_NIL;
+    obj->header.type_id = TYPE_U64;
+    obj->header.metadata = 0;
+    obj->value = value;
+    return BOX_PTR(obj);
+}
+
+RUNTIME_API LmValue lm_alloc_i128(__int128 value) {
+    ObjI128* obj = (ObjI128*)malloc(sizeof(ObjI128));
+    if (!obj) return VAL_NIL;
+    obj->header.type_id = TYPE_I128;
+    obj->header.metadata = 0;
+    obj->value = value;
+    return BOX_PTR(obj);
+}
+
+RUNTIME_API LmValue lm_alloc_u128(unsigned __int128 value) {
+    ObjU128* obj = (ObjU128*)malloc(sizeof(ObjU128));
+    if (!obj) return VAL_NIL;
+    obj->header.type_id = TYPE_U128;
+    obj->header.metadata = 0;
+    obj->value = value;
+    return BOX_PTR(obj);
+}
+
+RUNTIME_API LmValue lm_alloc_float(double value) {
+    ObjFloat* obj = (ObjFloat*)malloc(sizeof(ObjFloat));
+    if (!obj) return VAL_NIL;
+    obj->header.type_id = TYPE_FLOAT;
+    obj->header.metadata = 0;
+    obj->value = value;
+    return BOX_PTR(obj);
+}
 
 RUNTIME_API void* lm_frame_alloc(const char* name, int fields) {
     LmFrame* frame = (LmFrame*)malloc(sizeof(LmFrame));
     if (!frame) return NULL;
-    
     frame->header.type_id = TYPE_FRAME;
     frame->header.metadata = 0;
     frame->name = strdup(name);
     frame->field_count = fields;
-    frame->fields = (void**)calloc(fields, sizeof(void*));
-    
+    frame->fields = (LmValue*)calloc(fields, sizeof(LmValue));
+    for (int i = 0; i < fields; i++) frame->fields[i] = VAL_NIL;
     pthread_mutex_t* mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
     pthread_mutex_init(mutex, NULL);
     frame->mutex = mutex;
-    
-    return frame;
+    return (void*)frame;
 }
 
-RUNTIME_API void* lm_frame_get_field(void* frame_ptr, int offset) {
+RUNTIME_API LmValue lm_frame_get_field(void* frame_ptr, int offset) {
     LmFrame* frame = (LmFrame*)frame_ptr;
-    if (!frame || offset < 0 || offset >= frame->field_count) return NULL;
+    if (!frame || offset < 0 || offset >= frame->field_count) return VAL_NIL;
     return frame->fields[offset];
 }
 
-RUNTIME_API void lm_frame_set_field(void* frame_ptr, int offset, void* value) {
+RUNTIME_API void lm_frame_set_field(void* frame_ptr, int offset, LmValue value) {
     LmFrame* frame = (LmFrame*)frame_ptr;
     if (!frame || offset < 0 || offset >= frame->field_count) return;
     frame->fields[offset] = value;
 }
 
-RUNTIME_API void* lm_frame_get_field_atomic(void* frame_ptr, int offset) {
+RUNTIME_API LmValue lm_frame_get_field_atomic(void* frame_ptr, int offset) {
     LmFrame* frame = (LmFrame*)frame_ptr;
-    if (!frame || offset < 0 || offset >= frame->field_count) return NULL;
-    
+    if (!frame || offset < 0 || offset >= frame->field_count) return VAL_NIL;
     pthread_mutex_lock((pthread_mutex_t*)frame->mutex);
-    void* value = frame->fields[offset];
+    LmValue val = frame->fields[offset];
     pthread_mutex_unlock((pthread_mutex_t*)frame->mutex);
-    
-    return value;
+    return val;
 }
 
-RUNTIME_API void lm_frame_set_field_atomic(void* frame_ptr, int offset, void* value) {
+RUNTIME_API void lm_frame_set_field_atomic(void* frame_ptr, int offset, LmValue value) {
     LmFrame* frame = (LmFrame*)frame_ptr;
     if (!frame || offset < 0 || offset >= frame->field_count) return;
-    
     pthread_mutex_lock((pthread_mutex_t*)frame->mutex);
     frame->fields[offset] = value;
     pthread_mutex_unlock((pthread_mutex_t*)frame->mutex);
-}
-
-RUNTIME_API void lm_frame_field_atomic_add(void* frame_ptr, int offset, void* value_ptr) {
-    LmFrame* frame = (LmFrame*)frame_ptr;
-    if (!frame || offset < 0 || offset >= frame->field_count) return;
-    
-    LmBox* add_box = (LmBox*)value_ptr;
-    if (!add_box || add_box->type != LM_BOX_INT) return;
-    
-    pthread_mutex_lock((pthread_mutex_t*)frame->mutex);
-    LmBox* current_box = (LmBox*)frame->fields[offset];
-    if (current_box && current_box->type == LM_BOX_INT) {
-        current_box->value.as_int += add_box->value.as_int;
-    }
-    pthread_mutex_unlock((pthread_mutex_t*)frame->mutex);
-}
-
-RUNTIME_API void lm_frame_field_atomic_sub(void* frame_ptr, int offset, void* value_ptr) {
-    LmFrame* frame = (LmFrame*)frame_ptr;
-    if (!frame || offset < 0 || offset >= frame->field_count) return;
-    
-    LmBox* sub_box = (LmBox*)value_ptr;
-    if (!sub_box || sub_box->type != LM_BOX_INT) return;
-    
-    pthread_mutex_lock((pthread_mutex_t*)frame->mutex);
-    LmBox* current_box = (LmBox*)frame->fields[offset];
-    if (current_box && current_box->type == LM_BOX_INT) {
-        current_box->value.as_int -= sub_box->value.as_int;
-    }
-    pthread_mutex_unlock((pthread_mutex_t*)frame->mutex);
-}
-
-RUNTIME_API void* lm_trait_dispatch(void* trait_obj, const char* trait_name, const char* method_name) {
-    // Dynamic dispatch implementation for JIT/VM
-    LmFrame* frame = (LmFrame*)trait_obj;
-    if (!frame) return NULL;
-    
-    // Construct method name: FrameName.MethodName
-    char full_name[256];
-    snprintf(full_name, sizeof(full_name), "%s.%s", frame->name, method_name);
-    
-    // In a full implementation, we'd look up the function pointer in a global table
-    // For now, this is a placeholder for the JIT/VM to find the concrete implementation
-    return NULL;
 }

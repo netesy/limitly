@@ -6,7 +6,7 @@ RUNTIME_API LmTuple* lm_tuple_new(uint64_t size) {
     LmTuple* tuple = (LmTuple*)malloc(sizeof(LmTuple));
     if (!tuple) return NULL;
     
-    tuple->elements = (void**)malloc(sizeof(void*) * size);
+    tuple->elements = (LmValue*)malloc(sizeof(LmValue) * size);
     if (!tuple->elements) {
         free(tuple);
         return NULL;
@@ -14,59 +14,40 @@ RUNTIME_API LmTuple* lm_tuple_new(uint64_t size) {
     
     tuple->header.type_id = TYPE_TUPLE;
     tuple->header.metadata = 0;
-    tuple->size = size;  // Set size correctly
+    tuple->size = size;
     tuple->capacity = size;
     
-    // Initialize all elements to NULL
-    memset(tuple->elements, 0, sizeof(void*) * size);
+    for (uint64_t i = 0; i < size; i++) tuple->elements[i] = VAL_NIL;
     
     return tuple;
 }
 
-RUNTIME_API LmTuple* lm_tuple_new_with_values(uint64_t size, void** values) {
+RUNTIME_API LmTuple* lm_tuple_new_with_values(uint64_t size, LmValue* values) {
     LmTuple* tuple = lm_tuple_new(size);
     if (!tuple) return NULL;
     
-    // Copy initial values
     for (uint64_t i = 0; i < size; i++) {
         tuple->elements[i] = values[i];
-        tuple->size++;
     }
+    tuple->size = size;
     
     return tuple;
 }
 
-RUNTIME_API void lm_tuple_set(LmTuple* tuple, uint64_t index, void* value) {
+RUNTIME_API void lm_tuple_set(LmTuple* tuple, uint64_t index, LmValue value) {
     if (!tuple || !tuple->elements || index >= tuple->capacity) {
         return;
     }
     
-    // Ensure we have capacity
-    if (index >= tuple->capacity) {
-        // Resize to accommodate new index
-        uint64_t new_capacity = tuple->capacity * 2;
-        while (new_capacity <= index) {
-            new_capacity *= 2;
-        }
-        
-        void** new_elements = (void**)realloc(tuple->elements, sizeof(void*) * new_capacity);
-        if (!new_elements) return;
-        
-        tuple->elements = new_elements;
-        tuple->capacity = new_capacity;
-    }
-    
     tuple->elements[index] = value;
-    
-    // Update size if this is a new element
     if (index >= tuple->size) {
         tuple->size = index + 1;
     }
 }
 
-RUNTIME_API void* lm_tuple_get(LmTuple* tuple, uint64_t index) {
+RUNTIME_API LmValue lm_tuple_get(LmTuple* tuple, uint64_t index) {
     if (!tuple || !tuple->elements || index >= tuple->size) {
-        return NULL;
+        return VAL_NIL;
     }
     return tuple->elements[index];
 }
@@ -83,34 +64,31 @@ RUNTIME_API void lm_tuple_resize(LmTuple* tuple, uint64_t new_size) {
     if (!tuple) return;
     
     if (new_size > tuple->capacity) {
-        void** new_elements = (void**)realloc(tuple->elements, sizeof(void*) * new_size);
+        LmValue* new_elements = (LmValue*)realloc(tuple->elements, sizeof(LmValue) * new_size);
         if (new_elements) {
+            for (uint64_t i = tuple->capacity; i < new_size; i++) new_elements[i] = VAL_NIL;
             tuple->elements = new_elements;
             tuple->capacity = new_size;
         }
     }
     
-    // Adjust size if shrinking
     if (new_size < tuple->size) {
         tuple->size = new_size;
     }
 }
 
-RUNTIME_API void lm_tuple_append(LmTuple* tuple, void* value) {
+RUNTIME_API void lm_tuple_append(LmTuple* tuple, LmValue value) {
     if (!tuple) return;
-    
-    uint64_t index = tuple->size;
-    lm_tuple_set(tuple, index, value);
+    if (tuple->size >= tuple->capacity) {
+        lm_tuple_resize(tuple, tuple->capacity == 0 ? 8 : tuple->capacity * 2);
+    }
+    tuple->elements[tuple->size++] = value;
 }
 
 RUNTIME_API void lm_tuple_clear(LmTuple* tuple) {
     if (!tuple) return;
-    
-    if (tuple->elements) {
-        // Clear elements but keep memory
-        memset(tuple->elements, 0, sizeof(void*) * tuple->capacity);
-        tuple->size = 0;
-    }
+    for (uint64_t i = 0; i < tuple->size; i++) tuple->elements[i] = VAL_NIL;
+    tuple->size = 0;
 }
 
 RUNTIME_API void lm_tuple_free(LmTuple* tuple) {
@@ -125,20 +103,17 @@ RUNTIME_API void lm_tuple_free(LmTuple* tuple) {
 // Iterator implementation
 RUNTIME_API LmTupleIterator* lm_tuple_iterator_new(LmTuple* tuple) {
     if (!tuple) return NULL;
-    
     LmTupleIterator* iterator = (LmTupleIterator*)malloc(sizeof(LmTupleIterator));
     if (!iterator) return NULL;
-    
     iterator->tuple = tuple;
     iterator->current_index = 0;
     return iterator;
 }
 
-RUNTIME_API void* lm_tuple_iterator_next(LmTupleIterator* iterator) {
+RUNTIME_API LmValue lm_tuple_iterator_next(LmTupleIterator* iterator) {
     if (!iterator || !iterator->tuple || iterator->current_index >= iterator->tuple->size) {
-        return NULL;
+        return VAL_NIL;
     }
-    
     return iterator->tuple->elements[iterator->current_index++];
 }
 
@@ -147,7 +122,5 @@ RUNTIME_API uint8_t lm_tuple_iterator_has_next(LmTupleIterator* iterator) {
 }
 
 RUNTIME_API void lm_tuple_iterator_free(LmTupleIterator* iterator) {
-    if (iterator) {
-        free(iterator);
-    }
+    if (iterator) free(iterator);
 }

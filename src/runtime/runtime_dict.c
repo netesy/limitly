@@ -1,13 +1,15 @@
 #define BUILDING_RUNTIME
 #include "runtime_dict.h"
+#include "runtime_value.h"
+#include "runtime.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 
 #define INITIAL_BUCKET_COUNT 16
 
-RUNTIME_API LmDict* lm_dict_new(uint64_t (*hash_fn)(void*), 
-                                 int (*cmp_fn)(void*, void*)) {
+RUNTIME_API LmDict* lm_dict_new(uint64_t (*hash_fn)(LmValue),
+                                 int (*cmp_fn)(LmValue, LmValue)) {
     LmDict* dict = (LmDict*)malloc(sizeof(LmDict));
     if (!dict) return NULL;
     
@@ -28,8 +30,8 @@ RUNTIME_API LmDict* lm_dict_new(uint64_t (*hash_fn)(void*),
     return dict;
 }
 
-RUNTIME_API void lm_dict_set(LmDict* dict, void* key, void* value) {
-    if (!dict || !key) return;
+RUNTIME_API void lm_dict_set(LmDict* dict, LmValue key, LmValue value) {
+    if (!dict) return;
     
     uint64_t hash = dict->hash_fn(key);
     uint64_t bucket = hash % dict->bucket_count;
@@ -56,8 +58,8 @@ RUNTIME_API void lm_dict_set(LmDict* dict, void* key, void* value) {
     dict->size++;
 }
 
-RUNTIME_API void* lm_dict_get(LmDict* dict, void* key) {
-    if (!dict || !key) return NULL;
+RUNTIME_API LmValue lm_dict_get(LmDict* dict, LmValue key) {
+    if (!dict) return VAL_NIL;
     
     uint64_t hash = dict->hash_fn(key);
     uint64_t bucket = hash % dict->bucket_count;
@@ -70,11 +72,11 @@ RUNTIME_API void* lm_dict_get(LmDict* dict, void* key) {
         entry = entry->next;
     }
     
-    return NULL;
+    return VAL_NIL;
 }
 
-RUNTIME_API int lm_dict_contains(LmDict* dict, void* key) {
-    return lm_dict_get(dict, key) != NULL;
+RUNTIME_API int lm_dict_contains(LmDict* dict, LmValue key) {
+    return lm_dict_get(dict, key) != VAL_NIL;
 }
 
 RUNTIME_API void lm_dict_free(LmDict* dict) {
@@ -93,14 +95,13 @@ RUNTIME_API void lm_dict_free(LmDict* dict) {
     free(dict);
 }
 
-RUNTIME_API void** lm_dict_items(LmDict* dict, uint64_t* out_count) {
+RUNTIME_API LmValue* lm_dict_items(LmDict* dict, uint64_t* out_count) {
     if (!dict || dict->size == 0) {
         *out_count = 0;
         return NULL;
     }
     
-    // Allocate array for (key, value) pairs - 2 pointers per entry
-    void** items = (void**)malloc(sizeof(void*) * dict->size * 2);
+    LmValue* items = (LmValue*)malloc(sizeof(LmValue) * dict->size * 2);
     if (!items) {
         *out_count = 0;
         return NULL;
@@ -110,8 +111,8 @@ RUNTIME_API void** lm_dict_items(LmDict* dict, uint64_t* out_count) {
     for (uint64_t i = 0; i < dict->bucket_count; i++) {
         LmDictEntry* entry = dict->buckets[i];
         while (entry) {
-            items[index * 2] = entry->key;      // Even indices: keys
-            items[index * 2 + 1] = entry->value; // Odd indices: values
+            items[index * 2] = entry->key;
+            items[index * 2 + 1] = entry->value;
             index++;
             entry = entry->next;
         }
@@ -121,13 +122,16 @@ RUNTIME_API void** lm_dict_items(LmDict* dict, uint64_t* out_count) {
     return items;
 }
 
-RUNTIME_API uint64_t lm_hash_int(void* key) {
-    int64_t k = (int64_t)key;
+RUNTIME_API uint64_t lm_hash_int(LmValue key) {
+    int64_t k = as_i64(key);
     return (uint64_t)(k * 2654435761ULL);
 }
 
-RUNTIME_API uint64_t lm_hash_string(void* key) {
-    const char* str = (const char*)key;
+RUNTIME_API uint64_t lm_hash_string(LmValue key) {
+    if (!IS_PTR(key)) return 0;
+    LmBox* box = (LmBox*)UNBOX_PTR(key);
+    if (box->header.type_id != TYPE_BOX || box->type != LM_BOX_STRING) return 0;
+    const char* str = (const char*)box->value.as_ptr;
     uint64_t hash = 5381;
     int c;
     while ((c = *str++)) {
@@ -136,97 +140,37 @@ RUNTIME_API uint64_t lm_hash_string(void* key) {
     return hash;
 }
 
-RUNTIME_API int lm_cmp_int(void* k1, void* k2) {
-    int64_t i1 = (int64_t)k1;
-    int64_t i2 = (int64_t)k2;
+RUNTIME_API int lm_cmp_int(LmValue k1, LmValue k2) {
+    __int128 i1 = as_i128(k1);
+    __int128 i2 = as_i128(k2);
     return (i1 > i2) - (i1 < i2);
 }
 
-RUNTIME_API int lm_cmp_string(void* k1, void* k2) {
-    return strcmp((const char*)k1, (const char*)k2);
+RUNTIME_API int lm_cmp_string(LmValue k1, LmValue k2) {
+    if (!IS_PTR(k1) || !IS_PTR(k2)) return (k1 > k2) - (k1 < k2);
+    LmBox* b1 = (LmBox*)UNBOX_PTR(k1);
+    LmBox* b2 = (LmBox*)UNBOX_PTR(k2);
+    if (b1->header.type_id != TYPE_BOX || b1->type != LM_BOX_STRING) return 1;
+    if (b2->header.type_id != TYPE_BOX || b2->type != LM_BOX_STRING) return -1;
+    return strcmp((const char*)b1->value.as_ptr, (const char*)b2->value.as_ptr);
 }
 
-// Include boxing definitions for boxed value functions
-#include "runtime.h"
-
-// Hash function for boxed values (used by both VM and JIT)
-// Now tag-aware: handles both immediate tagged values and boxed objects
-RUNTIME_API uint64_t hash_boxed_value(void* key) {
-    int64_t v = (int64_t)(uintptr_t)key;
-    if (IS_INT(v)) return lm_hash_int((void*)(intptr_t)UNBOX_INT(v));
-    if (IS_BOOL(v)) return lm_hash_int((void*)(intptr_t)UNBOX_BOOL(v));
-    if (IS_NIL(v)) return 0;
-    
-    if (IS_PTR(v)) {
-        void* ptr = UNBOX_PTR(v);
-        if (!ptr) return 0;
-        ObjHeader* header = (ObjHeader*)ptr;
-        if (header->type_id == TYPE_BOX) {
-            LmBox* box = (LmBox*)ptr;
-            switch (box->type) {
-                case LM_BOX_INT:
-                    return lm_hash_int((void*)(intptr_t)box->value.as_int);
-                case LM_BOX_STRING:
-                    return lm_hash_string((void*)box->value.as_ptr);
-                case LM_BOX_FLOAT: {
-                    int64_t int_val = (int64_t)box->value.as_float;
-                    return lm_hash_int((void*)(intptr_t)int_val);
-                }
-                case LM_BOX_BOOL:
-                    return lm_hash_int((void*)(intptr_t)box->value.as_bool);
-                default:
-                    return 0;
-            }
-        }
-        // For other objects (List, Dict, etc.), hash by address
-        return lm_hash_int(ptr);
+RUNTIME_API uint64_t hash_boxed_value(LmValue key) {
+    if (is_integer(key)) return lm_hash_int(key);
+    if (IS_BOOL(key)) return lm_hash_int(key);
+    if (IS_NIL(key)) return 0;
+    if (IS_PTR(key)) {
+        ObjHeader* h = (ObjHeader*)UNBOX_PTR(key);
+        if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) return lm_hash_string(key);
+        return (uint64_t)h;
     }
-    
-    return lm_hash_int(key);
+    return (uint64_t)key;
 }
 
-// Compare function for boxed values (used by both VM and JIT)
-// Now tag-aware
-RUNTIME_API int cmp_boxed_value(void* k1, void* k2) {
-    if (k1 == k2) return 0;
-    
-    int64_t v1 = (int64_t)(uintptr_t)k1;
-    int64_t v2 = (int64_t)(uintptr_t)k2;
-    
-    if (IS_INT(v1) && IS_INT(v2)) {
-        int64_t i1 = UNBOX_INT(v1);
-        int64_t i2 = UNBOX_INT(v2);
-        return (i1 > i2) - (i1 < i2);
-    }
-    
-    if (IS_PTR(v1) && IS_PTR(v2)) {
-        void* p1 = UNBOX_PTR(v1);
-        void* p2 = UNBOX_PTR(v2);
-        ObjHeader* h1 = (ObjHeader*)p1;
-        ObjHeader* h2 = (ObjHeader*)p2;
-        
-        if (h1->type_id == TYPE_BOX && h2->type_id == TYPE_BOX) {
-            LmBox* b1 = (LmBox*)p1;
-            LmBox* b2 = (LmBox*)p2;
-            if (b1->type != b2->type) return 1;
-            
-            switch (b1->type) {
-                case LM_BOX_INT: return (b1->value.as_int > b2->value.as_int) - (b1->value.as_int < b2->value.as_int);
-                case LM_BOX_FLOAT: {
-                    double diff = b1->value.as_float - b2->value.as_float;
-                    return (diff > 0) - (diff < 0);
-                }
-                case LM_BOX_BOOL: return (b1->value.as_bool > b2->value.as_bool) - (b1->value.as_bool < b2->value.as_bool);
-                case LM_BOX_STRING: return strcmp((const char*)b1->value.as_ptr, (const char*)b2->value.as_ptr);
-                default: return 1;
-            }
-        }
-    }
-
-    return (v1 > v2) - (v1 < v2);
+RUNTIME_API int cmp_boxed_value(LmValue k1, LmValue k2) {
+    return lm_value_eq(k1, k2) ? 0 : (k1 > k2 ? 1 : -1);
 }
 
-// Wrapper function for JIT to create dicts with proper hash/compare functions
 RUNTIME_API void* jit_dict_new(void) {
     return lm_dict_new(hash_boxed_value, cmp_boxed_value);
 }
