@@ -1,3 +1,4 @@
+#include "frontend/value.hh"
 #ifndef LIR_H
 #define LIR_H
 
@@ -259,7 +260,7 @@ struct LIR_Inst {
     Reg a;                 // Operand 1 (source register)
     Reg b;                 // Operand 2 (source register, optional)
     Imm imm;               // Immediate value (optional, for constants or jump targets)
-    ValuePtr const_val;    // Constant value (for LoadConst operations)
+    Backend::Value const_val;    // Constant value (for LoadConst operations)
     
     // Enhanced function call support
     std::string func_name;          // Function name (for calls and function definitions)
@@ -276,16 +277,16 @@ struct LIR_Inst {
         : op(op), result_type(result_type), type_a(type_a), type_b(type_b), 
           dst(dst), a(a), b(b), imm(imm) {}
     
-    LIR_Inst(LIR_Op op, Type result_type, Reg dst, ValuePtr constant)
+    LIR_Inst(LIR_Op op, Type result_type, Reg dst, Backend::Value constant)
         : op(op), result_type(result_type), type_a(Type::Void), type_b(Type::Void),
           dst(dst), a(0), b(0), imm(0), const_val(constant) {}
     
     // Legacy constructors for backward compatibility
     LIR_Inst(LIR_Op op, Reg dst = 0, Reg a = 0, Reg b = 0, Imm imm = 0)
         : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
-          dst(dst), a(a), b(b), imm(imm) {}
+          dst(dst), a(a), b(b), imm(imm), const_val(0) {}
     
-    LIR_Inst(LIR_Op op, Reg dst, ValuePtr constant)
+    LIR_Inst(LIR_Op op, Reg dst, Backend::Value constant)
         : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
           dst(dst), a(0), b(0), imm(0), const_val(constant) {}
     

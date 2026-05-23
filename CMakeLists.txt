@@ -43,7 +43,7 @@ set(FRONTEND_SOURCES
 
 set(BACKEND_COMMON_SOURCES
     src/backend/symbol_table.cpp
-    src/backend/value.cpp
+    src/frontend/value.cpp
     src/backend/vm/register.cpp
 )
 
@@ -157,7 +157,7 @@ add_executable(limitly
     src/backend/stack_trace.cpp
     src/backend/type_checker.cpp
     src/backend/type_system.cpp
-    src/backend/value.cpp
+    src/frontend/value.cpp
     src/frontend/lexer.cpp
     src/frontend/ast.cpp
     ${FRONTEND_SOURCES}
@@ -182,7 +182,7 @@ add_executable(test_parser
     src/backend/ast_printer.cpp
     src/backend/bytecode_printer.cpp
     src/backend/vm.cpp
-    src/backend/value.cpp
+    src/frontend/value.cpp
     src/backend/function.cpp
     src/backend/instruction.cpp
     src/backend/opcodes.cpp
@@ -232,7 +232,7 @@ add_executable(benchmark_parsers
     src/backend/ast_printer.cpp
     src/backend/bytecode_printer.cpp
     src/backend/vm.cpp
-    src/backend/value.cpp
+    src/frontend/value.cpp
     src/backend/function.cpp
     src/backend/instruction.cpp
     src/backend/opcodes.cpp
@@ -268,7 +268,7 @@ add_executable(test_performance_optimization
     src/backend/ast_printer.cpp
     src/backend/bytecode_printer.cpp
     src/backend/vm.cpp
-    src/backend/value.cpp
+    src/frontend/value.cpp
     src/backend/function.cpp
     src/backend/instruction.cpp
     src/backend/opcodes.cpp

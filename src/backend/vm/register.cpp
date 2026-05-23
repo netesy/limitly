@@ -30,15 +30,6 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
     return result;
 }
 
-ValuePtr RegisterVM::createErrorValue(const std::string& errorType, const std::string& message) {
-    auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
-    return std::make_shared<::Value>(nil_type, "Error: " + errorType + ": " + message);
-}
-
-ValuePtr RegisterVM::createSuccessValue(const RegisterValue& value) {
-    auto string_type = std::make_shared<::Type>(TypeTag::String);
-    return std::make_shared<::Value>(string_type, this->to_string(value));
-}
 
 bool RegisterVM::isErrorValue(LIR::Reg reg) const {
     auto& value = registers[reg];
@@ -113,41 +104,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
         if (instruction_count > MAX_INSTRUCTIONS) { std::cerr << "Instruction limit exceeded" << std::endl; return; }
         switch (pc->op) {
             case LIR::LIR_Op::LoadConst: {
-                ValuePtr cv = pc->const_val;
-                if (!cv) {
-                    registers[pc->dst] = VAL_NIL;
-                } else {
-                    switch (cv->type->tag) {
-                        case TypeTag::Int:
-                        case TypeTag::Int64:
-                            try { registers[pc->dst] = make_i64(std::stoll(cv->data)); }
-                            catch(...) { registers[pc->dst] = make_i128(parse_i128(cv->data)); }
-                            break;
-                        case TypeTag::UInt:
-                        case TypeTag::UInt64:
-                            try { registers[pc->dst] = make_u64(std::stoull(cv->data)); }
-                            catch(...) { registers[pc->dst] = make_u128(parse_u128(cv->data)); }
-                            break;
-                        case TypeTag::Int128:
-                            registers[pc->dst] = make_i128(parse_i128(cv->data));
-                            break;
-                        case TypeTag::UInt128:
-                            registers[pc->dst] = make_u128(parse_u128(cv->data));
-                            break;
-                        case TypeTag::Float32:
-                        case TypeTag::Float64:
-                            try { registers[pc->dst] = make_float(std::stod(cv->data)); } catch(...) { registers[pc->dst] = VAL_NIL; }
-                            break;
-                        case TypeTag::Bool:
-                            registers[pc->dst] = (cv->data == "true") ? VAL_TRUE : VAL_FALSE;
-                            break;
-                        case TypeTag::String:
-                            registers[pc->dst] = BOX_PTR(lm_box_string(cv->data.c_str()));
-                            break;
-                        default:
-                            registers[pc->dst] = VAL_NIL;
-                    }
-                }
+                registers[pc->dst] = pc->const_val;
                 break;
             }
             case LIR::LIR_Op::Add:
@@ -156,6 +113,13 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::Div:
             case LIR::LIR_Op::Mod:
             case LIR::LIR_Op::Neg:
+            case LIR::LIR_Op::DecAdd:
+            case LIR::LIR_Op::DecSub:
+            case LIR::LIR_Op::DecMul:
+            case LIR::LIR_Op::DecDiv:
+            case LIR::LIR_Op::DecMod:
+            case LIR::LIR_Op::DecNeg:
+            case LIR::LIR_Op::DecRescale:
                 execute_arithmetic(pc);
                 break;
             case LIR::LIR_Op::CmpEQ:
@@ -182,6 +146,10 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 execute_collections(pc);
                 break;
             case LIR::LIR_Op::NewFrame:
+            case LIR::LIR_Op::ConstructError:
+            case LIR::LIR_Op::ConstructOk:
+            case LIR::LIR_Op::IsError:
+            case LIR::LIR_Op::Unwrap:
             case LIR::LIR_Op::FrameGetField:
             case LIR::LIR_Op::FrameSetField:
             case LIR::LIR_Op::FrameGetFieldAtomic:

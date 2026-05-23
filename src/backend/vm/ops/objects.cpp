@@ -18,6 +18,41 @@ void RegisterVM::execute_objects(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = BOX_PTR(enum_obj);
             break;
         }
+        case LIR::LIR_Op::ConstructError: {
+            // Error union with [is_error=1, payload]
+            void* err_obj = lm_frame_alloc("__lir_internal_error__", 2);
+            lm_frame_set_field(err_obj, 0, make_i64(1));
+            lm_frame_set_field(err_obj, 1, registers[pc->a]);
+            registers[pc->dst] = BOX_PTR(err_obj);
+            break;
+        }
+        case LIR::LIR_Op::ConstructOk: {
+            // Error union with [is_error=0, payload]
+            void* ok_obj = lm_frame_alloc("__lir_internal_ok__", 2);
+            lm_frame_set_field(ok_obj, 0, make_i64(0));
+            lm_frame_set_field(ok_obj, 1, registers[pc->a]);
+            registers[pc->dst] = BOX_PTR(ok_obj);
+            break;
+        }
+        case LIR::LIR_Op::IsError: {
+            if (IS_PTR(registers[pc->a])) {
+                void* obj = UNBOX_PTR(registers[pc->a]);
+                LmValue is_err = lm_frame_get_field(obj, 0);
+                registers[pc->dst] = (as_i64(is_err) != 0) ? VAL_TRUE : VAL_FALSE;
+            } else {
+                registers[pc->dst] = VAL_FALSE;
+            }
+            break;
+        }
+        case LIR::LIR_Op::Unwrap: {
+            if (IS_PTR(registers[pc->a])) {
+                void* obj = UNBOX_PTR(registers[pc->a]);
+                registers[pc->dst] = lm_frame_get_field(obj, 1);
+            } else {
+                registers[pc->dst] = registers[pc->a];
+            }
+            break;
+        }
         case LIR::LIR_Op::GetTag: {
             if (IS_PTR(registers[pc->a])) {
                 void* obj = UNBOX_PTR(registers[pc->a]);

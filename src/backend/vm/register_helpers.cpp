@@ -57,26 +57,26 @@ ValuePtr register_to_value_ptr(RegisterValue rv) {
         LmString s = lm_value_to_string(rv);
         std::string str(s.data ? s.data : "0");
         lm_string_free(s);
-        auto intType = std::make_shared<Type>(TypeTag::Int128);
-        return std::make_shared<Value>(intType, str);
+        auto intType = std::make_shared<::Type>(::TypeTag::Int128);
+        return std::make_shared<::Value>(intType, str);
     } else if (IS_BOOL(rv)) {
-        auto boolType = std::make_shared<Type>(TypeTag::Bool);
-        return std::make_shared<Value>(boolType, UNBOX_BOOL(rv) ? "true" : "false");
+        auto boolType = std::make_shared<::Type>(::TypeTag::Bool);
+        return std::make_shared<::Value>(boolType, UNBOX_BOOL(rv) ? "true" : "false");
     } else if (IS_PTR(rv)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(rv);
         if (h->type_id == TYPE_FLOAT) {
-            auto floatType = std::make_shared<Type>(TypeTag::Float64);
-            return std::make_shared<Value>(floatType, std::to_string(((ObjFloat*)h)->value));
+            auto floatType = std::make_shared<::Type>(::TypeTag::Float64);
+            return std::make_shared<::Value>(floatType, std::to_string(((ObjFloat*)h)->value));
         } else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
-            auto stringType = std::make_shared<Type>(TypeTag::String);
-            return std::make_shared<Value>(stringType, (char*)((LmBox*)h)->value.as_ptr);
+            auto stringType = std::make_shared<::Type>(::TypeTag::String);
+            return std::make_shared<::Value>(stringType, (char*)((LmBox*)h)->value.as_ptr);
         } else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_FLOAT) {
-             auto floatType = std::make_shared<Type>(TypeTag::Float64);
-             return std::make_shared<Value>(floatType, std::to_string(((LmBox*)h)->value.as_float));
+             auto floatType = std::make_shared<::Type>(::TypeTag::Float64);
+             return std::make_shared<::Value>(floatType, std::to_string(((LmBox*)h)->value.as_float));
         }
     }
-    auto nullType = std::make_shared<Type>(TypeTag::Nil);
-    return std::make_shared<Value>(nullType);
+    auto nullType = std::make_shared<::Type>(::TypeTag::Nil);
+    return std::make_shared<::Value>(nullType);
 }
 
 } // namespace Register

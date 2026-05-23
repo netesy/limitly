@@ -2,6 +2,7 @@
 #include "builder.hh"
 #include "fyra_builtin_functions.hh"
 #include "ir/PhiNode.h"
+#include "runtime/runtime.h"
 #include <iostream>
 #include <string>
 #include <unordered_map>
@@ -94,50 +95,44 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         switch (inst.op) {
             case LIR::LIR_Op::Label: break;
             case LIR::LIR_Op::LoadConst: {
-                if (!inst.const_val) break;
                 ir::Value* c = nullptr;
-                if (inst.const_val->type) {
-                    switch (inst.const_val->type->tag) {
-                        case TypeTag::Bool:
-                            c = context_->getConstantInt(context_->getIntegerType(64), inst.const_val->data == "true" ? 1 : 0);
-                            break;
-                        case TypeTag::Float32:
-                        case TypeTag::Float64:
-                            try { c = context_->getConstantFP(context_->getDoubleType(), std::stod(inst.const_val->data)); }
-                            catch (...) { c = context_->getConstantFP(context_->getDoubleType(), 0.0); errors_.push_back("Failed to parse float: " + inst.const_val->data); }
-                            break;
-                        case TypeTag::String: {
+                LmValue val = inst.const_val;
+                if (IS_INT(val)) {
+                    c = context_->getConstantInt(context_->getIntegerType(64), (long long)UNBOX_INT(val));
+                } else if (IS_BOOL(val)) {
+                    c = context_->getConstantInt(context_->getIntegerType(64), UNBOX_BOOL(val) ? 1 : 0);
+                } else if (IS_NIL(val)) {
+                    c = context_->getConstantInt(context_->getIntegerType(64), 0);
+                } else if (IS_PTR(val)) {
+                    ObjHeader* h = (ObjHeader*)UNBOX_PTR(val);
+                    if (h->type_id == TYPE_FLOAT) {
+                        c = context_->getConstantFP(context_->getDoubleType(), ((::ObjFloat*)h)->value);
+                    } else if (h->type_id == TYPE_BOX) {
+                        ::LmBox* box = (::LmBox*)h;
+                        if (box->type == LM_BOX_FLOAT) {
+                            c = context_->getConstantFP(context_->getDoubleType(), box->value.as_float);
+                        } else if (box->type == LM_BOX_STRING) {
                             used_builtins_.insert("lm_box_string");
                             ir::Function* box_string = current_module_->getFunction("lm_box_string");
                             if (!box_string) box_string = builder_->createFunction("lm_box_string", context_->getPointerType(context_->getIntegerType(8)), {context_->getPointerType(context_->getIntegerType(8))});
-                            ir::Value* str_const = context_->getConstantString(inst.const_val->data);
+                            ir::Value* str_const = context_->getConstantString((char*)box->value.as_ptr);
                             std::string name = "$str_" + std::to_string(label_counter_++);
                             auto gv = std::make_unique<ir::GlobalVariable>(context_->getPointerType(context_->getIntegerType(8)), name, static_cast<ir::Constant*>(str_const), false, ".data");
                             ir::GlobalVariable* gv_ptr = gv.get();
                             current_module_->addGlobalVariable(std::move(gv));
                             c = builder_->createCall(box_string, {gv_ptr});
-                            break;
+                        } else {
+                            c = context_->getConstantInt(context_->getIntegerType(64), 0);
                         }
-                        default:
-                            if (inst.const_val->data == "nil") c = context_->getConstantInt(context_->getIntegerType(64), 0);
-                            else {
-                                try { c = context_->getConstantInt(context_->getIntegerType(64), std::stoll(inst.const_val->data)); }
-                                catch (...) { c = context_->getConstantInt(context_->getIntegerType(64), 0); errors_.push_back("Failed to parse int: " + inst.const_val->data); }
-                            }
-                            break;
+                    } else {
+                         c = context_->getConstantInt(context_->getIntegerType(64), 0);
                     }
                 } else {
-                    if (inst.const_val->data == "nil") c = context_->getConstantInt(context_->getIntegerType(64), 0);
-                    else {
-                        try { c = context_->getConstantInt(context_->getIntegerType(64), std::stoll(inst.const_val->data)); }
-                        catch (...) { c = context_->getConstantInt(context_->getIntegerType(64), 0); errors_.push_back("Failed to parse untyped: " + inst.const_val->data); }
-                    }
+                    c = context_->getConstantInt(context_->getIntegerType(64), 0);
                 }
                 store_reg(inst.dst, c, inst.result_type);
                 break;
             }
-            case LIR::LIR_Op::Mov:
-            case LIR::LIR_Op::Copy:
                 store_reg(inst.dst, load_reg(inst.a, inst.type_a), inst.result_type);
                 break;
             case LIR::LIR_Op::Add:
@@ -199,7 +194,15 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             }
             case LIR::LIR_Op::Call:
             case LIR::LIR_Op::CallVoid: {
-                std::string name = inst.func_name; if (name.empty() && inst.const_val) name = inst.const_val->data;
+                std::string name = inst.func_name; 
+                if (name.empty() && inst.const_val) {
+                    if (IS_PTR(inst.const_val)) {
+                        ObjHeader* h = (ObjHeader*)UNBOX_PTR(inst.const_val);
+                        if (h->type_id == TYPE_BOX && ((::LmBox*)h)->type == LM_BOX_STRING) {
+                            name = (char*)((::LmBox*)h)->value.as_ptr;
+                        }
+                    }
+                }
                 ir::Function* func = current_module_->getFunction(name);
                 if (!func) {
                     std::vector<ir::Type*> pts;
@@ -213,7 +216,15 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                 break;
             }
             case LIR::LIR_Op::CallBuiltin: {
-                std::string name = inst.func_name; if (name.empty() && inst.const_val) name = inst.const_val->data;
+                std::string name = inst.func_name; 
+                if (name.empty() && inst.const_val) {
+                    if (IS_PTR(inst.const_val)) {
+                        ObjHeader* h = (ObjHeader*)UNBOX_PTR(inst.const_val);
+                        if (h->type_id == TYPE_BOX && ((::LmBox*)h)->type == LM_BOX_STRING) {
+                            name = (char*)((::LmBox*)h)->value.as_ptr;
+                        }
+                    }
+                }
                 used_builtins_.insert(name);
                 ir::Function* func = current_module_->getFunction(name);
                 if (!func) {

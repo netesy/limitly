@@ -89,7 +89,6 @@ private:
     };
     
     std::unordered_map<int64_t, ErrorInfo> error_table;
-    std::unordered_map<LIR::Reg, std::shared_ptr<ErrorValue>> error_storage;
     
     const LIR::LIR_Function* current_function_ = nullptr;
     std::unordered_map<std::string, RegisterValue> globals_;
@@ -153,8 +152,6 @@ private:
         return false;
     }
     
-    ValuePtr createErrorValue(const std::string& errorType, const std::string& message = "");
-    ValuePtr createSuccessValue(const RegisterValue& value);
     bool isErrorValue(LIR::Reg reg) const;
     
     FrameInstancePtr createFrameInstance(const std::string& frame_type);
