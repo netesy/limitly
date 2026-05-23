@@ -172,7 +172,7 @@ RUNTIME_API int numeric_compare(LmValue a, LmValue b) {
 }
 
 RUNTIME_API int lm_value_eq(LmValue v1, LmValue v2) {
-    if (v1 == v2) return 1;
+    if (v1 == v2) return 1; if (IS_PTR(v1) && IS_PTR(v2)) { ObjHeader* h1 = (ObjHeader*)UNBOX_PTR(v1); ObjHeader* h2 = (ObjHeader*)UNBOX_PTR(v2); if (h1->type_id == h2->type_id && h1->type_id == TYPE_BOX) { LmBox* b1 = (LmBox*)h1; LmBox* b2 = (LmBox*)h2; if (b1->type == b2->type && b1->type == LM_BOX_STRING) return strcmp((char*)b1->value.as_ptr, (char*)b2->value.as_ptr) == 0; } }
     if (is_numeric_internal(v1) && is_numeric_internal(v2)) {
         if (is_float(v1) || is_float(v2)) {
             return as_float(v1) == as_float(v2);

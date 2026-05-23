@@ -1,5 +1,6 @@
 #include "../generator.hh"
 #include "../functions.hh"
+#include "../../backend/vm/constant_utils.hh"
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
 #include "../builtin_functions.hh"
@@ -261,13 +262,13 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
                                     // Set task ID in field 0
                                     Reg task_id_reg = allocate_register();
                                     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-                                    ValuePtr task_id_val = std::make_shared<Value>(int_type, i);
+                                    Backend::Value task_id_val = make_i64(i);
                                     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_id_reg, task_id_val));
                                     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_id_reg, context_id_reg, 0, 0));
                                     
                                     // Set loop variable value in field 1
                                     Reg loop_var_reg = allocate_register();
-                                    ValuePtr loop_var_val = std::make_shared<Value>(int_type, i);
+                                    Backend::Value loop_var_val = make_i64(i);
                                     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, loop_var_reg, loop_var_val));
                                     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, loop_var_reg, context_id_reg, 0, 1));
                                     
@@ -279,7 +280,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
                                     // Set task function name in field 4
                                     Reg task_name_reg = allocate_register();
                                     auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                                    ValuePtr task_name_val = std::make_shared<Value>(string_type, task_name);
+                                    Backend::Value task_name_val = BOX_PTR(lm_box_string(task_name.c_str()));
                                     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, task_name_reg, task_name_val));
                                     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_name_reg, context_id_reg, 0, 4));
                                     
@@ -325,7 +326,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
                         // Set worker ID in field 0
                         Reg worker_id_reg = allocate_register();
                         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-                        ValuePtr worker_id_val = std::make_shared<Value>(int_type, static_cast<int64_t>(0));
+                        Backend::Value worker_id_val = make_i64(0);
                         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, worker_id_reg, worker_id_val));
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_id_reg, context_id_reg, 0, 0));
                        // std::cout << "[DEBUG] Worker ID set" << std::endl;
@@ -346,7 +347,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
                         // Set worker function name in field 4
                         Reg worker_name_reg = allocate_register();
                         auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                        ValuePtr worker_name_val = std::make_shared<Value>(string_type, worker_name);
+                        Backend::Value worker_name_val = BOX_PTR(lm_box_string(worker_name.c_str()));
                         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, worker_name_reg, worker_name_val));
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_name_reg, context_id_reg, 0, 4));
                        // std::cout << "[DEBUG] Worker function name field set" << std::endl;
@@ -368,7 +369,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
                         
                         Reg worker_id_reg = allocate_register();
                         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-                        ValuePtr worker_id_val = std::make_shared<Value>(int_type, static_cast<int64_t>(0));
+                        Backend::Value worker_id_val = make_i64(0);
                         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, worker_id_reg, worker_id_val));
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_id_reg, context_id_reg, 0, 0));
                         
@@ -378,7 +379,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
                         
                         Reg worker_name_reg = allocate_register();
                         auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                        ValuePtr worker_name_val = std::make_shared<Value>(string_type, worker_name);
+                        Backend::Value worker_name_val = BOX_PTR(lm_box_string(worker_name.c_str()));
                         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, worker_name_reg, worker_name_val));
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_name_reg, context_id_reg, 0, 4));
                         
@@ -650,7 +651,7 @@ void Generator::emit_task_init_and_step(LM::Frontend::AST::TaskStatement& task, 
     
     // Load task_id as the context register value
     Reg task_context_reg = allocate_register();
-    ValuePtr task_id_val = std::make_shared<Value>(int_type, int64_t(task_id));
+    Backend::Value task_id_val = make_i64(task_id);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, task_context_reg, task_id_val));
     set_register_type(task_context_reg, int_type);
     
@@ -664,7 +665,7 @@ void Generator::emit_task_init_and_step(LM::Frontend::AST::TaskStatement& task, 
     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_id_reg, task_context_reg, 0, 0));
     
     // Set loop variable value in context (field 1)
-    ValuePtr loop_var_val = std::make_shared<Value>(int_type, int64_t(loop_var_value));
+    Backend::Value loop_var_val = make_i64(loop_var_value);
     Reg loop_var_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, loop_var_reg, loop_var_val));
     set_register_type(loop_var_reg, int_type);
@@ -682,7 +683,7 @@ void Generator::emit_task_init_and_step(LM::Frontend::AST::TaskStatement& task, 
     Reg current_counter_reg = allocate_register();
     // Load current shared counter from global storage
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, current_counter_reg, 
-                              std::make_shared<Value>(int_type, int64_t(0))));
+                              make_i64(0)));
     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, current_counter_reg, task_context_reg, 0, 3));
     
     // Instead of copying task function instructions, store the task function name
@@ -694,7 +695,7 @@ void Generator::emit_task_init_and_step(LM::Frontend::AST::TaskStatement& task, 
             // Store the task function name in the task context for the scheduler to call
             Reg func_name_reg = allocate_register();
             auto string_type = std::make_shared<::Type>(::TypeTag::String);
-            ValuePtr func_name_val = std::make_shared<Value>(string_type, task.task_function_name);
+            Backend::Value func_name_val = BOX_PTR(lm_box_string(task.task_function_name.c_str()));
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, func_name_reg, func_name_val));
             set_register_type(func_name_reg, string_type);
             
@@ -773,8 +774,8 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
         // Implicit return of 0 if no explicit return
         Reg return_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-        ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, return_reg, zero_val));
+        Backend::Value zero_val = make_i64(0);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, return_reg, make_i64(0)));
         emit_instruction(LIR_Inst(LIR_Op::Ret, return_reg, 0, 0));
     }
     
@@ -857,8 +858,8 @@ void Generator::lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt) {
         // Implicit return of 0 if no explicit return
         Reg return_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-        ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, return_reg, zero_val));
+        Backend::Value zero_val = make_i64(0);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, return_reg, make_i64(0)));
         emit_instruction(LIR_Inst(LIR_Op::Ret, return_reg, 0, 0));
     }
     
@@ -982,14 +983,14 @@ void Generator::emit_concurrent_worker_init(LM::Frontend::AST::WorkerStatement& 
     
     // Set worker ID
     Reg worker_id_reg = allocate_register();
-    ValuePtr worker_id_val = std::make_shared<Value>(int_type, static_cast<int64_t>(worker_id));
+    Backend::Value worker_id_val = make_i64(worker_id);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, worker_id_reg, worker_id_val));
     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, 0, worker_context_reg, worker_id_reg, 0));
     
     // Set parameter name if specified
     if (!worker.paramName.empty()) {
         Reg param_reg = allocate_register();
-        ValuePtr param_val = std::make_shared<Value>(int_type, static_cast<int64_t>(0));
+        Backend::Value param_val = make_i64(0);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, param_reg, param_val));
         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, 0, worker_context_reg, param_reg, 1));
     }

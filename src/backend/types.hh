@@ -2,7 +2,8 @@
 #pragma once
 
 #include "../memory/memory.hh"
-#include "value.hh"
+#include "../frontend/value.hh"
+#include "../backend/value.hh"
 #include <algorithm>
 #include <array>
 #include <cstdint>

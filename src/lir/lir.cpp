@@ -19,7 +19,15 @@ std::string LIR_Inst::to_string() const {
             oss << " r" << dst << ", r" << a;
             break;
         case LIR_Op::LoadConst:
-            oss << " r" << dst << ", " << const_val->toString();
+            if (IS_INT(const_val)) {
+                oss << " r" << dst << ", " << UNBOX_INT(const_val);
+            } else if (IS_NIL(const_val)) {
+                oss << " r" << dst << ", nil";
+            } else if (IS_BOOL(const_val)) {
+                oss << " r" << dst << ", " << (UNBOX_BOOL(const_val) ? "true" : "false");
+            } else {
+                oss << " r" << dst << ", [boxed:" << std::hex << const_val << std::dec << "]";
+            }
             break;
         case LIR_Op::Add:
         case LIR_Op::Sub:

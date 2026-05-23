@@ -1,4 +1,5 @@
 #include "optimizer.hh"
+#include "runtime/runtime_value.h"
 #include <unordered_set>
 #include <algorithm>
 #include <queue>
@@ -321,8 +322,7 @@ bool Optimizer::peephole_optimize() {
         if (inst.op == LIR_Op::LoadConst && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
             if (next.op == LIR_Op::LoadConst && next.dst == inst.dst && 
-                next.const_val && inst.const_val &&
-                next.const_val->data == inst.const_val->data) {
+                next.const_val == inst.const_val) {
                 func_.instructions.erase(func_.instructions.begin() + i + 1);
                 changed = true;
                 continue;
@@ -335,7 +335,7 @@ bool Optimizer::peephole_optimize() {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
                 if (prev.op == LIR_Op::LoadConst && prev.dst == inst.b &&
-                    prev.const_val && prev.const_val->data == "0") {
+                    IS_INT(prev.const_val) && UNBOX_INT(prev.const_val) == 0) {
                     inst.op = LIR_Op::Mov;
                     inst.b = UINT32_MAX;
                     changed = true;
@@ -349,7 +349,7 @@ bool Optimizer::peephole_optimize() {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
                 if (prev.op == LIR_Op::LoadConst && prev.dst == inst.b &&
-                    prev.const_val && prev.const_val->data == "1") {
+                    IS_INT(prev.const_val) && UNBOX_INT(prev.const_val) == 1) {
                     inst.op = LIR_Op::Mov;
                     inst.b = UINT32_MAX;
                     changed = true;
@@ -363,7 +363,7 @@ bool Optimizer::peephole_optimize() {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
                 if (prev.op == LIR_Op::LoadConst && prev.dst == inst.b &&
-                    prev.const_val && prev.const_val->data == "2") {
+                    IS_INT(prev.const_val) && UNBOX_INT(prev.const_val) == 2) {
                     inst.op = LIR_Op::Add;
                     inst.b = inst.a;
                     changed = true;
@@ -379,8 +379,7 @@ bool Optimizer::peephole_optimize() {
             inst.a = UINT32_MAX;
             inst.b = UINT32_MAX;
             // Create a true constant
-            auto true_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Bool), true);
-            inst.const_val = true_val;
+            inst.const_val = VAL_TRUE;
             changed = true;
             continue;
         }
@@ -392,8 +391,7 @@ bool Optimizer::peephole_optimize() {
             inst.a = UINT32_MAX;
             inst.b = UINT32_MAX;
             // Create a false constant
-            auto false_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Bool), false);
-            inst.const_val = false_val;
+            inst.const_val = VAL_FALSE;
             changed = true;
             continue;
         }
@@ -419,8 +417,7 @@ bool Optimizer::peephole_optimize() {
             inst.op = LIR_Op::LoadConst;
             inst.a = UINT32_MAX;
             inst.b = UINT32_MAX;
-            auto false_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Bool), false);
-            inst.const_val = false_val;
+            inst.const_val = VAL_FALSE;
             changed = true;
             continue;
         }
@@ -478,7 +475,7 @@ bool Optimizer::peephole_optimize() {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
                 if (prev.op == LIR_Op::LoadConst && prev.dst == inst.b &&
-                    prev.const_val && prev.const_val->data == "0") {
+                    IS_INT(prev.const_val) && UNBOX_INT(prev.const_val) == 0) {
                     inst.op = LIR_Op::Mov;
                     inst.b = UINT32_MAX;
                     changed = true;
@@ -492,7 +489,7 @@ bool Optimizer::peephole_optimize() {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
                 if (prev.op == LIR_Op::LoadConst && prev.dst == inst.b &&
-                    prev.const_val && prev.const_val->data == "1") {
+                    IS_INT(prev.const_val) && UNBOX_INT(prev.const_val) == 1) {
                     inst.op = LIR_Op::Mov;
                     inst.b = UINT32_MAX;
                     changed = true;
@@ -506,12 +503,11 @@ bool Optimizer::peephole_optimize() {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
                 if (prev.op == LIR_Op::LoadConst && prev.dst == inst.b &&
-                    prev.const_val && prev.const_val->data == "1") {
+                    IS_INT(prev.const_val) && UNBOX_INT(prev.const_val) == 1) {
                     inst.op = LIR_Op::LoadConst;
                     inst.a = UINT32_MAX;
                     inst.b = UINT32_MAX;
-                    auto zero_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)0);
-                    inst.const_val = zero_val;
+                    inst.const_val = make_i64(0);
                     changed = true;
                     continue;
                 }
@@ -526,7 +522,7 @@ bool Optimizer::constant_folding() {
     if (func_.instructions.empty()) return false;
 
     bool changed = false;
-    std::unordered_map<Reg, ValuePtr> const_regs;
+    std::unordered_map<Reg, Backend::Value> const_regs;
 
     for (size_t i = 0; i < func_.instructions.size(); ++i) {
         auto& inst = func_.instructions[i];
@@ -548,30 +544,26 @@ bool Optimizer::constant_folding() {
         // Arithmetic folding
         if (inst.op == LIR_Op::Add || inst.op == LIR_Op::Sub || inst.op == LIR_Op::Mul || inst.op == LIR_Op::Div) {
             if (const_regs.count(inst.a) && const_regs.count(inst.b)) {
-                ValuePtr va = const_regs[inst.a];
-                ValuePtr vb = const_regs[inst.b];
+                Backend::Value va = const_regs[inst.a];
+                Backend::Value vb = const_regs[inst.b];
 
                 // Only fold integers for now
-                if (va && vb && va->type && vb->type &&
-                    (va->type->tag == TypeTag::Int || va->type->tag == TypeTag::Int64) &&
-                    (vb->type->tag == TypeTag::Int || vb->type->tag == TypeTag::Int64)) {
-                    try {
-                        int64_t a = std::stoll(va->data);
-                        int64_t b = std::stoll(vb->data);
-                        int64_t res = 0;
+                if (IS_INT(va) && IS_INT(vb)) {
+                    int64_t a = UNBOX_INT(va);
+                    int64_t b = UNBOX_INT(vb);
+                    int64_t res = 0;
 
-                        if (inst.op == LIR_Op::Add) res = a + b;
-                        else if (inst.op == LIR_Op::Sub) res = a - b;
-                        else if (inst.op == LIR_Op::Mul) res = a * b;
-                        else if (inst.op == LIR_Op::Div && b != 0) res = a / b;
-                        else continue;
+                    if (inst.op == LIR_Op::Add) res = a + b;
+                    else if (inst.op == LIR_Op::Sub) res = a - b;
+                    else if (inst.op == LIR_Op::Mul) res = a * b;
+                    else if (inst.op == LIR_Op::Div && b != 0) res = a / b;
+                    else continue;
 
-                        ValuePtr res_val = std::make_shared<Value>(va->type, res);
-                        inst.op = LIR_Op::LoadConst;
-                        inst.const_val = res_val;
-                        const_regs[inst.dst] = res_val;
-                        changed = true;
-                    } catch (...) {}
+                    Backend::Value res_val = make_i64(res);
+                    inst.op = LIR_Op::LoadConst;
+                    inst.const_val = res_val;
+                    const_regs[inst.dst] = res_val;
+                    changed = true;
                 }
             } else {
                 if (inst.dst != UINT32_MAX) const_regs.erase(inst.dst);

@@ -26,11 +26,11 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(shell [ -d "vendor/fyra" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
-	CFLAGS := -std=c99 -g -fPIC -I.
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -d "vendor/fyra" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CFLAGS := -std=c99 -g -fPIC -I. -Isrc
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. $(if $(shell [ -d "vendor/fyra" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
-	CFLAGS := -std=c99 -O3 -fPIC -I.
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -d "vendor/fyra" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CFLAGS := -std=c99 -O3 -fPIC -I. -Isrc
 endif
 
 ifeq ($(PLATFORM),windows)
@@ -115,7 +115,7 @@ LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
                  src/lir/generator/modules.cpp src/lir/function_registry.cpp \
                  src/lir/optimizer.cpp src/lir/metrics.cpp src/lir/serializer.cpp
 
-BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/backend/value.cpp 
+BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/frontend/value.cpp 
 
 ERROR_SRCS := src/error/debugger.cpp
 

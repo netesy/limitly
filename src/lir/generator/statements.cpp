@@ -1,5 +1,6 @@
 #include "../generator.hh"
 #include "../functions.hh"
+#include "../../backend/vm/constant_utils.hh"
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
 #include "../builtin_functions.hh"
@@ -82,7 +83,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
          gen->emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, val_reg));
          for (size_t i = 0; i < err_t_p->parameterNames.size(); ++i) {
                 Reg idx_reg = gen->allocate_register();
-                gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)i)));
+                gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64((int64_t)i)));
                 Reg elem = gen->allocate_register();
                 gen->emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, payload, idx_reg));
                 gen->bind_variable(err_t_p->parameterNames[i], elem);
@@ -90,7 +91,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
     } else if (auto list_p = std::dynamic_pointer_cast<LM::Frontend::AST::ListPatternExpr>(pattern)) {
         for (size_t i = 0; i < list_p->elements.size(); ++i) {
             Reg idx_reg = gen->allocate_register();
-            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(i))));
+            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
             Reg elem = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem, val_reg, idx_reg));
             bind_all_vars(gen, list_p->elements[i], elem);
@@ -104,7 +105,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
             LIR_BasicBlock* loop_body = gen->create_basic_block("rest_slice_body");
             LIR_BasicBlock* loop_exit = gen->create_basic_block("rest_slice_exit");
             Reg cur_idx = gen->allocate_register();
-            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, cur_idx, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)list_p->elements.size())));
+            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, cur_idx, make_i64(list_p->elements.size())));
             gen->emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, loop_cond->id));
             gen->add_block_edge(gen->get_current_block(), loop_cond);
             gen->set_current_block(loop_cond);
@@ -120,7 +121,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
             gen->emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, dummy_res, rest_list, elem));
             Reg next_idx = gen->allocate_register();
             Reg one_reg = gen->allocate_register();
-            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)1)));
+            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
             gen->emit_instruction(LIR_Inst(LIR_Op::Add, Type::I64, next_idx, cur_idx, one_reg));
             gen->emit_instruction(LIR_Inst(LIR_Op::Mov, Type::I64, cur_idx, next_idx, 0));
             gen->emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, loop_cond->id));
@@ -131,7 +132,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
     } else if (auto tuple_p = std::dynamic_pointer_cast<LM::Frontend::AST::TuplePatternExpr>(pattern)) {
         for (size_t i = 0; i < tuple_p->elements.size(); ++i) {
             Reg idx_reg = gen->allocate_register();
-            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(i))));
+            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
             Reg elem = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, val_reg, idx_reg));
             bind_all_vars(gen, tuple_p->elements[i], elem);
@@ -139,7 +140,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
     } else if (auto dict_p = std::dynamic_pointer_cast<LM::Frontend::AST::DictPatternExpr>(pattern)) {
         for (const auto& field : dict_p->fields) {
             Reg key_reg = gen->allocate_register();
-            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::String), field.key)));
+            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_reg, BOX_PTR(lm_box_string(field.key.c_str()))));
             Reg elem = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::DictGet, Type::Ptr, elem, val_reg, key_reg));
             bind_all_vars(gen, field.pattern, elem);
@@ -188,7 +189,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
         } else {
             for (size_t i = 0; i < binding->patterns.size(); ++i) {
                 Reg idx_reg = gen->allocate_register();
-                gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(i))));
+                gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
                 Reg elem = gen->allocate_register();
                 gen->emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, payload, idx_reg));
                 bind_all_vars(gen, binding->patterns[i], elem);
@@ -274,7 +275,7 @@ void Generator::emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt) {
         // Empty print statement - just print a newline
         Reg newline_reg = allocate_register();
         auto string_type = std::make_shared<::Type>(::TypeTag::String);
-        ValuePtr newline_val = std::make_shared<Value>(string_type, std::string("\n"));
+        Backend::Value newline_val = BOX_PTR(lm_box_string("\n"));
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, newline_reg, newline_val));
         emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, newline_reg, 0));
         return;
@@ -318,7 +319,7 @@ void Generator::emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt) {
         if (i > 1 || (first_type && first_type->tag == ::TypeTag::String)) {
             Reg space_reg = allocate_register();
             auto string_type = std::make_shared<::Type>(::TypeTag::String);
-            ValuePtr space_val = std::make_shared<Value>(string_type, std::string(" "));
+            Backend::Value space_val = BOX_PTR(lm_box_string(" "));
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, space_reg, space_val));
             set_register_language_type(space_reg, string_type);
             
@@ -408,7 +409,7 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
             val_reg = emit_expr(*stmt.initializer);
         } else {
             val_reg = allocate_register();
-            ValuePtr nil_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Nil), "");
+            Backend::Value nil_val = VAL_NIL;
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, val_reg, nil_val));
         }
         LIR_Inst store_inst(LIR_Op::StoreGlobal, Type::Void, 0, val_reg, 0);
@@ -486,7 +487,7 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
         // Initialize with nil
         value_reg = allocate_register();
         auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
-        ValuePtr nil_val = std::make_shared<Value>(nil_type, "");
+        Backend::Value nil_val = VAL_NIL;
         Type abi_type = language_type_to_abi_type(stmt.inferred_type);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, value_reg, nil_val));
         set_register_type(value_reg, nil_type);
@@ -510,7 +511,7 @@ void Generator::emit_destructuring_var_stmt(LM::Frontend::AST::DestructuringDecl
                 Reg val_reg = allocate_register();
                 Reg index_reg = allocate_register();
                 auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-                ValuePtr index_val = std::make_shared<Value>(int_type, static_cast<int64_t>(i));
+                Backend::Value index_val = make_i64(i);
                 emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, index_val));
                 set_register_type(index_reg, int_type);
                 
@@ -529,7 +530,7 @@ void Generator::emit_destructuring_var_stmt(LM::Frontend::AST::DestructuringDecl
             Reg val_reg = allocate_register();
             Reg index_reg = allocate_register();
             auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-            ValuePtr index_val = std::make_shared<Value>(int_type, static_cast<int64_t>(i));
+            Backend::Value index_val = make_i64(i);
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, index_val));
             set_register_type(index_reg, int_type);
             
@@ -543,7 +544,7 @@ void Generator::emit_destructuring_var_stmt(LM::Frontend::AST::DestructuringDecl
         // Fallback: Bind to nil if type is unknown or unsupported
         for (const auto& name : stmt.names) {
             Reg val_reg = allocate_register();
-            ValuePtr nil_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Nil), "");
+            Backend::Value nil_val = VAL_NIL;
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, val_reg, nil_val));
             bind_variable(name, val_reg);
         }
@@ -589,7 +590,7 @@ void Generator::emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt) {
         // Convert non-boolean condition to boolean
         Reg zero_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int);
-        ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+        Backend::Value zero_val = make_i64(0);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
         set_register_type(zero_reg, int_type);
         emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
@@ -666,7 +667,7 @@ void Generator::emit_if_stmt_linear(LM::Frontend::AST::IfStatement& stmt) {
         // Convert non-boolean condition to boolean
         Reg zero_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int);
-        ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+        Backend::Value zero_val = make_i64(0);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
         set_register_type(zero_reg, int_type);
         emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
@@ -746,7 +747,7 @@ void Generator::emit_while_stmt_cfg(LM::Frontend::AST::WhileStatement& stmt) {
         // Convert non-boolean condition to boolean
         Reg zero_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int);
-        ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+        Backend::Value zero_val = make_i64(0);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
         set_register_type(zero_reg, int_type);
         emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
@@ -870,7 +871,7 @@ void Generator::emit_for_stmt_cfg(LM::Frontend::AST::ForStatement& stmt) {
             // Convert non-boolean condition to boolean
             Reg zero_reg = allocate_register();
             auto int_type = std::make_shared<::Type>(::TypeTag::Int);
-            ValuePtr zero_val = std::make_shared<Value>(int_type, (int64_t)0);
+            Backend::Value zero_val = make_i64(0);
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
             set_register_type(zero_reg, int_type);
             emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition, condition_expr, zero_reg));
@@ -879,7 +880,7 @@ void Generator::emit_for_stmt_cfg(LM::Frontend::AST::ForStatement& stmt) {
     } else {
         // No condition - always true
         auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);
-        ValuePtr true_val = std::make_shared<Value>(bool_type, true);
+        Backend::Value true_val = VAL_TRUE;
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, LIR::Type::Bool, condition, true_val));
         set_register_type(condition, bool_type);
     }
@@ -982,7 +983,7 @@ void Generator::emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt) {
             // No value - store a default value (0)
             auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, else_context_.result_register,
-                                      std::make_shared<Value>(nil_type, "")));
+                                      VAL_NIL));
         }
         // Don't emit a return instruction - let the else block continue
     } else {
@@ -1097,7 +1098,7 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
         } else {
             step_reg = allocate_register();
             auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-            ValuePtr one_val = std::make_shared<Value>(int_type, (int64_t)1);
+            Backend::Value one_val = make_i64(1);
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, step_reg, one_val));
             set_register_type(step_reg, int_type);
         }
@@ -1189,7 +1190,7 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
             // Create nil constant for comparison
             Reg nil_reg = allocate_register();
             auto nil_type = std::make_shared<::Type>(::TypeTag::Nil);
-            ValuePtr nil_val = std::make_shared<Value>(nil_type, std::string("nil"));
+            Backend::Value nil_val = VAL_NIL;
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, nil_val));
             set_register_type(nil_reg, nil_type);
             
@@ -1254,7 +1255,7 @@ void Generator::emit_dict_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     // Initialize index to 0
     Reg index_reg = allocate_register();
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-    ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
+    Backend::Value zero_val = make_i64(0);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, zero_val));
     set_register_type(index_reg, int_type);
 
@@ -1267,7 +1268,7 @@ void Generator::emit_dict_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     // Get dict size using entry count from AST
     Reg size_reg = allocate_register();
     auto size_type = std::make_shared<::Type>(::TypeTag::Int64);
-    ValuePtr size_val = std::make_shared<Value>(size_type, int64_t(dict_expr.entries.size()));
+    Backend::Value size_val = make_i64(dict_expr.entries.size());
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, size_reg, size_val));
     set_register_type(size_reg, size_type);
     
@@ -1290,7 +1291,7 @@ void Generator::emit_dict_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     // Extract key from dict at current index
     Reg key_reg = allocate_register();
     auto key_type = std::make_shared<::Type>(::TypeTag::String);
-    LIR_Inst call_inst(LIR_Op::DictItems, Type::Ptr, key_reg, 0);
+    LIR_Inst call_inst(LIR_Op::DictItems, Type::Ptr, key_reg, 0, 0);
     call_inst.call_args = {dict_reg, index_reg};
     emit_instruction(call_inst);
     set_register_type(key_reg, key_type);
@@ -1306,7 +1307,7 @@ void Generator::emit_dict_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     
     // Increment index
     Reg one_reg = allocate_register();
-    ValuePtr one_val = std::make_shared<Value>(int_type, int64_t(1));
+    Backend::Value one_val = make_i64(1);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, one_val));
     set_register_type(one_reg, int_type);
     
@@ -1350,7 +1351,7 @@ void Generator::emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     // Initialize index to 0
     Reg index_reg = allocate_register();
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-    ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
+    Backend::Value zero_val = make_i64(0);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, zero_val));
     set_register_type(index_reg, int_type);
 
@@ -1363,7 +1364,7 @@ void Generator::emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     // Get list length using element count from AST
     Reg len_reg = allocate_register();
     auto len_type = std::make_shared<::Type>(::TypeTag::Int64);
-    ValuePtr len_val = std::make_shared<Value>(len_type, int64_t(list_expr.elements.size()));
+    Backend::Value len_val = make_i64(list_expr.elements.size());
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, len_val));
     set_register_type(len_reg, len_type);
     
@@ -1395,7 +1396,7 @@ void Generator::emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     
     // Increment index
     Reg one_reg = allocate_register();
-    ValuePtr one_val = std::make_shared<Value>(int_type, int64_t(1));
+    Backend::Value one_val = make_i64(1);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, one_val));
     set_register_type(one_reg, int_type);
     
@@ -1439,7 +1440,7 @@ void Generator::emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM:
     // Initialize index to 0
     Reg index_reg = allocate_register();
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-    ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
+    Backend::Value zero_val = make_i64(0);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, zero_val));
     set_register_type(index_reg, int_type);
 
@@ -1456,7 +1457,7 @@ void Generator::emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM:
     // Extract tuple size from register type
     int64_t tuple_len = tuple_expr.elements.size(); // Default fallback
     
-    ValuePtr len_val = std::make_shared<Value>(len_type, tuple_len);
+    Backend::Value len_val = make_i64(tuple_len);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, len_val));
     set_register_type(len_reg, len_type);
     
@@ -1488,7 +1489,7 @@ void Generator::emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM:
     
     // Increment index
     Reg one_reg = allocate_register();
-    ValuePtr one_val = std::make_shared<Value>(int_type, int64_t(1));
+    Backend::Value one_val = make_i64(1);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, one_val));
     set_register_type(one_reg, int_type);
     
@@ -1544,7 +1545,7 @@ void Generator::emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
     // Initialize index to 0
     Reg index_reg = allocate_register();
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-    ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
+    Backend::Value zero_val = make_i64(0);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, zero_val));
     set_register_type(index_reg, int_type);
 
@@ -1592,7 +1593,7 @@ void Generator::emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
     
     // Increment index
     Reg one_reg = allocate_register();
-    ValuePtr one_val = std::make_shared<Value>(int_type, int64_t(1));
+    Backend::Value one_val = make_i64(1);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, one_val));
     set_register_type(one_reg, int_type);
     
@@ -1633,7 +1634,7 @@ void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt,
     // Initialize index to 0
     Reg index_reg = allocate_register();
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-    ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
+    Backend::Value zero_val = make_i64(0);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, zero_val));
     set_register_type(index_reg, int_type);
 
@@ -1646,11 +1647,11 @@ void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt,
     Reg len_reg = allocate_register();
     auto len_type = std::make_shared<::Type>(::TypeTag::Int64);
     if (tuple_len > 0) {
-        ValuePtr len_val = std::make_shared<Value>(len_type, tuple_len);
+        Backend::Value len_val = make_i64(tuple_len);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, len_val));
     } else {
         // If tuple_len is 0, we can use TupleLen op if available, or assume it is known at runtime
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, std::make_shared<Value>(len_type, int64_t(0))));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, len_reg, make_i64(0)));
     }
     set_register_type(len_reg, len_type);
     
@@ -1682,7 +1683,7 @@ void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt,
     
     // Increment index
     Reg one_reg = allocate_register();
-    ValuePtr one_val = std::make_shared<Value>(int_type, int64_t(1));
+    Backend::Value one_val = make_i64(1);
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, one_val));
     set_register_type(one_reg, int_type);
     
@@ -1892,7 +1893,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
                 Reg tag_reg = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::GetTag, Type::I64, tag_reg, val_reg));
                 Reg expected = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), tag)));
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected, make_i64(tag)));
                 Reg cmp = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::CmpEQ, LIR::Type::Bool, cmp, tag_reg, expected));
                 set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
@@ -1908,7 +1909,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
                     } else {
                         for (size_t v_idx = 0; v_idx < binding->patterns.size(); ++v_idx) {
                             Reg idx_reg = allocate_register();
-                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(v_idx))));
+                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(v_idx)));
                             Reg elem = allocate_register();
                             emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, payload, idx_reg));
                             emit_pattern_match(binding->patterns[v_idx], elem, failure_target);
@@ -1930,7 +1931,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
         Reg len_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, len_reg, val_reg));
         Reg expected_len = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_len, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(list_p->elements.size()))));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_len, make_i64(list_p->elements.size())));
         
         Reg cmp = allocate_register();
         if (list_p->restElement.has_value()) {
@@ -1944,7 +1945,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
 
         for (size_t i = 0; i < list_p->elements.size(); ++i) {
             Reg idx_reg = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(i))));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
             Reg elem = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem, val_reg, idx_reg));
             emit_pattern_match(list_p->elements[i], elem, failure_target);
@@ -1953,7 +1954,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
         Reg len_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::TupleLen, Type::I64, len_reg, val_reg));
         Reg expected_len = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_len, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(tuple_p->elements.size()))));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_len, make_i64(tuple_p->elements.size())));
         
         Reg cmp = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::CmpEQ, LIR::Type::Bool, cmp, len_reg, expected_len));
@@ -1963,7 +1964,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
 
         for (size_t i = 0; i < tuple_p->elements.size(); ++i) {
             Reg idx_reg = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(i))));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
             Reg elem = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, val_reg, idx_reg));
             emit_pattern_match(tuple_p->elements[i], elem, failure_target);
@@ -1973,7 +1974,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             Reg len_reg = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::DictLen, Type::I64, len_reg, val_reg));
             Reg expected_len = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_len, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(dict_p->fields.size()))));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, expected_len, make_i64(dict_p->fields.size())));
             
             Reg cmp = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::CmpEQ, LIR::Type::Bool, cmp, len_reg, expected_len));
@@ -1985,7 +1986,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
         for (const auto& field : dict_p->fields) {
             Reg key_reg = allocate_register();
             auto str_type = std::make_shared<::Type>(::TypeTag::String);
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_reg, std::make_shared<Value>(str_type, field.key)));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_reg, BOX_PTR(lm_box_string(field.key.c_str()))));
             
             Reg exists = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::DictHas, LIR::Type::Bool, exists, val_reg, key_reg));

@@ -1,5 +1,6 @@
 #include "../generator.hh"
 #include "../functions.hh"
+#include "../../backend/vm/constant_utils.hh"
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
 #include "../builtin_functions.hh"
@@ -386,7 +387,7 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
             Type abi_type = Type::I64;
             set_register_language_type(dst, target_type);
             set_register_type(dst, target_type);
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, const_val));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, LM::Backend::VM::compiler_value_to_backend_value(const_val)));
             return dst;
         }
         
@@ -444,7 +445,6 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
                     // If parsing fails, treat as string
                     auto string_type = std::make_shared<::Type>(::TypeTag::String);
                     const_val = std::make_shared<Value>(string_type, stringValue);
-                    current_function_->instructions.back().const_val->type = string_type;
                 }
             } else {
                 // Create integer value - use target type if provided
@@ -513,7 +513,6 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
                     // If parsing fails, treat as string
                     auto string_type = std::make_shared<::Type>(::TypeTag::String);
                     const_val = std::make_shared<Value>(string_type, stringValue);
-                    current_function_->instructions.back().const_val->type = string_type;
                 }
             }
         } else {
@@ -551,9 +550,9 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
             const_val->type = target_type;
         }
         
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, const_val));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, LM::Backend::VM::compiler_value_to_backend_value(const_val)));
     } else {
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, dst, const_val));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, dst, LM::Backend::VM::compiler_value_to_backend_value(const_val)));
     }
     return dst;
 }
@@ -570,7 +569,7 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
             // In Tuple: (lambda_name, capture0, capture1, ...)
             // Captured variables start at index 1
             Reg idx_reg = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)(index + 1))));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(index + 1)));
             
             Type abi_type = Type::I64;
             if (expr.inferred_type) {
@@ -645,7 +644,7 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
             auto func_type = std::make_shared<::Type>(::TypeTag::Function);
             // In our LIR/VM, functions are referred to by name strings
             auto string_type = std::make_shared<::Type>(::TypeTag::String);
-            ValuePtr name_val = std::make_shared<Value>(string_type, expr.name);
+            Backend::Value name_val = BOX_PTR(lm_box_string(expr.name.c_str()));
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, func_reg, name_val));
             set_register_language_type(func_reg, func_type);
             set_register_abi_type(func_reg, Type::Ptr);
@@ -702,7 +701,7 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
 
     if (expr.parts.empty()) {
         Reg result = allocate_register();
-        ValuePtr result_val = std::make_shared<Value>(string_type, std::string(""));
+        Backend::Value result_val = BOX_PTR(lm_box_string(""));
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, result, result_val));
         set_register_language_type(result, string_type);
         return result;
@@ -724,7 +723,7 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
     // Constant folding: if all parts are string literals, fold them
     if (all_parts_are_string_literals) {
         Reg result = allocate_register();
-        ValuePtr result_val = std::make_shared<Value>(string_type, folded_result);
+        Backend::Value result_val = BOX_PTR(lm_box_string(folded_result.c_str()));
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, result, result_val));
         set_register_language_type(result, string_type);
         return result;
@@ -749,7 +748,7 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
     // Emit STR_FORMAT instruction
     Reg result = allocate_register();
     Reg format_reg = allocate_register();
-    ValuePtr format_val = std::make_shared<Value>(string_type, format_string);
+    Backend::Value format_val = BOX_PTR(lm_box_string(format_string.c_str()));
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, format_reg, format_val));
     
     // Handle multiple arguments by chaining STR_FORMAT calls
@@ -905,9 +904,8 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
             f_right = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::Cast, Type::F64, f_right, right, 0));
         }
-        LIR_Inst call_inst(LIR_Op::CallBuiltin, Type::F64, res, 0);
+        LIR_Inst call_inst(LIR_Op::CallBuiltin, Type::F64, res, 0, 0);
         call_inst.func_name = "pow";
-        call_inst.call_args = {f_left, f_right};
         emit_instruction(call_inst);
         set_register_type(res, float_type);
         return res;
@@ -1115,7 +1113,7 @@ Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
         // Logical NOT - compare with true and negate (operand != true gives us !operand)
         Reg true_reg = allocate_register();
         auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);
-        ValuePtr true_val = std::make_shared<Value>(bool_type, true);
+        Backend::Value true_val = VAL_TRUE;
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Bool, true_reg, true_val));
         set_register_type(true_reg, bool_type);
         emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, dst, operand, true_reg));
@@ -1126,7 +1124,7 @@ Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
         set_register_type(dst, result_type);
         // Bitwise NOT - XOR with all bits set (for 64-bit: -1)
         Reg all_bits = allocate_register();
-        ValuePtr neg_one_val = std::make_shared<Value>(int_type, static_cast<int64_t>(-1));
+        Backend::Value neg_one_val = make_i64(-1);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, all_bits, neg_one_val));
         set_register_type(all_bits, int_type);
         emit_instruction(LIR_Inst(LIR_Op::Xor, dst, operand, all_bits));
@@ -1276,7 +1274,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     for (size_t i = 0; i < expr.arguments.size(); ++i) {
                         Reg arg_reg = emit_expr(*expr.arguments[i]);
                         Reg idx_reg = allocate_register();
-                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)i)));
+                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
                         emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, payload_reg, idx_reg, arg_reg));
                     }
                 }
@@ -1316,7 +1314,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                         val_reg = emit_expr(*field->defaultValue);
                     } else {
                         val_reg = allocate_register();
-                        ValuePtr nil_val = std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Nil), "");
+                        Backend::Value nil_val = VAL_NIL;
                         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, val_reg, nil_val));
                     }
                     emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, frame_reg, static_cast<uint32_t>(i), val_reg));
@@ -1361,7 +1359,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                         } else {
                             // Fallback to nil if missing required parameter (type checker should have caught this)
                             Reg nil_reg = allocate_register();
-                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Nil), "")));
+                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, VAL_NIL));
                             arg_regs.push_back(nil_reg);
                         }
                     }
@@ -1383,7 +1381,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                                 arg_regs.push_back(emit_expr(*init->optionalParams[i].second.second));
                             } else {
                                 Reg nil_reg = allocate_register();
-                                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Nil), "")));
+                                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, VAL_NIL));
                                 arg_regs.push_back(nil_reg);
                             }
                         }
@@ -1610,7 +1608,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                         // Store each argument in the tuple
                         for (size_t i = 0; i < arg_regs.size(); ++i) {
                             Reg idx_reg = allocate_register();
-                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), static_cast<int64_t>(i))));
+                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
                             emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Ptr, tuple_reg, idx_reg, arg_regs[i]));
                         }
                         
@@ -2325,7 +2323,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         Reg method_marker = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, method_marker, 
-                                std::make_shared<Value>(int_type, int64_t(1)))); // Append marker
+                                make_i64(1))); // Append marker
         set_register_type(method_marker, int_type);
         return method_marker;
     }
@@ -2335,7 +2333,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         Reg method_marker = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, method_marker, 
-                                std::make_shared<Value>(int_type, int64_t(2)))); // Len marker
+                                make_i64(2))); // Len marker
         set_register_type(method_marker, int_type);
         return method_marker;
     }
@@ -2348,7 +2346,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         // Access first element of tuple (index 0)
         Reg index_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-        ValuePtr zero_val = std::make_shared<Value>(int_type, int64_t(0));
+        Backend::Value zero_val = make_i64(0);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, zero_val));
         set_register_type(index_reg, int_type);
         
@@ -2362,7 +2360,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         // Access second element of tuple (index 1)
         Reg index_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-        ValuePtr one_val = std::make_shared<Value>(int_type, int64_t(1));
+        Backend::Value one_val = make_i64(1);
        // std::cout << "[DEBUG] Emitting Dict value: "<< std::endl;
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, one_val));
         set_register_type(index_reg, int_type);
@@ -2442,7 +2440,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         Reg method_marker = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, method_marker, 
-                                std::make_shared<Value>(int_type, int64_t(-1)))); // Special marker
+                                make_i64(-1))); // Special marker
         set_register_type(method_marker, int_type);
         return method_marker;
     }
@@ -2467,7 +2465,7 @@ Reg Generator::emit_tuple_expr(LM::Frontend::AST::TupleExpr& expr) {
         Reg element_reg = emit_expr(*expr.elements[i]);
         Reg index_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
-        ValuePtr index_val = std::make_shared<Value>(int_type, int64_t(i));
+        Backend::Value index_val = make_i64(i);
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, index_val));
         set_register_type(index_reg, int_type);
         emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, tuple_reg, index_reg, element_reg));
@@ -2526,7 +2524,7 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
     // Create the lambda/closure object
     Reg func_reg = allocate_register();
     auto string_type = std::make_shared<::Type>(::TypeTag::String);
-    ValuePtr name_val = std::make_shared<Value>(string_type, lambda_name);
+    Backend::Value name_val = BOX_PTR(lm_box_string(lambda_name.c_str()));
     Reg name_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, name_reg, name_val));
 
@@ -2541,7 +2539,7 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
         
         // Set lambda name at index 0
         Reg zero_idx = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_idx, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)0)));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_idx, make_i64(0)));
         emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, closure_tuple, zero_idx, name_reg));
 
         // Set captured variables
@@ -2554,7 +2552,7 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
                     if (it != current_lambda_captures_.end()) {
                         size_t inner_idx = std::distance(current_lambda_captures_.begin(), it);
                         Reg inner_idx_reg = allocate_register();
-                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, inner_idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)(inner_idx + 1))));
+                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, inner_idx_reg, make_i64((int64_t)(inner_idx + 1))));
                         
                         val_reg = allocate_register();
                         emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::I64, val_reg, env_register_, inner_idx_reg));
@@ -2565,7 +2563,7 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
             if (val_reg == UINT32_MAX) continue;
 
             Reg idx_reg = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, std::make_shared<Value>(std::make_shared<::Type>(::TypeTag::Int64), (int64_t)(i + 1))));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64((int64_t)(i + 1))));
             emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, closure_tuple, idx_reg, val_reg));
         }
         
