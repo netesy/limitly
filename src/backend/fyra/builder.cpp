@@ -46,9 +46,15 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     builder_->setInsertPoint(entry_bb);
 
     std::unordered_map<uint32_t, ir::BasicBlock*> block_map;
-    for (const auto& inst : lir_func.instructions) {
-        if (inst.op == LIR::LIR_Op::Label) {
-            block_map[inst.imm] = builder_->createBasicBlock("label_" + std::to_string(inst.imm), main_fn);
+    if (lir_func.cfg && !lir_func.cfg->blocks.empty()) {
+        for (const auto& block : lir_func.cfg->blocks) {
+            block_map[block->id] = builder_->createBasicBlock(block->label.empty() ? "block_" + std::to_string(block->id) : block->label, main_fn);
+        }
+    } else {
+        for (const auto& inst : lir_func.instructions) {
+            if (inst.op == LIR::LIR_Op::Label) {
+                block_map[inst.imm] = builder_->createBasicBlock("label_" + std::to_string(inst.imm), main_fn);
+            }
         }
     }
 

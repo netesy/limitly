@@ -23,7 +23,7 @@ run_aot_windows_test() {
     TOTAL=$((TOTAL + 1))
     echo "Running Windows AOT Test: $source_file..."
     local exe_file="${source_file%.lm}.exe"
-    ./bin/limitly build windows x86_64 2 "$source_file" > /dev/null 2>&1
+    ./bin/limitly build -target windows -arch x86_64 -O 2 "$source_file" > /dev/null 2>&1
     if [ ! -f "$exe_file" ]; then
         echo "  FAIL: $source_file (AOT compilation failed)"
         FAILED=$((FAILED + 1))

@@ -214,7 +214,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             case LIR::LIR_Op::Return:
             case LIR::LIR_Op::Ret: {
-                if (pc->op == LIR::LIR_Op::Ret) registers[0] = registers[pc->a];
+                if (pc->op == LIR::LIR_Op::Ret) {
+                    registers[0] = registers[pc->a];
+                }
                 return;
             }
             default:
