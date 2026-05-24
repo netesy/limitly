@@ -1,174 +1,100 @@
-// builder.cpp - LIR to Fyra IR Conversion Builder implementation
+// builder.cpp - LIR to Fyra IR Conversion Implementation
 #include "builder.hh"
+#include "../../lir/lir.hh"
+#include "ir/Module.h"
+#include "ir/Function.h"
+#include "ir/IRBuilder.h"
+#include "ir/IRContext.h"
+#include "ir/Type.h"
+#include "ir/Value.h"
+#include "ir/Constant.h"
 #include "fyra_builtin_functions.hh"
-#include "ir/PhiNode.h"
-#include "runtime/runtime.h"
-#include <iostream>
-#include <string>
+#include "../../runtime/runtime_value_base.h"
+#include "../../runtime/runtime.h"
 #include <unordered_map>
-#include <set>
+#include <string>
+#include <vector>
 
 namespace LM::Backend::Fyra {
 
 LIRToFyraIRBuilder::LIRToFyraIRBuilder(std::shared_ptr<ir::IRContext> context)
-    : context_(context) {}
-
-std::string LIRToFyraIRBuilder::generate_label() {
-    return "L" + std::to_string(label_counter_++);
+    : context_(context), builder_(std::make_unique<ir::IRBuilder>(context)) {
 }
 
 ir::Type* LIRToFyraIRBuilder::lir_type_to_fyra_type(LIR::Type lir_type) {
     switch (lir_type) {
-        case LIR::Type::I32: return context_->getIntegerType(32);
-        case LIR::Type::I64: return context_->getIntegerType(64);
-        case LIR::Type::F64: return context_->getDoubleType();
-        case LIR::Type::Bool: return context_->getIntegerType(64);
-        case LIR::Type::Ptr: return context_->getPointerType(context_->getIntegerType(8));
         case LIR::Type::Void: return context_->getVoidType();
+        case LIR::Type::I64:
+        case LIR::Type::Bool: return context_->getIntegerType(64);
+        case LIR::Type::F64: return context_->getDoubleType();
+        case LIR::Type::Ptr: return context_->getPointerType(context_->getIntegerType(8));
         default: return context_->getIntegerType(64);
     }
 }
 
+std::string LIRToFyraIRBuilder::generate_label() {
+    return "label_" + std::to_string(label_counter_++);
+}
+
 std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& lir_func) {
-    current_module_ = context_->createModule("limit_lir_module");
-    builder_ = std::make_unique<ir::IRBuilder>(context_);
+    current_module_ = std::make_shared<ir::Module>(lir_func.name, context_);
     builder_->setModule(current_module_.get());
-    errors_.clear();
     used_builtins_.clear();
 
-    ir::Function* main_fn = builder_->createFunction(lir_func.name.empty() ? "main" : lir_func.name, context_->getIntegerType(64));
-    main_fn->setExported(true);
+    ir::Function* main_fn = builder_->createFunction(lir_func.name, context_->getIntegerType(64));
+    ir::BasicBlock* entry_bb = builder_->createBasicBlock("entry", main_fn);
+    builder_->setInsertPoint(entry_bb);
 
-    // 1. Identify all jump targets
-    std::set<uint32_t> jump_targets;
+    std::unordered_map<uint32_t, ir::BasicBlock*> block_map;
     for (const auto& inst : lir_func.instructions) {
-        if (inst.op == LIR::LIR_Op::Jump || inst.op == LIR::LIR_Op::JumpIf || inst.op == LIR::LIR_Op::JumpIfFalse) {
-            jump_targets.insert(inst.imm);
+        if (inst.op == LIR::LIR_Op::Label) {
+            block_map[inst.imm] = builder_->createBasicBlock("label_" + std::to_string(inst.imm), main_fn);
         }
     }
 
-    // 2. Pre-create basic blocks for targets
-    std::unordered_map<uint32_t, ir::BasicBlock*> block_map;
-    for (uint32_t target_idx : jump_targets) {
-        block_map[target_idx] = builder_->createBasicBlock("L" + std::to_string(target_idx), main_fn);
-    }
-
-    ir::BasicBlock* entry = builder_->createBasicBlock("entry", main_fn);
-    builder_->setInsertPoint(entry);
-
-    std::unordered_map<LIR::Reg, ir::Instruction*> register_slots;
-    auto ensure_slot = [&](LIR::Reg reg, LIR::Type type) -> ir::Instruction* {
-        auto it = register_slots.find(reg);
-        if (it != register_slots.end()) return it->second;
-        ir::Type* slot_type = lir_type_to_fyra_type(type);
-        if (slot_type->isVoidTy()) slot_type = context_->getIntegerType(64);
-        ir::Instruction* slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), slot_type);
-        slot->setName("r" + std::to_string(reg));
-        register_slots[reg] = slot;
-        return slot;
+    std::unordered_map<uint32_t, ir::Value*> regs;
+    auto load_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
+        if (regs.count(r)) return regs[r];
+        ir::Type* fty = lir_type_to_fyra_type(t);
+        if (fty->isIntegerTy()) {
+            return context_->getConstantInt(static_cast<ir::IntegerType*>(fty), 0);
+        }
+        return context_->getConstantInt(context_->getIntegerType(64), 0);
     };
-    auto load_reg = [&](LIR::Reg reg, LIR::Type type) -> ir::Value* {
-        return builder_->createLoad(ensure_slot(reg, type));
-    };
-    auto store_reg = [&](LIR::Reg reg, ir::Value* value, LIR::Type type) {
-        builder_->createStore(value, ensure_slot(reg, type));
+    auto store_reg = [&](uint32_t r, ir::Value* v, LIR::Type t) {
+        regs[r] = v;
     };
 
     bool terminated = false;
-    for (size_t i = 0; i < lir_func.instructions.size(); ++i) {
-        if (terminated) break;
-        const auto& inst = lir_func.instructions[i];
-
-        if (block_map.count((uint32_t)i)) {
-            ir::BasicBlock* next_bb = block_map[(uint32_t)i];
-            if (!builder_->getInsertPoint()->getInstructions().empty()) {
-                auto last_opcode = builder_->getInsertPoint()->getInstructions().back()->getOpcode();
-                if (last_opcode != ir::Instruction::Jmp && last_opcode != ir::Instruction::Br && last_opcode != ir::Instruction::Ret) {
-                     builder_->createJmp(next_bb);
-                }
-            } else {
-                 builder_->createJmp(next_bb);
-            }
-            builder_->setInsertPoint(next_bb);
+    for (const auto& inst : lir_func.instructions) {
+        if (inst.op == LIR::LIR_Op::Label) {
+            if (!terminated && builder_->getInsertPoint()) builder_->createJmp(block_map[inst.imm]);
+            builder_->setInsertPoint(block_map[inst.imm]);
+            terminated = false;
+            continue;
         }
 
+        if (terminated) continue;
+
         switch (inst.op) {
-            case LIR::LIR_Op::Label: break;
+            case LIR::LIR_Op::Mov:
+                store_reg(inst.dst, load_reg(inst.a, inst.type_a), inst.result_type);
+                break;
             case LIR::LIR_Op::LoadConst: {
                 ir::Value* c = nullptr;
                 LmValue val = inst.const_val;
-                if (IS_INT(val)) {
-                    c = context_->getConstantInt(context_->getIntegerType(64), (long long)UNBOX_INT(val));
-                } else if (IS_BOOL(val)) {
-                    c = context_->getConstantInt(context_->getIntegerType(64), UNBOX_BOOL(val) ? 1 : 0);
-                } else if (IS_NIL(val)) {
-                    c = context_->getConstantInt(context_->getIntegerType(64), 0);
-                } else if (IS_PTR(val)) {
-                    ObjHeader* h = (ObjHeader*)UNBOX_PTR(val);
-                    if (h->type_id == TYPE_FLOAT) {
-                        c = context_->getConstantFP(context_->getDoubleType(), ((::ObjFloat*)h)->value);
-                    } else if (h->type_id == TYPE_BOX) {
-                        ::LmBox* box = (::LmBox*)h;
-                        if (box->type == LM_BOX_FLOAT) {
-                            c = context_->getConstantFP(context_->getDoubleType(), box->value.as_float);
-                        } else if (box->type == LM_BOX_STRING) {
-                            used_builtins_.insert("lm_box_string");
-                            ir::Function* box_string = current_module_->getFunction("lm_box_string");
-                            if (!box_string) box_string = builder_->createFunction("lm_box_string", context_->getPointerType(context_->getIntegerType(8)), {context_->getPointerType(context_->getIntegerType(8))});
-                            ir::Value* str_const = context_->getConstantString((char*)box->value.as_ptr);
-                            std::string name = "$str_" + std::to_string(label_counter_++);
-                            auto gv = std::make_unique<ir::GlobalVariable>(context_->getPointerType(context_->getIntegerType(8)), name, static_cast<ir::Constant*>(str_const), false, ".data");
-                            ir::GlobalVariable* gv_ptr = gv.get();
-                            current_module_->addGlobalVariable(std::move(gv));
-                            c = builder_->createCall(box_string, {gv_ptr});
-                        } else {
-                            c = context_->getConstantInt(context_->getIntegerType(64), 0);
-                        }
-                    } else {
-                         c = context_->getConstantInt(context_->getIntegerType(64), 0);
-                    }
-                } else {
-                    c = context_->getConstantInt(context_->getIntegerType(64), 0);
-                }
+                if (IS_INT(val)) c = context_->getConstantInt(context_->getIntegerType(64), UNBOX_INT(val));
+                else if (IS_PTR(val)) c = context_->getConstantInt(context_->getIntegerType(64), (uintptr_t)UNBOX_PTR(val));
+                else c = context_->getConstantInt(context_->getIntegerType(64), val);
                 store_reg(inst.dst, c, inst.result_type);
                 break;
             }
-                store_reg(inst.dst, load_reg(inst.a, inst.type_a), inst.result_type);
-                break;
-            case LIR::LIR_Op::Add:
-            case LIR::LIR_Op::DecAdd:
-                store_reg(inst.dst, builder_->createAdd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
-                break;
-            case LIR::LIR_Op::Sub:
-            case LIR::LIR_Op::DecSub:
-                store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
-                break;
-            case LIR::LIR_Op::Mul:
-                store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
-                break;
-            case LIR::LIR_Op::DecMul: {
-                // Fyra-level multiplication for decimals is more complex due to scaling
-                // For now, use simple MUL but this needs proper scaling in AOT later
-                store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
-                break;
-            }
-            case LIR::LIR_Op::Div:
-                store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
-                break;
-            case LIR::LIR_Op::DecDiv: {
-                store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
-                break;
-            }
-            case LIR::LIR_Op::Mod:
-            case LIR::LIR_Op::DecMod:
-                store_reg(inst.dst, builder_->createRem(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
-                break;
-            case LIR::LIR_Op::Neg:
-            case LIR::LIR_Op::DecNeg:
-                store_reg(inst.dst, builder_->createNeg(load_reg(inst.a, inst.type_a)), inst.result_type);
-                break;
+            case LIR::LIR_Op::Add: store_reg(inst.dst, builder_->createAdd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::Sub: store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::Mul: store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::Div: store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::And: store_reg(inst.dst, builder_->createAnd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::Or: store_reg(inst.dst, builder_->createOr(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::Or:  store_reg(inst.dst, builder_->createOr(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Xor: store_reg(inst.dst, builder_->createXor(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::CmpEQ: store_reg(inst.dst, builder_->createCeq(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::CmpNEQ: store_reg(inst.dst, builder_->createCne(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
@@ -177,8 +103,10 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             case LIR::LIR_Op::CmpGT: store_reg(inst.dst, builder_->createCsgt(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::CmpGE: store_reg(inst.dst, builder_->createCsge(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Jump: {
-                if (block_map.count(inst.imm)) builder_->createJmp(block_map[inst.imm]);
-                else errors_.push_back("Jump to unknown index: " + std::to_string(inst.imm));
+                if (block_map.count(inst.imm)) {
+                    builder_->createJmp(block_map[inst.imm]);
+                    terminated = true;
+                } else errors_.push_back("Jump to unknown label ID: " + std::to_string(inst.imm));
                 break;
             }
             case LIR::LIR_Op::JumpIf:
@@ -189,7 +117,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                     if (inst.op == LIR::LIR_Op::JumpIfFalse) builder_->createBr(cond, fallthrough, block_map[inst.imm]);
                     else builder_->createBr(cond, block_map[inst.imm], fallthrough);
                     builder_->setInsertPoint(fallthrough);
-                } else errors_.push_back("Cond jump to unknown index: " + std::to_string(inst.imm));
+                } else errors_.push_back("Cond jump to unknown label ID: " + std::to_string(inst.imm));
                 break;
             }
             case LIR::LIR_Op::Call:
@@ -198,8 +126,8 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                 if (name.empty() && inst.const_val) {
                     if (IS_PTR(inst.const_val)) {
                         ObjHeader* h = (ObjHeader*)UNBOX_PTR(inst.const_val);
-                        if (h->type_id == TYPE_BOX && ((::LmBox*)h)->type == LM_BOX_STRING) {
-                            name = (char*)((::LmBox*)h)->value.as_ptr;
+                        if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                            name = (char*)((LmBox*)h)->value.as_ptr;
                         }
                     }
                 }
@@ -215,13 +143,21 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                 if (inst.op == LIR::LIR_Op::Call) store_reg(inst.dst, res, inst.result_type);
                 break;
             }
+            case LIR::LIR_Op::CallIndirect: {
+                std::vector<ir::Value*> args;
+                for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
+                ir::Value* callee = load_reg(inst.a, inst.type_a);
+                ir::Value* res = builder_->createCall(callee, args, lir_type_to_fyra_type(inst.result_type));
+                if (inst.dst != 0) store_reg(inst.dst, res, inst.result_type);
+                break;
+            }
             case LIR::LIR_Op::CallBuiltin: {
                 std::string name = inst.func_name; 
                 if (name.empty() && inst.const_val) {
                     if (IS_PTR(inst.const_val)) {
                         ObjHeader* h = (ObjHeader*)UNBOX_PTR(inst.const_val);
-                        if (h->type_id == TYPE_BOX && ((::LmBox*)h)->type == LM_BOX_STRING) {
-                            name = (char*)((::LmBox*)h)->value.as_ptr;
+                        if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                            name = (char*)((LmBox*)h)->value.as_ptr;
                         }
                     }
                 }

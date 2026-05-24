@@ -30,7 +30,6 @@ std::string RegisterVM::to_string(const RegisterValue& value) const {
     return result;
 }
 
-
 bool RegisterVM::isErrorValue(LIR::Reg reg) const {
     auto& value = registers[reg];
     if (is_integer(value)) {
@@ -104,7 +103,13 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
         if (instruction_count > MAX_INSTRUCTIONS) { std::cerr << "Instruction limit exceeded" << std::endl; return; }
         switch (pc->op) {
             case LIR::LIR_Op::LoadConst: {
-                registers[pc->dst] = pc->const_val;
+                // Use the more robust constant loader logic
+                if (pc->const_val == VAL_NIL) {
+                    registers[pc->dst] = VAL_NIL;
+                } else {
+                    // Assuming const_val is already an LmValue/RegisterValue
+                    registers[pc->dst] = pc->const_val;
+                }
                 break;
             }
             case LIR::LIR_Op::Add:

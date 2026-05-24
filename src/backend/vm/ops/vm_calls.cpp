@@ -47,6 +47,48 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
             }
             break;
         }
+        case LIR::LIR_Op::CallIndirect: {
+            // Register a contains the function object (which currently is just the function pointer/name in our simplified model)
+            RegisterValue func_obj = registers[pc->a];
+            std::string func_name = "";
+            
+            if (IS_PTR(func_obj)) {
+                ObjHeader* h = (ObjHeader*)UNBOX_PTR(func_obj);
+                if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                    func_name = (char*)((LmBox*)h)->value.as_ptr;
+                }
+            }
+            
+            if (!func_name.empty()) {
+                auto& func_manager = LIR::LIRFunctionManager::getInstance();
+                if (func_manager.hasFunction(func_name)) {
+                    auto func = func_manager.getFunction(func_name);
+                    std::vector<RegisterValue> arg_vals;
+                    for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
+
+                    auto saved_registers = registers;
+                    const LIR::LIR_Function* saved_func = current_function_;
+
+                    registers.assign(registers.size(), VAL_NIL);
+                    for (size_t i = 0; i < arg_vals.size() && i < registers.size(); ++i) {
+                        registers[i] = arg_vals[i];
+                    }
+
+                    LIR::LIR_Function temp_wrapper(func->getName(), static_cast<uint32_t>(arg_vals.size()));
+                    temp_wrapper.instructions = func->getInstructions();
+                    current_function_ = &temp_wrapper;
+
+                    execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
+
+                    RegisterValue return_value = registers[0];
+
+                    registers = saved_registers;
+                    current_function_ = saved_func;
+                    registers[pc->dst] = return_value;
+                }
+            }
+            break;
+        }
         default:
             break;
     }
