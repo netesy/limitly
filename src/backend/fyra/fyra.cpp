@@ -110,11 +110,20 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
         std::map<std::string, std::vector<uint8_t>> sections;
         sections[".text"] = generator.getAssembler().getCode();
         sections[".data"] = generator.getRodataAssembler().getCode();
+        std::vector<::codegen::CodeGen::SymbolInfo> syms = generator.getSymbols();
+        ::codegen::CodeGen::SymbolInfo start_sym;
+        start_sym.name = "_start";
+        start_sym.value = 0;
+        start_sym.size = 0;
+        start_sym.type = 2; // STT_FUNC
+        start_sym.binding = 1; // STB_GLOBAL
+        start_sym.sectionName = ".text";
+        syms.push_back(start_sym);
 
         if (options.platform == Platform::Windows) {
             PEGenerator pe_gen(true); // 64-bit
             std::vector<PEGenerator::Symbol> symbols;
-            for (const auto& sym : generator.getSymbols()) {
+            for (const auto& sym : syms) {
                 symbols.push_back({sym.name, sym.value, sym.size, static_cast<uint8_t>(sym.type), static_cast<uint8_t>(sym.binding), sym.sectionName});
             }
             std::vector<PEGenerator::Relocation> relocs;
@@ -130,9 +139,10 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
             ElfGenerator elf_gen(options.output_file);
             elf_gen.setMachine(62); // EM_X86_64
             elf_gen.setBaseAddress(0x400000);
+            elf_gen.setEntryPointName("_start");
 
             std::vector<ElfGenerator::Symbol> symbols;
-            for (const auto& sym : generator.getSymbols()) {
+            for (const auto& sym : syms) {
                 symbols.push_back({sym.name, sym.value, sym.size, static_cast<uint8_t>(sym.type), static_cast<uint8_t>(sym.binding), sym.sectionName});
             }
 
@@ -141,6 +151,7 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
                 relocs.push_back({reloc.offset, reloc.type, reloc.addend, reloc.symbolName, reloc.sectionName});
             }
 
+            for (const auto& sym : symbols) { if (sym.name == "_start") std::cout << "DEBUG: Found _start symbol in vector at " << sym.value << std::endl; }
             if (!elf_gen.generateFromCode(sections, symbols, relocs, options.output_file)) {
                 result.success = false;
                 result.error_message = "ELF generation failed: " + elf_gen.getLastError();

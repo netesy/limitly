@@ -80,7 +80,6 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             std::cout << "\n";
         }
 
-      //  std::cout << "[DEBUG] Starting LIR generation..." << std::endl;
         LIR::Generator lir_generator;
         lir_generator.set_import_aliases(post_opt_type_check.import_aliases);
         lir_generator.set_registered_modules(post_opt_type_check.registered_modules);
@@ -90,7 +89,6 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             std::cerr << "[ERROR] LIR generation failed" << std::endl;
             return 1;
         }
-        // std::cout << "[DEBUG] LIR generation complete. Instructions: " << lir_function->instructions.size() << std::endl;
 
         if (options.print_lir) {
              std::cout << "\n=== Final LIR ===\n";
@@ -113,7 +111,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             auto ir_context = std::make_shared<ir::IRContext>();
             LM::Backend::Fyra::LIRToFyraIRBuilder builder(ir_context);
             auto fyra_ir_module = builder.build(*lir_function);
-            if (!fyra_ir_module || builder.has_errors()) return 1;
+            if (!fyra_ir_module || builder.has_errors()) { std::cerr << "LIR to Fyra IR lowering failed" << std::endl; for (const auto& err : builder.get_errors()) std::cerr << "  Error: " << err << std::endl; return 1; }
 
             if (options.print_fyra_ir) {
                 for (const auto& func : fyra_ir_module->getFunctions()) { if (func) { func->print(std::cout); std::cout << "\n"; } }
@@ -130,6 +128,9 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             fyra_options.output_file = options.output_file;
 
             auto result = fyra.compile(*lir_function, fyra_options);
+            if (!result.success) {
+                std::cerr << "AOT Compilation Error: " << result.error_message << std::endl;
+            }
             return result.success ? 0 : 1;
 #else
             std::cerr << "Error: Fyra backend not available. AOT/WASM compilation is disabled.\n";
@@ -137,10 +138,8 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             return 1;
 #endif
         } else {
-            // std::cout << "[DEBUG] Starting VM execution..." << std::endl;
             LM::Backend::VM::Register::RegisterVM register_vm;
             register_vm.execute_function(*lir_function);
-            // std::cout << "[DEBUG] VM execution complete." << std::endl;
         }
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

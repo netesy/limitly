@@ -59,7 +59,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/parser/statements.cpp src/frontend/parser/expressions.cpp \
               src/frontend/parser/types.cpp src/frontend/parser/patterns.cpp \
               src/frontend/cst.cpp src/frontend/cst/printer.cpp src/frontend/cst/utils.cpp \
-              src/frontend/ast/builder.cpp src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp \
+              src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp
 
 BACK_SRCS := $(if $(shell [ -d "vendor/fyra" ] && echo yes),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp,)
@@ -483,9 +483,9 @@ aot-tests: $(PLATFORM)
 		fi; \
 		rm -f "$$EXE_FILE"; \
 		if [ "$(PLATFORM)" = "windows" ]; then \
-			./bin/limitly.exe build windows x86_64 2 "$$SOURCE_FILE"; \
+			./bin/limitly.exe build -target windows -arch x86_64 -O 2 "$$SOURCE_FILE"; \
 		else \
-			./bin/limitly build linux x86_64 2 "$$SOURCE_FILE"; \
+			./bin/limitly build -target linux -arch x86_64 -O 2 "$$SOURCE_FILE"; \
 		fi; \
 		BUILD_STATUS=$$?; \
 		if [ $$BUILD_STATUS -ne 0 ]; then \
