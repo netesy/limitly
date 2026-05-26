@@ -229,7 +229,108 @@ enum class LIR_Op : uint8_t {
     SharedCellLoad,     // Load value from SharedCell (reg = shared_cells[cell_id].value)
     SharedCellStore,    // Store value to SharedCell (shared_cells[cell_id].value = reg)
     SharedCellAdd,      // Atomic add to SharedCell (shared_cells[cell_id].value += reg)
-    SharedCellSub       // Atomic sub from SharedCell (shared_cells[cell_id].value -= reg)
+    SharedCellSub,      // Atomic sub from SharedCell (shared_cells[cell_id].value -= reg)
+    
+    // === FFI OPERATIONS ===
+    
+    // Memory allocation/deallocation
+    FFIAlloc,           // Allocate unmanaged memory: %r = ffi_alloc(size)
+    FFIFree,            // Free unmanaged memory: ffi_free(ptr)
+    FFIRealloc,         // Reallocate unmanaged memory: %r = ffi_realloc(ptr, new_size)
+    
+    // Memory operations
+    FFIMemcpy,          // Copy memory: ffi_memcpy(dest, src, size)
+    FFIMemset,          // Fill memory: ffi_memset(ptr, value, size)
+    FFIMemcmp,          // Compare memory: %r = ffi_memcmp(ptr1, ptr2, size)
+    
+    // Pointer arithmetic
+    FFIAddPtr,          // Add offset to pointer: %r = ptr_add(ptr, offset)
+    FFISubPtr,          // Subtract offset from pointer: %r = ptr_sub(ptr, offset)
+    FFIPtrDiff,         // Pointer difference: %r = ptr_diff(ptr1, ptr2)
+    FFIAlignPtr,        // Align pointer: %r = ptr_align(ptr, alignment)
+    FFIIsAligned,       // Check alignment: %r = ptr_is_aligned(ptr, alignment)
+    
+    // Load operations for primitive types
+    FFILoadInt8,        // Load 8-bit signed: %r = ffi_load_int8(ptr)
+    FFILoadUInt8,       // Load 8-bit unsigned: %r = ffi_load_uint8(ptr)
+    FFILoadInt16,       // Load 16-bit signed: %r = ffi_load_int16(ptr)
+    FFILoadUInt16,      // Load 16-bit unsigned: %r = ffi_load_uint16(ptr)
+    FFILoadInt32,       // Load 32-bit signed: %r = ffi_load_int32(ptr)
+    FFILoadUInt32,      // Load 32-bit unsigned: %r = ffi_load_uint32(ptr)
+    FFILoadInt64,       // Load 64-bit signed: %r = ffi_load_int64(ptr)
+    FFILoadUInt64,      // Load 64-bit unsigned: %r = ffi_load_uint64(ptr)
+    FFILoadFloat,       // Load float: %r = ffi_load_float(ptr)
+    FFILoadDouble,      // Load double: %r = ffi_load_double(ptr)
+    FFILoadPtr,         // Load pointer: %r = ffi_load_ptr(ptr)
+    
+    // Store operations for primitive types
+    FFIStoreInt8,       // Store 8-bit signed: ffi_store_int8(ptr, value)
+    FFIStoreUInt8,      // Store 8-bit unsigned: ffi_store_uint8(ptr, value)
+    FFIStoreInt16,      // Store 16-bit signed: ffi_store_int16(ptr, value)
+    FFIStoreUInt16,     // Store 16-bit unsigned: ffi_store_uint16(ptr, value)
+    FFIStoreInt32,      // Store 32-bit signed: ffi_store_int32(ptr, value)
+    FFIStoreUInt32,     // Store 32-bit unsigned: ffi_store_uint32(ptr, value)
+    FFIStoreInt64,      // Store 64-bit signed: ffi_store_int64(ptr, value)
+    FFIStoreUInt64,     // Store 64-bit unsigned: ffi_store_uint64(ptr, value)
+    FFIStoreFloat,      // Store float: ffi_store_float(ptr, value)
+    FFIStoreDouble,     // Store double: ffi_store_double(ptr, value)
+    FFIStorePtr,        // Store pointer: ffi_store_ptr(ptr, value)
+    
+    // CString operations
+    FFIToCString,       // Convert Limitly string to C string: %r = string_to_cstring(s)
+    FFIFromCString,     // Convert C string to Limitly string: %r = cstring_to_string(ptr)
+    FFIFreeCString,     // Free C string: cstring_free(cstring)
+    FFICStringPtr,      // Get C string pointer: %r = cstring_as_ptr(cstring)
+    FFICStringFromPtr,  // Create C string from pointer: %r = cstring_from_ptr(ptr, take_ownership)
+    
+    // Buffer operations
+    FFIBufferAlloc,     // Allocate buffer: %r = buffer_alloc(capacity)
+    FFIBufferFromPtr,   // Create buffer from pointer: %r = buffer_from_ptr(ptr, size, take_ownership)
+    FFIBufferFree,      // Free buffer: buffer_free(buf)
+    FFIBufferResize,    // Resize buffer: %r = buffer_resize(buf, new_capacity)
+    FFIBufferRead,      // Read from buffer: %r = buffer_read_type(buf, offset)
+    FFIBufferWrite,     // Write to buffer: %r = buffer_write_type(buf, offset, value)
+    FFIBufferSize,      // Get buffer size: %r = buffer_size(buf)
+    FFIBufferCapacity,  // Get buffer capacity: %r = buffer_capacity(buf)
+    FFIBufferAsPtr,     // Get buffer pointer: %r = buffer_as_ptr(buf)
+    
+    // Function pointer operations
+    FFICallPtr,         // Call function by pointer: %r = ffi_call_ptr(func_ptr, ...)
+    FFICallPtr0,        // Call with 0 args: %r = ffi_call_ptr(func_ptr)
+    FFICallPtr1,        // Call with 1 arg: %r = ffi_call_ptr1(func_ptr, arg1)
+    FFICallPtr2,        // Call with 2 args: %r = ffi_call_ptr2(func_ptr, arg1, arg2)
+    FFICallPtr3,        // Call with 3 args: %r = ffi_call_ptr3(func_ptr, arg1, arg2, arg3)
+    FFICallPtr4,        // Call with 4 args: %r = ffi_call_ptr4(func_ptr, arg1, arg2, arg3, arg4)
+    FFICallPtr5,        // Call with 5 args: %r = ffi_call_ptr5(func_ptr, arg1, arg2, arg3, arg4, arg5)
+    
+    // Library operations
+    FFILibraryLoad,     // Load dynamic library: %r = library_load(path)
+    FFILibraryUnload,   // Unload dynamic library: library_unload(lib)
+    FFILibraryGetSymbol,// Get symbol from library: %r = library_get_symbol(lib, symbol)
+    
+    // Callback registration
+    FFIRegisterCallback,// Register callback: %r = register_callback(func)
+    FFIUnregisterCallback, // Unregister callback: unregister_callback(callback_id)
+    FFIGetCallbackPtr,  // Get callback pointer: %r = get_callback_ptr(callback_id)
+    
+    // C call frame operations
+    FFICCallFrameCreate, // Create C call frame: %r = ccall_frame_create(register_count, stack_arg_size)
+    FFICCallFrameDestroy, // Destroy C call frame: ccall_frame_destroy(frame)
+    FFICCallFrameSetReg, // Set register in call frame: ccall_frame_set_register(frame, reg_index, value)
+    FFICCallFrameGetReg, // Get register from call frame: %r = ccall_frame_get_register(frame, reg_index)
+    FFICCallFrameSetStackArg, // Set stack argument: ccall_frame_set_stack_arg(frame, offset, value)
+    FFICCallFrameGetStackArg, // Get stack argument: %r = ccall_frame_get_stack_arg(frame, offset)
+    
+    // VM state management for FFI
+    FFIVMSave,          // Save VM state: %r = vm_state_save()
+    FFIVMRestore,       // Restore VM state: vm_state_restore(state)
+    FFICCallExecute,    // Execute C call with VM state: %r = ccall_execute(func_ptr, frame)
+    
+    // Struct layout operations
+    FFICalcStructLayout, // Calculate struct layout: %r = calculate_struct_layout(field_sizes, field_alignments)
+    
+    // ABI information
+    FFIGetABIInfo       // Get ABI information: %r = get_abi_info()
 };
 
 // Source location for debugging

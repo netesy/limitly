@@ -14,6 +14,7 @@
 #include "../register_value.hh"
 #include "../../runtime/runtime.h"
 #include "../../runtime/runtime_value.h"
+#include "callstack.hh"
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -75,6 +76,7 @@ private:
     void execute_strings(const LIR::LIR_Inst* pc);
     void execute_calls(const LIR::LIR_Inst* pc);
     void execute_cast(const LIR::LIR_Inst* pc);
+    void execute_ffi(const LIR::LIR_Inst* pc);
 
     std::vector<RegisterValue> registers;
     
@@ -110,6 +112,10 @@ private:
     std::atomic<uint64_t> work_queue_counter{0};
     
     std::vector<RegisterValue> argument_stack;
+    
+    // Call stack and VM state management for FFI
+    CallStack call_stack;
+    VMStateManager vm_state_manager;
 
     static constexpr uint64_t MAX_INSTRUCTIONS = 1000000000;
     uint64_t instruction_count = 0;

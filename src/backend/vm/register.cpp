@@ -209,6 +209,63 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::Cast:
                 execute_cast(pc);
                 break;
+            case LIR::LIR_Op::FFIAlloc:
+            case LIR::LIR_Op::FFIFree:
+            case LIR::LIR_Op::FFIRealloc:
+            case LIR::LIR_Op::FFIMemcpy:
+            case LIR::LIR_Op::FFIMemset:
+            case LIR::LIR_Op::FFIMemcmp:
+            case LIR::LIR_Op::FFIAddPtr:
+            case LIR::LIR_Op::FFISubPtr:
+            case LIR::LIR_Op::FFIPtrDiff:
+            case LIR::LIR_Op::FFIAlignPtr:
+            case LIR::LIR_Op::FFIIsAligned:
+            case LIR::LIR_Op::FFILoadInt8:
+            case LIR::LIR_Op::FFILoadUInt8:
+            case LIR::LIR_Op::FFILoadInt16:
+            case LIR::LIR_Op::FFILoadUInt16:
+            case LIR::LIR_Op::FFILoadInt32:
+            case LIR::LIR_Op::FFILoadUInt32:
+            case LIR::LIR_Op::FFILoadInt64:
+            case LIR::LIR_Op::FFILoadUInt64:
+            case LIR::LIR_Op::FFILoadFloat:
+            case LIR::LIR_Op::FFILoadDouble:
+            case LIR::LIR_Op::FFILoadPtr:
+            case LIR::LIR_Op::FFIStoreInt8:
+            case LIR::LIR_Op::FFIStoreUInt8:
+            case LIR::LIR_Op::FFIStoreInt16:
+            case LIR::LIR_Op::FFIStoreUInt16:
+            case LIR::LIR_Op::FFIStoreInt32:
+            case LIR::LIR_Op::FFIStoreUInt32:
+            case LIR::LIR_Op::FFIStoreInt64:
+            case LIR::LIR_Op::FFIStoreUInt64:
+            case LIR::LIR_Op::FFIStoreFloat:
+            case LIR::LIR_Op::FFIStoreDouble:
+            case LIR::LIR_Op::FFIStorePtr:
+            case LIR::LIR_Op::FFIToCString:
+            case LIR::LIR_Op::FFIFromCString:
+            case LIR::LIR_Op::FFIFreeCString:
+            case LIR::LIR_Op::FFICStringPtr:
+            case LIR::LIR_Op::FFICStringFromPtr:
+            case LIR::LIR_Op::FFILibraryLoad:
+            case LIR::LIR_Op::FFILibraryUnload:
+            case LIR::LIR_Op::FFILibraryGetSymbol:
+            case LIR::LIR_Op::FFIRegisterCallback:
+            case LIR::LIR_Op::FFIUnregisterCallback:
+            case LIR::LIR_Op::FFIGetCallbackPtr:
+            case LIR::LIR_Op::FFICCallFrameCreate:
+            case LIR::LIR_Op::FFICCallFrameDestroy:
+            case LIR::LIR_Op::FFICCallFrameSetReg:
+            case LIR::LIR_Op::FFICCallFrameGetReg:
+            case LIR::LIR_Op::FFICCallFrameSetStackArg:
+            case LIR::LIR_Op::FFICCallFrameGetStackArg:
+            case LIR::LIR_Op::FFIVMSave:
+            case LIR::LIR_Op::FFIVMRestore:
+            case LIR::LIR_Op::FFICCallExecute:
+            case LIR::LIR_Op::FFICalcStructLayout:
+            case LIR::LIR_Op::FFIGetABIInfo:
+                execute_ffi(pc);
+                break;
             case LIR::LIR_Op::Mov:
                 registers[pc->dst] = registers[pc->a];
                 break;
