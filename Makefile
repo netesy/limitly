@@ -106,7 +106,7 @@ LYRA_SRCS := $(wildcard $(LYRA_DIR)/src/*.cpp)
 LYRA_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_SRCS))
 LYRA_BIN := $(BIN_DIR)/lyra$(EXE_EXT)
 
-REGISTER_SRCS := src/backend/vm/register.cpp src/backend/vm/register_helpers.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp
+REGISTER_SRCS := src/backend/vm/register.cpp src/backend/vm/register_helpers.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/ffi.cpp src/backend/callstack.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
                  src/lir/builtin_functions.cpp src/lir/lir_types.cpp src/lir/generator.cpp \
