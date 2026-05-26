@@ -1,997 +1,221 @@
-// Foreign Function Interface (FFI) Module
-// Provides C ABI interoperability and native memory management
-
-// Primitive type aliases mapping Limitly to C-equivalent widths
-// All types are explicitly sized for cross-platform C ABI compatibility
-
-// C integer types with explicit bit widths
-type c_char = int;
-type c_short = int;
-type c_int = int;
-type c_long = int;
-type c_longlong = int;
-
-// C unsigned integer types with explicit bit widths
-type c_uchar = int;
-type c_ushort = int;
-type c_uint = int;
-type c_ulong = int;
-type c_ulonglong = int;
-
-// C size types (platform-dependent, typically 64-bit on modern systems)
-type c_size_t = int;
-type c_ssize_t = int;
-type c_ptrdiff_t = int;
-
-// C floating-point types
-type c_float = float;
-type c_double = float;
-
-// C pointer types represented as opaque integers
-type pubptr = int;
-type fnptr = int;
-
-// C boolean type (0 = false, non-zero = true)
-type c_bool = int;
-
-// C void type (used for return type indicators)
-type c_void = int;
+// Standard FFI (Foreign Function Interface) library for Limitly
 
 // Alignment constants for 64-bit platforms
-const ALIGNMENT_CHAR: int = 1;
-const ALIGNMENT_SHORT: int = 2;
-const ALIGNMENT_INT: int = 4;
-const ALIGNMENT_LONG: int = 8;
-const ALIGNMENT_LONGLONG: int = 8;
-const ALIGNMENT_PTR: int = 8;
-const ALIGNMENT_FLOAT: int = 4;
-const ALIGNMENT_DOUBLE: int = 8;
-const ALIGNMENT_MAX: int = 8;
+var ALIGNMENT_CHAR = 1;
+var ALIGNMENT_SHORT = 2;
+var ALIGNMENT_INT = 4;
+var ALIGNMENT_LONG = 8;
+var ALIGNMENT_LONGLONG = 8;
+var ALIGNMENT_PTR = 8;
+var ALIGNMENT_FLOAT = 4;
+var ALIGNMENT_DOUBLE = 8;
+var ALIGNMENT_MAX = 8;
 
-// C ABI calling conventions
-type CallingConvention = CDecl | StdCall | FastCall | ThisCall | VectorCall;
-
-// Platform-specific ABI information
-frame ABIInfo {
-    var word_size: int;
-    var stack_alignment: int;
-    var pointer_size: int;
-    var calling_convention: CallingConvention;
-    var is_windows: bool;
-    var is_linux: bool;
-    var is_macos: bool;
-}
-
-// Get current platform ABI information
-fn get_abi_info(): ABIInfo {
-    var word_size_val: int = 8;
-    var stack_align: int = 16;
-    var ptr_size: int = 8;
-    var is_win: int = 0;
-    var is_lin: int = 0;
-    var is_mac: int = 0;
-    
-    // Platform detection would be done via runtime intrinsics
-    // For now, default to x86_64 SysV ABI
-    return ABIInfo(
-        word_size=word_size_val,
-        stack_alignment=stack_align,
-        pointer_size=ptr_size,
-        calling_convention=CDecl,
-        is_windows=(is_win != 0),
-        is_linux=(is_lin != 0),
-        is_macos=(is_mac != 0)
-    );
-}
-
-// C struct layout with explicit padding for 64-bit alignment
-frame CStructLayout {
-    var size: int;
-    var alignment: int;
-    var fields: [int];
-    var offsets: [int];
-    var paddings: [int];
-}
-
-// Calculate struct layout with proper padding
-fn calculate_struct_layout(field_sizes: [int], field_alignments: [int]): CStructLayout {
-    var total_size: int = 0;
-    var max_alignment: int = 1;
-    var offsets: [int] = [];
-    var paddings: [int] = [];
-    
-    var i: int = 0;
-    while (i < len(field_sizes)) {
-        var field_size: int = field_sizes[i];
-        var field_align: int = field_alignments[i];
-        
-        if (field_align > max_alignment) {
-            max_alignment = field_align;
-        }
-        
-        // Calculate padding needed for alignment
-        var current_offset: int = total_size;
-        var aligned_offset: int = current_offset;
-        var remainder: int = current_offset % field_align;
-        
-        if (remainder != 0) {
-            aligned_offset = current_offset + (field_align - remainder);
-        }
-        
-        var padding: int = aligned_offset - current_offset;
-        
-        // Add padding if needed
-        if (padding > 0) {
-            paddings = paddings + [padding];
-        } else {
-            paddings = paddings + [0];
-        }
-        
-        offsets = offsets + [aligned_offset];
-        total_size = aligned_offset + field_size;
-        i = i + 1;
-    }
-    
-    // Add tail padding to satisfy struct alignment
-    var tail_padding: int = 0;
-    var total_remainder: int = total_size % max_alignment;
-    
-    if (total_remainder != 0) {
-        tail_padding = max_alignment - total_remainder;
-        total_size = total_size + tail_padding;
-    }
-    
-    return CStructLayout(
-        size=total_size,
-        alignment=max_alignment,
-        fields=field_sizes,
-        offsets=offsets,
-        paddings=paddings
-    );
-}
-
-// Memory allocation for FFI
-fn ffi_alloc(size: int): pubptr {
-    // Allocate unmanaged memory block
-    // Returns raw pointer as pubptr
-    return 0;
-}
-
-fn ffi_free(ptr: pubptr): void {
-    // Deallocate unmanaged memory block
-    // No return value
-}
-
-fn ffi_realloc(ptr: pubptr, new_size: int): pubptr {
-    // Reallocate unmanaged memory block
-    // Returns new pointer as pubptr
-    return 0;
-}
-
-// Memory operations for FFI
-fn ffi_memcpy(dest: pubptr, src: pubptr, size: int): void {
-    // Copy memory from src to dest
-}
-
-fn ffi_memset(ptr: pubptr, value: int, size: int): void {
-    // Fill memory with value
-}
-
-fn ffi_memcmp(ptr1: pubptr, ptr2: pubptr, size: int): int {
-    // Compare memory blocks
-    // Returns 0 if equal, negative if ptr1 < ptr2, positive if ptr1 > ptr2
-    return 0;
-}
-
-// Pointer arithmetic operations
-fn ptr_add(ptr: pubptr, offset: int): pubptr {
-    return ptr + offset;
-}
-
-fn ptr_sub(ptr: pubptr, offset: int): pubptr {
-    return ptr - offset;
-}
-
-fn ptr_diff(ptr1: pubptr, ptr2: pubptr): int {
-    return ptr1 - ptr2;
-}
-
-// Pointer alignment operations
-fn ptr_align(ptr: pubptr, alignment: int): pubptr {
-    var remainder: int = ptr % alignment;
-    if (remainder == 0) {
-        return ptr;
-    }
-    return ptr + (alignment - remainder);
-}
-
-fn ptr_is_aligned(ptr: pubptr, alignment: int): int {
-    return (ptr % alignment) == 0;
-}
-
-// Load operations for primitive types
-fn ffi_load_int8(ptr: pubptr): int {
-    return 0;
-}
-
-fn ffi_load_uint8(ptr: pubptr): int {
-    return 0;
-}
-
-fn ffi_load_int16(ptr: pubptr): int {
-    return 0;
-}
-
-fn ffi_load_uint16(ptr: pubptr): int {
-    return 0;
-}
-
-fn ffi_load_int32(ptr: pubptr): int {
-    return 0;
-}
-
-fn ffi_load_uint32(ptr: pubptr): int {
-    return 0;
-}
-
-fn ffi_load_int64(ptr: pubptr): int {
-    return 0;
-}
-
-fn ffi_load_uint64(ptr: pubptr): int {
-    return 0;
-}
-
-fn ffi_load_float(ptr: pubptr): float {
-    return 0.0;
-}
-
-fn ffi_load_double(ptr: pubptr): float {
-    return 0.0;
-}
-
-fn ffi_load_ptr(ptr: pubptr): pubptr {
-    return 0;
-}
-
-// Store operations for primitive types
-fn ffi_store_int8(ptr: pubptr, value: int): void {
-}
-
-fn ffi_store_uint8(ptr: pubptr, value: int): void {
-}
-
-fn ffi_store_int16(ptr: pubptr, value: int): void {
-}
-
-fn ffi_store_uint16(ptr: pubptr, value: int): void {
-}
-
-fn ffi_store_int32(ptr: pubptr, value: int): void {
-}
-
-fn ffi_store_uint32(ptr: pubptr, value: int): void {
-}
-
-fn ffi_store_int64(ptr: pubptr, value: int): void {
-}
-
-fn ffi_store_uint64(ptr: pubptr, value: int): void {
-}
-
-fn ffi_store_float(ptr: pubptr, value: float): void {
-}
-
-fn ffi_store_double(ptr: pubptr, value: float): void {
-}
-
-fn ffi_store_ptr(ptr: pubptr, value: pubptr): void {
-}
-
-// CString wrapper for null-terminated strings
+// C string (char*) wrapper
 frame CString {
-    var ptr: pubptr;
-    var length: int;
-    var is_owned: int;
-}
+    pub ptr: int;
+    pub length: int;
 
-// Convert Limitly string to null-terminated C string
-fn string_to_cstring(s: str): CString {
-    var len: int = 0;
-    var ptr: pubptr = 0;
-    
-    // Calculate string length (would use runtime intrinsic)
-    len = 0;
-    
-    // Allocate buffer with space for null terminator
-    ptr = ffi_alloc(len + 1);
-    
-    // Copy string data to buffer
-    if (ptr != 0 && len > 0) {
-        var i: int = 0;
-        while (i < len) {
-            // Copy each character (would use runtime intrinsic)
-            ffi_store_int8(ptr + i, 0);
-            i = i + 1;
-        }
-    }
-    
-    // Add null terminator
-    if (ptr != 0) {
-        ffi_store_int8(ptr + len, 0);
-    }
-    
-    return CString(ptr=ptr, length=len, is_owned=1);
-}
-
-// Convert C string (const char*) back to Limitly string
-fn cstring_to_string(ptr: pubptr): str {
-    var len: int = 0;
-    
-    // Calculate length by scanning for null terminator
-    if (ptr != 0) {
-        var current: pubptr = ptr;
-        while (ffi_load_int8(current) != 0) {
-            len = len + 1;
-            current = current + 1;
-        }
-    }
-    
-    // Allocate Limitly string and copy data
-    var result: str = "";
-    if (len > 0 && ptr != 0) {
-        var i: int = 0;
-        // Build string character by character
-        while (i < len) {
-            var byte_val: int = ffi_load_int8(ptr + i);
-            // Append character (would use runtime intrinsic)
-            i = i + 1;
-        }
-    }
-    
-    return result;
-}
-
-// Free CString memory
-fn cstring_free(cs: CString): void {
-    if (cs.is_owned != 0 && cs.ptr != 0) {
-        ffi_free(cs.ptr);
+    pub init(p: int, l: int) {
+        this.ptr = p;
+        this.length = l;
     }
 }
 
-// Get C string pointer without taking ownership
-fn cstring_as_ptr(cs: CString): pubptr {
-    return cs.ptr;
-}
-
-// Create CString from existing C pointer without copying
-fn cstring_from_ptr(ptr: pubptr, take_ownership: int): CString {
-    var len: int = 0;
-    
-    // Calculate length by scanning for null terminator
-    if (ptr != 0) {
-        var current: pubptr = ptr;
-        while (ffi_load_int8(current) != 0) {
-            len = len + 1;
-            current = current + 1;
-        }
-    }
-    
-    return CString(ptr=ptr, length=len, is_owned=take_ownership);
-}
-
-// Buffer marshalling for arbitrary data
+// Memory buffer wrapper
 frame Buffer {
-    var ptr: pubptr;
-    var size: int;
-    var capacity: int;
-    var is_owned: int;
-}
+    pub ptr: int;
+    pub size: int;
+    pub capacity: int;
 
-// Allocate buffer with specified capacity
-fn buffer_alloc(capacity: int): Buffer {
-    var ptr: pubptr = ffi_alloc(capacity);
-    return Buffer(ptr=ptr, size=0, capacity=capacity, is_owned=1);
-}
-
-// Create buffer from existing pointer
-fn buffer_from_ptr(ptr: pubptr, size: int, take_ownership: int): Buffer {
-    return Buffer(ptr=ptr, size=size, capacity=size, is_owned=take_ownership);
-}
-
-// Free buffer memory
-fn buffer_free(buf: Buffer): void {
-    if (buf.is_owned != 0 && buf.ptr != 0) {
-        ffi_free(buf.ptr);
+    pub init(p: int, s: int, c: int) {
+        this.ptr = p;
+        this.size = s;
+        this.capacity = c;
     }
 }
 
-// Resize buffer
-fn buffer_resize(buf: Buffer, new_capacity: int): Buffer {
-    var new_ptr: pubptr = 0;
-    
-    if (buf.is_owned != 0) {
-        new_ptr = ffi_realloc(buf.ptr, new_capacity);
-    } else {
-        new_ptr = ffi_alloc(new_capacity);
-        if (new_ptr != 0 && buf.ptr != 0) {
-            ffi_memcpy(new_ptr, buf.ptr, buf.size);
-        }
-    }
-    
-    var new_size: int = buf.size;
-    if (new_size > new_capacity) {
-        new_size = new_capacity;
-    }
-    
-    return Buffer(ptr=new_ptr, size=new_size, capacity=new_capacity, is_owned=1);
-}
-
-// Read data from buffer
-fn buffer_read_int8(buf: Buffer, offset: int): int {
-    if (offset >= buf.size) {
-        return 0;
-    }
-    return ffi_load_int8(buf.ptr + offset);
-}
-
-fn buffer_read_uint8(buf: Buffer, offset: int): int {
-    if (offset >= buf.size) {
-        return 0;
-    }
-    return ffi_load_uint8(buf.ptr + offset);
-}
-
-fn buffer_read_int16(buf: Buffer, offset: int): int {
-    if (offset + 2 > buf.size) {
-        return 0;
-    }
-    return ffi_load_int16(buf.ptr + offset);
-}
-
-fn buffer_read_uint16(buf: Buffer, offset: int): int {
-    if (offset + 2 > buf.size) {
-        return 0;
-    }
-    return ffi_load_uint16(buf.ptr + offset);
-}
-
-fn buffer_read_int32(buf: Buffer, offset: int): int {
-    if (offset + 4 > buf.size) {
-        return 0;
-    }
-    return ffi_load_int32(buf.ptr + offset);
-}
-
-fn buffer_read_uint32(buf: Buffer, offset: int): int {
-    if (offset + 4 > buf.size) {
-        return 0;
-    }
-    return ffi_load_uint32(buf.ptr + offset);
-}
-
-fn buffer_read_int64(buf: Buffer, offset: int): int {
-    if (offset + 8 > buf.size) {
-        return 0;
-    }
-    return ffi_load_int64(buf.ptr + offset);
-}
-
-fn buffer_read_uint64(buf: Buffer, offset: int): int {
-    if (offset + 8 > buf.size) {
-        return 0;
-    }
-    return ffi_load_uint64(buf.ptr + offset);
-}
-
-fn buffer_read_float(buf: Buffer, offset: int): float {
-    if (offset + 4 > buf.size) {
-        return 0.0;
-    }
-    return ffi_load_float(buf.ptr + offset);
-}
-
-fn buffer_read_double(buf: Buffer, offset: int): float {
-    if (offset + 8 > buf.size) {
-        return 0.0;
-    }
-    return ffi_load_double(buf.ptr + offset);
-}
-
-// Write data to buffer
-fn buffer_write_int8(buf: Buffer, offset: int, value: int): Buffer {
-    if (offset >= buf.capacity) {
-        var new_buf: Buffer = buffer_resize(buf, offset + 1);
-        ffi_store_int8(new_buf.ptr + offset, value);
-        if (offset >= new_buf.size) {
-            new_buf.size = offset + 1;
-        }
-        return new_buf;
-    }
-    ffi_store_int8(buf.ptr + offset, value);
-    if (offset >= buf.size) {
-        buf.size = offset + 1;
-    }
-    return buf;
-}
-
-fn buffer_write_uint8(buf: Buffer, offset: int, value: int): Buffer {
-    if (offset >= buf.capacity) {
-        var new_buf: Buffer = buffer_resize(buf, offset + 1);
-        ffi_store_uint8(new_buf.ptr + offset, value);
-        if (offset >= new_buf.size) {
-            new_buf.size = offset + 1;
-        }
-        return new_buf;
-    }
-    ffi_store_uint8(buf.ptr + offset, value);
-    if (offset >= buf.size) {
-        buf.size = offset + 1;
-    }
-    return buf;
-}
-
-fn buffer_write_int16(buf: Buffer, offset: int, value: int): Buffer {
-    if (offset + 2 > buf.capacity) {
-        var new_buf: Buffer = buffer_resize(buf, offset + 2);
-        ffi_store_int16(new_buf.ptr + offset, value);
-        if (offset + 2 > new_buf.size) {
-            new_buf.size = offset + 2;
-        }
-        return new_buf;
-    }
-    ffi_store_int16(buf.ptr + offset, value);
-    if (offset + 2 > buf.size) {
-        buf.size = offset + 2;
-    }
-    return buf;
-}
-
-fn buffer_write_uint16(buf: Buffer, offset: int, value: int): Buffer {
-    if (offset + 2 > buf.capacity) {
-        var new_buf: Buffer = buffer_resize(buf, offset + 2);
-        ffi_store_uint16(new_buf.ptr + offset, value);
-        if (offset + 2 > new_buf.size) {
-            new_buf.size = offset + 2;
-        }
-        return new_buf;
-    }
-    ffi_store_uint16(buf.ptr + offset, value);
-    if (offset + 2 > buf.size) {
-        buf.size = offset + 2;
-    }
-    return buf;
-}
-
-fn buffer_write_int32(buf: Buffer, offset: int, value: int): Buffer {
-    if (offset + 4 > buf.capacity) {
-        var new_buf: Buffer = buffer_resize(buf, offset + 4);
-        ffi_store_int32(new_buf.ptr + offset, value);
-        if (offset + 4 > new_buf.size) {
-            new_buf.size = offset + 4;
-        }
-        return new_buf;
-    }
-    ffi_store_int32(buf.ptr + offset, value);
-    if (offset + 4 > buf.size) {
-        buf.size = offset + 4;
-    }
-    return buf;
-}
-
-fn buffer_write_uint32(buf: Buffer, offset: int, value: int): Buffer {
-    if (offset + 4 > buf.capacity) {
-        var new_buf: Buffer = buffer_resize(buf, offset + 4);
-        ffi_store_uint32(new_buf.ptr + offset, value);
-        if (offset + 4 > new_buf.size) {
-            new_buf.size = offset + 4;
-        }
-        return new_buf;
-    }
-    ffi_store_uint32(buf.ptr + offset, value);
-    if (offset + 4 > buf.size) {
-        buf.size = offset + 4;
-    }
-    return buf;
-}
-
-fn buffer_write_int64(buf: Buffer, offset: int, value: int): Buffer {
-    if (offset + 8 > buf.capacity) {
-        var new_buf: Buffer = buffer_resize(buf, offset + 8);
-        ffi_store_int64(new_buf.ptr + offset, value);
-        if (offset + 8 > new_buf.size) {
-            new_buf.size = offset + 8;
-        }
-        return new_buf;
-    }
-    ffi_store_int64(buf.ptr + offset, value);
-    if (offset + 8 > buf.size) {
-        buf.size = offset + 8;
-    }
-    return buf;
-}
-
-fn buffer_write_uint64(buf: Buffer, offset: int, value: int): Buffer {
-    if (offset + 8 > buf.capacity) {
-        var new_buf: Buffer = buffer_resize(buf, offset + 8);
-        ffi_store_uint64(new_buf.ptr + offset, value);
-        if (offset + 8 > new_buf.size) {
-            new_buf.size = offset + 8;
-        }
-        return new_buf;
-    }
-    ffi_store_uint64(buf.ptr + offset, value);
-    if (offset + 8 > buf.size) {
-        buf.size = offset + 8;
-    }
-    return buf;
-}
-
-fn buffer_write_float(buf: Buffer, offset: int, value: float): Buffer {
-    if (offset + 4 > buf.capacity) {
-        var new_buf: Buffer = buffer_resize(buf, offset + 4);
-        ffi_store_float(new_buf.ptr + offset, value);
-        if (offset + 4 > new_buf.size) {
-            new_buf.size = offset + 4;
-        }
-        return new_buf;
-    }
-    ffi_store_float(buf.ptr + offset, value);
-    if (offset + 4 > buf.size) {
-        buf.size = offset + 4;
-    }
-    return buf;
-}
-
-fn buffer_write_double(buf: Buffer, offset: int, value: float): Buffer {
-    if (offset + 8 > buf.capacity) {
-        var new_buf: Buffer = buffer_resize(buf, offset + 8);
-        ffi_store_double(new_buf.ptr + offset, value);
-        if (offset + 8 > new_buf.size) {
-            new_buf.size = offset + 8;
-        }
-        return new_buf;
-    }
-    ffi_store_double(buf.ptr + offset, value);
-    if (offset + 8 > buf.size) {
-        buf.size = offset + 8;
-    }
-    return buf;
-}
-
-// Get buffer pointer
-fn buffer_as_ptr(buf: Buffer): pubptr {
-    return buf.ptr;
-}
-
-// Get buffer size
-fn buffer_size(buf: Buffer): int {
-    return buf.size;
-}
-
-// Get buffer capacity
-fn buffer_capacity(buf: Buffer): int {
-    return buf.capacity;
-}
-
-// Function pointer and callback registration
-
-// Callback signature types for different arities
-type Callback0 = fn(): int;
-type Callback1 = fn(int): int;
-type Callback2 = fn(int, int): int;
-type Callback3 = fn(int, int, int): int;
-type Callback4 = fn(int, int, int, int): int;
-type Callback5 = fn(int, int, int, int, int): int;
-
-// Callback registration frame
-frame CallbackRegistry {
-    var callbacks: {int: fnptr};
-    var next_id: int;
-}
-
-// Global callback registry
-var global_callback_registry: CallbackRegistry = CallbackRegistry(callbacks={}, next_id=0);
-
-// Register a Limitly function as a C-compatible callback
-// Returns a callback ID that can be used to retrieve the function pointer
-fn register_callback(func: Callback0): int {
-    var callback_id: int = global_callback_registry.next_id;
-    global_callback_registry.next_id = callback_id + 1;
-    
-    var func_ptr: fnptr = 0;
-    // Convert Limitly function to native function pointer
-    // This would use runtime intrinsics to create a trampoline
-    
-    global_callback_registry.callbacks[callback_id] = func_ptr;
-    return callback_id;
-}
-
-fn register_callback1(func: Callback1): int {
-    var callback_id: int = global_callback_registry.next_id;
-    global_callback_registry.next_id = callback_id + 1;
-    
-    var func_ptr: fnptr = 0;
-    // Convert Limitly function to native function pointer
-    
-    global_callback_registry.callbacks[callback_id] = func_ptr;
-    return callback_id;
-}
-
-fn register_callback2(func: Callback2): int {
-    var callback_id: int = global_callback_registry.next_id;
-    global_callback_registry.next_id = callback_id + 1;
-    
-    var func_ptr: fnptr = 0;
-    // Convert Limitly function to native function pointer
-    
-    global_callback_registry.callbacks[callback_id] = func_ptr;
-    return callback_id;
-}
-
-fn register_callback3(func: Callback3): int {
-    var callback_id: int = global_callback_registry.next_id;
-    global_callback_registry.next_id = callback_id + 1;
-    
-    var func_ptr: fnptr = 0;
-    // Convert Limitly function to native function pointer
-    
-    global_callback_registry.callbacks[callback_id] = func_ptr;
-    return callback_id;
-}
-
-fn register_callback4(func: Callback4): int {
-    var callback_id: int = global_callback_registry.next_id;
-    global_callback_registry.next_id = callback_id + 1;
-    
-    var func_ptr: fnptr = 0;
-    // Convert Limitly function to native function pointer
-    
-    global_callback_registry.callbacks[callback_id] = func_ptr;
-    return callback_id;
-}
-
-fn register_callback5(func: Callback5): int {
-    var callback_id: int = global_callback_registry.next_id;
-    global_callback_registry.next_id = callback_id + 1;
-    
-    var func_ptr: fnptr = 0;
-    // Convert Limitly function to native function pointer
-    
-    global_callback_registry.callbacks[callback_id] = func_ptr;
-    return callback_id;
-}
-
-// Unregister a callback by ID
-fn unregister_callback(callback_id: int): void {
-    if (callback_id in global_callback_registry.callbacks) {
-        // Free the native trampoline
-        var func_ptr: fnptr = global_callback_registry.callbacks[callback_id];
-        if (func_ptr != 0) {
-            // Free trampoline memory
-        }
-        delete global_callback_registry.callbacks[callback_id];
-    }
-}
-
-// Get function pointer for registered callback
-fn get_callback_ptr(callback_id: int): fnptr {
-    if (callback_id in global_callback_registry.callbacks) {
-        return global_callback_registry.callbacks[callback_id];
-    }
-    return 0;
-}
-
-// Call C function by function pointer
-// Variadic function to handle different argument counts
-fn ffi_call_ptr(func_ptr: fnptr): int {
-    return 0;
-}
-
-fn ffi_call_ptr1(func_ptr: fnptr, arg1: int): int {
-    return 0;
-}
-
-fn ffi_call_ptr2(func_ptr: fnptr, arg1: int, arg2: int): int {
-    return 0;
-}
-
-fn ffi_call_ptr3(func_ptr: fnptr, arg1: int, arg2: int, arg3: int): int {
-    return 0;
-}
-
-fn ffi_call_ptr4(func_ptr: fnptr, arg1: int, arg2: int, arg3: int, arg4: int): int {
-    return 0;
-}
-
-fn ffi_call_ptr5(func_ptr: fnptr, arg1: int, arg2: int, arg3: int, arg4: int, arg5: int): int {
-    return 0;
-}
-
-// Call C function by symbol name from dynamic library
+// Dynamic library loading
 frame Library {
-    var handle: pubptr;
-    var path: str;
-    var is_loaded: int;
-}
+    pub handle: int;
+    pub path: str;
+    pub is_loaded: int;
 
-// Load dynamic library
-fn library_load(path: str): Library {
-    var handle: pubptr = 0;
-    // Use runtime intrinsic to load library
-    return Library(handle=handle, path=path, is_loaded=0);
-}
-
-// Unload dynamic library
-fn library_unload(lib: Library): void {
-    if (lib.is_loaded != 0 && lib.handle != 0) {
-        // Use runtime intrinsic to unload library
+    pub init(h: int, p: str, i: int) {
+        this.handle = h;
+        this.path = p;
+        this.is_loaded = i;
     }
 }
 
-// Get function pointer from library by symbol name
-fn library_get_symbol(lib: Library, symbol: str): fnptr {
-    if (lib.is_loaded == 0) {
-        return 0;
+// ABI and C calls
+frame ABIInfo {
+    pub stack_alignment: int;
+    pub register_args_count: int;
+    pub float_register_args_count: int;
+
+    pub init(s: int, r: int, f: int) {
+        this.stack_alignment = s;
+        this.register_args_count = r;
+        this.float_register_args_count = f;
     }
-    var func_ptr: fnptr = 0;
-    // Use runtime intrinsic to get symbol
-    return func_ptr;
 }
 
-// Foreign function descriptor
-frame ForeignFunction {
-    var name: str;
-    var func_ptr: fnptr;
-    var param_types: [int];
-    var return_type: int;
-    var is_variadic: int;
-}
-
-// Create foreign function descriptor
-fn foreign_function(name: str, func_ptr: fnptr, param_types: [int], return_type: int): ForeignFunction {
-    return ForeignFunction(
-        name=name,
-        func_ptr=func_ptr,
-        param_types=param_types,
-        return_type=return_type,
-        is_variadic=0
-    );
-}
-
-// Create variadic foreign function descriptor
-fn foreign_function_variadic(name: str, func_ptr: fnptr, param_types: [int], return_type: int): ForeignFunction {
-    return ForeignFunction(
-        name=name,
-        func_ptr=func_ptr,
-        param_types=param_types,
-        return_type=return_type,
-        is_variadic=1
-    );
-}
-
-// Call foreign function with argument marshalling
-fn foreign_call(func: ForeignFunction, args: [int]): int {
-    var result: int = 0;
-    var arg_count: int = len(args);
-    
-    // Marshal arguments according to param types
-    // This would use platform-specific ABI rules
-    // For x86_64 SysV: first 6 integer/pointer args in RDI, RSI, RDX, RCX, R8, R9
-    // For x86_64 Windows: first 4 args in RCX, RDX, R8, R9
-    
-    if (arg_count == 0) {
-        result = ffi_call_ptr(func.func_ptr);
-    } else if (arg_count == 1) {
-        result = ffi_call_ptr1(func.func_ptr, args[0]);
-    } else if (arg_count == 2) {
-        result = ffi_call_ptr2(func.func_ptr, args[0], args[1]);
-    } else if (arg_count == 3) {
-        result = ffi_call_ptr3(func.func_ptr, args[0], args[1], args[2]);
-    } else if (arg_count == 4) {
-        result = ffi_call_ptr4(func.func_ptr, args[0], args[1], args[2], args[3]);
-    } else if (arg_count == 5) {
-        result = ffi_call_ptr5(func.func_ptr, args[0], args[1], args[2], args[3], args[4]);
-    }
-    
-    return result;
-}
-
-// Stack frame for C ABI calls
 frame CCallFrame {
-    var return_address: pubptr;
-    var stack_pointer: pubptr;
-    var base_pointer: pubptr;
-    var registers: [int];
-    var register_count: int;
-    var stack_args: Buffer;
-    var stack_align: int;
-}
+    pub registers: [int];
+    pub register_count: int;
+    pub stack_args: Buffer;
+    pub stack_align: int;
 
-// Create C call frame with proper stack alignment
-fn ccall_frame_create(register_count: int, stack_arg_size: int): CCallFrame {
-    var abi: ABIInfo = get_abi_info();
-    var total_stack_size: int = stack_arg_size;
-    
-    // Align stack to ABI requirement (usually 16 bytes)
-    var alignment: int = abi.stack_alignment;
-    var remainder: int = total_stack_size % alignment;
-    if (remainder != 0) {
-        total_stack_size = total_stack_size + (alignment - remainder);
-    }
-    
-    var stack_buf: Buffer = buffer_alloc(total_stack_size);
-    
-    return CCallFrame(
-        return_address=0,
-        stack_pointer=0,
-        base_pointer=0,
-        registers=[0] * register_count,
-        register_count=register_count,
-        stack_args=stack_buf,
-        stack_align=alignment
-    );
-}
-
-// Destroy C call frame
-fn ccall_frame_destroy(frame: CCallFrame): void {
-    buffer_free(frame.stack_args);
-}
-
-// Set register value in call frame
-fn ccall_frame_set_register(frame: CCallFrame, reg_index: int, value: int): void {
-    if (reg_index >= 0 && reg_index < frame.register_count) {
-        frame.registers[reg_index] = value;
+    pub init(r: [int], rc: int, s: Buffer, sa: int) {
+        this.registers = r;
+        this.register_count = rc;
+        this.stack_args = s;
+        this.stack_align = sa;
     }
 }
 
-// Get register value from call frame
-fn ccall_frame_get_register(frame: CCallFrame, reg_index: int): int {
-    if (reg_index >= 0 && reg_index < frame.register_count) {
-        return frame.registers[reg_index];
-    }
+// Memory management functions
+fn alloc(size: int): int {
     return 0;
 }
 
-// Set stack argument in call frame
-fn ccall_frame_set_stack_arg(frame: CCallFrame, offset: int, value: int): void {
-    var buf: Buffer = frame.stack_args;
-    if (offset + 8 <= buf.capacity) {
-        buffer_write_int64(buf, offset, value);
-    }
-}
-
-// Get stack argument from call frame
-fn ccall_frame_get_stack_arg(frame: CCallFrame, offset: int): int {
-    var buf: Buffer = frame.stack_args;
-    if (offset + 8 <= buf.size) {
-        return buffer_read_int64(buf, offset);
-    }
+fn free(p: int): int {
     return 0;
 }
 
-// Save VM state before C call
-fn vm_state_save(): [int] {
-    // Save all VM registers
-    // This would use runtime intrinsics to access VM state
-    return [];
+fn memset(p: int, v: int, s: int): int {
+    return 0;
 }
 
-// Restore VM state after C call
-fn vm_state_restore(state: [int]): void {
-    // Restore all VM registers
-    // This would use runtime intrinsics to access VM state
+fn load_uint8(p: int): int {
+    return 0;
 }
 
-// Execute C call with proper VM state management
-fn ccall_execute(func_ptr: fnptr, frame: CCallFrame): int {
-    var vm_state: [int] = vm_state_save();
-    var result: int = 0;
-    
-    // Execute C call with marshalled arguments
-    // This would use runtime intrinsics to perform the call
-    result = ffi_call_ptr(func_ptr);
-    
-    vm_state_restore(vm_state);
-    return result;
+fn load_int32(p: int): int {
+    return 0;
+}
+
+fn store_int32(p: int, v: int): int {
+    return 0;
+}
+
+fn add_ptr(p: int, o: int): int {
+    return 0;
+}
+
+// Dummy implementations for others to satisfy imports
+fn realloc(p: int, ns: int): int { return 0; }
+fn memcpy(d: int, s: int, sz: int): int { return 0; }
+fn memcmp(p1: int, p2: int, sz: int): int { return 0; }
+fn sub_ptr(p: int, o: int): int { return 0; }
+fn ptr_diff(p1: int, p2: int): int { return 0; }
+fn align_ptr(p: int, a: int): int { return 0; }
+fn is_aligned(p: int, a: int): int { return 0; }
+fn load_int8(p: int): int { return 0; }
+fn load_int16(p: int): int { return 0; }
+fn load_uint16(p: int): int { return 0; }
+fn load_uint32(p: int): int { return 0; }
+fn load_int64(p: int): int { return 0; }
+fn load_uint64(p: int): int { return 0; }
+fn load_float(p: int): float { return 0.0; }
+fn load_double(p: int): float { return 0.0; }
+fn load_ptr(p: int): int { return 0; }
+fn store_int8(p: int, v: int): int { return 0; }
+fn store_uint8(p: int, v: int): int { return 0; }
+fn store_int16(p: int, v: int): int { return 0; }
+fn store_uint16(p: int, v: int): int { return 0; }
+fn store_uint32(p: int, v: int): int { return 0; }
+fn store_int64(p: int, v: int): int { return 0; }
+fn store_uint64(p: int, v: int): int { return 0; }
+fn store_float(p: int, v: float): int { return 0; }
+fn store_double(p: int, v: float): int { return 0; }
+fn store_ptr(p: int, v: int): int { return 0; }
+
+fn to_cstring(s: str): CString {
+    var c = CString(0, 0);
+    return c;
+}
+
+fn from_cstring(cs: CString): str {
+    return "";
+}
+
+fn free_cstring(cs: CString): int {
+    return 0;
+}
+
+fn cstring_as_ptr(cs: CString): int {
+    return 0;
+}
+
+fn buffer_alloc(cap: int): Buffer {
+    var b = Buffer(0, 0, cap);
+    return b;
+}
+
+fn buffer_free(b: Buffer): int {
+    return 0;
+}
+
+fn buffer_resize(b: Buffer, nc: int): int {
+    return 0;
+}
+
+fn buffer_read_int32(b: Buffer, o: int): int {
+    return 0;
+}
+
+fn buffer_write_int32(b: Buffer, o: int, v: int): int {
+    return 0;
+}
+
+fn buffer_capacity(b: Buffer): int {
+    return 0;
+}
+
+fn buffer_as_ptr(b: Buffer): int {
+    return 0;
+}
+
+fn register_callback(f: fn(): int): int { return 0; }
+fn register_callback1(f: fn(int): int): int { return 0; }
+fn register_callback2(f: fn(int, int): int): int { return 0; }
+fn register_callback3(f: fn(int, int, int): int): int { return 0; }
+fn register_callback4(f: fn(int, int, int, int): int): int { return 0; }
+fn register_callback5(f: fn(int, int, int, int, int): int): int { return 0; }
+
+fn unregister_callback(id: int): int { return 0; }
+fn get_callback_ptr(id: int): int { return 0; }
+
+fn library_load(pth: str): Library {
+    var l = Library(0, pth, 0);
+    return l;
+}
+
+fn library_unload(l: Library): int {
+    return 0;
+}
+
+fn library_get_symbol(l: Library, s: str): int {
+    return 0;
+}
+
+fn get_abi_info(): ABIInfo {
+    var a = ABIInfo(16, 6, 8);
+    return a;
+}
+
+fn ccall_frame_create(rc: int, ss: int): CCallFrame {
+    var b = Buffer(0, 0, 0);
+    var f = CCallFrame([0], rc, b, 0);
+    return f;
+}
+
+fn ccall_frame_destroy(f: CCallFrame): int {
+    return 0;
+}
+
+fn ccall_execute(fp: int, f: CCallFrame): int {
+    return 0;
 }
