@@ -1,0 +1,692 @@
+// UI Context Module
+// Multi-Tree Pipeline implementation with RAII cleanup and reactive state management
+
+import std.ffi as ffi;
+import std.gfx.types as gfx_types;
+import std.gfx.context as gfx_context;
+import std.ui.types as ui_types;
+
+// Initialize UI context
+fn ui_init(): int {
+    if (global_ui_context.is_initialized != 0) {
+        return 0;
+    }
+    
+    global_ui_context.is_initialized = 1;
+    global_ui_context.next_element_id = 1;
+    global_ui_context.next_event_token = 1;
+    global_ui_context.next_state_id = 1;
+    global_ui_context.root_element = ui_types.INVALID_ELEMENT_ID;
+    global_ui_context.elements = {};
+    global_ui_context.state_containers = {};
+    global_ui_context.dependencies = [];
+    global_ui_context.event_handlers = [];
+    global_ui_context.event_queue = [];
+    global_ui_context.render_commands = [];
+    global_ui_context.dirty = 1;
+    
+    return 1;
+}
+
+// Shutdown UI context with RAII cleanup
+fn ui_shutdown(): void {
+    if (global_ui_context.is_initialized == 0) {
+        return;
+    }
+    
+    // RAII cleanup: Release all native resources from elements
+    var element_ids: [ui_types.ElementId] = [];
+    var iter: int = 0;
+    
+    // Collect all element IDs
+    for (id, element) in global_ui_context.elements {
+        element_ids = element_ids + [id];
+        iter = iter + 1;
+    }
+    
+    // Clean up each element's native resources
+    var i: int = 0;
+    while (i < len(element_ids)) {
+        var element_id: ui_types.ElementId = element_ids[i];
+        cleanup_element_resources(element_id);
+        i = i + 1;
+    }
+    
+    // Clean up state containers with custom state pointers
+    for (state_id, container) in global_ui_context.state_containers {
+        match (container.value) {
+            ui_types.CustomState(ptr, size) => {
+                if (ptr != 0) {
+                    ffi.ffi_free(ptr);
+                }
+            }
+            _ => { }
+        }
+    }
+    
+    // Clear all collections
+    global_ui_context.elements = {};
+    global_ui_context.state_containers = {};
+    global_ui_context.dependencies = [];
+    global_ui_context.event_handlers = [];
+    global_ui_context.event_queue = [];
+    global_ui_context.render_commands = [];
+    
+    global_ui_context.is_initialized = 0;
+}
+
+// Cleanup element resources (RAII destructor)
+fn cleanup_element_resources(element_id: ui_types.ElementId): void {
+    if (element_id == ui_types.INVALID_ELEMENT_ID) {
+        return;
+    }
+    
+    var element: ui_types.Element = global_ui_context.elements[element_id];
+    
+    // Release native graphics resources
+    var i: int = 0;
+    while (i < len(element.native_resources)) {
+        var resource_id: gfx_types.ResourceId = element.native_resources[i];
+        if (resource_id != ui_types.INVALID_ELEMENT_ID) {
+            gfx_context.destroy_image(resource_id);
+        }
+        i = i + 1;
+    }
+    
+    // Clean up custom element state
+    match (element.variant) {
+        ui_types.Custom(data) => {
+            if (data.state_ptr != 0) {
+                ffi.ffi_free(data.state_ptr);
+            }
+        }
+        _ => { }
+    }
+    
+    // Unregister from state dependencies
+    unregister_element_dependencies(element_id);
+}
+
+// Unregister element from state dependencies (RAII cleanup)
+fn unregister_element_dependencies(element_id: ui_types.ElementId): void {
+    var new_dependencies: [ui_types.StateDependency] = [];
+    var i: int = 0;
+    
+    while (i < len(global_ui_context.dependencies)) {
+        var dep: ui_types.StateDependency = global_ui_context.dependencies[i];
+        if (dep.element_id == element_id) {
+            // Remove this dependency
+        } else {
+            // Remove element_id from dependents list
+            var new_dependents: [ui_types.ElementId] = [];
+            var j: int = 0;
+            while (j < len(dep.dependents)) {
+                if (dep.dependents[j] != element_id) {
+                    new_dependents = new_dependents + [dep.dependents[j]];
+                }
+                j = j + 1;
+            }
+            new_dependencies = new_dependencies + [ui_types.StateDependency(
+                element_id=dep.element_id,
+                state_key=dep.state_key,
+                dependents=new_dependents
+            )];
+        }
+        i = i + 1;
+    }
+    
+    global_ui_context.dependencies = new_dependencies;
+}
+
+// Layer 1: Blueprint to Retained Element Tree conversion
+fn blueprint_to_tree(bp: ui_types.Blueprint, parent_id: ui_types.ElementId): ui_types.ElementId {
+    var element: ui_types.Element = create_element(bp.variant, parent_id);
+    
+    // Apply constraints
+    var i: int = 0;
+    while (i < len(bp.constraints)) {
+        element.constraints = element.constraints + [bp.constraints[i]];
+        i = i + 1;
+    }
+    
+    // Register element in global context
+    global_ui_context.elements[element.id] = element;
+    
+    // Process children recursively
+    var child_ids: [ui_types.ElementId] = [];
+    var j: int = 0;
+    while (j < len(bp.children)) {
+        var child_id: ui_types.ElementId = blueprint_to_tree(bp.children[j], element.id);
+        child_ids = child_ids + [child_id];
+        j = j + 1;
+    }
+    
+    // Update element with children
+    element.children = child_ids;
+    global_ui_context.elements[element.id] = element;
+    
+    // If this is a root element, set it as root
+    if (parent_id == ui_types.INVALID_ELEMENT_ID) {
+        global_ui_context.root_element = element.id;
+    }
+    
+    return element.id;
+}
+
+// Layer 2: Layout pass (compute metrics for element tree)
+fn layout_pass(width: float, height: float): ui_types.LayoutResult {
+    if (global_ui_context.root_element == ui_types.INVALID_ELEMENT_ID) {
+        return ui_types.LayoutResult(
+            root_metrics=ui_types.layout_metrics(ui_types.POINT_ZERO, ui_types.SIZE_ZERO, 0.0),
+            element_metrics={},
+            dirty_regions=[]
+        );
+    }
+    
+    var element_metrics: {ui_types.ElementId: ui_types.LayoutMetrics} = {};
+    var dirty_regions: [ui_types.Rect] = [];
+    
+    // Compute layout starting from root
+    var root_metrics: ui_types.LayoutMetrics = compute_element_layout(
+        global_ui_context.root_element,
+        ui_types.POINT_ZERO,
+        ui_types.size(width, height),
+        element_metrics
+    );
+    
+    return ui_types.LayoutResult(
+        root_metrics=root_metrics,
+        element_metrics=element_metrics,
+        dirty_regions=dirty_regions
+    );
+}
+
+// Compute layout for a single element
+fn compute_element_layout(
+    element_id: ui_types.ElementId,
+    position: ui_types.Point,
+    available_size: ui_types.Size,
+    metrics: {ui_types.ElementId: ui_types.LayoutMetrics}
+): ui_types.LayoutMetrics {
+    var element: ui_types.Element = global_ui_context.elements[element_id];
+    
+    // Compute size based on constraints
+    var computed_size: ui_types.Size = compute_size(element.constraints, available_size);
+    
+    // Compute child layouts based on variant
+    match (element.variant) {
+        ui_types.Container(data) => {
+            var child_offset: ui_types.Point = ui_types.point(
+                position.x + data.padding.x,
+                position.y + data.padding.y
+            );
+            var child_available_size: ui_types.Size = ui_types.size(
+                computed_size.width - data.padding.x - data.padding.width,
+                computed_size.height - data.padding.y - data.padding.height
+            );
+            
+            var i: int = 0;
+            var current_pos: float = 0.0;
+            
+            while (i < len(element.children)) {
+                var child_id: ui_types.ElementId = element.children[i];
+                var child_metrics: ui_types.LayoutMetrics = compute_element_layout(
+                    child_id,
+                    child_offset,
+                    child_available_size,
+                    metrics
+                );
+                
+                match (data.axis) {
+                    ui_types.Axis.Horizontal => {
+                        child_offset.x = child_offset.x + child_metrics.size.width + data.spacing;
+                    }
+                    ui_types.Axis.Vertical => {
+                        child_offset.y = child_offset.y + child_metrics.size.height + data.spacing;
+                    }
+                }
+                
+                i = i + 1;
+            }
+        }
+        _ => { }
+    }
+    
+    var result_metrics: ui_types.LayoutMetrics = ui_types.layout_metrics(position, computed_size, 0.0);
+    metrics[element_id] = result_metrics;
+    
+    // Update element with computed metrics
+    element.metrics = result_metrics;
+    global_ui_context.elements[element_id] = element;
+    
+    return result_metrics;
+}
+
+// Compute size from constraints
+fn compute_size(constraints: [ui_types.LayoutConstraint], available: ui_types.Size): ui_types.Size {
+    var width: float = available.width;
+    var height: float = available.height;
+    
+    var i: int = 0;
+    while (i < len(constraints)) {
+        match (constraints[i]) {
+            ui_types.Fixed(value) => {
+                width = value as float;
+                height = value as float;
+            }
+            ui_types.Min(value) => {
+                if (width < value as float) {
+                    width = value as float;
+                }
+                if (height < value as float) {
+                    height = value as float;
+                }
+            }
+            ui_types.Max(value) => {
+                if (width > value as float) {
+                    width = value as float;
+                }
+                if (height > value as float) {
+                    height = value as float;
+                }
+            }
+            ui_types.Fill => {
+                // Use available size
+            }
+            ui_types.Auto => {
+                // Compute from content (placeholder)
+                width = -1.0;
+                height = -1.0;
+            }
+        }
+        i = i + 1;
+    }
+    
+    return ui_types.size(width, height);
+}
+
+// Layer 3: Render pass (flatten element tree to command stream)
+fn render_pass(): ui_types.RenderResult {
+    global_ui_context.render_commands = [];
+    
+    if (global_ui_context.root_element == ui_types.INVALID_ELEMENT_ID) {
+        return ui_types.RenderResult(commands=[], resource_updates=[]);
+    }
+    
+    var resource_updates: [gfx_types.ResourceId] = [];
+    
+    // Render element tree
+    render_element(global_ui_context.root_element, ui_types.POINT_ZERO, resource_updates);
+    
+    return ui_types.RenderResult(
+        commands=global_ui_context.render_commands,
+        resource_updates=resource_updates
+    );
+}
+
+// Render single element to command stream
+fn render_element(
+    element_id: ui_types.ElementId,
+    offset: ui_types.Point,
+    resource_updates: [gfx_types.ResourceId]
+): void {
+    var element: ui_types.Element = global_ui_context.elements[element_id];
+    
+    if (element.visible == 0) {
+        return;
+    }
+    
+    var position: ui_types.Point = ui_types.point(
+        offset.x + element.metrics.position.x,
+        offset.y + element.metrics.position.y
+    );
+    
+    var rect: ui_types.Rect = ui_types.rect(
+        position.x,
+        position.y,
+        element.metrics.size.width,
+        element.metrics.size.height
+    );
+    
+    // Emit render commands based on variant
+    match (element.variant) {
+        ui_types.Container(data) => {
+            // Draw background
+            if (data.background.a > 0.0) {
+                global_ui_context.render_commands = global_ui_context.render_commands + [
+                    ui_types.RenderCommand.DrawRect(ui_types.DrawRectCommand(
+                        rect=rect,
+                        color=data.background,
+                        corner_radius=data.corner_radius
+                    ))
+                ];
+            }
+            
+            // Draw border
+            if (data.border.a > 0.0 && data.border_width > 0.0) {
+                global_ui_context.render_commands = global_ui_context.render_commands + [
+                    ui_types.RenderCommand.DrawRect(ui_types.DrawRectCommand(
+                        rect=rect,
+                        color=data.border,
+                        corner_radius=data.corner_radius
+                    ))
+                ];
+            }
+            
+            // Clip if needed
+            if (data.clip_content != 0) {
+                global_ui_context.render_commands = global_ui_context.render_commands + [
+                    ui_types.RenderCommand.ClipRect(ui_types.ClipRectCommand(rect=rect))
+                ];
+            }
+            
+            // Render children
+            var i: int = 0;
+            while (i < len(element.children)) {
+                render_element(element.children[i], position, resource_updates);
+                i = i + 1;
+            }
+            
+            // Restore clip
+            if (data.clip_content != 0) {
+                global_ui_context.render_commands = global_ui_context.render_commands + [
+                    ui_types.RenderCommand.ClipRect(ui_types.ClipRectCommand(rect=ui_types.RECT_ZERO))
+                ];
+            }
+        }
+        
+        ui_types.Text(data) => {
+            global_ui_context.render_commands = global_ui_context.render_commands + [
+                ui_types.RenderCommand.DrawText(ui_types.DrawTextCommand(
+                    text=data.content,
+                    position=position,
+                    font_size=data.font_size,
+                    color=data.color,
+                    max_width=element.metrics.size.width
+                ))
+            ];
+        }
+        
+        ui_types.Button(data) => {
+            var bg_color: ui_types.Color = data.background;
+            match (element.state) {
+                ui_types.Hovered => { bg_color = data.hover_background; }
+                ui_types.Pressed => { bg_color = data.pressed_background; }
+                _ => { }
+            }
+            
+            // Draw button background
+            global_ui_context.render_commands = global_ui_context.render_commands + [
+                ui_types.RenderCommand.DrawRect(ui_types.DrawRectCommand(
+                    rect=rect,
+                    color=bg_color,
+                    corner_radius=data.corner_radius
+                ))
+            ];
+            
+            // Draw button text
+            var text_pos: ui_types.Point = ui_types.point(
+                position.x + data.padding.x,
+                position.y + data.padding.y
+            );
+            global_ui_context.render_commands = global_ui_context.render_commands + [
+                ui_types.RenderCommand.DrawText(ui_types.DrawTextCommand(
+                    text=data.label,
+                    position=text_pos,
+                    font_size=data.font_size,
+                    color=data.text_color,
+                    max_width=element.metrics.size.width - data.padding.x - data.padding.width
+                ))
+            ];
+        }
+        
+        ui_types.Image(data) => {
+            global_ui_context.render_commands = global_ui_context.render_commands + [
+                ui_types.RenderCommand.DrawImage(ui_types.DrawImageCommand(
+                    texture_id=data.texture_id,
+                    rect=rect,
+                    tint=data.tint
+                ))
+            ];
+        }
+        
+        ui_types.Custom(data) => {
+            global_ui_context.render_commands = global_ui_context.render_commands + [
+                ui_types.RenderCommand.DrawCustom(ui_types.DrawCustomCommand(
+                    type_id=data.type_id,
+                    state_ptr=data.state_ptr,
+                    rect=rect
+                ))
+            ];
+        }
+        
+        _ => { }
+    }
+}
+
+// Reactive state management: Create state container
+fn create_state(value: ui_types.StateValue): int {
+    var container: ui_types.StateContainer = create_state_container(value);
+    global_ui_context.state_containers[container.id] = container;
+    return container.id;
+}
+
+// Reactive state management: Get state value
+fn get_state(state_id: int): ui_types.StateValue {
+    var container: ui_types.StateContainer = global_ui_context.state_containers[state_id];
+    return container.value;
+}
+
+// Reactive state management: Set state value and notify subscribers
+fn set_state(state_id: int, new_value: ui_types.StateValue): void {
+    var container: ui_types.StateContainer = global_ui_context.state_containers[state_id];
+    var old_value: ui_types.StateValue = container.value;
+    
+    container.value = new_value;
+    container.version = container.version + 1;
+    global_ui_context.state_containers[state_id] = container;
+    
+    // Notify subscribers
+    var i: int = 0;
+    while (i < len(container.subscribers)) {
+        var element_id: ui_types.ElementId = container.subscribers[i];
+        mark_element_dirty(element_id);
+        i = i + 1;
+    }
+    
+    // Queue change events
+    var j: int = 0;
+    while (j < len(container.subscribers)) {
+        var element_id: ui_types.ElementId = container.subscribers[j];
+        global_ui_context.event_queue = global_ui_context.event_queue + [
+            ui_types.UIEvent.Change(ui_types.ChangeEvent(
+                element_id=element_id,
+                old_value=old_value,
+                new_value=new_value
+            ))
+        ];
+        j = j + 1;
+    }
+}
+
+// Subscribe element to state changes
+fn subscribe_state(state_id: int, element_id: ui_types.ElementId): void {
+    var container: ui_types.StateContainer = global_ui_context.state_containers[state_id];
+    container.subscribers = container.subscribers + [element_id];
+    global_ui_context.state_containers[state_id] = container;
+}
+
+// Mark element as dirty (needs re-layout)
+fn mark_element_dirty(element_id: ui_types.ElementId): void {
+    var element: ui_types.Element = global_ui_context.elements[element_id];
+    // Mark as needing layout update
+    global_ui_context.dirty = 1;
+}
+
+// Event handling: Register event handler
+fn register_event_handler(
+    element_id: ui_types.ElementId,
+    event_type: ui_types.UIEvent,
+    callback: ui_types.EventToken
+): ui_types.EventToken {
+    var handler: ui_types.EventHandler = create_event_handler(element_id, event_type, callback);
+    global_ui_context.event_handlers = global_ui_context.event_handlers + [handler];
+    
+    // Add event token to element
+    var element: ui_types.Element = global_ui_context.elements[element_id];
+    element.event_tokens = element.event_tokens + [handler.token];
+    global_ui_context.elements[element_id] = element;
+    
+    return handler.token;
+}
+
+// Event handling: Process event queue
+fn process_events(): void {
+    var i: int = 0;
+    while (i < len(global_ui_context.event_queue)) {
+        var event: ui_types.UIEvent = global_ui_context.event_queue[i];
+        dispatch_event(event);
+        i = i + 1;
+    }
+    
+    global_ui_context.event_queue = [];
+}
+
+// Dispatch event to handlers
+fn dispatch_event(event: ui_types.UIEvent): void {
+    var i: int = 0;
+    while (i < len(global_ui_context.event_handlers)) {
+        var handler: ui_types.EventHandler = global_ui_context.event_handlers[i];
+        
+        // Check if handler matches event type and element
+        var matches: int = 0;
+        match (event) {
+            ui_types.Click(e) => {
+                match (handler.event_type) {
+                    ui_types.Click(_) => { matches = 1; }
+                    _ => { }
+                }
+            }
+            ui_types.Hover(e) => {
+                match (handler.event_type) {
+                    ui_types.Hover(_) => { matches = 1; }
+                    _ => { }
+                }
+            }
+            ui_types.Focus(e) => {
+                match (handler.event_type) {
+                    ui_types.Focus(_) => { matches = 1; }
+                    _ => { }
+                }
+            }
+            ui_types.Change(e) => {
+                match (handler.event_type) {
+                    ui_types.Change(_) => { matches = 1; }
+                    _ => { }
+                }
+            }
+            _ => { }
+        }
+        
+        if (matches != 0) {
+            // Invoke callback via event token
+            // This would use the VM's callback mechanism
+            invoke_callback(handler.callback, event);
+        }
+        
+        i = i + 1;
+    }
+}
+
+// Invoke callback by event token
+fn invoke_callback(token: ui_types.EventToken, event: ui_types.UIEvent): void {
+    // This would use the VM's callback registration system
+    // For now, placeholder for callback invocation
+}
+
+// Main frame update (called from std::app event loop)
+fn frame_update(delta_time: float): void {
+    // Process events
+    process_events();
+    
+    // Run layout pass if dirty
+    if (global_ui_context.dirty != 0) {
+        var layout_result: ui_types.LayoutResult = layout_pass(
+            get_window_width() as float,
+            get_window_height() as float
+        );
+        global_ui_context.dirty = 0;
+    }
+    
+    // Run render pass
+    var render_result: ui_types.RenderResult = render_pass();
+    
+    // Submit render commands to graphics context
+    submit_render_commands(render_result.commands);
+}
+
+// Submit render commands to graphics context
+fn submit_render_commands(commands: [ui_types.RenderCommand]): void {
+    var i: int = 0;
+    while (i < len(commands)) {
+        match (commands[i]) {
+            ui_types.RenderCommand.DrawRect(cmd) => {
+                // Convert to graphics context draw call
+                // This would use gfx_context.begin_pass, apply_pipeline, draw, etc.
+            }
+            ui_types.RenderCommand.DrawText(cmd) => {
+                // Convert to text rendering
+            }
+            ui_types.RenderCommand.DrawImage(cmd) => {
+                // Convert to image rendering
+            }
+            ui_types.RenderCommand.ClipRect(cmd) => {
+                // Apply scissor rect
+            }
+            ui_types.RenderCommand.PushTransform(cmd) => {
+                // Push transform matrix
+            }
+            ui_types.RenderCommand.PopTransform(cmd) => {
+                // Pop transform matrix
+            }
+            ui_types.RenderCommand.DrawCustom(cmd) => {
+                // Invoke custom render callback
+            }
+        }
+        i = i + 1;
+    }
+}
+
+// Get window width from std::app
+fn get_window_width(): int {
+    // This would call into std::app
+    return 800;
+}
+
+// Get window height from std::app
+fn get_window_height(): int {
+    // This would call into std::app
+    return 600;
+}
+
+// Update blueprint (rebuild retained tree)
+fn update_blueprint(bp: ui_types.Blueprint): void {
+    // RAII cleanup: Remove old elements that are no longer in new blueprint
+    var old_root: ui_types.ElementId = global_ui_context.root_element;
+    
+    // Convert new blueprint to tree
+    var new_root: ui_types.ElementId = blueprint_to_tree(bp, ui_types.INVALID_ELEMENT_ID);
+    
+    // Cleanup old tree
+    if (old_root != ui_types.INVALID_ELEMENT_ID) {
+        cleanup_element_resources(old_root);
+        delete global_ui_context.elements[old_root];
+    }
+    
+    global_ui_context.dirty = 1;
+}
+
+// Delete helper (simulated)
+fn delete(key: int, map: {int: ui_types.Element}): void {
+    // This would be a built-in operation
+}

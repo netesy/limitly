@@ -1,0 +1,569 @@
+// UI Builder Module
+// Declarative builder API for constructing UI blueprints
+
+import std.ui.types as ui_types;
+
+// VStack builder (vertical stack container)
+fn vstack(children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Vertical);
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[],
+        children=children
+    );
+}
+
+// VStack with spacing
+fn vstack_spacing(spacing: float, children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Vertical);
+    container_data.spacing = spacing;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[],
+        children=children
+    );
+}
+
+// VStack with padding
+fn vstack_padding(padding: ui_types.Rect, children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Vertical);
+    container_data.padding = padding;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[],
+        children=children
+    );
+}
+
+// VStack with alignment
+fn vstack_alignment(alignment: ui_types.Alignment, children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Vertical);
+    container_data.alignment = alignment;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[],
+        children=children
+    );
+}
+
+// VStack with background color
+fn vstack_background(color: ui_types.Color, children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Vertical);
+    container_data.background = color;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[],
+        children=children
+    );
+}
+
+// HStack builder (horizontal stack container)
+fn hstack(children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Horizontal);
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[],
+        children=children
+    );
+}
+
+// HStack with spacing
+fn hstack_spacing(spacing: float, children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Horizontal);
+    container_data.spacing = spacing;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[],
+        children=children
+    );
+}
+
+// HStack with padding
+fn hstack_padding(padding: ui_types.Rect, children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Horizontal);
+    container_data.padding = padding;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[],
+        children=children
+    );
+}
+
+// HStack with alignment
+fn hstack_alignment(alignment: ui_types.Alignment, children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Horizontal);
+    container_data.alignment = alignment;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[],
+        children=children
+    );
+}
+
+// HStack with background color
+fn hstack_background(color: ui_types.Color, children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Horizontal);
+    container_data.background = color;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[],
+        children=children
+    );
+}
+
+// Text builder
+fn text(content: str): ui_types.Blueprint {
+    var text_data: ui_types.TextData = ui_types.text_data(content);
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Text(text_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Text with font size
+fn text_size(content: str, font_size: float): ui_types.Blueprint {
+    var text_data: ui_types.TextData = ui_types.text_data(content);
+    text_data.font_size = font_size;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Text(text_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Text with color
+fn text_color(content: str, color: ui_types.Color): ui_types.Blueprint {
+    var text_data: ui_types.TextData = ui_types.text_data(content);
+    text_data.color = color;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Text(text_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Text with font weight
+fn text_weight(content: str, font_weight: int): ui_types.Blueprint {
+    var text_data: ui_types.TextData = ui_types.text_data(content);
+    text_data.font_weight = font_weight;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Text(text_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Button builder
+fn button(label: str): ui_types.Blueprint {
+    var button_data: ui_types.ButtonData = ui_types.button_data(label);
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Button(button_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Button with background color
+fn button_background(label: str, background: ui_types.Color): ui_types.Blueprint {
+    var button_data: ui_types.ButtonData = ui_types.button_data(label);
+    button_data.background = background;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Button(button_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Button with corner radius
+fn button_radius(label: str, corner_radius: float): ui_types.Blueprint {
+    var button_data: ui_types.ButtonData = ui_types.button_data(label);
+    button_data.corner_radius = corner_radius;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Button(button_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Button with padding
+fn button_padding(label: str, padding: ui_types.Rect): ui_types.Blueprint {
+    var button_data: ui_types.ButtonData = ui_types.button_data(label);
+    button_data.padding = padding;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Button(button_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Button with enabled state
+fn button_enabled(label: str, enabled: int): ui_types.Blueprint {
+    var button_data: ui_types.ButtonData = ui_types.button_data(label);
+    button_data.enabled = enabled;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Button(button_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Image builder
+fn image(texture_id: ui_types.ResourceId): ui_types.Blueprint {
+    var image_data: ui_types.ImageData = ui_types.image_data(texture_id);
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Image(image_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Image with tint
+fn image_tint(texture_id: ui_types.ResourceId, tint: ui_types.Color): ui_types.Blueprint {
+    var image_data: ui_types.ImageData = ui_types.image_data(texture_id);
+    image_data.tint = tint;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Image(image_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Image with fit mode
+fn image_fit(texture_id: ui_types.ResourceId, fit_mode: int): ui_types.Blueprint {
+    var image_data: ui_types.ImageData = ui_types.image_data(texture_id);
+    image_data.fit_mode = fit_mode;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Image(image_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Text field builder
+fn text_field(placeholder: str): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.TextField(field_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Text field with initial text
+fn text_field_value(placeholder: str, text: str): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+    field_data.text = text;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.TextField(field_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Text field with font size
+fn text_field_size(placeholder: str, font_size: float): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+    field_data.font_size = font_size;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.TextField(field_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Text field with background color
+fn text_field_background(placeholder: str, background: ui_types.Color): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+    field_data.background = background;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.TextField(field_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Text field with corner radius
+fn text_field_radius(placeholder: str, corner_radius: float): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+    field_data.corner_radius = corner_radius;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.TextField(field_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Text field with editable state
+fn text_field_editable(placeholder: str, editable: int): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+    field_data.editable = editable;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.TextField(field_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Scroll builder
+fn scroll(axis: ui_types.Axis, content: ui_types.Blueprint): ui_types.Blueprint {
+    var scroll_data: ui_types.ScrollData = ui_types.scroll_data(axis);
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Scroll(scroll_data),
+        constraints=[],
+        children=[content]
+    );
+}
+
+// Scroll with scrollbar width
+fn scroll_width(axis: ui_types.Axis, scrollbar_width: float, content: ui_types.Blueprint): ui_types.Blueprint {
+    var scroll_data: ui_types.ScrollData = ui_types.scroll_data(axis);
+    scroll_data.scrollbar_width = scrollbar_width;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Scroll(scroll_data),
+        constraints=[],
+        children=[content]
+    );
+}
+
+// Scroll with scrollbar color
+fn scroll_color(axis: ui_types.Axis, scrollbar_color: ui_types.Color, content: ui_types.Blueprint): ui_types.Blueprint {
+    var scroll_data: ui_types.ScrollData = ui_types.scroll_data(axis);
+    scroll_data.scrollbar_color = scrollbar_color;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Scroll(scroll_data),
+        constraints=[],
+        children=[content]
+    );
+}
+
+// Custom element builder
+fn custom(type_id: int, state_size: int): ui_types.Blueprint {
+    var custom_data: ui_types.CustomData = ui_types.custom_data(type_id, state_size);
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Custom(custom_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Custom element with render callback
+fn custom_render(type_id: int, state_size: int, render_callback: ui_types.EventToken): ui_types.Blueprint {
+    var custom_data: ui_types.CustomData = ui_types.custom_data(type_id, state_size);
+    custom_data.render_callback = render_callback;
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Custom(custom_data),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Constraint modifiers
+fn fixed(size: int): ui_types.LayoutConstraint {
+    return ui_types.LayoutConstraint.Fixed(size);
+}
+
+fn min_size(size: int): ui_types.LayoutConstraint {
+    return ui_types.LayoutConstraint.Min(size);
+}
+
+fn max_size(size: int): ui_types.LayoutConstraint {
+    return ui_types.LayoutConstraint.Max(size);
+}
+
+fn fill(): ui_types.LayoutConstraint {
+    return ui_types.LayoutConstraint.Fill;
+}
+
+fn auto(): ui_types.LayoutConstraint {
+    return ui_types.LayoutConstraint.Auto;
+}
+
+// Apply constraint to blueprint
+fn constrain(bp: ui_types.Blueprint, constraint: ui_types.LayoutConstraint): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, constraint);
+}
+
+// Apply width constraint
+fn width(bp: ui_types.Blueprint, width: int): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Fixed(width));
+}
+
+// Apply height constraint
+fn height(bp: ui_types.Blueprint, height: int): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Fixed(height));
+}
+
+// Apply min width constraint
+fn min_width(bp: ui_types.Blueprint, min_width: int): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Min(min_width));
+}
+
+// Apply min height constraint
+fn min_height(bp: ui_types.Blueprint, min_height: int): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Min(min_height));
+}
+
+// Apply max width constraint
+fn max_width(bp: ui_types.Blueprint, max_width: int): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Max(max_width));
+}
+
+// Apply max height constraint
+fn max_height(bp: ui_types.Blueprint, max_height: int): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Max(max_height));
+}
+
+// Apply fill constraint
+fn fill_width(bp: ui_types.Blueprint): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Fill);
+}
+
+fn fill_height(bp: ui_types.Blueprint): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Fill);
+}
+
+fn fill(bp: ui_types.Blueprint): ui_types.Blueprint {
+    var bp1: ui_types.Blueprint = ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Fill);
+    return ui_types.blueprint_add_constraint(bp1, ui_types.LayoutConstraint.Fill);
+}
+
+// Apply auto constraint
+fn auto_width(bp: ui_types.Blueprint): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Auto);
+}
+
+fn auto_height(bp: ui_types.Blueprint): ui_types.Blueprint {
+    return ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Auto);
+}
+
+fn auto(bp: ui_types.Blueprint): ui_types.Blueprint {
+    var bp1: ui_types.Blueprint = ui_types.blueprint_add_constraint(bp, ui_types.LayoutConstraint.Auto);
+    return ui_types.blueprint_add_constraint(bp1, ui_types.LayoutConstraint.Auto);
+}
+
+// Padding helper
+fn padding(all: float): ui_types.Rect {
+    return ui_types.rect(all, all, all, all);
+}
+
+fn padding_xy(x: float, y: float): ui_types.Rect {
+    return ui_types.rect(x, y, x, y);
+}
+
+fn padding_ltrb(left: float, top: float, right: float, bottom: float): ui_types.Rect {
+    return ui_types.rect(left, top, right, bottom);
+}
+
+// Spacing helpers
+fn spacing_small(): float {
+    return 4.0;
+}
+
+fn spacing_medium(): float {
+    return 8.0;
+}
+
+fn spacing_large(): float {
+    return 16.0;
+}
+
+fn spacing_xlarge(): float {
+    return 24.0;
+}
+
+// Color helpers
+fn color_hex(hex: int): ui_types.Color {
+    var r: float = ((hex >> 16) & 0xFF) as float / 255.0;
+    var g: float = ((hex >> 8) & 0xFF) as float / 255.0;
+    var b: float = (hex & 0xFF) as float / 255.0;
+    var a: float = ((hex >> 24) & 0xFF) as float / 255.0;
+    return ui_types.color_rgba(r, g, b, a);
+}
+
+fn color_rgb8(r: int, g: int, b: int): ui_types.Color {
+    return ui_types.color_rgb(r as float / 255.0, g as float / 255.0, b as float / 255.0);
+}
+
+fn color_rgba8(r: int, g: int, b: int, a: int): ui_types.Color {
+    return ui_types.color_rgba(r as float / 255.0, g as float / 255.0, b as float / 255.0, a as float / 255.0);
+}
+
+// Size helpers
+fn size_points(width: float, height: float): ui_types.Size {
+    return ui_types.size(width, height);
+}
+
+fn size_square(size: float): ui_types.Size {
+    return ui_types.size(size, size);
+}
+
+// Point helpers
+fn point_xy(x: float, y: float): ui_types.Point {
+    return ui_types.point(x, y);
+}
+
+// Compose blueprints (add child)
+fn add_child(parent: ui_types.Blueprint, child: ui_types.Blueprint): ui_types.Blueprint {
+    return ui_types.blueprint_add_child(parent, child);
+}
+
+// Compose multiple children
+fn add_children(parent: ui_types.Blueprint, children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var result: ui_types.Blueprint = parent;
+    var i: int = 0;
+    while (i < len(children)) {
+        result = ui_types.blueprint_add_child(result, children[i]);
+        i = i + 1;
+    }
+    return result;
+}
+
+// Empty blueprint
+fn empty(): ui_types.Blueprint {
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(ui_types.container_data(ui_types.Axis.Vertical)),
+        constraints=[],
+        children=[]
+    );
+}
+
+// Spacer (invisible element for spacing)
+fn spacer(width: float, height: float): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Vertical);
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[ui_types.LayoutConstraint.Fixed(width as int), ui_types.LayoutConstraint.Fixed(height as int)],
+        children=[]
+    );
+}
+
+fn spacer_width(width: float): ui_types.Blueprint {
+    return spacer(width, 0.0);
+}
+
+fn spacer_height(height: float): ui_types.Blueprint {
+    return spacer(0.0, height);
+}
+
+// Divider line
+fn divider(): ui_types.Blueprint {
+    var container_data: ui_types.ContainerData = ui_types.container_data(ui_types.Axis.Horizontal);
+    container_data.background = ui_types.color_rgb8(200, 200, 200);
+    return ui_types.Blueprint(
+        variant=ui_types.ElementVariant.Container(container_data),
+        constraints=[ui_types.LayoutConstraint.Fixed(1)],
+        children=[]
+    );
+}
+
+// Center content
+fn center(child: ui_types.Blueprint): ui_types.Blueprint {
+    return hstack_alignment(ui_types.Alignment.Center, [child]);
+}
+
+// Expand to fill available space
+fn expand(child: ui_types.Blueprint): ui_types.Blueprint {
+    var child_constrained: ui_types.Blueprint = ui_types.blueprint_add_constraint(child, ui_types.LayoutConstraint.Fill);
+    return hstack([child_constrained]);
+}

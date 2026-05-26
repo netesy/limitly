@@ -1,0 +1,521 @@
+// Graphics Types Module
+// Data structure definitions for graphics resources and configurations
+
+import std.ffi as ffi;
+
+// Resource handle types
+type ResourceId = int;
+const INVALID_RESOURCE_ID: int = 0;
+
+// Pixel format enumeration
+type PixelFormat = 
+    | RGBA8
+    | RGB8
+    | RGBA4
+    | R5G6B5
+    | R5G5B5A1
+    | RGB10A2
+    | RGBA32F
+    | RGB32F
+    | R16F
+    | RG16F
+    | RGBA16F
+    | R32F
+    | RG32F
+    | DEPTH16
+    | DEPTH24_STENCIL8
+    | DEPTH32F_STENCIL8;
+
+// Primitive type enumeration
+type PrimitiveType = 
+    | Points
+    | Lines
+    | LineStrip
+    | Triangles
+    | TriangleStrip;
+
+// Index type enumeration
+type IndexType = 
+    | UInt16
+    | UInt32;
+
+// Vertex attribute format
+type VertexFormat = 
+    | Float
+    | Float2
+    | Float3
+    | Float4
+    | Byte4
+    | Byte4N
+    | UByte4
+    | UByte4N
+    | Short2
+    | Short2N
+    | Short4
+    | Short4N
+    | UInt10_N2;
+
+// Vertex attribute semantic
+type VertexSemantic = 
+    | Position
+    | Normal
+    | Tangent
+    | TexCoord
+    | Color
+    | BoneIndex
+    | BoneWeight;
+
+// Vertex attribute descriptor
+frame VertexAttrDesc {
+    var semantic: VertexSemantic;
+    var format: VertexFormat;
+    var offset: int;
+}
+
+// Vertex layout descriptor
+frame VertexLayoutDesc {
+    var stride: int;
+    var attrs: [VertexAttrDesc];
+}
+
+// Buffer type enumeration
+type BufferType = 
+    | VertexBuffer
+    | IndexBuffer
+    | UniformBuffer;
+
+// Buffer usage hint
+type BufferUsage = 
+    | Immutable
+    | Dynamic
+    | Stream;
+
+// Buffer descriptor
+frame BufferDesc {
+    var size: int;
+    var type: BufferType;
+    var usage: BufferUsage;
+    var data_ptr: ffi.pubptr;
+    var data_size: int;
+}
+
+// Shader stage enumeration
+type ShaderStage = 
+    | Vertex
+    | Fragment;
+
+// Shader descriptor
+frame ShaderDesc {
+    var stage: ShaderStage;
+    var source: str;
+    var entry_point: str;
+}
+
+// Shader compilation error
+frame ShaderError {
+    var stage: ShaderStage;
+    var message: str;
+    var line: int;
+    var column: int;
+}
+
+// Shader program descriptor
+frame ShaderProgramDesc {
+    var vertex_shader: ShaderDesc;
+    var fragment_shader: ShaderDesc;
+}
+
+// Blend factor enumeration
+type BlendFactor = 
+    | Zero
+    | One
+    | SrcColor
+    | OneMinusSrcColor
+    | DstColor
+    | OneMinusDstColor
+    | SrcAlpha
+    | OneMinusSrcAlpha
+    | DstAlpha
+    | OneMinusDstAlpha
+    | ConstantColor
+    | OneMinusConstantColor
+    | ConstantAlpha
+    | OneMinusConstantAlpha
+    | SrcAlphaSaturated;
+
+// Blend operation enumeration
+type BlendOp = 
+    | Add
+    | Subtract
+    | ReverseSubtract
+    | Min
+    | Max;
+
+// Blend state descriptor
+frame BlendState {
+    var enabled: int;
+    var src_factor_rgb: BlendFactor;
+    var dst_factor_rgb: BlendFactor;
+    var op_rgb: BlendOp;
+    var src_factor_alpha: BlendFactor;
+    var dst_factor_alpha: BlendFactor;
+    var op_alpha: BlendOp;
+}
+
+// Compare function enumeration
+type CompareFunc = 
+    | Never
+    | Less
+    | Equal
+    | LessEqual
+    | Greater
+    | NotEqual
+    | GreaterEqual
+    | Always;
+
+// Stencil operation enumeration
+type StencilOp = 
+    | Keep
+    | Zero
+    | Replace
+    | IncrementClamp
+    | DecrementClamp
+    | Invert
+    | IncrementWrap
+    | DecrementWrap;
+
+// Stencil state descriptor
+frame StencilState {
+    var enabled: int;
+    var front_compare_func: CompareFunc;
+    var front_fail_op: StencilOp;
+    var front_depth_fail_op: StencilOp;
+    var front_pass_op: StencilOp;
+    var back_compare_func: CompareFunc;
+    var back_fail_op: StencilOp;
+    var back_depth_fail_op: StencilOp;
+    var back_pass_op: StencilOp;
+    var read_mask: int;
+    var write_mask: int;
+    var ref_value: int;
+}
+
+// Depth state descriptor
+frame DepthState {
+    var enabled: int;
+    var write_enabled: int;
+    var compare_func: CompareFunc;
+}
+
+// Cull mode enumeration
+type CullMode = 
+    | None
+    | Front
+    | Back;
+
+// Rasterizer state descriptor
+frame RasterizerState {
+    var cull_mode: CullMode;
+    var front_face_ccw: int;
+    var depth_bias: float;
+    var depth_bias_slope_scale: float;
+    var depth_bias_clamp: float;
+}
+
+// Color target state descriptor
+frame ColorTargetState {
+    var format: PixelFormat;
+    var blend: BlendState;
+    var write_mask_r: int;
+    var write_mask_g: int;
+    var write_mask_b: int;
+    var write_mask_a: int;
+}
+
+// Pipeline descriptor
+frame PipelineDesc {
+    var shader: ShaderProgramDesc;
+    var vertex_layout: VertexLayoutDesc;
+    var color_targets: [ColorTargetState];
+    var depth_stencil: DepthState;
+    var stencil: StencilState;
+    var rasterizer: RasterizerState;
+    var primitive_type: PrimitiveType;
+    var index_type: IndexType;
+}
+
+// Image type enumeration
+type ImageType = 
+    | Image2D
+    | Cube
+    | Image3D
+    | Image2DArray;
+
+// Image usage enumeration
+type ImageUsage = 
+    | Sampled
+    | RenderTarget
+    | Storage;
+
+// Image data descriptor
+frame ImageData {
+    var subimage: int;
+    var mip_level: int;
+    var ptr: ffi.pubptr;
+    var size: int;
+}
+
+// Image descriptor
+frame ImageDesc {
+    var type: ImageType;
+    var width: int;
+    var height: int;
+    var depth: int;
+    var num_slices: int;
+    var num_mipmaps: int;
+    var usage: ImageUsage;
+    var pixel_format: PixelFormat;
+    var data: [ImageData];
+}
+
+// Sampler filter enumeration
+type Filter = 
+    | Nearest
+    | Linear
+    | NearestMipmapNearest
+    | NearestMipmapLinear
+    | LinearMipmapNearest
+    | LinearMipmapLinear;
+
+// Sampler wrap mode enumeration
+type WrapMode = 
+    | Repeat
+    | ClampToEdge
+    | ClampToBorder
+    | MirroredRepeat;
+
+// Sampler descriptor
+frame SamplerDesc {
+    var min_filter: Filter;
+    var mag_filter: Filter;
+    var mipmap_filter: Filter;
+    var wrap_u: WrapMode;
+    var wrap_v: WrapMode;
+    var wrap_w: WrapMode;
+    var min_lod: float;
+    var max_lod: float;
+    var max_anisotropy: int;
+}
+
+// Resource binding type enumeration
+type ResourceBindingType = 
+    | UniformBuffer
+    | ImageSampler
+    | StorageBuffer;
+
+// Resource binding descriptor
+frame ResourceBinding {
+    var slot: int;
+    var type: ResourceBindingType;
+    var resource_id: ResourceId;
+}
+
+// Bindings descriptor
+frame Bindings {
+    var vertex_buffers: [ResourceId];
+    var index_buffer: ResourceId;
+    var index_buffer_offset: int;
+    var resources: [ResourceBinding];
+}
+
+// Pass action attachment action enumeration
+type PassAction = 
+    | DontCare
+    | Clear
+    | Load
+    | Discard;
+
+// Pass attachment action descriptor
+frame PassAttachmentAction {
+    var action: PassAction;
+    var clear_value_r: float;
+    var clear_value_g: float;
+    var clear_value_b: float;
+    var clear_value_a: float;
+    var clear_value_depth: float;
+    var clear_value_stencil: int;
+}
+
+// Pass action descriptor
+frame PassActionDesc {
+    var color_attachments: [PassAttachmentAction];
+    var depth_attachment: PassAttachmentAction;
+    var stencil_attachment: PassAttachmentAction;
+}
+
+// Viewport descriptor
+frame Viewport {
+    var x: int;
+    var y: int;
+    var width: int;
+    var height: int;
+    var min_depth: float;
+    var max_depth: float;
+}
+
+// Scissor rectangle descriptor
+frame ScissorRect {
+    var x: int;
+    var y: int;
+    var width: int;
+    var height: int;
+}
+
+// Draw state descriptor
+frame DrawState {
+    var pipeline: ResourceId;
+    var bindings: Bindings;
+    var viewport: Viewport;
+    var scissor_rect: ScissorRect;
+    var scissor_enabled: int;
+}
+
+// Context configuration
+frame ContextConfig {
+    var max_pool_size: int;
+    var num_pool_buffers: int;
+    var num_pool_images: int;
+    var num_pool_samplers: int;
+    var num_pool_passes: int;
+    var num_pool_pipelines: int;
+    var uniform_buffer_size: int;
+    var sampler_cache_size: int;
+}
+
+// Default context configuration
+fn default_context_config(): ContextConfig {
+    return ContextConfig(
+        max_pool_size=1024,
+        num_pool_buffers=256,
+        num_pool_images=128,
+        num_pool_samplers=64,
+        num_pool_passes=16,
+        num_pool_pipelines=64,
+        uniform_buffer_size=65536,
+        sampler_cache_size=64
+    );
+}
+
+// Default blend state
+fn default_blend_state(): BlendState {
+    return BlendState(
+        enabled=0,
+        src_factor_rgb=BlendFactor.One,
+        dst_factor_rgb=BlendFactor.Zero,
+        op_rgb=BlendOp.Add,
+        src_factor_alpha=BlendFactor.One,
+        dst_factor_alpha=BlendFactor.Zero,
+        op_alpha=BlendOp.Add
+    );
+}
+
+// Default depth state
+fn default_depth_state(): DepthState {
+    return DepthState(
+        enabled=0,
+        write_enabled=0,
+        compare_func=CompareFunc.LessEqual
+    );
+}
+
+// Default stencil state
+fn default_stencil_state(): StencilState {
+    return StencilState(
+        enabled=0,
+        front_compare_func=CompareFunc.Always,
+        front_fail_op=StencilOp.Keep,
+        front_depth_fail_op=StencilOp.Keep,
+        front_pass_op=StencilOp.Keep,
+        back_compare_func=CompareFunc.Always,
+        back_fail_op=StencilOp.Keep,
+        back_depth_fail_op=StencilOp.Keep,
+        back_pass_op=StencilOp.Keep,
+        read_mask=255,
+        write_mask=255,
+        ref_value=0
+    );
+}
+
+// Default rasterizer state
+fn default_rasterizer_state(): RasterizerState {
+    return RasterizerState(
+        cull_mode=CullMode.Back,
+        front_face_ccw=1,
+        depth_bias=0.0,
+        depth_bias_slope_scale=0.0,
+        depth_bias_clamp=0.0
+    );
+}
+
+// Default color target state
+fn default_color_target_state(format: PixelFormat): ColorTargetState {
+    return ColorTargetState(
+        format=format,
+        blend=default_blend_state(),
+        write_mask_r=1,
+        write_mask_g=1,
+        write_mask_b=1,
+        write_mask_a=1
+    );
+}
+
+// Default pass action
+fn default_pass_action(): PassActionDesc {
+    var color_clear: PassAttachmentAction = PassAttachmentAction(
+        action=PassAction.Clear,
+        clear_value_r=0.0,
+        clear_value_g=0.0,
+        clear_value_b=0.0,
+        clear_value_a=1.0,
+        clear_value_depth=1.0,
+        clear_value_stencil=0
+    );
+    
+    var depth_clear: PassAttachmentAction = PassAttachmentAction(
+        action=PassAction.Clear,
+        clear_value_r=0.0,
+        clear_value_g=0.0,
+        clear_value_b=0.0,
+        clear_value_a=1.0,
+        clear_value_depth=1.0,
+        clear_value_stencil=0
+    );
+    
+    return PassActionDesc(
+        color_attachments=[color_clear],
+        depth_attachment=depth_clear,
+        stencil_attachment=depth_clear
+    );
+}
+
+// Default viewport
+fn default_viewport(width: int, height: int): Viewport {
+    return Viewport(
+        x=0,
+        y=0,
+        width=width,
+        height=height,
+        min_depth=0.0,
+        max_depth=1.0
+    );
+}
+
+// Default scissor rect
+fn default_scissor_rect(width: int, height: int): ScissorRect {
+    return ScissorRect(
+        x=0,
+        y=0,
+        width=width,
+        height=height
+    );
+}

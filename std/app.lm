@@ -1,0 +1,728 @@
+// Application Module
+// System/window app lifecycle, event loop, and frame rendering callback driver
+
+import std.ffi as ffi;
+
+// Event type enumeration
+type EventType = 
+    | Quit
+    | Resize
+    | KeyDown
+    | KeyUp
+    | MouseDown
+    | MouseUp
+    | MouseMove
+    | MouseWheel
+    | TouchBegin
+    | TouchMove
+    | TouchEnd
+    | TouchCancel;
+
+// Key code enumeration
+type KeyCode = 
+    | Invalid
+    | Space
+    | Apostrophe
+    | Comma
+    | Minus
+    | Period
+    | Slash
+    | Semicolon
+    | Equal
+    | LeftBracket
+    | Backslash
+    | RightBracket
+    | GraveAccent
+    | World1
+    | World2
+    | Escape
+    | Enter
+    | Tab
+    | Backspace
+    | Insert
+    | Delete
+    | Right
+    | Left
+    | Down
+    | Up
+    | PageUp
+    | PageDown
+    | Home
+    | End
+    | CapsLock
+    | ScrollLock
+    | NumLock
+    | PrintScreen
+    | Pause
+    | F1
+    | F2
+    | F3
+    | F4
+    | F5
+    | F6
+    | F7
+    | F8
+    | F9
+    | F10
+    | F11
+    | F12
+    | F13
+    | F14
+    | F15
+    | F16
+    | F17
+    | F18
+    | F19
+    | F20
+    | F21
+    | F22
+    | F23
+    | F24
+    | F25
+    | KP0
+    | KP1
+    | KP2
+    | KP3
+    | KP4
+    | KP5
+    | KP6
+    | KP7
+    | KP8
+    | KP9
+    | KPDecimal
+    | KPDivide
+    | KPMultiply
+    | KPSubtract
+    | KPAdd
+    | KPEnter
+    | KPEqual
+    | LeftShift
+    | LeftControl
+    | LeftAlt
+    | LeftSuper
+    | RightShift
+    | RightControl
+    | RightAlt
+    | RightSuper
+    | Menu;
+
+// Mouse button enumeration
+type MouseButton = 
+    | Invalid
+    | Left
+    | Right
+    | Middle;
+
+// Modifier key flags
+type ModifierFlags = int;
+const MOD_SHIFT: int = 1;
+const MOD_CONTROL: int = 2;
+const MOD_ALT: int = 4;
+const MOD_SUPER: int = 8;
+
+// Event frame
+frame Event {
+    var type: EventType;
+    var timestamp: int;
+    var window_id: int;
+}
+
+// Key event frame
+frame KeyEvent {
+    var base: Event;
+    var key_code: KeyCode;
+    var modifiers: ModifierFlags;
+    var repeat: int;
+}
+
+// Mouse event frame
+frame MouseEvent {
+    var base: Event;
+    var x: int;
+    var y: int;
+    var button: MouseButton;
+    var modifiers: ModifierFlags;
+}
+
+// Mouse wheel event frame
+frame MouseWheelEvent {
+    var base: Event;
+    var x_offset: float;
+    var y_offset: float;
+    var modifiers: ModifierFlags;
+}
+
+// Resize event frame
+frame ResizeEvent {
+    var base: Event;
+    var width: int;
+    var height: int;
+    var framebuffer_width: int;
+    var framebuffer_height: int;
+}
+
+// Touch event frame
+frame TouchEvent {
+    var base: Event;
+    var touch_id: int;
+    var x: int;
+    var y: int;
+}
+
+// Window configuration
+frame WindowConfig {
+    var width: int;
+    var height: int;
+    var title: str;
+    var resizable: int;
+    var fullscreen: int;
+    var high_dpi: int;
+    var sample_count: int;
+    var swap_interval: int;
+}
+
+// Default window configuration
+fn default_window_config(): WindowConfig {
+    return WindowConfig(
+        width=800,
+        height=600,
+        title="Limitly Application",
+        resizable=1,
+        fullscreen=0,
+        high_dpi=1,
+        sample_count=1,
+        swap_interval=1
+    );
+}
+
+// Application state
+frame AppState {
+    var is_initialized: int;
+    var is_running: int;
+    var window_config: WindowConfig;
+    var native_window_ptr: ffi.pubptr;
+    var window_id: int;
+    var width: int;
+    var height: int;
+    var framebuffer_width: int;
+    var framebuffer_height: int;
+    var dpi_scale: float;
+    var event_queue: [Event];
+    var frame_count: int;
+    var last_frame_time: int;
+    var delta_time: float;
+}
+
+// Global application state
+var global_app_state: AppState = AppState(
+    is_initialized=0,
+    is_running=0,
+    window_config=default_window_config(),
+    native_window_ptr=0,
+    window_id=0,
+    width=800,
+    height=600,
+    framebuffer_width=800,
+    framebuffer_height=600,
+    dpi_scale=1.0,
+    event_queue=[],
+    frame_count=0,
+    last_frame_time=0,
+    delta_time=0.0
+);
+
+// Frame callback type
+type FrameCallback = fn(float): void;
+
+// Event callback type
+type EventCallback = fn(Event): void;
+
+// Registered frame callback
+var frame_callback: FrameCallback = null;
+
+// Registered event callback
+var event_callback: EventCallback = null;
+
+// Initialize application with window configuration
+fn app_init(config: WindowConfig): int {
+    if (global_app_state.is_initialized != 0) {
+        return 0;
+    }
+    
+    global_app_state.window_config = config;
+    global_app_state.width = config.width;
+    global_app_state.height = config.height;
+    global_app_state.framebuffer_width = config.width;
+    global_app_state.framebuffer_height = config.height;
+    
+    // Allocate native window structure
+    var window_size: int = 4096;
+    global_app_state.native_window_ptr = ffi.ffi_alloc(window_size);
+    
+    if (global_app_state.native_window_ptr == 0) {
+        return 0;
+    }
+    
+    // Initialize native window via FFI
+    ffi.ffi_memset(global_app_state.native_window_ptr, 0, window_size);
+    
+    // Store window configuration
+    ffi.ffi_store_int64(global_app_state.native_window_ptr, 0, config.width);
+    ffi.ffi_store_int64(global_app_state.native_window_ptr, 8, config.height);
+    ffi.ffi_store_int64(global_app_state.native_window_ptr, 16, config.resizable);
+    ffi.ffi_store_int64(global_app_state.native_window_ptr, 24, config.fullscreen);
+    ffi.ffi_store_int64(global_app_state.native_window_ptr, 32, config.high_dpi);
+    ffi.ffi_store_int64(global_app_state.native_window_ptr, 40, config.sample_count);
+    ffi.ffi_store_int64(global_app_state.native_window_ptr, 48, config.swap_interval);
+    
+    // Convert title to C string
+    var title_cstr: ffi.CString = ffi.string_to_cstring(config.title);
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 56, ffi.cstring_as_ptr(title_cstr));
+    
+    // Create native window via platform-specific API
+    // This would call into native windowing system (Win32, X11, Cocoa, etc.)
+    // For now, we simulate window creation
+    global_app_state.window_id = 1;
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 64, global_app_state.window_id);
+    
+    // Free title C string
+    ffi.cstring_free(title_cstr);
+    
+    global_app_state.is_initialized = 1;
+    global_app_state.is_running = 0;
+    global_app_state.frame_count = 0;
+    global_app_state.last_frame_time = 0;
+    global_app_state.delta_time = 0.0;
+    
+    return 1;
+}
+
+// Shutdown application and release resources
+fn app_shutdown(): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    // Stop event loop if running
+    if (global_app_state.is_running != 0) {
+        global_app_state.is_running = 0;
+    }
+    
+    // Destroy native window
+    if (global_app_state.native_window_ptr != 0) {
+        // This would call into native windowing system to destroy window
+        ffi.ffi_free(global_app_state.native_window_ptr);
+        global_app_state.native_window_ptr = 0;
+    }
+    
+    // Clear event queue
+    global_app_state.event_queue = [];
+    
+    // Clear callbacks
+    frame_callback = null;
+    event_callback = null;
+    
+    global_app_state.is_initialized = 0;
+    global_app_state.window_id = 0;
+}
+
+// Check if application is initialized
+fn app_is_valid(): int {
+    return global_app_state.is_initialized;
+}
+
+// Check if application is running
+fn app_is_running(): int {
+    return global_app_state.is_running;
+}
+
+// Set frame callback
+fn set_frame_callback(callback: FrameCallback): void {
+    frame_callback = callback;
+}
+
+// Set event callback
+fn set_event_callback(callback: EventCallback): void {
+    event_callback = callback;
+}
+
+// Start main event loop
+fn app_run(): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_app_state.is_running != 0) {
+        return;
+    }
+    
+    global_app_state.is_running = 1;
+    global_app_state.last_frame_time = get_current_time();
+    
+    // Main event loop
+    while (global_app_state.is_running != 0) {
+        var current_time: int = get_current_time();
+        var frame_time: int = current_time - global_app_state.last_frame_time;
+        global_app_state.delta_time = frame_time as float / 1000.0;
+        global_app_state.last_frame_time = current_time;
+        
+        // Process events
+        process_events();
+        
+        // Call frame callback if registered
+        if (frame_callback != null) {
+            frame_callback(global_app_state.delta_time);
+        }
+        
+        // Present frame
+        present_frame();
+        
+        global_app_state.frame_count = global_app_state.frame_count + 1;
+    }
+}
+
+// Stop event loop
+fn app_quit(): void {
+    global_app_state.is_running = 0;
+}
+
+// Process pending events
+fn process_events(): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    // Poll for events from native windowing system
+    // This would call into native windowing API
+    // For now, we simulate event processing
+    
+    var event_count: int = ffi.ffi_load_int64(global_app_state.native_window_ptr + 128);
+    var i: int = 0;
+    while (i < event_count) {
+        var event_ptr: ffi.pubptr = global_app_state.native_window_ptr + 136 + (i * 32);
+        var event_type: int = ffi.ffi_load_int32(event_ptr);
+        var event_timestamp: int = ffi.ffi_load_int64(event_ptr + 4);
+        var event_window_id: int = ffi.ffi_load_int64(event_ptr + 12);
+        
+        var event: Event = Event(
+            type=event_type as EventType,
+            timestamp=event_timestamp,
+            window_id=event_window_id
+        );
+        
+        // Add to event queue
+        global_app_state.event_queue = global_app_state.event_queue + [event];
+        
+        // Call event callback if registered
+        if (event_callback != null) {
+            event_callback(event);
+        }
+        
+        i = i + 1;
+    }
+    
+    // Clear event count in native structure
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 128, 0);
+}
+
+// Get next event from queue
+fn poll_event(): Event {
+    if (len(global_app_state.event_queue) == 0) {
+        return Event(type=EventType.Quit, timestamp=0, window_id=0);
+    }
+    
+    var event: Event = global_app_state.event_queue[0];
+    global_app_state.event_queue = global_app_state.event_queue[1..];
+    return event;
+}
+
+// Check if there are pending events
+fn has_pending_events(): int {
+    return len(global_app_state.event_queue) > 0;
+}
+
+// Present frame to screen
+fn present_frame(): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    // Swap buffers via native windowing API
+    // This would call into platform-specific swap chain
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 72, 1);
+}
+
+// Get window width
+fn get_window_width(): int {
+    return global_app_state.width;
+}
+
+// Get window height
+fn get_window_height(): int {
+    return global_app_state.height;
+}
+
+// Get framebuffer width
+fn get_framebuffer_width(): int {
+    return global_app_state.framebuffer_width;
+}
+
+// Get framebuffer height
+fn get_framebuffer_height(): int {
+    return global_app_state.framebuffer_height;
+}
+
+// Get DPI scale
+fn get_dpi_scale(): float {
+    return global_app_state.dpi_scale;
+}
+
+// Get frame count
+fn get_frame_count(): int {
+    return global_app_state.frame_count;
+}
+
+// Get delta time
+fn get_delta_time(): float {
+    return global_app_state.delta_time;
+}
+
+// Set window title
+fn set_window_title(title: str): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    global_app_state.window_config.title = title;
+    
+    // Convert title to C string
+    var title_cstr: ffi.CString = ffi.string_to_cstring(title);
+    
+    // Update native window title
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 56, ffi.cstring_as_ptr(title_cstr));
+    
+    // Free C string
+    ffi.cstring_free(title_cstr);
+}
+
+// Set window size
+fn set_window_size(width: int, height: int): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    global_app_state.window_config.width = width;
+    global_app_state.window_config.height = height;
+    global_app_state.width = width;
+    global_app_state.height = height;
+    
+    // Update native window size
+    ffi.ffi_store_int64(global_app_state.native_window_ptr, width);
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 8, height);
+}
+
+// Set fullscreen mode
+fn set_fullscreen(fullscreen: int): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    global_app_state.window_config.fullscreen = fullscreen;
+    
+    // Update native window fullscreen state
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 24, fullscreen);
+}
+
+// Set swap interval (vsync)
+fn set_swap_interval(interval: int): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    global_app_state.window_config.swap_interval = interval;
+    
+    // Update native window swap interval
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 48, interval);
+}
+
+// Show window
+fn show_window(): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    // Show native window
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 80, 1);
+}
+
+// Hide window
+fn hide_window(): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    // Hide native window
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 80, 0);
+}
+
+// Focus window
+fn focus_window(): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    // Focus native window
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 88, 1);
+}
+
+// Request window attention
+fn request_attention(): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    // Request attention from native window
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 96, 1);
+}
+
+// Get current time in milliseconds
+fn get_current_time(): int {
+    // Get current time via platform-specific API
+    // This would call into native time functions
+    // For now, return a simulated value
+    return 0;
+}
+
+// Sleep for specified milliseconds
+fn sleep_ms(milliseconds: int): void {
+    // Sleep via platform-specific API
+    // This would call into native sleep functions
+    // For now, do nothing
+}
+
+// Get clipboard string
+fn get_clipboard_string(): str {
+    if (global_app_state.is_initialized == 0) {
+        return "";
+    }
+    
+    // Get clipboard from native windowing system
+    var clipboard_ptr: ffi.pubptr = ffi.ffi_load_int64(global_app_state.native_window_ptr + 104);
+    if (clipboard_ptr != 0) {
+        return ffi.cstring_to_string(clipboard_ptr);
+    }
+    
+    return "";
+}
+
+// Set clipboard string
+fn set_clipboard_string(text: str): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    // Convert text to C string
+    var text_cstr: ffi.CString = ffi.string_to_cstring(text);
+    
+    // Set clipboard in native windowing system
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 104, ffi.cstring_as_ptr(text_cstr));
+    
+    // Note: We don't free the C string here as the clipboard system owns it
+}
+
+// Get mouse position
+fn get_mouse_position(): (int, int) {
+    if (global_app_state.is_initialized == 0) {
+        return (0, 0);
+    }
+    
+    var mouse_x: int = ffi.ffi_load_int64(global_app_state.native_window_ptr + 112);
+    var mouse_y: int = ffi.ffi_load_int64(global_app_state.native_window_ptr + 120);
+    
+    return (mouse_x, mouse_y);
+}
+
+// Set mouse position
+fn set_mouse_position(x: int, y: int): void {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    // Set mouse position in native windowing system
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 112, x);
+    ffi.ffi_store_int64(global_app_state.native_window_ptr + 120, y);
+}
+
+// Get mouse button state
+fn get_mouse_button_state(button: MouseButton): int {
+    if (global_app_state.is_initialized == 0) {
+        return 0;
+    }
+    
+    var button_state_offset: int = 128 + (button as int * 8);
+    return ffi.ffi_load_int64(global_app_state.native_window_ptr + button_state_offset);
+}
+
+// Get key state
+fn get_key_state(key: KeyCode): int {
+    if (global_app_state.is_initialized == 0) {
+        return 0;
+    }
+    
+    var key_state_offset: int = 160 + (key as int * 8);
+    return ffi.ffi_load_int64(global_app_state.native_window_ptr + key_state_offset);
+}
+
+// Get modifier state
+fn get_modifier_state(): ModifierFlags {
+    if (global_app_state.is_initialized == 0) {
+        return 0;
+    }
+    
+    return ffi.ffi_load_int64(global_app_state.native_window_ptr + 416);
+}
+
+// Create directory for app data
+fn create_app_data_directory(): str {
+    if (global_app_state.is_initialized == 0) {
+        return "";
+    }
+    
+    // Get app data path from native windowing system
+    var path_ptr: ffi.pubptr = ffi.ffi_load_int64(global_app_state.native_window_ptr + 424);
+    if (path_ptr != 0) {
+        return ffi.cstring_to_string(path_ptr);
+    }
+    
+    return "";
+}
+
+// Get executable path
+fn get_executable_path(): str {
+    if (global_app_state.is_initialized == 0) {
+        return "";
+    }
+    
+    // Get executable path from native windowing system
+    var path_ptr: ffi.pubptr = ffi.ffi_load_int64(global_app_state.native_window_ptr + 432);
+    if (path_ptr != 0) {
+        return ffi.cstring_to_string(path_ptr);
+    }
+    
+    return "";
+}
+
+// Get user home directory
+fn get_home_directory(): str {
+    if (global_app_state.is_initialized == 0) {
+        return "";
+    }
+    
+    // Get home directory from native windowing system
+    var path_ptr: ffi.pubptr = ffi.ffi_load_int64(global_app_state.native_window_ptr + 440);
+    if (path_ptr != 0) {
+        return ffi.cstring_to_string(path_ptr);
+    }
+    
+    return "";
+}

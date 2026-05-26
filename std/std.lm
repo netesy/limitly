@@ -32,6 +32,11 @@ import std.crypto.random as crypto_random;
 import std.encoding as encoding;
 import std.serialization as serialization;
 import std.debug as debug;
+import std.ffi as ffi;
+import std.gfx.types as gfx_types;
+import std.gfx.context as gfx_context;
+import std.app as app;
+import std.ui as ui;
 
 var List = collections.List;
 var Error = core.Error;

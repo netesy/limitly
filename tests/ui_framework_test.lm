@@ -1,0 +1,558 @@
+// UI Framework and FFI Integration Test
+// Comprehensive test to verify UI layer and FFI functionality
+
+import std.ffi as ffi;
+import std.gfx.types as gfx_types;
+import std.gfx.context as gfx_context;
+import std.ui.types as ui_types;
+import std.ui.context as ui_context;
+import std.ui.builder as builder;
+
+// Test helper function
+fn assert_equal(actual: int, expected: int, test_name: str): int {
+    if (actual == expected) {
+        print("[PASS] " + test_name);
+        return 1;
+    } else {
+        print("[FAIL] " + test_name + " - Expected: " + expected as str + ", Got: " + actual as str);
+        return 0;
+    }
+}
+
+fn assert_not_equal(actual: int, unexpected: int, test_name: str): int {
+    if (actual != unexpected) {
+        print("[PASS] " + test_name);
+        return 1;
+    } else {
+        print("[FAIL] " + test_name + " - Should not be: " + unexpected as str);
+        return 0;
+    }
+}
+
+fn assert_equal_float(actual: float, expected: float, tolerance: float, test_name: str): int {
+    var diff: float = actual - expected;
+    if (diff < 0) {
+        diff = -diff;
+    }
+    if (diff < tolerance) {
+        print("[PASS] " + test_name);
+        return 1;
+    } else {
+        print("[FAIL] " + test_name + " - Expected: " + expected as str + ", Got: " + actual as str);
+        return 0;
+    }
+}
+
+// FFI Tests
+fn test_ffi_memory_allocation(): int {
+    var passed: int = 0;
+    
+    // Test allocation
+    var ptr: ffi.pubptr = ffi.ffi_alloc(1024);
+    passed = passed + assert_not_equal(ptr as int, 0, "FFI: Memory allocation");
+    
+    // Test deallocation
+    if (ptr != 0) {
+        ffi.ffi_free(ptr);
+        passed = passed + assert_equal(1, 1, "FFI: Memory deallocation");
+    }
+    
+    return passed;
+}
+
+fn test_ffi_pointer_arithmetic(): int {
+    var passed: int = 0;
+    
+    var ptr: ffi.pubptr = ffi.ffi_alloc(256);
+    
+    // Test pointer addition
+    var ptr_plus: ffi.pubptr = ffi.ptr_add(ptr, 64);
+    passed = passed + assert_equal((ptr_plus - ptr) as int, 64, "FFI: Pointer addition");
+    
+    // Test pointer subtraction
+    var ptr_minus: ffi.pubptr = ffi.ptr_sub(ptr_plus, 32);
+    passed = passed + assert_equal((ptr_plus - ptr_minus) as int, 32, "FFI: Pointer subtraction");
+    
+    // Test pointer difference
+    var diff: int = ffi.ptr_diff(ptr_plus, ptr);
+    passed = passed + assert_equal(diff, 64, "FFI: Pointer difference");
+    
+    // Test pointer alignment
+    var aligned: ffi.pubptr = ffi.ptr_align(ptr, 16);
+    var is_aligned: int = ffi.ptr_is_aligned(aligned, 16);
+    passed = passed + assert_equal(is_aligned, 1, "FFI: Pointer alignment");
+    
+    ffi.ffi_free(ptr);
+    
+    return passed;
+}
+
+fn test_ffi_memory_operations(): int {
+    var passed: int = 0;
+    
+    var src: ffi.pubptr = ffi.ffi_alloc(128);
+    var dst: ffi.pubptr = ffi.ffi_alloc(128);
+    
+    // Test memset
+    ffi.ffi_memset(src, 42, 64);
+    var val: int = ffi.ffi_load_int8(src);
+    passed = passed + assert_equal(val, 42, "FFI: Memory set");
+    
+    // Test memcpy
+    ffi.ffi_memcpy(dst, src, 64);
+    var val2: int = ffi.ffi_load_int8(dst);
+    passed = passed + assert_equal(val2, 42, "FFI: Memory copy");
+    
+    // Test memcmp
+    var cmp: int = ffi.ffi_memcmp(src, dst, 64);
+    passed = passed + assert_equal(cmp, 0, "FFI: Memory compare");
+    
+    ffi.ffi_free(src);
+    ffi.ffi_free(dst);
+    
+    return passed;
+}
+
+fn test_ffi_load_store_operations(): int {
+    var passed: int = 0;
+    
+    var ptr: ffi.pubptr = ffi.ffi_alloc(64);
+    
+    // Test int32 store/load
+    ffi.ffi_store_int32(ptr, 12345);
+    var loaded_int32: int = ffi.ffi_load_int32(ptr);
+    passed = passed + assert_equal(loaded_int32, 12345, "FFI: Int32 store/load");
+    
+    // Test int64 store/load
+    ffi.ffi_store_int64(ptr + 8, 9876543210);
+    var loaded_int64: int = ffi.ffi_load_int64(ptr + 8);
+    passed = passed + assert_equal(loaded_int64, 9876543210, "FFI: Int64 store/load");
+    
+    // Test float store/load
+    ffi.ffi_store_float(ptr + 16, 3.14159);
+    var loaded_float: float = ffi.ffi_load_float(ptr + 16);
+    passed = passed + assert_equal_float(loaded_float, 3.14159, 0.0001, "FFI: Float store/load");
+    
+    // Test double store/load
+    ffi.ffi_store_double(ptr + 24, 2.71828);
+    var loaded_double: float = ffi.ffi_load_double(ptr + 24);
+    passed = passed + assert_equal_float(loaded_double, 2.71828, 0.0001, "FFI: Double store/load");
+    
+    // Test pointer store/load
+    ffi.ffi_store_ptr(ptr + 32, ptr);
+    var loaded_ptr: ffi.pubptr = ffi.ffi_load_ptr(ptr + 32);
+    passed = passed + assert_equal(loaded_ptr as int, ptr as int, "FFI: Pointer store/load");
+    
+    ffi.ffi_free(ptr);
+    
+    return passed;
+}
+
+fn test_ffi_cstring_marshalling(): int {
+    var passed: int = 0;
+    
+    // Test string to CString
+    var test_str: str = "Hello, Limitly!";
+    var cstr: ffi.CString = ffi.string_to_cstring(test_str);
+    passed = passed + assert_not_equal(ffi.cstring_as_ptr(cstr) as int, 0, "FFI: String to CString");
+    
+    // Test CString length
+    passed = passed + assert_equal(cstr.length, 15, "FFI: CString length");
+    
+    // Test CString back to string
+    var converted_str: str = ffi.cstring_to_string(ffi.cstring_as_ptr(cstr));
+    passed = passed + assert_equal(converted_str, test_str, "FFI: CString to string");
+    
+    // Test CString free
+    ffi.cstring_free(cstr);
+    passed = passed + assert_equal(1, 1, "FFI: CString free");
+    
+    return passed;
+}
+
+fn test_ffi_buffer_operations(): int {
+    var passed: int = 0;
+    
+    // Test buffer allocation
+    var buf: ffi.Buffer = ffi.buffer_alloc(256);
+    passed = passed + assert_equal(ffi.buffer_capacity(buf), 256, "FFI: Buffer allocation");
+    
+    // Test buffer write
+    buf = ffi.buffer_write_int32(buf, 0, 42);
+    buf = ffi.buffer_write_int32(buf, 4, 84);
+    
+    // Test buffer read
+    var val1: int = ffi.buffer_read_int32(buf, 0);
+    var val2: int = ffi.buffer_read_int32(buf, 4);
+    passed = passed + assert_equal(val1, 42, "FFI: Buffer write/read int32");
+    passed = passed + assert_equal(val2, 84, "FFI: Buffer write/read int32 (second)");
+    
+    // Test buffer resize
+    buf = ffi.buffer_resize(buf, 512);
+    passed = passed + assert_equal(ffi.buffer_capacity(buf), 512, "FFI: Buffer resize");
+    
+    // Test buffer free
+    ffi.buffer_free(buf);
+    passed = passed + assert_equal(1, 1, "FFI: Buffer free");
+    
+    return passed;
+}
+
+// UI Types Tests
+fn test_ui_type_creation(): int {
+    var passed: int = 0;
+    
+    // Test Color creation
+    var color: ui_types.Color = ui_types.color_rgba(1.0, 0.5, 0.25, 0.75);
+    passed = passed + assert_equal_float(color.r, 1.0, 0.001, "UI: Color red component");
+    passed = passed + assert_equal_float(color.g, 0.5, 0.001, "UI: Color green component");
+    passed = passed + assert_equal_float(color.b, 0.25, 0.001, "UI: Color blue component");
+    passed = passed + assert_equal_float(color.a, 0.75, 0.001, "UI: Color alpha component");
+    
+    // Test Size creation
+    var size: ui_types.Size = ui_types.size(100.0, 200.0);
+    passed = passed + assert_equal_float(size.width, 100.0, 0.001, "UI: Size width");
+    passed = passed + assert_equal_float(size.height, 200.0, 0.001, "UI: Size height");
+    
+    // Test Point creation
+    var point: ui_types.Point = ui_types.point(50.0, 75.0);
+    passed = passed + assert_equal_float(point.x, 50.0, 0.001, "UI: Point x");
+    passed = passed + assert_equal_float(point.y, 75.0, 0.001, "UI: Point y");
+    
+    // Test Rect creation
+    var rect: ui_types.Rect = ui_types.rect(10.0, 20.0, 30.0, 40.0);
+    passed = passed + assert_equal_float(rect.x, 10.0, 0.001, "UI: Rect x");
+    passed = passed + assert_equal_float(rect.y, 20.0, 0.001, "UI: Rect y");
+    passed = passed + assert_equal_float(rect.width, 30.0, 0.001, "UI: Rect width");
+    passed = passed + assert_equal_float(rect.height, 40.0, 0.001, "UI: Rect height");
+    
+    return passed;
+}
+
+fn test_ui_blueprint_creation(): int {
+    var passed: int = 0;
+    
+    // Test simple blueprint
+    var text_bp: ui_types.Blueprint = ui_types.blueprint(ui_types.ElementVariant.Text(ui_types.text_data("Test")));
+    passed = passed + assert_not_equal(0, 1, "UI: Blueprint creation");
+    
+    // Test blueprint with children
+    var child1: ui_types.Blueprint = ui_types.blueprint(ui_types.ElementVariant.Text(ui_types.text_data("Child1")));
+    var child2: ui_types.Blueprint = ui_types.blueprint(ui_types.ElementVariant.Text(ui_types.text_data("Child2")));
+    var container_bp: ui_types.Blueprint = ui_types.blueprint(ui_types.ElementVariant.Container(ui_types.container_data(ui_types.Axis.Vertical)));
+    var parent_bp: ui_types.Blueprint = ui_types.blueprint_add_child(container_bp, child1);
+    parent_bp = ui_types.blueprint_add_child(parent_bp, child2);
+    passed = passed + assert_equal(len(parent_bp.children), 2, "UI: Blueprint with children");
+    
+    // Test blueprint with constraints
+    var constrained_bp: ui_types.Blueprint = ui_types.blueprint_add_constraint(text_bp, ui_types.LayoutConstraint.Fixed(100));
+    passed = passed + assert_equal(len(constrained_bp.constraints), 1, "UI: Blueprint with constraints");
+    
+    return passed;
+}
+
+fn test_ui_element_creation(): int {
+    var passed: int = 0;
+    
+    // Test element creation
+    var text_data: ui_types.TextData = ui_types.text_data("Test Element");
+    var element: ui_types.Element = ui_types.create_element(ui_types.ElementVariant.Text(text_data), ui_types.INVALID_ELEMENT_ID);
+    passed = passed + assert_not_equal(element.id, ui_types.INVALID_ELEMENT_ID, "UI: Element creation");
+    passed = passed + assert_equal(element.parent_id, ui_types.INVALID_ELEMENT_ID, "UI: Element parent ID");
+    passed = passed + assert_equal(len(element.children), 0, "UI: Element children count");
+    
+    // Test element with parent
+    var parent: ui_types.Element = ui_types.create_element(ui_types.ElementVariant.Container(ui_types.container_data(ui_types.Axis.Vertical)), ui_types.INVALID_ELEMENT_ID);
+    var child: ui_types.Element = ui_types.create_element(ui_types.ElementVariant.Text(ui_types.text_data("Child")), parent.id);
+    passed = passed + assert_equal(child.parent_id, parent.id, "UI: Element with parent");
+    
+    return passed;
+}
+
+fn test_ui_state_management(): int {
+    var passed: int = 0;
+    
+    // Test state container creation
+    var int_state: ui_types.StateValue = ui_types.StateValue.IntState(42);
+    var container: ui_types.StateContainer = ui_types.create_state_container(int_state);
+    passed = passed + assert_not_equal(container.id, 0, "UI: State container creation");
+    passed = passed + assert_equal(container.version, 1, "UI: State container initial version");
+    
+    // Test state value retrieval
+    var retrieved: ui_types.StateValue = ui_types.StateValue.IntState(0);
+    match (container.value) {
+        ui_types.IntState(val) => { retrieved = ui_types.StateValue.IntState(val); }
+        _ => { }
+    }
+    passed = passed + assert_equal(0, 1, "UI: State value retrieval (match)");
+    
+    // Test state update
+    var new_state: ui_types.StateValue = ui_types.StateValue.IntState(100);
+    container.value = new_state;
+    container.version = container.version + 1;
+    passed = passed + assert_equal(container.version, 2, "UI: State update version increment");
+    
+    return passed;
+}
+
+// UI Context Tests
+fn test_ui_context_initialization(): int {
+    var passed: int = 0;
+    
+    // Test context initialization
+    var init_result: int = ui_context.ui_init();
+    passed = passed + assert_equal(init_result, 1, "UI: Context initialization");
+    passed = passed + assert_equal(ui_context.context_is_valid(), 1, "UI: Context validity check");
+    
+    // Test context shutdown
+    ui_context.ui_shutdown();
+    passed = passed + assert_equal(ui_context.context_is_valid(), 0, "UI: Context shutdown");
+    
+    // Re-initialize for subsequent tests
+    ui_context.ui_init();
+    
+    return passed;
+}
+
+fn test_ui_blueprint_to_tree_conversion(): int {
+    var passed: int = 0;
+    
+    // Create a simple blueprint
+    var text_bp: ui_types.Blueprint = builder.text("Hello World");
+    
+    // Convert to tree
+    var element_id: ui_types.ElementId = ui_context.blueprint_to_tree(text_bp, ui_types.INVALID_ELEMENT_ID);
+    passed = passed + assert_not_equal(element_id, ui_types.INVALID_ELEMENT_ID, "UI: Blueprint to tree conversion");
+    passed = passed + assert_equal(ui_context.global_ui_context.root_element, element_id, "UI: Root element set");
+    
+    // Verify element exists
+    var element: ui_types.Element = ui_context.global_ui_context.elements[element_id];
+    passed = passed + assert_equal(element.id, element_id, "UI: Element ID matches");
+    
+    return passed;
+}
+
+fn test_ui_layout_pass(): int {
+    var passed: int = 0;
+    
+    // Create a container blueprint with children
+    var child1: ui_types.Blueprint = builder.text("Child 1");
+    var child2: ui_types.Blueprint = builder.text("Child 2");
+    var container_bp: ui_types.builder.vstack([child1, child2]);
+    
+    // Convert to tree
+    ui_context.blueprint_to_tree(container_bp, ui_types.INVALID_ELEMENT_ID);
+    
+    // Run layout pass
+    var layout_result: ui_types.LayoutResult = ui_context.layout_pass(800.0, 600.0);
+    passed = passed + assert_not_equal(layout_result.root_metrics.size.width, 0.0, "UI: Layout pass computes size");
+    
+    return passed;
+}
+
+fn test_ui_render_pass(): int {
+    var passed: int = 0;
+    
+    // Create a simple blueprint
+    var text_bp: ui_types.builder.text("Render Test");
+    ui_context.blueprint_to_tree(text_bp, ui_types.INVALID_ELEMENT_ID);
+    
+    // Run render pass
+    var render_result: ui_types.RenderResult = ui_context.render_pass();
+    passed = passed + assert_not_equal(len(render_result.commands), 0, "UI: Render pass generates commands");
+    
+    return passed;
+}
+
+// Builder API Tests
+fn test_ui_builder_vstack(): int {
+    var passed: int = 0;
+    
+    // Test vstack creation
+    var child1: ui_types.Blueprint = builder.text("Item 1");
+    var child2: ui_types.Blueprint = builder.text("Item 2");
+    var stack: ui_types.Blueprint = builder.vstack([child1, child2]);
+    
+    passed = passed + assert_equal(len(stack.children), 2, "UI: VStack with children");
+    
+    // Test vstack with spacing
+    var stack_spacing: ui_types.Blueprint = builder.vstack_spacing(8.0, [child1]);
+    passed = passed + assert_equal(len(stack_spacing.children), 1, "UI: VStack with spacing");
+    
+    // Test vstack with padding
+    var padding: ui_types.Rect = ui_types.padding(16.0);
+    var stack_padding: ui_types.Blueprint = builder.vstack_padding(padding, [child1]);
+    passed = passed + assert_equal(len(stack_padding.children), 1, "UI: VStack with padding");
+    
+    return passed;
+}
+
+fn test_ui_builder_hstack(): int {
+    var passed: int = 0;
+    
+    // Test hstack creation
+    var child1: ui_types.Blueprint = builder.text("Left");
+    var child2: ui_types.Blueprint = builder.text("Right");
+    var stack: ui_types.Blueprint = builder.hstack([child1, child2]);
+    
+    passed = passed + assert_equal(len(stack.children), 2, "UI: HStack with children");
+    
+    // Test hstack with alignment
+    var stack_align: ui_types.Blueprint = builder.hstack_alignment(ui_types.Alignment.Center, [child1]);
+    passed = passed + assert_equal(len(stack_align.children), 1, "UI: HStack with alignment");
+    
+    return passed;
+}
+
+fn test_ui_builder_primitives(): int {
+    var passed: int = 0;
+    
+    // Test text builder
+    var text_bp: ui_types.Blueprint = builder.text("Test Text");
+    passed = passed + assert_equal(len(text_bp.children), 0, "UI: Text builder");
+    
+    // Test text with size
+    var text_size: ui_types.Blueprint = builder.text_size("Large Text", 24.0);
+    passed = passed + assert_equal(len(text_size.children), 0, "UI: Text with size");
+    
+    // Test text with color
+    var text_color: ui_types.Blueprint = builder.text_color("Colored Text", ui_types.COLOR_RED);
+    passed = passed + assert_equal(len(text_color.children), 0, "UI: Text with color");
+    
+    // Test button builder
+    var button_bp: ui_types.Blueprint = builder.button("Click Me");
+    passed = passed + assert_equal(len(button_bp.children), 0, "UI: Button builder");
+    
+    // Test button with background
+    var button_bg: ui_types.Blueprint = builder.button_background("Styled Button", ui_types.COLOR_BLUE);
+    passed = passed + assert_equal(len(button_bg.children), 0, "UI: Button with background");
+    
+    return passed;
+}
+
+fn test_ui_builder_constraints(): int {
+    var passed: int = 0;
+    
+    // Test fixed constraint
+    var bp: ui_types.Blueprint = builder.text("Constrained");
+    var fixed_bp: ui_types.Blueprint = builder.width(bp, 100);
+    passed = passed + assert_equal(len(fixed_bp.constraints), 1, "UI: Width constraint");
+    
+    // Test fill constraint
+    var fill_bp: ui_types.Blueprint = builder.fill(bp);
+    passed = passed + assert_equal(len(fill_bp.constraints), 2, "UI: Fill constraint");
+    
+    // Test auto constraint
+    var auto_bp: ui_types.Blueprint = builder.auto(bp);
+    passed = passed + assert_equal(len(auto_bp.constraints), 2, "UI: Auto constraint");
+    
+    // Test min/max constraints
+    var min_bp: ui_types.Blueprint = builder.min_width(bp, 50);
+    passed = passed + assert_equal(len(min_bp.constraints), 1, "UI: Min width constraint");
+    
+    var max_bp: ui_types.Blueprint = builder.max_width(bp, 200);
+    passed = passed + assert_equal(len(max_bp.constraints), 1, "UI: Max width constraint");
+    
+    return passed;
+}
+
+// Integration Test
+fn test_ui_full_pipeline(): int {
+    var passed: int = 0;
+    
+    // Initialize UI context
+    ui_context.ui_init();
+    passed = passed + assert_equal(ui_context.context_is_valid(), 1, "UI Integration: Context initialized");
+    
+    // Create a complex UI blueprint
+    var title: ui_types.Blueprint = builder.text_size("Limitly UI Framework", 32.0);
+    var subtitle: ui_types.Blueprint = builder.text_color("FFI-Powered Graphics", ui_types.color_rgb8(100, 100, 100));
+    
+    var button1: ui_types.Blueprint = builder.button("Test FFI");
+    var button2: ui_types.Blueprint = builder.button("Test Graphics");
+    
+    var button_row: ui_types.Blueprint = builder.hstack_spacing(16.0, [button1, button2]);
+    
+    var content: ui_types.Blueprint = builder.vstack_spacing(24.0, [title, subtitle, button_row]);
+    
+    var container: ui_types.Blueprint = builder.vstack_padding(ui_types.padding(32.0), [content]);
+    
+    // Convert to tree
+    var root_id: ui_types.ElementId = ui_context.blueprint_to_tree(container, ui_types.INVALID_ELEMENT_ID);
+    passed = passed + assert_not_equal(root_id, ui_types.INVALID_ELEMENT_ID, "UI Integration: Complex blueprint to tree");
+    
+    // Run layout pass
+    var layout_result: ui_types.LayoutResult = ui_context.layout_pass(800.0, 600.0);
+    passed = passed + assert_not_equal(layout_result.root_metrics.size.width, 0.0, "UI Integration: Layout pass");
+    
+    // Run render pass
+    var render_result: ui_types.RenderResult = ui_context.render_pass();
+    passed = passed + assert_not_equal(len(render_result.commands), 0, "UI Integration: Render pass");
+    
+    // Verify command types
+    var i: int = 0;
+    var has_text_command: int = 0;
+    var has_rect_command: int = 0;
+    while (i < len(render_result.commands)) {
+        match (render_result.commands[i]) {
+            ui_types.RenderCommand.DrawText(_) => { has_text_command = 1; }
+            ui_types.RenderCommand.DrawRect(_) => { has_rect_command = 1; }
+            _ => { }
+        }
+        i = i + 1;
+    }
+    passed = passed + assert_equal(has_text_command, 1, "UI Integration: Has text command");
+    passed = passed + assert_equal(has_rect_command, 1, "UI Integration: Has rect command");
+    
+    // Cleanup
+    ui_context.ui_shutdown();
+    passed = passed + assert_equal(ui_context.context_is_valid(), 0, "UI Integration: Context shutdown");
+    
+    return passed;
+}
+
+// Main test runner
+fn main(): void {
+    print("=== UI Framework and FFI Integration Test Suite ===");
+    print("");
+    
+    var total_passed: int = 0;
+    
+    print("--- FFI Tests ---");
+    total_passed = total_passed + test_ffi_memory_allocation();
+    total_passed = total_passed + test_ffi_pointer_arithmetic();
+    total_passed = total_passed + test_ffi_memory_operations();
+    total_passed = total_passed + test_ffi_load_store_operations();
+    total_passed = total_passed + test_ffi_cstring_marshalling();
+    total_passed = total_passed + test_ffi_buffer_operations();
+    print("");
+    
+    print("--- UI Types Tests ---");
+    total_passed = total_passed + test_ui_type_creation();
+    total_passed = total_passed + test_ui_blueprint_creation();
+    total_passed = total_passed + test_ui_element_creation();
+    total_passed = total_passed + test_ui_state_management();
+    print("");
+    
+    print("--- UI Context Tests ---");
+    total_passed = total_passed + test_ui_context_initialization();
+    total_passed = total_passed + test_ui_blueprint_to_tree_conversion();
+    total_passed = total_passed + test_ui_layout_pass();
+    total_passed = total_passed + test_ui_render_pass();
+    print("");
+    
+    print("--- Builder API Tests ---");
+    total_passed = total_passed + test_ui_builder_vstack();
+    total_passed = total_passed + test_ui_builder_hstack();
+    total_passed = total_passed + test_ui_builder_primitives();
+    total_passed = total_passed + test_ui_builder_constraints();
+    print("");
+    
+    print("--- Integration Tests ---");
+    total_passed = total_passed + test_ui_full_pipeline();
+    print("");
+    
+    print("=== Test Summary ===");
+    print("Total tests passed: " + total_passed as str);
+    print("All tests completed.");
+}
