@@ -3,49 +3,42 @@
 
 import std.ffi as ffi;
 
+fn main() {
     print("=== Simple FFI Test ===");
-    
-    // Test memory allocation
-    var ptr: int;
-    ptr = ffi.ffi_alloc(1024);
+
+    var ptr: int = ffi.ffi_alloc(1024);
     if (ptr != 0) {
         print("[PASS] Memory allocation");
     } else {
         print("[FAIL] Memory allocation");
     }
-    
-    // Test memory free
+
     if (ptr != 0) {
         ffi.ffi_free(ptr);
         print("[PASS] Memory free");
     }
-    
-    // Test pointer arithmetic
-    var ptr2: int;
-    ptr2 = ffi.ffi_alloc(256);
-    var ptr_plus: int;
-    ptr_plus = ffi.ptr_add(ptr2, 64);
-    var diff: int;
-    diff = ffi.ptr_diff(ptr_plus, ptr2);
+
+    var ptr2: int = ffi.ffi_alloc(256);
+    var ptr_plus: int = ffi.ptr_add(ptr2, 64);
+    var diff: int = ffi.ptr_diff(ptr_plus, ptr2);
     if (diff == 64) {
         print("[PASS] Pointer arithmetic");
     } else {
         print("[FAIL] Pointer arithmetic");
     }
     ffi.ffi_free(ptr2);
-    
-    // Test pointer alignment
-    var ptr3: int;
-    ptr3 = ffi.ffi_alloc(256);
-    var aligned: int;
-    aligned = ffi.ptr_align(ptr3, 16);
-    var is_aligned: int;
-    is_aligned = ffi.ptr_is_aligned(aligned, 16);
+
+    var ptr3: int = ffi.ffi_alloc(256);
+    var aligned: int = ffi.ptr_align(ptr3, 16);
+    var is_aligned: int = ffi.ptr_is_aligned(aligned, 16);
     if (is_aligned == 1) {
         print("[PASS] Pointer alignment");
     } else {
         print("[FAIL] Pointer alignment");
     }
     ffi.ffi_free(ptr3);
-    
+
     print("=== Test Complete ===");
+}
+
+main();
