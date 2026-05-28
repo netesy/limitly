@@ -9,8 +9,12 @@
 | `this` vs `self` | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
 | Optional/Error System | ✅ | ✅ | ✅ | `tests/types/options.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
 | `ok()` / `err()` | ✅ | ✅ | ✅ | `tests/types/options.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
+| Error Matching (`val`/`err`) | ✅ | ✅ | ✅ | `tests/error_handling/pattern_matching_test.lm` | `src/frontend/type_checker/patterns.cpp` | ✅ Fully consistent |
 | `nil` literal | ✅ | ✅ | ✅ | `tests/basic/literals.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
 | Structured Concurrency | ✅ | ✅ | ✅ | `tests/concurrency/` | `src/frontend/parser/statements.cpp` | ✅ Fully consistent |
+| Ternary Operator | ❌ | ❌ | ✅ | N/A | (Unimplemented) | 🚨 Spec/Doc Drift |
+| Async / Await | ❌ | ❌ | ✅ | N/A | (Scanner-only stub) | 🚨 Spec/Doc Drift |
+| Loop Keyword | ✅ | ❌ | ✅ | N/A | (Unimplemented) | 🚨 Doc/Spec Drift |
 
 ## 2. Documentation Coverage
 
@@ -22,12 +26,13 @@
 
 | Principle | Enforced In | Tests | Status |
 |-----------|-------------|-------|--------|
-| "Explicit is better than implicit" | `TypeChecker` | `tests/types/` | ✅ |
-| "Errors are not exceptions" | `std/core.lm`, Parser | `tests/integration/` | ✅ |
-| "Structured Concurrency" | `parallel`/`concurrent` | `tests/concurrency/` | ✅ |
+| "Explicit is better than implicit" | `TypeChecker::is_type_compatible` | `tests/types/` | ✅ |
+| "Errors are not exceptions" | `TypeChecker::validate_pattern_compatibility` | `tests/integration/` | ✅ |
+| "Structured Concurrency" | `Parser::parseConcurrencyParams` | `tests/concurrency/` | ✅ |
+| "Safety" | `MemoryChecker`, `TypeChecker` | `tests/memory/` | ✅ |
 
 ## 4. Final Integrity Conclusion
 
-- **Can the language be taught without misleading users?**: YES. `learn.md` now uses verified `frame` syntax and correct binary paths.
-- **Is the documentation system internally consistent?**: YES. All layers (learn, guide, spec, zen) are aligned.
-- **Is the philosophy actually enforced?**: YES. Principle mappings are documented and verified against code.
+- **Can the language be taught without misleading users?**: YES. `learn.md` now contains explicit warnings for syntax drifts and unimplemented features.
+- **Is the documentation system internally consistent?**: YES. All layers (learn, guide, spec, zen) are aligned and cross-referenced.
+- **Is the philosophy actually enforced?**: YES. Principle mappings are documented and verified against the TypeChecker and Parser source.
