@@ -68,6 +68,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::DictGet:
             case LIR::LIR_Op::DictHas:
             case LIR::LIR_Op::DictLen:
+            case LIR::LIR_Op::DictItems:
             case LIR::LIR_Op::TupleCreate:
             case LIR::LIR_Op::TupleSet:
             case LIR::LIR_Op::TupleGet:
@@ -120,6 +121,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::GetPayload:
                 execute_objects(pc);
                 break;
+            case LIR::LIR_Op::StringIndex:
             case LIR::LIR_Op::ToString:
             case LIR::LIR_Op::STR_CONCAT:
             case LIR::LIR_Op::STR_FORMAT:

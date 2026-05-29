@@ -26,10 +26,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -d "vendor/fyra" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I. -Isrc
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -d "vendor/fyra" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I. -Isrc
 endif
 
@@ -62,10 +62,10 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp \
               src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp
 
-BACK_SRCS := $(if $(shell [ -d "vendor/fyra" ] && echo yes),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp,)
+BACK_SRCS := $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp,)
 
 FYRA_DIR := vendor/fyra
-FYRA_SRCS := $(if $(shell [ -d "$(FYRA_DIR)" ] && echo yes),\
+FYRA_SRCS := $(if $(shell [ -f "$(FYRA_DIR)/include/ir/Module.h" ] && echo yes),\
              $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/*.cpp) \
 			 $(wildcard $(FYRA_DIR)/src/codegen/abi/*.cpp) \
@@ -213,7 +213,7 @@ FYRA_DIR := vendor/fyra
 FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
 # Check if Fyra is available
-FYRA_AVAILABLE := $(shell if [ -d "$(FYRA_DIR)" ]; then echo "yes"; else echo "no"; fi)
+FYRA_AVAILABLE := $(shell if [ -f "$(FYRA_DIR)/include/ir/Module.h" ]; then echo "yes"; else echo "no"; fi)
 
 ifeq ($(FYRA_AVAILABLE),yes)
 # Build Fyra using Makefile (excluding problematic debug files)

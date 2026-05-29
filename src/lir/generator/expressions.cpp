@@ -2205,17 +2205,9 @@ Reg Generator::emit_call_closure_expr(LM::Frontend::AST::CallClosureExpr& expr) 
         abi_type = language_type_to_abi_type(expr.inferred_type);
     }
 
-    if (arg_regs.empty()) {
-        emit_instruction(LIR_Inst(LIR_Op::CallIndirect, abi_type, result, closure_reg, 0));
-    } else {
-        // Pass arguments to CallIndirect using multi-register convention or internal argument stack
-        for (const auto& arg : arg_regs) {
-            LIR_Inst param_inst(LIR_Op::Param);
-            param_inst.a = arg;
-            emit_instruction(param_inst);
-        }
-        emit_instruction(LIR_Inst(LIR_Op::CallIndirect, abi_type, result, closure_reg, 0));
-    }
+    LIR_Inst call_inst(LIR_Op::CallIndirect, abi_type, result, closure_reg, 0);
+    call_inst.call_args = arg_regs;
+    emit_instruction(call_inst);
     
     // Set return type based on inference
     if (expr.inferred_type) {
@@ -2386,7 +2378,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
     TypePtr object_lang_type = get_register_language_type(object_reg);
     bool is_tuple = object_lang_type && object_lang_type->tag == ::TypeTag::Tuple;
 
-    if (is_tuple && expr.name == "key") {
+    if ((is_tuple || expr.name == "key") && expr.name == "key") {
         // Access first element of tuple (index 0)
         Reg index_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
@@ -2400,7 +2392,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         return result_reg;
     }
     
-    if (is_tuple && expr.name == "value") {
+    if ((is_tuple || expr.name == "value") && expr.name == "value") {
         // Access second element of tuple (index 1)
         Reg index_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);

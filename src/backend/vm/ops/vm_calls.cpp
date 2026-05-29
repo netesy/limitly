@@ -3,6 +3,7 @@
 #include "../../../lir/builtin_functions.hh"
 #include "../../../runtime/runtime.h"
 #include "../../../runtime/runtime_value.h"
+#include "../../../runtime/runtime_tuple.h"
 
 namespace LM {
 namespace Backend {
@@ -52,10 +53,21 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
             RegisterValue func_obj = registers[pc->a];
             std::string func_name = "";
             
+            std::vector<RegisterValue> closure_extra_args;
             if (IS_PTR(func_obj)) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(func_obj);
                 if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
                     func_name = (char*)((LmBox*)h)->value.as_ptr;
+                } else if (h->type_id == TYPE_TUPLE) {
+                    LmTuple* closure_tuple = (LmTuple*)h;
+                    RegisterValue name_value = lm_tuple_get(closure_tuple, 0);
+                    if (IS_PTR(name_value)) {
+                        ObjHeader* name_header = (ObjHeader*)UNBOX_PTR(name_value);
+                        if (name_header->type_id == TYPE_BOX && ((LmBox*)name_header)->type == LM_BOX_STRING) {
+                            func_name = (char*)((LmBox*)name_header)->value.as_ptr;
+                            closure_extra_args.push_back(func_obj);
+                        }
+                    }
                 }
             }
             
@@ -65,6 +77,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     auto func = func_manager.getFunction(func_name);
                     std::vector<RegisterValue> arg_vals;
                     for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
+                    arg_vals.insert(arg_vals.end(), closure_extra_args.begin(), closure_extra_args.end());
 
                     auto saved_registers = registers;
                     const LIR::LIR_Function* saved_func = current_function_;
