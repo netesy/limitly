@@ -2,12 +2,36 @@
 #include <iostream>
 #include <cmath>
 #include <cstring>
+#include <algorithm>
 #include "../fiber.hh"
 
 namespace LM {
 namespace Backend {
 namespace VM {
 namespace Register {
+
+namespace {
+
+void consider_register(uint32_t reg, size_t& max_register) {
+    if (reg != UINT32_MAX) {
+        max_register = std::max(max_register, static_cast<size_t>(reg));
+    }
+}
+
+size_t required_register_count(const LIR::LIR_Function& function) {
+    size_t max_register = 0;
+    for (const auto& inst : function.instructions) {
+        consider_register(inst.dst, max_register);
+        consider_register(inst.a, max_register);
+        consider_register(inst.b, max_register);
+        for (auto arg : inst.call_args) {
+            consider_register(arg, max_register);
+        }
+    }
+    return max_register + 1;
+}
+
+} // namespace
 
 RegisterVM::RegisterVM() {
     registers.resize(256, VAL_NIL);
@@ -20,6 +44,11 @@ void RegisterVM::execute_function(const LIR::LIR_Function& function) {
 }
 
 void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t start_pc, size_t end_pc) {
+    size_t needed_registers = required_register_count(function);
+    if (registers.size() < needed_registers) {
+        registers.resize(needed_registers, VAL_NIL);
+    }
+
     const LIR::LIR_Inst* instructions_ptr = function.instructions.data();
     const LIR::LIR_Inst* pc = instructions_ptr + start_pc;
     const LIR::LIR_Inst* end = instructions_ptr + end_pc;
@@ -110,6 +139,23 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::ChannelPoll:
             case LIR::LIR_Op::ChannelClose:
             case LIR::LIR_Op::ChannelHasData:
+            case LIR::LIR_Op::SchedulerInit:
+            case LIR::LIR_Op::SchedulerRun:
+            case LIR::LIR_Op::SchedulerAddTask:
+            case LIR::LIR_Op::ParallelInit:
+            case LIR::LIR_Op::ParallelSync:
+            case LIR::LIR_Op::TaskContextAlloc:
+            case LIR::LIR_Op::TaskContextInit:
+            case LIR::LIR_Op::TaskSetField:
+            case LIR::LIR_Op::TaskGetField:
+            case LIR::LIR_Op::SharedCellAlloc:
+            case LIR::LIR_Op::SharedCellLoad:
+            case LIR::LIR_Op::SharedCellStore:
+            case LIR::LIR_Op::SharedCellAdd:
+            case LIR::LIR_Op::SharedCellSub:
+            case LIR::LIR_Op::ResourceCreate:
+            case LIR::LIR_Op::ResourceDestroy:
+            case LIR::LIR_Op::ResourceCall:
                 execute_concurrency(pc);
                 break;
             case LIR::LIR_Op::LoadGlobal:
@@ -132,10 +178,24 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::CallBuiltin:
                 execute_calls(pc);
                 break;
+            case LIR::LIR_Op::MemoryAlloc:
+            case LIR::LIR_Op::MemoryFree:
+            case LIR::LIR_Op::MemoryResize:
+            case LIR::LIR_Op::MemoryLoad:
+            case LIR::LIR_Op::MemoryStore:
+            case LIR::LIR_Op::ForeignCall:
+                execute_ffi(pc);
+                break;
             case LIR::LIR_Op::Cast:
                 execute_cast(pc);
                 break;
             case LIR::LIR_Op::Mov:
+                registers[pc->dst] = registers[pc->a];
+                break;
+            case LIR::LIR_Op::Load:
+                registers[pc->dst] = registers[pc->a];
+                break;
+            case LIR::LIR_Op::Store:
                 registers[pc->dst] = registers[pc->a];
                 break;
             case LIR::LIR_Op::Return:

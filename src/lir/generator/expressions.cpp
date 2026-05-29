@@ -1601,10 +1601,18 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             return result;
             
         } else {
-            // Check if it's actually a variable holding a function (indirect call)
+            // Check if it's actually a variable holding a function (directly
+            // bound in scope or captured in the current closure environment).
             Reg var_reg = resolve_variable(func_name);
-            if (var_reg != UINT32_MAX) {
-                // Redirect to closure call
+            bool captured_function = false;
+            if (env_register_ != UINT32_MAX) {
+                captured_function = std::find(current_lambda_captures_.begin(),
+                                              current_lambda_captures_.end(),
+                                              func_name) != current_lambda_captures_.end();
+            }
+            if (var_reg != UINT32_MAX || captured_function) {
+                // Redirect to closure call. emit_variable_expr will materialize
+                // captured function values from the environment tuple.
                 LM::Frontend::AST::CallClosureExpr closure_call;
                 closure_call.closure = expr.callee;
                 closure_call.arguments = expr.arguments;
@@ -1632,7 +1640,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
             if (resolve_enum_variant_info(type_system_.get(), enum_hint, qualified_variant, tag, expected_arity)) {
                 Reg result = allocate_register();
-                Reg payload = 0;
+                Reg payload = UINT32_MAX;
                 
                 if (!expr.arguments.empty()) {
                     if (expr.arguments.size() == 1) {
@@ -1688,15 +1696,33 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 
                 // Generate function call
                 Reg result = allocate_register();
+                Type abi_res_type = Type::Void;
                 
                 // Set the result type if available from type checking
                 if (expr.inferred_type) {
                     set_register_language_type(result, expr.inferred_type);
-                    set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+                    abi_res_type = language_type_to_abi_type(expr.inferred_type);
+                    set_register_abi_type(result, abi_res_type);
                 } else {
                     auto any_type = std::make_shared<::Type>(::TypeTag::Any);
                     set_register_language_type(result, any_type);
-                    set_register_abi_type(result, language_type_to_abi_type(any_type));
+                    abi_res_type = language_type_to_abi_type(any_type);
+                    set_register_abi_type(result, abi_res_type);
+                }
+
+                std::string intrinsic_name = qualified_name;
+                if (intrinsic_name.find('.') != std::string::npos && intrinsic_name.find("::") == std::string::npos) {
+                    intrinsic_name.replace(intrinsic_name.rfind('.'), 1, "::");
+                }
+
+                if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(intrinsic_name)) {
+                    LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
+                    inst.imm = intrinsic->type_id;
+                    if (!arg_regs.empty()) inst.a = arg_regs[0];
+                    if (arg_regs.size() > 1) inst.b = arg_regs[1];
+                    inst.call_args = arg_regs;
+                    emit_instruction(inst);
+                    return result;
                 }
                 
                 // Generate function call using the qualified name
@@ -2035,6 +2061,19 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
         }
     }
     
+    // For assignments to captured variables inside a closure, write through the
+    // closure environment tuple so subsequent reads and calls observe the update.
+    if (!expr.name.empty() && env_register_ != UINT32_MAX) {
+        auto captured_it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), expr.name);
+        if (captured_it != current_lambda_captures_.end()) {
+            size_t captured_index = std::distance(current_lambda_captures_.begin(), captured_it);
+            Reg idx_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(static_cast<int64_t>(captured_index + 1))));
+            emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, env_register_, idx_reg, value));
+            return value;
+        }
+    }
+
     // For simple variable assignment
     if (!expr.name.empty()) {
         // Get the existing register for this variable
@@ -2317,7 +2356,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
 
         if (resolve_enum_variant_info(type_system_.get(), enum_hint, qualified_variant, tag, expected_arity) && expected_arity == 0) {
             Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::MakeEnum, Type::Ptr, result, 0, 0, static_cast<uint32_t>(tag)));
+            emit_instruction(LIR_Inst(LIR_Op::MakeEnum, Type::Ptr, result, UINT32_MAX, 0, static_cast<uint32_t>(tag)));
             if (expr.inferred_type) {
                 set_register_language_type(result, expr.inferred_type);
                 set_register_abi_type(result, Type::Ptr);
@@ -2548,10 +2587,28 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
     fn_decl->returnType = expr.returnType;
     fn_decl->body = expr.body;
     fn_decl->inferred_type = expr.inferred_type;
+
+    std::vector<std::string> effective_captures = expr.capturedVars;
+    if (expr.body) {
+        std::set<std::string> used_names;
+        std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> lambda_body_statements;
+        lambda_body_statements.push_back(expr.body);
+        find_accessed_variables_recursive(lambda_body_statements, used_names);
+        for (const auto& used_name : used_names) {
+            bool is_param = false;
+            for (const auto& param : expr.params) {
+                if (param.first == used_name) { is_param = true; break; }
+            }
+            if (!is_param && resolve_variable(used_name) != UINT32_MAX &&
+                std::find(effective_captures.begin(), effective_captures.end(), used_name) == effective_captures.end()) {
+                effective_captures.push_back(used_name);
+            }
+        }
+    }
     
     // Set captures for the new function's generation
     auto prev_captures = current_lambda_captures_;
-    current_lambda_captures_ = expr.capturedVars;
+    current_lambda_captures_ = effective_captures;
     
     generate_function(*fn_decl);
     
@@ -2564,13 +2621,13 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
     Reg name_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, name_reg, name_val));
 
-    if (expr.capturedVars.empty()) {
+    if (effective_captures.empty()) {
         // Simple function pointer
         emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Ptr, func_reg, name_reg, 0));
     } else {
         // Bundle into a Tuple: (lambda_name, capture1, capture2, ...)
         Reg closure_tuple = allocate_register();
-        uint32_t tuple_size = static_cast<uint32_t>(expr.capturedVars.size() + 1);
+        uint32_t tuple_size = static_cast<uint32_t>(effective_captures.size() + 1);
         emit_instruction(LIR_Inst(LIR_Op::TupleCreate, Type::Ptr, closure_tuple, 0, 0, tuple_size));
         
         // Set lambda name at index 0
@@ -2579,12 +2636,12 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
         emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, closure_tuple, zero_idx, name_reg));
 
         // Set captured variables
-        for (size_t i = 0; i < expr.capturedVars.size(); ++i) {
-            Reg val_reg = resolve_variable(expr.capturedVars[i]);
+        for (size_t i = 0; i < effective_captures.size(); ++i) {
+            Reg val_reg = resolve_variable(effective_captures[i]);
             if (val_reg == UINT32_MAX) {
                 // If not found in local scope, it might be in current lambda's env
                 if (env_register_ != UINT32_MAX) {
-                    auto it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), expr.capturedVars[i]);
+                    auto it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), effective_captures[i]);
                     if (it != current_lambda_captures_.end()) {
                         size_t inner_idx = std::distance(current_lambda_captures_.begin(), it);
                         Reg inner_idx_reg = allocate_register();

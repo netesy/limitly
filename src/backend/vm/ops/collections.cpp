@@ -6,6 +6,16 @@
 #include "../../../runtime/runtime_value.h"
 #include <cstdlib>
 
+namespace {
+
+ObjHeader* header_if_type(LmValue value, uint32_t type_id) {
+    if (!IS_PTR(value)) return nullptr;
+    auto* header = static_cast<ObjHeader*>(UNBOX_PTR(value));
+    return header && header->type_id == type_id ? header : nullptr;
+}
+
+} // namespace
+
 namespace LM {
 namespace Backend {
 namespace VM {
@@ -17,13 +27,13 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = BOX_PTR(lm_list_new());
             break;
         case LIR::LIR_Op::ListAppend:
-            if (IS_PTR(registers[pc->a])) {
-                lm_list_append((LmList*)UNBOX_PTR(registers[pc->a]), registers[pc->b]);
+            if (auto* list = reinterpret_cast<LmList*>(header_if_type(registers[pc->a], TYPE_LIST))) {
+                lm_list_append(list, registers[pc->b]);
             }
             break;
         case LIR::LIR_Op::ListLen:
-            if (IS_PTR(registers[pc->a])) {
-                registers[pc->dst] = make_i64(lm_list_len((LmList*)UNBOX_PTR(registers[pc->a])));
+            if (auto* list = reinterpret_cast<LmList*>(header_if_type(registers[pc->a], TYPE_LIST))) {
+                registers[pc->dst] = make_i64(lm_list_len(list));
             } else {
                 registers[pc->dst] = make_i64(0);
             }
@@ -47,32 +57,35 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = BOX_PTR(lm_dict_new(hash_boxed_value, cmp_boxed_value));
             break;
         case LIR::LIR_Op::DictSet:
-            if (IS_PTR(registers[pc->dst])) {
-                lm_dict_set((LmDict*)UNBOX_PTR(registers[pc->dst]), registers[pc->a], registers[pc->b]);
+            if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->dst], TYPE_DICT))) {
+                lm_dict_set(dict, registers[pc->a], registers[pc->b]);
             }
             break;
         case LIR::LIR_Op::DictGet:
-            if (IS_PTR(registers[pc->a])) {
-                registers[pc->dst] = lm_dict_get((LmDict*)UNBOX_PTR(registers[pc->a]), registers[pc->b]);
+            if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->a], TYPE_DICT))) {
+                registers[pc->dst] = lm_dict_get(dict, registers[pc->b]);
             } else {
                 registers[pc->dst] = VAL_NIL;
             }
             break;
         case LIR::LIR_Op::DictHas:
-            registers[pc->dst] = (IS_PTR(registers[pc->a]) && lm_dict_contains((LmDict*)UNBOX_PTR(registers[pc->a]), registers[pc->b])) ? VAL_TRUE : VAL_FALSE;
+            if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->a], TYPE_DICT))) {
+                registers[pc->dst] = lm_dict_contains(dict, registers[pc->b]) ? VAL_TRUE : VAL_FALSE;
+            } else {
+                registers[pc->dst] = VAL_FALSE;
+            }
             break;
         case LIR::LIR_Op::DictLen:
-            if (IS_PTR(registers[pc->a])) {
-                LmDict* dict = (LmDict*)UNBOX_PTR(registers[pc->a]);
+            if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->a], TYPE_DICT))) {
                 registers[pc->dst] = make_i64(static_cast<int64_t>(dict->size));
             } else {
                 registers[pc->dst] = make_i64(0);
             }
             break;
         case LIR::LIR_Op::DictItems:
-            if (pc->call_args.size() >= 2 && IS_PTR(registers[pc->call_args[0]])) {
+            if (pc->call_args.size() >= 2 && header_if_type(registers[pc->call_args[0]], TYPE_DICT)) {
                 uint64_t count = 0;
-                LmValue* items = lm_dict_items((LmDict*)UNBOX_PTR(registers[pc->call_args[0]]), &count);
+                LmValue* items = lm_dict_items(reinterpret_cast<LmDict*>(header_if_type(registers[pc->call_args[0]], TYPE_DICT)), &count);
                 int64_t wanted = as_i64(registers[pc->call_args[1]]);
                 if (items && wanted >= 0 && static_cast<uint64_t>(wanted) < count) {
                     registers[pc->dst] = items[static_cast<uint64_t>(wanted) * 2];
@@ -80,9 +93,9 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
                     registers[pc->dst] = VAL_NIL;
                 }
                 if (items) free(items);
-            } else if (IS_PTR(registers[pc->a])) {
+            } else if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->a], TYPE_DICT))) {
                 uint64_t count = 0;
-                LmValue* items = lm_dict_items((LmDict*)UNBOX_PTR(registers[pc->a]), &count);
+                LmValue* items = lm_dict_items(dict, &count);
                 LmList* list = lm_list_new();
                 for (uint64_t i = 0; items && i < count; ++i) {
                     LmTuple* entry = lm_tuple_new(2);
@@ -100,20 +113,20 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = BOX_PTR(lm_tuple_new(pc->imm));
             break;
         case LIR::LIR_Op::TupleSet:
-            if (IS_PTR(registers[pc->dst])) {
-                lm_tuple_set((LmTuple*)UNBOX_PTR(registers[pc->dst]), static_cast<uint64_t>(as_i64(registers[pc->a])), registers[pc->b]);
+            if (auto* tuple = reinterpret_cast<LmTuple*>(header_if_type(registers[pc->dst], TYPE_TUPLE))) {
+                lm_tuple_set(tuple, static_cast<uint64_t>(as_i64(registers[pc->a])), registers[pc->b]);
             }
             break;
         case LIR::LIR_Op::TupleGet:
-            if (IS_PTR(registers[pc->a])) {
-                registers[pc->dst] = lm_tuple_get((LmTuple*)UNBOX_PTR(registers[pc->a]), static_cast<uint64_t>(as_i64(registers[pc->b])));
+            if (auto* tuple = reinterpret_cast<LmTuple*>(header_if_type(registers[pc->a], TYPE_TUPLE))) {
+                registers[pc->dst] = lm_tuple_get(tuple, static_cast<uint64_t>(as_i64(registers[pc->b])));
             } else {
                 registers[pc->dst] = VAL_NIL;
             }
             break;
         case LIR::LIR_Op::TupleLen:
-            if (IS_PTR(registers[pc->a])) {
-                registers[pc->dst] = make_i64(static_cast<int64_t>(lm_tuple_size((LmTuple*)UNBOX_PTR(registers[pc->a]))));
+            if (auto* tuple = reinterpret_cast<LmTuple*>(header_if_type(registers[pc->a], TYPE_TUPLE))) {
+                registers[pc->dst] = make_i64(static_cast<int64_t>(lm_tuple_size(tuple)));
             } else {
                 registers[pc->dst] = make_i64(0);
             }

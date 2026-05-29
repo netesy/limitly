@@ -23,11 +23,24 @@ namespace Register {
 namespace {
     std::mutex g_ffi_mutex;
     std::unordered_map<uintptr_t, size_t> g_ffi_allocations;
+
+    LIR::Reg arg_reg(const LIR::LIR_Inst* pc, size_t index, LIR::Reg fallback) {
+        return index < pc->call_args.size() ? pc->call_args[index] : fallback;
+    }
+
+    const char* boxed_c_string(RegisterValue value) {
+        if (!IS_PTR(value)) return nullptr;
+        auto* header = static_cast<ObjHeader*>(UNBOX_PTR(value));
+        if (header->type_id == TYPE_BOX && static_cast<LmBox*>(static_cast<void*>(header))->type == LM_BOX_STRING) {
+            return static_cast<const char*>(static_cast<LmBox*>(static_cast<void*>(header))->value.as_ptr);
+        }
+        return nullptr;
+    }
 }
 
 // Memory allocation/deallocation
 void RegisterVM::execute_ffi_alloc(const LIR::LIR_Inst* pc) {
-    int64_t size = to_int(registers[pc->a]);
+    int64_t size = to_int(registers[arg_reg(pc, 0, pc->a)]);
     if (size < 0) {
         registers[pc->dst] = VAL_NIL;
         return;
@@ -44,11 +57,12 @@ void RegisterVM::execute_ffi_alloc(const LIR::LIR_Inst* pc) {
 }
 
 void RegisterVM::execute_ffi_free(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
+    LIR::Reg ptr_reg = arg_reg(pc, 0, pc->a);
+    if (!IS_PTR(registers[ptr_reg])) {
         return;
     }
     
-    void* ptr = UNBOX_PTR(registers[pc->a]);
+    void* ptr = UNBOX_PTR(registers[ptr_reg]);
     if (ptr) {
         std::lock_guard<std::mutex> lock(g_ffi_mutex);
         auto it = g_ffi_allocations.find(reinterpret_cast<uintptr_t>(ptr));
@@ -60,13 +74,15 @@ void RegisterVM::execute_ffi_free(const LIR::LIR_Inst* pc) {
 }
 
 void RegisterVM::execute_ffi_realloc(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
+    LIR::Reg ptr_reg = arg_reg(pc, 0, pc->a);
+    LIR::Reg size_reg = arg_reg(pc, 1, pc->b);
+    if (!IS_PTR(registers[ptr_reg])) {
         registers[pc->dst] = VAL_NIL;
         return;
     }
     
-    void* ptr = UNBOX_PTR(registers[pc->a]);
-    int64_t new_size = to_int(registers[pc->b]);
+    void* ptr = UNBOX_PTR(registers[ptr_reg]);
+    int64_t new_size = to_int(registers[size_reg]);
     
     if (new_size < 0) {
         registers[pc->dst] = VAL_NIL;
@@ -86,13 +102,16 @@ void RegisterVM::execute_ffi_realloc(const LIR::LIR_Inst* pc) {
 
 // Memory operations
 void RegisterVM::execute_ffi_memcpy(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a]) || !IS_PTR(registers[pc->b])) {
+    LIR::Reg dest_reg = arg_reg(pc, 0, pc->a);
+    LIR::Reg src_reg = arg_reg(pc, 1, pc->b);
+    LIR::Reg size_reg = arg_reg(pc, 2, pc->dst);
+    if (!IS_PTR(registers[dest_reg]) || !IS_PTR(registers[src_reg])) {
         return;
     }
     
-    void* dest = UNBOX_PTR(registers[pc->a]);
-    void* src = UNBOX_PTR(registers[pc->b]);
-    int64_t size = to_int(registers[pc->dst]);
+    void* dest = UNBOX_PTR(registers[dest_reg]);
+    void* src = UNBOX_PTR(registers[src_reg]);
+    int64_t size = to_int(registers[size_reg]);
     
     if (dest && src && size > 0) {
         std::memcpy(dest, src, size);
@@ -100,13 +119,16 @@ void RegisterVM::execute_ffi_memcpy(const LIR::LIR_Inst* pc) {
 }
 
 void RegisterVM::execute_ffi_memset(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
+    LIR::Reg ptr_reg = arg_reg(pc, 0, pc->a);
+    LIR::Reg value_reg = arg_reg(pc, 1, pc->b);
+    LIR::Reg size_reg = arg_reg(pc, 2, pc->dst);
+    if (!IS_PTR(registers[ptr_reg])) {
         return;
     }
     
-    void* ptr = UNBOX_PTR(registers[pc->a]);
-    int64_t value = to_int(registers[pc->b]);
-    int64_t size = to_int(registers[pc->dst]);
+    void* ptr = UNBOX_PTR(registers[ptr_reg]);
+    int64_t value = to_int(registers[value_reg]);
+    int64_t size = to_int(registers[size_reg]);
     
     if (ptr && size > 0) {
         std::memset(ptr, static_cast<int>(value), size);
@@ -114,14 +136,17 @@ void RegisterVM::execute_ffi_memset(const LIR::LIR_Inst* pc) {
 }
 
 void RegisterVM::execute_ffi_memcmp(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a]) || !IS_PTR(registers[pc->b])) {
+    LIR::Reg lhs_reg = arg_reg(pc, 0, pc->a);
+    LIR::Reg rhs_reg = arg_reg(pc, 1, pc->b);
+    LIR::Reg size_reg = arg_reg(pc, 2, pc->imm);
+    if (!IS_PTR(registers[lhs_reg]) || !IS_PTR(registers[rhs_reg])) {
         registers[pc->dst] = BOX_INT(0);
         return;
     }
     
-    void* ptr1 = UNBOX_PTR(registers[pc->a]);
-    void* ptr2 = UNBOX_PTR(registers[pc->b]);
-    int64_t size = to_int(registers[pc->imm]);
+    void* ptr1 = UNBOX_PTR(registers[lhs_reg]);
+    void* ptr2 = UNBOX_PTR(registers[rhs_reg]);
+    int64_t size = to_int(registers[size_reg]);
     
     if (ptr1 && ptr2 && size > 0) {
         int result = std::memcmp(ptr1, ptr2, size);
@@ -496,10 +521,24 @@ namespace {
 }
 
 void RegisterVM::execute_ffi_library_load(const LIR::LIR_Inst* pc) {
-    // Get library path from string register
-    // This requires runtime support to extract string data
-    // For now, return nil as placeholder
-    registers[pc->dst] = VAL_NIL;
+    LIR::Reg path_reg = arg_reg(pc, 0, pc->a);
+    const char* path = boxed_c_string(registers[path_reg]);
+    if (!path) {
+        registers[pc->dst] = VAL_NIL;
+        return;
+    }
+#ifdef _WIN32
+    void* handle = static_cast<void*>(LoadLibraryA(path));
+#else
+    void* handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL);
+#endif
+    if (!handle) {
+        registers[pc->dst] = VAL_NIL;
+        return;
+    }
+    std::lock_guard<std::mutex> lock(g_library_mutex);
+    g_libraries[reinterpret_cast<uintptr_t>(handle)] = path;
+    registers[pc->dst] = BOX_PTR(handle);
 }
 
 void RegisterVM::execute_ffi_library_unload(const LIR::LIR_Inst* pc) {
@@ -520,16 +559,24 @@ void RegisterVM::execute_ffi_library_unload(const LIR::LIR_Inst* pc) {
 }
 
 void RegisterVM::execute_ffi_library_get_symbol(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
+    LIR::Reg handle_reg = arg_reg(pc, 0, pc->a);
+    LIR::Reg symbol_reg = arg_reg(pc, 1, pc->b);
+    if (!IS_PTR(registers[handle_reg])) {
         registers[pc->dst] = VAL_NIL;
         return;
     }
-    
-    void* handle = UNBOX_PTR(registers[pc->a]);
-    // Get symbol name from string register
-    // This requires runtime support to extract string data
-    // For now, return nil as placeholder
-    registers[pc->dst] = VAL_NIL;
+    const char* symbol = boxed_c_string(registers[symbol_reg]);
+    if (!symbol) {
+        registers[pc->dst] = VAL_NIL;
+        return;
+    }
+    void* handle = UNBOX_PTR(registers[handle_reg]);
+#ifdef _WIN32
+    void* ptr = reinterpret_cast<void*>(GetProcAddress(static_cast<HMODULE>(handle), symbol));
+#else
+    void* ptr = dlsym(handle, symbol);
+#endif
+    registers[pc->dst] = ptr ? BOX_PTR(ptr) : VAL_NIL;
 }
 
 // Callback registration
@@ -699,6 +746,57 @@ void RegisterVM::execute_ffi_get_abi_info(const LIR::LIR_Inst* pc) {
 // Main FFI execution dispatcher
 void RegisterVM::execute_ffi(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
+        case LIR::LIR_Op::MemoryAlloc:
+            execute_ffi_alloc(pc);
+            break;
+        case LIR::LIR_Op::MemoryFree:
+            execute_ffi_free(pc);
+            break;
+        case LIR::LIR_Op::MemoryResize:
+            execute_ffi_realloc(pc);
+            break;
+        case LIR::LIR_Op::MemoryLoad: {
+            switch (pc->imm) {
+                case 0: execute_ffi_load_int8(pc); break;
+                case 1: execute_ffi_load_uint8(pc); break;
+                case 2: execute_ffi_load_int16(pc); break;
+                case 3: execute_ffi_load_uint16(pc); break;
+                case 4: execute_ffi_load_int32(pc); break;
+                case 5: execute_ffi_load_uint32(pc); break;
+                case 6: execute_ffi_load_int64(pc); break;
+                case 7: execute_ffi_load_uint64(pc); break;
+                case 8: execute_ffi_load_float(pc); break;
+                case 9: execute_ffi_load_double(pc); break;
+                case 10: execute_ffi_load_ptr(pc); break;
+                default: registers[pc->dst] = VAL_NIL; break;
+            }
+            break;
+        }
+        case LIR::LIR_Op::MemoryStore: {
+            LIR::Reg ptr_reg = arg_reg(pc, 0, pc->a);
+            LIR::Reg value_reg = arg_reg(pc, 1, pc->b);
+            if (!IS_PTR(registers[ptr_reg])) break;
+            void* ptr = UNBOX_PTR(registers[ptr_reg]);
+            switch (pc->imm) {
+                case 0: *static_cast<int8_t*>(ptr) = static_cast<int8_t>(to_int(registers[value_reg])); break;
+                case 1: *static_cast<uint8_t*>(ptr) = static_cast<uint8_t>(to_int(registers[value_reg])); break;
+                case 2: *static_cast<int16_t*>(ptr) = static_cast<int16_t>(to_int(registers[value_reg])); break;
+                case 3: *static_cast<uint16_t*>(ptr) = static_cast<uint16_t>(to_int(registers[value_reg])); break;
+                case 4: *static_cast<int32_t*>(ptr) = static_cast<int32_t>(to_int(registers[value_reg])); break;
+                case 5: *static_cast<uint32_t*>(ptr) = static_cast<uint32_t>(to_int(registers[value_reg])); break;
+                case 6: *static_cast<int64_t*>(ptr) = to_int(registers[value_reg]); break;
+                case 7: *static_cast<uint64_t*>(ptr) = static_cast<uint64_t>(to_int(registers[value_reg])); break;
+                case 8: *static_cast<float*>(ptr) = static_cast<float>(to_float(registers[value_reg])); break;
+                case 9: *static_cast<double*>(ptr) = to_float(registers[value_reg]); break;
+                case 10: *static_cast<void**>(ptr) = IS_PTR(registers[value_reg]) ? UNBOX_PTR(registers[value_reg]) : nullptr; break;
+                default: break;
+            }
+            registers[pc->dst] = registers[value_reg];
+            break;
+        }
+        case LIR::LIR_Op::ForeignCall:
+            execute_ffi_ccall_execute(pc);
+            break;
         // Memory allocation/deallocation
         case LIR::LIR_Op::FFIAlloc:
             execute_ffi_alloc(pc);

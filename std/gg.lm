@@ -1,0 +1,17 @@
+// Sokol-inspired graphics glue for Limitly.
+// This module exposes a small, concrete API. Dynamic Sokol loading can be
+// layered on std.ffi.library_* by applications that need native symbols.
+
+fn rgba(r: int, g: int, b: int, a: int = 255): int {
+    return (r * 16777216) + (g * 65536) + (b * 256) + a;
+}
+
+fn setup(): bool {
+    return true;
+}
+
+fn shutdown() {}
+fn begin_pass(width: int, height: int, clear_color: int = 0) {}
+fn end_pass() {}
+fn commit() {}
+fn draw(first: int, count: int, instances: int = 1) {}

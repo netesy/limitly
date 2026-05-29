@@ -39,3 +39,8 @@ fn ffi_memcpy(d: int, s: int, sz: int): int { return memcpy(d, s, sz); }
 
 fn ptr_add(p: int, o: int): int { return p + o; }
 fn ptr_sub(p: int, o: int): int { return p - o; }
+
+fn ptr_diff(a: int, b: int): int { return 0; }
+fn library_load(path: str): int { return 0; }
+fn library_unload(handle: int) {}
+fn library_get_symbol(handle: int, name: str): int { return 0; }

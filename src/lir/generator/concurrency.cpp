@@ -924,6 +924,22 @@ void Generator::find_accessed_variables_recursive(const std::vector<std::shared_
         } else if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(stmt.get())) {
            // std::cout << "[DEBUG] Found BlockStatement" << std::endl;
             find_accessed_variables_recursive(block_stmt->statements, accessed_variables);
+        } else if (auto return_stmt = dynamic_cast<LM::Frontend::AST::ReturnStatement*>(stmt.get())) {
+            if (return_stmt->value) {
+                find_accessed_variables_in_expr(*return_stmt->value, accessed_variables);
+            }
+        } else if (auto if_stmt = dynamic_cast<LM::Frontend::AST::IfStatement*>(stmt.get())) {
+            if (if_stmt->condition) find_accessed_variables_in_expr(*if_stmt->condition, accessed_variables);
+            if (if_stmt->thenBranch) {
+                if (auto then_block = dynamic_cast<LM::Frontend::AST::BlockStatement*>(if_stmt->thenBranch.get())) {
+                    find_accessed_variables_recursive(then_block->statements, accessed_variables);
+                }
+            }
+            if (if_stmt->elseBranch) {
+                if (auto else_block = dynamic_cast<LM::Frontend::AST::BlockStatement*>(if_stmt->elseBranch.get())) {
+                    find_accessed_variables_recursive(else_block->statements, accessed_variables);
+                }
+            }
         } else {
            // std::cout << "[DEBUG] Statement type not handled: " << typeid(*stmt.get()).name() << std::endl;
         }
@@ -962,6 +978,11 @@ void Generator::find_accessed_variables_in_expr(const LM::Frontend::AST::Express
                 find_accessed_variables_in_expr(*arg, accessed_variables);
             }
         }
+    } else if (auto closure_call = dynamic_cast<const LM::Frontend::AST::CallClosureExpr*>(&expr)) {
+        if (closure_call->closure) find_accessed_variables_in_expr(*closure_call->closure, accessed_variables);
+        for (const auto& arg : closure_call->arguments) if (arg) find_accessed_variables_in_expr(*arg, accessed_variables);
+    } else if (auto grouping_expr = dynamic_cast<const LM::Frontend::AST::GroupingExpr*>(&expr)) {
+        if (grouping_expr->expression) find_accessed_variables_in_expr(*grouping_expr->expression, accessed_variables);
     } else if (auto interp_expr = dynamic_cast<const LM::Frontend::AST::InterpolatedStringExpr*>(&expr)) {
         for (const auto& part : interp_expr->parts) {
             if (std::holds_alternative<std::shared_ptr<LM::Frontend::AST::Expression>>(part)) {

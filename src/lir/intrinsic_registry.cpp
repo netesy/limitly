@@ -40,12 +40,30 @@ IntrinsicRegistry::IntrinsicRegistry() {
     registerIntrinsic("std.ffi::store_f64", {LIR_Op::MemoryStore, 0, 0, 2, 9});
     registerIntrinsic("std.ffi::store_ptr", {LIR_Op::MemoryStore, 0, 0, 2, 10});
 
+    // Memory utilities beyond typed load/store
+    registerIntrinsic("std.ffi::memset", {LIR_Op::FFIMemset, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi::memcpy", {LIR_Op::FFIMemcpy, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi::memcmp", {LIR_Op::FFIMemcmp, 0, 0, 3, 0});
+
+    // Pointer arithmetic
+    registerIntrinsic("std.ffi::ptr_add", {LIR_Op::FFIAddPtr, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi::ptr_sub", {LIR_Op::FFISubPtr, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi::ptr_diff", {LIR_Op::FFIPtrDiff, 0, 0, 2, 0});
+
+    // Dynamic library and symbol handles
+    registerIntrinsic("std.ffi::library_load", {LIR_Op::FFILibraryLoad, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi::library_unload", {LIR_Op::FFILibraryUnload, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi::library_get_symbol", {LIR_Op::FFILibraryGetSymbol, 0, 0, 2, 0});
+
     // Foreign Call
     registerIntrinsic("std.ffi::ccall_execute", {LIR_Op::ForeignCall, 0, 0, 2, 0});
 
     // Legacy aliases for tests
     registerIntrinsic("std.ffi::ffi_alloc", {LIR_Op::MemoryAlloc, 0, 0, 1, 0});
     registerIntrinsic("std.ffi::ffi_free", {LIR_Op::MemoryFree, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi::ffi_realloc", {LIR_Op::MemoryResize, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi::ffi_memset", {LIR_Op::FFIMemset, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi::ffi_memcpy", {LIR_Op::FFIMemcpy, 0, 0, 3, 0});
 }
 
 void IntrinsicRegistry::registerIntrinsic(const std::string& qualified_name, const IntrinsicMetadata& meta) {

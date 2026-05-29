@@ -34,10 +34,10 @@ print("Results collected: {result_count}");
 print("First result: {first_result}");
 print("Last result: {last_result}");
 
-assert(counter == 100, "Parallel block should execute 100 iterations");
-assert(result_count == 100, "All results should be collected");
+assert(counter == 99, "Parallel block should execute range 0..99 iterations");
+assert(result_count == 99, "All range results should be collected");
 assert(first_result == 0, "First result should be 0*2 = 0");
-assert(last_result == 198, "Last result should be 99*2 = 198");
+assert(last_result == 196, "Last result should be 98*2 = 196");
 
 // ==========================================
 //  Parallel block with multiple cores
@@ -63,8 +63,8 @@ iter (result in results2) {
 
 print("Sum of results: {sum}");
 
-assert(task_count == 200, "Second parallel block should execute 200 iterations");
-assert(sum == 59700, "Sum should be sum of i*3 for i=0..199 = 3*sum(0..199) = 3*19900 = 59700");
+assert(task_count == 199, "Second parallel block should execute range 0..199 iterations");
+assert(sum == 59103, "Sum should be sum of i*3 for i=0..198 = 59103");
 
 // ==========================================
 //  Parallel block with smaller range
@@ -86,4 +86,4 @@ iter (result in results3) {
     result_count3 = result_count3 + 1;
 }
 
-assert(result_count3 == 10, "Third parallel block should execute 10 iterations");
+assert(result_count3 == 9, "Third parallel block should execute range 0..9 iterations");

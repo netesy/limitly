@@ -13,8 +13,8 @@ void RegisterVM::execute_objects(const LIR::LIR_Inst* pc) {
             // In the unified model, Enum can be a specialized LmFrame or its own type.
             // For now, let's use a Frame with 2 fields: [tag, payload]
             void* enum_obj = lm_frame_alloc("__lir_internal_enum__", 2);
-            lm_frame_set_field(enum_obj, 0, make_i64(pc->a));
-            lm_frame_set_field(enum_obj, 1, registers[pc->b]);
+            lm_frame_set_field(enum_obj, 0, make_i64(static_cast<int64_t>(pc->imm)));
+            lm_frame_set_field(enum_obj, 1, pc->a == UINT32_MAX ? VAL_NIL : registers[pc->a]);
             registers[pc->dst] = BOX_PTR(enum_obj);
             break;
         }

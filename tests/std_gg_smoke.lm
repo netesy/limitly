@@ -1,0 +1,10 @@
+import std.gg as gg
+
+fn main() {
+    assert(gg.setup(), "std.gg setup should succeed");
+    var color = gg.rgba(1, 2, 3);
+    assert(color != 0, "std.gg rgba should pack a non-zero color");
+    print("std.gg smoke passed");
+}
+
+main();
