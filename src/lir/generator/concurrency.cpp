@@ -213,7 +213,8 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
        // std::cout << "[DEBUG] No channel param, allocating new channel" << std::endl;
         // Original behavior: allocate new channel
         channel_reg = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::ChannelAlloc, channel_reg, 32, 0));
+        LIR_Inst ch_inst(LIR_Op::ResourceCreate, Type::Ptr, channel_reg, 0, 0, (uint32_t)ResourceType::CHANNEL);
+        emit_instruction(ch_inst);
         bind_variable(stmt.channel, channel_reg);
         set_register_type(channel_reg, int_type);
     }

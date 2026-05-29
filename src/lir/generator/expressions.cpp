@@ -1,5 +1,6 @@
 #include "../generator.hh"
 #include "../functions.hh"
+#include "../intrinsic_registry.hh"
 #include "../../backend/vm/constant_utils.hh"
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
@@ -1236,6 +1237,37 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
     if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.callee.get())) {
         std::string func_name = var_expr->name;
 
+        // Resolve qualified name for intrinsic lookup
+        std::string registry_lookup_name = func_name;
+        size_t d_pos = func_name.find("::");
+        if (d_pos != std::string::npos) {
+            std::string mod_name = func_name.substr(0, d_pos);
+            std::string sym_name = func_name.substr(d_pos + 2);
+            auto a_it = import_aliases_.find(mod_name);
+            if (a_it != import_aliases_.end()) mod_name = a_it->second;
+            registry_lookup_name = mod_name + "::" + sym_name;
+        }
+
+        if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(registry_lookup_name)) {
+            std::vector<Reg> arg_regs;
+            for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+            Reg result = allocate_register();
+            Type abi_res_type = Type::Void;
+            if (expr.inferred_type) {
+                set_register_language_type(result, expr.inferred_type);
+                abi_res_type = language_type_to_abi_type(expr.inferred_type);
+                set_register_abi_type(result, abi_res_type);
+            }
+            
+            LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
+            inst.imm = intrinsic->type_id; // For MemoryLoad/Store
+            if (!arg_regs.empty()) inst.a = arg_regs[0];
+            if (arg_regs.size() > 1) inst.b = arg_regs[1];
+            inst.call_args = arg_regs;
+            emit_instruction(inst);
+            return result;
+        }
+
         // Try looking up in imported symbols to find the actual qualified name
         if (expr.inferred_type && expr.inferred_type->tag == ::TypeTag::Frame) {
             FrameType ft = std::get<FrameType>(expr.inferred_type->extra);
@@ -1294,7 +1326,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
             // NewFrame allocates the object
             LIR_Inst new_frame_inst(LIR_Op::NewFrame, Type::Ptr, frame_reg, 0, 0, static_cast<uint32_t>(frame_info.total_field_size));
-            new_frame_inst.func_name = func_name;
+            new_frame_inst.type_name = func_name;
             emit_instruction(new_frame_inst);
 
             // Set frame type
@@ -1471,6 +1503,30 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
         }
         if (function_table_.find(func_name) != function_table_.end()) {
+            std::string full_func_name = func_name;
+            if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(full_func_name)) {
+                std::vector<Reg> arg_regs;
+                for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+                Reg result = allocate_register();
+                Type abi_res_type = Type::Void;
+                if (expr.inferred_type) {
+                    set_register_language_type(result, expr.inferred_type);
+                    abi_res_type = language_type_to_abi_type(expr.inferred_type);
+                    set_register_abi_type(result, abi_res_type);
+                }
+                LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
+                if (intrinsic->opcode == LIR_Op::ResourceCall) {
+                    inst.imm = intrinsic->resource_type;
+                    inst.a = intrinsic->operation_type;
+                } else {
+                    inst.imm = intrinsic->type_id;
+                    if (!arg_regs.empty()) inst.a = arg_regs[0];
+                    if (arg_regs.size() > 1) inst.b = arg_regs[1];
+                }
+                inst.call_args = arg_regs;
+                emit_instruction(inst);
+                return result;
+            }
            // std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
             
             // Evaluate arguments and store them in registers
@@ -1502,28 +1558,16 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             
             // Special handling for channel() function
             if (func_name == "channel") {
-               // std::cout << "[DEBUG] Processing channel() builtin function" << std::endl;
                 if (!expr.arguments.empty()) {
-                   // std::cout << "[DEBUG] channel() has arguments, reporting error" << std::endl;
                     report_error("channel() function takes no arguments");
                     return 0;
                 }
-                
-               // std::cout << "[DEBUG] Allocating result register for channel" << std::endl;
-                // Allocate result register
                 Reg result = allocate_register();
-                
-               // std::cout << "[DEBUG] Setting channel type for register " << result << std::endl;
-                
-                // Set the result type to Channel
                 auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
                 set_register_language_type(result, channel_type);
-                set_register_abi_type(result, Type::I64); // Channel handles are int64
-                
-                // Generate ChannelAlloc instruction with default capacity
-                emit_instruction(LIR_Inst(LIR_Op::ChannelAlloc, result, 32, 0));
-                
-               // std::cout << "[DEBUG] Generated ChannelAlloc: channel_alloc r" << result << std::endl;
+                set_register_abi_type(result, Type::Ptr);
+                LIR_Inst ch_inst(LIR_Op::ResourceCreate, Type::Ptr, result, 0, 0, (uint32_t)ResourceType::CHANNEL);
+                emit_instruction(ch_inst);
                 return result;
             }
             

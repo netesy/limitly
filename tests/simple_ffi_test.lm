@@ -3,7 +3,7 @@
 
 import std.ffi as ffi;
 
-fn main() {
+
     print("=== Simple FFI Test ===");
 
     var ptr: int = ffi.ffi_alloc(1024);
@@ -39,6 +39,3 @@ fn main() {
     ffi.ffi_free(ptr3);
 
     print("=== Test Complete ===");
-}
-
-main();

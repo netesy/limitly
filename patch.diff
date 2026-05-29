@@ -1,0 +1,8 @@
+<<<<<<< SEARCH
+#include "../generator.hh"
+#include "../functions.hh"
+=======
+#include "../generator.hh"
+#include "../functions.hh"
+#include "../intrinsic_registry.hh"
+>>>>>>> REPLACE

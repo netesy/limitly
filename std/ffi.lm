@@ -1,91 +1,41 @@
 // Standard FFI (Foreign Function Interface) library for Limitly
 
-var ALIGNMENT_CHAR = 1;
-var ALIGNMENT_SHORT = 2;
-var ALIGNMENT_INT = 4;
-var ALIGNMENT_LONG = 8;
-var ALIGNMENT_LONGLONG = 8;
-var ALIGNMENT_PTR = 8;
-var ALIGNMENT_FLOAT = 4;
-var ALIGNMENT_DOUBLE = 8;
-var ALIGNMENT_MAX = 8;
-
-frame CString {}
-frame Buffer {}
-frame Library {}
-frame ABIInfo {}
-frame CCallFrame {}
-
-fn alloc(size: int): int { return 1; }
-fn free(p: int): int { return 0; }
-fn realloc(p: int, ns: int): int { return p; }
+fn alloc(size: int): int { return 0; }
+fn free(p: int) {}
+fn realloc(p: int, ns: int): int { return 0; }
 fn memset(p: int, v: int, s: int): int { return 0; }
 fn memcpy(d: int, s: int, sz: int): int { return 0; }
-fn memcmp(p1: int, p2: int, sz: int): int { return 0; }
 
-fn add_ptr(p: int, o: int): int { return p + o; }
-fn sub_ptr(p: int, o: int): int { return p - o; }
-fn ptr_diff(p1: int, p2: int): int { return p1 - p2; }
-fn align_ptr(p: int, a: int): int { if ((p % a) == 0) { return p; } return p + (a - (p % a)); }
-fn is_aligned(p: int, a: int): int { if ((p % a) == 0) { return 1; } return 0; }
+fn load_i8(p: int): int { return 0; }
+fn load_u8(p: int): int { return 0; }
+fn load_i16(p: int): int { return 0; }
+fn load_u16(p: int): int { return 0; }
+fn load_i32(p: int): int { return 0; }
+fn load_u32(p: int): int { return 0; }
+fn load_i64(p: int): int { return 0; }
+fn load_u64(p: int): int { return 0; }
+fn load_f32(p: int): float { return 0.0; }
+fn load_f64(p: int): float { return 0.0; }
+fn load_ptr(p: int): int { return 0; }
 
-fn load_int8(p: int): int { return 0 }
-fn load_uint8(p: int): int { return 0 }
-fn load_int16(p: int): int { return 0 }
-fn load_uint16(p: int): int { return 0 }
-fn load_int32(p: int): int { return 0 }
-fn load_uint32(p: int): int { return 0 }
-fn load_int64(p: int): int { return 0 }
-fn load_uint64(p: int): int { return 0 }
-fn load_float(p: int): float { return 0.0 }
-fn load_double(p: int): float { return 0.0 }
-fn load_ptr(p: int): int { return 0 }
-fn store_int8(p: int, v: int): int { return 0 }
-fn store_uint8(p: int, v: int): int { return 0 }
-fn store_int16(p: int, v: int): int { return 0 }
-fn store_uint16(p: int, v: int): int { return 0 }
-fn store_int32(p: int, v: int): int { return 0 }
-fn store_uint32(p: int, v: int): int { return 0 }
-fn store_int64(p: int, v: int): int { return 0 }
-fn store_uint64(p: int, v: int): int { return 0 }
-fn store_float(p: int, v: float): int { return 0 }
-fn store_double(p: int, v: float): int { return 0 }
-fn store_ptr(p: int, v: int): int { return 0 }
+fn store_i8(p: int, v: int) {}
+fn store_u8(p: int, v: int) {}
+fn store_i16(p: int, v: int) {}
+fn store_u16(p: int, v: int) {}
+fn store_i32(p: int, v: int) {}
+fn store_u32(p: int, v: int) {}
+fn store_i64(p: int, v: int) {}
+fn store_u64(p: int, v: int) {}
+fn store_f32(p: int, v: float) {}
+fn store_f64(p: int, v: float) {}
+fn store_ptr(p: int, v: int) {}
 
-fn to_cstring(s: str): CString { return CString(); }
-fn from_cstring(cs: CString): str { return ""; }
-fn free_cstring(cs: CString): int { return 0; }
-fn cstring_as_ptr(cs: CString): int { return 0; }
-
-fn buffer_alloc(cap: int): Buffer { return Buffer(); }
-fn buffer_free(b: Buffer): int { return 0; }
-fn buffer_resize(b: Buffer, nc: int): int { return 0; }
-fn buffer_read_int32(b: Buffer, o: int): int { return 0; }
-fn buffer_write_int32(b: Buffer, o: int, v: int): int { return 0; }
-fn buffer_capacity(b: Buffer): int { return 0; }
-fn buffer_as_ptr(b: Buffer): int { return 0; }
-
-fn register_callback(f: fn(): int): int { return 0; }
-fn register_callback1(f: fn(int): int): int { return 0; }
-fn register_callback2(f: fn(int, int): int): int { return 0; }
-fn register_callback3(f: fn(int, int, int): int): int { return 0; }
-fn register_callback4(f: fn(int, int, int, int): int): int { return 0; }
-fn register_callback5(f: fn(int, int, int, int, int): int): int { return 0; }
-fn unregister_callback(id: int): int { return 0; }
-fn get_callback_ptr(id: int): int { return 0; }
-
-fn library_load(pth: str): Library { return Library(); }
-fn library_unload(l: Library): int { return 0; }
-fn library_get_symbol(l: Library, s: str): int { return 0; }
-fn get_abi_info(): ABIInfo { return ABIInfo(); }
-fn ccall_frame_create(rc: int, ss: int): CCallFrame { return CCallFrame(); }
-fn ccall_frame_destroy(f: CCallFrame): int { return 0; }
-fn ccall_execute(fp: int, f: CCallFrame): int { return 0; }
-
+// Compatibility aliases
 fn ffi_alloc(size: int): int { return alloc(size); }
 fn ffi_free(p: int) { free(p); }
 fn ffi_realloc(p: int, ns: int): int { return realloc(p, ns); }
-fn ptr_add(p: int, o: int): int { return add_ptr(p, o); }
-fn ptr_sub(p: int, o: int): int { return sub_ptr(p, o); }
-fn ptr_align(p: int, a: int): int { return align_ptr(p, a); }
-fn ptr_is_aligned(p: int, a: int): int { return is_aligned(p, a); }
+fn ffi_memset(p: int, v: int, s: int): int { return memset(p, v, s); }
+fn ffi_memcpy(d: int, s: int, sz: int): int { return memcpy(d, s, sz); }
+
+fn ptr_add(p: int, o: int): int { return p + o; }
+fn ptr_sub(p: int, o: int): int { return p - o; }

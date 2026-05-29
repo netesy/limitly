@@ -1,113 +1,37 @@
-#include "../../lir/lir.hh"
-#include "../../lir/functions.hh"
-#include "../../lir/function_registry.hh"
-#include "../../lir/builtin_functions.hh"
 #include "register.hh"
-#include "../../runtime/runtime.h"
-#include "../../runtime/runtime_list.h"
-#include "../../runtime/runtime_dict.h"
-#include "../../runtime/runtime_tuple.h"
-#include "../../runtime/runtime_value.h"
 #include <iostream>
-#include <memory>
+#include <cmath>
 #include <cstring>
-#include <cstdint>
-#include <string>
-#include <charconv>
+#include "../fiber.hh"
 
 namespace LM {
 namespace Backend {
 namespace VM {
 namespace Register {
 
-extern void* box_register_value(const RegisterValue& value);
-extern RegisterValue unbox_register_value(void* boxed_value);
-
-std::string RegisterVM::to_string(const RegisterValue& value) const {
-    LmString s = lm_value_to_string(value);
-    std::string result(s.data ? s.data : "nil");
-    lm_string_free(s);
-    return result;
-}
-
-bool RegisterVM::isErrorValue(LIR::Reg reg) const {
-    auto& value = registers[reg];
-    if (is_integer(value)) {
-        int64_t int_val = as_i64(value);
-        return int_val <= -1000000;
-    }
-    return false;
-}
-
-RegisterVM::RegisterVM() 
-    : type_system(std::make_unique<TypeSystem>()) {
-    registers.resize(1024, VAL_NIL);
-    scheduler = std::make_unique<Scheduler>();
-    current_time = 0;
-    current_function_ = nullptr;
-    
-    shared_variables.emplace(std::piecewise_construct, 
-        std::forward_as_tuple("shared_counter"), 
-        std::forward_as_tuple(0));
-}
-
-void RegisterVM::reset() {
-    std::fill(registers.begin(), registers.end(), VAL_NIL);
-    argument_stack.clear();
-    task_contexts.clear();
-    channels.clear();
-    scheduler = std::make_unique<Scheduler>();
-    current_time = 0;
-    current_function_ = nullptr;
-    
-    shared_variables.clear();
-    shared_variables.emplace(std::piecewise_construct, 
-        std::forward_as_tuple("shared_counter"), 
-        std::forward_as_tuple(0));
-    
-    shared_cells.clear();
-    default_atomic.store(0);
-    work_queues.clear();
-    work_queue_counter.store(0);
+RegisterVM::RegisterVM() {
+    registers.resize(256, VAL_NIL);
     instruction_count = 0;
 }
 
-static __int128 parse_i128(const std::string& s) {
-    __int128 result = 0;
-    bool neg = false;
-    size_t i = 0;
-    if (s.empty()) return 0;
-    if (s[0] == '-') { neg = true; i = 1; }
-    for (; i < s.length(); i++) {
-        if (s[i] >= '0' && s[i] <= '9')
-            result = result * 10 + (s[i] - '0');
-    }
-    return neg ? -result : result;
-}
-
-static unsigned __int128 parse_u128(const std::string& s) {
-    unsigned __int128 result = 0;
-    for (size_t i = 0; i < s.length(); i++) {
-        if (s[i] >= '0' && s[i] <= '9')
-            result = result * 10 + (s[i] - '0');
-    }
-    return result;
+void RegisterVM::execute_function(const LIR::LIR_Function& function) {
+    current_function_ = &function;
+    execute_instructions(function, 0, function.instructions.size());
 }
 
 void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t start_pc, size_t end_pc) {
-    const LIR::LIR_Inst* pc = function.instructions.data() + start_pc;
-    const LIR::LIR_Inst* end = function.instructions.data() + end_pc;
+    const LIR::LIR_Inst* instructions_ptr = function.instructions.data();
+    const LIR::LIR_Inst* pc = instructions_ptr + start_pc;
+    const LIR::LIR_Inst* end = instructions_ptr + end_pc;
     
     while (pc < end) {
         instruction_count++;
         if (instruction_count > MAX_INSTRUCTIONS) { std::cerr << "Instruction limit exceeded" << std::endl; return; }
         switch (pc->op) {
             case LIR::LIR_Op::LoadConst: {
-                // Use the more robust constant loader logic
                 if (pc->const_val == VAL_NIL) {
                     registers[pc->dst] = VAL_NIL;
                 } else {
-                    // Assuming const_val is already an LmValue/RegisterValue
                     registers[pc->dst] = pc->const_val;
                 }
                 break;
@@ -198,10 +122,10 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             case LIR::LIR_Op::ToString:
             case LIR::LIR_Op::STR_CONCAT:
+            case LIR::LIR_Op::STR_FORMAT:
                 execute_strings(pc);
                 break;
             case LIR::LIR_Op::Call:
-            case LIR::LIR_Op::CallVoid:
             case LIR::LIR_Op::CallIndirect:
             case LIR::LIR_Op::CallBuiltin:
                 execute_calls(pc);
@@ -209,93 +133,22 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::Cast:
                 execute_cast(pc);
                 break;
-            case LIR::LIR_Op::FFIAlloc:
-            case LIR::LIR_Op::FFIFree:
-            case LIR::LIR_Op::FFIRealloc:
-            case LIR::LIR_Op::FFIMemcpy:
-            case LIR::LIR_Op::FFIMemset:
-            case LIR::LIR_Op::FFIMemcmp:
-            case LIR::LIR_Op::FFIAddPtr:
-            case LIR::LIR_Op::FFISubPtr:
-            case LIR::LIR_Op::FFIPtrDiff:
-            case LIR::LIR_Op::FFIAlignPtr:
-            case LIR::LIR_Op::FFIIsAligned:
-            case LIR::LIR_Op::FFILoadInt8:
-            case LIR::LIR_Op::FFILoadUInt8:
-            case LIR::LIR_Op::FFILoadInt16:
-            case LIR::LIR_Op::FFILoadUInt16:
-            case LIR::LIR_Op::FFILoadInt32:
-            case LIR::LIR_Op::FFILoadUInt32:
-            case LIR::LIR_Op::FFILoadInt64:
-            case LIR::LIR_Op::FFILoadUInt64:
-            case LIR::LIR_Op::FFILoadFloat:
-            case LIR::LIR_Op::FFILoadDouble:
-            case LIR::LIR_Op::FFILoadPtr:
-            case LIR::LIR_Op::FFIStoreInt8:
-            case LIR::LIR_Op::FFIStoreUInt8:
-            case LIR::LIR_Op::FFIStoreInt16:
-            case LIR::LIR_Op::FFIStoreUInt16:
-            case LIR::LIR_Op::FFIStoreInt32:
-            case LIR::LIR_Op::FFIStoreUInt32:
-            case LIR::LIR_Op::FFIStoreInt64:
-            case LIR::LIR_Op::FFIStoreUInt64:
-            case LIR::LIR_Op::FFIStoreFloat:
-            case LIR::LIR_Op::FFIStoreDouble:
-            case LIR::LIR_Op::FFIStorePtr:
-            case LIR::LIR_Op::FFIToCString:
-            case LIR::LIR_Op::FFIFromCString:
-            case LIR::LIR_Op::FFIFreeCString:
-            case LIR::LIR_Op::FFICStringPtr:
-            case LIR::LIR_Op::FFICStringFromPtr:
-            case LIR::LIR_Op::FFILibraryLoad:
-            case LIR::LIR_Op::FFILibraryUnload:
-            case LIR::LIR_Op::FFILibraryGetSymbol:
-            case LIR::LIR_Op::FFIRegisterCallback:
-            case LIR::LIR_Op::FFIUnregisterCallback:
-            case LIR::LIR_Op::FFIGetCallbackPtr:
-            case LIR::LIR_Op::FFICCallFrameCreate:
-            case LIR::LIR_Op::FFICCallFrameDestroy:
-            case LIR::LIR_Op::FFICCallFrameSetReg:
-            case LIR::LIR_Op::FFICCallFrameGetReg:
-            case LIR::LIR_Op::FFICCallFrameSetStackArg:
-            case LIR::LIR_Op::FFICCallFrameGetStackArg:
-            case LIR::LIR_Op::FFIVMSave:
-            case LIR::LIR_Op::FFIVMRestore:
-            case LIR::LIR_Op::FFICCallExecute:
-            case LIR::LIR_Op::FFICalcStructLayout:
-            case LIR::LIR_Op::FFIGetABIInfo:
-                execute_ffi(pc);
-                break;
             case LIR::LIR_Op::Mov:
                 registers[pc->dst] = registers[pc->a];
                 break;
             case LIR::LIR_Op::Return:
             case LIR::LIR_Op::Ret: {
-                if (pc->op == LIR::LIR_Op::Ret) {
+                if (pc->a != UINT32_MAX) {
                     registers[0] = registers[pc->a];
                 }
                 return;
             }
             default:
+                execute_ffi(pc);
                 break;
         }
         pc++;
     }
-}
-
-void RegisterVM::execute_function(const LIR::LIR_Function& function) {
-    execute_instructions(function, 0, function.instructions.size());
-}
-
-void RegisterVM::execute_lir_function(const LIR::LIRFunction& function) {
-    LIR::LIR_Function temp_wrapper(function.getName(), 0);
-    temp_wrapper.instructions = function.getInstructions();
-    execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
-}
-
-LM::Backend::Fiber* RegisterVM::get_current_fiber() {
-    static LM::Backend::Fiber dummy_fiber(0, nullptr);
-    return &dummy_fiber;
 }
 
 } // namespace Register

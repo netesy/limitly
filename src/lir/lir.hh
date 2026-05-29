@@ -9,727 +9,270 @@
 #include <unordered_map>
 #include <sstream>
 #include <iomanip>
+#include <algorithm>
 #include "../backend/value.hh"
 #include "../backend/types.hh"
 
 namespace LM {
 namespace LIR {
 
-// Register and Immediate types
 using Reg = uint32_t;
 using Imm = uint32_t;
 
-// Single type system for both LIR and JIT (ABI-level types)
 enum class Type : uint8_t {
-    // Primitive types
-    I32,
-    I64, 
-    F64,
-    Bool,
-    
-    // Pointer types
-    Ptr,
-    
-    // Special types
-    Void
+    I32, I64, F64, Bool, Ptr, Void
 };
 
-// Convert Type to string
 std::string type_to_string(Type type);
 
-// Add new call-related operations following Fyra IL best practices
-enum class LIR_Op : uint8_t {
-    // Move and constants
-    Mov,        // Move (reg = reg)
-    LoadConst,  // Load constant into register (reg = ValuePtr)
-    
-    // Arithmetic operations
-    Add,        // Add (reg = reg1 + reg2)
-    Sub,        // Subtract (reg = reg1 - reg2)
-    Mul,        // Multiply (reg = reg1 * reg2)
-    Div,        // Divide (reg = reg1 / reg2)
-    Mod,        // Modulo (reg = reg1 % reg2)
-    Neg,        // Negate (reg = -reg1)
-    
-    // Bitwise operations
-    And,        // Bitwise AND (reg = reg1 & reg2)
-    Or,         // Bitwise OR (reg = reg1 | reg2)
-    Xor,        // Bitwise XOR (reg = reg1 ^ reg2)
-    
-    // Comparison operations
-    CmpEQ,      // Compare Equal (reg = reg1 == reg2)
-    CmpNEQ,     // Compare Not Equal (reg = reg1 != reg2)
-    CmpLT,      // Compare Less Than (reg = reg1 < reg2)
-    CmpLE,      // Compare Less Than or Equal (reg = reg1 <= reg2)
-    CmpGT,      // Compare Greater Than (reg = reg1 > reg2)
-    CmpGE,      // Compare Greater Than or Equal (reg = reg1 >= reg2)
-    
-    // Collection indexing operations
-    StringIndex, // Index into string (reg = string[index])
-    
-    // Control flow
-    Jump,       // Unconditional jump (jump to label)
-    JumpIfFalse,// Jump if condition is false
-    JumpIf,     // Jump if condition is true
-    Label,      // Label definition for jump targets
-    
-    // Function calls (following Fyra IL best practices)
-    Call,       // Function call with return value: %r = call $f(...) : T
-    CallVoid,   // Function call without return value: call $f(...) : void
-    CallIndirect, // Indirect call through function pointer
-    CallBuiltin,  // Call to builtin function
-    CallVariadic, // Variadic function call
-    
-    // Function definition and control
-    Return,     // Return (return from function)
-    FuncDef,    // Function definition (fn name, return_reg)
-    Param,      // Parameter definition (param reg)
-    Ret,        // Function return with register (ret reg)
-    
-    // Variadic function support (following Fyra IL)
-    VaStart,    // Start variadic argument list: vastart %ap
-    VaArg,      // Get next variadic argument: %r = vaarg %ap : T
-    VaEnd,      // End variadic argument processing
-    
-    // Enhanced function operations
-    Copy,       // Copy value: %r = copy %a : T
-    
-    // Typed print operations
-    PrintInt,   // Print integer (print_int(reg))
-    PrintUint,   // Print unsigned integer (print_uint(reg))
-    PrintFloat, // Print float (print_float(reg))
-    PrintBool,  // Print boolean (print_bool(reg))
-    PrintString,// Print string (print_string(reg))
-    
-    Nop,        // No operation (debugging)
-    
-    // Memory operations
-    Load,       // Load from memory
-    Store,      // Store to memory
-    
-    // Type operations
-    Cast,       // Type casting
-    ToString,   // Convert value to string representation
-    
-    // String operations
-    STR_CONCAT, // Explicit string concatenation (+)
-    STR_FORMAT, // String formatting (interpolation)
-    
-    // Decimal operations
-    DecAdd,     // Decimal addition
-    DecSub,     // Decimal subtraction
-    DecMul,     // Decimal multiplication
-    DecDiv,     // Decimal division
-    DecMod,     // Decimal modulo
-    DecNeg,     // Decimal negation
-    DecRescale, // Decimal rescaling (narrowing/widening)
-
-    // Error handling
-    ConstructError,
-    ConstructOk,
-    IsError,     // Check if Result contains an error
-    Unwrap,      // Unwrap Result value (panic if error)
-    UnwrapOr,    // Unwrap with default value
-
-    // Enum operations (tagged payload representation)
-    MakeEnum,    // Construct enum value from tag and optional payload
-    GetTag,      // Extract enum tag
-    GetPayload,  // Extract enum payload
-    
-    // Atomic operations
-    AtomicLoad,
-    AtomicStore,
-    AtomicFetchAdd,
-    
-    // Concurrency
-    Await,
-    AsyncCall,
-    
-    // === THREADLESS CONCURRENCY ===
-    
-    // Task management (pure data structures)
-    TaskContextAlloc,    // Allocate task context array
-    TaskContextInit,     // Initialize a task context
-    TaskGetState,        // Get current state from context
-    TaskSetState,        // Set new state in context
-    TaskSetField,        // Set arbitrary field in context (sleep_until, counter, etc.)
-    TaskGetField,        // Get arbitrary field from context
-    
-    // Simple channel (no locks, single-threaded)
-    ChannelAlloc,        // Allocate channel buffer
-    ChannelPush,         // Push value (no blocking)
-    ChannelPop,          // Pop value (no blocking)
-    ChannelHasData,      // Check if channel has data
-
-    ChannelSend,        // Blocks sender if channel is full
-    ChannelOffer,       // Non-blocking send, returns false if full
-    ChannelRecv,        // Blocks receiver if channel is empty
-    ChannelPoll,        // Non-blocking receive, returns false if empty
-    ChannelClose,       // Closes channel and wakes all waiting receivers
-    
-    // Scheduler control
-    SchedulerInit,       // Initialize scheduler
-    SchedulerRun,        // Run scheduler loop (returns when all done)
-    SchedulerTick,       // Single scheduler tick
-    SchedulerAddTask,    // Add task to scheduler
-    
-    // Time (bare metal compatible)
-    GetTickCount,        // Get monotonic tick counter
-    DelayUntil,          // Check if delay expired (non-blocking)
-    
-    // === NEW SIMPLIFIED PARALLEL OPERATIONS ===
-    ParallelInit,        // Initialize parallel execution context
-    ParallelSync,        // Synchronize and complete parallel execution
-    
-    // List/Collection operations
-    ListCreate,
-    ListAppend,
-    ListIndex,
-    ListLen,             // Get list length
-    
-    // Dict operations
-    DictCreate,
-    DictSet,
-    DictGet,
-    DictHas,
-    DictLen,
-    DictItems,  // Get dict items as flat array of (key, value) pairs
-    
-    // Tuple operations
-    TupleCreate,
-    TupleGet,
-    TupleSet,  // Set tuple element by index
-    TupleLen,  // Get tuple size
-    
-    
-    // Frame operations (modern OOP)
-    NewFrame,        // Allocate and initialize frame instance
-    FrameGetField,   // Load field from frame instance
-    FrameSetField,   // Store field to frame instance
-    FrameGetFieldAtomic, // Atomic load field from frame instance
-    FrameSetFieldAtomic, // Atomic store field to frame instance
-    FrameFieldAtomicAdd, // Atomic add to frame field
-    FrameFieldAtomicSub, // Atomic sub from frame field
-    FrameCallMethod, // Call frame method (static dispatch)
-    FrameCallInit,   // Call frame init() method
-    FrameCallDeinit, // Call frame deinit() method
-    TraitCallMethod, // Call trait method (dynamic dispatch via vtable)
-    MakeTraitObject, // Package instance and vtable into trait object
-    
-    // Module operations
-    ImportModule,
-    ExportSymbol,
-    BeginModule,
-    EndModule,
-    LoadGlobal,
-    StoreGlobal,
-    
-    // SharedCell operations for parallel execution
-    SharedCellAlloc,    // Allocate SharedCell, returns cell_id (reg = cell_id)
-    SharedCellLoad,     // Load value from SharedCell (reg = shared_cells[cell_id].value)
-    SharedCellStore,    // Store value to SharedCell (shared_cells[cell_id].value = reg)
-    SharedCellAdd,      // Atomic add to SharedCell (shared_cells[cell_id].value += reg)
-    SharedCellSub,      // Atomic sub from SharedCell (shared_cells[cell_id].value -= reg)
-    
-    // === FFI OPERATIONS ===
-    
-    // Memory allocation/deallocation
-    FFIAlloc,           // Allocate unmanaged memory: %r = ffi_alloc(size)
-    FFIFree,            // Free unmanaged memory: ffi_free(ptr)
-    FFIRealloc,         // Reallocate unmanaged memory: %r = ffi_realloc(ptr, new_size)
-    
-    // Memory operations
-    FFIMemcpy,          // Copy memory: ffi_memcpy(dest, src, size)
-    FFIMemset,          // Fill memory: ffi_memset(ptr, value, size)
-    FFIMemcmp,          // Compare memory: %r = ffi_memcmp(ptr1, ptr2, size)
-    
-    // Pointer arithmetic
-    FFIAddPtr,          // Add offset to pointer: %r = ptr_add(ptr, offset)
-    FFISubPtr,          // Subtract offset from pointer: %r = ptr_sub(ptr, offset)
-    FFIPtrDiff,         // Pointer difference: %r = ptr_diff(ptr1, ptr2)
-    FFIAlignPtr,        // Align pointer: %r = ptr_align(ptr, alignment)
-    FFIIsAligned,       // Check alignment: %r = ptr_is_aligned(ptr, alignment)
-    
-    // Load operations for primitive types
-    FFILoadInt8,        // Load 8-bit signed: %r = ffi_load_int8(ptr)
-    FFILoadUInt8,       // Load 8-bit unsigned: %r = ffi_load_uint8(ptr)
-    FFILoadInt16,       // Load 16-bit signed: %r = ffi_load_int16(ptr)
-    FFILoadUInt16,      // Load 16-bit unsigned: %r = ffi_load_uint16(ptr)
-    FFILoadInt32,       // Load 32-bit signed: %r = ffi_load_int32(ptr)
-    FFILoadUInt32,      // Load 32-bit unsigned: %r = ffi_load_uint32(ptr)
-    FFILoadInt64,       // Load 64-bit signed: %r = ffi_load_int64(ptr)
-    FFILoadUInt64,      // Load 64-bit unsigned: %r = ffi_load_uint64(ptr)
-    FFILoadFloat,       // Load float: %r = ffi_load_float(ptr)
-    FFILoadDouble,      // Load double: %r = ffi_load_double(ptr)
-    FFILoadPtr,         // Load pointer: %r = ffi_load_ptr(ptr)
-    
-    // Store operations for primitive types
-    FFIStoreInt8,       // Store 8-bit signed: ffi_store_int8(ptr, value)
-    FFIStoreUInt8,      // Store 8-bit unsigned: ffi_store_uint8(ptr, value)
-    FFIStoreInt16,      // Store 16-bit signed: ffi_store_int16(ptr, value)
-    FFIStoreUInt16,     // Store 16-bit unsigned: ffi_store_uint16(ptr, value)
-    FFIStoreInt32,      // Store 32-bit signed: ffi_store_int32(ptr, value)
-    FFIStoreUInt32,     // Store 32-bit unsigned: ffi_store_uint32(ptr, value)
-    FFIStoreInt64,      // Store 64-bit signed: ffi_store_int64(ptr, value)
-    FFIStoreUInt64,     // Store 64-bit unsigned: ffi_store_uint64(ptr, value)
-    FFIStoreFloat,      // Store float: ffi_store_float(ptr, value)
-    FFIStoreDouble,     // Store double: ffi_store_double(ptr, value)
-    FFIStorePtr,        // Store pointer: ffi_store_ptr(ptr, value)
-    
-    // CString operations
-    FFIToCString,       // Convert Limitly string to C string: %r = string_to_cstring(s)
-    FFIFromCString,     // Convert C string to Limitly string: %r = cstring_to_string(ptr)
-    FFIFreeCString,     // Free C string: cstring_free(cstring)
-    FFICStringPtr,      // Get C string pointer: %r = cstring_as_ptr(cstring)
-    FFICStringFromPtr,  // Create C string from pointer: %r = cstring_from_ptr(ptr, take_ownership)
-    
-    // Buffer operations
-    FFIBufferAlloc,     // Allocate buffer: %r = buffer_alloc(capacity)
-    FFIBufferFromPtr,   // Create buffer from pointer: %r = buffer_from_ptr(ptr, size, take_ownership)
-    FFIBufferFree,      // Free buffer: buffer_free(buf)
-    FFIBufferResize,    // Resize buffer: %r = buffer_resize(buf, new_capacity)
-    FFIBufferRead,      // Read from buffer: %r = buffer_read_type(buf, offset)
-    FFIBufferWrite,     // Write to buffer: %r = buffer_write_type(buf, offset, value)
-    FFIBufferSize,      // Get buffer size: %r = buffer_size(buf)
-    FFIBufferCapacity,  // Get buffer capacity: %r = buffer_capacity(buf)
-    FFIBufferAsPtr,     // Get buffer pointer: %r = buffer_as_ptr(buf)
-    
-    // Function pointer operations
-    FFICallPtr,         // Call function by pointer: %r = ffi_call_ptr(func_ptr, ...)
-    FFICallPtr0,        // Call with 0 args: %r = ffi_call_ptr(func_ptr)
-    FFICallPtr1,        // Call with 1 arg: %r = ffi_call_ptr1(func_ptr, arg1)
-    FFICallPtr2,        // Call with 2 args: %r = ffi_call_ptr2(func_ptr, arg1, arg2)
-    FFICallPtr3,        // Call with 3 args: %r = ffi_call_ptr3(func_ptr, arg1, arg2, arg3)
-    FFICallPtr4,        // Call with 4 args: %r = ffi_call_ptr4(func_ptr, arg1, arg2, arg3, arg4)
-    FFICallPtr5,        // Call with 5 args: %r = ffi_call_ptr5(func_ptr, arg1, arg2, arg3, arg4, arg5)
-    
-    // Library operations
-    FFILibraryLoad,     // Load dynamic library: %r = library_load(path)
-    FFILibraryUnload,   // Unload dynamic library: library_unload(lib)
-    FFILibraryGetSymbol,// Get symbol from library: %r = library_get_symbol(lib, symbol)
-    
-    // Callback registration
-    FFIRegisterCallback,// Register callback: %r = register_callback(func)
-    FFIUnregisterCallback, // Unregister callback: unregister_callback(callback_id)
-    FFIGetCallbackPtr,  // Get callback pointer: %r = get_callback_ptr(callback_id)
-    
-    // C call frame operations
-    FFICCallFrameCreate, // Create C call frame: %r = ccall_frame_create(register_count, stack_arg_size)
-    FFICCallFrameDestroy, // Destroy C call frame: ccall_frame_destroy(frame)
-    FFICCallFrameSetReg, // Set register in call frame: ccall_frame_set_register(frame, reg_index, value)
-    FFICCallFrameGetReg, // Get register from call frame: %r = ccall_frame_get_register(frame, reg_index)
-    FFICCallFrameSetStackArg, // Set stack argument: ccall_frame_set_stack_arg(frame, offset, value)
-    FFICCallFrameGetStackArg, // Get stack argument: %r = ccall_frame_get_stack_arg(frame, offset)
-    
-    // VM state management for FFI
-    FFIVMSave,          // Save VM state: %r = vm_state_save()
-    FFIVMRestore,       // Restore VM state: vm_state_restore(state)
-    FFICCallExecute,    // Execute C call with VM state: %r = ccall_execute(func_ptr, frame)
-    
-    // Struct layout operations
-    FFICalcStructLayout, // Calculate struct layout: %r = calculate_struct_layout(field_sizes, field_alignments)
-    
-    // ABI information
-    FFIGetABIInfo       // Get ABI information: %r = get_abi_info()
+enum class ResourceType : uint32_t {
+    FILE = 0, SOCKET = 1, WINDOW = 2, SURFACE = 3, PROCESS = 4, CHANNEL = 5,
+    TIMER = 6, TASK = 7, LIBRARY = 8, STDOUT = 9, STDERR = 10, MEMORY = 11
 };
 
-// Source location for debugging
+enum class ResourceOperation : uint32_t {
+    OPEN = 0, CLOSE = 1, READ = 2, WRITE = 3, SEND = 4, RECEIVE = 5,
+    CONNECT = 6, DRAW_RECT = 7, DRAW_TEXT = 8, SPAWN = 9, POLL = 10,
+    PUSH = 11, POP = 12, GET_STATE = 13, SET_STATE = 14, COPY = 15,
+    FILL = 16, COMPARE = 17, ADD_PTR = 18, SUB_PTR = 19, PTR_DIFF = 20,
+    ALIGN_PTR = 21, IS_ALIGNED = 22
+};
+
+enum class LIR_Op : uint8_t {
+    Mov, LoadConst, Add, Sub, Mul, Div, Mod, Neg, And, Or, Xor,
+    CmpEQ, CmpNEQ, CmpLT, CmpLE, CmpGT, CmpGE, StringIndex,
+    Jump, JumpIfFalse, JumpIf, Label,
+    Call, CallVoid, CallIndirect, CallBuiltin, CallVariadic,
+    Return, FuncDef, Param, Ret, VaStart, VaArg, VaEnd, Copy,
+    PrintInt, PrintUint, PrintFloat, PrintBool, PrintString,
+    Nop, Load, Store, Cast, ToString, STR_CONCAT, STR_FORMAT,
+    DecAdd, DecSub, DecMul, DecDiv, DecMod, DecNeg, DecRescale,
+    ConstructError, ConstructOk, IsError, Unwrap, UnwrapOr,
+    MakeEnum, GetTag, GetPayload, AtomicLoad, AtomicStore, AtomicFetchAdd,
+    Await, AsyncCall,
+    TaskContextAlloc, TaskContextInit, TaskGetState, TaskSetState, TaskSetField, TaskGetField,
+    ChannelAlloc, ChannelPush, ChannelPop, ChannelHasData,
+    ChannelSend, ChannelOffer, ChannelRecv, ChannelPoll, ChannelClose,
+    SchedulerInit, SchedulerRun, SchedulerTick, SchedulerAddTask,
+    GetTickCount, DelayUntil, ParallelInit, ParallelSync,
+    ListCreate, ListAppend, ListIndex, ListLen,
+    DictCreate, DictSet, DictGet, DictHas, DictLen, DictItems,
+    TupleCreate, TupleGet, TupleSet, TupleLen,
+    NewFrame, FrameGetField, FrameSetField, FrameGetFieldAtomic, FrameSetFieldAtomic,
+    FrameFieldAtomicAdd, FrameFieldAtomicSub, FrameCallMethod, FrameCallInit, FrameCallDeinit,
+    TraitCallMethod, MakeTraitObject,
+    ImportModule, ExportSymbol, BeginModule, EndModule, LoadGlobal, StoreGlobal,
+    SharedCellAlloc, SharedCellLoad, SharedCellStore, SharedCellAdd, SharedCellSub,
+    MemoryAlloc, MemoryFree, MemoryResize, MemoryLoad, MemoryStore, ForeignCall,
+    ResourceCreate, ResourceDestroy, ResourceCall,
+    FFIAlloc, FFIFree, FFIRealloc, FFIMemcpy, FFIMemset, FFIMemcmp,
+    FFIAddPtr, FFISubPtr, FFIPtrDiff, FFIAlignPtr, FFIIsAligned,
+    FFILoadInt8, FFILoadUInt8, FFILoadInt16, FFILoadUInt16, FFILoadInt32, FFILoadUInt32,
+    FFILoadInt64, FFILoadUInt64, FFILoadFloat, FFILoadDouble, FFILoadPtr,
+    FFIStoreInt8, FFIStoreUInt8, FFIStoreInt16, FFIStoreUInt16, FFIStoreInt32, FFIStoreUInt32,
+    FFIStoreInt64, FFIStoreUInt64, FFIStoreFloat, FFIStoreDouble, FFIStorePtr,
+    FFIToCString, FFIFromCString, FFIFreeCString, FFICStringPtr, FFICStringFromPtr,
+    FFIBufferAlloc, FFIBufferFromPtr, FFIBufferFree, FFIBufferResize, FFIBufferRead, FFIBufferWrite,
+    FFIBufferSize, FFIBufferCapacity, FFIBufferAsPtr,
+    FFICallPtr, FFICallPtr0, FFICallPtr1, FFICallPtr2, FFICallPtr3, FFICallPtr4, FFICallPtr5,
+    FFILibraryLoad, FFILibraryUnload, FFILibraryGetSymbol,
+    FFIRegisterCallback, FFIUnregisterCallback, FFIGetCallbackPtr,
+    FFICCallFrameCreate, FFICCallFrameDestroy, FFICCallFrameSetReg, FFICCallFrameGetReg,
+    FFICCallFrameSetStackArg, FFICCallFrameGetStackArg,
+    FFIVMSave, FFIVMRestore, FFICCallExecute,
+    FFICalcStructLayout, FFIGetABIInfo
+};
+
 struct LIR_SourceLoc {
-    std::string filename;
+    std::string file;
     uint32_t line;
     uint32_t column;
-    
-    LIR_SourceLoc() : line(0), column(0) {}
-    LIR_SourceLoc(const std::string& file, uint32_t ln, uint32_t col = 0)
-        : filename(file), line(ln), column(col) {}
-    
-    std::string to_string() const {
-        std::stringstream ss;
-        ss << filename << ":" << line;
-        if (column > 0) ss << ":" << column;
-        return ss.str();
-    }
 };
 
-// LIR Instruction structure (typed with operand types)
 struct LIR_Inst {
-    LIR_Op op;             // Operation
-    Type result_type;      // Type of the result register (ABI-level)
-    Type type_a;           // Type of operand a
-    Type type_b;           // Type of operand b
-    Reg dst;               // Destination register
-    Reg a;                 // Operand 1 (source register)
-    Reg b;                 // Operand 2 (source register, optional)
-    Imm imm;               // Immediate value (optional, for constants or jump targets)
-    Backend::Value const_val;    // Constant value (for LoadConst operations)
-    
-    // Enhanced function call support
-    std::string func_name;          // Function name (for calls and function definitions)
-    std::string type_name;          // Type name (for trait objects and vtable generation)
-    std::vector<Reg> call_args;     // Arguments for calls, parameters for declarations
-    std::vector<Type> call_arg_types; // Types of call arguments
-    
-    // Debug information
+    LIR_Op op;
+    Type result_type;
+    Type type_a;
+    Type type_b;
+    Reg dst;
+    Reg a;
+    Reg b;
+    Imm imm;
+    Backend::Value const_val;
+    std::string func_name;
+    std::string type_name;
+    std::vector<Reg> call_args;
+    std::vector<Type> call_arg_types;
     std::string comment;
     LIR_SourceLoc loc;
     
-    LIR_Inst(LIR_Op op, Type result_type, Reg dst = 0, Reg a = 0, Reg b = 0, Imm imm = 0,
-             Type type_a = Type::Void, Type type_b = Type::Void)
-        : op(op), result_type(result_type), type_a(type_a), type_b(type_b), 
-          dst(dst), a(a), b(b), imm(imm) {}
+    LIR_Inst() : op(LIR_Op::Nop), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
+                dst(UINT32_MAX), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(VAL_NIL) {}
     
+    LIR_Inst(LIR_Op op, Type res_type, Reg dst = 0, Reg a = 0, Reg b = 0, Imm imm = 0,
+             Type type_a = Type::Void, Type type_b = Type::Void)
+        : op(op), result_type(res_type), type_a(type_a), type_b(type_b),
+          dst(dst), a(a), b(b), imm(imm), const_val(VAL_NIL) {}
+
+    LIR_Inst(LIR_Op op, Reg dst = 0, Reg a = 0, Reg b = 0, Imm imm = 0)
+        : op(op), result_type(Type::I64), type_a(Type::Void), type_b(Type::Void),
+          dst(dst), a(a), b(b), imm(imm), const_val(VAL_NIL) {}
+          
     LIR_Inst(LIR_Op op, Type result_type, Reg dst, Backend::Value constant)
         : op(op), result_type(result_type), type_a(Type::Void), type_b(Type::Void),
-          dst(dst), a(0), b(0), imm(0), const_val(constant) {}
-    
-    // Legacy constructors for backward compatibility
-    LIR_Inst(LIR_Op op, Reg dst = 0, Reg a = 0, Reg b = 0, Imm imm = 0)
-        : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
-          dst(dst), a(a), b(b), imm(imm), const_val(0) {}
-    
+          dst(dst), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(constant) {}
+
     LIR_Inst(LIR_Op op, Reg dst, Backend::Value constant)
-        : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
-          dst(dst), a(0), b(0), imm(0), const_val(constant) {}
-    
-    // Enhanced constructors for function calls and declarations
-    // Function call with return value: call r2, add(r0, r1)
+        : op(op), result_type(Type::I64), type_a(Type::Void), type_b(Type::Void),
+          dst(dst), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(constant) {}
+
     LIR_Inst(LIR_Op op, Reg dst, const std::string& func, const std::vector<Reg>& args,
              const std::vector<Type>& arg_types = {})
-        : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
-          dst(dst), a(0), b(0), imm(0), func_name(func), call_args(args), call_arg_types(arg_types) {}
-    
-    // Void function call: call print(r0)
+        : op(op), result_type(Type::I64), type_a(Type::Void), type_b(Type::Void),
+          dst(dst), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(VAL_NIL),
+          func_name(func), call_args(args), call_arg_types(arg_types) {}
+
     LIR_Inst(LIR_Op op, const std::string& func, const std::vector<Reg>& args,
              const std::vector<Type>& arg_types = {})
         : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
-          dst(0), a(0), b(0), imm(0), func_name(func), call_args(args), call_arg_types(arg_types) {}
-    
-    // Function definition: fn r2, add(r0, r1)
+          dst(UINT32_MAX), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(VAL_NIL),
+          func_name(func), call_args(args), call_arg_types(arg_types) {}
+
     LIR_Inst(LIR_Op op, const std::string& func, const std::vector<Reg>& params, Reg return_reg,
              const std::vector<Type>& param_types = {})
         : op(op), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
-          dst(return_reg), a(0), b(0), imm(0), func_name(func), call_args(params), call_arg_types(param_types) {}
-    
-    // Check if this instruction is a return instruction
-    bool isReturn() const {
-        return op == LIR_Op::Return || op == LIR_Op::Ret;
-    }
-    
+          dst(return_reg), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(VAL_NIL),
+          func_name(func), call_args(params), call_arg_types(param_types) {}
+
     std::string to_string() const;
+    bool isReturn() const { return op == LIR_Op::Return || op == LIR_Op::Ret; }
 };
 
-// Forward declaration
-struct LIR_Inst;
-
-// Basic Block for CFG
 struct LIR_BasicBlock {
-    uint32_t id;                     // Unique block identifier
-    std::string label;               // Optional label for debugging
-    std::vector<LIR_Inst> instructions; // Instructions in this block
-    std::vector<uint32_t> successors; // Successor block IDs
-    std::vector<uint32_t> predecessors; // Predecessor block IDs
-    bool is_entry;                   // Is this the entry block?
-    bool is_exit;                    // Is this the exit block?
-    bool terminated;                 // Explicitly marked as terminated
+    uint32_t id;
+    std::string label;
+    std::vector<LIR_Inst> instructions;
+    std::vector<uint32_t> successors;
+    std::vector<uint32_t> predecessors;
+    bool is_entry;
+    bool is_exit;
+    bool terminated;
     
     LIR_BasicBlock(uint32_t id, const std::string& label = "") 
         : id(id), label(label), is_entry(false), is_exit(false), terminated(false) {}
     
-    // Add instruction to block
-    void add_instruction(const LIR_Inst& inst) {
-        instructions.push_back(inst);
-    }
-    
-    // Add successor edge
-    void add_successor(uint32_t block_id) {
-        successors.push_back(block_id);
-    }
-    
-    // Add predecessor edge
-    void add_predecessor(uint32_t block_id) {
-        predecessors.push_back(block_id);
-    }
-    
-    // Check if block has terminator (last instruction is control flow)
+    void add_instruction(const LIR_Inst& inst) { instructions.push_back(inst); }
     bool has_terminator() const {
         if (terminated) return true;
         if (instructions.empty()) return false;
         const auto& last = instructions.back();
-        return last.op == LIR_Op::Jump || 
-               last.op == LIR_Op::Return ||
-               last.op == LIR_Op::Ret;
+        return last.op == LIR_Op::Jump || last.op == LIR_Op::Return || last.op == LIR_Op::Ret;
     }
 };
 
-// Control Flow Graph
 class LIR_CFG {
 public:
     std::vector<std::unique_ptr<LIR_BasicBlock>> blocks;
     uint32_t entry_block_id;
     uint32_t exit_block_id;
     uint32_t next_block_id;
-    
     LIR_CFG() : entry_block_id(0), exit_block_id(UINT32_MAX), next_block_id(0) {}
-    
-    // Create new basic block
     LIR_BasicBlock* create_block(const std::string& label = "") {
         auto block = std::make_unique<LIR_BasicBlock>(next_block_id++, label);
         LIR_BasicBlock* block_ptr = block.get();
         blocks.push_back(std::move(block));
         return block_ptr;
     }
-    
-    // Get block by ID
-    LIR_BasicBlock* get_block(uint32_t id) {
-        if (id < blocks.size()) {
-            return blocks[id].get();
-        }
-        return nullptr;
-    }
-    
-    // Add edge between blocks
+    LIR_BasicBlock* get_block(uint32_t id) { return (id < blocks.size()) ? blocks[id].get() : nullptr; }
     void add_edge(uint32_t from_id, uint32_t to_id) {
         LIR_BasicBlock* from = get_block(from_id);
         LIR_BasicBlock* to = get_block(to_id);
-        if (from && to) {
-            from->add_successor(to_id);
-            to->add_predecessor(from_id);
+        if (from && to) { 
+            from->successors.push_back(to_id); 
+            to->predecessors.push_back(from_id); 
         }
     }
-    
-    // Validate CFG structure
     bool validate() const;
-    void dump_dot() const; // For debugging
+    void dump_dot() const;
 };
 
-// Source location information
-// Debug information for a function
 struct LIR_DebugInfo {
     std::string function_name;
     LIR_SourceLoc loc;
-    std::unordered_map<uint32_t, std::string> var_names; // reg -> name
-    std::unordered_map<uint32_t, LIR_SourceLoc> reg_defs; // reg -> definition location
+    std::unordered_map<uint32_t, std::string> var_names;
+    std::unordered_map<uint32_t, LIR_SourceLoc> reg_defs;
 };
 
-// LIR Instruction Structure (register-based)
-// Register allocation context
-class LIR_FunctionContext {
-public:
-    std::unordered_map<std::string, Reg> variable_to_reg;
-    std::unordered_map<Reg, Type> register_types;  // ABI-level types for registers
-    std::unordered_map<Reg, TypePtr> register_language_types; // Language types for reference
-    std::vector<LIR_Inst> instructions;
-    uint32_t next_reg = 0;
-    
-    // Register allocation
-    Reg allocate_register() {
-        return next_reg++;
-    }
-    
-    // Variable mapping
-    Reg get_variable_register(const std::string& name) {
-        auto it = variable_to_reg.find(name);
-        return (it != variable_to_reg.end()) ? it->second : UINT32_MAX;
-    }
-    
-    void set_variable_register(const std::string& name, Reg reg) {
-        variable_to_reg[name] = reg;
-    }
-
-    void set_register_type(Reg reg, Type abi_type) {
-        register_types[reg] = abi_type;
-    }
-
-    void set_register_language_type(Reg reg, TypePtr lang_type) {
-        register_language_types[reg] = lang_type;
-    }
-
-    Type get_register_type(Reg reg) const {
-        auto it = register_types.find(reg);
-        return (it != register_types.end()) ? it->second : Type::Void;
-    }
-
-    TypePtr get_register_language_type(Reg reg) const {
-        auto it = register_language_types.find(reg);
-        return (it != register_language_types.end()) ? it->second : nullptr;
-    }
-
-    // Legacy method for backward compatibility
-    void set_register_type_legacy(Reg reg, TypePtr type) {
-        // Convert legacy TypePtr to Type if needed
-        register_types[reg] = Type::I64; // Default
-    }
-
-    TypePtr get_register_type_legacy(Reg reg) const {
-        // Return nullptr since we're moving away from TypePtr
-        return nullptr;
-    }
-
-    // Instruction emission
-    void add_instruction(const LIR_Inst& inst) {
-        instructions.push_back(inst);
-    }
-    
-    // Utility methods
-    Reg new_temp() {
-        return allocate_register();
-    }
-};
-
-// Optimization flags
 struct OptimizationFlags {
     bool enable_peephole : 1;
     bool enable_const_fold : 1;
     bool enable_dead_code_elim : 1;
-    
-    OptimizationFlags() : 
-        enable_peephole(false), 
-        enable_const_fold(false), 
-        enable_dead_code_elim(false) {}
+    OptimizationFlags() : enable_peephole(false), enable_const_fold(false), enable_dead_code_elim(false) {}
 };
 
-// LIR Function with register allocation, debug info, and CFG
 class LIR_Function {
 public:
     std::string name;
-    std::vector<LIR_Inst> instructions; // Keep for backward compatibility
-    std::unique_ptr<LIR_CFG> cfg;       // New CFG structure
+    std::vector<LIR_Inst> instructions;
+    std::unique_ptr<LIR_CFG> cfg;
     uint32_t param_count;
     uint32_t register_count;
     LIR_DebugInfo debug_info;
     OptimizationFlags optimizations;
-    
-    // Variable to register mapping
     std::unordered_map<std::string, Reg> variable_to_reg;
-    std::unordered_map<Reg, Type> register_types;    // ABI-level types for registers
-    std::unordered_map<Reg, TypePtr> register_language_types; // Language types for reference
+    std::unordered_map<Reg, Type> register_types;
+    std::unordered_map<Reg, TypePtr> register_language_types;
 
     LIR_Function(const std::string& name, uint32_t param_count = 0)
-        : name(name), cfg(std::make_unique<LIR_CFG>()), param_count(param_count), register_count(0) {
-        // Ensure the name is properly initialized
-        this->name = name;
-    }
+        : name(name), cfg(std::make_unique<LIR_CFG>()), param_count(param_count), register_count(0) {}
     
-    // Add copy constructor and assignment operator to prevent shallow copies
     LIR_Function(const LIR_Function& other) 
-        : name(other.name),
-          instructions(other.instructions),
-          cfg(other.cfg ? std::make_unique<LIR_CFG>() : nullptr),
-          param_count(other.param_count),
-          register_count(other.register_count),
-          debug_info(other.debug_info),
-          optimizations(other.optimizations),
-          variable_to_reg(other.variable_to_reg),
-          register_types(other.register_types),
-          register_language_types(other.register_language_types) {
-        // Manually copy CFG blocks if needed
-        if (other.cfg && cfg) {
-            // Copy basic CFG structure but recreate blocks
-            cfg->entry_block_id = other.cfg->entry_block_id;
-            cfg->exit_block_id = other.cfg->exit_block_id;
-            cfg->next_block_id = other.cfg->next_block_id;
-            // Note: We don't copy the blocks themselves since they contain unique_ptr
-        }
-    }
+        : name(other.name), instructions(other.instructions), cfg(std::make_unique<LIR_CFG>()),
+          param_count(other.param_count), register_count(other.register_count),
+          debug_info(other.debug_info), optimizations(other.optimizations),
+          variable_to_reg(other.variable_to_reg), register_types(other.register_types),
+          register_language_types(other.register_language_types) {}
           
     LIR_Function& operator=(const LIR_Function& other) {
         if (this != &other) {
-            name = other.name;
-            instructions = other.instructions;
-            cfg = other.cfg ? std::make_unique<LIR_CFG>() : nullptr;
-            param_count = other.param_count;
-            register_count = other.register_count;
-            debug_info = other.debug_info;
-            optimizations = other.optimizations;
-            variable_to_reg = other.variable_to_reg;
-            register_types = other.register_types;
+            name = other.name; instructions = other.instructions; cfg = std::make_unique<LIR_CFG>();
+            param_count = other.param_count; register_count = other.register_count;
+            debug_info = other.debug_info; optimizations = other.optimizations;
+            variable_to_reg = other.variable_to_reg; register_types = other.register_types;
             register_language_types = other.register_language_types;
-            
-            // Manually copy CFG structure if needed
-            if (other.cfg && cfg) {
-                cfg->entry_block_id = other.cfg->entry_block_id;
-                cfg->exit_block_id = other.cfg->exit_block_id;
-                cfg->next_block_id = other.cfg->next_block_id;
-                // Note: We don't copy the blocks themselves since they contain unique_ptr
-            }
         }
         return *this;
     }
     
-    // Register allocation
-    Reg allocate_register() {
-        return register_count++;
-    }
-    
-    // Variable mapping
+    Reg allocate_register() { return register_count++; }
     Reg get_variable_register(const std::string& name) const {
-        auto it = variable_to_reg.find(name);
-        return (it != variable_to_reg.end()) ? it->second : UINT32_MAX;
+        auto it = variable_to_reg.find(name); return (it != variable_to_reg.end()) ? it->second : UINT32_MAX;
     }
-    
-    void set_variable_register(const std::string& name, Reg reg) {
-        variable_to_reg[name] = reg;
-    }
-
-    void set_register_type(Reg reg, TypePtr type) {
-        // Legacy method - convert to ABI type
-        register_types[reg] = Type::I64;
-    }
-
-    TypePtr get_register_type(Reg reg) const {
-        // Legacy method - return nullptr since we're moving away from TypePtr
-        return nullptr;
-    }
-
-    // New simplified methods
-    void set_register_abi_type(Reg reg, Type abi_type) {
-        register_types[reg] = abi_type;
-    }
-
-    void set_register_language_type(Reg reg, TypePtr lang_type) {
-        register_language_types[reg] = lang_type;
-    }
-
+    void set_variable_register(const std::string& name, Reg reg) { variable_to_reg[name] = reg; }
+    void set_register_abi_type(Reg reg, Type abi_type) { register_types[reg] = abi_type; }
+    void set_register_language_type(Reg reg, TypePtr lang_type) { register_language_types[reg] = lang_type; }
     Type get_register_abi_type(Reg reg) const {
-        auto it = register_types.find(reg);
-        return (it != register_types.end()) ? it->second : Type::Void;
+        auto it = register_types.find(reg); return (it != register_types.end()) ? it->second : Type::Void;
     }
-
     TypePtr get_register_language_type(Reg reg) const {
-        auto it = register_language_types.find(reg);
-        return (it != register_language_types.end()) ? it->second : nullptr;
+        auto it = register_language_types.find(reg); return (it != register_language_types.end()) ? it->second : nullptr;
     }
-
-    // Instruction emission
-    void add_instruction(const LIR_Inst& inst) {
-        instructions.push_back(inst);
-    }
-    
+    void add_instruction(const LIR_Inst& inst) { instructions.push_back(inst); }
     std::string to_string() const;
 };
 
-// Disassembler
 class Disassembler {
-    const LIR_Function& func;
-    bool show_debug_info;
-    
+    const LIR_Function& func; bool show_debug_info;
 public:
-    Disassembler(const LIR_Function& f, bool debug = false) 
-        : func(f), show_debug_info(debug) {}
-        
+    Disassembler(const LIR_Function& f, bool debug = false) : func(f), show_debug_info(debug) {}
     std::string disassemble() const;
     std::string disassemble_instruction(const LIR_Inst& inst) const;
 };
 
-
-// Utility functions
 std::string lir_op_to_string(LIR_Op op);
-std::string type_to_string(Type type);
-
-// Type conversion utilities (simplified)
 Type language_type_to_abi_type(TypePtr lang_type);
 
 } // namespace LIR
 } // namespace LM
 
-#endif // LIR_H
+#endif

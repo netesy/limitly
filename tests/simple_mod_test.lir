@@ -1,0 +1,34 @@
+
+=== Final LIR ===
+0: call tests.modules.basic_module.__init__()
+1: load_const r1, 10
+2: load_const r2, 20
+3: call r3, tests.modules.basic_module.add(r1, r2)
+4: mov r4, r3
+5: load_const r5, [boxed:55b570e5a200]
+6: print_string r5
+7: to_string r6, r4
+8: print_string r6
+9: ret r0
+
+=== Function LIR: tests.modules.basic_module.getModuleVar ===
+0: load_global
+1: return
+
+=== Function LIR: tests.modules.basic_module.__init__ ===
+0: load_const r0, [boxed:55b570e5b840]
+1: store_global
+2: load_const r1, 42
+3: store_global, r1
+4: return
+
+=== Function LIR: tests.modules.basic_module.add ===
+0: add r2, r0, r1
+1: return r2
+
+=== Function LIR: tests.modules.basic_module.greet ===
+0: load_const r0, [boxed:55b570e5b860]
+1: print_string r0
+2: return
+Result: 
+10

@@ -102,12 +102,12 @@ RUNTIME_API uint8_t lm_unbox_bool(LmBox* box) {
 }
 
 RUNTIME_API const char* lm_unbox_string(LmBox* box) {
-    if (!box || box->type != LM_BOX_STRING) return "";
+    if (!box || box->type != LM_BOX_STRING) return NULL;
     return (const char*)box->value.as_ptr;
 }
 
 RUNTIME_API void* lm_unbox_ptr(LmBox* box) {
-    if (!box) return NULL;
+    if (!box || box->type != LM_BOX_NULLPTR) return NULL;
     return box->value.as_ptr;
 }
 
@@ -164,46 +164,67 @@ RUNTIME_API LmValue lm_alloc_float(double value) {
     return BOX_PTR(obj);
 }
 
+RUNTIME_API LmValue lm_alloc_foreign_ptr(void* ptr) {
+    ObjForeignPtr* obj = (ObjForeignPtr*)malloc(sizeof(ObjForeignPtr));
+    if (!obj) return VAL_NIL;
+    obj->header.type_id = TYPE_FOREIGN_PTR;
+    obj->header.metadata = 0;
+    obj->ptr = ptr;
+    return BOX_PTR(obj);
+}
+
 RUNTIME_API void* lm_frame_alloc(const char* name, int fields) {
     LmFrame* frame = (LmFrame*)malloc(sizeof(LmFrame));
     if (!frame) return NULL;
     frame->header.type_id = TYPE_FRAME;
     frame->header.metadata = 0;
-    frame->name = strdup(name);
+    frame->name = name ? strdup(name) : NULL;
     frame->field_count = fields;
-    frame->fields = (LmValue*)calloc(fields, sizeof(LmValue));
+    frame->fields = (LmValue*)malloc(sizeof(LmValue) * fields);
     for (int i = 0; i < fields; i++) frame->fields[i] = VAL_NIL;
-    pthread_mutex_t* mutex = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-    pthread_mutex_init(mutex, NULL);
-    frame->mutex = mutex;
-    return (void*)frame;
+    frame->mutex = NULL;
+    return frame;
 }
 
-RUNTIME_API LmValue lm_frame_get_field(void* frame_ptr, int offset) {
-    LmFrame* frame = (LmFrame*)frame_ptr;
-    if (!frame || offset < 0 || offset >= frame->field_count) return VAL_NIL;
-    return frame->fields[offset];
+RUNTIME_API LmValue lm_frame_get_field(void* frame, int offset) {
+    if (!frame) return VAL_NIL;
+    LmFrame* f = (LmFrame*)frame;
+    if (offset < 0 || offset >= f->field_count) return VAL_NIL;
+    return f->fields[offset];
 }
 
-RUNTIME_API void lm_frame_set_field(void* frame_ptr, int offset, LmValue value) {
-    LmFrame* frame = (LmFrame*)frame_ptr;
-    if (!frame || offset < 0 || offset >= frame->field_count) return;
-    frame->fields[offset] = value;
+RUNTIME_API void lm_frame_set_field(void* frame, int offset, LmValue value) {
+    if (!frame) return;
+    LmFrame* f = (LmFrame*)frame;
+    if (offset >= 0 && offset < f->field_count) {
+        f->fields[offset] = value;
+    }
 }
 
-RUNTIME_API LmValue lm_frame_get_field_atomic(void* frame_ptr, int offset) {
-    LmFrame* frame = (LmFrame*)frame_ptr;
-    if (!frame || offset < 0 || offset >= frame->field_count) return VAL_NIL;
-    pthread_mutex_lock((pthread_mutex_t*)frame->mutex);
-    LmValue val = frame->fields[offset];
-    pthread_mutex_unlock((pthread_mutex_t*)frame->mutex);
-    return val;
+RUNTIME_API LmValue lm_frame_get_field_atomic(void* frame, int offset) {
+    return lm_frame_get_field(frame, offset);
 }
 
-RUNTIME_API void lm_frame_set_field_atomic(void* frame_ptr, int offset, LmValue value) {
-    LmFrame* frame = (LmFrame*)frame_ptr;
-    if (!frame || offset < 0 || offset >= frame->field_count) return;
-    pthread_mutex_lock((pthread_mutex_t*)frame->mutex);
-    frame->fields[offset] = value;
-    pthread_mutex_unlock((pthread_mutex_t*)frame->mutex);
+RUNTIME_API void lm_frame_set_field_atomic(void* frame, int offset, LmValue value) {
+    lm_frame_set_field(frame, offset, value);
+}
+
+RUNTIME_API void lm_frame_field_atomic_add(void* frame, int offset, LmValue value) {
+    if (!frame) return;
+    LmFrame* f = (LmFrame*)frame;
+    if (offset >= 0 && offset < f->field_count) {
+        f->fields[offset] += value;
+    }
+}
+
+RUNTIME_API void lm_frame_field_atomic_sub(void* frame, int offset, LmValue value) {
+    if (!frame) return;
+    LmFrame* f = (LmFrame*)frame;
+    if (offset >= 0 && offset < f->field_count) {
+        f->fields[offset] -= value;
+    }
+}
+
+RUNTIME_API void* lm_trait_dispatch(void* trait_obj, const char* trait_name, const char* method_name) {
+    return NULL;
 }

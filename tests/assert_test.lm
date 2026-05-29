@@ -1,0 +1,10 @@
+// Test assert function
+print("Testing assert function");
+
+// This should pass
+assert(true, "This should pass");
+print("PASS: assert(true) passed");
+
+// This should fail
+assert(false, "This should fail");
+print("This should not print");

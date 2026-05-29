@@ -1,0 +1,12 @@
+frame Point {
+    pub var x: int;
+    pub var y: int;
+}
+
+var p = Point(x=10, y=20);
+print("P.x: ");
+print(p.x);
+
+p.x = 100;
+print("P.x after set: ");
+print(p.x);

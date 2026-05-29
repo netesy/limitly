@@ -364,6 +364,18 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::SharedCellStore: return "shared_cell_store";
         case LIR_Op::SharedCellAdd: return "shared_cell_add";
         case LIR_Op::SharedCellSub: return "shared_cell_sub";
+        case LIR_Op::MemoryAlloc: return "memory_alloc";
+        case LIR_Op::MemoryFree: return "memory_free";
+        case LIR_Op::MemoryResize: return "memory_resize";
+        case LIR_Op::MemoryLoad: return "memory_load";
+        case LIR_Op::MemoryStore: return "memory_store";
+        case LIR_Op::ForeignCall: return "foreign_call";
+        case LIR_Op::ResourceCreate: return "resource_create";
+        case LIR_Op::ResourceDestroy: return "resource_destroy";
+        case LIR_Op::ResourceCall: return "resource_call";
+        case LIR_Op::FFIAlloc: return "ffi_alloc";
+        case LIR_Op::FFIFree: return "ffi_free";
+        case LIR_Op::FFIRealloc: return "ffi_realloc";
     }
     return "unknown";
 }

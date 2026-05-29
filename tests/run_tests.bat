@@ -108,6 +108,7 @@ echo Running %~1...
 rem Create a temporary file to capture output
 set TEMP_FILE=%TEMP%\limitly_test_output_%RANDOM%.txt
 %LIMITLY% %~1 > "%TEMP_FILE%" 2>&1
+set TEST_EXIT_CODE=!ERRORLEVEL!
 
 findstr /I /C:"segmentation fault" /C:"segfault" "%TEMP_FILE%" >nul 2>&1
 if !ERRORLEVEL! EQU 0 (
@@ -119,17 +120,15 @@ if !ERRORLEVEL! EQU 0 (
     goto :eof
 )
 
-rem Check if the output contains error patterns
-findstr /C:"error[E" /C:"Error:" /C:"RuntimeError" /C:"SemanticError" /C:"BytecodeError" "%TEMP_FILE%" >nul 2>&1
-if !ERRORLEVEL! EQU 0 (
-    echo   FAIL: %~1 ^(contains errors^)
-    echo   Error output:
-    type "%TEMP_FILE%" | findstr /C:"error[E" /C:"Error:" /C:"RuntimeError" /C:"SemanticError" /C:"BytecodeError"
+if !TEST_EXIT_CODE! NEQ 0 (
+    echo   FAIL: %~1 ^(exit code !TEST_EXIT_CODE!^)
+    type "%TEMP_FILE%"
     set /a FAILED+=1
 ) else (
-    findstr /C:"❌ FAIL" /C:"ASSERT FAIL" /C:"Assertion failed" "%TEMP_FILE%" >nul 2>&1
+    rem Check if the output contains error patterns
+    findstr /C:"error[E" /C:"Error:" /C:"RuntimeError" /C:"SemanticError" /C:"BytecodeError" /C:"❌ FAIL" /C:"ASSERT FAIL" /C:"Assertion failed" "%TEMP_FILE%" >nul 2>&1
     if !ERRORLEVEL! EQU 0 (
-        echo   FAIL: %~1 ^(assertion failure detected^)
+        echo   FAIL: %~1 ^(contains error patterns^)
         type "%TEMP_FILE%"
         set /a FAILED+=1
     ) else (

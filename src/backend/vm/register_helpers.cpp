@@ -83,3 +83,29 @@ ValuePtr register_to_value_ptr(RegisterValue rv) {
 } // namespace VM
 } // namespace Backend
 } // namespace LM
+
+namespace LM {
+namespace Backend {
+namespace VM {
+namespace Register {
+
+void RegisterVM::reset() {
+    registers.assign(registers.size(), VAL_NIL);
+    instruction_count = 0;
+}
+
+std::string RegisterVM::to_string(const RegisterValue& value) const {
+    LmString s = lm_value_to_string(value);
+    std::string result(s.data ? s.data : "nil");
+    lm_string_free(s);
+    return result;
+}
+
+Fiber* RegisterVM::get_current_fiber() {
+    return nullptr; // Simplified for now
+}
+
+} // namespace Register
+} // namespace VM
+} // namespace Backend
+} // namespace LM

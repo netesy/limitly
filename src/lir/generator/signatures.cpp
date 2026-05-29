@@ -215,14 +215,22 @@ void Generator::lower_function_body(LM::Frontend::AST::FunctionDeclaration& stmt
 
 
 void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
-    
     for (const auto& stmt : program.statements) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
             collect_frame_signature(frame_decl);
         }
     }
 
-    // Also collect signatures from imported symbols
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
+    for (const auto& [path, module] : manager.get_all_modules()) {
+        if (path == "root" || !module || !module->ast) continue;
+        for (const auto& stmt : module->ast->statements) {
+            if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+                collect_frame_signature(frame_decl, path + "." + frame_decl->name);
+            }
+        }
+    }
+
     for (const auto& [qualified_name, stmt] : program.imported_symbols) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
             collect_frame_signature(frame_decl, qualified_name);

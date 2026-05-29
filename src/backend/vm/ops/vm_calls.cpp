@@ -42,7 +42,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 if (!condition) {
                     std::string msg = "Assertion failed";
                     if (pc->call_args.size() > 1) msg = to_string(registers[pc->call_args[1]]);
-                    std::cerr << msg << std::endl;
+                    throw std::runtime_error("Assertion failed: " + msg);
                 }
             }
             break;

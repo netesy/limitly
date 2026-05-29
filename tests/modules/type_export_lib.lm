@@ -1,0 +1,6 @@
+pub frame ExportedFrame {
+    pub var x: int;
+    pub init(v: int) {
+        this.x = v;
+    }
+}

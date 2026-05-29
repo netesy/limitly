@@ -1,5 +1,6 @@
 #include "../generator.hh"
 #include "../functions.hh"
+#include "../verifier.hh"
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
 #include "../builtin_functions.hh"
@@ -94,6 +95,8 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
 
     // Finish CFG building for main
     finish_cfg_build();
+
+    
 
     // Optimize the generated LIR (but NOT for top-level wrapper)
     if (current_function_->name != "__top_level_wrapper__") {

@@ -1,0 +1,6 @@
+import tests.modules.type_export_lib as lib;
+
+print("Testing Exported Frame...");
+var f = lib.ExportedFrame(123);
+print("F: ");
+print(f);

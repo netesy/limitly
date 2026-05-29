@@ -1,5 +1,6 @@
 #include "../generator.hh"
 #include "../functions.hh"
+#include "../intrinsic_registry.hh"
 #include "../../backend/vm/constant_utils.hh"
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
@@ -271,6 +272,30 @@ void Generator::emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt) {
 
 
 void Generator::emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt) {
+    // Check Intrinsic Registry for std.io::print
+    if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic("std.io::print")) {
+        if (stmt.arguments.empty()) {
+             // Handle empty println: print newline
+             Reg nl_reg = allocate_register();
+             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, nl_reg, BOX_PTR(lm_box_string("\n"))));
+             LIR_Inst inst(intrinsic->opcode, Type::Void, 0, 0, 0, 0);
+             inst.imm = intrinsic->resource_type;
+             inst.a = intrinsic->operation_type;
+             inst.call_args = {nl_reg};
+             emit_instruction(inst);
+             return;
+        }
+        for (const auto& arg : stmt.arguments) {
+            Reg arg_reg = emit_expr(*arg);
+            LIR_Inst inst(intrinsic->opcode, Type::Void, 0, 0, 0, 0);
+            inst.imm = intrinsic->resource_type;
+            inst.a = intrinsic->operation_type;
+            inst.call_args = {arg_reg};
+            emit_instruction(inst);
+        }
+        return;
+    }
+
     if (stmt.arguments.empty()) {
         // Empty print statement - just print a newline
         Reg newline_reg = allocate_register();
@@ -301,6 +326,19 @@ void Generator::emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt) {
         result_reg = str_reg;
     }
     
+    // Check Intrinsic Registry for std.io::print
+    if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic("std.io::print")) {
+        for (const auto& arg : stmt.arguments) {
+            Reg arg_reg = emit_expr(*arg);
+            LIR_Inst inst(intrinsic->opcode, Type::Void, 0, 0, 0, 0);
+            inst.imm = intrinsic->resource_type;
+            inst.a = intrinsic->operation_type;
+            inst.call_args = {arg_reg};
+            emit_instruction(inst);
+        }
+        return;
+    }
+
     // Concatenate remaining arguments
     for (size_t i = 1; i < stmt.arguments.size(); ++i) {
         Reg arg_reg = emit_expr(*stmt.arguments[i]);
