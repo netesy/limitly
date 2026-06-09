@@ -173,21 +173,97 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
             case LIR::LIR_Op::STR_FORMAT:
                 execute_strings(pc);
                 break;
+             case LIR::LIR_Op::Cast:
+                execute_cast(pc);
+                break;    
             case LIR::LIR_Op::Call:
             case LIR::LIR_Op::CallIndirect:
             case LIR::LIR_Op::CallBuiltin:
                 execute_calls(pc);
                 break;
+            // === REDESIGNED: Generic memory operations ===
+            case LIR::LIR_Op::MemoryLoad:
+                execute_memory_load(pc);
+                break;
+            case LIR::LIR_Op::MemoryStore:
+                execute_memory_store(pc);
+                break;
+            case LIR::LIR_Op::MemoryCopy:
+                execute_memory_copy(pc);
+                break;
+            case LIR::LIR_Op::MemoryFill:
+                execute_memory_fill(pc);
+                break;
+            case LIR::LIR_Op::MemoryCompare:
+                execute_memory_compare(pc);
+                break;
+            
+            // === REDESIGNED: Generic pointer operations ===
+            case LIR::LIR_Op::PtrAdd:
+                execute_ptr_add(pc);
+                break;
+            case LIR::LIR_Op::PtrSub:
+                execute_ptr_sub(pc);
+                break;
+            case LIR::LIR_Op::PtrDiff:
+                execute_ptr_diff(pc);
+                break;
+            case LIR::LIR_Op::PtrAlign:
+                execute_ptr_align(pc);
+                break;
+            case LIR::LIR_Op::PtrIsAligned:
+                execute_ptr_is_aligned(pc);
+                break;
+            
+            // === REDESIGNED: Marshaling operations ===
+            case LIR::LIR_Op::Marshal:
+                execute_marshal(pc);
+                break;
+            case LIR::LIR_Op::Unmarshal:
+                execute_unmarshal(pc);
+                break;
+            case LIR::LIR_Op::BufferView:
+                execute_buffer_view(pc);
+                break;
+            case LIR::LIR_Op::BufferCreate:
+                execute_buffer_create(pc);
+                break;
+            case LIR::LIR_Op::BufferResize:
+                execute_buffer_resize(pc);
+                break;
+            
+            // === REDESIGNED: Dynamic linking operations ===
+            case LIR::LIR_Op::LibraryLoad:
+                execute_library_load(pc);
+                break;
+            case LIR::LIR_Op::LibraryUnload:
+                execute_library_unload(pc);
+                break;
+            case LIR::LIR_Op::LibrarySymbol:
+                execute_library_symbol(pc);
+                break;
+            
+            // === REDESIGNED: Foreign call operations ===
+            case LIR::LIR_Op::ForeignCall:
+                execute_foreign_call(pc);
+                break;
+            case LIR::LIR_Op::ForeignCallDirect:
+                execute_foreign_call_direct(pc);
+                break;
+            
+            // === REDESIGNED: Callback operations ===
+            case LIR::LIR_Op::CallbackCreate:
+                execute_callback_create(pc);
+                break;
+            case LIR::LIR_Op::CallbackDestroy:
+                execute_callback_destroy(pc);
+                break;
+            
+            // === Old memory operations (for backward compatibility with old code) ===
             case LIR::LIR_Op::MemoryAlloc:
             case LIR::LIR_Op::MemoryFree:
             case LIR::LIR_Op::MemoryResize:
-            case LIR::LIR_Op::MemoryLoad:
-            case LIR::LIR_Op::MemoryStore:
-            case LIR::LIR_Op::ForeignCall:
                 execute_ffi(pc);
-                break;
-            case LIR::LIR_Op::Cast:
-                execute_cast(pc);
                 break;
             case LIR::LIR_Op::Mov:
                 registers[pc->dst] = registers[pc->a];

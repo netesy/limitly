@@ -25,6 +25,46 @@ enum class Type : uint8_t {
 
 std::string type_to_string(Type type);
 
+// === Metadata Encoding for Generic Operations ===
+// Used to encode type information and calling conventions in the 'imm' field
+
+namespace Metadata {
+    // Marshal type encoding: source and target types for data conversions
+    enum class MarshalType : uint16_t {
+        StringToCString  = 0,
+        CStringToString  = 1,
+        PtrToBuffer      = 2,
+        BufferToPtr      = 3,
+        IntToFloat       = 4,
+        FloatToInt       = 5,
+        // Expand as needed for other conversions
+    };
+    
+    inline uint32_t make_marshal_imm(MarshalType type) {
+        return static_cast<uint32_t>(type);
+    }
+    
+    inline MarshalType extract_marshal_type(uint32_t imm) {
+        return static_cast<MarshalType>(imm & 0xFFFF);
+    }
+    
+    // Calling convention encoding for ForeignCall operations
+    enum class CallingConvention : uint8_t {
+        SystemV_x64      = 0,    // System V AMD64 ABI (Linux/BSD)
+        Windows_x64      = 1,    // Windows x64 calling convention
+        ARM64_EABI       = 2,    // ARM64 EABI
+        Default          = SystemV_x64,
+    };
+    
+    inline uint32_t make_calling_convention_imm(CallingConvention cc) {
+        return static_cast<uint32_t>(cc);
+    }
+    
+    inline CallingConvention extract_calling_convention(uint32_t imm) {
+        return static_cast<CallingConvention>(imm & 0xFF);
+    }
+}
+
 enum class ResourceType : uint32_t {
     FILE = 0, SOCKET = 1, WINDOW = 2, SURFACE = 3, PROCESS = 4, CHANNEL = 5,
     TIMER = 6, TASK = 7, LIBRARY = 8, STDOUT = 9, STDERR = 10, MEMORY = 11
@@ -39,6 +79,7 @@ enum class ResourceOperation : uint32_t {
 };
 
 enum class LIR_Op : uint8_t {
+    // === Core Operations ===
     Mov, LoadConst, Add, Sub, Mul, Div, Mod, Neg, And, Or, Xor,
     CmpEQ, CmpNEQ, CmpLT, CmpLE, CmpGT, CmpGE, StringIndex,
     Jump, JumpIfFalse, JumpIf, Label,
@@ -46,25 +87,87 @@ enum class LIR_Op : uint8_t {
     Return, FuncDef, Param, Ret, VaStart, VaArg, VaEnd, Copy,
     PrintInt, PrintUint, PrintFloat, PrintBool, PrintString,
     Nop, Load, Store, Cast, ToString, STR_CONCAT, STR_FORMAT,
+    
+    // === Decimal Operations ===
     DecAdd, DecSub, DecMul, DecDiv, DecMod, DecNeg, DecRescale,
+    
+    // === Error Handling ===
     ConstructError, ConstructOk, IsError, Unwrap, UnwrapOr,
-    MakeEnum, GetTag, GetPayload, AtomicLoad, AtomicStore, AtomicFetchAdd,
+    
+    // === Type Operations ===
+    MakeEnum, GetTag, GetPayload,
+    
+    // === Atomic Operations ===
+    AtomicLoad, AtomicStore, AtomicFetchAdd,
+    
+    // === Async Operations ===
     Await, AsyncCall,
+    
+    // === Concurrency ===
     TaskContextAlloc, TaskContextInit, TaskGetState, TaskSetState, TaskSetField, TaskGetField,
     ChannelAlloc, ChannelPush, ChannelPop, ChannelHasData,
     ChannelSend, ChannelOffer, ChannelRecv, ChannelPoll, ChannelClose,
     SchedulerInit, SchedulerRun, SchedulerTick, SchedulerAddTask,
     GetTickCount, DelayUntil, ParallelInit, ParallelSync,
+    
+    // === Collections ===
     ListCreate, ListAppend, ListIndex, ListLen,
     DictCreate, DictSet, DictGet, DictHas, DictLen, DictItems,
     TupleCreate, TupleGet, TupleSet, TupleLen,
+    
+    // === Object-Oriented ===
     NewFrame, FrameGetField, FrameSetField, FrameGetFieldAtomic, FrameSetFieldAtomic,
     FrameFieldAtomicAdd, FrameFieldAtomicSub, FrameCallMethod, FrameCallInit, FrameCallDeinit,
     TraitCallMethod, MakeTraitObject,
+    
+    // === Module System ===
     ImportModule, ExportSymbol, BeginModule, EndModule, LoadGlobal, StoreGlobal,
+    
+    // === Shared Memory ===
     SharedCellAlloc, SharedCellLoad, SharedCellStore, SharedCellAdd, SharedCellSub,
-    MemoryAlloc, MemoryFree, MemoryResize, MemoryLoad, MemoryStore, ForeignCall,
+    
+    // === Legacy Resource Operations (deprecated, kept for compatibility) ===
     ResourceCreate, ResourceDestroy, ResourceCall,
+    
+    // === REDESIGNED: Memory Operations (generic with type dispatch via result_type) ===
+    MemoryAlloc,        // malloc(size)
+    MemoryFree,         // free(ptr)
+    MemoryResize,       // realloc(ptr, size)
+    MemoryLoad,         // Load from memory: result_type controls interpretation
+    MemoryStore,        // Store to memory: type_a controls interpretation
+    MemoryCopy,         // memcpy(dst, src, size)
+    MemoryFill,         // memset(dst, value, size)
+    MemoryCompare,      // memcmp(lhs, rhs, size) -> result
+    
+    // === REDESIGNED: Pointer Operations (renamed from FFI*Ptr) ===
+    PtrAdd,             // ptr + offset
+    PtrSub,             // ptr - offset
+    PtrDiff,            // ptr1 - ptr2
+    PtrAlign,           // align_to(ptr, alignment)
+    PtrIsAligned,       // (ptr % alignment) == 0 ? true : false
+    
+    // === REDESIGNED: Marshaling Operations (data conversions) ===
+    Marshal,            // Convert value (from_type, to_type in imm field)
+    Unmarshal,          // Reverse conversion (to_type, from_type in imm field)
+    BufferView,         // Create buffer view of memory range
+    BufferCreate,       // Allocate new buffer
+    BufferResize,       // Resize existing buffer
+    
+    // === REDESIGNED: Dynamic Linking (genuine C boundary crossing) ===
+    LibraryLoad,        // dlopen(path)
+    LibraryUnload,      // dlclose(handle)
+    LibrarySymbol,      // dlsym(handle, symbol)
+    
+    // === REDESIGNED: Foreign Calls (generic with args in call_args vector) ===
+    ForeignCall,        // Indirect: call function pointer with args
+    ForeignCallDirect,  // Direct: call known function (func_name field)
+    
+    // === REDESIGNED: Callbacks (genuine C boundary crossing) ===
+    CallbackCreate,     // Create callback wrapper returning callback ID
+    CallbackDestroy,    // Destroy callback wrapper
+    
+    // === DEPRECATED: Old type-specific FFI opcodes (kept for compatibility during migration) ===
+    // Do NOT use these - they will be removed after Phase 4 testing
     FFIAlloc, FFIFree, FFIRealloc, FFIMemcpy, FFIMemset, FFIMemcmp,
     FFIAddPtr, FFISubPtr, FFIPtrDiff, FFIAlignPtr, FFIIsAligned,
     FFILoadInt8, FFILoadUInt8, FFILoadInt16, FFILoadUInt16, FFILoadInt32, FFILoadUInt32,

@@ -97,28 +97,58 @@ private:
     void execute_memory_ptr_diff(const LIR::LIR_Inst* pc);
     void execute_memory_align_ptr(const LIR::LIR_Inst* pc);
     void execute_memory_is_aligned(const LIR::LIR_Inst* pc);
-    void execute_memory_load_int8(const LIR::LIR_Inst* pc);
-    void execute_memory_load_uint8(const LIR::LIR_Inst* pc);
-    void execute_memory_load_int16(const LIR::LIR_Inst* pc);
-    void execute_memory_load_uint16(const LIR::LIR_Inst* pc);
-    void execute_memory_load_int32(const LIR::LIR_Inst* pc);
-    void execute_memory_load_uint32(const LIR::LIR_Inst* pc);
-    void execute_memory_load_int64(const LIR::LIR_Inst* pc);
-    void execute_memory_load_uint64(const LIR::LIR_Inst* pc);
-    void execute_memory_load_float(const LIR::LIR_Inst* pc);
-    void execute_memory_load_double(const LIR::LIR_Inst* pc);
-    void execute_memory_load_ptr(const LIR::LIR_Inst* pc);
-    void execute_memory_store_int8(const LIR::LIR_Inst* pc);
-    void execute_memory_store_uint8(const LIR::LIR_Inst* pc);
-    void execute_memory_store_int16(const LIR::LIR_Inst* pc);
-    void execute_memory_store_uint16(const LIR::LIR_Inst* pc);
-    void execute_memory_store_int32(const LIR::LIR_Inst* pc);
-    void execute_memory_store_uint32(const LIR::LIR_Inst* pc);
-    void execute_memory_store_int64(const LIR::LIR_Inst* pc);
-    void execute_memory_store_uint64(const LIR::LIR_Inst* pc);
-    void execute_memory_store_float(const LIR::LIR_Inst* pc);
-    void execute_memory_store_double(const LIR::LIR_Inst* pc);
-    void execute_memory_store_ptr(const LIR::LIR_Inst* pc);
+    
+    // === REDESIGNED: Generic memory operations with type dispatch ===
+    void execute_memory_load(const LIR::LIR_Inst* pc);    // Type dispatch via result_type
+    void execute_memory_store(const LIR::LIR_Inst* pc);   // Type dispatch via type_a
+    void execute_memory_copy(const LIR::LIR_Inst* pc);    // memcpy
+    void execute_memory_fill(const LIR::LIR_Inst* pc);    // memset
+    void execute_memory_compare(const LIR::LIR_Inst* pc); // memcmp
+    
+    // === REDESIGNED: Generic pointer operations ===
+    void execute_ptr_add(const LIR::LIR_Inst* pc);        // ptr + offset
+    void execute_ptr_sub(const LIR::LIR_Inst* pc);        // ptr - offset
+    void execute_ptr_diff(const LIR::LIR_Inst* pc);       // ptr1 - ptr2
+    void execute_ptr_align(const LIR::LIR_Inst* pc);      // align_to
+    void execute_ptr_is_aligned(const LIR::LIR_Inst* pc); // is_aligned
+    
+    // === NEW: Marshaling operations ===
+    void execute_marshal(const LIR::LIR_Inst* pc);           // Generic conversion
+    void execute_unmarshal(const LIR::LIR_Inst* pc);         // Reverse conversion
+    void execute_buffer_view(const LIR::LIR_Inst* pc);       // Create buffer view
+    void execute_buffer_create(const LIR::LIR_Inst* pc);     // Allocate buffer
+    void execute_buffer_resize(const LIR::LIR_Inst* pc);     // Resize buffer
+    
+    // === NEW: Dynamic linking operations ===
+    void execute_library_load(const LIR::LIR_Inst* pc);      // dlopen
+    void execute_library_unload(const LIR::LIR_Inst* pc);    // dlclose
+    void execute_library_symbol(const LIR::LIR_Inst* pc);    // dlsym
+    
+    // === NEW: Foreign call operations ===
+    void execute_foreign_call(const LIR::LIR_Inst* pc);      // Indirect call
+    void execute_foreign_call_direct(const LIR::LIR_Inst* pc); // Direct call
+    
+    // === NEW: Callback operations ===
+    void execute_callback_create(const LIR::LIR_Inst* pc);   // Create wrapper
+    void execute_callback_destroy(const LIR::LIR_Inst* pc);  // Destroy wrapper
+    
+    // === DEPRECATED: Type-specific load/store (for compatibility during migration) ===
+    void execute_memory_load(const LIR::LIR_Inst* pc);
+    void execute_memory_store(const LIR::LIR_Inst* pc);
+    void execute_memory_copy(const LIR::LIR_Inst* pc);
+    void execute_memory_fill(const LIR::LIR_Inst* pc);
+    void execute_memory_compare(const LIR::LIR_Inst* pc);
+    void execute_memory_alloc(const LIR::LIR_Inst* pc);
+    void execute_memory_free(const LIR::LIR_Inst* pc);
+    void execute_memory_realloc(const LIR::LIR_Inst* pc);
+    void execute_memory(const LIR::LIR_Inst* pc);
+    
+    // Generic pointer operations
+    void execute_ptr_add(const LIR::LIR_Inst* pc);
+    void execute_ptr_sub(const LIR::LIR_Inst* pc);
+    void execute_ptr_diff(const LIR::LIR_Inst* pc);
+    void execute_ptr_align(const LIR::LIR_Inst* pc);
+    void execute_ptr_is_aligned(const LIR::LIR_Inst* pc);
     
     // Data construction - internal implementation helpers
     void execute_construct_string_from_cstr(const LIR::LIR_Inst* pc);

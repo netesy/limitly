@@ -21,22 +21,121 @@ namespace {
     }
 }
 
-// Memory allocation - intrinsic
-void RegisterVM::execute_memory_alloc(const LIR::LIR_Inst* pc) {
-    int64_t size = to_int(registers[arg_reg(pc, 0, pc->a)]);
-    if (size < 0) {
+// ============================================================================
+// PHASE 2: Generic Memory Operations with Type Dispatch
+// ============================================================================
+
+// Generic memory load - type dispatch via result_type
+void RegisterVM::execute_memory_load(const LIR::LIR_Inst* pc) {
+    if (!IS_PTR(registers[pc->a])) {
         registers[pc->dst] = VAL_NIL;
         return;
     }
     
-    void* ptr = std::malloc(size);
-    if (ptr) {
-        std::lock_guard<std::mutex> lock(g_memory_mutex);
-        g_memory_allocations[reinterpret_cast<uintptr_t>(ptr)] = size;
-        registers[pc->dst] = BOX_PTR(ptr);
-    } else {
+    void* ptr = UNBOX_PTR(registers[pc->a]);
+    if (!ptr) {
         registers[pc->dst] = VAL_NIL;
+        return;
     }
+    
+    // Type dispatch: interpret pointer based on result_type
+    switch (pc->result_type) {
+        case LIR::Type::I32:
+            registers[pc->dst] = BOX_INT(*(int32_t*)ptr);
+            break;
+        case LIR::Type::I64:
+            registers[pc->dst] = BOX_INT(*(int64_t*)ptr);
+            break;
+        case LIR::Type::F64:
+            registers[pc->dst] = make_float(*(double*)ptr);
+            break;
+        case LIR::Type::Bool:
+            registers[pc->dst] = *(bool*)ptr ? VAL_TRUE : VAL_FALSE;
+            break;
+        case LIR::Type::Ptr:
+            registers[pc->dst] = BOX_PTR(*(void**)ptr);
+            break;
+        default:
+            registers[pc->dst] = VAL_NIL;
+    }
+}
+
+// Generic memory store - type dispatch via type_a
+void RegisterVM::execute_memory_store(const LIR::LIR_Inst* pc) {
+    if (!IS_PTR(registers[pc->a])) {
+        return;
+    }
+    
+    void* ptr = UNBOX_PTR(registers[pc->a]);
+    if (!ptr) {
+        return;
+    }
+    
+    // Type dispatch: store value at pointer based on type_a
+    switch (pc->type_a) {
+        case LIR::Type::I32: {
+            int32_t value = static_cast<int32_t>(to_int(registers[pc->b]));
+            *(int32_t*)ptr = value;
+            break;
+        }
+        case LIR::Type::I64: {
+            int64_t value = to_int(registers[pc->b]);
+            *(int64_t*)ptr = value;
+            break;
+        }
+        case LIR::Type::F64: {
+            double value = to_float(registers[pc->b]);
+            *(double*)ptr = value;
+            break;
+        }
+        case LIR::Type::Bool: {
+            // Extract boolean from value - use inline conversion
+            bool value = IS_BOOL(registers[pc->b]) ? UNBOX_BOOL(registers[pc->b]) : (to_int(registers[pc->b]) != 0);
+            *(bool*)ptr = value;
+            break;
+        }
+        case LIR::Type::Ptr: {
+            void* value = IS_PTR(registers[pc->b]) ? UNBOX_PTR(registers[pc->b]) : nullptr;
+            *(void**)ptr = value;
+            break;
+        }
+        default:
+            break;
+    }
+}
+
+// Bulk memory operations
+void RegisterVM::execute_memory_copy(const LIR::LIR_Inst* pc) {
+    execute_memory_memcpy(pc);  // Delegate to existing impl
+}
+
+void RegisterVM::execute_memory_fill(const LIR::LIR_Inst* pc) {
+    execute_memory_memset(pc);  // Delegate to existing impl
+}
+
+void RegisterVM::execute_memory_compare(const LIR::LIR_Inst* pc) {
+    execute_memory_memcmp(pc);  // Delegate to existing impl
+}
+
+// Pointer operations with generic names
+void RegisterVM::execute_ptr_add(const LIR::LIR_Inst* pc) {
+    execute_memory_add_ptr(pc);  // Delegate to existing impl
+}
+
+void RegisterVM::execute_ptr_sub(const LIR::LIR_Inst* pc) {
+    execute_memory_sub_ptr(pc);  // Delegate to existing impl
+}
+
+void RegisterVM::execute_ptr_diff(const LIR::LIR_Inst* pc) {
+    execute_memory_ptr_diff(pc);  // Delegate to existing impl
+}
+
+void RegisterVM::execute_ptr_align(const LIR::LIR_Inst* pc) {
+    execute_memory_align_ptr(pc);  // Delegate to existing impl
+}
+
+void RegisterVM::execute_ptr_is_aligned(const LIR::LIR_Inst* pc) {
+    execute_memory_is_aligned(pc);  // Delegate to existing impl
 }
 
 // Memory deallocation - intrinsic
@@ -387,10 +486,48 @@ void RegisterVM::execute_memory_store_ptr(const LIR::LIR_Inst* pc) {
     *ptr = IS_PTR(registers[pc->a]) ? UNBOX_PTR(registers[pc->a]) : nullptr;
 }
 
+// Backward compatibility stubs - delegate to existing alloc/free/realloc implementations
+
+void RegisterVM::execute_memory_alloc(const LIR::LIR_Inst* pc) {
+    // Allocate memory and track it
+    int64_t size = to_int(registers[pc->a]);
+    if (size < 0) {
+        registers[pc->dst] = VAL_NIL;
+        return;
+    }
+    
+    void* ptr = std::malloc(size);
+    if (ptr) {
+        std::lock_guard<std::mutex> lock(g_memory_mutex);
+        g_memory_allocations[reinterpret_cast<uintptr_t>(ptr)] = size;
+        registers[pc->dst] = BOX_PTR(ptr);
+    } else {
+        registers[pc->dst] = VAL_NIL;
+    }
+}
+
 // Main memory intrinsics dispatcher
 void RegisterVM::execute_memory(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
-        // Memory allocation/deallocation
+        // === NEW: Generic memory operations with type dispatch ===
+        case LIR::LIR_Op::MemoryLoad:
+            execute_memory_load(pc);
+            break;
+        case LIR::LIR_Op::MemoryStore:
+            execute_memory_store(pc);
+            break;
+        case LIR::LIR_Op::MemoryCopy:
+        case LIR::LIR_Op::FFIMemcpy:
+            execute_memory_memcpy(pc);
+            break;
+        case LIR::LIR_Op::MemoryFill:
+        case LIR::LIR_Op::FFIMemset:
+            execute_memory_memset(pc);
+            break;
+        case LIR::LIR_Op::MemoryCompare:
+        case LIR::LIR_Op::FFIMemcmp:
+            execute_memory_memcmp(pc);
+            break;
         case LIR::LIR_Op::MemoryAlloc:
         case LIR::LIR_Op::FFIAlloc:
             execute_memory_alloc(pc);
@@ -404,104 +541,55 @@ void RegisterVM::execute_memory(const LIR::LIR_Inst* pc) {
             execute_memory_realloc(pc);
             break;
         
-        // Bulk operations
-        case LIR::LIR_Op::FFIMemcpy:
-            execute_memory_memcpy(pc);
-            break;
-        case LIR::LIR_Op::FFIMemset:
-            execute_memory_memset(pc);
-            break;
-        case LIR::LIR_Op::FFIMemcmp:
-            execute_memory_memcmp(pc);
-            break;
-        
-        // Pointer arithmetic
+        // === NEW: Generic pointer operations ===
+        case LIR::LIR_Op::PtrAdd:
         case LIR::LIR_Op::FFIAddPtr:
             execute_memory_add_ptr(pc);
             break;
+        case LIR::LIR_Op::PtrSub:
         case LIR::LIR_Op::FFISubPtr:
             execute_memory_sub_ptr(pc);
             break;
+        case LIR::LIR_Op::PtrDiff:
         case LIR::LIR_Op::FFIPtrDiff:
             execute_memory_ptr_diff(pc);
             break;
+        case LIR::LIR_Op::PtrAlign:
         case LIR::LIR_Op::FFIAlignPtr:
             execute_memory_align_ptr(pc);
             break;
+        case LIR::LIR_Op::PtrIsAligned:
         case LIR::LIR_Op::FFIIsAligned:
             execute_memory_is_aligned(pc);
             break;
         
-        // Load operations (intrinsic type dispatch)
-        case LIR::LIR_Op::MemoryLoad:
+        // Load/Store operations now use generic type dispatch
         case LIR::LIR_Op::FFILoadInt8:
-            execute_memory_load_int8(pc);
-            break;
         case LIR::LIR_Op::FFILoadUInt8:
-            execute_memory_load_uint8(pc);
-            break;
         case LIR::LIR_Op::FFILoadInt16:
-            execute_memory_load_int16(pc);
-            break;
         case LIR::LIR_Op::FFILoadUInt16:
-            execute_memory_load_uint16(pc);
-            break;
         case LIR::LIR_Op::FFILoadInt32:
-            execute_memory_load_int32(pc);
-            break;
         case LIR::LIR_Op::FFILoadUInt32:
-            execute_memory_load_uint32(pc);
-            break;
         case LIR::LIR_Op::FFILoadInt64:
-            execute_memory_load_int64(pc);
-            break;
         case LIR::LIR_Op::FFILoadUInt64:
-            execute_memory_load_uint64(pc);
-            break;
         case LIR::LIR_Op::FFILoadFloat:
-            execute_memory_load_float(pc);
-            break;
         case LIR::LIR_Op::FFILoadDouble:
-            execute_memory_load_double(pc);
-            break;
         case LIR::LIR_Op::FFILoadPtr:
-            execute_memory_load_ptr(pc);
+            execute_memory_load(pc);
             break;
         
-        // Store operations (intrinsic type dispatch)
-        case LIR::LIR_Op::MemoryStore:
         case LIR::LIR_Op::FFIStoreInt8:
-            execute_memory_store_int8(pc);
-            break;
         case LIR::LIR_Op::FFIStoreUInt8:
-            execute_memory_store_uint8(pc);
-            break;
         case LIR::LIR_Op::FFIStoreInt16:
-            execute_memory_store_int16(pc);
-            break;
         case LIR::LIR_Op::FFIStoreUInt16:
-            execute_memory_store_uint16(pc);
-            break;
         case LIR::LIR_Op::FFIStoreInt32:
-            execute_memory_store_int32(pc);
-            break;
         case LIR::LIR_Op::FFIStoreUInt32:
-            execute_memory_store_uint32(pc);
-            break;
         case LIR::LIR_Op::FFIStoreInt64:
-            execute_memory_store_int64(pc);
-            break;
         case LIR::LIR_Op::FFIStoreUInt64:
-            execute_memory_store_uint64(pc);
-            break;
         case LIR::LIR_Op::FFIStoreFloat:
-            execute_memory_store_float(pc);
-            break;
         case LIR::LIR_Op::FFIStoreDouble:
-            execute_memory_store_double(pc);
-            break;
         case LIR::LIR_Op::FFIStorePtr:
-            execute_memory_store_ptr(pc);
+            execute_memory_store(pc);
             break;
         
         default:
