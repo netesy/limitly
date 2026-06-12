@@ -371,6 +371,11 @@ public:
     std::string disassemble_instruction(const LIR_Inst& inst) const;
 };
 
+size_t get_type_size(Type type);
+size_t get_type_alignment(Type type);
+bool is_integer_type(Type type);
+bool is_unsigned_type(Type type);
+bool is_float_type(Type type);
 std::string lir_op_to_string(LIR_Op op);
 Type language_type_to_abi_type(TypePtr lang_type);
 

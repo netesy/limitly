@@ -140,7 +140,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
     while (pc < end_ptr) {
         instruction_count++;
         if (instruction_count > MAX_INSTRUCTIONS) { std::cerr << "Instruction limit exceeded" << std::endl; return; }
-        switch (pc->op) {
+                switch (pc->op) {
             case LIR::LIR_Op::LoadConst: registers[pc->dst] = pc->const_val; break;
             case LIR::LIR_Op::Add: case LIR::LIR_Op::Sub: case LIR::LIR_Op::Mul: case LIR::LIR_Op::Div:
             case LIR::LIR_Op::Mod: case LIR::LIR_Op::Neg: case LIR::LIR_Op::DecAdd: case LIR::LIR_Op::DecSub:
@@ -155,6 +155,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::NewFrame: case LIR::LIR_Op::ConstructError: case LIR::LIR_Op::ConstructOk:
             case LIR::LIR_Op::IsError: case LIR::LIR_Op::Unwrap: case LIR::LIR_Op::FrameGetField:
             case LIR::LIR_Op::FrameSetField: case LIR::LIR_Op::FrameGetFieldAtomic: case LIR::LIR_Op::FrameSetFieldAtomic:
+            case LIR::LIR_Op::FrameFieldAtomicAdd: case LIR::LIR_Op::FrameFieldAtomicSub:
+            case LIR::LIR_Op::FrameCallMethod: case LIR::LIR_Op::FrameCallInit: case LIR::LIR_Op::FrameCallDeinit:
+            case LIR::LIR_Op::TraitCallMethod: case LIR::LIR_Op::MakeTraitObject:
                 execute_frames(pc); break;
             case LIR::LIR_Op::Jump: case LIR::LIR_Op::JumpIf: case LIR::LIR_Op::JumpIfFalse:
                 execute_control_flow(pc, function); break;
@@ -206,7 +209,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                 execute_ffi(pc); break;
             case LIR::LIR_Op::Mov: registers[pc->dst] = registers[pc->a]; break;
             case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret: if (pc->a != UINT32_MAX) registers[0] = registers[pc->a]; return;
-            default: std::cerr << "Unknown opcode: " << (int)pc->op << std::endl; break;
+            default: std::cerr << "JULES_DEBUG: Unknown opcode: " << (int)pc->op << " at PC " << (pc - instructions_ptr) << " [" << LIR::lir_op_to_string(pc->op) << "]" << std::endl; break;
         }
         pc++;
     }

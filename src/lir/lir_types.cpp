@@ -23,6 +23,42 @@ std::string type_to_string(Type type) {
     }
 }
 
+size_t get_type_size(Type type) {
+    switch (type) {
+        case Type::I8:   case Type::U8:   case Type::Bool: return 1;
+        case Type::I16:  case Type::U16:  return 2;
+        case Type::I32:  case Type::U32:  case Type::F32: return 4;
+        case Type::I64:  case Type::U64:  case Type::F64: case Type::Ptr: return 8;
+        default: return 0;
+    }
+}
+
+size_t get_type_alignment(Type type) {
+    return get_type_size(type);
+}
+
+bool is_integer_type(Type type) {
+    switch (type) {
+        case Type::I8:  case Type::U8:
+        case Type::I16: case Type::U16:
+        case Type::I32: case Type::U32:
+        case Type::I64: case Type::U64: return true;
+        default: return false;
+    }
+}
+
+bool is_unsigned_type(Type type) {
+    switch (type) {
+        case Type::U8:  case Type::U16:
+        case Type::U32: case Type::U64: return true;
+        default: return false;
+    }
+}
+
+bool is_float_type(Type type) {
+    return type == Type::F32 || type == Type::F64;
+}
+
 Type language_type_to_abi_type(TypePtr lang_type) {
     if (!lang_type) return Type::Void;
     

@@ -46,8 +46,11 @@ IntrinsicRegistry::IntrinsicRegistry() {
     registerIntrinsic("std.ffi::library_get_symbol", {LIR_Op::LibrarySymbol, (uint8_t)Type::Ptr, 0, 2, 0});
     registerIntrinsic("std.ffi::ccall_execute1", {LIR_Op::ForeignCall, (uint8_t)Type::I64, 0, 0, 0});
     registerIntrinsic("std.ffi::ccall_execute1_ptr", {LIR_Op::ForeignCall, (uint8_t)Type::Ptr, 0, 0, 0});
+    registerIntrinsic("std.ffi::ccall_execute1_void", {LIR_Op::ForeignCall, (uint8_t)Type::Void, 0, 0, 0});
     registerIntrinsic("std.ffi::ccall_execute3_ifps_ptr", {LIR_Op::ForeignCall, (uint8_t)Type::Ptr, 0, 0, 0});
     registerIntrinsic("std.ffi::ccall_execute3_piif", {LIR_Op::ForeignCall, (uint8_t)Type::Void, 0, 0, 0});
+    registerIntrinsic("std.ffi::ccall_execute4_sppp_ptr", {LIR_Op::ForeignCall, (uint8_t)Type::Ptr, 0, 0, 0});
+    registerIntrinsic("std.ffi::ccall_execute5_siiip_int", {LIR_Op::ForeignCall, (uint8_t)Type::I64, 0, 0, 0});
     registerIntrinsic("std.ffi::ffi_alloc", {LIR_Op::MemoryAlloc, (uint8_t)Type::Ptr, 0, 1, 0});
     registerIntrinsic("std.ffi::ffi_free", {LIR_Op::MemoryFree, (uint8_t)Type::Void, 0, 1, 0});
     registerIntrinsic("std.ffi::ffi_realloc", {LIR_Op::MemoryResize, (uint8_t)Type::Ptr, 0, 2, 0});
