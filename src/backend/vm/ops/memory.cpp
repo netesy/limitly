@@ -5,565 +5,259 @@
 #include <cstring>
 #include <unordered_map>
 #include <mutex>
+#include <iostream>
 
 namespace LM {
 namespace Backend {
 namespace VM {
 namespace Register {
 
-// Memory allocation tracking - intrinsic layer
 namespace {
     std::mutex g_memory_mutex;
     std::unordered_map<uintptr_t, size_t> g_memory_allocations;
 
-    LIR::Reg arg_reg(const LIR::LIR_Inst* pc, size_t index, LIR::Reg fallback) {
-        return index < pc->call_args.size() ? pc->call_args[index] : fallback;
+    void* value_to_ptr(RegisterValue val) {
+        if (IS_PTR(val)) {
+            auto* header = static_cast<ObjHeader*>(UNBOX_PTR(val));
+            if (header->type_id == TYPE_FOREIGN_PTR) return ((ObjForeignPtr*)header)->ptr;
+            return UNBOX_PTR(val);
+        }
+        if (is_integer(val)) return (void*)(uintptr_t)as_i64(val);
+        return nullptr;
     }
 }
 
-// ============================================================================
-// PHASE 2: Generic Memory Operations with Type Dispatch
-// ============================================================================
-
-// Generic memory load - type dispatch via result_type
 void RegisterVM::execute_memory_load(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
+    void* ptr = value_to_ptr(registers[pc->a]);
+    if (!ptr) { registers[pc->dst] = VAL_NIL; return; }
     
-    void* ptr = UNBOX_PTR(registers[pc->a]);
-    if (!ptr) {
-        registers[pc->dst] = VAL_NIL;
-        return;
+    LIR::Type target_type = pc->result_type;
+    if (pc->op == LIR::LIR_Op::MemoryLoad) {
+        switch (pc->imm) {
+            case 0: target_type = LIR::Type::I8; break;
+            case 1: target_type = LIR::Type::U8; break;
+            case 2: target_type = LIR::Type::I16; break;
+            case 3: target_type = LIR::Type::U16; break;
+            case 4: target_type = LIR::Type::I32; break;
+            case 5: target_type = LIR::Type::U32; break;
+            case 6: target_type = LIR::Type::I64; break;
+            case 7: target_type = LIR::Type::U64; break;
+            case 8: target_type = LIR::Type::F32; break;
+            case 9: target_type = LIR::Type::F64; break;
+            case 10: target_type = LIR::Type::Ptr; break;
+        }
+    } else {
+        switch (pc->op) {
+            case LIR::LIR_Op::FFILoadInt8: target_type = LIR::Type::I8; break;
+            case LIR::LIR_Op::FFILoadUInt8: target_type = LIR::Type::U8; break;
+            case LIR::LIR_Op::FFILoadInt16: target_type = LIR::Type::I16; break;
+            case LIR::LIR_Op::FFILoadUInt16: target_type = LIR::Type::U16; break;
+            case LIR::LIR_Op::FFILoadInt32: target_type = LIR::Type::I32; break;
+            case LIR::LIR_Op::FFILoadUInt32: target_type = LIR::Type::U32; break;
+            case LIR::LIR_Op::FFILoadInt64: target_type = LIR::Type::I64; break;
+            case LIR::LIR_Op::FFILoadUInt64: target_type = LIR::Type::U64; break;
+            case LIR::LIR_Op::FFILoadFloat: target_type = LIR::Type::F32; break;
+            case LIR::LIR_Op::FFILoadDouble: target_type = LIR::Type::F64; break;
+            case LIR::LIR_Op::FFILoadPtr: target_type = LIR::Type::Ptr; break;
+            default: break;
+        }
     }
-    
-    // Type dispatch: interpret pointer based on result_type
-    switch (pc->result_type) {
-        case LIR::Type::I32:
-            registers[pc->dst] = BOX_INT(*(int32_t*)ptr);
-            break;
-        case LIR::Type::I64:
-            registers[pc->dst] = BOX_INT(*(int64_t*)ptr);
-            break;
-        case LIR::Type::F64:
-            registers[pc->dst] = make_float(*(double*)ptr);
-            break;
-        case LIR::Type::Bool:
-            registers[pc->dst] = *(bool*)ptr ? VAL_TRUE : VAL_FALSE;
-            break;
-        case LIR::Type::Ptr:
-            registers[pc->dst] = BOX_PTR(*(void**)ptr);
-            break;
-        default:
-            registers[pc->dst] = VAL_NIL;
+
+    switch (target_type) {
+        case LIR::Type::I8: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(int8_t*)ptr)); break;
+        case LIR::Type::U8: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(uint8_t*)ptr)); break;
+        case LIR::Type::I16: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(int16_t*)ptr)); break;
+        case LIR::Type::U16: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(uint16_t*)ptr)); break;
+        case LIR::Type::I32: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(int32_t*)ptr)); break;
+        case LIR::Type::U32: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(uint32_t*)ptr)); break;
+        case LIR::Type::I64: registers[pc->dst] = BOX_INT(*(int64_t*)ptr); break;
+        case LIR::Type::U64: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(uint64_t*)ptr)); break;
+        case LIR::Type::F32: registers[pc->dst] = make_float(static_cast<double>(*(float*)ptr)); break;
+        case LIR::Type::F64: registers[pc->dst] = make_float(*(double*)ptr); break;
+        case LIR::Type::Bool: registers[pc->dst] = *(bool*)ptr ? VAL_TRUE : VAL_FALSE; break;
+        case LIR::Type::Ptr: registers[pc->dst] = lm_alloc_foreign_ptr(*(void**)ptr); break;
+        default: registers[pc->dst] = VAL_NIL; break;
     }
 }
 
-// Generic memory store - type dispatch via type_a
 void RegisterVM::execute_memory_store(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        return;
+    void* ptr = value_to_ptr(registers[pc->a]);
+    if (!ptr) return;
+    LIR::Type value_type = pc->type_b;
+    if (pc->op == LIR::LIR_Op::MemoryStore) {
+        switch (pc->imm) {
+            case 0: value_type = LIR::Type::I8; break;
+            case 1: value_type = LIR::Type::U8; break;
+            case 2: value_type = LIR::Type::I16; break;
+            case 3: value_type = LIR::Type::U16; break;
+            case 4: value_type = LIR::Type::I32; break;
+            case 5: value_type = LIR::Type::U32; break;
+            case 6: value_type = LIR::Type::I64; break;
+            case 7: value_type = LIR::Type::U64; break;
+            case 8: value_type = LIR::Type::F32; break;
+            case 9: value_type = LIR::Type::F64; break;
+            case 10: value_type = LIR::Type::Ptr; break;
+        }
+    } else {
+        switch (pc->op) {
+            case LIR::LIR_Op::FFIStoreInt8: value_type = LIR::Type::I8; break;
+            case LIR::LIR_Op::FFIStoreUInt8: value_type = LIR::Type::U8; break;
+            case LIR::LIR_Op::FFIStoreInt16: value_type = LIR::Type::I16; break;
+            case LIR::LIR_Op::FFIStoreUInt16: value_type = LIR::Type::U16; break;
+            case LIR::LIR_Op::FFIStoreInt32: value_type = LIR::Type::I32; break;
+            case LIR::LIR_Op::FFIStoreUInt32: value_type = LIR::Type::U32; break;
+            case LIR::LIR_Op::FFIStoreInt64: value_type = LIR::Type::I64; break;
+            case LIR::LIR_Op::FFIStoreUInt64: value_type = LIR::Type::U64; break;
+            case LIR::LIR_Op::FFIStoreFloat: value_type = LIR::Type::F32; break;
+            case LIR::LIR_Op::FFIStoreDouble: value_type = LIR::Type::F64; break;
+            case LIR::LIR_Op::FFIStorePtr: value_type = LIR::Type::Ptr; break;
+            default: break;
+        }
     }
-    
-    void* ptr = UNBOX_PTR(registers[pc->a]);
-    if (!ptr) {
-        return;
-    }
-    
-    // Type dispatch: store value at pointer based on type_a
-    switch (pc->type_a) {
-        case LIR::Type::I32: {
-            int32_t value = static_cast<int32_t>(to_int(registers[pc->b]));
-            *(int32_t*)ptr = value;
-            break;
-        }
-        case LIR::Type::I64: {
-            int64_t value = to_int(registers[pc->b]);
-            *(int64_t*)ptr = value;
-            break;
-        }
-        case LIR::Type::F64: {
-            double value = to_float(registers[pc->b]);
-            *(double*)ptr = value;
-            break;
-        }
-        case LIR::Type::Bool: {
-            // Extract boolean from value - use inline conversion
-            bool value = IS_BOOL(registers[pc->b]) ? UNBOX_BOOL(registers[pc->b]) : (to_int(registers[pc->b]) != 0);
-            *(bool*)ptr = value;
-            break;
-        }
-        case LIR::Type::Ptr: {
-            void* value = IS_PTR(registers[pc->b]) ? UNBOX_PTR(registers[pc->b]) : nullptr;
-            *(void**)ptr = value;
-            break;
-        }
-        default:
-            break;
+    switch (value_type) {
+        case LIR::Type::I8: *(int8_t*)ptr = static_cast<int8_t>(to_int(registers[pc->b])); break;
+        case LIR::Type::U8: *(uint8_t*)ptr = static_cast<uint8_t>(to_int(registers[pc->b])); break;
+        case LIR::Type::I16: *(int16_t*)ptr = static_cast<int16_t>(to_int(registers[pc->b])); break;
+        case LIR::Type::U16: *(uint16_t*)ptr = static_cast<uint16_t>(to_int(registers[pc->b])); break;
+        case LIR::Type::I32: *(int32_t*)ptr = static_cast<int32_t>(to_int(registers[pc->b])); break;
+        case LIR::Type::U32: *(uint32_t*)ptr = static_cast<uint32_t>(to_int(registers[pc->b])); break;
+        case LIR::Type::I64: *(int64_t*)ptr = to_int(registers[pc->b]); break;
+        case LIR::Type::U64: *(uint64_t*)ptr = static_cast<uint64_t>(to_int(registers[pc->b])); break;
+        case LIR::Type::F32: *(float*)ptr = static_cast<float>(to_float(registers[pc->b])); break;
+        case LIR::Type::F64: *(double*)ptr = to_float(registers[pc->b]); break;
+        case LIR::Type::Bool: *(bool*)ptr = IS_BOOL(registers[pc->b]) ? UNBOX_BOOL(registers[pc->b]) : (to_int(registers[pc->b]) != 0); break;
+        case LIR::Type::Ptr: *(void**)ptr = value_to_ptr(registers[pc->b]); break;
+        default: break;
     }
 }
 
-// Bulk memory operations
 void RegisterVM::execute_memory_copy(const LIR::LIR_Inst* pc) {
-    execute_memory_memcpy(pc);  // Delegate to existing impl
+    void* dest = value_to_ptr(registers[pc->dst]);
+    void* src = value_to_ptr(registers[pc->a]);
+    size_t n = static_cast<size_t>(to_int(registers[pc->b]));
+    if (dest && src && n > 0) std::memcpy(dest, src, n);
 }
 
 void RegisterVM::execute_memory_fill(const LIR::LIR_Inst* pc) {
-    execute_memory_memset(pc);  // Delegate to existing impl
+    void* dest = value_to_ptr(registers[pc->dst]);
+    int value = static_cast<int>(to_int(registers[pc->a]));
+    size_t n = static_cast<size_t>(to_int(registers[pc->b]));
+    if (dest && n > 0) std::memset(dest, value, n);
 }
 
 void RegisterVM::execute_memory_compare(const LIR::LIR_Inst* pc) {
-    execute_memory_memcmp(pc);  // Delegate to existing impl
+    void* s1 = value_to_ptr(registers[pc->a]);
+    void* s2 = value_to_ptr(registers[pc->b]);
+    size_t n = static_cast<size_t>(pc->imm);
+    if (s1 && s2 && n > 0) {
+        int result = std::memcmp(s1, s2, n);
+        registers[pc->dst] = BOX_INT(static_cast<int64_t>(result));
+    } else registers[pc->dst] = BOX_INT(0);
 }
-
-// Pointer operations with generic names
-void RegisterVM::execute_ptr_add(const LIR::LIR_Inst* pc) {
-    execute_memory_add_ptr(pc);  // Delegate to existing impl
-}
-
-void RegisterVM::execute_ptr_sub(const LIR::LIR_Inst* pc) {
-    execute_memory_sub_ptr(pc);  // Delegate to existing impl
-}
-
-void RegisterVM::execute_ptr_diff(const LIR::LIR_Inst* pc) {
-    execute_memory_ptr_diff(pc);  // Delegate to existing impl
-}
-
-void RegisterVM::execute_ptr_align(const LIR::LIR_Inst* pc) {
-    execute_memory_align_ptr(pc);  // Delegate to existing impl
-}
-
-void RegisterVM::execute_ptr_is_aligned(const LIR::LIR_Inst* pc) {
-    execute_memory_is_aligned(pc);  // Delegate to existing impl
-}
-
-// Memory deallocation - intrinsic
-void RegisterVM::execute_memory_free(const LIR::LIR_Inst* pc) {
-    LIR::Reg ptr_reg = arg_reg(pc, 0, pc->a);
-    if (!IS_PTR(registers[ptr_reg])) {
-        return;
-    }
-    
-    void* ptr = UNBOX_PTR(registers[ptr_reg]);
-    if (ptr) {
-        std::lock_guard<std::mutex> lock(g_memory_mutex);
-        auto it = g_memory_allocations.find(reinterpret_cast<uintptr_t>(ptr));
-        if (it != g_memory_allocations.end()) {
-            g_memory_allocations.erase(it);
-            std::free(ptr);
-        }
-    }
-}
-
-// Memory resizing - intrinsic
-void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
-    LIR::Reg ptr_reg = arg_reg(pc, 0, pc->a);
-    LIR::Reg size_reg = arg_reg(pc, 1, pc->b);
-    if (!IS_PTR(registers[ptr_reg])) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    void* ptr = UNBOX_PTR(registers[ptr_reg]);
-    int64_t new_size = to_int(registers[size_reg]);
-    
-    if (new_size < 0) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    void* new_ptr = std::realloc(ptr, new_size);
-    if (new_ptr) {
-        std::lock_guard<std::mutex> lock(g_memory_mutex);
-        g_memory_allocations.erase(reinterpret_cast<uintptr_t>(ptr));
-        g_memory_allocations[reinterpret_cast<uintptr_t>(new_ptr)] = new_size;
-        registers[pc->dst] = BOX_PTR(new_ptr);
-    } else {
-        registers[pc->dst] = VAL_NIL;
-    }
-}
-
-// Bulk memory copy - intrinsic
-void RegisterVM::execute_memory_memcpy(const LIR::LIR_Inst* pc) {
-    LIR::Reg dest_reg = arg_reg(pc, 0, pc->a);
-    LIR::Reg src_reg = arg_reg(pc, 1, pc->b);
-    LIR::Reg size_reg = arg_reg(pc, 2, pc->dst);
-    if (!IS_PTR(registers[dest_reg]) || !IS_PTR(registers[src_reg])) {
-        return;
-    }
-    
-    void* dest = UNBOX_PTR(registers[dest_reg]);
-    void* src = UNBOX_PTR(registers[src_reg]);
-    int64_t size = to_int(registers[size_reg]);
-    
-    if (dest && src && size > 0) {
-        std::memcpy(dest, src, size);
-    }
-}
-
-// Bulk memory fill - intrinsic
-void RegisterVM::execute_memory_memset(const LIR::LIR_Inst* pc) {
-    LIR::Reg ptr_reg = arg_reg(pc, 0, pc->a);
-    LIR::Reg value_reg = arg_reg(pc, 1, pc->b);
-    LIR::Reg size_reg = arg_reg(pc, 2, pc->dst);
-    if (!IS_PTR(registers[ptr_reg])) {
-        return;
-    }
-    
-    void* ptr = UNBOX_PTR(registers[ptr_reg]);
-    int64_t value = to_int(registers[value_reg]);
-    int64_t size = to_int(registers[size_reg]);
-    
-    if (ptr && size > 0) {
-        std::memset(ptr, static_cast<int>(value), size);
-    }
-}
-
-// Bulk memory comparison - intrinsic
-void RegisterVM::execute_memory_memcmp(const LIR::LIR_Inst* pc) {
-    LIR::Reg lhs_reg = arg_reg(pc, 0, pc->a);
-    LIR::Reg rhs_reg = arg_reg(pc, 1, pc->b);
-    LIR::Reg size_reg = arg_reg(pc, 2, pc->imm);
-    if (!IS_PTR(registers[lhs_reg]) || !IS_PTR(registers[rhs_reg])) {
-        registers[pc->dst] = BOX_INT(0);
-        return;
-    }
-    
-    void* ptr1 = UNBOX_PTR(registers[lhs_reg]);
-    void* ptr2 = UNBOX_PTR(registers[rhs_reg]);
-    int64_t size = to_int(registers[size_reg]);
-    
-    if (ptr1 && ptr2 && size > 0) {
-        int result = std::memcmp(ptr1, ptr2, size);
-        registers[pc->dst] = BOX_INT(result);
-    } else {
-        registers[pc->dst] = BOX_INT(0);
-    }
-}
-
-// Pointer arithmetic - intrinsic
-void RegisterVM::execute_memory_add_ptr(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    uintptr_t ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(registers[pc->a]));
-    int64_t offset = to_int(registers[pc->b]);
-    uintptr_t result = ptr + static_cast<uintptr_t>(offset);
-    registers[pc->dst] = BOX_PTR(reinterpret_cast<void*>(result));
-}
-
-// Pointer subtraction - intrinsic
-void RegisterVM::execute_memory_sub_ptr(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    uintptr_t ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(registers[pc->a]));
-    int64_t offset = to_int(registers[pc->b]);
-    uintptr_t result = ptr - static_cast<uintptr_t>(offset);
-    registers[pc->dst] = BOX_PTR(reinterpret_cast<void*>(result));
-}
-
-// Pointer difference - intrinsic
-void RegisterVM::execute_memory_ptr_diff(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a]) || !IS_PTR(registers[pc->b])) {
-        registers[pc->dst] = BOX_INT(0);
-        return;
-    }
-    
-    uintptr_t ptr1 = reinterpret_cast<uintptr_t>(UNBOX_PTR(registers[pc->a]));
-    uintptr_t ptr2 = reinterpret_cast<uintptr_t>(UNBOX_PTR(registers[pc->b]));
-    int64_t diff = static_cast<int64_t>(ptr1 - ptr2);
-    registers[pc->dst] = BOX_INT(diff);
-}
-
-// Pointer alignment calculation - intrinsic
-void RegisterVM::execute_memory_align_ptr(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    uintptr_t ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(registers[pc->a]));
-    int64_t alignment = to_int(registers[pc->b]);
-    
-    if (alignment <= 0 || (alignment & (alignment - 1)) != 0) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    uintptr_t aligned = (ptr + alignment - 1) & ~(alignment - 1);
-    registers[pc->dst] = BOX_PTR(reinterpret_cast<void*>(aligned));
-}
-
-// Pointer alignment check - intrinsic
-void RegisterVM::execute_memory_is_aligned(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = VAL_FALSE;
-        return;
-    }
-    
-    uintptr_t ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(registers[pc->a]));
-    int64_t alignment = to_int(registers[pc->b]);
-    
-    if (alignment <= 0) {
-        registers[pc->dst] = VAL_FALSE;
-        return;
-    }
-    
-    bool aligned = (ptr % static_cast<uintptr_t>(alignment)) == 0;
-    registers[pc->dst] = aligned ? VAL_TRUE : VAL_FALSE;
-}
-
-// Type-specific load operations - intrinsic
-void RegisterVM::execute_memory_load_int8(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = BOX_INT(0);
-        return;
-    }
-    int8_t* ptr = static_cast<int8_t*>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = BOX_INT(static_cast<int64_t>(*ptr));
-}
-
-void RegisterVM::execute_memory_load_uint8(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = BOX_INT(0);
-        return;
-    }
-    uint8_t* ptr = static_cast<uint8_t*>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = BOX_INT(static_cast<int64_t>(*ptr));
-}
-
-void RegisterVM::execute_memory_load_int16(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = BOX_INT(0);
-        return;
-    }
-    int16_t* ptr = static_cast<int16_t*>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = BOX_INT(static_cast<int64_t>(*ptr));
-}
-
-void RegisterVM::execute_memory_load_uint16(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = BOX_INT(0);
-        return;
-    }
-    uint16_t* ptr = static_cast<uint16_t*>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = BOX_INT(static_cast<int64_t>(*ptr));
-}
-
-void RegisterVM::execute_memory_load_int32(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = BOX_INT(0);
-        return;
-    }
-    int32_t* ptr = static_cast<int32_t*>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = BOX_INT(static_cast<int64_t>(*ptr));
-}
-
-void RegisterVM::execute_memory_load_uint32(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = BOX_INT(0);
-        return;
-    }
-    uint32_t* ptr = static_cast<uint32_t*>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = BOX_INT(static_cast<int64_t>(*ptr));
-}
-
-void RegisterVM::execute_memory_load_int64(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = BOX_INT(0);
-        return;
-    }
-    int64_t* ptr = static_cast<int64_t*>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = BOX_INT(*ptr);
-}
-
-void RegisterVM::execute_memory_load_uint64(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = BOX_INT(0);
-        return;
-    }
-    uint64_t* ptr = static_cast<uint64_t*>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = BOX_INT(static_cast<int64_t>(*ptr));
-}
-
-void RegisterVM::execute_memory_load_float(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = make_float(0.0);
-        return;
-    }
-    float* ptr = static_cast<float*>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = make_float(static_cast<double>(*ptr));
-}
-
-void RegisterVM::execute_memory_load_double(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = make_float(0.0);
-        return;
-    }
-    double* ptr = static_cast<double*>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = make_float(*ptr);
-}
-
-void RegisterVM::execute_memory_load_ptr(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    void** ptr = static_cast<void**>(UNBOX_PTR(registers[pc->a]));
-    registers[pc->dst] = BOX_PTR(*ptr);
-}
-
-// Type-specific store operations - intrinsic
-void RegisterVM::execute_memory_store_int8(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    int8_t* ptr = static_cast<int8_t*>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = static_cast<int8_t>(to_int(registers[pc->a]));
-}
-
-void RegisterVM::execute_memory_store_uint8(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    uint8_t* ptr = static_cast<uint8_t*>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = static_cast<uint8_t>(to_int(registers[pc->a]));
-}
-
-void RegisterVM::execute_memory_store_int16(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    int16_t* ptr = static_cast<int16_t*>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = static_cast<int16_t>(to_int(registers[pc->a]));
-}
-
-void RegisterVM::execute_memory_store_uint16(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    uint16_t* ptr = static_cast<uint16_t*>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = static_cast<uint16_t>(to_int(registers[pc->a]));
-}
-
-void RegisterVM::execute_memory_store_int32(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    int32_t* ptr = static_cast<int32_t*>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = static_cast<int32_t>(to_int(registers[pc->a]));
-}
-
-void RegisterVM::execute_memory_store_uint32(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    uint32_t* ptr = static_cast<uint32_t*>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = static_cast<uint32_t>(to_int(registers[pc->a]));
-}
-
-void RegisterVM::execute_memory_store_int64(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    int64_t* ptr = static_cast<int64_t*>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = to_int(registers[pc->a]);
-}
-
-void RegisterVM::execute_memory_store_uint64(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    uint64_t* ptr = static_cast<uint64_t*>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = static_cast<uint64_t>(to_int(registers[pc->a]));
-}
-
-void RegisterVM::execute_memory_store_float(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    float* ptr = static_cast<float*>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = static_cast<float>(to_float(registers[pc->a]));
-}
-
-void RegisterVM::execute_memory_store_double(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    double* ptr = static_cast<double*>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = to_float(registers[pc->a]);
-}
-
-void RegisterVM::execute_memory_store_ptr(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->dst])) return;
-    void** ptr = static_cast<void**>(UNBOX_PTR(registers[pc->dst]));
-    *ptr = IS_PTR(registers[pc->a]) ? UNBOX_PTR(registers[pc->a]) : nullptr;
-}
-
-// Backward compatibility stubs - delegate to existing alloc/free/realloc implementations
 
 void RegisterVM::execute_memory_alloc(const LIR::LIR_Inst* pc) {
-    // Allocate memory and track it
     int64_t size = to_int(registers[pc->a]);
-    if (size < 0) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
+    if (size < 0) { registers[pc->dst] = VAL_NIL; return; }
     void* ptr = std::malloc(size);
     if (ptr) {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         g_memory_allocations[reinterpret_cast<uintptr_t>(ptr)] = size;
-        registers[pc->dst] = BOX_PTR(ptr);
-    } else {
-        registers[pc->dst] = VAL_NIL;
+        registers[pc->dst] = lm_alloc_foreign_ptr(ptr);
+    } else registers[pc->dst] = VAL_NIL;
+}
+
+void RegisterVM::execute_memory_free(const LIR::LIR_Inst* pc) {
+    void* ptr = value_to_ptr(registers[pc->a]);
+    if (ptr) {
+        std::lock_guard<std::mutex> lock(g_memory_mutex);
+        g_memory_allocations.erase(reinterpret_cast<uintptr_t>(ptr));
+        std::free(ptr);
     }
 }
 
-// Main memory intrinsics dispatcher
+void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
+    void* ptr = value_to_ptr(registers[pc->a]);
+    if (!ptr) { execute_memory_alloc(pc); return; }
+    int64_t size = to_int(registers[pc->b]);
+    if (size < 0) { registers[pc->dst] = VAL_NIL; return; }
+    void* new_ptr = std::realloc(ptr, size);
+    if (new_ptr) {
+        std::lock_guard<std::mutex> lock(g_memory_mutex);
+        g_memory_allocations.erase(reinterpret_cast<uintptr_t>(ptr));
+        g_memory_allocations[reinterpret_cast<uintptr_t>(new_ptr)] = size;
+        registers[pc->dst] = lm_alloc_foreign_ptr(new_ptr);
+    } else registers[pc->dst] = VAL_NIL;
+}
+
+void RegisterVM::execute_ptr_add(const LIR::LIR_Inst* pc) {
+    void* ptr = value_to_ptr(registers[pc->a]);
+    if (!ptr) { registers[pc->dst] = VAL_NIL; return; }
+    uint8_t* p = static_cast<uint8_t*>(ptr);
+    int64_t offset = to_int(registers[pc->b]);
+    registers[pc->dst] = lm_alloc_foreign_ptr(p + offset);
+}
+
+void RegisterVM::execute_ptr_sub(const LIR::LIR_Inst* pc) {
+    void* ptr = value_to_ptr(registers[pc->a]);
+    if (!ptr) { registers[pc->dst] = VAL_NIL; return; }
+    uint8_t* p = static_cast<uint8_t*>(ptr);
+    int64_t offset = to_int(registers[pc->b]);
+    registers[pc->dst] = lm_alloc_foreign_ptr(p - offset);
+}
+
+void RegisterVM::execute_ptr_diff(const LIR::LIR_Inst* pc) {
+    void* p1 = value_to_ptr(registers[pc->a]);
+    void* p2 = value_to_ptr(registers[pc->b]);
+    if (!p1 || !p2) { registers[pc->dst] = BOX_INT(0); return; }
+    registers[pc->dst] = BOX_INT(static_cast<int64_t>((uint8_t*)p1 - (uint8_t*)p2));
+}
+
+void RegisterVM::execute_ptr_align(const LIR::LIR_Inst* pc) {
+    void* ptr = value_to_ptr(registers[pc->a]);
+    if (!ptr) { registers[pc->dst] = VAL_NIL; return; }
+    uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
+    int64_t alignment = to_int(registers[pc->b]);
+    if (alignment <= 0) { registers[pc->dst] = registers[pc->a]; return; }
+    uintptr_t aligned = (addr + (alignment - 1)) & ~(alignment - 1);
+    registers[pc->dst] = lm_alloc_foreign_ptr(reinterpret_cast<void*>(aligned));
+}
+
+void RegisterVM::execute_ptr_is_aligned(const LIR::LIR_Inst* pc) {
+    void* ptr = value_to_ptr(registers[pc->a]);
+    if (!ptr) { registers[pc->dst] = VAL_FALSE; return; }
+    uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
+    int64_t alignment = to_int(registers[pc->b]);
+    if (alignment <= 0) { registers[pc->dst] = VAL_FALSE; return; }
+    bool aligned = (addr % static_cast<uintptr_t>(alignment)) == 0;
+    registers[pc->dst] = aligned ? VAL_TRUE : VAL_FALSE;
+}
+
 void RegisterVM::execute_memory(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
-        // === NEW: Generic memory operations with type dispatch ===
-        case LIR::LIR_Op::MemoryLoad:
-            execute_memory_load(pc);
-            break;
-        case LIR::LIR_Op::MemoryStore:
-            execute_memory_store(pc);
-            break;
+        case LIR::LIR_Op::MemoryLoad: execute_memory_load(pc); break;
+        case LIR::LIR_Op::MemoryStore: execute_memory_store(pc); break;
         case LIR::LIR_Op::MemoryCopy:
-        case LIR::LIR_Op::FFIMemcpy:
-            execute_memory_memcpy(pc);
-            break;
+        case LIR::LIR_Op::FFIMemcpy: execute_memory_copy(pc); break;
         case LIR::LIR_Op::MemoryFill:
-        case LIR::LIR_Op::FFIMemset:
-            execute_memory_memset(pc);
-            break;
+        case LIR::LIR_Op::FFIMemset: execute_memory_fill(pc); break;
         case LIR::LIR_Op::MemoryCompare:
-        case LIR::LIR_Op::FFIMemcmp:
-            execute_memory_memcmp(pc);
-            break;
+        case LIR::LIR_Op::FFIMemcmp: execute_memory_compare(pc); break;
         case LIR::LIR_Op::MemoryAlloc:
-        case LIR::LIR_Op::FFIAlloc:
-            execute_memory_alloc(pc);
-            break;
+        case LIR::LIR_Op::FFIAlloc: execute_memory_alloc(pc); break;
         case LIR::LIR_Op::MemoryFree:
-        case LIR::LIR_Op::FFIFree:
-            execute_memory_free(pc);
-            break;
+        case LIR::LIR_Op::FFIFree: execute_memory_free(pc); break;
         case LIR::LIR_Op::MemoryResize:
-        case LIR::LIR_Op::FFIRealloc:
-            execute_memory_realloc(pc);
-            break;
-        
-        // === NEW: Generic pointer operations ===
+        case LIR::LIR_Op::FFIRealloc: execute_memory_realloc(pc); break;
         case LIR::LIR_Op::PtrAdd:
-        case LIR::LIR_Op::FFIAddPtr:
-            execute_memory_add_ptr(pc);
-            break;
+        case LIR::LIR_Op::FFIAddPtr: execute_ptr_add(pc); break;
         case LIR::LIR_Op::PtrSub:
-        case LIR::LIR_Op::FFISubPtr:
-            execute_memory_sub_ptr(pc);
-            break;
+        case LIR::LIR_Op::FFISubPtr: execute_ptr_sub(pc); break;
         case LIR::LIR_Op::PtrDiff:
-        case LIR::LIR_Op::FFIPtrDiff:
-            execute_memory_ptr_diff(pc);
-            break;
+        case LIR::LIR_Op::FFIPtrDiff: execute_ptr_diff(pc); break;
         case LIR::LIR_Op::PtrAlign:
-        case LIR::LIR_Op::FFIAlignPtr:
-            execute_memory_align_ptr(pc);
-            break;
+        case LIR::LIR_Op::FFIAlignPtr: execute_ptr_align(pc); break;
         case LIR::LIR_Op::PtrIsAligned:
-        case LIR::LIR_Op::FFIIsAligned:
-            execute_memory_is_aligned(pc);
-            break;
-        
-        // Load/Store operations now use generic type dispatch
+        case LIR::LIR_Op::FFIIsAligned: execute_ptr_is_aligned(pc); break;
         case LIR::LIR_Op::FFILoadInt8:
         case LIR::LIR_Op::FFILoadUInt8:
         case LIR::LIR_Op::FFILoadInt16:
@@ -574,10 +268,7 @@ void RegisterVM::execute_memory(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::FFILoadUInt64:
         case LIR::LIR_Op::FFILoadFloat:
         case LIR::LIR_Op::FFILoadDouble:
-        case LIR::LIR_Op::FFILoadPtr:
-            execute_memory_load(pc);
-            break;
-        
+        case LIR::LIR_Op::FFILoadPtr: execute_memory_load(pc); break;
         case LIR::LIR_Op::FFIStoreInt8:
         case LIR::LIR_Op::FFIStoreUInt8:
         case LIR::LIR_Op::FFIStoreInt16:
@@ -588,12 +279,8 @@ void RegisterVM::execute_memory(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::FFIStoreUInt64:
         case LIR::LIR_Op::FFIStoreFloat:
         case LIR::LIR_Op::FFIStoreDouble:
-        case LIR::LIR_Op::FFIStorePtr:
-            execute_memory_store(pc);
-            break;
-        
-        default:
-            break;
+        case LIR::LIR_Op::FFIStorePtr: execute_memory_store(pc); break;
+        default: break;
     }
 }
 

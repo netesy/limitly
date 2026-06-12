@@ -44,3 +44,9 @@ fn ptr_diff(a: int, b: int): int { return 0; }
 fn library_load(path: str): int { return 0; }
 fn library_unload(handle: int) {}
 fn library_get_symbol(handle: int, name: str): int { return 0; }
+
+// Generic execute
+fn ccall_execute1(func_ptr: int, arg1: int): int { return 0; }
+fn ccall_execute1_ptr(func_ptr: int, arg1: int): int { return 0; }
+fn ccall_execute3_ifps_ptr(func_ptr: int, arg1: int, arg2: float, arg3: str): int { return 0; }
+fn ccall_execute3_piif(func_ptr: int, arg1: int, arg2: int, arg3: float): int { return 0; }

@@ -1262,7 +1262,13 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
             inst.imm = intrinsic->type_id; // For MemoryLoad/Store
             if (!arg_regs.empty()) inst.a = arg_regs[0];
-            if (arg_regs.size() > 1) inst.b = arg_regs[1];
+            if (arg_regs.size() > 1) {
+                inst.b = arg_regs[1];
+                if (intrinsic->opcode == LIR_Op::MemoryStore) {
+                    TypePtr val_type = (expr.arguments.size() > 1) ? get_register_language_type(arg_regs[1]) : nullptr;
+                    inst.type_b = language_type_to_abi_type(val_type);
+                }
+            }
             inst.call_args = arg_regs;
             emit_instruction(inst);
             return result;

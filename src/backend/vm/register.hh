@@ -2,64 +2,54 @@
 #define REGISTER_H
 
 #include "../../lir/lir.hh"
-#include "../../lir/functions.hh"
-#include "../types.hh"
-#include "../../memory/memory.hh"
-#include "../value.hh"
+#include "../../frontend/type_checker.hh"
+#include "../register_value.hh"
 #include "../task.hh"
+#include "../scheduler.hh"
 #include "../channel.hh"
 #include "../shared_cell.hh"
-#include "../scheduler.hh"
-#include "../fiber.hh"
-#include "../register_value.hh"
 #include "../../runtime/runtime.h"
 #include "../../runtime/runtime_value.h"
 #include "callstack.hh"
+#include "resource_types.hh"
 #include <vector>
 #include <string>
-#include <cstdint>
-#include <queue>
 #include <unordered_map>
 #include <memory>
+#include <mutex>
 #include <atomic>
+#include <queue>
 
 namespace LM {
 namespace Backend {
 namespace VM {
 namespace Register {
 
-    // Forward declaration of the helper
-    ValuePtr register_to_value_ptr(RegisterValue rv);
+void* box_register_value(const RegisterValue& value);
+RegisterValue unbox_register_value(void* boxed_value);
+ValuePtr register_to_value_ptr(RegisterValue rv);
 
-    class RegisterVM {
+class RegisterVM {
 public:
     RegisterVM();
-    
-    void execute_instructions(const LIR::LIR_Function& function, size_t start_pc, size_t end_pc);
+    ~RegisterVM();
+
+    void execute(const LIR::LIR_Function& function);
     void execute_function(const LIR::LIR_Function& function);
-    void execute_lir_function(const LIR::LIRFunction& function);
-    
-    inline const RegisterValue& get_register(LIR::Reg reg) const {
-        return registers[reg];
-    }
-    
-    inline void set_register(LIR::Reg reg, const RegisterValue& value) {
-        registers[reg] = value;
-    }
-    
+    void execute_instructions(const LIR::LIR_Function& function, uint64_t start_pc, uint64_t end_pc);
     void reset();
-    std::string to_string(const RegisterValue& value) const;
     
-    void execute_task_body(TaskContext* task, const LIR::LIR_Function& function);
-    
-    uint64_t create_fiber(std::unique_ptr<TaskContext> task);
-    void suspend_fiber(uint64_t fiber_id);
-    void resume_fiber(uint64_t fiber_id);
-    void execute_fiber_step();
+    RegisterValue get_global(const std::string& name) const;
+    void set_global(const std::string& name, RegisterValue value);
+
     bool has_active_fibers() const;
+    std::string to_string(const RegisterValue& value) const;
     Fiber* get_current_fiber();
     
     void set_current_function(const LIR::LIR_Function* func) { current_function_ = func; }
+
+    ValuePtr createErrorValue(const std::string& errorType, const std::string& message);
+    ValuePtr createSuccessValue(const RegisterValue& value);
 
 private:
     // Opcode execution modules
@@ -85,54 +75,8 @@ private:
     
     // External C interop layer
     void execute_ffi(const LIR::LIR_Inst* pc);
-    // Memory intrinsics - internal implementation helpers
-    void execute_memory_alloc(const LIR::LIR_Inst* pc);
-    void execute_memory_free(const LIR::LIR_Inst* pc);
-    void execute_memory_realloc(const LIR::LIR_Inst* pc);
-    void execute_memory_memcpy(const LIR::LIR_Inst* pc);
-    void execute_memory_memset(const LIR::LIR_Inst* pc);
-    void execute_memory_memcmp(const LIR::LIR_Inst* pc);
-    void execute_memory_add_ptr(const LIR::LIR_Inst* pc);
-    void execute_memory_sub_ptr(const LIR::LIR_Inst* pc);
-    void execute_memory_ptr_diff(const LIR::LIR_Inst* pc);
-    void execute_memory_align_ptr(const LIR::LIR_Inst* pc);
-    void execute_memory_is_aligned(const LIR::LIR_Inst* pc);
-    
-    // === REDESIGNED: Generic memory operations with type dispatch ===
-    void execute_memory_load(const LIR::LIR_Inst* pc);    // Type dispatch via result_type
-    void execute_memory_store(const LIR::LIR_Inst* pc);   // Type dispatch via type_a
-    void execute_memory_copy(const LIR::LIR_Inst* pc);    // memcpy
-    void execute_memory_fill(const LIR::LIR_Inst* pc);    // memset
-    void execute_memory_compare(const LIR::LIR_Inst* pc); // memcmp
-    
-    // === REDESIGNED: Generic pointer operations ===
-    void execute_ptr_add(const LIR::LIR_Inst* pc);        // ptr + offset
-    void execute_ptr_sub(const LIR::LIR_Inst* pc);        // ptr - offset
-    void execute_ptr_diff(const LIR::LIR_Inst* pc);       // ptr1 - ptr2
-    void execute_ptr_align(const LIR::LIR_Inst* pc);      // align_to
-    void execute_ptr_is_aligned(const LIR::LIR_Inst* pc); // is_aligned
-    
-    // === NEW: Marshaling operations ===
-    void execute_marshal(const LIR::LIR_Inst* pc);           // Generic conversion
-    void execute_unmarshal(const LIR::LIR_Inst* pc);         // Reverse conversion
-    void execute_buffer_view(const LIR::LIR_Inst* pc);       // Create buffer view
-    void execute_buffer_create(const LIR::LIR_Inst* pc);     // Allocate buffer
-    void execute_buffer_resize(const LIR::LIR_Inst* pc);     // Resize buffer
-    
-    // === NEW: Dynamic linking operations ===
-    void execute_library_load(const LIR::LIR_Inst* pc);      // dlopen
-    void execute_library_unload(const LIR::LIR_Inst* pc);    // dlclose
-    void execute_library_symbol(const LIR::LIR_Inst* pc);    // dlsym
-    
-    // === NEW: Foreign call operations ===
-    void execute_foreign_call(const LIR::LIR_Inst* pc);      // Indirect call
-    void execute_foreign_call_direct(const LIR::LIR_Inst* pc); // Direct call
-    
-    // === NEW: Callback operations ===
-    void execute_callback_create(const LIR::LIR_Inst* pc);   // Create wrapper
-    void execute_callback_destroy(const LIR::LIR_Inst* pc);  // Destroy wrapper
-    
-    // === DEPRECATED: Type-specific load/store (for compatibility during migration) ===
+
+    // Memory operations
     void execute_memory_load(const LIR::LIR_Inst* pc);
     void execute_memory_store(const LIR::LIR_Inst* pc);
     void execute_memory_copy(const LIR::LIR_Inst* pc);
@@ -141,16 +85,35 @@ private:
     void execute_memory_alloc(const LIR::LIR_Inst* pc);
     void execute_memory_free(const LIR::LIR_Inst* pc);
     void execute_memory_realloc(const LIR::LIR_Inst* pc);
-    void execute_memory(const LIR::LIR_Inst* pc);
-    
-    // Generic pointer operations
+
+    // Pointer operations
     void execute_ptr_add(const LIR::LIR_Inst* pc);
     void execute_ptr_sub(const LIR::LIR_Inst* pc);
     void execute_ptr_diff(const LIR::LIR_Inst* pc);
     void execute_ptr_align(const LIR::LIR_Inst* pc);
     void execute_ptr_is_aligned(const LIR::LIR_Inst* pc);
     
-    // Data construction - internal implementation helpers
+    // Marshaling operations
+    void execute_marshal(const LIR::LIR_Inst* pc);
+    void execute_unmarshal(const LIR::LIR_Inst* pc);
+    void execute_buffer_view(const LIR::LIR_Inst* pc);
+    void execute_buffer_create(const LIR::LIR_Inst* pc);
+    void execute_buffer_resize(const LIR::LIR_Inst* pc);
+
+    // Dynamic linking operations
+    void execute_library_load(const LIR::LIR_Inst* pc);
+    void execute_library_unload(const LIR::LIR_Inst* pc);
+    void execute_library_symbol(const LIR::LIR_Inst* pc);
+
+    // Foreign call operations
+    void execute_foreign_call(const LIR::LIR_Inst* pc);
+    void execute_foreign_call_direct(const LIR::LIR_Inst* pc);
+
+    // Callback operations
+    void execute_callback_create(const LIR::LIR_Inst* pc);
+    void execute_callback_destroy(const LIR::LIR_Inst* pc);
+
+    // Data construction helpers
     void execute_construct_string_from_cstr(const LIR::LIR_Inst* pc);
     void execute_construct_cstr_from_string(const LIR::LIR_Inst* pc);
     void execute_construct_free_cstr(const LIR::LIR_Inst* pc);
@@ -162,7 +125,7 @@ private:
     void execute_construct_cstring_from_ptr(const LIR::LIR_Inst* pc);
     void execute_construct_cstring_ptr(const LIR::LIR_Inst* pc);
     
-    // External C interop - internal implementation helpers
+    // External C interop helpers
     void execute_extern_library_load(const LIR::LIR_Inst* pc);
     void execute_extern_library_unload(const LIR::LIR_Inst* pc);
     void execute_extern_library_get_symbol(const LIR::LIR_Inst* pc);

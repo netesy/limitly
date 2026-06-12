@@ -20,9 +20,8 @@ using Reg = uint32_t;
 using Imm = uint32_t;
 
 enum class Type : uint8_t {
-    I32, I64, F64, Bool, Ptr, Void
+    I8, U8, I16, U16, I32, U32, I64, U64, F32, F64, Bool, Ptr, Void
 };
-
 std::string type_to_string(Type type);
 
 // === Metadata Encoding for Generic Operations ===

@@ -89,7 +89,6 @@ void RegisterVM::execute_buffer_view(const LIR::LIR_Inst* pc) {
         return;
     }
     
-    // TODO: Create buffer view object
     // For now, just return pointer
     registers[pc->dst] = BOX_PTR(ptr);
 }
@@ -122,41 +121,7 @@ void RegisterVM::execute_buffer_resize(const LIR::LIR_Inst* pc) {
     }
 }
 
-// Library operations - dynamic linking
-void RegisterVM::execute_library_load(const LIR::LIR_Inst* pc) {
-    // TODO: Implement dlopen
-    registers[pc->dst] = VAL_NIL;
-}
-
-void RegisterVM::execute_library_unload(const LIR::LIR_Inst* pc) {
-    // TODO: Implement dlclose
-}
-
-void RegisterVM::execute_library_symbol(const LIR::LIR_Inst* pc) {
-    // TODO: Implement dlsym
-    registers[pc->dst] = VAL_NIL;
-}
-
-// Foreign call - indirect function invocation
-void RegisterVM::execute_foreign_call(const LIR::LIR_Inst* pc) {
-    // TODO: Implement foreign call dispatch
-    registers[pc->dst] = VAL_NIL;
-}
-
-void RegisterVM::execute_foreign_call_direct(const LIR::LIR_Inst* pc) {
-    // TODO: Implement direct foreign call
-    registers[pc->dst] = VAL_NIL;
-}
-
-// Callback creation and destruction
-void RegisterVM::execute_callback_create(const LIR::LIR_Inst* pc) {
-    // TODO: Implement callback wrapper creation
-    registers[pc->dst] = VAL_NIL;
-}
-
-void RegisterVM::execute_callback_destroy(const LIR::LIR_Inst* pc) {
-    // TODO: Implement callback wrapper destruction
-}
+// Library, Foreign Call, and Callback operations are handled in ffi.cpp
 
 } // namespace Register
 } // namespace VM

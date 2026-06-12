@@ -1,0 +1,54 @@
+import std.ffi as ffi;
+
+fn main() {
+    print("Starting FFI Complex Test...");
+
+    var lib = ffi.library_load("tests/ffi/libcomplex_test.so");
+    if (lib != nil) {
+        print("Library loaded successfully");
+
+        var create_p = ffi.library_get_symbol(lib, "create_packet");
+        var update_p = ffi.library_get_symbol(lib, "update_packet");
+        var free_p = ffi.library_get_symbol(lib, "free_packet");
+
+        if (create_p != nil) {
+            print("Symbols resolved successfully");
+
+            var label = "Hello Limitly!";
+            var packet = ffi.ccall_execute3_ifps_ptr(create_p, 101, 42.5, label);
+            if (packet != nil) {
+                print("Packet created");
+
+                var id_val = ffi.load_i32(packet);
+                print("Read ID: {id_val}");
+
+                var val_ptr = ffi.ptr_add(packet, 8);
+                var value_f = ffi.load_f64(val_ptr);
+                print("Read Value: {value_f}");
+
+                ffi.ccall_execute3_piif(update_p, packet, 202, 84.0);
+                print("Packet updated");
+
+                id_val = ffi.load_i32(packet);
+                print("Read ID after update: {id_val}");
+
+                value_f = ffi.load_f64(val_ptr);
+                print("Read Value after update: {value_f}");
+
+                ffi.ccall_execute1_ptr(free_p, packet);
+                print("Packet freed");
+            } else {
+                print("Failed to create packet");
+            }
+        } else {
+            print("Failed to resolve symbols");
+        }
+        ffi.library_unload(lib);
+        print("Library unloaded");
+    } else {
+        print("Failed to load library");
+    }
+    print("FFI Complex Test Finished!");
+}
+
+main();
