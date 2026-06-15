@@ -1,44 +1,36 @@
-import std.core as core;
-import std.math as math;
+// Standard Library Networking Module (Unified Resource System)
 
-var __tcp_next_handle: int = 1000;
-var __tcp_buffers: {int: str} = {};
+import std.core as core;
 
 frame TCP {
     pub fn connect(address: str, port: int): core.ResultInt {
-        __tcp_next_handle = __tcp_next_handle + 1;
-        __tcp_buffers[__tcp_next_handle] = "";
-        return core.ok_int(__tcp_next_handle);
-    }
+        var h = resource_create(1); // RT_SOCKET
+        if (h == -1) return core.err_int("Failed to create socket resource");
 
-    pub fn listen(port: int): core.ResultInt {
-        __tcp_next_handle = __tcp_next_handle + 1;
-        __tcp_buffers[__tcp_next_handle] = "";
-        return core.ok_int(__tcp_next_handle);
-    }
+        var success = resource_call(h, 6, address, port); // OP_CONNECT
+        if (!success) {
+            resource_destroy(h);
+            return core.err_int("Failed to connect to " + address);
+        }
 
-    pub fn accept(listener: int): core.ResultInt {
-        __tcp_next_handle = __tcp_next_handle + 1;
-        __tcp_buffers[__tcp_next_handle] = "";
-        return core.ok_int(__tcp_next_handle);
+        return core.ok_int(h);
     }
 
     pub fn send(handle: int, data: str): core.ResultInt {
-        var current = __tcp_buffers[handle];
-        if (current == nil) return core.err_int("invalid tcp handle");
-        __tcp_buffers[handle] = current + data;
-        return core.ok_int(data.length);
+        var bytes = resource_call(handle, 4, data); // OP_SEND
+        if (bytes == nil) return core.err_int("Send failed");
+        return core.ok_int(bytes as int);
     }
 
     pub fn recv(handle: int): core.ResultStr {
-        var current = __tcp_buffers[handle];
-        if (current == nil) return core.err_str("invalid tcp handle");
-        __tcp_buffers[handle] = "";
-        return core.ok_str(current);
+        var data = resource_call(handle, 5); // OP_RECEIVE
+        if (data == nil) return core.err_str("Receive failed");
+        return core.ok_str(data as str);
     }
 
     pub fn close(handle: int): core.ResultInt {
-        __tcp_buffers[handle] = nil;
+        resource_call(handle, 1); // OP_CLOSE
+        resource_destroy(handle);
         return core.ok_int(0);
     }
 }

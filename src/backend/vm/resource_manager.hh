@@ -18,7 +18,7 @@ class Resource {
 public:
     virtual ~Resource() = default;
     virtual ResourceType getType() const = 0;
-    virtual RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args) = 0;
+    virtual RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void* context = nullptr) = 0;
 };
 
 class ResourceManager {
@@ -26,7 +26,7 @@ public:
     static ResourceManager& getInstance();
 
     int64_t create(ResourceType type);
-    RegisterValue call(int64_t id, ResourceOperation op, const std::vector<RegisterValue>& args);
+    RegisterValue call(int64_t id, ResourceOperation op, const std::vector<RegisterValue>& args, void* context = nullptr);
     void destroy(int64_t id);
 
     void shutdown();

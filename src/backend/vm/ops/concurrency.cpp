@@ -5,42 +5,20 @@
 #include "../../scheduler.hh"
 #include "../../shared_cell.hh"
 #include "../../../lir/function_registry.hh"
+#include "../resource_manager.hh"
 #include <string>
 #include <iostream>
-#include <fstream>
-#include <unordered_map>
 #include <vector>
 #include <memory>
-#include <sstream>
 #include <mutex>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <unistd.h>
 
 namespace LM {
 namespace Backend {
 namespace VM {
 namespace Register {
 
-namespace {
-std::string value_to_std_string(RegisterValue value) {
-    if (is_integer(value)) return std::to_string(as_i64(value));
-    if (!IS_PTR(value)) return {};
-    ObjHeader* h = (ObjHeader*)UNBOX_PTR(value);
-    if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
-        return std::string((char*)((LmBox*)h)->value.as_ptr);
-    }
-    return {};
-}
-
-static std::mutex g_resource_mutex;
-static std::unordered_map<int64_t, std::shared_ptr<std::fstream>> g_file_resources;
-static std::unordered_map<int64_t, int> g_socket_resources;
-static int64_t g_next_resource_id = 1;
-}
-
 void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
+    auto& rm = ResourceManager::getInstance();
     switch (pc->op) {
         case LIR::LIR_Op::ChannelAlloc: {
             size_t capacity = pc->a == 0 ? 1024 : static_cast<size_t>(pc->a);
@@ -50,100 +28,24 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::ResourceCreate: {
-            std::lock_guard<std::mutex> lock(g_resource_mutex);
-            int64_t id = g_next_resource_id++;
-            LIR::ResourceType type = static_cast<LIR::ResourceType>(to_int(registers[pc->a]));
-            
-            if (type == LIR::ResourceType::FILE) {
-                g_file_resources[id] = std::make_shared<std::fstream>();
-                registers[pc->dst] = BOX_INT(id);
-            } else if (type == LIR::ResourceType::SOCKET) {
-                int fd = socket(AF_INET, SOCK_STREAM, 0);
-                g_socket_resources[id] = fd;
-                registers[pc->dst] = BOX_INT(id);
-            } else if (type == LIR::ResourceType::CHANNEL) {
-                auto channel = std::make_unique<LM::Backend::Channel>(1024);
-                channels.push_back(std::move(channel));
-                registers[pc->dst] = BOX_PTR(channels.back().get());
-            } else {
-                registers[pc->dst] = VAL_NIL;
-            }
+            ResourceType type = static_cast<ResourceType>(to_int(registers[pc->a]));
+            int64_t id = rm.create(type);
+            registers[pc->dst] = (id != -1) ? BOX_INT(id) : VAL_NIL;
             break;
         }
         case LIR::LIR_Op::ResourceCall: {
             int64_t id = to_int(registers[pc->a]);
-            LIR::ResourceOperation op = static_cast<LIR::ResourceOperation>(pc->imm);
+            ResourceOperation op = static_cast<ResourceOperation>(pc->imm);
+            std::vector<RegisterValue> args;
+            if (pc->b != 0) args.push_back(registers[pc->b]);
+            for (auto arg_reg : pc->call_args) args.push_back(registers[arg_reg]);
             
-            std::lock_guard<std::mutex> lock(g_resource_mutex);
-            if (g_file_resources.count(id)) {
-                auto file = g_file_resources[id];
-                if (op == LIR::ResourceOperation::OPEN) {
-                    std::string path = value_to_std_string(registers[pc->b]);
-                    std::string mode_str = value_to_std_string(registers[pc->call_args[0]]);
-                    std::ios_base::openmode mode = (std::ios_base::openmode)0;
-                    if (mode_str.find('r') != std::string::npos) mode |= std::ios_base::in;
-                    if (mode_str.find('w') != std::string::npos) mode |= std::ios_base::out;
-                    if (mode_str.find('a') != std::string::npos) mode |= std::ios_base::app;
-                    file->open(path, mode);
-                    registers[pc->dst] = file->is_open() ? VAL_TRUE : VAL_FALSE;
-                } else if (op == LIR::ResourceOperation::READ) {
-                    if (file->is_open()) {
-                        std::stringstream ss;
-                        ss << file->rdbuf();
-                        registers[pc->dst] = BOX_PTR(lm_box_string(ss.str().c_str()));
-                    } else registers[pc->dst] = VAL_NIL;
-                } else if (op == LIR::ResourceOperation::WRITE) {
-                    if (file->is_open()) {
-                        std::string data = value_to_std_string(registers[pc->b]);
-                        (*file) << data;
-                        file->flush();
-                        registers[pc->dst] = VAL_TRUE;
-                    } else registers[pc->dst] = VAL_FALSE;
-                } else if (op == LIR::ResourceOperation::CLOSE) {
-                    if (file->is_open()) file->close();
-                    registers[pc->dst] = VAL_TRUE;
-                }
-            } else if (g_socket_resources.count(id)) {
-                int fd = g_socket_resources[id];
-                if (op == LIR::ResourceOperation::CONNECT) {
-                    std::string addr_str = value_to_std_string(registers[pc->b]);
-                    int port = (int)to_int(registers[pc->call_args[0]]);
-                    struct sockaddr_in serv_addr;
-                    serv_addr.sin_family = AF_INET;
-                    serv_addr.sin_port = htons(port);
-                    inet_pton(AF_INET, addr_str.c_str(), &serv_addr.sin_addr);
-                    int res = connect(fd, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
-                    registers[pc->dst] = (res == 0) ? VAL_TRUE : VAL_FALSE;
-                } else if (op == LIR::ResourceOperation::SEND) {
-                    std::string data = value_to_std_string(registers[pc->b]);
-                    ssize_t bytes = send(fd, data.c_str(), data.length(), 0);
-                    registers[pc->dst] = BOX_INT((int64_t)bytes);
-                } else if (op == LIR::ResourceOperation::RECEIVE) {
-                    char buf[4096];
-                    ssize_t bytes = recv(fd, buf, 4095, 0);
-                    if (bytes > 0) {
-                        buf[bytes] = '\0';
-                        registers[pc->dst] = BOX_PTR(lm_box_string(buf));
-                    } else registers[pc->dst] = VAL_NIL;
-                } else if (op == LIR::ResourceOperation::CLOSE) {
-                    close(fd);
-                    registers[pc->dst] = VAL_TRUE;
-                }
-            } else {
-                registers[pc->dst] = VAL_NIL;
-            }
+            registers[pc->dst] = rm.call(id, op, args, get_current_fiber());
             break;
         }
         case LIR::LIR_Op::ResourceDestroy: {
             int64_t id = to_int(registers[pc->a]);
-            std::lock_guard<std::mutex> lock(g_resource_mutex);
-            if (g_file_resources.count(id)) {
-                if (g_file_resources[id]->is_open()) g_file_resources[id]->close();
-                g_file_resources.erase(id);
-            } else if (g_socket_resources.count(id)) {
-                close(g_socket_resources[id]);
-                g_socket_resources.erase(id);
-            }
+            rm.destroy(id);
             break;
         }
         case LIR::LIR_Op::ChannelSend: {
@@ -273,7 +175,16 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 if (!context || context->state == TaskState::COMPLETED) continue;
                 auto name_it = context->fields.find(4);
                 if (name_it == context->fields.end()) continue;
-                std::string func_name = value_to_std_string(name_it->second);
+
+                // Extract function name from register value
+                std::string func_name = "";
+                if (IS_PTR(name_it->second)) {
+                    ObjHeader* h = (ObjHeader*)UNBOX_PTR(name_it->second);
+                    if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                        func_name = (char*)((LmBox*)h)->value.as_ptr;
+                    }
+                }
+
                 auto* func = registry.getFunction(func_name);
                 if (!func) continue;
 

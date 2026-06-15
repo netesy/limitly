@@ -1261,15 +1261,35 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             
             LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
             inst.imm = intrinsic->type_id; // For MemoryLoad/Store
-            if (!arg_regs.empty()) inst.a = arg_regs[0];
-            if (arg_regs.size() > 1) {
-                inst.b = arg_regs[1];
-                if (intrinsic->opcode == LIR_Op::MemoryStore) {
-                    TypePtr val_type = (expr.arguments.size() > 1) ? get_register_language_type(arg_regs[1]) : nullptr;
-                    inst.type_b = language_type_to_abi_type(val_type);
+            if (intrinsic->opcode == LIR_Op::ResourceCall) {
+                if (arg_regs.size() >= 2) {
+                    inst.a = arg_regs[0];
+                    // Operation ID is second argument
+                    if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr.arguments[1])) {
+                        if (std::holds_alternative<std::string>(lit->value)) {
+                             try {
+                                 inst.imm = static_cast<uint32_t>(std::stoll(std::get<std::string>(lit->value)));
+                             } catch (...) { inst.imm = 0; }
+                        }
+                    }
+                    if (arg_regs.size() > 2) {
+                        inst.b = arg_regs[2];
+                        for (size_t k = 3; k < arg_regs.size(); ++k) inst.call_args.push_back(arg_regs[k]);
+                    }
+                }
+            } else {
+                if (!arg_regs.empty()) inst.a = arg_regs[0];
+                if (arg_regs.size() > 1) {
+                    inst.b = arg_regs[1];
+                    if (intrinsic->opcode == LIR_Op::MemoryStore) {
+                        TypePtr val_type = (expr.arguments.size() > 1) ? get_register_language_type(arg_regs[1]) : nullptr;
+                        inst.type_b = language_type_to_abi_type(val_type);
+                    }
+                }
+                if (arg_regs.size() > 2) {
+                    for (size_t k = 2; k < arg_regs.size(); ++k) inst.call_args.push_back(arg_regs[k]);
                 }
             }
-            inst.call_args = arg_regs;
             emit_instruction(inst);
             return result;
         }
@@ -1521,17 +1541,38 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     set_register_abi_type(result, abi_res_type);
                 }
                 LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
-                if (intrinsic->opcode == LIR_Op::ResourceCall) {
-                    inst.imm = intrinsic->resource_type;
-                    inst.a = intrinsic->operation_type;
-                } else {
-                    inst.imm = intrinsic->type_id;
-                    if (!arg_regs.empty()) inst.a = arg_regs[0];
-                    if (arg_regs.size() > 1) inst.b = arg_regs[1];
+            inst.imm = intrinsic->type_id; // For MemoryLoad/Store
+            if (intrinsic->opcode == LIR_Op::ResourceCall) {
+                if (arg_regs.size() >= 2) {
+                    inst.a = arg_regs[0];
+                    // Operation ID is second argument
+                    if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr.arguments[1])) {
+                        if (std::holds_alternative<std::string>(lit->value)) {
+                             try {
+                                 inst.imm = static_cast<uint32_t>(std::stoll(std::get<std::string>(lit->value)));
+                             } catch (...) { inst.imm = 0; }
+                        }
+                    }
+                    if (arg_regs.size() > 2) {
+                        inst.b = arg_regs[2];
+                        for (size_t k = 3; k < arg_regs.size(); ++k) inst.call_args.push_back(arg_regs[k]);
+                    }
                 }
-                inst.call_args = arg_regs;
-                emit_instruction(inst);
-                return result;
+            } else {
+                if (!arg_regs.empty()) inst.a = arg_regs[0];
+                if (arg_regs.size() > 1) {
+                    inst.b = arg_regs[1];
+                    if (intrinsic->opcode == LIR_Op::MemoryStore) {
+                        TypePtr val_type = (expr.arguments.size() > 1) ? get_register_language_type(arg_regs[1]) : nullptr;
+                        inst.type_b = language_type_to_abi_type(val_type);
+                    }
+                }
+                if (arg_regs.size() > 2) {
+                    for (size_t k = 2; k < arg_regs.size(); ++k) inst.call_args.push_back(arg_regs[k]);
+                }
+            }
+            emit_instruction(inst);
+            return result;
             }
            // std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
             
@@ -1723,12 +1764,38 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
                 if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(intrinsic_name)) {
                     LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
-                    inst.imm = intrinsic->type_id;
-                    if (!arg_regs.empty()) inst.a = arg_regs[0];
-                    if (arg_regs.size() > 1) inst.b = arg_regs[1];
-                    inst.call_args = arg_regs;
-                    emit_instruction(inst);
-                    return result;
+            inst.imm = intrinsic->type_id; // For MemoryLoad/Store
+            if (intrinsic->opcode == LIR_Op::ResourceCall) {
+                if (arg_regs.size() >= 2) {
+                    inst.a = arg_regs[0];
+                    // Operation ID is second argument
+                    if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr.arguments[1])) {
+                        if (std::holds_alternative<std::string>(lit->value)) {
+                             try {
+                                 inst.imm = static_cast<uint32_t>(std::stoll(std::get<std::string>(lit->value)));
+                             } catch (...) { inst.imm = 0; }
+                        }
+                    }
+                    if (arg_regs.size() > 2) {
+                        inst.b = arg_regs[2];
+                        for (size_t k = 3; k < arg_regs.size(); ++k) inst.call_args.push_back(arg_regs[k]);
+                    }
+                }
+            } else {
+                if (!arg_regs.empty()) inst.a = arg_regs[0];
+                if (arg_regs.size() > 1) {
+                    inst.b = arg_regs[1];
+                    if (intrinsic->opcode == LIR_Op::MemoryStore) {
+                        TypePtr val_type = (expr.arguments.size() > 1) ? get_register_language_type(arg_regs[1]) : nullptr;
+                        inst.type_b = language_type_to_abi_type(val_type);
+                    }
+                }
+                if (arg_regs.size() > 2) {
+                    for (size_t k = 2; k < arg_regs.size(); ++k) inst.call_args.push_back(arg_regs[k]);
+                }
+            }
+            emit_instruction(inst);
+            return result;
                 }
                 
                 // Generate function call using the qualified name
