@@ -171,7 +171,7 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
         }
         ffi_arg_values[i] = &arg_storage[i];
     }
-
+    
     ffi_cif cif;
     ffi_type* ffi_ret_type = lir_type_to_ffi_type(ret_type);
     if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, num_args, ffi_ret_type, ffi_arg_types.data()) == FFI_OK) {

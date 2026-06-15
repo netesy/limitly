@@ -138,6 +138,7 @@ void TypeChecker::register_builtin_function(const std::string& name,
     function_signatures[name] = sig;
     TypePtr func_type = type_system.createFunctionType(sig.param_types, sig.return_type);
     declare_variable(name, func_type);
+    variable_types[name] = func_type;
 }
 
 // =============================================================================

@@ -1,0 +1,8 @@
+fn main() {
+    var f = resource_create(0);
+    print("f_id=" + typeof(f));
+    resource_call(f, 0, ["test.txt", "w"]);
+    resource_call(f, 3, ["Hello from resources!\n"]);
+    resource_destroy(f);
+    print("DONE");
+}

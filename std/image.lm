@@ -18,7 +18,7 @@ fn load(filename: str): Image {
     var c_p = ffi.alloc(4);
 
     var data_ptr = ffi.ccall_execute4_sppp_ptr(load_fn, filename, w_p, h_p, c_p);
-
+    
     var w = ffi.load_i32(w_p);
     var h = ffi.load_i32(h_p);
     var c = ffi.load_i32(c_p);

@@ -1,17 +1,78 @@
-// Sokol-inspired graphics glue for Limitly.
-// This module exposes a small, concrete API. Dynamic Sokol loading can be
-// layered on std.ffi.library_* by applications that need native symbols.
+import std.ffi as ffi;
 
-fn rgba(r: int, g: int, b: int, a: int = 255): int {
-    return (r * 16777216) + (g * 65536) + (b * 256) + a;
+pub frame Buffer {
+    pub id: int;
+    pub size: int;
 }
 
-fn setup(): bool {
-    return true;
+pub frame Shader {
+    pub id: int;
 }
 
-fn shutdown() {}
-fn begin_pass(width: int, height: int, clear_color: int = 0) {}
-fn end_pass() {}
-fn commit() {}
-fn draw(first: int, count: int, instances: int = 1) {}
+pub frame Pipeline {
+    pub id: int;
+}
+
+pub frame PassAction {
+    pub r: float;
+    pub g: float;
+    pub b: float;
+    pub a: float;
+}
+
+pub fn setup() {
+    _setup();
+}
+
+pub fn shutdown() {
+    _shutdown();
+}
+
+pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float) {
+    _begin_pass(w, h, r, g, b, a);
+}
+
+pub fn end_pass() {
+    _end_pass();
+}
+
+pub fn commit() {
+    _commit();
+}
+
+pub fn apply_bindings(v_id: int, i_id: int) {
+    _apply_bindings(v_id, i_id);
+}
+
+pub fn apply_pipeline(pip_id: int) {
+    _apply_pipeline(pip_id);
+}
+
+pub fn draw(base: int, count: int, instances: int) {
+    _draw(base, count, instances);
+}
+
+pub fn make_buffer(data_ptr: int, data_size: int, index: bool): int {
+    return _make_buffer(data_ptr, data_size, index);
+}
+
+pub fn make_shader(vs: str, fs: str): int {
+    return _make_shader(vs, fs);
+}
+
+pub fn make_pipeline(shd_id: int, primitive_type: int): int {
+    return _make_pipeline(shd_id, primitive_type);
+}
+
+// Private built-in hooks
+fn _setup() {}
+fn _shutdown() {}
+fn _begin_pass(w: int, h: int, r: float, g: float, b: float, a: float) {}
+fn _end_pass() {}
+fn _commit() {}
+fn _apply_bindings(vbuf: int, ibuf: int) {}
+fn _apply_pipeline(pip: int) {}
+fn _draw(base: int, count: int, instances: int) {}
+fn _make_buffer(data_val: int, size_val: int, index_val: bool): int { return 0; }
+fn _make_shader(vs_val: str, fs_val: str): int { return 0; }
+fn _make_pipeline(shd_val: int, prim_val: int): int { return 0; }

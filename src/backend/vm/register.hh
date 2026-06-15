@@ -99,20 +99,20 @@ private:
     void execute_buffer_view(const LIR::LIR_Inst* pc);
     void execute_buffer_create(const LIR::LIR_Inst* pc);
     void execute_buffer_resize(const LIR::LIR_Inst* pc);
-
+    
     // Dynamic linking operations
     void execute_library_load(const LIR::LIR_Inst* pc);
     void execute_library_unload(const LIR::LIR_Inst* pc);
     void execute_library_symbol(const LIR::LIR_Inst* pc);
-
+    
     // Foreign call operations
     void execute_foreign_call(const LIR::LIR_Inst* pc);
     void execute_foreign_call_direct(const LIR::LIR_Inst* pc);
-
+    
     // Callback operations
     void execute_callback_create(const LIR::LIR_Inst* pc);
     void execute_callback_destroy(const LIR::LIR_Inst* pc);
-
+    
     // Data construction helpers
     void execute_construct_string_from_cstr(const LIR::LIR_Inst* pc);
     void execute_construct_cstr_from_string(const LIR::LIR_Inst* pc);

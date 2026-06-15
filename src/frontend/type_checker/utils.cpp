@@ -65,6 +65,7 @@ bool TypeChecker::check_function_call(const std::string& func_name,
                                      int line) {
     auto it = function_signatures.find(func_name);
     if (it == function_signatures.end()) {
+        // std::cerr << "DEBUG: Undefined function " << func_name << " (sigs: " << function_signatures.size() << ", vars: " << variable_types.size() << ")" << std::endl;
         add_error("Undefined function: " + func_name, line);
         return false;
     }
