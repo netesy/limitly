@@ -40,48 +40,7 @@ std::unique_ptr<TypeChecker> create(TypeSystem& type_system) {
 void register_builtin_functions(TypeChecker& checker) {
     auto& ts = checker.get_type_system();
     
-    // Math functions
-    checker.register_builtin_function("abs", {ts.INT_TYPE}, ts.INT_TYPE);
-    checker.register_builtin_function("fabs", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("sqrt", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("cbrt", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("pow", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("exp", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("exp2", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("log", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("log10", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("log2", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    
-    // Trigonometric functions
-    checker.register_builtin_function("sin", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("cos", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("tan", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("asin", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("acos", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("atan", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("atan2", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    
-    // Hyperbolic functions
-    checker.register_builtin_function("sinh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("cosh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("tanh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("asinh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("acosh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("atanh", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    
-    // Rounding functions
-    checker.register_builtin_function("ceil", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("floor", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("trunc", {ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("round", {ts.FLOAT64_TYPE, ts.INT_TYPE}, ts.FLOAT64_TYPE);
-    
-    // Other math functions
-    checker.register_builtin_function("fmod", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("remainder", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("fmax", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("fmin", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("fdim", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
-    checker.register_builtin_function("hypot", {ts.FLOAT32_TYPE, ts.FLOAT32_TYPE}, ts.FLOAT32_TYPE);
+    // Math functions are implemented in the std.math library
     
     // String functions
     checker.register_builtin_function("concat", {ts.STRING_TYPE, ts.STRING_TYPE}, ts.STRING_TYPE);
@@ -100,12 +59,6 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("assert", {ts.BOOL_TYPE, ts.STRING_TYPE}, ts.NIL_TYPE);
     checker.register_builtin_function("print", {ts.ANY_TYPE}, ts.NIL_TYPE);
     
-    // Math constants (as functions)
-    checker.register_builtin_function("pi", {}, ts.FLOAT64_TYPE);
-    checker.register_builtin_function("e", {}, ts.FLOAT64_TYPE);
-    checker.register_builtin_function("ln2", {}, ts.FLOAT64_TYPE);
-    checker.register_builtin_function("ln10", {}, ts.FLOAT64_TYPE);
-    checker.register_builtin_function("sqrt2", {}, ts.FLOAT64_TYPE);
     
     // Collection functions (enhanced)
     auto function_type = ts.createFunctionType({}, ts.ANY_TYPE); // Simple function type

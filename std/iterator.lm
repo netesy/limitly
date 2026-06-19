@@ -1,0 +1,81 @@
+// Standard Library Iterator Module
+
+frame MapIterator {
+    var source: any;
+    var f: fn(any): any;
+    
+    pub init(source: any, f: fn(any): any) {
+        this.source = source;
+        this.f = f;
+    }
+    
+    pub fn next(): any {
+        var item = this.source.next();
+        if (item == nil) return nil;
+        return this.f(item);
+    }
+}
+
+frame FilterIterator {
+    var source: any;
+    var p: fn(any): bool;
+    
+    pub init(source: any, p: fn(any): bool) {
+        this.source = source;
+        this.p = p;
+    }
+    
+    pub fn next(): any {
+        while (true) {
+            var item = this.source.next();
+            if (item == nil) return nil;
+            if (this.p(item)) return item;
+        }
+    }
+}
+
+frame RangeIterator {
+    var current: int;
+    var stop: int;
+    var step: int;
+    
+    pub init(start: int, stop: int, step: int = 1) {
+        this.current = start;
+        this.stop = stop;
+        this.step = step;
+    }
+    
+    pub fn next(): any {
+        if (this.step > 0 and this.current >= this.stop) return nil;
+        if (this.step < 0 and this.current <= this.stop) return nil;
+        
+        var res = this.current;
+        this.current = this.current + this.step;
+        return res;
+    }
+}
+
+fn range(start: int, stop: int? = nil, step: int = 1): RangeIterator {
+    if (stop == nil) {
+        return RangeIterator(0, start, step);
+    }
+    return RangeIterator(start, stop, step);
+}
+
+fn map(it: any, f: fn(any): any): MapIterator {
+    return MapIterator(it, f);
+}
+
+fn filter(it: any, p: fn(any): bool): FilterIterator {
+    return FilterIterator(it, p);
+}
+
+fn collect(it: any): [any] {
+    var res = [];
+    var item = it.next();
+    while (item != nil) {
+        res = res + [item];
+        item = it.next();
+    }
+    return res;
+}

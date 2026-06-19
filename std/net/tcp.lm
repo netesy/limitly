@@ -6,13 +6,13 @@ frame TCP {
     pub fn connect(address: str, port: int): core.ResultInt {
         var h = resource_create(1); // RT_SOCKET
         if (h == -1) return core.err_int("Failed to create socket resource");
-
+        
         var success = resource_call(h, 6, address, port); // OP_CONNECT
         if (!success) {
             resource_destroy(h);
             return core.err_int("Failed to connect to " + address);
         }
-
+        
         return core.ok_int(h);
     }
 

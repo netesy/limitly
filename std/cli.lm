@@ -1,0 +1,34 @@
+// Standard Library CLI Module
+import std.strings as str;
+import std.collections.hash as hash;
+
+frame ArgParser {
+    var program_name: string;
+    var options: {string: bool};
+    var args: [string];
+    
+    pub init(name: string = "app") {
+        this.program_name = name;
+        this.options = {};
+        this.args = [];
+    }
+    
+    pub fn parse(argv: [string]) {
+        for (var i = 1; i < len(argv); i = i + 1) {
+            var arg = argv[i];
+            if (str.String(arg).starts_with("-")) {
+                this.options[arg] = true;
+            } else {
+                this.args = this.args + [arg];
+            }
+        }
+    }
+    
+    pub fn has_flag(flag: string): bool {
+        return this.options[flag] != nil;
+    }
+    
+    pub fn get_args(): [string] {
+        return this.args;
+    }
+}

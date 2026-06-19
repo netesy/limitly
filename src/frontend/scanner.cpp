@@ -143,10 +143,26 @@ void Scanner::scanToken() {
         }
         break;
     case '<':
-        addToken(match('=') ? TokenType::LESS_EQUAL : TokenType::LESS);
+        if (match('<')) {
+            if (match('=')) {
+                addToken(TokenType::LESS_LESS_EQUAL);
+            } else {
+                addToken(TokenType::LESS_LESS);
+            }
+        } else {
+            addToken(match('=') ? TokenType::LESS_EQUAL : TokenType::LESS);
+        }
         break;
     case '>':
-        addToken(match('=') ? TokenType::GREATER_EQUAL : TokenType::GREATER);
+        if (match('>')) {
+            if (match('=')) {
+                addToken(TokenType::GREATER_GREATER_EQUAL);
+            } else {
+                addToken(TokenType::GREATER_GREATER);
+            }
+        } else {
+            addToken(match('=') ? TokenType::GREATER_EQUAL : TokenType::GREATER);
+        }
         break;
     case '_':
         // Check if this is part of an identifier or standalone underscore
@@ -194,13 +210,25 @@ void Scanner::scanToken() {
         addToken(match('=') ? TokenType::MODULUS_EQUAL : TokenType::MODULUS);
         break;
     case '|':
-        addToken(TokenType::PIPE);
+        if (match('|')) {
+            addToken(TokenType::PIPE_PIPE);
+        } else if (match('=')) {
+            addToken(TokenType::PIPE_EQUAL);
+        } else {
+            addToken(TokenType::PIPE);
+        }
         break;
     case '&':
-        addToken(TokenType::AMPERSAND);
+        if (match('&')) {
+            addToken(TokenType::AMPERSAND_AMPERSAND);
+        } else if (match('=')) {
+            addToken(TokenType::AMPERSAND_EQUAL);
+        } else {
+            addToken(TokenType::AMPERSAND);
+        }
         break;
     case '^':
-        addToken(TokenType::CARET);
+        addToken(match('=') ? TokenType::CARET_EQUAL : TokenType::CARET);
         break;
     case '~':
         addToken(TokenType::TILDE);
@@ -593,6 +621,16 @@ void Scanner::string() {
 void Scanner::number() {
     bool hasDecimal = false;
     bool hasScientific = false;
+
+    // Check for hex literal (0x...)
+    if (peekPrevious() == '0' && (peek() == 'x' || peek() == 'X')) {
+        advance(); // consume 'x'
+        while (isDigit(peek()) || (peek() >= 'a' && peek() <= 'f') || (peek() >= 'A' && peek() <= 'F')) {
+            advance();
+        }
+        addToken(TokenType::HEX_LITERAL);
+        return;
+    }
     
     while (isDigit(peek())) advance();
 
@@ -854,12 +892,26 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "LESS";
     case TokenType::LESS_EQUAL:
         return "LESS_EQUAL";
+    case TokenType::LESS_LESS:
+        return "LESS_LESS";
+    case TokenType::LESS_LESS_EQUAL:
+        return "LESS_LESS_EQUAL";
+    case TokenType::GREATER_GREATER:
+        return "GREATER_GREATER";
+    case TokenType::GREATER_GREATER_EQUAL:
+        return "GREATER_GREATER_EQUAL";
     case TokenType::AMPERSAND:
         return "AMPERSAND";
+    case TokenType::AMPERSAND_EQUAL:
+        return "AMPERSAND_EQUAL";
     case TokenType::PIPE:
         return "PIPE";
+    case TokenType::PIPE_EQUAL:
+        return "PIPE_EQUAL";
     case TokenType::CARET:
         return "CARET";
+    case TokenType::CARET_EQUAL:
+        return "CARET_EQUAL";
     case TokenType::TILDE:
         return "TILDE";
     case TokenType::POWER:
@@ -868,6 +920,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "STRING";
     case TokenType::INT_LITERAL:
         return "INT LITERAL";
+    case TokenType::HEX_LITERAL:
+        return "HEX LITERAL";
     case TokenType::FLOAT_LITERAL:
         return "FLOAT LITERAL";                
     case TokenType::SCIENTIFIC_LITERAL:

@@ -1,0 +1,14 @@
+// Standard Library Archive Module
+
+frame Archive {
+    pub fn list(): [string] { return []; }
+    pub fn extract(target_dir: string) { }
+}
+
+fn open_zip(path: string): Archive {
+    return Archive();
+}
+
+fn open_tar(path: string): Archive {
+    return Archive();
+}

@@ -464,12 +464,13 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
     if (!expr) return nullptr;
     
     TypePtr right_type = check_expression(expr->right, expected_type);
+    if (!right_type) return type_system.ANY_TYPE;
     TypePtr right_base = type_system.unwrapRefined(right_type);
 
     switch (expr->op) {
         case TokenType::BANG:
             // Logical NOT
-            if (!is_boolean_type(right_type)) {
+            if (right_type->tag != TypeTag::Any && !is_boolean_type(right_type)) {
                 add_type_error("bool", right_type->toString(), expr->line);
             }
             return type_system.BOOL_TYPE;
@@ -477,7 +478,7 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
         case TokenType::MINUS:
         case TokenType::PLUS:
             // Numeric negation/affirmation
-            if (!is_numeric_type(right_base)) {
+            if (right_base->tag != TypeTag::Any && !is_numeric_type(right_base)) {
                 add_type_error("numeric", right_base->toString(), expr->line);
             }
             
@@ -530,8 +531,8 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
                 expr->inferred_type = right_base;
                 return right_base;
             }
-            expr->inferred_type = right_type;
-            return right_type;
+            expr->inferred_type = right_base;
+            return right_base;
             
         default:
             add_error("Unsupported unary operator", expr->line);

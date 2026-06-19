@@ -1,0 +1,41 @@
+// Standard Library Color Module
+import std.math as math;
+
+frame Color {
+    pub var r: float; // 0.0 to 1.0
+    pub var g: float;
+    pub var b: float;
+    pub var a: float;
+    
+    pub init(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0) {
+        this.r = r;
+        this.g = g;
+        this.b = b;
+        this.a = a;
+    }
+    
+    pub fn to_hex(): string {
+        var ri = (this.r * 255.0) as int;
+        var gi = (this.g * 255.0) as int;
+        var bi = (this.b * 255.0) as int;
+        // Hex conversion helper needed or use std.encoding
+        return "#000000"; // Placeholder
+    }
+}
+
+fn rgb(r: int, g: int, b: int): Color {
+    return Color(r as float / 255.0, g as float / 255.0, b as float / 255.0, 1.0);
+}
+
+fn rgba(r: int, g: int, b: int, a: float): Color {
+    return Color(r as float / 255.0, g as float / 255.0, b as float / 255.0, a);
+}
+
+fn lerp(c1: Color, c2: Color, t: float): Color {
+    return Color(
+        c1.r + (c2.r - c1.r) * t,
+        c1.g + (c2.g - c1.g) * t,
+        c1.b + (c2.b - c1.b) * t,
+        c1.a + (c2.a - c1.a) * t
+    );
+}

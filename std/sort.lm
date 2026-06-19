@@ -1,0 +1,169 @@
+// Standard Library Sort Module
+
+fn insertion_sort(items: [any], start: int = 0, end: int = -1) {
+    var n = len(items);
+    if (end == -1) end = n;
+    
+    for (var i = start + 1; i < end; i = i + 1) {
+        var key = items[i];
+        var j = i - 1;
+        while (j >= start and items[j] > key) {
+            items[j + 1] = items[j];
+            j = j - 1;
+        }
+        items[j + 1] = key;
+    }
+}
+
+fn quicksort(items: [any], low: int = 0, high: int = -1) {
+    if (high == -1) high = len(items) - 1;
+    if (low < high) {
+        var p = partition(items, low, high);
+        quicksort(items, low, p);
+        quicksort(items, p + 1, high);
+    }
+}
+
+fn partition(items: [any], low: int, high: int): int {
+    var pivot = items[low];
+    var i = low - 1;
+    var j = high + 1;
+    while (true) {
+        do { i = i + 1; } while (items[i] < pivot);
+        do { j = j - 1; } while (items[j] > pivot);
+        if (i >= j) return j;
+        var temp = items[i];
+        items[i] = items[j];
+        items[j] = temp;
+    }
+    return j;
+}
+
+fn heapsort(items: [any]) {
+    var n = len(items);
+    for (var i = n / 2 - 1; i >= 0; i = i - 1) {
+        heapify(items, n, i);
+    }
+    for (var i = n - 1; i > 0; i = i - 1) {
+        var temp = items[0];
+        items[0] = items[i];
+        items[i] = temp;
+        heapify(items, i, 0);
+    }
+}
+
+fn heapify(items: [any], n: int, i: int) {
+    var largest = i;
+    var l = 2 * i + 1;
+    var r = 2 * i + 2;
+    if (l < n and items[l] > items[largest]) largest = l;
+    if (r < n and items[r] > items[largest]) largest = r;
+    if (largest != i) {
+        var swap = items[i];
+        items[i] = items[largest];
+        items[largest] = swap;
+        heapify(items, n, largest);
+    }
+}
+
+// Stable sort (Merge sort)
+fn stable_sort(items: [any]) {
+    var n = len(items);
+    if (n <= 1) return;
+    
+    var mid = n / 2;
+    var left = [];
+    var right = [];
+    
+    for (var i = 0; i < mid; i = i + 1) {
+        left = left + [items[i]];
+    }
+    for (var i = mid; i < n; i = i + 1) {
+        right = right + [items[i]];
+    }
+    
+    stable_sort(left);
+    stable_sort(right);
+    
+    var i = 0;
+    var j = 0;
+    var k = 0;
+    while (i < len(left) and j < len(right)) {
+        if (left[i] <= right[j]) {
+            items[k] = left[i];
+            i = i + 1;
+        } else {
+            items[k] = right[j];
+            j = j + 1;
+        }
+        k = k + 1;
+    }
+    
+    while (i < len(left)) {
+        items[k] = left[i];
+        i = i + 1;
+        k = k + 1;
+    }
+    while (j < len(right)) {
+        items[k] = right[j];
+        j = j + 1;
+        k = k + 1;
+    }
+}
+
+fn radix_sort(items: [int]) {
+    var n = len(items);
+    if (n <= 1) return;
+    
+    var max_val = items[0];
+    for (var i = 1; i < n; i = i + 1) {
+        if (items[i] > max_val) max_val = items[i];
+    }
+    
+    var exp = 1;
+    while (max_val / exp > 0) {
+        counting_sort_by_digit(items, exp);
+        exp = exp * 10;
+    }
+}
+
+fn counting_sort_by_digit(items: [int], exp: int) {
+    var n = len(items);
+    var output = [];
+    for (var i = 0; i < n; i = i + 1) output = output + [0];
+    
+    var count = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    
+    for (var i = 0; i < n; i = i + 1) {
+        var digit = (items[i] / exp) % 10;
+        count[digit] = count[digit] + 1;
+    }
+    
+    for (var i = 1; i < 10; i = i + 1) {
+        count[i] = count[i] + count[i-1];
+    }
+    
+    for (var i = n - 1; i >= 0; i = i - 1) {
+        var digit = (items[i] / exp) % 10;
+        output[count[digit] - 1] = items[i];
+        count[digit] = count[digit] - 1;
+    }
+    
+    for (var i = 0; i < n; i = i + 1) {
+        items[i] = output[i];
+    }
+}
+
+fn sort(items: [any], reverse: bool = false, key: fn(any): any = nil) {
+    // Default sort - use quicksort for efficiency
+    quicksort(items);
+    
+    if (reverse) {
+        var n = len(items);
+        for (var i = 0; i < n / 2; i = i + 1) {
+            var temp = items[i];
+            items[i] = items[n - 1 - i];
+            items[n - 1 - i] = temp;
+        }
+    }
+}

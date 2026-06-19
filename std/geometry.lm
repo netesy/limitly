@@ -1,0 +1,50 @@
+// Standard Library Geometry Module
+import std.math as math;
+import std.linear_algebra as la;
+
+frame Rect {
+    pub var x: float;
+    pub var y: float;
+    pub var w: float;
+    pub var h: float;
+    
+    pub init(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0) {
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+    }
+    
+    pub fn contains(px: float, py: float): bool {
+        return px >= this.x and px <= this.x + this.w and py >= this.y and py <= this.y + this.h;
+    }
+    
+    pub fn intersects(other: Rect): bool {
+        return !(other.x > this.x + this.w or 
+                 other.x + other.w < this.x or 
+                 other.y > this.y + this.h or 
+                 other.y + other.h < this.y);
+    }
+    
+    pub fn area(): float { return this.w * this.h; }
+}
+
+frame Circle {
+    pub var x: float;
+    pub var y: float;
+    pub var r: float;
+    
+    pub init(x: float = 0.0, y: float = 0.0, r: float = 0.0) {
+        this.x = x;
+        this.y = y;
+        this.r = r;
+    }
+    
+    pub fn contains(px: float, py: float): bool {
+        var dx = px - this.x;
+        var dy = py - this.y;
+        return dx * dx + dy * dy <= this.r * this.r;
+    }
+    
+    pub fn area(): float { return 3.1415926535 * this.r * this.r; }
+}

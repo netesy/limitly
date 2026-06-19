@@ -1,0 +1,56 @@
+// Standard Library Bytes Module
+
+frame ByteBuffer {
+    var data: [int];
+    
+    pub init(initial: [int] = []) {
+        this.data = initial;
+    }
+    
+    pub fn append(byte: int) {
+        this.data = this.data + [byte % 256];
+    }
+    
+    pub fn append_all(bytes: [int]) {
+        this.data = this.data + bytes;
+    }
+    
+    pub fn get(idx: int): int {
+        return this.data[idx];
+    }
+    
+    pub fn len(): int { return len(this.data); }
+    
+    pub fn to_hex(): string {
+        var hex = "0123456789abcdef";
+        var res = "";
+        for (var i = 0; i < len(this.data); i = i + 1) {
+            var b = this.data[i];
+            res = res + substring(hex, (b / 16) % 16, (b / 16) % 16 + 1);
+            res = res + substring(hex, b % 16, b % 16 + 1);
+        }
+        return res;
+    }
+}
+
+fn encode_i32_be(val: int): [int] {
+    return [
+        (val >> 24) & 0xFF,
+        (val >> 16) & 0xFF,
+        (val >> 8) & 0xFF,
+        val & 0xFF
+    ];
+}
+
+fn encode_i32_le(val: int): [int] {
+    return [
+        val & 0xFF,
+        (val >> 8) & 0xFF,
+        (val >> 16) & 0xFF,
+        (val >> 24) & 0xFF
+    ];
+}
+
+fn decode_i32_be(bytes: [int]): int {
+    return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
+}

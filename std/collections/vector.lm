@@ -1,0 +1,97 @@
+// Standard Library Vector Collection
+
+frame Vector {
+    var data: [any];
+    var size: int;
+
+    pub init(initial_capacity: int = 10) {
+        this.data = [];
+        this.size = 0;
+    }
+
+    pub fn push(item: any) {
+        this.data = this.data + [item];
+        this.size = this.size + 1;
+    }
+
+    pub fn pop(): any {
+        if (this.size == 0) return nil;
+        var item = this.data[this.size - 1];
+        // Note: Shrinking array is hard without better slice support
+        this.size = this.size - 1;
+        return item;
+    }
+
+    pub fn get(index: int): any {
+        if (index < 0 or index >= this.size) return nil;
+        return this.data[index];
+    }
+
+    pub fn set(index: int, item: any) {
+        if (index < 0 or index >= this.size) return;
+        this.data[index] = item;
+    }
+
+    pub fn peek(): any {
+        if (this.size == 0) return nil;
+        return this.data[this.size - 1];
+    }
+
+    pub fn len(): int { return this.size; }
+
+    pub fn clear() {
+        this.data = [];
+        this.size = 0;
+    }
+}
+
+frame Deque {
+    var data: [any];
+    
+    pub init() {
+        this.data = [];
+    }
+    
+    pub fn push_back(item: any) {
+        this.data = this.data + [item];
+    }
+    
+    pub fn push_front(item: any) {
+        this.data = [item] + this.data;
+    }
+    
+    pub fn peek_back(): any {
+        var n = len(this.data);
+        if (n == 0) return nil;
+        return this.data[n-1];
+    }
+
+    pub fn peek_front(): any {
+        var n = len(this.data);
+        if (n == 0) return nil;
+        return this.data[0];
+    }
+
+    pub fn pop_back(): any {
+        var n = len(this.data);
+        if (n == 0) return nil;
+        var item = this.data[n-1];
+        // Slice simulation if supported, otherwise this is slow
+        var next_data = [];
+        for (var i = 0; i < n - 1; i = i + 1) next_data = next_data + [this.data[i]];
+        this.data = next_data;
+        return item;
+    }
+    
+    pub fn pop_front(): any {
+        var n = len(this.data);
+        if (n == 0) return nil;
+        var item = this.data[0];
+        var next_data = [];
+        for (var i = 1; i < n; i = i + 1) next_data = next_data + [this.data[i]];
+        this.data = next_data;
+        return item;
+    }
+    
+    pub fn len(): int { return len(this.data); }
+}

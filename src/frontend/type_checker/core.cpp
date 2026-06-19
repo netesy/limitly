@@ -96,11 +96,24 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     for (const auto& [path, module] : all_modules) {
         if (module && !module->is_checked) {
             module->is_checked = true; // Mark before to prevent recursion
-            TypeSystem ts;
-            TypeChecker checker(ts);
+            TypeChecker checker(this->type_system);
             checker.set_source_context(module->source, module->path);
             if (!checker.check_program(module->ast)) {
                 add_error("Failed to type check module: " + path);
+            }
+
+            // Merge metadata back into current checker
+            for (const auto& [name, info] : checker.frame_declarations) {
+                this->frame_declarations[name] = info;
+            }
+            for (const auto& [name, info] : checker.trait_declarations) {
+                this->trait_declarations[name] = info;
+            }
+            for (const auto& [name, sig] : checker.function_signatures) {
+                this->function_signatures[name] = sig;
+            }
+            for (const auto& [name, type] : checker.variable_types) {
+                this->variable_types[name] = type;
             }
         }
     }
@@ -153,6 +166,15 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
             }
             info.totalFieldSize = offset;
 
+            auto& fd = frame_declarations[name];
+            fd.name = name;
+            fd.declaration = frame_decl;
+            fd.fields = info.fields;
+            fd.field_has_default.clear();
+            for (const auto& field : frame_decl->fields) {
+                fd.field_has_default.push_back({field->name, field->defaultValue != nullptr});
+            }
+
             if (frame_decl->init) {
                 std::string init_name = name + ".init";
                 FunctionSignature sig;
@@ -160,6 +182,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 sig.return_type = type_system.NIL_TYPE;
                 sig.param_types.push_back(type_system.createFrameType(name));
                 for (const auto& p : frame_decl->init->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
+                for (const auto& op : frame_decl->init->optionalParams) sig.param_types.push_back(resolve_type_annotation(op.second.first));
                 function_signatures[init_name] = sig;
             }
             for (const auto& m : frame_decl->methods) {
@@ -169,6 +192,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 sig.return_type = m->returnType ? resolve_type_annotation(m->returnType) : type_system.NIL_TYPE;
                 sig.param_types.push_back(type_system.createFrameType(name));
                 for (const auto& p : m->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
+                for (const auto& op : m->optionalParams) sig.param_types.push_back(resolve_type_annotation(op.second.first));
                 function_signatures[m_name] = sig;
                 info.methodSignatures[m->name] = sig.return_type;
             }

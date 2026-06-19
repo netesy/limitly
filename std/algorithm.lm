@@ -1,0 +1,143 @@
+// Standard Library Algorithm Module
+
+fn map(items: [any], f: fn(any): any): [any] {
+    var res = [];
+    for (var i = 0; i < len(items); i = i + 1) {
+        res = res + [f(items[i])];
+    }
+    return res;
+}
+
+fn filter(items: [any], p: fn(any): bool): [any] {
+    var res = [];
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (p(items[i])) res = res + [items[i]];
+    }
+    return res;
+}
+
+fn reduce(items: [any], f: fn(any, any): any, initial: any): any {
+    var acc = initial;
+    for (var i = 0; i < len(items); i = i + 1) {
+        acc = f(acc, items[i]);
+    }
+    return acc;
+}
+
+fn fold(items: [any], initial: any, f: fn(any, any): any): any {
+    return reduce(items, f, initial);
+}
+
+fn all(items: [any], p: fn(any): bool): bool {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (!p(items[i])) return false;
+    }
+    return true;
+}
+
+fn any(items: [any], p: fn(any): bool): bool {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (p(items[i])) return true;
+    }
+    return false;
+}
+
+fn none(items: [any], p: fn(any): bool): bool {
+    return !any(items, p);
+}
+
+fn count(items: [any], target: any): int {
+    var c = 0;
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (items[i] == target) c = c + 1;
+    }
+    return c;
+}
+
+fn find(items: [any], target: any): int {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (items[i] == target) return i;
+    }
+    return -1;
+}
+
+fn find_if(items: [any], p: fn(any): bool): int {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (p(items[i])) return i;
+    }
+    return -1;
+}
+
+fn reverse(items: [any]) {
+    var n = len(items);
+    for (var i = 0; i < n / 2; i = i + 1) {
+        var tmp = items[i];
+        items[i] = items[n - 1 - i];
+        items[n - 1 - i] = tmp;
+    }
+}
+
+fn rotate(items: [any], k: int) {
+    var n = len(items);
+    if (n == 0) return;
+    k = k % n;
+    if (k < 0) k = k + n;
+    if (k == 0) return;
+    
+    // Simple rotation: reverse parts then whole
+    _reverse_range(items, 0, n - 1);
+    _reverse_range(items, 0, k - 1);
+    _reverse_range(items, k, n - 1);
+}
+
+private fn _reverse_range(items: [any], start: int, end: int) {
+    while (start < end) {
+        var tmp = items[start];
+        items[start] = items[end];
+        items[end] = tmp;
+        start = start + 1;
+        end = end - 1;
+    }
+}
+
+fn unique(items: [any]): [any] {
+    var res = [];
+    for (var i = 0; i < len(items); i = i + 1) {
+        var found = false;
+        for (var j = 0; j < len(res); j = j + 1) {
+            if (res[j] == items[i]) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) res = res + [items[i]];
+    }
+    return res;
+}
+
+fn partition(items: [any], p: fn(any): bool): int {
+    var i = 0;
+    var j = len(items) - 1;
+    while (i <= j) {
+        while (i <= j and p(items[i])) i = i + 1;
+        while (i <= j and !p(items[j])) j = j - 1;
+        if (i < j) {
+            var tmp = items[i];
+            items[i] = items[j];
+            items[j] = tmp;
+            i = i + 1;
+            j = j - 1;
+        }
+    }
+    return i;
+}
+
+fn zip(a: [any], b: [any]): [(any, any)] {
+    var res = [];
+    var n = len(a);
+    if (len(b) < n) n = len(b);
+    for (var i = 0; i < n; i = i + 1) {
+        res = res + [(a[i], b[i])];
+    }
+    return res;
+}

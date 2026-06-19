@@ -49,9 +49,18 @@ enum class TokenType {
     GREATER_EQUAL, // >=
     LESS,          // <
     LESS_EQUAL,    // <=
+    LESS_LESS,     // <<
+    LESS_LESS_EQUAL, // <<=
+    GREATER_GREATER, // >>
+    GREATER_GREATER_EQUAL, // >>=
     AMPERSAND,     // &
+    AMPERSAND_EQUAL, // &=
+    AMPERSAND_AMPERSAND, // &&
     PIPE,          // |
+    PIPE_EQUAL,      // |=
+    PIPE_PIPE,     // ||
     CARET,         // ^
+    CARET_EQUAL,     // ^=
     TILDE,         // ~
     POWER,         // **
 
@@ -62,6 +71,7 @@ enum class TokenType {
     INTERPOLATION_START,// { for starting interpolation
     INTERPOLATION_END,  // } for ending interpolation
     INT_LITERAL,        // integer literals (123, -456)
+    HEX_LITERAL,        // hexadecimal literals (0x123)
     FLOAT_LITERAL,      // floating-point literals (1.23, 3.14159)
     SCIENTIFIC_LITERAL, // scientific notation literals (1e9, 2.5e-3)
 

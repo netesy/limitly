@@ -1,30 +1,26 @@
-// Config abstraction (format-agnostic)
-import std.core as core;
+// Standard Library Config Module
+import std.strings as str;
 
 frame Config {
-    var data: {str: str};
-
-    pub fn get(key: str): core.ResultStr {
-        var value = self.data[key];
-        if (value == nil) return core.err_str("missing key: " + key);
-        return core.ok_str(value);
+    var data: {string: any};
+    
+    pub init() {
+        this.data = {};
     }
-
-    pub fn set(key: str, value: str): Config {
-        self.data[key] = value;
-        return self;
+    
+    pub fn get(key: string, default: any = nil): any {
+        var val = this.data[key];
+        if (val == nil) return default;
+        return val;
     }
-
-    pub fn has(key: str): bool {
-        return self.data[key] != nil;
-    }
-
-    pub fn remove(key: str): Config {
-        self.data[key] = nil;
-        return self;
+    
+    pub fn set(key: string, val: any) {
+        this.data[key] = val;
     }
 }
 
-fn new_config(): Config {
-    return Config(data={});
+fn load_json(json_str: string): Config {
+    var conf = Config();
+    // Simplified JSON parser placeholder
+    return conf;
 }

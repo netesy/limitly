@@ -1,0 +1,20 @@
+// Standard Library Hash Module
+
+fn fnv1a_32(data: [int]): int {
+    var h = 0x811C9DC5;
+    for (var i = 0; i < len(data); i = i + 1) {
+        h = h ^ data[i];
+        h = h * 0x01000193;
+    }
+    return h;
+}
+
+fn djb2(s: string): int {
+    var h = 5381;
+    for (var i = 0; i < len(s); i = i + 1) {
+        // Need char to int
+        // var c = s[i] as int;
+        // h = ((h << 5) + h) + c;
+    }
+    return h;
+}
