@@ -126,3 +126,7 @@ Concurrency is bound to the lifetime of the block.
 ### 6.2 Tasks and Workers
 - `task([name in] iterable) { ... }`: Spawn a unit of work.
 - `worker(param in channel) { ... }`: Process elements from a channel.
+## 2026-06-19 Parser/operator stabilization note
+
+The scanner and parser now recognize the keyword unary logical operator `not` in addition to legacy `!`. Bitwise operators `&`, `|`, `^`, `<<`, and `>>` parse as expression operators with precedence lower than comparison and higher than equality, so `flags & READ == READ` is parsed as `(flags & READ) == READ`. Compound bitwise assignments `&=`, `|=`, `^=`, `<<=`, and `>>=` are accepted as assignment operators. Exponentiation remains right-associative and binds tighter than unary plus/minus: `-2 ** 2` parses as `-(2 ** 2)`, while `2 ** 3 ** 2` parses as `2 ** (3 ** 2)`.
+

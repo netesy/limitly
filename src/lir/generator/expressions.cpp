@@ -917,9 +917,11 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     else if (expr.op == LM::Frontend::TokenType::LESS_EQUAL) op = LIR_Op::CmpLE;
     else if (expr.op == LM::Frontend::TokenType::GREATER) op = LIR_Op::CmpGT;
     else if (expr.op == LM::Frontend::TokenType::GREATER_EQUAL) op = LIR_Op::CmpGE;
-
-
+    else if (expr.op == LM::Frontend::TokenType::AMPERSAND) op = LIR_Op::And;
+    else if (expr.op == LM::Frontend::TokenType::PIPE) op = LIR_Op::Or;
     else if (expr.op == LM::Frontend::TokenType::CARET) op = LIR_Op::Xor;
+    else if (expr.op == LM::Frontend::TokenType::LESS_LESS) op = LIR_Op::Shl;
+    else if (expr.op == LM::Frontend::TokenType::GREATER_GREATER) op = LIR_Op::Shr;
     else {
         report_error("Unknown binary operator");
         return 0;
@@ -1067,10 +1069,12 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
             }
         }
     } else if (op == LIR_Op::And || op == LIR_Op::Or) {
-        // Logical operations return bool
-        result_type = std::make_shared<::Type>(::TypeTag::Bool);
-    } else if (op == LIR_Op::Xor) {
-        // Bitwise XOR should preserve integer types like arithmetic operations
+        if (expr.op == LM::Frontend::TokenType::AND || expr.op == LM::Frontend::TokenType::OR) {
+            result_type = std::make_shared<::Type>(::TypeTag::Bool);
+        } else {
+            result_type = get_promoted_numeric_type(left_type, right_type);
+        }
+    } else if (op == LIR_Op::Xor || op == LIR_Op::Shl || op == LIR_Op::Shr) {
         result_type = get_promoted_numeric_type(left_type, right_type);
     }
     
@@ -1107,7 +1111,7 @@ Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
         set_register_type(dst, result_type);
         // Unary plus - just copy the value (no operation needed)
         emit_instruction(LIR_Inst(LIR_Op::Mov, dst, operand, 0));
-    } else if (expr.op == LM::Frontend::TokenType::BANG) {
+    } else if (expr.op == LM::Frontend::TokenType::BANG || expr.op == LM::Frontend::TokenType::NOT) {
         // Result type is bool
         result_type = std::make_shared<::Type>(::TypeTag::Bool);
         set_register_type(dst, result_type);

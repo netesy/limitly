@@ -195,6 +195,10 @@ public:
     std::shared_ptr<LM::Frontend::AST::Expression> logicalOr();
     std::shared_ptr<LM::Frontend::AST::Expression> logicalAnd();
     std::shared_ptr<LM::Frontend::AST::Expression> equality();
+    std::shared_ptr<LM::Frontend::AST::Expression> bitwiseOr();
+    std::shared_ptr<LM::Frontend::AST::Expression> bitwiseXor();
+    std::shared_ptr<LM::Frontend::AST::Expression> bitwiseAnd();
+    std::shared_ptr<LM::Frontend::AST::Expression> bitwiseShift();
     std::shared_ptr<LM::Frontend::AST::Expression> comparison();
     std::shared_ptr<LM::Frontend::AST::Expression> term();
     std::shared_ptr<LM::Frontend::AST::Expression> factor();

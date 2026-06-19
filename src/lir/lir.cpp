@@ -37,6 +37,8 @@ std::string LIR_Inst::to_string() const {
         case LIR_Op::And:
         case LIR_Op::Or:
         case LIR_Op::Xor:
+        case LIR_Op::Shl:
+        case LIR_Op::Shr:
         case LIR_Op::CmpEQ:
         case LIR_Op::CmpNEQ:
         case LIR_Op::CmpLT:
@@ -243,6 +245,8 @@ std::string lir_op_to_string(LIR_Op op) {
         case LIR_Op::And: return "and";
         case LIR_Op::Or: return "or";
         case LIR_Op::Xor: return "xor";
+        case LIR_Op::Shl: return "shl";
+        case LIR_Op::Shr: return "shr";
         case LIR_Op::CmpEQ: return "cmpeq";
         case LIR_Op::CmpNEQ: return "cmpneq";
         case LIR_Op::CmpLT: return "cmplt";

@@ -16,7 +16,9 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::assignment() {
     auto expr = logicalOr();
 
     if (match({TokenType::EQUAL, TokenType::PLUS_EQUAL, TokenType::MINUS_EQUAL, 
-               TokenType::STAR_EQUAL, TokenType::SLASH_EQUAL, TokenType::MODULUS_EQUAL})) {
+               TokenType::STAR_EQUAL, TokenType::SLASH_EQUAL, TokenType::MODULUS_EQUAL,
+               TokenType::AMPERSAND_EQUAL, TokenType::PIPE_EQUAL, TokenType::CARET_EQUAL,
+               TokenType::LESS_LESS_EQUAL, TokenType::GREATER_GREATER_EQUAL})) {
         Token op = previous();
         auto value = assignment();
 
@@ -88,11 +90,11 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::logicalAnd() {
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::equality() {
-    auto expr = comparison();
+    auto expr = bitwiseOr();
 
     while (match({TokenType::BANG_EQUAL, TokenType::EQUAL_EQUAL})) {
         auto op = previous();
-        auto right = comparison();
+        auto right = bitwiseOr();
 
         auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
@@ -117,14 +119,82 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::equality() {
     return expr;
 }
 
-std::shared_ptr<LM::Frontend::AST::Expression> Parser::comparison() {
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::bitwiseOr() {
+    auto expr = bitwiseXor();
+
+    while (match({TokenType::PIPE})) {
+        auto op = previous();
+        auto right = bitwiseXor();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::bitwiseXor() {
+    auto expr = bitwiseAnd();
+
+    while (match({TokenType::CARET})) {
+        auto op = previous();
+        auto right = bitwiseAnd();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::bitwiseAnd() {
+    auto expr = comparison();
+
+    while (match({TokenType::AMPERSAND})) {
+        auto op = previous();
+        auto right = comparison();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::bitwiseShift() {
     auto expr = term();
+
+    while (match({TokenType::LESS_LESS, TokenType::GREATER_GREATER})) {
+        auto op = previous();
+        auto right = term();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::comparison() {
+    auto expr = bitwiseShift();
 
     if (match({TokenType::RANGE})) {
         auto rangeExpr = std::make_shared<LM::Frontend::AST::RangeExpr>();
         rangeExpr->line = previous().line;
         rangeExpr->start = expr;
-        rangeExpr->end = term();
+        rangeExpr->end = bitwiseShift();
         rangeExpr->step = nullptr;
         rangeExpr->inclusive = true;
         
@@ -156,7 +226,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::comparison() {
             continue;
         }
 
-        auto right = term();
+        auto right = bitwiseShift();
 
         auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
@@ -212,7 +282,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::term() {
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::factor() {
-    auto expr = power();
+    auto expr = unary();
 
     while (match({TokenType::SLASH, TokenType::STAR, TokenType::MODULUS})) {
         auto op = previous();
@@ -242,10 +312,10 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::factor() {
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::power() {
-    auto expr = unary();
-    while (match({TokenType::POWER})) {
+    auto expr = call();
+    if (match({TokenType::POWER})) {
         auto op = previous();
-        auto right = power();
+        auto right = unary();
         auto binaryExpr = createNodeWithContext<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
         binaryExpr->left = expr;
@@ -271,9 +341,9 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::power() {
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::unary() {
-    if (match({TokenType::BANG, TokenType::MINUS, TokenType::PLUS})) {
+    if (match({TokenType::BANG, TokenType::TILDE, TokenType::MINUS, TokenType::PLUS, TokenType::NOT})) {
         auto op = previous();
-        auto right = unary();
+        auto right = (op.type == TokenType::MINUS || op.type == TokenType::PLUS) ? power() : unary();
 
         auto unaryExpr = std::make_shared<LM::Frontend::AST::UnaryExpr>();
         unaryExpr->line = op.line;
@@ -294,7 +364,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::unary() {
         return unaryExpr;
     }
 
-    return call();
+    return power();
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::call() {
@@ -444,7 +514,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
         literalExpr->line = previous().line; literalExpr->value = nullptr;
         attachTriviaFromToken(previous()); return literalExpr;
     }
-    if (match({TokenType::INT_LITERAL, TokenType::FLOAT_LITERAL, TokenType::SCIENTIFIC_LITERAL})) {
+    if (match({TokenType::INT_LITERAL, TokenType::HEX_LITERAL, TokenType::FLOAT_LITERAL, TokenType::SCIENTIFIC_LITERAL})) {
         auto token = previous(); auto literalExpr = createNodeWithContext<LM::Frontend::AST::LiteralExpr>();
         literalExpr->line = token.line; literalExpr->value = token.lexeme; literalExpr->literalType = token.type;
         if (cstMode && config.detailedExpressionNodes) {

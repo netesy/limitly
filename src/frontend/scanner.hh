@@ -128,6 +128,7 @@ enum class TokenType {
     IN,         // in
     NIL,        // nil
     ENUM,       // enum
+    NOT,        // not
     OR,         // or
     DEFAULT,    // default
     PRINT,      // print

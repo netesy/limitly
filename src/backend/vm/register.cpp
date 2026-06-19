@@ -163,7 +163,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                 execute_control_flow(pc, function); break;
             case LIR::LIR_Op::PrintInt: case LIR::LIR_Op::PrintUint: case LIR::LIR_Op::PrintFloat:
             case LIR::LIR_Op::PrintBool: case LIR::LIR_Op::PrintString: execute_io(pc); break;
-            case LIR::LIR_Op::And: case LIR::LIR_Op::Or: case LIR::LIR_Op::Xor: execute_bitwise(pc); break;
+            case LIR::LIR_Op::And: case LIR::LIR_Op::Or: case LIR::LIR_Op::Xor: case LIR::LIR_Op::Shl: case LIR::LIR_Op::Shr: execute_bitwise(pc); break;
             case LIR::LIR_Op::ChannelAlloc: case LIR::LIR_Op::ChannelSend: case LIR::LIR_Op::ChannelOffer:
             case LIR::LIR_Op::ChannelRecv: case LIR::LIR_Op::ChannelPoll: case LIR::LIR_Op::ChannelClose:
             case LIR::LIR_Op::ChannelHasData: case LIR::LIR_Op::SchedulerInit: case LIR::LIR_Op::SchedulerRun:

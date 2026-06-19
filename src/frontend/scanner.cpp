@@ -628,7 +628,13 @@ void Scanner::number() {
         while (isDigit(peek()) || (peek() >= 'a' && peek() <= 'f') || (peek() >= 'A' && peek() <= 'F')) {
             advance();
         }
-        addToken(TokenType::HEX_LITERAL);
+        std::string hexText = source.substr(start, current - start);
+        try {
+            unsigned long long value = std::stoull(hexText, nullptr, 16);
+            addToken(TokenType::INT_LITERAL, std::to_string(value));
+        } catch (const std::exception&) {
+            addToken(TokenType::HEX_LITERAL);
+        }
         return;
     }
     
@@ -717,6 +723,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "for") return TokenType::FOR;
     if (rest == "fn") return TokenType::FN;
     if (rest == "if") return TokenType::IF;
+    if (rest == "not") return TokenType::NOT;
     if (rest == "or") return TokenType::OR;
     if (rest == "print") return TokenType::PRINT;
     if (rest == "return") return TokenType::RETURN;

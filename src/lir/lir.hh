@@ -79,7 +79,7 @@ enum class ResourceOperation : uint32_t {
 
 enum class LIR_Op : uint8_t {
     // === Core Operations ===
-    Mov, LoadConst, Add, Sub, Mul, Div, Mod, Neg, And, Or, Xor,
+    Mov, LoadConst, Add, Sub, Mul, Div, Mod, Neg, And, Or, Xor, Shl, Shr,
     CmpEQ, CmpNEQ, CmpLT, CmpLE, CmpGT, CmpGE, StringIndex,
     Jump, JumpIfFalse, JumpIf, Label,
     Call, CallVoid, CallIndirect, CallBuiltin, CallVariadic,

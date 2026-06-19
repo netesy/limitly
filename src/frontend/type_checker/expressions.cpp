@@ -135,6 +135,7 @@ TypePtr TypeChecker::check_literal_expr(std::shared_ptr<LM::Frontend::AST::Liter
         // Use the token type to determine the correct type
         switch (expr->literalType) {
             case TokenType::INT_LITERAL:
+            case TokenType::HEX_LITERAL:
                 if (expected_type && is_decimal_type(expected_type)) {
                     expr->inferred_type = expected_type;
                     return expected_type;
@@ -177,7 +178,8 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::F
         
         // Use the token type to determine the correct type
         switch (expr->literalType) {
-            case TokenType::INT_LITERAL: {
+            case TokenType::INT_LITERAL:
+            case TokenType::HEX_LITERAL: {
                 // If we have an expected type and it's an integer type or decimal type, use it
                 if (expected_type && (is_integer_type(expected_type) || is_decimal_type(expected_type))) {
                     expr->inferred_type = expected_type;
@@ -431,6 +433,20 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
             add_error("Logical operations require boolean operands", expr->line);
             return type_system.BOOL_TYPE;
             
+        case TokenType::AMPERSAND:
+        case TokenType::PIPE:
+        case TokenType::CARET:
+        case TokenType::LESS_LESS:
+        case TokenType::GREATER_GREATER:
+            if (left_base->tag == TypeTag::Any || right_base->tag == TypeTag::Any) {
+                return type_system.ANY_TYPE;
+            }
+            if (is_integer_type(left_base) && is_integer_type(right_base)) {
+                return promote_numeric_types(left_base, right_base);
+            }
+            add_error("Bitwise operations require integer operands", expr->line);
+            return type_system.INT_TYPE;
+
         case TokenType::MODULUS:
         case TokenType::POWER:
             if (left_base->tag == TypeTag::Any || right_base->tag == TypeTag::Any) {
@@ -469,12 +485,20 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
 
     switch (expr->op) {
         case TokenType::BANG:
+        case TokenType::NOT:
             // Logical NOT
             if (right_type->tag != TypeTag::Any && !is_boolean_type(right_type)) {
                 add_type_error("bool", right_type->toString(), expr->line);
             }
             return type_system.BOOL_TYPE;
             
+        case TokenType::TILDE:
+            if (right_base->tag != TypeTag::Any && !is_integer_type(right_base)) {
+                add_type_error("integer", right_base->toString(), expr->line);
+            }
+            expr->inferred_type = right_base;
+            return right_base;
+
         case TokenType::MINUS:
         case TokenType::PLUS:
             // Numeric negation/affirmation
