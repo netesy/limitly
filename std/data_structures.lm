@@ -168,7 +168,11 @@ frame BinaryTree {
         if (self.left != nil) left_height = self.left.height();
         if (self.right != nil) right_height = self.right.height();
         
-        return 1 + (left_height if left_height > right_height else right_height);
+        if (left_height > right_height) {
+            return 1 + left_height;
+        } else {
+            return 1 + right_height;
+        }
     }
 
     pub fn size(): int {

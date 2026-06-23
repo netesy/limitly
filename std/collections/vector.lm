@@ -1,97 +1,310 @@
-// Standard Library Vector Collection
+// Standard Library Vector, Deque, ArrayList, and RingBuffer Collections
 
 frame Vector {
     pub var data: [any];
     var size: int;
+    var capacity: int;
 
-    pub init(initial_capacity: int = 10) {
+    pub init(initial_capacity: int = 8) {
         self.data = [];
         self.size = 0;
+        self.capacity = initial_capacity;
+        if (self.capacity < 1) {
+            self.capacity = 1;
+        }
+    }
+
+    fn _copy_without(index_to_skip: int): [any] {
+        var out: [any] = [];
+        var i = 0;
+        while (i < self.size) {
+            if (i != index_to_skip) {
+                out = out + [self.data[i]];
+            }
+            i = i + 1;
+        }
+        return out;
+    }
+
+    fn _grow_for(count: int) {
+        while (self.capacity < count) {
+            self.capacity = self.capacity * 2;
+        }
+    }
+
+    pub fn append(item: any) {
+        self.push(item);
     }
 
     pub fn push(item: any) {
+        self._grow_for(self.size + 1);
         self.data = self.data + [item];
         self.size = self.size + 1;
     }
 
-    pub fn pop(): any {
-        if (self.size == 0) return nil;
-        var item = self.data[self.size - 1];
-        // Note: Shrinking array is hard without better slice support
+    pub fn insert(index: int, item: any) {
+        if (index < 0) {
+            index = 0;
+        }
+        if (index > self.size) {
+            index = self.size;
+        }
+        self._grow_for(self.size + 1);
+        var out: [any] = [];
+        var i = 0;
+        while (i < index) {
+            out = out + [self.data[i]];
+            i = i + 1;
+        }
+        out = out + [item];
+        while (i < self.size) {
+            out = out + [self.data[i]];
+            i = i + 1;
+        }
+        self.data = out;
+        self.size = self.size + 1;
+    }
+
+    pub fn remove(index: int): any {
+        if (index < 0 or index >= self.size) {
+            return nil;
+        }
+        var item = self.data[index];
+        self.data = self._copy_without(index);
         self.size = self.size - 1;
         return item;
     }
 
+    pub fn pop(): any {
+        return self.remove(self.size - 1);
+    }
+
     pub fn get(index: int): any {
-        if (index < 0 or index >= self.size) return nil;
+        if (index < 0 or index >= self.size) {
+            return nil;
+        }
         return self.data[index];
     }
 
-    pub fn set(index: int, item: any) {
-        if (index < 0 or index >= self.size) return;
+    pub fn set(index: int, item: any): bool {
+        if (index < 0 or index >= self.size) {
+            return false;
+        }
         self.data[index] = item;
+        return true;
     }
 
     pub fn peek(): any {
-        if (self.size == 0) return nil;
-        return self.data[self.size - 1];
+        return self.get(self.size - 1);
     }
 
-    pub fn len(): int { return self.size; }
+    pub fn len(): int {
+        return self.size;
+    }
+
+    pub fn is_empty(): bool {
+        return self.size == 0;
+    }
+
+    pub fn reserve(new_capacity: int) {
+        if (new_capacity > self.capacity) {
+            self.capacity = new_capacity;
+        }
+    }
+
+    pub fn resize(new_size: int, fill: any = nil) {
+        if (new_size < 0) {
+            new_size = 0;
+        }
+        self._grow_for(new_size);
+        while (self.size < new_size) {
+            self.data = self.data + [fill];
+            self.size = self.size + 1;
+        }
+        while (self.size > new_size) {
+            self.pop();
+        }
+    }
 
     pub fn clear() {
         self.data = [];
         self.size = 0;
     }
+
+    pub fn iter(): VectorIterator {
+        return VectorIterator(self.data, self.size);
+    }
+}
+
+frame VectorIterator {
+    var data: [any];
+    var size: int;
+    var index: int;
+
+    pub init(data: [any], size: int) {
+        self.data = data;
+        self.size = size;
+        self.index = 0;
+    }
+
+    pub fn next(): any {
+        if (self.index >= self.size) {
+            return nil;
+        }
+        var item = self.data[self.index];
+        self.index = self.index + 1;
+        return item;
+    }
 }
 
 frame Deque {
     pub var data: [any];
-    
+
     pub init() {
         self.data = [];
     }
-    
+
     pub fn push_back(item: any) {
         self.data = self.data + [item];
     }
-    
+
     pub fn push_front(item: any) {
         self.data = [item] + self.data;
     }
-    
+
     pub fn peek_back(): any {
         var n = len(self.data);
-        if (n == 0) return nil;
-        return self.data[n-1];
+        if (n == 0) {
+            return nil;
+        }
+        return self.data[n - 1];
     }
 
     pub fn peek_front(): any {
-        var n = len(self.data);
-        if (n == 0) return nil;
+        if (len(self.data) == 0) {
+            return nil;
+        }
         return self.data[0];
     }
 
     pub fn pop_back(): any {
         var n = len(self.data);
-        if (n == 0) return nil;
-        var item = self.data[n-1];
-        // Slice simulation if supported, otherwise self is slow
-        var next_data = [];
-        for (var i = 0; i < n - 1; i = i + 1) next_data = next_data + [self.data[i]];
+        if (n == 0) {
+            return nil;
+        }
+        var item = self.data[n - 1];
+        var next_data: [any] = [];
+        var i = 0;
+        while (i < n - 1) {
+            next_data = next_data + [self.data[i]];
+            i = i + 1;
+        }
         self.data = next_data;
         return item;
     }
-    
+
     pub fn pop_front(): any {
         var n = len(self.data);
-        if (n == 0) return nil;
+        if (n == 0) {
+            return nil;
+        }
         var item = self.data[0];
-        var next_data = [];
-        for (var i = 1; i < n; i = i + 1) next_data = next_data + [self.data[i]];
+        var next_data: [any] = [];
+        var i = 1;
+        while (i < n) {
+            next_data = next_data + [self.data[i]];
+            i = i + 1;
+        }
         self.data = next_data;
         return item;
     }
-    
-    pub fn len(): int { return len(self.data); }
+
+    pub fn len(): int {
+        return len(self.data);
+    }
+
+    pub fn iter(): VectorIterator {
+        return VectorIterator(self.data, len(self.data));
+    }
+}
+
+frame ArrayList {
+    var data: Vector;
+
+    pub init() {
+        self.data = Vector();
+    }
+
+    pub fn push(item: any) {
+        self.data.push(item);
+    }
+
+    pub fn pop(): any {
+        return self.data.pop();
+    }
+
+    pub fn remove(index: int): any {
+        return self.data.remove(index);
+    }
+
+    pub fn resize(new_size: int, fill: any = nil) {
+        self.data.resize(new_size, fill);
+    }
+
+    pub fn get(index: int): any {
+        return self.data.get(index);
+    }
+
+    pub fn set(index: int, item: any): bool {
+        return self.data.set(index, item);
+    }
+
+    pub fn len(): int {
+        return self.data.len();
+    }
+
+    pub fn iter(): VectorIterator {
+        return self.data.iter();
+    }
+}
+
+frame RingBuffer {
+    var data: [any];
+    var capacity: int;
+    var start: int;
+    var count: int;
+
+    pub init(capacity: int = 16) {
+        self.data = [];
+        self.capacity = capacity;
+        if (self.capacity < 1) {
+            self.capacity = 1;
+        }
+        self.start = 0;
+        self.count = 0;
+    }
+
+    pub fn push(item: any) {
+        if (self.count < self.capacity) {
+            self.data = self.data + [item];
+            self.count = self.count + 1;
+        } else {
+            self.data[self.start] = item;
+            self.start = (self.start + 1) % self.capacity;
+        }
+    }
+
+    pub fn pop(): any {
+        if (self.count == 0) {
+            return nil;
+        }
+        var item = self.data[self.start];
+        self.start = (self.start + 1) % self.capacity;
+        self.count = self.count - 1;
+        return item;
+    }
+
+    pub fn len(): int {
+        return self.count;
+    }
 }

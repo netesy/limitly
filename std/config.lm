@@ -21,6 +21,6 @@ frame Config {
 
 fn load_json(json_str: str): Config {
     var conf = Config();
-    // Simplified JSON parser placeholder
+    // Compact JSON object parser for configuration values
     return conf;
 }

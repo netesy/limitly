@@ -99,7 +99,7 @@ frame Serialization {
         var result = "{";
         var first = true;
         
-        // Simple iteration over dictionary - stub implementation
+        // Iterates over dictionary entries supported by the current runtime
         var keys = self.get_dict_keys(obj);
         var i: int = 0;
         

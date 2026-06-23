@@ -241,8 +241,8 @@ fn image_fit(texture_id: ui_types.ResourceId, fit_mode: int): ui_types.Blueprint
 }
 
 // Text field builder
-fn text_field(placeholder: str): ui_types.Blueprint {
-    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+fn text_field(prompt_text: str): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(prompt_text);
     return ui_types.Blueprint(
         variant=ui_types.ElementVariant.TextField(field_data),
         constraints=[],
@@ -251,8 +251,8 @@ fn text_field(placeholder: str): ui_types.Blueprint {
 }
 
 // Text field with initial text
-fn text_field_value(placeholder: str, text: str): ui_types.Blueprint {
-    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+fn text_field_value(prompt_text: str, text: str): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(prompt_text);
     field_data.text = text;
     return ui_types.Blueprint(
         variant=ui_types.ElementVariant.TextField(field_data),
@@ -262,8 +262,8 @@ fn text_field_value(placeholder: str, text: str): ui_types.Blueprint {
 }
 
 // Text field with font size
-fn text_field_size(placeholder: str, font_size: float): ui_types.Blueprint {
-    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+fn text_field_size(prompt_text: str, font_size: float): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(prompt_text);
     field_data.font_size = font_size;
     return ui_types.Blueprint(
         variant=ui_types.ElementVariant.TextField(field_data),
@@ -273,8 +273,8 @@ fn text_field_size(placeholder: str, font_size: float): ui_types.Blueprint {
 }
 
 // Text field with background color
-fn text_field_background(placeholder: str, background: ui_types.Color): ui_types.Blueprint {
-    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+fn text_field_background(prompt_text: str, background: ui_types.Color): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(prompt_text);
     field_data.background = background;
     return ui_types.Blueprint(
         variant=ui_types.ElementVariant.TextField(field_data),
@@ -284,8 +284,8 @@ fn text_field_background(placeholder: str, background: ui_types.Color): ui_types
 }
 
 // Text field with corner radius
-fn text_field_radius(placeholder: str, corner_radius: float): ui_types.Blueprint {
-    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+fn text_field_radius(prompt_text: str, corner_radius: float): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(prompt_text);
     field_data.corner_radius = corner_radius;
     return ui_types.Blueprint(
         variant=ui_types.ElementVariant.TextField(field_data),
@@ -295,8 +295,8 @@ fn text_field_radius(placeholder: str, corner_radius: float): ui_types.Blueprint
 }
 
 // Text field with editable state
-fn text_field_editable(placeholder: str, editable: int): ui_types.Blueprint {
-    var field_data: ui_types.TextFieldData = ui_types.text_field_data(placeholder);
+fn text_field_editable(prompt_text: str, editable: int): ui_types.Blueprint {
+    var field_data: ui_types.TextFieldData = ui_types.text_field_data(prompt_text);
     field_data.editable = editable;
     return ui_types.Blueprint(
         variant=ui_types.ElementVariant.TextField(field_data),

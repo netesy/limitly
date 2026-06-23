@@ -225,3 +225,7 @@ frame Counter {
     }
 }
 ```
+
+## Standard-library syntax conformance
+
+The compiler parser is the source of truth for Limit syntax. Standard-library modules use supported statement-level control flow (`if (...) { ... } else { ... }`), `self` for frame receivers, concrete collection shorthand types such as `[int]` and `[any]`, and function types such as `fn(any): any`. Expression-level conditional forms and `this` are not part of the standard-library style.

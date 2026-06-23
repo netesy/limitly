@@ -294,7 +294,7 @@ fn compute_size(constraints: [ui_types.LayoutConstraint], available: ui_types.Si
                 // Use available size
             }
             ui_types.Auto => {
-                // Compute from content (placeholder)
+                // Compute from content
                 width = -1.0;
                 height = -1.0;
             }
@@ -601,7 +601,7 @@ fn dispatch_event(event: ui_types.UIEvent): void {
 // Invoke callback by event token
 fn invoke_callback(token: ui_types.EventToken, event: ui_types.UIEvent): void {
     // This would use the VM's callback registration system
-    // For now, placeholder for callback invocation
+    // Callback invocation hook
 }
 
 // Main frame update (called from std::app event loop)

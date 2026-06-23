@@ -20,7 +20,7 @@ frame Regex {
     }
 
     pub fn find_first_match(text: str): core.ResultStr {
-        // Simple regex engine implementation - stub for basic patterns
+        // Simple regex engine implementation for basic patterns
         if (self.pattern == "" or text == "") {
             return core.err_str("empty pattern or text");
         }
@@ -130,12 +130,20 @@ frame Regex {
     fn simple_match(text: str, start_pos: int): str? {
         // Very basic pattern matching - handles literal strings and simple wildcards
         if (self.pattern == "*") {
-            return text.substring(start_pos, start_pos + 1) if start_pos < text.length else nil;
+            if (start_pos < text.length) {
+                return text.substring(start_pos, start_pos + 1);
+            } else {
+                return nil;
+            }
         }
 
         if (self.pattern == ".*") {
             // Match any sequence
-            return text.substring(start_pos, text.length) if start_pos < text.length else nil;
+            if (start_pos < text.length) {
+                return text.substring(start_pos, text.length);
+            } else {
+                return nil;
+            }
         }
 
         // Literal string matching

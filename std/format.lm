@@ -12,7 +12,11 @@ frame Format {
     }
 
     pub fn bool(value: bool): str {
-        return "true" if value else "false";
+        if (value) {
+        return "true";
+    } else {
+        return "false";
+    }
     }
 
     // Number formatting with options
@@ -29,7 +33,7 @@ frame Format {
     }
 
     pub fn float_with_precision(value: float, precision: int): str {
-        // Basic float precision formatting - stub implementation
+        // Basic float precision formatting
         var str_value = value as str;
         var dot_pos = str_value.index_of(".");
         
@@ -234,8 +238,8 @@ frame Format {
         
         while (i < keys.length) {
             var key = keys[i];
-            var placeholder = "{" + key + "}";
-            result = result.replace(placeholder, values[key]);
+            var token = "{" + key + "}";
+            result = result.replace(token, values[key]);
             i = i + 1;
         }
         

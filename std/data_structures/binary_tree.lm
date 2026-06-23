@@ -198,7 +198,11 @@ frame BinaryTree {
         if (self.left != nil) left_height = self.left.height();
         if (self.right != nil) right_height = self.right.height();
         
-        return 1 + (left_height if left_height > right_height else right_height);
+        if (left_height > right_height) {
+            return 1 + left_height;
+        } else {
+            return 1 + right_height;
+        }
     }
 
     pub fn size(): int {
@@ -250,10 +254,18 @@ frame BinaryTree {
         
         if (value < self.value and self.left != nil) {
             var left_depth = self.left.depth(value);
-            return left_depth + 1 if left_depth != -1 else -1;
+            if (left_depth != -1) {
+                return left_depth + 1;
+            } else {
+                return -1;
+            }
         } else if (value > self.value and self.right != nil) {
             var right_depth = self.right.depth(value);
-            return right_depth + 1 if right_depth != -1 else -1;
+            if (right_depth != -1) {
+                return right_depth + 1;
+            } else {
+                return -1;
+            }
         }
         
         return -1;

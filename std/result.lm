@@ -1,11 +1,61 @@
-// Compatibility facade: core contains Option/Result frames.
-import std.core as core;
+// Standard Library Result Module
 
+frame Result {
+    var success: bool;
+    var value: any;
+    var error: any;
+
+    pub init(success: bool = false, value: any = nil, error: any = nil) {
+        self.success = success;
+        self.value = value;
+        self.error = error;
+    }
+
+    pub fn is_ok(): bool {
+        return self.success;
+    }
+
+    pub fn is_err(): bool {
+        return not self.success;
+    }
+
+    pub fn unwrap(): any {
+        return self.value;
+    }
+
+    pub fn unwrap_or(default_value: any): any {
+        if (self.success) {
+            return self.value;
+        }
+        return default_value;
+    }
+
+    pub fn unwrap_err(): any {
+        return self.error;
+    }
+
+    pub fn map(f: fn(any): any): Result {
+        if (self.success) {
+            return Ok(f(self.value));
+        }
+        return self;
+    }
+}
+
+fn Ok(value: any): Result {
+    return Result(true, value, nil);
+}
+
+fn Err(error: any): Result {
+    return Result(false, nil, error);
+}
+
+// Compatibility exports for typed core result helpers.
+import std.core as core;
 var OptionInt = core.OptionInt;
 var OptionStr = core.OptionStr;
 var ResultInt = core.ResultInt;
 var ResultStr = core.ResultStr;
-
 var some_int = core.some_int;
 var none_int = core.none_int;
 var some_str = core.some_str;

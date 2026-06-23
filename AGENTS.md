@@ -256,3 +256,11 @@ When in doubt, write concrete, specific code rather than attempting generic abst
 
 The scanner and parser now recognize the keyword unary logical operator `not` in addition to legacy `!`. Bitwise operators `&`, `|`, `^`, `<<`, and `>>` parse as expression operators with precedence lower than comparison and higher than equality, so `flags & READ == READ` is parsed as `(flags & READ) == READ`. Compound bitwise assignments `&=`, `|=`, `^=`, `<<=`, and `>>=` are accepted as assignment operators. Exponentiation remains right-associative and binds tighter than unary plus/minus: `-2 ** 2` parses as `-(2 ** 2)`, while `2 ** 3 ** 2` parses as `2 ** (3 ** 2)`.
 
+
+## 2026-06-23 Standard Library Group 2 note
+
+`std.sort`, `std.search`, `std.algorithm`, `std.iterator`, `std.range`, and `std.collections.index` expose the current Group 2 APIs documented in `docs/stdlib.md`. Keep these modules conforming to parser-supported syntax only: use `self`, block-bodied control flow, concrete collection shorthand types, and pure standard-library collection implementations.
+
+## 2026-06-23 Standard Library Expansion note
+
+Additional stdlib modules `std.string`, `std.option`, and `std.result` are available alongside the Group 2 modules. New stdlib tests should be placed under `tests/stdlib/` and must use the `.lm` extension.

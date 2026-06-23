@@ -141,3 +141,31 @@ fn zip(a: [any], b: [any]): [(any, any)] {
     }
     return res;
 }
+
+fn transform(items: [any], f: fn(any): any): [any] {
+    return map(items, f);
+}
+
+fn unzip(pairs: [(any, any)]): ([any], [any]) {
+    var left: [any] = [];
+    var right: [any] = [];
+    var i = 0;
+    while (i < len(pairs)) {
+        left = left + [pairs[i][0]];
+        right = right + [pairs[i][1]];
+        i = i + 1;
+    }
+    return (left, right);
+}
+
+fn remove_if(items: [any], p: fn(any): bool): [any] {
+    var res: [any] = [];
+    var i = 0;
+    while (i < len(items)) {
+        if (not p(items[i])) {
+            res = res + [items[i]];
+        }
+        i = i + 1;
+    }
+    return res;
+}

@@ -63,3 +63,7 @@ fn interpolation_search(items: [int], target: int): int {
     }
     return -1;
 }
+
+fn equal_range(items: [any], target: any): (int, int) {
+    return (lower_bound(items, target), upper_bound(items, target));
+}

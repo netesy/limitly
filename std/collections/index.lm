@@ -14,11 +14,14 @@ var HashMap = hash.HashMap;
 var HashSet = hash.HashSet;
 var TreeMap = tree.TreeMap;
 var TreeSet = tree.TreeSet;
+var BTree = tree.BTree;
 var Queue = queue.Queue;
 var PriorityQueue = queue.PriorityQueue;
 var Stack = queue.Stack;
 var Vector = vector.Vector;
 var Deque = vector.Deque;
+var ArrayList = vector.ArrayList;
+var RingBuffer = vector.RingBuffer;
 var BitSet = queue.BitSet;
 
 fn main(): int {

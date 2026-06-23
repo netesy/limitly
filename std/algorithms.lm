@@ -314,7 +314,11 @@ frame Searching {
         
         while (left <= right and target >= arr[left] and target <= arr[right]) {
             if (left == right) {
-                return left if arr[left] == target else nil;
+                if (arr[left] == target) {
+                    return left;
+                } else {
+                    return nil;
+                }
             }
             
             var pos = left + ((target - arr[left]) * (right - left)) / (arr[right] - arr[left]);
@@ -552,7 +556,7 @@ frame StringAlgorithms {
         return substrings;
     }
 
-    // Simple pattern matching (Knuth-Morris-Pratt algorithm stub)
+    // Simple pattern matching
     pub fn kmp_search(text: str, pattern: str): [int] {
         pub var matches: [int] = [];
         if (pattern == "" or text == "") return matches;

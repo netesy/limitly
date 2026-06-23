@@ -1,0 +1,96 @@
+import std.sort as sort;
+import std.search as search;
+import std.algorithm as algorithm;
+import std.iterator as iterator;
+import std.range as range;
+import std.collections.index as collections;
+
+fn descending_compare(a: any, b: any): int {
+    if (a > b) {
+        return -1;
+    }
+    if (a < b) {
+        return 1;
+    }
+    return 0;
+}
+
+fn is_even(value: any): bool {
+    return value % 2 == 0;
+}
+
+fn double_value(value: any): any {
+    return value * 2;
+}
+
+fn add_values(left: any, right: any): any {
+    return left + right;
+}
+
+fn main(): int {
+    var values: [any] = [5, 1, 4, 2, 3];
+    sort.insertion_sort(values);
+    sort.quicksort(values, true);
+    sort.mergesort(values, false, descending_compare);
+    sort.heapsort(values);
+    sort.stable_sort(values);
+    sort.timsort(values);
+    sort.partial_sort(values, 3);
+
+    var ints: [int] = [4, 1, 3, 2, 0];
+    sort.counting_sort(ints);
+    sort.radix_sort(ints, true);
+
+    var idx = search.linear_search(values, 3);
+    var bidx = search.binary_search(values, 3);
+    var lb = search.lower_bound(values, 3);
+    var ub = search.upper_bound(values, 3);
+    var er = search.equal_range(values, 3);
+    var ip = search.interpolation_search([1, 2, 3, 4, 5], 4);
+
+    var mapped = algorithm.map(values, double_value);
+    var filtered = algorithm.filter(values, is_even);
+    var reduced = algorithm.reduce(values, add_values, 0);
+    var folded = algorithm.fold(values, 0, add_values);
+    var zipped = algorithm.zip(values, mapped);
+    var unzipped = algorithm.unzip(zipped);
+    var boundary = algorithm.partition(values, is_even);
+    algorithm.reverse(values);
+    algorithm.rotate(values, 2);
+    var unique_values = algorithm.unique([1, 1, 2, 3, 3]);
+    var c = algorithm.count(unique_values, 2);
+    var found = algorithm.find(unique_values, 3);
+    var found_if = algorithm.find_if(unique_values, is_even);
+    var any_even = algorithm.any(unique_values, is_even);
+    var all_even = algorithm.all(unique_values, is_even);
+    var none_even = algorithm.none([1, 3, 5], is_even);
+    var removed = algorithm.remove_if(unique_values, is_even);
+    var transformed = algorithm.transform(unique_values, double_value);
+
+    var it = iterator.iter(unique_values);
+    var mapped_it = iterator.map(it, double_value);
+    var collected = iterator.collect(mapped_it);
+    var r = range.inclusive(1, 3).iter();
+    var first = r.next();
+
+    var vector = collections.Vector();
+    vector.push(1);
+    var deque = collections.Deque();
+    deque.push_back(1);
+    var queue = collections.Queue();
+    queue.enqueue(1);
+    var stack = collections.Stack();
+    stack.push(1);
+    var pq = collections.PriorityQueue();
+    pq.push(1);
+    var bitset = collections.BitSet(128);
+    bitset.set(4);
+    var tree = collections.TreeMap();
+    tree.put(1, 2);
+    var set = collections.TreeSet();
+    set.add(1);
+    var linked = collections.LinkedList();
+    linked.push_front(1);
+
+    return 0;
+}

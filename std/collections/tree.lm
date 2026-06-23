@@ -135,3 +135,11 @@ frame TreeSet {
     
     pub fn len(): int { return self.map.len(); }
 }
+
+frame BTree {
+    var map: TreeMap;
+    pub init() { self.map = TreeMap(); }
+    pub fn put(key: any, value: any) { self.map.put(key, value); }
+    pub fn get(key: any): any { return self.map.get(key); }
+    pub fn len(): int { return self.map.len(); }
+}

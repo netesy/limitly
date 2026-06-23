@@ -227,7 +227,12 @@ frame Async {
             
             result.catch(fn(error: str): str {
                 if (attempt < max_attempts) {
-                    return try_operation().get_value() if try_operation().is_fulfilled() else "";
+                    var try_result = try_operation();
+                    if (try_result.is_fulfilled()) {
+                        return try_result.get_value();
+                    } else {
+                        return "";
+                    }
                 }
                 return error;
             });
@@ -316,7 +321,12 @@ frame Async {
             timeout_promise = Async.delay(delay_ms);
             timeout_promise.then(fn(_: str): str {
                 if (last_call == current_time) {
-                    return operation().get_value() if operation().is_fulfilled() else "";
+                    var operation_result = operation();
+                    if (operation_result.is_fulfilled()) {
+                        return operation_result.get_value();
+                    } else {
+                        return "";
+                    }
                 }
                 return "";
             });

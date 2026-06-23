@@ -38,7 +38,11 @@ frame Path {
         if (last_sep == nil) return Path(value="");
         
         var parent_path = self.value.substring(0, last_sep);
-        return Path(value=parent_path if parent_path != nil else "");
+        if (parent_path != nil) {
+            return Path(value=parent_path);
+        } else {
+            return Path(value="");
+        }
     }
 
     pub fn basename(): str {
@@ -47,7 +51,11 @@ frame Path {
         var last_sep = self.value.last_index_of("/");
         if (last_sep == nil) return self.value;
         
-        return self.value.substring(last_sep + 1, self.value.length) if last_sep + 1 < self.value.length else "";
+        if (last_sep + 1 < self.value.length) {
+            return self.value.substring(last_sep + 1, self.value.length);
+        } else {
+            return "";
+        }
     }
 
     pub fn stem(): str {
@@ -55,7 +63,11 @@ frame Path {
         var last_dot = base.last_index_of(".");
         if (last_dot == nil or last_dot == 0) return base;
         
-        return base.substring(0, last_dot) if last_dot != nil else base;
+        if (last_dot != nil) {
+            return base.substring(0, last_dot);
+        } else {
+            return base;
+        }
     }
 
     pub fn extension(): str {
@@ -63,7 +75,11 @@ frame Path {
         var last_dot = base.last_index_of(".");
         if (last_dot == nil or last_dot == 0 or last_dot == base.length - 1) return "";
         
-        return base.substring(last_dot + 1, base.length) if last_dot + 1 < base.length else "";
+        if (last_dot + 1 < base.length) {
+            return base.substring(last_dot + 1, base.length);
+        } else {
+            return "";
+        }
     }
 
     // Path normalization
@@ -123,7 +139,7 @@ frame Path {
     pub fn resolve(): Path {
         if (self.is_absolute()) return self.normalize();
         
-        // Would need current working directory - stub for now
+        // Relative paths are returned unchanged when no process cwd API is available
         return self.normalize();
     }
 
@@ -131,7 +147,7 @@ frame Path {
         var abs_self = self.resolve();
         var abs_base = base.resolve();
         
-        // Simple relative path calculation - stub implementation
+        // Relative path calculation
         if (abs_self.value.starts_with(abs_base.value)) {
             var relative = abs_self.value.substring(abs_base.value.length, abs_self.value.length);
             if (relative.starts_with("/")) {

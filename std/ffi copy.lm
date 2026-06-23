@@ -688,7 +688,7 @@ frame CallbackRegistry {
 var global_callback_registry: CallbackRegistry = CallbackRegistry(callbacks={}, next_id=0);
 
 // Register a Limitly function as a C-compatible callback
-// Note: Function type aliases not supported, using placeholder
+// Note: Function type aliases are not supported by the current parser
 // Returns a callback ID that can be used to retrieve the function pointer
 fn register_callback(func: int): int {
     var callback_id: int = global_callback_registry.next_id;

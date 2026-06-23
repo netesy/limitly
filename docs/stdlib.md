@@ -116,3 +116,61 @@ The FFI module provides typed wrappers around the libffi-based native call infra
 The standard library also includes: `math`, `random`, `time`, `strings`, `iter`, `collections` (with submodules `vector`, `list`, `stack`, `queue`, `hashmap`, `set`, `tree`), `data_structures`, `parsers` (`json`, `toml`, `yaml`), `net` (`tcp`, `udp`, `dns`), `http` (`client`, `server`), `crypto` (`hash`, `hmac`, `random`), `fs`, `log`, `path`, `format`, `regex`, `bytes`, `color`, `cli`, `env`, `process`, `async`, `validation`, `statistics`, `linear_algebra`, `geometry`, `sort`, `search`, `algorithm`, `functional`, `iter`, `debug`, `url`, `serialization`, `app`, `archive`, `image`, `config`.
 
 The umbrella `std/std.lm` re-exports the most commonly used modules. Note that some modules are stubs (process, env, archive, net/dns, http/*) — they return real errors rather than silently succeeding.
+
+## Group 2 standard library modules
+
+The standard library Group 2 modules use parser-supported statement syntax only: control flow is expressed with `if (...) { ... } else { ... }`, `while (...) { ... }`, and `for (...) { ... }`; method receivers use `self`; and collection type annotations use concrete shorthand such as `[int]`, `[any]`, `{str: int}`, and tuple types.
+
+### `std.sort`
+
+`std.sort` provides in-place sorting over `[any]` plus integer counting/radix helpers:
+
+- `insertion_sort(items, descending = false, cmp = nil)`
+- `quicksort(items, descending = false, cmp = nil)`
+- `mergesort(items, descending = false, cmp = nil)`
+- `heapsort(items, descending = false, cmp = nil)`
+- `counting_sort(items: [int], descending = false)`
+- `radix_sort(items: [int], descending = false)`
+- `timsort(items, descending = false, cmp = nil)`
+- `stable_sort(items, descending = false, cmp = nil)`
+- `partial_sort(items, count, descending = false, cmp = nil)`
+
+Comparators have type `fn(any, any): int` and return a negative value, zero, or a positive value.
+
+### `std.search`
+
+`std.search` provides `linear_search`, `binary_search`, `interpolation_search`, `lower_bound`, `upper_bound`, and `equal_range`.
+
+### `std.algorithm`
+
+`std.algorithm` provides `map`, `filter`, `reduce`, `fold`, `transform`, `zip`, `unzip`, `partition`, `reverse`, `rotate`, `unique`, `count`, `find`, `find_if`, `any`, `all`, `none`, and `remove_if`.
+
+### `std.iterator`
+
+`std.iterator` provides iterator frames and adapters for `iter`, `map`, `filter`, `enumerate`, `zip`, `chain`, `flatten`, `skip`, `take`, `step_by`, `chunk`, `cycle`, `peekable`, and `collect`.
+
+### `std.range`
+
+`std.range` provides `exclusive`, `inclusive`, `stepped`, `reverse`, and `infinite` range constructors. Each range creates a `RangeIterator` through `iter()`.
+
+### `std.collections`
+
+The collections index re-exports `Vector`, `ArrayList`, `LinkedList`, `Deque`, `RingBuffer`, `Queue`, `Stack`, `PriorityQueue`, `BitSet`, `TreeMap`, `TreeSet`, and `BTree` from pure standard-library modules.
+
+## Core module additions
+
+### `std.string`
+
+`std.string` exposes free functions for common string operations: `length`, `contains`, `starts_with`, `ends_with`, `split`, `join`, `trim`, `replace`, `substring`, `lowercase`, `uppercase`, `compare`, and `format_pair`.
+
+### `std.option`
+
+`std.option` provides `Option`, `Some(value)`, and `None()`. `Option` supports `is_some`, `is_none`, `unwrap`, `unwrap_or`, `map`, and `filter`.
+
+### `std.result`
+
+`std.result` provides `Result`, `Ok(value)`, and `Err(error)`. `Result` supports `is_ok`, `is_err`, `unwrap`, `unwrap_or`, `unwrap_err`, and `map`.
+
+## Standard-library test layout
+
+New standard-library regression tests live under `tests/stdlib/` with `.lm` source files grouped by module area: `collections`, `sort`, `search`, `algorithm`, `iterator`, `range`, and `core`.

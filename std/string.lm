@@ -1,10 +1,75 @@
-// Compatibility module to keep singular naming alongside std.strings
-import std.strings as strings;
+// Standard Library String Module
 
+fn length(value: str): int {
+    return value.length;
+}
+
+fn contains(value: str, needle: str): bool {
+    return value.contains(needle);
+}
+
+fn starts_with(value: str, prefix: str): bool {
+    return value.starts_with(prefix);
+}
+
+fn ends_with(value: str, suffix: str): bool {
+    return value.ends_with(suffix);
+}
+
+fn split(value: str, delimiter: str): [str] {
+    return value.split(delimiter);
+}
+
+fn join(values: [str], delimiter: str): str {
+    if (values.length == 0) {
+        return "";
+    }
+    var result = values[0];
+    var i = 1;
+    while (i < values.length) {
+        result = result + delimiter + values[i];
+        i = i + 1;
+    }
+    return result;
+}
+
+fn trim(value: str): str {
+    return value.trim();
+}
+
+fn replace(value: str, old: str, replacement: str): str {
+    return value.replace(old, replacement);
+}
+
+fn substring(value: str, start: int, end: int): str {
+    return value.substring(start, end);
+}
+
+fn lowercase(value: str): str {
+    return value.to_lower();
+}
+
+fn uppercase(value: str): str {
+    return value.to_upper();
+}
+
+fn compare(left: str, right: str): int {
+    if (left < right) {
+        return -1;
+    }
+    if (left > right) {
+        return 1;
+    }
+    return 0;
+}
+
+fn format_pair(key: str, value: str): str {
+    return key + "=" + value;
+}
+
+// Compatibility exports matching the existing std.strings module names.
+import std.strings as strings;
 var String = strings.String;
-var split = strings.split;
 var join_strings = strings.join_strings;
-var trim = strings.trim;
 var to_upper = strings.to_upper;
 var to_lower = strings.to_lower;
-var substring = strings.substring;

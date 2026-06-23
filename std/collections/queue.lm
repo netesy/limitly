@@ -1,96 +1,149 @@
-// Standard Library Queue & PriorityQueue Collections
+// Standard Library Queue, PriorityQueue, Stack, and BitSet Collections
 import std.collections.vector as vec;
 
 frame Queue {
     var data: vec.Deque;
-    
+
     pub init() {
         self.data = vec.Deque();
     }
-    
+
     pub fn enqueue(item: any) {
         self.data.push_back(item);
     }
-    
+
     pub fn dequeue(): any {
         return self.data.pop_front();
     }
-    
+
     pub fn peek(): any {
         return self.data.peek_front();
     }
-    
-    pub fn len(): int { return self.data.len(); }
+
+    pub fn length(): int {
+        return self.data.len();
+    }
+
+    pub fn len(): int {
+        return self.length();
+    }
 }
 
 frame PriorityQueue {
     pub var heap: [any];
-    
-    pub init() {
+    var comparator: fn(any, any): int;
+
+    pub init(comparator: fn(any, any): int = nil) {
         self.heap = [];
+        self.comparator = comparator;
     }
-    
+
+    fn _compare(left: any, right: any): int {
+        if (self.comparator != nil) {
+            return self.comparator(left, right);
+        }
+        if (left < right) {
+            return -1;
+        }
+        if (left > right) {
+            return 1;
+        }
+        return 0;
+    }
+
+    pub fn insert(item: any) {
+        self.push(item);
+    }
+
     pub fn push(item: any) {
         self.heap = self.heap + [item];
         self._sift_up(len(self.heap) - 1);
     }
-    
+
+    pub fn peek(): any {
+        if (len(self.heap) == 0) {
+            return nil;
+        }
+        return self.heap[0];
+    }
+
+    pub fn remove(): any {
+        return self.pop();
+    }
+
     pub fn pop(): any {
         var n = len(self.heap);
-        if (n == 0) return nil;
-        var res = self.heap[0];
-        self.heap[0] = self.heap[n-1];
-        // Shrink heap... slow in pure limit currently
-        var next_heap = [];
-        for (var i = 0; i < n - 1; i = i + 1) next_heap = next_heap + [self.heap[i]];
+        if (n == 0) {
+            return nil;
+        }
+        var result = self.heap[0];
+        self.heap[0] = self.heap[n - 1];
+        var next_heap: [any] = [];
+        var i = 0;
+        while (i < n - 1) {
+            next_heap = next_heap + [self.heap[i]];
+            i = i + 1;
+        }
         self.heap = next_heap;
-        if (len(self.heap) > 0) self._sift_down(0);
-        return res;
+        if (len(self.heap) > 0) {
+            self._sift_down(0);
+        }
+        return result;
     }
-    
-    pub fn len(): int { return len(self.heap); }
-    
+
+    pub fn len(): int {
+        return len(self.heap);
+    }
+
     fn _sift_up(idx: int) {
         while (idx > 0) {
             var parent = (idx - 1) / 2;
-            if (self.heap[idx] < self.heap[parent]) {
+            if (self._compare(self.heap[idx], self.heap[parent]) < 0) {
                 var tmp = self.heap[idx];
                 self.heap[idx] = self.heap[parent];
                 self.heap[parent] = tmp;
                 idx = parent;
-            } else break;
+            } else {
+                return;
+            }
         }
     }
-    
+
     fn _sift_down(idx: int) {
         var n = len(self.heap);
         while (true) {
             var smallest = idx;
-            var l = 2 * idx + 1;
-            var r = 2 * idx + 2;
-            if (l < n and self.heap[l] < self.heap[smallest]) smallest = l;
-            if (r < n and self.heap[r] < self.heap[smallest]) smallest = r;
+            var left = 2 * idx + 1;
+            var right = 2 * idx + 2;
+            if (left < n and self._compare(self.heap[left], self.heap[smallest]) < 0) {
+                smallest = left;
+            }
+            if (right < n and self._compare(self.heap[right], self.heap[smallest]) < 0) {
+                smallest = right;
+            }
             if (smallest != idx) {
                 var tmp = self.heap[idx];
                 self.heap[idx] = self.heap[smallest];
                 self.heap[smallest] = tmp;
                 idx = smallest;
-            } else break;
+            } else {
+                return;
+            }
         }
     }
 }
 
 frame Stack {
     var data: vec.Vector;
-    
+
     pub init() {
         self.data = vec.Vector();
     }
-    
+
     pub fn push(item: any) {
         self.data.push(item);
     }
-    
+
     pub fn pop(): any {
         return self.data.pop();
     }
@@ -98,37 +151,80 @@ frame Stack {
     pub fn peek(): any {
         return self.data.peek();
     }
-    
-    pub fn len(): int { return self.data.len(); }
+
+    pub fn len(): int {
+        return self.data.len();
+    }
 }
 
 frame BitSet {
-    pub var bits: [int];
-    
+    pub var words: [int];
+    var size: int;
+
     pub init(size: int = 64) {
-        self.bits = [];
-        var words = (size + 63) / 64;
-        for (var i = 0; i < words; i = i + 1) self.bits = self.bits + [0];
+        self.words = [];
+        self.size = size;
+        if (self.size < 1) {
+            self.size = 1;
+        }
+        var word_count = (self.size + 63) / 64;
+        var i = 0;
+        while (i < word_count) {
+            self.words = self.words + [0];
+            i = i + 1;
+        }
     }
-    
+
+    fn _mask(bit: int): int {
+        return 1 << (bit % 64);
+    }
+
+    fn _valid(bit: int): bool {
+        return bit >= 0 and bit < self.size;
+    }
+
     pub fn set(bit: int) {
-        var word = bit / 64;
-        var pos = bit % 64;
-        if (word < len(self.bits)) {
-            // Need bitwise OR
-            // self.bits[word] = self.bits[word] | (1 << pos);
-            // Placeholder:
-            self.bits[word] = 1; 
+        if (self._valid(bit)) {
+            var word = bit / 64;
+            self.words[word] = self.words[word] | self._mask(bit);
         }
     }
-    
-    pub fn get(bit: int): bool {
-        var word = bit / 64;
-        var pos = bit % 64;
-        if (word < len(self.bits)) {
-            // return (self.bits[word] & (1 << pos)) != 0;
-            return self.bits[word] != 0;
+
+    pub fn unset(bit: int) {
+        if (self.contains(bit)) {
+            var word = bit / 64;
+            self.words[word] = self.words[word] ^ self._mask(bit);
         }
-        return false;
+    }
+
+    pub fn toggle(bit: int) {
+        if (self._valid(bit)) {
+            var word = bit / 64;
+            self.words[word] = self.words[word] ^ self._mask(bit);
+        }
+    }
+
+    pub fn contains(bit: int): bool {
+        if (not self._valid(bit)) {
+            return false;
+        }
+        var word = bit / 64;
+        return (self.words[word] & self._mask(bit)) != 0;
+    }
+
+    pub fn get(bit: int): bool {
+        return self.contains(bit);
+    }
+
+    pub fn count(): int {
+        var total = 0;
+        var bit = 0;
+        while (bit < self.size) {
+            if (self.contains(bit)) {
+                total = total + 1;
+            }
+            bit = bit + 1;
+        }
+        return total;
     }
 }
