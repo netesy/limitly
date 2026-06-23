@@ -35,7 +35,7 @@ fn ui_shutdown(): void {
     }
     
     // RAII cleanup: Release all native resources from elements
-    var element_ids: [ui_types.ElementId] = [];
+    pub var element_ids: [ui_types.ElementId] = [];
     var iter: int = 0;
     
     // Collect all element IDs
@@ -109,16 +109,16 @@ fn cleanup_element_resources(element_id: ui_types.ElementId): void {
 
 // Unregister element from state dependencies (RAII cleanup)
 fn unregister_element_dependencies(element_id: ui_types.ElementId): void {
-    var new_dependencies: [ui_types.StateDependency] = [];
+    pub var new_dependencies: [ui_types.StateDependency] = [];
     var i: int = 0;
     
     while (i < len(global_ui_context.dependencies)) {
         var dep: ui_types.StateDependency = global_ui_context.dependencies[i];
         if (dep.element_id == element_id) {
-            // Remove this dependency
+            // Remove self dependency
         } else {
             // Remove element_id from dependents list
-            var new_dependents: [ui_types.ElementId] = [];
+            pub var new_dependents: [ui_types.ElementId] = [];
             var j: int = 0;
             while (j < len(dep.dependents)) {
                 if (dep.dependents[j] != element_id) {
@@ -153,7 +153,7 @@ fn blueprint_to_tree(bp: ui_types.Blueprint, parent_id: ui_types.ElementId): ui_
     global_ui_context.elements[element.id] = element;
     
     // Process children recursively
-    var child_ids: [ui_types.ElementId] = [];
+    pub var child_ids: [ui_types.ElementId] = [];
     var j: int = 0;
     while (j < len(bp.children)) {
         var child_id: ui_types.ElementId = blueprint_to_tree(bp.children[j], element.id);
@@ -165,7 +165,7 @@ fn blueprint_to_tree(bp: ui_types.Blueprint, parent_id: ui_types.ElementId): ui_
     element.children = child_ids;
     global_ui_context.elements[element.id] = element;
     
-    // If this is a root element, set it as root
+    // If self is a root element, set it as root
     if (parent_id == ui_types.INVALID_ELEMENT_ID) {
         global_ui_context.root_element = element.id;
     }
@@ -184,7 +184,7 @@ fn layout_pass(width: float, height: float): ui_types.LayoutResult {
     }
     
     var element_metrics: {ui_types.ElementId: ui_types.LayoutMetrics} = {};
-    var dirty_regions: [ui_types.Rect] = [];
+    pub var dirty_regions: [ui_types.Rect] = [];
     
     // Compute layout starting from root
     var root_metrics: ui_types.LayoutMetrics = compute_element_layout(
@@ -313,7 +313,7 @@ fn render_pass(): ui_types.RenderResult {
         return ui_types.RenderResult(commands=[], resource_updates=[]);
     }
     
-    var resource_updates: [gfx_types.ResourceId] = [];
+    pub var resource_updates: [gfx_types.ResourceId] = [];
     
     // Render element tree
     render_element(global_ui_context.root_element, ui_types.POINT_ZERO, resource_updates);

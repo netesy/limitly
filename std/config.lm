@@ -2,24 +2,24 @@
 import std.strings as str;
 
 frame Config {
-    var data: {string: any};
+    var data: {str: any};
     
     pub init() {
-        this.data = {};
+        self.data = {};
     }
     
-    pub fn get(key: string, default: any = nil): any {
-        var val = this.data[key];
+    pub fn get(key: str, default: any = nil): any {
+        var val = self.data[key];
         if (val == nil) return default;
         return val;
     }
     
-    pub fn set(key: string, val: any) {
-        this.data[key] = val;
+    pub fn set(key: str, val: any) {
+        self.data[key] = val;
     }
 }
 
-fn load_json(json_str: string): Config {
+fn load_json(json_str: str): Config {
     var conf = Config();
     // Simplified JSON parser placeholder
     return conf;

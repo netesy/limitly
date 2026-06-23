@@ -66,3 +66,25 @@ fn print(msg: any): nil {
     resource_call(stdout, 3, msg.toString());
     resource_destroy(stdout);
 }
+
+// Filesystem helpers — wrap native file_exists/file_delete builtins.
+// create_directory / list_directory have no native backing yet, so they
+// return a real error instead of silently succeeding.
+
+fn exists(path: str): bool {
+    return file_exists(path);
+}
+
+fn delete(path: str): bool {
+    return file_delete(path);
+}
+
+fn create_directory(path: str): nil?IOError {
+    // No native mkdir builtin registered yet.
+    return UnknownError { message: "create_directory not supported on current runtime" };
+}
+
+fn list_directory(path: str): [str]?IOError {
+    // No native readdir builtin registered yet.
+    return UnknownError { message: "list_directory not supported on current runtime" };
+}

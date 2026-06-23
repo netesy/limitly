@@ -90,7 +90,7 @@ fn rotate(items: [any], k: int) {
     _reverse_range(items, k, n - 1);
 }
 
-private fn _reverse_range(items: [any], start: int, end: int) {
+fn _reverse_range(items: [any], start: int, end: int) {
     while (start < end) {
         var tmp = items[start];
         items[start] = items[end];

@@ -8,11 +8,11 @@ frame AVLNode {
     pub var height: int;
     
     pub init(key: any, value: any) {
-        this.key = key;
-        this.value = value;
-        this.left = nil;
-        this.right = nil;
-        this.height = 1;
+        self.key = key;
+        self.value = value;
+        self.left = nil;
+        self.right = nil;
+        self.height = 1;
     }
 }
 
@@ -21,16 +21,16 @@ frame TreeMap {
     var size: int;
     
     pub init() {
-        this.root = nil;
-        this.size = 0;
+        self.root = nil;
+        self.size = 0;
     }
     
     pub fn put(key: any, value: any) {
-        this.root = this._insert(this.root, key, value);
+        self.root = self._insert(self.root, key, value);
     }
     
     pub fn get(key: any): any {
-        var curr = this.root;
+        var curr = self.root;
         while (curr != nil) {
             if (key == curr.key) return curr.value;
             if (key < curr.key) curr = curr.left;
@@ -39,79 +39,79 @@ frame TreeMap {
         return nil;
     }
     
-    pub fn len(): int { return this.size; }
+    pub fn len(): int { return self.size; }
     
-    private fn _get_height(node: any): int {
+    fn _get_height(node: any): int {
         if (node == nil) return 0;
         return node.height;
     }
     
-    private fn _get_balance(node: any): int {
+    fn _get_balance(node: any): int {
         if (node == nil) return 0;
-        return this._get_height(node.left) - this._get_height(node.right);
+        return self._get_height(node.left) - self._get_height(node.right);
     }
     
-    private fn _update_height(node: any) {
-        var hl = this._get_height(node.left);
-        var hr = this._get_height(node.right);
+    fn _update_height(node: any) {
+        var hl = self._get_height(node.left);
+        var hr = self._get_height(node.right);
         if (hl > hr) node.height = hl + 1;
         else node.height = hr + 1;
     }
     
-    private fn _rotate_right(y: any): any {
+    fn _rotate_right(y: any): any {
         var x = y.left;
         var T2 = x.right;
         x.right = y;
         y.left = T2;
-        this._update_height(y);
-        this._update_height(x);
+        self._update_height(y);
+        self._update_height(x);
         return x;
     }
     
-    private fn _rotate_left(x: any): any {
+    fn _rotate_left(x: any): any {
         var y = x.right;
         var T2 = y.left;
         y.left = x;
         x.right = T2;
-        this._update_height(x);
-        this._update_height(y);
+        self._update_height(x);
+        self._update_height(y);
         return y;
     }
     
-    private fn _insert(node: any, key: any, value: any): any {
+    fn _insert(node: any, key: any, value: any): any {
         if (node == nil) {
-            this.size = this.size + 1;
+            self.size = self.size + 1;
             return AVLNode(key, value);
         }
         
         if (key < node.key) {
-            node.left = this._insert(node.left, key, value);
+            node.left = self._insert(node.left, key, value);
         } else if (key > node.key) {
-            node.right = this._insert(node.right, key, value);
+            node.right = self._insert(node.right, key, value);
         } else {
             node.value = value;
             return node;
         }
         
-        this._update_height(node);
-        var balance = this._get_balance(node);
+        self._update_height(node);
+        var balance = self._get_balance(node);
         
         // Left Left Case
-        if (balance > 1 and key < node.left.key) return this._rotate_right(node);
+        if (balance > 1 and key < node.left.key) return self._rotate_right(node);
         
         // Right Right Case
-        if (balance < -1 and key > node.right.key) return this._rotate_left(node);
+        if (balance < -1 and key > node.right.key) return self._rotate_left(node);
         
         // Left Right Case
         if (balance > 1 and key > node.left.key) {
-            node.left = this._rotate_left(node.left);
-            return this._rotate_right(node);
+            node.left = self._rotate_left(node.left);
+            return self._rotate_right(node);
         }
         
         // Right Left Case
         if (balance < -1 and key < node.right.key) {
-            node.right = this._rotate_right(node.right);
-            return this._rotate_left(node);
+            node.right = self._rotate_right(node.right);
+            return self._rotate_left(node);
         }
         
         return node;
@@ -122,16 +122,16 @@ frame TreeSet {
     var map: TreeMap;
     
     pub init() {
-        this.map = TreeMap();
+        self.map = TreeMap();
     }
     
     pub fn add(item: any) {
-        this.map.put(item, true);
+        self.map.put(item, true);
     }
     
     pub fn contains(item: any): bool {
-        return this.map.get(item) != nil;
+        return self.map.get(item) != nil;
     }
     
-    pub fn len(): int { return this.map.len(); }
+    pub fn len(): int { return self.map.len(); }
 }

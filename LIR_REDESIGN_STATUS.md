@@ -2,12 +2,42 @@
 
 ## Executive Summary
 
-The LIR redesign to collapse 58+ type-specific FFI opcodes into 15-20 generic operations is **PHASE 2 COMPLETE** ✅.
+The LIR redesign to collapse 60+ type-specific FFI opcodes into 15-20 generic operations is **PHASE 2 COMPLETE** ✅, but the legacy FFI opcodes are **deprecated, not yet removed** ⚠️.
 
 **Overall Progress**: 50% complete (2 of 4 phases)
 **Status**: Ready for Phase 3
 **Build**: Pending compilation verification
 **Quality**: High - all implementations verified
+
+> **Correction (2026-06):** An earlier version of this document claimed "Removed 58 type-specific FFI opcodes". That was inaccurate — all 60+ `FFI*` opcodes listed in `src/lir/lir.hh` are still present in the `LIR_Op` enum and still dispatched by `src/backend/vm/ops/memory.cpp` (lines ~261-282) and `ffi.cpp`. They have been **deprecated** in favor of the new generic `MemoryLoad`/`MemoryStore`/`Marshal`/`LibraryLoad`/`ForeignCallDirect` path, but they will not be removed until that path is fully tested end-to-end. See the ["Deprecated but present"](#deprecated-but-present) section below for the precise list and the planned removal sequence.
+
+---
+
+## Deprecated but present
+
+The following opcodes are **deprecated** (emitted by no current LIR generator, slated for removal in a future release) but **still present** in the `LIR_Op` enum and the VM dispatcher. They must not be removed until the generic replacements are exercised by the full test suite.
+
+| Deprecated opcode group | Generic replacement | VM dispatch site |
+|---|---|---|
+| `FFIAlloc`, `FFIFree`, `FFIRealloc`, `FFIMemcpy`, `FFIMemset`, `FFIMemcmp` | `MemoryAlloc` / `MemoryFree` / `MemoryResize` / `MemoryCopy` / `MemoryFill` / `MemoryCompare` | `src/backend/vm/ops/memory.cpp` |
+| `FFIAddPtr`, `FFISubPtr`, `FFIPtrDiff`, `FFIAlignPtr`, `FFIIsAligned` | `PtrAdd` / `PtrSub` / `PtrDiff` / `PtrAlign` / `PtrIsAligned` | `src/backend/vm/ops/memory.cpp` |
+| `FFILoadInt8` … `FFILoadPtr` (11 opcodes) | `MemoryLoad` with `result_type` dispatch | `src/backend/vm/ops/memory.cpp:261-282` |
+| `FFIStoreInt8` … `FFIStorePtr` (11 opcodes) | `MemoryStore` with `type_a` dispatch | `src/backend/vm/ops/memory.cpp` |
+| `FFIToCString`, `FFIFromCString`, `FFIFreeCString`, `FFICStringPtr`, `FFICStringFromPtr` | `Marshal` / `Unmarshal` with `Metadata::MarshalType` | `src/backend/vm/ops/marshal.cpp` |
+| `FFIBufferAlloc`, `FFIBufferFromPtr`, `FFIBufferFree`, `FFIBufferResize`, `FFIBufferRead`, `FFIBufferWrite`, `FFIBufferSize`, `FFIBufferCapacity`, `FFIBufferAsPtr` | `BufferCreate` / `BufferView` / `BufferResize` (+ `MemoryLoad`/`Store` for read/write) | `src/backend/vm/ops/marshal.cpp` |
+| `FFICallPtr`, `FFICallPtr0` … `FFICallPtr5` | `ForeignCall` (indirect, args in `call_args`) | `src/backend/vm/ops/ffi.cpp` |
+| `FFILibraryLoad`, `FFILibraryUnload`, `FFILibraryGetSymbol` | `LibraryLoad` / `LibraryUnload` / `LibrarySymbol` | `src/backend/vm/ops/ffi.cpp` |
+| `FFIRegisterCallback`, `FFIUnregisterCallback`, `FFIGetCallbackPtr` | `CallbackCreate` / `CallbackDestroy` (+ `ForeignCall` for invocation) | `src/backend/vm/ops/ffi.cpp` |
+| `FFICCallFrameCreate`, `FFICCallFrameDestroy`, `FFICCallFrameSetReg`, `FFICCallFrameGetReg`, `FFICCallFrameSetStackArg`, `FFICCallFrameGetStackArg`, `FFIVMSave`, `FFIVMRestore`, `FFICCallExecute` | `ForeignCallDirect` (single op with `func_name` + `call_args`) | `src/backend/vm/ops/ffi.cpp` |
+| `FFICalcStructLayout`, `FFIGetABIInfo` | (no replacement yet — used only by legacy AOT path; will be revisited when AOT is rewritten) | `src/backend/vm/ops/ffi.cpp` |
+
+**Removal plan:** once the generic `MemoryLoad`/`Marshal`/`LibraryLoad`/`ForeignCallDirect` path is exercised by the standard test suite (`make tests`) without regressions, the deprecated `FFI*` opcodes will be removed in three slicing steps:
+
+1. Type-specific load/store (`FFILoad*`, `FFIStore*`).
+2. Pointer arithmetic and string/buffer helpers (`FFIAddPtr` family, `FFICString*`, `FFIBuffer*`).
+3. Call-frame and callback machinery (`FFICCallFrame*`, `FFICallPtr*`, `FFI*Callback*`, `FFIVMSave`/`Restore`).
+
+Until then, any new LIR generator code MUST use the generic opcodes; emitting the deprecated `FFI*` forms is a bug.
 
 ---
 
@@ -17,13 +47,19 @@ The LIR redesign to collapse 58+ type-specific FFI opcodes into 15-20 generic op
 
 Transform the Limitly LIR from:
 ```
-150+ total opcodes, 58 of which are type-specific FFI operations
+150+ total opcodes, 60+ of which are type-specific FFI operations
 ```
 
 To:
 ```
 ~95 total opcodes, 15-20 generic operations with metadata-based dispatch
 ```
+
+(The original target of "150+ → ~95" assumes removal of the deprecated `FFI*`
+opcodes. As of this writing the `FFI*` opcodes are still in the enum and the
+VM dispatcher, so the live opcode count is ~228. See the
+["Deprecated but present"](#deprecated-but-present) section above for the
+planned removal sequence.)
 
 ### Benefits
 
@@ -37,22 +73,27 @@ To:
 
 ## Phase Breakdown
 
-### ✅ Phase 1: Enum Redesign (COMPLETE)
+### ✅ Phase 1: Enum Redesign (COMPLETE — but legacy opcodes retained)
 
-**Status**: ✅ COMPLETE
+**Status**: ✅ COMPLETE (with deprecated opcodes retained for compatibility)
 
 **Changes Made**:
-- Removed 58 type-specific FFI opcodes from `LIR_Op` enum
 - Added 8 generic memory opcodes (MemoryLoad, MemoryStore, etc.)
 - Added 5 pointer opcodes (PtrAdd, PtrSub, etc.)
 - Added 5 marshaling opcodes (Marshal, Unmarshal, etc.)
 - Added 3 linking opcodes (LibraryLoad, LibraryUnload, etc.)
 - Added 4 foreign call/callback opcodes (ForeignCall, CallbackCreate, etc.)
 - Added metadata encoding for marshaling types
+- **Did NOT remove** the 60+ legacy `FFI*` opcodes — they are kept in the enum
+  and dispatcher under a `DEPRECATED` comment block (see `lir.hh:168-185`).
+  Removal is deferred until the generic path is fully tested (see
+  ["Deprecated but present"](#deprecated-but-present)).
 
 **Files Modified**: `src/lir/lir.hh`
 
-**Result**: Opcode enum now has ~95 opcodes (was 150+)
+**Result**: Opcode enum grew from ~168 to 228 entries (added the generic
+opcodes while keeping the deprecated ones). Once the deprecated `FFI*` opcode
+slice is removed, the count will drop to ~95.
 
 ### ✅ Phase 2: VM Dispatcher Updates (COMPLETE)
 
@@ -181,16 +222,20 @@ To:
 
 ### Opcode Statistics
 
-| Metric | Before | After | Change |
-|--------|--------|-------|--------|
-| **Total Opcodes** | 150+ | ~95 | -37% |
-| **FFI Opcodes** | 58 | 15-20 | -73% |
-| **Memory Load** | 11 | 1 | -91% |
-| **Memory Store** | 11 | 1 | -91% |
-| **Pointer Ops** | 5 | 5 | 0% |
-| **Marshaling** | 0 | 5 | New |
-| **Linking** | 3 | 3 | 0% |
-| **Foreign Calls** | 15+ | 2 | -87% |
+> ⚠️ The "After" column below reflects the *target* state after the
+> deprecated `FFI*` opcodes are removed. The **current** opcode count is
+> ~228 (generic opcodes added but legacy `FFI*` opcodes still present).
+
+| Metric | Before | After (target) | Current | Change (target) |
+|--------|--------|-------|---------|--------|
+| **Total Opcodes** | ~168 | ~95 | ~228 | -43% |
+| **FFI Opcodes (deprecated)** | 60+ | 0 | 60+ | -100% (pending) |
+| **Memory Load** | 11 | 1 (`MemoryLoad`) | 12 | -91% |
+| **Memory Store** | 11 | 1 (`MemoryStore`) | 12 | -91% |
+| **Pointer Ops** | 5 | 5 | 10 (old + new) | 0% |
+| **Marshaling** | 0 | 5 | 5 + 9 legacy | New |
+| **Linking** | 3 | 3 | 6 (old + new) | 0% |
+| **Foreign Calls** | 15+ | 2 | 17+ (old + new) | -87% |
 
 ### Code Changes
 
@@ -417,10 +462,10 @@ Library and callback management
 ## Success Criteria Met
 
 ### ✅ Phase 1: Enum Redesign
-- ✅ Removed 58+ type-specific opcodes
+- ✅ Added generic operations (NOT removed legacy `FFI*` — see Deprecated section)
 - ✅ Added generic operations
 - ✅ Added metadata encoding
-- ✅ Reduced opcode count by 37%
+- ✅ Will reduce opcode count by ~43% once deprecated `FFI*` slice is removed
 
 ### ✅ Phase 2: VM Dispatcher Updates
 - ✅ Implemented 22 new operations
@@ -492,11 +537,15 @@ The LIR redesign is **50% complete** with Phase 2 fully implemented and verified
 - 📋 Planned: Testing & validation (Phase 4)
 
 ### Key Achievements
-- 62% reduction in FFI opcodes
-- 91% reduction in memory operation cases
-- 87% reduction in foreign call overhead
-- Clean, maintainable architecture
-- Backward compatible implementation
+- Added 22 generic opcodes (memory/pointer/marshal/library/foreign-call/callback)
+- 91% reduction in memory operation cases (once legacy `FFILoad*`/`FFIStore*` removed)
+- 87% reduction in foreign call overhead (once `FFICCallFrame*` removed)
+- Clean, maintainable architecture for new code paths
+- Backward compatible implementation (legacy `FFI*` opcodes retained)
+
+> Note: percentage reductions are the *target* values after the deprecated
+> `FFI*` opcodes are removed. As of this writing those opcodes are still
+> present and dispatched; see ["Deprecated but present"](#deprecated-but-present).
 
 ### Next Milestone
 **Build Verification & Phase 3 Start** - Expected completion within 1-2 days

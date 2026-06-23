@@ -92,6 +92,8 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("resource_destroy", {ts.INT64_TYPE}, ts.NIL_TYPE);
 
     // File I/O intrinsics
+    checker.register_builtin_function("file_exists", {ts.STRING_TYPE}, ts.BOOL_TYPE);
+    checker.register_builtin_function("file_delete", {ts.STRING_TYPE}, ts.BOOL_TYPE);
 }
 
 } // namespace TypeCheckerFactory

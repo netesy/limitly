@@ -17,6 +17,9 @@ private:
     static bool verify_instruction(const LIR_Inst& inst, const LIR_Function& func, std::vector<std::string>& errors);
     static bool verify_control_flow(const LIR_Function& func, std::vector<std::string>& errors);
     static bool detect_infinite_loops(const LIR_Function& func, std::vector<std::string>& errors);
+    // H27: conservative, linear / flow-insensitive checks.
+    static bool verify_use_before_def(const LIR_Function& func, std::vector<std::string>& errors);
+    static bool verify_terminators(const LIR_Function& func, std::vector<std::string>& errors);
 };
 
 } // namespace LIR

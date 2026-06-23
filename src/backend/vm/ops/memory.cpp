@@ -132,23 +132,47 @@ void RegisterVM::execute_memory_store(const LIR::LIR_Inst* pc) {
 }
 
 void RegisterVM::execute_memory_copy(const LIR::LIR_Inst* pc) {
-    void* dest = value_to_ptr(registers[pc->dst]);
-    void* src = value_to_ptr(registers[pc->a]);
-    size_t n = static_cast<size_t>(to_int(registers[pc->b]));
+    // Arg layout (set by the LIR generator for 3-arg intrinsics):
+    //   pc->a            = destination pointer
+    //   pc->b            = source pointer
+    //   pc->call_args[0] = byte count
+    // The previous implementation read dest from pc->dst (the result
+    // register), which silently turned every copy into a no-op when dst
+    // was unused. Read dest from pc->a instead.
+    void* dest = value_to_ptr(registers[pc->a]);
+    void* src = (pc->b != UINT32_MAX) ? value_to_ptr(registers[pc->b]) : nullptr;
+    size_t n = (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX)
+                   ? static_cast<size_t>(to_int(registers[pc->call_args[0]]))
+                   : 0;
     if (dest && src && n > 0) std::memcpy(dest, src, n);
 }
 
 void RegisterVM::execute_memory_fill(const LIR::LIR_Inst* pc) {
-    void* dest = value_to_ptr(registers[pc->dst]);
-    int value = static_cast<int>(to_int(registers[pc->a]));
-    size_t n = static_cast<size_t>(to_int(registers[pc->b]));
+    // Arg layout:
+    //   pc->a            = destination pointer
+    //   pc->b            = fill byte (int)
+    //   pc->call_args[0] = byte count
+    void* dest = value_to_ptr(registers[pc->a]);
+    int value = (pc->b != UINT32_MAX) ? static_cast<int>(to_int(registers[pc->b])) : 0;
+    size_t n = (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX)
+                   ? static_cast<size_t>(to_int(registers[pc->call_args[0]]))
+                   : 0;
     if (dest && n > 0) std::memset(dest, value, n);
 }
 
 void RegisterVM::execute_memory_compare(const LIR::LIR_Inst* pc) {
+    // Arg layout:
+    //   pc->a            = lhs pointer
+    //   pc->b            = rhs pointer
+    //   pc->call_args[0] = byte count
+    //   pc->dst          = result register
+    // The previous implementation read size from pc->imm (always a tiny
+    // constant); read from the third argument register instead.
     void* s1 = value_to_ptr(registers[pc->a]);
-    void* s2 = value_to_ptr(registers[pc->b]);
-    size_t n = static_cast<size_t>(pc->imm);
+    void* s2 = (pc->b != UINT32_MAX) ? value_to_ptr(registers[pc->b]) : nullptr;
+    size_t n = (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX)
+                   ? static_cast<size_t>(to_int(registers[pc->call_args[0]]))
+                   : 0;
     if (s1 && s2 && n > 0) {
         int result = std::memcmp(s1, s2, n);
         registers[pc->dst] = BOX_INT(static_cast<int64_t>(result));

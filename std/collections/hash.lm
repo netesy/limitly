@@ -5,37 +5,37 @@ frame HashMap {
     var data: {any: any};
     
     pub init() {
-        this.data = {};
+        self.data = {};
     }
     
     pub fn put(key: any, value: any) {
-        this.data[key] = value;
+        self.data[key] = value;
     }
     
     pub fn get(key: any): any {
-        return this.data[key];
+        return self.data[key];
     }
     
     pub fn has(key: any): bool {
         // Assuming 'in' operator or a method. Based on VM ops, DictHas exists.
         // If 'in' is not supported, we might need a builtin wrapper.
         // For now, assume data[key] != nil as a proxy if we don't have 'has'
-        return this.data[key] != nil;
+        return self.data[key] != nil;
     }
     
     pub fn remove(key: any) {
         // Dictionary removal might need a specific op if data[key] = nil doesn't delete
-        this.data[key] = nil;
+        self.data[key] = nil;
     }
     
     pub fn len(): int {
-        return len(this.data);
+        return len(self.data);
     }
     
     pub fn keys(): [any] {
         var res = [];
         // This is slow in pure Limit without proper iterators
-        // We'll improve this when std.iter is ready.
+        // We'll improve self when std.iter is ready.
         return res;
     }
 }
@@ -44,22 +44,22 @@ frame HashSet {
     var map: HashMap;
     
     pub init() {
-        this.map = HashMap();
+        self.map = HashMap();
     }
     
     pub fn add(item: any) {
-        this.map.put(item, true);
+        self.map.put(item, true);
     }
     
     pub fn contains(item: any): bool {
-        return this.map.has(item);
+        return self.map.has(item);
     }
     
     pub fn remove(item: any) {
-        this.map.remove(item);
+        self.map.remove(item);
     }
     
     pub fn len(): int {
-        return this.map.len();
+        return self.map.len();
     }
 }

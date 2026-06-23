@@ -3,14 +3,14 @@
 import std.core as core;
 
 frame Set {
-    var elements: [int];
+    pub var elements: [int];
 
     pub fn init(): Set {
         return Set(elements=[]);
     }
 
     pub fn from_array(arr: [int]): Set {
-        var elements: [int] = [];
+        pub var elements: [int] = [];
         var seen: {int: bool} = {};
         var i: int = 0;
         var j: int = 0;
@@ -32,7 +32,7 @@ frame Set {
     pub fn add(value: int): Set {
         if (self.contains(value)) return self;
         
-        var new_elements: [int] = [];
+        pub var new_elements: [int] = [];
         var i: int = 0;
         
         while (i < self.elements.length) {
@@ -48,7 +48,7 @@ frame Set {
         var index = self.find_index(value);
         if (index == nil) return self;
         
-        var new_elements: [int] = [];
+        pub var new_elements: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -93,7 +93,7 @@ frame Set {
     }
 
     pub fn intersection(other: Set): Set {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -109,7 +109,7 @@ frame Set {
     }
 
     pub fn difference(other: Set): Set {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -149,7 +149,7 @@ frame Set {
 
     // Functional operations
     pub fn map(f: fn(int): int): Set {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var seen: {int: bool} = {};
         var i: int = 0;
         var j: int = 0;
@@ -168,7 +168,7 @@ frame Set {
     }
 
     pub fn filter(predicate: fn(int): bool): Set {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -232,7 +232,7 @@ frame Set {
     }
 
     // Utility methods
-    private fn find_index(value: int): int? {
+    fn find_index(value: int): int? {
         var i: int = 0;
         while (i < self.elements.length) {
             if (self.elements[i] == value) return i;

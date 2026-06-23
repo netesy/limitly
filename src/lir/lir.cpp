@@ -232,156 +232,36 @@ std::string LIR_Function::to_string() const {
 }
 
 // Utility function implementations
+//
+// Uses the LIR_OP_LIST X-macro so that every opcode in the enum has a
+// matching stringifier.  This eliminates the "unknown" fall-through that the
+// old hand-written switch silently hit for ~150 of 228 opcodes.  Whenever a
+// new opcode is added to LIR_Op, it MUST also be added to LIR_OP_LIST in
+// lir.hh; the static_assert below catches divergence at compile time.
+namespace {
+// Counts entries in LIR_OP_LIST (each X(name) bumps the counter by 1).
+constexpr size_t lir_op_list_size() {
+    size_t n = 0;
+#define X(name) ++n;
+    LIR_OP_LIST(X)
+#undef X
+    return n;
+}
+// Last entry of LIR_Op (used to derive the enum's cardinality, since no
+// explicit values are assigned and entries are sequential).  Keep this name
+// in sync with the enum.
+constexpr size_t kLirOpCount_Enum = static_cast<size_t>(LIR_Op::FFIGetABIInfo) + 1;
+static_assert(lir_op_list_size() == kLirOpCount_Enum,
+              "LIR_OP_LIST is out of sync with LIR_Op enum — update both in lir.hh");
+} // namespace
+
 std::string lir_op_to_string(LIR_Op op) {
     switch (op) {
-        case LIR_Op::Mov: return "mov";
-        case LIR_Op::LoadConst: return "load_const";
-        case LIR_Op::Add: return "add";
-        case LIR_Op::Sub: return "sub";
-        case LIR_Op::Mul: return "mul";
-        case LIR_Op::Div: return "div";
-        case LIR_Op::Mod: return "mod";
-        case LIR_Op::Neg: return "neg";
-        case LIR_Op::And: return "and";
-        case LIR_Op::Or: return "or";
-        case LIR_Op::Xor: return "xor";
-        case LIR_Op::Shl: return "shl";
-        case LIR_Op::Shr: return "shr";
-        case LIR_Op::CmpEQ: return "cmpeq";
-        case LIR_Op::CmpNEQ: return "cmpneq";
-        case LIR_Op::CmpLT: return "cmplt";
-        case LIR_Op::CmpLE: return "cmple";
-        case LIR_Op::CmpGT: return "cmpgt";
-        case LIR_Op::CmpGE: return "cmpge";
-        case LIR_Op::Jump: return "jump";
-        case LIR_Op::JumpIfFalse: return "jmp_if_false";
-        case LIR_Op::JumpIf: return "jmp_if";
-        case LIR_Op::Label: return "label";
-        case LIR_Op::Call: return "call";
-        case LIR_Op::CallVoid: return "call_void";
-        case LIR_Op::CallIndirect: return "call_indirect";
-        case LIR_Op::CallBuiltin: return "call_builtin";
-        case LIR_Op::CallVariadic: return "call_variadic";
-        case LIR_Op::FuncDef: return "fn";
-        case LIR_Op::Param: return "param";
-        case LIR_Op::Ret: return "ret";
-        case LIR_Op::Return: return "return";
-        case LIR_Op::VaStart: return "vastart";
-        case LIR_Op::VaArg: return "vaarg";
-        case LIR_Op::VaEnd: return "vaend";
-        case LIR_Op::Copy: return "copy";
-        case LIR_Op::PrintInt: return "print_int";
-        case LIR_Op::PrintUint: return "print_uint";
-        case LIR_Op::PrintFloat: return "print_float";
-        case LIR_Op::PrintBool: return "print_bool";
-        case LIR_Op::PrintString: return "print_string";
-        case LIR_Op::Nop: return "nop";
-        case LIR_Op::Load: return "load";
-        case LIR_Op::Store: return "store";
-        case LIR_Op::Cast: return "cast";
-        case LIR_Op::ToString: return "to_string";
-        case LIR_Op::STR_CONCAT: return "str_concat";
-        case LIR_Op::STR_FORMAT: return "str_format";
-        case LIR_Op::DecAdd: return "dec_add";
-        case LIR_Op::DecSub: return "dec_sub";
-        case LIR_Op::DecMul: return "dec_mul";
-        case LIR_Op::DecDiv: return "dec_div";
-        case LIR_Op::DecMod: return "dec_mod";
-        case LIR_Op::DecNeg: return "dec_neg";
-        case LIR_Op::DecRescale: return "dec_rescale";
-        case LIR_Op::ConstructError: return "error";
-        case LIR_Op::ConstructOk: return "ok";
-        case LIR_Op::IsError: return "is_error";
-        case LIR_Op::Unwrap: return "unwrap";
-        case LIR_Op::UnwrapOr: return "unwrap_or";
-        case LIR_Op::MakeEnum: return "make_enum";
-        case LIR_Op::GetTag: return "get_tag";
-        case LIR_Op::GetPayload: return "get_payload";
-
-        //  === ATOMIC OPERATIONS ===
-        case LIR_Op::AtomicLoad: return "atomic_load";
-        case LIR_Op::AtomicStore: return "atomic_store";
-        case LIR_Op::AtomicFetchAdd: return "atomic_fetch_add";
-        case LIR_Op::Await: return "await";
-        case LIR_Op::AsyncCall: return "async_call";
-
-        //  === CHANNEL OPERATIONS ===
-        case LIR_Op::ChannelOffer: return "channel_offer";
-        case LIR_Op::ChannelPush: return "channel_push";
-        case LIR_Op::ChannelPop: return "channel_pop";
-        case LIR_Op::ChannelRecv: return "channel_recv";
-        case LIR_Op::ChannelPoll: return "channel_poll";
-        case LIR_Op::ChannelClose: return "channel_close";
-        case LIR_Op::ChannelAlloc: return "channel_alloc";
-        case LIR_Op::ChannelSend: return "channel_send";
-        case LIR_Op::ChannelHasData: return "channel_has_data";
-        
-        // === THREADLESS CONCURRENCY ===
-        case LIR_Op::TaskContextAlloc: return "task_context_alloc";
-        case LIR_Op::TaskContextInit: return "task_context_init";
-        case LIR_Op::TaskGetState: return "task_get_state";
-        case LIR_Op::TaskSetState: return "task_set_state";
-        case LIR_Op::TaskSetField: return "task_set_field";
-        case LIR_Op::TaskGetField: return "task_get_field";
-        case LIR_Op::SchedulerInit: return "scheduler_init";
-        case LIR_Op::SchedulerRun: return "scheduler_run";
-        case LIR_Op::SchedulerTick: return "scheduler_tick";
-        case LIR_Op::SchedulerAddTask: return "scheduler_add_task";
-        case LIR_Op::GetTickCount: return "get_tick_count";
-        case LIR_Op::DelayUntil: return "delay_until";
-        case LIR_Op::ParallelInit: return "parallel_init";
-        case LIR_Op::ParallelSync: return "parallel_sync";
-        
-        // === LOCK-FREE PARALLEL OPERATIONS ===
-        case LIR_Op::ListCreate: return "list_create";
-        case LIR_Op::ListAppend: return "list_append";
-        case LIR_Op::ListIndex: return "list_index";
-        case LIR_Op::ListLen: return "list_len";
-        case LIR_Op::DictCreate: return "dict_create";
-        case LIR_Op::DictSet: return "dict_set";
-        case LIR_Op::DictGet: return "dict_get";
-        case LIR_Op::DictHas: return "dict_has";
-        case LIR_Op::DictLen: return "dict_len";
-        case LIR_Op::DictItems: return "dict_items";
-        case LIR_Op::TupleCreate: return "tuple_create";
-        case LIR_Op::TupleGet: return "tuple_get";
-        case LIR_Op::TupleSet: return "tuple_set";
-        case LIR_Op::TupleLen: return "tuple_len";
-        case LIR_Op::NewFrame: return "new_frame";
-        case LIR_Op::FrameGetField: return "frame_get_field";
-        case LIR_Op::FrameSetField: return "frame_set_field";
-        case LIR_Op::FrameCallMethod: return "frame_call_method";
-        case LIR_Op::FrameCallInit: return "frame_call_init";
-        case LIR_Op::FrameCallDeinit: return "frame_call_deinit";
-        case LIR_Op::TraitCallMethod: return "trait_call_method";
-        case LIR_Op::MakeTraitObject: return "make_trait_object";
-        case LIR_Op::ImportModule: return "import_module";
-        case LIR_Op::ExportSymbol: return "export_symbol";
-        case LIR_Op::BeginModule: return "begin_module";
-        case LIR_Op::EndModule: return "end_module";
-        case LIR_Op::LoadGlobal: return "load_global";
-        case LIR_Op::StoreGlobal: return "store_global";
-        
-        // === SHARED CELL OPERATIONS ===
-        case LIR_Op::SharedCellAlloc: return "shared_cell_alloc";
-        case LIR_Op::SharedCellLoad: return "shared_cell_load";
-        case LIR_Op::SharedCellStore: return "shared_cell_store";
-        case LIR_Op::SharedCellAdd: return "shared_cell_add";
-        case LIR_Op::SharedCellSub: return "shared_cell_sub";
-        case LIR_Op::MemoryAlloc: return "memory_alloc";
-        case LIR_Op::MemoryFree: return "memory_free";
-        case LIR_Op::MemoryResize: return "memory_resize";
-        case LIR_Op::MemoryLoad: return "memory_load";
-        case LIR_Op::MemoryStore: return "memory_store";
-        case LIR_Op::ForeignCall: return "foreign_call";
-        case LIR_Op::ResourceCreate: return "resource_create";
-        case LIR_Op::ResourceDestroy: return "resource_destroy";
-        case LIR_Op::ResourceCall: return "resource_call";
-        case LIR_Op::FFIAlloc: return "ffi_alloc";
-        case LIR_Op::FFIFree: return "ffi_free";
-        case LIR_Op::FFIRealloc: return "ffi_realloc";
+    #define X(name) case LIR_Op::name: return #name;
+    LIR_OP_LIST(X)
+    #undef X
     }
-    return "unknown";
+    return "unknown"; // unreachable if LIR_OP_LIST is complete
 }
 
 // CFG validation implementation

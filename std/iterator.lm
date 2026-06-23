@@ -5,14 +5,14 @@ frame MapIterator {
     var f: fn(any): any;
     
     pub init(source: any, f: fn(any): any) {
-        this.source = source;
-        this.f = f;
+        self.source = source;
+        self.f = f;
     }
     
     pub fn next(): any {
-        var item = this.source.next();
+        var item = self.source.next();
         if (item == nil) return nil;
-        return this.f(item);
+        return self.f(item);
     }
 }
 
@@ -21,15 +21,15 @@ frame FilterIterator {
     var p: fn(any): bool;
     
     pub init(source: any, p: fn(any): bool) {
-        this.source = source;
-        this.p = p;
+        self.source = source;
+        self.p = p;
     }
     
     pub fn next(): any {
         while (true) {
-            var item = this.source.next();
+            var item = self.source.next();
             if (item == nil) return nil;
-            if (this.p(item)) return item;
+            if (self.p(item)) return item;
         }
     }
 }
@@ -40,17 +40,17 @@ frame RangeIterator {
     var step: int;
     
     pub init(start: int, stop: int, step: int = 1) {
-        this.current = start;
-        this.stop = stop;
-        this.step = step;
+        self.current = start;
+        self.stop = stop;
+        self.step = step;
     }
     
     pub fn next(): any {
-        if (this.step > 0 and this.current >= this.stop) return nil;
-        if (this.step < 0 and this.current <= this.stop) return nil;
+        if (self.step > 0 and self.current >= self.stop) return nil;
+        if (self.step < 0 and self.current <= self.stop) return nil;
         
-        var res = this.current;
-        this.current = this.current + this.step;
+        var res = self.current;
+        self.current = self.current + self.step;
         return res;
     }
 }

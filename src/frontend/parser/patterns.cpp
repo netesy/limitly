@@ -48,6 +48,21 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::createTypeAnnotationF
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
+    auto first = parseSinglePattern();
+    // Or-patterns: A | B | C
+    if (check(TokenType::PIPE)) {
+        auto orPattern = std::make_shared<LM::Frontend::AST::OrPatternExpr>();
+        orPattern->line = first->line;
+        orPattern->patterns.push_back(first);
+        while (match({TokenType::PIPE})) {
+            orPattern->patterns.push_back(parseSinglePattern());
+        }
+        return orPattern;
+    }
+    return first;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseSinglePattern() {
     if (match({TokenType::UNDERSCORE, TokenType::DEFAULT})) {
         auto varExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
         varExpr->line = previous().line;

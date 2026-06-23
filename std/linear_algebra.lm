@@ -6,20 +6,20 @@ frame Vec2 {
     pub var y: float;
     
     pub init(x: float = 0.0, y: float = 0.0) {
-        this.x = x;
-        this.y = y;
+        self.x = x;
+        self.y = y;
     }
     
-    pub fn add(other: Vec2): Vec2 { return Vec2(this.x + other.x, this.y + other.y); }
-    pub fn sub(other: Vec2): Vec2 { return Vec2(this.x - other.x, this.y - other.y); }
-    pub fn scale(s: float): Vec2 { return Vec2(this.x * s, this.y * s); }
-    pub fn dot(other: Vec2): float { return this.x * other.x + this.y * other.y; }
-    pub fn mag(): float { return math.sqrt(this.x * this.x + this.y * this.y); }
+    pub fn add(other: Vec2): Vec2 { return Vec2(self.x + other.x, self.y + other.y); }
+    pub fn sub(other: Vec2): Vec2 { return Vec2(self.x - other.x, self.y - other.y); }
+    pub fn scale(s: float): Vec2 { return Vec2(self.x * s, self.y * s); }
+    pub fn dot(other: Vec2): float { return self.x * other.x + self.y * other.y; }
+    pub fn mag(): float { return math.sqrt(self.x * self.x + self.y * self.y); }
     
     pub fn normalize(): Vec2 {
-        var m = this.mag();
+        var m = self.mag();
         if (m == 0.0) return Vec2();
-        return this.scale(1.0 / m);
+        return self.scale(1.0 / m);
     }
 }
 
@@ -29,30 +29,30 @@ frame Vec3 {
     pub var z: float;
     
     pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+        self.x = x;
+        self.y = y;
+        self.z = z;
     }
     
-    pub fn add(other: Vec3): Vec3 { return Vec3(this.x + other.x, this.y + other.y, this.z + other.z); }
-    pub fn sub(other: Vec3): Vec3 { return Vec3(this.x - other.x, this.y - other.y, this.z - other.z); }
-    pub fn scale(s: float): Vec3 { return Vec3(this.x * s, this.y * s, this.z * s); }
-    pub fn dot(other: Vec3): float { return this.x * other.x + this.y * other.y + this.z * other.z; }
+    pub fn add(other: Vec3): Vec3 { return Vec3(self.x + other.x, self.y + other.y, self.z + other.z); }
+    pub fn sub(other: Vec3): Vec3 { return Vec3(self.x - other.x, self.y - other.y, self.z - other.z); }
+    pub fn scale(s: float): Vec3 { return Vec3(self.x * s, self.y * s, self.z * s); }
+    pub fn dot(other: Vec3): float { return self.x * other.x + self.y * other.y + self.z * other.z; }
     
     pub fn cross(other: Vec3): Vec3 {
         return Vec3(
-            this.y * other.z - this.z * other.y,
-            this.z * other.x - this.x * other.z,
-            this.x * other.y - this.y * other.x
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x
         );
     }
     
-    pub fn mag(): float { return math.sqrt(this.x * this.x + this.y * this.y + this.z * this.z); }
+    pub fn mag(): float { return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z); }
     
     pub fn normalize(): Vec3 {
-        var m = this.mag();
+        var m = self.mag();
         if (m == 0.0) return Vec3();
-        return this.scale(1.0 / m);
+        return self.scale(1.0 / m);
     }
 }
 
@@ -60,7 +60,7 @@ frame Mat4 {
     pub var data: [float]; // 16 elements
     
     pub init() {
-        this.data = [
+        self.data = [
             1.0, 0.0, 0.0, 0.0,
             0.0, 1.0, 0.0, 0.0,
             0.0, 0.0, 1.0, 0.0,
@@ -69,10 +69,10 @@ frame Mat4 {
     }
     
     pub fn get(row: int, col: int): float {
-        return this.data[row * 4 + col];
+        return self.data[row * 4 + col];
     }
     
     pub fn set(row: int, col: int, val: float) {
-        this.data[row * 4 + col] = val;
+        self.data[row * 4 + col] = val;
     }
 }

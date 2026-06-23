@@ -127,6 +127,11 @@ MAIN_SRCS := src/main.cpp
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS)
 
+# LIR round-trip test (C17): builds a small test binary that exercises every
+# field of LIR_Inst through serialize() -> deserialize() -> compare.
+LIR_TEST_SRCS := tests/lir/test_round_trip.cpp
+LIR_TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(LIR_TEST_SRCS))
+
 # =============================
 # Objects and response files
 # =============================
@@ -329,6 +334,17 @@ parser: $(BIN_DIR) $(TEST_RSP)
 	@echo "🔨 Building test_parser$(EXE_EXT)...."
 	$(CXX) $(CXXFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser$(EXE_EXT) $(LIBS)
 	@echo "✅ $(BIN_DIR)/test_parser$(EXE_EXT) built."
+
+# =============================
+# LIR Round-Trip Test Target (C17)
+# =============================
+.PHONY: lir-test
+lir-test: $(BIN_DIR) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(LIR_TEST_OBJS)
+	@echo "\360\237\223\260 Linking lir_test ..."
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIR_TEST_OBJS) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) -o $(BIN_DIR)/lir_test $(LIBS) -lpthread
+	@echo "\342\234\205 lir_test built."
+	@echo "\360\237\247\252 Running lir_test ..."
+	./bin/lir_test
 
 # =============================
 # Test Target

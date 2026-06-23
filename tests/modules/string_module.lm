@@ -2,15 +2,15 @@
 pub var greeting = "Hello";
 pub var farewell = "Goodbye";
 
-pub fn say_hello(name) {
+pub fn say_hello(name: str): str {
     return greeting + ", " + name + "!";
 }
 
-pub fn say_goodbye(name) {
+pub fn say_goodbye(name: str): str {
     return farewell + ", " + name + "!";
 }
 
-pub fn repeat_string(text, times) {
+pub fn repeat_string(text: str, times: int): str {
     var result = "";
     iter (i in 1..times) {
         result = result + text;

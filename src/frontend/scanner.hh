@@ -27,7 +27,7 @@ enum class TokenType {
     ARROW,         // ->
     RANGE,         // ..
     ELLIPSIS,      // ...
-    AT_SIGN,       // @
+    COLON_COLON,   // ::
     UNDERSCORE,    // _
 
     // Group: Operators
@@ -115,7 +115,6 @@ enum class TokenType {
     // Group: Keywords
     AND,        // and
     AS,         // as
-    CLASS,      // class
     FRAME,      // frame
     FALSE,      // false
     FN,         // fn
@@ -130,20 +129,19 @@ enum class TokenType {
     ENUM,       // enum
     NOT,        // not
     OR,         // or
-    DEFAULT,    // default
+    DEFAULT,    // default (also produced by standalone _)
     PRINT,      // print
     RETURN,     // return
     SHOW,       // show
     HIDE,       // hide
     SUPER,      // super
-    THIS,       // this
-    SELF,       // self
+    SELF,       // self (canonical; 'this' is no longer a keyword)
     TRUE,       // true
     VAR,        // var
     PARALLEL,   // parallel
     CONCURRENT, // concurrent
-    // ASYNC,      // async
-    // AWAIT,      // await
+    TASK,       // task
+    WORKER,     // worker
     BREAK,      // break
     CONTINUE,   // continue
     IMPORT,     // import
@@ -153,32 +151,28 @@ enum class TokenType {
     MIXIN,      // mixin
     IMPLEMENTS, // implements
     MODULE,     // module
-    PUBLIC,     // public
-    PRIVATE,    // private
-    PROTECTED,  // protected
-    OPEN,       // open
 
     CONTRACT,   // contract
     COMPTIME,   // comptime
     UNSAFE,     // unsafe
     ITER,       // iter
     WHERE,      // where
-    PROPERTY,   // property
-    CACHE,      // cache
-    SLEEP,      // sleep
     ERR,        // err
     OK,         // ok
-    VAL,        // val
-    FROM,       // from
+    VAL,        // val (immutable local)
+    CONST,      // const (immutable binding, parallel to var)
+    FROM,       // from (for `from X import Y`)
     
-    // Visibility keywords
+    // Visibility keywords (only pub/prot — vars/fns are private by default
+    // when neither is specified; no explicit 'private' keyword).
     PUB,        // pub
     PROT,       // prot
+
+    // Method / frame modifiers (not visibility).
+    // 'data' was removed — traits cover the same ground.
     STATIC,     // static
     ABSTRACT,   // abstract
     FINAL,      // final
-    DATA,       // data
-    CONST,      // const (for read-only public)
 
     // CST Support - Trivia tokens
     WHITESPACE,     // spaces, tabs

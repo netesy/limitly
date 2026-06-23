@@ -64,9 +64,12 @@ namespace Metadata {
     }
 }
 
+// NOTE: This enum must stay in sync with the mirror in
+// src/backend/vm/resource_types.hh
 enum class ResourceType : uint32_t {
     FILE = 0, SOCKET = 1, WINDOW = 2, SURFACE = 3, PROCESS = 4, CHANNEL = 5,
-    TIMER = 6, TASK = 7, LIBRARY = 8, STDOUT = 9, STDERR = 10, MEMORY = 11
+    TIMER = 6, TASK = 7, LIBRARY = 8, STDOUT = 9, STDERR = 10, MEMORY = 11,
+    ENTROPY = 12
 };
 
 enum class ResourceOperation : uint32_t {
@@ -184,6 +187,100 @@ enum class LIR_Op : uint8_t {
     FFIVMSave, FFIVMRestore, FFICCallExecute,
     FFICalcStructLayout, FFIGetABIInfo
 };
+
+// ============================================================================
+// LIR_OP_LIST — X-macro enumerating every opcode in `LIR_Op`, in declaration
+// order.  Used to derive `lir_op_to_string()` and any other per-opcode tables
+// without risking the "unknown opcode" fall-through that plagues hand-written
+// switch statements.
+//
+// To use:
+//   #define X(name) ...
+//   LIR_OP_LIST(X)
+//   #undef X
+//
+// IMPORTANT: keep this list in lock-step with the enum above.
+// ============================================================================
+#define LIR_OP_LIST(X) \
+    /* === Core Operations === */ \
+    X(Mov) X(LoadConst) X(Add) X(Sub) X(Mul) X(Div) X(Mod) X(Neg) \
+    X(And) X(Or) X(Xor) X(Shl) X(Shr) \
+    X(CmpEQ) X(CmpNEQ) X(CmpLT) X(CmpLE) X(CmpGT) X(CmpGE) X(StringIndex) \
+    X(Jump) X(JumpIfFalse) X(JumpIf) X(Label) \
+    X(Call) X(CallVoid) X(CallIndirect) X(CallBuiltin) X(CallVariadic) \
+    X(Return) X(FuncDef) X(Param) X(Ret) \
+    X(VaStart) X(VaArg) X(VaEnd) X(Copy) \
+    X(PrintInt) X(PrintUint) X(PrintFloat) X(PrintBool) X(PrintString) \
+    X(Nop) X(Load) X(Store) X(Cast) X(ToString) X(STR_CONCAT) X(STR_FORMAT) \
+    /* === Decimal Operations === */ \
+    X(DecAdd) X(DecSub) X(DecMul) X(DecDiv) X(DecMod) X(DecNeg) X(DecRescale) \
+    /* === Error Handling === */ \
+    X(ConstructError) X(ConstructOk) X(IsError) X(Unwrap) X(UnwrapOr) \
+    /* === Type Operations === */ \
+    X(MakeEnum) X(GetTag) X(GetPayload) \
+    /* === Atomic Operations === */ \
+    X(AtomicLoad) X(AtomicStore) X(AtomicFetchAdd) \
+    /* === Async Operations === */ \
+    X(Await) X(AsyncCall) \
+    /* === Concurrency === */ \
+    X(TaskContextAlloc) X(TaskContextInit) X(TaskGetState) X(TaskSetState) \
+    X(TaskSetField) X(TaskGetField) \
+    X(ChannelAlloc) X(ChannelPush) X(ChannelPop) X(ChannelHasData) \
+    X(ChannelSend) X(ChannelOffer) X(ChannelRecv) X(ChannelPoll) X(ChannelClose) \
+    X(SchedulerInit) X(SchedulerRun) X(SchedulerTick) X(SchedulerAddTask) \
+    X(GetTickCount) X(DelayUntil) X(ParallelInit) X(ParallelSync) \
+    /* === Collections === */ \
+    X(ListCreate) X(ListAppend) X(ListIndex) X(ListLen) \
+    X(DictCreate) X(DictSet) X(DictGet) X(DictHas) X(DictLen) X(DictItems) \
+    X(TupleCreate) X(TupleGet) X(TupleSet) X(TupleLen) \
+    /* === Object-Oriented === */ \
+    X(NewFrame) X(FrameGetField) X(FrameSetField) \
+    X(FrameGetFieldAtomic) X(FrameSetFieldAtomic) \
+    X(FrameFieldAtomicAdd) X(FrameFieldAtomicSub) \
+    X(FrameCallMethod) X(FrameCallInit) X(FrameCallDeinit) \
+    X(TraitCallMethod) X(MakeTraitObject) \
+    /* === Module System === */ \
+    X(ImportModule) X(ExportSymbol) X(BeginModule) X(EndModule) \
+    X(LoadGlobal) X(StoreGlobal) \
+    /* === Shared Memory === */ \
+    X(SharedCellAlloc) X(SharedCellLoad) X(SharedCellStore) \
+    X(SharedCellAdd) X(SharedCellSub) \
+    /* === Legacy Resource Operations (deprecated, kept for compatibility) === */ \
+    X(ResourceCreate) X(ResourceDestroy) X(ResourceCall) \
+    /* === REDESIGNED: Memory Operations === */ \
+    X(MemoryAlloc) X(MemoryFree) X(MemoryResize) \
+    X(MemoryLoad) X(MemoryStore) X(MemoryCopy) X(MemoryFill) X(MemoryCompare) \
+    /* === REDESIGNED: Pointer Operations === */ \
+    X(PtrAdd) X(PtrSub) X(PtrDiff) X(PtrAlign) X(PtrIsAligned) \
+    /* === REDESIGNED: Marshaling Operations === */ \
+    X(Marshal) X(Unmarshal) X(BufferView) X(BufferCreate) X(BufferResize) \
+    /* === REDESIGNED: Dynamic Linking === */ \
+    X(LibraryLoad) X(LibraryUnload) X(LibrarySymbol) \
+    /* === REDESIGNED: Foreign Calls === */ \
+    X(ForeignCall) X(ForeignCallDirect) \
+    /* === REDESIGNED: Callbacks === */ \
+    X(CallbackCreate) X(CallbackDestroy) \
+    /* === DEPRECATED: Old type-specific FFI opcodes (kept during migration) === */ \
+    X(FFIAlloc) X(FFIFree) X(FFIRealloc) X(FFIMemcpy) X(FFIMemset) X(FFIMemcmp) \
+    X(FFIAddPtr) X(FFISubPtr) X(FFIPtrDiff) X(FFIAlignPtr) X(FFIIsAligned) \
+    X(FFILoadInt8) X(FFILoadUInt8) X(FFILoadInt16) X(FFILoadUInt16) \
+    X(FFILoadInt32) X(FFILoadUInt32) X(FFILoadInt64) X(FFILoadUInt64) \
+    X(FFILoadFloat) X(FFILoadDouble) X(FFILoadPtr) \
+    X(FFIStoreInt8) X(FFIStoreUInt8) X(FFIStoreInt16) X(FFIStoreUInt16) \
+    X(FFIStoreInt32) X(FFIStoreUInt32) X(FFIStoreInt64) X(FFIStoreUInt64) \
+    X(FFIStoreFloat) X(FFIStoreDouble) X(FFIStorePtr) \
+    X(FFIToCString) X(FFIFromCString) X(FFIFreeCString) X(FFICStringPtr) X(FFICStringFromPtr) \
+    X(FFIBufferAlloc) X(FFIBufferFromPtr) X(FFIBufferFree) X(FFIBufferResize) \
+    X(FFIBufferRead) X(FFIBufferWrite) X(FFIBufferSize) X(FFIBufferCapacity) X(FFIBufferAsPtr) \
+    X(FFICallPtr) X(FFICallPtr0) X(FFICallPtr1) X(FFICallPtr2) \
+    X(FFICallPtr3) X(FFICallPtr4) X(FFICallPtr5) \
+    X(FFILibraryLoad) X(FFILibraryUnload) X(FFILibraryGetSymbol) \
+    X(FFIRegisterCallback) X(FFIUnregisterCallback) X(FFIGetCallbackPtr) \
+    X(FFICCallFrameCreate) X(FFICCallFrameDestroy) \
+    X(FFICCallFrameSetReg) X(FFICCallFrameGetReg) \
+    X(FFICCallFrameSetStackArg) X(FFICCallFrameGetStackArg) \
+    X(FFIVMSave) X(FFIVMRestore) X(FFICCallExecute) \
+    X(FFICalcStructLayout) X(FFIGetABIInfo)
 
 struct LIR_SourceLoc {
     std::string file;

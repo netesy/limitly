@@ -10,42 +10,35 @@ using namespace LM::Error;
 
 std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
     try {
-        // Collect leading annotations
+        // Collect leading annotations (no-op now that @-annotations are removed).
         std::vector<Token> annotations = collectAnnotations();
-        
-        // Parse modifiers for module-level declarations
-        LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private; // Default to private
+
+        // Parse modifiers for module-level declarations.
+        // Visibility: pub / prot only. Vars/fns are private by default when
+        // neither is specified (no explicit 'private' keyword).
+        // Method/frame modifiers (parallel to visibility, not interchangeable):
+        //   static, abstract, final. ('data' was removed — traits cover it.)
+        LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private;
         bool isStatic = false;
         bool isAbstract = false;
         bool isFinal = false;
-        bool isDataClass = false;
-        
-        // Parse visibility and modifiers
-        while (check(TokenType::PUB) || check(TokenType::PROT) || check(TokenType::PUBLIC) ||
-               check(TokenType::PRIVATE) || check(TokenType::PROTECTED) ||
-               check(TokenType::CONST) || check(TokenType::STATIC) ||
-               check(TokenType::ABSTRACT) || check(TokenType::FINAL) || check(TokenType::DATA)) {
-            
-            if (match({TokenType::PUB}) || match({TokenType::PUBLIC})) {
+
+        while (check(TokenType::PUB) || check(TokenType::PROT) ||
+               check(TokenType::STATIC) ||
+               check(TokenType::ABSTRACT) || check(TokenType::FINAL)) {
+            if (match({TokenType::PUB})) {
                 visibility = LM::Frontend::AST::VisibilityLevel::Public;
-            } else if (match({TokenType::PROT}) || match({TokenType::PROTECTED})) {
+            } else if (match({TokenType::PROT})) {
                 visibility = LM::Frontend::AST::VisibilityLevel::Protected;
-            } else if (match({TokenType::PRIVATE})) {
-                visibility = LM::Frontend::AST::VisibilityLevel::Private;
-            } else if (match({TokenType::CONST})) {
-                visibility = LM::Frontend::AST::VisibilityLevel::Const;
             } else if (match({TokenType::STATIC})) {
                 isStatic = true;
             } else if (match({TokenType::ABSTRACT})) {
                 isAbstract = true;
             } else if (match({TokenType::FINAL})) {
                 isFinal = true;
-            } else if (match({TokenType::DATA})) {
-                isDataClass = true;
-                isFinal = true; // Data classes are automatically final
             }
         }
-        
+
         if (match({TokenType::FRAME})) {
             auto decl = frameDeclaration();
             if (decl) {
@@ -66,14 +59,19 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
             }
             return decl;
         }
-        if (match({TokenType::VAR})) {
+        // const, val, and var all produce a VarDeclaration; const/val set isConst=true.
+        if (match({TokenType::VAR}) || match({TokenType::CONST}) || match({TokenType::VAL})) {
+            bool isConst = (previous().type == TokenType::CONST || previous().type == TokenType::VAL);
             auto decl = varDeclaration();
             if (decl) {
                 decl->annotations = annotations;
-                // Cast to VarDeclaration to access visibility fields
                 if (auto varDecl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(decl)) {
                     varDecl->visibility = visibility;
                     varDecl->isStatic = isStatic;
+                    varDecl->isConst = isConst;
+                    if (isConst && !varDecl->initializer) {
+                        error("const/val declaration requires an initializer");
+                    }
                 }
             }
             return decl;
@@ -198,6 +196,8 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::statement() {
     if (match({TokenType::RETURN})) return returnStatement();
     if (match({TokenType::PARALLEL})) return parallelStatement();
     if (match({TokenType::CONCURRENT})) return concurrentStatement();
+    if (match({TokenType::TASK})) return taskStatement();
+    if (match({TokenType::WORKER})) return workerStatement();
     if (match({TokenType::MATCH})) return matchStatement();
     if (match({TokenType::UNSAFE})) return unsafeBlock();
     if (match({TokenType::CONTRACT})) return contractStatement();
@@ -370,26 +370,19 @@ std::shared_ptr<LM::Frontend::AST::BlockStatement> Parser::block() {
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         try {
             if (in_concurrent_block) {
-                bool is_async = false; // Temporarily disabled async support
-                if (peek().type == TokenType::IDENTIFIER) {
-                    if (peek().lexeme == "task") {
-                        advance(); 
-                        auto stmt = taskStatement();
-                        auto task_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::TaskStatement>(stmt);
-                        if (task_stmt) task_stmt->isAsync = is_async;
-                        block->statements.push_back(stmt);
-                        continue;
-                    }
-                    if (peek().lexeme == "worker") {
-                        advance();
-                        auto stmt = workerStatement();
-                        auto worker_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::WorkerStatement>(stmt);
-                        if (worker_stmt) worker_stmt->isAsync = is_async;
-                        block->statements.push_back(stmt);
-                        continue;
-                    }
+                // task/worker are now keywords (TASK/WORKER tokens), not identifiers.
+                if (peek().type == TokenType::TASK) {
+                    advance();
+                    auto stmt = taskStatement();
+                    block->statements.push_back(stmt);
+                    continue;
                 }
-                if (is_async) error("Expected 'task' or 'worker' after 'async' in this context.");
+                if (peek().type == TokenType::WORKER) {
+                    advance();
+                    auto stmt = workerStatement();
+                    block->statements.push_back(stmt);
+                    continue;
+                }
             }
             auto declaration = this->declaration();
             if (declaration) block->statements.push_back(declaration);
@@ -652,16 +645,20 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
     pushBlockContext("frame", leftBrace);
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private;
-        while (check(TokenType::PUB) || check(TokenType::PROT) || check(TokenType::PUBLIC) || check(TokenType::PRIVATE) || check(TokenType::PROTECTED) || check(TokenType::CONST)) {
-            if (match({TokenType::PUB}) || match({TokenType::PUBLIC})) visibility = LM::Frontend::AST::VisibilityLevel::Public;
-            else if (match({TokenType::PROT}) || match({TokenType::PROTECTED})) visibility = LM::Frontend::AST::VisibilityLevel::Protected;
-            else if (match({TokenType::PRIVATE})) visibility = LM::Frontend::AST::VisibilityLevel::Private;
-            else if (match({TokenType::CONST})) visibility = LM::Frontend::AST::VisibilityLevel::Const;
+        bool memberStatic = false, memberAbstract = false, memberFinal = false;
+        while (check(TokenType::PUB) || check(TokenType::PROT) ||
+               check(TokenType::STATIC) || check(TokenType::ABSTRACT) || check(TokenType::FINAL)) {
+            if (match({TokenType::PUB})) visibility = LM::Frontend::AST::VisibilityLevel::Public;
+            else if (match({TokenType::PROT})) visibility = LM::Frontend::AST::VisibilityLevel::Protected;
+            else if (match({TokenType::STATIC})) memberStatic = true;
+            else if (match({TokenType::ABSTRACT})) memberAbstract = true;
+            else if (match({TokenType::FINAL})) memberFinal = true;
         }
         if (check(TokenType::IDENTIFIER) && peek().lexeme == "init") {
             advance(); consume(TokenType::LEFT_PAREN, "Expected '(' after 'init'.");
             auto initMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
             initMethod->name = "init"; initMethod->visibility = visibility; initMethod->isInit = true;
+            initMethod->isStatic = memberStatic; initMethod->isAbstract = memberAbstract; initMethod->isFinal = memberFinal;
             if (!check(TokenType::RIGHT_PAREN)) {
                 do {
                     auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
@@ -683,6 +680,7 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             advance(); consume(TokenType::LEFT_PAREN, "Expected '(' after 'deinit'.");
             auto deinitMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
             deinitMethod->name = "deinit"; deinitMethod->visibility = visibility; deinitMethod->isDeinit = true;
+            deinitMethod->isStatic = memberStatic; deinitMethod->isAbstract = memberAbstract; deinitMethod->isFinal = memberFinal;
             if (!check(TokenType::RIGHT_PAREN)) error("deinit() method cannot have parameters.");
             consume(TokenType::RIGHT_PAREN, "Expected ')' after deinit.");
             consume(TokenType::LEFT_BRACE, "Expected '{' before deinit body.");
@@ -691,6 +689,9 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
         } else if (match({TokenType::FN})) {
             auto frameMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
             frameMethod->visibility = visibility;
+            frameMethod->isStatic = memberStatic;
+            frameMethod->isAbstract = memberAbstract;
+            frameMethod->isFinal = memberFinal;
             Token methodName = consume(TokenType::IDENTIFIER, "Expected method name.");
             frameMethod->name = methodName.lexeme;
             consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
@@ -713,16 +714,18 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             if (frameMethod->name == "init") { frameMethod->isInit = true; frameDecl->init = frameMethod; }
             else if (frameMethod->name == "deinit") { frameMethod->isDeinit = true; frameDecl->deinit = frameMethod; }
             else frameDecl->methods.push_back(frameMethod);
-        } else if (match({TokenType::VAR})) {
+        } else if (match({TokenType::VAR}) || match({TokenType::CONST}) || match({TokenType::VAL})) {
+            bool fieldConst = (previous().type == TokenType::CONST || previous().type == TokenType::VAL);
             auto fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
             consume(TokenType::COLON, "Expected ':' after field name.");
             auto fieldType = parseTypeAnnotation();
             auto field = std::make_shared<LM::Frontend::AST::FrameField>();
-            field->name = fieldName; field->type = fieldType; field->visibility = visibility;
+            field->name = fieldName; field->type = fieldType; field->visibility = visibility; field->isConst = fieldConst;
             if (match({TokenType::EQUAL})) field->defaultValue = expression();
             consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
             frameDecl->fields.push_back(field);
         } else if (check(TokenType::IDENTIFIER)) {
+            // Legacy: bare identifier field. New code should use var/const/val.
             Token fieldName = advance();
             if (check(TokenType::COLON)) {
                 advance();
@@ -768,11 +771,23 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::taskStatement() {
     auto stmt = std::make_shared<LM::Frontend::AST::TaskStatement>();
     stmt->line = peek().line;
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'task'.");
-    if (check(TokenType::IDENTIFIER)) {
-        stmt->loopVar = consume(TokenType::IDENTIFIER, "Expected loop variable name.").lexeme;
-        consume(TokenType::IN, "Expected 'in' after loop variable.");
+    // The 'name in' part is optional. Parse an expression; if 'in' follows,
+    // treat the parsed expression as the loop variable (must be an identifier)
+    // and parse a second expression for the iterable. Otherwise the first
+    // expression is the iterable.
+    if (!check(TokenType::RIGHT_PAREN)) {
+        auto firstExpr = expression();
+        if (match({TokenType::IN})) {
+            if (auto idExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(firstExpr)) {
+                stmt->loopVar = idExpr->name;
+            } else {
+                error("Expected identifier before 'in' in task statement");
+            }
+            stmt->iterable = expression();
+        } else {
+            stmt->iterable = firstExpr;
+        }
     }
-    stmt->iterable = expression();
     consume(TokenType::RIGHT_PAREN, "Expected ')' after task arguments.");
     consume(TokenType::LEFT_BRACE, "Expected '{' before task body.");
     stmt->body = block();
@@ -783,10 +798,25 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::workerStatement() {
     auto stmt = std::make_shared<LM::Frontend::AST::WorkerStatement>();
     stmt->line = peek().line;
     consume(TokenType::LEFT_PAREN, "Expected '(' after 'worker'.");
-    if (check(TokenType::IDENTIFIER)) {
-        stmt->paramName = consume(TokenType::IDENTIFIER, "Expected loop variable name.").lexeme;
-        stmt->param = stmt->paramName;
-        if (match({TokenType::IN, TokenType::FROM})) stmt->iterable = expression();
+    // Optional 'param in iterable' form; if 'in' is absent, the parsed
+    // expression is the channel/iterable itself.
+    if (!check(TokenType::RIGHT_PAREN)) {
+        if (check(TokenType::IDENTIFIER)) {
+            Token firstIdent = advance();
+            if (match({TokenType::IN, TokenType::FROM})) {
+                stmt->paramName = firstIdent.lexeme;
+                stmt->param = stmt->paramName;
+                stmt->iterable = expression();
+            } else {
+                // No 'in' — firstIdent is the channel/iterable. Construct a VariableExpr.
+                auto idExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
+                idExpr->name = firstIdent.lexeme;
+                idExpr->line = firstIdent.line;
+                stmt->iterable = idExpr;
+            }
+        } else {
+            stmt->iterable = expression();
+        }
     }
     consume(TokenType::RIGHT_PAREN, "Expected ')' after worker arguments.");
     consume(TokenType::LEFT_BRACE, "Expected '{' before worker body.");
@@ -874,8 +904,14 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::matchStatement() {
             exprStmt->expression = expression();
             matchCase.body = exprStmt;
         }
-        if (match({TokenType::COMMA})) if (check(TokenType::RIGHT_BRACE)) break;
+        // Push the case BEFORE checking for trailing comma — the old code
+        // dropped the last case when a trailing comma preceded the closing brace.
         stmt->cases.push_back(matchCase);
+        if (match({TokenType::COMMA})) {
+            if (check(TokenType::RIGHT_BRACE)) break;
+        } else {
+            break;
+        }
     }
     
     popBlockContext();
@@ -888,7 +924,11 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::matchStatement() {
 std::shared_ptr<LM::Frontend::AST::Statement> Parser::traitDeclaration() {
     auto traitDecl = std::make_shared<LM::Frontend::AST::TraitDeclaration>();
     traitDecl->line = previous().line;
-    if (match({TokenType::OPEN})) traitDecl->isOpen = true;
+    // 'open' is no longer a keyword; treat as identifier for backward compat.
+    if (check(TokenType::IDENTIFIER) && peek().lexeme == "open") {
+        advance();
+        traitDecl->isOpen = true;
+    }
     Token name = consume(TokenType::IDENTIFIER, "Expected trait name.");
     traitDecl->name = name.lexeme;
     if (match({TokenType::COLON})) {
@@ -935,9 +975,10 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::traitDeclaration() {
 std::shared_ptr<LM::Frontend::AST::Statement> Parser::interfaceDeclaration() {
     auto interfaceDecl = std::make_shared<LM::Frontend::AST::InterfaceDeclaration>();
     interfaceDecl->line = previous().line;
-    if (match({TokenType::AT_SIGN})) {
-        Token annotation = consume(TokenType::IDENTIFIER, "Expected annotation name after '@'.");
-        if (annotation.lexeme == "open") interfaceDecl->isOpen = true;
+    // @-annotations removed; check for bare 'open' identifier for backward compat.
+    if (check(TokenType::IDENTIFIER) && peek().lexeme == "open") {
+        advance();
+        interfaceDecl->isOpen = true;
     }
     Token name = consume(TokenType::IDENTIFIER, "Expected interface name.");
     interfaceDecl->name = name.lexeme;
@@ -959,16 +1000,17 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::moduleDeclaration() {
     moduleDecl->name = name.lexeme;
     consume(TokenType::LEFT_BRACE, "Expected '{' before module body.");
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-        bool isPublic = false, isProtected = false;
-        if (match({TokenType::AT_SIGN})) {
-            Token annotation = consume(TokenType::IDENTIFIER, "Expected annotation name after '@'.");
-            if (annotation.lexeme == "public") isPublic = true;
-            else if (annotation.lexeme == "protected") isProtected = true;
+        // Module members use pub/prot visibility (private by default).
+        LM::Frontend::AST::VisibilityLevel memberVisibility = LM::Frontend::AST::VisibilityLevel::Private;
+        while (check(TokenType::PUB) || check(TokenType::PROT)) {
+            if (match({TokenType::PUB})) memberVisibility = LM::Frontend::AST::VisibilityLevel::Public;
+            else if (match({TokenType::PROT})) memberVisibility = LM::Frontend::AST::VisibilityLevel::Protected;
         }
         auto member = declaration();
         if (member) {
-            if (isPublic) moduleDecl->publicMembers.push_back(member);
-            else if (isProtected) moduleDecl->protectedMembers.push_back(member);
+            member->visibility = memberVisibility;
+            if (memberVisibility == LM::Frontend::AST::VisibilityLevel::Public) moduleDecl->publicMembers.push_back(member);
+            else if (memberVisibility == LM::Frontend::AST::VisibilityLevel::Protected) moduleDecl->protectedMembers.push_back(member);
             else moduleDecl->privateMembers.push_back(member);
         }
     }

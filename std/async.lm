@@ -7,8 +7,8 @@ frame Promise {
     var state: str;  // "pending", "fulfilled", "rejected"
     var value: str?;
     var error: str?;
-    var then_callbacks: [fn(str): str];
-    var catch_callbacks: [fn(str): str];
+    pub var then_callbacks: [fn(str): str];
+    pub var catch_callbacks: [fn(str): str];
 
     pub fn init(): Promise {
         return Promise(state="pending", value=nil, error=nil, then_callbacks=[], catch_callbacks=[]);
@@ -126,7 +126,7 @@ frame Async {
 
     pub fn all(promises: [Promise]): Promise {
         var result_promise = Promise.init();
-        var results: [str] = [];
+        pub var results: [str] = [];
         var completed: int = 0;
         var has_error: bool = false;
 
@@ -202,7 +202,7 @@ frame Async {
     pub fn delay(ms: int): Promise {
         var promise = Promise.init();
         
-        // In a real implementation, this would use timers
+        // In a real implementation, self would use timers
         // For now, we'll simulate the delay
         var result = "delayed_" + ms as str;
         return promise.resolve(result);
@@ -240,7 +240,7 @@ frame Async {
 
     // Async iteration utilities
     pub fn map_async(items: [str], mapper: fn(str): Promise): Promise {
-        var promises: [Promise] = [];
+        pub var promises: [Promise] = [];
         var i: int = 0;
         
         while (i < items.length) {
@@ -252,7 +252,7 @@ frame Async {
     }
 
     pub fn filter_async(items: [str], predicate: fn(str): Promise): Promise {
-        var promises: [Promise] = [];
+        pub var promises: [Promise] = [];
         var i: int = 0;
         
         while (i < items.length) {
@@ -263,7 +263,7 @@ frame Async {
         var filter_promise = Async.all(promises);
         
         filter_promise.then(fn(results: str): str {
-            var filtered_items: [str] = [];
+            pub var filtered_items: [str] = [];
             var result_parts = results.split(",");
             var j: int = 0;
             var k: int = 0;

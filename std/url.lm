@@ -2,46 +2,46 @@
 import std.strings as str;
 
 frame URL {
-    pub var scheme: string;
-    pub var host: string;
+    pub var scheme: str;
+    pub var host: str;
     pub var port: int;
-    pub var path: string;
-    pub var query: string;
-    pub var fragment: string;
+    pub var path: str;
+    pub var query: str;
+    pub var fragment: str;
     
-    pub init(url_str: string = "") {
-        this.scheme = "";
-        this.host = "";
-        this.port = 80;
-        this.path = "/";
-        this.query = "";
-        this.fragment = "";
-        if (url_str != "") this.parse(url_str);
+    pub init(url_str: str = "") {
+        self.scheme = "";
+        self.host = "";
+        self.port = 80;
+        self.path = "/";
+        self.query = "";
+        self.fragment = "";
+        if (url_str != "") self.parse(url_str);
     }
     
-    pub fn parse(url_str: string) {
+    pub fn parse(url_str: str) {
         // Very basic parser
         var s = str.String(url_str);
         var scheme_idx = s.index_of("://");
         if (scheme_idx != nil) {
-            this.scheme = substring(url_str, 0, scheme_idx);
+            self.scheme = substring(url_str, 0, scheme_idx);
             var rest = substring(url_str, scheme_idx + 3, len(url_str));
             var path_idx = str.String(rest).index_of("/");
             if (path_idx != nil) {
-                this.host = substring(rest, 0, path_idx);
-                this.path = substring(rest, path_idx, len(rest));
+                self.host = substring(rest, 0, path_idx);
+                self.path = substring(rest, path_idx, len(rest));
             } else {
-                this.host = rest;
+                self.host = rest;
             }
         }
     }
     
-    pub fn to_string(): string {
-        var res = this.scheme + "://" + this.host;
-        if (this.port != 80 and this.port != 443) res = res + ":" + this.port as string;
-        res = res + this.path;
-        if (this.query != "") res = res + "?" + this.query;
-        if (this.fragment != "") res = res + "#" + this.fragment;
+    pub fn to_string(): str {
+        var res = self.scheme + "://" + self.host;
+        if (self.port != 80 and self.port != 443) res = res + ":" + (self.port as str);
+        res = res + self.path;
+        if (self.query != "") res = res + "?" + self.query;
+        if (self.fragment != "") res = res + "#" + self.fragment;
         return res;
     }
 }

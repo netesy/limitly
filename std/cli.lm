@@ -3,32 +3,32 @@ import std.strings as str;
 import std.collections.hash as hash;
 
 frame ArgParser {
-    var program_name: string;
-    var options: {string: bool};
-    var args: [string];
+    var program_name: str;
+    var options: {str: bool};
+    pub var args: [str];
     
-    pub init(name: string = "app") {
-        this.program_name = name;
-        this.options = {};
-        this.args = [];
+    pub init(name: str = "app") {
+        self.program_name = name;
+        self.options = {};
+        self.args = [];
     }
     
-    pub fn parse(argv: [string]) {
+    pub fn parse(argv: [str]) {
         for (var i = 1; i < len(argv); i = i + 1) {
             var arg = argv[i];
             if (str.String(arg).starts_with("-")) {
-                this.options[arg] = true;
+                self.options[arg] = true;
             } else {
-                this.args = this.args + [arg];
+                self.args = self.args + [arg];
             }
         }
     }
     
-    pub fn has_flag(flag: string): bool {
-        return this.options[flag] != nil;
+    pub fn has_flag(flag: str): bool {
+        return self.options[flag] != nil;
     }
     
-    pub fn get_args(): [string] {
-        return this.args;
+    pub fn get_args(): [str] {
+        return self.args;
     }
 }

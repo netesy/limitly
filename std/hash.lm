@@ -9,7 +9,7 @@ fn fnv1a_32(data: [int]): int {
     return h;
 }
 
-fn djb2(s: string): int {
+fn djb2(s: str): int {
     var h = 5381;
     for (var i = 0; i < len(s); i = i + 1) {
         // Need char to int

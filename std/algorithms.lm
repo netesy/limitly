@@ -9,7 +9,7 @@ frame Sorting {
     
     // Bubble sort
     pub fn bubble_sort(arr: [int]): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         
         // Copy array
@@ -38,7 +38,7 @@ frame Sorting {
 
     // Selection sort
     pub fn selection_sort(arr: [int]): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         
         // Copy array
@@ -72,7 +72,7 @@ frame Sorting {
 
     // Insertion sort
     pub fn insertion_sort(arr: [int]): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         
         // Copy array
@@ -111,7 +111,7 @@ frame Sorting {
     }
 
     private fn merge(left: [int], right: [int]): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         var j: int = 0;
         var k: int = 0;
@@ -147,9 +147,9 @@ frame Sorting {
         if (arr.length <= 1) return arr;
         
         var pivot = arr[arr.length / 2];
-        var left: [int] = [];
-        var middle: [int] = [];
-        var right: [int] = [];
+        pub var left: [int] = [];
+        pub var middle: [int] = [];
+        pub var right: [int] = [];
         
         var i: int = 0;
         var left_i: int = 0;
@@ -174,7 +174,7 @@ frame Sorting {
         var sorted_right = self.quick_sort(right);
         
         // Combine results
-        var result: [int] = [];
+        pub var result: [int] = [];
         var result_i: int = 0;
         
         i = 0;
@@ -203,7 +203,7 @@ frame Sorting {
 
     // Heap sort
     pub fn heap_sort(arr: [int]): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         
         // Copy array
@@ -415,7 +415,7 @@ frame MathAlgorithms {
     pub fn sieve_of_eratosthenes(n: int): [int] {
         if (n < 2) return [];
         
-        var is_prime: [bool] = [];
+        pub var is_prime: [bool] = [];
         var i: int = 0;
         while (i <= n) {
             is_prime[i] = true;
@@ -437,7 +437,7 @@ frame MathAlgorithms {
             p = p + 1;
         }
         
-        var primes: [int] = [];
+        pub var primes: [int] = [];
         i = 2;
         var prime_i: int = 0;
         while (i <= n) {
@@ -534,7 +534,7 @@ frame StringAlgorithms {
 
     // Find all substrings
     pub fn all_substrings(s: str): [str] {
-        var substrings: [str] = [];
+        pub var substrings: [str] = [];
         var i: int = 0;
         var j: int = 0;
         var k: int = 0;
@@ -554,7 +554,7 @@ frame StringAlgorithms {
 
     // Simple pattern matching (Knuth-Morris-Pratt algorithm stub)
     pub fn kmp_search(text: str, pattern: str): [int] {
-        var matches: [int] = [];
+        pub var matches: [int] = [];
         if (pattern == "" or text == "") return matches;
         
         // Simple implementation - in reality would use KMP algorithm

@@ -11,7 +11,7 @@ var EPSILON: float = 0.00000000000000022204;
 frame Int {
     pub var value: int;
     pub init(value: int) {
-        this.value = value;
+        self.value = value;
     }
     pub fn abs(): int { if (self.value < 0) return -self.value; return self.value; }
     pub fn min(other: int): int { if (self.value < other) return self.value; return other; }
@@ -21,7 +21,7 @@ frame Int {
 frame Float {
     pub var value: float;
     pub init(value: float) {
-        this.value = value;
+        self.value = value;
     }
     pub fn abs(): float { if (self.value < 0.0) return -self.value; return self.value; }
     pub fn min(other: float): float { if (self.value < other) return self.value; return other; }
@@ -231,7 +231,7 @@ frame Float {
     }
 
     // Helper method for trigonometric functions
-    private fn normalize_angle(): float { 
+    fn normalize_angle(): float { 
         var y: float = self.value; 
         while (y > PI) { y = y - TAU; } 
         while (y < -PI) { y = y + TAU; } 

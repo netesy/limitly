@@ -30,6 +30,8 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_while_statement(while_stmt);
     } else if (auto for_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ForStatement>(stmt)) {
         return check_for_statement(for_stmt);
+    } else if (auto iter_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::IterStatement>(stmt)) {
+        return check_iter_statement(iter_stmt);
     } else if (auto parallel_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ParallelStatement>(stmt)) {
         return check_parallel_statement(parallel_stmt);
     } else if (auto concurrent_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ConcurrentStatement>(stmt)) {
@@ -490,6 +492,95 @@ TypePtr TypeChecker::check_for_statement(std::shared_ptr<LM::Frontend::AST::ForS
     TypePtr result_type = type_system.NIL_TYPE;
     for_stmt->inferred_type = result_type;
     
+    return result_type;
+}
+
+TypePtr TypeChecker::check_iter_statement(std::shared_ptr<LM::Frontend::AST::IterStatement> iter_stmt) {
+    if (!iter_stmt) return nullptr;
+
+    // Type-check the iterable expression
+    TypePtr iterable_type = check_expression(iter_stmt->iterable);
+
+    // Infer element type(s) from the iterable's inferred type.
+    // For lists/ranges/channels there is a single element type; for dicts we
+    // can produce a (key, value) pair when two loop variables are bound.
+    TypePtr key_type = type_system.ANY_TYPE;
+    TypePtr value_type = type_system.ANY_TYPE;
+    TypePtr element_type = type_system.ANY_TYPE;
+    bool recognized = false;
+
+    if (iterable_type) {
+        switch (iterable_type->tag) {
+            case TypeTag::List:
+                element_type = type_system.getContainerElementType(iterable_type);
+                key_type = element_type;
+                recognized = true;
+                break;
+            case TypeTag::Dict: {
+                auto kv = type_system.getDictTypes(iterable_type);
+                key_type = kv.first;
+                value_type = kv.second;
+                element_type = key_type;
+                recognized = true;
+                break;
+            }
+            case TypeTag::Range:
+                element_type = type_system.INT64_TYPE;
+                key_type = element_type;
+                recognized = true;
+                break;
+            case TypeTag::Channel:
+                // Channels currently carry no typed element info; default to any.
+                element_type = type_system.ANY_TYPE;
+                key_type = element_type;
+                recognized = true;
+                break;
+            case TypeTag::Any:
+                // Untyped iterable; bind loop vars to any without erroring.
+                recognized = true;
+                break;
+            default:
+                recognized = false;
+                break;
+        }
+    }
+
+    if (!recognized) {
+        std::string type_name = iterable_type ? iterable_type->toString() : std::string("unknown");
+        add_error("Cannot iterate over type " + type_name, iter_stmt->line);
+    }
+
+    // Push a scope and bind the loop variable(s).
+    enter_scope();
+
+    if (iter_stmt->loopVars.size() == 1) {
+        // For a single loop var: lists/ranges/channels bind to the element type;
+        // dicts bind to the key type per task spec.
+        declare_variable(iter_stmt->loopVars[0], element_type);
+    } else if (iter_stmt->loopVars.size() == 2) {
+        // Two loop vars: (key, value). For non-dict iterables the second var
+        // gets any type as a fallback.
+        declare_variable(iter_stmt->loopVars[0], key_type);
+        declare_variable(iter_stmt->loopVars[1], value_type);
+    } else if (!iter_stmt->loopVars.empty()) {
+        // Defensive: bind all loop vars to any.
+        for (const auto& var_name : iter_stmt->loopVars) {
+            declare_variable(var_name, type_system.ANY_TYPE);
+        }
+    }
+
+    // Type-check the body in the loop scope.
+    bool was_in_loop = in_loop;
+    in_loop = true;
+    check_statement(iter_stmt->body);
+    in_loop = was_in_loop;
+
+    exit_scope();
+
+    // iter statements do not produce a value.
+    TypePtr result_type = type_system.NIL_TYPE;
+    iter_stmt->inferred_type = result_type;
+
     return result_type;
 }
 

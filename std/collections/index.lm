@@ -8,6 +8,7 @@ import std.collections.queue as queue;
 import std.collections.vector as vector;
 
 // Re-export frames for easy access
+// In Limit, variables can hold frame types for instantiation
 var LinkedList = list.LinkedList;
 var HashMap = hash.HashMap;
 var HashSet = hash.HashSet;
@@ -19,3 +20,7 @@ var Stack = queue.Stack;
 var Vector = vector.Vector;
 var Deque = vector.Deque;
 var BitSet = queue.BitSet;
+
+fn main(): int {
+    return 0;
+}

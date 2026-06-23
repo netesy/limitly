@@ -137,7 +137,7 @@ frame Validate {
         return self.is_alphanumeric(domain_name) and self.is_alpha(tld) and tld.length >= 2;
     }
 
-    private fn validate_email_local(local: str): bool {
+    fn validate_email_local(local: str): bool {
         // Allow dots, underscores, hyphens in local part
         var i: int = 0;
         while (i < local.length) {

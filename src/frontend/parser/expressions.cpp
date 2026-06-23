@@ -154,9 +154,30 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::bitwiseXor() {
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::bitwiseAnd() {
-    auto expr = comparison();
+    // Per language.md §2026-06-19 note: bitwise operators bind looser than comparison
+    // and tighter than equality. So bitwise_and calls bitwise_shift as its operand.
+    auto expr = bitwiseShift();
 
     while (match({TokenType::AMPERSAND})) {
+        auto op = previous();
+        auto right = bitwiseShift();
+        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
+        binaryExpr->line = op.line;
+        binaryExpr->left = expr;
+        binaryExpr->op = op.type;
+        binaryExpr->right = right;
+        expr = binaryExpr;
+    }
+
+    return expr;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::bitwiseShift() {
+    // Per language.md §2026-06-19 note: shift binds looser than comparison
+    // (and tighter than the other bitwise ops). So shift calls comparison as operand.
+    auto expr = comparison();
+
+    while (match({TokenType::LESS_LESS, TokenType::GREATER_GREATER})) {
         auto op = previous();
         auto right = comparison();
         auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
@@ -170,31 +191,16 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::bitwiseAnd() {
     return expr;
 }
 
-std::shared_ptr<LM::Frontend::AST::Expression> Parser::bitwiseShift() {
-    auto expr = term();
-
-    while (match({TokenType::LESS_LESS, TokenType::GREATER_GREATER})) {
-        auto op = previous();
-        auto right = term();
-        auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
-        binaryExpr->line = op.line;
-        binaryExpr->left = expr;
-        binaryExpr->op = op.type;
-        binaryExpr->right = right;
-        expr = binaryExpr;
-    }
-
-    return expr;
-}
-
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::comparison() {
-    auto expr = bitwiseShift();
+    // Comparison binds tighter than bitwise (per language.md §2026-06-19 note),
+    // so comparison calls term() as its operand.
+    auto expr = term();
 
     if (match({TokenType::RANGE})) {
         auto rangeExpr = std::make_shared<LM::Frontend::AST::RangeExpr>();
         rangeExpr->line = previous().line;
         rangeExpr->start = expr;
-        rangeExpr->end = bitwiseShift();
+        rangeExpr->end = term();
         rangeExpr->step = nullptr;
         rangeExpr->inclusive = true;
         
@@ -226,7 +232,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::comparison() {
             continue;
         }
 
-        auto right = bitwiseShift();
+        auto right = term();
 
         auto binaryExpr = std::make_shared<LM::Frontend::AST::BinaryExpr>();
         binaryExpr->line = op.line;
@@ -554,7 +560,8 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
         if (check(TokenType::STRING)) { advance(); interpolated->addStringPart(parseStringLiteral(previous().lexeme)); }
         return interpolated;
     }
-    if (match({TokenType::THIS})) {
+    // 'this' is no longer a keyword; 'self' is canonical. Both produce a ThisExpr node.
+    if (match({TokenType::SELF})) {
         auto thisExpr = std::make_shared<LM::Frontend::AST::ThisExpr>();
         thisExpr->line = previous().line; return thisExpr;
     }
@@ -568,7 +575,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
     }
     if (match({TokenType::IDENTIFIER})) {
         auto token = previous();
-        if (token.lexeme == "self" || token.lexeme == "this") {
+        if (token.lexeme == "self") {
             auto thisExpr = std::make_shared<LM::Frontend::AST::ThisExpr>();
             thisExpr->line = token.line; return thisExpr;
         } else {
@@ -598,10 +605,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
             }
         }
     }
-    if (match({TokenType::SLEEP})) {
-        auto varExpr = createNodeWithContext<LM::Frontend::AST::VariableExpr>();
-        varExpr->line = previous().line; varExpr->name = "sleep"; attachTriviaFromToken(previous()); return varExpr;
-    }
+    // 'sleep' is no longer a keyword; it's a regular identifier handled above.
     if (match({TokenType::ERR})) {
         auto errorExpr = std::make_shared<LM::Frontend::AST::ErrorConstructExpr>();
         errorExpr->line = previous().line; consume(TokenType::LEFT_PAREN, "Expected '(' after 'err'.");
@@ -707,7 +711,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
     }
     if (current > 0 && current < scanner.getTokens().size() && scanner.getTokens()[current-1].type == TokenType::LEFT_BRACE && scanner.getTokens()[current].type == TokenType::RIGHT_BRACE) {
         return makeErrorExpr("Empty dictionary not allowed here");
-    } else if (match({TokenType::SELF, TokenType::THIS})) {
+    } else if (match({TokenType::SELF})) {
         auto thisExpr = createNodeWithContext<LM::Frontend::AST::ThisExpr>();
         thisExpr->line = previous().line; attachTriviaFromToken(previous()); return thisExpr;
     } else if (match({TokenType::SUPER})) {

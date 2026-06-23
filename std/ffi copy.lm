@@ -88,17 +88,17 @@ fn get_abi_info(): ABIInfo {
 frame CStructLayout {
     var size: int;
     var alignment: int;
-    var fields: [int];
-    var offsets: [int];
-    var paddings: [int];
+    pub var fields: [int];
+    pub var offsets: [int];
+    pub var paddings: [int];
 }
 
 // Calculate struct layout with proper padding
 fn calculate_struct_layout(field_sizes: [int], field_alignments: [int]): CStructLayout {
     var total_size: int = 0;
     var max_alignment: int = 1;
-    var offsets: [int] = [];
-    var paddings: [int] = [];
+    pub var offsets: [int] = [];
+    pub var paddings: [int] = [];
     
     var i: int = 0;
     while (i < len(field_sizes)) {
@@ -783,7 +783,7 @@ fn library_get_symbol(lib: Library, symbol: str): fnptr {
 frame ForeignFunction {
     var name: str;
     var func_ptr: fnptr;
-    var param_types: [int];
+    pub var param_types: [int];
     var return_type: int;
     var is_variadic: int;
 }
@@ -842,7 +842,7 @@ frame CCallFrame {
     var return_address: pubptr;
     var stack_pointer: pubptr;
     var base_pointer: pubptr;
-    var registers: [int];
+    pub var registers: [int];
     var register_count: int;
     var stack_args: Buffer;
     var stack_align: int;
@@ -925,7 +925,7 @@ fn vm_state_restore(state: [int]): void {
 
 // Execute C call with proper VM state management
 fn ccall_execute(func_ptr: fnptr, frame: CCallFrame): int {
-    var vm_state: [int] = vm_state_save();
+    pub var vm_state: [int] = vm_state_save();
     var result: int = 0;
     
     // Execute C call with marshalled arguments

@@ -113,10 +113,20 @@ void Scanner::scanToken() {
         addToken(match('=') ? TokenType::PLUS_EQUAL : TokenType::PLUS);
         break;
     case '?':
-        addToken(TokenType::QUESTION);
+        if (match(':')) {
+            addToken(TokenType::ELVIS);
+        } else if (match('.')) {
+            addToken(TokenType::SAFE);
+        } else {
+            addToken(TokenType::QUESTION);
+        }
         break;
     case ':':
-        addToken(TokenType::COLON);
+        if (match(':')) {
+            addToken(TokenType::COLON_COLON);
+        } else {
+            addToken(TokenType::COLON);
+        }
         break;
     case ';':
         addToken(TokenType::SEMICOLON);
@@ -189,15 +199,20 @@ void Scanner::scanToken() {
                 scanComment();
                 collectTrivia(TokenType::COMMENT_BLOCK);
             } else {
-                // Original behavior - skip block comment
+                // Original behavior - skip block comment, error if unterminated
+                bool closed = false;
                 while (!isAtEnd()) {
                     if (peek() == '*' && peekNext() == '/') {
                         advance(); // consume '*'
                         advance(); // consume '/'
+                        closed = true;
                         break;
                     }
                     if (peek() == '\n') line++;
                     advance();
+                }
+                if (!closed) {
+                    error("Unterminated block comment", "*/");
                 }
             }
         } else if (match('=')) {
@@ -234,8 +249,15 @@ void Scanner::scanToken() {
         addToken(TokenType::TILDE);
         break;
     case '@':
-        // Handle annotations
-        annotation();
+        // @-prefixed annotations were removed; @ is now an unexpected character.
+        {
+            if (cstConfig.emitErrorTokens) {
+                Token errorToken = createErrorToken("'@' annotations are no longer supported; use pub/prot directly");
+                tokens.push_back(errorToken);
+            } else {
+                this->error("Unexpected character '@' (annotations removed; use pub/prot)", "valid identifier, number, string, or operator");
+            }
+        }
         break;
     case ' ':
     case '\r':
@@ -282,35 +304,9 @@ void Scanner::scanToken() {
 }
 
 void Scanner::annotation() {
-    // Consume all alphanumeric characters after the @ symbol
-    while (isAlphaNumeric(peek())) {
-        advance();
-    }
-
-    // Get the annotation name (without the @ symbol)
-    std::string annotationName = source.substr(start + 1, current - start - 1);
-
-    // Check for known annotations
-    if (annotationName == "open") {
-        addToken(TokenType::OPEN);
-    } else if (annotationName == "public") {
-        addToken(TokenType::PUBLIC);
-    } else if (annotationName == "private") {
-        addToken(TokenType::PRIVATE);
-    } else if (annotationName == "protected") {
-        addToken(TokenType::PROTECTED);
-    } else if (annotationName == "property") {
-        addToken(TokenType::PROPERTY);
-    } else if (annotationName == "cache") {
-        addToken(TokenType::CACHE);
-    } else {
-        // For unknown annotations, just add the AT_SIGN token
-        addToken(TokenType::AT_SIGN);
-
-        // And then process the identifier separately
-        current = start + 1; // Reset to just after the @ symbol
-        identifier();
-    }
+    // @-annotations were removed; this function is retained only for ABI
+    // compatibility and emits an error if ever invoked.
+    error("'@' annotations are no longer supported; use pub/prot directly", "");
 }
 
 bool Scanner::isAtEnd() const {
@@ -672,19 +668,19 @@ void Scanner::number() {
         }
     }
 
-    // Check for time suffixes (only if we don't have scientific notation)
+    // Check for time suffixes (only if we don't have scientific notation).
+    // Bounds-checked: never read past EOF.
     if (isAlpha(peek()) && peek() != 'e' && peek() != 'E') {
-        if (peek() == 's' && !isAlphaNumeric(peekNext())) {
+        char s1 = peekNext();  // safe: peekNext() returns '\0' at EOF
+        char s2 = (current + 2 < source.size()) ? source[current + 2] : '\0';
+        if (peek() == 's' && !isAlphaNumeric(s1)) {
             advance();
-        } else if (peek() == 'm' && peekNext() == 's' && !isAlphaNumeric(source[current+2])) {
-            advance();
-            advance();
-        } else if (peek() == 'u' && peekNext() == 's' && !isAlphaNumeric(source[current+2])) {
-            advance();
-            advance();
-        } else if (peek() == 'n' && peekNext() == 's' && !isAlphaNumeric(source[current+2])) {
-            advance();
-            advance();
+        } else if (peek() == 'm' && s1 == 's' && !isAlphaNumeric(s2)) {
+            advance(); advance();
+        } else if (peek() == 'u' && s1 == 's' && !isAlphaNumeric(s2)) {
+            advance(); advance();
+        } else if (peek() == 'n' && s1 == 's' && !isAlphaNumeric(s2)) {
+            advance(); advance();
         }
     }
 
@@ -715,7 +711,6 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "interface") return TokenType::INTERFACE;
     if (rest == "and") return TokenType::AND;
     if (rest == "as") return TokenType::AS;
-    if (rest == "class") return TokenType::CLASS;
     if (rest == "frame") return TokenType::FRAME;
     if (rest == "elif") return TokenType::ELIF;
     if (rest == "else") return TokenType::ELSE;
@@ -730,51 +725,46 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "show") return TokenType::SHOW;
     if (rest == "hide") return TokenType::HIDE;
     if (rest == "super") return TokenType::SUPER;
-    if (rest == "this") return TokenType::THIS;
     if (rest == "self") return TokenType::SELF;
     if (rest == "true") return TokenType::TRUE;
     if (rest == "var") return TokenType::VAR;
+    if (rest == "val") return TokenType::VAL;
+    if (rest == "const") return TokenType::CONST;
     if (rest == "while") return TokenType::WHILE;
     if (rest == "parallel") return TokenType::PARALLEL;
     if (rest == "concurrent") return TokenType::CONCURRENT;
-    // if (rest == "async") return TokenType::ASYNC;
-    // if (rest == "await") return TokenType::AWAIT;
+    if (rest == "task") return TokenType::TASK;
+    if (rest == "worker") return TokenType::WORKER;
     if (rest == "break") return TokenType::BREAK;
     if (rest == "continue") return TokenType::CONTINUE;
     if (rest == "import") return TokenType::IMPORT;
+    if (rest == "from") return TokenType::FROM;
     if (rest == "match") return TokenType::MATCH;
     if (rest == "in") return TokenType::IN;
     if (rest == "type") return TokenType::TYPE;
     if (rest == "trait") return TokenType::TRAIT;
-    if (rest == "interface") return TokenType::INTERFACE;
     if (rest == "mixin") return TokenType::MIXIN;
     if (rest == "implements") return TokenType::IMPLEMENTS;
     if (rest == "module") return TokenType::MODULE;
-    if (rest == "public") return TokenType::PUBLIC;
-    if (rest == "private") return TokenType::PRIVATE;
-    if (rest == "protected") return TokenType::PROTECTED;
-    if (rest == "open") return TokenType::OPEN;
     if (rest == "contract") return TokenType::CONTRACT;
     if (rest == "comptime") return TokenType::COMPTIME;
     if (rest == "unsafe") return TokenType::UNSAFE;
     if (rest == "iter") return TokenType::ITER;
     if (rest == "where") return TokenType::WHERE;
-    if (rest == "property") return TokenType::PROPERTY;
-    if (rest == "cache") return TokenType::CACHE;
     if (rest == "enum") return TokenType::ENUM;
     if (rest == "err") return TokenType::ERR;
     if (rest == "ok") return TokenType::OK;
-    if (rest == "val") return TokenType::VAL;
-    if (rest == "from") return TokenType::FROM;
-    
-    // Visibility keywords
+
+    // Visibility keywords — only pub/prot. Vars/fns are private by default
+    // when neither is specified; there is no explicit 'private' keyword.
     if (rest == "pub") return TokenType::PUB;
     if (rest == "prot") return TokenType::PROT;
+
+    // Method / frame modifiers (not visibility). 'data' was removed (traits
+    // cover the same ground); 'loop' was removed (for/while/iter suffice).
     if (rest == "static") return TokenType::STATIC;
     if (rest == "abstract") return TokenType::ABSTRACT;
     if (rest == "final") return TokenType::FINAL;
-    if (rest == "data") return TokenType::DATA;
-    if (rest == "const") return TokenType::CONST;
 
     // Check if the identifier matches a type keyword
     if (rest == "int") return TokenType::INT_TYPE;
@@ -804,12 +794,16 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "array") return TokenType::ARRAY_TYPE;
     if (rest == "dict") return TokenType::DICT_TYPE;
     if (rest == "option") return TokenType::OPTION_TYPE;
-    // Always treat "result" as an identifier to avoid conflicts with variable names
+    // 'result' is treated as an identifier to allow variable names.
     if (rest == "result") return TokenType::IDENTIFIER;
+    // channel/atomic are reserved as type names in the spec but are also used
+    // as builtin function names (channel()). Treat as identifiers so they can
+    // be called; the type system recognises them contextually.
     if (rest == "channel") return TokenType::IDENTIFIER;
     if (rest == "atomic") return TokenType::IDENTIFIER;
     if (rest == "function") return TokenType::FUNCTION_TYPE;
     if (rest == "events") return TokenType::IDENTIFIER;
+    // Built-in functions that should remain available as identifiers:
     if (rest == "sleep") return TokenType::IDENTIFIER;
     if (rest == "assert") return TokenType::IDENTIFIER;
     if (rest == "offer") return TokenType::IDENTIFIER;
@@ -859,8 +853,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "RANGE";
     case TokenType::ELLIPSIS:
         return "ELLIPSIS";
-    case TokenType::AT_SIGN:
-        return "AT_SIGN";
+    case TokenType::COLON_COLON:
+        return "COLON_COLON";
     case TokenType::UNDERSCORE:
         return "UNDERSCORE";
     case TokenType::PLUS:
@@ -969,8 +963,6 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "AND";
     case TokenType::AS:
         return "AS";
-    case TokenType::CLASS:
-        return "CLASS";
     case TokenType::FRAME:
         return "FRAME";
     case TokenType::FALSE:
@@ -1009,8 +1001,6 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "HIDE";
     case TokenType::SUPER:
         return "SUPER";
-    case TokenType::THIS:
-        return "THIS";
     case TokenType::SELF:
         return "SELF";
     case TokenType::TRUE:
@@ -1025,6 +1015,10 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "PARALLEL";
     case TokenType::CONCURRENT:
         return "CONCURRENT";
+    case TokenType::TASK:
+        return "TASK";
+    case TokenType::WORKER:
+        return "WORKER";
     case TokenType::CONTRACT:
         return "CONTRACT";        
     // case TokenType::ASYNC:
@@ -1037,10 +1031,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "CONTINUE";
     case TokenType::IMPORT:
         return "IMPORT";
-    // case TokenType::NONE:
-    //     return "NONE";
-    // case TokenType::THROWS:
-    //     return "THROWS";
+    case TokenType::FROM:
+        return "FROM";
     case TokenType::TYPE:
         return "TYPE";
     case TokenType::TRAIT:
@@ -1059,12 +1051,6 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "IMPLEMENTS";
     case TokenType::MODULE:
         return "MODULE";
-    case TokenType::PUBLIC:
-        return "PUBLIC";
-    case TokenType::PRIVATE:
-        return "PRIVATE";
-    case TokenType::PROTECTED:
-        return "PROTECTED";
     case TokenType::COMPTIME:
         return "COMPTIME";
     case TokenType::UNSAFE:
@@ -1073,12 +1059,6 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "ITER";
     case TokenType::WHERE:
         return "WHERE";
-    case TokenType::PROPERTY:
-        return "PROPERTY";
-    case TokenType::CACHE:
-        return "CACHE";
-    case TokenType::SLEEP:
-        return "SLEEP";
     case TokenType::WHITESPACE:
         return "WHITESPACE";
     case TokenType::NEWLINE:
@@ -1155,11 +1135,14 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "ABSTRACT";
     case TokenType::FINAL:
         return "FINAL";
-    case TokenType::DATA:
-        return "DATA";
     case TokenType::CONST:
         return "CONST";
-        break;
+    case TokenType::AMPERSAND_AMPERSAND:
+        return "AMPERSAND_AMPERSAND";
+    case TokenType::PIPE_PIPE:
+        return "PIPE_PIPE";
+    case TokenType::NOT:
+        return "NOT";
     }
     return "UNKNOWN";
 }
@@ -1206,32 +1189,42 @@ void Scanner::scanTokenCST(const CSTConfig& config) {
         } else if (match('*')) {
             if (config.preserveComments) {
                 // Handle block comment - consume everything until */
+                bool closed = false;
                 while (!isAtEnd()) {
                     if (peek() == '*' && peekNext() == '/') {
                         advance(); // consume '*'
                         advance(); // consume '/'
+                        closed = true;
                         break;
                     }
                     if (peek() == '\n') line++;
                     advance();
+                }
+                if (!closed) {
+                    error("Unterminated block comment", "*/");
                 }
                 addToken(TokenType::COMMENT_BLOCK);
             } else {
                 // Skip block comment as before
+                bool closed = false;
                 while (!isAtEnd()) {
                     if (peek() == '*' && peekNext() == '/') {
                         advance(); // consume '*'
                         advance(); // consume '/'
+                        closed = true;
                         break;
                     }
                     if (peek() == '\n') line++;
                     advance();
                 }
+                if (!closed) {
+                    error("Unterminated block comment", "*/");
+                }
             }
         } else {
-            // Back up and let the default case handle it
+            // Back up only the '/' (do NOT double-back-up — that causes an
+            // infinite loop on '/' not followed by '/' or '*').
             current--; // Back up the '/'
-            current--; // Back up to re-process
             scanToken(); // Use existing logic
         }
         break;
@@ -1263,16 +1256,21 @@ void Scanner::scanComment() {
     } else {
         // Block comment - we're positioned after '/*'
         // Consume until we find '*/'
+        bool closed = false;
         while (!isAtEnd()) {
             if (peek() == '*' && peekNext() == '/') {
                 advance(); // consume '*'
                 advance(); // consume '/'
+                closed = true;
                 break;
             }
             if (peek() == '\n') {
                 line++;
             }
             advance();
+        }
+        if (!closed) {
+            error("Unterminated block comment", "*/");
         }
         // Don't call addToken here - let collectTrivia handle it
     }

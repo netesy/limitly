@@ -94,11 +94,13 @@ RUNTIME_API LmBox* lm_box_nullptr(void);
 RUNTIME_API void* lm_frame_alloc(const char* name, int fields);
 RUNTIME_API LmValue lm_frame_get_field(void* frame, int offset);
 RUNTIME_API void lm_frame_set_field(void* frame, int offset, LmValue value);
+RUNTIME_API LmValue lm_frame_get_field_atomic(void* frame, int offset);
+RUNTIME_API void lm_frame_set_field_atomic(void* frame, int offset, LmValue value);
+RUNTIME_API void lm_frame_field_atomic_add(void* frame, int offset, LmValue value);
+RUNTIME_API void lm_frame_field_atomic_sub(void* frame, int offset, LmValue value);
 
 #ifdef __cplusplus
 }
 #endif
 
 #endif
-RUNTIME_API LmValue lm_frame_get_field_atomic(void* frame, int offset);
-RUNTIME_API void lm_frame_set_field_atomic(void* frame, int offset, LmValue value);

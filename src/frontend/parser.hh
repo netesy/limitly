@@ -211,6 +211,7 @@ public:
 
     // Pattern parsing methods for match statements
     std::shared_ptr<LM::Frontend::AST::Expression> parsePattern();
+    std::shared_ptr<LM::Frontend::AST::Expression> parseSinglePattern();  // one pattern, no or-pattern
     std::shared_ptr<LM::Frontend::AST::Expression> parseBindingPattern();
     std::shared_ptr<LM::Frontend::AST::Expression> parseListPattern();
     std::shared_ptr<LM::Frontend::AST::Expression> parseDictPattern();

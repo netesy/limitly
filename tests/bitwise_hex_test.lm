@@ -1,0 +1,19 @@
+fn main(): int {
+    var a = 0x12;
+    var b = 0x34;
+    var c = a | b;
+    var d = a & b;
+    var e = a ^ b;
+    var f = a << 1;
+    var g = b >> 1;
+    
+    print("a: " + a as str);
+    print("b: " + b as str);
+    print("a | b: " + c as str);
+    print("a & b: " + d as str);
+    print("a ^ b: " + e as str);
+    print("a << 1: " + f as str);
+    print("b >> 1: " + g as str);
+    
+    return 0;
+}

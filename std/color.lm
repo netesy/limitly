@@ -8,16 +8,16 @@ frame Color {
     pub var a: float;
     
     pub init(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0) {
-        this.r = r;
-        this.g = g;
-        this.b = b;
-        this.a = a;
+        self.r = r;
+        self.g = g;
+        self.b = b;
+        self.a = a;
     }
     
-    pub fn to_hex(): string {
-        var ri = (this.r * 255.0) as int;
-        var gi = (this.g * 255.0) as int;
-        var bi = (this.b * 255.0) as int;
+    pub fn to_hex(): str {
+        var ri = (self.r * 255.0) as int;
+        var gi = (self.g * 255.0) as int;
+        var bi = (self.b * 255.0) as int;
         // Hex conversion helper needed or use std.encoding
         return "#000000"; // Placeholder
     }

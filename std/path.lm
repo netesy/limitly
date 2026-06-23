@@ -68,8 +68,8 @@ frame Path {
 
     // Path normalization
     pub fn normalize(): Path {
-        var parts: [str] = [];
-        var normalized_parts: [str] = [];
+        pub var parts: [str] = [];
+        pub var normalized_parts: [str] = [];
         
         // Split path into parts
         if (self.value.starts_with("/")) {

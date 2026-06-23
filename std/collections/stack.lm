@@ -3,7 +3,7 @@
 import std.core as core;
 
 frame Stack {
-    var data: [int];
+    pub var data: [int];
 
     pub fn init(): Stack {
         return Stack(data=[]);
@@ -15,7 +15,7 @@ frame Stack {
 
     // Stack operations
     pub fn push(value: int): Stack {
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         
         // Copy existing data
@@ -34,7 +34,7 @@ frame Stack {
         if (self.data.length == 0) return nil;
         
         var value = self.data[self.data.length - 1];
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         
         // Copy all except last element
@@ -92,7 +92,7 @@ frame Stack {
     }
 
     pub fn reverse(): Stack {
-        var reversed: [int] = [];
+        pub var reversed: [int] = [];
         var i: int = 0;
         
         while (i < self.data.length) {
@@ -104,7 +104,7 @@ frame Stack {
     }
 
     pub fn copy(): Stack {
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         
         while (i < self.data.length) {
@@ -120,7 +120,7 @@ frame Stack {
         if (end > self.data.length) end = self.data.length;
         if (start >= end) return Stack.init();
         
-        var sliced_data: [int] = [];
+        pub var sliced_data: [int] = [];
         var i: int = start;
         var j: int = 0;
         
@@ -149,7 +149,7 @@ frame Stack {
         if (count <= 0) return ([], self);
         if (count > self.data.length) count = self.data.length;
         
-        var popped: [int] = [];
+        pub var popped: [int] = [];
         var i: int = 0;
         var remaining_stack = self;
         
@@ -168,7 +168,7 @@ frame Stack {
     pub fn swap(): Stack {
         if (self.data.length < 2) return self;
         
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         
         // Copy all elements
@@ -188,7 +188,7 @@ frame Stack {
     pub fn rotate(count: int): Stack {
         if (self.data.length <= 1 or count == 0) return self;
         
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         
         // Normalize count
@@ -207,7 +207,7 @@ frame Stack {
 
     // Functional operations
     pub fn map(f: fn(int): int): Stack {
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         
         while (i < self.data.length) {
@@ -219,7 +219,7 @@ frame Stack {
     }
 
     pub fn filter(predicate: fn(int): bool): Stack {
-        var filtered_data: [int] = [];
+        pub var filtered_data: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -285,7 +285,7 @@ frame Stack {
     }
 
     pub fn sort(): Stack {
-        var sorted_data: [int] = [];
+        pub var sorted_data: [int] = [];
         var i: int = 0;
         
         // Copy data

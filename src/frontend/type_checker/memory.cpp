@@ -239,9 +239,10 @@ void TypeChecker::check_double_free(const std::string& name, int line) {
 void TypeChecker::check_multiple_owners(const std::string& name, int line) {
     auto it = variable_memory_info.find(name);
     if (it != variable_memory_info.end()) {
+        // Check if variable is being shared/copied when it should be unique
         if (it->second.memory_state == "owned") {
-            // In a real implementation, we'd track ownership transfers
-            // For now, this is a placeholder
+            // In a real implementation, we'd track reference counts
+            add_error("Multiple owners detected: variable '" + name + "' should have single ownership [Mitigation: Single ownership, compile-time drop]", line);
         }
     }
 }
@@ -255,7 +256,7 @@ void TypeChecker::check_uninitialized_use(const std::string& name, int line) {
     auto it = variable_memory_info.find(name);
     if (it != variable_memory_info.end()) {
         if (it->second.memory_state == "uninitialized") {
-            add_error("Use of uninitialized variable '" + name + "' [Mitigation: Require initialization before use]", line);
+            add_error("Uninitialized use: variable '" + name + "' used before initialization [Mitigation: Require initialization, zero-fill debug]", line);
         }
     }
 }
@@ -281,13 +282,16 @@ void TypeChecker::check_race_condition(const std::string& shared_var, int line) 
 void TypeChecker::check_variable_use(const std::string& name, int line) {
     TypePtr type = lookup_variable(name);
     if (type && (type->tag == TypeTag::Function || type->tag == TypeTag::Int || type->tag == TypeTag::Int64 || type->tag == TypeTag::String || type->tag == TypeTag::Bool)) return;
-    
-    // Check if variable is in memory info
     auto it = variable_memory_info.find(name);
     if (it != variable_memory_info.end()) {
-        if (it->second.memory_state == "dropped") {
+        if (it->second.memory_state == "moved") {
+            add_error("Use after move: variable '" + name + "' was moved and is no longer accessible [Mitigation: Linear types, regions, lifetime checks]", line);
+            check_dangling_pointer(name, line);
+        } else if (it->second.memory_state == "dropped") {
+            add_error("Use after drop: variable '" + name + "' was dropped and is no longer accessible [Mitigation: Single ownership, compile-time drop]", line);
             check_use_after_free(name, line);
         } else if (it->second.memory_state == "uninitialized") {
+            add_error("Use before initialization: variable '" + name + "' is used before being initialized [Mitigation: Require initialization, zero-fill debug]", line);
             check_uninitialized_use(name, line);
         }
     }
@@ -296,11 +300,15 @@ void TypeChecker::check_variable_use(const std::string& name, int line) {
 void TypeChecker::check_variable_move(const std::string& name) {
     TypePtr type = lookup_variable(name);
     if (type && (type->tag == TypeTag::Function || type->tag == TypeTag::Int || type->tag == TypeTag::Int64 || type->tag == TypeTag::String || type->tag == TypeTag::Bool)) return;
-    
-    // Mark variable as moved
     auto it = variable_memory_info.find(name);
     if (it != variable_memory_info.end()) {
-        it->second.memory_state = "moved";
+        if (it->second.memory_state == "moved") {
+            add_error("Double move: variable '" + name + "' was already moved");
+        } else if (it->second.memory_state == "dropped") {
+            add_error("Move after drop: variable '" + name + "' was already dropped");
+        } else {
+            it->second.memory_state = "moved";
+        }
     }
 }
 
@@ -308,7 +316,9 @@ void TypeChecker::check_variable_drop(const std::string& name) {
     auto it = variable_memory_info.find(name);
     if (it != variable_memory_info.end()) {
         if (it->second.memory_state == "dropped") {
-            check_double_free(name, 0);
+            add_error("Double drop: variable '" + name + "' was already dropped");
+        } else if (it->second.memory_state == "moved") {
+            add_error("Drop after move: cannot drop moved variable '" + name + "'");
         } else {
             it->second.memory_state = "dropped";
         }
@@ -318,9 +328,9 @@ void TypeChecker::check_variable_drop(const std::string& name) {
 void TypeChecker::check_borrow_safety(const std::string& var_name) {
     auto it = variable_memory_info.find(var_name);
     if (it != variable_memory_info.end()) {
-        // Check if variable can be borrowed
-        if (it->second.memory_state == "dropped" || it->second.memory_state == "moved") {
-            add_error("Cannot borrow variable '" + var_name + "' - it has been moved or dropped", 0);
+        if (it->second.memory_state != "owned") {
+            add_error("Cannot borrow variable '" + var_name + "' in state '" + 
+                     it->second.memory_state + "'; only owned values can be borrowed");
         }
     }
 }
@@ -332,8 +342,7 @@ void TypeChecker::check_escape_analysis(const std::string& var_name, const std::
 bool TypeChecker::is_variable_alive(const std::string& name) {
     auto it = variable_memory_info.find(name);
     return (it != variable_memory_info.end() && 
-            it->second.memory_state != "dropped" && 
-            it->second.memory_state != "moved");
+            (it->second.memory_state == "owned" || it->second.memory_state == "borrowed"));
 }
 
 void TypeChecker::mark_variable_moved(const std::string& name) {

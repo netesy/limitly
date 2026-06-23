@@ -3,7 +3,7 @@
 import std.core as core;
 
 frame PriorityQueue {
-    var data: [int];
+    pub var data: [int];
     var comparator: fn(int, int): bool;  // returns true if first should come before second
 
     pub fn init(): PriorityQueue {
@@ -15,7 +15,7 @@ frame PriorityQueue {
     }
 
     pub fn enqueue(value: int): PriorityQueue {
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         
         // Copy existing data
@@ -50,7 +50,7 @@ frame PriorityQueue {
         var result = self.data[0];
         
         // Move last element to root
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 1;
         while (i < self.data.length) {
             new_data[i - 1] = self.data[i];
@@ -114,7 +114,7 @@ frame PriorityQueue {
     }
 
     pub fn copy(): PriorityQueue {
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         while (i < self.data.length) {
             new_data[i] = self.data[i];
@@ -138,7 +138,7 @@ frame PriorityQueue {
     }
 
     pub fn to_array(): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         while (i < self.data.length) {
             result[i] = self.data[i];
@@ -148,7 +148,7 @@ frame PriorityQueue {
     }
 
     pub fn to_sorted_array(): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var temp = self.copy();
         
         while (!temp.is_empty()) {
@@ -203,7 +203,7 @@ frame PriorityQueue {
         var index = self.find_index(old_value);
         if (index == nil) return self;
         
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         while (i < self.data.length) {
             new_data[i] = if (i == index) then new_value else self.data[i];
@@ -263,7 +263,7 @@ frame PriorityQueue {
         
         // Replace with last element and reheapify
         var last_value = self.data[self.data.length - 1];
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         
         while (i < self.data.length - 1) {
@@ -318,7 +318,7 @@ frame PriorityQueue {
         return PriorityQueue(data=new_data, comparator=self.comparator);
     }
 
-    private fn find_index(value: int): int? {
+    fn find_index(value: int): int? {
         var i: int = 0;
         while (i < self.data.length) {
             if (self.data[i] == value) return i;

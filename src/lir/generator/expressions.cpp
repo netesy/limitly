@@ -1265,6 +1265,12 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             
             LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
             inst.imm = intrinsic->type_id; // For MemoryLoad/Store
+            // H34: Use UINT32_MAX as the "no data arg" sentinel for
+            // ResourceCall so that an argument in register 0 is not
+            // silently dropped by the VM.
+            if (intrinsic->opcode == LIR_Op::ResourceCall) {
+                inst.b = UINT32_MAX;
+            }
             if (intrinsic->opcode == LIR_Op::ResourceCall) {
                 if (arg_regs.size() >= 2) {
                     inst.a = arg_regs[0];
@@ -1546,6 +1552,12 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 }
                 LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
             inst.imm = intrinsic->type_id; // For MemoryLoad/Store
+            // H34: Use UINT32_MAX as the "no data arg" sentinel for
+            // ResourceCall so that an argument in register 0 is not
+            // silently dropped by the VM.
+            if (intrinsic->opcode == LIR_Op::ResourceCall) {
+                inst.b = UINT32_MAX;
+            }
             if (intrinsic->opcode == LIR_Op::ResourceCall) {
                 if (arg_regs.size() >= 2) {
                     inst.a = arg_regs[0];
@@ -1607,7 +1619,10 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         } else if (BuiltinUtils::isBuiltinFunction(func_name)) {
            // std::cout << "[DEBUG] LIR Generator: Generating builtin call to '" << func_name << "'" << std::endl;
             
-            // Special handling for channel() function
+            // Special handling for channel() function.
+            // Use ChannelAlloc (not ResourceCreate) so the channel register
+            // holds a pointer to a Channel object — ChannelSend/Recv/Poll/etc.
+            // check IS_PTR on the register and need a real pointer.
             if (func_name == "channel") {
                 if (!expr.arguments.empty()) {
                     report_error("channel() function takes no arguments");
@@ -1617,7 +1632,8 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
                 set_register_language_type(result, channel_type);
                 set_register_abi_type(result, Type::Ptr);
-                LIR_Inst ch_inst(LIR_Op::ResourceCreate, Type::Ptr, result, 0, 0, (uint32_t)ResourceType::CHANNEL);
+                // ChannelAlloc: dst = channel pointer, a = capacity (0 = default 1024)
+                LIR_Inst ch_inst(LIR_Op::ChannelAlloc, Type::Ptr, result, 0, 0);
                 emit_instruction(ch_inst);
                 return result;
             }
@@ -1769,6 +1785,12 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(intrinsic_name)) {
                     LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
             inst.imm = intrinsic->type_id; // For MemoryLoad/Store
+            // H34: Use UINT32_MAX as the "no data arg" sentinel for
+            // ResourceCall so that an argument in register 0 is not
+            // silently dropped by the VM.
+            if (intrinsic->opcode == LIR_Op::ResourceCall) {
+                inst.b = UINT32_MAX;
+            }
             if (intrinsic->opcode == LIR_Op::ResourceCall) {
                 if (arg_regs.size() >= 2) {
                     inst.a = arg_regs[0];

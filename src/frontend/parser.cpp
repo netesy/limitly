@@ -42,19 +42,24 @@ bool Parser::isAtEnd() {
 
 Token Parser::consume(TokenType type, const std::string &message) {
     if (check(type)) return advance();
-    
+
+    // Capture position BEFORE advancing so error messages point to the right line.
+    size_t errorLine = peek().line;
+    size_t errorStart = peek().start;
+
     // Report error but don't throw - let parser continue
     error(message);
-    
+
     // Advance to ensure progress and avoid infinite loops
     if (!isAtEnd()) advance();
 
-    // Return a dummy token to allow parsing to continue
+    // Return a dummy token to allow parsing to continue.
+    // Use the captured position (pre-advance) so error reports are accurate.
     Token dummy;
     dummy.type = type;
     dummy.lexeme = "";
-    dummy.line = peek().line;
-    dummy.start = peek().start;
+    dummy.line = errorLine;
+    dummy.start = errorStart;
     return dummy;
 }
 
@@ -631,15 +636,12 @@ std::shared_ptr<LM::Frontend::AST::Program> Parser::parse() {
     return program;
 }
 
-// Parse declarations
-// Helper to collect leading annotations
+// Helper to collect leading visibility tokens that were parsed as annotations
+// in older versions. With @-annotations removed and `private` no longer a
+// keyword, this is a no-op retained for ABI compatibility — visibility is
+// handled in declaration().
 std::vector<Token> Parser::collectAnnotations() {
     std::vector<Token> annotations;
-    while (check(TokenType::PUBLIC) || check(TokenType::PRIVATE) || check(TokenType::PROTECTED)) {
-        // Note: PUB, PROT, STATIC, ABSTRACT, FINAL, and DATA are not collected as annotations
-        // They are handled as visibility/class modifiers in the declaration() function
-        annotations.push_back(advance());
-    }
     return annotations;
 }
 

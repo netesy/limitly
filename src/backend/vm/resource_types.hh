@@ -7,6 +7,7 @@ namespace LM {
 namespace Backend {
 namespace VM {
 
+// NOTE: This enum must stay in sync with the mirror in src/lir/lir.hh
 enum class ResourceType : uint32_t {
     FILE = 0,
     SOCKET = 1,
@@ -18,7 +19,9 @@ enum class ResourceType : uint32_t {
     TASK = 7,
     LIBRARY = 8,
     STDOUT = 9,
-    STDERR = 10
+    STDERR = 10,
+    MEMORY = 11,
+    ENTROPY = 12
 };
 
 enum class ResourceOperation : uint32_t {
@@ -36,7 +39,15 @@ enum class ResourceOperation : uint32_t {
     PUSH = 11,
     POP = 12,
     GET_STATE = 13,
-    SET_STATE = 14
+    SET_STATE = 14,
+    COPY = 15,
+    FILL = 16,
+    COMPARE = 17,
+    ADD_PTR = 18,
+    SUB_PTR = 19,
+    PTR_DIFF = 20,
+    ALIGN_PTR = 21,
+    IS_ALIGNED = 22
 };
 
 } // namespace VM

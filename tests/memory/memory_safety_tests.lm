@@ -19,7 +19,7 @@ print(moved_to);  // OK: moved_to owns the value
 
 // Test 4: Reference creation and validation
 var original: int = 300;
-// In a real implementation, this would create a reference
+// In a real implementation, self would create a reference
 var reference = original;  // Creates reference to original
 print(reference);  // OK: Reference is valid
 

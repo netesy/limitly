@@ -1,31 +1,31 @@
 // Standard Library Bytes Module
 
 frame ByteBuffer {
-    var data: [int];
+    pub var data: [int] = [];
     
     pub init(initial: [int] = []) {
-        this.data = initial;
+        self.data = initial;
     }
     
     pub fn append(byte: int) {
-        this.data = this.data + [byte % 256];
+        self.data = self.data + [byte % 256];
     }
     
     pub fn append_all(bytes: [int]) {
-        this.data = this.data + bytes;
+        self.data = self.data + bytes;
     }
     
     pub fn get(idx: int): int {
-        return this.data[idx];
+        return self.data[idx];
     }
     
-    pub fn len(): int { return len(this.data); }
+    pub fn len(): int { return len(self.data); }
     
-    pub fn to_hex(): string {
+    pub fn to_hex(): str {
         var hex = "0123456789abcdef";
         var res = "";
-        for (var i = 0; i < len(this.data); i = i + 1) {
-            var b = this.data[i];
+        for (var i = 0; i < len(self.data); i = i + 1) {
+            var b = self.data[i];
             res = res + substring(hex, (b / 16) % 16, (b / 16) % 16 + 1);
             res = res + substring(hex, b % 16, b % 16 + 1);
         }

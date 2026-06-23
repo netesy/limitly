@@ -1546,13 +1546,95 @@ void Generator::emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM:
 
 
 void Generator::emit_dict_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg dict_reg) {
-    // Convert dict to list of tuples using DictItems operation
-    // The runtime does the heavy lifting (walking the hash table)
+    // Convert dict to list of (key, value) tuples using DictItems operation.
+    // The runtime does the heavy lifting (walking the hash table).
     LIR::Reg items_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::DictItems, Type::Ptr, items_reg, dict_reg));
-    
-    // Iterate the list normally using existing list iteration
-    emit_list_var_iter_stmt(stmt, items_reg);
+
+    if (stmt.loopVars.size() == 2) {
+        // Destructuring form: iter (k, v in dict) { ... }
+        // Iterate the items list and unpack each tuple into k and v.
+        const std::string& key_var = stmt.loopVars[0];
+        const std::string& val_var = stmt.loopVars[1];
+
+        LIR_BasicBlock* header_block = create_basic_block("dict_var_iter_header");
+        LIR_BasicBlock* body_block = create_basic_block("dict_var_iter_body");
+        LIR_BasicBlock* exit_block = create_basic_block("dict_var_iter_exit");
+
+        enter_scope();
+        enter_loop();
+        set_loop_labels(header_block->id, exit_block->id, 0);
+
+        Reg key_reg = allocate_register();
+        Reg val_reg = allocate_register();
+        bind_variable(key_var, key_reg);
+        bind_variable(val_var, val_reg);
+
+        // index = 0
+        Reg index_reg = allocate_register();
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, make_i64(0)));
+        set_register_type(index_reg, int_type);
+
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(get_current_block(), header_block);
+
+        set_current_block(header_block);
+        Reg len_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, len_reg, items_reg));
+        set_register_type(len_reg, int_type);
+
+        Reg cmp_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp_reg, index_reg, len_reg));
+        set_register_type(cmp_reg, std::make_shared<::Type>(::TypeTag::Bool));
+
+        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp_reg, 0, exit_block->id));
+        add_block_edge(header_block, body_block);
+        add_block_edge(header_block, exit_block);
+
+        set_current_block(body_block);
+        // Get the (k, v) tuple at index
+        Reg tuple_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, tuple_reg, items_reg, index_reg));
+        set_register_type(tuple_reg, std::make_shared<::Type>(::TypeTag::Any));
+
+        // Unpack: tuple[0] = key, tuple[1] = value
+        Reg idx0 = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx0, make_i64(0)));
+        set_register_type(idx0, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, key_reg, tuple_reg, idx0));
+        set_register_type(key_reg, std::make_shared<::Type>(::TypeTag::Any));
+
+        Reg idx1 = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx1, make_i64(1)));
+        set_register_type(idx1, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, val_reg, tuple_reg, idx1));
+        set_register_type(val_reg, std::make_shared<::Type>(::TypeTag::Any));
+
+        // Body
+        if (stmt.body) {
+            emit_stmt(*stmt.body);
+        }
+
+        // index++
+        Reg one_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
+        set_register_type(one_reg, int_type);
+        Reg next_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Add, Type::I64, next_reg, index_reg, one_reg));
+        set_register_type(next_reg, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, next_reg, 0));
+
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(get_current_block(), header_block);
+
+        set_current_block(exit_block);
+        exit_loop();
+        exit_scope();
+    } else {
+        // Single loop variable: iterate items list, each item is a (k, v) tuple.
+        emit_list_var_iter_stmt(stmt, items_reg);
+    }
 }
 
 

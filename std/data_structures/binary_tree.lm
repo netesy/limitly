@@ -96,7 +96,7 @@ frame BinaryTree {
     }
 
     pub fn inorder(): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         
         if (self.left != nil) {
             var left_result = self.left.inorder();
@@ -122,7 +122,7 @@ frame BinaryTree {
     }
 
     pub fn preorder(): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         result[0] = self.value;
         
         if (self.left != nil) {
@@ -147,7 +147,7 @@ frame BinaryTree {
     }
 
     pub fn postorder(): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         
         if (self.left != nil) {
             var left_result = self.left.postorder();
@@ -173,8 +173,8 @@ frame BinaryTree {
     }
 
     pub fn level_order(): [int] {
-        var result: [int] = [];
-        var queue: [(BinaryTree?, int)] = [(self, 0)];
+        pub var result: [int] = [];
+        pub var queue: [(BinaryTree?, int)] = [(self, 0)];
         var queue_front = 0;
         
         while (queue_front < queue.length) {
@@ -326,7 +326,7 @@ frame BinaryTree {
         return self.to_string_pretty_helper("", true);
     }
 
-    private fn to_string_pretty_helper(prefix: str, is_last: bool): str {
+    fn to_string_pretty_helper(prefix: str, is_last: bool): str {
         var result = "";
         
         result = result + prefix;

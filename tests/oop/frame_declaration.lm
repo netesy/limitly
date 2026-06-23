@@ -8,11 +8,11 @@ frame Person {
     prot email: str;
 
     pub fn greet(): str {
-        return "Hello, {this.name}";
+        return "Hello, {self.name}";
     }
 
     pub fn birthday() {
-        this.age = this.age + 1;
+        self.age = self.age + 1;
     }
 }
 
@@ -22,12 +22,12 @@ frame Point {
     pub y: int;
 
     pub init(px: int, py: int) {
-        this.x = px;
-        this.y = py;
+        self.x = px;
+        self.y = py;
     }
 
     pub fn distance(): int {
-        return this.x + this.y;
+        return self.x + self.y;
     }
 }
 
@@ -36,7 +36,7 @@ frame Resource {
     pub id: int;
 
     pub init(resource_id: int) {
-        this.id = resource_id;
+        self.id = resource_id;
     }
 
     pub deinit() {
@@ -57,11 +57,11 @@ frame BankAccount {
     prot balance: int;
 
     pub fn deposit(amount: int) {
-        this.balance = this.balance + amount;
+        self.balance = self.balance + amount;
     }
 
     prot fn calculateInterest(): int {
-        return this.balance / 100;
+        return self.balance / 100;
     }
 }
 

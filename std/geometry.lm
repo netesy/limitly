@@ -9,24 +9,24 @@ frame Rect {
     pub var h: float;
     
     pub init(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0) {
-        this.x = x;
-        this.y = y;
-        this.w = w;
-        this.h = h;
+        self.x = x;
+        self.y = y;
+        self.w = w;
+        self.h = h;
     }
     
     pub fn contains(px: float, py: float): bool {
-        return px >= this.x and px <= this.x + this.w and py >= this.y and py <= this.y + this.h;
+        return px >= self.x and px <= self.x + self.w and py >= self.y and py <= self.y + self.h;
     }
     
     pub fn intersects(other: Rect): bool {
-        return !(other.x > this.x + this.w or 
-                 other.x + other.w < this.x or 
-                 other.y > this.y + this.h or 
-                 other.y + other.h < this.y);
+        return !(other.x > self.x + self.w or 
+                 other.x + other.w < self.x or 
+                 other.y > self.y + self.h or 
+                 other.y + other.h < self.y);
     }
     
-    pub fn area(): float { return this.w * this.h; }
+    pub fn area(): float { return self.w * self.h; }
 }
 
 frame Circle {
@@ -35,16 +35,16 @@ frame Circle {
     pub var r: float;
     
     pub init(x: float = 0.0, y: float = 0.0, r: float = 0.0) {
-        this.x = x;
-        this.y = y;
-        this.r = r;
+        self.x = x;
+        self.y = y;
+        self.r = r;
     }
     
     pub fn contains(px: float, py: float): bool {
-        var dx = px - this.x;
-        var dy = py - this.y;
-        return dx * dx + dy * dy <= this.r * this.r;
+        var dx = px - self.x;
+        var dy = py - self.y;
+        return dx * dx + dy * dy <= self.r * self.r;
     }
     
-    pub fn area(): float { return 3.1415926535 * this.r * this.r; }
+    pub fn area(): float { return 3.1415926535 * self.r * self.r; }
 }

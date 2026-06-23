@@ -986,7 +986,7 @@ std::string ASTPrinter::tokenTypeToString(LM::Frontend::TokenType type) const {
         case LM::Frontend::TokenType::ARROW: return "->";
         case LM::Frontend::TokenType::RANGE: return "..";
         case LM::Frontend::TokenType::ELLIPSIS: return "...";
-        case LM::Frontend::TokenType::AT_SIGN: return "@";
+        case LM::Frontend::TokenType::COLON_COLON: return "::";
         
         // Operators
         case LM::Frontend::TokenType::PLUS: return "+";
@@ -1054,7 +1054,7 @@ std::string ASTPrinter::tokenTypeToString(LM::Frontend::TokenType type) const {
         // Keywords
         case LM::Frontend::TokenType::AND: return "and";
         case LM::Frontend::TokenType::OR: return "or";
-        case LM::Frontend::TokenType::CLASS: return "class";
+        case LM::Frontend::TokenType::FRAME: return "frame";
         case LM::Frontend::TokenType::FALSE: return "false";
         case LM::Frontend::TokenType::FN: return "fn";
         case LM::Frontend::TokenType::ELSE: return "else";

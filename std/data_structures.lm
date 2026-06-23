@@ -85,7 +85,7 @@ frame BinaryTree {
     }
 
     pub fn inorder(): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         
         if (self.left != nil) {
             var left_result = self.left.inorder();
@@ -111,7 +111,7 @@ frame BinaryTree {
     }
 
     pub fn preorder(): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         result[0] = self.value;
         
         if (self.left != nil) {
@@ -136,7 +136,7 @@ frame BinaryTree {
     }
 
     pub fn postorder(): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         
         if (self.left != nil) {
             var left_result = self.left.postorder();
@@ -218,7 +218,7 @@ frame BinaryTree {
 
 // Graph frame for network data structures
 frame Graph {
-    var vertices: [int];
+    pub var vertices: [int];
     var edges: {int: [int]};  // adjacency list representation
     var directed: bool;
 
@@ -229,7 +229,7 @@ frame Graph {
     pub fn add_vertex(vertex: int): Graph {
         if (self.contains_vertex(vertex)) return self;
         
-        var new_vertices: [int] = [];
+        pub var new_vertices: [int] = [];
         var i: int = 0;
         while (i < self.vertices.length) {
             new_vertices[i] = self.vertices[i];
@@ -275,7 +275,7 @@ frame Graph {
         if (!self.contains_vertex(vertex)) return self;
         
         // Remove from vertices list
-        var new_vertices: [int] = [];
+        pub var new_vertices: [int] = [];
         var i: int = 0;
         var j: int = 0;
         while (i < self.vertices.length) {
@@ -286,14 +286,14 @@ frame Graph {
             i = i + 1;
         }
         
-        // Remove all edges to/from this vertex
+        // Remove all edges to/from self vertex
         var new_edges: {int: [int]} = {};
         i = 0;
         while (i < self.vertices.length) {
             var v = self.vertices[i];
             if (v != vertex) {
                 var edges = self.edges[v];
-                var filtered_edges: [int] = [];
+                pub var filtered_edges: [int] = [];
                 var k: int = 0;
                 var l: int = 0;
                 while (k < edges.length) {
@@ -318,7 +318,7 @@ frame Graph {
         var from_edges = new_edges[from];
         
         // Remove edge from adjacency list
-        var filtered_edges: [int] = [];
+        pub var filtered_edges: [int] = [];
         var i: int = 0;
         var j: int = 0;
         while (i < from_edges.length) {
@@ -333,7 +333,7 @@ frame Graph {
         // Remove reverse edge for undirected graphs
         if (!self.directed) {
             var to_edges = new_edges[to];
-            var filtered_to_edges: [int] = [];
+            pub var filtered_to_edges: [int] = [];
             i = 0;
             j = 0;
             while (i < to_edges.length) {
@@ -401,8 +401,8 @@ frame Graph {
         if (!self.contains_vertex(start)) return [];
         
         var visited: {int: bool} = {};
-        var queue: [int] = [];
-        var result: [int] = [];
+        pub var queue: [int] = [];
+        pub var result: [int] = [];
         
         queue[0] = start;
         visited[start] = true;
@@ -432,7 +432,7 @@ frame Graph {
         if (!self.contains_vertex(start)) return [];
         
         var visited: {int: bool} = {};
-        var result: [int] = [];
+        pub var result: [int] = [];
         
         fn dfs_visit(vertex: int): nil {
             visited[vertex] = true;
@@ -479,7 +479,7 @@ frame Graph {
 
 // Priority Queue frame
 frame PriorityQueue {
-    var data: [int];
+    pub var data: [int];
     var comparator: fn(int, int): bool;  // returns true if first should come before second
 
     pub fn init(): PriorityQueue {
@@ -491,7 +491,7 @@ frame PriorityQueue {
     }
 
     pub fn enqueue(value: int): PriorityQueue {
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 0;
         
         // Copy existing data
@@ -526,7 +526,7 @@ frame PriorityQueue {
         var result = self.data[0];
         
         // Move last element to root
-        var new_data: [int] = [];
+        pub var new_data: [int] = [];
         var i: int = 1;
         while (i < self.data.length) {
             new_data[i - 1] = self.data[i];

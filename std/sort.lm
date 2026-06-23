@@ -29,8 +29,10 @@ fn partition(items: [any], low: int, high: int): int {
     var i = low - 1;
     var j = high + 1;
     while (true) {
-        do { i = i + 1; } while (items[i] < pivot);
-        do { j = j - 1; } while (items[j] > pivot);
+        i = i + 1;
+        while (items[i] < pivot) { i = i + 1; }
+        j = j - 1;
+        while (items[j] > pivot) { j = j - 1; }
         if (i >= j) return j;
         var temp = items[i];
         items[i] = items[j];

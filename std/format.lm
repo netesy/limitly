@@ -243,7 +243,7 @@ frame Format {
     }
 
     // Utility methods
-    private fn repeat_string(char: str, count: int): str {
+    fn repeat_string(char: str, count: int): str {
         var result = "";
         var i: int = 0;
         while (i < count) {
@@ -253,7 +253,7 @@ frame Format {
         return result;
     }
 
-    private fn int_to_binary(value: int): str {
+    fn int_to_binary(value: int): str {
         if (value == 0) return "0";
         
         var result = "";
@@ -267,7 +267,7 @@ frame Format {
         return result;
     }
 
-    private fn int_to_octal(value: int): str {
+    fn int_to_octal(value: int): str {
         if (value == 0) return "0";
         
         var result = "";
@@ -281,7 +281,7 @@ frame Format {
         return result;
     }
 
-    private fn int_to_hexadecimal(value: int): str {
+    fn int_to_hexadecimal(value: int): str {
         if (value == 0) return "0";
         
         var result = "";
@@ -297,7 +297,7 @@ frame Format {
         return result;
     }
 
-    private fn get_dict_keys(dict: {str: str}): [str] {
+    fn get_dict_keys(dict: {str: str}): [str] {
         // Stub - would need proper dictionary key extraction
         return [];
     }

@@ -4,6 +4,7 @@
 #include <cstring>
 #include <algorithm>
 #include <cstdio>
+#include <stdexcept>
 #include "../fiber.hh"
 #include "../../lir/functions.hh"
 #include "../../lir/function_registry.hh"
@@ -152,8 +153,8 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::DictCreate: case LIR::LIR_Op::DictSet: case LIR::LIR_Op::DictGet: case LIR::LIR_Op::DictHas:
             case LIR::LIR_Op::DictLen: case LIR::LIR_Op::DictItems: case LIR::LIR_Op::TupleCreate: case LIR::LIR_Op::TupleSet:
             case LIR::LIR_Op::TupleGet: case LIR::LIR_Op::TupleLen: execute_collections(pc); break;
-            case LIR::LIR_Op::NewFrame: case LIR::LIR_Op::ConstructError: case LIR::LIR_Op::ConstructOk:
-            case LIR::LIR_Op::IsError: case LIR::LIR_Op::Unwrap: case LIR::LIR_Op::FrameGetField:
+            case LIR::LIR_Op::NewFrame:
+            case LIR::LIR_Op::FrameGetField:
             case LIR::LIR_Op::FrameSetField: case LIR::LIR_Op::FrameGetFieldAtomic: case LIR::LIR_Op::FrameSetFieldAtomic:
             case LIR::LIR_Op::FrameFieldAtomicAdd: case LIR::LIR_Op::FrameFieldAtomicSub:
             case LIR::LIR_Op::FrameCallMethod: case LIR::LIR_Op::FrameCallInit: case LIR::LIR_Op::FrameCallDeinit:
@@ -166,15 +167,22 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::And: case LIR::LIR_Op::Or: case LIR::LIR_Op::Xor: case LIR::LIR_Op::Shl: case LIR::LIR_Op::Shr: execute_bitwise(pc); break;
             case LIR::LIR_Op::ChannelAlloc: case LIR::LIR_Op::ChannelSend: case LIR::LIR_Op::ChannelOffer:
             case LIR::LIR_Op::ChannelRecv: case LIR::LIR_Op::ChannelPoll: case LIR::LIR_Op::ChannelClose:
-            case LIR::LIR_Op::ChannelHasData: case LIR::LIR_Op::SchedulerInit: case LIR::LIR_Op::SchedulerRun:
-            case LIR::LIR_Op::SchedulerAddTask: case LIR::LIR_Op::ParallelInit: case LIR::LIR_Op::ParallelSync:
+            case LIR::LIR_Op::ChannelHasData: case LIR::LIR_Op::ChannelPush: case LIR::LIR_Op::ChannelPop:
+            case LIR::LIR_Op::SchedulerInit: case LIR::LIR_Op::SchedulerRun:
+            case LIR::LIR_Op::SchedulerTick: case LIR::LIR_Op::SchedulerAddTask:
+            case LIR::LIR_Op::GetTickCount: case LIR::LIR_Op::DelayUntil:
+            case LIR::LIR_Op::ParallelInit: case LIR::LIR_Op::ParallelSync:
             case LIR::LIR_Op::TaskContextAlloc: case LIR::LIR_Op::TaskContextInit: case LIR::LIR_Op::TaskSetField:
-            case LIR::LIR_Op::TaskGetField: case LIR::LIR_Op::SharedCellAlloc: case LIR::LIR_Op::SharedCellLoad:
+            case LIR::LIR_Op::TaskGetField: case LIR::LIR_Op::TaskGetState: case LIR::LIR_Op::TaskSetState:
+            case LIR::LIR_Op::SharedCellAlloc: case LIR::LIR_Op::SharedCellLoad:
             case LIR::LIR_Op::SharedCellStore: case LIR::LIR_Op::SharedCellAdd: case LIR::LIR_Op::SharedCellSub:
             case LIR::LIR_Op::ResourceCreate: case LIR::LIR_Op::ResourceDestroy: case LIR::LIR_Op::ResourceCall:
                 execute_concurrency(pc); break;
             case LIR::LIR_Op::LoadGlobal: case LIR::LIR_Op::StoreGlobal: execute_modules(pc); break;
-            case LIR::LIR_Op::MakeEnum: case LIR::LIR_Op::GetTag: case LIR::LIR_Op::GetPayload: execute_objects(pc); break;
+            case LIR::LIR_Op::MakeEnum: case LIR::LIR_Op::GetTag: case LIR::LIR_Op::GetPayload:
+            case LIR::LIR_Op::ConstructError: case LIR::LIR_Op::ConstructOk:
+            case LIR::LIR_Op::IsError: case LIR::LIR_Op::Unwrap:
+            case LIR::LIR_Op::UnwrapOr: execute_objects(pc); break;
             case LIR::LIR_Op::StringIndex: case LIR::LIR_Op::ToString: case LIR::LIR_Op::STR_CONCAT:
             case LIR::LIR_Op::STR_FORMAT: execute_strings(pc); break;
             case LIR::LIR_Op::Cast: execute_cast(pc); break;
@@ -209,7 +217,14 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                 execute_ffi(pc); break;
             case LIR::LIR_Op::Mov: registers[pc->dst] = registers[pc->a]; break;
             case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret: if (pc->a != UINT32_MAX) registers[0] = registers[pc->a]; return;
-            default: std::cerr << "JULES_DEBUG: Unknown opcode: " << (int)pc->op << " at PC " << (pc - instructions_ptr) << " [" << LIR::lir_op_to_string(pc->op) << "]" << std::endl; break;
+            default:
+                // H36: previously this printed a debug message and silently
+                // continued, which corrupted VM state. Throw so the caller
+                // sees the real failure.
+                throw std::runtime_error(
+                    "VM: unknown opcode " + std::to_string(static_cast<int>(pc->op)) +
+                    " at pc=" + std::to_string(static_cast<uint64_t>(pc - instructions_ptr)) +
+                    " (" + LIR::lir_op_to_string(pc->op) + ")");
         }
         pc++;
     }

@@ -113,7 +113,7 @@ frame Hash {
     }
 
     // Private helper methods
-    private fn simple_hash(data: str, bit_length: int): str {
+    fn simple_hash(data: str, bit_length: int): str {
         // Very simple hash function for demonstration
         // In reality, would use proper cryptographic hash algorithms
         
