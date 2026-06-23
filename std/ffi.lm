@@ -708,7 +708,7 @@ fn unregister_callback(callback_id: int): nil {
     var func_ptr: fnptr = global_callback_registry.callbacks[callback_id];
     if (func_ptr != 0) {
         // Free the native trampoline
-        delete global_callback_registry.callbacks[callback_id];
+        global_callback_registry.callbacks[callback_id] = 0;
     }
 }
 

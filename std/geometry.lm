@@ -46,5 +46,5 @@ frame Circle {
         return dx * dx + dy * dy <= self.r * self.r;
     }
     
-    pub fn area(): float { return 3.1415926535 * self.r * self.r; }
+    pub fn area(): float { return math.PI * self.r * self.r; }
 }

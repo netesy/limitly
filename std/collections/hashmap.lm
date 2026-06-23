@@ -11,8 +11,8 @@ frame HashMap {
     }
 
     pub fn from_pairs(pairs: [(str, int)]): HashMap {
-        pub var keys: [str] = [];
-        pub var values: [int] = [];
+        var keys: [str] = [];
+        var values: [int] = [];
         var i: int = 0;
         
         while (i < pairs.length) {
@@ -31,17 +31,17 @@ frame HashMap {
         
         if (index != nil) {
             // Update existing key
-            pub var new_values: [int] = [];
+            var new_values: [int] = [];
             var i: int = 0;
             while (i < self.values.length) {
-                new_values[i] = if (i == index) then value else self.values[i];
+                new_values[i] = (i == index) ? value : self.values[i];
                 i = i + 1;
             }
             return HashMap(keys=self.keys, values=new_values);
         } else {
             // Add new key-value pair
-            pub var new_keys: [str] = [];
-            pub var new_values: [int] = [];
+            var new_keys: [str] = [];
+            var new_values: [int] = [];
             var i: int = 0;
             
             while (i < self.keys.length) {
@@ -67,8 +67,8 @@ frame HashMap {
         var index = self.find_key_index(key);
         if (index == nil) return self;
         
-        pub var new_keys: [str] = [];
-        pub var new_values: [int] = [];
+        var new_keys: [str] = [];
+        var new_values: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -119,7 +119,7 @@ frame HashMap {
     }
 
     pub fn entries(): [(str, int)] {
-        pub var entries: [(str, int)] = [];
+        var entries: [(str, int)] = [];
         var i: int = 0;
         
         while (i < self.keys.length) {
@@ -132,7 +132,7 @@ frame HashMap {
 
     // Functional operations
     pub fn map_values(f: fn(int): int): HashMap {
-        pub var new_values: [int] = [];
+        var new_values: [int] = [];
         var i: int = 0;
         
         while (i < self.values.length) {
@@ -144,8 +144,8 @@ frame HashMap {
     }
 
     pub fn filter(predicate: fn(str, int): bool): HashMap {
-        pub var new_keys: [str] = [];
-        pub var new_values: [int] = [];
+        var new_keys: [str] = [];
+        var new_values: [int] = [];
         var i: int = 0;
         var j: int = 0;
         

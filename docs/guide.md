@@ -37,11 +37,8 @@ Welcome to the official guide for the Limit programming language. This document 
     *   [Frame Members and Modifiers](#frame-members-and-modifiers)
     *   [Fields and Methods](#fields-and-methods)
     *   [The `init` Constructor](#the-init-constructor)
-    *   [The `this` Keyword](#the-this-keyword)
-    *   [Inheritance](#inheritance)
-    *   [Method Overriding](#method-overriding)
-    *   [The `super` Keyword](#the-super-keyword)
-    *   [Polymorphism](#polymorphism)
+    *   [The `self` Keyword](#the-self-keyword)
+    *   [Trait-Based Composition](#trait-based-composition)
 7.  [Modules and Imports](#modules-and-imports)
     *   [Defining a Module](#defining-a-module)
     *   [Importing a Module](#importing-a-module)
@@ -641,7 +638,7 @@ frame Greeter {
     var name: str = "World";
 
     fn say_hello() {
-        print("Hello, {this.name}!");
+        print("Hello, {self.name}!");
     }
 }
 
@@ -703,11 +700,11 @@ frame Circle : Shape {
     var radius: float;
 
     fn init(r: float) {
-        this.radius = r;
+        self.radius = r;
     }
 
     fn area(): float {
-        return 3.14 * this.radius * this.radius;
+        return 3.14 * self.radius * self.radius;
     }
 }
 ```
@@ -752,12 +749,12 @@ frame Person {
     var age: int;
 
     fn init(name_param: str, age_param: int) {
-        this.name = name_param;
-        this.age = age_param;
+        self.name = name_param;
+        self.age = age_param;
     }
 
     fn introduce() {
-        print("Hi, I'm {this.name} and I'm {this.age} years old.");
+        print("Hi, I'm {self.name} and I'm {self.age} years old.");
     }
 }
 
@@ -765,76 +762,55 @@ var person: Person = Person("Jules", 28);
 person.introduce(); // Output: Hi, I'm Jules and I'm 28 years old.
 ```
 
-### The `this` Keyword
+### The `self` Keyword
 
-The `this` keyword refers to the current instance of the frame. It is used to access the instance's fields and methods. Limit also supports `self` as an alias for `this`.
+The `self` keyword refers to the current instance of the frame. It is used to access the instance's fields and methods.
 
-### Inheritance
+### Trait-Based Composition
 
-A frame can inherit from a parent frame using the `:` operator. This allows the child frame to inherit the fields and methods of the parent.
+Limit does not support frame inheritance. Instead, use **traits** to define shared interfaces and implement them across frames. This promotes composition over inheritance.
 
-```
-frame Animal {
+```limit
+trait Speaker {
+    fn speak();
+}
+
+frame Dog : Speaker {
     fn speak() {
-        print("The animal makes a sound.");
+        print("Woof!");
     }
 }
 
-frame Dog : Animal {
-    // Dog inherits the speak() method from Animal
-}
-
-var my_dog: Dog = Dog();
-my_dog.speak(); // Output: The animal makes a sound.
-```
-
-### Method Overriding
-
-A child frame can provide its own implementation of a method that it inherited from its parent.
-
-```
-frame Cat : Animal {
+frame Cat : Speaker {
     fn speak() {
-        print("The cat meows.");
+        print("Meow!");
     }
 }
 
-var my_cat: Cat = Cat();
-my_cat.speak(); // Output: The cat meows.
-```
-
-### The `super` Keyword
-
-The `super` keyword can be used to call methods from the parent frame.
-
-```
-frame SmartDog : Dog {
-    fn speak() {
-        super.speak(); // Call the speak() method from the parent (Dog)
-        print("Woof woof!");
-    }
-}
-
-var smart_dog: SmartDog = SmartDog();
-smart_dog.speak();
-// Output:
-// The animal makes a sound.
-// Woof woof!
-```
-
-### Polymorphism
-
-Polymorphism allows you to treat objects of different frames as objects of a common parent frame.
-
-```
-var animals: [Animal] = [Dog(), Cat(), Animal()];
-iter (animal: Animal in animals) {
-    animal.speak();
+var speakers: [Speaker] = [Dog(), Cat()];
+iter (s: Speaker in speakers) {
+    s.speak();
 }
 // Output:
-// The animal makes a sound.
-// The cat meows.
-// The animal makes a sound.
+// Woof!
+// Meow!
+```
+
+Traits can also provide default method implementations:
+
+```limit
+trait Greeter {
+    fn greet() {
+        print("Hello there!");
+    }
+}
+
+frame Friendly : Greeter {
+    // Inherits the default greet() implementation
+}
+
+var f: Friendly = Friendly();
+f.greet(); // Output: Hello there!
 ```
 
 ## Modules and Imports
@@ -899,27 +875,24 @@ greet(); // greet is imported
 
 ### Module Declarations
 
-For more explicit control over what a module exposes, you can use a `module` block. This allows you to define `public`, `protected`, and `private` sections for your module's members.
+For more explicit control over what a module exposes, you can use a `module` block with `pub` and `prot` visibility keywords. By default, members are private.
 
 ```limit
 // in file my_app/utils.lm
 module my_app.utils {
-    @public
-    fn format_user(user: User): str {
+    pub fn format_user(user: User): str {
         // ...
     }
 
-    @protected
-    frame StringHelper {
+    prot frame StringHelper {
         // ...
     }
 
-    @private
-    var api_key = "secret";
+    var api_key = "secret"; // private by default
 }
 ```
 
-When another file imports this module, it will only have access to the `public` members. `protected` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and `private` members are internal to the module.
+When another file imports this module, it will only have access to `pub` members. `prot` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and unmarked members are private (internal to the module).
 
 ## Advanced Features
 

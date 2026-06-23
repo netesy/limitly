@@ -296,7 +296,7 @@ frame Greeter {
     pub var name: str = "World";
 
     pub fn say_hello() {
-        print("Hello, {this.name}!");
+        print("Hello, {self.name}!");
     }
 }
 
@@ -398,7 +398,7 @@ Now it's time to put everything you've learned together! Let's build a simple nu
 var secret_number: int = 7; 
 print("I'm thinking of a number. Guess what it is!");
 
-loop { 
+while (true) { 
     print("Please input your guess:");
     var input_str: str = "7"; // Simulating input
 

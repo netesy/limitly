@@ -1,12 +1,12 @@
 import std.ffi as ffi;
 
 frame Image {
-    pub name: str;
-    pub width: int;
-    pub height: int;
-    pub channels: int;
-    pub pixels: int;
-    pub lib_handle: int;
+    pub var name: str;
+    pub var width: int;
+    pub var height: int;
+    pub var channels: int;
+    pub var pixels: int;
+    pub var lib_handle: int;
 }
 
 fn load(filename: str): Image {

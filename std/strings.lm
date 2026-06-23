@@ -15,7 +15,7 @@ frame String {
         
         var result: str = "";
         var len: int = len(self.value);
-        var end_idx: int = if (end != nil) then end else len;
+        var end_idx: int = (end != nil) ? end : len;
         
         if (end_idx > len) end_idx = len;
         if (start >= len) return "";
@@ -87,7 +87,7 @@ frame String {
 
     pub fn split(delimiter: str): [str] {
         if (delimiter == "") {
-            pub var result: [str] = [];
+            var result: [str] = [];
             var i: int = 0;
             while (i < len(self.value)) {
                 result = result + [substring(self.value, i, i + 1)];
@@ -96,7 +96,7 @@ frame String {
             return result;
         }
         
-        pub var result: [str] = [];
+        var result: [str] = [];
         var start: int = 0;
         var i: int = 0;
         

@@ -105,8 +105,8 @@ frame Promise {
     // Utility methods
     pub fn to_string(): str {
         return "Promise(state=" + self.state + 
-               (if self.value != nil then ", value=" + self.value else "") +
-               (if self.error != nil then ", error=" + self.error else "") + ")";
+               (self.value != nil ? ", value=" + self.value : "") +
+               (self.error != nil ? ", error=" + self.error : "") + ")";
     }
 }
 
@@ -126,7 +126,7 @@ frame Async {
 
     pub fn all(promises: [Promise]): Promise {
         var result_promise = Promise.init();
-        pub var results: [str] = [];
+        var results: [str] = [];
         var completed: int = 0;
         var has_error: bool = false;
 
@@ -240,7 +240,7 @@ frame Async {
 
     // Async iteration utilities
     pub fn map_async(items: [str], mapper: fn(str): Promise): Promise {
-        pub var promises: [Promise] = [];
+        var promises: [Promise] = [];
         var i: int = 0;
         
         while (i < items.length) {
@@ -252,7 +252,7 @@ frame Async {
     }
 
     pub fn filter_async(items: [str], predicate: fn(str): Promise): Promise {
-        pub var promises: [Promise] = [];
+        var promises: [Promise] = [];
         var i: int = 0;
         
         while (i < items.length) {
@@ -263,7 +263,7 @@ frame Async {
         var filter_promise = Async.all(promises);
         
         filter_promise.then(fn(results: str): str {
-            pub var filtered_items: [str] = [];
+            var filtered_items: [str] = [];
             var result_parts = results.split(",");
             var j: int = 0;
             var k: int = 0;

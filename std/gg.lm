@@ -1,23 +1,21 @@
-import std.ffi as ffi;
-
 pub frame Buffer {
-    pub id: int;
-    pub size: int;
+    pub var id: int;
+    pub var size: int;
 }
 
 pub frame Shader {
-    pub id: int;
+    pub var id: int;
 }
 
 pub frame Pipeline {
-    pub id: int;
+    pub var id: int;
 }
 
 pub frame PassAction {
-    pub r: float;
-    pub g: float;
-    pub b: float;
-    pub a: float;
+    pub var r: float;
+    pub var g: float;
+    pub var b: float;
+    pub var a: float;
 }
 
 pub fn setup() {

@@ -16,7 +16,7 @@ frame List {
 
     // Basic operations
     pub fn push(value: int): List {
-        pub var out: [int] = [];
+        var out: [int] = [];
         var i: int = 0;
         while (i < self.data.length) {
             out[i] = self.data[i];
@@ -37,7 +37,7 @@ frame List {
     }
 
     pub fn set(index: int, value: int): List {
-        pub var out: [int] = [];
+        var out: [int] = [];
         var i: int = 0;
         while (i < self.data.length) {
             out[i] = self.data[i];
@@ -58,7 +58,7 @@ frame List {
         if (index < 0) index = 0;
         if (index > self.data.length) index = self.data.length;
         
-        pub var out: [int] = [];
+        var out: [int] = [];
         var i: int = 0;
         
         // Copy elements before insertion point
@@ -83,7 +83,7 @@ frame List {
     pub fn remove(index: int): List {
         if (index < 0 or index >= self.data.length) return self;
         
-        pub var out: [int] = [];
+        var out: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -132,7 +132,7 @@ frame List {
         if (end > self.data.length) end = self.data.length;
         if (start >= end) return List(data=[]);
         
-        pub var out: [int] = [];
+        var out: [int] = [];
         var i: int = start;
         var j: int = 0;
         
@@ -146,7 +146,7 @@ frame List {
     }
 
     pub fn reverse(): List {
-        pub var out: [int] = [];
+        var out: [int] = [];
         var i: int = 0;
         
         while (i < self.data.length) {
@@ -158,7 +158,7 @@ frame List {
     }
 
     pub fn sort(): List {
-        pub var out: [int] = [];
+        var out: [int] = [];
         var i: int = 0;
         
         // Copy array
@@ -186,7 +186,7 @@ frame List {
     }
 
     pub fn unique(): List {
-        pub var out: [int] = [];
+        var out: [int] = [];
         var seen: {int: bool} = {};
         var i: int = 0;
         var j: int = 0;
@@ -206,7 +206,7 @@ frame List {
 
     // Functional operations
     pub fn map(f: fn(int): int): List {
-        pub var out: [int] = [];
+        var out: [int] = [];
         var i: int = 0;
         while (i < self.data.length) {
             out[i] = f(self.data[i]);
@@ -216,7 +216,7 @@ frame List {
     }
 
     pub fn filter(f: fn(int): bool): List {
-        pub var out: [int] = [];
+        var out: [int] = [];
         var i: int = 0;
         var j: int = 0;
         while (i < self.data.length) {
@@ -300,8 +300,8 @@ frame HashMap {
     }
 
     pub fn from_pairs(pairs: [(str, int)]): HashMap {
-        pub var keys: [str] = [];
-        pub var values: [int] = [];
+        var keys: [str] = [];
+        var values: [int] = [];
         var i: int = 0;
         
         while (i < pairs.length) {
@@ -320,17 +320,17 @@ frame HashMap {
         
         if (index != nil) {
             // Update existing key
-            pub var new_values: [int] = [];
+            var new_values: [int] = [];
             var i: int = 0;
             while (i < self.values.length) {
-                new_values[i] = if (i == index) then value else self.values[i];
+                new_values[i] = (i == index) ? value : self.values[i];
                 i = i + 1;
             }
             return HashMap(keys=self.keys, values=new_values);
         } else {
             // Add new key-value pair
-            pub var new_keys: [str] = [];
-            pub var new_values: [int] = [];
+            var new_keys: [str] = [];
+            var new_values: [int] = [];
             var i: int = 0;
             
             while (i < self.keys.length) {
@@ -356,8 +356,8 @@ frame HashMap {
         var index = self.find_key_index(key);
         if (index == nil) return self;
         
-        pub var new_keys: [str] = [];
-        pub var new_values: [int] = [];
+        var new_keys: [str] = [];
+        var new_values: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -408,7 +408,7 @@ frame HashMap {
     }
 
     pub fn entries(): [(str, int)] {
-        pub var entries: [(str, int)] = [];
+        var entries: [(str, int)] = [];
         var i: int = 0;
         
         while (i < self.keys.length) {
@@ -421,7 +421,7 @@ frame HashMap {
 
     // Functional operations
     pub fn map_values(f: fn(int): int): HashMap {
-        pub var new_values: [int] = [];
+        var new_values: [int] = [];
         var i: int = 0;
         
         while (i < self.values.length) {
@@ -433,8 +433,8 @@ frame HashMap {
     }
 
     pub fn filter(predicate: fn(str, int): bool): HashMap {
-        pub var new_keys: [str] = [];
-        pub var new_values: [int] = [];
+        var new_keys: [str] = [];
+        var new_values: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -484,7 +484,7 @@ frame Set {
     }
 
     pub fn from_array(arr: [int]): Set {
-        pub var elements: [int] = [];
+        var elements: [int] = [];
         var seen: {int: bool} = {};
         var i: int = 0;
         var j: int = 0;
@@ -506,7 +506,7 @@ frame Set {
     pub fn add(value: int): Set {
         if (self.contains(value)) return self;
         
-        pub var new_elements: [int] = [];
+        var new_elements: [int] = [];
         var i: int = 0;
         
         while (i < self.elements.length) {
@@ -522,7 +522,7 @@ frame Set {
         var index = self.find_index(value);
         if (index == nil) return self;
         
-        pub var new_elements: [int] = [];
+        var new_elements: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -567,7 +567,7 @@ frame Set {
     }
 
     pub fn intersection(other: Set): Set {
-        pub var result: [int] = [];
+        var result: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -583,7 +583,7 @@ frame Set {
     }
 
     pub fn difference(other: Set): Set {
-        pub var result: [int] = [];
+        var result: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
@@ -656,7 +656,7 @@ frame Queue {
 
     // Queue operations
     pub fn enqueue(value: int): Queue {
-        pub var new_data: [int] = [];
+        var new_data: [int] = [];
         var i: int = 0;
         
         // Copy existing data
@@ -696,7 +696,7 @@ frame Queue {
     }
 
     pub fn to_array(): [int] {
-        pub var result: [int] = [];
+        var result: [int] = [];
         var i: int = self.front;
         var j: int = 0;
         
@@ -738,7 +738,7 @@ frame Stack {
 
     // Stack operations
     pub fn push(value: int): Stack {
-        pub var new_data: [int] = [];
+        var new_data: [int] = [];
         var i: int = 0;
         
         // Copy existing data
@@ -757,7 +757,7 @@ frame Stack {
         if (self.data.length == 0) return nil;
         
         var value = self.data[self.data.length - 1];
-        pub var new_data: [int] = [];
+        var new_data: [int] = [];
         var i: int = 0;
         
         // Copy all except last element

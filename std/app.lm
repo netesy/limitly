@@ -238,10 +238,10 @@ type FrameCallback = fn(float): nil;
 type EventCallback = fn(Event): nil;
 
 // Registered frame callback
-var frame_callback: FrameCallback = null;
+var frame_callback: FrameCallback = nil;
 
 // Registered event callback
-var event_callback: EventCallback = null;
+var event_callback: EventCallback = nil;
 
 // Initialize application with window configuration
 fn app_init(config: WindowConfig): int {
@@ -319,8 +319,8 @@ fn app_shutdown(): nil {
     global_app_state.event_queue = [];
     
     // Clear callbacks
-    frame_callback = null;
-    event_callback = null;
+    frame_callback = nil;
+    event_callback = nil;
     
     global_app_state.is_initialized = 0;
     global_app_state.window_id = 0;
@@ -370,7 +370,7 @@ fn app_run(): nil {
         process_events();
         
         // Call frame callback if registered
-        if (frame_callback != null) {
+        if (frame_callback != nil) {
             frame_callback(global_app_state.delta_time);
         }
         
@@ -414,7 +414,7 @@ fn process_events(): nil {
         global_app_state.event_queue = global_app_state.event_queue + [event];
         
         // Call event callback if registered
-        if (event_callback != null) {
+        if (event_callback != nil) {
             event_callback(event);
         }
         
