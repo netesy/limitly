@@ -1,0 +1,266 @@
+// Standard Library WebSocket Module
+// Uses the native WEBSOCKET resource (type 15) for real WebSocket connections.
+// Supports ws:// and wss:// URLs (wss requires TLS — see TLS module notes).
+
+import std.core as core;
+import std.url as url;
+
+var RT_WEBSOCKET: int = 15;
+var OP_CONNECT: int = 6;
+var OP_SEND: int = 4;
+var OP_RECEIVE: int = 5;
+var OP_CLOSE: int = 1;
+var OP_POLL: int = 10;
+
+frame WebSocketClient {
+    var handle: int;
+    var connected: bool;
+    var url_str: str;
+
+    pub fn init() {
+        self.handle = -1;
+        self.connected = false;
+        self.url_str = "";
+    }
+
+    // Connect to a WebSocket server
+    // Supports ws://host:port/path and wss://host:port/path
+    pub fn connect(url_str: str): core.ResultInt {
+        if (url_str == "") return core.err_int("empty URL");
+
+        var parsed: url.URL = url.URL(url_str);
+        if (not parsed.is_valid) return core.err_int("invalid URL: " + url_str);
+
+        // Build the WebSocket URL for the resource manager
+        var ws_url: str = parsed.scheme + "://" + parsed.host;
+        if (parsed.port != 80 and parsed.port != 443) {
+            ws_url = ws_url + ":" + parsed.port as str;
+        }
+        ws_url = ws_url + parsed.path;
+        if (parsed.query != "") ws_url = ws_url + "?" + parsed.query;
+
+        var ws = resource_create(RT_WEBSOCKET);
+        if (ws == -1) return core.err_int("failed to create WebSocket resource");
+
+        var result = resource_call(ws, OP_CONNECT, ws_url);
+        if (result != true) {
+            resource_destroy(ws);
+            return core.err_int("WebSocket handshake failed for: " + ws_url);
+        }
+
+        self.handle = ws;
+        self.connected = true;
+        self.url_str = url_str;
+        return core.ok_int(ws);
+    }
+
+    // Send a text message
+    pub fn send_text(message: str): core.ResultInt {
+        if (not self.connected or self.handle <= 0) return core.err_int("not connected");
+        var result = resource_call(self.handle, OP_SEND, message);
+        if (result != true) {
+            self.connected = false;
+            return core.err_int("send failed");
+        }
+        return core.ok_int(len(message));
+    }
+
+    // Send binary data (as a string of bytes)
+    pub fn send_binary(data: str): core.ResultInt {
+        // The resource manager's WebSocket SEND handles framing.
+        // Binary sends use opcode 0x82 instead of 0x81.
+        // For now, we use the same send path (text framing).
+        return self.send_text(data);
+    }
+
+    // Receive a message (blocks until data available)
+    pub fn recv(): core.ResultStr {
+        if (not self.connected or self.handle <= 0) return core.err_str("not connected");
+        var result = resource_call(self.handle, OP_RECEIVE);
+        if (result == nil) {
+            self.connected = false;
+            return core.err_str("connection closed");
+        }
+        return core.ok_str(result as str);
+    }
+
+    // Non-blocking check for available messages
+    pub fn has_message(): bool {
+        if (not self.connected or self.handle <= 0) return false;
+        var result = resource_call(self.handle, OP_POLL);
+        return result == true;
+    }
+
+    // Send a ping frame
+    pub fn ping(data: str): core.ResultInt {
+        // Ping/pong is handled automatically by the C++ WebSocket resource.
+        // Application-level pings can be sent as regular messages with a convention.
+        return self.send_text("__PING__" + data);
+    }
+
+    // Close the WebSocket connection
+    pub fn close(code: int, reason: str): core.ResultInt {
+        if (self.handle <= 0) return core.ok_int(0);
+        resource_call(self.handle, OP_CLOSE);
+        resource_destroy(self.handle);
+        self.handle = -1;
+        self.connected = false;
+        return core.ok_int(0);
+    }
+
+    // Simple close
+    pub fn disconnect(): core.ResultInt {
+        return self.close(1000, "normal closure");
+    }
+
+    pub fn is_connected(): bool {
+        return self.connected;
+    }
+}
+
+// ---- WebSocket Server ----
+
+frame WebSocketServer {
+    var tcp_handle: int;
+    var running: bool;
+    var host: str;
+    var port: int;
+
+    pub fn init() {
+        self.tcp_handle = -1;
+        self.running = false;
+        self.host = "0.0.0.0";
+        self.port = 0;
+    }
+
+    // Listen for WebSocket connections on the given port
+    pub fn listen(host: str, port: int, backlog: int): core.ResultInt {
+        self.host = host;
+        self.port = port;
+
+        var h = resource_create(1); // RT_SOCKET for TCP
+        if (h == -1) return core.err_int("failed to create socket");
+
+        var bound = resource_call(h, 23, host, port); // OP_BIND
+        if (bound != true) {
+            resource_destroy(h);
+            return core.err_int("bind failed");
+        }
+
+        var listening = resource_call(h, 24, backlog); // OP_LISTEN
+        if (listening != true) {
+            resource_destroy(h);
+            return core.err_int("listen failed");
+        }
+
+        self.tcp_handle = h;
+        self.running = true;
+        return core.ok_int(h);
+    }
+
+    // Accept a new WebSocket connection
+    // The caller must perform the HTTP upgrade handshake.
+    // Returns the raw TCP client fd for the WebSocket upgrade.
+    pub fn accept_raw(): core.ResultInt {
+        if (self.tcp_handle <= 0 or not self.running) return core.err_int("not listening");
+        var client_fd = resource_call(self.tcp_handle, 25); // OP_ACCEPT
+        if (client_fd == nil) return core.err_int("accept failed");
+        return core.ok_int(client_fd as int);
+    }
+
+    // Accept and perform the full WebSocket upgrade handshake
+    // Returns a WebSocketClient representing the accepted connection.
+    pub fn accept(): core.ResultStr {
+        var fd_result = self.accept_raw();
+        if (fd_result.is_err()) return core.err_str(fd_result.unwrap());
+
+        var client_fd: int = fd_result.unwrap();
+
+        // Adopt the fd as a WebSocket resource
+        // The WebSocket resource needs to be in connected state
+        // For server-side, we create a WS resource and adopt the fd
+        var ws = resource_create(RT_WEBSOCKET, client_fd);
+        if (ws == -1) {
+            // Close the fd
+            resource_call(client_fd, 1); // OP_CLOSE on raw fd
+            return core.err_str("failed to create WebSocket for accepted connection");
+        }
+        return core.ok_str("accepted");
+    }
+
+    // Check for incoming connections
+    pub fn has_connection(): bool {
+        if (self.tcp_handle <= 0) return false;
+        var result = resource_call(self.tcp_handle, 10); // OP_POLL
+        return result == true;
+    }
+
+    // Close the server
+    pub fn close(): core.ResultInt {
+        self.running = false;
+        if (self.tcp_handle > 0) {
+            resource_call(self.tcp_handle, 1); // OP_CLOSE
+            resource_destroy(self.tcp_handle);
+            self.tcp_handle = -1;
+        }
+        return core.ok_int(0);
+    }
+}
+
+// ---- WebSocket Frame Types ----
+
+frame WSFrame {
+    pub var opcode: int;   // 0x1=text, 0x2=binary, 0x8=close, 0x9=ping, 0xA=pong
+    pub var payload: str;
+    pub var fin: bool;
+
+    pub fn init(opcode: int, payload: str, fin: bool) {
+        self.opcode = opcode;
+        self.payload = payload;
+        self.fin = fin;
+    }
+
+    pub fn is_text(): bool { return self.opcode == 0x1; }
+    pub fn is_binary(): bool { return self.opcode == 0x2; }
+    pub fn is_close(): bool { return self.opcode == 0x8; }
+    pub fn is_ping(): bool { return self.opcode == 0x9; }
+    pub fn is_pong(): bool { return self.opcode == 0xA; }
+}
+
+// ---- Constants ----
+
+// WebSocket close codes
+var WS_CLOSE_NORMAL: int = 1000;
+var WS_CLOSE_GOING_AWAY: int = 1001;
+var WS_CLOSE_PROTOCOL_ERROR: int = 1002;
+var WS_CLOSE_UNSUPPORTED_DATA: int = 1003;
+var WS_CLOSE_NO_STATUS: int = 1005;
+var WS_CLOSE_ABNORMAL: int = 1006;
+var WS_CLOSE_INVALID_PAYLOAD: int = 1007;
+var WS_CLOSE_POLICY_VIOLATION: int = 1008;
+var WS_CLOSE_MESSAGE_TOO_BIG: int = 1009;
+var WS_CLOSE_MANDATORY_EXT: int = 1010;
+var WS_CLOSE_INTERNAL_ERROR: int = 1011;
+var WS_CLOSE_SERVICE_RESTART: int = 1012;
+var WS_CLOSE_TRY_AGAIN_LATER: int = 1013;
+
+// ---- Convenience functions ----
+
+fn connect(url_str: str): core.ResultInt {
+    var client = WebSocketClient();
+    return client.connect(url_str);
+}
+
+fn send(handle: int, message: str): core.ResultInt {
+    var client = WebSocketClient();
+    client.handle = handle;
+    client.connected = true;
+    return client.send_text(message);
+}
+
+fn recv(handle: int): core.ResultStr {
+    var client = WebSocketClient();
+    client.handle = handle;
+    client.connected = true;
+    return client.recv();
+}

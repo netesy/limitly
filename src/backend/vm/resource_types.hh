@@ -21,7 +21,11 @@ enum class ResourceType : uint32_t {
     STDOUT = 9,
     STDERR = 10,
     MEMORY = 11,
-    ENTROPY = 12
+    ENTROPY = 12,
+    DNS_RESOLVER = 13,
+    UDP_SOCKET = 14,
+    WEBSOCKET = 15,
+    HASH_ENGINE = 16
 };
 
 enum class ResourceOperation : uint32_t {
@@ -47,7 +51,13 @@ enum class ResourceOperation : uint32_t {
     SUB_PTR = 19,
     PTR_DIFF = 20,
     ALIGN_PTR = 21,
-    IS_ALIGNED = 22
+    IS_ALIGNED = 22,
+    BIND = 23,
+    LISTEN = 24,
+    ACCEPT = 25,
+    RESOLVE = 26,
+    SEND_TO = 27,
+    RECV_FROM = 28
 };
 
 } // namespace VM

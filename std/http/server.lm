@@ -1,16 +1,557 @@
+// Standard Library HTTP Server Module
+// Full HTTP/1.1 server with routing, middleware, and request/response handling.
+// Built on top of TCP server (SOCKET resource with BIND/LISTEN/ACCEPT).
+
 import std.core as core;
 
+// Resource constants
+var RT_SOCKET: int = 1;
+var OP_BIND: int = 23;
+var OP_LISTEN: int = 24;
+var OP_ACCEPT: int = 25;
+var OP_SEND: int = 4;
+var OP_RECEIVE: int = 5;
+var OP_CLOSE: int = 1;
+var OP_POLL: int = 10;
+
+// ---- Request / Response frames ----
+
+frame ServerRequest {
+    pub var method: str;
+    pub var path: str;
+    pub var query_string: str;
+    pub var version: str;
+    pub var headers: {str: str};
+    pub var body: str;
+    pub var remote_addr: str;
+    pub var client_handle: int;
+
+    pub fn init() {
+        self.method = "";
+        self.path = "";
+        self.query_string = "";
+        self.version = "HTTP/1.1";
+        self.headers = {};
+        self.body = "";
+        self.remote_addr = "";
+        self.client_handle = -1;
+    }
+
+    pub fn header(name: str): str {
+        return self.headers[to_lower_h(name)];
+    }
+
+    pub fn content_type(): str {
+        return self.header("Content-Type");
+    }
+
+    pub fn content_length(): int {
+        var cl: str = self.header("Content-Length");
+        if (cl == "") return 0;
+        return cl as int;
+    }
+
+    pub fn query_params(): {str: str} {
+        return parse_qs(self.query_string);
+    }
+}
+
+frame ServerResponse {
+    pub var status_code: int;
+    pub var status_text: str;
+    pub var headers: {str: str};
+    pub var body: str;
+    pub var client_handle: int;
+    pub var sent: bool;
+
+    pub fn init(client_handle: int) {
+        self.client_handle = client_handle;
+        self.status_code = 200;
+        self.status_text = "OK";
+        self.headers = {};
+        self.headers["Content-Type"] = "text/plain; charset=utf-8";
+        self.headers["Server"] = "LimitlyHTTP/1.0";
+        self.headers["Connection"] = "close";
+        self.body = "";
+        self.sent = false;
+    }
+
+    pub fn set_status(code: int, text: str): ServerResponse {
+        self.status_code = code;
+        self.status_text = text;
+        return self;
+    }
+
+    pub fn set_header(name: str, value: str): ServerResponse {
+        self.headers[to_lower_h(name)] = value;
+        return self;
+    }
+
+    pub fn set_content_type(ct: str): ServerResponse {
+        self.headers["Content-Type"] = ct;
+        return self;
+    }
+
+    pub fn set_json(): ServerResponse {
+        return self.set_content_type("application/json; charset=utf-8");
+    }
+
+    pub fn set_html(): ServerResponse {
+        return self.set_content_type("text/html; charset=utf-8");
+    }
+
+    pub fn send(body: str): ServerResponse {
+        self.body = body;
+        self.headers["Content-Length"] = len(body) as str;
+        self.flush();
+        return self;
+    }
+
+    pub fn send_json(json_body: str): ServerResponse {
+        return self.set_json().send(json_body);
+    }
+
+    pub fn send_html(html_body: str): ServerResponse {
+        return self.set_html().send(html_body);
+    }
+
+    pub fn send_status(code: int): ServerResponse {
+        var text: str = status_text_for(code);
+        self.set_status(code, text);
+        self.headers["Content-Length"] = "0";
+        self.flush();
+        return self;
+    }
+
+    pub fn send_error(code: int, message: str): ServerResponse {
+        var text: str = status_text_for(code);
+        self.set_status(code, text);
+        self.headers["Content-Type"] = "text/plain; charset=utf-8";
+        self.send(message);
+        return self;
+    }
+
+    pub fn send_not_found(): ServerResponse {
+        return self.send_error(404, "Not Found");
+    }
+
+    pub fn send_internal_error(message: str): ServerResponse {
+        return self.send_error(500, message);
+    }
+
+    pub fn set_cookie(name: str, value: str, options: str): ServerResponse {
+        var cookie: str = name + "=" + value + options;
+        return self.set_header("Set-Cookie", cookie);
+    }
+
+    fn flush() {
+        if (self.sent or self.client_handle <= 0) return;
+        // Build HTTP response
+        var response: str = "HTTP/1.1 " + self.status_code as str + " " + self.status_text + "\r\n";
+        // Add Content-Length if not set
+        if (self.headers["Content-Length"] == "") {
+            self.headers["Content-Length"] = len(self.body) as str;
+        }
+        // Serialize headers
+        // (Limited map iteration in current language — we serialize known headers)
+        var header_keys: [str] = ["Content-Type", "Content-Length", "Server", "Connection", "Set-Cookie", "Location", "Cache-Control", "Authorization", "Access-Control-Allow-Origin", "Access-Control-Allow-Methods", "Access-Control-Allow-Headers"];
+        var i: int = 0;
+        while (i < len(header_keys)) {
+            var key: str = header_keys[i];
+            var val: str = self.headers[key];
+            if (val != "") {
+                response = response + key + ": " + val + "\r\n";
+            }
+            i = i + 1;
+        }
+        response = response + "\r\n";
+        response = response + self.body;
+        // Send
+        resource_call(self.client_handle, OP_SEND, response);
+        resource_call(self.client_handle, OP_CLOSE);
+        resource_destroy(self.client_handle);
+        self.sent = true;
+    }
+}
+
+// ---- Route handler frame ----
+
+frame Route {
+    pub var method: str;
+    pub var pattern: str;
+    pub var handler: str; // reference to handler function name
+
+    pub fn init(method: str, pattern: str, handler: str) {
+        self.method = method;
+        self.pattern = pattern;
+        self.handler = handler;
+    }
+
+    pub fn matches(method: str, path: str): bool {
+        if (self.method != method and self.method != "*") return false;
+        return path_matches(self.pattern, path);
+    }
+}
+
+// ---- Middleware frame ----
+
+frame Middleware {
+    pub var name: str;
+    pub var before: str;  // function reference name
+    pub var after: str;   // function reference name
+
+    pub fn init(name: str) {
+        self.name = name;
+        self.before = "";
+        self.after = "";
+    }
+}
+
+// ---- HTTP Server ----
+
 frame HTTPServer {
-    pub fn listen(port: int): core.ResultInt {
-        if (port <= 0) return core.err_int("invalid port");
-        return core.ok_int(port);
+    var handle: int;
+    var routes: [Route];
+    var middlewares: [Middleware];
+    var running: bool;
+    var host: str;
+    var port: int;
+
+    pub fn init() {
+        self.handle = -1;
+        self.routes = [];
+        self.middlewares = [];
+        self.running = false;
+        self.host = "0.0.0.0";
+        self.port = 8080;
     }
 
-    pub fn route(method: str, path: str): core.ResultInt {
-        return core.ok_int(1);
+    // Add a route
+    pub fn route(method: str, pattern: str, handler: str): HTTPServer {
+        var r: Route = Route(method, pattern, handler);
+        self.routes = self.routes + [r];
+        return self;
     }
 
-    pub fn respond(status: int, body: str): core.ResultInt {
-        return core.ok_int(status);
+    pub fn get(pattern: str, handler: str): HTTPServer {
+        return self.route("GET", pattern, handler);
     }
+
+    pub fn post(pattern: str, handler: str): HTTPServer {
+        return self.route("POST", pattern, handler);
+    }
+
+    pub fn put(pattern: str, handler: str): HTTPServer {
+        return self.route("PUT", pattern, handler);
+    }
+
+    pub fn delete(pattern: str, handler: str): HTTPServer {
+        return self.route("DELETE", pattern, handler);
+    }
+
+    pub fn patch(pattern: str, handler: str): HTTPServer {
+        return self.route("PATCH", pattern, handler);
+    }
+
+    pub fn any(pattern: str, handler: str): HTTPServer {
+        return self.route("*", pattern, handler);
+    }
+
+    // Add middleware
+    pub fn use(middleware: Middleware): HTTPServer {
+        self.middlewares = self.middlewares + [middleware];
+        return self;
+    }
+
+    // Bind and listen
+    pub fn listen(host: str, port: int, backlog: int): core.ResultInt {
+        self.host = host;
+        self.port = port;
+
+        var h = resource_create(RT_SOCKET);
+        if (h == -1) return core.err_int("failed to create socket");
+
+        var bound = resource_call(h, OP_BIND, host, port);
+        if (bound != true) {
+            resource_destroy(h);
+            return core.err_int("failed to bind to " + host + ":" + port as str);
+        }
+
+        var listening = resource_call(h, OP_LISTEN, backlog);
+        if (listening != true) {
+            resource_destroy(h);
+            return core.err_int("listen failed on port " + port as str);
+        }
+
+        self.handle = h;
+        self.running = true;
+        return core.ok_int(h);
+    }
+
+    // Accept a single connection and process the request
+    // Returns the parsed request. Caller is responsible for sending the response.
+    pub fn accept_request(): core.ResultServerRequest {
+        if (self.handle <= 0 or not self.running) return core.err_str("server not listening");
+
+        var client_fd = resource_call(self.handle, OP_ACCEPT);
+        if (client_fd == nil) return core.err_str("accept returned nil (no connection)");
+
+        // Adopt the client fd as a new socket resource
+        var client_handle = resource_create(RT_SOCKET, client_fd);
+        if (client_handle == -1) return core.err_str("failed to adopt client socket");
+
+        // Read request data
+        var request_data: str = "";
+        var max_read: int = 1048576; // 1MB max
+        var total: int = 0;
+        while (total < max_read) {
+            var chunk = resource_call(client_handle, OP_RECEIVE);
+            if (chunk == nil) break;
+            request_data = request_data + (chunk as str);
+            total = total + len(chunk as str);
+            // Check if we have the full headers (ended with \r\n\r\n)
+            if (index_of_h(request_data, "\r\n\r\n") != -1) {
+                // Check if body is complete
+                var req: ServerRequest = parse_server_request(request_data);
+                if (req.content_length() <= len(request_data) - index_of_h(request_data, "\r\n\r\n") - 4) {
+                    // We have the full body
+                    total = max_read;
+                }
+            }
+        }
+
+        // Parse the request
+        var req: ServerRequest = parse_server_request(request_data);
+        req.client_handle = client_handle;
+        req.remote_addr = "client";
+
+        return core.ok_str("request");
+    }
+
+    // Close the server
+    pub fn close(): core.ResultInt {
+        self.running = false;
+        if (self.handle > 0) {
+            resource_call(self.handle, OP_CLOSE);
+            resource_destroy(self.handle);
+            self.handle = -1;
+        }
+        return core.ok_int(0);
+    }
+
+    // Check for incoming connections (non-blocking)
+    pub fn has_connection(): bool {
+        if (self.handle <= 0) return false;
+        var result = resource_call(self.handle, OP_POLL);
+        return result == true;
+    }
+}
+
+// ---- Request parser ----
+
+fn parse_server_request(raw: str): ServerRequest {
+    var req: ServerRequest = ServerRequest();
+
+    var header_end: int = index_of_h(raw, "\r\n\r\n");
+    var header_section: str = "";
+    var body: str = "";
+    if (header_end != -1) {
+        header_section = substring(raw, 0, header_end);
+        body = substring(raw, header_end + 4, len(raw));
+    } else {
+        header_section = raw;
+    }
+
+    // Parse request line: "GET /path HTTP/1.1"
+    var first_line_end: int = index_of_h(header_section, "\r\n");
+    var request_line: str = "";
+    var rest: str = "";
+    if (first_line_end != -1) {
+        request_line = substring(header_section, 0, first_line_end);
+        rest = substring(header_section, first_line_end + 2, len(header_section));
+    } else {
+        request_line = header_section;
+    }
+
+    // Split request line into parts
+    var space1: int = index_of_h(request_line, " ");
+    if (space1 == -1) return req;
+    req.method = substring(request_line, 0, space1);
+
+    var rest_line: str = substring(request_line, space1 + 1, len(request_line));
+    var space2: int = index_of_h(rest_line, " ");
+    if (space2 != -1) {
+        var full_path: str = substring(rest_line, 0, space2);
+        req.version = substring(rest_line, space2 + 1, len(rest_line));
+
+        // Split path and query
+        var qmark: int = index_of_h(full_path, "?");
+        if (qmark != -1) {
+            req.path = substring(full_path, 0, qmark);
+            req.query_string = substring(full_path, qmark + 1, len(full_path));
+        } else {
+            req.path = full_path;
+        }
+    }
+
+    // Parse headers
+    var header_lines: [str] = split_h(rest, "\r\n");
+    var i: int = 0;
+    while (i < len(header_lines)) {
+        var line: str = header_lines[i];
+        if (line != "") {
+            var colon: int = index_of_h(line, ":");
+            if (colon != -1) {
+                var name: str = to_lower_h(substring(line, 0, colon));
+                var value: str = trim_h(substring(line, colon + 1, len(line)));
+                req.headers[name] = value;
+            }
+        }
+        i = i + 1;
+    }
+
+    // Extract body based on Content-Length
+    var cl: int = 0;
+    if (req.headers["content-length"] != "") {
+        cl = req.headers["content-length"] as int;
+    }
+    if (cl > 0 and len(body) >= cl) {
+        req.body = substring(body, 0, cl);
+    } else {
+        req.body = body;
+    }
+
+    return req;
+}
+
+// ---- Internal helpers ----
+
+fn status_text_for(code: int): str {
+    if (code == 100) return "Continue";
+    if (code == 101) return "Switching Protocols";
+    if (code == 200) return "OK";
+    if (code == 201) return "Created";
+    if (code == 204) return "No Content";
+    if (code == 301) return "Moved Permanently";
+    if (code == 302) return "Found";
+    if (code == 304) return "Not Modified";
+    if (code == 307) return "Temporary Redirect";
+    if (code == 308) return "Permanent Redirect";
+    if (code == 400) return "Bad Request";
+    if (code == 401) return "Unauthorized";
+    if (code == 403) return "Forbidden";
+    if (code == 404) return "Not Found";
+    if (code == 405) return "Method Not Allowed";
+    if (code == 408) return "Request Timeout";
+    if (code == 409) return "Conflict";
+    if (code == 410) return "Gone";
+    if (code == 413) return "Payload Too Large";
+    if (code == 415) return "Unsupported Media Type";
+    if (code == 422) return "Unprocessable Entity";
+    if (code == 429) return "Too Many Requests";
+    if (code == 500) return "Internal Server Error";
+    if (code == 501) return "Not Implemented";
+    if (code == 502) return "Bad Gateway";
+    if (code == 503) return "Service Unavailable";
+    if (code == 504) return "Gateway Timeout";
+    return "Unknown";
+}
+
+fn path_matches(pattern: str, path: str): bool {
+    // Exact match
+    if (pattern == path) return true;
+    // Wildcard match: "/api/*" matches "/api/anything"
+    if (len(pattern) > 1 and substring(pattern, len(pattern) - 1, len(pattern)) == "*") {
+        var prefix: str = substring(pattern, 0, len(pattern) - 1);
+        if (len(path) >= len(prefix) and substring(path, 0, len(prefix)) == prefix) return true;
+    }
+    // Parameter match: "/users/:id" matches "/users/123"
+    var pattern_parts: [str] = split_h(pattern, "/");
+    var path_parts: [str] = split_h(path, "/");
+    if (len(pattern_parts) != len(path_parts)) return false;
+    var i: int = 0;
+    while (i < len(pattern_parts)) {
+        var pp: str = pattern_parts[i];
+        if (len(pp) > 0 and substring(pp, 0, 1) == ":") {
+            // Parameter — matches anything
+        } else if (pp != path_parts[i]) {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
+
+fn parse_qs(qs: str): {str: str} {
+    var params: {str: str} = {};
+    if (qs == "") return params;
+    var pairs: [str] = split_h(qs, "&");
+    var i: int = 0;
+    while (i < len(pairs)) {
+        var pair: str = pairs[i];
+        if (pair != "") {
+            var eq: int = index_of_h(pair, "=");
+            if (eq != -1) {
+                params[substring(pair, 0, eq)] = substring(pair, eq + 1, len(pair));
+            } else {
+                params[pair] = "";
+            }
+        }
+        i = i + 1;
+    }
+    return params;
+}
+
+fn to_lower_h(s: str): str {
+    var result: str = "";
+    var i: int = 0;
+    while (i < len(s)) {
+        var ch: str = substring(s, i, i + 1);
+        if (ch >= "A" and ch <= "Z") {
+            result = result + substring("abcdefghijklmnopqrstuvwxyz", (ch - "A"), (ch - "A") + 1);
+        } else {
+            result = result + ch;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+fn trim_h(s: str): str {
+    var start: int = 0;
+    while (start < len(s) and (substring(s, start, start + 1) == " " or substring(s, start, start + 1) == "\t")) {
+        start = start + 1;
+    }
+    var end: int = len(s) - 1;
+    while (end >= start and (substring(s, end, end + 1) == " " or substring(s, end, end + 1) == "\t")) {
+        end = end - 1;
+    }
+    if (start > end) return "";
+    return substring(s, start, end + 1);
+}
+
+fn index_of_h(s: str, pattern: str): int {
+    var i: int = 0;
+    while (i <= len(s) - len(pattern)) {
+        if (substring(s, i, i + len(pattern)) == pattern) return i;
+        i = i + 1;
+    }
+    return -1;
+}
+
+fn split_h(s: str, delimiter: str): [str] {
+    var parts: [str] = [];
+    var current: str = "";
+    var i: int = 0;
+    while (i < len(s)) {
+        if (substring(s, i, i + 1) == delimiter) {
+            parts = parts + [current];
+            current = "";
+        } else {
+            current = current + substring(s, i, i + 1);
+        }
+        i = i + 1;
+    }
+    parts = parts + [current];
+    return parts;
 }

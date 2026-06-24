@@ -20,7 +20,7 @@ This document describes the built-in functions and core modules available in the
 - `file_delete(path: str): bool`: Deletes a file.
 
 ### 1.3 Resource System
-- `resource_create(type_id: int): int64`: Creates a resource handle of the given type. Types: `0`=FILE, `1`=SOCKET, `9`=STDOUT, `10`=STDERR, `12`=ENTROPY, plus channel/memory types.
+- `resource_create(type_id: int): int64`: Creates a resource handle of the given type. Types: `0`=FILE, `1`=SOCKET (TCP), `5`=CHANNEL, `9`=STDOUT, `10`=STDERR, `11`=MEMORY, `12`=ENTROPY, `13`=DNS_RESOLVER, `14`=UDP_SOCKET, `15`=WEBSOCKET, `16`=HASH_ENGINE.
 - `resource_call(handle: int64, op: int [, data: any]): any`: Invokes an operation on a resource. The 3-arg form passes `data` as the operation argument.
 - `resource_destroy(handle: int64): nil`: Releases a resource handle.
 

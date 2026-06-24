@@ -1,8 +1,118 @@
+// Standard Library DNS Module (Unified Resource System)
+// Uses the native DNS_RESOLVER resource (type 13) with RESOLVE=26 operation.
+// Performs real DNS A-record lookups via getaddrinfo().
+
 import std.core as core;
 
+var RT_DNS: int = 13;
+var OP_RESOLVE: int = 26;
+var OP_CLOSE: int = 1;
+
 frame DNS {
+
+    // Resolve a hostname to an IPv4 address.
+    // Returns the first A-record as a dotted-quad string (e.g., "93.184.216.34").
     pub fn resolve(host: str): core.ResultStr {
-        if (host == "") return core.err_str("empty host");
-        return core.ok_str(host);
+        if (host == "") return core.err_str("empty host name");
+        // Strip any trailing dots
+        var cleaned: str = host;
+        while (len(cleaned) > 0 and substring(cleaned, len(cleaned) - 1, len(cleaned)) == ".") {
+            cleaned = substring(cleaned, 0, len(cleaned) - 1);
+        }
+        if (cleaned == "") return core.err_str("empty host name after normalization");
+
+        var resolver = resource_create(RT_DNS);
+        if (resolver == -1) return core.err_str("failed to create DNS resolver resource");
+
+        var result = resource_call(resolver, OP_RESOLVE, cleaned);
+        resource_destroy(resolver);
+
+        if (result == nil) return core.err_str("DNS resolution failed for host: " + cleaned);
+        return core.ok_str(result as str);
     }
+
+    // Resolve and return all addresses (currently returns first; future resource
+    // op could return a list).
+    pub fn resolve_all(host: str): core.ResultStr {
+        return self.resolve(host);
+    }
+
+    // Reverse DNS: given an IP, attempt to look up the hostname.
+    // Note: the current DNS resource only supports forward resolution.
+    // Reverse DNS would need a new resource operation.
+    pub fn reverse_lookup(ip: str): core.ResultStr {
+        // Attempt forward resolution as a sanity check; reverse DNS
+        // requires getnameinfo() which is not yet a resource op.
+        return core.err_str("reverse DNS lookup not yet implemented; use FFI for getnameinfo");
+    }
+
+    // Check if a string looks like a valid IPv4 address
+    pub fn is_ipv4(address: str): bool {
+        var parts: [str] = split_string(address, ".");
+        if (len(parts) != 4) return false;
+        var i: int = 0;
+        while (i < 4) {
+            var part: str = parts[i];
+            if (len(part) == 0) return false;
+            if (len(part) > 1 and substring(part, 0, 1) == "0") return false;
+            var j: int = 0;
+            while (j < len(part)) {
+                var ch: str = substring(part, j, j + 1);
+                if (ch < "0" or ch > "9") return false;
+                j = j + 1;
+            }
+            var val: int = part as int;
+            if (val < 0 or val > 255) return false;
+            i = i + 1;
+        }
+        return true;
+    }
+
+    // Check if a string looks like a valid IPv6 address (simplified)
+    pub fn is_ipv6(address: str): bool {
+        // Basic check: contains colons, no invalid characters
+        if (len(address) < 2) return false;
+        var has_colon: bool = false;
+        var i: int = 0;
+        while (i < len(address)) {
+            var ch: str = substring(address, i, i + 1);
+            if (ch == ":") {
+                has_colon = true;
+            } else if (not ((ch >= "0" and ch <= "9") or (ch >= "a" and ch <= "f") or (ch >= "A" and ch <= "F"))) {
+                return false;
+            }
+            i = i + 1;
+        }
+        return has_colon;
+    }
+
+    // Resolve a hostname, handling the case where it might already be an IP.
+    pub fn resolve_or_passthrough(host: str): core.ResultStr {
+        if (self.is_ipv4(host)) return core.ok_str(host);
+        if (self.is_ipv6(host)) return core.ok_str(host);
+        return self.resolve(host);
+    }
+}
+
+// ---- Internal helper ----
+fn split_string(s: str, delimiter: str): [str] {
+    var parts: [str] = [];
+    var current: str = "";
+    var i: int = 0;
+    while (i < len(s)) {
+        if (substring(s, i, i + 1) == delimiter) {
+            parts = parts + [current];
+            current = "";
+        } else {
+            current = current + substring(s, i, i + 1);
+        }
+        i = i + 1;
+    }
+    parts = parts + [current];
+    return parts;
+}
+
+// ---- Convenience functions ----
+fn resolve(host: str): core.ResultStr {
+    return DNS.resolve(host);
 }

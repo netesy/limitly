@@ -1,0 +1,34 @@
+// Standard Library WSS (WebSocket Secure) Module (Index)
+// Re-exports WebSocket client and server submodules.
+//
+// Usage:
+//   import std.wss as wss;
+//   var client = wss.WebSocketClient();
+//   client.connect("ws://localhost:8080/ws");
+//   client.send_text("Hello");
+//   var msg = client.recv();
+
+pub import std.wss.client as client;
+pub import std.wss.server as server;
+
+pub type WebSocketClient = client.WebSocketClient;
+pub type WebSocketServer = client.WebSocketServer;
+pub type WSFrame = client.WSFrame;
+pub type WSSServer = server.WSSServer;
+pub type WSConnection = server.WSConnection;
+pub type WSRoom = server.WSRoom;
+
+// Re-export WebSocket close code constants
+pub var WS_CLOSE_NORMAL: int = client.WS_CLOSE_NORMAL;
+pub var WS_CLOSE_GOING_AWAY: int = client.WS_CLOSE_GOING_AWAY;
+pub var WS_CLOSE_PROTOCOL_ERROR: int = client.WS_CLOSE_PROTOCOL_ERROR;
+pub var WS_CLOSE_UNSUPPORTED_DATA: int = client.WS_CLOSE_UNSUPPORTED_DATA;
+pub var WS_CLOSE_NO_STATUS: int = client.WS_CLOSE_NO_STATUS;
+pub var WS_CLOSE_ABNORMAL: int = client.WS_CLOSE_ABNORMAL;
+pub var WS_CLOSE_INVALID_PAYLOAD: int = client.WS_CLOSE_INVALID_PAYLOAD;
+pub var WS_CLOSE_POLICY_VIOLATION: int = client.WS_CLOSE_POLICY_VIOLATION;
+pub var WS_CLOSE_MESSAGE_TOO_BIG: int = client.WS_CLOSE_MESSAGE_TOO_BIG;
+pub var WS_CLOSE_MANDATORY_EXT: int = client.WS_CLOSE_MANDATORY_EXT;
+pub var WS_CLOSE_INTERNAL_ERROR: int = client.WS_CLOSE_INTERNAL_ERROR;
+pub var WS_CLOSE_SERVICE_RESTART: int = client.WS_CLOSE_SERVICE_RESTART;
+pub var WS_CLOSE_TRY_AGAIN_LATER: int = client.WS_CLOSE_TRY_AGAIN_LATER;

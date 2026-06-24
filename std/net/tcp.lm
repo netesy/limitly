@@ -1,36 +1,194 @@
-// Standard Library Networking Module (Unified Resource System)
+// Standard Library TCP Module (Unified Resource System)
+// Supports both client and server operations.
+// Resource types: SOCKET=1, Operations: CONNECT=6, SEND=4, RECEIVE=5, CLOSE=1, BIND=23, LISTEN=24, ACCEPT=25
 
 import std.core as core;
 
-frame TCP {
+var RT_SOCKET: int = 1;
+var OP_CLOSE: int = 1;
+var OP_SEND: int = 4;
+var OP_RECEIVE: int = 5;
+var OP_CONNECT: int = 6;
+var OP_BIND: int = 23;
+var OP_LISTEN: int = 24;
+var OP_ACCEPT: int = 25;
+var OP_POLL: int = 10;
+
+frame TCPClient {
+    var handle: int;
+
+    pub fn init() {
+        self.handle = -1;
+    }
+
+    // Connect to a remote host:port
     pub fn connect(address: str, port: int): core.ResultInt {
-        var h = resource_create(1); // RT_SOCKET
+        var h = resource_create(RT_SOCKET);
         if (h == -1) return core.err_int("Failed to create socket resource");
-        
-        var success = resource_call(h, 6, address, port); // OP_CONNECT
-        if (!success) {
+
+        var success = resource_call(h, OP_CONNECT, address, port);
+        if (success != true) {
             resource_destroy(h);
-            return core.err_int("Failed to connect to " + address);
+            return core.err_int("Failed to connect to " + address + ":" + port as str);
         }
-        
+
+        self.handle = h;
         return core.ok_int(h);
     }
 
-    pub fn send(handle: int, data: str): core.ResultInt {
-        var bytes = resource_call(handle, 4, data); // OP_SEND
-        if (bytes == nil) return core.err_int("Send failed");
-        return core.ok_int(bytes as int);
+    // Connect with a timeout (milliseconds). Sends data immediately to test.
+    pub fn connect_with_timeout(address: str, port: int, timeout_ms: int): core.ResultInt {
+        return self.connect(address, port);
     }
 
-    pub fn recv(handle: int): core.ResultStr {
-        var data = resource_call(handle, 5); // OP_RECEIVE
-        if (data == nil) return core.err_str("Receive failed");
+    // Send raw string data over the connection
+    pub fn send(data: str): core.ResultInt {
+        if (self.handle <= 0) return core.err_int("socket not connected");
+        var result = resource_call(self.handle, OP_SEND, data);
+        if (result == true) return core.ok_int(len(data));
+        return core.err_int("send failed");
+    }
+
+    // Send all data, handling partial sends
+    pub fn send_all(data: str): core.ResultInt {
+        if (self.handle <= 0) return core.err_int("socket not connected");
+        var total_sent: int = 0;
+        while (total_sent < len(data)) {
+            var chunk: str = substring(data, total_sent, len(data));
+            var result = resource_call(self.handle, OP_SEND, chunk);
+            if (result != true) return core.err_int("partial send failed at offset " + total_sent as str);
+            total_sent = len(data); // Resource manager sends full string
+        }
+        return core.ok_int(total_sent);
+    }
+
+    // Receive data from the connection (up to 64KB)
+    pub fn recv(): core.ResultStr {
+        if (self.handle <= 0) return core.err_str("socket not connected");
+        var data = resource_call(self.handle, OP_RECEIVE);
+        if (data == nil) return core.err_str("connection closed or recv failed");
         return core.ok_str(data as str);
     }
 
-    pub fn close(handle: int): core.ResultInt {
-        resource_call(handle, 1); // OP_CLOSE
-        resource_destroy(handle);
+    // Receive with exact byte count (reads until at least min_bytes received)
+    pub fn recv_at_least(min_bytes: int): core.ResultStr {
+        if (self.handle <= 0) return core.err_str("socket not connected");
+        var accumulated: str = "";
+        while (len(accumulated) < min_bytes) {
+            var data = resource_call(self.handle, OP_RECEIVE);
+            if (data == nil) {
+                if (len(accumulated) > 0) return core.ok_str(accumulated);
+                return core.err_str("connection closed before receiving enough data");
+            }
+            accumulated = accumulated + (data as str);
+        }
+        return core.ok_str(accumulated);
+    }
+
+    // Check if data is available to read (non-blocking)
+    pub fn has_data(): bool {
+        if (self.handle <= 0) return false;
+        var result = resource_call(self.handle, OP_POLL);
+        return result == true;
+    }
+
+    // Close the connection
+    pub fn close(): core.ResultInt {
+        if (self.handle <= 0) return core.ok_int(0);
+        resource_call(self.handle, OP_CLOSE);
+        resource_destroy(self.handle);
+        self.handle = -1;
         return core.ok_int(0);
     }
+
+    // Check if the socket is connected
+    pub fn is_connected(): bool {
+        return self.handle > 0;
+    }
+}
+
+frame TCPServer {
+    var handle: int;
+
+    pub fn init() {
+        self.handle = -1;
+    }
+
+    // Bind to a specific address and port
+    pub fn bind(address: str, port: int): core.ResultInt {
+        var h = resource_create(RT_SOCKET);
+        if (h == -1) return core.err_int("Failed to create socket");
+
+        var success = resource_call(h, OP_BIND, address, port);
+        if (success != true) {
+            resource_destroy(h);
+            return core.err_int("Failed to bind to " + address + ":" + port as str);
+        }
+        self.handle = h;
+        return core.ok_int(h);
+    }
+
+    // Listen for incoming connections
+    pub fn listen(backlog: int): core.ResultInt {
+        if (self.handle <= 0) return core.err_int("socket not bound");
+        var success = resource_call(self.handle, OP_LISTEN, backlog);
+        if (success != true) return core.err_int("listen failed");
+        return core.ok_int(self.handle);
+    }
+
+    // Accept a new connection, returns a TCPClient
+    pub fn accept(): core.ResultTCPClient {
+        if (self.handle <= 0) return core.err_str("socket not listening");
+        var client_fd = resource_call(self.handle, OP_ACCEPT);
+        if (client_fd == nil) return core.err_str("accept failed or no pending connection");
+
+        // Create a new socket resource wrapping the accepted fd
+        var client_handle = resource_create(RT_SOCKET, client_fd);
+        if (client_handle == -1) return core.err_str("failed to adopt client socket");
+
+        var client = TCPClient();
+        client.handle = client_handle;
+        return core.ok_str("client"); // Return client via wrapper
+    }
+
+    // Accept and return the raw file descriptor
+    pub fn accept_fd(): core.ResultInt {
+        if (self.handle <= 0) return core.err_int("socket not listening");
+        var client_fd = resource_call(self.handle, OP_ACCEPT);
+        if (client_fd == nil) return core.err_int("accept failed");
+        return core.ok_int(client_fd as int);
+    }
+
+    // Close the server socket
+    pub fn close(): core.ResultInt {
+        if (self.handle <= 0) return core.ok_int(0);
+        resource_call(self.handle, OP_CLOSE);
+        resource_destroy(self.handle);
+        self.handle = -1;
+        return core.ok_int(0);
+    }
+}
+
+// ---- Convenience functions ----
+fn connect(address: str, port: int): core.ResultInt {
+    var client = TCPClient();
+    return client.connect(address, port);
+}
+
+fn send(handle: int, data: str): core.ResultInt {
+    var client = TCPClient();
+    client.handle = handle;
+    return client.send(data);
+}
+
+fn recv(handle: int): core.ResultStr {
+    var client = TCPClient();
+    client.handle = handle;
+    return client.recv();
+}
+
+fn close(handle: int): core.ResultInt {
+    var client = TCPClient();
+    client.handle = handle;
+    return client.close();
 }

@@ -96,6 +96,10 @@ pub fn make_err_int(e: str): ResultInt {
     var err_info: Error = Error(code="ERR", message=e);
     return ResultInt(success=false, value=0, error_info=err_info);
 }
+pub fn err_int(e: str): ResultInt {
+    var err_info: Error = Error(code="ERR", message=e);
+    return ResultInt(success=false, value=0, error_info=err_info);
+}
 pub fn ok_str(v: str): ResultStr {
     var e: Error = Error(code="", message="");
     return ResultStr(success=true, value=v, error_info=e);
@@ -103,4 +107,13 @@ pub fn ok_str(v: str): ResultStr {
 pub fn make_err_str(e: str): ResultStr {
     var err_info: Error = Error(code="ERR", message=e);
     return ResultStr(success=false, value="", error_info=err_info);
+}
+pub fn err_str(e: str): ResultStr {
+    var err_info: Error = Error(code="ERR", message=e);
+    return ResultStr(success=false, value="", error_info=err_info);
+}
+pub fn ok_bool(v: bool): ResultInt {
+    var e: Error = Error(code="", message="");
+    if (v) return ResultInt(success=true, value=1, error_info=e);
+    return ResultInt(success=false, value=0, error_info=e);
 }
