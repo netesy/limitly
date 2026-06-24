@@ -32,7 +32,7 @@ struct Fiber {
         : fiber_id(id), state(FiberState::CREATED), task_context(context),
           current_instruction(0), suspend_count(0), stack_pointer(nullptr), stack_size(0) {
         if (task_context) {
-            current_instruction = task_context->body_start_pc;
+            current_instruction = (uint64_t)task_context->body_start_pc;
         }
     }
     
@@ -72,14 +72,14 @@ struct Fiber {
     
     // Advance to next instruction
     void advance_instruction() {
-        if (task_context && current_instruction < task_context->body_end_pc) {
+        if (task_context && current_instruction < (uint64_t)task_context->body_end_pc) {
             current_instruction++;
         }
     }
     
     // Check if fiber has more instructions
     bool has_more_instructions() const {
-        return task_context && current_instruction <= task_context->body_end_pc;
+        return task_context && current_instruction <= (uint64_t)task_context->body_end_pc;
     }
 };
 
