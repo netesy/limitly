@@ -1,0 +1,12 @@
+import std.collections.index as collections;
+
+fn main(): int {
+    var list = collections.ArrayList();
+    list.push("a");
+    list.push("b");
+    if (list.len() != 2) { return 1; }
+    if (list.pop() != "b") { return 2; }
+    list.resize(3, "x");
+    if (list.get(2) != "x") { return 3; }
+    return 0;
+}

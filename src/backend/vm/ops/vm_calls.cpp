@@ -1,4 +1,5 @@
 #include "../register.hh"
+#include "../resource_manager.hh"
 #include "../../../lir/function_registry.hh"
 #include "../../../lir/builtin_functions.hh"
 #include "../../../runtime/runtime.h"
@@ -11,6 +12,7 @@ namespace VM {
 namespace Register {
 
 void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
+    ResourceManager::getInstance().setCurrentFiber(get_current_fiber());
     switch (pc->op) {
         case LIR::LIR_Op::Call: {
             auto& func_manager = LIR::LIRFunctionManager::getInstance();

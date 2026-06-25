@@ -567,11 +567,29 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
 TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
-    // Handle assert() specially to allow decimal comparisons
+    // Handle built-in functions with special or variadic signatures
     if (auto var_callee = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
-        if (var_callee->name == "assert" && !expr->arguments.empty()) {
-            // Re-check the first argument with awareness it's a condition
-            check_expression(expr->arguments[0], type_system.BOOL_TYPE);
+        if (var_callee->name == "print") {
+            for (auto& arg : expr->arguments) {
+                check_expression(arg);
+            }
+            expr->inferred_type = type_system.NIL_TYPE;
+            return type_system.NIL_TYPE;
+        }
+        if (var_callee->name == "assert") {
+            if (!expr->arguments.empty()) {
+                check_expression(expr->arguments[0], type_system.BOOL_TYPE);
+            }
+            if (expr->arguments.size() > 1) {
+                check_expression(expr->arguments[1], type_system.STRING_TYPE);
+            }
+            expr->inferred_type = type_system.NIL_TYPE;
+            return type_system.NIL_TYPE;
+        }
+        if (var_callee->name == "error" && expr->arguments.size() == 1) {
+             check_expression(expr->arguments[0], type_system.STRING_TYPE);
+             expr->inferred_type = type_system.NIL_TYPE;
+             return type_system.NIL_TYPE;
         }
     }
 

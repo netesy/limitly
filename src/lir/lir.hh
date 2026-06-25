@@ -78,7 +78,8 @@ enum class ResourceOperation : uint32_t {
     PUSH = 11, POP = 12, GET_STATE = 13, SET_STATE = 14, COPY = 15,
     FILL = 16, COMPARE = 17, ADD_PTR = 18, SUB_PTR = 19, PTR_DIFF = 20,
     ALIGN_PTR = 21, IS_ALIGNED = 22, BIND = 23, LISTEN = 24, ACCEPT = 25,
-    RESOLVE = 26, SEND_TO = 27, RECV_FROM = 28
+    RESOLVE = 26, SEND_TO = 27, RECV_FROM = 28,
+    FLUSH = 29, MKDIR = 30, READDIR = 31, RENAME = 32, EXISTS = 33, DELETE = 34, HMAC = 35
 };
 
 enum class LIR_Op : uint8_t {

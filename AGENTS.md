@@ -1,266 +1,159 @@
 # Limitly Language - AI Agent Guidelines
 
-This document provides essential guidelines for AI agents generating code for the Limitly language to ensure compatibility and avoid introducing unsupported features.
+This document provides essential guidelines for AI agents generating code for the Limitly language. It outlines the valid syntax, supported language constructs, type system rules, module/import behavior, and error handling style that are actually implemented and supported by the Limitly compiler.
+
+---
 
 ## 🚫 **DO NOT USE - Unsupported Features**
 
 ### **Generics/Template Types**
-- ❌ `fn my_func<T>(param: T): T` - Generic type parameters are NOT supported
-- ❌ `List<T>` - Generic collections are NOT implemented
-- ❌ `Dict<K, V>` - Generic dictionaries are NOT implemented
-- ❌ `Option<T>` - Generic option types are NOT supported
-- ❌ `Result<T, E>` - Generic result types are NOT supported
+- ❌ `fn my_func<T>(param: T): T` - Generic type parameters are NOT supported.
+- ❌ `List<T>` / `Dict<K, V>` - Generic collections are NOT implemented (use `[int]` or `{str: int}`).
+- ❌ `Option<T>` / `Result<T, E>` - Generic option/result types are NOT supported as built-in generics (use option/result union types or standard library wrappers).
 
-### **Advanced Type Features**
-- ❌ Generic type constraints (`where T: Trait`)
-- ❌ Type inference for complex generic scenarios
-- ❌ Variadic generics (`T...`)
-- ❌ Generic trait implementations
+---
 
 ## ✅ **USE - Supported Features**
 
-### **Type System**
-- ✅ **Type Aliases**: `type UserId = int`
-- ✅ **Optional Types**: `str?` (union with nil)
-- ✅ **Union Types**: `int | string`
-- ✅ **Error Unions**: `Result<int, Error>`
-- ✅ **Frame Types**: User-defined objects with fields and methods
-- ✅ **Trait Types**: Interfaces with method signatures
-- ✅ **Primitive Types**: `int`, `float`, `str`, `bool`, `nil`
-- ✅ **Collection Types**: `[int]` (lists), `{str: int}` (dicts), `(int, str)` (tuples)
+### **1. Valid Syntax & Basic Constructs**
 
-### **Functions**
-- ✅ **Optional Parameters**: `fn greet(name: str = "World")`
-- ✅ **Default Values**: Function parameters can have defaults
-- ✅ **Multiple Parameters**: `fn func(a: int, b: str, c: bool = true)`
-- ✅ **Return Types**: `fn add(a: int, b: int): int`
-- ✅ **Closures**: Functions that capture variables
-- ✅ **First-class Functions**: Functions as values
+#### **Variables & Constants**
+- **Variable**: `var x = 42;` or `var x: int = 42;`
+- **Immutable Local**: `val y = 100;` (binds an immutable variable).
+- **Constant**: `const PI = 3.14;` (defines an immutable binding).
+- **Atomic**: `var counter: atomic = 0;` (special type for thread-safe operations).
 
-### **Control Flow**
-- ✅ **Match Statements**: Pattern matching with literal, enum, frame, variable patterns
-- ✅ **If/Else**: Conditional statements
-- ✅ **Loops**: `for`, `while`, `iter`
-- ✅ **Ranges**: `1..10`, `start..end`
+#### **Operators**
+- **Arithmetic**: `+`, `-`, `*`, `/`, `%` (modulo), `**` (exponentiation, right-associative).
+- **Unary**: `not` (logical negator keyword, preferred over `!`), `-` (negation), `~` (bitwise NOT).
+- **Bitwise**: `&` (AND), `|` (OR), `^` (XOR), `<<` (left shift), `>>` (right shift).
+- **Comparison**: `==`, `!=`, `<`, `<=`, `>`, `>=`
+- **Type Cast**: `expression as TargetType`
+- **Compound Assignment**: `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`
 
-### **Modules**
-- ✅ **Import**: `import std.collections as collections`
-- ✅ **Module Aliases**: `as` keyword for renaming
-- ✅ **Selective Import**: `import module { specific_function }`
+#### **Control Flow**
+- **Conditionals**: `if (cond) { ... } else if (cond) { ... } else { ... }`
+- **Loops**:
+  - `while (cond) { ... }`
+  - `for (var i = 0; i < 10; i = i + 1) { ... }`
+  - `iter (item in collection) { ... }` (for lists, dicts, ranges)
+- **Pattern Matching (Match)**: Uses block syntax `pattern => { statements }`.
+  ```limit
+  match (value) {
+      5 => { print("Literal match"); },
+      Color.Red => { print("Enum variant"); },
+      point => { print("Variable binding"); },
+      val success => { print("Fallible success: {success}"); },
+      err error => { print("Fallible error: {error}"); },
+      _ => { print("Wildcard"); }
+  }
+  ```
 
-### **OOP Features**
-- ✅ **Frames**: User-defined objects with fields and methods
-- ✅ **Traits**: Interfaces that frames can implement
-- ✅ **Method Calls**: `obj.method()`
-- ✅ **Field Access**: `obj.field`
-- ✅ **Trait Implementation**: Frames can implement multiple traits
+#### **Basic Data Structures**
+- **Lists**: Homogeneous collection, shorthand: `[int]`. Literal: `[1, 2, 3]`.
+- **Dictionaries**: Shorthand: `{str: int}`. Literal: `{"a": 1, "b": 2}`. Bare identifiers are allowed as string keys: `{name: "John"}`.
+- **Tuples**: Shorthand: `(int, str)`. Literal: `(42, "hello")`. Indexed with dot notation: `tuple.0`.
+- **Objects**: Literal: `Point { x: 10, y: 20 }`.
+- **Ranges**: `1..10` (inclusive).
 
-### **Concurrency**
-- ✅ **Parallel Blocks**: `parallel { ... }`
-- ✅ **Concurrent Blocks**: `concurrent { ... }`
-- ✅ **Tasks**: `task(i in 1..10) { ... }`
-- ✅ **Atomic Types**: `var counter: atomic = 0`
+---
 
-## 📝 **Code Examples**
+### **2. Type System Rules**
 
-### **Correct Usage**
+#### **Static & Strong Typing**
+No implicit type conversions. You must explicitly cast types using `as` (e.g. `x as float`).
+
+#### **Built-in Primitive Types**
+- **Integers**: `int`, `i8`, `i16`, `i32`, `i64`, `i128`, `uint`, `u8`, `u16`, `u32`, `u64`, `u128`.
+- **Floats**: `float`, `f32`, `f64`.
+- **Decimals**: `d2`, `d4`, `d6`, `decimal`.
+- **Others**: `str`, `bool`, `any` (dynamically checked), `nil` (null representation), `channel`.
+
+#### **Advanced Type Constructs**
+- **Type Aliases**: `type UserId = int;`
+- **Union Types**: `int | str`
+- **Intersection Types**: `TraitA & TraitB`
+- **Refined Types**: `int where value > 0` or `str where length(value) > 10`
+- **Optional Types**: `Type?` (syntactic sugar for `Type | nil`)
+- **Fallible Types**: `Type?Error1,Error2` (defines specific error types that can be returned)
+
+---
+
+### **3. Object-Oriented Programming (OOP)**
+
+#### **Frames**
+Frames are class-like structures that define fields and methods.
+- **Modifiers**: Fields and methods use `pub` (public), `prot` (protected), or default to private.
+- **`self` Reference**: Inside methods, `self` is the canonical reference to the current instance (`this` is unsupported).
+- **Lifecycle Methods**:
+  - `pub init(...)` (constructor)
+  - `pub deinit()` (destructor)
+
 ```limit
-// Type aliases
-type UserId = int
-type Name = str
+frame Rectangle {
+    pub width: int;
+    pub height: int;
 
-// Optional parameters with defaults
-fn createUser(name: str, age: int = 18, active: bool = true): str {
-    return "{name}, {age}, {active}"
-}
+    pub init(w: int, h: int) {
+        self.width = w;
+        self.height = h;
+    }
 
-// Optional types (not generics)
-fn processOptional(value: int?): str {
-    if (value) {
-        return "Got: {value}"
-    } else {
-        return "Got nothing"
+    pub fn area(): int {
+        return self.width * self.height;
     }
 }
+```
 
-// Union types with proper match patterns
-fn handleValue(value: int | str): str {
-    match (value) {
-        n => { return "Value: {n}"; }
+#### **Traits**
+Traits define interface requirements that frames can implement.
+```limit
+trait Shape {
+    fn area(): int
+}
+
+frame Square: Shape {
+    pub side: int;
+    pub fn area(): int {
+        return self.side * self.side;
     }
 }
-
-// Frame with trait
-trait Drawable {
-    fn draw(): str
-}
-
-frame Circle: Drawable {
-    var radius: float
-    pub fn draw(): str {
-        return "Drawing circle with radius {self.radius}"
-    }
-}
-
-// Collections (concrete types)
-var numbers: [int] = [1, 2, 3]
-var mapping: {str: int} = {"a": 1, "b": 2}
-var point: (int, int) = (10, 20)
 ```
 
-### **Incorrect Usage - DO NOT DO THIS**
-```limit
-// ❌ NO GENERICS
-fn identity<T>(x: T): T {
-    return x
-}
+---
 
-// ❌ NO GENERIC COLLECTIONS
-var list: List<int> = [1, 2, 3]
-var dict: Dict<string, int> = {"a": 1}
+### **4. Error Handling Style**
 
-// ❌ NO GENERIC TRAITS
-trait Comparable<T> {
-    fn compare(other: T): int
-}
+#### **Fallible Types & Error Propagation**
+Limitly does not use generic `Result` types. Instead, it uses fallible annotations like `int?` (generic error) or `int?DivisionByZero` (specific error).
 
-// ❌ NO GENERIC CONSTRAINTS
-fn sort<T where T: Comparable>(list: [T]): [T] {
-    // implementation
-}
-```
+- **Success/Error constructors**: Values must be returned using `ok(value)` or `err(ErrorType)` (or `err()` for generic fallible returns).
+- **Propagator (`?`)**: Suffixing an expression with `?` will propagate the error up the call stack if it fails.
+- **Inline Handling (`? else`)**: You can handle errors inline with optional error variable capturing.
+  ```limit
+  var value = divide(a, b)? else {
+      return 0; // fallback default
+  };
 
-## 🔧 **Common Patterns**
+  var value_with_err = divide(a, b)? else err {
+      print("Failed: {err}");
+      return 0;
+  };
+  ```
 
-### **Match Statement Patterns**
+---
 
-Match statements in Limitly use **block syntax** (`=> { statements }`) and support these pattern types:
+### **5. Module & Import Behavior**
 
-```limit
-// 1. Literal Patterns
-match (x) {
-    5 => { print("x is five"); },
-    10 => { print("x is ten"); },
-    _ => { print("x is something else"); }
-}
+- **Import Module**: `import std.collections as collections;`
+- **Import Specific Symbols**: `import std.collections { List, Map };` (utilizes show filters under the hood).
+- **Import Alias**: Imports can be aliased with `as`. Qualified names are referenced as `alias.Symbol`.
 
-// 2. Enum Patterns
-enum Status { Active, Inactive, Pending }
+---
 
-match (status) {
-    Status.Active => { print("Active"); },
-    Status.Inactive => { print("Inactive"); },
-    _ => { print("Other"); }
-}
+### **6. Concurrency**
 
-// 3. Enum with Associated Values
-enum Result {
-    Success(str),
-    Error(str)
-}
-
-match (result) {
-    Result.Success(msg) => { print("Success: {msg}"); },
-    Result.Error(msg) => { print("Error: {msg}"); }
-}
-
-// 4. Variable Binding Patterns
-match (value) {
-    n => { print("The value is: {n}"); }
-}
-
-// 5. Frame Patterns
-frame Point { var x: float; var y: float; }
-
-match (p) {
-    point => { print("Point at ({point.x}, {point.y})"); }
-}
-
-// 6. Wildcard Patterns
-match (anything) {
-    _ => { print("Matched anything"); }
-}
-```
-
-**Important**: Match statements MUST use block syntax with braces:
-```limit
-// ✅ CORRECT
-match (x) {
-    5 => { print("five"); },
-    _ => { print("other"); }
-}
-
-// ❌ INCORRECT - Missing braces
-match (x) {
-    5 => print("five"),
-    _ => print("other")
-}
-```
-
-**❌ DO NOT use type patterns** like `int =>` or `str =>` - these are not valid patterns.
-
-### **Instead of Generics, Use:**
-1. **Type Aliases**: `type UserId = int`
-2. **Union Types**: `int | str | bool`
-3. **Overloaded Functions**: Multiple functions with different parameter types
-4. **Trait Objects**: Dynamic dispatch through traits
-
-### **Function Signatures**
-```limit
-// ✅ GOOD: Specific types
-fn processInts(numbers: [int]): int
-fn processStrings(texts: [str]): str
-
-// ❌ BAD: Generic types
-fn process<T>(items: [T]): T
-```
-
-### **Collection Handling**
-```limit
-// ✅ GOOD: Concrete collections
-var numbers: [int] = [1, 2, 3]
-var names: [str] = ["Alice", "Bob"]
-var data: {str: int} = {"count": 10}
-
-// ❌ BAD: Generic collections
-var items: List<T> = []
-var mapping: Dict<K, V> = {}
-```
-
-## 🎯 **Key Principles**
-
-1. **Be Specific**: Use concrete types instead of generic placeholders
-2. **Use Unions**: For multiple possible types, use union syntax
-3. **Leverage Traits**: For polymorphism, use traits not generics
-4. **Type Aliases**: Create meaningful aliases for complex types
-5. **Optional Types**: Use `?` syntax for nullable values
-
-## ⚠️ **Important Notes**
-
-- The type system is **static** and **strong** - no implicit conversions
-- **Optional types** use `?` syntax (e.g., `int?`) not generic `Option<T>`
-- **Union types** use `|` syntax (e.g., `int | string`)
-- **Error handling** uses error unions, not generic `Result<T, E>`
-- **Collections** are homogeneous but not generic - specify element types directly
-
-## 📚 **Reference Implementation**
-
-Always check existing standard library code for patterns:
-- `std/collections/list.lm` - List implementation
-- `std/collections/hashmap.lm` - HashMap implementation  
-- `std/core.lm` - Core type definitions
-- Test files in `tests/` directory for working examples
-
-When in doubt, write concrete, specific code rather than attempting generic abstractions.
-## 2026-06-19 Parser/operator stabilization note
-
-The scanner and parser now recognize the keyword unary logical operator `not` in addition to legacy `!`. Bitwise operators `&`, `|`, `^`, `<<`, and `>>` parse as expression operators with precedence lower than comparison and higher than equality, so `flags & READ == READ` is parsed as `(flags & READ) == READ`. Compound bitwise assignments `&=`, `|=`, `^=`, `<<=`, and `>>=` are accepted as assignment operators. Exponentiation remains right-associative and binds tighter than unary plus/minus: `-2 ** 2` parses as `-(2 ** 2)`, while `2 ** 3 ** 2` parses as `2 ** (3 ** 2)`.
-
-
-## 2026-06-23 Standard Library Group 2 note
-
-`std.sort`, `std.search`, `std.algorithm`, `std.iterator`, `std.range`, and `std.collections.index` expose the current Group 2 APIs documented in `docs/stdlib.md`. Keep these modules conforming to parser-supported syntax only: use `self`, block-bodied control flow, concrete collection shorthand types, and pure standard-library collection implementations.
-
-## 2026-06-23 Standard Library Expansion note
-
-Additional stdlib modules `std.string`, `std.option`, and `std.result` are available alongside the Group 2 modules. New stdlib tests should be placed under `tests/stdlib/` and must use the `.lm` extension.
+- **Parallel Block**: `parallel { ... }` runs blocks in parallel.
+- **Concurrent Block**: `concurrent { ... }` handles channel-based execution.
+- **Tasks**: `task(i in 1..10) { ... }` spawns parallel tasks.
+- **Workers**: `worker(data in stream) { ... }` processes streams.

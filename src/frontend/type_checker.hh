@@ -57,7 +57,7 @@ private:
         std::string name;
         std::vector<TypePtr> param_types;
         TypePtr return_type;
-        std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> declaration;
+        std::shared_ptr<LM::Frontend::AST::Statement> declaration;
         bool can_fail = false;
         std::vector<std::string> error_types;
         std::vector<bool> optional_params;

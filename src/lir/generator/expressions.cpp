@@ -1274,7 +1274,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             if (intrinsic->opcode == LIR_Op::ResourceCall) {
                 if (arg_regs.size() >= 2) {
                     inst.a = arg_regs[0];
-                    // Operation ID is second argument
+            if (intrinsic->opcode == LIR_Op::ResourceCall) {
+                if (arg_regs.size() >= 2) {
+                    inst.a = arg_regs[0];
                     if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr.arguments[1])) {
                         if (std::holds_alternative<std::string>(lit->value)) {
                              try {
@@ -1286,6 +1288,14 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                         inst.b = arg_regs[2];
                         for (size_t k = 3; k < arg_regs.size(); ++k) inst.call_args.push_back(arg_regs[k]);
                     }
+                }
+            } else if (intrinsic->opcode == LIR_Op::ResourceCreate) {
+                if (!arg_regs.empty()) inst.a = arg_regs[0];
+                if (arg_regs.size() > 1) {
+                    inst.b = arg_regs[1];
+                    for (size_t k = 2; k < arg_regs.size(); ++k) inst.call_args.push_back(arg_regs[k]);
+                }
+            }
                 }
             } else {
                 if (!arg_regs.empty()) inst.a = arg_regs[0];

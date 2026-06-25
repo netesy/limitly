@@ -57,7 +57,7 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("date", {}, ts.STRING_TYPE);
     checker.register_builtin_function("now", {}, ts.STRING_TYPE);
     checker.register_builtin_function("assert", {ts.BOOL_TYPE, ts.STRING_TYPE}, ts.NIL_TYPE);
-    checker.register_builtin_function("print", {ts.ANY_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("print", {ts.ANY_TYPE, ts.ANY_TYPE, ts.ANY_TYPE, ts.ANY_TYPE, ts.ANY_TYPE}, ts.NIL_TYPE);
     
     
     // Collection functions (enhanced)
@@ -84,8 +84,8 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("input", {ts.STRING_TYPE}, ts.STRING_TYPE);
 
     // Unified Resource System
-    checker.register_builtin_function("resource_create", {ts.INT_TYPE}, ts.INT64_TYPE);
-    checker.register_builtin_function("resource_call", {ts.INT64_TYPE, ts.INT_TYPE, ts.ANY_TYPE}, ts.ANY_TYPE);
+    checker.register_builtin_function("resource_create", {ts.INT_TYPE, ts.ANY_TYPE, ts.ANY_TYPE}, ts.INT64_TYPE);
+    checker.register_builtin_function("resource_call", {ts.INT64_TYPE, ts.INT_TYPE, ts.ANY_TYPE, ts.ANY_TYPE, ts.ANY_TYPE}, ts.ANY_TYPE);
     checker.register_builtin_function("resource_destroy", {ts.INT64_TYPE}, ts.NIL_TYPE);
 
     // File I/O intrinsics

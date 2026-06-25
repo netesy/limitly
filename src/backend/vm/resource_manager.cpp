@@ -15,6 +15,7 @@
 #include <sstream>
 #include <cmath>
 #include <mutex>
+#include <filesystem>
 
 // Platform-specific headers and macros
 #if defined(_WIN32)
@@ -33,7 +34,17 @@
         #define MSG_WAITALL 0x8
     #endif
     typedef int socklen_t;
-    typedef int ssize_t;
+    #ifndef _SSIZE_T_DEFINED
+        #define _SSIZE_T_DEFINED
+        #ifdef _WIN64
+            typedef __int64 ssize_t;
+        #else
+            typedef int ssize_t;
+        #endif
+    #endif
+    #ifdef DELETE
+        #undef DELETE
+    #endif
 #else
     #include <unistd.h>
     #include <sys/socket.h>
@@ -474,6 +485,38 @@ private:
     uint64_t totlen_;
 };
 
+static std::string compute_hmac(const std::string& algo, const std::string& key, const std::string& data) {
+    size_t block_size = 64;
+    if (algo == "sha512") block_size = 128;
+    
+    std::string k = key;
+    if (k.size() > block_size) {
+        if (algo == "sha256") { SHA256 h; h.update((const uint8_t*)k.data(), k.size()); k = h.digest(); }
+        else if (algo == "sha512") { SHA512 h; h.update((const uint8_t*)k.data(), k.size()); k = h.digest(); }
+        else if (algo == "sha1") { SHA1 h; h.update((const uint8_t*)k.data(), k.size()); k = h.digest(); }
+        else if (algo == "md5") { MD5 h; h.update((const uint8_t*)k.data(), k.size()); k = h.digest(); }
+    }
+    if (k.size() < block_size) k.append(block_size - k.size(), '\0');
+    
+    std::string o_key_pad = k, i_key_pad = k;
+    for (size_t i = 0; i < block_size; i++) {
+        o_key_pad[i] ^= 0x5c;
+        i_key_pad[i] ^= 0x36;
+    }
+    
+    std::string i_hash;
+    if (algo == "sha256") { SHA256 h; h.update((const uint8_t*)i_key_pad.data(), i_key_pad.size()); h.update((const uint8_t*)data.data(), data.size()); i_hash = h.digest(); }
+    else if (algo == "sha512") { SHA512 h; h.update((const uint8_t*)i_key_pad.data(), i_key_pad.size()); h.update((const uint8_t*)data.data(), data.size()); i_hash = h.digest(); }
+    else if (algo == "sha1") { SHA1 h; h.update((const uint8_t*)i_key_pad.data(), i_key_pad.size()); h.update((const uint8_t*)data.data(), data.size()); i_hash = h.digest(); }
+    else if (algo == "md5") { MD5 h; h.update((const uint8_t*)i_key_pad.data(), i_key_pad.size()); h.update((const uint8_t*)data.data(), data.size()); i_hash = h.digest(); }
+    
+    if (algo == "sha256") { SHA256 h; h.update((const uint8_t*)o_key_pad.data(), o_key_pad.size()); h.update((const uint8_t*)i_hash.data(), i_hash.size()); return h.digest(); }
+    else if (algo == "sha512") { SHA512 h; h.update((const uint8_t*)o_key_pad.data(), o_key_pad.size()); h.update((const uint8_t*)i_hash.data(), i_hash.size()); return h.digest(); }
+    else if (algo == "sha1") { SHA1 h; h.update((const uint8_t*)o_key_pad.data(), o_key_pad.size()); h.update((const uint8_t*)i_hash.data(), i_hash.size()); return h.digest(); }
+    else if (algo == "md5") { MD5 h; h.update((const uint8_t*)o_key_pad.data(), o_key_pad.size()); h.update((const uint8_t*)i_hash.data(), i_hash.size()); return h.digest(); }
+    return "";
+}
+
 } // anonymous namespace
 
 // ===================== Concrete Resource Implementations =====================
@@ -530,6 +573,52 @@ public:
             }
             case ResourceOperation::POLL: {
                 return fp_ ? VAL_TRUE : VAL_FALSE;
+            }
+            case ResourceOperation::FLUSH: {
+                if (fp_) {
+                    std::fflush(fp_);
+                    return VAL_TRUE;
+                }
+                return VAL_FALSE;
+            }
+            case ResourceOperation::MKDIR: {
+                const char* path = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
+                if (!path) return VAL_FALSE;
+                try {
+                    return std::filesystem::create_directories(path) ? VAL_TRUE : VAL_FALSE;
+                } catch (...) { return VAL_FALSE; }
+            }
+            case ResourceOperation::READDIR: {
+                const char* path = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
+                if (!path) return VAL_NIL;
+                try {
+                    std::string res;
+                    for (const auto& entry : std::filesystem::directory_iterator(path)) {
+                        res += entry.path().filename().string() + "\n";
+                    }
+                    return make_string_value(res.c_str());
+                } catch (...) { return VAL_NIL; }
+            }
+            case ResourceOperation::RENAME: {
+                const char* old_path = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
+                const char* new_path = args.size() > 1 ? register_value_to_cstr(args[1]) : nullptr;
+                if (!old_path || !new_path) return VAL_FALSE;
+                try {
+                    std::filesystem::rename(old_path, new_path);
+                    return VAL_TRUE;
+                } catch (...) { return VAL_FALSE; }
+            }
+            case ResourceOperation::EXISTS: {
+                const char* path = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
+                if (!path) return VAL_FALSE;
+                return std::filesystem::exists(path) ? VAL_TRUE : VAL_FALSE;
+            }
+            case ResourceOperation::DELETE: {
+                const char* path = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
+                if (!path) return VAL_FALSE;
+                try {
+                    return std::filesystem::remove_all(path) > 0 ? VAL_TRUE : VAL_FALSE;
+                } catch (...) { return VAL_FALSE; }
             }
             default:
                 return VAL_NIL;
@@ -993,6 +1082,14 @@ public:
                 else if (algo_ == "md5") r = md5_.digest();
                 return make_string_value(r.c_str());
             }
+            case ResourceOperation::HMAC: {
+                const char* algo = args.size() > 0 ? register_value_to_cstr(args[0]) : "sha256";
+                const char* key = args.size() > 1 ? register_value_to_cstr(args[1]) : nullptr;
+                const char* data = args.size() > 2 ? register_value_to_cstr(args[2]) : nullptr;
+                if (!key || !data) return VAL_NIL;
+                std::string res = compute_hmac(algo, key, data);
+                return make_string_value(res.c_str());
+            }
             case ResourceOperation::CLOSE: return VAL_TRUE;
             default: return VAL_NIL;
         }
@@ -1010,7 +1107,7 @@ public:
     explicit ChannelResource(size_t c = 1024) : ch_(c) {}
     ResourceType getType() const override { return ResourceType::CHANNEL; }
     RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void* ctx) override {
-        Fiber* f = static_cast<Fiber*>(ctx);
+        Fiber* f = static_cast<Fiber*>(ctx != nullptr ? ctx : ResourceManager::getInstance().getCurrentFiber());
         if (op == ResourceOperation::SEND || op == ResourceOperation::PUSH) {
             ch_.send(args.empty() ? VAL_NIL : args[0], f);
             return VAL_TRUE;
@@ -1133,7 +1230,7 @@ int64_t ResourceManager::create(ResourceType type, const std::vector<RegisterVal
 RegisterValue ResourceManager::call(int64_t id, ResourceOperation op, const std::vector<RegisterValue>& args, void* ctx) {
     std::lock_guard<std::mutex> lock(mutex_);
     auto it = resources_.find(id);
-    return (it == resources_.end()) ? VAL_NIL : it->second->call(op, args, ctx);
+    return (it == resources_.end()) ? VAL_NIL : it->second->call(op, args, ctx != nullptr ? ctx : current_fiber_);
 }
 
 void ResourceManager::destroy(int64_t id) {

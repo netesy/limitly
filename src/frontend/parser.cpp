@@ -81,7 +81,7 @@ void Parser::synchronize() {
             case TokenType::FOR:
             case TokenType::IF:
             case TokenType::WHILE:
-            case TokenType::PRINT:
+            // // // case TokenType::PRINT:
             case TokenType::RETURN:
             case TokenType::IMPORT:
             case TokenType::TRAIT:

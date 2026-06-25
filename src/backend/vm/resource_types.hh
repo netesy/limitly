@@ -57,7 +57,14 @@ enum class ResourceOperation : uint32_t {
     ACCEPT = 25,
     RESOLVE = 26,
     SEND_TO = 27,
-    RECV_FROM = 28
+    RECV_FROM = 28,
+    FLUSH = 29,
+    MKDIR = 30,
+    READDIR = 31,
+    RENAME = 32,
+    EXISTS = 33,
+    DELETE = 34,
+    HMAC = 35
 };
 
 } // namespace VM

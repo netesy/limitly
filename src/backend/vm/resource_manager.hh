@@ -48,6 +48,8 @@ public:
     void destroy(int64_t id);
 
     void shutdown();
+    void setCurrentFiber(void* fiber) { current_fiber_ = fiber; }
+    void* getCurrentFiber() { return current_fiber_; }
 
 private:
     ResourceManager() = default;
@@ -56,6 +58,7 @@ private:
     std::unordered_map<int64_t, std::unique_ptr<Resource>> resources_;
     int64_t next_id_ = 1;
     std::mutex mutex_;
+    void* current_fiber_ = nullptr;
 };
 
 } // namespace VM
