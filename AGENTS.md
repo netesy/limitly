@@ -7,8 +7,9 @@ This document provides essential guidelines for AI agents generating code for th
 ## 🚫 **DO NOT USE - Unsupported Features**
 
 ### **Reserved Keywords as Identifiers**
-- ❌ **DO NOT use reserved keywords as variable names, function names, or method names**. All language keywords (e.g., `iter`, `any`, `list`, `fn`, `if`, `while`, `for`, `return`, `var`, `val`, `const`, `frame`, `trait`, `import`, `match`, `in`, `type`, `enum`, `err`, `ok`, `and`, `or`, `not`, `as`, `where`, `self`, `super`, `true`, `false`, `nil`, `break`, `continue`, `parallel`, `concurrent`, `task`, `worker`, `contract`, `comptime`, `unsafe`, `module`, `interface`, `mixin`, `implements`, `show`, `hide`, `from`, `elif`, `else`, `static`, `abstract`, `final`, `pub`, `prot`) are reserved and cannot be used as identifiers.
+- ❌ **DO NOT use reserved keywords as variable names, function names, or method names**. All language keywords (e.g., `iter`, `any`, `fn`, `if`, `while`, `for`, `return`, `var`, `val`, `const`, `frame`, `trait`, `import`, `match`, `in`, `type`, `enum`, `err`, `ok`, `and`, `or`, `not`, `as`, `where`, `self`, `super`, `true`, `false`, `nil`, `break`, `continue`, `parallel`, `concurrent`, `task`, `worker`, `contract`, `comptime`, `unsafe`, `module`, `interface`, `mixin`, `implements`, `show`, `hide`, `from`, `elif`, `else`, `static`, `abstract`, `final`, `pub`, `prot`) are reserved and cannot be used as identifiers.
 - ❌ For example: `var iter = 5;` or `fn iter(): int { ... }` or `frame Foo { pub fn iter(): int { ... } }` are **INVALID**.
+- ✅ **Note**: `list`, `dict`, `array` are **NOT** reserved keywords and can be used as identifiers.
 
 ### **Generics/Template Types**
 - ❌ `fn my_func<T>(param: T): T` - Generic type parameters are NOT supported.
@@ -155,7 +156,41 @@ Limitly does not use generic `Result` types. Instead, it uses fallible annotatio
 
 ---
 
-### **6. Concurrency**
+### **6. Stdlib Guidelines**
+
+#### **Type Ownership**
+- ❌ **DO NOT put type ownership in stdlib.** Type definitions (primitive types, collection types, enum types) are compiler-owned.
+- ✅ **Stdlib provides behavior only.** Stdlib modules implement functionality using compiler-defined types.
+
+#### **Stdlib Implementation Rules**
+- ❌ **Do not define fake replacement types for compiler collections.** Stdlib should not redefine types like `List`, `Dict`, `Array` as type aliases.
+- ❌ **Do not solve missing typing by changing everything to `any`.** The `any` type is a dynamic escape hatch, not a replacement for real types.
+- ✅ **Use current supported mechanisms for generic-like behavior:**
+  - `any` (dynamic typing, use sparingly)
+  - `traits` (interface-based polymorphism)
+  - `frames` (class-like structures with methods)
+  - `union types` (e.g., `int | str`)
+  - `function types` (higher-order functions)
+
+#### **Example: Correct Stdlib Implementation**
+```limit
+// std/collections/vector.lm
+frame Vector {
+    pub var data: [int];  // Uses compiler's list type
+
+    pub fn init(): Vector {
+        return Vector(data=[]);
+    }
+
+    pub fn push(value: int): Vector {
+        // Implementation details...
+    }
+}
+```
+
+---
+
+### **7. Concurrency**
 
 - **Parallel Block**: `parallel { ... }` runs blocks in parallel.
 - **Concurrent Block**: `concurrent { ... }` handles channel-based execution.

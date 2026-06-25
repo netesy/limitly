@@ -154,6 +154,7 @@ fn unzip(pairs: [any]): ([any], [any]) {
     var i = 0;
     while (i < len(pairs)) {
         var pair = pairs[i];
+        // Revert to any - tuple field access on any not yet supported
         left.push(pair.0);
         right.push(pair.1);
         i = i + 1;

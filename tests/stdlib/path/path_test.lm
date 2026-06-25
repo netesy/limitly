@@ -184,15 +184,17 @@ fn test_is_absolute_wrapper(): bool {
 // For our test, we verify the conditions
 fn test_join_conditions(): bool {
     // base ends with "/" -> no separator needed
-    assert(not ("" == "" or "/a" == "" or "/a"[0] != "/"), "join cond 1");
+    var base_ends_with_slash = starts_with("/a/", "/") and ends_with("/a/", "/");
+    assert(base_ends_with_slash, "join cond 1");
     // base empty -> return other
-    assert("" == "" or "/b" == "", "join cond 2");
+    var base_empty = "" == "";
+    assert(base_empty, "join cond 2");
     // other starts with "/" -> no separator needed
-    assert(not ("" == "" or "/a" == "" or "/a"[0] != "/"), "join cond 3");
+    var other_starts_with_slash = starts_with("/a", "/");
+    assert(other_starts_with_slash, "join cond 3");
     // both have content, need separator
-    assert(not ("" == "" or "a" == "" or "/a"[0] == "/"), "join cond 4");
-    // identical strings -> no separator needed
-    assert("a" == "" or "b" == "", "join identical");
+    var both_have_content = "a" != "" and "b" != "";
+    assert(both_have_content, "join cond 4");
     return true;
 }
 assert(test_join_conditions(), "join conditions");

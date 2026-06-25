@@ -1,0 +1,12 @@
+// Standard Library Core Traits
+// These traits define shared capabilities for stdlib abstractions
+
+// Iterator trait for types that can produce a sequence of values
+trait Iterator {
+    fn next(): any
+}
+
+// Iterable trait for types that can create an iterator
+trait Iterable {
+    fn iter(): Iterator
+}

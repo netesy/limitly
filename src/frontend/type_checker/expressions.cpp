@@ -908,6 +908,28 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                     }
                 }
 
+                // Check if it's a callable field (field with function type)
+                for (const auto& [field_name, field_type] : frame_info.fields) {
+                    if (field_name == method_name && field_type && field_type->tag == TypeTag::Function) {
+                        // This is a callable field - validate arguments and return function type
+                        if (auto* func_type = std::get_if<FunctionType>(&field_type->extra)) {
+                            // Validate arguments against function type
+                            if (arg_types.size() != func_type->paramTypes.size()) {
+                                add_error("Function field expects " + std::to_string(func_type->paramTypes.size()) +
+                                         " arguments, but " + std::to_string(arg_types.size()) + " were provided", expr->line);
+                            } else {
+                                for (size_t i = 0; i < arg_types.size(); ++i) {
+                                    if (!is_type_compatible(func_type->paramTypes[i], arg_types[i])) {
+                                        add_type_error(func_type->paramTypes[i]->toString(), arg_types[i]->toString(), expr->line);
+                                    }
+                                }
+                            }
+                            expr->inferred_type = func_type->returnType;
+                            return func_type->returnType;
+                        }
+                    }
+                }
+
                 add_error("Frame '" + frame_name + "' has no method '" + method_name + "'", expr->line);
                 return type_system.ANY_TYPE;
             }
@@ -1270,6 +1292,16 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
                         return field_type;
                     }
                 }
+            }
+        }
+
+        // Check if member is a field with function type (for callable fields)
+        for (const auto& [field_name, field_type] : frame_info.fields) {
+            if (field_name == member_name && field_type && field_type->tag == TypeTag::Function) {
+                // This is a callable field - return the function type
+                // The caller will handle the function invocation
+                expr->inferred_type = field_type;
+                return field_type;
             }
         }
         
