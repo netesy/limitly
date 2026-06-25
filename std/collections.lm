@@ -18,45 +18,45 @@ frame List {
     pub fn push(value: int): List {
         var out: [int] = [];
         var i: int = 0;
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             out[i] = self.data[i];
             i = i + 1;
         }
-        out[self.data.length] = value;
+        out[len(self.data)] = value;
         return List(data=out);
     }
 
     pub fn pop(): int? {
-        if (self.data.length == 0) return nil;
-        return self.data[self.data.length - 1];
+        if (len(self.data) == 0) return nil;
+        return self.data[len(self.data) - 1];
     }
 
     pub fn get(index: int): int? {
-        if (index < 0 or index >= self.data.length) return nil;
+        if (index < 0 or index >= len(self.data)) return nil;
         return self.data[index];
     }
 
     pub fn set(index: int, value: int): List {
         var out: [int] = [];
         var i: int = 0;
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             out[i] = self.data[i];
             i = i + 1;
         }
-        if (index >= 0 and index < out.length) {
+        if (index >= 0 and index < len(out)) {
             out[index] = value;
         }
         return List(data=out);
     }
 
-    pub fn length(): int { return self.data.length; }
-    pub fn is_empty(): bool { return self.data.length == 0; }
+    pub fn length(): int { return len(self.data); }
+    pub fn is_empty(): bool { return len(self.data) == 0; }
     pub fn clear(): List { return List(data=[]); }
 
     // Advanced operations
     pub fn insert(index: int, value: int): List {
         if (index < 0) index = 0;
-        if (index > self.data.length) index = self.data.length;
+        if (index > len(self.data)) index = len(self.data);
         
         var out: [int] = [];
         var i: int = 0;
@@ -72,7 +72,7 @@ frame List {
         i = i + 1;
         
         // Copy remaining elements
-        while (i < self.data.length + 1) {
+        while (i < len(self.data) + 1) {
             out[i] = self.data[i - 1];
             i = i + 1;
         }
@@ -81,13 +81,13 @@ frame List {
     }
 
     pub fn remove(index: int): List {
-        if (index < 0 or index >= self.data.length) return self;
+        if (index < 0 or index >= len(self.data)) return self;
         
         var out: [int] = [];
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             if (i != index) {
                 out[j] = self.data[i];
                 j = j + 1;
@@ -106,7 +106,7 @@ frame List {
 
     pub fn index_of(value: int): int? {
         var i: int = 0;
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             if (self.data[i] == value) return i;
             i = i + 1;
         }
@@ -118,18 +118,18 @@ frame List {
     }
 
     pub fn first(): int? {
-        if (self.data.length == 0) return nil;
+        if (len(self.data) == 0) return nil;
         return self.data[0];
     }
 
     pub fn last(): int? {
-        if (self.data.length == 0) return nil;
-        return self.data[self.data.length - 1];
+        if (len(self.data) == 0) return nil;
+        return self.data[len(self.data) - 1];
     }
 
     pub fn slice(start: int, end: int): List {
         if (start < 0) start = 0;
-        if (end > self.data.length) end = self.data.length;
+        if (end > len(self.data)) end = len(self.data);
         if (start >= end) return List(data=[]);
         
         var out: [int] = [];
@@ -149,8 +149,8 @@ frame List {
         var out: [int] = [];
         var i: int = 0;
         
-        while (i < self.data.length) {
-            out[i] = self.data[self.data.length - 1 - i];
+        while (i < len(self.data)) {
+            out[i] = self.data[len(self.data) - 1 - i];
             i = i + 1;
         }
         
@@ -162,16 +162,16 @@ frame List {
         var i: int = 0;
         
         // Copy array
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             out[i] = self.data[i];
             i = i + 1;
         }
         
         // Simple bubble sort
         i = 0;
-        while (i < out.length - 1) {
+        while (i < len(out) - 1) {
             var j: int = 0;
-            while (j < out.length - i - 1) {
+            while (j < len(out) - i - 1) {
                 if (out[j] > out[j + 1]) {
                     var temp = out[j];
                     out[j] = out[j + 1];
@@ -191,7 +191,7 @@ frame List {
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             var value = self.data[i];
             if (seen[value] == nil) {
                 out[j] = value;
@@ -208,7 +208,7 @@ frame List {
     pub fn map(f: fn(int): int): List {
         var out: [int] = [];
         var i: int = 0;
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             out[i] = f(self.data[i]);
             i = i + 1;
         }
@@ -219,7 +219,7 @@ frame List {
         var out: [int] = [];
         var i: int = 0;
         var j: int = 0;
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             if (f(self.data[i])) {
                 out[j] = self.data[i];
                 j = j + 1;
@@ -232,7 +232,7 @@ frame List {
     pub fn fold(f: fn(int, int): int, initial: int): int {
         var acc: int = initial;
         var i: int = 0;
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             acc = f(acc, self.data[i]);
             i = i + 1;
         }
@@ -241,7 +241,7 @@ frame List {
 
     pub fn for_each(f: fn(int): nil): nil {
         var i: int = 0;
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             f(self.data[i]);
             i = i + 1;
         }
@@ -256,10 +256,10 @@ frame List {
     }
 
     pub fn min(): int? {
-        if (self.data.length == 0) return nil;
+        if (len(self.data) == 0) return nil;
         var min_val = self.data[0];
         var i: int = 1;
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             if (self.data[i] < min_val) min_val = self.data[i];
             i = i + 1;
         }
@@ -267,10 +267,10 @@ frame List {
     }
 
     pub fn max(): int? {
-        if (self.data.length == 0) return nil;
+        if (len(self.data) == 0) return nil;
         var max_val = self.data[0];
         var i: int = 1;
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             if (self.data[i] > max_val) max_val = self.data[i];
             i = i + 1;
         }
@@ -280,7 +280,7 @@ frame List {
     pub fn to_string(): str {
         var result = "[";
         var i: int = 0;
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             if (i > 0) result = result + ", ";
             result = result + self.data[i] as str;
             i = i + 1;
@@ -304,7 +304,7 @@ frame HashMap {
         var values: [int] = [];
         var i: int = 0;
         
-        while (i < pairs.length) {
+        while (i < len(pairs)) {
             var pair = pairs[i];
             keys[i] = pair[0];
             values[i] = pair[1];
@@ -322,7 +322,7 @@ frame HashMap {
             // Update existing key
             var new_values: [int] = [];
             var i: int = 0;
-            while (i < self.values.length) {
+            while (i < len(self.values)) {
                 new_values[i] = (i == index) ? value : self.values[i];
                 i = i + 1;
             }
@@ -333,14 +333,14 @@ frame HashMap {
             var new_values: [int] = [];
             var i: int = 0;
             
-            while (i < self.keys.length) {
+            while (i < len(self.keys)) {
                 new_keys[i] = self.keys[i];
                 new_values[i] = self.values[i];
                 i = i + 1;
             }
             
-            new_keys[self.keys.length] = key;
-            new_values[self.values.length] = value;
+            new_keys[len(self.keys)] = key;
+            new_values[len(self.values)] = value;
             
             return HashMap(keys=new_keys, values=new_values);
         }
@@ -361,7 +361,7 @@ frame HashMap {
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.keys.length) {
+        while (i < len(self.keys)) {
             if (i != index) {
                 new_keys[j] = self.keys[i];
                 new_values[j] = self.values[i];
@@ -379,7 +379,7 @@ frame HashMap {
 
     pub fn contains_value(value: int): bool {
         var i: int = 0;
-        while (i < self.values.length) {
+        while (i < len(self.values)) {
             if (self.values[i] == value) return true;
             i = i + 1;
         }
@@ -387,11 +387,11 @@ frame HashMap {
     }
 
     pub fn size(): int {
-        return self.keys.length;
+        return len(self.keys);
     }
 
     pub fn is_empty(): bool {
-        return self.keys.length == 0;
+        return len(self.keys) == 0;
     }
 
     pub fn clear(): HashMap {
@@ -411,7 +411,7 @@ frame HashMap {
         var entries: [(str, int)] = [];
         var i: int = 0;
         
-        while (i < self.keys.length) {
+        while (i < len(self.keys)) {
             entries[i] = (self.keys[i], self.values[i]);
             i = i + 1;
         }
@@ -424,7 +424,7 @@ frame HashMap {
         var new_values: [int] = [];
         var i: int = 0;
         
-        while (i < self.values.length) {
+        while (i < len(self.values)) {
             new_values[i] = f(self.values[i]);
             i = i + 1;
         }
@@ -438,7 +438,7 @@ frame HashMap {
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.keys.length) {
+        while (i < len(self.keys)) {
             if (predicate(self.keys[i], self.values[i])) {
                 new_keys[j] = self.keys[i];
                 new_values[j] = self.values[i];
@@ -453,7 +453,7 @@ frame HashMap {
     // Utility methods
     fn find_key_index(key: str): int? {
         var i: int = 0;
-        while (i < self.keys.length) {
+        while (i < len(self.keys)) {
             if (self.keys[i] == key) return i;
             i = i + 1;
         }
@@ -464,7 +464,7 @@ frame HashMap {
         var result = "{";
         var i: int = 0;
         
-        while (i < self.keys.length) {
+        while (i < len(self.keys)) {
             if (i > 0) result = result + ", ";
             result = result + self.keys[i] + ": " + self.values[i] as str;
             i = i + 1;
@@ -489,7 +489,7 @@ frame Set {
         var i: int = 0;
         var j: int = 0;
         
-        while (i < arr.length) {
+        while (i < len(arr)) {
             var value = arr[i];
             if (seen[value] == nil) {
                 elements[j] = value;
@@ -509,12 +509,12 @@ frame Set {
         var new_elements: [int] = [];
         var i: int = 0;
         
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             new_elements[i] = self.elements[i];
             i = i + 1;
         }
         
-        new_elements[self.elements.length] = value;
+        new_elements[len(self.elements)] = value;
         return Set(elements=new_elements);
     }
 
@@ -526,7 +526,7 @@ frame Set {
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (i != index) {
                 new_elements[j] = self.elements[i];
                 j = j + 1;
@@ -542,11 +542,11 @@ frame Set {
     }
 
     pub fn size(): int {
-        return self.elements.length;
+        return len(self.elements);
     }
 
     pub fn is_empty(): bool {
-        return self.elements.length == 0;
+        return len(self.elements) == 0;
     }
 
     pub fn clear(): Set {
@@ -558,7 +558,7 @@ frame Set {
         var combined = Set.from_array(self.elements);
         var i: int = 0;
         
-        while (i < other.elements.length) {
+        while (i < len(other.elements)) {
             combined = combined.add(other.elements[i]);
             i = i + 1;
         }
@@ -571,7 +571,7 @@ frame Set {
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (other.contains(self.elements[i])) {
                 result[j] = self.elements[i];
                 j = j + 1;
@@ -587,7 +587,7 @@ frame Set {
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (!other.contains(self.elements[i])) {
                 result[j] = self.elements[i];
                 j = j + 1;
@@ -600,7 +600,7 @@ frame Set {
 
     pub fn is_subset(other: Set): bool {
         var i: int = 0;
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (!other.contains(self.elements[i])) return false;
             i = i + 1;
         }
@@ -614,7 +614,7 @@ frame Set {
     // Utility methods
     fn find_index(value: int): int? {
         var i: int = 0;
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (self.elements[i] == value) return i;
             i = i + 1;
         }
@@ -629,7 +629,7 @@ frame Set {
         var result = "{";
         var i: int = 0;
         
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (i > 0) result = result + ", ";
             result = result + self.elements[i] as str;
             i = i + 1;
@@ -651,7 +651,7 @@ frame Queue {
     }
 
     pub fn from_array(arr: [int]): Queue {
-        return Queue(data=arr, front=0, back=arr.length);
+        return Queue(data=arr, front=0, back=len(arr));
     }
 
     // Queue operations
@@ -660,7 +660,7 @@ frame Queue {
         var i: int = 0;
         
         // Copy existing data
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             new_data[i] = self.data[i];
             i = i + 1;
         }
@@ -742,26 +742,26 @@ frame Stack {
         var i: int = 0;
         
         // Copy existing data
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             new_data[i] = self.data[i];
             i = i + 1;
         }
         
         // Add new element at top
-        new_data[self.data.length] = value;
+        new_data[len(self.data)] = value;
         
         return Stack(data=new_data);
     }
 
     pub fn pop(): int? {
-        if (self.data.length == 0) return nil;
+        if (len(self.data) == 0) return nil;
         
-        var value = self.data[self.data.length - 1];
+        var value = self.data[len(self.data) - 1];
         var new_data: [int] = [];
         var i: int = 0;
         
         // Copy all except last element
-        while (i < self.data.length - 1) {
+        while (i < len(self.data) - 1) {
             new_data[i] = self.data[i];
             i = i + 1;
         }
@@ -770,16 +770,16 @@ frame Stack {
     }
 
     pub fn peek(): int? {
-        if (self.data.length == 0) return nil;
-        return self.data[self.data.length - 1];
+        if (len(self.data) == 0) return nil;
+        return self.data[len(self.data) - 1];
     }
 
     pub fn size(): int {
-        return self.data.length;
+        return len(self.data);
     }
 
     pub fn is_empty(): bool {
-        return self.data.length == 0;
+        return len(self.data) == 0;
     }
 
     pub fn clear(): Stack {
@@ -794,7 +794,7 @@ frame Stack {
         var result = "Stack[";
         var i: int = 0;
         
-        while (i < self.data.length) {
+        while (i < len(self.data)) {
             if (i > 0) result = result + ", ";
             result = result + self.data[i] as str;
             i = i + 1;
@@ -845,49 +845,11 @@ fn stack(): Stack {
 fn stack_from(arr: [int]): Stack {
     return Stack.from_array(arr);
 }
-        var i: int = 0;
-        while (i < self.data.length) {
-            if (f(self.data[i])) return self.data[i];
-            i = i + 1;
-        }
-        return nil;
-    }
-
-    pub fn contains(value: int): bool {
-        var i: int = 0;
-        while (i < self.data.length) {
-            if (self.data[i] == value) return true;
-            i = i + 1;
-        }
-        return false;
-    }
-
-    pub fn any(f: fn(int): bool): bool {
-        var i: int = 0;
-        while (i < self.data.length) {
-            if (f(self.data[i])) return true;
-            i = i + 1;
-        }
-        return false;
-    }
-
-    pub fn all(f: fn(int): bool): bool {
-        var i: int = 0;
-        while (i < self.data.length) {
-            if (!f(self.data[i])) return false;
-            i = i + 1;
-        }
-        return true;
-    }
-}
-
-// Frame-focused collections - use List frame directly
-// Example: List(data=[1,2,3]).push(4) instead of push([1,2,3], 4)
 
 // Pure utility functions that don't duplicate frame functionality
 fn find_index(arr: [int], item: int): int? {
     var i: int = 0;
-    while (i < arr.length) {
+    while (i < len(arr)) {
         if (arr[i] == item) return i;
         i = i + 1;
     }
@@ -896,10 +858,10 @@ fn find_index(arr: [int], item: int): int? {
 
 // String-specific join utility (different from List operations)
 fn join_string_array(arr: [str], separator: str): str {
-    if (arr.length == 0) return "";
+    if (len(arr) == 0) return "";
     var out: str = arr[0];
     var i: int = 1;
-    while (i < arr.length) {
+    while (i < len(arr)) {
         out = out + separator + arr[i];
         i = i + 1;
     }

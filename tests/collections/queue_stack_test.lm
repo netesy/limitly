@@ -31,7 +31,7 @@ fn main(): int {
     bitset.unset(10);
     assert(!bitset.contains(10), "BitSet should not contain bit 10 after unset");
     
-    var bit_it = bitset.iter();
+    var bit_it = bitset.iterator();
     assert(bit_it.next() == 20, "Iterator should return bit 20");
     assert(bit_it.next() == nil, "Iterator should be exhausted");
     

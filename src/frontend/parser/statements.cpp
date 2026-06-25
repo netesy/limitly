@@ -557,10 +557,16 @@ std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> Parser::function(const s
         advance();
         func->body = nullptr;
     } else {
-        Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before " + kind + " body.");
-        pushBlockContext("function", leftBrace);
-        func->body = block();
-        popBlockContext();
+        try {
+            Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before " + kind + " body.");
+            pushBlockContext("function", leftBrace);
+            func->body = block();
+            popBlockContext();
+        } catch (const std::exception& e) {
+            popBlockContext();
+            if (std::string(e.what()).find("Too many syntax errors") != std::string::npos) throw;
+            synchronize();
+        }
     }
 
     if (cstMode && !cstContextStack.empty()) popCSTContext();

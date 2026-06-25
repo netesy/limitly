@@ -1,0 +1,14 @@
+frame Foo {
+    pub fn bar(): int {
+        return 42;
+    }
+}
+
+fn makeFoo(): Foo {
+    return Foo();
+}
+
+fn main(): int {
+    var x = makeFoo().bar();
+    return 0;
+}

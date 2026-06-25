@@ -254,7 +254,7 @@ private:
     TypePtr check_grouping_expr(std::shared_ptr<LM::Frontend::AST::GroupingExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_member_expr(std::shared_ptr<LM::Frontend::AST::MemberExpr> expr);
     TypePtr check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexExpr> expr);
-    TypePtr check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr);
+    TypePtr check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_tuple_expr(std::shared_ptr<LM::Frontend::AST::TupleExpr> expr);
     TypePtr check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr> expr);
     TypePtr check_range_expr(std::shared_ptr<LM::Frontend::AST::RangeExpr> expr);

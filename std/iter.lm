@@ -345,7 +345,7 @@ frame Iterator {
         return true;
     }
 
-    pub fn any(f: fn(int): bool): bool {
+    pub fn any_match(f: fn(int): bool): bool {
         var i: int = self.index;
         
         while (i < self.end_index) {
@@ -359,7 +359,7 @@ frame Iterator {
     }
 
     pub fn none(f: fn(int): bool): bool {
-        return !self.any(f);
+        return !self.any_match(f);
     }
 
     // Partitioning and grouping
@@ -506,18 +506,18 @@ frame Iterator {
 }
 
 // Utility functions
-fn iter_array(arr: [int]): Iterator {
+fn iterator_array(arr: [int]): Iterator {
     return Iterator.from_array(arr);
 }
 
-fn iter_range(start: int, end: int): Iterator {
+fn iterator_range(start: int, end: int): Iterator {
     return Iterator.from_range(start, end);
 }
 
-fn iter_range_step(start: int, end: int, step: int): Iterator {
+fn iterator_range_step(start: int, end: int, step: int): Iterator {
     return Iterator.from_range_step(start, end, step);
 }
 
-fn iter_empty(): Iterator {
+fn iterator_empty(): Iterator {
     return Iterator(data=[], index=0, start_index=0, end_index=0);
 }

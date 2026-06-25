@@ -97,6 +97,8 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         if (module && !module->is_checked) {
             module->is_checked = true; // Mark before to prevent recursion
             TypeChecker checker(this->type_system);
+            // Register builtin functions for module type checking
+            TypeCheckerFactory::register_builtin_functions(checker);
             checker.set_source_context(module->source, module->path);
             if (!checker.check_program(module->ast)) {
                 add_error("Failed to type check module: " + path);

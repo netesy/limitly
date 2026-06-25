@@ -72,24 +72,24 @@ fn quicksort(items: [any], descending: bool = false, cmp: fn(any, any): int = ni
 }
 
 fn _merge(items: [any], left: int, mid: int, right: int, descending: bool, cmp: fn(any, any): int) {
-    var temp: [any] = [];
+    var temp = [];
     var i = left;
     var j = mid + 1;
     while (i <= mid and j <= right) {
         if (_compare(items[i], items[j], descending, cmp) <= 0) {
-            temp = temp + [items[i]];
+            temp.append(items[i]);
             i = i + 1;
         } else {
-            temp = temp + [items[j]];
+            temp.append(items[j]);
             j = j + 1;
         }
     }
     while (i <= mid) {
-        temp = temp + [items[i]];
+        temp.append(items[i]);
         i = i + 1;
     }
     while (j <= right) {
-        temp = temp + [items[j]];
+        temp.append(items[j]);
         j = j + 1;
     }
     var k = 0;
@@ -131,7 +131,7 @@ fn _heapify(items: [any], n: int, i: int, descending: bool, cmp: fn(any, any): i
 }
 
 fn heapsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
-    var n = items.length;
+    var n = len(items);
     var i = n / 2 - 1;
     while (i >= 0) {
         _heapify(items, n, i, descending, cmp);
@@ -175,7 +175,8 @@ fn counting_sort(items: [int], descending: bool = false) {
     var counts: [int] = [];
     i = 0;
     while (i <= max_value - min_value) {
-        counts = counts + [0];
+        var zero: int = 0;
+        counts.append(zero);
         i = i + 1;
     }
     i = 0;

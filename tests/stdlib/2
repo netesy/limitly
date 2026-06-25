@@ -10,7 +10,7 @@ fn main(): int {
     if (v.remove(1) != 9) { return 3; }
     v.resize(5, 7);
     if (v.len() != 5) { return 4; }
-    var it = v.iter();
+    var it = v.iterator();
     if (it.next() != 1) { return 5; }
     v.clear();
     if (not v.is_empty()) { return 6; }

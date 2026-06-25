@@ -1,19 +1,21 @@
 // Standard Library Algorithm Module
 
+import std.collections.vector as vector;
+
 fn map(items: [any], f: fn(any): any): [any] {
-    var res = [];
+    var res = vector.Vector();
     for (var i = 0; i < len(items); i = i + 1) {
-        res = res + [f(items[i])];
+        res.push(f(items[i]));
     }
-    return res;
+    return res.data;
 }
 
 fn filter(items: [any], p: fn(any): bool): [any] {
-    var res = [];
+    var res = vector.Vector();
     for (var i = 0; i < len(items); i = i + 1) {
-        if (p(items[i])) res = res + [items[i]];
+        if (p(items[i])) res.push(items[i]);
     }
-    return res;
+    return res.data;
 }
 
 fn reduce(items: [any], f: fn(any, any): any, initial: any): any {
@@ -35,7 +37,7 @@ fn all(items: [any], p: fn(any): bool): bool {
     return true;
 }
 
-fn any(items: [any], p: fn(any): bool): bool {
+fn any_match(items: [any], p: fn(any): bool): bool {
     for (var i = 0; i < len(items); i = i + 1) {
         if (p(items[i])) return true;
     }
@@ -43,7 +45,7 @@ fn any(items: [any], p: fn(any): bool): bool {
 }
 
 fn none(items: [any], p: fn(any): bool): bool {
-    return !any(items, p);
+    return !any_match(items, p);
 }
 
 fn count(items: [any], target: any): int {
@@ -101,18 +103,18 @@ fn _reverse_range(items: [any], start: int, end: int) {
 }
 
 fn unique(items: [any]): [any] {
-    var res = [];
+    var res = vector.Vector();
     for (var i = 0; i < len(items); i = i + 1) {
         var found = false;
-        for (var j = 0; j < len(res); j = j + 1) {
-            if (res[j] == items[i]) {
+        for (var j = 0; j < len(res.data); j = j + 1) {
+            if (res.data[j] == items[i]) {
                 found = true;
                 break;
             }
         }
-        if (!found) res = res + [items[i]];
+        if (!found) res.push(items[i]);
     }
-    return res;
+    return res.data;
 }
 
 fn partition(items: [any], p: fn(any): bool): int {
@@ -132,40 +134,41 @@ fn partition(items: [any], p: fn(any): bool): int {
     return i;
 }
 
-fn zip(a: [any], b: [any]): [(any, any)] {
-    var res = [];
+fn zip(a: [any], b: [any]): [any] {
+    var res = vector.Vector();
     var n = len(a);
     if (len(b) < n) n = len(b);
     for (var i = 0; i < n; i = i + 1) {
-        res = res + [(a[i], b[i])];
+        res.push((a[i], b[i]));
     }
-    return res;
+    return res.data;
 }
 
 fn transform(items: [any], f: fn(any): any): [any] {
     return map(items, f);
 }
 
-fn unzip(pairs: [(any, any)]): ([any], [any]) {
-    var left: [any] = [];
-    var right: [any] = [];
+fn unzip(pairs: [any]): ([any], [any]) {
+    var left = vector.Vector();
+    var right = vector.Vector();
     var i = 0;
     while (i < len(pairs)) {
-        left = left + [pairs[i][0]];
-        right = right + [pairs[i][1]];
+        var pair = pairs[i];
+        left.push(pair.0);
+        right.push(pair.1);
         i = i + 1;
     }
-    return (left, right);
+    return (left.data, right.data);
 }
 
 fn remove_if(items: [any], p: fn(any): bool): [any] {
-    var res: [any] = [];
+    var res = vector.Vector();
     var i = 0;
     while (i < len(items)) {
         if (not p(items[i])) {
-            res = res + [items[i]];
+            res.push(items[i]);
         }
         i = i + 1;
     }
-    return res;
+    return res.data;
 }

@@ -1,5 +1,7 @@
 // Standard Library Bytes Module
 
+import std.collections.vector as vector;
+
 frame ByteBuffer {
     pub var data: [int] = [];
     
@@ -8,11 +10,21 @@ frame ByteBuffer {
     }
     
     pub fn append(byte: int) {
-        self.data = self.data + [byte % 256];
+        var vec = vector.Vector();
+        vec.data = self.data;
+        vec.push(byte % 256);
+        self.data = vec.data;
     }
     
     pub fn append_all(bytes: [int]) {
-        self.data = self.data + bytes;
+        var vec = vector.Vector();
+        vec.data = self.data;
+        var i = 0;
+        while (i < len(bytes)) {
+            vec.push(bytes[i]);
+            i = i + 1;
+        }
+        self.data = vec.data;
     }
     
     pub fn get(idx: int): int {

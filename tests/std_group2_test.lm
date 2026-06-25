@@ -61,16 +61,16 @@ fn main(): int {
     var c = algorithm.count(unique_values, 2);
     var found = algorithm.find(unique_values, 3);
     var found_if = algorithm.find_if(unique_values, is_even);
-    var any_even = algorithm.any(unique_values, is_even);
+    var any_even = algorithm.any_match(unique_values, is_even);
     var all_even = algorithm.all(unique_values, is_even);
     var none_even = algorithm.none([1, 3, 5], is_even);
     var removed = algorithm.remove_if(unique_values, is_even);
     var transformed = algorithm.transform(unique_values, double_value);
 
-    var it = iterator.iter(unique_values);
+    var it = iterator.iterator(unique_values);
     var mapped_it = iterator.map(it, double_value);
     var collected = iterator.collect(mapped_it);
-    var r = range.inclusive(1, 3).iter();
+    var r = range.inclusive(1, 3).iterator();
     var first = r.next();
 
     var vector = collections.Vector();

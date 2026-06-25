@@ -6,6 +6,10 @@ This document provides essential guidelines for AI agents generating code for th
 
 ## 🚫 **DO NOT USE - Unsupported Features**
 
+### **Reserved Keywords as Identifiers**
+- ❌ **DO NOT use reserved keywords as variable names, function names, or method names**. All language keywords (e.g., `iter`, `any`, `list`, `fn`, `if`, `while`, `for`, `return`, `var`, `val`, `const`, `frame`, `trait`, `import`, `match`, `in`, `type`, `enum`, `err`, `ok`, `and`, `or`, `not`, `as`, `where`, `self`, `super`, `true`, `false`, `nil`, `break`, `continue`, `parallel`, `concurrent`, `task`, `worker`, `contract`, `comptime`, `unsafe`, `module`, `interface`, `mixin`, `implements`, `show`, `hide`, `from`, `elif`, `else`, `static`, `abstract`, `final`, `pub`, `prot`) are reserved and cannot be used as identifiers.
+- ❌ For example: `var iter = 5;` or `fn iter(): int { ... }` or `frame Foo { pub fn iter(): int { ... } }` are **INVALID**.
+
 ### **Generics/Template Types**
 - ❌ `fn my_func<T>(param: T): T` - Generic type parameters are NOT supported.
 - ❌ `List<T>` / `Dict<K, V>` - Generic collections are NOT implemented (use `[int]` or `{str: int}`).

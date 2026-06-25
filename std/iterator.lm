@@ -52,11 +52,11 @@ frame ChainIterator { var left: any; var right: any; var on_left: bool; pub init
 frame SkipIterator { var source: any; var remaining: int; pub init(source: any, count: int) { self.source = source; self.remaining = count; } pub fn next(): any { while (self.remaining > 0) { var skipped = self.source.next(); if (skipped == nil) { return nil; } self.remaining = self.remaining - 1; } return self.source.next(); } }
 frame TakeIterator { var source: any; var remaining: int; pub init(source: any, count: int) { self.source = source; self.remaining = count; } pub fn next(): any { if (self.remaining <= 0) { return nil; } self.remaining = self.remaining - 1; return self.source.next(); } }
 frame StepByIterator { var source: any; var step: int; pub init(source: any, step: int) { self.source = source; self.step = step; } pub fn next(): any { var item = self.source.next(); var i = 1; while (i < self.step) { var skipped = self.source.next(); if (skipped == nil) { return item; } i = i + 1; } return item; } }
-frame ChunkIterator { var source: any; var size: int; pub init(source: any, size: int) { self.source = source; self.size = size; } pub fn next(): any { var chunk: [any] = []; var i = 0; while (i < self.size) { var item = self.source.next(); if (item == nil) { if (len(chunk) == 0) { return nil; } return chunk; } chunk = chunk + [item]; i = i + 1; } return chunk; } }
+frame ChunkIterator { var source: any; var size: int; pub init(source: any, size: int) { self.source = source; self.size = size; } pub fn next(): any { var chunk: [any] = []; var i = 0; var j = 0; while (i < self.size) { var item = self.source.next(); if (item == nil) { if (j == 0) { return nil; } return chunk; } chunk[j] = item; j = j + 1; i = i + 1; } return chunk; } }
 frame CycleIterator { var items: [any]; var index: int; pub init(items: [any]) { self.items = items; self.index = 0; } pub fn next(): any { if (len(self.items) == 0) { return nil; } var item = self.items[self.index]; self.index = (self.index + 1) % len(self.items); return item; } }
 frame PeekableIterator { var source: any; var cached: any; pub init(source: any) { self.source = source; self.cached = nil; } pub fn peek(): any { if (self.cached == nil) { self.cached = self.source.next(); } return self.cached; } pub fn next(): any { if (self.cached != nil) { var item = self.cached; self.cached = nil; return item; } return self.source.next(); } }
 
-fn iter(items: [any]): ListIterator { return ListIterator(items); }
+fn iterator(items: [any]): ListIterator { return ListIterator(items); }
 fn map(it: any, f: fn(any): any): MapIterator { return MapIterator(it, f); }
 fn filter(it: any, p: fn(any): bool): FilterIterator { return FilterIterator(it, p); }
 fn enumerate(it: any): EnumerateIterator { return EnumerateIterator(it); }
@@ -69,4 +69,13 @@ fn step_by(it: any, step: int): StepByIterator { return StepByIterator(it, step)
 fn chunk(it: any, size: int): ChunkIterator { return ChunkIterator(it, size); }
 fn cycle(items: [any]): CycleIterator { return CycleIterator(items); }
 fn peekable(it: any): PeekableIterator { return PeekableIterator(it); }
-fn collect(it: any): [any] { var res: [any] = []; var item = it.next(); while (item != nil) { res = res + [item]; item = it.next(); } return res; }
+fn collect(it: any): [any] { 
+    import std.collections.vector as vector;
+    var res = vector.Vector(); 
+    var item = it.next(); 
+    while (item != nil) { 
+        res.push(item); 
+        item = it.next(); 
+    } 
+    return res.data; 
+}

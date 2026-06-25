@@ -82,7 +82,7 @@ assert(not char_eq("abc", "abd"), "char_eq multi char");
 // "/file.txt" -> "file.txt"  
 // "/" -> "/"
 // "" -> ""
-fn test_basename_hello(): bool {
+fn test_basename_hello(): str {
     var p: str = "/usr/local/bin";
     var slen: int = str_len(p);
     assert(slen == 14, "bn0 len");
@@ -90,20 +90,21 @@ fn test_basename_hello(): bool {
     var result: str = "";
     var j: int = slen - 1;
     while (j >= 0) {
-        var ch: str = p[j];
-        if (ch == "/") { j = -1; break; }
+        var ch = p[j];
+        if (ch == "/") { break; }
+        j = j - 1;
     }
     // Build the basename from position j+1 to end
-    var i: int = 0;
+    var i: int = j + 1;
     while (i < slen) {
-        if (j + 1 < slen) {
-            result = result + p[j + 1];
-            i = i + 1;
-        }
+        result = result + p[i];
+        i = i + 1;
     }
     return result;
 }
 assert(test_basename_hello() == "bin", "basename hello");
+assert(test_parent_wrapper(), "parent wrapper");
+assert(test_is_absolute_wrapper(), "is_absolute wrapper");
 
 // Test basename edge cases
 fn test_basename_empty(): bool {
@@ -142,18 +143,40 @@ fn test_stem(): bool {
 // "/a/b/c" -> "/a/b"
 // "file.txt" -> "" (no slash)
 // "/" -> ""
-fn test_parent(): bool {
+fn test_parent(p: str): str {
+    var slen: int = str_len(p);
+    var result: str = "";
+    var j: int = slen - 1;
+    while (j >= 0) {
+        var ch = p[j];
+        if (ch == "/") { break; }
+        j = j - 1;
+    }
+    if (j <= 0) { return ""; }
+    var i: int = 0;
+    while (i < j) {
+        result = result + p[i];
+        i = i + 1;
+    }
+    return result;
+}
+fn test_parent_wrapper(): bool {
     assert(test_parent("/a/b/c") == "/a/b", "parent");
     assert(test_parent("file.txt") == "", "parent file");
     assert(test_parent("/") == "", "parent root");
+    return true;
 }
 
 // Test is_absolute (delegates to starts_with("/"))
-fn test_is_absolute(): bool {
+fn test_is_absolute(p: str): bool {
+    return starts_with(p, "/");
+}
+fn test_is_absolute_wrapper(): bool {
     assert(test_is_absolute("/abs/path"), "abs");
     assert(test_is_absolute("/"), "root");
     assert(not test_is_absolute("relative"), "relative");
     assert(not test_is_absolute("a/b/c"), "a/b/c");
+    return true;
 }
 
 // Test join logic (without actual concat due to compiler bug)
@@ -161,11 +184,11 @@ fn test_is_absolute(): bool {
 // For our test, we verify the conditions
 fn test_join_conditions(): bool {
     // base ends with "/" -> no separator needed
-    assert("/" == "" or "/a" == "/" or "/a"[0] == "/", "join cond 1");
+    assert(not ("" == "" or "/a" == "" or "/a"[0] != "/"), "join cond 1");
     // base empty -> return other
     assert("" == "" or "/b" == "", "join cond 2");
     // other starts with "/" -> no separator needed
-    assert("x" == "" or "/a" == "/" or "/a"[0] == "/", "join cond 3");
+    assert(not ("" == "" or "/a" == "" or "/a"[0] != "/"), "join cond 3");
     // both have content, need separator
     assert(not ("" == "" or "a" == "" or "/a"[0] == "/"), "join cond 4");
     // identical strings -> no separator needed

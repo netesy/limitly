@@ -15,7 +15,7 @@ frame Range {
         self.infinite = infinite;
     }
 
-    pub fn iter(): RangeIterator {
+    pub fn iterator(): RangeIterator {
         return RangeIterator(self.start, self.stop, self.step, self.inclusive, self.infinite);
     }
 }

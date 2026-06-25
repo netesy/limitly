@@ -23,7 +23,7 @@ frame Path {
     pub fn join_multiple(parts: [str]): Path {
         var result = self;
         var i: int = 0;
-        while (i < parts.length) {
+        while (i < parts.len) {
             result = result.join(parts[i]);
             i = i + 1;
         }
@@ -51,8 +51,8 @@ frame Path {
         var last_sep = self.value.last_index_of("/");
         if (last_sep == nil) return self.value;
         
-        if (last_sep + 1 < self.value.length) {
-            return self.value.substring(last_sep + 1, self.value.length);
+        if (last_sep + 1 < self.value.len) {
+            return self.value.substring(last_sep + 1, self.value.len);
         } else {
             return "";
         }
@@ -73,10 +73,10 @@ frame Path {
     pub fn extension(): str {
         var base = self.basename();
         var last_dot = base.last_index_of(".");
-        if (last_dot == nil or last_dot == 0 or last_dot == base.length - 1) return "";
+        if (last_dot == nil or last_dot == 0 or last_dot == base.len - 1) return "";
         
-        if (last_dot + 1 < base.length) {
-            return base.substring(last_dot + 1, base.length);
+        if (last_dot + 1 < base.len) {
+            return base.substring(last_dot + 1, base.len);
         } else {
             return "";
         }
@@ -100,12 +100,12 @@ frame Path {
         var current = self.value;
         var start = 0;
         var i: int = 0;
-        while (i <= current.length) {
-            if (i == current.length or current[i] == "/") {
+        while (i <= current.len) {
+            if (i == current.len or current[i] == "/") {
                 if (i > start) {
                     var part = current.substring(start, i);
                     if (part == "..") {
-                        if (normalized_parts.length > 0 and normalized_parts[normalized_parts.length - 1] != "..") {
+                        if (normalized_parts.len > 0 and normalized_parts[normalized_parts.len - 1] != "..") {
                             normalized_parts.pop();
                         } else {
                             normalized_parts.push("..");
@@ -120,12 +120,12 @@ frame Path {
         }
         
         // Reconstruct path
-        if (normalized_parts.length == 0) return Path(value=".");
-        if (normalized_parts.length == 1 and normalized_parts[0] == "/") return Path(value="/");
+        if (normalized_parts.len == 0) return Path(value=".");
+        if (normalized_parts.len == 1 and normalized_parts[0] == "/") return Path(value="/");
         
         var result = "";
         i = 0;
-        while (i < normalized_parts.length) {
+        while (i < normalized_parts.len) {
             if (i > 0 and not (normalized_parts[0] == "/" and i == 1)) {
                 result = result + "/";
             }
@@ -149,9 +149,9 @@ frame Path {
         
         // Relative path calculation
         if (abs_self.value.starts_with(abs_base.value)) {
-            var relative = abs_self.value.substring(abs_base.value.length, abs_self.value.length);
+            var relative = abs_self.value.substring(abs_base.value.len, abs_self.value.len);
             if (relative.starts_with("/")) {
-                relative = relative.substring(1, relative.length);
+                relative = relative.substring(1, relative.len);
             }
             return Path(value=relative);
         }
@@ -224,12 +224,12 @@ fn from_string(v: str): Path {
 }
 
 fn join(paths: [str]): Path {
-    if (paths.length == 0) return Path(value="");
-    if (paths.length == 1) return Path.from_string(paths[0]);
+    if (paths.len == 0) return Path(value="");
+    if (paths.len == 1) return Path.from_string(paths[0]);
     
     var result = Path.from_string(paths[0]);
     var i: int = 1;
-    while (i < paths.length) {
+    while (i < paths.len) {
         result = result.join(paths[i]);
         i = i + 1;
     }

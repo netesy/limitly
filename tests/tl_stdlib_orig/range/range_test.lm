@@ -1,13 +1,13 @@
 import std.range as range;
 
 fn main(): int {
-    var inc = range.inclusive(1, 2).iter();
+    var inc = range.inclusive(1, 2).iterator();
     if (inc.next() != 1) { return 1; }
     if (inc.next() != 2) { return 2; }
     if (inc.next() != nil) { return 3; }
-    var rev = range.reverse(3, 1).iter();
+    var rev = range.reverse(3, 1).iterator();
     if (rev.next() != 3) { return 4; }
-    var inf = range.infinite(10, 2).iter();
+    var inf = range.infinite(10, 2).iterator();
     if (inf.next() != 10) { return 5; }
     return 0;
 }

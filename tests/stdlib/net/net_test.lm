@@ -52,21 +52,21 @@ assert(not is_ipv4_simple("1..1.1"), "ipv4 empty seg");
 // Socket lifecycle (type 1)
 var sock = resource_create(1);
 assert(sock > 0, "socket positive");
-var conn = resource_call(sock, 6, "127.0.0.1");
+var conn = resource_call(sock, 6, "127.0.0.1", 0);
 assert(conn != true, "port 0 fails");
-resource_call(sock, 1, "x");
+resource_call(sock, 1, 0, 0);
 resource_destroy(sock);
 
 // UDP lifecycle (type 14)
 var udp = resource_create(14);
 assert(udp > 0, "UDP positive");
-resource_call(udp, 1, "x");
+resource_call(udp, 1, 0, 0);
 resource_destroy(udp);
 
 // DNS resolve localhost -> 127.0.0.1
 var dns = resource_create(13);
 assert(dns > 0, "DNS positive");
-var lip: str = resource_call(dns, 26, "localhost");
+var lip: str = resource_call(dns, 26, "localhost", 0);
 resource_destroy(dns);
 assert(lip != nil, "DNS result not nil");
 assert(lip == "127.0.0.1", "DNS localhost");

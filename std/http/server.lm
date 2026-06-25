@@ -253,7 +253,7 @@ frame HTTPServer {
         return self.route("PATCH", pattern, handler);
     }
 
-    pub fn any(pattern: str, handler: str): HTTPServer {
+    pub fn any_method(pattern: str, handler: str): HTTPServer {
         return self.route("*", pattern, handler);
     }
 

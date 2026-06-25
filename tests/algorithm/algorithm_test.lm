@@ -9,7 +9,7 @@ fn main(): int {
     if (algorithm.count(values, 2) != 2) { return 1; }
     if (algorithm.find(values, 3) != 3) { return 2; }
     if (algorithm.find_if(values, even) != 1) { return 3; }
-    if (not algorithm.any(values, even)) { return 4; }
+    if (not algorithm.any_match(values, even)) { return 4; }
     if (algorithm.none(values, even)) { return 5; }
     var mapped = algorithm.map(values, twice);
     var filtered = algorithm.filter(values, even);

@@ -63,7 +63,7 @@ fn open(path: str, mode: str): File?IOError {
 // Global print helper
 fn print(msg: any): nil {
     var stdout = resource_create(9); // RT_STDOUT
-    resource_call(stdout, 3, msg.toString());
+    resource_call(stdout, 3, msg);
     resource_destroy(stdout);
 }
 

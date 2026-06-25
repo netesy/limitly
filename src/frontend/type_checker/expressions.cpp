@@ -37,7 +37,7 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
     } else if (auto index = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
         type = check_index_expr(index);
     } else if (auto list = std::dynamic_pointer_cast<LM::Frontend::AST::ListExpr>(expr)) {
-        type = check_list_expr(list);
+        type = check_list_expr(list, expected_type);
     } else if (auto tuple = std::dynamic_pointer_cast<LM::Frontend::AST::TupleExpr>(expr)) {
         type = check_tuple_expr(tuple);
     } else if (auto dict = std::dynamic_pointer_cast<LM::Frontend::AST::DictExpr>(expr)) {
@@ -93,7 +93,7 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
     } else if (auto index = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
         type = check_index_expr(index);
     } else if (auto list = std::dynamic_pointer_cast<LM::Frontend::AST::ListExpr>(expr)) {
-        type = check_list_expr(list);
+        type = check_list_expr(list, expected_type);
     } else if (auto tuple = std::dynamic_pointer_cast<LM::Frontend::AST::TupleExpr>(expr)) {
         type = check_tuple_expr(tuple);
     } else if (auto dict = std::dynamic_pointer_cast<LM::Frontend::AST::DictExpr>(expr)) {
@@ -1387,11 +1387,15 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
     return type_system.ANY_TYPE;
 }
 
-TypePtr TypeChecker::check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr) {
+TypePtr TypeChecker::check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     if (expr->elements.empty()) {
-        // Empty list - return generic list type
+        // Empty list - use expected type if available and it's a list type
+        if (expected_type && expected_type->tag == TypeTag::List) {
+            return expected_type;
+        }
+        // Otherwise return generic list type
         return type_system.createTypedListType(type_system.ANY_TYPE);
     }
     

@@ -48,15 +48,15 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("substring", {ts.STRING_TYPE, ts.INT_TYPE, ts.INT_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("str_format", {ts.STRING_TYPE, ts.ANY_TYPE}, ts.STRING_TYPE);
     
-    // Utility functions
+    // Utility functions - len must be registered before other builtins that might depend on it
+    checker.register_builtin_function("len", {ts.STRING_TYPE}, ts.INT_TYPE);
+    checker.register_builtin_function("len", {ts.createTypedListType(ts.ANY_TYPE)}, ts.INT_TYPE);
+    checker.register_builtin_function("len", {ts.createTypedListType(ts.INT_TYPE)}, ts.INT_TYPE);
+    checker.register_builtin_function("len", {ts.ANY_TYPE}, ts.INT_TYPE);
+    
     checker.register_builtin_function("typeof", {ts.ANY_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("clock", {}, ts.FLOAT64_TYPE);
     checker.register_builtin_function("sleep", {ts.FLOAT64_TYPE}, ts.NIL_TYPE);
-    checker.register_builtin_function("len", {ts.ANY_TYPE}, ts.INT_TYPE);
-    // Overload for lists
-    checker.register_builtin_function("len", {ts.createTypedListType(ts.ANY_TYPE)}, ts.INT_TYPE);
-    // Overload for strings (already covered by length builtin, but alias)
-    checker.register_builtin_function("len", {ts.STRING_TYPE}, ts.INT_TYPE);
     checker.register_builtin_function("time", {}, ts.INT64_TYPE);
     checker.register_builtin_function("date", {}, ts.STRING_TYPE);
     checker.register_builtin_function("now", {}, ts.STRING_TYPE);

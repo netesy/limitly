@@ -117,6 +117,9 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
         if (annotation->typeName == "atomic") {
             // atomic is an alias for i64
             base_type = type_system.INT64_TYPE;
+        } else if (annotation->typeName == "any") {
+            // any is the top type
+            base_type = type_system.ANY_TYPE;
         } else if (annotation->typeName == "channel") {
             // channel type is represented as any (channel handle)
             base_type = type_system.ANY_TYPE;

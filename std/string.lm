@@ -1,32 +1,73 @@
 // Standard Library String Module
+// Uses only built-in functions: len(), substring(), concat(), print(), assert()
 
 fn length(value: str): int {
-    return value.length;
+    return len(value);
 }
 
 fn contains(value: str, needle: str): bool {
-    return value.contains(needle);
+    var nlen = len(needle);
+    var vlen = len(value);
+    if (nlen == 0) { return true; }
+    if (nlen > vlen) { return false; }
+    var i = 0;
+    while (i <= vlen - nlen) {
+        if (substring(value, i, i + nlen) == needle) {
+            return true;
+        }
+        i = i + 1;
+    }
+    return false;
 }
 
 fn starts_with(value: str, prefix: str): bool {
-    return value.starts_with(prefix);
+    var plen = len(prefix);
+    if (plen == 0) { return true; }
+    if (plen > len(value)) { return false; }
+    return substring(value, 0, plen) == prefix;
 }
 
 fn ends_with(value: str, suffix: str): bool {
-    return value.ends_with(suffix);
+    var slen = len(suffix);
+    var vlen = len(value);
+    if (slen == 0) { return true; }
+    if (slen > vlen) { return false; }
+    return substring(value, vlen - slen, vlen) == suffix;
 }
 
 fn split(value: str, delimiter: str): [str] {
-    return value.split(delimiter);
+    var dlen = len(delimiter);
+    var vlen = len(value);
+    var parts: [str] = [];
+    if (dlen == 0) {
+        var i = 0;
+        while (i < vlen) {
+            parts = parts + [substring(value, i, i + 1)];
+            i = i + 1;
+        }
+        return parts;
+    }
+    var start = 0;
+    var i = 0;
+    while (i <= vlen - dlen) {
+        if (substring(value, i, i + dlen) == delimiter) {
+            parts = parts + [substring(value, start, i)];
+            start = i + dlen;
+            i = start;
+        } else {
+            i = i + 1;
+        }
+    }
+    parts = parts + [substring(value, start, vlen)];
+    return parts;
 }
 
 fn join(values: [str], delimiter: str): str {
-    if (values.length == 0) {
-        return "";
-    }
+    var n = len(values);
+    if (n == 0) { return ""; }
     var result = values[0];
     var i = 1;
-    while (i < values.length) {
+    while (i < n) {
         result = result + delimiter + values[i];
         i = i + 1;
     }
@@ -34,41 +75,143 @@ fn join(values: [str], delimiter: str): str {
 }
 
 fn trim(value: str): str {
-    return value.trim();
+    var vlen = len(value);
+    var start = 0;
+    while (start < vlen) {
+        var ch = substring(value, start, start + 1);
+        if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
+            start = start + 1;
+        } else {
+            break;
+        }
+    }
+    var end = vlen;
+    while (end > start) {
+        var ch = substring(value, end - 1, end);
+        if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
+            end = end - 1;
+        } else {
+            break;
+        }
+    }
+    return substring(value, start, end);
 }
 
 fn replace(value: str, old: str, replacement: str): str {
-    return value.replace(old, replacement);
+    var olen = len(old);
+    var vlen = len(value);
+    if (olen == 0) { return value; }
+    var result = "";
+    var i = 0;
+    while (i <= vlen - olen) {
+        if (substring(value, i, i + olen) == old) {
+            result = result + replacement;
+            i = i + olen;
+        } else {
+            result = result + substring(value, i, i + 1);
+            i = i + 1;
+        }
+    }
+    while (i < vlen) {
+        result = result + substring(value, i, i + 1);
+        i = i + 1;
+    }
+    return result;
 }
 
-fn substring(value: str, start: int, end: int): str {
-    return value.substring(start, end);
+fn _char_to_lower(ch: str): str {
+    if (ch == "A") { return "a"; }
+    if (ch == "B") { return "b"; }
+    if (ch == "C") { return "c"; }
+    if (ch == "D") { return "d"; }
+    if (ch == "E") { return "e"; }
+    if (ch == "F") { return "f"; }
+    if (ch == "G") { return "g"; }
+    if (ch == "H") { return "h"; }
+    if (ch == "I") { return "i"; }
+    if (ch == "J") { return "j"; }
+    if (ch == "K") { return "k"; }
+    if (ch == "L") { return "l"; }
+    if (ch == "M") { return "m"; }
+    if (ch == "N") { return "n"; }
+    if (ch == "O") { return "o"; }
+    if (ch == "P") { return "p"; }
+    if (ch == "Q") { return "q"; }
+    if (ch == "R") { return "r"; }
+    if (ch == "S") { return "s"; }
+    if (ch == "T") { return "t"; }
+    if (ch == "U") { return "u"; }
+    if (ch == "V") { return "v"; }
+    if (ch == "W") { return "w"; }
+    if (ch == "X") { return "x"; }
+    if (ch == "Y") { return "y"; }
+    if (ch == "Z") { return "z"; }
+    return ch;
+}
+
+fn _char_to_upper(ch: str): str {
+    if (ch == "a") { return "A"; }
+    if (ch == "b") { return "B"; }
+    if (ch == "c") { return "C"; }
+    if (ch == "d") { return "D"; }
+    if (ch == "e") { return "E"; }
+    if (ch == "f") { return "F"; }
+    if (ch == "g") { return "G"; }
+    if (ch == "h") { return "H"; }
+    if (ch == "i") { return "I"; }
+    if (ch == "j") { return "J"; }
+    if (ch == "k") { return "K"; }
+    if (ch == "l") { return "L"; }
+    if (ch == "m") { return "M"; }
+    if (ch == "n") { return "N"; }
+    if (ch == "o") { return "O"; }
+    if (ch == "p") { return "P"; }
+    if (ch == "q") { return "Q"; }
+    if (ch == "r") { return "R"; }
+    if (ch == "s") { return "S"; }
+    if (ch == "t") { return "T"; }
+    if (ch == "u") { return "U"; }
+    if (ch == "v") { return "V"; }
+    if (ch == "w") { return "W"; }
+    if (ch == "x") { return "X"; }
+    if (ch == "y") { return "Y"; }
+    if (ch == "z") { return "Z"; }
+    return ch;
 }
 
 fn lowercase(value: str): str {
-    return value.to_lower();
+    var result = "";
+    var i = 0;
+    var vlen = len(value);
+    while (i < vlen) {
+        result = result + _char_to_lower(substring(value, i, i + 1));
+        i = i + 1;
+    }
+    return result;
 }
 
 fn uppercase(value: str): str {
-    return value.to_upper();
+    var result = "";
+    var i = 0;
+    var vlen = len(value);
+    while (i < vlen) {
+        result = result + _char_to_upper(substring(value, i, i + 1));
+        i = i + 1;
+    }
+    return result;
 }
 
 fn to_lower(value: str): str {
-    return value.to_lower();
+    return lowercase(value);
 }
 
 fn to_upper(value: str): str {
-    return value.to_upper();
+    return uppercase(value);
 }
 
-
 fn compare(left: str, right: str): int {
-    if (left < right) {
-        return -1;
-    }
-    if (left > right) {
-        return 1;
-    }
+    if (left < right) { return -1; }
+    if (left > right) { return 1; }
     return 0;
 }
 
@@ -76,3 +219,107 @@ fn format_pair(key: str, value: str): str {
     return key + "=" + value;
 }
 
+fn is_empty(value: str): bool {
+    return len(value) == 0;
+}
+
+fn reverse(value: str): str {
+    var result = "";
+    var i = len(value) - 1;
+    while (i >= 0) {
+        result = result + substring(value, i, i + 1);
+        i = i - 1;
+    }
+    return result;
+}
+
+fn index_of(value: str, needle: str): int {
+    var nlen = len(needle);
+    var vlen = len(value);
+    if (nlen == 0) { return 0; }
+    var i = 0;
+    while (i <= vlen - nlen) {
+        if (substring(value, i, i + nlen) == needle) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+fn last_index_of(value: str, needle: str): int {
+    var nlen = len(needle);
+    var vlen = len(value);
+    if (nlen == 0) { return vlen; }
+    var i = vlen - nlen;
+    while (i >= 0) {
+        if (substring(value, i, i + nlen) == needle) {
+            return i;
+        }
+        i = i - 1;
+    }
+    return -1;
+}
+
+fn repeat(value: str, count: int): str {
+    var result = "";
+    var i = 0;
+    while (i < count) {
+        result = result + value;
+        i = i + 1;
+    }
+    return result;
+}
+
+fn pad_left(value: str, total_length: int, pad_char: str): str {
+    var vlen = len(value);
+    if (vlen >= total_length) { return value; }
+    var result = "";
+    var i = 0;
+    while (i < total_length - vlen) {
+        result = result + pad_char;
+        i = i + 1;
+    }
+    return result + value;
+}
+
+fn pad_right(value: str, total_length: int, pad_char: str): str {
+    var vlen = len(value);
+    if (vlen >= total_length) { return value; }
+    var result = value;
+    var i = 0;
+    while (i < total_length - vlen) {
+        result = result + pad_char;
+        i = i + 1;
+    }
+    return result;
+}
+
+fn count_occurrences(value: str, needle: str): int {
+    var nlen = len(needle);
+    var vlen = len(value);
+    if (nlen == 0) { return 0; }
+    var count = 0;
+    var i = 0;
+    while (i <= vlen - nlen) {
+        if (substring(value, i, i + nlen) == needle) {
+            count = count + 1;
+            i = i + nlen;
+        } else {
+            i = i + 1;
+        }
+    }
+    return count;
+}
+
+fn is_palindrome(value: str): bool {
+    var vlen = len(value);
+    var i = 0;
+    while (i < vlen / 2) {
+        if (substring(value, i, i + 1) != substring(value, vlen - 1 - i, vlen - i)) {
+            return false;
+        }
+        i = i + 1;
+    }
+    return true;
+}
