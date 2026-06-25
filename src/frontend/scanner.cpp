@@ -790,9 +790,8 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "nil") return TokenType::NIL;
     if (rest == "str") return TokenType::STR_TYPE;
     if (rest == "bool") return TokenType::BOOL_TYPE;
-    if (rest == "list") return TokenType::LIST_TYPE;
-    if (rest == "array") return TokenType::ARRAY_TYPE;
-    if (rest == "dict") return TokenType::DICT_TYPE;
+    // list, dict, array are no longer reserved keywords - they can be used as identifiers
+    // Collection syntax uses [int], {str:int}, (int,str) instead
     if (rest == "option") return TokenType::OPTION_TYPE;
     // 'result' is treated as an identifier to allow variable names.
     if (rest == "result") return TokenType::IDENTIFIER;
@@ -943,12 +942,7 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "USER_TYPE";
     case TokenType::FUNCTION_TYPE:
         return "FUNCTION_TYPE";
-    case TokenType::LIST_TYPE:
-        return "LIST_TYPE";
-    case TokenType::DICT_TYPE:
-        return "DICT_TYPE";
-    case TokenType::ARRAY_TYPE:
-        return "ARRAY_TYPE";
+    // LIST_TYPE, DICT_TYPE, ARRAY_TYPE removed - collection syntax uses [int], {str:int}, (int,str)
     case TokenType::ENUM_TYPE:
         return "ENUM_TYPE";
     case TokenType::OPTION_TYPE:

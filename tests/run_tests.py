@@ -98,6 +98,8 @@ tests = [
     "tests/stdlib/http/http_test.lm",
     # Stdlib - WSS
     "tests/stdlib/wss/wss_test.lm",
+    # Regression - Type Ownership Refactor
+    "tests/regression/ownership_refactor_test.lm",
 ]
 
 # Tests that need extra time (resource creation, crypto, network)

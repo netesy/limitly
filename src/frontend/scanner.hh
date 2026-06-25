@@ -99,9 +99,7 @@ enum class TokenType {
     BOOL_TYPE,     // bool
     USER_TYPE,     // user-defined types
     FUNCTION_TYPE, // function
-    LIST_TYPE,     // list
-    DICT_TYPE,     // dictionary
-    ARRAY_TYPE,    // array
+    // LIST_TYPE, DICT_TYPE, ARRAY_TYPE removed - collection syntax uses [int], {str:int}, (int,str)
     ENUM_TYPE,     // enum
     SUM_TYPE,      //sum type
     UNION_TYPE,    //union type

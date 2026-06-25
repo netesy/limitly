@@ -121,9 +121,7 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
     else if (match({TokenType::BOOL_TYPE})) { type->typeName = "bool"; type->isPrimitive = true; }
     else if (match({TokenType::ANY_TYPE})) { type->typeName = "any"; type->isPrimitive = true; }
     else if (match({TokenType::NIL_TYPE}) || match({TokenType::NIL})) { type->typeName = "nil"; type->isPrimitive = true; }
-    else if (match({TokenType::LIST_TYPE})) { type->typeName = "list"; type->isList = true; }
-    else if (match({TokenType::DICT_TYPE})) { type->typeName = "dict"; type->isDict = true; }
-    else if (match({TokenType::ARRAY_TYPE})) { type->typeName = "array"; type->isList = true; }
+    // LIST_TYPE, DICT_TYPE, ARRAY_TYPE removed - collection syntax uses [int], {str:int}, (int,str)
     else if (match({TokenType::OPTION_TYPE})) type->typeName = "option";
     else if (match({TokenType::RESULT_TYPE})) type->typeName = "result";
     else if (match({TokenType::CHANNEL_TYPE})) type->typeName = "channel";
@@ -205,7 +203,7 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseDictionaryType()
 
 bool Parser::isKnownTypeName(const std::string& name) {
     return name == "any" || name == "str" || name == "int" || name == "float" || 
-           name == "bool" || name == "list" || name == "dict" || name == "option" || 
+           name == "bool" || name == "decimal" || name == "d2" || name == "d4"|| name == "d6" || name == "option" || 
            name == "result" || name == "i8" || name == "i16" || name == "i32" || 
            name == "i64" || name == "u8" || name == "u16" || name == "u32" || 
            name == "u64" || name == "f32" || name == "f64" || name == "uint" ||
@@ -315,7 +313,9 @@ bool Parser::isValidParameterName(const std::string& name) {
     static const std::set<std::string> reservedTypes = {
         "int", "i8", "i16", "i32", "i64", "uint", "u8", "u16", "u32", "u64", 
         "float", "f32", "f64", "str", "string", "bool", "nil", "any",
-        "list", "dict", "array", "function", "option", "result", "channel", "atomic"
+        "d2", "d4", "d6", "decimal",
+        // list, dict, array removed - they are no longer reserved keywords
+        "function", "option", "result", "channel", "atomic"
     };
     return reservedTypes.find(name) == reservedTypes.end();
 }

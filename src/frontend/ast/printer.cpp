@@ -1038,9 +1038,7 @@ std::string ASTPrinter::tokenTypeToString(LM::Frontend::TokenType type) const {
         case LM::Frontend::TokenType::BOOL_TYPE: return "bool";
         case LM::Frontend::TokenType::USER_TYPE: return "user_type";
         case LM::Frontend::TokenType::FUNCTION_TYPE: return "fn";
-        case LM::Frontend::TokenType::LIST_TYPE: return "list";
-        case LM::Frontend::TokenType::DICT_TYPE: return "dict";
-        case LM::Frontend::TokenType::ARRAY_TYPE: return "array";
+        // LIST_TYPE, DICT_TYPE, ARRAY_TYPE removed - collection syntax uses [int], {str:int}, (int,str)
         case LM::Frontend::TokenType::ENUM_TYPE: return "enum";
         case LM::Frontend::TokenType::SUM_TYPE: return "sum";
         case LM::Frontend::TokenType::UNION_TYPE: return "union";

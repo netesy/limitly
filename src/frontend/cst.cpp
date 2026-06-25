@@ -463,9 +463,7 @@ namespace CST {
             // Types
             case NodeKind::PRIMITIVE_TYPE: return "PRIMITIVE_TYPE";
             case NodeKind::FUNCTION_TYPE: return "FUNCTION_TYPE";
-            case NodeKind::LIST_TYPE: return "LIST_TYPE";
-            case NodeKind::DICT_TYPE: return "DICT_TYPE";
-            case NodeKind::ARRAY_TYPE: return "ARRAY_TYPE";
+            // LIST_TYPE, DICT_TYPE, ARRAY_TYPE removed - collection syntax uses [int], {str:int}, (int,str)
             case NodeKind::UNION_TYPE: return "UNION_TYPE";
             case NodeKind::OPTION_TYPE: return "OPTION_TYPE";
             case NodeKind::RESULT_TYPE: return "RESULT_TYPE";
