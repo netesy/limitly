@@ -14,8 +14,8 @@ type UnknownError = { message: str };
 
 frame Console {
     pub fn print(msg: str): nil {
-        var stdout = resource_create(9); // RT_STDOUT
-        resource_call(stdout, 3, msg); // OP_WRITE
+        var stdout = resource_create(9, nil, nil); // RT_STDOUT
+        resource_call(stdout, 3, msg); // OP_WRITE with message
         resource_destroy(stdout);
     }
 

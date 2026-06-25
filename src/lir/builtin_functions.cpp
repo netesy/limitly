@@ -389,6 +389,40 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
     ));
 
     registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "len",
+        std::vector<TypeTag>{TypeTag::Any},
+        TypeTag::Int,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const auto& value = args[0];
+            size_t length = 0;
+            
+            switch (value->type->tag) {
+                case TypeTag::String: {
+                    length = value->data.length();
+                    break;
+                }
+                case TypeTag::List: {
+                    if (std::holds_alternative<ListValue>(value->complexData)) {
+                        length = std::get<ListValue>(value->complexData).elements.size();
+                    }
+                    break;
+                }
+                case TypeTag::Dict: {
+                    if (std::holds_alternative<DictValue>(value->complexData)) {
+                        length = std::get<DictValue>(value->complexData).elements.size();
+                    }
+                    break;
+                }
+                default:
+                    throw std::runtime_error("len: unsupported type " + value->type->toString());
+            }
+            
+            auto int_type = std::make_shared<::Type>(TypeTag::Int);
+            return std::make_shared<Value>(int_type, static_cast<int64_t>(length));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
         "channel",
         std::vector<TypeTag>{},
         TypeTag::Channel,

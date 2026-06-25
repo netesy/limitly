@@ -53,6 +53,10 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("clock", {}, ts.FLOAT64_TYPE);
     checker.register_builtin_function("sleep", {ts.FLOAT64_TYPE}, ts.NIL_TYPE);
     checker.register_builtin_function("len", {ts.ANY_TYPE}, ts.INT_TYPE);
+    // Overload for lists
+    checker.register_builtin_function("len", {ts.createTypedListType(ts.ANY_TYPE)}, ts.INT_TYPE);
+    // Overload for strings (already covered by length builtin, but alias)
+    checker.register_builtin_function("len", {ts.STRING_TYPE}, ts.INT_TYPE);
     checker.register_builtin_function("time", {}, ts.INT64_TYPE);
     checker.register_builtin_function("date", {}, ts.STRING_TYPE);
     checker.register_builtin_function("now", {}, ts.STRING_TYPE);
@@ -84,8 +88,13 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("input", {ts.STRING_TYPE}, ts.STRING_TYPE);
 
     // Unified Resource System
+    // Core overloads
     checker.register_builtin_function("resource_create", {ts.INT_TYPE, ts.ANY_TYPE, ts.ANY_TYPE}, ts.INT64_TYPE);
+    checker.register_builtin_function("resource_create", {ts.INT_TYPE}, ts.INT64_TYPE); // overload for type only
     checker.register_builtin_function("resource_call", {ts.INT64_TYPE, ts.INT_TYPE, ts.ANY_TYPE, ts.ANY_TYPE, ts.ANY_TYPE}, ts.ANY_TYPE);
+    checker.register_builtin_function("resource_call", {ts.INT64_TYPE, ts.INT_TYPE}, ts.ANY_TYPE); // overload for no extra args
+    checker.register_builtin_function("resource_call", {ts.INT64_TYPE, ts.INT_TYPE, ts.ANY_TYPE}, ts.ANY_TYPE); // overload for one arg
+    checker.register_builtin_function("resource_call", {ts.INT64_TYPE, ts.INT_TYPE, ts.ANY_TYPE, ts.ANY_TYPE}, ts.ANY_TYPE); // overload for two args
     checker.register_builtin_function("resource_destroy", {ts.INT64_TYPE}, ts.NIL_TYPE);
 
     // File I/O intrinsics

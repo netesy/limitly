@@ -1,0 +1,11 @@
+// Standard Library List Module
+
+// Builtin length function for lists
+fn len(self: [any]): int {
+    return self.length;
+}
+
+// Alias property/method that forwards to the builtin len function
+fn length(self: [any]): int {
+    return len(self);
+}

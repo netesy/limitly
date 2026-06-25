@@ -53,6 +53,15 @@ fn uppercase(value: str): str {
     return value.to_upper();
 }
 
+fn to_lower(value: str): str {
+    return value.to_lower();
+}
+
+fn to_upper(value: str): str {
+    return value.to_upper();
+}
+
+
 fn compare(left: str, right: str): int {
     if (left < right) {
         return -1;
@@ -67,9 +76,3 @@ fn format_pair(key: str, value: str): str {
     return key + "=" + value;
 }
 
-// Compatibility exports matching the existing std.strings module names.
-import std.strings as strings;
-var String = strings.String;
-var join_strings = strings.join_strings;
-var to_upper = strings.to_upper;
-var to_lower = strings.to_lower;
