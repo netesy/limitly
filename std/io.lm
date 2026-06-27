@@ -62,8 +62,8 @@ fn open(path: str, mode: str): File?IOError {
 
 // Global print helper
 fn print(msg: any): nil {
-    var stdout = resource_create(9); // RT_STDOUT
-    resource_call(stdout, 3, msg);
+    var stdout = resource_create(9, nil, nil); // RT_STDOUT
+    resource_call(stdout, 3, msg, nil);
     resource_destroy(stdout);
 }
 
@@ -81,10 +81,9 @@ fn delete(path: str): bool {
 
 fn create_directory(path: str): nil?IOError {
     // No native mkdir builtin registered yet.
-    return UnknownError { message: "create_directory not supported on current runtime" };
+    return err(UnknownError);
 }
 
-fn list_directory(path: str): [str]?IOError {
-    // No native readdir builtin registered yet.
-    return UnknownError { message: "list_directory not supported on current runtime" };
-}
+// fn list_directory(path: str): [str]?IOError {
+//     return err(UnknownError);
+// }

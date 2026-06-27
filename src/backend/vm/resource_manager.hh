@@ -52,7 +52,7 @@ public:
     void* getCurrentFiber() { return current_fiber_; }
 
 private:
-    ResourceManager() = default;
+    ResourceManager();
     ~ResourceManager();
 
     std::unordered_map<int64_t, std::unique_ptr<Resource>> resources_;

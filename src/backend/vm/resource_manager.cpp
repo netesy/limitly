@@ -1197,6 +1197,13 @@ ResourceManager& ResourceManager::getInstance() {
     return instance;
 }
 
+ResourceManager::ResourceManager() {
+    // Pre-allocate standard resources with fixed IDs
+    resources_[0] = std::make_unique<StdoutResource>();
+    resources_[1] = std::make_unique<StderrResource>();
+    next_id_ = 2;  // Start user resources from ID 2
+}
+
 ResourceManager::~ResourceManager() {
     shutdown();
 }

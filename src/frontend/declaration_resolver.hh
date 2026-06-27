@@ -14,7 +14,7 @@ public:
     explicit DeclarationResolver(SymbolDatabase& db) : symbol_db_(db) {}
 
     // Resolve declarations for all modules managed by ModuleManager
-    void resolve_all(ModuleManager& manager);
+    void resolve_all(const ModuleManager& manager);
 
 private:
     SymbolDatabase& symbol_db_;

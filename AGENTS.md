@@ -133,6 +133,11 @@ frame Square: Shape {
 Limitly does not use generic `Result` types. Instead, it uses fallible annotations like `int?` (generic error) or `int?DivisionByZero` (specific error).
 
 - **Success/Error constructors**: Values must be returned using `ok(value)` or `err(ErrorType)` (or `err()` for generic fallible returns).
+- **Error construction syntax**:
+  - Simple error type: `return err(DivisionByZero);`
+  - Generic error: `return err();`
+  - Error with type and message: `return err("ValidationError", "Value cannot be negative");`
+  - Error with struct fields: `return err(UnknownError { message = "Value cannot be negative" });`
 - **Propagator (`?`)**: Suffixing an expression with `?` will propagate the error up the call stack if it fails.
 - **Inline Handling (`? else`)**: You can handle errors inline with optional error variable capturing.
   ```limit
@@ -140,7 +145,7 @@ Limitly does not use generic `Result` types. Instead, it uses fallible annotatio
       return 0; // fallback default
   };
 
-  var value_with_err = divide(a, b)? else err {
+  var value_with_err = divide(a, b)? else {
       print("Failed: {err}");
       return 0;
   };
@@ -153,6 +158,7 @@ Limitly does not use generic `Result` types. Instead, it uses fallible annotatio
 - **Import Module**: `import std.collections as collections;`
 - **Import Specific Symbols**: `import std.collections { List, Map };` (utilizes show filters under the hood).
 - **Import Alias**: Imports can be aliased with `as`. Qualified names are referenced as `alias.Symbol`.
+- **Import Visibility**: `import std.collections show Iterator;`
 
 ---
 

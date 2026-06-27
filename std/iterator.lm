@@ -136,3 +136,25 @@ import std.collections.collection_utils as utils;
 fn collect(it: Iterator): [any] {
     return utils.collect(it);
 }
+
+// Factory functions
+pub fn iterator(items: [any]): Iterator {
+    return ListIterator(items=items);
+}
+
+pub fn map(it: Iterator, f: fn(any): any): Iterator {
+    return MapIterator(source=it, f=f);
+}
+
+pub fn filter(it: Iterator, p: fn(any): bool): Iterator {
+    return FilterIterator(source=it, p=p);
+}
+
+pub fn chunk(it: Iterator, size: int): Iterator {
+    return ChunkIterator(source=it, size=size);
+}
+
+pub fn cycle(items: [any]): Iterator {
+    return CycleIterator(items=items);
+}
+

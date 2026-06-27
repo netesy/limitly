@@ -3,7 +3,7 @@
 namespace LM {
 namespace Frontend {
 
-void DeclarationResolver::resolve_all(ModuleManager& manager) {
+void DeclarationResolver::resolve_all(const ModuleManager& manager) {
     // Iterate over all loaded modules and process each AST program
     for (const auto& [module_name, module_ptr] : manager.get_all_modules()) {
         if (!module_ptr || !module_ptr->ast) continue;
@@ -47,7 +47,7 @@ void DeclarationResolver::process_statement(const std::string& module_name, cons
         sym.kind = SymbolKind::Function;
         sym.module = module_name;
         symbol_db_.register_symbol(sym);
-    } else if (auto ad = std::dynamic_pointer_cast<AST::AliasDeclaration>(stmt)) {
+    } else if (auto ad = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) {
         Symbol sym;
         sym.name = ad->name;
         sym.fully_qualified_name = module_name + "." + ad->name;

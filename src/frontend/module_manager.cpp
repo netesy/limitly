@@ -28,7 +28,7 @@ std::shared_ptr<Module> ModuleManager::get_module_unlocked(const std::string& na
     return (it != modules_.end()) ? it->second : nullptr;
 }
 
-std::unordered_map<std::string, std::shared_ptr<Module>> ModuleManager::get_all_modules() {
+std::unordered_map<std::string, std::shared_ptr<Module>> ModuleManager::get_all_modules() const {
     std::lock_guard<std::mutex> lock(modules_mutex_);
     return modules_;
 }

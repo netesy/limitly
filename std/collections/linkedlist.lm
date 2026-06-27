@@ -66,7 +66,7 @@ frame LinkedList {
     pub fn pop_front(): any {
         if (self.head == nil) return nil;
         var node: Node = self.head;
-        var val = node.value;
+        var vals = node.value;
         self.head = node.next;
         if (self.head == nil) {
             self.tail = nil;
@@ -74,7 +74,7 @@ frame LinkedList {
             self.head.prev = nil;
         }
         self.size = self.size - 1;
-        return val;
+        return vals;
     }
 
     pub fn len(): int { return self.size; }
@@ -136,7 +136,7 @@ frame LinkedList {
     pub fn pop_back(): any {
         if (self.tail == nil) return nil;
         var node = self.tail;
-        var val = node.value;
+        var vals = node.value;
         self.tail = node.prev;
         if (self.tail == nil) {
             self.head = nil;
@@ -144,13 +144,13 @@ frame LinkedList {
             self.tail.next = nil;
         }
         self.size = self.size - 1;
-        return val;
+        return vals;
     }
     
     pub fn pop_front(): any {
         if (self.head == nil) return nil;
         var node = self.head;
-        var val = node.value;
+        var vals = node.value;
         self.head = node.next;
         if (self.head == nil) {
             self.tail = nil;
@@ -158,7 +158,7 @@ frame LinkedList {
             self.head.prev = nil;
         }
         self.size = self.size - 1;
-        return val;
+        return vals;
     }
     
     pub fn len(): int { return self.size; }
