@@ -643,8 +643,14 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
     frameDecl->name = name.lexeme;
     if (match({TokenType::COLON})) {
         do {
-            Token traitName = consume(TokenType::IDENTIFIER, "Expected trait name.");
-            frameDecl->implements.push_back(traitName.lexeme);
+            std::string traitName;
+            Token traitToken = consume(TokenType::IDENTIFIER, "Expected trait name.");
+            traitName = traitToken.lexeme;
+            while (match({TokenType::DOT})) {
+                traitName += ".";
+                traitName += consume(TokenType::IDENTIFIER, "Expected trait name after '.'.").lexeme;
+            }
+            frameDecl->implements.push_back(traitName);
         } while (match({TokenType::COMMA}));
     }
     Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before frame body.");

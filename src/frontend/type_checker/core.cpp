@@ -93,30 +93,25 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
 
     // Type check all loaded modules recursively
     auto all_modules = manager.get_all_modules();
-    for (const auto& [path, module] : all_modules) {
+    std::vector<std::string> topo_order = manager.get_topological_order();
+
+    for (const auto& path : topo_order) {
+        auto it = all_modules.find(path);
+        if (it == all_modules.end()) continue;
+        auto module = it->second;
         if (module && !module->is_checked) {
-            module->is_checked = true; // Mark before to prevent recursion
-            TypeChecker checker(this->type_system);
-            // Register builtin functions for module type checking
+            module->is_checked = true;
+            TypeChecker checker(this->type_system, this->symbol_db_);
             TypeCheckerFactory::register_builtin_functions(checker);
             checker.set_source_context(module->source, module->path);
             if (!checker.check_program(module->ast)) {
                 add_error("Failed to type check module: " + path);
             }
 
-            // Merge metadata back into current checker
-            for (const auto& [name, info] : checker.frame_declarations) {
-                this->frame_declarations[name] = info;
-            }
-            for (const auto& [name, info] : checker.trait_declarations) {
-                this->trait_declarations[name] = info;
-            }
-            for (const auto& [name, sig] : checker.function_signatures) {
-                this->function_signatures[name] = sig;
-            }
-            for (const auto& [name, type] : checker.variable_types) {
-                this->variable_types[name] = type;
-            }
+            for (const auto& [name, info] : checker.frame_declarations) this->frame_declarations[name] = info;
+            for (const auto& [name, info] : checker.trait_declarations) this->trait_declarations[name] = info;
+            for (const auto& [name, sig] : checker.function_signatures) this->function_signatures[name] = sig;
+            for (const auto& [name, type] : checker.variable_types) this->variable_types[name] = type;
         }
     }
 
@@ -133,7 +128,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
             type_system.addUserDefinedType(name, type_system.createFrameType(name));
         } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
-            TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait);
+            TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait, TraitType{name});
             type_system.addUserDefinedType(name, trait_type);
         }
     };

@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <string>
+#include <cstring>
+#include "symbol_database.hh"
 
 // =============================================================================
 // TYPE CHECKER - Runs BEFORE LIR generation
@@ -28,7 +30,9 @@ class TypeChecker {
 private:
     struct Scope;
 
+
     TypeSystem& type_system;
+    SymbolDatabase& symbol_db_;
     std::vector<std::string> errors;
     
     // Symbol table for variable types
@@ -139,7 +143,11 @@ private:
     std::shared_ptr<LM::Frontend::AST::Program> current_program_ = nullptr;
     
 public:
-    explicit TypeChecker(TypeSystem& ts) : type_system(ts) {}
+    // Constructor accepting TypeSystem and SymbolDatabase
+    explicit TypeChecker(TypeSystem& ts, SymbolDatabase& symbol_db) : type_system(ts), symbol_db_(symbol_db) {}
+
+    // Getter for SymbolDatabase
+    SymbolDatabase& get_symbol_db() const { return symbol_db_; }
     
     // Main entry point - type check entire program
     bool check_program(std::shared_ptr<LM::Frontend::AST::Program> program);
@@ -381,7 +389,7 @@ namespace TypeCheckerFactory {
     TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source = "", const std::string& file_path = "");
     
     // Create type checker instance (for testing)
-    std::unique_ptr<TypeChecker> create(TypeSystem& type_system);
+    std::unique_ptr<TypeChecker> create(TypeSystem& type_system, SymbolDatabase& symbol_db);
     
     // Register builtin functions with the type checker
     void register_builtin_functions(TypeChecker& checker);

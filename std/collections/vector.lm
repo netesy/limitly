@@ -1,6 +1,7 @@
 // Standard Library Vector, Deque, ArrayList, and RingBuffer Collections
 
 import std.iterator as iterator;
+import std.iterator show Iterator;
 
 frame Vector {
     pub var data: [any];
@@ -129,12 +130,12 @@ frame Vector {
         self.size = 0;
     }
 
-    pub fn iterator(): VectorIterator {
+    pub fn iterator(): Iterator {
         return VectorIterator(self.data, self.size);
     }
 }
 
-frame VectorIterator: iterator.Iterator {
+pub frame VectorIterator: Iterator {
     var data: [any];
     var size: int;
     var index: int;
@@ -239,7 +240,7 @@ frame Deque {
         return len(self.data);
     }
 
-    pub fn iterator(): VectorIterator {
+    pub fn iterator(): Iterator {
         return VectorIterator(self.data, len(self.data));
     }
 }
@@ -279,7 +280,7 @@ frame ArrayList {
         return self.data.len();
     }
 
-    pub fn iterator(): VectorIterator {
+    pub fn iterator(): Iterator {
         return self.data.iterator();
     }
 }

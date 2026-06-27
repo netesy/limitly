@@ -1,0 +1,25 @@
+// Utility iterator functions moved from std.iterator
+
+fn iterator(items: [any]): ListIterator { return ListIterator(items); }
+fn map(it: Iterator, f: fn(any): any): MapIterator { return MapIterator(it, f); }
+fn filter(it: Iterator, p: fn(any): bool): FilterIterator { return FilterIterator(it, p); }
+fn enumerate(it: Iterator): EnumerateIterator { return EnumerateIterator(it); }
+fn zip(left: Iterator, right: Iterator): ZipIterator { return ZipIterator(left, right); }
+fn chain(left: Iterator, right: Iterator): ChainIterator { return ChainIterator(left, right); }
+fn flatten(it: Iterator): Iterator { return it; }
+fn skip(it: Iterator, count: int): SkipIterator { return SkipIterator(it, count); }
+fn take(it: Iterator, count: int): TakeIterator { return TakeIterator(it, count); }
+fn step_by(it: Iterator, step: int): StepByIterator { return StepByIterator(it, step); }
+fn chunk(it: Iterator, size: int): ChunkIterator { return ChunkIterator(it, size); }
+fn cycle(items: [any]): CycleIterator { return CycleIterator(items); }
+fn peekable(it: Iterator): PeekableIterator { return PeekableIterator(it); }
+fn collect(it: Iterator): [any] {
+    import std.collections.vector as vector;
+    var res = vector.Vector();
+    var item = it.next();
+    while (item != nil) {
+        res.push(item);
+        item = it.next();
+    }
+    return res.data;
+}

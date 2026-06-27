@@ -655,7 +655,12 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                         function_signatures[init_name] = sig;
                     }
                 } else if (auto t = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
-                    declare_variable(qname, type_system.ANY_TYPE); // Simplification for traits
+                    TraitInfo ti;
+                    ti.name = qname;
+                    ti.declaration = t;
+                    ti.extends = t->extends;
+                    trait_declarations[qname] = ti;
+                    declare_variable(qname, type_system.ANY_TYPE); 
                 }
             }
         }

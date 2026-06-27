@@ -977,6 +977,64 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 expr->inferred_type = type_system.NIL_TYPE;
                 return type_system.NIL_TYPE;
             }
+        } else if (object_type && object_type->tag == TypeTag::Trait) {
+            auto traitTypeData = std::get_if<TraitType>(&object_type->extra);
+            if (!traitTypeData) {
+                add_error("Invalid trait type", expr->line);
+                return type_system.ANY_TYPE;
+            }
+
+            std::string trait_name = traitTypeData->name;
+            std::string method_name = member_expr->name;
+
+            // Resolve method through trait hierarchy
+            std::vector<std::string> trait_worklist = {trait_name};
+            std::unordered_set<std::string> visited_traits;
+
+            while (!trait_worklist.empty()) {
+                std::string current_trait = trait_worklist.back();
+                trait_worklist.pop_back();
+
+                if (visited_traits.count(current_trait)) continue;
+                visited_traits.insert(current_trait);
+
+                auto trait_it = trait_declarations.find(current_trait);
+                if (trait_it != trait_declarations.end()) {
+                    for (const auto& tm : trait_it->second.declaration->methods) {
+                        if (tm->name == method_name) {
+                            // Found in trait - validate arguments
+                            std::vector<TypePtr> expected_params;
+                            for (const auto& p : tm->params) expected_params.push_back(resolve_type_annotation(p.second));
+
+                            if (arg_types.size() < expected_params.size()) {
+                                add_error("Trait method '" + method_name + "' requires " + std::to_string(expected_params.size()) +
+                                         " arguments, but " + std::to_string(arg_types.size()) + " were provided", expr->line);
+                            } else {
+                                for (size_t i = 0; i < expected_params.size(); ++i) {
+                                    if (!is_type_compatible(expected_params[i], arg_types[i])) {
+                                        add_type_error(expected_params[i]->toString(), arg_types[i]->toString(), expr->line);
+                                    }
+                                }
+                            }
+
+                            TypePtr trait_return_type = tm->returnType ? resolve_type_annotation(tm->returnType.value()) : type_system.NIL_TYPE;
+                            expr->inferred_type = trait_return_type;
+                            return trait_return_type;
+                        }
+                    }
+                    // Add parent traits
+                    for (const auto& parent : trait_it->second.extends) {
+                        trait_worklist.push_back(parent);
+                    }
+                }
+            }
+
+            add_error("Trait '" + trait_name + "' has no method '" + method_name + "'", expr->line);
+            return type_system.ANY_TYPE;
+        } else if (object_type && object_type->tag == TypeTag::Any) {
+            // Dynamic call on 'any' - allowed, returns any
+            expr->inferred_type = type_system.ANY_TYPE;
+            return type_system.ANY_TYPE;
         }
         
         // For other types, just check the member expression
