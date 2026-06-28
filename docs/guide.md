@@ -965,6 +965,8 @@ print(a); // Output: 1
 
 ### Unsafe Blocks
 
+> **Note**: `unsafe` blocks are currently part of the language specification but are **not yet enforced** or fully implemented.
+
 Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
 
 ```limit
@@ -974,6 +976,8 @@ unsafe {
 ```
 
 ### Contract Statements
+
+> **Note**: `contract` statements are currently part of the language specification but are **not yet implemented**.
 
 Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
 
@@ -986,6 +990,8 @@ fn divide(a: int, b: int): int {
 
 ### Compile-Time Execution
 
+> **Note**: `comptime` is currently part of the language specification but is **not yet implemented**.
+
 The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
 
 ```limit
@@ -997,6 +1003,12 @@ comptime {
 ## The Type System
 
 Limit has a rich type system that allows for creating complex and expressive data structures while maintaining null-safety by design.
+
+> **Unimplemented Features**: The following features are in the language specification but currently **unimplemented** in the parser/runtime:
+> - **Elvis Operator** (`?:`)
+> - **Safe Navigation/Access** (`?.`)
+> - **Ternary Operator** (`? :`)
+> - **Range Steps** (e.g., `0..10..2`)
 
 ### Type Aliases
 
@@ -1164,8 +1176,8 @@ fn divide(a: int, b: int): int?DivisionByZero {
 
 var result = divide(10, 2);
 match (result) {
-    Ok(value) => { print("Result: {value}"); },
-    Err(e) => { print("Error: {e}"); }
+    val value => { print("Result: {value}"); },
+    err => { print("Error occurred"); }
 }
 ```
 
@@ -1317,8 +1329,8 @@ The result is a **deterministic, region-scoped runtime** that feels automatic ye
 
 The `?` operator provides a convenient way to **propagate** both errors and absent values. When you append `?` to an expression that returns a `Type?`:
 
-*   If the value is `Ok(value)`, the operator unwraps the value and the program continues.
-*   If the value is `Err`, the `?` operator will cause the current function to immediately return that `Err`.
+*   If the value is `ok(value)`, the operator unwraps the value and the program continues.
+*   If the value is `err()`, the `?` operator will cause the current function to immediately return that `err()`.
 
 This allows you to write cleaner code by avoiding deeply nested `match` statements when you simply want to pass an error or absent value up the call stack.
 
@@ -1440,6 +1452,8 @@ print("All concurrent tasks have completed.");
 Channels are the primary way for concurrent tasks to communicate. One or more tasks can send messages to a channel, and another task can receive them.
 
 ### Async/Await
+
+> **Note**: `async` and `await` are currently part of the language specification but are **not yet implemented** in the VM runtime.
 
 The `async` and `await` keywords are used for non-blocking operations, typically within a `concurrent` block. An `async` function returns immediately without blocking the thread, and you can use `await` to get its result when it's ready.
 

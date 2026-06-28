@@ -45,6 +45,8 @@ While there isn't a `--version` command yet, you can test your installation by s
 ./bin/limitly -repl
 ```
 
+> **Note**: The `-repl` flag is currently unimplemented and will be added in a future update. For now, please run `.lm` files directly.
+
 If you see a `>` prompt, you're all set! You can type `exit` to leave the REPL.
 
 ## ✍️ Your First Program
@@ -333,11 +335,11 @@ fn do_something(): int? {
     var result = might_fail();
     
     match result {
-        Ok(value) => {
+        val value => {
             print("Got value: {value}");
             return ok(value * 2);
         },
-        Err => {
+        err => {
             print("No value available");
             return err();
         }
@@ -398,14 +400,14 @@ Now it's time to put everything you've learned together! Let's build a simple nu
 var secret_number: int = 7; 
 print("I'm thinking of a number. Guess what it is!");
 
-loop { 
+while (true) {
     print("Please input your guess:");
     var input_str: str = "7"; // Simulating input
 
     var guess_result: int? = to_int(input_str);
 
     match (guess_result) {
-        Ok(guess) => {
+        val guess => {
             print("You guessed: {guess}");
             if (guess < secret_number) {
                 print("Too low!");
@@ -416,7 +418,7 @@ loop {
                 break; 
             }
         },
-        Err => {
+        err => {
             print("That's not a number! Please try again.");
         }
     }

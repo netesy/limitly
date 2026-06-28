@@ -9,6 +9,7 @@
 | `this` vs `self` | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
 | Optional/Error System | ✅ | ✅ | ✅ | `tests/types/options.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
 | `ok()` / `err()` | ✅ | ✅ | ✅ | `tests/types/options.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
+| `val`/`err` Patterns | ✅ | ✅ | ✅ | `tests/loops/match.lm` | `src/frontend/parser/patterns.cpp` | ✅ Fully consistent (Updated) |
 | `nil` literal | ✅ | ✅ | ✅ | `tests/basic/literals.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
 | Structured Concurrency | ✅ | ✅ | ✅ | `tests/concurrency/` | `src/frontend/parser/statements.cpp` | ✅ Fully consistent |
 
@@ -26,8 +27,8 @@
 | "Errors are not exceptions" | `std/core.lm`, Parser | `tests/integration/` | ✅ |
 | "Structured Concurrency" | `parallel`/`concurrent` | `tests/concurrency/` | ✅ |
 
-## 4. Final Integrity Conclusion
+## 4. Final Integrity Conclusion (Audit 2025-05-15)
 
-- **Can the language be taught without misleading users?**: YES. `learn.md` now uses verified `frame` syntax and correct binary paths.
-- **Is the documentation system internally consistent?**: YES. All layers (learn, guide, spec, zen) are aligned.
-- **Is the philosophy actually enforced?**: YES. Principle mappings are documented and verified against code.
+- **Can the language be taught without misleading users?**: YES. `learn.md` has been remediated to use `val`/`err` match patterns and `while (true)` instead of `loop`.
+- **Is the documentation system internally consistent?**: YES. All layers (learn, guide, spec, zen, drift) are now aligned with the implementation reality of `src/frontend/parser`.
+- **Is the philosophy actually enforced?**: YES. Principles in `zen.md` are mapped to code, and drifts are transparently cataloged in `drift.md`.
