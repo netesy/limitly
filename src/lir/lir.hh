@@ -89,7 +89,6 @@ enum class LIR_Op : uint8_t {
     Jump, JumpIfFalse, JumpIf, Label,
     Call, CallVoid, CallIndirect, CallBuiltin, CallVariadic,
     Return, FuncDef, Param, Ret, VaStart, VaArg, VaEnd, Copy,
-    PrintInt, PrintUint, PrintFloat, PrintBool, PrintString,
     Nop, Load, Store, Cast, ToString, STR_CONCAT, STR_FORMAT,
     
     // === Decimal Operations ===
@@ -212,7 +211,6 @@ enum class LIR_Op : uint8_t {
     X(Call) X(CallVoid) X(CallIndirect) X(CallBuiltin) X(CallVariadic) \
     X(Return) X(FuncDef) X(Param) X(Ret) \
     X(VaStart) X(VaArg) X(VaEnd) X(Copy) \
-    X(PrintInt) X(PrintUint) X(PrintFloat) X(PrintBool) X(PrintString) \
     X(Nop) X(Load) X(Store) X(Cast) X(ToString) X(STR_CONCAT) X(STR_FORMAT) \
     /* === Decimal Operations === */ \
     X(DecAdd) X(DecSub) X(DecMul) X(DecDiv) X(DecMod) X(DecNeg) X(DecRescale) \

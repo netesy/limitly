@@ -32,11 +32,17 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
         }
         case LIR::LIR_Op::ResourceCreate: {
             ResourceType type = static_cast<ResourceType>(to_int(registers[pc->a]));
-            // Allow callers to pass additional creation args via call_args
-            // (e.g. size for MEMORY, capacity for CHANNEL).
             std::vector<RegisterValue> create_args;
-            for (auto arg_reg : pc->call_args) {
-                if (arg_reg != UINT32_MAX) create_args.push_back(registers[arg_reg]);
+            if (pc->b != UINT32_MAX) {
+                RegisterValue list_val = registers[pc->b];
+                if (auto* list = reinterpret_cast<LmList*>(header_if_type(list_val, TYPE_LIST))) {
+                    size_t len = lm_list_len(list);
+                    for (size_t i = 0; i < len; ++i) {
+                        create_args.push_back(lm_list_get(list, i));
+                    }
+                } else {
+                    create_args.push_back(list_val);
+                }
             }
             int64_t id = rm.create(type, create_args);
             registers[pc->dst] = (id != -1) ? BOX_INT(id) : VAL_NIL;
@@ -44,14 +50,26 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
         }
         case LIR::LIR_Op::ResourceCall: {
             int64_t id = to_int(registers[pc->a]);
-            ResourceOperation op = static_cast<ResourceOperation>(pc->imm);
+            // Operation can be in pc->b (from call) or pc->imm (from literal optimization)
+            ResourceOperation op;
+            if (pc->b != UINT32_MAX) {
+                op = static_cast<ResourceOperation>(to_int(registers[pc->b]));
+            } else {
+                op = static_cast<ResourceOperation>(pc->imm);
+            }
+            
             std::vector<RegisterValue> args;
-            // H34: pc->b == 0 was incorrectly treated as "no arg", which
-            // silently dropped any argument that happened to land in
-            // register 0. Use UINT32_MAX as the "no arg" sentinel.
-            if (pc->b != UINT32_MAX) args.push_back(registers[pc->b]);
-            for (auto arg_reg : pc->call_args) {
-                if (arg_reg != UINT32_MAX) args.push_back(registers[arg_reg]);
+            // Arguments list is in call_args[0]
+            if (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX) {
+                RegisterValue list_val = registers[pc->call_args[0]];
+                if (auto* list = reinterpret_cast<LmList*>(header_if_type(list_val, TYPE_LIST))) {
+                    size_t len = lm_list_len(list);
+                    for (size_t i = 0; i < len; ++i) {
+                        args.push_back(lm_list_get(list, i));
+                    }
+                } else {
+                    args.push_back(list_val);
+                }
             }
 
             registers[pc->dst] = rm.call(id, op, args, get_current_fiber());

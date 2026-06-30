@@ -605,10 +605,10 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
     }
 
     // First check if this is a module variable access (e.g., "math.pi")
-    size_t dot_pos = expr.name.find("::");
+    size_t dot_pos = expr.name.rfind('.');
     if (dot_pos != std::string::npos) {
         std::string module_name = expr.name.substr(0, dot_pos);
-        std::string symbol_name = expr.name.substr(dot_pos + 2);
+        std::string symbol_name = expr.name.substr(dot_pos + 1);
         
         // Check for alias mapping
         auto alias_it = import_aliases_.find(module_name);
@@ -617,7 +617,7 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
         }
         
         // Resolve module symbol
-        std::string qualified_name = module_name + "::" + symbol_name;
+        std::string qualified_name = module_name + "." + symbol_name;
         ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
         if (symbol && symbol->is_variable) {
             if (!can_access_module_symbol(*symbol, current_module_)) {
@@ -1243,13 +1243,13 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
         // Resolve qualified name for intrinsic lookup
         std::string registry_lookup_name = func_name;
-        size_t d_pos = func_name.find("::");
+        size_t d_pos = func_name.rfind('.');
         if (d_pos != std::string::npos) {
             std::string mod_name = func_name.substr(0, d_pos);
-            std::string sym_name = func_name.substr(d_pos + 2);
+            std::string sym_name = func_name.substr(d_pos + 1);
             auto a_it = import_aliases_.find(mod_name);
             if (a_it != import_aliases_.end()) mod_name = a_it->second;
-            registry_lookup_name = mod_name + "::" + sym_name;
+            registry_lookup_name = mod_name + "." + sym_name;
         }
 
         if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(registry_lookup_name)) {
@@ -1493,11 +1493,11 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             return frame_reg;
         }
         
-        // Check if this is a module function call (e.g., "math::add")
-        size_t dot_pos = func_name.find("::");
+        // Check if this is a module function call (e.g., "math.add")
+        size_t dot_pos = func_name.rfind('.');
         if (dot_pos != std::string::npos) {
             std::string module_name = func_name.substr(0, dot_pos);
-            std::string symbol_name = func_name.substr(dot_pos + 2);
+            std::string symbol_name = func_name.substr(dot_pos + 1);
             
             // Check for alias mapping
             auto alias_it = import_aliases_.find(module_name);
@@ -1506,7 +1506,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
             
             // Resolve module symbol
-            std::string qualified_name = module_name + "::" + symbol_name;
+            std::string qualified_name = module_name + "." + symbol_name;
             ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
             if (symbol && symbol->is_function) {
                 if (!can_access_module_symbol(*symbol, current_module_)) {
@@ -1788,9 +1788,6 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 }
 
                 std::string intrinsic_name = qualified_name;
-                if (intrinsic_name.find('.') != std::string::npos && intrinsic_name.find("::") == std::string::npos) {
-                    intrinsic_name.replace(intrinsic_name.rfind('.'), 1, "::");
-                }
 
                 if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(intrinsic_name)) {
                     LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);

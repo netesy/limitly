@@ -78,6 +78,13 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         }
         emit_stmt(*stmt);
     }
+
+    // 3. Automatically call main() if defined
+    if (LIRFunctionManager::getInstance().hasFunction("main") || function_table_.count("main")) {
+        std::vector<Reg> empty_args;
+        Reg main_res = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Call, main_res, "main", empty_args));
+    }
     
     // Call exit_scope BEFORE implicit return to ensure deinitializers are called
     exit_scope();

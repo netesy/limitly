@@ -4,6 +4,7 @@ import std.core as core;
 
 // Resource Types (aligned with LIR/VM)
 // RT_FILE: 0, RT_SOCKET: 1, RT_STDOUT: 9, RT_STDERR: 10
+// Operations: OPEN: 0, CLOSE: 1, READ: 2, WRITE: 3
 
 type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
 type FileNotFound = { path: str };
@@ -13,10 +14,9 @@ type NetworkError = { message: str };
 type UnknownError = { message: str };
 
 frame Console {
-    pub fn print(msg: str): nil {
-        var stdout = resource_create(9, nil, nil); // RT_STDOUT
-        resource_call(stdout, 3, msg); // OP_WRITE with message
-        resource_destroy(stdout);
+    pub fn print(msg: any): nil {
+        // Use pre-allocated STDOUT resource (ID 0)
+        resource_call(0, 3, [msg]); 
     }
 
     pub fn read_line(): str {
@@ -26,32 +26,35 @@ frame Console {
 
 frame File {
     var path: str;
-    var handle: int;
+    var handle: int64;
 
     pub fn read(): str?IOError {
-        var res = resource_call(self.handle, 2); // OP_READ
+        var res = resource_call(this.handle, 2, []); // OP_READ
         if (res == nil) return UnknownError { message: "Failed to read file" };
         return (res as str);
     }
 
     pub fn write(content: str): nil?IOError {
-        var success = resource_call(self.handle, 3, content); // OP_WRITE
+        var success = resource_call(this.handle, 3, [content]); // OP_WRITE
         if (!success) return UnknownError { message: "Failed to write file" };
         return nil;
     }
 
     pub fn close(): nil?IOError {
-        resource_call(self.handle, 1); // OP_CLOSE
-        resource_destroy(self.handle);
+        resource_call(this.handle, 1, []); // OP_CLOSE
+        resource_destroy(this.handle);
         return nil;
     }
 }
 
 fn open(path: str, mode: str): File?IOError {
-    var h = resource_create(0); // RT_FILE
+    var h = resource_create(0, [path, mode]); // RT_FILE
     if (h == -1) return UnknownError { message: "Failed to create file resource" };
 
-    var success = resource_call(h, 0, path, mode); // OP_OPEN
+    // Note: resource_create for FILE might already perform the open 
+    // depending on the implementation. Based on the previous code, 
+    // it was separate.
+    var success = resource_call(h, 0, [path, mode]); // OP_OPEN
     if (!success) {
         resource_destroy(h);
         return FileNotFound { path: path };
@@ -62,15 +65,10 @@ fn open(path: str, mode: str): File?IOError {
 
 // Global print helper
 fn print(msg: any): nil {
-    var stdout = resource_create(9, nil, nil); // RT_STDOUT
-    resource_call(stdout, 3, msg, nil);
-    resource_destroy(stdout);
+    resource_call(0, 3, [msg]);
 }
 
-// Filesystem helpers — wrap native file_exists/file_delete builtins.
-// create_directory / list_directory have no native backing yet, so they
-// return a real error instead of silently succeeding.
-
+// Filesystem helpers
 fn exists(path: str): bool {
     return file_exists(path);
 }
@@ -80,10 +78,5 @@ fn delete(path: str): bool {
 }
 
 fn create_directory(path: str): nil?IOError {
-    // No native mkdir builtin registered yet.
-    return err(UnknownError);
+    return err(UnknownError { message: "Not implemented" });
 }
-
-// fn list_directory(path: str): [str]?IOError {
-//     return err(UnknownError);
-// }

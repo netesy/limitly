@@ -634,10 +634,12 @@ public:
     ResourceType getType() const override { return ResourceType::STDOUT; }
     RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
         if (op == ResourceOperation::WRITE) {
-            const char* data = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
-            if (data) {
-                std::fputs(data, stdout);
+            if (args.empty()) return VAL_FALSE;
+            LmString s = lm_value_to_string(args[0]);
+            if (s.data) {
+                std::fputs(s.data, stdout);
                 std::fflush(stdout);
+                lm_string_free(s);
                 return VAL_TRUE;
             }
             return VAL_FALSE;
@@ -651,10 +653,12 @@ public:
     ResourceType getType() const override { return ResourceType::STDERR; }
     RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
         if (op == ResourceOperation::WRITE) {
-            const char* data = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
-            if (data) {
-                std::fputs(data, stderr);
+            if (args.empty()) return VAL_FALSE;
+            LmString s = lm_value_to_string(args[0]);
+            if (s.data) {
+                std::fputs(s.data, stderr);
                 std::fflush(stderr);
+                lm_string_free(s);
                 return VAL_TRUE;
             }
             return VAL_FALSE;
