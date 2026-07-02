@@ -1,0 +1,7 @@
+resource_call(0, 3, "Hello from Phase 2\n", nil);
+resource_call(0, 3, 123, nil);
+resource_call(0, 3, "\n", nil);
+resource_call(0, 3, true, nil);
+resource_call(0, 3, "\n", nil);
+resource_call(0, 3, [1, 2, 3], nil);
+resource_call(0, 3, "\n", nil);

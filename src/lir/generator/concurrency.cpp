@@ -450,10 +450,6 @@ void Generator::collect_variables_from_statement(LM::Frontend::AST::Statement& s
         }
     } else if (auto expr_stmt = dynamic_cast<LM::Frontend::AST::ExprStatement*>(&stmt)) {
         collect_variables_from_expression(*expr_stmt->expression, variables);
-    } else if (auto print_stmt = dynamic_cast<LM::Frontend::AST::PrintStatement*>(&stmt)) {
-        for (const auto& arg : print_stmt->arguments) {
-            collect_variables_from_expression(*arg, variables);
-        }
     }
     // Add other statement types as needed
 }

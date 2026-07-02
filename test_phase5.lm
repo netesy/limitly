@@ -1,0 +1,7 @@
+import std.io;
+
+print("Direct print")
+std.io.print("Module print")
+
+import std.io as io;
+io.print("Aliased module print")

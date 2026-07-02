@@ -84,13 +84,6 @@ std::string LIR_Inst::to_string() const {
             }
             oss << ") {";
             break;
-        case LIR_Op::PrintInt:
-        case LIR_Op::PrintUint:
-        case LIR_Op::PrintFloat:
-        case LIR_Op::PrintBool:
-        case LIR_Op::PrintString:
-            oss << " r" << a;
-            break;
         case LIR_Op::Return:
             if (a != 0) {
                 oss << " r" << a;

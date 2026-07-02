@@ -7,9 +7,9 @@ frame Random {
     pub init(seed: int = 0) {
         if (seed == 0) {
             // Try to get a secure seed if none provided
-            var entropy = resource_create(11); // RT_ENTROPY
+            var entropy = resource_create(11, [ []]); // RT_ENTROPY
             if (entropy != -1) {
-                self.state = resource_call(entropy, 2) as int; // OP_READ
+                self.state = resource_call(entropy, 2, [ []]) as int; // OP_READ
                 resource_destroy(entropy);
             } else {
                 self.state = 123456789; // Fallback
@@ -76,12 +76,12 @@ frame SecureRandom {
     var entropy_source: int;
 
     pub init() {
-        self.entropy_source = resource_create(11); // RT_ENTROPY
+        self.entropy_source = resource_create(11, [ []]); // RT_ENTROPY
     }
 
     pub fn next_int(): int {
         if (self.entropy_source == -1) return 0;
-        return resource_call(self.entropy_source, 2) as int; // OP_READ
+        return resource_call(self.entropy_source, 2, [ []]) as int; // OP_READ
     }
 
     pub fn next_float(): float {

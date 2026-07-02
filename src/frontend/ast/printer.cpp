@@ -261,7 +261,7 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
         std::cout << indentation << "  Body:" << std::endl;
         printNode(whileStmt->body, indent + 2);
     }
-    // Handle ReturnStatement and PrintStatement in their respective cases below
+    // Handle ReturnStatement in its respective case below
     else if (auto parallelStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ParallelStatement>(node)) {
         std::cout << indentation << "ParallelStatement:" << std::endl;
         printNode(parallelStmt->body, indent + 1);
@@ -572,13 +572,6 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
             printNode(returnStmt->value, indent + 2);
         } else {
             std::cout << std::endl;
-        }
-    }
-    // Consolidated PrintStatement case
-    else if (auto printStmt = std::dynamic_pointer_cast<LM::Frontend::AST::PrintStatement>(node)) {
-        std::cout << indentation << "PrintStatement:" << std::endl;
-        for (const auto& arg : printStmt->arguments) {
-            printNode(arg, indent + 1);
         }
     }
     else if (auto binaryExpr = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(node)) {

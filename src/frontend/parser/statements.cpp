@@ -185,9 +185,7 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::statement() {
         return emptyStmt;
     }
     
-    if (match({TokenType::PRINT})) return printStatement();
     if (match({TokenType::IF})) return ifStatement();
-    if (match({TokenType::FOR})) return forStatement();
     if (match({TokenType::WHILE})) return whileStatement();
     if (match({TokenType::BREAK})) return breakStatement();
     if (match({TokenType::CONTINUE})) return continueStatement();
@@ -228,20 +226,6 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::expressionStatement() {
         stmt->expression = nullptr;
         return stmt;
     }
-}
-
-std::shared_ptr<LM::Frontend::AST::Statement> Parser::printStatement() {
-    auto stmt = createNodeWithContext<LM::Frontend::AST::PrintStatement>();
-    stmt->line = previous().line;
-    consume(TokenType::LEFT_PAREN, "Expected '(' after 'print'.");
-    if (!check(TokenType::RIGHT_PAREN)) {
-        do {
-            stmt->arguments.push_back(expression());
-        } while (match({TokenType::COMMA}));
-    }
-    consume(TokenType::RIGHT_PAREN, "Expected ')' after print arguments.");
-    match({TokenType::SEMICOLON});
-    return stmt;
 }
 
 std::shared_ptr<LM::Frontend::AST::Statement> Parser::ifStatement() {

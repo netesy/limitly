@@ -83,19 +83,19 @@ frame HMAC {
 
     // Direct hash call (avoids circular dependency with crypto/hash)
     fn raw_hash(data: str, algorithm: str): core.ResultStr {
-        var engine = resource_create(16); // RT_HASH_ENGINE
+        var engine = resource_create(16, [ []]); // RT_HASH_ENGINE
         if (engine == -1) return core.err_str("failed to create hash engine");
-        var init = resource_call(engine, 0, algorithm); // OP_OPEN
+        var init = resource_call(engine, 0, [algorithm]); // OP_OPEN
         if (init != true) {
             resource_destroy(engine);
             return core.err_str("failed to initialize " + algorithm);
         }
-        var wrote = resource_call(engine, 3, data); // OP_WRITE
+        var wrote = resource_call(engine, 3, [data]); // OP_WRITE
         if (wrote != true) {
             resource_destroy(engine);
             return core.err_str("failed to feed data");
         }
-        var result = resource_call(engine, 2); // OP_READ
+        var result = resource_call(engine, 2, [ []]); // OP_READ
         resource_destroy(engine);
         if (result == nil) return core.err_str("digest failed");
         return core.ok_str(result as str);

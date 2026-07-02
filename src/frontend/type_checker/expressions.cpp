@@ -591,6 +591,15 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
              expr->inferred_type = type_system.NIL_TYPE;
              return type_system.NIL_TYPE;
         }
+        if (var_callee->name == "resource_call" || var_callee->name == "resource_create" || var_callee->name == "resource_destroy") {
+            for (auto& arg : expr->arguments) {
+                check_expression(arg);
+            }
+            TypePtr res_type = (var_callee->name == "resource_create") ? type_system.INT64_TYPE : type_system.ANY_TYPE;
+            if (var_callee->name == "resource_destroy") res_type = type_system.NIL_TYPE;
+            expr->inferred_type = res_type;
+            return res_type;
+        }
     }
 
     // Check positional arguments first

@@ -1,0 +1,5 @@
+print("Phase 4 Test: Hello from direct print!")
+print(12345)
+print([1, 2, 3])
+print(3.14159)
+print(true)

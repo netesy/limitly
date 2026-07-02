@@ -14,9 +14,7 @@ type UnknownError = { message: str };
 
 frame Console {
     pub fn print(msg: str): nil {
-        var stdout = resource_create(9, nil, nil); // RT_STDOUT
-        resource_call(stdout, 3, msg); // OP_WRITE with message
-        resource_destroy(stdout);
+        resource_call(0, 3, [msg]); // OP_WRITE to STDOUT (0)
     }
 
     pub fn read_line(): str {
@@ -29,29 +27,29 @@ frame File {
     var handle: int;
 
     pub fn read(): str?IOError {
-        var res = resource_call(self.handle, 2); // OP_READ
+        var res = resource_call(self.handle, 2, []); // OP_READ
         if (res == nil) return UnknownError { message: "Failed to read file" };
         return (res as str);
     }
 
     pub fn write(content: str): nil?IOError {
-        var success = resource_call(self.handle, 3, content); // OP_WRITE
+        var success = resource_call(self.handle, 3, [content]); // OP_WRITE
         if (!success) return UnknownError { message: "Failed to write file" };
         return nil;
     }
 
     pub fn close(): nil?IOError {
-        resource_call(self.handle, 1); // OP_CLOSE
+        resource_call(self.handle, 1, []); // OP_CLOSE
         resource_destroy(self.handle);
         return nil;
     }
 }
 
 fn open(path: str, mode: str): File?IOError {
-    var h = resource_create(0); // RT_FILE
+    var h = resource_create(0, []); // RT_FILE
     if (h == -1) return UnknownError { message: "Failed to create file resource" };
 
-    var success = resource_call(h, 0, path, mode); // OP_OPEN
+    var success = resource_call(h, 0, [path, mode]); // OP_OPEN
     if (!success) {
         resource_destroy(h);
         return FileNotFound { path: path };
@@ -61,10 +59,8 @@ fn open(path: str, mode: str): File?IOError {
 }
 
 // Global print helper
-fn print(msg: any): nil {
-    var stdout = resource_create(9, nil, nil); // RT_STDOUT
-    resource_call(stdout, 3, msg, nil);
-    resource_destroy(stdout);
+pub fn print(msg: any): nil {
+    resource_call(0, 3, [msg]); // OP_WRITE to STDOUT (0)
 }
 
 // Filesystem helpers — wrap native file_exists/file_delete builtins.

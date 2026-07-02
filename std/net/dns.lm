@@ -21,10 +21,10 @@ frame DNS {
         }
         if (cleaned == "") return core.err_str("empty host name after normalization");
 
-        var resolver = resource_create(RT_DNS);
+        var resolver = resource_create(RT_DNS, [ []]);
         if (resolver == -1) return core.err_str("failed to create DNS resolver resource");
 
-        var result = resource_call(resolver, OP_RESOLVE, cleaned);
+        var result = resource_call(resolver, OP_RESOLVE, [cleaned]);
         resource_destroy(resolver);
 
         if (result == nil) return core.err_str("DNS resolution failed for host: " + cleaned);

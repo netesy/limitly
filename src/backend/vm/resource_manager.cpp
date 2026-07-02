@@ -3,6 +3,7 @@
 #include "../fiber.hh"
 #include "../../runtime/runtime.h"
 #include "../../runtime/runtime_value.h"
+#include "../../runtime/runtime_list.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -437,9 +438,9 @@ public:
         uint64_t total_bits = totlen_ * 8;
         uint8_t pad = 0x80; update(&pad, 1); pad = 0;
         while (buflen_ != 56) update(&pad, 1);
-        uint8_t len_le[8] = {}; uint64_t tb = total_bits;
-        for (int i = 0; i < 8; i++) { len_le[i] = (uint8_t)(tb & 0xFF); tb >>= 8; }
-        update(len_le, 8);
+        uint8_t len_be[8] = {}; uint64_t tb = total_bits;
+        for (int i = 0; i < 8; i++) { len_be[i] = (uint8_t)(tb & 0xFF); tb >>= 8; }
+        update(len_be, 8);
         char hex[33];
         std::snprintf(hex, sizeof(hex), "%08x%08x%08x%08x", a0_, b0_, c0_, d0_);
         return std::string(hex);
@@ -634,13 +635,14 @@ public:
     ResourceType getType() const override { return ResourceType::STDOUT; }
     RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
         if (op == ResourceOperation::WRITE) {
-            const char* data = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
-            if (data) {
-                std::fputs(data, stdout);
-                std::fflush(stdout);
-                return VAL_TRUE;
+            for (const auto& arg : args) {
+                LmString s = lm_value_to_string(arg);
+                if (s.data) {
+                    std::fwrite(s.data, 1, (size_t)s.len, stdout);
+                }
             }
-            return VAL_FALSE;
+            std::fflush(stdout);
+            return VAL_TRUE;
         }
         return (op == ResourceOperation::CLOSE || op == ResourceOperation::POLL) ? VAL_TRUE : VAL_NIL;
     }
@@ -651,13 +653,14 @@ public:
     ResourceType getType() const override { return ResourceType::STDERR; }
     RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
         if (op == ResourceOperation::WRITE) {
-            const char* data = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
-            if (data) {
-                std::fputs(data, stderr);
-                std::fflush(stderr);
-                return VAL_TRUE;
+            for (const auto& arg : args) {
+                LmString s = lm_value_to_string(arg);
+                if (s.data) {
+                    std::fwrite(s.data, 1, (size_t)s.len, stderr);
+                }
             }
-            return VAL_FALSE;
+            std::fflush(stderr);
+            return VAL_TRUE;
         }
         return (op == ResourceOperation::CLOSE || op == ResourceOperation::POLL) ? VAL_TRUE : VAL_NIL;
     }

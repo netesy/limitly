@@ -259,22 +259,6 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                 builder_->createStore(load_reg(inst.a, inst.type_a), addr);
                 break;
             }
-            case LIR::LIR_Op::PrintInt:
-            case LIR::LIR_Op::PrintUint:
-            case LIR::LIR_Op::PrintFloat:
-            case LIR::LIR_Op::PrintBool:
-            case LIR::LIR_Op::PrintString: {
-                std::string b = "lm_print_int"; ir::Type* at = context_->getIntegerType(64);
-                if (inst.op == LIR::LIR_Op::PrintFloat) { b = "lm_print_float"; at = context_->getDoubleType(); }
-                else if (inst.op == LIR::LIR_Op::PrintBool) b = "lm_print_bool";
-                else if (inst.op == LIR::LIR_Op::PrintString) { b = "lm_print_str"; at = context_->getPointerType(context_->getIntegerType(8)); }
-                else if (inst.op == LIR::LIR_Op::PrintUint) b = "lm_print_uint";
-                used_builtins_.insert(b);
-                ir::Function* fn = current_module_->getFunction(b);
-                if (!fn) fn = builder_->createFunction(b, context_->getVoidType(), {at});
-                builder_->createCall(fn, {load_reg(inst.a, inst.type_a)});
-                break;
-            }
             case LIR::LIR_Op::Return:
             case LIR::LIR_Op::Ret:
                 if (inst.a != 0 || inst.type_a != LIR::Type::Void) builder_->createRet(load_reg(inst.a, inst.type_a));

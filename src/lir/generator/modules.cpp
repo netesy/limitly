@@ -32,7 +32,7 @@ void Generator::collect_module_signatures(LM::Frontend::AST::Program& program) {
 void Generator::register_module_symbol(const std::string& module_name, const std::string& symbol_name, 
                                        LM::Frontend::AST::VisibilityLevel visibility, bool is_function, size_t param_count) {
     ModuleSymbolInfo symbol_info;
-    symbol_info.qualified_name = module_name + "::" + symbol_name;
+    symbol_info.qualified_name = module_name + "." + symbol_name;
     symbol_info.module_name = module_name;
     symbol_info.symbol_name = symbol_name;
     symbol_info.visibility = visibility;
@@ -48,14 +48,6 @@ Generator::ModuleSymbolInfo* Generator::resolve_module_symbol(const std::string&
     auto it = module_symbol_table_.find(qualified_name);
     if (it != module_symbol_table_.end()) {
         return &it->second;
-    }
-    // Try converting . to ::
-    std::string alt = qualified_name;
-    size_t last_dot = alt.find_last_of('.');
-    if (last_dot != std::string::npos) {
-        alt.replace(last_dot, 1, "::");
-        it = module_symbol_table_.find(alt);
-        if (it != module_symbol_table_.end()) return &it->second;
     }
     return nullptr;
 }
