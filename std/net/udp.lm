@@ -20,10 +20,10 @@ frame UDP {
 
     // Create and optionally bind a UDP socket to a port
     pub fn bind(address: str, port: int): core.ResultInt {
-        var h = resource_create(RT_UDP);
+        var h = resource_create(RT_UDP, [ []]);
         if (h == -1) return core.err_int("failed to create UDP socket");
 
-        var success = resource_call(h, OP_BIND, address, port);
+        var success = resource_call(h, OP_BIND, [address, port]);
         if (success != true) {
             resource_destroy(h);
             return core.err_int("failed to bind UDP socket to " + address + ":" + port as str);
@@ -35,7 +35,7 @@ frame UDP {
 
     // Create an unbound UDP socket (for sending only)
     pub fn create(): core.ResultInt {
-        var h = resource_create(RT_UDP);
+        var h = resource_create(RT_UDP, [ []]);
         if (h == -1) return core.err_int("failed to create UDP socket");
         self.handle = h;
         return core.ok_int(h);
@@ -53,7 +53,7 @@ frame UDP {
     // Use parse_recv to split into components.
     pub fn recv_from(): core.ResultStr {
         if (self.handle <= 0) return core.err_str("UDP socket not initialized");
-        var result = resource_call(self.handle, OP_RECV_FROM);
+        var result = resource_call(self.handle, OP_RECV_FROM, [ []]);
         if (result == nil) return core.err_str("recv_from failed (no data or socket error)");
         return core.ok_str(result as str);
     }
@@ -97,14 +97,14 @@ frame UDP {
     // Check if data is available (non-blocking poll)
     pub fn has_data(): bool {
         if (self.handle <= 0) return false;
-        var result = resource_call(self.handle, OP_POLL);
+        var result = resource_call(self.handle, OP_POLL, [ []]);
         return result == true;
     }
 
     // Close the UDP socket
     pub fn close(): core.ResultInt {
         if (self.handle <= 0) return core.ok_int(0);
-        resource_call(self.handle, OP_CLOSE);
+        resource_call(self.handle, OP_CLOSE, [ []]);
         resource_destroy(self.handle);
         self.handle = -1;
         return core.ok_int(0);

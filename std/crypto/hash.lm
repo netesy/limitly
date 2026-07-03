@@ -18,22 +18,22 @@ frame Hash {
         if (algorithm != "sha256" and algorithm != "sha512" and algorithm != "md5" and algorithm != "sha1") {
             return core.err_str("unsupported algorithm: " + algorithm + ". Supported: sha256, sha512, md5, sha1");
         }
-        var engine = resource_create(RT_HASH_ENGINE);
+        var engine = resource_create(RT_HASH_ENGINE, [ []]);
         if (engine == -1) return core.err_str("failed to create hash engine resource");
 
-        var init = resource_call(engine, OP_OPEN, algorithm);
+        var init = resource_call(engine, OP_OPEN, [algorithm]);
         if (init != true) {
             resource_destroy(engine);
             return core.err_str("failed to initialize " + algorithm);
         }
 
-        var wrote = resource_call(engine, OP_WRITE, data);
+        var wrote = resource_call(engine, OP_WRITE, [data]);
         if (wrote != true) {
             resource_destroy(engine);
             return core.err_str("failed to feed data to " + algorithm);
         }
 
-        var result = resource_call(engine, OP_READ);
+        var result = resource_call(engine, OP_READ, [ []]);
         resource_destroy(engine);
 
         if (result == nil) return core.err_str(algorithm + " digest computation failed");
@@ -65,9 +65,9 @@ frame Hash {
         if (algorithm != "sha256" and algorithm != "sha512" and algorithm != "md5" and algorithm != "sha1") {
             return core.err_int("unsupported algorithm: " + algorithm);
         }
-        var engine = resource_create(RT_HASH_ENGINE);
+        var engine = resource_create(RT_HASH_ENGINE, [ []]);
         if (engine == -1) return core.err_int("failed to create hash engine resource");
-        var init = resource_call(engine, OP_OPEN, algorithm);
+        var init = resource_call(engine, OP_OPEN, [algorithm]);
         if (init != true) {
             resource_destroy(engine);
             return core.err_int("failed to initialize " + algorithm);
@@ -77,14 +77,14 @@ frame Hash {
 
     pub fn update(handle: int, data: str): core.ResultInt {
         if (handle <= 0) return core.err_int("invalid hash engine handle");
-        var wrote = resource_call(handle, OP_WRITE, data);
+        var wrote = resource_call(handle, OP_WRITE, [data]);
         if (wrote != true) return core.err_int("failed to update hash");
         return core.ok_int(0);
     }
 
     pub fn finalize(handle: int): core.ResultStr {
         if (handle <= 0) return core.err_str("invalid hash engine handle");
-        var result = resource_call(handle, OP_READ);
+        var result = resource_call(handle, OP_READ, [ []]);
         resource_destroy(handle);
         if (result == nil) return core.err_str("hash finalization failed");
         return core.ok_str(result as str);
@@ -149,14 +149,14 @@ frame Hash {
     // ---- File hashing ----
     pub fn hash_file(path: str, algorithm: str): core.ResultStr {
         // Read file content using the file resource system
-        var fh = resource_create(0); // RT_FILE
+        var fh = resource_create(0, [ []]); // RT_FILE
         if (fh == -1) return core.err_str("failed to create file resource");
-        var opened = resource_call(fh, 0, path, "rb"); // OP_OPEN
+        var opened = resource_call(fh, 0, [path, "rb"]); // OP_OPEN
         if (opened != true) {
             resource_destroy(fh);
             return core.err_str("failed to open file: " + path);
         }
-        var content = resource_call(fh, 2); // OP_READ
+        var content = resource_call(fh, 2, [ []]); // OP_READ
         resource_destroy(fh);
         if (content == nil) return core.err_str("failed to read file: " + path);
         return self.hash(content as str, algorithm);
@@ -178,9 +178,9 @@ frame Hash {
     // ---- Salted hashing (password hashing pattern) ----
     pub fn generate_salt(length: int): core.ResultStr {
         if (length <= 0 or length > 256) return core.err_str("salt length must be between 1 and 256");
-        var entropy = resource_create(12); // RT_ENTROPY
+        var entropy = resource_create(12, [ []]); // RT_ENTROPY
         if (entropy == -1) return core.err_str("entropy source unavailable");
-        var raw = resource_call(entropy, 2, length); // OP_READ
+        var raw = resource_call(entropy, 2, [length]); // OP_READ
         resource_destroy(entropy);
         if (raw == nil) return core.err_str("failed to generate random bytes");
         // Convert raw bytes to hex string

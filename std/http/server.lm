@@ -167,8 +167,8 @@ frame ServerResponse {
         response = response + "\r\n";
         response = response + self.body;
         // Send
-        resource_call(self.client_handle, OP_SEND, response);
-        resource_call(self.client_handle, OP_CLOSE);
+        resource_call(self.client_handle, OP_SEND, [response]);
+        resource_call(self.client_handle, OP_CLOSE, [ []]);
         resource_destroy(self.client_handle);
         self.sent = true;
     }
@@ -268,16 +268,16 @@ frame HTTPServer {
         self.host = host;
         self.port = port;
 
-        var h = resource_create(RT_SOCKET);
+        var h = resource_create(RT_SOCKET, [ []]);
         if (h == -1) return core.err_int("failed to create socket");
 
-        var bound = resource_call(h, OP_BIND, host, port);
+        var bound = resource_call(h, OP_BIND, [host, port]);
         if (bound != true) {
             resource_destroy(h);
             return core.err_int("failed to bind to " + host + ":" + port as str);
         }
 
-        var listening = resource_call(h, OP_LISTEN, backlog);
+        var listening = resource_call(h, OP_LISTEN, [backlog]);
         if (listening != true) {
             resource_destroy(h);
             return core.err_int("listen failed on port " + port as str);
@@ -293,11 +293,11 @@ frame HTTPServer {
     pub fn accept_request(): core.ResultServerRequest {
         if (self.handle <= 0 or not self.running) return core.err_str("server not listening");
 
-        var client_fd = resource_call(self.handle, OP_ACCEPT);
+        var client_fd = resource_call(self.handle, OP_ACCEPT, [ []]);
         if (client_fd == nil) return core.err_str("accept returned nil (no connection)");
 
         // Adopt the client fd as a new socket resource
-        var client_handle = resource_create(RT_SOCKET, client_fd);
+        var client_handle = resource_create(RT_SOCKET, [client_fd]);
         if (client_handle == -1) return core.err_str("failed to adopt client socket");
 
         // Read request data
@@ -305,7 +305,7 @@ frame HTTPServer {
         var max_read: int = 1048576; // 1MB max
         var total: int = 0;
         while (total < max_read) {
-            var chunk = resource_call(client_handle, OP_RECEIVE);
+            var chunk = resource_call(client_handle, OP_RECEIVE, [ []]);
             if (chunk == nil) break;
             request_data = request_data + (chunk as str);
             total = total + len(chunk as str);
@@ -332,7 +332,7 @@ frame HTTPServer {
     pub fn close(): core.ResultInt {
         self.running = false;
         if (self.handle > 0) {
-            resource_call(self.handle, OP_CLOSE);
+            resource_call(self.handle, OP_CLOSE, [ []]);
             resource_destroy(self.handle);
             self.handle = -1;
         }
@@ -342,7 +342,7 @@ frame HTTPServer {
     // Check for incoming connections (non-blocking)
     pub fn has_connection(): bool {
         if (self.handle <= 0) return false;
-        var result = resource_call(self.handle, OP_POLL);
+        var result = resource_call(self.handle, OP_POLL, [ []]);
         return result == true;
     }
 }

@@ -220,19 +220,19 @@ frame HTTPClient {
         // Resolve hostname
         var host: str = parsed.host;
         if (not is_ipv4(host)) {
-            var resolver = resource_create(RT_DNS);
+            var resolver = resource_create(RT_DNS, [ []]);
             if (resolver == -1) return core.err_str("DNS resolver unavailable");
-            var resolved = resource_call(resolver, OP_RESOLVE, host);
+            var resolved = resource_call(resolver, OP_RESOLVE, [host]);
             resource_destroy(resolver);
             if (resolved == nil) return core.err_str("DNS resolution failed for: " + host);
             host = resolved as str;
         }
 
         // Connect TCP
-        var sock = resource_create(RT_SOCKET);
+        var sock = resource_create(RT_SOCKET, [ []]);
         if (sock == -1) return core.err_str("failed to create socket");
 
-        var connected = resource_call(sock, OP_CONNECT, host, parsed.port);
+        var connected = resource_call(sock, OP_CONNECT, [host, parsed.port]);
         if (connected != true) {
             resource_destroy(sock);
             return core.err_str("failed to connect to " + host + ":" + parsed.port as str);
@@ -279,9 +279,9 @@ frame HTTPClient {
         }
 
         // Send request
-        var sent = resource_call(sock, OP_SEND, full_request);
+        var sent = resource_call(sock, OP_SEND, [full_request]);
         if (sent != true) {
-            resource_call(sock, OP_CLOSE);
+            resource_call(sock, OP_CLOSE, [ []]);
             resource_destroy(sock);
             return core.err_str("failed to send request");
         }
@@ -289,12 +289,12 @@ frame HTTPClient {
         // Receive response
         var response_data: str = "";
         while (true) {
-            var chunk = resource_call(sock, OP_RECEIVE);
+            var chunk = resource_call(sock, OP_RECEIVE, [ []]);
             if (chunk == nil) break;
             response_data = response_data + (chunk as str);
         }
 
-        resource_call(sock, OP_CLOSE);
+        resource_call(sock, OP_CLOSE, [ []]);
         resource_destroy(sock);
 
         // Parse response

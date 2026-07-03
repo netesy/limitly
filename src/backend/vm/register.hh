@@ -59,6 +59,7 @@ private:
     void execute_frames(const LIR::LIR_Inst* pc);
     void execute_control_flow(const LIR::LIR_Inst*& pc, const LIR::LIR_Function& function);
     void execute_concurrency(const LIR::LIR_Inst* pc);
+    void execute_io(const LIR::LIR_Inst* pc);
     void execute_bitwise(const LIR::LIR_Inst* pc);
     void execute_modules(const LIR::LIR_Inst* pc);
     void execute_objects(const LIR::LIR_Inst* pc);

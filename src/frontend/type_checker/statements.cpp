@@ -42,8 +42,6 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_worker_statement(worker_stmt);
     } else if (auto return_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         return check_return_statement(return_stmt);
-    } else if (auto print_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::PrintStatement>(stmt)) {
-        return check_print_statement(print_stmt);
     } else if (auto match_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::MatchStatement>(stmt)) {
         return check_match_statement(match_stmt);
     } else if (auto contract_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContractStatement>(stmt)) {
@@ -738,20 +736,6 @@ TypePtr TypeChecker::check_range_expr(std::shared_ptr<LM::Frontend::AST::RangeEx
     TypePtr rangeType = std::make_shared<::Type>(TypeTag::Range);
     expr->inferred_type = rangeType;
     return rangeType;
-}
-
-TypePtr TypeChecker::check_print_statement(std::shared_ptr<LM::Frontend::AST::PrintStatement> print_stmt) {
-    if (!print_stmt) return nullptr;
-    
-    for (const auto& arg : print_stmt->arguments) {
-        check_expression(arg);
-    }
-    
-    // Set the inferred type on the print statement
-    TypePtr result_type = type_system.STRING_TYPE;
-    print_stmt->inferred_type = result_type;
-    
-    return result_type;
 }
 
 } // namespace Frontend

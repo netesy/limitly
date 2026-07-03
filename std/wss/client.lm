@@ -39,10 +39,10 @@ frame WebSocketClient {
         ws_url = ws_url + parsed.path;
         if (parsed.query != "") ws_url = ws_url + "?" + parsed.query;
 
-        var ws = resource_create(RT_WEBSOCKET);
+        var ws = resource_create(RT_WEBSOCKET, [ []]);
         if (ws == -1) return core.err_int("failed to create WebSocket resource");
 
-        var result = resource_call(ws, OP_CONNECT, ws_url);
+        var result = resource_call(ws, OP_CONNECT, [ws_url]);
         if (result != true) {
             resource_destroy(ws);
             return core.err_int("WebSocket handshake failed for: " + ws_url);
@@ -57,7 +57,7 @@ frame WebSocketClient {
     // Send a text message
     pub fn send_text(message: str): core.ResultInt {
         if (not self.connected or self.handle <= 0) return core.err_int("not connected");
-        var result = resource_call(self.handle, OP_SEND, message);
+        var result = resource_call(self.handle, OP_SEND, [message]);
         if (result != true) {
             self.connected = false;
             return core.err_int("send failed");
@@ -76,7 +76,7 @@ frame WebSocketClient {
     // Receive a message (blocks until data available)
     pub fn recv(): core.ResultStr {
         if (not self.connected or self.handle <= 0) return core.err_str("not connected");
-        var result = resource_call(self.handle, OP_RECEIVE);
+        var result = resource_call(self.handle, OP_RECEIVE, [ []]);
         if (result == nil) {
             self.connected = false;
             return core.err_str("connection closed");
@@ -87,7 +87,7 @@ frame WebSocketClient {
     // Non-blocking check for available messages
     pub fn has_message(): bool {
         if (not self.connected or self.handle <= 0) return false;
-        var result = resource_call(self.handle, OP_POLL);
+        var result = resource_call(self.handle, OP_POLL, [ []]);
         return result == true;
     }
 
@@ -101,7 +101,7 @@ frame WebSocketClient {
     // Close the WebSocket connection
     pub fn close(code: int, reason: str): core.ResultInt {
         if (self.handle <= 0) return core.ok_int(0);
-        resource_call(self.handle, OP_CLOSE);
+        resource_call(self.handle, OP_CLOSE, [ []]);
         resource_destroy(self.handle);
         self.handle = -1;
         self.connected = false;
@@ -138,16 +138,16 @@ frame WebSocketServer {
         self.host = host;
         self.port = port;
 
-        var h = resource_create(1); // RT_SOCKET for TCP
+        var h = resource_create(1, [ []]); // RT_SOCKET for TCP
         if (h == -1) return core.err_int("failed to create socket");
 
-        var bound = resource_call(h, 23, host, port); // OP_BIND
+        var bound = resource_call(h, 23, [host, port]); // OP_BIND
         if (bound != true) {
             resource_destroy(h);
             return core.err_int("bind failed");
         }
 
-        var listening = resource_call(h, 24, backlog); // OP_LISTEN
+        var listening = resource_call(h, 24, [backlog]); // OP_LISTEN
         if (listening != true) {
             resource_destroy(h);
             return core.err_int("listen failed");
@@ -163,7 +163,7 @@ frame WebSocketServer {
     // Returns the raw TCP client fd for the WebSocket upgrade.
     pub fn accept_raw(): core.ResultInt {
         if (self.tcp_handle <= 0 or not self.running) return core.err_int("not listening");
-        var client_fd = resource_call(self.tcp_handle, 25); // OP_ACCEPT
+        var client_fd = resource_call(self.tcp_handle, 25, [ []]); // OP_ACCEPT
         if (client_fd == nil) return core.err_int("accept failed");
         return core.ok_int(client_fd as int);
     }
@@ -179,10 +179,10 @@ frame WebSocketServer {
         // Adopt the fd as a WebSocket resource
         // The WebSocket resource needs to be in connected state
         // For server-side, we create a WS resource and adopt the fd
-        var ws = resource_create(RT_WEBSOCKET, client_fd);
+        var ws = resource_create(RT_WEBSOCKET, [client_fd]);
         if (ws == -1) {
             // Close the fd
-            resource_call(client_fd, 1); // OP_CLOSE on raw fd
+            resource_call(client_fd, 1, [ []]); // OP_CLOSE on raw fd
             return core.err_str("failed to create WebSocket for accepted connection");
         }
         return core.ok_str("accepted");
@@ -191,7 +191,7 @@ frame WebSocketServer {
     // Check for incoming connections
     pub fn has_connection(): bool {
         if (self.tcp_handle <= 0) return false;
-        var result = resource_call(self.tcp_handle, 10); // OP_POLL
+        var result = resource_call(self.tcp_handle, 10, [ []]); // OP_POLL
         return result == true;
     }
 
@@ -199,7 +199,7 @@ frame WebSocketServer {
     pub fn close(): core.ResultInt {
         self.running = false;
         if (self.tcp_handle > 0) {
-            resource_call(self.tcp_handle, 1); // OP_CLOSE
+            resource_call(self.tcp_handle, 1, [ []]); // OP_CLOSE
             resource_destroy(self.tcp_handle);
             self.tcp_handle = -1;
         }

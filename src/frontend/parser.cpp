@@ -366,7 +366,6 @@ CST::NodeKind Parser::mapASTNodeKind(const std::string& astNodeType) {
     if (className.find("ReturnStatement") != std::string::npos) return CST::NodeKind::RETURN_STATEMENT;
     if (className.find("BreakStatement") != std::string::npos) return CST::NodeKind::BREAK_STATEMENT;
     if (className.find("ContinueStatement") != std::string::npos) return CST::NodeKind::CONTINUE_STATEMENT;
-    if (className.find("PrintStatement") != std::string::npos) return CST::NodeKind::PRINT_STATEMENT;
     if (className.find("ParallelStatement") != std::string::npos) return CST::NodeKind::PARALLEL_STATEMENT;
     if (className.find("ConcurrentStatement") != std::string::npos) return CST::NodeKind::CONCURRENT_STATEMENT;
     if (className.find("ContractStatement") != std::string::npos) return CST::NodeKind::CONTRACT_STATEMENT;
@@ -495,7 +494,6 @@ template auto Parser::createNode<LM::Frontend::AST::IterStatement>() -> std::sha
 template auto Parser::createNode<LM::Frontend::AST::BlockStatement>() -> std::shared_ptr<LM::Frontend::AST::BlockStatement>;
 template auto Parser::createNode<LM::Frontend::AST::ExprStatement>() -> std::shared_ptr<LM::Frontend::AST::ExprStatement>;
 template auto Parser::createNode<LM::Frontend::AST::ReturnStatement>() -> std::shared_ptr<LM::Frontend::AST::ReturnStatement>;
-template auto Parser::createNode<LM::Frontend::AST::PrintStatement>() -> std::shared_ptr<LM::Frontend::AST::PrintStatement>;
 template auto Parser::createNode<LM::Frontend::AST::ContractStatement>() -> std::shared_ptr<LM::Frontend::AST::ContractStatement>;
 template auto Parser::createNode<LM::Frontend::AST::MatchStatement>() -> std::shared_ptr<LM::Frontend::AST::MatchStatement>;
 template auto Parser::createNode<LM::Frontend::AST::ConcurrentStatement>() -> std::shared_ptr<LM::Frontend::AST::ConcurrentStatement>;
@@ -526,7 +524,6 @@ template auto Parser::createNodeWithContext<LM::Frontend::AST::IterStatement>() 
 template auto Parser::createNodeWithContext<LM::Frontend::AST::BlockStatement>() -> std::shared_ptr<LM::Frontend::AST::BlockStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ExprStatement>() -> std::shared_ptr<LM::Frontend::AST::ExprStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ReturnStatement>() -> std::shared_ptr<LM::Frontend::AST::ReturnStatement>;
-template auto Parser::createNodeWithContext<LM::Frontend::AST::PrintStatement>() -> std::shared_ptr<LM::Frontend::AST::PrintStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ContractStatement>() -> std::shared_ptr<LM::Frontend::AST::ContractStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::MatchStatement>() -> std::shared_ptr<LM::Frontend::AST::MatchStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ConcurrentStatement>() -> std::shared_ptr<LM::Frontend::AST::ConcurrentStatement>;

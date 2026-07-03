@@ -239,8 +239,6 @@ void FyraIRGenerator::emit_statement(
         emit_concurrent_statement(concurrent_stmt);
     } else if (auto ret_stmt = std::dynamic_pointer_cast<Frontend::AST::ReturnStatement>(stmt)) {
         emit_return_statement(ret_stmt);
-    } else if (auto print_stmt = std::dynamic_pointer_cast<Frontend::AST::PrintStatement>(stmt)) {
-        emit_print_statement(print_stmt);
     } else if (auto expr_stmt = std::dynamic_pointer_cast<Frontend::AST::ExprStatement>(stmt)) {
         emit_expression(expr_stmt->expression);
     }
@@ -652,30 +650,6 @@ void FyraIRGenerator::emit_concurrent_statement(
     emit_statement(stmt->body);
 }
 
-void FyraIRGenerator::emit_print_statement(
-    const std::shared_ptr<Frontend::AST::PrintStatement>& stmt) {
-    for (const auto& arg_expr : stmt->arguments) {
-        ir::Value* val = emit_expression(arg_expr);
-        if (!val) continue;
-
-        std::string func_name;
-        if (val->getType()->isPointerTy()) {
-            func_name = "lm_print_str";
-        } else {
-            func_name = "lm_print_int";
-        }
-
-        used_builtins_.insert(func_name);
-        ir::Function* print_func = current_module_->getFunction(func_name);
-        if (!print_func) {
-            ir::Type* arg_type = (func_name == "lm_print_str") ? 
-                                 (ir::Type*)context_->getPointerType(context_->getIntegerType(8)) : 
-                                 (ir::Type*)context_->getIntegerType(64);
-            print_func = builder_->createFunction(func_name, context_->getVoidType(), {arg_type});
-        }
-        builder_->createCall(print_func, {val});
-    }
-}
 
 void FyraIRGenerator::emit_return_statement(
     const std::shared_ptr<Frontend::AST::ReturnStatement>& stmt) {

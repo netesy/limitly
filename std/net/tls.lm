@@ -171,9 +171,9 @@ fn resolve_or_passthrough(host: str): core.ResultStr {
     if (has_only_digits_dots and dot_count == 3) return core.ok_str(host);
 
     // Use DNS resolver
-    var resolver = resource_create(13); // RT_DNS
+    var resolver = resource_create(13, [ []]); // RT_DNS
     if (resolver == -1) return core.err_str("DNS resolver unavailable");
-    var result = resource_call(resolver, 26, host); // OP_RESOLVE
+    var result = resource_call(resolver, 26, [host]); // OP_RESOLVE
     resource_destroy(resolver);
     if (result == nil) return core.err_str("DNS resolution failed for: " + host);
     return core.ok_str(result as str);

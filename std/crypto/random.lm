@@ -13,9 +13,9 @@ frame CryptoRandom {
     pub fn bytes_hex(length: int): core.ResultStr {
         if (length < 0) return core.err_str("negative length");
         if (length == 0) return core.ok_str("");
-        var entropy = resource_create(RT_ENTROPY);
+        var entropy = resource_create(RT_ENTROPY, [ []]);
         if (entropy == -1) return core.err_str("entropy source unavailable");
-        var raw = resource_call(entropy, OP_READ, length);
+        var raw = resource_call(entropy, OP_READ, [length]);
         resource_destroy(entropy);
         if (raw == nil) return core.err_str("entropy read failed");
         // raw is a string of binary data; encode as hex
@@ -36,9 +36,9 @@ frame CryptoRandom {
     pub fn bytes_base64(count: int): core.ResultStr {
         if (count < 0) return core.err_str("negative count");
         if (count == 0) return core.ok_str("");
-        var entropy = resource_create(RT_ENTROPY);
+        var entropy = resource_create(RT_ENTROPY, [ []]);
         if (entropy == -1) return core.err_str("entropy source unavailable");
-        var raw = resource_call(entropy, OP_READ, count);
+        var raw = resource_call(entropy, OP_READ, [count]);
         resource_destroy(entropy);
         if (raw == nil) return core.err_str("entropy read failed");
         // Convert raw binary string to byte array then base64
@@ -52,9 +52,9 @@ frame CryptoRandom {
         if (min >= max) return core.err_int("invalid range: min must be less than max");
         var range_size: int = max - min;
         // Read 4 bytes for a 32-bit random value
-        var entropy = resource_create(RT_ENTROPY);
+        var entropy = resource_create(RT_ENTROPY, [ []]);
         if (entropy == -1) return core.err_int("entropy source unavailable");
-        var raw = resource_call(entropy, OP_READ, 4);
+        var raw = resource_call(entropy, OP_READ, [4]);
         resource_destroy(entropy);
         if (raw == nil) return core.err_int("entropy read failed");
         // Use modular reduction (simplified; real impl would use rejection sampling)
@@ -72,9 +72,9 @@ frame CryptoRandom {
 
     // Generate a UUID v4 (cryptographically random)
     pub fn uuid(): core.ResultStr {
-        var entropy = resource_create(RT_ENTROPY);
+        var entropy = resource_create(RT_ENTROPY, [ []]);
         if (entropy == -1) return core.err_str("entropy source unavailable");
-        var raw = resource_call(entropy, OP_READ, 16);
+        var raw = resource_call(entropy, OP_READ, [16]);
         resource_destroy(entropy);
         if (raw == nil) return core.err_str("entropy read failed");
         var s: str = raw as str;

@@ -209,8 +209,6 @@ private:
     
     // Specific statement handlers
     void emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt);
-    void emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt);
-    void emit_print_value(Reg value);  // Helper for printing single values
     void emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt);
     void emit_destructuring_var_stmt(LM::Frontend::AST::DestructuringDeclaration& stmt);
     void emit_block_stmt(LM::Frontend::AST::BlockStatement& stmt);

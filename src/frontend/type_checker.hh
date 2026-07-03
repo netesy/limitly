@@ -246,7 +246,6 @@ private:
     TypePtr check_task_statement(std::shared_ptr<LM::Frontend::AST::TaskStatement> task_stmt);
     TypePtr check_worker_statement(std::shared_ptr<LM::Frontend::AST::WorkerStatement> worker_stmt);
     TypePtr check_return_statement(std::shared_ptr<LM::Frontend::AST::ReturnStatement> return_stmt);
-    TypePtr check_print_statement(std::shared_ptr<LM::Frontend::AST::PrintStatement> print_stmt);
     TypePtr check_match_statement(std::shared_ptr<LM::Frontend::AST::MatchStatement> match_stmt);
     TypePtr check_contract_statement(std::shared_ptr<LM::Frontend::AST::ContractStatement> contract_stmt);
     

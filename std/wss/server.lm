@@ -49,16 +49,16 @@ frame WSSServer {
     // Start the server (bind + listen)
     pub fn start(): core.ResultInt {
         // Use TCP socket for the server
-        var h = resource_create(1); // RT_SOCKET
+        var h = resource_create(1, [ []]); // RT_SOCKET
         if (h == -1) return core.err_int("failed to create socket");
 
-        var bound = resource_call(h, 23, self.host, self.port); // OP_BIND
+        var bound = resource_call(h, 23, [self.host, self.port]); // OP_BIND
         if (bound != true) {
             resource_destroy(h);
             return core.err_int("bind failed on " + self.host + ":" + self.port as str);
         }
 
-        var listening = resource_call(h, 24, 128); // OP_LISTEN
+        var listening = resource_call(h, 24, [128]); // OP_LISTEN
         if (listening != true) {
             resource_destroy(h);
             return core.err_int("listen failed on port " + self.port as str);
@@ -73,7 +73,7 @@ frame WSSServer {
     pub fn accept(): core.ResultStr {
         // Server-side WebSocket accept is handled via the WebSocket resource
         // For server-side, we use TCP accept then upgrade manually
-        var ws = resource_create(15); // RT_WEBSOCKET
+        var ws = resource_create(15, [ []]); // RT_WEBSOCKET
         if (ws == -1) return core.err_str("failed to create WebSocket resource");
         return core.ok_str("ws_handle");
     }
@@ -86,7 +86,7 @@ frame WSSServer {
         while (i < len(handles)) {
             var h: int = handles[i];
             if (h > 0) {
-                var result = resource_call(h, 4, message); // OP_SEND
+                var result = resource_call(h, 4, [message]); // OP_SEND
                 if (result == true) {
                     sent = sent + 1;
                 } else {
@@ -127,7 +127,7 @@ frame WSConnection {
 
     pub fn send(message: str): core.ResultInt {
         if (not self.connected or self.handle <= 0) return core.err_int("not connected");
-        var result = resource_call(self.handle, 4, message); // OP_SEND
+        var result = resource_call(self.handle, 4, [message]); // OP_SEND
         if (result != true) {
             self.connected = false;
             return core.err_int("send failed");
@@ -137,7 +137,7 @@ frame WSConnection {
 
     pub fn recv(): core.ResultStr {
         if (not self.connected or self.handle <= 0) return core.err_str("not connected");
-        var result = resource_call(self.handle, 5); // OP_RECEIVE
+        var result = resource_call(self.handle, 5, [ []]); // OP_RECEIVE
         if (result == nil) {
             self.connected = false;
             return core.err_str("connection closed");
@@ -147,13 +147,13 @@ frame WSConnection {
 
     pub fn has_message(): bool {
         if (not self.connected) return false;
-        var result = resource_call(self.handle, 10); // OP_POLL
+        var result = resource_call(self.handle, 10, [ []]); // OP_POLL
         return result == true;
     }
 
     pub fn close(): core.ResultInt {
         if (self.handle > 0) {
-            resource_call(self.handle, 1); // OP_CLOSE
+            resource_call(self.handle, 1, [ []]); // OP_CLOSE
             resource_destroy(self.handle);
         }
         self.connected = false;

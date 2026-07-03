@@ -434,7 +434,6 @@ namespace CST {
             case NodeKind::RETURN_STATEMENT: return "RETURN_STATEMENT";
             case NodeKind::BREAK_STATEMENT: return "BREAK_STATEMENT";
             case NodeKind::CONTINUE_STATEMENT: return "CONTINUE_STATEMENT";
-            case NodeKind::PRINT_STATEMENT: return "PRINT_STATEMENT";
             case NodeKind::ATTEMPT_STATEMENT: return "ATTEMPT_STATEMENT";
             case NodeKind::HANDLE_STATEMENT: return "HANDLE_STATEMENT";
             case NodeKind::PARALLEL_STATEMENT: return "PARALLEL_STATEMENT";
@@ -519,7 +518,6 @@ namespace CST {
             case NodeKind::RETURN_STATEMENT:
             case NodeKind::BREAK_STATEMENT:
             case NodeKind::CONTINUE_STATEMENT:
-            case NodeKind::PRINT_STATEMENT:
             case NodeKind::ATTEMPT_STATEMENT:
             case NodeKind::HANDLE_STATEMENT:
             case NodeKind::PARALLEL_STATEMENT:

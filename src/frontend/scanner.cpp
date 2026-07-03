@@ -720,7 +720,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "if") return TokenType::IF;
     if (rest == "not") return TokenType::NOT;
     if (rest == "or") return TokenType::OR;
-    // // // if (rest == "print") return TokenType::PRINT;
+    // // //
     if (rest == "return") return TokenType::RETURN;
     if (rest == "show") return TokenType::SHOW;
     if (rest == "hide") return TokenType::HIDE;

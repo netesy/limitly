@@ -57,7 +57,6 @@ namespace AST {
     struct ReturnStatement;
     struct BreakStatement;
     struct ContinueStatement;
-    struct PrintStatement;
     struct HandleClause;
     struct ParallelStatement;
     struct ConcurrentStatement;
@@ -530,11 +529,6 @@ namespace AST {
     // Return statement
     struct ReturnStatement : public Statement {
         std::shared_ptr<Expression> value;
-    };
-
-    // Print statement
-    struct PrintStatement : public Statement {
-        std::vector<std::shared_ptr<Expression>> arguments;
     };
 
     // Concurrency constructs
@@ -1020,7 +1014,6 @@ namespace AST {
         virtual std::shared_ptr<WhileStatement> optimizeWhileStatement(std::shared_ptr<WhileStatement> stmt);
         virtual std::shared_ptr<ForStatement> optimizeForStatement(std::shared_ptr<ForStatement> stmt);
         virtual std::shared_ptr<ReturnStatement> optimizeReturnStatement(std::shared_ptr<ReturnStatement> stmt);
-        virtual std::shared_ptr<PrintStatement> optimizePrintStatement(std::shared_ptr<PrintStatement> stmt);
         
         // Core optimization utilities
         std::shared_ptr<Expression> foldConstants(std::shared_ptr<Expression> expr);
