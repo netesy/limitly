@@ -142,12 +142,33 @@ void LIRBuiltinFunctions::registerIOFunctions() {
                 if (value && value->type) {
                     switch (value->type->tag) {
                         case TypeTag::Int:
+                        case TypeTag::Int32:
                         case TypeTag::Int64:
+                        case TypeTag::Int128:
+                        case TypeTag::UInt:
+                        case TypeTag::UInt32:
+                        case TypeTag::UInt64:
+                        case TypeTag::UInt128:
                             std::cout << value->as<int64_t>();
                             break;
                         case TypeTag::Float32:
                         case TypeTag::Float64:
                             std::cout << value->as<double>();
+                            break;
+                        case TypeTag::Decimal2:
+                        case TypeTag::Decimal4:
+                        case TypeTag::Decimal6:
+                            // Decimal types are stored as integers with fixed scale
+                            {
+                                int64_t intVal = value->as<int64_t>();
+                                int scale = 2;
+                                if (value->type->tag == TypeTag::Decimal4) scale = 4;
+                                else if (value->type->tag == TypeTag::Decimal6) scale = 6;
+                                
+                                double decimalVal = static_cast<double>(intVal) / std::pow(10, scale);
+                                std::cout << std::fixed << std::setprecision(scale) << decimalVal;
+                                std::cout.unsetf(std::ios::fixed);
+                            }
                             break;
                         case TypeTag::Bool:
                             std::cout << (value->as<bool>() ? "true" : "false");
@@ -158,8 +179,12 @@ void LIRBuiltinFunctions::registerIOFunctions() {
                         case TypeTag::Nil:
                             std::cout << "nil";
                             break;
+                        case TypeTag::Any:
+                            // Try to print any type by converting to string
+                            std::cout << value->toString();
+                            break;
                         default:
-                            std::cout << "<unsupported type>";
+                            std::cout << "<unsupported type:" << static_cast<int>(value->type->tag) << ">";
                             break;
                     }
                     // Add space between arguments

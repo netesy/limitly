@@ -187,6 +187,7 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::statement() {
     
     if (match({TokenType::IF})) return ifStatement();
     if (match({TokenType::WHILE})) return whileStatement();
+    if (match({TokenType::FOR})) return forStatement();
     if (match({TokenType::BREAK})) return breakStatement();
     if (match({TokenType::CONTINUE})) return continueStatement();
     if (match({TokenType::ITER})) return iterStatement();
