@@ -1,33 +1,56 @@
-# Documentation Traceability & Verification Report (Post-Remediation)
+# Documentation Traceability & Verification Matrix
 
-## 1. Traceability Matrix
+This document tracks the consistency between learning materials, guides, the formal language specification, and the actual test suite.
 
-| Concept | learn.md | guide.md | language.md | Tests | Implementation | Status |
-|---------|----------|----------|-------------|-------|----------------|--------|
-| Variables (`var`) | ✅ | ✅ | ✅ | `tests/basic/variables.lm` | `src/frontend/parser/statements.cpp` | ✅ Fully consistent |
-| Frame Declarations | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm` | `src/frontend/parser/statements.cpp` | ✅ Fully consistent |
-| `this` vs `self` | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm` | `src/frontend/parser/expressions.cpp` | ⚠️ Partially consistent — guide.md and learn.md still use `this` (pending fix) |
-| Optional/Error System | ✅ | ✅ | ✅ | `tests/types/options.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
-| `ok()` / `err()` | ✅ | ✅ | ✅ | `tests/types/options.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
-| `nil` literal | ✅ | ✅ | ✅ | `tests/basic/literals.lm` | `src/frontend/parser/expressions.cpp` | ✅ Fully consistent |
-| Structured Concurrency | ✅ | ✅ | ✅ | `tests/concurrency/` | `src/frontend/parser/statements.cpp` | ✅ Fully consistent |
+## Concept Traceability Matrix
 
-## 2. Documentation Coverage
+| Concept | learn.md | guide.md | language.md | Tests | Status |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **Variables (`var`)** | ✅ | ✅ | ✅ | `tests/basic/variables.lm` | ✅ |
+| **Constants (`val`/`const`)** | ❌ | ❌ | ✅ | `tests/basic/variables.lm` | ⚠️ |
+| **Integers (`int`)** | ✅ | ✅ | ✅ | `tests/types/basic.lm` | ✅ |
+| **Decimals (`d2`, `d4`)** | ❌ | ❌ | ✅ | `tests/decimal_tests.lm` | ⚠️ |
+| **Frames (`frame`)** | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm`| ✅ |
+| **Self reference (`self`)**| ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm`| ✅ |
+| **Traits (`trait`)** | ❌ | ✅ | ✅ | `tests/oop/traits_dynamic.lm` | ✅ |
+| **Modules (`import`)** | ✅ | ✅ | ✅ | `tests/modules/*` | ✅ |
+| **Fallible (`Type?`)** | ✅ | ✅ | ✅ | `tests/types/options.lm` | ✅ |
+| **Structured Concurrency**| ❌ | ✅ | ✅ | `tests/concurrency/*` | ✅ |
+| **Pattern Match** | ✅ | ✅ | ✅ | `tests/loops/match.lm` | ✅ |
+| **Ternary (`? :`)** | ❌ | ⚠️ | ⚠️ | ❌ | 🚨 |
+| **Safe Access (`?.`)** | ❌ | ❌ | ⚠️ | ❌ | 🚨 |
 
-- **language.md**: Created. Provides formal syntax and type specification.
-- **stdlib.md**: Created. Documents built-ins and core modules.
-- **Syntax Consistency**: All documents should use `frame` and `self` consistently.
+**Statuses:**
+- ✅ Fully consistent
+- ⚠️ Partial / missing links (documented but not fully tested or implemented)
+- 🚨 Contradiction / Spec Drift (documented but not implemented)
 
-## 3. Philosophy Enforcement (zen.md)
+## 🚨 Surfaced Violations
 
-| Principle | Enforced In | Tests | Status |
-|-----------|-------------|-------|--------|
-| "Explicit is better than implicit" | `TypeChecker` | `tests/types/` | ✅ |
-| "Errors are not exceptions" | `std/core.lm`, Parser | `tests/integration/` | ✅ |
-| "Structured Concurrency" | `parallel`/`concurrent` | `tests/concurrency/` | ✅ |
+### Philosophical Drift (zen.md)
+- **Principle**: "The absence of a value is a state to be handled explicitly, not a source of crashes."
+- **Status**: Implemented via `Type?` system.
 
-## 4. Final Integrity Conclusion
+### Spec Drift (language.md)
+- **Feature**: Ternary operator (`? :`) is documented but not implemented in the parser.
+- **Feature**: Safe access operator (`?.`) is documented but not implemented.
+- **Feature**: Range steps (`0..10..2`) are documented but not implemented.
 
-- **Can the language be taught without misleading users?**: MOSTLY. `learn.md` uses verified `frame` syntax and correct binary paths, but still references `this` instead of `self` in places.
-- **Is the documentation system internally consistent?**: IN PROGRESS. Most layers (learn, guide, spec, zen) are aligned, but `guide.md` and `learn.md` still use `this` instead of `self` — fixes are pending.
-- **Is the philosophy actually enforced?**: YES. Principle mappings are documented and verified against code.
+### Doc Drift (Beginner Risk - learn.md)
+- **Violation**: `learn.md` mentions `this` as supported, but `language.md` explicitly states it is no longer a keyword.
+- **Violation**: `learn.md` mentions a `-repl` flag that is not implemented in the CLI.
+
+### Doc Drift (User Risk - guide.md)
+- **Violation**: `guide.md` uses `class` in some descriptions while the language uses `frame`.
+- **Violation**: `guide.md` documents `data frame` which is not enforced/implemented.
+
+## 🏁 Final Integrity Check
+
+1. **Is the language teachable without misleading users?**
+   - **NO**. The inclusion of `this`, `class`, and unimplemented operators like ternary and safe-access in the guides and specification will mislead users.
+
+2. **Is the documentation system internally consistent?**
+   - **NO**. `language.md` contradicts `learn.md` regarding `this` vs `self`.
+
+3. **Is the philosophy actually enforced?**
+   - **YES**. Philosophical principles like explicit decimal scaling and structured concurrency are strictly enforced in the compiler and runtime.

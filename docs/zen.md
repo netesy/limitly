@@ -38,8 +38,8 @@
 
 ## Philosophy Mapping
 
-- **Explicit vs Implicit**: Enforced by `TypeChecker`.
-- **Errors as Values**: Implemented via the `Type?` system and `std/core.lm`.
-- **Structured Concurrency**: Enforced by `parallel` and `concurrent` scope-bound blocks.
-- **Safety**: Managed by the region-based deterministic memory model.
-- **Modules**: Implemented in `src/frontend/module_manager.cpp`.
+- **Explicit vs Implicit**: Enforced by `TypeChecker::is_type_compatible` (especially for decimal types) and strict type annotations in `src/frontend/type_checker/`.
+- **Errors as Values**: Implemented via the unified `Type?` system, `ok()` and `err()` constructors, and `match` statement patterns (`val` and `err`).
+- **Structured Concurrency**: Enforced by `parallel` and `concurrent` scope-bound blocks in the parser and LIR generator, ensuring task lifetimes are bound to their lexical scope.
+- **Safety**: Managed by the region-based deterministic memory model, where allocations are tied to scopes and destroyed in reverse order.
+- **Modules**: Implemented in `src/frontend/module_manager.cpp` and `src/frontend/type_checker_factory.cpp`, enforcing encapsulation and reachability.

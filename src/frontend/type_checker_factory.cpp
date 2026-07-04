@@ -1,5 +1,3 @@
-#pragma once
-
 #include "type_checker.hh"
 #include "module_manager.hh"
 #include "module_graph.hh"
@@ -72,16 +70,22 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     // Detect unreachable modules (not reachable from root)
     std::set<std::string> visited;
     std::vector<std::string> stack;
+
+    // Find the root module. Since ModuleManager::resolve_all is called with "root",
+    // and it registers the root_program under that name, we look for "root".
     const std::string root_name = "root";
-    if (manager.get_module(root_name)) {
+    auto all_modules = manager.get_all_modules();
+
+    if (all_modules.count(root_name)) {
         stack.push_back(root_name);
         while (!stack.empty()) {
             std::string cur = stack.back();
             stack.pop_back();
             if (visited.count(cur)) continue;
             visited.insert(cur);
-            auto it = manager.get_all_modules().find(cur);
-            if (it != manager.get_all_modules().end()) {
+
+            auto it = all_modules.find(cur);
+            if (it != all_modules.end()) {
                 for (const auto& dep : it->second->dependencies) {
                     if (!visited.count(dep)) stack.push_back(dep);
                 }

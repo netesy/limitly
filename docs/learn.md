@@ -39,13 +39,14 @@ To get started with Limit, you'll need to build the interpreter from source. Don
 After building, you'll have a `limitly` executable in the `bin/` directory. This is the Limit interpreter!
 
 **Verify your installation:**
-While there isn't a `--version` command yet, you can test your installation by starting the interactive REPL (Read-Eval-Print Loop):
+While there isn't a `--version` command yet, you can verify your installation by running a simple print command:
 
 ```bash
-./bin/limitly -repl
+echo 'print("Limitly is working!");' > test.lm
+./bin/limitly test.lm
 ```
 
-If you see a `>` prompt, you're all set! You can type `exit` to leave the REPL.
+If you see "Limitly is working!", you're all set! (Note: The `-repl` mode is a planned feature).
 
 ## ✍️ Your First Program
 
@@ -304,7 +305,7 @@ var greeter = Greeter();
 greeter.say_hello(); // Output: Hello, World!
 ```
 
-Wait, what is `this`? Inside a frame's method, `this` refers to the specific object you are working with. You can also use `self` if you prefer - Limit supports both!
+What is `self`? Inside a frame's method, `self` refers to the specific object you are working with.
 
 ## 🧪 Errors and Optional Values
 

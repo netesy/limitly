@@ -58,7 +58,12 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
         LM::Frontend::ModuleManager::getInstance().resolve_all(ast, "root");
 
         auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
-        if (!type_check_result.success || !type_check_result.errors.empty()) return 1;
+        if (!type_check_result.success || !type_check_result.errors.empty()) {
+            for (const auto& err : type_check_result.errors) {
+                std::cerr << "Type Check Error: " << err << std::endl;
+            }
+            return 1;
+        }
 
         auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(type_check_result.program, source, filename);
         if (!memory_check_result.success) return 1;

@@ -94,6 +94,16 @@ void ModuleManager::extract_metadata(std::shared_ptr<Module> module) {
 void ModuleManager::resolve_all(std::shared_ptr<AST::Program> root_program, const std::string& root_path) {
     if (!root_program) return;
 
+    // Register root program as a module
+    auto root_module = std::make_shared<Module>();
+    root_module->name = root_path;
+    root_module->ast = root_program;
+    extract_metadata(root_module);
+    {
+        std::lock_guard<std::mutex> lock(modules_mutex_);
+        modules_[root_path] = root_module;
+    }
+
     std::vector<std::string> worklist;
     for (const auto& stmt : root_program->statements) {
         if (auto imp = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {

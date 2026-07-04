@@ -297,16 +297,15 @@ iter (i in 0..10..2) {
 ```
 > **Note:** The step value feature is planned but not yet fully implemented in the parser.
 
-### Ternary Operator
+### Ternary Operator (Planned)
 
-Limit supports the ternary operator (`? :`) for concise conditional expressions.
+Limit plans to support the ternary operator (`? :`) for concise conditional expressions.
 
 ```limit
 var x = 10;
 var result = x > 5 ? "Greater than 5" : "Not greater than 5";
 print(result); // Output: Greater than 5
 ```
-> **Note:** The ternary operator is planned but not yet implemented in the parser.
 
 ### Match Statements
 
@@ -652,14 +651,14 @@ Limit provides several modifiers to control the behavior and visibility of frame
 
 #### Visibility Modifiers
 
-You can control the visibility of frame members (fields and methods) using `pub` (public) and `prot` (protected). By default, all members are `private`.
+You can control the visibility of frame members (fields and methods) using `pub` (public) and `prot` (protected). By default, all members are **private** (there is no explicit `private` keyword).
 
-*   **`private`** (default): The member can only be accessed from within the frame.
+*   **private** (default): The member can only be accessed from within the frame or module.
 *   **`prot`** (protected): The member can be accessed from within the frame and by its subframes.
 *   **`pub`** (public): The member can be accessed from anywhere.
 
 ```limit
-frame MyClass {
+frame MyFrame {
     var private_field = 1;      // private by default
     pub var public_field = 2;
     prot var protected_field = 3;
@@ -721,7 +720,7 @@ frame Parent {
 }
 ```
 
-#### Data Frames
+#### Data Frames (Planned)
 
 A `data` frame is a special kind of frame that automatically generates useful methods, such as a constructor for all its fields. Data frames are implicitly `final`.
 
