@@ -60,15 +60,15 @@ ValuePtr LIRBuiltinFunction::execute(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("No implementation for LIR builtin function: " + name_);
     }
     
-    // Validate argument count
-    if (args.size() != paramTypes_.size()) {
+    // Validate argument count (allow variable arguments if paramTypes is empty)
+    if (!paramTypes_.empty() && args.size() != paramTypes_.size()) {
         throw std::runtime_error("Argument count mismatch for LIR builtin function: " + name_ + 
                               " (expected " + std::to_string(paramTypes_.size()) + 
                               ", got " + std::to_string(args.size()) + ")");
     }
     
-    // Validate argument types
-    for (size_t i = 0; i < args.size(); i++) {
+    // Validate argument types (skip if variable arguments)
+    for (size_t i = 0; i < args.size() && i < paramTypes_.size(); i++) {
         if (!args[i]) {
             throw std::runtime_error("Argument type mismatch for LIR builtin function: " + name_ + 
                                   " at position " + std::to_string(i) + " (null argument)");
@@ -134,35 +134,41 @@ void LIRBuiltinFunctions::initialize() {
 void LIRBuiltinFunctions::registerIOFunctions() {
     registerFunction(std::make_shared<LIRBuiltinFunction>(
         "print",
-        std::vector<TypeTag>{TypeTag::Any},
+        std::vector<TypeTag>{},  // Variable arguments - empty vector
         TypeTag::Nil,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            const auto& value = args[0];
-            if (value && value->type) {
-                switch (value->type->tag) {
-                    case TypeTag::Int:
-                    case TypeTag::Int64:
-                        std::cout << value->as<int64_t>();
-                        break;
-                    case TypeTag::Float32:
-                    case TypeTag::Float64:
-                        std::cout << value->as<double>();
-                        break;
-                    case TypeTag::Bool:
-                        std::cout << (value->as<bool>() ? "true" : "false");
-                        break;
-                    case TypeTag::String:
-                        std::cout << value->as<std::string>();
-                        break;
-                    case TypeTag::Nil:
-                        std::cout << "nil";
-                        break;
-                    default:
-                        std::cout << "<unsupported type>";
-                        break;
+            for (size_t i = 0; i < args.size(); ++i) {
+                const auto& value = args[i];
+                if (value && value->type) {
+                    switch (value->type->tag) {
+                        case TypeTag::Int:
+                        case TypeTag::Int64:
+                            std::cout << value->as<int64_t>();
+                            break;
+                        case TypeTag::Float32:
+                        case TypeTag::Float64:
+                            std::cout << value->as<double>();
+                            break;
+                        case TypeTag::Bool:
+                            std::cout << (value->as<bool>() ? "true" : "false");
+                            break;
+                        case TypeTag::String:
+                            std::cout << value->as<std::string>();
+                            break;
+                        case TypeTag::Nil:
+                            std::cout << "nil";
+                            break;
+                        default:
+                            std::cout << "<unsupported type>";
+                            break;
+                    }
+                    // Add space between arguments
+                    if (i < args.size() - 1) {
+                        std::cout << " ";
+                    }
                 }
-                std::cout << std::endl;
             }
+            std::cout << std::endl;
             auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
         }

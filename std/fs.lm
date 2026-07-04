@@ -6,21 +6,15 @@ frame FS {
     pub fn exists(p: path.Path): bool { return io.exists(p.value); }
     pub fn create_dir(p: path.Path): nil?io.IOError { return io.create_directory(p.value); }
     pub fn remove(p: path.Path): nil?io.IOError {
-        if (!io.delete(p.value)) return io.UnknownError { message: "failed to remove path" };
-        return nil;
+        if (!io.delete(p.value)) return err(io.UnknownError { message: "failed to remove path" });
+        return ok(nil);
     }
-    pub fn rename(from: path.Path, to: path.Path): nil?io.IOError {
-        var src = io.open(from.value, "read");
-        if (src == nil) return nil;
-        var content = src.read();
-        if (content == nil) { src.close(); return nil; }
-        src.close();
-        var dst = io.open(to.value, "write");
-        if (dst == nil) return nil;
-        dst.write(content);
-        dst.close();
-        io.delete(from.value);
-        return nil;
+    pub fn rename(from_path: path.Path, to_path: path.Path): nil?io.IOError {
+        if (!io.rename(from_path.value, to_path.value)) return err(io.UnknownError { message: "failed to rename path" });
+        return ok(nil);
     }
-    pub fn list_dir(p: path.Path): [str]?io.IOError { return io.list_directory(p.value); }
+    pub fn list_dir(p: path.Path): [str]?io.IOError { 
+        var res = io.list_directory(p.value)?;
+        return ok(res);
+    }
 }

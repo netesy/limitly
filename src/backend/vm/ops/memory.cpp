@@ -46,21 +46,6 @@ void RegisterVM::execute_memory_load(const LIR::LIR_Inst* pc) {
             case 9: target_type = LIR::Type::F64; break;
             case 10: target_type = LIR::Type::Ptr; break;
         }
-    } else {
-        switch (pc->op) {
-            case LIR::LIR_Op::FFILoadInt8: target_type = LIR::Type::I8; break;
-            case LIR::LIR_Op::FFILoadUInt8: target_type = LIR::Type::U8; break;
-            case LIR::LIR_Op::FFILoadInt16: target_type = LIR::Type::I16; break;
-            case LIR::LIR_Op::FFILoadUInt16: target_type = LIR::Type::U16; break;
-            case LIR::LIR_Op::FFILoadInt32: target_type = LIR::Type::I32; break;
-            case LIR::LIR_Op::FFILoadUInt32: target_type = LIR::Type::U32; break;
-            case LIR::LIR_Op::FFILoadInt64: target_type = LIR::Type::I64; break;
-            case LIR::LIR_Op::FFILoadUInt64: target_type = LIR::Type::U64; break;
-            case LIR::LIR_Op::FFILoadFloat: target_type = LIR::Type::F32; break;
-            case LIR::LIR_Op::FFILoadDouble: target_type = LIR::Type::F64; break;
-            case LIR::LIR_Op::FFILoadPtr: target_type = LIR::Type::Ptr; break;
-            default: break;
-        }
     }
 
     switch (target_type) {
@@ -97,21 +82,6 @@ void RegisterVM::execute_memory_store(const LIR::LIR_Inst* pc) {
             case 8: value_type = LIR::Type::F32; break;
             case 9: value_type = LIR::Type::F64; break;
             case 10: value_type = LIR::Type::Ptr; break;
-        }
-    } else {
-        switch (pc->op) {
-            case LIR::LIR_Op::FFIStoreInt8: value_type = LIR::Type::I8; break;
-            case LIR::LIR_Op::FFIStoreUInt8: value_type = LIR::Type::U8; break;
-            case LIR::LIR_Op::FFIStoreInt16: value_type = LIR::Type::I16; break;
-            case LIR::LIR_Op::FFIStoreUInt16: value_type = LIR::Type::U16; break;
-            case LIR::LIR_Op::FFIStoreInt32: value_type = LIR::Type::I32; break;
-            case LIR::LIR_Op::FFIStoreUInt32: value_type = LIR::Type::U32; break;
-            case LIR::LIR_Op::FFIStoreInt64: value_type = LIR::Type::I64; break;
-            case LIR::LIR_Op::FFIStoreUInt64: value_type = LIR::Type::U64; break;
-            case LIR::LIR_Op::FFIStoreFloat: value_type = LIR::Type::F32; break;
-            case LIR::LIR_Op::FFIStoreDouble: value_type = LIR::Type::F64; break;
-            case LIR::LIR_Op::FFIStorePtr: value_type = LIR::Type::Ptr; break;
-            default: break;
         }
     }
     switch (value_type) {
@@ -260,50 +230,17 @@ void RegisterVM::execute_memory(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
         case LIR::LIR_Op::MemoryLoad: execute_memory_load(pc); break;
         case LIR::LIR_Op::MemoryStore: execute_memory_store(pc); break;
-        case LIR::LIR_Op::MemoryCopy:
-        case LIR::LIR_Op::FFIMemcpy: execute_memory_copy(pc); break;
-        case LIR::LIR_Op::MemoryFill:
-        case LIR::LIR_Op::FFIMemset: execute_memory_fill(pc); break;
-        case LIR::LIR_Op::MemoryCompare:
-        case LIR::LIR_Op::FFIMemcmp: execute_memory_compare(pc); break;
-        case LIR::LIR_Op::MemoryAlloc:
-        case LIR::LIR_Op::FFIAlloc: execute_memory_alloc(pc); break;
-        case LIR::LIR_Op::MemoryFree:
-        case LIR::LIR_Op::FFIFree: execute_memory_free(pc); break;
-        case LIR::LIR_Op::MemoryResize:
-        case LIR::LIR_Op::FFIRealloc: execute_memory_realloc(pc); break;
-        case LIR::LIR_Op::PtrAdd:
-        case LIR::LIR_Op::FFIAddPtr: execute_ptr_add(pc); break;
-        case LIR::LIR_Op::PtrSub:
-        case LIR::LIR_Op::FFISubPtr: execute_ptr_sub(pc); break;
-        case LIR::LIR_Op::PtrDiff:
-        case LIR::LIR_Op::FFIPtrDiff: execute_ptr_diff(pc); break;
-        case LIR::LIR_Op::PtrAlign:
-        case LIR::LIR_Op::FFIAlignPtr: execute_ptr_align(pc); break;
-        case LIR::LIR_Op::PtrIsAligned:
-        case LIR::LIR_Op::FFIIsAligned: execute_ptr_is_aligned(pc); break;
-        case LIR::LIR_Op::FFILoadInt8:
-        case LIR::LIR_Op::FFILoadUInt8:
-        case LIR::LIR_Op::FFILoadInt16:
-        case LIR::LIR_Op::FFILoadUInt16:
-        case LIR::LIR_Op::FFILoadInt32:
-        case LIR::LIR_Op::FFILoadUInt32:
-        case LIR::LIR_Op::FFILoadInt64:
-        case LIR::LIR_Op::FFILoadUInt64:
-        case LIR::LIR_Op::FFILoadFloat:
-        case LIR::LIR_Op::FFILoadDouble:
-        case LIR::LIR_Op::FFILoadPtr: execute_memory_load(pc); break;
-        case LIR::LIR_Op::FFIStoreInt8:
-        case LIR::LIR_Op::FFIStoreUInt8:
-        case LIR::LIR_Op::FFIStoreInt16:
-        case LIR::LIR_Op::FFIStoreUInt16:
-        case LIR::LIR_Op::FFIStoreInt32:
-        case LIR::LIR_Op::FFIStoreUInt32:
-        case LIR::LIR_Op::FFIStoreInt64:
-        case LIR::LIR_Op::FFIStoreUInt64:
-        case LIR::LIR_Op::FFIStoreFloat:
-        case LIR::LIR_Op::FFIStoreDouble:
-        case LIR::LIR_Op::FFIStorePtr: execute_memory_store(pc); break;
+        case LIR::LIR_Op::MemoryCopy: execute_memory_copy(pc); break;
+        case LIR::LIR_Op::MemoryFill: execute_memory_fill(pc); break;
+        case LIR::LIR_Op::MemoryCompare: execute_memory_compare(pc); break;
+        case LIR::LIR_Op::MemoryAlloc: execute_memory_alloc(pc); break;
+        case LIR::LIR_Op::MemoryFree: execute_memory_free(pc); break;
+        case LIR::LIR_Op::MemoryResize: execute_memory_realloc(pc); break;
+        case LIR::LIR_Op::PtrAdd: execute_ptr_add(pc); break;
+        case LIR::LIR_Op::PtrSub: execute_ptr_sub(pc); break;
+        case LIR::LIR_Op::PtrDiff: execute_ptr_diff(pc); break;
+        case LIR::LIR_Op::PtrAlign: execute_ptr_align(pc); break;
+        case LIR::LIR_Op::PtrIsAligned: execute_ptr_is_aligned(pc); break;
         default: break;
     }
 }

@@ -226,6 +226,12 @@ private:
     
     bool isErrorValue(LIR::Reg reg) const;
     
+    inline ObjHeader* header_if_type(RegisterValue value, uint32_t type_id) const {
+        if (!IS_PTR(value)) return nullptr;
+        auto* header = static_cast<ObjHeader*>(UNBOX_PTR(value));
+        return header && header->type_id == type_id ? header : nullptr;
+    }
+
     FrameInstancePtr createFrameInstance(const std::string& frame_type);
     void setFrameField(FrameInstancePtr frame, size_t index, const RegisterValue& value);
     RegisterValue getFrameField(FrameInstancePtr frame, size_t index) const;

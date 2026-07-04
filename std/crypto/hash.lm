@@ -2,7 +2,6 @@
 // Uses the native HASH_ENGINE resource (type 16) for correct SHA-256/512/MD5/SHA-1.
 
 import std.core as core;
-import std.encoding as encoding;
 
 // Resource type and operation codes (must match resource_types.hh)
 var RT_HASH_ENGINE: int = 16;
@@ -10,199 +9,117 @@ var OP_OPEN: int = 0;
 var OP_CLOSE: int = 1;
 var OP_READ: int = 2;
 var OP_WRITE: int = 3;
+var OP_HMAC: int = 35;
 
 frame Hash {
 
     // ---- Core: hash a string with a given algorithm ----
-    pub fn hash(data: str, algorithm: str): core.ResultStr {
+    pub fn hash(data: str, algorithm: str): str?core.Error {
         if (algorithm != "sha256" and algorithm != "sha512" and algorithm != "md5" and algorithm != "sha1") {
-            return core.err_str("unsupported algorithm: " + algorithm + ". Supported: sha256, sha512, md5, sha1");
+            return err(core.Error { code: "ERR", message: "unsupported algorithm: " + algorithm });
         }
-        var engine = resource_create(RT_HASH_ENGINE, [ []]);
-        if (engine == -1) return core.err_str("failed to create hash engine resource");
+        var engine = resource_create(RT_HASH_ENGINE, []);
+        if (engine == -1) return err(core.Error { code: "ERR", message: "failed to create hash engine resource" });
 
         var init = resource_call(engine, OP_OPEN, [algorithm]);
         if (init != true) {
             resource_destroy(engine);
-            return core.err_str("failed to initialize " + algorithm);
+            return err(core.Error { code: "ERR", message: "failed to initialize " + algorithm });
         }
 
         var wrote = resource_call(engine, OP_WRITE, [data]);
         if (wrote != true) {
             resource_destroy(engine);
-            return core.err_str("failed to feed data to " + algorithm);
+            return err(core.Error { code: "ERR", message: "failed to feed data to " + algorithm });
         }
 
-        var result = resource_call(engine, OP_READ, [ []]);
+        var result = resource_call(engine, OP_READ, []);
         resource_destroy(engine);
 
-        if (result == nil) return core.err_str(algorithm + " digest computation failed");
-        return core.ok_str(result as str);
+        if (result == nil) return err(core.Error { code: "ERR", message: algorithm + " digest computation failed" });
+        return ok(result as str);
     }
 
     // ---- SHA-256 ----
-    pub fn sha256(data: str): core.ResultStr {
+    pub fn sha256(data: str): str?core.Error {
         return self.hash(data, "sha256");
     }
 
     // ---- SHA-512 ----
-    pub fn sha512(data: str): core.ResultStr {
+    pub fn sha512(data: str): str?core.Error {
         return self.hash(data, "sha512");
     }
 
     // ---- MD5 ----
-    pub fn md5(data: str): core.ResultStr {
+    pub fn md5(data: str): str?core.Error {
         return self.hash(data, "md5");
     }
 
     // ---- SHA-1 ----
-    pub fn sha1(data: str): core.ResultStr {
+    pub fn sha1(data: str): str?core.Error {
         return self.hash(data, "sha1");
     }
 
     // ---- Streaming API: create a hash engine, update, then finalize ----
-    pub fn create(algorithm: str): core.ResultInt {
+    pub fn create(algorithm: str): int?core.Error {
         if (algorithm != "sha256" and algorithm != "sha512" and algorithm != "md5" and algorithm != "sha1") {
-            return core.err_int("unsupported algorithm: " + algorithm);
+            return err(core.Error { code: "ERR", message: "unsupported algorithm: " + algorithm });
         }
-        var engine = resource_create(RT_HASH_ENGINE, [ []]);
-        if (engine == -1) return core.err_int("failed to create hash engine resource");
+        var engine = resource_create(RT_HASH_ENGINE, []);
+        if (engine == -1) return err(core.Error { code: "ERR", message: "failed to create hash engine resource" });
         var init = resource_call(engine, OP_OPEN, [algorithm]);
         if (init != true) {
             resource_destroy(engine);
-            return core.err_int("failed to initialize " + algorithm);
+            return err(core.Error { code: "ERR", message: "failed to initialize " + algorithm });
         }
-        return core.ok_int(engine);
+        return ok(engine);
     }
 
-    pub fn update(handle: int, data: str): core.ResultInt {
-        if (handle <= 0) return core.err_int("invalid hash engine handle");
+    pub fn update(handle: int, data: str): nil?core.Error {
+        if (handle <= 0) return err(core.Error { code: "ERR", message: "invalid hash engine handle" });
         var wrote = resource_call(handle, OP_WRITE, [data]);
-        if (wrote != true) return core.err_int("failed to update hash");
-        return core.ok_int(0);
+        if (wrote != true) return err(core.Error { code: "ERR", message: "failed to update hash" });
+        return ok(nil);
     }
 
-    pub fn finalize(handle: int): core.ResultStr {
-        if (handle <= 0) return core.err_str("invalid hash engine handle");
-        var result = resource_call(handle, OP_READ, [ []]);
+    pub fn finalize(handle: int): str?core.Error {
+        if (handle <= 0) return err(core.Error { code: "ERR", message: "invalid hash engine handle" });
+        var result = resource_call(handle, OP_READ, []);
         resource_destroy(handle);
-        if (result == nil) return core.err_str("hash finalization failed");
-        return core.ok_str(result as str);
+        if (result == nil) return err(core.Error { code: "ERR", message: "hash finalization failed" });
+        return ok(result as str);
     }
 
     // ---- HMAC implementations ----
-    pub fn hmac_sha256(data: str, key: str): core.ResultStr {
-        return self.hmac(data, key, "sha256", 64);
+    pub fn hmac(data: str, key: str, algorithm: str): str?core.Error {
+        var engine = resource_create(RT_HASH_ENGINE, []);
+        if (engine == -1) return err(core.Error { code: "ERR", message: "failed to create hash engine resource" });
+        var res = resource_call(engine, OP_HMAC, [algorithm, key, data]);
+        resource_destroy(engine);
+        if (res == nil) return err(core.Error { code: "ERR", message: "HMAC computation failed" });
+        return ok(res as str);
     }
 
-    pub fn hmac_sha512(data: str, key: str): core.ResultStr {
-        return self.hmac(data, key, "sha512", 128);
+    pub fn hmac_sha256(data: str, key: str): str?core.Error {
+        return self.hmac(data, key, "sha256");
     }
 
-    pub fn hmac_md5(data: str, key: str): core.ResultStr {
-        return self.hmac(data, key, "md5", 64);
+    pub fn hmac_sha512(data: str, key: str): str?core.Error {
+        return self.hmac(data, key, "sha512");
     }
 
-    pub fn hmac_sha1(data: str, key: str): core.ResultStr {
-        return self.hmac(data, key, "sha1", 64);
+    pub fn hmac_md5(data: str, key: str): str?core.Error {
+        return self.hmac(data, key, "md5");
     }
 
-    // Generic HMAC per RFC 2104
-    fn hmac(data: str, key: str, algorithm: str, block_size: int): core.ResultStr {
-        // If key is longer than block size, hash it first
-        var actual_key: str = key;
-        if (len(key) > block_size) {
-            var key_hash = self.hash(key, algorithm);
-            if (key_hash.is_err()) return key_hash;
-            actual_key = key_hash.unwrap();
-        }
-
-        // Pad key to block size with zeros
-        while (len(actual_key) < block_size) {
-            actual_key = actual_key + "\x00";
-        }
-
-        // Build inner and outer padded keys
-        var ipad: str = "";
-        var opad: str = "";
-        var i: int = 0;
-        while (i < block_size) {
-            var b: int = byte_ord(substring(actual_key, i, i + 1));
-            ipad = ipad + char_from(b ^ 0x36);
-            opad = opad + char_from(b ^ 0x5C);
-            i = i + 1;
-        }
-
-        // HMAC = H(opad || H(ipad || data))
-        var inner_hash = self.hash(ipad + data, algorithm);
-        if (inner_hash.is_err()) return inner_hash;
-        return self.hash(opad + inner_hash.unwrap(), algorithm);
+    pub fn hmac_sha1(data: str, key: str): str?core.Error {
+        return self.hmac(data, key, "sha1");
     }
 
     // ---- Hash verification ----
     pub fn verify(data: str, expected_hash: str, algorithm: str): bool {
-        var hash_result = self.hash(data, algorithm);
-        if (hash_result.is_err()) return false;
-        return hash_result.unwrap() == expected_hash;
-    }
-
-    // ---- File hashing ----
-    pub fn hash_file(path: str, algorithm: str): core.ResultStr {
-        // Read file content using the file resource system
-        var fh = resource_create(0, [ []]); // RT_FILE
-        if (fh == -1) return core.err_str("failed to create file resource");
-        var opened = resource_call(fh, 0, [path, "rb"]); // OP_OPEN
-        if (opened != true) {
-            resource_destroy(fh);
-            return core.err_str("failed to open file: " + path);
-        }
-        var content = resource_call(fh, 2, [ []]); // OP_READ
-        resource_destroy(fh);
-        if (content == nil) return core.err_str("failed to read file: " + path);
-        return self.hash(content as str, algorithm);
-    }
-
-    // ---- Hash encoding utilities ----
-    pub fn to_base64(hex_hash: str): core.ResultStr {
-        // Convert hex string to bytes, then base64 encode
-        var bytes: [int] = encoding.Encoding.hex_decode(hex_hash);
-        var encoded: str = encoding.Encoding.base64_encode(bytes);
-        return core.ok_str(encoded);
-    }
-
-    pub fn to_hex(hash_bytes: [int]): core.ResultStr {
-        var hex_str: str = encoding.Encoding.hex_encode(hash_bytes);
-        return core.ok_str(hex_str);
-    }
-
-    // ---- Salted hashing (password hashing pattern) ----
-    pub fn generate_salt(length: int): core.ResultStr {
-        if (length <= 0 or length > 256) return core.err_str("salt length must be between 1 and 256");
-        var entropy = resource_create(12, [ []]); // RT_ENTROPY
-        if (entropy == -1) return core.err_str("entropy source unavailable");
-        var raw = resource_call(entropy, 2, [length]); // OP_READ
-        resource_destroy(entropy);
-        if (raw == nil) return core.err_str("failed to generate random bytes");
-        // Convert raw bytes to hex string
-        return core.ok_str(raw as str);
-    }
-
-    pub fn salted_hash(data: str, salt: str, algorithm: str): core.ResultStr {
-        // PBKDF1-like: hash(salt + data + salt)
-        return self.hash(salt + data + salt, algorithm);
-    }
-
-    pub fn salted_hash_iterations(data: str, salt: str, algorithm: str, iterations: int): core.ResultStr {
-        // Iterative hashing: apply hash multiple times for key stretching
-        var current: str = salt + data;
-        var i: int = 0;
-        while (i < iterations) {
-            var result = self.hash(current, algorithm);
-            if (result.is_err()) return result;
-            current = salt + result.unwrap();
-            i = i + 1;
-        }
-        return self.hash(current, algorithm);
+        var hash_result = self.hash(data, algorithm)? else { return false; };
+        return hash_result == expected_hash;
     }
 
     // ---- Hash comparison with constant-time semantics ----
@@ -221,44 +138,32 @@ frame Hash {
 }
 
 // ---- Standalone convenience functions ----
-fn sha256(data: str): core.ResultStr {
+pub fn sha256(data: str): str?core.Error {
     return Hash.sha256(data);
 }
 
-fn sha512(data: str): core.ResultStr {
+pub fn sha512(data: str): str?core.Error {
     return Hash.sha512(data);
 }
 
-fn md5(data: str): core.ResultStr {
+pub fn md5(data: str): str?core.Error {
     return Hash.md5(data);
 }
 
-fn sha1(data: str): core.ResultStr {
+pub fn sha1(data: str): str?core.Error {
     return Hash.sha1(data);
 }
 
-fn hash_data(data: str, algorithm: str): core.ResultStr {
+pub fn hash_data(data: str, algorithm: str): str?core.Error {
     return Hash.hash(data, algorithm);
 }
 
-fn hmac_sha256(data: str, key: str): core.ResultStr {
+pub fn hmac_sha256(data: str, key: str): str?core.Error {
     return Hash.hmac_sha256(data, key);
 }
 
-fn hmac_sha512(data: str, key: str): core.ResultStr {
+pub fn hmac_sha512(data: str, key: str): str?core.Error {
     return Hash.hmac_sha512(data, key);
-}
-
-fn generate_salt(length: int): core.ResultStr {
-    return Hash.generate_salt(length);
-}
-
-fn salted_hash(data: str, salt: str, algorithm: str): core.ResultStr {
-    return Hash.salted_hash(data, salt, algorithm);
-}
-
-fn verify_hash(data: str, expected_hash: str, algorithm: str): bool {
-    return Hash.verify(data, expected_hash, algorithm);
 }
 
 // ---- Internal byte helpers ----
@@ -271,17 +176,4 @@ fn byte_ord(ch: str): int {
     if (ch == "\r") return 13;
     if (ch == "\t") return 9;
     return 0;
-}
-
-fn char_from(b: int): str {
-    // Convert a byte value (0-255) back to a character
-    if (b >= 97 and b <= 122) return substring("abcdefghijklmnopqrstuvwxyz", b - 97, b - 96);
-    if (b >= 65 and b <= 90) return substring("ABCDEFGHIJKLMNOPQRSTUVWXYZ", b - 65, b - 64);
-    if (b >= 48 and b <= 57) return substring("0123456789", b - 48, b - 47);
-    if (b == 32) return " ";
-    if (b == 10) return "\n";
-    if (b == 13) return "\r";
-    if (b == 9) return "\t";
-    // For other bytes, use a safe mapping
-    return "\x00";
 }

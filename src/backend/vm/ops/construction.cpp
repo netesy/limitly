@@ -173,44 +173,37 @@ void RegisterVM::execute_construct_cstring_ptr(const LIR::LIR_Inst* pc) {
 // This handles all data construction operations (strings, buffers, wrappers, etc.)
 void RegisterVM::execute_construction(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
-        // String construction
-        case LIR::LIR_Op::FFIFromCString:
-            execute_construct_string_from_cstr(pc);
-            break;
-        case LIR::LIR_Op::FFIToCString:
-            execute_construct_cstr_from_string(pc);
-            break;
-        case LIR::LIR_Op::FFIFreeCString:
-            execute_construct_free_cstr(pc);
+        // String construction - using Marshal operations
+        case LIR::LIR_Op::Marshal:
+            // Dispatch based on marshal type in imm field
+            switch (pc->imm) {
+                case static_cast<uint32_t>(LIR::Metadata::MarshalType::CStringToString):
+                    execute_construct_string_from_cstr(pc);
+                    break;
+                case static_cast<uint32_t>(LIR::Metadata::MarshalType::StringToCString):
+                    execute_construct_cstr_from_string(pc);
+                    break;
+                default:
+                    break;
+            }
             break;
         
         // Buffer construction
-        case LIR::LIR_Op::FFIBufferAlloc:
+        case LIR::LIR_Op::BufferCreate:
             execute_construct_buffer_alloc(pc);
             break;
-        case LIR::LIR_Op::FFIBufferFromPtr:
+        case LIR::LIR_Op::BufferView:
             execute_construct_buffer_from_ptr(pc);
             break;
-        case LIR::LIR_Op::FFIBufferCapacity:
-            execute_construct_buffer_capacity(pc);
-            break;
-        case LIR::LIR_Op::FFIBufferSize:
-            execute_construct_buffer_size(pc);
-            break;
-        case LIR::LIR_Op::FFIBufferAsPtr:
-            execute_construct_buffer_as_ptr(pc);
-            break;
-        case LIR::LIR_Op::FFIBufferFree:
+        case LIR::LIR_Op::MemoryFree:
             // Free buffer memory
-            registers[pc->dst] = registers[pc->a]; // Pass through for now
-            break;
-        
-        // CString wrapper construction
-        case LIR::LIR_Op::FFICStringFromPtr:
-            execute_construct_cstring_from_ptr(pc);
-            break;
-        case LIR::LIR_Op::FFICStringPtr:
-            execute_construct_cstring_ptr(pc);
+            if (IS_PTR(registers[pc->a])) {
+                void* ptr = UNBOX_PTR(registers[pc->a]);
+                if (ptr) {
+                    std::free(ptr);
+                }
+            }
+            registers[pc->dst] = registers[pc->a];
             break;
         
         default:

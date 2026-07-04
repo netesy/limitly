@@ -40,6 +40,20 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 registers = saved_registers;
                 current_function_ = saved_func;
                 registers[pc->dst] = return_value;
+            } else if (LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
+                // Handle builtin functions (print, input, etc.)
+                std::vector<ValuePtr> args;
+                for (auto arg_reg : pc->call_args) {
+                    args.push_back(register_to_value_ptr(registers[arg_reg]));
+                }
+                try {
+                    ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(pc->func_name, args);
+                    // Builtin functions return ValuePtr, convert to RegisterValue if needed
+                    // For now, most builtins return nil or their output is side effects (like print)
+                    registers[pc->dst] = VAL_NIL;
+                } catch (const std::exception& e) {
+                    throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
+                }
             } else if (pc->func_name == "assert") {
                 bool condition = to_bool(registers[pc->call_args[0]]);
                 if (!condition) {

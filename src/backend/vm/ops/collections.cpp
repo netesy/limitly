@@ -6,16 +6,6 @@
 #include "../../../runtime/runtime_value.h"
 #include <cstdlib>
 
-namespace {
-
-ObjHeader* header_if_type(LmValue value, uint32_t type_id) {
-    if (!IS_PTR(value)) return nullptr;
-    auto* header = static_cast<ObjHeader*>(UNBOX_PTR(value));
-    return header && header->type_id == type_id ? header : nullptr;
-}
-
-} // namespace
-
 namespace LM {
 namespace Backend {
 namespace VM {

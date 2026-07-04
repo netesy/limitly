@@ -169,24 +169,6 @@ enum class LIR_Op : uint8_t {
     CallbackCreate,     // Create callback wrapper returning callback ID
     CallbackDestroy,    // Destroy callback wrapper
     
-    // === DEPRECATED: Old type-specific FFI opcodes (kept for compatibility during migration) ===
-    // Do NOT use these - they will be removed after Phase 4 testing
-    FFIAlloc, FFIFree, FFIRealloc, FFIMemcpy, FFIMemset, FFIMemcmp,
-    FFIAddPtr, FFISubPtr, FFIPtrDiff, FFIAlignPtr, FFIIsAligned,
-    FFILoadInt8, FFILoadUInt8, FFILoadInt16, FFILoadUInt16, FFILoadInt32, FFILoadUInt32,
-    FFILoadInt64, FFILoadUInt64, FFILoadFloat, FFILoadDouble, FFILoadPtr,
-    FFIStoreInt8, FFIStoreUInt8, FFIStoreInt16, FFIStoreUInt16, FFIStoreInt32, FFIStoreUInt32,
-    FFIStoreInt64, FFIStoreUInt64, FFIStoreFloat, FFIStoreDouble, FFIStorePtr,
-    FFIToCString, FFIFromCString, FFIFreeCString, FFICStringPtr, FFICStringFromPtr,
-    FFIBufferAlloc, FFIBufferFromPtr, FFIBufferFree, FFIBufferResize, FFIBufferRead, FFIBufferWrite,
-    FFIBufferSize, FFIBufferCapacity, FFIBufferAsPtr,
-    FFICallPtr, FFICallPtr0, FFICallPtr1, FFICallPtr2, FFICallPtr3, FFICallPtr4, FFICallPtr5,
-    FFILibraryLoad, FFILibraryUnload, FFILibraryGetSymbol,
-    FFIRegisterCallback, FFIUnregisterCallback, FFIGetCallbackPtr,
-    FFICCallFrameCreate, FFICCallFrameDestroy, FFICCallFrameSetReg, FFICCallFrameGetReg,
-    FFICCallFrameSetStackArg, FFICCallFrameGetStackArg,
-    FFIVMSave, FFIVMRestore, FFICCallExecute,
-    FFICalcStructLayout, FFIGetABIInfo
 };
 
 // ============================================================================
@@ -260,27 +242,6 @@ enum class LIR_Op : uint8_t {
     X(ForeignCall) X(ForeignCallDirect) \
     /* === REDESIGNED: Callbacks === */ \
     X(CallbackCreate) X(CallbackDestroy) \
-    /* === DEPRECATED: Old type-specific FFI opcodes (kept during migration) === */ \
-    X(FFIAlloc) X(FFIFree) X(FFIRealloc) X(FFIMemcpy) X(FFIMemset) X(FFIMemcmp) \
-    X(FFIAddPtr) X(FFISubPtr) X(FFIPtrDiff) X(FFIAlignPtr) X(FFIIsAligned) \
-    X(FFILoadInt8) X(FFILoadUInt8) X(FFILoadInt16) X(FFILoadUInt16) \
-    X(FFILoadInt32) X(FFILoadUInt32) X(FFILoadInt64) X(FFILoadUInt64) \
-    X(FFILoadFloat) X(FFILoadDouble) X(FFILoadPtr) \
-    X(FFIStoreInt8) X(FFIStoreUInt8) X(FFIStoreInt16) X(FFIStoreUInt16) \
-    X(FFIStoreInt32) X(FFIStoreUInt32) X(FFIStoreInt64) X(FFIStoreUInt64) \
-    X(FFIStoreFloat) X(FFIStoreDouble) X(FFIStorePtr) \
-    X(FFIToCString) X(FFIFromCString) X(FFIFreeCString) X(FFICStringPtr) X(FFICStringFromPtr) \
-    X(FFIBufferAlloc) X(FFIBufferFromPtr) X(FFIBufferFree) X(FFIBufferResize) \
-    X(FFIBufferRead) X(FFIBufferWrite) X(FFIBufferSize) X(FFIBufferCapacity) X(FFIBufferAsPtr) \
-    X(FFICallPtr) X(FFICallPtr0) X(FFICallPtr1) X(FFICallPtr2) \
-    X(FFICallPtr3) X(FFICallPtr4) X(FFICallPtr5) \
-    X(FFILibraryLoad) X(FFILibraryUnload) X(FFILibraryGetSymbol) \
-    X(FFIRegisterCallback) X(FFIUnregisterCallback) X(FFIGetCallbackPtr) \
-    X(FFICCallFrameCreate) X(FFICCallFrameDestroy) \
-    X(FFICCallFrameSetReg) X(FFICCallFrameGetReg) \
-    X(FFICCallFrameSetStackArg) X(FFICCallFrameGetStackArg) \
-    X(FFIVMSave) X(FFIVMRestore) X(FFICCallExecute) \
-    X(FFICalcStructLayout) X(FFIGetABIInfo)
 
 struct LIR_SourceLoc {
     std::string file;

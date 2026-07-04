@@ -243,7 +243,7 @@ constexpr size_t lir_op_list_size() {
 // Last entry of LIR_Op (used to derive the enum's cardinality, since no
 // explicit values are assigned and entries are sequential).  Keep this name
 // in sync with the enum.
-constexpr size_t kLirOpCount_Enum = static_cast<size_t>(LIR_Op::FFIGetABIInfo) + 1;
+constexpr size_t kLirOpCount_Enum = static_cast<size_t>(LIR_Op::CallbackDestroy) + 1;
 static_assert(lir_op_list_size() == kLirOpCount_Enum,
               "LIR_OP_LIST is out of sync with LIR_Op enum — update both in lir.hh");
 } // namespace

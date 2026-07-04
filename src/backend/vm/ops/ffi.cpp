@@ -126,7 +126,7 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
     LIR::Type ret_type = pc->result_type;
     std::vector<LIR::Reg> arg_regs = pc->call_args;
     size_t arg_start = 0;
-    if (pc->op == LIR::LIR_Op::ForeignCall || pc->op == LIR::LIR_Op::FFICCallExecute) arg_start = 1;
+    if (pc->op == LIR::LIR_Op::ForeignCall) arg_start = 1;
     size_t num_args = (arg_regs.size() > arg_start) ? (arg_regs.size() - arg_start) : 0;
     
     std::vector<LIR::Type> resolved_arg_types;
@@ -262,35 +262,13 @@ void RegisterVM::execute_extern_get_abi_info(const LIR::LIR_Inst* pc) { register
 
 void RegisterVM::execute_ffi(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
-        case LIR::LIR_Op::LibraryLoad:
-        case LIR::LIR_Op::FFILibraryLoad: execute_extern_library_load(pc); break;
-        case LIR::LIR_Op::LibraryUnload:
-        case LIR::LIR_Op::FFILibraryUnload: execute_extern_library_unload(pc); break;
-        case LIR::LIR_Op::LibrarySymbol:
-        case LIR::LIR_Op::FFILibraryGetSymbol: execute_extern_library_get_symbol(pc); break;
+        case LIR::LIR_Op::LibraryLoad: execute_extern_library_load(pc); break;
+        case LIR::LIR_Op::LibraryUnload: execute_extern_library_unload(pc); break;
+        case LIR::LIR_Op::LibrarySymbol: execute_extern_library_get_symbol(pc); break;
         case LIR::LIR_Op::ForeignCall:
-        case LIR::LIR_Op::ForeignCallDirect:
-        case LIR::LIR_Op::FFICallPtr:
-        case LIR::LIR_Op::FFICallPtr0:
-        case LIR::LIR_Op::FFICallPtr1:
-        case LIR::LIR_Op::FFICallPtr2:
-        case LIR::LIR_Op::FFICallPtr3:
-        case LIR::LIR_Op::FFICallPtr4:
-        case LIR::LIR_Op::FFICallPtr5:
-        case LIR::LIR_Op::FFICCallExecute: execute_extern_call_function(pc); break;
-        case LIR::LIR_Op::FFIRegisterCallback: execute_extern_register_callback(pc); break;
-        case LIR::LIR_Op::FFIUnregisterCallback: execute_extern_unregister_callback(pc); break;
-        case LIR::LIR_Op::FFIGetCallbackPtr: execute_extern_get_callback_ptr(pc); break;
-        case LIR::LIR_Op::FFICCallFrameCreate: execute_extern_ccall_frame_create(pc); break;
-        case LIR::LIR_Op::FFICCallFrameDestroy: execute_extern_ccall_frame_destroy(pc); break;
-        case LIR::LIR_Op::FFICCallFrameSetReg: execute_extern_ccall_frame_set_reg(pc); break;
-        case LIR::LIR_Op::FFICCallFrameGetReg: execute_extern_ccall_frame_get_reg(pc); break;
-        case LIR::LIR_Op::FFICCallFrameSetStackArg: execute_extern_ccall_frame_set_stack_arg(pc); break;
-        case LIR::LIR_Op::FFICCallFrameGetStackArg: execute_extern_ccall_frame_get_stack_arg(pc); break;
-        case LIR::LIR_Op::FFIVMSave: execute_extern_vm_save(pc); break;
-        case LIR::LIR_Op::FFIVMRestore: execute_extern_vm_restore(pc); break;
-        case LIR::LIR_Op::FFICalcStructLayout: execute_extern_calc_struct_layout(pc); break;
-        case LIR::LIR_Op::FFIGetABIInfo: execute_extern_get_abi_info(pc); break;
+        case LIR::LIR_Op::ForeignCallDirect: execute_extern_call_function(pc); break;
+        case LIR::LIR_Op::CallbackCreate: execute_extern_register_callback(pc); break;
+        case LIR::LIR_Op::CallbackDestroy: execute_extern_unregister_callback(pc); break;
         default: break;
     }
 }

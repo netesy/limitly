@@ -3,15 +3,15 @@
 import std.core as core;
 
 // Resource Types (aligned with LIR/VM)
-// RT_FILE: 0, RT_SOCKET: 1, RT_STDOUT: 9, RT_STDERR: 10
-// Operations: OPEN: 0, CLOSE: 1, READ: 2, WRITE: 3
+// RT_FILE: 0, RT_STDOUT: 9, RT_STDERR: 10
+// Operations: OPEN: 0, CLOSE: 1, READ: 2, WRITE: 3, FLUSH: 29, MKDIR: 30, READDIR: 31, RENAME: 32, EXISTS: 33, DELETE: 34
 
-type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
-type FileNotFound = { path: str };
-type PermissionDenied = { path: str, operation: str };
-type DiskFull = { path: str };
-type NetworkError = { message: str };
-type UnknownError = { message: str };
+pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
+pub type FileNotFound = { path: str };
+pub type PermissionDenied = { path: str, operation: str };
+pub type DiskFull = { path: str };
+pub type NetworkError = { message: str };
+pub type UnknownError = { message: str };
 
 frame Console {
     pub fn print(msg: any): nil {
@@ -25,58 +25,106 @@ frame Console {
 }
 
 frame File {
-    var path: str;
-    var handle: int64;
+    pub var path: str;
+    pub var handle: int;
 
     pub fn read(): str?IOError {
-        var res = resource_call(this.handle, 2, []); // OP_READ
-        if (res == nil) return UnknownError { message: "Failed to read file" };
-        return (res as str);
+        var res = resource_call(self.handle, 2, []); // OP_READ
+        if (res == nil) return err(UnknownError { message: "Failed to read file" });
+        return ok(res as str);
     }
 
     pub fn write(content: str): nil?IOError {
-        var success = resource_call(this.handle, 3, [content]); // OP_WRITE
-        if (!success) return UnknownError { message: "Failed to write file" };
-        return nil;
+        var success = resource_call(self.handle, 3, [content]); // OP_WRITE
+        if (!success) return err(UnknownError { message: "Failed to write file" });
+        return ok(nil);
+    }
+
+    pub fn flush(): nil?IOError {
+        var success = resource_call(self.handle, 29, []); // OP_FLUSH
+        if (!success) return err(UnknownError { message: "Failed to flush file" });
+        return ok(nil);
     }
 
     pub fn close(): nil?IOError {
-        resource_call(this.handle, 1, []); // OP_CLOSE
-        resource_destroy(this.handle);
-        return nil;
+        resource_call(self.handle, 1, []); // OP_CLOSE
+        resource_destroy(self.handle);
+        return ok(nil);
     }
 }
 
-fn open(path: str, mode: str): File?IOError {
+pub fn open(path: str, mode: str): File?IOError {
     var h = resource_create(0, [path, mode]); // RT_FILE
-    if (h == -1) return UnknownError { message: "Failed to create file resource" };
+    if (h == -1) return err(UnknownError { message: "Failed to create file resource" });
 
-    // Note: resource_create for FILE might already perform the open 
-    // depending on the implementation. Based on the previous code, 
-    // it was separate.
     var success = resource_call(h, 0, [path, mode]); // OP_OPEN
     if (!success) {
         resource_destroy(h);
-        return FileNotFound { path: path };
+        return err(FileNotFound { path: path });
     }
 
-    return File(path=path, handle=h);
+    return ok(File(path=path, handle=h));
 }
 
 // Global print helper
-fn print(msg: any): nil {
+pub fn print(msg: any): nil {
     resource_call(0, 3, [msg]);
 }
 
 // Filesystem helpers
-fn exists(path: str): bool {
-    return file_exists(path);
+pub fn exists(path: str): bool {
+    var result = resource_call(0, 33, [path]); // Using ID 0 (STDOUT) as a temporary target if RT_FILE 
+                                               // doesn't support static calls. Actually RT_FILE create
+                                               // should be used but EXISTS is a static-like op.
+                                               // Resource Manager handles 0 as a valid resource.
+                                               // We create a temporary RT_FILE for filesystem ops.
+    var h = resource_create(0, []); 
+    var res = resource_call(h, 33, [path]); // OP_EXISTS
+    resource_destroy(h);
+    return res == true;
 }
 
-fn delete(path: str): bool {
-    return file_delete(path);
+pub fn delete(path: str): bool {
+    var h = resource_create(0, []);
+    var res = resource_call(h, 34, [path]); // OP_DELETE
+    resource_destroy(h);
+    return res == true;
 }
 
-fn create_directory(path: str): nil?IOError {
-    return err(UnknownError { message: "Not implemented" });
+pub fn rename(old_path: str, new_path: str): bool {
+    var h = resource_create(0, []);
+    var res = resource_call(h, 32, [old_path, new_path]); // OP_RENAME
+    resource_destroy(h);
+    return res == true;
+}
+
+pub fn create_directory(path: str): nil?IOError {
+    var h = resource_create(0, []);
+    var res = resource_call(h, 30, [path]); // OP_MKDIR
+    resource_destroy(h);
+    if (!res) return err(UnknownError { message: "Failed to create directory: " + path });
+    return ok(nil);
+}
+
+pub fn list_directory(path: str): [str]?IOError {
+    var h = resource_create(0, []);
+    var res = resource_call(h, 31, [path]); // OP_READDIR
+    resource_destroy(h);
+    if (res == nil) return err(UnknownError { message: "Failed to list directory: " + path });
+    
+    // READDIR returns a newline-separated string
+    var s = res as str;
+    var parts: [str] = [];
+    var current = "";
+    for (var i = 0; i < len(s); i = i + 1) {
+        var ch = substring(s, i, i + 1);
+        if (ch == "\n") {
+            if (len(current) > 0) parts = parts + [current];
+            current = "";
+        } else {
+            current = current + ch;
+        }
+    }
+    if (len(current) > 0) parts = parts + [current];
+    return ok(parts);
 }

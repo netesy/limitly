@@ -41,6 +41,8 @@ RegisterVM::RegisterVM() : type_system(std::make_unique<TypeSystem>()) {
     scheduler = std::make_unique<Scheduler>();
     current_time = 0;
     current_function_ = nullptr;
+    // Initialize builtin functions
+    LIR::BuiltinUtils::initializeBuiltins();
 }
 
 RegisterVM::~RegisterVM() {}
@@ -190,28 +192,12 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::MemoryFill: case LIR::LIR_Op::MemoryCompare: case LIR::LIR_Op::PtrAdd:
             case LIR::LIR_Op::PtrSub: case LIR::LIR_Op::PtrDiff: case LIR::LIR_Op::PtrAlign:
             case LIR::LIR_Op::PtrIsAligned:
-            case LIR::LIR_Op::FFIAlloc: case LIR::LIR_Op::FFIFree: case LIR::LIR_Op::FFIRealloc:
-            case LIR::LIR_Op::FFIMemcpy: case LIR::LIR_Op::FFIMemset: case LIR::LIR_Op::FFIMemcmp:
-            case LIR::LIR_Op::FFIAddPtr: case LIR::LIR_Op::FFISubPtr: case LIR::LIR_Op::FFIPtrDiff:
-            case LIR::LIR_Op::FFIAlignPtr: case LIR::LIR_Op::FFIIsAligned:
-            case LIR::LIR_Op::FFILoadInt8: case LIR::LIR_Op::FFILoadUInt8: case LIR::LIR_Op::FFILoadInt16:
-            case LIR::LIR_Op::FFILoadUInt16: case LIR::LIR_Op::FFILoadInt32: case LIR::LIR_Op::FFILoadUInt32:
-            case LIR::LIR_Op::FFILoadInt64: case LIR::LIR_Op::FFILoadUInt64: case LIR::LIR_Op::FFILoadFloat:
-            case LIR::LIR_Op::FFILoadDouble: case LIR::LIR_Op::FFILoadPtr:
-            case LIR::LIR_Op::FFIStoreInt8: case LIR::LIR_Op::FFIStoreUInt8: case LIR::LIR_Op::FFIStoreInt16:
-            case LIR::LIR_Op::FFIStoreUInt16: case LIR::LIR_Op::FFIStoreInt32: case LIR::LIR_Op::FFIStoreUInt32:
-            case LIR::LIR_Op::FFIStoreInt64: case LIR::LIR_Op::FFIStoreUInt64: case LIR::LIR_Op::FFIStoreFloat:
-            case LIR::LIR_Op::FFIStoreDouble: case LIR::LIR_Op::FFIStorePtr:
                 execute_memory(pc); break;
             case LIR::LIR_Op::Marshal: case LIR::LIR_Op::Unmarshal: case LIR::LIR_Op::BufferView:
             case LIR::LIR_Op::BufferCreate: case LIR::LIR_Op::BufferResize: execute_marshal(pc); break;
             case LIR::LIR_Op::LibraryLoad: case LIR::LIR_Op::LibraryUnload: case LIR::LIR_Op::LibrarySymbol:
             case LIR::LIR_Op::ForeignCall: case LIR::LIR_Op::ForeignCallDirect: case LIR::LIR_Op::CallbackCreate:
-            case LIR::LIR_Op::CallbackDestroy: case LIR::LIR_Op::FFICCallExecute:
-            case LIR::LIR_Op::FFILibraryLoad: case LIR::LIR_Op::FFILibraryUnload: case LIR::LIR_Op::FFILibraryGetSymbol:
-            case LIR::LIR_Op::FFICallPtr: case LIR::LIR_Op::FFICallPtr0: case LIR::LIR_Op::FFICallPtr1:
-            case LIR::LIR_Op::FFICallPtr2: case LIR::LIR_Op::FFICallPtr3: case LIR::LIR_Op::FFICallPtr4:
-            case LIR::LIR_Op::FFICallPtr5:
+            case LIR::LIR_Op::CallbackDestroy:
                 execute_ffi(pc); break;
             case LIR::LIR_Op::Mov: registers[pc->dst] = registers[pc->a]; break;
             case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret: if (pc->a != UINT32_MAX) registers[0] = registers[pc->a]; return;
