@@ -35,9 +35,11 @@ This document tracks "Spec Drift" (unimplemented features), "Doc Drift" (inconsi
 | "Structured Concurrency" | Implemented via `parallel`/`concurrent` blocks. | ✅ |
 | "Absence of value handled explicitly" | defines `nil` and `Type?`, but `nil` exists. | ✅ |
 
-## 🛠 Verification Required
+## 🛠 Verification Complete
 
-- [ ] Standardize `self` usage across all docs.
-- [ ] Replace `class` with `frame` in `guide.md`.
-- [ ] Flag unimplemented operators in `language.md` as "planned".
-- [ ] Add `-repl` implementation or remove from `learn.md`.
+- [x] Standardize `self` usage across all docs.
+- [x] Replace `class` with `frame` in `guide.md`.
+- [x] Flag unimplemented operators in `language.md` as "planned".
+- [x] Remove `-repl` flag from docs and update `src/main.cpp` for default REPL behavior.
+- [x] Document private-by-default visibility.
+- [x] Document `const`/`val` and decimal types in guides.

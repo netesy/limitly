@@ -37,8 +37,9 @@ void printUsage(const char* programName) {
 
 int main(int argc, char* argv[]) {
     if (argc < 2) {
-        printUsage(argv[0]);
-        return 1;
+        // Default to REPL if no arguments provided
+        std::cout << "Limit Programming Language REPL (planned feature)\n";
+        return 0;
     }
     
     std::string command = argv[1];

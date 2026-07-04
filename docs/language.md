@@ -17,7 +17,7 @@ while, worker
 **Removed keywords** (now regular identifiers or deleted):
 - `this` — use `self` instead.
 - `class` — use `frame`.
-- `public`, `protected`, `private` — use `pub`/`prot`; declarations are private by default when neither is specified.
+- `public`, `protected`, `private` — use `pub`/`prot`; declarations are **private by default** (no explicit `private` keyword).
 - `open`, `property`, `cache`, `sleep` — removed; `sleep` is now a regular builtin function identifier.
 - `loop` — removed; use `for`, `while`, or `iter`.
 - `data` — removed; traits cover the same ground.
@@ -77,6 +77,13 @@ So `flags & READ == READ` parses as `(flags & READ) == READ`, and `flags << 1 ==
 - Integers: `i8`, `i16`, `i32`, `i64`, `i128`
 - Unsigned: `u8`, `u16`, `u32`, `u64`, `u128`
 - Floats: `f32`, `f64`
+- Decimals: `d2`, `d4`, `d6`, `decimal` (alias for `d4`). Stored as signed 64-bit integers with fixed scaling.
+
+#### 2.2.1 Decimal Rules
+- **Arithmetic**: Operations between decimals promote to the widest scale (e.g., `d2 + d4 -> d4`). Mixed arithmetic between decimals and floats/integers is disallowed.
+- **Comparisons**: Require exact scale matches. Comparing `d2` to `d4` is a compile-time error.
+- **Modulo**: Requires exact scale matches.
+- **Casting**: Narrowing casts (e.g., `d4 as d2`) trigger mandatory runtime traps if precision is lost.
 
 ### 2.3 Composite Types
 - **List**: `[Type]` — Dynamic array of elements.

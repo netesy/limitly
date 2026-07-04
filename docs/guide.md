@@ -106,8 +106,9 @@ The `limitly` executable is the interpreter for the Limit language, located in `
     ```
 
 *   **Start the REPL (interactive mode):**
+    Simply run the interpreter without any arguments:
     ```bash
-    ./bin/limitly -repl
+    ./bin/limitly
     ```
 
 ## Basic Syntax
@@ -116,7 +117,7 @@ This section covers the fundamental syntax of the Limit language.
 
 ### Variables
 
-Variables are declared using the `var` keyword. While the compiler can infer types, it is good practice to use explicit type annotations.
+Variables are declared using the `var` keyword. Constant bindings use `const` or `val`. While the compiler can infer types, it is good practice to use explicit type annotations.
 
 ```
 // Declare a variable with a type annotation
@@ -126,6 +127,10 @@ print(x); // Output: 10
 // Reassign the variable
 x = 20;
 print(x); // Output: 20
+
+// Immutable bindings
+const pi = 3.14;
+val name = "Limit";
 ```
 
 You can also declare multiple variables in a sequence.
@@ -143,6 +148,7 @@ Limit has several built-in primitive types:
 *   **`int`**: A signed integer (e.g., `10`, `-5`, `0`).
 *   **`uint`**: An unsigned integer.
 *   **`float`**: A floating-point number (e.g., `3.14`, `-0.01`).
+*   **`decimal`**: Fixed-precision decimal (default scale 4). Also supports `d2`, `d4`, `d6`.
 *   **`bool`**: A boolean value, which can be `true` or `false`.
 *   **`str`**: A string of characters (e.g., `"Hello, World!"`).
 *   **`nil`**: A special value representing "nothing" or "null".
@@ -150,6 +156,7 @@ Limit has several built-in primitive types:
 ```
 var my_integer: int = 42;
 var my_float: float = 3.14;
+var my_decimal: d2 = 10.50;
 var my_boolean: bool = true;
 var my_string: str = "Hello, Limit!";
 var my_nil: nil = nil;

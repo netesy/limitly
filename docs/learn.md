@@ -46,7 +46,7 @@ echo 'print("Limitly is working!");' > test.lm
 ./bin/limitly test.lm
 ```
 
-If you see "Limitly is working!", you're all set! (Note: The `-repl` mode is a planned feature).
+If you see "Limitly is working!", you're all set!
 
 ## ✍️ Your First Program
 
@@ -82,16 +82,17 @@ Now that you've written your first program, let's learn some of the basic buildi
 
 ### Variables and Types
 
-A variable is a name that refers to a value. You can create a variable using the `var` keyword. While Limit can sometimes infer the type, it's good practice to be explicit by adding a type annotation.
+A variable is a name that refers to a value. You can create a variable using the `var` keyword. Immutable bindings use `const` or `val`. While Limit can sometimes infer the type, it's good practice to be explicit by adding a type annotation.
 
 ```limit
 var my_age: int = 28;
-var my_name: str = "Jules";
+const my_name: str = "Jules";
 ```
 
 Limit is a statically-typed language, which means that every variable has a type that is known when you write the code. The basic types are:
 *   **`int`**: for integers (e.g., `10`, `-5`).
-*   **`float`**: for decimal numbers (e.g., `3.14`).
+*   **`float`**: for floating-point numbers (e.g., `3.14`).
+*   **`decimal`**: for fixed-precision numbers (e.g., `10.50`). Supports `d2`, `d4`, `d6`.
 *   **`bool`**: for `true` or `false`.
 *   **`str`**: for strings of text (e.g., `"Hello"`).
 
