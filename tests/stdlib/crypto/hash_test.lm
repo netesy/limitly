@@ -1,0 +1,15 @@
+import std.resource as res;
+print("Creating hash engine...");
+var engine_res_wrap = res.create_hash_engine();
+if (engine_res_wrap.is_ok()) {
+    print("Got engine resource");
+    var engine_res = engine_res_wrap.value;
+    var hasher = res.Hasher(r=engine_res);
+    hasher.open_algo(algo="sha256");
+    var digest = hasher.finalize();
+    engine_res.close();
+    if (digest != nil) {
+        print("Digest obtained");
+    }
+}
+print("Crypto hash tests finished!");

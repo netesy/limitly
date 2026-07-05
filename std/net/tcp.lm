@@ -2,127 +2,194 @@
 // Supports both client and server operations.
 
 import std.core as core;
-
-var RT_SOCKET: int = 1;
-var OP_CLOSE: int = 1;
-var OP_SEND: int = 4;
-var OP_RECEIVE: int = 5;
-var OP_CONNECT: int = 6;
-var OP_BIND: int = 23;
-var OP_LISTEN: int = 24;
-var OP_ACCEPT: int = 25;
-var OP_POLL: int = 10;
+import std.resource as res;
 
 frame TCPClient {
-    pub var handle: int;
+    var resource: res.Resource?;
+    var reader: res.Reader?;
+    var writer: res.Writer?;
+    var connector: res.Connector?;
+    var poller: res.Poller?;
 
     pub fn init() {
-        self.handle = -1;
+        self.resource = nil;
+        self.reader = nil;
+        self.writer = nil;
+        self.connector = nil;
+        self.poller = nil;
     }
 
     // Connect to a remote host:port
     pub fn connect(address: str, port: int): int?core.Error {
-        var h = resource_create(RT_SOCKET, []);
-        if (h == -1) return err(core.Error { code: "ERR", message: "Failed to create socket resource" });
-
-        var success = resource_call(h, OP_CONNECT, [address, port]);
-        if (success != true) {
-            resource_destroy(h);
-            return err(core.Error { code: "ERR", message: "Failed to connect to " + address + ":" + port as str });
+        match (res.create_socket()) {
+            case ok(r) => {
+                var connector = res.Connector(r);
+                if (connector.connect([address, port])) {
+                    self.resource = ok(r);
+                    self.reader = ok(res.Reader(r));
+                    self.writer = ok(res.Writer(r));
+                    self.connector = ok(connector);
+                    self.poller = ok(res.Poller(r));
+                    return ok(r._handle());
+                } else {
+                    r.close();
+                    return err(core.Error { code: "ERR", message: "Failed to connect to " + address + ":" + port as str });
+                }
+            }
+            case err(e) => return err(core.Error { code: "ERR", message: "Failed to create socket resource" });
         }
-
-        self.handle = h;
-        return ok(h);
     }
 
     // Send raw string data over the connection
     pub fn send(data: str): int?core.Error {
-        if (self.handle <= 0) return err(core.Error { code: "ERR", message: "socket not connected" });
-        var result = resource_call(self.handle, OP_SEND, [data]);
-        if (result == true) return ok(len(data));
-        return err(core.Error { code: "ERR", message: "send failed" });
+        match (self.writer) {
+            case ok(w) => {
+                var result = w.write([data]);
+                if (result == true) return ok(len(data));
+                return err(core.Error { code: "ERR", message: "send failed" });
+            }
+            case nil => return err(core.Error { code: "ERR", message: "socket not connected" });
+        }
     }
 
     // Receive data from the connection (up to 64KB)
     pub fn recv(): str?core.Error {
-        if (self.handle <= 0) return err(core.Error { code: "ERR", message: "socket not connected" });
-        var data = resource_call(self.handle, OP_RECEIVE, []);
-        if (data == nil) return err(core.Error { code: "ERR", message: "connection closed or recv failed" });
-        return ok(data as str);
+        match (self.reader) {
+            case ok(rd) => {
+                var data = rd.read([]);
+                if (data == nil) return err(core.Error { code: "ERR", message: "connection closed or recv failed" });
+                return ok(data as str);
+            }
+            case nil => return err(core.Error { code: "ERR", message: "socket not connected" });
+        }
     }
 
     // Check if data is available to read (non-blocking)
     pub fn has_data(): bool {
-        if (self.handle <= 0) return false;
-        var result = resource_call(self.handle, OP_POLL, []);
-        return result == true;
+        match (self.poller) {
+            case ok(p) => return p.poll();
+            case nil => return false;
+        }
     }
 
     // Close the connection
     pub fn close(): nil?core.Error {
-        if (self.handle <= 0) return ok(nil);
-        resource_call(self.handle, OP_CLOSE, []);
-        resource_destroy(self.handle);
-        self.handle = -1;
-        return ok(nil);
+        match (self.resource) {
+            case ok(r) => {
+                r.close();
+                self.resource = nil;
+                self.reader = nil;
+                self.writer = nil;
+                self.connector = nil;
+                self.poller = nil;
+                return ok(nil);
+            }
+            case nil => return ok(nil);
+        }
     }
 
     // Check if the socket is connected
     pub fn is_connected(): bool {
-        return self.handle > 0;
+        match (self.resource) {
+            case ok(r) => return r.is_open();
+            case nil => return false;
+        }
+    }
+
+    pub fn handle(): int {
+        match (self.resource) {
+            case ok(r) => return r._handle();
+            case nil => return -1;
+        }
     }
 }
 
 frame TCPServer {
-    pub var handle: int;
+    var resource: res.Resource?;
+    var binder: res.Binder?;
+    var listener: res.Listener?;
+    var accepter: res.Accepter?;
 
     pub fn init() {
-        self.handle = -1;
+        self.resource = nil;
+        self.binder = nil;
+        self.listener = nil;
+        self.accepter = nil;
     }
 
     // Bind to a specific address and port
     pub fn bind(address: str, port: int): int?core.Error {
-        var h = resource_create(RT_SOCKET, []);
-        if (h == -1) return err(core.Error { code: "ERR", message: "Failed to create socket" });
-
-        var success = resource_call(h, OP_BIND, [address, port]);
-        if (success != true) {
-            resource_destroy(h);
-            return err(core.Error { code: "ERR", message: "Failed to bind to " + address + ":" + port as str });
+        match (res.create_socket()) {
+            case ok(r) => {
+                var binder = res.Binder(r);
+                if (binder.bind([address, port])) {
+                    self.resource = ok(r);
+                    self.binder = ok(binder);
+                    return ok(r._handle());
+                } else {
+                    r.close();
+                    return err(core.Error { code: "ERR", message: "Failed to bind to " + address + ":" + port as str });
+                }
+            }
+            case err(e) => return err(core.Error { code: "ERR", message: "Failed to create socket" });
         }
-        self.handle = h;
-        return ok(h);
     }
 
     // Listen for incoming connections
     pub fn listen(backlog: int): int?core.Error {
-        if (self.handle <= 0) return err(core.Error { code: "ERR", message: "socket not bound" });
-        var success = resource_call(self.handle, OP_LISTEN, [backlog]);
-        if (success != true) return err(core.Error { code: "ERR", message: "listen failed" });
-        return ok(self.handle);
+        match (self.resource) {
+            case ok(r) => {
+                var listener = res.Listener(r);
+                if (listener.listen([backlog])) {
+                    self.listener = ok(listener);
+                    self.accepter = ok(res.Accepter(r));
+                    return ok(r._handle());
+                } else {
+                    return err(core.Error { code: "ERR", message: "listen failed" });
+                }
+            }
+            case nil => return err(core.Error { code: "ERR", message: "socket not bound" });
+        }
     }
 
     // Accept a new connection, returns a TCPClient
     pub fn accept(): TCPClient?core.Error {
-        if (self.handle <= 0) return err(core.Error { code: "ERR", message: "socket not listening" });
-        var client_fd = resource_call(self.handle, OP_ACCEPT, []);
-        if (client_fd == nil) return err(core.Error { code: "ERR", message: "accept failed or no pending connection" });
+        match (self.accepter) {
+            case ok(acc) => {
+                var client_fd = acc.accept();
+                if (client_fd == -1) return err(core.Error { code: "ERR", message: "accept failed or no pending connection" });
 
-        // Create a new socket resource wrapping the accepted fd
-        var client_handle = resource_create(RT_SOCKET, [client_fd]);
-        if (client_handle == -1) return err(core.Error { code: "ERR", message: "failed to adopt client socket" });
-
-        var client = TCPClient();
-        client.handle = client_handle;
-        return ok(client);
+                var cr = res.adopt_socket(client_fd);
+                var client = TCPClient();
+                client.resource = ok(cr);
+                client.reader = ok(res.Reader(cr));
+                client.writer = ok(res.Writer(cr));
+                client.poller = ok(res.Poller(cr));
+                return ok(client);
+            }
+            case nil => return err(core.Error { code: "ERR", message: "socket not listening" });
+        }
     }
 
     // Close the server socket
     pub fn close(): nil?core.Error {
-        if (self.handle <= 0) return ok(nil);
-        resource_call(self.handle, OP_CLOSE, []);
-        resource_destroy(self.handle);
-        self.handle = -1;
-        return ok(nil);
+        match (self.resource) {
+            case ok(r) => {
+                r.close();
+                self.resource = nil;
+                self.binder = nil;
+                self.listener = nil;
+                self.accepter = nil;
+                return ok(nil);
+            }
+            case nil => return ok(nil);
+        }
+    }
+
+    pub fn handle(): int {
+        match (self.resource) {
+            case ok(r) => return r._handle();
+            case nil => return -1;
+        }
     }
 }

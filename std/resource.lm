@@ -1,0 +1,236 @@
+// Standard Library Resource Module
+// Capability-based abstraction for runtime-backed objects.
+
+import std.internal.runtime as runtime;
+
+frame ResourceInvalid { pub var handle: int; }
+frame OperationFailed { pub var operation: str; pub var message: str; }
+frame PermissionDenied { pub var message: str; }
+frame UnknownError { pub var message: str; }
+
+pub type ResourceError = ResourceInvalid | OperationFailed | PermissionDenied | UnknownError;
+
+frame Resource {
+    pub var handle: int;
+    pub var kind: int;
+    pub var is_open_val: bool;
+
+    pub init(h: int, k: int) {
+        self.handle = h;
+        self.kind = k;
+        self.is_open_val = (h != -1);
+    }
+
+    pub fn is_open(): bool {
+        return self.is_open_val;
+    }
+
+    pub fn close(): nil?ResourceError {
+        if (!self.is_open_val) return ok(nil);
+        runtime.call(self.handle, runtime.OP_CLOSE, []);
+        runtime.destroy(self.handle);
+        self.is_open_val = false;
+        return ok(nil);
+    }
+}
+
+frame Reader {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn read(args: [any]): any {
+        return runtime.call(self.resource.handle, runtime.OP_READ, args);
+    }
+}
+
+frame Writer {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn write(args: [any]): any {
+        return runtime.call(self.resource.handle, runtime.OP_WRITE, args);
+    }
+}
+
+frame Flusher {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn flush(): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_FLUSH, []);
+        return (res == true);
+    }
+}
+
+frame Connector {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn connect(args: [any]): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_CONNECT, args);
+        return (res == true);
+    }
+}
+
+frame Binder {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn bind(args: [any]): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_BIND, args);
+        return (res == true);
+    }
+}
+
+frame Listener {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn listen(args: [any]): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_LISTEN, args);
+        return (res == true);
+    }
+}
+
+frame Accepter {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn accept(): int {
+        var res = runtime.call(self.resource.handle, runtime.OP_ACCEPT, []);
+        if (res == nil) return -1;
+        return res as int;
+    }
+}
+
+frame Poller {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn poll(): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_POLL, []);
+        return (res == true);
+    }
+}
+
+frame FileSystem {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn exists(path: str): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_EXISTS, [path]);
+        return (res == true);
+    }
+    pub fn delete(path: str): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_DELETE, [path]);
+        return (res == true);
+    }
+    pub fn rename(old: str, new: str): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_RENAME, [old, new]);
+        return (res == true);
+    }
+    pub fn mkdir(path: str): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_MKDIR, [path]);
+        return (res == true);
+    }
+    pub fn readdir(path: str): any {
+        return runtime.call(self.resource.handle, runtime.OP_READDIR, [path]);
+    }
+}
+
+frame Hasher {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn open_algo(algo: str): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_OPEN, [algo]);
+        return (res == true);
+    }
+    pub fn update(data: str): bool {
+        var res = runtime.call(self.resource.handle, runtime.OP_WRITE, [data]);
+        return (res == true);
+    }
+    pub fn finalize(): any {
+        return runtime.call(self.resource.handle, runtime.OP_READ, []);
+    }
+    pub fn hmac(algo: str, key: str, data: str): any {
+        return runtime.call(self.resource.handle, runtime.OP_HMAC, [algo, key, data]);
+    }
+}
+
+frame Resolver {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn resolve(host: str): any {
+        return runtime.call(self.resource.handle, runtime.OP_RESOLVE, [host]);
+    }
+}
+
+frame Datagram {
+    var resource: Resource;
+    pub init(r: Resource) { self.resource = r; }
+    pub fn send_to(addr: str, port: int, data: str): any {
+        return runtime.call(self.resource.handle, runtime.OP_SEND_TO, [addr, port, data]);
+    }
+    pub fn recv_from(): any {
+        return runtime.call(self.resource.handle, runtime.OP_RECV_FROM, []);
+    }
+}
+
+// --- Factory Functions ---
+
+pub fn open_file(path: str, mode: str): Resource?ResourceError {
+    var h = runtime.create(runtime.RT_FILE, [path, mode]);
+    if (h == -1) return err(UnknownError { message: "fail" });
+    var r = Resource(h=h, k=runtime.RT_FILE);
+    var success = runtime.call(h, runtime.OP_OPEN, [path, mode]);
+    if (!success) {
+        r.close();
+        return err(UnknownError { message: "fail" });
+    }
+    return ok(r);
+}
+
+pub fn create_fs_resource(): Resource?ResourceError {
+    var h = runtime.create(runtime.RT_FILE, []);
+    if (h == -1) return err(UnknownError { message: "fail" });
+    return ok(Resource(h=h, k=runtime.RT_FILE));
+}
+
+pub fn create_socket(): Resource?ResourceError {
+    var h = runtime.create(runtime.RT_SOCKET, []);
+    if (h == -1) return err(UnknownError { message: "fail" });
+    return ok(Resource(h=h, k=runtime.RT_SOCKET));
+}
+
+pub fn adopt_socket(fd: int): Resource {
+    var h = runtime.create(runtime.RT_SOCKET, [fd]);
+    return Resource(h=h, k=runtime.RT_SOCKET);
+}
+
+pub fn create_udp_socket(): Resource?ResourceError {
+    var h = runtime.create(runtime.RT_UDP_SOCKET, []);
+    if (h == -1) return err(UnknownError { message: "fail" });
+    return ok(Resource(h=h, k=runtime.RT_UDP_SOCKET));
+}
+
+pub fn create_websocket(): Resource?ResourceError {
+    var h = runtime.create(runtime.RT_WEBSOCKET, []);
+    if (h == -1) return err(UnknownError { message: "fail" });
+    return ok(Resource(h=h, k=runtime.RT_WEBSOCKET));
+}
+
+pub fn create_dns_resolver(): Resource?ResourceError {
+    var h = runtime.create(runtime.RT_DNS_RESOLVER, []);
+    if (h == -1) return err(UnknownError { message: "fail" });
+    return ok(Resource(h=h, k=runtime.RT_DNS_RESOLVER));
+}
+
+pub fn create_entropy(): Resource?ResourceError {
+    var h = runtime.create(runtime.RT_ENTROPY, [ []]);
+    if (h == -1) return err(UnknownError { message: "fail" });
+    return ok(Resource(h=h, k=runtime.RT_ENTROPY));
+}
+
+pub fn create_hash_engine(): Resource?ResourceError {
+    var h = runtime.create(runtime.RT_HASH_ENGINE, []);
+    if (h == -1) return err(UnknownError { message: "fail" });
+    return ok(Resource(h=h, k=runtime.RT_HASH_ENGINE));
+}
+
+pub fn adopt_hash_engine(h: int): Resource {
+    return Resource(h=h, k=runtime.RT_HASH_ENGINE);
+}
+
+// Pre-allocated resources
+pub var stdout: Resource = Resource(h=0, k=runtime.RT_STDOUT);

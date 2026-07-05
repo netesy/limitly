@@ -1,15 +1,8 @@
 // Cryptographic Hash Functions Module
-// Uses the native HASH_ENGINE resource (type 16) for correct SHA-256/512/MD5/SHA-1.
+// Uses the native HASH_ENGINE resource for correct SHA-256/512/MD5/SHA-1.
 
 import std.core as core;
-
-// Resource type and operation codes (must match resource_types.hh)
-var RT_HASH_ENGINE: int = 16;
-var OP_OPEN: int = 0;
-var OP_CLOSE: int = 1;
-var OP_READ: int = 2;
-var OP_WRITE: int = 3;
-var OP_HMAC: int = 35;
+import std.resource as res;
 
 frame Hash {
 
@@ -18,103 +11,95 @@ frame Hash {
         if (algorithm != "sha256" and algorithm != "sha512" and algorithm != "md5" and algorithm != "sha1") {
             return err(core.Error { code: "ERR", message: "unsupported algorithm: " + algorithm });
         }
-        var engine = resource_create(RT_HASH_ENGINE, []);
-        if (engine == -1) return err(core.Error { code: "ERR", message: "failed to create hash engine resource" });
+        match res.create_hash_engine() {
+            case ok(engine_res) => {
+                var hasher = res.Hasher(engine_res);
+                if (not hasher.open_algo(algorithm)) {
+                    engine_res.close();
+                    return err(core.Error { code: "ERR", message: "failed to initialize " + algorithm });
+                }
 
-        var init = resource_call(engine, OP_OPEN, [algorithm]);
-        if (init != true) {
-            resource_destroy(engine);
-            return err(core.Error { code: "ERR", message: "failed to initialize " + algorithm });
+                if (not hasher.update(data)) {
+                    engine_res.close();
+                    return err(core.Error { code: "ERR", message: "failed to feed data to " + algorithm });
+                }
+
+                var result = hasher.finalize();
+                engine_res.close();
+
+                if (result == nil) return err(core.Error { code: "ERR", message: algorithm + " digest computation failed" });
+                return ok(result as str);
+            }
+            case err(e) => return err(core.Error { code: "ERR", message: "failed to create hash engine resource" });
         }
-
-        var wrote = resource_call(engine, OP_WRITE, [data]);
-        if (wrote != true) {
-            resource_destroy(engine);
-            return err(core.Error { code: "ERR", message: "failed to feed data to " + algorithm });
-        }
-
-        var result = resource_call(engine, OP_READ, []);
-        resource_destroy(engine);
-
-        if (result == nil) return err(core.Error { code: "ERR", message: algorithm + " digest computation failed" });
-        return ok(result as str);
     }
 
     // ---- SHA-256 ----
-    pub fn sha256(data: str): str?core.Error {
-        return self.hash(data, "sha256");
-    }
+    pub fn sha256(data: str): str?core.Error { return self.hash(data, "sha256"); }
 
     // ---- SHA-512 ----
-    pub fn sha512(data: str): str?core.Error {
-        return self.hash(data, "sha512");
-    }
+    pub fn sha512(data: str): str?core.Error { return self.hash(data, "sha512"); }
 
     // ---- MD5 ----
-    pub fn md5(data: str): str?core.Error {
-        return self.hash(data, "md5");
-    }
+    pub fn md5(data: str): str?core.Error { return self.hash(data, "md5"); }
 
     // ---- SHA-1 ----
-    pub fn sha1(data: str): str?core.Error {
-        return self.hash(data, "sha1");
-    }
+    pub fn sha1(data: str): str?core.Error { return self.hash(data, "sha1"); }
 
     // ---- Streaming API: create a hash engine, update, then finalize ----
     pub fn create(algorithm: str): int?core.Error {
         if (algorithm != "sha256" and algorithm != "sha512" and algorithm != "md5" and algorithm != "sha1") {
             return err(core.Error { code: "ERR", message: "unsupported algorithm: " + algorithm });
         }
-        var engine = resource_create(RT_HASH_ENGINE, []);
-        if (engine == -1) return err(core.Error { code: "ERR", message: "failed to create hash engine resource" });
-        var init = resource_call(engine, OP_OPEN, [algorithm]);
-        if (init != true) {
-            resource_destroy(engine);
-            return err(core.Error { code: "ERR", message: "failed to initialize " + algorithm });
+        match res.create_hash_engine() {
+            case ok(engine_res) => {
+                var hasher = res.Hasher(engine_res);
+                if (not hasher.open_algo(algorithm)) {
+                    engine_res.close();
+                    return err(core.Error { code: "ERR", message: "failed to initialize " + algorithm });
+                }
+                return ok(engine_res._handle());
+            }
+            case err(e) => return err(core.Error { code: "ERR", message: "failed to create hash engine resource" });
         }
-        return ok(engine);
     }
 
     pub fn update(handle: int, data: str): nil?core.Error {
         if (handle <= 0) return err(core.Error { code: "ERR", message: "invalid hash engine handle" });
-        var wrote = resource_call(handle, OP_WRITE, [data]);
-        if (wrote != true) return err(core.Error { code: "ERR", message: "failed to update hash" });
+        var engine_res = res.adopt_hash_engine(handle);
+        var hasher = res.Hasher(engine_res);
+        if (not hasher.update(data)) return err(core.Error { code: "ERR", message: "failed to update hash" });
         return ok(nil);
     }
 
     pub fn finalize(handle: int): str?core.Error {
         if (handle <= 0) return err(core.Error { code: "ERR", message: "invalid hash engine handle" });
-        var result = resource_call(handle, OP_READ, []);
-        resource_destroy(handle);
+        var engine_res = res.adopt_hash_engine(handle);
+        var hasher = res.Hasher(engine_res);
+        var result = hasher.finalize();
+        engine_res.close();
         if (result == nil) return err(core.Error { code: "ERR", message: "hash finalization failed" });
         return ok(result as str);
     }
 
     // ---- HMAC implementations ----
     pub fn hmac(data: str, key: str, algorithm: str): str?core.Error {
-        var engine = resource_create(RT_HASH_ENGINE, []);
-        if (engine == -1) return err(core.Error { code: "ERR", message: "failed to create hash engine resource" });
-        var res = resource_call(engine, OP_HMAC, [algorithm, key, data]);
-        resource_destroy(engine);
-        if (res == nil) return err(core.Error { code: "ERR", message: "HMAC computation failed" });
-        return ok(res as str);
+        match res.create_hash_engine() {
+            case ok(engine_res) => {
+                var hasher = res.Hasher(engine_res);
+                var result = hasher.hmac(algorithm, key, data);
+                engine_res.close();
+                if (result == nil) return err(core.Error { code: "ERR", message: "HMAC computation failed" });
+                return ok(result as str);
+            }
+            case err(e) => return err(core.Error { code: "ERR", message: "failed to create hash engine resource" });
+        }
     }
 
-    pub fn hmac_sha256(data: str, key: str): str?core.Error {
-        return self.hmac(data, key, "sha256");
-    }
-
-    pub fn hmac_sha512(data: str, key: str): str?core.Error {
-        return self.hmac(data, key, "sha512");
-    }
-
-    pub fn hmac_md5(data: str, key: str): str?core.Error {
-        return self.hmac(data, key, "md5");
-    }
-
-    pub fn hmac_sha1(data: str, key: str): str?core.Error {
-        return self.hmac(data, key, "sha1");
-    }
+    pub fn hmac_sha256(data: str, key: str): str?core.Error { return self.hmac(data, key, "sha256"); }
+    pub fn hmac_sha512(data: str, key: str): str?core.Error { return self.hmac(data, key, "sha512"); }
+    pub fn hmac_md5(data: str, key: str): str?core.Error { return self.hmac(data, key, "md5"); }
+    pub fn hmac_sha1(data: str, key: str): str?core.Error { return self.hmac(data, key, "sha1"); }
 
     // ---- Hash verification ----
     pub fn verify(data: str, expected_hash: str, algorithm: str): bool {
@@ -138,33 +123,13 @@ frame Hash {
 }
 
 // ---- Standalone convenience functions ----
-pub fn sha256(data: str): str?core.Error {
-    return Hash.sha256(data);
-}
-
-pub fn sha512(data: str): str?core.Error {
-    return Hash.sha512(data);
-}
-
-pub fn md5(data: str): str?core.Error {
-    return Hash.md5(data);
-}
-
-pub fn sha1(data: str): str?core.Error {
-    return Hash.sha1(data);
-}
-
-pub fn hash_data(data: str, algorithm: str): str?core.Error {
-    return Hash.hash(data, algorithm);
-}
-
-pub fn hmac_sha256(data: str, key: str): str?core.Error {
-    return Hash.hmac_sha256(data, key);
-}
-
-pub fn hmac_sha512(data: str, key: str): str?core.Error {
-    return Hash.hmac_sha512(data, key);
-}
+pub fn sha256(data: str): str?core.Error { return Hash.sha256(data); }
+pub fn sha512(data: str): str?core.Error { return Hash.sha512(data); }
+pub fn md5(data: str): str?core.Error { return Hash.md5(data); }
+pub fn sha1(data: str): str?core.Error { return Hash.sha1(data); }
+pub fn hash_data(data: str, algorithm: str): str?core.Error { return Hash.hash(data, algorithm); }
+pub fn hmac_sha256(data: str, key: str): str?core.Error { return Hash.hmac_sha256(data, key); }
+pub fn hmac_sha512(data: str, key: str): str?core.Error { return Hash.hmac_sha512(data, key); }
 
 // ---- Internal byte helpers ----
 fn byte_ord(ch: str): int {

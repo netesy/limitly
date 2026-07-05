@@ -1,10 +1,8 @@
 // Standard Library DNS Module (Unified Resource System)
-// Uses the native DNS_RESOLVER resource (type 13) with RESOLVE=26 operation.
+// Uses the native DNS_RESOLVER resource.
 
 import std.core as core;
-
-var RT_DNS: int = 13;
-var OP_RESOLVE: int = 26;
+import std.resource as res;
 
 frame DNS {
 
@@ -12,14 +10,17 @@ frame DNS {
     pub fn resolve(host: str): str?core.Error {
         if (host == "") return err(core.Error { code: "ERR", message: "empty host name" });
         
-        var resolver = resource_create(RT_DNS, []);
-        if (resolver == -1) return err(core.Error { code: "ERR", message: "failed to create DNS resolver resource" });
+        match res.create_dns_resolver() {
+            case ok(resolver_res) => {
+                var resolver = res.Resolver(resolver_res);
+                var result = resolver.resolve(host);
+                resolver_res.close();
 
-        var result = resource_call(resolver, OP_RESOLVE, [host]);
-        resource_destroy(resolver);
-
-        if (result == nil) return err(core.Error { code: "ERR", message: "DNS resolution failed for host: " + host });
-        return ok(result as str);
+                if (result == nil) return err(core.Error { code: "ERR", message: "DNS resolution failed for host: " + host });
+                return ok(result as str);
+            }
+            case err(e) => return err(core.Error { code: "ERR", message: "failed to create DNS resolver resource" });
+        }
     }
 
     // Check if a string looks like a valid IPv4 address

@@ -1,0 +1,4 @@
+import std.resource as res;
+print("Starting...");
+var r_wrap = res.create_hash_engine();
+print("Result is " + r_wrap as str);

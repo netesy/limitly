@@ -1,0 +1,337 @@
+[1;31m[1merror[E003]: Function 'open_file' declares 'throws' but return type is not an error union type[0m
+  [1m-->[0m std/resource.lm:175:1
+    174 |
+    175 | pub fn open_file(path: str, mode: str): Resource?ResourceError {
+    176 |     var h = runtime.create(runtime.RT_FILE, [path, mode]);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Nil?[0m
+  [1m-->[0m std/resource.lm:177:1
+    176 |     var h = runtime.create(runtime.RT_FILE, [path, mode]);
+    177 |     if (h == -1) return err(UnknownError(message="failed to create file resource"));
+    178 |     var r = Resource(h=h, k=runtime.RT_FILE);
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Nil?[0m
+  [1m-->[0m std/resource.lm:182:1
+    181 |         r.close();
+    182 |         return err(UnknownError(message="failed to open file: " + path));
+    183 |     }
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Frame<Resource>?[0m
+  [1m-->[0m std/resource.lm:184:1
+    183 |     }
+    184 |     return ok(r);
+    185 | }
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Function 'open_file' declares error type 'ResourceError' but function body cannot produce this error type[0m
+  [1m-->[0m std/resource.lm:175:1
+    174 |
+    175 | pub fn open_file(path: str, mode: str): Resource?ResourceError {
+    176 |     var h = runtime.create(runtime.RT_FILE, [path, mode]);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'open_file' body can produce error type 'UnknownError' but it is not declared in function signature[0m
+  [1m-->[0m std/resource.lm:175:1
+    174 |
+    175 | pub fn open_file(path: str, mode: str): Resource?ResourceError {
+    176 |     var h = runtime.create(runtime.RT_FILE, [path, mode]);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_fs_resource' declares 'throws' but return type is not an error union type[0m
+  [1m-->[0m std/resource.lm:187:1
+    186 |
+    187 | pub fn create_fs_resource(): Resource?ResourceError {
+    188 |     var h = runtime.create(runtime.RT_FILE, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Nil?[0m
+  [1m-->[0m std/resource.lm:189:1
+    188 |     var h = runtime.create(runtime.RT_FILE, []);
+    189 |     if (h == -1) return err(UnknownError(message="failed to create fs resource"));
+    190 |     return ok(Resource(h=h, k=runtime.RT_FILE));
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Frame<Resource>?[0m
+  [1m-->[0m std/resource.lm:190:1
+    189 |     if (h == -1) return err(UnknownError(message="failed to create fs resource"));
+    190 |     return ok(Resource(h=h, k=runtime.RT_FILE));
+    191 | }
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Function 'create_fs_resource' declares error type 'ResourceError' but function body cannot produce this error type[0m
+  [1m-->[0m std/resource.lm:187:1
+    186 |
+    187 | pub fn create_fs_resource(): Resource?ResourceError {
+    188 |     var h = runtime.create(runtime.RT_FILE, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_fs_resource' body can produce error type 'UnknownError' but it is not declared in function signature[0m
+  [1m-->[0m std/resource.lm:187:1
+    186 |
+    187 | pub fn create_fs_resource(): Resource?ResourceError {
+    188 |     var h = runtime.create(runtime.RT_FILE, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_socket' declares 'throws' but return type is not an error union type[0m
+  [1m-->[0m std/resource.lm:193:1
+    192 |
+    193 | pub fn create_socket(): Resource?ResourceError {
+    194 |     var h = runtime.create(runtime.RT_SOCKET, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Nil?[0m
+  [1m-->[0m std/resource.lm:195:1
+    194 |     var h = runtime.create(runtime.RT_SOCKET, []);
+    195 |     if (h == -1) return err(UnknownError(message="failed to create socket resource"));
+    196 |     return ok(Resource(h=h, k=runtime.RT_SOCKET));
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Frame<Resource>?[0m
+  [1m-->[0m std/resource.lm:196:1
+    195 |     if (h == -1) return err(UnknownError(message="failed to create socket resource"));
+    196 |     return ok(Resource(h=h, k=runtime.RT_SOCKET));
+    197 | }
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Function 'create_socket' declares error type 'ResourceError' but function body cannot produce this error type[0m
+  [1m-->[0m std/resource.lm:193:1
+    192 |
+    193 | pub fn create_socket(): Resource?ResourceError {
+    194 |     var h = runtime.create(runtime.RT_SOCKET, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_socket' body can produce error type 'UnknownError' but it is not declared in function signature[0m
+  [1m-->[0m std/resource.lm:193:1
+    192 |
+    193 | pub fn create_socket(): Resource?ResourceError {
+    194 |     var h = runtime.create(runtime.RT_SOCKET, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_udp_socket' declares 'throws' but return type is not an error union type[0m
+  [1m-->[0m std/resource.lm:204:1
+    203 |
+    204 | pub fn create_udp_socket(): Resource?ResourceError {
+    205 |     var h = runtime.create(runtime.RT_UDP_SOCKET, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Nil?[0m
+  [1m-->[0m std/resource.lm:206:1
+    205 |     var h = runtime.create(runtime.RT_UDP_SOCKET, []);
+    206 |     if (h == -1) return err(UnknownError(message="failed to create udp resource"));
+    207 |     return ok(Resource(h=h, k=runtime.RT_UDP_SOCKET));
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Frame<Resource>?[0m
+  [1m-->[0m std/resource.lm:207:1
+    206 |     if (h == -1) return err(UnknownError(message="failed to create udp resource"));
+    207 |     return ok(Resource(h=h, k=runtime.RT_UDP_SOCKET));
+    208 | }
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Function 'create_udp_socket' declares error type 'ResourceError' but function body cannot produce this error type[0m
+  [1m-->[0m std/resource.lm:204:1
+    203 |
+    204 | pub fn create_udp_socket(): Resource?ResourceError {
+    205 |     var h = runtime.create(runtime.RT_UDP_SOCKET, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_udp_socket' body can produce error type 'UnknownError' but it is not declared in function signature[0m
+  [1m-->[0m std/resource.lm:204:1
+    203 |
+    204 | pub fn create_udp_socket(): Resource?ResourceError {
+    205 |     var h = runtime.create(runtime.RT_UDP_SOCKET, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_websocket' declares 'throws' but return type is not an error union type[0m
+  [1m-->[0m std/resource.lm:210:1
+    209 |
+    210 | pub fn create_websocket(): Resource?ResourceError {
+    211 |     var h = runtime.create(runtime.RT_WEBSOCKET, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Nil?[0m
+  [1m-->[0m std/resource.lm:212:1
+    211 |     var h = runtime.create(runtime.RT_WEBSOCKET, []);
+    212 |     if (h == -1) return err(UnknownError(message="failed to create websocket resource"));
+    213 |     return ok(Resource(h=h, k=runtime.RT_WEBSOCKET));
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Frame<Resource>?[0m
+  [1m-->[0m std/resource.lm:213:1
+    212 |     if (h == -1) return err(UnknownError(message="failed to create websocket resource"));
+    213 |     return ok(Resource(h=h, k=runtime.RT_WEBSOCKET));
+    214 | }
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Function 'create_websocket' declares error type 'ResourceError' but function body cannot produce this error type[0m
+  [1m-->[0m std/resource.lm:210:1
+    209 |
+    210 | pub fn create_websocket(): Resource?ResourceError {
+    211 |     var h = runtime.create(runtime.RT_WEBSOCKET, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_websocket' body can produce error type 'UnknownError' but it is not declared in function signature[0m
+  [1m-->[0m std/resource.lm:210:1
+    209 |
+    210 | pub fn create_websocket(): Resource?ResourceError {
+    211 |     var h = runtime.create(runtime.RT_WEBSOCKET, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_dns_resolver' declares 'throws' but return type is not an error union type[0m
+  [1m-->[0m std/resource.lm:216:1
+    215 |
+    216 | pub fn create_dns_resolver(): Resource?ResourceError {
+    217 |     var h = runtime.create(runtime.RT_DNS_RESOLVER, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Nil?[0m
+  [1m-->[0m std/resource.lm:218:1
+    217 |     var h = runtime.create(runtime.RT_DNS_RESOLVER, []);
+    218 |     if (h == -1) return err(UnknownError(message="failed to create dns resource"));
+    219 |     return ok(Resource(h=h, k=runtime.RT_DNS_RESOLVER));
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Frame<Resource>?[0m
+  [1m-->[0m std/resource.lm:219:1
+    218 |     if (h == -1) return err(UnknownError(message="failed to create dns resource"));
+    219 |     return ok(Resource(h=h, k=runtime.RT_DNS_RESOLVER));
+    220 | }
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Function 'create_dns_resolver' declares error type 'ResourceError' but function body cannot produce this error type[0m
+  [1m-->[0m std/resource.lm:216:1
+    215 |
+    216 | pub fn create_dns_resolver(): Resource?ResourceError {
+    217 |     var h = runtime.create(runtime.RT_DNS_RESOLVER, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_dns_resolver' body can produce error type 'UnknownError' but it is not declared in function signature[0m
+  [1m-->[0m std/resource.lm:216:1
+    215 |
+    216 | pub fn create_dns_resolver(): Resource?ResourceError {
+    217 |     var h = runtime.create(runtime.RT_DNS_RESOLVER, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_entropy' declares 'throws' but return type is not an error union type[0m
+  [1m-->[0m std/resource.lm:222:1
+    221 |
+    222 | pub fn create_entropy(): Resource?ResourceError {
+    223 |     var h = runtime.create(runtime.RT_ENTROPY, [ []]);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Nil?[0m
+  [1m-->[0m std/resource.lm:224:1
+    223 |     var h = runtime.create(runtime.RT_ENTROPY, [ []]);
+    224 |     if (h == -1) return err(UnknownError(message="failed to create entropy resource"));
+    225 |     return ok(Resource(h=h, k=runtime.RT_ENTROPY));
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Frame<Resource>?[0m
+  [1m-->[0m std/resource.lm:225:1
+    224 |     if (h == -1) return err(UnknownError(message="failed to create entropy resource"));
+    225 |     return ok(Resource(h=h, k=runtime.RT_ENTROPY));
+    226 | }
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Function 'create_entropy' declares error type 'ResourceError' but function body cannot produce this error type[0m
+  [1m-->[0m std/resource.lm:222:1
+    221 |
+    222 | pub fn create_entropy(): Resource?ResourceError {
+    223 |     var h = runtime.create(runtime.RT_ENTROPY, [ []]);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_entropy' body can produce error type 'UnknownError' but it is not declared in function signature[0m
+  [1m-->[0m std/resource.lm:222:1
+    221 |
+    222 | pub fn create_entropy(): Resource?ResourceError {
+    223 |     var h = runtime.create(runtime.RT_ENTROPY, [ []]);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_hash_engine' declares 'throws' but return type is not an error union type[0m
+  [1m-->[0m std/resource.lm:228:1
+    227 |
+    228 | pub fn create_hash_engine(): Resource?ResourceError {
+    229 |     var h = runtime.create(runtime.RT_HASH_ENGINE, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Nil?[0m
+  [1m-->[0m std/resource.lm:230:1
+    229 |     var h = runtime.create(runtime.RT_HASH_ENGINE, []);
+    230 |     if (h == -1) return err(UnknownError(message="failed to create hash resource"));
+    231 |     return ok(Resource(h=h, k=runtime.RT_HASH_ENGINE));
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Type mismatch: expected Frame<Resource>, found Frame<Resource>?[0m
+  [1m-->[0m std/resource.lm:231:1
+    230 |     if (h == -1) return err(UnknownError(message="failed to create hash resource"));
+    231 |     return ok(Resource(h=h, k=runtime.RT_HASH_ENGINE));
+    232 | }
+       | ^
+   [1mhelp:[0m Ensure the value type matches the expected type. Check type annotations and assignments.
+
+[1;31m[1merror[E003]: Function 'create_hash_engine' declares error type 'ResourceError' but function body cannot produce this error type[0m
+  [1m-->[0m std/resource.lm:228:1
+    227 |
+    228 | pub fn create_hash_engine(): Resource?ResourceError {
+    229 |     var h = runtime.create(runtime.RT_HASH_ENGINE, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Function 'create_hash_engine' body can produce error type 'UnknownError' but it is not declared in function signature[0m
+  [1m-->[0m std/resource.lm:228:1
+    227 |
+    228 | pub fn create_hash_engine(): Resource?ResourceError {
+    229 |     var h = runtime.create(runtime.RT_HASH_ENGINE, []);
+       | ^
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Failed to type check module: std.resource[0m
+  [1m-->[0m (in REPL):0:1
+   [1mhelp:[0m Check your code for errors.
+
+[1;31m[1merror[E003]: Failed to type check module: std.internal.runtime[0m
+  [1m-->[0m (in REPL):0:1
+   [1mhelp:[0m Check your code for errors.
+
+Type Check Error: Failed to type check module: std.internal.runtime

@@ -1,25 +1,32 @@
 // Standard Library Random Module
 import std.math as math;
+import std.resource as res;
 
 frame Random {
     var state: int;
 
     pub init(seed: int = 0) {
         if (seed == 0) {
-            // Try to get a secure seed if none provided
-            var entropy = resource_create(11, [ []]); // RT_ENTROPY
-            if (entropy != -1) {
-                self.state = resource_call(entropy, 2, [ []]) as int; // OP_READ
-                resource_destroy(entropy);
-            } else {
-                self.state = 123456789; // Fallback
+            match (res.create_entropy()) {
+                case ok(r) => {
+                    var rd = res.Reader(r);
+                    var s = rd.read([ []]);
+                    if (s != nil) {
+                        self.state = s as int;
+                    } else {
+                        self.state = 123456789;
+                    }
+                    r.close();
+                }
+                case err(e) => {
+                    self.state = 123456789;
+                }
             }
         } else {
             self.state = seed;
         }
     }
 
-    // Xorshift64* PRNG
     pub fn next_int(): int {
         var x = self.state;
         x = x ^ (x << 13);
@@ -35,22 +42,14 @@ frame Random {
         return (i % 1000000000 as float) / 1000000000.0;
     }
 
-    pub fn next_bool(): bool {
-        return self.next_int() % 2 == 0;
-    }
-
+    pub fn next_bool(): bool { return self.next_int() % 2 == 0; }
     pub fn range_int(min: int, max: int): int {
         if (min >= max) return min;
-        var diff = max - min;
         var r = self.next_int();
         if (r < 0) r = -r;
-        return min + (r % diff);
+        return min + (r % (max - min));
     }
-
-    pub fn range_float(min: float, max: float): float {
-        return min + (max - min) * self.next_float();
-    }
-
+    pub fn range_float(min: float, max: float): float { return min + (max - min) * self.next_float(); }
     pub fn next_bytes(count: int): [int] {
         var res = [];
         for (var i = 0; i < count; i = i + 1) {
@@ -60,7 +59,6 @@ frame Random {
         }
         return res;
     }
-
     pub fn next_string(len: int, alphabet: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"): str {
         var res = "";
         var a_len = length(alphabet);
@@ -73,15 +71,24 @@ frame Random {
 }
 
 frame SecureRandom {
-    var entropy_source: int;
+    var reader: res.Reader?;
 
     pub init() {
-        self.entropy_source = resource_create(11, [ []]); // RT_ENTROPY
+        match (res.create_entropy()) {
+            case ok(r) => self.reader = ok(res.Reader(r));
+            case err(e) => self.reader = nil;
+        }
     }
 
     pub fn next_int(): int {
-        if (self.entropy_source == -1) return 0;
-        return resource_call(self.entropy_source, 2, [ []]) as int; // OP_READ
+        match (self.reader) {
+            case ok(rd) => {
+                var s = rd.read([ []]);
+                if (s != nil) return s as int;
+                return 0;
+            }
+            case nil => return 0;
+        }
     }
 
     pub fn next_float(): float {
@@ -101,106 +108,9 @@ frame SecureRandom {
     }
 }
 
-// Global default PRNG
 var _default_rng: Random = Random(seed=0);
-
 fn random_int(min: int, max: int): int { return _default_rng.range_int(min, max); }
 fn random_float(min: float, max: float): float { return _default_rng.range_float(min, max); }
 fn random_bool(): bool { return _default_rng.next_bool(); }
 fn random_bytes(count: int): [int] { return _default_rng.next_bytes(count); }
 fn random_string(len: int): str { return _default_rng.next_string(len); }
-
-fn choice(items: [any]): any {
-    var idx = random_int(0, len(items));
-    return items[idx];
-}
-
-fn weighted_choice(items: [any], weights: [float]): any {
-    var total_weight = 0.0;
-    for (var i = 0; i < len(weights); i = i + 1) {
-        total_weight = total_weight + weights[i];
-    }
-    var r = random_float(0.0, total_weight);
-    for (var i = 0; i < len(items); i = i + 1) {
-        if (r < weights[i]) return items[i];
-        r = r - weights[i];
-    }
-    return items[0];
-}
-
-fn sample(items: [any], count: int): [any] {
-    var res = [];
-    var n = len(items);
-    if (count > n) count = n;
-    
-    // Simple reservoir-like or shuffle-based sample
-    var indices = [];
-    for (var i = 0; i < n; i = i + 1) {
-        indices = indices + [i];
-    }
-    shuffle(indices);
-    
-    for (var i = 0; i < count; i = i + 1) {
-        res = res + [items[indices[i]]];
-    }
-    return res;
-}
-
-fn shuffle(items: [any]) {
-    var n = len(items);
-    for (var i = n - 1; i > 0; i = i - 1) {
-        var j = random_int(0, i + 1);
-        var temp = items[i];
-        items[i] = items[j];
-        items[j] = temp;
-    }
-}
-
-// Distributions
-fn uniform(min: float, max: float): float { return random_float(min, max); }
-
-fn gaussian(mean: float, stddev: float): float {
-    // Box-Muller transform
-    var u1 = _default_rng.next_float();
-    var u2 = _default_rng.next_float();
-    if (u1 == 0.0) u1 = 1e-10;
-    var r = math.sqrt(-2.0 * math.log(u1));
-    var theta = 2.0 * 3.1415926535 * u2;
-    return mean + stddev * r * math.cos(theta);
-}
-
-fn exponential(lambda: float): float {
-    var u = _default_rng.next_float();
-    if (u == 0.0) u = 1e-10;
-    return -math.log(u) / lambda;
-}
-
-fn poisson(lambda: float): int {
-    // Knuth's algorithm
-    var L = math.exp(-lambda);
-    var k = 0;
-    var p = 1.0;
-    while (p > L) {
-        k = k + 1;
-        p = p * _default_rng.next_float();
-    }
-    return k - 1;
-}
-
-// UUID v4 generation
-fn uuid(): str {
-    var chars = "0123456789abcdef";
-    var res = "";
-    for (var i = 0; i < 36; i = i + 1) {
-        if (i == 8 or i == 13 or i == 18 or i == 23) {
-            res = res + "-";
-        } else if (i == 14) {
-            res = res + "4";
-        } else {
-            var r = random_int(0, 16);
-            if (i == 19) r = (r & 0x3) | 0x8;
-            res = res + substring(chars, r, r + 1);
-        }
-    }
-    return res;
-}
