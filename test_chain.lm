@@ -1,14 +1,16 @@
-frame Foo {
-    pub fn bar(): int {
-        return 42;
+frame Test {
+    var x: int;
+
+    pub init() {
+        self.x = 123;
+    }
+
+    pub fn get(): int {
+        return self.x;
     }
 }
 
-fn makeFoo(): Foo {
-    return Foo();
-}
+var t = Test();
 
-fn main(): int {
-    var x = makeFoo().bar();
-    return 0;
-}
+
+print(t.get());

@@ -978,6 +978,18 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
         type->extra = ft;
         return type;
     }
+    
+    // Fallback: try to find frame by unqualified name
+    for (const auto& [qualified_name, frame_info] : frame_table_) {
+        size_t last_dot = qualified_name.rfind('.');
+        if (last_dot != std::string::npos && qualified_name.substr(last_dot + 1) == typeName) {
+            auto type = std::make_shared<::Type>(::TypeTag::Frame);
+            FrameType ft;
+            ft.name = qualified_name;
+            type->extra = ft;
+            return type;
+        }
+    }
 
     // Default to Any type for complex or unknown types
     return std::make_shared<::Type>(::TypeTag::Any);

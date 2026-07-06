@@ -60,7 +60,7 @@ build.bat
 ./limitly sample.lm
 
 # Start the REPL (interactive mode)
-./limitly -repl
+./limitly 
 ```
 
 ## Testing

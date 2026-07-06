@@ -1,8 +1,23 @@
-import std.range as range;
+print("Start");
 
-fn main(): int {
-    var inc = range.inclusive(1, 2);
-    inc = inc.iter();
-    if (inc.next() != 1) { return 1; }
-    return 0;
+frame Test {
+    var x: int;
+
+    pub init() {
+        self.x = 123;
+    }
+
+    pub fn get(): int {
+        return self.x;
+    }
 }
+
+print("After frame definition");
+
+var t = Test();
+print("After instantiation");
+
+var result = t.get();
+print("Got result");
+
+print(result);

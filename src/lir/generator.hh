@@ -344,6 +344,7 @@ private:
         size_t param_count = 0;
         bool is_function = false;
         bool is_variable = false;
+        bool is_frame = false;  // NEW: distinguish frame instantiation from functions
     };
     std::unordered_map<std::string, ModuleSymbolInfo> module_symbol_table_;
     

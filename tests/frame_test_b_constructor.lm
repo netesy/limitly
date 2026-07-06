@@ -1,0 +1,19 @@
+// Test B - Constructor Execution
+// Verify that init() is called and mutations persist
+
+frame Foo {
+    pub var a: int;
+
+    pub fn init() {
+        self.a = 5;
+    }
+}
+
+fn main(): int {
+    var f = Foo();
+    
+    assert(f.a == 5, "Constructor should set a to 5");
+    
+    print("Test B - Constructor Execution: PASSED");
+    return 0;
+}

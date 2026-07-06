@@ -1,121 +1,67 @@
-// HMAC Module — RFC 2104 compliant HMAC implementation
-// Delegates to std/crypto/hash for the underlying hash functions.
+// HMAC Module
 
 import std.core as core;
+import std.resource as res;
+import std.crypto.hash as hash;
 
 frame HMAC {
-
-    // Compute HMAC for any supported algorithm.
-    // key: the secret key (any length; will be padded or hashed to block size)
-    // data: the message to authenticate
-    // algorithm: "sha256", "sha512", "md5", or "sha1"
     pub fn sign(key: str, data: str, algorithm: str): core.ResultStr {
-        if (algorithm == "sha256") return self.sign_with_block(key, data, "sha256", 64);
-        if (algorithm == "sha512") return self.sign_with_block(key, data, "sha512", 128);
-        if (algorithm == "md5") return self.sign_with_block(key, data, "md5", 64);
-        if (algorithm == "sha1") return self.sign_with_block(key, data, "sha1", 64);
-        return core.err_str("unsupported algorithm: " + algorithm);
+        if (algorithm == "sha256") return self.sign_with_block(key=key, data=data, algorithm="sha256", block_size=64);
+        if (algorithm == "sha512") return self.sign_with_block(key=key, data=data, algorithm="sha512", block_size=128);
+        if (algorithm == "md5") return self.sign_with_block(key=key, data=data, algorithm="md5", block_size=64);
+        if (algorithm == "sha1") return self.sign_with_block(key=key, data=data, algorithm="sha1", block_size=64);
+        return core.err_str(e="fail");
     }
 
-    // Default HMAC-SHA256
-    pub fn sha256(key: str, data: str): core.ResultStr {
-        return self.sign_with_block(key, data, "sha256", 64);
-    }
-
-    // HMAC-SHA512
-    pub fn sha512(key: str, data: str): core.ResultStr {
-        return self.sign_with_block(key, data, "sha512", 128);
-    }
-
-    // HMAC-MD5
-    pub fn md5(key: str, data: str): core.ResultStr {
-        return self.sign_with_block(key, data, "md5", 64);
-    }
-
-    // HMAC-SHA1
-    pub fn sha1(key: str, data: str): core.ResultStr {
-        return self.sign_with_block(key, data, "sha1", 64);
-    }
-
-    // Verify an HMAC signature
-    pub fn verify(key: str, data: str, signature: str, algorithm: str): core.ResultInt {
-        var expected = self.sign(key, data, algorithm);
-        if (expected.is_err()) return core.err_int("sign failed: " + expected.unwrap());
-        // Use constant-time comparison
-        if (len(expected.unwrap()) != len(signature)) return core.err_int("signature length mismatch");
-        var match: bool = self.constant_time_compare(expected.unwrap(), signature);
-        if (match) return core.ok_int(1);
-        return core.err_int("invalid signature");
-    }
-
-    // ---- Internal implementation ----
+    pub fn sha256(key: str, data: str): core.ResultStr { return self.sign_with_block(key=key, data=data, algorithm="sha256", block_size=64); }
+    pub fn sha512(key: str, data: str): core.ResultStr { return self.sign_with_block(key=key, data=data, algorithm="sha512", block_size=128); }
+    pub fn md5(key: str, data: str): core.ResultStr { return self.sign_with_block(key=key, data=data, algorithm="md5", block_size=64); }
+    pub fn sha1(key: str, data: str): core.ResultStr { return self.sign_with_block(key=key, data=data, algorithm="sha1", block_size=64); }
 
     fn sign_with_block(key: str, data: str, algorithm: str, block_size: int): core.ResultStr {
-        // Step 1: If key > block_size, hash the key
-        var k: str = key;
+        var k = key;
         if (len(key) > block_size) {
-            var key_hash = self.raw_hash(key, algorithm);
+            var key_hash = self.raw_hash(data=key, algorithm=algorithm);
             if (key_hash.is_err()) return key_hash;
             k = key_hash.unwrap();
         }
-
-        // Step 2: Pad key to block_size with zero bytes
-        while (len(k) < block_size) {
-            k = k + "\x00";
-        }
-
-        // Step 3: Create ipad and opad
-        var ipad: str = "";
-        var opad: str = "";
-        var i: int = 0;
+        while (len(k) < block_size) { k = k + "\x00"; }
+        var ipad = "";
+        var opad = "";
+        var i = 0;
         while (i < block_size) {
-            var b: int = byte_ord(substring(k, i, i + 1));
-            ipad = ipad + char_from(b ^ 0x36);
-            opad = opad + char_from(b ^ 0x5C);
+            var b = byte_ord(substring(k, i, i + 1));
+            ipad = ipad + char_from(b=b ^ 0x36);
+            opad = opad + char_from(b=b ^ 0x5C);
             i = i + 1;
         }
-
-        // Step 4: HMAC = H(opad || H(ipad || message))
-        var inner = self.raw_hash(ipad + data, algorithm);
+        var inner = self.raw_hash(data=ipad + data, algorithm=algorithm);
         if (inner.is_err()) return inner;
-        return self.raw_hash(opad + inner.unwrap(), algorithm);
+        return self.raw_hash(data=opad + inner.unwrap(), algorithm=algorithm);
     }
 
-    // Direct hash call (avoids circular dependency with crypto/hash)
     fn raw_hash(data: str, algorithm: str): core.ResultStr {
-        var engine = resource_create(16, [ []]); // RT_HASH_ENGINE
-        if (engine == -1) return core.err_str("failed to create hash engine");
-        var init = resource_call(engine, 0, [algorithm]); // OP_OPEN
-        if (init != true) {
-            resource_destroy(engine);
-            return core.err_str("failed to initialize " + algorithm);
+        match (res.create_hash_engine()) {
+            val engine_res => {
+                var engine = hash.HashEngine(h=engine_res.handle);
+                if (not engine.hasher.open_algo(algo=algorithm)) {
+                    engine.resource.close();
+                    return core.err_str(e="fail");
+                }
+                if (not engine.hasher.update(data=data)) {
+                    engine.resource.close();
+                    return core.err_str(e="fail");
+                }
+                var result = engine.hasher.finalize();
+                engine.resource.close();
+                if (result == nil) return core.err_str(e="fail");
+                return core.ok_str(v=result as str);
+            },
+            err e => return core.err_str(e="fail")
         }
-        var wrote = resource_call(engine, 3, [data]); // OP_WRITE
-        if (wrote != true) {
-            resource_destroy(engine);
-            return core.err_str("failed to feed data");
-        }
-        var result = resource_call(engine, 2, [ []]); // OP_READ
-        resource_destroy(engine);
-        if (result == nil) return core.err_str("digest failed");
-        return core.ok_str(result as str);
-    }
-
-    fn constant_time_compare(a: str, b: str): bool {
-        if (len(a) != len(b)) return false;
-        var result: int = 0;
-        var i: int = 0;
-        while (i < len(a)) {
-            var ca: int = byte_ord(substring(a, i, i + 1));
-            var cb: int = byte_ord(substring(b, i, i + 1));
-            result = result | (ca ^ cb);
-            i = i + 1;
-        }
-        return result == 0;
     }
 }
 
-// ---- Convenience functions ----
 fn byte_ord(ch: str): int {
     if (ch >= "a" and ch <= "z") return 97 + (len(ch) == 1 ? (ch - "a") : 0);
     if (ch >= "A" and ch <= "Z") return 65 + (len(ch) == 1 ? (ch - "A") : 0);

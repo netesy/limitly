@@ -2,9 +2,7 @@
 // Uses the native ENTROPY resource (type 12) backed by getrandom(2) /dev/urandom.
 
 import std.core as core;
-
-var RT_ENTROPY: int = 12;
-var OP_READ: int = 2;
+import std.resource as res;
 
 frame CryptoRandom {
 
@@ -12,68 +10,74 @@ frame CryptoRandom {
     pub fn bytes_hex(length: int): str?core.Error {
         if (length < 0) return err(core.Error { code: "ERR", message: "negative length" });
         if (length == 0) return ok("");
-        var entropy = resource_create(RT_ENTROPY, []);
-        if (entropy == -1) return err(core.Error { code: "ERR", message: "entropy source unavailable" });
-        var raw = resource_call(entropy, OP_READ, [length]);
-        resource_destroy(entropy);
-        if (raw == nil) return err(core.Error { code: "ERR", message: "entropy read failed" });
-        // raw is a string of binary data; encode as hex
-        var result: str = "";
-        var i: int = 0;
-        var hex_chars: str = "0123456789abcdef";
-        var s: str = raw as str;
-        while (i < len(s)) {
-            var ch: str = substring(s, i, i + 1);
-            var b: int = byte_ord(ch);
-            result = result + substring(hex_chars, (b >> 4) & 0xF, ((b >> 4) & 0xF) + 1);
-            result = result + substring(hex_chars, b & 0xF, (b & 0xF) + 1);
-            i = i + 1;
+        match res.create(res.KIND_ENTROPY, []) {
+            case ok(entropy) => {
+                var raw = entropy.read([length]);
+                entropy.close();
+                if (raw == nil) return err(core.Error { code: "ERR", message: "entropy read failed" });
+                // raw is a string of binary data; encode as hex
+                var result: str = "";
+                var i: int = 0;
+                var hex_chars: str = "0123456789abcdef";
+                var s: str = raw as str;
+                while (i < len(s)) {
+                    var ch: str = substring(s, i, i + 1);
+                    var b: int = byte_ord(ch);
+                    result = result + substring(hex_chars, (b >> 4) & 0xF, ((b >> 4) & 0xF) + 1);
+                    result = result + substring(hex_chars, b & 0xF, (b & 0xF) + 1);
+                    i = i + 1;
+                }
+                return ok(result);
+            }
+            case err(e) => return err(core.Error { code: "ERR", message: "entropy source unavailable" });
         }
-        return ok(result);
     }
 
     // Generate `count` random bytes, returned as a base64 string.
     pub fn bytes_base64(count: int): str?core.Error {
         if (count < 0) return err(core.Error { code: "ERR", message: "negative count" });
         if (count == 0) return ok("");
-        var entropy = resource_create(RT_ENTROPY, []);
-        if (entropy == -1) return err(core.Error { code: "ERR", message: "entropy source unavailable" });
-        var raw = resource_call(entropy, OP_READ, [count]);
-        resource_destroy(entropy);
-        if (raw == nil) return err(core.Error { code: "ERR", message: "entropy read failed" });
-        
-        // Simple base64 encoding
-        var chars: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        var result: str = "";
-        var s: str = raw as str;
-        var i: int = 0;
-        while (i < len(s)) {
-            var b1: int = byte_ord(substring(s, i, i + 1));
-            var b2: int = 0;
-            if (i + 1 < len(s)) b2 = byte_ord(substring(s, i + 1, i + 2));
-            var b3: int = 0;
-            if (i + 2 < len(s)) b3 = byte_ord(substring(s, i + 2, i + 3));
+        match res.create(res.KIND_ENTROPY, []) {
+            case ok(entropy) => {
+                var raw = entropy.read([count]);
+                entropy.close();
+                if (raw == nil) return err(core.Error { code: "ERR", message: "entropy read failed" });
+                
+                // Simple base64 encoding
+                var chars: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+                var result: str = "";
+                var s: str = raw as str;
+                var i: int = 0;
+                while (i < len(s)) {
+                    var b1: int = byte_ord(substring(s, i, i + 1));
+                    var b2: int = 0;
+                    if (i + 1 < len(s)) b2 = byte_ord(substring(s, i + 1, i + 2));
+                    var b3: int = 0;
+                    if (i + 2 < len(s)) b3 = byte_ord(substring(s, i + 2, i + 3));
 
-            var c1: int = b1 >> 2;
-            var c2: int = ((b1 & 0x3) << 4) | (b2 >> 4);
-            var c3: int = ((b2 & 0xF) << 2) | (b3 >> 6);
-            var c4: int = b3 & 0x3F;
+                    var c1: int = b1 >> 2;
+                    var c2: int = ((b1 & 0x3) << 4) | (b2 >> 4);
+                    var c3: int = ((b2 & 0xF) << 2) | (b3 >> 6);
+                    var c4: int = b3 & 0x3F;
 
-            result = result + substring(chars, c1, c1 + 1);
-            result = result + substring(chars, c2, c2 + 1);
-            if (i + 1 < len(s)) {
-                result = result + substring(chars, c3, c3 + 1);
-            } else {
-                result = result + "=";
+                    result = result + substring(chars, c1, c1 + 1);
+                    result = result + substring(chars, c2, c2 + 1);
+                    if (i + 1 < len(s)) {
+                        result = result + substring(chars, c3, c3 + 1);
+                    } else {
+                        result = result + "=";
+                    }
+                    if (i + 2 < len(s)) {
+                        result = result + substring(chars, c4, c4 + 1);
+                    } else {
+                        result = result + "=";
+                    }
+                    i = i + 3;
+                }
+                return ok(result);
             }
-            if (i + 2 < len(s)) {
-                result = result + substring(chars, c4, c4 + 1);
-            } else {
-                result = result + "=";
-            }
-            i = i + 3;
+            case err(e) => return err(core.Error { code: "ERR", message: "entropy source unavailable" });
         }
-        return ok(result);
     }
 
     // Generate a cryptographically secure random integer in [min, max).
@@ -81,53 +85,59 @@ frame CryptoRandom {
         if (min >= max) return err(core.Error { code: "ERR", message: "invalid range: min must be less than max" });
         var range_size: int = max - min;
         // Read 4 bytes for a 32-bit random value
-        var entropy = resource_create(RT_ENTROPY, []);
-        if (entropy == -1) return err(core.Error { code: "ERR", message: "entropy source unavailable" });
-        var raw = resource_call(entropy, OP_READ, [4]);
-        resource_destroy(entropy);
-        if (raw == nil) return err(core.Error { code: "ERR", message: "entropy read failed" });
-        // Use modular reduction
-        var val: int = 0;
-        var i: int = 0;
-        var s: str = raw as str;
-        while (i < len(s) and i < 4) {
-            var b: int = byte_ord(substring(s, i, i + 1));
-            val = val | (b << (i * 8));
-            i = i + 1;
+        match res.create(res.KIND_ENTROPY, []) {
+            case ok(entropy) => {
+                var raw = entropy.read([4]);
+                entropy.close();
+                if (raw == nil) return err(core.Error { code: "ERR", message: "entropy read failed" });
+                // Use modular reduction
+                var val: int = 0;
+                var i: int = 0;
+                var s: str = raw as str;
+                while (i < len(s) and i < 4) {
+                    var b: int = byte_ord(substring(s, i, i + 1));
+                    val = val | (b << (i * 8));
+                    i = i + 1;
+                }
+                if (val < 0) val = -val;
+                return ok(min + (val % range_size));
+            }
+            case err(e) => return err(core.Error { code: "ERR", message: "entropy source unavailable" });
         }
-        if (val < 0) val = -val;
-        return ok(min + (val % range_size));
     }
 
     // Generate a UUID v4 (cryptographically random)
     pub fn uuid(): str?core.Error {
-        var entropy = resource_create(RT_ENTROPY, []);
-        if (entropy == -1) return err(core.Error { code: "ERR", message: "entropy source unavailable" });
-        var raw = resource_call(entropy, OP_READ, [16]);
-        resource_destroy(entropy);
-        if (raw == nil) return err(core.Error { code: "ERR", message: "entropy read failed" });
-        var s: str = raw as str;
-        var hex_chars: str = "0123456789abcdef";
-        var result: str = "";
-        var i: int = 0;
-        while (i < 16) {
-            if (i == 4 or i == 6 or i == 8 or i == 10) {
-                result = result + "-";
+        match res.create(res.KIND_ENTROPY, []) {
+            case ok(entropy) => {
+                var raw = entropy.read([16]);
+                entropy.close();
+                if (raw == nil) return err(core.Error { code: "ERR", message: "entropy read failed" });
+                var s: str = raw as str;
+                var hex_chars: str = "0123456789abcdef";
+                var result: str = "";
+                var i: int = 0;
+                while (i < 16) {
+                    if (i == 4 or i == 6 or i == 8 or i == 10) {
+                        result = result + "-";
+                    }
+                    var b: int = byte_ord(substring(s, i, i + 1));
+                    if (i == 6) {
+                        // Version 4: set top 4 bits to 0100
+                        b = (b & 0x0F) | 0x40;
+                    }
+                    if (i == 8) {
+                        // Variant 1: set top 2 bits to 10
+                        b = (b & 0x3F) | 0x80;
+                    }
+                    result = result + substring(hex_chars, (b >> 4) & 0xF, ((b >> 4) & 0xF) + 1);
+                    result = result + substring(hex_chars, b & 0xF, (b & 0xF) + 1);
+                    i = i + 1;
+                }
+                return ok(result);
             }
-            var b: int = byte_ord(substring(s, i, i + 1));
-            if (i == 6) {
-                // Version 4: set top 4 bits to 0100
-                b = (b & 0x0F) | 0x40;
-            }
-            if (i == 8) {
-                // Variant 1: set top 2 bits to 10
-                b = (b & 0x3F) | 0x80;
-            }
-            result = result + substring(hex_chars, (b >> 4) & 0xF, ((b >> 4) & 0xF) + 1);
-            result = result + substring(hex_chars, b & 0xF, (b & 0xF) + 1);
-            i = i + 1;
+            case err(e) => return err(core.Error { code: "ERR", message: "entropy source unavailable" });
         }
-        return ok(result);
     }
 
     // Generate a random alphanumeric string of the given length

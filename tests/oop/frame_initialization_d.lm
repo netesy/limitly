@@ -1,0 +1,30 @@
+// Test D: Reference Identity
+// Determine whether methods receive the original object or a copy
+
+frame Counter {
+    pub count: int = 0;
+    
+    pub fn inc() {
+        self.count = self.count + 1;
+    }
+    
+    pub fn get_count(): int {
+        return self.count;
+    }
+}
+
+var c = Counter();
+
+print("Initial count: {c.get_count()}");
+
+c.inc();
+print("After inc(): {c.get_count()}");
+
+c.inc();
+print("After second inc(): {c.get_count()}");
+
+if (c.get_count() == 2) {
+    print("OK: Reference identity maintained across multiple calls");
+} else {
+    print("ERROR: Reference identity broken, count is {c.get_count()} instead of 2");
+}

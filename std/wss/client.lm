@@ -1,23 +1,23 @@
 // Standard Library WebSocket Module
-// Uses the native WEBSOCKET resource (type 15) for real WebSocket connections.
+// Uses the native WEBSOCKET resource for real WebSocket connections.
 
 import std.core as core;
 import std.url as url;
-
-var RT_WEBSOCKET: int = 15;
-var OP_CONNECT: int = 6;
-var OP_SEND: int = 4;
-var OP_RECEIVE: int = 5;
-var OP_CLOSE: int = 1;
-var OP_POLL: int = 10;
+import std.resource as res;
 
 frame WebSocketClient {
-    pub var handle: int;
-    pub var connected: bool;
+    var resource: res.Resource?;
+    var connector: res.Connector?;
+    var writer: res.Writer?;
+    var reader: res.Reader?;
+    var poller: res.Poller?;
 
     pub fn init() {
-        self.handle = -1;
-        self.connected = false;
+        self.resource = nil;
+        self.connector = nil;
+        self.writer = nil;
+        self.reader = nil;
+        self.poller = nil;
     }
 
     // Connect to a WebSocket server
@@ -27,56 +27,83 @@ frame WebSocketClient {
         var parsed = url.URL(url_str);
         if (not parsed.is_valid) return err(core.Error { code: "ERR", message: "invalid URL" });
 
-        var ws = resource_create(RT_WEBSOCKET, []);
-        if (ws == -1) return err(core.Error { code: "ERR", message: "failed to create WebSocket resource" });
+        match (res.create_websocket()) {
+            case ok(ws) => {
+                var connector = res.Connector(ws);
+                if (not connector.connect([url_str])) {
+                    ws.close();
+                    return err(core.Error { code: "ERR", message: "WebSocket handshake failed" });
+                }
 
-        var result = resource_call(ws, OP_CONNECT, [url_str]);
-        if (result != true) {
-            resource_destroy(ws);
-            return err(core.Error { code: "ERR", message: "WebSocket handshake failed" });
+                self.resource = ok(ws);
+                self.connector = ok(connector);
+                self.writer = ok(res.Writer(ws));
+                self.reader = ok(res.Reader(ws));
+                self.poller = ok(res.Poller(ws));
+                return ok(ws._handle());
+            }
+            case err(e) => return err(core.Error { code: "ERR", message: "failed to create WebSocket resource" });
         }
-
-        self.handle = ws;
-        self.connected = true;
-        return ok(ws);
     }
 
     // Send a text message
     pub fn send_text(message: str): int?core.Error {
-        if (not self.connected or self.handle <= 0) return err(core.Error { code: "ERR", message: "not connected" });
-        var result = resource_call(self.handle, OP_SEND, [message]);
-        if (result != true) {
-            self.connected = false;
-            return err(core.Error { code: "ERR", message: "send failed" });
+        match (self.writer) {
+            case ok(w) => {
+                var result = w.write([message]);
+                if (result != true) {
+                    self.close();
+                    return err(core.Error { code: "ERR", message: "send failed" });
+                }
+                return ok(len(message));
+            }
+            case nil => return err(core.Error { code: "ERR", message: "not connected" });
         }
-        return ok(len(message));
     }
 
     // Receive a message (blocks until data available)
     pub fn recv(): str?core.Error {
-        if (not self.connected or self.handle <= 0) return err(core.Error { code: "ERR", message: "not connected" });
-        var result = resource_call(self.handle, OP_RECEIVE, []);
-        if (result == nil) {
-            self.connected = false;
-            return err(core.Error { code: "ERR", message: "connection closed" });
+        match (self.reader) {
+            case ok(rd) => {
+                var result = rd.read([]);
+                if (result == nil) {
+                    self.close();
+                    return err(core.Error { code: "ERR", message: "connection closed" });
+                }
+                return ok(result as str);
+            }
+            case nil => return err(core.Error { code: "ERR", message: "not connected" });
         }
-        return ok(result as str);
     }
 
     // Non-blocking check for available messages
     pub fn has_message(): bool {
-        if (not self.connected or self.handle <= 0) return false;
-        var result = resource_call(self.handle, OP_POLL, []);
-        return result == true;
+        match (self.poller) {
+            case ok(p) => return p.poll();
+            case nil => return false;
+        }
     }
 
     // Close the WebSocket connection
     pub fn close(): nil?core.Error {
-        if (self.handle <= 0) return ok(nil);
-        resource_call(self.handle, OP_CLOSE, []);
-        resource_destroy(self.handle);
-        self.handle = -1;
-        self.connected = false;
-        return ok(nil);
+        match (self.resource) {
+            case ok(r) => {
+                r.close();
+                self.resource = nil;
+                self.connector = nil;
+                self.writer = nil;
+                self.reader = nil;
+                self.poller = nil;
+                return ok(nil);
+            }
+            case nil => return ok(nil);
+        }
+    }
+
+    pub fn is_connected(): bool {
+        match (self.resource) {
+            case ok(r) => return r.is_open();
+            case nil => return false;
+        }
     }
 }

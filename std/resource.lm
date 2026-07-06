@@ -1,0 +1,17 @@
+// Standard Library Resource Module
+
+frame Resource {
+    pub var handle: int;
+    pub var kind: int;
+    pub var is_open_val: bool;
+
+    pub init(h: int, k: int) {
+        self.handle = h;
+        self.kind = k;
+        self.is_open_val = (h != -1);
+    }
+}
+
+pub fn create_hash_engine(): Resource {
+    return Resource(h=0, k=16);
+}

@@ -113,7 +113,6 @@ Variables and functions are **private by default** when neither `pub` nor `prot`
 fn name([params])[: ReturnType] { body }
 ```
 - Supports optional parameters: `name: Type = default`
-- Supports generic parameters: `fn name[T](...)`
 - Function-level modifiers (parallel to visibility, not interchangeable): `static`, `abstract`, `final`.
 
 ### 3.3 Frames (Objects)

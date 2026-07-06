@@ -1,128 +1,209 @@
-// Standard Library TCP Module (Unified Resource System)
-// Supports both client and server operations.
+// Standard Library TCP Module
 
 import std.core as core;
+import std.resource as res;
 
-var RT_SOCKET: int = 1;
-var OP_CLOSE: int = 1;
-var OP_SEND: int = 4;
-var OP_RECEIVE: int = 5;
-var OP_CONNECT: int = 6;
-var OP_BIND: int = 23;
-var OP_LISTEN: int = 24;
-var OP_ACCEPT: int = 25;
-var OP_POLL: int = 10;
+frame Connector {
+    var resource: res.Resource;
+    pub init(r: res.Resource) { self.resource = r; }
+    pub fn connect(args: [any]): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_CONNECT, args=args);
+        return (result == true);
+    }
+}
+
+frame Binder {
+    var resource: res.Resource;
+    pub init(r: res.Resource) { self.resource = r; }
+    pub fn bind(args: [any]): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_BIND, args=args);
+        return (result == true);
+    }
+}
+
+frame Listener {
+    var resource: res.Resource;
+    pub init(r: res.Resource) { self.resource = r; }
+    pub fn listen(args: [any]): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_LISTEN, args=args);
+        return (result == true);
+    }
+}
+
+frame Accepter {
+    var resource: res.Resource;
+    pub init(r: res.Resource) { self.resource = r; }
+    pub fn accept(): int {
+        var result = res._call(h=self.resource.handle, op=res.OP_ACCEPT, args=[]);
+        if (result == nil) return -1;
+        return result as int;
+    }
+}
 
 frame TCPClient {
-    pub var handle: int;
+    var resource: res.Resource?;
+    var reader: res.Reader?;
+    var writer: res.Writer?;
+    var poller: res.Pollable?;
 
     pub fn init() {
-        self.handle = -1;
+        self.resource = nil;
+        self.reader = nil;
+        self.writer = nil;
+        self.poller = nil;
     }
 
-    // Connect to a remote host:port
     pub fn connect(address: str, port: int): int?core.Error {
-        var h = resource_create(RT_SOCKET, []);
-        if (h == -1) return err(core.Error { code: "ERR", message: "Failed to create socket resource" });
-
-        var success = resource_call(h, OP_CONNECT, [address, port]);
-        if (success != true) {
-            resource_destroy(h);
-            return err(core.Error { code: "ERR", message: "Failed to connect to " + address + ":" + port as str });
+        match (res.create_socket()) {
+            val r => {
+                var c = Connector(r=r);
+                if (c.connect(args=[address, port])) {
+                    self.resource = ok(r);
+                    self.reader = ok(res.Reader(r=r));
+                    self.writer = ok(res.Writer(r=r));
+                    self.poller = ok(res.Pollable(r=r));
+                    return ok(r.handle);
+                } else {
+                    r.close();
+                    return err(core.Error(code="ERR", message="fail"));
+                }
+            },
+            err e => return err(core.Error(code="ERR", message="fail"))
         }
-
-        self.handle = h;
-        return ok(h);
     }
 
-    // Send raw string data over the connection
     pub fn send(data: str): int?core.Error {
-        if (self.handle <= 0) return err(core.Error { code: "ERR", message: "socket not connected" });
-        var result = resource_call(self.handle, OP_SEND, [data]);
-        if (result == true) return ok(len(data));
-        return err(core.Error { code: "ERR", message: "send failed" });
+        match (self.writer) {
+            val w => {
+                var result = w.write(args=[data]);
+                if (result == true) return ok(len(data));
+                return err(core.Error(code="ERR", message="fail"));
+            },
+            nil => return err(core.Error(code="ERR", message="fail"))
+        }
     }
 
-    // Receive data from the connection (up to 64KB)
     pub fn recv(): str?core.Error {
-        if (self.handle <= 0) return err(core.Error { code: "ERR", message: "socket not connected" });
-        var data = resource_call(self.handle, OP_RECEIVE, []);
-        if (data == nil) return err(core.Error { code: "ERR", message: "connection closed or recv failed" });
-        return ok(data as str);
+        match (self.reader) {
+            val rd => {
+                var data = rd.read(args=[]);
+                if (data == nil) return err(core.Error(code="ERR", message="fail"));
+                return ok(data as str);
+            },
+            nil => return err(core.Error(code="ERR", message="fail"))
+        }
     }
 
-    // Check if data is available to read (non-blocking)
     pub fn has_data(): bool {
-        if (self.handle <= 0) return false;
-        var result = resource_call(self.handle, OP_POLL, []);
-        return result == true;
+        match (self.poller) {
+            val p => return p.poll(),
+            nil => return false
+        }
     }
 
-    // Close the connection
     pub fn close(): nil?core.Error {
-        if (self.handle <= 0) return ok(nil);
-        resource_call(self.handle, OP_CLOSE, []);
-        resource_destroy(self.handle);
-        self.handle = -1;
-        return ok(nil);
+        match (self.resource) {
+            val r => {
+                r.close();
+                self.resource = nil;
+                self.reader = nil;
+                self.writer = nil;
+                self.poller = nil;
+                return ok(nil);
+            },
+            nil => return ok(nil)
+        }
     }
 
-    // Check if the socket is connected
     pub fn is_connected(): bool {
-        return self.handle > 0;
+        match (self.resource) {
+            val r => return r.is_open(),
+            nil => return false
+        }
+    }
+
+    pub fn handle(): int {
+        match (self.resource) {
+            val r => return r.handle,
+            nil => return -1
+        }
     }
 }
 
 frame TCPServer {
-    pub var handle: int;
+    var resource: res.Resource?;
+    var binder: Binder?;
+    var listener: Listener?;
+    var accepter: Accepter?;
 
     pub fn init() {
-        self.handle = -1;
+        self.resource = nil;
+        self.binder = nil;
+        self.listener = nil;
+        self.accepter = nil;
     }
 
-    // Bind to a specific address and port
     pub fn bind(address: str, port: int): int?core.Error {
-        var h = resource_create(RT_SOCKET, []);
-        if (h == -1) return err(core.Error { code: "ERR", message: "Failed to create socket" });
-
-        var success = resource_call(h, OP_BIND, [address, port]);
-        if (success != true) {
-            resource_destroy(h);
-            return err(core.Error { code: "ERR", message: "Failed to bind to " + address + ":" + port as str });
+        match (res.create_socket()) {
+            val r => {
+                var b = Binder(r=r);
+                if (b.bind(args=[address, port])) {
+                    self.resource = ok(r);
+                    self.binder = ok(b);
+                    return ok(r.handle);
+                } else {
+                    r.close();
+                    return err(core.Error(code="ERR", message="fail"));
+                }
+            },
+            err e => return err(core.Error(code="ERR", message="fail"))
         }
-        self.handle = h;
-        return ok(h);
     }
 
-    // Listen for incoming connections
     pub fn listen(backlog: int): int?core.Error {
-        if (self.handle <= 0) return err(core.Error { code: "ERR", message: "socket not bound" });
-        var success = resource_call(self.handle, OP_LISTEN, [backlog]);
-        if (success != true) return err(core.Error { code: "ERR", message: "listen failed" });
-        return ok(self.handle);
+        match (self.resource) {
+            val r => {
+                var l = Listener(r=r);
+                if (l.listen(args=[backlog])) {
+                    self.listener = ok(l);
+                    self.accepter = ok(Accepter(r=r));
+                    return ok(r.handle);
+                } else {
+                    return err(core.Error(code="ERR", message="fail"));
+                }
+            },
+            nil => return err(core.Error(code="ERR", message="fail"))
+        }
     }
 
-    // Accept a new connection, returns a TCPClient
     pub fn accept(): TCPClient?core.Error {
-        if (self.handle <= 0) return err(core.Error { code: "ERR", message: "socket not listening" });
-        var client_fd = resource_call(self.handle, OP_ACCEPT, []);
-        if (client_fd == nil) return err(core.Error { code: "ERR", message: "accept failed or no pending connection" });
-
-        // Create a new socket resource wrapping the accepted fd
-        var client_handle = resource_create(RT_SOCKET, [client_fd]);
-        if (client_handle == -1) return err(core.Error { code: "ERR", message: "failed to adopt client socket" });
-
-        var client = TCPClient();
-        client.handle = client_handle;
-        return ok(client);
+        match (self.accepter) {
+            val acc => {
+                var fd = acc.accept();
+                if (fd == -1) return err(core.Error(code="ERR", message="fail"));
+                var cr = res.adopt_socket(fd=fd);
+                var client = TCPClient();
+                client.resource = ok(cr);
+                client.reader = ok(res.Reader(r=cr));
+                client.writer = ok(res.Writer(r=cr));
+                client.poller = ok(res.Pollable(r=cr));
+                return ok(client);
+            },
+            nil => return err(core.Error(code="ERR", message="fail"))
+        }
     }
 
-    // Close the server socket
     pub fn close(): nil?core.Error {
-        if (self.handle <= 0) return ok(nil);
-        resource_call(self.handle, OP_CLOSE, []);
-        resource_destroy(self.handle);
-        self.handle = -1;
-        return ok(nil);
+        match (self.resource) {
+            val r => {
+                r.close();
+                self.resource = nil;
+                self.binder = nil;
+                self.listener = nil;
+                self.accepter = nil;
+                return ok(nil);
+            },
+            nil => return ok(nil)
+        }
     }
 }

@@ -12,10 +12,28 @@ frame Node {
     }
 }
 
+frame Iterator {
+    var current: any; // Node?
+
+    pub init(head: any) {
+        self.current = head;
+    }
+
+    pub fn next(): any {
+        if (self.current == nil) {
+            return nil;
+        }
+        var node: Node = self.current;
+        var vals = node.value;
+        self.current = node.next;
+        return vals;
+    }
+}
+
 frame LinkedList {
-    var head: any; // Node?
-    var tail: any; // Node?
-    var size: int;
+    pub var head: any; // Node?
+    pub var tail: any; // Node?
+    pub var size: int;
 
     pub init() {
         self.head = nil;
@@ -80,86 +98,8 @@ frame LinkedList {
     pub fn len(): int { return self.size; }
     pub fn length(): int { return self.size; }
     pub fn is_empty(): bool { return self.size == 0; }
-    // Optional iterator method can be added later
-}
-
-
-frame Node {
-    pub var value: any;
-    pub var next: any; // Node?
-    pub var prev: any; // Node?
     
-    pub init(value: any) {
-        self.value = value;
-        self.next = nil;
-        self.prev = nil;
+    pub fn iterator(): Iterator {
+        return Iterator(self.head);
     }
-}
-
-frame LinkedList {
-    var head: any; // Node?
-    var tail: any; // Node?
-    var size: int;
-    
-    pub init() {
-        self.head = nil;
-        self.tail = nil;
-        self.size = 0;
-    }
-    
-    pub fn push_back(value: any) {
-        var node = Node(value);
-        if (self.tail == nil) {
-            self.head = node;
-            self.tail = node;
-        } else {
-            node.prev = self.tail;
-            self.tail.next = node;
-            self.tail = node;
-        }
-        self.size = self.size + 1;
-    }
-    
-    pub fn push_front(value: any) {
-        var node = Node(value);
-        if (self.head == nil) {
-            self.head = node;
-            self.tail = node;
-        } else {
-            node.next = self.head;
-            self.head.prev = node;
-            self.head = node;
-        }
-        self.size = self.size + 1;
-    }
-    
-    pub fn pop_back(): any {
-        if (self.tail == nil) return nil;
-        var node = self.tail;
-        var vals = node.value;
-        self.tail = node.prev;
-        if (self.tail == nil) {
-            self.head = nil;
-        } else {
-            self.tail.next = nil;
-        }
-        self.size = self.size - 1;
-        return vals;
-    }
-    
-    pub fn pop_front(): any {
-        if (self.head == nil) return nil;
-        var node = self.head;
-        var vals = node.value;
-        self.head = node.next;
-        if (self.head == nil) {
-            self.tail = nil;
-        } else {
-            self.head.prev = nil;
-        }
-        self.size = self.size - 1;
-        return vals;
-    }
-    
-    pub fn len(): int { return self.size; }
 }

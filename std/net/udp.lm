@@ -1,74 +1,104 @@
-// Standard Library UDP Module (Unified Resource System)
-// Uses the native UDP_SOCKET resource (type 14) for real datagram I/O.
+// Standard Library UDP Module
 
 import std.core as core;
+import std.resource as res;
+import std.net.tcp as tcp;
 
-var RT_UDP: int = 14;
-var OP_CLOSE: int = 1;
-var OP_BIND: int = 23;
-var OP_SEND_TO: int = 27;
-var OP_RECV_FROM: int = 28;
-var OP_POLL: int = 10;
+frame Datagram {
+    var resource: res.Resource;
+    pub init(r: res.Resource) { self.resource = r; }
+    pub fn send_to(addr: str, port: int, data: str): any {
+        return res._call(h=self.resource.handle, op=res.OP_SEND_TO, args=[addr, port, data]);
+    }
+    pub fn recv_from(): any {
+        return res._call(h=self.resource.handle, op=res.OP_RECV_FROM, args=[]);
+    }
+}
 
 frame UDP {
-    pub var handle: int;
+    var resource: res.Resource?;
+    var binder: tcp.Binder?;
+    var datagram: Datagram?;
+    var poller: res.Pollable?;
 
     pub fn init() {
-        self.handle = -1;
+        self.resource = nil;
+        self.binder = nil;
+        self.datagram = nil;
+        self.poller = nil;
     }
 
-    // Create and optionally bind a UDP socket to a port
     pub fn bind(address: str, port: int): int?core.Error {
-        var h = resource_create(RT_UDP, []);
-        if (h == -1) return err(core.Error { code: "ERR", message: "failed to create UDP socket" });
-
-        var success = resource_call(h, OP_BIND, [address, port]);
-        if (success != true) {
-            resource_destroy(h);
-            return err(core.Error { code: "ERR", message: "failed to bind UDP socket to " + address + ":" + port as str });
+        match (res.create_udp_socket()) {
+            val r => {
+                var b = tcp.Binder(r=r);
+                if (b.bind(args=[address, port])) {
+                    self.resource = ok(r);
+                    self.binder = ok(b);
+                    self.datagram = ok(Datagram(r=r));
+                    self.poller = ok(res.Pollable(r=r));
+                    return ok(r.handle);
+                } else {
+                    r.close();
+                    return err(core.Error(code="ERR", message="fail"));
+                }
+            },
+            err e => return err(core.Error(code="ERR", message="fail"))
         }
-
-        self.handle = h;
-        return ok(h);
     }
 
-    // Create an unbound UDP socket (for sending only)
     pub fn create(): int?core.Error {
-        var h = resource_create(RT_UDP, []);
-        if (h == -1) return err(core.Error { code: "ERR", message: "failed to create UDP socket" });
-        self.handle = h;
-        return ok(h);
+        match (res.create_udp_socket()) {
+            val r => {
+                self.resource = ok(r);
+                self.datagram = ok(Datagram(r=r));
+                self.poller = ok(res.Pollable(r=r));
+                return ok(r.handle);
+            },
+            err e => return err(core.Error(code="ERR", message="fail"))
+        }
     }
 
-    // Send a datagram to a specific address:port
     pub fn send_to(address: str, port: int, data: str): int?core.Error {
-        if (self.handle <= 0) return err(core.Error { code: "ERR", message: "UDP socket not initialized" });
-        var result = resource_call(self.handle, OP_SEND_TO, [address, port, data]);
-        if (result == nil) return err(core.Error { code: "ERR", message: "send_to failed to " + address + ":" + port as str });
-        return ok(result as int);
+        match (self.datagram) {
+            val d => {
+                var result = d.send_to(addr=address, port=port, data=data);
+                if (result == nil) return err(core.Error(code="ERR", message="fail"));
+                return ok(result as int);
+            },
+            nil => return err(core.Error(code="ERR", message="fail"))
+        }
     }
 
-    // Receive a datagram. Returns "ip:port\ndata" format.
     pub fn recv_from(): str?core.Error {
-        if (self.handle <= 0) return err(core.Error { code: "ERR", message: "UDP socket not initialized" });
-        var result = resource_call(self.handle, OP_RECV_FROM, []);
-        if (result == nil) return err(core.Error { code: "ERR", message: "recv_from failed (no data or socket error)" });
-        return ok(result as str);
+        match (self.datagram) {
+            val d => {
+                var result = d.recv_from();
+                if (result == nil) return err(core.Error(code="ERR", message="fail"));
+                return ok(result as str);
+            },
+            nil => return err(core.Error(code="ERR", message="fail"))
+        }
     }
 
-    // Check if data is available (non-blocking poll)
     pub fn has_data(): bool {
-        if (self.handle <= 0) return false;
-        var result = resource_call(self.handle, OP_POLL, []);
-        return result == true;
+        match (self.poller) {
+            val p => return p.poll(),
+            nil => return false
+        }
     }
 
-    // Close the UDP socket
     pub fn close(): nil?core.Error {
-        if (self.handle <= 0) return ok(nil);
-        resource_call(self.handle, OP_CLOSE, []);
-        resource_destroy(self.handle);
-        self.handle = -1;
-        return ok(nil);
+        match (self.resource) {
+            val r => {
+                r.close();
+                self.resource = nil;
+                self.binder = nil;
+                self.datagram = nil;
+                self.poller = nil;
+                return ok(nil);
+            },
+            nil => return ok(nil)
+        }
     }
 }

@@ -1,28 +1,31 @@
-// Standard Library DNS Module (Unified Resource System)
-// Uses the native DNS_RESOLVER resource (type 13) with RESOLVE=26 operation.
+// Standard Library DNS Module
 
 import std.core as core;
+import std.resource as res;
 
-var RT_DNS: int = 13;
-var OP_RESOLVE: int = 26;
+frame Resolver {
+    var resource: res.Resource;
+    pub init(r: res.Resource) { self.resource = r; }
+    pub fn resolve(host: str): any {
+        return res._call(h=self.resource.handle, op=res.OP_RESOLVE, args=[host]);
+    }
+}
 
 frame DNS {
-
-    // Resolve a hostname to an IPv4 address.
     pub fn resolve(host: str): str?core.Error {
-        if (host == "") return err(core.Error { code: "ERR", message: "empty host name" });
-        
-        var resolver = resource_create(RT_DNS, []);
-        if (resolver == -1) return err(core.Error { code: "ERR", message: "failed to create DNS resolver resource" });
-
-        var result = resource_call(resolver, OP_RESOLVE, [host]);
-        resource_destroy(resolver);
-
-        if (result == nil) return err(core.Error { code: "ERR", message: "DNS resolution failed for host: " + host });
-        return ok(result as str);
+        if (host == "") return err(core.Error(code="ERR", message="fail"));
+        match (res.create_dns_resolver()) {
+            val r => {
+                var resolver = Resolver(r=r);
+                var result = resolver.resolve(host=host);
+                r.close();
+                if (result == nil) return err(core.Error(code="ERR", message="fail"));
+                return ok(result as str);
+            },
+            err e => return err(core.Error(code="ERR", message="fail"))
+        }
     }
 
-    // Check if a string looks like a valid IPv4 address
     pub fn is_ipv4(address: str): bool {
         var parts: [str] = split_string(address, ".");
         if (len(parts) != 4) return false;
@@ -43,7 +46,6 @@ frame DNS {
         return true;
     }
 
-    // Check if a string looks like a valid IPv6 address (simplified)
     pub fn is_ipv6(address: str): bool {
         if (len(address) < 2) return false;
         var has_colon: bool = false;
@@ -60,15 +62,13 @@ frame DNS {
         return has_colon;
     }
 
-    // Resolve a hostname, handling the case where it might already be an IP.
     pub fn resolve_or_passthrough(host: str): str?core.Error {
         if (self.is_ipv4(host)) return ok(host);
         if (self.is_ipv6(host)) return ok(host);
-        return self.resolve(host);
+        return self.resolve(host=host);
     }
 }
 
-// ---- Internal helper ----
 fn split_string(s: str, delimiter: str): [str] {
     var parts: [str] = [];
     var current: str = "";

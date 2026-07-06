@@ -7,6 +7,7 @@
 
 import std.core as core;
 import std.net.tcp as tcp;
+import std.resource as res;
 
 frame TLSConfig {
     pub var cert_path: str;
@@ -80,7 +81,7 @@ frame TLSClient {
         // TODO: When native TLS resource is available, perform TLS handshake here.
         // For now, mark as connected (unencrypted passthrough).
         self.encrypted = false;
-        return core.ok_int(self.tcp_client.handle);
+        return core.ok_int(tcp_result.unwrap());
     }
 
     // Send encrypted data
@@ -135,15 +136,15 @@ frame TLSServer {
         if (listen_result.is_err()) return listen_result;
 
         self.listening = true;
-        return core.ok_int(self.tcp_server.handle);
+        return core.ok_int(bind_result.unwrap());
     }
 
     // Accept a new TLS connection
     pub fn accept(): core.ResultInt {
-        var fd_result = self.tcp_server.accept_fd();
-        if (fd_result.is_err()) return fd_result;
+        var client_result = self.tcp_server.accept();
+        if (client_result.is_err()) return core.err_int(client_result.unwrap());
         // TODO: When native TLS resource is available, perform TLS handshake here
-        return fd_result;
+        return core.ok_int(0);
     }
 
     pub fn close(): core.ResultInt {
@@ -171,10 +172,13 @@ fn resolve_or_passthrough(host: str): core.ResultStr {
     if (has_only_digits_dots and dot_count == 3) return core.ok_str(host);
 
     // Use DNS resolver
-    var resolver = resource_create(13, [ []]); // RT_DNS
-    if (resolver == -1) return core.err_str("DNS resolver unavailable");
-    var result = resource_call(resolver, 26, [host]); // OP_RESOLVE
-    resource_destroy(resolver);
-    if (result == nil) return core.err_str("DNS resolution failed for: " + host);
-    return core.ok_str(result as str);
+    match res.create("dns", []) {
+        case ok(resolver) => {
+            var result = resolver._call("resolve", [host]);
+            resolver.close();
+            if (result == nil) return core.err_str("DNS resolution failed for: " + host);
+            return core.ok_str(result as str);
+        }
+        case err(e) => return core.err_str("DNS resolver unavailable");
+    }
 }
