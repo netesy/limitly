@@ -625,9 +625,11 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
                 return 0;
             }
             
-            // Load the actual module variable value
+            // Load the actual module variable value using LoadGlobal
             Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::Load, Type::Ptr, result, 0, 0));
+            LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
+            load_inst.func_name = qualified_name;
+            emit_instruction(load_inst);
             // Note: Module variable type information is not available in ModuleSymbolInfo
             // Type information should be obtained from the module's type system
             return result;
@@ -1391,6 +1393,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             set_register_language_type(frame_reg, frame_type);
             set_register_abi_type(frame_reg, Type::Ptr);
 
+                // Track which named arguments are consumed by init
+                std::unordered_set<std::string> consumed_named_args;
+
             // Call init if present (init handles all field initialization)
             if (frame_info.has_init) {
                 // Make sure func_name is fully qualified if we're in a module
@@ -1404,9 +1409,6 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 std::string init_name = func_name + ".init";
                 std::vector<Reg> arg_regs;
                 arg_regs.push_back(frame_reg);
-
-                // Track which named arguments are consumed by init
-                std::unordered_set<std::string> consumed_named_args;
 
                 // Match arguments to init parameters
                 if (frame_info.declaration && frame_info.declaration->init) {
@@ -1434,7 +1436,6 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     }
 
                     // 3c. Optional parameters matched by remaining positional or named arguments
-                    size_t opt_pos_idx = pos_idx - init->parameters.size();
                     for (size_t i = 0; i < init->optionalParams.size(); ++i) {
                         const std::string& param_name = init->optionalParams[i].first;
 
@@ -1464,6 +1465,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 LIR_Inst call_inst(LIR_Op::Call, init_result, init_name, arg_regs);
                 for (Reg r : arg_regs) call_inst.call_arg_types.push_back(get_register_abi_type(r));
                 emit_instruction(call_inst);
+                }
 
                 // 4. Apply remaining named arguments as direct field assignments
                 for (const auto& [name, arg_expr] : expr.namedArgs) {
@@ -1474,7 +1476,6 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                         emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, frame_reg, static_cast<uint32_t>(offset_it->second), val_reg));
                     }
                 }
-            }
 
             // Track instance for deinit at scope exit
             if (frame_info.has_deinit && !scope_stack_.empty()) {

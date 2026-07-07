@@ -444,6 +444,17 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
                     }
                     break;
                 }
+                case TypeTag::Frame: {
+                    if (std::holds_alternative<UserDefinedValue>(value->complexData)) {
+                        const auto& udv = std::get<UserDefinedValue>(value->complexData);
+                        if (udv.fields.count("size")) {
+                            length = static_cast<size_t>(udv.fields.at("size")->as<int64_t>());
+                        } else if (udv.fields.count("length")) {
+                            length = static_cast<size_t>(udv.fields.at("length")->as<int64_t>());
+                        }
+                    }
+                    break;
+                }
                 default:
                     throw std::runtime_error("len: unsupported type " + value->type->toString());
             }

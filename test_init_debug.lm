@@ -1,0 +1,6 @@
+import test_module_frame as test;
+
+print("Creating counter...");
+var counter = test.Counter();
+print("Counter created, checking field...");
+print("count = {counter.count}");

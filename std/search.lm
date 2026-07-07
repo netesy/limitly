@@ -1,13 +1,13 @@
 // Standard Library Search Module
 
-fn linear_search(items: [any], target: any): int {
+pub fn linear_search(items: [any], target: any): int {
     for (var i = 0; i < len(items); i = i + 1) {
         if (items[i] == target) return i;
     }
     return -1;
 }
 
-fn binary_search(items: [any], target: any): int {
+pub fn binary_search(items: [any], target: any): int {
     var low = 0;
     var high = len(items) - 1;
     
@@ -20,7 +20,7 @@ fn binary_search(items: [any], target: any): int {
     return -1;
 }
 
-fn lower_bound(items: [any], target: any): int {
+pub fn lower_bound(items: [any], target: any): int {
     var low = 0;
     var high = len(items);
     
@@ -32,7 +32,7 @@ fn lower_bound(items: [any], target: any): int {
     return low;
 }
 
-fn upper_bound(items: [any], target: any): int {
+pub fn upper_bound(items: [any], target: any): int {
     var low = 0;
     var high = len(items);
     
@@ -44,7 +44,7 @@ fn upper_bound(items: [any], target: any): int {
     return low;
 }
 
-fn interpolation_search(items: [int], target: int): int {
+pub fn interpolation_search(items: [int], target: int): int {
     var low = 0;
     var high = len(items) - 1;
     
@@ -64,6 +64,6 @@ fn interpolation_search(items: [int], target: int): int {
     return -1;
 }
 
-fn equal_range(items: [any], target: any): (int, int) {
+pub fn equal_range(items: [any], target: any): (int, int) {
     return (lower_bound(items, target), upper_bound(items, target));
 }

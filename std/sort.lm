@@ -65,7 +65,7 @@ fn _quicksort_range(items: [any], low: int, high: int, descending: bool, cmp: fn
     }
 }
 
-fn quicksort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+pub fn quicksort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     if (len(items) > 1) {
         _quicksort_range(items, 0, len(items) - 1, descending, cmp);
     }
@@ -108,7 +108,7 @@ fn _mergesort_range(items: [any], left: int, right: int, descending: bool, cmp: 
     }
 }
 
-fn mergesort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+pub fn mergesort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     if (len(items) > 1) {
         _mergesort_range(items, 0, len(items) - 1, descending, cmp);
     }
@@ -130,7 +130,7 @@ fn _heapify(items: [any], n: int, i: int, descending: bool, cmp: fn(any, any): i
     }
 }
 
-fn heapsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+pub fn heapsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     var n = len(items);
     var i = n / 2 - 1;
     while (i >= 0) {
@@ -155,7 +155,7 @@ fn heapsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil
     }
 }
 
-fn counting_sort(items: [int], descending: bool = false) {
+pub fn counting_sort(items: [int], descending: bool = false) {
     var n = len(items);
     if (n <= 1) {
         return;
@@ -200,25 +200,25 @@ fn counting_sort(items: [int], descending: bool = false) {
     }
 }
 
-fn radix_sort(items: [int], descending: bool = false) {
+pub fn radix_sort(items: [int], descending: bool = false) {
     counting_sort(items, descending);
 }
 
-fn timsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+pub fn timsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     stable_sort(items, descending, cmp);
 }
 
-fn stable_sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+pub fn stable_sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     mergesort(items, descending, cmp);
 }
 
-fn partial_sort(items: [any], count: int, descending: bool = false, cmp: fn(any, any): int = nil) {
+pub fn partial_sort(items: [any], count: int, descending: bool = false, cmp: fn(any, any): int = nil) {
     quicksort(items, descending, cmp);
     if (count < 0) {
         return;
     }
 }
 
-fn sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+pub fn sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     quicksort(items, descending, cmp);
 }

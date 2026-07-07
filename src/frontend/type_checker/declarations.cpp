@@ -606,6 +606,13 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                 target_names.push_back({name, true});
             }
 
+            std::string full_path_base = import_stmt->modulePath + "." + name;
+
+            // Always include full module path in targets for unified lookup
+            bool already_has_full = false;
+            for(auto& t : target_names) if(t.first == full_path_base) already_has_full = true;
+            if(!already_has_full) target_names.push_back({full_path_base, true});
+
             for (const auto& target : target_names) {
                 const std::string& qname = target.first;
                 
@@ -621,8 +628,12 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                     }
                     function_signatures[qname] = sig;
                     declare_variable(qname, type_system.createFunctionType({}, sig.param_types, sig.return_type));
+                    
+                    // Register in imported symbols so LIR generator can find it
+                    current_program_->imported_symbols[qname] = f;
                 } else if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
                     declare_variable(qname, type_system.ANY_TYPE);
+                    current_program_->imported_symbols[qname] = v;
                 } else if (auto fr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
                     FrameInfo fi; 
                     fi.name = qname; 
@@ -632,19 +643,6 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                     }
                     frame_declarations[qname] = fi;
                     declare_variable(qname, type_system.createFrameType(qname));
-                    
-                    // Also register with full module path for cross-module lookups
-                    std::string full_path = import_stmt->modulePath + "." + name;
-                    if (qname != full_path) {
-                        FrameInfo fi_full;
-                        fi_full.name = full_path;
-                        fi_full.declaration = fr;
-                        for (const auto& field : fr->fields) {
-                            fi_full.fields.push_back({field->name, resolve_type_annotation(field->type)});
-                        }
-                        frame_declarations[full_path] = fi_full;
-                        declare_variable(full_path, type_system.createFrameType(full_path));
-                    }
                     
                     // Register in imported symbols so LIR generator can find it
                     current_program_->imported_symbols[qname] = fr;
@@ -681,6 +679,21 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                     ti.extends = t->extends;
                     trait_declarations[qname] = ti;
                     declare_variable(qname, type_system.ANY_TYPE); 
+                    current_program_->imported_symbols[qname] = t;
+
+                    // Register trait methods
+                    for (const auto& method : t->methods) {
+                        std::string m_name = qname + "." + method->name;
+                        FunctionSignature sig; 
+                        sig.name = m_name; 
+                        sig.declaration = method;
+                        sig.return_type = method->returnType ? resolve_type_annotation(method->returnType.value()) : type_system.ANY_TYPE;
+                        sig.param_types.push_back(type_system.ANY_TYPE); // 'this' (polymorphic)
+                        for (const auto& p : method->params) {
+                             sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                        }
+                        function_signatures[m_name] = sig;
+                    }
                 }
             }
         }

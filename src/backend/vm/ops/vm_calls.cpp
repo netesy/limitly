@@ -5,6 +5,7 @@
 #include "../../../runtime/runtime.h"
 #include "../../../runtime/runtime_value.h"
 #include "../../../runtime/runtime_tuple.h"
+#include "../constant_utils.hh"
 
 namespace LM {
 namespace Backend {
@@ -48,9 +49,8 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 }
                 try {
                     ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(pc->func_name, args);
-                    // Builtin functions return ValuePtr, convert to RegisterValue if needed
-                    // For now, most builtins return nil or their output is side effects (like print)
-                    registers[pc->dst] = VAL_NIL;
+                    // Builtin functions return ValuePtr, convert to RegisterValue
+                    registers[pc->dst] = LM::Backend::VM::compiler_value_to_backend_value(result);
                 } catch (const std::exception& e) {
                     throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
                 }

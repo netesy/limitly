@@ -901,6 +901,16 @@ void Generator::emit_import_stmt(LM::Frontend::AST::ImportStatement& stmt) {
     std::string alias = stmt.alias.value_or(stmt.modulePath);
     import_aliases_[alias] = stmt.modulePath;
     
+    // Ensure the imported module is initialized by calling its __init__ function
+    // This is needed because module globals are stored in the VM's globals_ map
+    // and need to be initialized before they can be accessed
+    std::string init_func_name = stmt.modulePath + ".__init__";
+    if (LIRFunctionManager::getInstance().hasFunction(init_func_name) || function_table_.count(init_func_name)) {
+        std::vector<Reg> empty_args;
+        Reg dummy_res = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Call, dummy_res, init_func_name, empty_args));
+    }
+    
    // std::cout << "[DEBUG] Import registered: " << alias << " -> " << stmt.modulePath << std::endl;
 }
 

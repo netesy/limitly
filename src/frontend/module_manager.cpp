@@ -80,11 +80,20 @@ void ModuleManager::extract_metadata(std::shared_ptr<Module> module) {
 
     for (const auto& stmt : module->ast->statements) {
         if (auto func = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
-            module->public_symbols.insert(func->name);
+            if (func->visibility == AST::VisibilityLevel::Public) {
+                module->public_symbols.insert(func->name);
+            }
         } else if (auto var = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
-            module->public_symbols.insert(var->name);
+            // Const declarations are always public module-level symbols
+            if (var->visibility == AST::VisibilityLevel::Public || var->isConst) {
+                module->public_symbols.insert(var->name);
+            }
         } else if (auto frame = std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt)) {
+            // Mandate: Frames are always public module-level symbols.
             module->public_symbols.insert(frame->name);
+        } else if (auto trait = std::dynamic_pointer_cast<AST::TraitDeclaration>(stmt)) {
+            // Mandate: Traits are always public module-level symbols.
+            module->public_symbols.insert(trait->name);
         } else if (auto import_stmt = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {
             module->dependencies.push_back(import_stmt->modulePath);
         }

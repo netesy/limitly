@@ -1,6 +1,6 @@
 // Standard Library Range Module
 
-frame Range {
+pub frame Range {
     var start: int;
     var stop: int;
     var step: int;
@@ -20,7 +20,7 @@ frame Range {
     }
 }
 
-frame RangeIterator {
+pub frame RangeIterator {
     var current: int;
     var stop: int;
     var step: int;
@@ -65,22 +65,22 @@ frame RangeIterator {
     }
 }
 
-fn exclusive(start: int, stop: int, step: int = 1): Range {
+pub fn exclusive(start: int, stop: int, step: int = 1): Range {
     return Range(start, stop, step, false, false);
 }
 
-fn inclusive(start: int, stop: int, step: int = 1): Range {
+pub fn inclusive(start: int, stop: int, step: int = 1): Range {
     return Range(start, stop, step, true, false);
 }
 
-fn stepped(start: int, stop: int, step: int): Range {
+pub fn stepped(start: int, stop: int, step: int): Range {
     return Range(start, stop, step, false, false);
 }
 
-fn reverse(start: int, stop: int, step: int = -1): Range {
+pub fn reverse(start: int, stop: int, step: int = -1): Range {
     return Range(start, stop, step, true, false);
 }
 
-fn infinite(start: int = 0, step: int = 1): Range {
+pub fn infinite(start: int = 0, step: int = 1): Range {
     return Range(start, 0, step, false, true);
 }

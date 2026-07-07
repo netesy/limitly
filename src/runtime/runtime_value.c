@@ -231,6 +231,24 @@ static char* uint128_to_str(unsigned __int128 n) {
 
 static LmString format_value(LmValue value);
 
+static LmString format_tuple(LmTuple* tuple) {
+    uint64_t capacity = 256;
+    char* buf = (char*)malloc(capacity);
+    uint64_t pos = 0;
+    buf[0] = 0;
+    append_to_buffer(&buf, &pos, &capacity, "(");
+    for (uint64_t i = 0; i < tuple->size; i++) {
+        if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
+        LmString s = format_value(tuple->elements[i]);
+        append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
+        lm_string_free(s);
+    }
+    if (tuple->size == 1) append_to_buffer(&buf, &pos, &capacity, ",");
+    append_to_buffer(&buf, &pos, &capacity, ")");
+    buf[pos] = 0;
+    return (LmString){ buf, pos };
+}
+
 static LmString format_list(LmList* list) {
     uint64_t capacity = 256;
     char* buf = (char*)malloc(capacity);
@@ -286,7 +304,27 @@ static LmString format_value(LmValue value) {
             }
             case TYPE_FLOAT: return lm_double_to_string(((ObjFloat*)h)->value);
             case TYPE_LIST: return format_list((LmList*)h);
-            case TYPE_FRAME: return lm_string_from_cstr(((LmFrame*)h)->name);
+            case TYPE_TUPLE: return format_tuple((LmTuple*)h);
+            case TYPE_FRAME: {
+                LmFrame* f = (LmFrame*)h;
+                uint64_t capacity = 128;
+                char* buf = (char*)malloc(capacity);
+                uint64_t pos = 0;
+                buf[0] = 0;
+                append_to_buffer(&buf, &pos, &capacity, f->name ? f->name : "Frame");
+                append_to_buffer(&buf, &pos, &capacity, "{");
+                for (int i = 0; i < f->field_count; i++) {
+                    if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
+                    char idx[16]; sprintf(idx, "%d: ", i);
+                    append_to_buffer(&buf, &pos, &capacity, idx);
+                    LmString s = format_value(f->fields[i]);
+                    append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
+                    lm_string_free(s);
+                }
+                append_to_buffer(&buf, &pos, &capacity, "}");
+                buf[pos] = 0;
+                return (LmString){ buf, pos };
+            }
             default: break;
         }
     }

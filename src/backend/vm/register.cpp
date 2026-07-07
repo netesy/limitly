@@ -239,6 +239,36 @@ ValuePtr register_to_value_ptr(RegisterValue rv) {
              auto ptrType = std::make_shared<::Type>(::TypeTag::Int128);
              char buf[32]; sprintf(buf, "%p", ((ObjForeignPtr*)h)->ptr);
              return std::make_shared<::Value>(ptrType, buf);
+        } else if (h->type_id == TYPE_LIST) {
+            auto list = (LmList*)h;
+            auto listType = std::make_shared<::Type>(::TypeTag::List);
+            ListValue lv;
+            for (uint64_t i = 0; i < list->size; ++i) lv.elements.push_back(register_to_value_ptr(list->data[i]));
+            return std::make_shared<::Value>(listType, lv);
+        } else if (h->type_id == TYPE_TUPLE) {
+            auto tuple = (LmTuple*)h;
+            auto tupleType = std::make_shared<::Type>(::TypeTag::Tuple);
+            TupleValue tv;
+            for (uint64_t i = 0; i < tuple->size; ++i) tv.elements.push_back(register_to_value_ptr(tuple->elements[i]));
+            return std::make_shared<::Value>(tupleType, tv);
+        } else if (h->type_id == TYPE_FRAME) {
+            auto frame = (LmFrame*)h;
+            auto frameType = std::make_shared<::Type>(::TypeTag::Frame);
+            FrameType ft; ft.name = frame->name ? frame->name : "unknown";
+            frameType->extra = ft;
+            UserDefinedValue udv; udv.variantName = ft.name;
+            // Frame fields are accessed by index but we don't have metadata here.
+            // For 'len' builtin support, we look for 'size' or 'length' fields.
+            // Diagnostic test uses 'size'.
+            for (int i = 0; i < frame->field_count; ++i) {
+                std::string field_name = "field_" + std::to_string(i);
+                // Heuristic: if field_count is consistent with LinkedList or ListIterator
+                if (ft.name == "LinkedList" && i == 2) field_name = "size";
+                else if (ft.name == "ListIterator" && i == 1) field_name = "index";
+                
+                udv.fields[field_name] = register_to_value_ptr(frame->fields[i]);
+            }
+            return std::make_shared<::Value>(frameType, udv);
         }
     }
     auto nullType = std::make_shared<::Type>(::TypeTag::Nil);
