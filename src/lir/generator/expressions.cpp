@@ -1322,6 +1322,14 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
                 // Check if it is a frame instantiation
         auto frame_it = frame_table_.find(func_name);
+        if (frame_it == frame_table_.end() && !current_module_.empty() && current_module_ != "root") {
+            // Try looking up with the current module prefix
+            std::string qualified_func_name = current_module_ + "." + func_name;
+            frame_it = frame_table_.find(qualified_func_name);
+            if (frame_it != frame_table_.end()) {
+                func_name = qualified_func_name;
+            }
+        }
         if (frame_it == frame_table_.end()) {
              // Check for enum constructor call: EnumName.Variant(payload)
             int64_t tag = 0; size_t expected_arity = 0;
@@ -1385,6 +1393,14 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
             // Call init if present (init handles all field initialization)
             if (frame_info.has_init) {
+                // Make sure func_name is fully qualified if we're in a module
+                if (func_name.find('.') == std::string::npos && !current_module_.empty() && current_module_ != "root") {
+                    std::string test_qualified = current_module_ + "." + func_name;
+                    if (frame_table_.find(test_qualified) != frame_table_.end()) {
+                        func_name = test_qualified;
+                    }
+                }
+                
                 std::string init_name = func_name + ".init";
                 std::vector<Reg> arg_regs;
                 arg_regs.push_back(frame_reg);
@@ -2543,7 +2559,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
     TypePtr object_lang_type = get_register_language_type(object_reg);
     bool is_tuple = object_lang_type && object_lang_type->tag == ::TypeTag::Tuple;
 
-    if ((is_tuple || expr.name == "key") && expr.name == "key") {
+    if (is_tuple && expr.name == "key") {
         // Access first element of tuple (index 0)
         Reg index_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
@@ -2557,7 +2573,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         return result_reg;
     }
     
-    if ((is_tuple || expr.name == "value") && expr.name == "value") {
+    if (is_tuple && expr.name == "value") {
         // Access second element of tuple (index 1)
         Reg index_reg = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
