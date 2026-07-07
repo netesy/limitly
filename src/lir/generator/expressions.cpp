@@ -1383,32 +1383,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             set_register_language_type(frame_reg, frame_type);
             set_register_abi_type(frame_reg, Type::Ptr);
 
-            // 1. Set default values for ALL fields
-            if (frame_info.declaration) {
-                for (size_t i = 0; i < frame_info.declaration->fields.size(); ++i) {
-                    auto field = frame_info.declaration->fields[i];
-                    Reg val_reg = 0;
-                    if (field->defaultValue) {
-                        val_reg = emit_expr(*field->defaultValue);
-                    } else {
-                        val_reg = allocate_register();
-                        Backend::Value nil_val = VAL_NIL;
-                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, val_reg, nil_val));
-                    }
-                    emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, frame_reg, static_cast<uint32_t>(i), val_reg));
-                }
-            }
-
-            // 2. Overwrite with named arguments
-            for (const auto& [name, arg_expr] : expr.namedArgs) {
-                auto offset_it = frame_info.field_offsets.find(name);
-                if (offset_it != frame_info.field_offsets.end()) {
-                    Reg val_reg = emit_expr(*arg_expr);
-                    emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, frame_reg, static_cast<uint32_t>(offset_it->second), val_reg));
-                }
-            }
-
-            // 3. Call init if present
+            // Call init if present (init handles all field initialization)
             if (frame_info.has_init) {
                 std::string init_name = func_name + ".init";
                 std::vector<Reg> arg_regs;
@@ -1760,9 +1735,54 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             // Check if the variable is a module alias
             auto alias_it = import_aliases_.find(var_expr->name);
             if (alias_it != import_aliases_.end()) {
-                // This is a module function call
+                // Get the full module path (not just the alias)
                 std::string module_path = alias_it->second;
                 std::string qualified_name = module_path + "." + method_name;
+                
+                // Check if this is a frame instantiation
+                if (expr.inferred_type && expr.inferred_type->tag == ::TypeTag::Frame) {
+                    auto frame_type_info = std::get_if<FrameType>(&expr.inferred_type->extra);
+                    if (frame_type_info) {
+                        // Frame instantiation: use the full module path-qualified name
+                        // Look up the frame
+                        auto frame_it = frame_table_.find(qualified_name);
+                        if (frame_it != frame_table_.end()) {
+                            // Treat as frame instantiation
+                            Reg frame_reg = allocate_register();
+                            const FrameInfo& frame_info = frame_it->second;
+
+                            // NewFrame allocates the object
+                            LIR_Inst new_frame_inst(LIR_Op::NewFrame, Type::Ptr, frame_reg, 0, 0, static_cast<uint32_t>(frame_info.total_field_size));
+                            new_frame_inst.type_name = qualified_name;
+                            emit_instruction(new_frame_inst);
+
+                            // Set frame type
+                            auto frame_type = std::make_shared<::Type>(::TypeTag::Frame);
+                            FrameType ft;
+                            ft.name = qualified_name;
+                            frame_type->extra = ft;
+                            set_register_language_type(frame_reg, frame_type);
+                            set_register_abi_type(frame_reg, Type::Ptr);
+
+                            // Call init if present (init handles all field initialization)
+                            std::string init_name = qualified_name + ".init";
+                            std::vector<Reg> arg_regs;
+                            arg_regs.push_back(frame_reg); // 'this' parameter
+                            for (const auto& arg : expr.arguments) {
+                                arg_regs.push_back(emit_expr(*arg));
+                            }
+
+                            Reg init_result = allocate_register();
+                            LIR_Inst call_inst(LIR_Op::Call, init_result, init_name, arg_regs);
+                            for (Reg r : arg_regs) call_inst.call_arg_types.push_back(get_register_abi_type(r));
+                            emit_instruction(call_inst);
+
+                            return frame_reg;
+                        }
+                    }
+                }
+                
+                // This is a module function call
 
                 // Evaluate arguments
                 std::vector<Reg> arg_regs;

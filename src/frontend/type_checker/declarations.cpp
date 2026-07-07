@@ -395,6 +395,10 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
     
     const FrameInfo& frame_info = frame_it->second;
     
+    // Use the qualified name from frame_declarations (which is the actual registered name)
+    // This ensures module frames use their full qualified name (e.g., test_module_frame.Counter)
+    std::string frame_qualified_name = frame_info.name;
+    
     // Check that all required fields are provided
     std::set<std::string> provided_fields;
     
@@ -442,8 +446,8 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
         }
     }
     
-    // Return the frame type
-    TypePtr frame_type = type_system.createFrameType(expr->frameName);
+    // Return the frame type using the qualified name
+    TypePtr frame_type = type_system.createFrameType(frame_qualified_name);
     expr->inferred_type = frame_type;
     
     return frame_type;
@@ -628,6 +632,22 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                     }
                     frame_declarations[qname] = fi;
                     declare_variable(qname, type_system.createFrameType(qname));
+                    
+                    // Also register with full module path for cross-module lookups
+                    std::string full_path = import_stmt->modulePath + "." + name;
+                    if (qname != full_path) {
+                        FrameInfo fi_full;
+                        fi_full.name = full_path;
+                        fi_full.declaration = fr;
+                        for (const auto& field : fr->fields) {
+                            fi_full.fields.push_back({field->name, resolve_type_annotation(field->type)});
+                        }
+                        frame_declarations[full_path] = fi_full;
+                        declare_variable(full_path, type_system.createFrameType(full_path));
+                    }
+                    
+                    // Register in imported symbols so LIR generator can find it
+                    current_program_->imported_symbols[qname] = fr;
                     
                     // Register frame methods (e.g. io.File.read)
                     for (const auto& method : fr->methods) {
