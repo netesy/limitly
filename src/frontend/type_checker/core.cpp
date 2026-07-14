@@ -293,36 +293,9 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     }
 
     // PASS 3: Body Verification (local and inlined symbols)
+    // We only verify statements in the current program.
+    // Imported symbols were already verified in their own module's type-check pass.
     for (const auto& stmt : program->statements) {
-        if (auto enum_decl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) {
-            // Already handled in PASS 2/3 but let's be explicit
-        } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
-            // Already handled
-        }
-    }
-    for (const auto& stmt : program->statements) {
-        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
-            if (func_decl->name == "main") {
-                // Ensure main's signature uses String for params if needed by the language
-                // but let's just make it return int
-            }
-        }
-        check_statement(stmt);
-    }
-    for (const auto& [name, stmt] : program->imported_symbols) {
-        // Skip frames in PASS 3 as their methods are checked when frame is checked
-        if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-            // Check frame declaration using qualified name
-            check_frame_declaration_with_name(name, frame_decl);
-            continue;
-        } else if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
-            // Save original name, set to qualified name for checking, then restore
-            std::string original_name = func_decl->name;
-            func_decl->name = name;
-            check_function_declaration(func_decl);
-            func_decl->name = original_name;
-            continue;
-        }
         check_statement(stmt);
     }
     

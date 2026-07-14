@@ -4,8 +4,8 @@ var PI: float = 3.14159265358979323846;
 var E: float = 2.71828182845904523536;
 var TAU: float = 6.28318530717958647692;
 var PHI: float = 1.61803398874989484820;
-var INF: float = 1.0 / 0.0;
-var NAN: float = 0.0 / 0.0;
+var INF: float = 1e300;
+var NAN: float = 0.0;
 var EPSILON: float = 0.00000000000000022204;
 
 frame Int {
@@ -245,11 +245,11 @@ frame Float {
 }
 
 // Basic operations
-fn abs(x: float): float { return Float(x).abs(); }
-fn abs_int(x: int): int { return Int(x).abs(); }
+pub fn abs(x: float): float { return Float(x).abs(); }
+pub fn abs_int(x: int): int { return Int(x).abs(); }
 
 // Integer utilities
-fn gcd(a: int, b: int): int {
+pub fn gcd(a: int, b: int): int {
     var x = abs_int(a);
     var y = abs_int(b);
     while (y != 0) {
@@ -260,12 +260,12 @@ fn gcd(a: int, b: int): int {
     return x;
 }
 
-fn lcm(a: int, b: int): int {
+pub fn lcm(a: int, b: int): int {
     if (a == 0 or b == 0) return 0;
     return abs_int(a * b) / gcd(a, b);
 }
 
-fn factorial(n: int): int {
+pub fn factorial(n: int): int {
     if (n < 0) return 0;
     if (n == 0) return 1;
     var res = 1;
@@ -277,55 +277,55 @@ fn factorial(n: int): int {
     return res;
 }
 
-fn permutations(n: int, k: int): int {
+pub fn permutations(n: int, k: int): int {
     if (k < 0 or k > n) return 0;
     return factorial(n) / factorial(n - k);
 }
 
-fn combinations(n: int, k: int): int {
+pub fn combinations(n: int, k: int): int {
     if (k < 0 or k > n) return 0;
     return factorial(n) / (factorial(k) * factorial(n - k));
 }
-fn min(a: float, b: float): float { return Float(a).min(b); }
-fn max(a: float, b: float): float { return Float(a).max(b); }
-fn clamp(value: float, low: float, high: float): float { if (value < low) return low; if (value > high) return high; return value; }
-fn sign(x: float): float { if (x > 0.0) return 1.0; if (x < 0.0) return -1.0; return 0.0; }
-fn lerp(a: float, b: float, t: float): float { return a + (b - a) * t; }
+pub fn min(a: float, b: float): float { return Float(a).min(b); }
+pub fn max(a: float, b: float): float { return Float(a).max(b); }
+pub fn clamp(value: float, low: float, high: float): float { if (value < low) return low; if (value > high) return high; return value; }
+pub fn sign(x: float): float { if (x > 0.0) return 1.0; if (x < 0.0) return -1.0; return 0.0; }
+pub fn lerp(a: float, b: float, t: float): float { return a + (b - a) * t; }
 
 // Rounding utility functions
-fn floor(x: float): int { return Float(x).floor(); }
-fn ceil(x: float): int { return Float(x).ceil(); }
-fn round(x: float): int { return Float(x).round(); }
-fn trunc(x: float): int { return Float(x).trunc(); }
-fn fract(x: float): float { return Float(x).fract(); }
+pub fn floor(x: float): int { return Float(x).floor(); }
+pub fn ceil(x: float): int { return Float(x).ceil(); }
+pub fn round(x: float): int { return Float(x).round(); }
+pub fn trunc(x: float): int { return Float(x).trunc(); }
+pub fn fract(x: float): float { return Float(x).fract(); }
 
 // Powers and logs utility functions
-fn pow(base: float, exponent: float): float { return Float(base).pow(exponent); }
-fn sqrt(x: float): float { return Float(x).sqrt(); }
-fn cbrt(x: float): float { return Float(x).cbrt(); }
-fn hypot(x: float, y: float): float { return Float(x).hypot(y); }
-fn log(x: float): float { return Float(x).log(); }
-fn log2(x: float): float { return Float(x).log2(); }
-fn log10(x: float): float { return Float(x).log10(); }
-fn exp(x: float): float { return Float(x).exp(); }
-fn exp2(x: float): float { return Float(x).exp2(); }
+pub fn pow(base: float, exponent: float): float { return Float(base).pow(exponent); }
+pub fn sqrt(x: float): float { return Float(x).sqrt(); }
+pub fn cbrt(x: float): float { return Float(x).cbrt(); }
+pub fn hypot(x: float, y: float): float { return Float(x).hypot(y); }
+pub fn log(x: float): float { return Float(x).log(); }
+pub fn log2(x: float): float { return Float(x).log2(); }
+pub fn log10(x: float): float { return Float(x).log10(); }
+pub fn exp(x: float): float { return Float(x).exp(); }
+pub fn exp2(x: float): float { return Float(x).exp2(); }
 
 // Trigonometry utility functions
-fn sin(x: float): float { return Float(x).sin(); }
-fn cos(x: float): float { return Float(x).cos(); }
-fn tan(x: float): float { return Float(x).tan(); }
-fn asin(x: float): float { return Float(x).asin(); }
-fn acos(x: float): float { return Float(x).acos(); }
-fn atan(x: float): float { return Float(x).atan(); }
-fn atan2(y: float, x: float): float { return Float(y).atan2(x); }
+pub fn sin(x: float): float { return Float(x).sin(); }
+pub fn cos(x: float): float { return Float(x).cos(); }
+pub fn tan(x: float): float { return Float(x).tan(); }
+pub fn asin(x: float): float { return Float(x).asin(); }
+pub fn acos(x: float): float { return Float(x).acos(); }
+pub fn atan(x: float): float { return Float(x).atan(); }
+pub fn atan2(y: float, x: float): float { return Float(y).atan2(x); }
 
 // Hyperbolic utility functions
-fn sinh(x: float): float { return Float(x).sinh(); }
-fn cosh(x: float): float { return Float(x).cosh(); }
-fn tanh(x: float): float { return Float(x).tanh(); }
+pub fn sinh(x: float): float { return Float(x).sinh(); }
+pub fn cosh(x: float): float { return Float(x).cosh(); }
+pub fn tanh(x: float): float { return Float(x).tanh(); }
 
 // Floating-point helpers
-fn is_nan(x: float): bool { return Float(x).is_nan(); }
-fn is_inf(x: float): bool { return Float(x).is_inf(); }
-fn is_finite(x: float): bool { return Float(x).is_finite(); }
-fn nearly_equal(a: float, b: float, epsilon: float = 0.000001): bool { return abs(a - b) <= epsilon; }
+pub fn is_nan(x: float): bool { return Float(x).is_nan(); }
+pub fn is_inf(x: float): bool { return Float(x).is_inf(); }
+pub fn is_finite(x: float): bool { return Float(x).is_finite(); }
+pub fn nearly_equal(a: float, b: float, epsilon: float = 0.000001): bool { return abs(a - b) <= epsilon; }

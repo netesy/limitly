@@ -620,14 +620,32 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                     FunctionSignature sig; 
                     sig.name = qname; 
                     sig.declaration = f;
-                    sig.return_type = f->returnType.has_value() 
+                    sig.return_type = (f->name == "main") ? type_system.INT64_TYPE : (f->returnType.has_value() 
                         ? resolve_type_annotation(f->returnType.value()) 
-                        : type_system.ANY_TYPE;
+                        : type_system.ANY_TYPE);
+                    sig.can_fail = f->canFail || f->throws;
+                    sig.error_types = f->declaredErrorTypes;
+                    
+                    std::vector<std::string> param_names;
+                    std::vector<bool> has_defaults;
+                    
                     for (const auto& p : f->params) {
                         sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                        sig.optional_params.push_back(false);
+                        sig.has_default_values.push_back(false);
+                        param_names.push_back(p.first);
+                        has_defaults.push_back(false);
                     }
+                    for (const auto& op : f->optionalParams) {
+                        sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
+                        sig.optional_params.push_back(true);
+                        sig.has_default_values.push_back(op.second.second != nullptr);
+                        param_names.push_back(op.first);
+                        has_defaults.push_back(op.second.second != nullptr);
+                    }
+                    
                     function_signatures[qname] = sig;
-                    declare_variable(qname, type_system.createFunctionType({}, sig.param_types, sig.return_type));
+                    declare_variable(qname, type_system.createFunctionType(param_names, sig.param_types, sig.return_type, has_defaults));
                     
                     // Register in imported symbols so LIR generator can find it
                     current_program_->imported_symbols[qname] = f;
@@ -653,10 +671,20 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                         FunctionSignature sig; 
                         sig.name = m_name; 
                         sig.declaration = method;
-                        sig.return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.ANY_TYPE;
+                        sig.return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
                         sig.param_types.push_back(type_system.createFrameType(qname)); // 'this'
+                        sig.optional_params.push_back(false);
+                        sig.has_default_values.push_back(false);
+                        
                         for (const auto& p : method->parameters) {
                              sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                             sig.optional_params.push_back(false);
+                             sig.has_default_values.push_back(false);
+                        }
+                        for (const auto& op : method->optionalParams) {
+                             sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
+                             sig.optional_params.push_back(true);
+                             sig.has_default_values.push_back(op.second.second != nullptr);
                         }
                         function_signatures[m_name] = sig;
                     }
@@ -667,8 +695,18 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                         sig.declaration = fr->init;
                         sig.return_type = type_system.createFrameType(qname);
                         sig.param_types.push_back(type_system.createFrameType(qname)); // 'this'
+                        sig.optional_params.push_back(false);
+                        sig.has_default_values.push_back(false);
+                        
                         for (const auto& p : fr->init->parameters) {
                              sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                             sig.optional_params.push_back(false);
+                             sig.has_default_values.push_back(false);
+                        }
+                        for (const auto& op : fr->init->optionalParams) {
+                             sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
+                             sig.optional_params.push_back(true);
+                             sig.has_default_values.push_back(op.second.second != nullptr);
                         }
                         function_signatures[init_name] = sig;
                     }
@@ -689,9 +727,15 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                         sig.declaration = method;
                         sig.return_type = method->returnType ? resolve_type_annotation(method->returnType.value()) : type_system.ANY_TYPE;
                         sig.param_types.push_back(type_system.ANY_TYPE); // 'this' (polymorphic)
+                        sig.optional_params.push_back(false);
+                        sig.has_default_values.push_back(false);
+                        
                         for (const auto& p : method->params) {
                              sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                             sig.optional_params.push_back(false);
+                             sig.has_default_values.push_back(false);
                         }
+                        // Trait methods don't support optionalParams in AST yet, but we're ready
                         function_signatures[m_name] = sig;
                     }
                 }

@@ -1,18 +1,68 @@
 // Standard Library String Module
-// Uses only built-in functions: len(), substring(), concat(), print(), assert()
+// Unified implementation of string utilities
 
-fn length(value: str): int {
+pub frame String {
+    pub var value: str;
+
+    pub init(value: str) {
+        self.value = value;
+    }
+
+    pub fn length(): int { return len(self.value); }
+    
+    pub fn concat(other: str): str { 
+        return self.value + other;
+    }
+    
+    pub fn _builtin_substring(start: int, end: int): str {
+        return _builtin_substring(self.value, start, end);
+    }
+
+    pub fn trim(): str { 
+        return trim(self.value);
+    }
+    
+    pub fn to_upper(): str { 
+        return to_upper(self.value);
+    }
+    
+    pub fn to_lower(): str { 
+        return to_lower(self.value);
+    }
+
+    pub fn contains(needle: str): bool {
+        return contains(self.value, needle);
+    }
+
+    pub fn split(delimiter: str): [str] {
+        return split(self.value, delimiter);
+    }
+
+    pub fn replace(old: str, replacement: str): str {
+        return replace(self.value, old, replacement);
+    }
+
+    pub fn starts_with(prefix: str): bool {
+        return starts_with(self.value, prefix);
+    }
+    
+    pub fn ends_with(suffix: str): bool {
+        return ends_with(self.value, suffix);
+    }
+}
+
+pub fn length(value: str): int {
     return len(value);
 }
 
-fn contains(value: str, needle: str): bool {
+pub fn contains(value: str, needle: str): bool {
     var nlen = len(needle);
     var vlen = len(value);
     if (nlen == 0) { return true; }
     if (nlen > vlen) { return false; }
     var i = 0;
     while (i <= vlen - nlen) {
-        if (substring(value, i, i + nlen) == needle) {
+        if (_builtin_substring(value, i, i + nlen) == needle) {
             return true;
         }
         i = i + 1;
@@ -20,29 +70,29 @@ fn contains(value: str, needle: str): bool {
     return false;
 }
 
-fn starts_with(value: str, prefix: str): bool {
+pub fn starts_with(value: str, prefix: str): bool {
     var plen = len(prefix);
     if (plen == 0) { return true; }
     if (plen > len(value)) { return false; }
-    return substring(value, 0, plen) == prefix;
+    return _builtin_substring(value, 0, plen) == prefix;
 }
 
-fn ends_with(value: str, suffix: str): bool {
+pub fn ends_with(value: str, suffix: str): bool {
     var slen = len(suffix);
     var vlen = len(value);
     if (slen == 0) { return true; }
     if (slen > vlen) { return false; }
-    return substring(value, vlen - slen, vlen) == suffix;
+    return _builtin_substring(value, vlen - slen, vlen) == suffix;
 }
 
-fn split(value: str, delimiter: str): [str] {
+pub fn split(value: str, delimiter: str): [str] {
     var dlen = len(delimiter);
     var vlen = len(value);
     var parts: [str] = [];
     if (dlen == 0) {
         var i = 0;
         while (i < vlen) {
-            parts = parts + [substring(value, i, i + 1)];
+            parts.append(_builtin_substring(value, i, i + 1));
             i = i + 1;
         }
         return parts;
@@ -50,19 +100,19 @@ fn split(value: str, delimiter: str): [str] {
     var start = 0;
     var i = 0;
     while (i <= vlen - dlen) {
-        if (substring(value, i, i + dlen) == delimiter) {
-            parts = parts + [substring(value, start, i)];
+        if (_builtin_substring(value, i, i + dlen) == delimiter) {
+            parts.append(_builtin_substring(value, start, i));
             start = i + dlen;
             i = start;
         } else {
             i = i + 1;
         }
     }
-    parts = parts + [substring(value, start, vlen)];
+    parts.append(_builtin_substring(value, start, vlen));
     return parts;
 }
 
-fn join(values: [str], delimiter: str): str {
+pub fn join(values: [str], delimiter: str): str {
     var n = len(values);
     if (n == 0) { return ""; }
     var result = values[0];
@@ -74,11 +124,11 @@ fn join(values: [str], delimiter: str): str {
     return result;
 }
 
-fn trim(value: str): str {
+pub fn trim(value: str): str { 
     var vlen = len(value);
     var start = 0;
     while (start < vlen) {
-        var ch = substring(value, start, start + 1);
+        var ch = _builtin_substring(value, start, start + 1);
         if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
             start = start + 1;
         } else {
@@ -87,33 +137,33 @@ fn trim(value: str): str {
     }
     var end = vlen;
     while (end > start) {
-        var ch = substring(value, end - 1, end);
+        var ch = _builtin_substring(value, end - 1, end);
         if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
             end = end - 1;
         } else {
             break;
         }
     }
-    return substring(value, start, end);
+    return _builtin_substring(value, start, end);
 }
 
-fn replace(value: str, old: str, replacement: str): str {
+pub fn replace(value: str, old: str, replacement: str): str {
     var olen = len(old);
     var vlen = len(value);
     if (olen == 0) { return value; }
     var result = "";
     var i = 0;
     while (i <= vlen - olen) {
-        if (substring(value, i, i + olen) == old) {
+        if (_builtin_substring(value, i, i + olen) == old) {
             result = result + replacement;
             i = i + olen;
         } else {
-            result = result + substring(value, i, i + 1);
+            result = result + _builtin_substring(value, i, i + 1);
             i = i + 1;
         }
     }
     while (i < vlen) {
-        result = result + substring(value, i, i + 1);
+        result = result + _builtin_substring(value, i, i + 1);
         i = i + 1;
     }
     return result;
@@ -179,147 +229,38 @@ fn _char_to_upper(ch: str): str {
     return ch;
 }
 
-fn lowercase(value: str): str {
+pub fn to_lower(value: str): str {
     var result = "";
     var i = 0;
     var vlen = len(value);
     while (i < vlen) {
-        result = result + _char_to_lower(substring(value, i, i + 1));
+        result = result + _char_to_lower(_builtin_substring(value, i, i + 1));
         i = i + 1;
     }
     return result;
 }
 
-fn uppercase(value: str): str {
+pub fn to_upper(value: str): str {
     var result = "";
     var i = 0;
     var vlen = len(value);
     while (i < vlen) {
-        result = result + _char_to_upper(substring(value, i, i + 1));
+        result = result + _char_to_upper(_builtin_substring(value, i, i + 1));
         i = i + 1;
     }
     return result;
 }
 
-fn to_lower(value: str): str {
-    return lowercase(value);
-}
-
-fn to_upper(value: str): str {
-    return uppercase(value);
-}
-
-fn compare(left: str, right: str): int {
+pub fn compare(left: str, right: str): int {
     if (left < right) { return -1; }
     if (left > right) { return 1; }
     return 0;
 }
 
-fn format_pair(key: str, value: str): str {
-    return key + "=" + value;
+pub fn substr(value: str, start: int, end: int): str {
+    return _builtin_substring(value, start, end);
 }
 
-fn is_empty(value: str): bool {
-    return len(value) == 0;
-}
-
-fn reverse(value: str): str {
-    var result = "";
-    var i = len(value) - 1;
-    while (i >= 0) {
-        result = result + substring(value, i, i + 1);
-        i = i - 1;
-    }
-    return result;
-}
-
-fn index_of(value: str, needle: str): int {
-    var nlen = len(needle);
-    var vlen = len(value);
-    if (nlen == 0) { return 0; }
-    var i = 0;
-    while (i <= vlen - nlen) {
-        if (substring(value, i, i + nlen) == needle) {
-            return i;
-        }
-        i = i + 1;
-    }
-    return -1;
-}
-
-fn last_index_of(value: str, needle: str): int {
-    var nlen = len(needle);
-    var vlen = len(value);
-    if (nlen == 0) { return vlen; }
-    var i = vlen - nlen;
-    while (i >= 0) {
-        if (substring(value, i, i + nlen) == needle) {
-            return i;
-        }
-        i = i - 1;
-    }
-    return -1;
-}
-
-fn repeat(value: str, count: int): str {
-    var result = "";
-    var i = 0;
-    while (i < count) {
-        result = result + value;
-        i = i + 1;
-    }
-    return result;
-}
-
-fn pad_left(value: str, total_length: int, pad_char: str): str {
-    var vlen = len(value);
-    if (vlen >= total_length) { return value; }
-    var result = "";
-    var i = 0;
-    while (i < total_length - vlen) {
-        result = result + pad_char;
-        i = i + 1;
-    }
-    return result + value;
-}
-
-fn pad_right(value: str, total_length: int, pad_char: str): str {
-    var vlen = len(value);
-    if (vlen >= total_length) { return value; }
-    var result = value;
-    var i = 0;
-    while (i < total_length - vlen) {
-        result = result + pad_char;
-        i = i + 1;
-    }
-    return result;
-}
-
-fn count_occurrences(value: str, needle: str): int {
-    var nlen = len(needle);
-    var vlen = len(value);
-    if (nlen == 0) { return 0; }
-    var count = 0;
-    var i = 0;
-    while (i <= vlen - nlen) {
-        if (substring(value, i, i + nlen) == needle) {
-            count = count + 1;
-            i = i + nlen;
-        } else {
-            i = i + 1;
-        }
-    }
-    return count;
-}
-
-fn is_palindrome(value: str): bool {
-    var vlen = len(value);
-    var i = 0;
-    while (i < vlen / 2) {
-        if (substring(value, i, i + 1) != substring(value, vlen - 1 - i, vlen - i)) {
-            return false;
-        }
-        i = i + 1;
-    }
-    return true;
+pub fn substring(value: str, start: int, end: int): str {
+    return _builtin_substring(value, start, end);
 }

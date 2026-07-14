@@ -60,7 +60,7 @@ void RegisterVM::reset() {
     default_atomic.store(0);
     work_queues.clear();
     work_queue_counter.store(0);
-    instruction_count = 0;
+    // instruction_count = 0;
 }
 
 std::string RegisterVM::to_string(const RegisterValue& value) const {
@@ -142,7 +142,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
     
     while (pc < end_ptr) {
         instruction_count++;
-        if (instruction_count > MAX_INSTRUCTIONS) { std::cerr << "Instruction limit exceeded" << std::endl; return; }
+        if (instruction_count > MAX_INSTRUCTIONS) { std::cerr << "Instruction limit exceeded at " << (int)pc->op << " " << instruction_count << std::endl; return; }
                 switch (pc->op) {
             case LIR::LIR_Op::LoadConst: registers[pc->dst] = pc->const_val; break;
             case LIR::LIR_Op::Add: case LIR::LIR_Op::Sub: case LIR::LIR_Op::Mul: case LIR::LIR_Op::Div:

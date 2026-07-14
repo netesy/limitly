@@ -9,12 +9,13 @@ fn main(): int {
     assert(s.ends_with(text, "World"), "EndsWith fail");
     
     var parts = s.split(text, " ");
-    assert(parts.length == 2 and parts[0] == "Hello", "Split fail");
+    assert(parts.len == 2 and parts[0] == "Hello", "Split fail");
     
     var joined = s.join(["A", "B", "C"], "-");
     assert(joined == "A-B-C", "Join fail");
     
-    var trimmed = s.trim("  abc  ");
+    var text2 = "  abc  ";
+    var trimmed = s.trim(text2);
     assert(trimmed == "abc", "Trim fail");
     
     var replaced = s.replace(text, "World", "Limit");

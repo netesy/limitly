@@ -183,7 +183,7 @@ private:
     CallStack call_stack;
     VMStateManager vm_state_manager;
 
-    static constexpr uint64_t MAX_INSTRUCTIONS = 1000000000;
+    static constexpr uint64_t MAX_INSTRUCTIONS = 10000000000;
     uint64_t instruction_count = 0;
     
     inline LIR::Type get_register_type(LIR::Reg reg) const {

@@ -37,7 +37,7 @@ This document provides essential guidelines for AI agents generating code for th
 - **Compound Assignment**: `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`
 
 #### **Control Flow**
-- **Conditionals**: `if (cond) { ... } else if (cond) { ... } else { ... }`
+- **Conditionals**: `if (cond) { ... } elif (cond) { ... } else { ... }`
 - **Loops**:
   - `while (cond) { ... }`
   - `for (var i = 0; i < 10; i = i + 1) { ... }`

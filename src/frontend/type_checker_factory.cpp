@@ -118,6 +118,7 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("concat", {ts.STRING_TYPE, ts.STRING_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("length", {ts.STRING_TYPE}, ts.INT_TYPE);
     checker.register_builtin_function("substring", {ts.STRING_TYPE, ts.INT_TYPE, ts.INT_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("_builtin_substring", {ts.STRING_TYPE, ts.INT_TYPE, ts.INT_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("str_format", {ts.STRING_TYPE, ts.ANY_TYPE}, ts.STRING_TYPE);
     // Utility len functions
     checker.register_builtin_function("len", {ts.STRING_TYPE}, ts.INT_TYPE);

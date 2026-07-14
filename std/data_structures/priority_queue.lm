@@ -1,58 +1,82 @@
 // Priority Queue Frame - Min-heap based priority queue
 
-frame PriorityQueue {
-    pub var data: [int];
+import std.iterator as iterator;
+import std.iterator show Iterator;
 
-    pub init() {
+frame PriorityQueue {
+    pub var data: [any];
+    pub var comparator: any; // Using any for now to allow nil and handle callability
+
+    pub init(comparator: any = nil) {
         self.data = [];
+        self.comparator = comparator;
     }
 
-    pub fn push(item: int) {
+    fn _compare(a: any, b: any): int {
+        if (self.comparator != nil) {
+            // Dynamic call on 'any' is supported and returns any
+            var res = self.comparator(a, b);
+            return res as int;
+        }
+        if (a < b) return -1;
+        if (a > b) return 1;
+        return 0;
+    }
+
+    pub fn push(item: any) {
         self.data = self.data + [item];
         self._sift_up(len(self.data) - 1);
     }
 
-    pub fn enqueue(item: int) {
+    pub fn enqueue(item: any) {
         self.push(item);
     }
 
-    pub fn insert(item: int) {
+    pub fn insert(item: any) {
         self.push(item);
     }
 
-    pub fn pop(): int? {
+    pub fn pop(): any? {
         var n = len(self.data);
         if (n == 0) {
             return nil;
         }
         var result = self.data[0];
+        
+        if (n == 1) {
+            self.data = [];
+            return ok(result);
+        }
+
         self.data[0] = self.data[n - 1];
-        var next_data: [int] = [];
+        
+        var next_data: [any] = [];
         var i = 0;
         while (i < n - 1) {
             next_data = next_data + [self.data[i]];
             i = i + 1;
         }
         self.data = next_data;
+
         if (len(self.data) > 0) {
             self._sift_down(0);
         }
-        return result;
+        return ok(result);
     }
 
-    pub fn remove(): int? {
+    pub fn remove(): any? {
         return self.pop();
     }
 
-    pub fn dequeue(): int? {
+    pub fn dequeue(): any? {
         return self.pop();
     }
 
-    pub fn peek(): int? {
+    pub fn peek(): any? {
         if (len(self.data) == 0) {
             return nil;
         }
-        return self.data[0];
+        return ok(self.data[0]);
     }
 
     pub fn length(): int {
@@ -75,7 +99,7 @@ frame PriorityQueue {
         self.data = [];
     }
 
-    pub fn contains(value: int): bool {
+    pub fn contains(value: any): bool {
         var i = 0;
         while (i < len(self.data)) {
             if (self.data[i] == value) return true;
@@ -84,21 +108,14 @@ frame PriorityQueue {
         return false;
     }
 
-    pub fn to_array(): [int] {
-        import std.collections.vector as vector;
-        var result = vector.Vector();
-        var i = 0;
-        while (i < len(self.data)) {
-            result.push(self.data[i]);
-            i = i + 1;
-        }
-        return result.data;
+    pub fn to_array(): [any] {
+        return self.data;
     }
 
     fn _sift_up(idx: int) {
         while (idx > 0) {
             var parent = (idx - 1) / 2;
-            if (self.data[idx] < self.data[parent]) {
+            if (self._compare(self.data[idx], self.data[parent]) < 0) {
                 var tmp = self.data[idx];
                 self.data[idx] = self.data[parent];
                 self.data[parent] = tmp;
@@ -115,10 +132,10 @@ frame PriorityQueue {
             var smallest = idx;
             var left = 2 * idx + 1;
             var right = 2 * idx + 2;
-            if (left < n and self.data[left] < self.data[smallest]) {
+            if (left < n and self._compare(self.data[left], self.data[smallest]) < 0) {
                 smallest = left;
             }
-            if (right < n and self.data[right] < self.data[smallest]) {
+            if (right < n and self._compare(self.data[right], self.data[smallest]) < 0) {
                 smallest = right;
             }
             if (smallest != idx) {
@@ -131,14 +148,19 @@ frame PriorityQueue {
             }
         }
     }
+
+    pub fn iterator(): Iterator {
+        import std.collections.vector as vector;
+        return vector.VectorIterator(self.data, len(self.data));
+    }
 }
 
-fn priority_queue(): PriorityQueue {
-    return PriorityQueue();
+fn priority_queue(comparator: any = nil): PriorityQueue {
+    return PriorityQueue(comparator=comparator);
 }
 
-fn priority_queue_from_array(arr: [int]): PriorityQueue {
-    var pq = PriorityQueue();
+fn priority_queue_from_array(arr: [any], comparator: any = nil): PriorityQueue {
+    var pq = PriorityQueue(comparator=comparator);
     var i = 0;
     while (i < len(arr)) {
         pq.push(arr[i]);

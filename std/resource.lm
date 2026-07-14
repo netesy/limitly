@@ -1,5 +1,7 @@
 // Standard Library Resource Module
 
+import std.internal.runtime as rt;
+
 frame Resource {
     pub var handle: int;
     pub var kind: int;
@@ -10,8 +12,28 @@ frame Resource {
         self.kind = k;
         self.is_open_val = (h != -1);
     }
+
+    pub fn close() {
+        if (self.is_open_val) {
+            rt.destroy(self.handle);
+            self.is_open_val = false;
+        }
+    }
 }
 
 pub fn create_hash_engine(): Resource {
-    return Resource(h=0, k=16);
+    var h = rt.create(rt.RT_HASH_ENGINE, []);
+    return Resource(h=h, k=rt.RT_HASH_ENGINE);
 }
+
+pub fn create_dns_resolver(): Resource {
+    var h = rt.create(rt.RT_DNS_RESOLVER, []);
+    return Resource(h=h, k=rt.RT_DNS_RESOLVER);
+}
+
+pub fn _call(h: int, op: int, args: [any]): any {
+    return rt.call(h, op, args);
+}
+
+// Re-export essential constants for DNS and other modules
+pub var OP_RESOLVE: int = 26;

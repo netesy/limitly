@@ -588,74 +588,74 @@ frame StringAlgorithms {
 }
 
 // Utility functions
-fn bubble_sort(arr: [int]): [int] {
+pub fn bubble_sort(arr: [int]): [int] {
     return Sorting.bubble_sort(arr);
 }
 
-fn selection_sort(arr: [int]): [int] {
+pub fn selection_sort(arr: [int]): [int] {
     return Sorting.selection_sort(arr);
 }
 
-fn insertion_sort(arr: [int]): [int] {
+pub fn insertion_sort(arr: [int]): [int] {
     return Sorting.insertion_sort(arr);
 }
 
-fn merge_sort(arr: [int]): [int] {
+pub fn merge_sort(arr: [int]): [int] {
     return Sorting.merge_sort(arr);
 }
 
-fn quick_sort(arr: [int]): [int] {
+pub fn quick_sort(arr: [int]): [int] {
     return Sorting.quick_sort(arr);
 }
 
-fn heap_sort(arr: [int]): [int] {
+pub fn heap_sort(arr: [int]): [int] {
     return Sorting.heap_sort(arr);
 }
 
-fn linear_search(arr: [int], target: int): int? {
+pub fn linear_search(arr: [int], target: int): int? {
     return Searching.linear_search(arr, target);
 }
 
-fn binary_search(arr: [int], target: int): int? {
+pub fn binary_search(arr: [int], target: int): int? {
     return Searching.binary_search(arr, target);
 }
 
-fn gcd(a: int, b: int): int {
+pub fn gcd(a: int, b: int): int {
     return MathAlgorithms.gcd(a, b);
 }
 
-fn lcm(a: int, b: int): int {
+pub fn lcm(a: int, b: int): int {
     return MathAlgorithms.lcm(a, b);
 }
 
-fn power(base: int, exponent: int): int {
+pub fn power(base: int, exponent: int): int {
     return MathAlgorithms.power(base, exponent);
 }
 
-fn fibonacci(n: int): int {
+pub fn fibonacci(n: int): int {
     return MathAlgorithms.fibonacci(n);
 }
 
-fn factorial(n: int): int {
+pub fn factorial(n: int): int {
     return MathAlgorithms.factorial(n);
 }
 
-fn is_prime(n: int): bool {
+pub fn is_prime(n: int): bool {
     return MathAlgorithms.is_prime(n);
 }
 
-fn sieve_of_eratosthenes(n: int): [int] {
+pub fn sieve_of_eratosthenes(n: int): [int] {
     return MathAlgorithms.sieve_of_eratosthenes(n);
 }
 
-fn is_palindrome(s: str): bool {
+pub fn is_palindrome(s: str): bool {
     return StringAlgorithms.is_palindrome(s);
 }
 
-fn reverse_string(s: str): str {
+pub fn reverse_string(s: str): str {
     return StringAlgorithms.reverse_string(s);
 }
 
-fn are_anagrams(s1: str, s2: str): bool {
+pub fn are_anagrams(s1: str, s2: str): bool {
     return StringAlgorithms.are_anagrams(s1, s2);
 }

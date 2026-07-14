@@ -15,20 +15,11 @@ namespace LM {
 namespace LIR {
 
 void Generator::collect_function_signatures(const LM::Frontend::TypeCheckResult& type_check_result) {
-    
     for (const auto& stmt : type_check_result.program->statements) {
         if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
             collect_function_signature(*func_stmt);
         }
     }
-    
-    // Also collect signatures from imported symbols
-    for (const auto& [qualified_name, stmt] : type_check_result.program->imported_symbols) {
-        if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
-            collect_function_signature(*func_decl, qualified_name);
-        }
-    }
-    
 }
 
 
@@ -63,10 +54,14 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         }
     }
 
+
     // Lower all module symbols and generate .__init__ functions
     auto modules = manager.get_all_modules();
     for (const auto& [path, module] : modules) {
         if (path == "root" || !module || !module->ast) continue;
+        
+        // Skip if already lowered
+        if (function_table_.count(path + ".__init__")) continue;
 
         std::string prev_mod = current_module_;
         current_module_ = path;
@@ -75,9 +70,11 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         for (const auto& stmt : module->ast->statements) {
             if (auto func_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
                 std::string original_name = func_stmt->name;
+                std::string qname = path + "." + original_name;
+                if (function_table_.count(qname)) continue;
                 {
                     FunctionInfo info;
-                    info.name = path + "." + original_name;
+                    info.name = qname;
                     info.param_count = func_stmt->params.size();
                     info.optional_param_count = func_stmt->optionalParams.size();
                     info.has_closure = false;
@@ -85,17 +82,20 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
                     info.lir_function = nullptr;
                     function_table_[info.name] = std::move(info);
                 }
-                func_stmt->name = path + "." + original_name;
+                func_stmt->name = qname;
                 generate_function(*func_stmt);
                 func_stmt->name = original_name;
             } else if (auto frame_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
                 std::string original_name = frame_stmt->name;
-                frame_stmt->name = path + "." + original_name;
+                std::string qname = path + "." + original_name;
+                if (frame_table_.count(qname)) continue;
+                frame_stmt->name = qname;
                 lower_frame_methods(*frame_stmt);
                 frame_stmt->name = original_name;
             } else if (auto trait_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
                 std::string original_name = trait_stmt->name;
-                trait_stmt->name = path + "." + original_name;
+                std::string qname = path + "." + original_name;
+                trait_stmt->name = qname;
                 lower_trait_declaration(*trait_stmt);
                 trait_stmt->name = original_name;
             }
@@ -218,22 +218,6 @@ void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
     for (const auto& stmt : program.statements) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
             collect_frame_signature(frame_decl);
-        }
-    }
-
-    auto& manager = LM::Frontend::ModuleManager::getInstance();
-    for (const auto& [path, module] : manager.get_all_modules()) {
-        if (path == "root" || !module || !module->ast) continue;
-        for (const auto& stmt : module->ast->statements) {
-            if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-                collect_frame_signature(frame_decl, path + "." + frame_decl->name);
-            }
-        }
-    }
-
-    for (const auto& [qualified_name, stmt] : program.imported_symbols) {
-        if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-            collect_frame_signature(frame_decl, qualified_name);
         }
     }
 }

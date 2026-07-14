@@ -22,7 +22,7 @@ frame DNS {
                 if (result == nil) return err(core.Error(code="ERR", message="fail"));
                 return ok(result as str);
             },
-            err e => return err(core.Error(code="ERR", message="fail"))
+            err e => return err(core.Error(code="ERR", message="fail"));
         }
     }
 
@@ -54,7 +54,7 @@ frame DNS {
             var ch: str = substring(address, i, i + 1);
             if (ch == ":") {
                 has_colon = true;
-            } else if (not ((ch >= "0" and ch <= "9") or (ch >= "a" and ch <= "f") or (ch >= "A" and ch <= "F"))) {
+            } elif (not ((ch >= "0" and ch <= "9") or (ch >= "a" and ch <= "f") or (ch >= "A" and ch <= "F"))) {
                 return false;
             }
             i = i + 1;

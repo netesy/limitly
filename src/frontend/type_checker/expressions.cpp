@@ -405,6 +405,9 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
             } else if (expr->op == TokenType::PLUS && 
                       (is_string_type(left_base) || is_string_type(right_base))) {
                 return type_system.STRING_TYPE;
+            } else if (expr->op == TokenType::PLUS && 
+                      (left_base->tag == TypeTag::List && right_base->tag == TypeTag::List)) {
+                return type_system.getCommonType(left_base, right_base);
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
             return type_system.INT_TYPE;
@@ -590,6 +593,16 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
              check_expression(expr->arguments[0], type_system.STRING_TYPE);
              expr->inferred_type = type_system.NIL_TYPE;
              return type_system.NIL_TYPE;
+        }
+        if (var_callee->name == "_builtin_len") {
+            check_expression(expr->arguments[0]);
+            expr->inferred_type = type_system.INT64_TYPE;
+            return type_system.INT64_TYPE;
+        }
+        if (var_callee->name == "_builtin_substring") {
+            for (auto& arg : expr->arguments) check_expression(arg, type_system.ANY_TYPE);
+            expr->inferred_type = type_system.STRING_TYPE;
+            return type_system.STRING_TYPE;
         }
         if (var_callee->name == "resource_call" || var_callee->name == "resource_create" || var_callee->name == "resource_destroy") {
             for (auto& arg : expr->arguments) {
@@ -1038,15 +1051,12 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             return type_system.ANY_TYPE;
         }
         
-        // For other types, just check the member expression
-        TypePtr result_type = check_expression(expr->callee);
-        if (result_type) {
-            expr->inferred_type = result_type;
-            return result_type;
-        }
+        // For other types (like Enum variants or module functions), 
+        // we'll fall through to the generic function call handling below
+        // which will check the callee expression and then validate the call.
     }
     
-    // If not a known function, check the callee as an expression
+    // If not a known function name, check the callee as an expression
     // But first check if it's already marked as undefined to avoid cascading errors
     if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
         if (undefined_symbols.find(var_expr->name) != undefined_symbols.end()) {
@@ -1056,12 +1066,24 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     }
     
     TypePtr callee_type = check_expression(expr->callee);
-    
-    if (callee_type && callee_type->tag == TypeTag::Function) {
+    if (!callee_type) return type_system.NIL_TYPE;
+
+    if (callee_type->tag == TypeTag::Function) {
         if (auto* func_type = std::get_if<FunctionType>(&callee_type->extra)) {
-            // Validate arguments against function type
-            if (arg_types.size() != func_type->paramTypes.size()) {
-                add_error("Function expects " + std::to_string(func_type->paramTypes.size()) + 
+            // Validate argument count considering optional parameters
+            size_t min_args = 0;
+            size_t max_args = func_type->paramTypes.size();
+            
+            for (bool hasDefault : func_type->hasDefaultValues) {
+                if (!hasDefault) min_args++;
+            }
+            // If hasDefaultValues is smaller than paramTypes, assume remaining are required
+            if (func_type->hasDefaultValues.size() < max_args) {
+                min_args += (max_args - func_type->hasDefaultValues.size());
+            }
+
+            if (arg_types.size() < min_args || arg_types.size() > max_args) {
+                add_error("Function expects " + std::to_string(min_args) + (min_args == max_args ? "" : "-" + std::to_string(max_args)) +
                          " arguments, but " + std::to_string(arg_types.size()) + " were provided", expr->line);
             } else {
                 for (size_t i = 0; i < arg_types.size(); ++i) {
@@ -1075,6 +1097,12 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
         }
     }
 
+    if (callee_type->tag == TypeTag::Any) {
+        // Dynamic call on 'any' - allowed, returns any
+        expr->inferred_type = type_system.ANY_TYPE;
+        return type_system.ANY_TYPE;
+    }
+
     // Only report error if the callee is not an undefined symbol
     // (to avoid cascading errors)
     if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
@@ -1082,7 +1110,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             add_error("Cannot call non-function value: " + callee_type->toString(), expr->line);
         }
     } else {
-        add_error("Cannot call non-function value", expr->line);
+        add_error("Cannot call non-function value: " + callee_type->toString(), expr->line);
     }
     
     return type_system.NIL_TYPE;
@@ -1218,6 +1246,18 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
     TypePtr object_type = check_expression(expr->object);
     std::string member_name = expr->name;
     
+    if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::String)) {
+        if (member_name == "len" || member_name == "length") {
+            return type_system.createFunctionType({}, type_system.INT64_TYPE);
+        }
+        if (object_type->tag == TypeTag::List && member_name == "append") {
+            return type_system.createFunctionType({type_system.ANY_TYPE}, type_system.NIL_TYPE);
+        }
+        if (object_type->tag == TypeTag::List && member_name == "pop") {
+            return type_system.createFunctionType({}, type_system.ANY_TYPE);
+        }
+    }
+    
     // Check for module alias access
     if (object_type && object_type->tag == TypeTag::Frame) {
         auto* fData = std::get_if<FrameType>(&object_type->extra);
@@ -1241,17 +1281,16 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
     if (object_type && object_type->tag == TypeTag::Channel) {
         std::string method_name = expr->name;
         
-        // Return appropriate types for channel methods
         if (method_name == "offer") {
-            return type_system.BOOL_TYPE; // offer() returns bool
+            return type_system.createFunctionType({type_system.ANY_TYPE}, type_system.BOOL_TYPE);
         } else if (method_name == "poll") {
-            return type_system.ANY_TYPE; // poll() returns Option<T> (represented as any for now)
+            return type_system.createFunctionType({}, type_system.ANY_TYPE);
         } else if (method_name == "send") {
-            return type_system.NIL_TYPE; // send() returns nil
+            return type_system.createFunctionType({type_system.ANY_TYPE}, type_system.NIL_TYPE);
         } else if (method_name == "recv") {
-            return type_system.ANY_TYPE; // recv() returns T
+            return type_system.createFunctionType({}, type_system.ANY_TYPE);
         } else if (method_name == "close") {
-            return type_system.NIL_TYPE; // close() returns nil
+            return type_system.createFunctionType({}, type_system.NIL_TYPE);
         } else {
             add_error("Unknown channel method: " + method_name, expr->line);
             return type_system.ANY_TYPE;
@@ -1373,16 +1412,13 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
                              " method '" + member_name + "' of frame '" + frame_name + "'", expr->line);
                 }
                 
-                // Return the method's return type
-                if (method->returnType) {
-                    TypePtr return_type = resolve_type_annotation(method->returnType);
-                    expr->inferred_type = return_type;
-                    return return_type;
-                } else {
-                    // Method has no explicit return type, assume nil
-                    expr->inferred_type = type_system.NIL_TYPE;
-                    return type_system.NIL_TYPE;
-                }
+                // Return the method as a function type
+                std::vector<TypePtr> param_types;
+                for (const auto& p : method->parameters) param_types.push_back(resolve_type_annotation(p.second));
+                TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
+                TypePtr func_type = type_system.createFunctionType(param_types, return_type);
+                expr->inferred_type = func_type;
+                return func_type;
             }
         }
         
@@ -1427,8 +1463,16 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         if (member_name == "len") return type_system.INT_TYPE;
         if (member_name == "upper" || member_name == "lower") return type_system.FUNCTION_TYPE;
     } else if (object_type->tag == TypeTag::List) {
-        if (member_name == "len") return type_system.INT_TYPE;
-        if (member_name == "append" || member_name == "pop") return type_system.FUNCTION_TYPE;
+        if (member_name == "len" || member_name == "length") return type_system.INT_TYPE;
+        if (member_name == "append" || member_name == "pop") {
+            // Create a specific function type for list methods if possible
+            if (member_name == "append") {
+                if (auto* lt = std::get_if<ListType>(&object_type->extra)) {
+                    return type_system.createFunctionType({lt->elementType}, type_system.NIL_TYPE);
+                }
+            }
+            return type_system.FUNCTION_TYPE;
+        }
     } else if (object_type->tag == TypeTag::Dict) {
         if (member_name == "len") return type_system.INT_TYPE;
         if (member_name == "keys" || member_name == "values") return type_system.FUNCTION_TYPE;

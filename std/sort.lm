@@ -1,9 +1,11 @@
 // Standard Library Sort Module
 
-fn _compare(a: any, b: any, descending: bool = false, cmp: fn(any, any): int = nil): int {
+pub fn _compare(a: any, b: any, descending: bool = false, cmp: fn(any, any): int = nil): int {
     var result: int = 0;
     if (cmp != nil) {
-        result = cmp(a, b);
+        // Dynamic call on 'cmp' which is a function pointer
+        var res = cmp(a, b);
+        result = res as int;
     } else {
         if (a < b) {
             result = -1;
@@ -21,13 +23,13 @@ fn _compare(a: any, b: any, descending: bool = false, cmp: fn(any, any): int = n
     return result;
 }
 
-fn _swap(items: [any], i: int, j: int) {
+pub fn _swap(items: [any], i: int, j: int) {
     var temp = items[i];
     items[i] = items[j];
     items[j] = temp;
 }
 
-fn insertion_sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+pub fn insertion_sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     var n = len(items);
     var i = 1;
     while (i < n) {
@@ -42,7 +44,7 @@ fn insertion_sort(items: [any], descending: bool = false, cmp: fn(any, any): int
     }
 }
 
-fn _partition(items: [any], low: int, high: int, descending: bool, cmp: fn(any, any): int): int {
+pub fn _partition(items: [any], low: int, high: int, descending: bool, cmp: fn(any, any): int): int {
     var pivot = items[high];
     var i = low - 1;
     var j = low;
@@ -57,7 +59,7 @@ fn _partition(items: [any], low: int, high: int, descending: bool, cmp: fn(any, 
     return i + 1;
 }
 
-fn _quicksort_range(items: [any], low: int, high: int, descending: bool, cmp: fn(any, any): int) {
+pub fn _quicksort_range(items: [any], low: int, high: int, descending: bool, cmp: fn(any, any): int) {
     if (low < high) {
         var p = _partition(items, low, high, descending, cmp);
         _quicksort_range(items, low, p - 1, descending, cmp);
@@ -71,8 +73,8 @@ pub fn quicksort(items: [any], descending: bool = false, cmp: fn(any, any): int 
     }
 }
 
-fn _merge(items: [any], left: int, mid: int, right: int, descending: bool, cmp: fn(any, any): int) {
-    var temp = [];
+pub fn _merge(items: [any], left: int, mid: int, right: int, descending: bool, cmp: fn(any, any): int) {
+    var temp: [any] = [];
     var i = left;
     var j = mid + 1;
     while (i <= mid and j <= right) {
@@ -99,7 +101,7 @@ fn _merge(items: [any], left: int, mid: int, right: int, descending: bool, cmp: 
     }
 }
 
-fn _mergesort_range(items: [any], left: int, right: int, descending: bool, cmp: fn(any, any): int) {
+pub fn _mergesort_range(items: [any], left: int, right: int, descending: bool, cmp: fn(any, any): int) {
     if (left < right) {
         var mid = (left + right) / 2;
         _mergesort_range(items, left, mid, descending, cmp);
@@ -114,7 +116,7 @@ pub fn mergesort(items: [any], descending: bool = false, cmp: fn(any, any): int 
     }
 }
 
-fn _heapify(items: [any], n: int, i: int, descending: bool, cmp: fn(any, any): int) {
+pub fn _heapify(items: [any], n: int, i: int, descending: bool, cmp: fn(any, any): int) {
     var best = i;
     var l = 2 * i + 1;
     var r = 2 * i + 2;
@@ -132,6 +134,7 @@ fn _heapify(items: [any], n: int, i: int, descending: bool, cmp: fn(any, any): i
 
 pub fn heapsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
     var n = len(items);
+    if (n <= 1) return;
     var i = n / 2 - 1;
     while (i >= 0) {
         _heapify(items, n, i, descending, cmp);

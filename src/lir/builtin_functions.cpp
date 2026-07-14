@@ -80,8 +80,8 @@ ValuePtr LIRBuiltinFunction::execute(const std::vector<ValuePtr>& args) {
         bool type_compatible = (expected == actual) || (expected == TypeTag::Any);
         
         if (!type_compatible && 
-            (expected == TypeTag::Int || expected == TypeTag::Int32 || expected == TypeTag::Int64) &&
-            (actual == TypeTag::Int || actual == TypeTag::Int32 || actual == TypeTag::Int64)) {
+            (expected == TypeTag::Int || expected == TypeTag::Int32 || expected == TypeTag::Int64 || expected == TypeTag::Int128 || expected == TypeTag::UInt || expected == TypeTag::UInt32 || expected == TypeTag::UInt64 || expected == TypeTag::UInt128) &&
+            (actual == TypeTag::Int || actual == TypeTag::Int32 || actual == TypeTag::Int64 || actual == TypeTag::Int128 || actual == TypeTag::UInt || actual == TypeTag::UInt32 || actual == TypeTag::UInt64 || actual == TypeTag::UInt128)) {
             type_compatible = true;
         }
         
@@ -471,6 +471,42 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             auto channel_type = std::make_shared<::Type>(TypeTag::Channel);
             return std::make_shared<Value>(channel_type, static_cast<int64_t>(0));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "substring",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Int, TypeTag::Int},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            int64_t start = args[1]->as<int64_t>();
+            int64_t end = args[2]->as<int64_t>();
+            
+            if (start < 0) start = 0;
+            if (end > (int64_t)str.length()) end = str.length();
+            if (start > end) return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), std::string(""));
+            
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, str.substr(start, end - start));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_substring",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Int, TypeTag::Int},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            int64_t start = args[1]->as<int64_t>();
+            int64_t end = args[2]->as<int64_t>();
+            
+            if (start < 0) start = 0;
+            if (end > (int64_t)str.length()) end = str.length();
+            if (start > end) return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), std::string(""));
+            
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, str.substr(start, end - start));
         }
     ));
 }
