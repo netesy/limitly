@@ -91,16 +91,16 @@ frame CryptoRandom {
                 entropy.close();
                 if (raw == nil) return err(core.Error { code: "ERR", message: "entropy read failed" });
                 // Use modular reduction
-                var val: int = 0;
+                var val_int: int = 0;
                 var i: int = 0;
                 var s: str = raw as str;
                 while (i < len(s) and i < 4) {
                     var b: int = byte_ord(substring(s, i, i + 1));
-                    val = val | (b << (i * 8));
+                    val_int = val_int | (b << (i * 8));
                     i = i + 1;
                 }
-                if (val < 0) val = -val;
-                return ok(min + (val % range_size));
+                if (val_int < 0) val_int = -val_int;
+                return ok(min + (val_int % range_size));
             }
             case err(e) => return err(core.Error { code: "ERR", message: "entropy source unavailable" });
         }

@@ -183,6 +183,21 @@ public:
     bool isKnownTypeName(const std::string& name);
     std::string tokenTypeToString(TokenType type);
     
+    bool isIdentifierLike(const Token& token) {
+        if (token.lexeme.empty()) return false;
+        char first = token.lexeme[0];
+        if (!((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_')) {
+            return false;
+        }
+        for (size_t i = 1; i < token.lexeme.size(); ++i) {
+            char c = token.lexeme[i];
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_')) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
     // Function type parsing methods
     std::shared_ptr<LM::Frontend::AST::FunctionTypeAnnotation> parseFunctionTypeAnnotation();
     std::shared_ptr<LM::Frontend::AST::TypeAnnotation> parseLegacyFunctionType();

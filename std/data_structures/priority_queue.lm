@@ -45,7 +45,7 @@ frame PriorityQueue {
         
         if (n == 1) {
             self.data = [];
-            return ok(result);
+            return result;
         }
 
         self.data[0] = self.data[n - 1];
@@ -61,7 +61,7 @@ frame PriorityQueue {
         if (len(self.data) > 0) {
             self._sift_down(0);
         }
-        return ok(result);
+        return result;
     }
 
     pub fn remove(): any? {
@@ -76,7 +76,7 @@ frame PriorityQueue {
         if (len(self.data) == 0) {
             return nil;
         }
-        return ok(self.data[0]);
+        return self.data[0];
     }
 
     pub fn length(): int {

@@ -13,7 +13,7 @@ fn main(): int {
     
     // File open/read/write/close test
     var f_res = io.open("test_io_temp.txt", "w");
-    match f_res {
+    match (f_res) {
         val f => {
             f.write("Hello Luminar");
             f.close();
@@ -24,10 +24,10 @@ fn main(): int {
     }
     
     var f_read_res = io.open("test_io_temp.txt", "r");
-    match f_read_res {
+    match (f_read_res) {
         val f => {
             var content_res = f.read();
-            match content_res {
+            match (content_res) {
                 val content => {
                     assert(content == "Hello Luminar", "File content mismatch");
                 }

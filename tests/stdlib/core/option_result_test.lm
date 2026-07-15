@@ -13,13 +13,13 @@ fn main(): int {
     var mapped = some.map(fn(x: any): any { return (x as int) + 1; });
     assert(mapped.unwrap() == 43, "Option map fail");
     
-    var ok = r.Ok("success");
-    var err = r.Err("failure");
+    var res_ok = r.Ok("success");
+    var res_err = r.Err("failure");
     
-    assert(ok.is_ok(), "Ok is_ok fail");
-    assert(err.is_err(), "Err is_err fail");
-    assert(ok.unwrap() == "success", "Ok unwrap fail");
-    assert(err.unwrap_error() == "failure", "Err unwrap_error fail");
+    assert(res_ok.is_ok(), "Ok is_ok fail");
+    assert(res_err.is_err(), "Err is_err fail");
+    assert(res_ok.unwrap() == "success", "Ok unwrap fail");
+    assert(res_err.unwrap_err() == "failure", "Err unwrap_error fail");
     
     print("Option/Result tests passed!");
     return 0;

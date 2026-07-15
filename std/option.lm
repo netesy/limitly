@@ -43,10 +43,10 @@ frame Option {
     }
 }
 
-fn Some(value: any): Option {
+pub fn Some(value: any): Option {
     return Option(true, value);
 }
 
-fn None(): Option {
+pub fn None(): Option {
     return Option(false, nil);
 }

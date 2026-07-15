@@ -400,7 +400,12 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::call() {
                 indexExpr->index = indexLiteral;
                 expr = indexExpr;
             } else {
-                auto name = consume(TokenType::IDENTIFIER, "Expected property name after '.'.");
+                Token name;
+                if (isIdentifierLike(peek())) {
+                    name = advance();
+                } else {
+                    name = consume(TokenType::IDENTIFIER, "Expected property name after '.'.");
+                }
                 auto memberExpr = std::make_shared<LM::Frontend::AST::MemberExpr>();
                 memberExpr->line = name.line;
                 memberExpr->object = expr;
@@ -573,8 +578,14 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
 // // //         attachTriviaFromToken(token);
 // // //         return varExpr;
 // // //     }
-    if (match({TokenType::IDENTIFIER})) {
-        auto token = previous();
+    bool parse_as_constructor = false;
+    if (isIdentifierLike(peek())) {
+        if ((peek().type == TokenType::OK || peek().type == TokenType::ERR) && scanner.getNextToken().type == TokenType::LEFT_PAREN) {
+            parse_as_constructor = true;
+        }
+    }
+    if (isIdentifierLike(peek()) && peek().type != TokenType::FN && peek().type != TokenType::FUNCTION_TYPE && !parse_as_constructor) {
+        auto token = advance();
         if (token.lexeme == "self") {
             auto thisExpr = std::make_shared<LM::Frontend::AST::ThisExpr>();
             thisExpr->line = token.line; return thisExpr;
@@ -585,7 +596,9 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
                 advance();
                 if (!check(TokenType::RIGHT_BRACE)) {
                     do {
-                        Token keyToken = consume(TokenType::IDENTIFIER, "Expected property name in object literal.");
+                        Token keyToken;
+                        if (isIdentifierLike(peek())) keyToken = advance();
+                        else keyToken = consume(TokenType::IDENTIFIER, "Expected property name in object literal.");
                         consume(TokenType::COLON, "Expected ':' after property name.");
                         objExpr->properties[keyToken.lexeme] = expression();
                     } while (match({TokenType::COMMA}));

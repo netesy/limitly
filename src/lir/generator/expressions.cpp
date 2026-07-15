@@ -1400,7 +1400,14 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             
             if (op != LIR_Op::Call) {
                 LIR_Inst call_inst;
-                call_inst.op = op; call_inst.dst = result;
+                call_inst.op = op; 
+                call_inst.dst = result;
+                call_inst.a = object_reg;
+                if (!arg_regs.empty()) {
+                    call_inst.b = arg_regs[0];
+                } else {
+                    call_inst.b = UINT32_MAX;
+                }
                 call_inst.call_args = arg_regs;
                 call_inst.result_type = (expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::I64);
                 emit_instruction(call_inst);

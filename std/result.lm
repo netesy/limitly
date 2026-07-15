@@ -42,11 +42,11 @@ frame Result {
     }
 }
 
-fn Ok(value: any): Result {
+pub fn Ok(value: any): Result {
     return Result(true, value, nil);
 }
 
-fn Err(error: any): Result {
+pub fn Err(error: any): Result {
     return Result(false, nil, error);
 }
 

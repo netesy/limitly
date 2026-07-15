@@ -58,14 +58,18 @@ void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
     
    // std::cout << "[DEBUG] Found " << accessed_variables.size() << " variables to share via SharedCell" << std::endl;
     
-    // 2. Allocate SharedCell IDs for each accessed variable
+    // 2. Allocate and initialize SharedCell IDs for each accessed variable
     parallel_block_cell_ids_.clear();
     for (const auto& var_name : accessed_variables) {
         Reg cell_id_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::SharedCellAlloc, Type::I64, cell_id_reg, 0, 0));
         parallel_block_cell_ids_[var_name] = cell_id_reg;
         
-
+        // Initialize the SharedCell with the variable's current value from the main thread
+        Reg var_reg = resolve_variable(var_name);
+        if (var_reg != UINT32_MAX) {
+            emit_instruction(LIR_Inst(LIR_Op::SharedCellStore, var_reg, cell_id_reg, var_reg, 0));
+        }
     }
     
     // 3. Initialize parallel execution system (using available operations)

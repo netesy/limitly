@@ -22,7 +22,7 @@ frame DNS {
                 if (result == nil) return err(core.Error(code="ERR", message="fail"));
                 return ok(result as str);
             },
-            err e => return err(core.Error(code="ERR", message="fail"));
+            err e => { return err(core.Error(code="ERR", message="fail")); }
         }
     }
 
@@ -39,8 +39,8 @@ frame DNS {
                 if (ch < "0" or ch > "9") return false;
                 j = j + 1;
             }
-            var val: int = part as int;
-            if (val < 0 or val > 255) return false;
+            var val_int: int = part as int;
+            if (val_int < 0 or val_int > 255) return false;
             i = i + 1;
         }
         return true;

@@ -824,10 +824,10 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::workerStatement() {
 std::shared_ptr<LM::Frontend::AST::Statement> Parser::importStatement() {
     auto stmt = std::make_shared<LM::Frontend::AST::ImportStatement>();
     stmt->line = previous().line;
-    if (check(TokenType::IDENTIFIER) || check(TokenType::MODULE)) {
+    if (isIdentifierLike(peek())) {
         stmt->modulePath = advance().lexeme;
         while (match({TokenType::DOT})) {
-            if (check(TokenType::IDENTIFIER) || check(TokenType::MODULE)) stmt->modulePath += "." + advance().lexeme;
+            if (isIdentifierLike(peek())) stmt->modulePath += "." + advance().lexeme;
             else { error("Expected module path component."); return nullptr; }
         }
     } else if (match({TokenType::LEFT_PAREN})) {
@@ -835,12 +835,15 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::importStatement() {
         stmt->modulePath = consume(TokenType::STRING, "Expected string literal for module path.").lexeme;
         consume(TokenType::RIGHT_PAREN, "Expected ')' after module path string.");
     } else { error("Expected module path or string literal after 'import'."); return nullptr; }
-    if (match({TokenType::AS})) stmt->alias = consume(TokenType::IDENTIFIER, "Expected alias name.").lexeme;
+    if (match({TokenType::AS})) {
+        if (isIdentifierLike(peek())) stmt->alias = advance().lexeme;
+        else { error("Expected alias name."); return nullptr; }
+    }
     if (match({TokenType::SHOW, TokenType::HIDE})) {
         LM::Frontend::AST::ImportFilter filter;
         filter.type = previous().type == TokenType::SHOW ? LM::Frontend::AST::ImportFilterType::Show : LM::Frontend::AST::ImportFilterType::Hide;
         do {
-            if (check(TokenType::IDENTIFIER) || check(TokenType::MODULE)) filter.identifiers.push_back(advance().lexeme);
+            if (isIdentifierLike(peek())) filter.identifiers.push_back(advance().lexeme);
             else { error("Expected identifier in filter list."); return nullptr; }
         } while (match({TokenType::COMMA}));
         stmt->filter = filter;

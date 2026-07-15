@@ -96,8 +96,17 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
         return type;
     }
     if (match({TokenType::LEFT_BRACE})) return parseBraceType();
-    if (check(TokenType::IDENTIFIER) && !isPrimitiveType(peek().type) && !isKnownTypeName(peek().lexeme)) {
-        type->typeName = consume(TokenType::IDENTIFIER, "Expected type name.").lexeme; type->isUserDefined = true;
+    if (isIdentifierLike(peek()) && peek().type != TokenType::FN && peek().type != TokenType::FUNCTION_TYPE && !isPrimitiveType(peek().type) && !isKnownTypeName(peek().lexeme)) {
+        type->typeName = advance().lexeme;
+        while (match({TokenType::DOT})) {
+            if (isIdentifierLike(peek())) {
+                type->typeName += "." + advance().lexeme;
+            } else {
+                error("Expected type name component after '.'.");
+                return nullptr;
+            }
+        }
+        type->isUserDefined = true;
     } else if (match({TokenType::INT_TYPE})) { type->typeName = "int"; type->isPrimitive = true; }
     else if (match({TokenType::INT8_TYPE})) { type->typeName = "i8"; type->isPrimitive = true; }
     else if (match({TokenType::INT16_TYPE})) { type->typeName = "i16"; type->isPrimitive = true; }
@@ -142,9 +151,35 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
         type->typeName = "\"" + literalValue + "\""; type->isPrimitive = true;
     }
     if (match({TokenType::QUESTION})) {
-        if (check(TokenType::IDENTIFIER)) {
-            type->isFallible = true; type->errorTypes.push_back(consume(TokenType::IDENTIFIER, "Expected error type after '?'.").lexeme);
-            while (match({TokenType::COMMA})) type->errorTypes.push_back(consume(TokenType::IDENTIFIER, "Expected error type after ','.").lexeme);
+        if (isIdentifierLike(peek())) {
+            type->isFallible = true;
+            std::string errType = advance().lexeme;
+            while (match({TokenType::DOT})) {
+                if (isIdentifierLike(peek())) {
+                    errType += "." + advance().lexeme;
+                } else {
+                    error("Expected error type name component after '.'.");
+                    return nullptr;
+                }
+            }
+            type->errorTypes.push_back(errType);
+            while (match({TokenType::COMMA})) {
+                if (isIdentifierLike(peek())) {
+                    std::string nextErrType = advance().lexeme;
+                    while (match({TokenType::DOT})) {
+                        if (isIdentifierLike(peek())) {
+                            nextErrType += "." + advance().lexeme;
+                        } else {
+                            error("Expected error type name component after '.'.");
+                            return nullptr;
+                        }
+                    }
+                    type->errorTypes.push_back(nextErrType);
+                } else {
+                    error("Expected error type after ','.");
+                    return nullptr;
+                }
+            }
         } else type->isOptional = true;
     }
     return type;

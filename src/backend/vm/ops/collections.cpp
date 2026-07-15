@@ -47,8 +47,17 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = BOX_PTR(lm_dict_new(hash_boxed_value, cmp_boxed_value));
             break;
         case LIR::LIR_Op::DictSet:
-            if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->dst], TYPE_DICT))) {
-                lm_dict_set(dict, registers[pc->a], registers[pc->b]);
+            if (IS_PTR(registers[pc->dst])) {
+                ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->dst]);
+                if (h->type_id == TYPE_DICT) {
+                    lm_dict_set((LmDict*)h, registers[pc->a], registers[pc->b]);
+                } else if (h->type_id == TYPE_LIST) {
+                    uint64_t index = static_cast<uint64_t>(as_i64(registers[pc->a]));
+                    lm_list_set((LmList*)h, index, registers[pc->b]);
+                } else if (h->type_id == TYPE_TUPLE) {
+                    uint64_t index = static_cast<uint64_t>(as_i64(registers[pc->a]));
+                    lm_tuple_set((LmTuple*)h, index, registers[pc->b]);
+                }
             }
             break;
         case LIR::LIR_Op::DictGet:

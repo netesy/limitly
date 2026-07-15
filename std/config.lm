@@ -9,13 +9,13 @@ frame Config {
     }
     
     pub fn get(key: str, default: any = nil): any {
-        var val = self.data[key];
-        if (val == nil) return default;
-        return val;
+        var val_any = self.data[key];
+        if (val_any == nil) return default;
+        return val_any;
     }
     
-    pub fn set(key: str, val: any) {
-        self.data[key] = val;
+    pub fn set(key: str, val_any: any) {
+        self.data[key] = val_any;
     }
 }
 

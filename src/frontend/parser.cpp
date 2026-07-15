@@ -9,10 +9,16 @@ using namespace LM::Error;
 
 // Helper methods
 Token Parser::peek() {
+    if (current >= scanner.getTokens().size()) {
+        return {TokenType::EOF_TOKEN, "", 0, 0, 0, {}, {}};
+    }
     return scanner.getTokens()[current];
 }
 
 Token Parser::previous() {
+    if (current == 0 || current - 1 >= scanner.getTokens().size()) {
+        return {TokenType::EOF_TOKEN, "", 0, 0, 0, {}, {}};
+    }
     return scanner.getTokens()[current - 1];
 }
 

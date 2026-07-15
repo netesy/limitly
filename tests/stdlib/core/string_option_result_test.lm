@@ -13,9 +13,9 @@ fn main(): int {
     if (some.unwrap() != 4) { return 4; }
     var none = option.None();
     if (none.unwrap_or(9) != 9) { return 5; }
-    var ok = result.Ok(3).map(twice);
-    if (ok.unwrap() != 6) { return 6; }
-    var err = result.Err("bad");
-    if (not err.is_err()) { return 7; }
+    var res_ok = result.Ok(3).map(twice);
+    if (res_ok.unwrap() != 6) { return 6; }
+    var res_err = result.Err("bad");
+    if (not res_err.is_err()) { return 7; }
     return 0;
 }

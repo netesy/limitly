@@ -99,14 +99,24 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
         }
     }
 
+    std::string type_name = annotation->typeName;
+    size_t dot_pos = type_name.find('.');
+    if (dot_pos != std::string::npos) {
+        std::string alias = type_name.substr(0, dot_pos);
+        std::string member = type_name.substr(dot_pos + 1);
+        if (import_aliases.count(alias)) {
+            type_name = import_aliases[alias] + "." + member;
+        }
+    }
+
     // First try to get the base type from the type system (handles built-in types and aliases)
-    TypePtr base_type = type_system.getType(annotation->typeName);
+    TypePtr base_type = type_system.getType(type_name);
     
     // Check if getType returned NIL_TYPE (which means type not found)
     if (base_type && base_type->tag == TypeTag::Nil) {
         // Type not found, try type alias
         try {
-            base_type = type_system.getTypeAlias(annotation->typeName);
+            base_type = type_system.getTypeAlias(type_name);
         } catch (...) {
             base_type = nullptr;
         }
