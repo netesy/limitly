@@ -198,7 +198,11 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             case LIR::LIR_Op::ToString:
             case LIR::LIR_Op::STR_CONCAT:
+            case LIR::LIR_Op::STR_FORMAT:
                 execute_strings(pc);
+                break;
+            case LIR::LIR_Op::Param:
+                argument_stack.push_back(registers[pc->a]);
                 break;
             case LIR::LIR_Op::Call:
             case LIR::LIR_Op::CallVoid:
@@ -214,7 +218,8 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, size_t 
                 break;
             case LIR::LIR_Op::Return:
             case LIR::LIR_Op::Ret: {
-                if (pc->op == LIR::LIR_Op::Ret) registers[0] = registers[pc->a];
+                LIR::Reg ret_reg = pc->a != 0 ? pc->a : pc->dst;
+                registers[0] = registers[ret_reg];
                 return;
             }
             default:

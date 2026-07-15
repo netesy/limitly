@@ -3,6 +3,7 @@
 #include "../../../lir/builtin_functions.hh"
 #include "../../../runtime/runtime.h"
 #include "../../../runtime/runtime_value.h"
+#include "../../../runtime/runtime_tuple.h"
 
 namespace LM {
 namespace Backend {
@@ -48,14 +49,23 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::CallIndirect: {
-            // Register a contains the function object (which currently is just the function pointer/name in our simplified model)
             RegisterValue func_obj = registers[pc->a];
             std::string func_name = "";
+            RegisterValue closure_env = VAL_NIL;
             
             if (IS_PTR(func_obj)) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(func_obj);
                 if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
                     func_name = (char*)((LmBox*)h)->value.as_ptr;
+                } else if (h->type_id == TYPE_TUPLE) {
+                    closure_env = func_obj;
+                    LmValue first_elem = lm_tuple_get((LmTuple*)h, 0);
+                    if (IS_PTR(first_elem)) {
+                        ObjHeader* fh = (ObjHeader*)UNBOX_PTR(first_elem);
+                        if (fh->type_id == TYPE_BOX && ((LmBox*)fh)->type == LM_BOX_STRING) {
+                            func_name = (char*)((LmBox*)fh)->value.as_ptr;
+                        }
+                    }
                 }
             }
             
@@ -64,7 +74,34 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 if (func_manager.hasFunction(func_name)) {
                     auto func = func_manager.getFunction(func_name);
                     std::vector<RegisterValue> arg_vals;
-                    for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
+                    size_t expected_params = func->getParameters().size();
+
+                    if (pc->call_args.empty()) {
+                        size_t num_given_args = expected_params;
+                        bool is_closure_call = false;
+                        if (closure_env != VAL_NIL && expected_params > 0) {
+                            num_given_args = expected_params - 1;
+                            is_closure_call = true;
+                        }
+
+                        if (argument_stack.size() >= num_given_args) {
+                            for (size_t i = 0; i < num_given_args; ++i) {
+                                arg_vals.push_back(argument_stack[argument_stack.size() - num_given_args + i]);
+                            }
+                            argument_stack.resize(argument_stack.size() - num_given_args);
+                        }
+
+                        if (is_closure_call) {
+                            arg_vals.push_back(closure_env);
+                        }
+                    } else {
+                        for (auto arg_reg : pc->call_args) {
+                            arg_vals.push_back(registers[arg_reg]);
+                        }
+                        if (closure_env != VAL_NIL && arg_vals.size() < expected_params) {
+                            arg_vals.push_back(closure_env);
+                        }
+                    }
 
                     auto saved_registers = registers;
                     const LIR::LIR_Function* saved_func = current_function_;
