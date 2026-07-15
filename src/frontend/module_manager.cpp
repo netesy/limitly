@@ -85,6 +85,10 @@ void ModuleManager::extract_metadata(std::shared_ptr<Module> module) {
             module->public_symbols.insert(var->name);
         } else if (auto frame = std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt)) {
             module->public_symbols.insert(frame->name);
+        } else if (auto trait = std::dynamic_pointer_cast<AST::TraitDeclaration>(stmt)) {
+            module->public_symbols.insert(trait->name);
+        } else if (auto enm = std::dynamic_pointer_cast<AST::EnumDeclaration>(stmt)) {
+            module->public_symbols.insert(enm->name);
         } else if (auto import_stmt = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {
             module->dependencies.push_back(import_stmt->modulePath);
         }
