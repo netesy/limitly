@@ -31,16 +31,17 @@ frame Queue {
 
 frame PriorityQueue {
     pub var heap: [any];
-    var comparator: fn(any, any): int;
+    var comparator: any;
 
-    pub init(comparator: fn(any, any): int = nil) {
+    pub init(comparator: any = nil) {
         self.heap = [];
         self.comparator = comparator;
     }
 
     fn _compare(left: any, right: any): int {
         if (self.comparator != nil) {
-            return self.comparator(left, right);
+            var comp = self.comparator;
+            return comp(left, right);
         }
         if (left < right) {
             return -1;
@@ -162,7 +163,7 @@ frame BitSet {
     var size: int;
 
     pub init(size: int = 64) {
-        self.words = [];
+        self.words = [] as [int];
         self.size = size;
         if (self.size < 1) {
             self.size = 1;

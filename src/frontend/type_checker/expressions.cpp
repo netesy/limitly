@@ -569,6 +569,39 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
 
 TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
+
+    std::string target_name = "";
+    if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+        target_name = var_expr->name;
+        auto frame_it = frame_declarations.find(target_name);
+        if (frame_it != frame_declarations.end()) {
+            target_name = target_name + ".init";
+        } else {
+            auto import_it = current_program_->imported_symbols.find(target_name);
+            if (import_it != current_program_->imported_symbols.end()) {
+                if (std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(import_it->second)) {
+                    target_name = target_name + ".init";
+                }
+            }
+        }
+    } else if (auto member_expr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
+        if (auto var_obj = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(member_expr->object)) {
+            auto alias_it = import_aliases.find(var_obj->name);
+            if (alias_it != import_aliases.end()) {
+                std::string qualified = alias_it->second + "." + member_expr->name;
+                auto frame_it = frame_declarations.find(qualified);
+                if (frame_it != frame_declarations.end()) {
+                    target_name = qualified + ".init";
+                } else {
+                    target_name = qualified;
+                }
+            }
+        }
+    }
+
+    if (!target_name.empty()) {
+        resolve_call_arguments(expr, target_name);
+    }
     
     // Handle built-in functions with special or variadic signatures
     if (auto var_callee = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
@@ -946,6 +979,22 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 
                 add_error("Frame '" + frame_name + "' has no method '" + method_name + "'", expr->line);
                 return type_system.ANY_TYPE;
+            }
+            
+            std::string qualified_method_name = frame_name + "." + method_name;
+            size_t old_arg_count = expr->arguments.size();
+            resolve_call_arguments(expr, qualified_method_name);
+            if (expr->arguments.size() != old_arg_count || !expr->namedArgs.empty()) {
+                arg_types.clear();
+                for (size_t i = 0; i < expr->arguments.size(); ++i) {
+                    TypePtr expected_p = nullptr;
+                    if (i < method->parameters.size()) {
+                        expected_p = resolve_type_annotation(method->parameters[i].second);
+                    } else if (i - method->parameters.size() < method->optionalParams.size()) {
+                        expected_p = resolve_type_annotation(method->optionalParams[i - method->parameters.size()].second.first);
+                    }
+                    arg_types.push_back(check_expression(expr->arguments[i], expected_p));
+                }
             }
             
             // Check visibility
@@ -1842,6 +1891,83 @@ TypePtr TypeChecker::check_cast_expr(std::shared_ptr<LM::Frontend::AST::CastExpr
 
     expr->inferred_type = target_type;
     return target_type;
+}
+
+void TypeChecker::resolve_call_arguments(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, const std::string& qualified_name) {
+    if (!expr) return;
+
+    auto sig_it = function_signatures.find(qualified_name);
+    if (sig_it == function_signatures.end()) return;
+
+    std::vector<std::pair<std::string, std::shared_ptr<LM::Frontend::AST::TypeAnnotation>>> params;
+    std::vector<std::pair<std::string, std::pair<std::shared_ptr<LM::Frontend::AST::TypeAnnotation>, std::shared_ptr<LM::Frontend::AST::Expression>>>> optional_params;
+
+    if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(sig_it->second.declaration)) {
+        params = func_decl->params;
+        optional_params = func_decl->optionalParams;
+    } else if (auto method_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameMethod>(sig_it->second.declaration)) {
+        params = method_decl->parameters;
+        optional_params = method_decl->optionalParams;
+    } else {
+        return;
+    }
+
+    std::vector<std::string> param_names;
+    for (const auto& p : params) {
+        param_names.push_back(p.first);
+    }
+    for (const auto& op : optional_params) {
+        param_names.push_back(op.first);
+    }
+
+    std::vector<std::shared_ptr<LM::Frontend::AST::Expression>> mapped_args;
+    size_t num_positional = expr->arguments.size();
+    bool has_errors = false;
+    std::unordered_set<std::string> consumed_named;
+
+    for (size_t i = 0; i < param_names.size(); ++i) {
+        const std::string& param_name = param_names[i];
+        if (i < num_positional) {
+            if (expr->namedArgs.count(param_name)) {
+                add_error("Parameter '" + param_name + "' passed both positionally and as named argument in call to '" + qualified_name + "'", expr->line);
+                has_errors = true;
+            }
+            mapped_args.push_back(expr->arguments[i]);
+        } else {
+            auto it = expr->namedArgs.find(param_name);
+            if (it != expr->namedArgs.end()) {
+                mapped_args.push_back(it->second);
+                consumed_named.insert(param_name);
+            } else {
+                if (i < params.size()) {
+                    add_error("Missing argument for required parameter '" + param_name + "' in call to '" + qualified_name + "'", expr->line);
+                    has_errors = true;
+                } else {
+                    size_t opt_idx = i - params.size();
+                    if (opt_idx < optional_params.size() && optional_params[opt_idx].second.second) {
+                        mapped_args.push_back(optional_params[opt_idx].second.second);
+                    } else {
+                        add_error("Missing argument for optional parameter '" + param_name + "' with no default value in call to '" + qualified_name + "'", expr->line);
+                        has_errors = true;
+                    }
+                }
+            }
+        }
+    }
+
+    for (const auto& [name, val] : expr->namedArgs) {
+        if (!consumed_named.count(name)) {
+            if (qualified_name.find(".init") == std::string::npos) {
+                add_error("Function '" + qualified_name + "' has no parameter named '" + name + "'", expr->line);
+                has_errors = true;
+            }
+        }
+    }
+
+    if (!has_errors) {
+        expr->arguments = mapped_args;
+        expr->namedArgs.clear();
+    }
 }
 
 } // namespace Frontend

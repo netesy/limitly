@@ -256,6 +256,7 @@ private:
     TypePtr check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type = nullptr);
+    void resolve_call_arguments(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, const std::string& qualified_name);
     TypePtr check_cast_expr(std::shared_ptr<LM::Frontend::AST::CastExpr> expr);
     TypePtr check_assign_expr(std::shared_ptr<LM::Frontend::AST::AssignExpr> expr);
     TypePtr check_grouping_expr(std::shared_ptr<LM::Frontend::AST::GroupingExpr> expr, TypePtr expected_type = nullptr);

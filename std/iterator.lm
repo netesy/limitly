@@ -1,8 +1,6 @@
 // Standard Library Iterator Module
 
-import std.collections.vector as vector;
-
-trait Iterator {
+pub trait Iterator {
     fn next(): any;
 }
 
@@ -131,10 +129,14 @@ frame PeekableIterator: Iterator {
     pub fn next(): any { if (self.cached != nil) { var item = self.cached; self.cached = nil; return item; } return self.source.next(); }
 }
 
-import std.collections.collection_utils as utils;
-
-fn collect(it: Iterator): [any] {
-    return utils.collect(it);
+pub fn collect(it: Iterator): [any] {
+    var res: [any] = [];
+    var item = it.next();
+    while (item != nil) {
+        res.append(item);
+        item = it.next();
+    }
+    return res;
 }
 
 // Factory functions

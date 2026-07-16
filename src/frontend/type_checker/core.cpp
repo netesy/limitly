@@ -106,12 +106,16 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
             checker.set_source_context(module->source, module->path);
             if (!checker.check_program(module->ast)) {
                 add_error("Failed to type check module: " + path);
+                    for (const auto& err : checker.get_errors()) {
+                        std::cerr << "  Module [" << path << "] local error: " << err << std::endl;
+                    }
             }
 
             for (const auto& [name, info] : checker.frame_declarations) this->frame_declarations[name] = info;
             for (const auto& [name, info] : checker.trait_declarations) this->trait_declarations[name] = info;
             for (const auto& [name, sig] : checker.function_signatures) this->function_signatures[name] = sig;
             for (const auto& [name, type] : checker.variable_types) this->variable_types[name] = type;
+            for (const auto& [alias, path] : checker.import_aliases) this->import_aliases[alias] = path;
         }
     }
 

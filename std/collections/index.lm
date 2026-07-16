@@ -1,9 +1,8 @@
 // Collections Module Index - Re-exports all collection frames
 
 // Import all collection frames
-import std.collections.list as list;
+import std.collections.linkedlist as list;
 import std.collections.hash as hash;
-import std.collections.tree as tree;
 import std.collections.queue as queue;
 import std.collections.vector as vector;
 
@@ -12,9 +11,6 @@ import std.collections.vector as vector;
 var LinkedList = list.LinkedList;
 var HashMap = hash.HashMap;
 var HashSet = hash.HashSet;
-var TreeMap = tree.TreeMap;
-var TreeSet = tree.TreeSet;
-var BTree = tree.BTree;
 var Queue = queue.Queue;
 var PriorityQueue = queue.PriorityQueue;
 var Stack = queue.Stack;

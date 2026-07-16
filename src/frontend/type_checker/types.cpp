@@ -112,6 +112,11 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
     // First try to get the base type from the type system (handles built-in types and aliases)
     TypePtr base_type = type_system.getType(type_name);
     
+    // If not found with the expanded name, try the original name
+    if (!base_type || base_type->tag == TypeTag::Nil) {
+        base_type = type_system.getType(annotation->typeName);
+    }
+    
     // Check if getType returned NIL_TYPE (which means type not found)
     if (base_type && base_type->tag == TypeTag::Nil) {
         // Type not found, try type alias
@@ -181,6 +186,8 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
 bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
     if (!expected || !actual) return false;
     if (expected->tag == TypeTag::Any || actual->tag == TypeTag::Any) return true;
+    // Allow nil to be compatible with function types (for optional function parameters)
+    if (actual->tag == TypeTag::Nil && expected->tag == TypeTag::Function) return true;
     if (is_numeric_type(expected) && is_numeric_type(actual)) {
         if (is_decimal_type(expected) || is_decimal_type(actual)) {
             return expected->tag == actual->tag;
@@ -268,15 +275,20 @@ bool TypeChecker::check_function_call(const std::string& func_name,
                                      const std::vector<TypePtr>& arg_types,
                                      TypePtr& result_type,
                                      int line) {
-    // Check if it's an enum variant constructor
+    // Check if it's a local variable in scope
     TypePtr callee_type = lookup_variable(func_name);
-    if (callee_type && callee_type->tag == TypeTag::Function) {
-        if (auto* func_type = std::get_if<FunctionType>(&callee_type->extra)) {
-            if (validate_argument_types(func_type->paramTypes, arg_types, func_name)) {
-                result_type = func_type->returnType;
-                return true;
+    if (callee_type) {
+        if (callee_type->tag == TypeTag::Function) {
+            if (auto* func_type = std::get_if<FunctionType>(&callee_type->extra)) {
+                if (validate_argument_types(func_type->paramTypes, arg_types, func_name)) {
+                    result_type = func_type->returnType;
+                    return true;
+                }
             }
         }
+        // It's a local variable (but not a statically known function type), 
+        // return false without adding an error to let check_call_expr check it dynamically as any
+        return false;
     }
 
     auto it = function_signatures.find(func_name);

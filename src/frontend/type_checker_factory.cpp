@@ -46,7 +46,8 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     // Build dependency graph and detect cycles
     ModuleGraph graph(manager.get_all_modules());
     if (graph.has_cycle()) {
-        return TypeCheckResult(program, nullptr, false, {});
+        std::cerr << "[ERROR] Dependency graph has a cycle!" << std::endl;
+        return TypeCheckResult(program, nullptr, false, {"Dependency graph cycle detected"});
     }
 
     // Verify declared dependencies exist

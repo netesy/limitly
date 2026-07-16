@@ -597,7 +597,9 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
         else if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) name = v->name;
         else if (auto t = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) name = t->name;
         
-        if (!name.empty() && symbols_to_import.count(name)) {
+        // Import all public symbols if no filter, or only filtered symbols
+        bool should_import = symbols_to_import.empty() || symbols_to_import.count(name);
+        if (!name.empty() && should_import) {
             std::vector<std::pair<std::string, bool>> target_names;
             // Qualified name: alias.name
             target_names.push_back({alias + "." + name, true});
@@ -660,7 +662,13 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                         fi.fields.push_back({field->name, resolve_type_annotation(field->type)});
                     }
                     frame_declarations[qname] = fi;
-                    declare_variable(qname, type_system.createFrameType(qname));
+                    
+                    // Create and register the frame type
+                    TypePtr frame_type = type_system.createFrameType(qname);
+                    type_system.addUserDefinedType(qname, frame_type);
+                    type_system.addUserDefinedType(full_path_base, frame_type);
+                    type_system.addUserDefinedType(alias + "." + name, frame_type);
+                    declare_variable(qname, frame_type);
                     
                     // Register in imported symbols so LIR generator can find it
                     current_program_->imported_symbols[qname] = fr;
@@ -716,7 +724,22 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                     ti.declaration = t;
                     ti.extends = t->extends;
                     trait_declarations[qname] = ti;
-                    declare_variable(qname, type_system.ANY_TYPE); 
+                    
+                    // Create and register the trait type
+                    TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait);
+                    TraitType trait_extra;
+                    trait_extra.name = qname;
+                    trait_extra.extends = t->extends;
+                    for (const auto& method : t->methods) {
+                        TypePtr ret_type = method->returnType ? resolve_type_annotation(method->returnType.value()) : type_system.NIL_TYPE;
+                        trait_extra.methodSignatures.push_back({method->name, ret_type});
+                    }
+                    trait_type->extra = trait_extra;
+                    type_system.addUserDefinedType(qname, trait_type);
+                    type_system.addUserDefinedType(full_path_base, trait_type);
+                    type_system.addUserDefinedType(alias + "." + name, trait_type);
+                    declare_variable(qname, trait_type);
+                    
                     current_program_->imported_symbols[qname] = t;
 
                     // Register trait methods
