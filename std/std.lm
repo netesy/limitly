@@ -1,7 +1,7 @@
 // Standard Library Main Module
 
 import std.core as core;
-import std.collections as collections;
+import std.collections.index as collections;
 import std.iter as iter;
 import std.functional as functional;
 import std.math as math;

@@ -8,17 +8,17 @@ import std.collections.vector as vector;
 
 // Re-export frames for easy access
 // In Limit, variables can hold frame types for instantiation
-var LinkedList = list.LinkedList;
-var HashMap = hash.HashMap;
-var HashSet = hash.HashSet;
-var Queue = queue.Queue;
-var PriorityQueue = queue.PriorityQueue;
-var Stack = queue.Stack;
-var Vector = vector.Vector;
-var Deque = vector.Deque;
-var ArrayList = vector.ArrayList;
-var RingBuffer = vector.RingBuffer;
-var BitSet = queue.BitSet;
+pub var LinkedList = list.LinkedList;
+pub var HashMap = hash.HashMap;
+pub var HashSet = hash.HashSet;
+pub var Queue = queue.Queue;
+pub var PriorityQueue = queue.PriorityQueue;
+pub var Stack = queue.Stack;
+pub var Vector = vector.Vector;
+pub var Deque = vector.Deque;
+pub var ArrayList = vector.ArrayList;
+pub var RingBuffer = vector.RingBuffer;
+pub var BitSet = queue.BitSet;
 
 fn main(): int {
     return 0;

@@ -1,7 +1,7 @@
 // Standard Library HashMap Collection
 // This implementation uses the native dict type for efficiency.
 
-frame HashMap {
+pub frame HashMap {
     var data: {any: any};
     
     pub init() {
@@ -40,7 +40,7 @@ frame HashMap {
     }
 }
 
-frame HashSet {
+pub frame HashSet {
     var map: HashMap;
     
     pub init() {

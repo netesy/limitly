@@ -879,6 +879,118 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                     return sig_it->second.return_type;
                 }
 
+                // 3. Check if it's a module variable/alias
+                TypePtr var_type = lookup_variable(qualified_name);
+                if (!var_type) {
+                    auto vt_it = variable_types.find(qualified_name);
+                    if (vt_it != variable_types.end()) var_type = vt_it->second;
+                }
+
+                if (var_type && var_type->tag != TypeTag::Nil) {
+                    if (var_type->tag == TypeTag::Frame) {
+                        auto* fData = std::get_if<FrameType>(&var_type->extra);
+                        if (fData) {
+                            std::string frame_name = fData->name;
+                            auto frame_it = frame_declarations.find(frame_name);
+                            if (frame_it != frame_declarations.end()) {
+                                const FrameInfo& frame_info = frame_it->second;
+                                std::string init_name = frame_name + ".init";
+                                auto init_sig_it = function_signatures.find(init_name);
+
+                                // Validate named arguments against both init parameters AND fields
+                                for (const auto& [arg_name, value] : expr->namedArgs) {
+                                    bool matched = false;
+                                    TypePtr target_type = nullptr;
+
+                                    if (frame_info.declaration && frame_info.declaration->init) {
+                                        const auto& init = frame_info.declaration->init;
+                                        for (const auto& p : init->parameters) {
+                                            if (p.first == arg_name) { target_type = resolve_type_annotation(p.second); matched = true; break; }
+                                        }
+                                        if (!matched) {
+                                            for (const auto& op : init->optionalParams) {
+                                                if (op.first == arg_name) { target_type = resolve_type_annotation(op.second.first); matched = true; break; }
+                                            }
+                                        }
+                                    }
+
+                                    if (!matched) {
+                                        for (const auto& field : frame_info.fields) {
+                                            if (field.first == arg_name) { target_type = field.second; matched = true; break; }
+                                        }
+                                    }
+
+                                    if (matched) {
+                                        TypePtr val_type = check_expression(value);
+                                        if (!is_type_compatible(target_type, val_type)) add_type_error(target_type->toString(), val_type->toString(), expr->line);
+                                    } else {
+                                        add_error("Frame '" + frame_name + "' has no field or init parameter named '" + arg_name + "'", expr->line);
+                                    }
+                                }
+
+                                // Validate positional arguments (passing to init)
+                                if (!expr->arguments.empty() || init_sig_it != function_signatures.end()) {
+                                    if (init_sig_it == function_signatures.end()) {
+                                        if (!expr->arguments.empty()) add_error("Frame '" + frame_name + "' has no init() method to accept positional arguments", expr->line);
+                                    } else {
+                                        std::vector<TypePtr> expected_params = init_sig_it->second.param_types;
+                                        if (!expected_params.empty()) expected_params.erase(expected_params.begin()); // skip 'this'
+
+                                        size_t satisfied_by_named = 0;
+                                        size_t required_count = 0;
+                                        if (frame_info.declaration && frame_info.declaration->init) {
+                                            const auto& init = frame_info.declaration->init;
+                                            required_count = init->parameters.size();
+                                            for (size_t i = 0; i < required_count; ++i) {
+                                                if (expr->namedArgs.count(init->parameters[i].first)) satisfied_by_named++;
+                                            }
+                                        } else {
+                                            required_count = expected_params.size();
+                                        }
+
+                                        if (expr->arguments.size() + satisfied_by_named < required_count) {
+                                             if (!expr->arguments.empty()) {
+                                                 add_error("Frame '" + frame_name + "' init method requires " + std::to_string(required_count) + " arguments, but only " +
+                                                          std::to_string(expr->arguments.size() + satisfied_by_named) + " were provided", expr->line);
+                                             }
+                                        }
+                                    }
+                                }
+
+                                TypePtr frame_type = type_system.createFrameType(frame_name);
+                                expr->inferred_type = frame_type;
+                                return frame_type;
+                            }
+                        }
+                    } else if (var_type->tag == TypeTag::Function) {
+                        if (auto* func_type = std::get_if<FunctionType>(&var_type->extra)) {
+                            size_t min_args = 0;
+                            size_t max_args = func_type->paramTypes.size();
+                            for (bool hasDefault : func_type->hasDefaultValues) {
+                                if (!hasDefault) min_args++;
+                            }
+                            if (func_type->hasDefaultValues.size() < max_args) {
+                                min_args += (max_args - func_type->hasDefaultValues.size());
+                            }
+                            if (arg_types.size() < min_args || arg_types.size() > max_args) {
+                                add_error("Function expects " + std::to_string(min_args) + (min_args == max_args ? "" : "-" + std::to_string(max_args)) +
+                                         " arguments, but " + std::to_string(arg_types.size()) + " were provided", expr->line);
+                            } else {
+                                for (size_t i = 0; i < arg_types.size(); ++i) {
+                                    if (!is_type_compatible(func_type->paramTypes[i], arg_types[i])) {
+                                        add_type_error(func_type->paramTypes[i]->toString(), arg_types[i]->toString(), expr->line);
+                                    }
+                                }
+                            }
+                            expr->inferred_type = func_type->returnType;
+                            return func_type->returnType;
+                        }
+                    } else if (var_type->tag == TypeTag::Any) {
+                        expr->inferred_type = type_system.ANY_TYPE;
+                        return type_system.ANY_TYPE;
+                    }
+                }
+
                 // No frame or function found in module
                 add_error("Module '" + module_path + "' has no member '" + member_expr->name + "'", expr->line);
                 return type_system.ANY_TYPE;

@@ -1,7 +1,7 @@
-import std.data_structures.priority_queue as pq;
+import std.collections.index as collections;
 
 fn main(): int {
-    var p = pq.PriorityQueue(); // Min-heap by default
+    var p = collections.PriorityQueue(); // Min-heap by default
     p.push(10);
     p.push(5);
     p.push(20);
@@ -16,7 +16,7 @@ fn main(): int {
     assert(p.pop() == nil, "Pop on empty PQ should return nil");
     
     // Custom comparator (Max-heap)
-    var pmax = pq.PriorityQueue(comparator=fn(a: any, b: any): int {
+    var pmax = collections.PriorityQueue(comparator=fn(a: any, b: any): int {
         if (a > b) return -1;
         if (a < b) return 1;
         return 0;

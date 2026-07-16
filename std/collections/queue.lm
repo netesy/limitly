@@ -1,11 +1,11 @@
 // Standard Library Queue, PriorityQueue, Stack, and BitSet Collections
-import std.collections.vector as vec;
+import std.collections.vector as vector;
 
-frame Queue {
-    var data: vec.Deque;
+pub frame Queue {
+    var data: Deque;
 
     pub init() {
-        self.data = vec.Deque();
+        self.data = vector.Deque();
     }
 
     pub fn enqueue(item: any) {
@@ -29,7 +29,7 @@ frame Queue {
     }
 }
 
-frame PriorityQueue {
+pub frame PriorityQueue {
     pub var heap: [any];
     var comparator: any;
 
@@ -134,11 +134,11 @@ frame PriorityQueue {
     }
 }
 
-frame Stack {
-    var data: vec.Vector;
+pub frame Stack {
+    var data: Vector;
 
     pub init() {
-        self.data = vec.Vector();
+        self.data = vector.Vector();
     }
 
     pub fn push(item: any) {
@@ -158,7 +158,7 @@ frame Stack {
     }
 }
 
-frame BitSet {
+pub frame BitSet {
     pub var words: [int];
     var size: int;
 

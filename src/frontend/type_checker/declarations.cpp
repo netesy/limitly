@@ -652,7 +652,8 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                     // Register in imported symbols so LIR generator can find it
                     current_program_->imported_symbols[qname] = f;
                 } else if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
-                    declare_variable(qname, type_system.ANY_TYPE);
+                    TypePtr v_type = v->inferred_type ? v->inferred_type : type_system.ANY_TYPE;
+                    declare_variable(qname, v_type);
                     current_program_->imported_symbols[qname] = v;
                 } else if (auto fr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
                     FrameInfo fi; 
