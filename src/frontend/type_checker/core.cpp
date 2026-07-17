@@ -114,11 +114,39 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                     }
                 }
 
-                for (const auto& [name, info] : checker.frame_declarations) this->frame_declarations[name] = info;
-                for (const auto& [name, info] : checker.trait_declarations) this->trait_declarations[name] = info;
-                for (const auto& [name, sig] : checker.function_signatures) this->function_signatures[name] = sig;
-                for (const auto& [name, type] : checker.variable_types) this->variable_types[name] = type;
-                for (const auto& [alias, path] : checker.import_aliases) this->import_aliases[alias] = path;
+                for (const auto& [name, info] : checker.frame_declarations) {
+                    this->frame_declarations[name] = info;
+                    if (!name.starts_with(path + ".")) {
+                        FrameInfo info_copy = info;
+                        info_copy.name = path + "." + name;
+                        this->frame_declarations[path + "." + name] = info_copy;
+                    }
+                }
+                for (const auto& [name, info] : checker.trait_declarations) {
+                    this->trait_declarations[name] = info;
+                    if (!name.starts_with(path + ".")) {
+                        TraitInfo info_copy = info;
+                        info_copy.name = path + "." + name;
+                        this->trait_declarations[path + "." + name] = info_copy;
+                    }
+                }
+                for (const auto& [name, sig] : checker.function_signatures) {
+                    this->function_signatures[name] = sig;
+                    if (!name.starts_with(path + ".")) {
+                        FunctionSignature sig_copy = sig;
+                        sig_copy.name = path + "." + name;
+                        this->function_signatures[path + "." + name] = sig_copy;
+                    }
+                }
+                for (const auto& [name, type] : checker.variable_types) {
+                    if (type != nullptr) {
+                        this->variable_types[name] = type;
+                        if (!name.starts_with(path + ".")) {
+                            this->variable_types[path + "." + name] = type;
+                        }
+                    }
+                }
+                for (const auto& [alias, path_] : checker.import_aliases) this->import_aliases[alias] = path_;
             }
         }
     }
