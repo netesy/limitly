@@ -1,6 +1,7 @@
 // Standard Library UDP Module
 
 import std.core as core;
+import std.core show Error;
 import std.resource as res;
 import std.net.tcp as tcp;
 
@@ -40,10 +41,10 @@ frame UDP {
                     return ok(r.handle);
                 } else {
                     r.close();
-                    return err(core.Error(code="ERR", message="fail"));
+                    return err(Error(code="ERR", message="fail"));
                 }
             },
-            err e => return err(core.Error(code="ERR", message="fail"))
+            err e => return err(Error(code="ERR", message="fail"))
         }
     }
 
@@ -55,7 +56,7 @@ frame UDP {
                 self.poller = ok(res.Pollable(r=r));
                 return ok(r.handle);
             },
-            err e => return err(core.Error(code="ERR", message="fail"))
+            err e => return err(Error(code="ERR", message="fail"))
         }
     }
 
@@ -63,10 +64,10 @@ frame UDP {
         match (self.datagram) {
             val d => {
                 var result = d.send_to(addr=address, port=port, data=data);
-                if (result == nil) return err(core.Error(code="ERR", message="fail"));
+                if (result == nil) return err(Error(code="ERR", message="fail"));
                 return ok(result as int);
             },
-            nil => return err(core.Error(code="ERR", message="fail"))
+            nil => return err(Error(code="ERR", message="fail"))
         }
     }
 
@@ -74,10 +75,10 @@ frame UDP {
         match (self.datagram) {
             val d => {
                 var result = d.recv_from();
-                if (result == nil) return err(core.Error(code="ERR", message="fail"));
+                if (result == nil) return err(Error(code="ERR", message="fail"));
                 return ok(result as str);
             },
-            nil => return err(core.Error(code="ERR", message="fail"))
+            nil => return err(Error(code="ERR", message="fail"))
         }
     }
 

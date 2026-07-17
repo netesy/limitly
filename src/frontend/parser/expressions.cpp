@@ -580,8 +580,8 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
 // // //     }
     bool parse_as_constructor = false;
     if (isIdentifierLike(peek())) {
-        const auto& tokens = scanner.getTokens();
-        if ((peek().type == TokenType::OK || peek().type == TokenType::ERR) && current + 1 < tokens.size() && tokens[current + 1].type == TokenType::LEFT_PAREN) {
+        if ((peek().type == TokenType::OK || peek().type == TokenType::ERR) && 
+            (current + 1 < scanner.getTokens().size() && scanner.getTokens()[current + 1].type == TokenType::LEFT_PAREN)) {
             parse_as_constructor = true;
         }
     }

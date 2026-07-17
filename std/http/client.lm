@@ -2,6 +2,7 @@
 // Full HTTP/1.1 client built on top of TCP and DNS resources.
 
 import std.core as core;
+import std.core show Error;
 import std.url as url;
 import std.net.dns as dns;
 import std.net.tcp as tcp;
@@ -105,12 +106,12 @@ frame HTTPClient {
                 return ok(resp);
             }
         }
-        return err(core.Error { code: "ERR", message: "too many redirects" });
+        return err(Error { code: "ERR", message: "too many redirects" });
     }
 
     fn execute_single(req: HTTPRequest): HTTPResponse?core.Error {
         var parsed = url.URL(req.url_str);
-        if (not parsed.is_valid) return err(core.Error { code: "ERR", message: "invalid URL" });
+        if (not parsed.is_valid) return err(Error { code: "ERR", message: "invalid URL" });
 
         var d = dns.DNS();
         var host = d.resolve_or_passthrough(parsed.host)?;

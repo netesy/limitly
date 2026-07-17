@@ -2,6 +2,7 @@
 
 import std.resource as res;
 import std.core as core;
+import std.core show Error;
 
 frame Hasher {
     var resource: res.Resource;
@@ -35,18 +36,18 @@ frame Hash {
                 var engine = HashEngine(h=engine_res.handle);
                 if (not engine.hasher.open_algo(algo=algorithm)) {
                     engine.resource.close();
-                    return err(core.Error(code="ERR", message="fail"));
+                    return err(Error(code="ERR", message="fail"));
                 }
                 if (not engine.hasher.update(data=data)) {
                     engine.resource.close();
-                    return err(core.Error(code="ERR", message="fail"));
+                    return err(Error(code="ERR", message="fail"));
                 }
                 var result = engine.hasher.finalize();
                 engine.resource.close();
-                if (result == nil) return err(core.Error(code="ERR", message="fail"));
+                if (result == nil) return err(Error(code="ERR", message="fail"));
                 return ok(result as str);
             },
-            err e => return err(core.Error(code="ERR", message="fail"))
+            err e => return err(Error(code="ERR", message="fail"))
         }
     }
 
@@ -61,17 +62,17 @@ frame Hash {
                 var engine = HashEngine(h=engine_res.handle);
                 if (not engine.hasher.open_algo(algo=algorithm)) {
                     engine.resource.close();
-                    return err(core.Error(code="ERR", message="fail"));
+                    return err(Error(code="ERR", message="fail"));
                 }
                 return ok(engine_res.handle);
             },
-            err e => return err(core.Error(code="ERR", message="fail"))
+            err e => return err(Error(code="ERR", message="fail"))
         }
     }
 
     pub fn update(handle: int, data: str): nil?core.Error {
         var engine = HashEngine(h=handle);
-        if (not engine.hasher.update(data=data)) return err(core.Error(code="ERR", message="fail"));
+        if (not engine.hasher.update(data=data)) return err(Error(code="ERR", message="fail"));
         return ok(nil);
     }
 
@@ -79,7 +80,7 @@ frame Hash {
         var engine = HashEngine(h=handle);
         var result = engine.hasher.finalize();
         engine.resource.close();
-        if (result == nil) return err(core.Error(code="ERR", message="fail"));
+        if (result == nil) return err(Error(code="ERR", message="fail"));
         return ok(result as str);
     }
 }

@@ -51,9 +51,10 @@ frame Stack {
         return self.data[self.data.length - 1];
     }
 
-    pub fn size(): int {
-        return self.data.length;
+    pub fn length(): int {
+        return self.data.len();
     }
+
 
     pub fn is_empty(): bool {
         return self.data.length == 0;

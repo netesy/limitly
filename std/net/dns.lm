@@ -1,6 +1,7 @@
 // Standard Library DNS Module
 
 import std.core as core;
+import std.core show Error;
 import std.resource as res;
 
 frame Resolver {
@@ -13,17 +14,13 @@ frame Resolver {
 
 frame DNS {
     pub fn resolve(host: str): str?core.Error {
-        if (host == "") return err(core.Error(code="ERR", message="fail"));
-        match (res.create_dns_resolver()) {
-            val r => {
-                var resolver = Resolver(r=r);
-                var result = resolver.resolve(host=host);
-                r.close();
-                if (result == nil) return err(core.Error(code="ERR", message="fail"));
-                return ok(result as str);
-            },
-            err e => { return err(core.Error(code="ERR", message="fail")); }
-        }
+        if (host == "") return err(Error(code="ERR", message="fail"));
+        var r = res.create_dns_resolver();
+        var resolver = Resolver(r=r);
+        var result = resolver.resolve(host=host);
+        r.close();
+        if (result == nil) return err(Error(code="ERR", message="fail"));
+        return ok(result as str);
     }
 
     pub fn is_ipv4(address: str): bool {

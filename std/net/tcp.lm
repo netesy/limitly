@@ -1,6 +1,7 @@
 // Standard Library TCP Module
 
 import std.core as core;
+import std.core show Error;
 import std.resource as res;
 
 frame Connector {
@@ -65,10 +66,10 @@ frame TCPClient {
                     return ok(r.handle);
                 } else {
                     r.close();
-                    return err(core.Error(code="ERR", message="fail"));
+                    return err(Error(code="ERR", message="fail"));
                 }
             },
-            err e => return err(core.Error(code="ERR", message="fail"))
+            err e => return err(Error(code="ERR", message="fail"))
         }
     }
 
@@ -77,9 +78,9 @@ frame TCPClient {
             val w => {
                 var result = w.write(args=[data]);
                 if (result == true) return ok(len(data));
-                return err(core.Error(code="ERR", message="fail"));
+                return err(Error(code="ERR", message="fail"));
             },
-            nil => return err(core.Error(code="ERR", message="fail"))
+            nil => return err(Error(code="ERR", message="fail"))
         }
     }
 
@@ -87,10 +88,10 @@ frame TCPClient {
         match (self.reader) {
             val rd => {
                 var data = rd.read(args=[]);
-                if (data == nil) return err(core.Error(code="ERR", message="fail"));
+                if (data == nil) return err(Error(code="ERR", message="fail"));
                 return ok(data as str);
             },
-            nil => return err(core.Error(code="ERR", message="fail"))
+            nil => return err(Error(code="ERR", message="fail"))
         }
     }
 
@@ -153,10 +154,10 @@ frame TCPServer {
                     return ok(r.handle);
                 } else {
                     r.close();
-                    return err(core.Error(code="ERR", message="fail"));
+                    return err(Error(code="ERR", message="fail"));
                 }
             },
-            err e => return err(core.Error(code="ERR", message="fail"))
+            err e => return err(Error(code="ERR", message="fail"))
         }
     }
 
@@ -169,10 +170,10 @@ frame TCPServer {
                     self.accepter = ok(Accepter(r=r));
                     return ok(r.handle);
                 } else {
-                    return err(core.Error(code="ERR", message="fail"));
+                    return err(Error(code="ERR", message="fail"));
                 }
             },
-            nil => return err(core.Error(code="ERR", message="fail"))
+            nil => return err(Error(code="ERR", message="fail"))
         }
     }
 
@@ -180,7 +181,7 @@ frame TCPServer {
         match (self.accepter) {
             val acc => {
                 var fd = acc.accept();
-                if (fd == -1) return err(core.Error(code="ERR", message="fail"));
+                if (fd == -1) return err(Error(code="ERR", message="fail"));
                 var cr = res.adopt_socket(fd=fd);
                 var client = TCPClient();
                 client.resource = ok(cr);
@@ -189,7 +190,7 @@ frame TCPServer {
                 client.poller = ok(res.Pollable(r=cr));
                 return ok(client);
             },
-            nil => return err(core.Error(code="ERR", message="fail"))
+            nil => return err(Error(code="ERR", message="fail"))
         }
     }
 

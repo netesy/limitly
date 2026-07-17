@@ -84,38 +84,42 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     }
 
     // PASS 0: Module Resolution and Type Checking
-    auto& manager = ModuleManager::getInstance();
-    // manager.clear(); // Removed to prevent infinite recursion
-    // manager.resolve_all(program, "root"); // Handled by factory or initial call
-    if (manager.has_circular_dependencies()) {
-        add_error("Circular dependency detected in modules");
-    }
+    if (is_root) {
+        auto& manager = ModuleManager::getInstance();
+        // manager.clear(); // Removed to prevent infinite recursion
+        // manager.resolve_all(program, "root"); // Handled by factory or initial call
+        if (manager.has_circular_dependencies()) {
+            add_error("Circular dependency detected in modules");
+        }
 
-    // Type check all loaded modules recursively
-    auto all_modules = manager.get_all_modules();
-    std::vector<std::string> topo_order = manager.get_topological_order();
+        // Type check all loaded modules recursively
+        auto all_modules = manager.get_all_modules();
+        std::vector<std::string> topo_order = manager.get_topological_order();
 
-    for (const auto& path : topo_order) {
-        auto it = all_modules.find(path);
-        if (it == all_modules.end()) continue;
-        auto module = it->second;
-        if (module && !module->is_checked) {
-            module->is_checked = true;
-            TypeChecker checker(this->type_system, this->symbol_db_);
-            TypeCheckerFactory::register_builtin_functions(checker);
-            checker.set_source_context(module->source, module->path);
-            if (!checker.check_program(module->ast)) {
-                add_error("Failed to type check module: " + path);
+        for (const auto& path : topo_order) {
+            if (path == "root") continue; // Skip root module recursion
+            auto it = all_modules.find(path);
+            if (it == all_modules.end()) continue;
+            auto module = it->second;
+            if (module && !module->is_checked) {
+                module->is_checked = true;
+                TypeChecker checker(this->type_system, this->symbol_db_);
+                checker.is_root = false; // Submodules are not root checkers
+                TypeCheckerFactory::register_builtin_functions(checker);
+                checker.set_source_context(module->source, module->path);
+                if (!checker.check_program(module->ast)) {
+                    add_error("Failed to type check module: " + path);
                     for (const auto& err : checker.get_errors()) {
                         std::cerr << "  Module [" << path << "] local error: " << err << std::endl;
                     }
-            }
+                }
 
-            for (const auto& [name, info] : checker.frame_declarations) this->frame_declarations[name] = info;
-            for (const auto& [name, info] : checker.trait_declarations) this->trait_declarations[name] = info;
-            for (const auto& [name, sig] : checker.function_signatures) this->function_signatures[name] = sig;
-            for (const auto& [name, type] : checker.variable_types) this->variable_types[name] = type;
-            for (const auto& [alias, path] : checker.import_aliases) this->import_aliases[alias] = path;
+                for (const auto& [name, info] : checker.frame_declarations) this->frame_declarations[name] = info;
+                for (const auto& [name, info] : checker.trait_declarations) this->trait_declarations[name] = info;
+                for (const auto& [name, sig] : checker.function_signatures) this->function_signatures[name] = sig;
+                for (const auto& [name, type] : checker.variable_types) this->variable_types[name] = type;
+                for (const auto& [alias, path] : checker.import_aliases) this->import_aliases[alias] = path;
+            }
         }
     }
 
@@ -180,6 +184,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 std::string init_name = name + ".init";
                 FunctionSignature sig;
                 sig.name = init_name;
+                sig.declaration = frame_decl->init;
                 sig.return_type = type_system.NIL_TYPE;
                 sig.param_types.push_back(type_system.createFrameType(name));
                 for (const auto& p : frame_decl->init->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
@@ -190,6 +195,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 std::string m_name = name + "." + m->name;
                 FunctionSignature sig;
                 sig.name = m_name;
+                sig.declaration = m;
                 sig.return_type = m->returnType ? resolve_type_annotation(m->returnType) : type_system.NIL_TYPE;
                 sig.param_types.push_back(type_system.createFrameType(name));
                 for (const auto& p : m->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
@@ -201,6 +207,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 std::string deinit_name = name + ".deinit";
                 FunctionSignature sig;
                 sig.name = deinit_name;
+                sig.declaration = frame_decl->deinit;
                 sig.return_type = type_system.NIL_TYPE;
                 sig.param_types.push_back(type_system.createFrameType(name));
                 function_signatures[deinit_name] = sig;
@@ -371,11 +378,7 @@ void TypeChecker::declare_variable(const std::string& name, TypePtr type) {
     if (current_scope) {
         current_scope->declare(name, type);
     }
-    if (current_scope_level == 0) {
-        variable_types[name] = type;
-    }
 }
-
 
 TypePtr TypeChecker::lookup_variable(const std::string& name) {
     TypePtr res = current_scope ? current_scope->lookup(name) : nullptr;

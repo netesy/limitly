@@ -1,7 +1,7 @@
 // Standard Library String Module
 // Unified implementation of string utilities
 
-pub frame String {
+frame String {
     pub var value: str;
 
     pub init(value: str) {

@@ -2,6 +2,7 @@
 // Uses the native WEBSOCKET resource for real WebSocket connections.
 
 import std.core as core;
+import std.core show Error;
 import std.url as url;
 import std.resource as res;
 
@@ -22,17 +23,17 @@ frame WebSocketClient {
 
     // Connect to a WebSocket server
     pub fn connect(url_str: str): int?core.Error {
-        if (url_str == "") return err(core.Error { code: "ERR", message: "empty URL" });
+        if (url_str == "") return err(Error { code: "ERR", message: "empty URL" });
 
         var parsed = url.URL(url_str);
-        if (not parsed.is_valid) return err(core.Error { code: "ERR", message: "invalid URL" });
+        if (not parsed.is_valid) return err(Error { code: "ERR", message: "invalid URL" });
 
         match (res.create_websocket()) {
             case ok(ws) => {
                 var connector = res.Connector(ws);
                 if (not connector.connect([url_str])) {
                     ws.close();
-                    return err(core.Error { code: "ERR", message: "WebSocket handshake failed" });
+                    return err(Error { code: "ERR", message: "WebSocket handshake failed" });
                 }
 
                 self.resource = ok(ws);
@@ -42,7 +43,7 @@ frame WebSocketClient {
                 self.poller = ok(res.Poller(ws));
                 return ok(ws._handle());
             }
-            case err(e) => return err(core.Error { code: "ERR", message: "failed to create WebSocket resource" });
+            case err(e) => return err(Error { code: "ERR", message: "failed to create WebSocket resource" });
         }
     }
 
@@ -53,11 +54,11 @@ frame WebSocketClient {
                 var result = w.write([message]);
                 if (result != true) {
                     self.close();
-                    return err(core.Error { code: "ERR", message: "send failed" });
+                    return err(Error { code: "ERR", message: "send failed" });
                 }
                 return ok(len(message));
             }
-            case nil => return err(core.Error { code: "ERR", message: "not connected" });
+            case nil => return err(Error { code: "ERR", message: "not connected" });
         }
     }
 
@@ -68,11 +69,11 @@ frame WebSocketClient {
                 var result = rd.read([]);
                 if (result == nil) {
                     self.close();
-                    return err(core.Error { code: "ERR", message: "connection closed" });
+                    return err(Error { code: "ERR", message: "connection closed" });
                 }
                 return ok(result as str);
             }
-            case nil => return err(core.Error { code: "ERR", message: "not connected" });
+            case nil => return err(Error { code: "ERR", message: "not connected" });
         }
     }
 

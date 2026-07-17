@@ -1,16 +1,17 @@
 // Filesystem structure module
 import std.path as path;
 import std.io as io;
+import std.io show UnknownError;
 
 frame FS {
     pub fn exists(p: path.Path): bool { return io.exists(p.value); }
     pub fn create_dir(p: path.Path): nil?io.IOError { return io.create_directory(p.value); }
     pub fn remove(p: path.Path): nil?io.IOError {
-        if (!io.delete(p.value)) return err(io.UnknownError { message: "failed to remove path" });
+        if (!io.delete(p.value)) return err(UnknownError { message: "failed to remove path" });
         return ok(nil);
     }
     pub fn rename(from_path: path.Path, to_path: path.Path): nil?io.IOError {
-        if (!io.rename(from_path.value, to_path.value)) return err(io.UnknownError { message: "failed to rename path" });
+        if (!io.rename(from_path.value, to_path.value)) return err(UnknownError { message: "failed to rename path" });
         return ok(nil);
     }
     pub fn list_dir(p: path.Path): [str]?io.IOError { 

@@ -143,6 +143,8 @@ private:
     std::shared_ptr<LM::Frontend::AST::Program> current_program_ = nullptr;
     
 public:
+    bool is_root = true;
+
     // Constructor accepting TypeSystem and SymbolDatabase
     explicit TypeChecker(TypeSystem& ts, SymbolDatabase& symbol_db) : type_system(ts), symbol_db_(symbol_db) {}
 
