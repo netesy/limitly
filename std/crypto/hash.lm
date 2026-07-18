@@ -30,7 +30,7 @@ frame HashEngine {
 }
 
 frame Hash {
-    pub fn hash(data: str, algorithm: str): str?core.Error {
+    pub fn hash(data: str, algorithm: str): str?Error {
         match (res.create_hash_engine()) {
             val engine_res => {
                 var engine = HashEngine(h=engine_res.handle);
@@ -51,12 +51,32 @@ frame Hash {
         }
     }
 
-    pub fn sha256(data: str): str?core.Error { return ok(self.hash(data=data, algorithm="sha256")?); }
-    pub fn sha512(data: str): str?core.Error { return ok(self.hash(data=data, algorithm="sha512")?); }
-    pub fn md5(data: str): str?core.Error { return ok(self.hash(data=data, algorithm="md5")?); }
-    pub fn sha1(data: str): str?core.Error { return ok(self.hash(data=data, algorithm="sha1")?); }
+    pub fn sha256(data: str): str?Error {
+        match (self.hash(data=data, algorithm="sha256")) {
+            val s => return ok(s),
+            err e => return err(Error(code="ERR", message="fail"))
+        }
+    }
+    pub fn sha512(data: str): str?Error {
+        match (self.hash(data=data, algorithm="sha512")) {
+            val s => return ok(s),
+            err e => return err(Error(code="ERR", message="fail"))
+        }
+    }
+    pub fn md5(data: str): str?Error {
+        match (self.hash(data=data, algorithm="md5")) {
+            val s => return ok(s),
+            err e => return err(Error(code="ERR", message="fail"))
+        }
+    }
+    pub fn sha1(data: str): str?Error {
+        match (self.hash(data=data, algorithm="sha1")) {
+            val s => return ok(s),
+            err e => return err(Error(code="ERR", message="fail"))
+        }
+    }
 
-    pub fn create(algorithm: str): int?core.Error {
+    pub fn create(algorithm: str): int?Error {
         match (res.create_hash_engine()) {
             val engine_res => {
                 var engine = HashEngine(h=engine_res.handle);
@@ -70,13 +90,13 @@ frame Hash {
         }
     }
 
-    pub fn update(handle: int, data: str): nil?core.Error {
+    pub fn update(handle: int, data: str): nil?Error {
         var engine = HashEngine(h=handle);
         if (not engine.hasher.update(data=data)) return err(Error(code="ERR", message="fail"));
         return ok(nil);
     }
 
-    pub fn finalize(handle: int): str?core.Error {
+    pub fn finalize(handle: int): str?Error {
         var engine = HashEngine(h=handle);
         var result = engine.hasher.finalize();
         engine.resource.close();
@@ -85,23 +105,43 @@ frame Hash {
     }
 }
 
-pub fn sha256(data: str): str?core.Error { return ok(Hash.sha256(data=data)?); }
-pub fn sha512(data: str): str?core.Error { return ok(Hash.sha512(data=data)?); }
-pub fn md5(data: str): str?core.Error { return ok(Hash.md5(data=data)?); }
-pub fn sha1(data: str): str?core.Error { return ok(Hash.sha1(data=data)?); }
+pub fn sha256(data: str): str?Error {
+    match (Hash.sha256(data=data)) {
+        val s => return ok(s),
+        err e => return err(Error(code="ERR", message="fail"))
+    }
+}
+pub fn sha512(data: str): str?Error {
+    match (Hash.sha512(data=data)) {
+        val s => return ok(s),
+        err e => return err(Error(code="ERR", message="fail"))
+    }
+}
+pub fn md5(data: str): str?Error {
+    match (Hash.md5(data=data)) {
+        val s => return ok(s),
+        err e => return err(Error(code="ERR", message="fail"))
+    }
+}
+pub fn sha1(data: str): str?Error {
+    match (Hash.sha1(data=data)) {
+        val s => return ok(s),
+        err e => return err(Error(code="ERR", message="fail"))
+    }
+}
 
 fn byte_ord(ch: str): int {
-    if (ch >= "a" and ch <= "z") {
-        if (len(ch) == 1) return 97 + (ch - "a");
-        return 97;
+    var alphabet = "abcdefghijklmnopqrstuvwxyz";
+    for (var i = 0; i < len(alphabet); i = i + 1) {
+        if (substring(alphabet, i, i + 1) == ch) return 97 + i;
     }
-    if (ch >= "A" and ch <= "Z") {
-        if (len(ch) == 1) return 65 + (ch - "A");
-        return 65;
+    var u_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    for (var i = 0; i < len(u_alphabet); i = i + 1) {
+        if (substring(u_alphabet, i, i + 1) == ch) return 65 + i;
     }
-    if (ch >= "0" and ch <= "9") {
-        if (len(ch) == 1) return 48 + (ch - "0");
-        return 48;
+    var digits = "0123456789";
+    for (var i = 0; i < len(digits); i = i + 1) {
+        if (substring(digits, i, i + 1) == ch) return 48 + i;
     }
     if (ch == " ") return 32;
     if (ch == "\n") return 10;

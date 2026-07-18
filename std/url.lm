@@ -408,15 +408,15 @@ fn byte_ord(ch: str): int {
     var alphabet = "abcdefghijklmnopqrstuvwxyz";
     var idx = index_of(alphabet, ch);
     if (idx != -1) return 97 + idx;
-    
+
     var u_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     idx = index_of(u_alphabet, ch);
     if (idx != -1) return 65 + idx;
-    
+
     var digits = "0123456789";
     idx = index_of(digits, ch);
     if (idx != -1) return 48 + idx;
-    
+
     if (ch == " ") return 32;
     if (ch == "\n") return 10;
     if (ch == "\r") return 13;

@@ -11,7 +11,7 @@ frame Path {
 
     pub fn join(other: str): Path {
         if (self.value == "") return Path(value=other);
-        if (other == "") return self;
+        if (other == "") return Path(value=self.value);
         
         // Handle path separators
         var separator = "/";
@@ -22,13 +22,13 @@ frame Path {
     }
 
     pub fn join_multiple(parts: [str]): Path {
-        var result = self;
+        var p = Path(value=self.value);
         var i: int = 0;
         while (i < len(parts)) {
-            result = result.join(parts[i]);
+            p = p.join(parts[i]);
             i = i + 1;
         }
-        return result;
+        return p;
     }
 
     // Path components
@@ -81,7 +81,7 @@ frame Path {
     // Path normalization
     pub fn normalize(): Path {
         // Simplified normalization
-        return self;
+        return Path(value=self.value);
     }
 
     pub fn resolve(): Path {

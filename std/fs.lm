@@ -16,7 +16,7 @@ frame FS {
         if (!io.rename(from_path.value, to_path.value)) return err(UnknownError(message="failed to rename path"));
         return ok(nil);
     }
-    pub fn list_dir(p: path.Path): [str]?IOError { 
+    pub fn list_dir(p: path.Path): [str]?IOError {
         var res = io.list_directory(p.value)?;
         return ok(res);
     }
