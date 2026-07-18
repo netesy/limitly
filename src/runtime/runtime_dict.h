@@ -44,15 +44,15 @@ RUNTIME_API uint64_t lm_hash_string(LmValue key);
 RUNTIME_API int lm_cmp_int(LmValue k1, LmValue k2);
 RUNTIME_API int lm_cmp_string(LmValue k1, LmValue k2);
 
-#ifdef __cplusplus
-}
-#endif
-
-#endif // RUNTIME_DICT_H
-
 // Boxed value hash and compare functions (used by both VM and JIT)
 RUNTIME_API uint64_t hash_boxed_value(LmValue key);
 RUNTIME_API int cmp_boxed_value(LmValue k1, LmValue k2);
 
 // Wrapper function for JIT to create dicts with proper hash/compare functions
 RUNTIME_API void* jit_dict_new(void);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif // RUNTIME_DICT_H

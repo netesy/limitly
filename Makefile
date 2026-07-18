@@ -10,14 +10,14 @@ ifeq ($(OS),Windows_NT)
 	CXX := $(MSYS2_PATH)/mingw64/bin/g++.exe
 	CC := $(MSYS2_PATH)/mingw64/bin/gcc.exe
 	AR := $(MSYS2_PATH)/mingw64/bin/ar.exe
-	LIBS := -lws2_32
+	LIBS := -lws2_32 -lffi
 else
 	PLATFORM := linux
 	EXE_EXT :=
 	CXX := g++
 	CC := gcc
 	AR := ar
-	LIBS :=
+	LIBS := -lffi -ldl
 endif
 
 # =============================
@@ -26,10 +26,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -d "vendor/fyra" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I. -Isrc
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -d "vendor/fyra" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O3 -fPIC -I. -Isrc
 endif
 
@@ -59,13 +59,13 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/parser/statements.cpp src/frontend/parser/expressions.cpp \
               src/frontend/parser/types.cpp src/frontend/parser/patterns.cpp \
               src/frontend/cst.cpp src/frontend/cst/printer.cpp src/frontend/cst/utils.cpp \
-              src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp \
+              src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp src/frontend/module_graph.cpp src/frontend/declaration_resolver.cpp \
               src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp
 
-BACK_SRCS := $(if $(shell [ -d "vendor/fyra" ] && echo yes),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp,)
+BACK_SRCS := $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp,)
 
 FYRA_DIR := vendor/fyra
-FYRA_SRCS := $(if $(shell [ -d "$(FYRA_DIR)" ] && echo yes),\
+FYRA_SRCS := $(if $(shell [ -f "$(FYRA_DIR)/include/ir/Module.h" ] && echo yes),\
              $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/codegen/*.cpp) \
 			 $(wildcard $(FYRA_DIR)/src/codegen/abi/*.cpp) \
@@ -106,10 +106,10 @@ LYRA_SRCS := $(wildcard $(LYRA_DIR)/src/*.cpp)
 LYRA_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_SRCS))
 LYRA_BIN := $(BIN_DIR)/lyra$(EXE_EXT)
 
-REGISTER_SRCS := src/backend/vm/register.cpp src/backend/vm/register_helpers.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp
+REGISTER_SRCS := src/backend/vm/resource_manager.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
-                 src/lir/builtin_functions.cpp src/lir/lir_types.cpp src/lir/generator.cpp \
+                 src/lir/builtin_functions.cpp src/lir/intrinsic_registry.cpp src/lir/verifier.cpp src/lir/lir_types.cpp src/lir/generator.cpp \
                  src/lir/generator/core.cpp src/lir/generator/statements.cpp src/lir/generator/expressions.cpp \
                  src/lir/generator/signatures.cpp src/lir/generator/oop.cpp src/lir/generator/concurrency.cpp \
                  src/lir/generator/modules.cpp src/lir/function_registry.cpp \
@@ -126,6 +126,11 @@ MAIN_SRCS := src/main.cpp
 
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS)
+
+# LIR round-trip test (C17): builds a small test binary that exercises every
+# field of LIR_Inst through serialize() -> deserialize() -> compare.
+LIR_TEST_SRCS := tests/lir/test_round_trip.cpp
+LIR_TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(LIR_TEST_SRCS))
 
 # =============================
 # Objects and response files
@@ -213,7 +218,7 @@ FYRA_DIR := vendor/fyra
 FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
 # Check if Fyra is available
-FYRA_AVAILABLE := $(shell if [ -d "$(FYRA_DIR)" ]; then echo "yes"; else echo "no"; fi)
+FYRA_AVAILABLE := $(shell if [ -f "$(FYRA_DIR)/include/ir/Module.h" ]; then echo "yes"; else echo "no"; fi)
 
 ifeq ($(FYRA_AVAILABLE),yes)
 # Build Fyra using Makefile (excluding problematic debug files)
@@ -329,6 +334,17 @@ parser: $(BIN_DIR) $(TEST_RSP)
 	@echo "🔨 Building test_parser$(EXE_EXT)...."
 	$(CXX) $(CXXFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser$(EXE_EXT) $(LIBS)
 	@echo "✅ $(BIN_DIR)/test_parser$(EXE_EXT) built."
+
+# =============================
+# LIR Round-Trip Test Target (C17)
+# =============================
+.PHONY: lir-test
+lir-test: $(BIN_DIR) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(LIR_TEST_OBJS)
+	@echo "\360\237\223\260 Linking lir_test ..."
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIR_TEST_OBJS) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) -o $(BIN_DIR)/lir_test $(LIBS) -lpthread
+	@echo "\342\234\205 lir_test built."
+	@echo "\360\237\247\252 Running lir_test ..."
+	./bin/lir_test
 
 # =============================
 # Test Target

@@ -1,0 +1,109 @@
+// HTTP tests - status codes, method validation, URL validation
+
+fn str_len(s: str): int {
+    if (s == "") { return 0; }
+    var count: int = 0;
+    var i: int = 0;
+    while (i < 10000) {
+        if (s[i] == nil) { return count; }
+        count = count + 1;
+        i = i + 1;
+    }
+    return count;
+}
+
+fn substr(s: str, start: int, end: int): str {
+    var result: str = "";
+    var i: int = start;
+    while (i < end) {
+        result = result + s[i];
+        i = i + 1;
+    }
+    return result;
+}
+
+print("=== HTTP Tests ===");
+
+// Status code classification
+fn is_success(code: int): bool { return code >= 200 and code < 300; }
+fn is_redirect(code: int): bool { return code >= 300 and code < 400; }
+fn is_client_err(code: int): bool { return code >= 400 and code < 500; }
+fn is_server_err(code: int): bool { return code >= 500 and code < 600; }
+
+assert(is_success(200), "200");
+assert(is_success(201), "201");
+assert(is_success(299), "299");
+assert(not is_success(199), "not 199");
+assert(not is_success(300), "not 300");
+
+assert(is_redirect(301), "301");
+assert(is_redirect(302), "302");
+assert(is_redirect(399), "399");
+assert(not is_redirect(200), "200 no");
+assert(not is_redirect(400), "400 no");
+
+assert(is_client_err(400), "400");
+assert(is_client_err(404), "404");
+assert(is_client_err(499), "499");
+assert(not is_client_err(500), "500 no");
+
+assert(is_server_err(500), "500");
+assert(is_server_err(503), "503");
+assert(not is_server_err(400), "400 no");
+
+// Method validation
+fn is_valid_method(m: str): bool {
+    if (m == "GET") { return true; }
+    if (m == "POST") { return true; }
+    if (m == "PUT") { return true; }
+    if (m == "PATCH") { return true; }
+    if (m == "DELETE") { return true; }
+    if (m == "HEAD") { return true; }
+    if (m == "OPTIONS") { return true; }
+    return false;
+}
+
+assert(is_valid_method("GET"), "GET");
+assert(is_valid_method("POST"), "POST");
+assert(is_valid_method("PUT"), "PUT");
+assert(is_valid_method("DELETE"), "DELETE");
+assert(is_valid_method("PATCH"), "PATCH");
+assert(is_valid_method("HEAD"), "HEAD");
+assert(is_valid_method("OPTIONS"), "OPTIONS");
+assert(not is_valid_method("INVALID"), "no");
+
+// URL validation
+fn is_http_url(s: str): bool {
+    var slen: int = str_len(s);
+    if (slen < 7) { return false; }
+    var p: str = substr(s, 0, 7);
+    if (p == "http://") { return true; }
+    if (slen < 8) { return false; }
+    var p2: str = substr(s, 0, 8);
+    if (p2 == "https://") { return true; }
+    return false;
+}
+
+assert(is_http_url("http://example.com"), "http");
+assert(is_http_url("https://example.com/path"), "https");
+assert(not is_http_url("not-a-url"), "no");
+assert(not is_http_url(""), "empty");
+assert(not is_http_url("ftp://x.com"), "ftp");
+
+// Content-type parameter stripping
+fn strip_ct_params(ct: str): str {
+    var slen: int = str_len(ct);
+    var i: int = 0;
+    while (i < slen) {
+        if (ct[i] == ";") {
+            return substr(ct, 0, i);
+        }
+        i = i + 1;
+    }
+    return ct;
+}
+
+assert(strip_ct_params("text/html; charset=utf-8") == "text/html", "strip params");
+assert(strip_ct_params("application/json") == "application/json", "no params");
+
+print("HTTP tests passed!");

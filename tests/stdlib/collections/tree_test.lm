@@ -1,0 +1,35 @@
+import std.collections.tree as tree;
+
+fn main(): int {
+    var m = tree.TreeMap();
+    m.put("apple", 1);
+    m.put("banana", 2);
+    m.put("cherry", 3);
+    
+    assert(m.length() == 3, "TreeMap length should be 3");
+    assert(m.get("banana") == 2, "TreeMap get banana should be 2");
+    assert(m.get("date") == nil, "TreeMap get non-existent should be nil");
+    
+    m.remove("banana");
+    assert(m.length() == 2, "TreeMap length after remove should be 2");
+    assert(m.get("banana") == nil, "TreeMap get banana after remove should be nil");
+    
+    var s = tree.TreeSet();
+    s.add(10);
+    s.add(20);
+    s.add(10);
+    assert(s.length() == 2, "TreeSet length should be 2 (unique)");
+    assert(s.contains(10), "TreeSet should contain 10");
+    assert(!s.contains(15), "TreeSet should not contain 15");
+    
+    var b = tree.BTree(3);
+    b.put(5, "five");
+    b.put(1, "one");
+    b.put(10, "ten");
+    assert(b.get(5) == "five", "BTree get 5 should be five");
+    assert(b.get(1) == "one", "BTree get 1 should be one");
+    assert(b.get(10) == "ten", "BTree get 10 should be ten");
+    
+    print("Tree tests passed!");
+    return 0;
+}

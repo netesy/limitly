@@ -11,6 +11,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <inttypes.h>
+#include <math.h>
 
 // Phase 6: Centralized Runtime Constructors
 RUNTIME_API LmValue make_i64(int64_t v) {
@@ -230,6 +231,24 @@ static char* uint128_to_str(unsigned __int128 n) {
 
 static LmString format_value(LmValue value);
 
+static LmString format_tuple(LmTuple* tuple) {
+    uint64_t capacity = 256;
+    char* buf = (char*)malloc(capacity);
+    uint64_t pos = 0;
+    buf[0] = 0;
+    append_to_buffer(&buf, &pos, &capacity, "(");
+    for (uint64_t i = 0; i < tuple->size; i++) {
+        if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
+        LmString s = format_value(tuple->elements[i]);
+        append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
+        lm_string_free(s);
+    }
+    if (tuple->size == 1) append_to_buffer(&buf, &pos, &capacity, ",");
+    append_to_buffer(&buf, &pos, &capacity, ")");
+    buf[pos] = 0;
+    return (LmString){ buf, pos };
+}
+
 static LmString format_list(LmList* list) {
     uint64_t capacity = 256;
     char* buf = (char*)malloc(capacity);
@@ -285,7 +304,27 @@ static LmString format_value(LmValue value) {
             }
             case TYPE_FLOAT: return lm_double_to_string(((ObjFloat*)h)->value);
             case TYPE_LIST: return format_list((LmList*)h);
-            case TYPE_FRAME: return lm_string_from_cstr(((LmFrame*)h)->name);
+            case TYPE_TUPLE: return format_tuple((LmTuple*)h);
+            case TYPE_FRAME: {
+                LmFrame* f = (LmFrame*)h;
+                uint64_t capacity = 128;
+                char* buf = (char*)malloc(capacity);
+                uint64_t pos = 0;
+                buf[0] = 0;
+                append_to_buffer(&buf, &pos, &capacity, f->name ? f->name : "Frame");
+                append_to_buffer(&buf, &pos, &capacity, "{");
+                for (int i = 0; i < f->field_count; i++) {
+                    if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
+                    char idx[16]; sprintf(idx, "%d: ", i);
+                    append_to_buffer(&buf, &pos, &capacity, idx);
+                    LmString s = format_value(f->fields[i]);
+                    append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
+                    lm_string_free(s);
+                }
+                append_to_buffer(&buf, &pos, &capacity, "}");
+                buf[pos] = 0;
+                return (LmString){ buf, pos };
+            }
             default: break;
         }
     }
@@ -298,6 +337,24 @@ RUNTIME_API LmString lm_value_to_string(LmValue value) {
 
 // Phase 12: Overflow-aware Arithmetic
 RUNTIME_API LmValue lm_add(LmValue a, LmValue b) {
+    if (IS_PTR(a) && IS_PTR(b)) {
+        ObjHeader* h1 = (ObjHeader*)UNBOX_PTR(a);
+        ObjHeader* h2 = (ObjHeader*)UNBOX_PTR(b);
+        if (h1->type_id == TYPE_BOX && h2->type_id == TYPE_BOX) {
+            LmBox* b1 = (LmBox*)h1;
+            LmBox* b2 = (LmBox*)h2;
+            if (b1->type == LM_BOX_STRING && b2->type == LM_BOX_STRING) {
+                LmString s1 = lm_string_from_cstr((const char*)b1->value.as_ptr);
+                LmString s2 = lm_string_from_cstr((const char*)b2->value.as_ptr);
+                LmString combined = lm_string_concat(s1, s2);
+                LmValue result = BOX_PTR(lm_box_string(combined.data));
+                lm_string_free(s1);
+                lm_string_free(s2);
+                lm_string_free(combined);
+                return result;
+            }
+        }
+    }
     if (is_integer(a) && is_integer(b)) {
         __int128 i1 = as_i128(a);
         __int128 i2 = as_i128(b);

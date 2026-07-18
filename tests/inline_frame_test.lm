@@ -1,0 +1,7 @@
+frame Simple {
+    pub x: int;
+}
+var s = Simple(x=42);
+// s.x = 42; // Let's see if constructor assignment works now
+print("Simple X: ");
+print(s.x);

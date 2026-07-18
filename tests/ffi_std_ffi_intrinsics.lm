@@ -1,0 +1,13 @@
+import std.ffi as ffi;
+
+fn main() {
+    var ptr: int = ffi.alloc(16);
+    assert(ptr != 0, "std.ffi alloc should return a pointer");
+    ffi.store_i32(ptr, 12345);
+    var loaded = ffi.load_i32(ptr);
+    assert(loaded == 12345, "std.ffi load/store i32 should round-trip");
+    ffi.free(ptr);
+    print("std.ffi intrinsic smoke passed");
+}
+
+main();

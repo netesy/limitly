@@ -1,0 +1,82 @@
+// Network tests - DNS resolver (type 13) and socket resources (type 1, 14)
+
+fn str_len(s: str): int {
+    if (s == "") { return 0; }
+    var count: int = 0;
+    var i: int = 0;
+    while (i < 10000) {
+        if (s[i] == nil) { return count; }
+        count = count + 1;
+        i = i + 1;
+    }
+    return count;
+}
+
+fn is_ipv4_simple(addr: str): bool {
+    var dot_count: int = 0;
+    var digit_count: int = 0;
+    var slen: int = str_len(addr);
+    if (slen < 7) { return false; }
+    if (slen > 15) { return false; }
+    var i: int = 0;
+    while (i < slen) {
+        var ch = addr[i];
+        if (ch == nil) { return false; }
+        if (ch == ".") {
+            dot_count = dot_count + 1;
+            if (digit_count == 0) { return false; }
+            digit_count = 0;
+        } else {
+            var is_d: bool = ch == "0" or ch == "1" or ch == "2" or ch == "3" or ch == "4" or ch == "5" or ch == "6" or ch == "7" or ch == "8" or ch == "9";
+            if (not is_d) { return false; }
+            digit_count = digit_count + 1;
+        }
+        i = i + 1;
+    }
+    return dot_count == 3 and digit_count > 0;
+}
+
+print("=== Net Tests ===");
+
+// IPv4 validation
+assert(is_ipv4_simple("192.168.1.1"), "ipv4 valid");
+assert(is_ipv4_simple("0.0.0.0"), "ipv4 min");
+assert(is_ipv4_simple("255.255.255.255"), "ipv4 max");
+assert(not is_ipv4_simple("256.1.1.1"), "ipv4 too big");
+assert(not is_ipv4_simple("1.1.1"), "ipv4 3 parts");
+assert(not is_ipv4_simple("1.1.1.1.1"), "ipv4 5 parts");
+assert(not is_ipv4_simple("a.b.c.d"), "ipv4 alpha");
+assert(not is_ipv4_simple(""), "ipv4 empty");
+assert(not is_ipv4_simple("1..1.1"), "ipv4 empty seg");
+
+// Socket lifecycle (type 1)
+var sock = resource_create(1);
+assert(sock > 0, "socket positive");
+var conn = resource_call(sock, 6, "127.0.0.1");
+assert(conn != true, "port 0 fails");
+resource_call(sock, 1, "x");
+resource_destroy(sock);
+
+// UDP lifecycle (type 14)
+var udp = resource_create(14);
+assert(udp > 0, "UDP positive");
+resource_call(udp, 1, "x");
+resource_destroy(udp);
+
+// DNS resolve localhost -> 127.0.0.1
+var dns = resource_create(13);
+assert(dns > 0, "DNS positive");
+var lip: str = resource_call(dns, 26, "localhost");
+resource_destroy(dns);
+assert(lip != nil, "DNS result not nil");
+assert(lip == "127.0.0.1", "DNS localhost");
+
+// DNS lifecycle
+var dns2 = resource_create(13);
+resource_destroy(dns2);
+
+// Invalid type
+var bad = resource_create(99);
+assert(bad == -1 or bad == nil, "bad type");
+
+print("Net tests passed!");

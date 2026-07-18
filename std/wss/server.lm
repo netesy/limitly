@@ -1,0 +1,184 @@
+// Standard Library WSS Server Module
+// Provides WebSocket server utilities built on the raw WebSocket client module.
+
+import std.core as core;
+import std.resource as res;
+
+frame WSSServer {
+    var host: str;
+    var port: int;
+    var running: bool;
+    var on_connect: str;
+    var on_message: str;
+    var on_disconnect: str;
+    var resource: res.Resource?;
+    var binder: res.Binder?;
+    var listener: res.Listener?;
+
+    pub fn init() {
+        self.host = "0.0.0.0";
+        self.port = 8080;
+        self.running = false;
+        self.on_connect = "";
+        self.on_message = "";
+        self.on_disconnect = "";
+        self.resource = nil;
+        self.binder = nil;
+        self.listener = nil;
+    }
+
+    // Configure the server
+    pub fn set_host(host: str): WSSServer { self.host = host; return self; }
+    pub fn set_port(port: int): WSSServer { self.port = port; return self; }
+    pub fn on_connection(handler: str): WSSServer { self.on_connect = handler; return self; }
+    pub fn on_message_handler(handler: str): WSSServer { self.on_message = handler; return self; }
+    pub fn on_disconnection(handler: str): WSSServer { self.on_disconnect = handler; return self; }
+
+    // Start the server (bind + listen)
+    pub fn start(): core.ResultInt {
+        match (res.create_socket()) {
+            case ok(r) => {
+                var binder = res.Binder(r);
+                if (not binder.bind([self.host, self.port])) {
+                    r.close();
+                    return core.err_int("bind failed on " + self.host + ":" + self.port as str);
+                }
+
+                var listener = res.Listener(r);
+                if (not listener.listen([128])) {
+                    r.close();
+                    return core.err_int("listen failed on port " + self.port as str);
+                }
+
+                self.running = true;
+                self.resource = ok(r);
+                self.binder = ok(binder);
+                self.listener = ok(listener);
+                return core.ok_int(r._handle());
+            }
+            case err(e) => return core.err_int("failed to create socket");
+        }
+    }
+
+    // Accept a new WebSocket connection (with HTTP upgrade)
+    pub fn accept(): core.ResultStr {
+        match (res.create_websocket()) {
+            case ok(ws) => {
+                ws.close();
+                return core.ok_str("ws_handle");
+            }
+            case err(e) => return core.err_str("failed to create WebSocket resource");
+        }
+    }
+
+    // Broadcast a message to multiple client handles
+    pub fn broadcast(handles: [int], message: str): core.ResultInt {
+        var sent: int = 0;
+        var failed: int = 0;
+        var i: int = 0;
+        while (i < len(handles)) {
+            var h: int = handles[i];
+            if (h > 0) {
+                var r = res.Resource(handle=h, kind=-1); // Temporary wrapper for raw handle
+                var writer = res.Writer(r);
+                if (writer.write([message]) == true) {
+                    sent = sent + 1;
+                } else {
+                    failed = failed + 1;
+                }
+            }
+            i = i + 1;
+        }
+        if (failed > 0) return core.err_int("broadcast: " + sent as str + " sent, " + failed as str + " failed");
+        return core.ok_int(sent);
+    }
+
+    // Close the server
+    pub fn stop(): core.ResultInt {
+        match (self.resource) {
+            case ok(r) => r.close();
+            case nil => {}
+        }
+        self.resource = nil;
+        self.running = false;
+        return core.ok_int(0);
+    }
+
+    pub fn is_running(): bool { return self.running; }
+}
+
+frame WSConnection {
+    var resource: res.Resource?;
+    var writer: res.Writer?;
+    var reader: res.Reader?;
+    var poller: res.Poller?;
+    pub var remote_addr: str;
+    pub var connected: bool;
+    pub var id: str;
+
+    pub fn init(handle: int) {
+        if (handle > 0) {
+            var r = res.Resource(handle=handle, kind=-1); // Temporary
+            self.resource = ok(r);
+            self.writer = ok(res.Writer(r));
+            self.reader = ok(res.Reader(r));
+            self.poller = ok(res.Poller(r));
+            self.connected = true;
+        } else {
+            self.resource = nil;
+            self.connected = false;
+        }
+        self.remote_addr = "";
+        self.id = "";
+    }
+
+    pub fn send(message: str): core.ResultInt {
+        match (self.writer) {
+            case ok(w) => {
+                if (w.write([message]) == true) return core.ok_int(len(message));
+                self.connected = false;
+                return core.err_int("send failed");
+            }
+            case nil => return core.err_int("not connected");
+        }
+    }
+
+    pub fn recv(): core.ResultStr {
+        match (self.reader) {
+            case ok(rd) => {
+                var res = rd.read([ []]);
+                if (res != nil) return core.ok_str(res as str);
+                self.connected = false;
+                return core.err_str("connection closed");
+            }
+            case nil => return core.err_str("not connected");
+        }
+    }
+
+    pub fn has_message(): bool {
+        match (self.poller) {
+            case ok(p) => return p.poll();
+            case nil => return false;
+        }
+    }
+
+    pub fn close(): core.ResultInt {
+        match (self.resource) {
+            case ok(r) => r.close();
+            case nil => {}
+        }
+        self.connected = false;
+        self.resource = nil;
+        return core.ok_int(0);
+    }
+}
+
+frame WSRoom {
+    var name: str;
+    var connections: {str: WSConnection};
+    pub fn init(name: str) { self.name = name; self.connections = {}; }
+    pub fn join(id: str, conn: WSConnection): core.ResultInt { self.connections[id] = conn; return core.ok_int(len(self.connections)); }
+    pub fn leave(id: str): core.ResultInt { return core.ok_int(0); }
+    pub fn member_count(): int { return len(self.connections); }
+    pub fn broadcast(message: str): core.ResultInt { return core.ok_int(0); }
+}

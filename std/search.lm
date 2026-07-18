@@ -1,0 +1,69 @@
+// Standard Library Search Module
+
+pub fn linear_search(items: [any], target: any): int {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (items[i] == target) return i;
+    }
+    return -1;
+}
+
+pub fn binary_search(items: [any], target: any): int {
+    var low = 0;
+    var high = len(items) - 1;
+    
+    while (low <= high) {
+        var mid = (low + high) / 2;
+        if (items[mid] == target) return mid;
+        if (items[mid] < target) low = mid + 1;
+        else high = mid - 1;
+    }
+    return -1;
+}
+
+pub fn lower_bound(items: [any], target: any): int {
+    var low = 0;
+    var high = len(items);
+    
+    while (low < high) {
+        var mid = (low + high) / 2;
+        if (items[mid] < target) low = mid + 1;
+        else high = mid;
+    }
+    return low;
+}
+
+pub fn upper_bound(items: [any], target: any): int {
+    var low = 0;
+    var high = len(items);
+    
+    while (low < high) {
+        var mid = (low + high) / 2;
+        if (items[mid] <= target) low = mid + 1;
+        else high = mid;
+    }
+    return low;
+}
+
+pub fn interpolation_search(items: [int], target: int): int {
+    var low = 0;
+    var high = len(items) - 1;
+    
+    while (low <= high and target >= items[low] and target <= items[high]) {
+        if (low == high) {
+            if (items[low] == target) return low;
+            return -1;
+        }
+        
+        // pos = low + [ (target-items[low])*(high-low) / (items[high]-items[low]) ]
+        var pos = low + ((target - items[low]) * (high - low)) / (items[high] - items[low]);
+        
+        if (items[pos] == target) return pos;
+        if (items[pos] < target) low = pos + 1;
+        else high = pos - 1;
+    }
+    return -1;
+}
+
+pub fn equal_range(items: [any], target: any): (int, int) {
+    return (lower_bound(items, target), upper_bound(items, target));
+}

@@ -1,0 +1,13 @@
+import std.string as s;
+fn main(): int {
+    var text = "Hello World";
+    print("Text: " + text);
+    
+    var bl = _builtin_len(text);
+    print("Length from _builtin_len: " + (bl as str));
+    
+    var l = s.length(text);
+    print("Length from std.string.length: " + (l as str));
+    
+    return 0;
+}

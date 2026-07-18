@@ -1,0 +1,39 @@
+import std.ffi as ffi;
+
+frame Image {
+    pub var name: str;
+    pub var width: int;
+    pub var height: int;
+    pub var channels: int;
+    pub var pixels: int;
+    pub var lib_handle: int;
+}
+
+fn load(filename: str): Image {
+    var lib = ffi.library_load("tests/ffi/libstb_image.so");
+    var load_fn = ffi.library_get_symbol(lib, "load_image");
+
+    var w_p = ffi.alloc(4);
+    var h_p = ffi.alloc(4);
+    var c_p = ffi.alloc(4);
+
+    var data_ptr = ffi.ccall_execute4_sppp_ptr(load_fn, filename, w_p, h_p, c_p);
+    
+    var w = ffi.load_i32(w_p);
+    var h = ffi.load_i32(h_p);
+    var c = ffi.load_i32(c_p);
+
+    ffi.free(w_p); ffi.free(h_p); ffi.free(c_p);
+
+    return Image(name=filename, width=w, height=h, channels=c, pixels=data_ptr, lib_handle=lib);
+}
+
+fn save_png(img: Image, filename: str): bool {
+    var save_fn = ffi.library_get_symbol(img.lib_handle, "save_image_png");
+    var res = ffi.ccall_execute5_siiip_int(save_fn, filename, img.width, img.height, img.channels, img.pixels);
+    return res != 0;
+}
+
+fn free(img: Image) {
+    ffi.library_unload(img.lib_handle);
+}

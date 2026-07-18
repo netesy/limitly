@@ -1,0 +1,19 @@
+import std.iterator as iterator;
+
+fn twice(x: any): any { return x * 2; }
+fn even(x: any): bool { return x % 2 == 0; }
+
+fn main(): int {
+    var it = iterator.iterator([1, 2, 3]);
+    if (it.next() != 1) { return 1; }
+    var mapped = iterator.map(iterator.iterator([1, 2]), twice);
+    var values = iterator.collect(mapped);
+    if (values[1] != 4) { return 2; }
+    var filtered = iterator.filter(iterator.iterator([1, 2, 3]), even);
+    if (filtered.next() != 2) { return 3; }
+    var chunks = iterator.chunk(iterator.iterator([1, 2, 3]), 2);
+    var first = chunks.next();
+    var cycled = iterator.cycle([5]);
+    if (cycled.next() != 5) { return 4; }
+    return 0;
+}

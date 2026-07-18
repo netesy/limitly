@@ -4,7 +4,7 @@
 
 `frame` is the primary **object-oriented construct** in Limitly, following modern principles:
 
-* ✅ **Composition over inheritance** (no class hierarchies)
+* ✅ **Composition over inheritance** (no frame hierarchies)
 * ✅ **Trait-based polymorphism** (interfaces)
 * ✅ **Encapsulation** with visibility modifiers
 * ✅ **Concurrency integration** (parallel/concurrent)
@@ -831,7 +831,7 @@ frame Service : Configurable {
 ## **12. Summary**
 
 ### **Core Principles:**
-1. **Composition over inheritance** (no class hierarchies)
+1. **Composition over inheritance** (no frame hierarchies)
 2. **Traits for polymorphism** (flexible contracts)
 3. **Default private visibility** (no need for `private` keyword)
 4. **Three concurrency models:**

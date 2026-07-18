@@ -1,0 +1,86 @@
+// Standard Library Range Module
+
+pub frame Range {
+    var start: int;
+    var stop: int;
+    var step: int;
+    var inclusive: bool;
+    var infinite: bool;
+
+    pub init(start: int = 0, stop: int = 0, step: int = 1, inclusive: bool = false, infinite: bool = false) {
+        self.start = start;
+        self.stop = stop;
+        self.step = step;
+        self.inclusive = inclusive;
+        self.infinite = infinite;
+    }
+
+    pub fn iterator(): RangeIterator {
+        return RangeIterator(self.start, self.stop, self.step, self.inclusive, self.infinite);
+    }
+}
+
+pub frame RangeIterator {
+    var current: int;
+    var stop: int;
+    var step: int;
+    var inclusive: bool;
+    var infinite: bool;
+
+    pub init(start: int, stop: int, step: int = 1, inclusive: bool = false, infinite: bool = false) {
+        self.current = start;
+        self.stop = stop;
+        self.step = step;
+        self.inclusive = inclusive;
+        self.infinite = infinite;
+    }
+
+    pub fn next(): int? {
+        if (not self.infinite) {
+            if (self.step > 0) {
+                if (self.inclusive) {
+                    if (self.current > self.stop) {
+                        return nil;
+                    }
+                } else {
+                    if (self.current >= self.stop) {
+                        return nil;
+                    }
+                }
+            } else {
+                if (self.inclusive) {
+                    if (self.current < self.stop) {
+                        return nil;
+                    }
+                } else {
+                    if (self.current <= self.stop) {
+                        return nil;
+                    }
+                }
+            }
+        }
+        var value = self.current;
+        self.current = self.current + self.step;
+        return value;
+    }
+}
+
+pub fn exclusive(start: int, stop: int, step: int = 1): Range {
+    return Range(start, stop, step, false, false);
+}
+
+pub fn inclusive(start: int, stop: int, step: int = 1): Range {
+    return Range(start, stop, step, true, false);
+}
+
+pub fn stepped(start: int, stop: int, step: int): Range {
+    return Range(start, stop, step, false, false);
+}
+
+pub fn reverse(start: int, stop: int, step: int = -1): Range {
+    return Range(start, stop, step, true, false);
+}
+
+pub fn infinite(start: int = 0, step: int = 1): Range {
+    return Range(start, 0, step, false, true);
+}

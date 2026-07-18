@@ -81,7 +81,7 @@ fn errorNotInSignature(): int?IndexOutOfBounds {
 
 // Test 14: ✅ SHOULD WORK - Proper error handling (simplified without match)
 fn properHandling(x: int, y: int): int {
-    // In a real implementation, this would use match statement
+    // In a real implementation, self would use match statement
     // For now, we'll just return a default value
     return 0;
 }

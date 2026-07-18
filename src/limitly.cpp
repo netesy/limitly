@@ -38,7 +38,9 @@ static std::string readFile(const std::string& filename) {
 
 int Compiler::executeFile(const std::string& filename, const CompileOptions& options) {
     try {
+        std::cout << "DEBUG STEP 1: Reading file" << std::endl;
         std::string source = readFile(filename);
+        std::cout << "DEBUG STEP 2: Scanning tokens" << std::endl;
         LM::Frontend::Scanner scanner(source, filename);
         scanner.scanTokens();
 
@@ -51,22 +53,48 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             std::cout << "\n";
         }
 
+        std::cout << "DEBUG STEP 3: Parsing AST" << std::endl;
         LM::Frontend::Parser parser(scanner, options.print_cst);
         std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
-        if (LM::Error::Debugger::hasError()) return 1;
+        if (LM::Error::Debugger::hasError()) {
+            std::cerr << "Parser hasError is true! reportedErrors size: " << LM::Error::Debugger::hasError() << std::endl;
+            return 1;
+        }
 
+        std::cout << "DEBUG STEP 4: ModuleManager resolve_all" << std::endl;
         LM::Frontend::ModuleManager::getInstance().resolve_all(ast, "root");
 
+        std::cout << "DEBUG STEP 5: Type checking" << std::endl;
         auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
-        if (!type_check_result.success || !type_check_result.errors.empty()) return 1;
+        if (!type_check_result.success || !type_check_result.errors.empty()) {
+            for (const auto& err : type_check_result.errors) {
+                std::cerr << "Type Check Error: " << err << std::endl;
+            }
+            return 1;
+        }
 
+        std::cout << "DEBUG STEP 6: Memory checking" << std::endl;
         auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(type_check_result.program, source, filename);
-        if (!memory_check_result.success) return 1;
+        if (!memory_check_result.success) {
+            std::cerr << "Memory Check Failed! Local errors count: " << memory_check_result.errors.size() << std::endl;
+            for (const auto& err : memory_check_result.errors) {
+                std::cerr << "  Memory Error: " << err << std::endl;
+            }
+            return 1;
+        }
         ast = memory_check_result.program;
 
+        std::cout << "DEBUG STEP 7: Post-opt Type checking" << std::endl;
         auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
-        if (!post_opt_type_check.success || !post_opt_type_check.errors.empty()) return 1;
+        if (!post_opt_type_check.success || !post_opt_type_check.errors.empty()) {
+            std::cerr << "Post-opt Type Check Failed!" << std::endl;
+            for (const auto& err : post_opt_type_check.errors) {
+                std::cerr << "  Post-opt Type Error: " << err << std::endl;
+            }
+            return 1;
+        }
 
+        std::cout << "DEBUG STEP 8: LIR generation starting" << std::endl;
         if (options.print_cst) {
             std::cout << "=== CST ===\n";
             const auto* cstRoot = parser.getCST();
@@ -80,10 +108,12 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             std::cout << "\n";
         }
 
+        std::cout << "DEBUG STEP 9: Creating LIR Generator" << std::endl;
         LIR::Generator lir_generator;
         lir_generator.set_import_aliases(post_opt_type_check.import_aliases);
         lir_generator.set_registered_modules(post_opt_type_check.registered_modules);
 
+        std::cout << "DEBUG STEP 10: Generating LIR program" << std::endl;
         auto lir_function = lir_generator.generate_program(post_opt_type_check);
         if (!lir_function) {
             std::cerr << "[ERROR] LIR generation failed" << std::endl;
@@ -111,7 +141,13 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             auto ir_context = std::make_shared<ir::IRContext>();
             LM::Backend::Fyra::LIRToFyraIRBuilder builder(ir_context);
             auto fyra_ir_module = builder.build(*lir_function);
-            if (!fyra_ir_module || builder.has_errors()) { std::cerr << "LIR to Fyra IR lowering failed" << std::endl; for (const auto& err : builder.get_errors()) std::cerr << "  Error: " << err << std::endl; return 1; }
+            if (!fyra_ir_module || builder.has_errors()) {
+                std::cerr << "[ERROR] LIR to Fyra IR lowering failed" << std::endl;
+                for (const auto& err : builder.get_errors()) {
+                    std::cerr << "  Details: " << err << std::endl;
+                }
+                return 1;
+            }
 
             if (options.print_fyra_ir) {
                 for (const auto& func : fyra_ir_module->getFunctions()) { if (func) { func->print(std::cout); std::cout << "\n"; } }
@@ -129,15 +165,18 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
 
             auto result = fyra.compile(*lir_function, fyra_options);
             if (!result.success) {
-                std::cerr << "AOT Compilation Error: " << result.error_message << std::endl;
+                std::cerr << "[ERROR] AOT Compilation Failed" << std::endl;
+                std::cerr << "  Message: " << result.error_message << std::endl;
+                return 1;
             }
-            return result.success ? 0 : 1;
+            return 0;
 #else
             std::cerr << "Error: Fyra backend not available. AOT/WASM compilation is disabled.\n";
             std::cerr << "Please install Fyra or use the register VM instead.\n";
             return 1;
 #endif
         } else {
+            std::cout << "DEBUG STEP 11: Register VM executing function" << std::endl;
             LM::Backend::VM::Register::RegisterVM register_vm;
             register_vm.execute_function(*lir_function);
         }

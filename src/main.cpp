@@ -36,9 +36,14 @@ void printUsage(const char* programName) {
 }
 
 int main(int argc, char* argv[]) {
+    std::cout << "[MAIN DEBUG] argc=" << argc << std::endl << std::flush;
+    for (int i = 0; i < argc; ++i) {
+        std::cout << "  argv[" << i << "]=" << argv[i] << std::endl << std::flush;
+    }
     if (argc < 2) {
-        printUsage(argv[0]);
-        return 1;
+        // Default to REPL if no arguments provided
+        std::cout << "Limit Programming Language REPL (planned feature)\n";
+        return 0;
     }
     
     std::string command = argv[1];
@@ -73,8 +78,14 @@ int main(int argc, char* argv[]) {
             if (arg == "-debug") options.debug = true;
             else if (arg[0] != '-') source_file = arg;
         }
-        if (source_file.empty()) return 1;
-        return LM::Compiler::executeFile(source_file, options);
+        if (source_file.empty()) {
+            std::cout << "[MAIN DEBUG] source_file is empty!" << std::endl << std::flush;
+            return 1;
+        }
+        std::cout << "[MAIN DEBUG] Calling executeFile with source_file=" << source_file << std::endl << std::flush;
+        int res = LM::Compiler::executeFile(source_file, options);
+        std::cout << "[MAIN DEBUG] executeFile returned: " << res << std::endl << std::flush;
+        return res;
     }
 
     if (command == "build") {

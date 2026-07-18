@@ -1,0 +1,175 @@
+// Standard Library Algorithm Module
+
+import std.collections.vector as vector;
+
+fn map(items: [any], f: fn(any): any): [any] {
+    var res = vector.Vector();
+    for (var i = 0; i < len(items); i = i + 1) {
+        res.push(f(items[i]));
+    }
+    return res.data;
+}
+
+fn filter(items: [any], p: fn(any): bool): [any] {
+    var res = vector.Vector();
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (p(items[i])) res.push(items[i]);
+    }
+    return res.data;
+}
+
+fn reduce(items: [any], f: fn(any, any): any, initial: any): any {
+    var acc = initial;
+    for (var i = 0; i < len(items); i = i + 1) {
+        acc = f(acc, items[i]);
+    }
+    return acc;
+}
+
+fn fold(items: [any], initial: any, f: fn(any, any): any): any {
+    return reduce(items, f, initial);
+}
+
+fn all(items: [any], p: fn(any): bool): bool {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (!p(items[i])) return false;
+    }
+    return true;
+}
+
+fn any_match(items: [any], p: fn(any): bool): bool {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (p(items[i])) return true;
+    }
+    return false;
+}
+
+fn none(items: [any], p: fn(any): bool): bool {
+    return !any_match(items, p);
+}
+
+fn count(items: [any], target: any): int {
+    var c = 0;
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (items[i] == target) c = c + 1;
+    }
+    return c;
+}
+
+fn find(items: [any], target: any): int {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (items[i] == target) return i;
+    }
+    return -1;
+}
+
+fn find_if(items: [any], p: fn(any): bool): int {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (p(items[i])) return i;
+    }
+    return -1;
+}
+
+fn reverse(items: [any]) {
+    var n = len(items);
+    for (var i = 0; i < n / 2; i = i + 1) {
+        var tmp = items[i];
+        items[i] = items[n - 1 - i];
+        items[n - 1 - i] = tmp;
+    }
+}
+
+fn rotate(items: [any], k: int) {
+    var n = len(items);
+    if (n == 0) return;
+    k = k % n;
+    if (k < 0) k = k + n;
+    if (k == 0) return;
+    
+    // Simple rotation: reverse parts then whole
+    _reverse_range(items, 0, n - 1);
+    _reverse_range(items, 0, k - 1);
+    _reverse_range(items, k, n - 1);
+}
+
+fn _reverse_range(items: [any], start: int, end: int) {
+    while (start < end) {
+        var tmp = items[start];
+        items[start] = items[end];
+        items[end] = tmp;
+        start = start + 1;
+        end = end - 1;
+    }
+}
+
+fn unique(items: [any]): [any] {
+    var res = vector.Vector();
+    for (var i = 0; i < len(items); i = i + 1) {
+        var found = false;
+        for (var j = 0; j < len(res.data); j = j + 1) {
+            if (res.data[j] == items[i]) {
+                found = true;
+                break;
+            }
+        }
+        if (!found) res.push(items[i]);
+    }
+    return res.data;
+}
+
+fn partition(items: [any], p: fn(any): bool): int {
+    var i = 0;
+    var j = len(items) - 1;
+    while (i <= j) {
+        while (i <= j and p(items[i])) i = i + 1;
+        while (i <= j and !p(items[j])) j = j - 1;
+        if (i < j) {
+            var tmp = items[i];
+            items[i] = items[j];
+            items[j] = tmp;
+            i = i + 1;
+            j = j - 1;
+        }
+    }
+    return i;
+}
+
+fn zip(a: [any], b: [any]): [any] {
+    var res = vector.Vector();
+    var n = len(a);
+    if (len(b) < n) n = len(b);
+    for (var i = 0; i < n; i = i + 1) {
+        res.push((a[i], b[i]));
+    }
+    return res.data;
+}
+
+fn transform(items: [any], f: fn(any): any): [any] {
+    return map(items, f);
+}
+
+fn unzip(pairs: [any]): ([any], [any]) {
+    var left = vector.Vector();
+    var right = vector.Vector();
+    var i = 0;
+    while (i < len(pairs)) {
+        var pair = pairs[i];
+        // Revert to any - tuple field access on any not yet supported
+        left.push(pair.0);
+        right.push(pair.1);
+        i = i + 1;
+    }
+    return (left.data, right.data);
+}
+
+fn remove_if(items: [any], p: fn(any): bool): [any] {
+    var res = vector.Vector();
+    var i = 0;
+    while (i < len(items)) {
+        if (not p(items[i])) {
+            res.push(items[i]);
+        }
+        i = i + 1;
+    }
+    return res.data;
+}

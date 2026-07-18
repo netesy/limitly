@@ -1,0 +1,32 @@
+// Test C: Member Mutation
+// Verify that member assignments modify the original object
+
+frame Foo {
+    pub value: int = 0;
+    
+    pub fn inc() {
+        self.value = self.value + 1;
+    }
+}
+
+var f = Foo();
+
+print("Initial f.value: {f.value}");
+
+f.inc();
+print("After first inc(), f.value: {f.value}");
+
+if (f.value == 1) {
+    print("OK: Member mutation persisted after method call");
+} else {
+    print("ERROR: Member mutation didn't persist, got {f.value}");
+}
+
+f.inc();
+print("After second inc(), f.value: {f.value}");
+
+if (f.value == 2) {
+    print("OK: Second mutation also persisted");
+} else {
+    print("ERROR: Second mutation didn't persist, got {f.value}");
+}

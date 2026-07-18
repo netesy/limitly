@@ -55,7 +55,7 @@ type LongString = str where length(value) > 10;
 type ShortString = str where length(value) < 5;
 
 var str1: NonEmptyString = "hello";
-var str2: LongString = "this is a long string";
+var str2: LongString = "self is a long string";
 var str3: ShortString = "hi";
 
 print("Non-empty string: {str1}");

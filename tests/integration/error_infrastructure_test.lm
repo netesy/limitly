@@ -23,7 +23,7 @@ print("arr[2] = {item1}");
 // Test function that could potentially fail
 fn divide_safe(x, y) {
     // For now, just do regular division
-    // Later this will be enhanced with error handling
+    // Later self will be enhanced with error handling
     return x / y;
 }
 

@@ -40,7 +40,7 @@ public:
     std::shared_ptr<Module> get_module(const std::string& name);
 
     // Returns a copy of the modules map for thread-safe iteration
-    std::unordered_map<std::string, std::shared_ptr<Module>> get_all_modules();
+    std::unordered_map<std::string, std::shared_ptr<Module>> get_all_modules() const;
 
     // Helper to filter symbols based on show/hide
     std::set<std::string> filter_symbols(std::shared_ptr<Module> module, const std::optional<AST::ImportFilter>& filter);

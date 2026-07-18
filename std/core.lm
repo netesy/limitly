@@ -1,27 +1,23 @@
 // Standard Library Core Module
 
-frame Error {
-    var code: str;
-    var message: str;
+pub frame Error {
+    pub var code: str;
+    pub var message: str;
 }
 
-frame OptionInt {
-    var has_value: bool;
-    var value: int;
+pub frame OptionInt {
+    pub var has_value: bool;
+    pub var value: int;
 
     pub fn is_some(): bool { return self.has_value; }
     pub fn is_none(): bool { return !self.has_value; }
     pub fn unwrap(): int { if (self.has_value) return self.value; return 0; }
     pub fn unwrap_or(default_value: int): int { if (self.has_value) return self.value; return default_value; }
-    pub fn map(f: fn(int): int): OptionInt {
-        if (!self.has_value) return OptionInt(has_value=false, value=0);
-        return OptionInt(has_value=true, value=f(self.value));
-    }
 }
 
-frame OptionStr {
-    var has_value: bool;
-    var value: str;
+pub frame OptionStr {
+    pub var has_value: bool;
+    pub var value: str;
 
     pub fn is_some(): bool { return self.has_value; }
     pub fn is_none(): bool { return !self.has_value; }
@@ -29,44 +25,95 @@ frame OptionStr {
     pub fn unwrap_or(default_value: str): str { if (self.has_value) return self.value; return default_value; }
 }
 
-frame ResultInt {
-    var ok: bool;
-    var value: int;
-    var error: Error;
+pub frame ResultInt {
+    pub var success: bool;
+    pub var value: int;
+    pub var error_info: Error;
 
-    pub fn is_ok(): bool { return self.ok; }
-    pub fn is_err(): bool { return !self.ok; }
-    pub fn unwrap(): int { if (self.ok) return self.value; return 0; }
-    pub fn unwrap_or(default_value: int): int { if (self.ok) return self.value; return default_value; }
+    pub fn is_ok(): bool { return self.success; }
+    pub fn is_err(): bool { return !self.success; }
+    pub fn unwrap(): int { if (self.success) return self.value; return 0; }
+    pub fn unwrap_or(default_value: int): int { if (self.success) return self.value; return default_value; }
 
     pub fn map(f: fn(int): int): ResultInt {
-        if (!self.ok) return self;
-        return ResultInt(ok=true, value=f(self.value), error=Error(code="", message=""));
+        if (self.success) {
+            var new_err: Error = Error(code="", message="");
+            var new_val: int = f(self.value);
+            return ResultInt(success=true, value=new_val, error_info=new_err);
+        }
+        return ResultInt(success=false, value=0, error_info=self.error_info);
     }
 
     pub fn map_err(f: fn(str): str): ResultInt {
-        if (self.ok) return self;
-        return ResultInt(ok=false, value=0, error=Error(code=self.error.code, message=f(self.error.message)));
+        if (self.success) {
+            var new_err: Error = Error(code="", message="");
+            return ResultInt(success=true, value=self.value, error_info=new_err);
+        }
+        var new_msg: str = f(self.error_info.message);
+        var new_err2: Error = Error(code=self.error_info.code, message=new_msg);
+        return ResultInt(success=false, value=0, error_info=new_err2);
     }
 }
 
-frame ResultStr {
-    var ok: bool;
-    var value: str;
-    var error: Error;
+pub frame ResultStr {
+    pub var success: bool;
+    pub var value: str;
+    pub var error_info: Error;
 
-    pub fn is_ok(): bool { return self.ok; }
-    pub fn is_err(): bool { return !self.ok; }
-    pub fn unwrap(): str { if (self.ok) return self.value; return ""; }
-    pub fn unwrap_or(default_value: str): str { if (self.ok) return self.value; return default_value; }
+    pub fn is_ok(): bool { return self.success; }
+    pub fn is_err(): bool { return !self.success; }
+    pub fn unwrap(): str { if (self.success) return self.value; return ""; }
+    pub fn unwrap_or(default_value: str): str { if (self.success) return self.value; return default_value; }
+
+    pub fn map(f: fn(str): str): ResultStr {
+        if (self.success) {
+            var new_err: Error = Error(code="", message="");
+            var new_val: str = f(self.value);
+            return ResultStr(success=true, value=new_val, error_info=new_err);
+        }
+        return ResultStr(success=false, value="", error_info=self.error_info);
+    }
+
+    pub fn map_err(f: fn(str): str): ResultStr {
+        if (self.success) {
+            var new_err: Error = Error(code="", message="");
+            return ResultStr(success=true, value=self.value, error_info=new_err);
+        }
+        var new_msg: str = f(self.error_info.message);
+        var new_err2: Error = Error(code=self.error_info.code, message=new_msg);
+        return ResultStr(success=false, value="", error_info=new_err2);
+    }
 }
 
-fn some_int(value: int): int? { return value; }
-fn none_int(): int? { return nil; }
-fn some_str(value: str): str? { return value; }
-fn none_str(): str? { return nil; }
+pub fn some_int(value: int): int { return value; }
+pub fn some_str(value: str): str { return value; }
 
-fn ok_int(value: int): ResultInt { return ResultInt(ok=true, value=value, error=Error(code="", message="")); }
-fn err_int(error: str): ResultInt { return ResultInt(ok=false, value=0, error=Error(code="ERR", message=error)); }
-fn ok_str(value: str): ResultStr { return ResultStr(ok=true, value=value, error=Error(code="", message="")); }
-fn err_str(error: str): ResultStr { return ResultStr(ok=false, value="", error=Error(code="ERR", message=error)); }
+pub fn ok_int(v: int): ResultInt {
+    var e: Error = Error(code="", message="");
+    return ResultInt(success=true, value=v, error_info=e);
+}
+pub fn make_err_int(e: str): ResultInt {
+    var err_info: Error = Error(code="ERR", message=e);
+    return ResultInt(success=false, value=0, error_info=err_info);
+}
+pub fn err_int(e: str): ResultInt {
+    var err_info: Error = Error(code="ERR", message=e);
+    return ResultInt(success=false, value=0, error_info=err_info);
+}
+pub fn ok_str(v: str): ResultStr {
+    var e: Error = Error(code="", message="");
+    return ResultStr(success=true, value=v, error_info=e);
+}
+pub fn make_err_str(e: str): ResultStr {
+    var err_info: Error = Error(code="ERR", message=e);
+    return ResultStr(success=false, value="", error_info=err_info);
+}
+pub fn err_str(e: str): ResultStr {
+    var err_info: Error = Error(code="ERR", message=e);
+    return ResultStr(success=false, value="", error_info=err_info);
+}
+pub fn ok_bool(v: bool): ResultInt {
+    var e: Error = Error(code="", message="");
+    if (v) return ResultInt(success=true, value=1, error_info=e);
+    return ResultInt(success=false, value=0, error_info=e);
+}

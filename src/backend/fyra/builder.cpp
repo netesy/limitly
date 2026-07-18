@@ -46,9 +46,15 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     builder_->setInsertPoint(entry_bb);
 
     std::unordered_map<uint32_t, ir::BasicBlock*> block_map;
-    for (const auto& inst : lir_func.instructions) {
-        if (inst.op == LIR::LIR_Op::Label) {
-            block_map[inst.imm] = builder_->createBasicBlock("label_" + std::to_string(inst.imm), main_fn);
+    if (lir_func.cfg && !lir_func.cfg->blocks.empty()) {
+        for (const auto& block : lir_func.cfg->blocks) {
+            block_map[block->id] = builder_->createBasicBlock(block->label.empty() ? "block_" + std::to_string(block->id) : block->label, main_fn);
+        }
+    } else {
+        for (const auto& inst : lir_func.instructions) {
+            if (inst.op == LIR::LIR_Op::Label) {
+                block_map[inst.imm] = builder_->createBasicBlock("label_" + std::to_string(inst.imm), main_fn);
+            }
         }
     }
 
@@ -251,22 +257,6 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             case LIR::LIR_Op::FrameSetField: {
                 ir::Value* addr = builder_->createAdd(load_reg(inst.dst, inst.result_type), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm * 8));
                 builder_->createStore(load_reg(inst.a, inst.type_a), addr);
-                break;
-            }
-            case LIR::LIR_Op::PrintInt:
-            case LIR::LIR_Op::PrintUint:
-            case LIR::LIR_Op::PrintFloat:
-            case LIR::LIR_Op::PrintBool:
-            case LIR::LIR_Op::PrintString: {
-                std::string b = "lm_print_int"; ir::Type* at = context_->getIntegerType(64);
-                if (inst.op == LIR::LIR_Op::PrintFloat) { b = "lm_print_float"; at = context_->getDoubleType(); }
-                else if (inst.op == LIR::LIR_Op::PrintBool) b = "lm_print_bool";
-                else if (inst.op == LIR::LIR_Op::PrintString) { b = "lm_print_str"; at = context_->getPointerType(context_->getIntegerType(8)); }
-                else if (inst.op == LIR::LIR_Op::PrintUint) b = "lm_print_uint";
-                used_builtins_.insert(b);
-                ir::Function* fn = current_module_->getFunction(b);
-                if (!fn) fn = builder_->createFunction(b, context_->getVoidType(), {at});
-                builder_->createCall(fn, {load_reg(inst.a, inst.type_a)});
                 break;
             }
             case LIR::LIR_Op::Return:

@@ -1,0 +1,50 @@
+import std.io as io;
+
+fn main(): int {
+    // Basic print test (we can't easily capture output here, but we can verify it doesn't crash)
+    io.print("Testing IO print...");
+    
+    // File exists test
+    var exists = io.exists("Makefile");
+    assert(exists, "io.exists fail for Makefile");
+    
+    var non_existent = io.exists("non_existent_file_xyz.txt");
+    assert(!non_existent, "io.exists fail for non-existent file");
+    
+    // File open/read/write/close test
+    var f_res = io.open("test_io_temp.txt", "w");
+    match (f_res) {
+        val f => {
+            f.write("Hello Luminar");
+            f.close();
+        }
+        err e => {
+            assert(false, "Failed to open file for writing");
+        }
+    }
+    
+    var f_read_res = io.open("test_io_temp.txt", "r");
+    match (f_read_res) {
+        val f => {
+            var content_res = f.read();
+            match (content_res) {
+                val content => {
+                    assert(content == "Hello Luminar", "File content mismatch");
+                }
+                err e => {
+                    assert(false, "Failed to read file");
+                }
+            }
+            f.close();
+        }
+        err e => {
+            assert(false, "Failed to open file for reading");
+        }
+    }
+    
+    io.delete("test_io_temp.txt");
+    assert(!io.exists("test_io_temp.txt"), "File should be deleted");
+    
+    print("IO tests passed!");
+    return 0;
+}

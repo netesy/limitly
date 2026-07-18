@@ -1,5 +1,6 @@
 #include "../generator.hh"
 #include "../functions.hh"
+#include "../intrinsic_registry.hh"
 #include "../../backend/vm/constant_utils.hh"
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
@@ -68,8 +69,7 @@ bool resolve_enum_variant_info(TypeSystem* type_system,
     }
 
     return false;
-}
-}
+} }
 
 Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
     if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(&expr)) {
@@ -604,10 +604,10 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
     }
 
     // First check if this is a module variable access (e.g., "math.pi")
-    size_t dot_pos = expr.name.find("::");
+    size_t dot_pos = expr.name.rfind('.');
     if (dot_pos != std::string::npos) {
         std::string module_name = expr.name.substr(0, dot_pos);
-        std::string symbol_name = expr.name.substr(dot_pos + 2);
+        std::string symbol_name = expr.name.substr(dot_pos + 1);
         
         // Check for alias mapping
         auto alias_it = import_aliases_.find(module_name);
@@ -616,7 +616,7 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
         }
         
         // Resolve module symbol
-        std::string qualified_name = module_name + "::" + symbol_name;
+        std::string qualified_name = module_name + "." + symbol_name;
         ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
         if (symbol && symbol->is_variable) {
             if (!can_access_module_symbol(*symbol, current_module_)) {
@@ -624,9 +624,11 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
                 return 0;
             }
             
-            // Load the actual module variable value
+            // Load the actual module variable value using LoadGlobal
             Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::Load, Type::Ptr, result, 0, 0));
+            LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
+            load_inst.func_name = qualified_name;
+            emit_instruction(load_inst);
             // Note: Module variable type information is not available in ModuleSymbolInfo
             // Type information should be obtained from the module's type system
             return result;
@@ -916,9 +918,11 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     else if (expr.op == LM::Frontend::TokenType::LESS_EQUAL) op = LIR_Op::CmpLE;
     else if (expr.op == LM::Frontend::TokenType::GREATER) op = LIR_Op::CmpGT;
     else if (expr.op == LM::Frontend::TokenType::GREATER_EQUAL) op = LIR_Op::CmpGE;
-
-
+    else if (expr.op == LM::Frontend::TokenType::AMPERSAND) op = LIR_Op::And;
+    else if (expr.op == LM::Frontend::TokenType::PIPE) op = LIR_Op::Or;
     else if (expr.op == LM::Frontend::TokenType::CARET) op = LIR_Op::Xor;
+    else if (expr.op == LM::Frontend::TokenType::LESS_LESS) op = LIR_Op::Shl;
+    else if (expr.op == LM::Frontend::TokenType::GREATER_GREATER) op = LIR_Op::Shr;
     else {
         report_error("Unknown binary operator");
         return 0;
@@ -1066,10 +1070,12 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
             }
         }
     } else if (op == LIR_Op::And || op == LIR_Op::Or) {
-        // Logical operations return bool
-        result_type = std::make_shared<::Type>(::TypeTag::Bool);
-    } else if (op == LIR_Op::Xor) {
-        // Bitwise XOR should preserve integer types like arithmetic operations
+        if (expr.op == LM::Frontend::TokenType::AND || expr.op == LM::Frontend::TokenType::OR) {
+            result_type = std::make_shared<::Type>(::TypeTag::Bool);
+        } else {
+            result_type = get_promoted_numeric_type(left_type, right_type);
+        }
+    } else if (op == LIR_Op::Xor || op == LIR_Op::Shl || op == LIR_Op::Shr) {
         result_type = get_promoted_numeric_type(left_type, right_type);
     }
     
@@ -1106,7 +1112,7 @@ Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
         set_register_type(dst, result_type);
         // Unary plus - just copy the value (no operation needed)
         emit_instruction(LIR_Inst(LIR_Op::Mov, dst, operand, 0));
-    } else if (expr.op == LM::Frontend::TokenType::BANG) {
+    } else if (expr.op == LM::Frontend::TokenType::BANG || expr.op == LM::Frontend::TokenType::NOT) {
         // Result type is bool
         result_type = std::make_shared<::Type>(::TypeTag::Bool);
         set_register_type(dst, result_type);
@@ -1235,678 +1241,202 @@ Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
 Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
     if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.callee.get())) {
         std::string func_name = var_expr->name;
+        
+        // --- 1. Intrinsic lookup ---
+        std::string registry_lookup_name = func_name;
+        size_t d_pos = func_name.rfind('.');
+        if (d_pos != std::string::npos) {
+            std::string mod_name = func_name.substr(0, d_pos);
+            std::string sym_name = func_name.substr(d_pos + 1);
+            auto a_it = import_aliases_.find(mod_name);
+            if (a_it != import_aliases_.end()) mod_name = a_it->second;
+            registry_lookup_name = mod_name + "." + sym_name;
+        }
 
-        // Try looking up in imported symbols to find the actual qualified name
+        if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(registry_lookup_name)) {
+            std::vector<Reg> arg_regs;
+            for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+            Reg result = allocate_register();
+            Type abi_res_type = (expr.inferred_type) ? language_type_to_abi_type(expr.inferred_type) : Type::Void;
+            if (expr.inferred_type) set_register_language_type(result, expr.inferred_type);
+            
+            LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
+            inst.imm = intrinsic->type_id; 
+            inst.func_name = registry_lookup_name;
+            if (arg_regs.size() > 0) inst.a = arg_regs[0];
+            if (arg_regs.size() > 1) inst.b = arg_regs[1];
+            for (size_t k = 0; k < arg_regs.size(); ++k) inst.call_args.push_back(arg_regs[k]);
+            emit_instruction(inst);
+            return result;
+        }
+
+        // --- 2. Builtin Check ---
+        std::vector<Reg> arg_regs;
+        for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+        Reg result = allocate_register();
+        
+        std::string vm_name = func_name;
+        LIR_Op op = LIR_Op::Call;
+        bool is_builtin = false;
+        
+        if (func_name == "len" || func_name == "length" || func_name == "_builtin_len" || 
+            (func_name.length() >= 4 && func_name.substr(func_name.length()-4) == ".len") ||
+            (func_name.length() >= 7 && func_name.substr(func_name.length()-7) == ".length")) {
+            op = LIR_Op::CallBuiltin; vm_name = "len"; is_builtin = true;
+        } else if (func_name == "print" || func_name == "assert" || func_name == "to_upper" || func_name == "to_lower" || func_name == "trim" || func_name == "replace" || func_name == "split" || func_name == "substring") {
+            op = LIR_Op::CallBuiltin; is_builtin = true;
+        } else if (func_name.length() >= 9 && func_name.substr(0, 9) == "_builtin_") {
+            op = LIR_Op::CallBuiltin; vm_name = func_name.substr(9); is_builtin = true;
+        }
+        
+        if (is_builtin) {
+            LIR_Inst inst;
+            inst.op = op; inst.dst = result; inst.func_name = vm_name; inst.call_args = arg_regs;
+            inst.result_type = (expr.inferred_type) ? language_type_to_abi_type(expr.inferred_type) : Type::I64;
+            emit_instruction(inst);
+            return result;
+        }
+
+        // --- 3. Frame instantiation ---
         if (expr.inferred_type && expr.inferred_type->tag == ::TypeTag::Frame) {
-            FrameType ft = std::get<FrameType>(expr.inferred_type->extra);
+            auto ft = std::get<FrameType>(expr.inferred_type->extra);
             func_name = ft.name;
         }
-
-                // Check if it is a frame instantiation
         auto frame_it = frame_table_.find(func_name);
-        if (frame_it == frame_table_.end()) {
-             // Check for enum constructor call: EnumName.Variant(payload)
-            int64_t tag = 0; size_t expected_arity = 0;
-            TypePtr enum_hint = expr.inferred_type;
-            
-            if (func_name.find('.') != std::string::npos && type_system_) {
-                 auto name = func_name.substr(0, func_name.find('.'));
-                 auto found = type_system_->getType(name);
-                 if (found && (found->tag == TypeTag::Enum || found->tag == TypeTag::UserDefined)) enum_hint = found;
-            }
-
-            // Try resolving directly or via TypeChecker inferred type
-            bool resolved = resolve_enum_variant_info(type_system_.get(), enum_hint, func_name, tag, expected_arity);
-            if (!resolved && enum_hint && (enum_hint->tag == TypeTag::Enum || enum_hint->tag == TypeTag::UserDefined || enum_hint->tag == TypeTag::Frame)) {
-                if (auto* et = std::get_if<EnumType>(&enum_hint->extra)) {
-                    resolved = resolve_enum_variant_info(type_system_.get(), enum_hint, et->name + "." + func_name, tag, expected_arity);
-                }
-            }
-
-            if (resolved) {
-                Reg payload_reg = UINT32_MAX;
-                if (expr.arguments.size() == 1) {
-                    payload_reg = emit_expr(*expr.arguments[0]);
-                } else if (expr.arguments.size() > 1) {
-                    // Create tuple for multiple payloads
-                    payload_reg = allocate_register();
-                    emit_instruction(LIR_Inst(LIR_Op::TupleCreate, Type::Ptr, payload_reg, 0, 0, (uint32_t)expr.arguments.size()));
-                    for (size_t i = 0; i < expr.arguments.size(); ++i) {
-                        Reg arg_reg = emit_expr(*expr.arguments[i]);
-                        Reg idx_reg = allocate_register();
-                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
-                        emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, payload_reg, idx_reg, arg_reg));
-                    }
-                }
-                
-                Reg result = allocate_register();
-                LIR_Inst make_enum_inst(LIR_Op::MakeEnum, Type::Ptr, result, payload_reg, 0, (uint32_t)tag);
-                emit_instruction(make_enum_inst);
-                if (expr.inferred_type) set_register_language_type(result, expr.inferred_type);
-                return result;
-            }
-        }
-
         if (frame_it != frame_table_.end()) {
-            // Treat as instantiation
-            Reg frame_reg = allocate_register();
-            const FrameInfo& frame_info = frame_it->second;
-
-            // NewFrame allocates the object
-            LIR_Inst new_frame_inst(LIR_Op::NewFrame, Type::Ptr, frame_reg, 0, 0, static_cast<uint32_t>(frame_info.total_field_size));
-            new_frame_inst.func_name = func_name;
-            emit_instruction(new_frame_inst);
-
-            // Set frame type
-            auto frame_type = std::make_shared<::Type>(::TypeTag::Frame);
-            FrameType ft;
-            ft.name = func_name;
-            frame_type->extra = ft;
-            set_register_language_type(frame_reg, frame_type);
-            set_register_abi_type(frame_reg, Type::Ptr);
-
-            // 1. Set default values for ALL fields
-            if (frame_info.declaration) {
-                for (size_t i = 0; i < frame_info.declaration->fields.size(); ++i) {
-                    auto field = frame_info.declaration->fields[i];
-                    Reg val_reg = 0;
-                    if (field->defaultValue) {
-                        val_reg = emit_expr(*field->defaultValue);
-                    } else {
-                        val_reg = allocate_register();
-                        Backend::Value nil_val = VAL_NIL;
-                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, val_reg, nil_val));
-                    }
-                    emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, frame_reg, static_cast<uint32_t>(i), val_reg));
-                }
+            LIR_Inst new_inst(LIR_Op::NewFrame, Type::Ptr, result, 0, 0, (uint32_t)frame_it->second.total_field_size);
+            new_inst.type_name = func_name;
+            emit_instruction(new_inst);
+            set_register_language_type(result, expr.inferred_type);
+            
+            if (frame_it->second.has_init) {
+                std::vector<Reg> args; args.push_back(result);
+                for (Reg r : arg_regs) args.push_back(r);
+                Reg dummy = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::Call, dummy, func_name + ".init", args));
             }
+            return result;
+        }
 
-            // 2. Overwrite with named arguments
-            for (const auto& [name, arg_expr] : expr.namedArgs) {
-                auto offset_it = frame_info.field_offsets.find(name);
-                if (offset_it != frame_info.field_offsets.end()) {
-                    Reg val_reg = emit_expr(*arg_expr);
-                    emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, frame_reg, static_cast<uint32_t>(offset_it->second), val_reg));
-                }
-            }
-
-            // 3. Call init if present
-            if (frame_info.has_init) {
-                std::string init_name = func_name + ".init";
-                std::vector<Reg> arg_regs;
-                arg_regs.push_back(frame_reg);
-
-                // Track which named arguments are consumed by init
-                std::unordered_set<std::string> consumed_named_args;
-
-                // Match arguments to init parameters
-                if (frame_info.declaration && frame_info.declaration->init) {
-                    const auto& init = frame_info.declaration->init;
-
-                    // 3a. Positional arguments match required parameters
-                    size_t pos_idx = 0;
-                    for (; pos_idx < expr.arguments.size() && pos_idx < init->parameters.size(); ++pos_idx) {
-                        arg_regs.push_back(emit_expr(*expr.arguments[pos_idx]));
-                    }
-
-                    // 3b. Remaining required parameters must be matched by named arguments
-                    for (; pos_idx < init->parameters.size(); ++pos_idx) {
-                        const std::string& param_name = init->parameters[pos_idx].first;
-                        auto it = expr.namedArgs.find(param_name);
-                        if (it != expr.namedArgs.end()) {
-                            arg_regs.push_back(emit_expr(*it->second));
-                            consumed_named_args.insert(param_name);
-                        } else {
-                            // Fallback to nil if missing required parameter (type checker should have caught this)
-                            Reg nil_reg = allocate_register();
-                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, VAL_NIL));
-                            arg_regs.push_back(nil_reg);
-                        }
-                    }
-
-                    // 3c. Optional parameters matched by remaining positional or named arguments
-                    size_t opt_pos_idx = pos_idx - init->parameters.size();
-                    for (size_t i = 0; i < init->optionalParams.size(); ++i) {
-                        const std::string& param_name = init->optionalParams[i].first;
-
-                        auto it = expr.namedArgs.find(param_name);
-                        if (it != expr.namedArgs.end()) {
-                            arg_regs.push_back(emit_expr(*it->second));
-                            consumed_named_args.insert(param_name);
-                        } else if (expr.arguments.size() > pos_idx) {
-                            arg_regs.push_back(emit_expr(*expr.arguments[pos_idx++]));
-                        } else {
-                            // Use default value
-                            if (init->optionalParams[i].second.second) {
-                                arg_regs.push_back(emit_expr(*init->optionalParams[i].second.second));
-                            } else {
-                                Reg nil_reg = allocate_register();
-                                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, nil_reg, VAL_NIL));
-                                arg_regs.push_back(nil_reg);
-                            }
-                        }
-                    }
-                } else {
-                    // Fallback for missing declaration info
-                    for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
-                }
-
-                Reg init_result = allocate_register();
-                LIR_Inst call_inst(LIR_Op::Call, init_result, init_name, arg_regs);
-                for (Reg r : arg_regs) call_inst.call_arg_types.push_back(get_register_abi_type(r));
-                emit_instruction(call_inst);
-
-                // 4. Apply remaining named arguments as direct field assignments
-                for (const auto& [name, arg_expr] : expr.namedArgs) {
-                    if (consumed_named_args.count(name)) continue;
-                    auto offset_it = frame_info.field_offsets.find(name);
-                    if (offset_it != frame_info.field_offsets.end()) {
-                        Reg val_reg = emit_expr(*arg_expr);
-                        emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, frame_reg, static_cast<uint32_t>(offset_it->second), val_reg));
-                    }
-                }
-            }
-
-            // Track instance for deinit at scope exit
-            if (frame_info.has_deinit && !scope_stack_.empty()) {
-                scope_stack_.back().frame_instances.push_back({func_name, frame_reg});
-            }
-
-            return frame_reg;
+        // --- 4. Normal function call ---
+        if (!current_module_.empty() && current_module_ != "root" && func_name.find('.') == std::string::npos) {
+            std::string qname = current_module_ + "." + func_name;
+            if (function_table_.count(qname) || LIRFunctionManager::getInstance().hasFunction(qname)) vm_name = qname;
         }
         
-        // Check if this is a module function call (e.g., "math::add")
-        size_t dot_pos = func_name.find("::");
-        if (dot_pos != std::string::npos) {
-            std::string module_name = func_name.substr(0, dot_pos);
-            std::string symbol_name = func_name.substr(dot_pos + 2);
-            
-            // Check for alias mapping
-            auto alias_it = import_aliases_.find(module_name);
-            if (alias_it != import_aliases_.end()) {
-                module_name = alias_it->second;
-            }
-            
-            // Resolve module symbol
-            std::string qualified_name = module_name + "::" + symbol_name;
-            ModuleSymbolInfo* symbol = resolve_module_symbol(qualified_name);
-            if (symbol && symbol->is_function) {
-                if (!can_access_module_symbol(*symbol, current_module_)) {
-                    report_error("Cannot access private/protected function: " + qualified_name);
-                    return 0;
-                }
-                
-               // std::cout << "[DEBUG] LIR Generator: Generating module function call to '" << qualified_name << "'" << std::endl;
-                
-                // Evaluate arguments and store them in registers
-                std::vector<Reg> arg_regs;
-                for (const auto& arg : expr.arguments) {
-                    Reg arg_reg = emit_expr(*arg);
-                    arg_regs.push_back(arg_reg);
-                }
-                
-                // Allocate result register
-                Reg result = allocate_register();
-                
-                // Set the result type if available from type checking
-                if (expr.inferred_type) {
-                    set_register_language_type(result, expr.inferred_type);
-                    set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-                } else {
-                    auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-                    set_register_language_type(result, any_type);
-                    set_register_abi_type(result, language_type_to_abi_type(any_type));
-                }
-                
-                // Generate module function call using new format: call r2, module_func(r0, r1)
-                emit_instruction(LIR_Inst(LIR_Op::Call, result, qualified_name, arg_regs));
-                
-                return result;
-            }
-        }
-        if (!current_module_.empty()) {
-            std::string qualified_func_name = current_module_ + "." + func_name;
-            if (function_table_.find(qualified_func_name) != function_table_.end()) {
-                func_name = qualified_func_name;
-            }
-        }
-        if (function_table_.find(func_name) != function_table_.end()) {
-           // std::cout << "[DEBUG] LIR Generator: Generating call to user function '" << func_name << "'" << std::endl;
-            
-            // Evaluate arguments and store them in registers
-            std::vector<Reg> arg_regs;
-            for (const auto& arg : expr.arguments) {
-                Reg arg_reg = emit_expr(*arg);
-                arg_regs.push_back(arg_reg);
-            }
-            
-            // Allocate result register
-            Reg result = allocate_register();
-            
-            // Set the result type if available from type checking
-            if (expr.inferred_type) {
-                set_register_language_type(result, expr.inferred_type);
-                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-            } else {
-                auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-                set_register_language_type(result, any_type);
-                set_register_abi_type(result, language_type_to_abi_type(any_type));
-            }
-            
-            // Generate user function call using new format: call r2, user_func(r0, r1, r2, ...)
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, func_name, arg_regs));
-            
-            return result;
-        } else if (BuiltinUtils::isBuiltinFunction(func_name)) {
-           // std::cout << "[DEBUG] LIR Generator: Generating builtin call to '" << func_name << "'" << std::endl;
-            
-            // Special handling for channel() function
-            if (func_name == "channel") {
-               // std::cout << "[DEBUG] Processing channel() builtin function" << std::endl;
-                if (!expr.arguments.empty()) {
-                   // std::cout << "[DEBUG] channel() has arguments, reporting error" << std::endl;
-                    report_error("channel() function takes no arguments");
-                    return 0;
-                }
-                
-               // std::cout << "[DEBUG] Allocating result register for channel" << std::endl;
-                // Allocate result register
-                Reg result = allocate_register();
-                
-               // std::cout << "[DEBUG] Setting channel type for register " << result << std::endl;
-                
-                // Set the result type to Channel
-                auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
-                set_register_language_type(result, channel_type);
-                set_register_abi_type(result, Type::I64); // Channel handles are int64
-                
-                // Generate ChannelAlloc instruction with default capacity
-                emit_instruction(LIR_Inst(LIR_Op::ChannelAlloc, result, 32, 0));
-                
-               // std::cout << "[DEBUG] Generated ChannelAlloc: channel_alloc r" << result << std::endl;
-                return result;
-            }
-            
-            // Evaluate arguments and store them in registers
-            std::vector<Reg> arg_regs;
-            for (const auto& arg : expr.arguments) {
-                Reg arg_reg = emit_expr(*arg);
-                arg_regs.push_back(arg_reg);
-            }
-            
-            // Allocate result register
-            Reg result = allocate_register();
-            
-            // Set the result type if available from type checking
-            if (expr.inferred_type) {
-                set_register_language_type(result, expr.inferred_type);
-                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-            } else {
-                auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-                set_register_language_type(result, any_type);
-                set_register_abi_type(result, language_type_to_abi_type(any_type));
-            }
-            
-           // std::cout << "[DEBUG] Builtin function '" << func_name << "' called with " << arg_regs.size() << " arguments" << std::endl;
-            
-            // Generate builtin call using new format: call r2, builtin_func(r0, r1, r2, ...)
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, func_name, arg_regs));
-            
-           // std::cout << "[DEBUG] Generated call: call r" << result << ", " << func_name << "(...)" << std::endl;
-            
-            return result;
-            
-        } else {
-            // Check if it's actually a variable holding a function (indirect call)
-            Reg var_reg = resolve_variable(func_name);
-            if (var_reg != UINT32_MAX) {
-                // Redirect to closure call
-                LM::Frontend::AST::CallClosureExpr closure_call;
-                closure_call.closure = expr.callee;
-                closure_call.arguments = expr.arguments;
-                closure_call.namedArgs = expr.namedArgs;
-                closure_call.inferred_type = expr.inferred_type;
-                return emit_call_closure_expr(closure_call);
-            }
-
-            report_error("Unknown function: " + func_name);
-            return 0;
-        }
-    } else if (auto member_expr = dynamic_cast<LM::Frontend::AST::MemberExpr*>(expr.callee.get())) {
-        // Method call: obj.method(args...) or module function call: module.function(args...)
+        LIR_Inst inst(LIR_Op::Call, result, vm_name, arg_regs);
+        inst.func_name = vm_name;
+        if (expr.inferred_type) inst.result_type = language_type_to_abi_type(expr.inferred_type);
+        emit_instruction(inst);
+        return result;
+    } 
+    
+    // Member method call: obj.method()
+    else if (auto member_expr = dynamic_cast<LM::Frontend::AST::MemberExpr*>(expr.callee.get())) {
         std::string method_name = member_expr->name;
-
-        // Enum variant constructor call: EnumName.Variant(payload?)
-        if (auto enum_obj = dynamic_cast<LM::Frontend::AST::VariableExpr*>(member_expr->object.get())) {
-            int64_t tag = 0;
-            size_t expected_arity = 0;
-            std::string qualified_variant = enum_obj->name + "." + method_name;
-            TypePtr enum_hint = member_expr->object->inferred_type;
-            if ((!enum_hint || enum_hint->tag != TypeTag::Enum) && type_system_) {
-                enum_hint = type_system_->getType(enum_obj->name);
-            }
-
-            if (resolve_enum_variant_info(type_system_.get(), enum_hint, qualified_variant, tag, expected_arity)) {
-                Reg result = allocate_register();
-                Reg payload = 0;
-                
-                if (!expr.arguments.empty()) {
-                    if (expr.arguments.size() == 1) {
-                        // Single argument - use directly as payload
-                        payload = emit_expr(*expr.arguments[0]);
-                    } else {
-                        // Multiple arguments - create a tuple
-                        std::vector<Reg> arg_regs;
-                        for (const auto& arg : expr.arguments) {
-                            arg_regs.push_back(emit_expr(*arg));
-                        }
-                        
-                        // Create tuple from arguments
-                        Reg tuple_reg = allocate_register();
-                        emit_instruction(LIR_Inst(LIR_Op::TupleCreate, Type::Ptr, tuple_reg, 0, 0, static_cast<uint32_t>(arg_regs.size())));
-                        
-                        // Store each argument in the tuple
-                        for (size_t i = 0; i < arg_regs.size(); ++i) {
-                            Reg idx_reg = allocate_register();
-                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
-                            emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Ptr, tuple_reg, idx_reg, arg_regs[i]));
-                        }
-                        
-                        payload = tuple_reg;
-                    }
-                }
-
-                emit_instruction(LIR_Inst(LIR_Op::MakeEnum, Type::Ptr, result, payload, 0, static_cast<uint32_t>(tag)));
-
-                if (expr.inferred_type) {
-                    set_register_language_type(result, expr.inferred_type);
-                    set_register_abi_type(result, Type::Ptr);
-                }
-                return result;
-            }
-        }
         
-        // Check if this is a module member access
-        if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(member_expr->object.get())) {
-            // Check if the variable is a module alias
-            auto alias_it = import_aliases_.find(var_expr->name);
+        // Check if object is a module alias
+        if (auto var_obj = dynamic_cast<LM::Frontend::AST::VariableExpr*>(member_expr->object.get())) {
+            auto alias_it = import_aliases_.find(var_obj->name);
             if (alias_it != import_aliases_.end()) {
-                // This is a module function call
-                std::string module_path = alias_it->second;
-                std::string qualified_name = module_path + "." + method_name;
-
-                // Evaluate arguments
-                std::vector<Reg> arg_regs;
-                for (const auto& arg : expr.arguments) {
-                    Reg arg_reg = emit_expr(*arg);
-                    arg_regs.push_back(arg_reg);
-                }
+                std::string qualified_name = alias_it->second + "." + method_name;
                 
-                // Generate function call
+                std::vector<Reg> arg_regs;
+                for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
                 Reg result = allocate_register();
                 
-                // Set the result type if available from type checking
+                std::string vm_name = qualified_name;
+                LIR_Op op = LIR_Op::Call;
+                if (qualified_name == "len" || qualified_name == "length" || qualified_name == "_builtin_len" || 
+                    (qualified_name.length() >= 4 && qualified_name.substr(qualified_name.length()-4) == ".len") ||
+                    (qualified_name.length() >= 7 && qualified_name.substr(qualified_name.length()-7) == ".length")) {
+                    op = LIR_Op::CallBuiltin; vm_name = "len";
+                } else if (qualified_name.length() >= 9 && qualified_name.substr(0, 9) == "_builtin_") {
+                    op = LIR_Op::CallBuiltin; vm_name = qualified_name.substr(9);
+                }
+                
+                LIR_Inst inst;
+                inst.op = op; inst.dst = result; inst.func_name = vm_name; inst.call_args = arg_regs;
                 if (expr.inferred_type) {
-                    set_register_language_type(result, expr.inferred_type);
-                    set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+                    inst.result_type = language_type_to_abi_type(expr.inferred_type);
                 } else {
-                    auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-                    set_register_language_type(result, any_type);
-                    set_register_abi_type(result, language_type_to_abi_type(any_type));
+                    inst.result_type = Type::I64;
                 }
-                
-                // Generate function call using the qualified name
-                LIR_Inst call_inst(LIR_Op::Call, result, qualified_name, arg_regs);
-                
-                // Set argument types for the call
-                for (Reg arg_reg : arg_regs) {
-                    call_inst.call_arg_types.push_back(get_register_abi_type(arg_reg));
+                emit_instruction(inst);
+                return result;
+            }
+        }
+
+        Reg object_reg = emit_expr(*member_expr->object);
+        std::vector<Reg> arg_regs; arg_regs.push_back(object_reg);
+        for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+        
+        Reg result = allocate_register();
+        TypePtr object_type = member_expr->object->inferred_type;
+
+        // Built-in methods
+        if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::String)) {
+            if (method_name == "append") {
+                if (arg_regs.size() > 1) {
+                    emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, object_reg, arg_regs[1], 0));
                 }
-                
-                emit_instruction(call_inst);
-                
+                return 0;
+            }
+            if (method_name == "len" || method_name == "length") {
+                LIR_Inst inst;
+                inst.op = LIR_Op::CallBuiltin; inst.dst = result; inst.func_name = "len";
+                inst.call_args.push_back(object_reg);
+                inst.result_type = Type::I64;
+                emit_instruction(inst);
                 return result;
             }
         }
         
-        // Evaluate the object (this will be the first argument)
-        Reg object_reg = emit_expr(*member_expr->object);
-        
-        // Evaluate other arguments
-        std::vector<Reg> arg_regs;
-        arg_regs.push_back(object_reg); // 'this' is first parameter
-        for (const auto& arg : expr.arguments) {
-            Reg arg_reg = emit_expr(*arg);
-            arg_regs.push_back(arg_reg);
+        if (object_type && object_type->tag == TypeTag::Channel) {
+            LIR_Op op = LIR_Op::Call; 
+            if (method_name == "send") op = LIR_Op::ChannelSend;
+            else if (method_name == "recv") op = LIR_Op::ChannelRecv;
+            else if (method_name == "close") op = LIR_Op::ChannelClose;
+            
+            if (op != LIR_Op::Call) {
+                LIR_Inst call_inst;
+                call_inst.op = op; 
+                call_inst.dst = result;
+                call_inst.a = object_reg;
+                if (!arg_regs.empty()) {
+                    call_inst.b = arg_regs[0];
+                } else {
+                    call_inst.b = UINT32_MAX;
+                }
+                call_inst.call_args = arg_regs;
+                call_inst.result_type = (expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::I64);
+                emit_instruction(call_inst);
+                return result;
+            }
         }
-        
-        // Get the type of the object to find the correct method
-        TypePtr object_type = member_expr->object->inferred_type;
+
+        // Frame method call
+        std::string full_name;
         if (object_type && object_type->tag == TypeTag::Frame) {
-            auto frame_type_info = std::get_if<FrameType>(&object_type->extra);
-            if (frame_type_info) {
-                std::string frame_name = frame_type_info->name;
-                auto it = frame_table_.find(frame_name);
-                if (it != frame_table_.end()) {
-                    const FrameInfo& frame_info = it->second;
-                    auto method_it = frame_info.method_indices.find(method_name);
-                    if (method_it != frame_info.method_indices.end()) {
-                        // Check visibility
-                        std::string full_method_name = frame_name + "." + method_name;
-                        auto func_it = function_table_.find(full_method_name);
-                        if (func_it != function_table_.end()) {
-                            if (!is_visible(func_it->second.visibility, frame_name)) {
-                                report_error("Cannot access " + LM::Frontend::AST::visibilityToString(func_it->second.visibility) +
-                                           " method '" + method_name + "' of frame '" + frame_name + "'");
-                                return 0;
-                            }
-                        }
-
-                        // Found the method - generate frame method call
-                        Reg result = allocate_register();
-
-                        // Set the result type if available from type checking
-                        if (expr.inferred_type) {
-                            set_register_language_type(result, expr.inferred_type);
-                            set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-                        } else {
-                            auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-                            set_register_language_type(result, any_type);
-                            set_register_abi_type(result, language_type_to_abi_type(any_type));
-                        }
-
-                        // Generate frame method call using Call
-                        LIR_Inst call_inst(LIR_Op::Call, result, full_method_name, arg_regs);
-
-                        // Set argument types for the call
-                        for (Reg arg_reg : arg_regs) {
-                            call_inst.call_arg_types.push_back(get_register_abi_type(arg_reg));
-                        }
-
-                        emit_instruction(call_inst);
-
-                        return result;
-                    }
-
-                    // Check if it's a trait method call recursively
-                    std::vector<std::string> trait_worklist = frame_info.implements;
-                    std::unordered_set<std::string> visited_traits;
-
-                    while (!trait_worklist.empty()) {
-                        std::string current_trait = trait_worklist.back();
-                        trait_worklist.pop_back();
-
-                        if (visited_traits.count(current_trait)) continue;
-                        visited_traits.insert(current_trait);
-
-                        std::string full_trait_method_name = current_trait + "." + method_name;
-                        if (LIRFunctionManager::getInstance().hasFunction(full_trait_method_name)) {
-                            // Generate call to trait method (static dispatch)
-                            Reg result = allocate_register();
-                            if (expr.inferred_type) {
-                                set_register_language_type(result, expr.inferred_type);
-                                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-                            }
-                            
-                            LIR_Inst call_inst(LIR_Op::Call, result, full_trait_method_name, arg_regs);
-                            for (Reg r : arg_regs) call_inst.call_arg_types.push_back(get_register_abi_type(r));
-                            emit_instruction(call_inst);
-                            return result;
-                        }
-
-                        // Add parent traits to worklist
-                        // We need to look up trait info to find parent traits
-                        auto trait_it = trait_table_.find(current_trait);
-                        if (trait_it != trait_table_.end()) {
-                            for (const auto& parent : trait_it->second.extends) {
-                                trait_worklist.push_back(parent);
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            // Fallback for when type inference is missing - still try to find the method in ANY frame
-            // This is less safe but better than failing if inference is incomplete
-            for (const auto& [frame_name, frame_info] : frame_table_) {
-                auto method_it = frame_info.method_indices.find(method_name);
-                if (method_it != frame_info.method_indices.end()) {
-                    // Found the method - generate frame method call
-                    Reg result = allocate_register();
-
-                    // Set the result type if available from type checking
-                    if (expr.inferred_type) {
-                        set_register_language_type(result, expr.inferred_type);
-                        set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-                    } else {
-                        auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-                        set_register_language_type(result, any_type);
-                        set_register_abi_type(result, language_type_to_abi_type(any_type));
-                    }
-
-                    // Generate frame method call using Call
-                    std::string full_method_name = frame_name + "." + method_name;
-                    LIR_Inst call_inst(LIR_Op::Call, result, full_method_name, arg_regs);
-
-                    // Set argument types for the call
-                    for (Reg arg_reg : arg_regs) {
-                        call_inst.call_arg_types.push_back(get_register_abi_type(arg_reg));
-                    }
-
-                    emit_instruction(call_inst);
-
-                    return result;
-                }
-            }
+            auto ft = std::get_if<FrameType>(&object_type->extra);
+            if (ft) full_name = ft->name + "." + method_name;
         }
-        
-        // Check for special channel methods
-        if (method_name == "send") {
-            if (expr.arguments.size() != 1) {
-                report_error("channel.send() requires exactly one argument");
-                return 0;
+
+        if (!full_name.empty()) {
+            if (expr.inferred_type) {
+                set_register_language_type(result, expr.inferred_type);
+                set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
             }
-            
-            // Evaluate value to send
-            Reg value_reg = emit_expr(*expr.arguments[0]);
-            
-            // Generate ChannelSend instruction (blocking)
-            Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ChannelSend, result, object_reg, value_reg));
-            set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
+            emit_instruction(LIR_Inst(LIR_Op::Call, result, full_name, arg_regs));
             return result;
         }
 
-        if (method_name == "recv") {
-            if (expr.arguments.size() != 0) {
-                report_error("channel.recv() requires no arguments");
-                return 0;
-            }
-            
-            // Generate ChannelRecv instruction (blocking)
-            Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ChannelRecv, result, object_reg));
-            set_register_type(result, std::make_shared<::Type>(::TypeTag::Any)); // Returns T
-            return result;
-        }        
-
-        if (method_name == "offer") {
-            if (expr.arguments.size() != 1) {
-                report_error("channel.offer() requires exactly one argument");
-                return 0;
-            }
-            
-            // Evaluate value to offer
-            Reg value_reg = emit_expr(*expr.arguments[0]);
-            
-            // Generate ChannelOffer instruction (non-blocking)
-            Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ChannelOffer, result, object_reg, value_reg));
-            set_register_type(result, std::make_shared<::Type>(::TypeTag::Bool)); // Returns success/failure
-            return result;
-        } 
-
-        if (method_name == "poll") {
-            if (expr.arguments.size() != 0) {
-                report_error("channel.poll() requires no arguments");
-                return 0;
-            }
-            
-            // Generate ChannelPoll instruction (non-blocking)
-            Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ChannelPoll, result, object_reg));
-            set_register_type(result, std::make_shared<::Type>(::TypeTag::Any)); // Returns Option<T>
-            return result;
-        } 
-
-        if (method_name == "close") {
-            if (expr.arguments.size() != 0) {
-                report_error("channel.close() requires no arguments");
-                return 0;
-            }
-            
-            // Generate ChannelClose instruction
-            Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ChannelClose, result, object_reg));
-            set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
-            return result;
-        }         
-
-        // Check for built-in list methods
-        if (method_name == "append") {
-            if (expr.arguments.size() != 1) {
-                report_error("list.append() requires exactly one argument");
-                return 0;
-            }
-            
-            // Evaluate the argument to append
-            Reg arg_reg = emit_expr(*expr.arguments[0]);
-            
-            // Generate ListAppend instruction
-            Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, result, object_reg, arg_reg));
-            set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
-            return result;
-        }
-        
-        if (method_name == "len") {
-            if (expr.arguments.size() != 0) {
-                report_error("list.len() requires no arguments");
-                return 0;
-            }
-            
-            Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, result, object_reg));
-            set_register_type(result, std::make_shared<::Type>(::TypeTag::Int));
-            return result;
-        }
-        
-        report_error("Unknown method: " + method_name);
-        return 0;
-    } else {
-        report_error("Complex function calls not yet supported in LIR");
+        report_error("Unresolved method: " + method_name);
         return 0;
     }
+
+    report_error("Complex function calls not yet supported in LIR");
+    return 0;
 }
 
 
@@ -1991,6 +1521,19 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
         }
     }
     
+    // For assignments to captured variables inside a closure, write through the
+    // closure environment tuple so subsequent reads and calls observe the update.
+    if (!expr.name.empty() && env_register_ != UINT32_MAX) {
+        auto captured_it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), expr.name);
+        if (captured_it != current_lambda_captures_.end()) {
+            size_t captured_index = std::distance(current_lambda_captures_.begin(), captured_it);
+            Reg idx_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(static_cast<int64_t>(captured_index + 1))));
+            emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, env_register_, idx_reg, value));
+            return value;
+        }
+    }
+
     // For simple variable assignment
     if (!expr.name.empty()) {
         // Get the existing register for this variable
@@ -2161,17 +1704,9 @@ Reg Generator::emit_call_closure_expr(LM::Frontend::AST::CallClosureExpr& expr) 
         abi_type = language_type_to_abi_type(expr.inferred_type);
     }
 
-    if (arg_regs.empty()) {
-        emit_instruction(LIR_Inst(LIR_Op::CallIndirect, abi_type, result, closure_reg, 0));
-    } else {
-        // Pass arguments to CallIndirect using multi-register convention or internal argument stack
-        for (const auto& arg : arg_regs) {
-            LIR_Inst param_inst(LIR_Op::Param);
-            param_inst.a = arg;
-            emit_instruction(param_inst);
-        }
-        emit_instruction(LIR_Inst(LIR_Op::CallIndirect, abi_type, result, closure_reg, 0));
-    }
+    LIR_Inst call_inst(LIR_Op::CallIndirect, abi_type, result, closure_reg, 0);
+    call_inst.call_args = arg_regs;
+    emit_instruction(call_inst);
     
     // Set return type based on inference
     if (expr.inferred_type) {
@@ -2281,7 +1816,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
 
         if (resolve_enum_variant_info(type_system_.get(), enum_hint, qualified_variant, tag, expected_arity) && expected_arity == 0) {
             Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::MakeEnum, Type::Ptr, result, 0, 0, static_cast<uint32_t>(tag)));
+            emit_instruction(LIR_Inst(LIR_Op::MakeEnum, Type::Ptr, result, UINT32_MAX, 0, static_cast<uint32_t>(tag)));
             if (expr.inferred_type) {
                 set_register_language_type(result, expr.inferred_type);
                 set_register_abi_type(result, Type::Ptr);
@@ -2328,7 +1863,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         return method_marker;
     }
     
-    if (expr.name == "len") {
+    if (expr.name == "len" || expr.name == "length") {
         // Return a special marker for len method
         Reg method_marker = allocate_register();
         auto int_type = std::make_shared<::Type>(::TypeTag::Int);
@@ -2512,10 +2047,28 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
     fn_decl->returnType = expr.returnType;
     fn_decl->body = expr.body;
     fn_decl->inferred_type = expr.inferred_type;
+
+    std::vector<std::string> effective_captures = expr.capturedVars;
+    if (expr.body) {
+        std::set<std::string> used_names;
+        std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> lambda_body_statements;
+        lambda_body_statements.push_back(expr.body);
+        find_accessed_variables_recursive(lambda_body_statements, used_names);
+        for (const auto& used_name : used_names) {
+            bool is_param = false;
+            for (const auto& param : expr.params) {
+                if (param.first == used_name) { is_param = true; break; }
+            }
+            if (!is_param && resolve_variable(used_name) != UINT32_MAX &&
+                std::find(effective_captures.begin(), effective_captures.end(), used_name) == effective_captures.end()) {
+                effective_captures.push_back(used_name);
+            }
+        }
+    }
     
     // Set captures for the new function's generation
     auto prev_captures = current_lambda_captures_;
-    current_lambda_captures_ = expr.capturedVars;
+    current_lambda_captures_ = effective_captures;
     
     generate_function(*fn_decl);
     
@@ -2528,13 +2081,13 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
     Reg name_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, name_reg, name_val));
 
-    if (expr.capturedVars.empty()) {
+    if (effective_captures.empty()) {
         // Simple function pointer
         emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Ptr, func_reg, name_reg, 0));
     } else {
         // Bundle into a Tuple: (lambda_name, capture1, capture2, ...)
         Reg closure_tuple = allocate_register();
-        uint32_t tuple_size = static_cast<uint32_t>(expr.capturedVars.size() + 1);
+        uint32_t tuple_size = static_cast<uint32_t>(effective_captures.size() + 1);
         emit_instruction(LIR_Inst(LIR_Op::TupleCreate, Type::Ptr, closure_tuple, 0, 0, tuple_size));
         
         // Set lambda name at index 0
@@ -2543,12 +2096,12 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
         emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, closure_tuple, zero_idx, name_reg));
 
         // Set captured variables
-        for (size_t i = 0; i < expr.capturedVars.size(); ++i) {
-            Reg val_reg = resolve_variable(expr.capturedVars[i]);
+        for (size_t i = 0; i < effective_captures.size(); ++i) {
+            Reg val_reg = resolve_variable(effective_captures[i]);
             if (val_reg == UINT32_MAX) {
                 // If not found in local scope, it might be in current lambda's env
                 if (env_register_ != UINT32_MAX) {
-                    auto it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), expr.capturedVars[i]);
+                    auto it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), effective_captures[i]);
                     if (it != current_lambda_captures_.end()) {
                         size_t inner_idx = std::distance(current_lambda_captures_.begin(), it);
                         Reg inner_idx_reg = allocate_register();

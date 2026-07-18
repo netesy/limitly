@@ -1,5 +1,6 @@
 #include "../generator.hh"
 #include "../functions.hh"
+#include "../verifier.hh"
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
 #include "../builtin_functions.hh"
@@ -31,13 +32,19 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         type_system_ = type_check_result.type_system;
         
         // PASS 0: Collect function, frame, and module signatures only
+        std::cout << "LIR: Pass 0 - Trait" << std::endl;
         collect_trait_signatures(*type_check_result.program);
+        std::cout << "LIR: Pass 0 - Frame" << std::endl;
         collect_frame_signatures(*type_check_result.program);
+        std::cout << "LIR: Pass 0 - Function" << std::endl;
         collect_function_signatures(type_check_result);
+        std::cout << "LIR: Pass 0 - Module" << std::endl;
         collect_module_signatures(*type_check_result.program);
         
         // PASS 1: Lower function bodies into separate LIR functions
+        std::cout << "LIR: Pass 1" << std::endl;
         lower_function_bodies(type_check_result);
+        std::cout << "LIR: Pass 2" << std::endl;
     
     // PASS 2: Generate main function with top-level code only
     current_module_ = "root";
@@ -77,6 +84,13 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         }
         emit_stmt(*stmt);
     }
+
+    // 3. Automatically call main() if defined
+    if (LIRFunctionManager::getInstance().hasFunction("main") || function_table_.count("main")) {
+        std::vector<Reg> empty_args;
+        Reg main_res = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Call, main_res, "main", empty_args));
+    }
     
     // Call exit_scope BEFORE implicit return to ensure deinitializers are called
     exit_scope();
@@ -94,6 +108,8 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
 
     // Finish CFG building for main
     finish_cfg_build();
+
+    
 
     // Optimize the generated LIR (but NOT for top-level wrapper)
     if (current_function_->name != "__top_level_wrapper__") {
@@ -967,6 +983,18 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
         ft.name = typeName;
         type->extra = ft;
         return type;
+    }
+    
+    // Fallback: try to find frame by unqualified name
+    for (const auto& [qualified_name, frame_info] : frame_table_) {
+        size_t last_dot = qualified_name.rfind('.');
+        if (last_dot != std::string::npos && qualified_name.substr(last_dot + 1) == typeName) {
+            auto type = std::make_shared<::Type>(::TypeTag::Frame);
+            FrameType ft;
+            ft.name = qualified_name;
+            type->extra = ft;
+            return type;
+        }
     }
 
     // Default to Any type for complex or unknown types

@@ -4,9 +4,9 @@ frame Resource {
     prot secret: str;
 
     pub init(n: str, i: int, s: str) {
-        this.name = n;
-        this.id = i;
-        this.secret = s;
+        self.name = n;
+        self.id = i;
+        self.secret = s;
     }
 
     pub fn print_all() {

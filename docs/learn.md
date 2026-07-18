@@ -39,13 +39,14 @@ To get started with Limit, you'll need to build the interpreter from source. Don
 After building, you'll have a `limitly` executable in the `bin/` directory. This is the Limit interpreter!
 
 **Verify your installation:**
-While there isn't a `--version` command yet, you can test your installation by starting the interactive REPL (Read-Eval-Print Loop):
+While there isn't a `--version` command yet, you can verify your installation by running a simple print command:
 
 ```bash
-./bin/limitly -repl
+echo 'print("Limitly is working!");' > test.lm
+./bin/limitly test.lm
 ```
 
-If you see a `>` prompt, you're all set! You can type `exit` to leave the REPL.
+If you see "Limitly is working!", you're all set!
 
 ## ✍️ Your First Program
 
@@ -81,16 +82,17 @@ Now that you've written your first program, let's learn some of the basic buildi
 
 ### Variables and Types
 
-A variable is a name that refers to a value. You can create a variable using the `var` keyword. While Limit can sometimes infer the type, it's good practice to be explicit by adding a type annotation.
+A variable is a name that refers to a value. You can create a variable using the `var` keyword. Immutable bindings use `const` or `val`. While Limit can sometimes infer the type, it's good practice to be explicit by adding a type annotation.
 
 ```limit
 var my_age: int = 28;
-var my_name: str = "Jules";
+const my_name: str = "Jules";
 ```
 
 Limit is a statically-typed language, which means that every variable has a type that is known when you write the code. The basic types are:
 *   **`int`**: for integers (e.g., `10`, `-5`).
-*   **`float`**: for decimal numbers (e.g., `3.14`).
+*   **`float`**: for floating-point numbers (e.g., `3.14`).
+*   **`decimal`**: for fixed-precision numbers (e.g., `10.50`). Supports `d2`, `d4`, `d6`.
 *   **`bool`**: for `true` or `false`.
 *   **`str`**: for strings of text (e.g., `"Hello"`).
 
@@ -296,7 +298,7 @@ frame Greeter {
     pub var name: str = "World";
 
     pub fn say_hello() {
-        print("Hello, {this.name}!");
+        print("Hello, {self.name}!");
     }
 }
 
@@ -304,7 +306,7 @@ var greeter = Greeter();
 greeter.say_hello(); // Output: Hello, World!
 ```
 
-Wait, what is `this`? Inside a frame's method, `this` refers to the specific object you are working with. You can also use `self` if you prefer - Limit supports both!
+What is `self`? Inside a frame's method, `self` refers to the specific object you are working with.
 
 ## 🧪 Errors and Optional Values
 
@@ -398,7 +400,7 @@ Now it's time to put everything you've learned together! Let's build a simple nu
 var secret_number: int = 7; 
 print("I'm thinking of a number. Guess what it is!");
 
-loop { 
+while (true) { 
     print("Please input your guess:");
     var input_str: str = "7"; // Simulating input
 

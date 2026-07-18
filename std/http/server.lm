@@ -1,16 +1,147 @@
+// HTTP Server Module
+// Built on the standard resource abstraction.
+
 import std.core as core;
+import std.resource as res;
+
+pub type ServerRequest = {
+    method: str,
+    path: str,
+    query_string: str,
+    version: str,
+    headers: {str: str},
+    body: str,
+    remote_addr: str,
+    client_resource: res.Resource?
+};
+
+pub type ServerResponse = {
+    status: int,
+    headers: {str: str},
+    body: str
+};
+
+pub type ResultServerRequest = ServerRequest | str; // Simplified Result pattern
 
 frame HTTPServer {
-    pub fn listen(port: int): core.ResultInt {
-        if (port <= 0) return core.err_int("invalid port");
-        return core.ok_int(port);
+    var host: str;
+    var port: int;
+    var handle: int;
+    var running: bool;
+    var resource: res.Resource?;
+    var binder: res.Binder?;
+    var listener: res.Listener?;
+    var accepter: res.Accepter?;
+
+    pub fn init() {
+        self.host = "0.0.0.0";
+        self.port = 80;
+        self.handle = -1;
+        self.running = false;
+        self.resource = nil;
     }
 
-    pub fn route(method: str, path: str): core.ResultInt {
-        return core.ok_int(1);
+    // Bind and listen
+    pub fn listen(host: str, port: int, backlog: int): core.ResultInt {
+        self.host = host;
+        self.port = port;
+
+        match (res.create_socket()) {
+            case ok(r) => {
+                var binder = res.Binder(r);
+                if (not binder.bind([host, port])) {
+                    r.close();
+                    return core.err_int("failed to bind to " + host + ":" + port as str);
+                }
+
+                var listener = res.Listener(r);
+                if (not listener.listen([backlog])) {
+                    r.close();
+                    return core.err_int("listen failed on port " + port as str);
+                }
+
+                self.resource = ok(r);
+                self.binder = ok(binder);
+                self.listener = ok(listener);
+                self.accepter = ok(res.Accepter(r));
+                self.handle = r._handle();
+                self.running = true;
+                return core.ok_int(self.handle);
+            }
+            case err(e) => return core.err_int("failed to create socket");
+        }
     }
 
-    pub fn respond(status: int, body: str): core.ResultInt {
-        return core.ok_int(status);
+    // Accept a single connection and process the request
+    pub fn accept_request(): ResultServerRequest {
+        match (self.accepter) {
+            case ok(acc) => {
+                var client_fd = acc.accept();
+                if (client_fd == -1) return "accept returned nil (no connection)";
+
+                var cr = res.adopt_socket(client_fd);
+                var rd = res.Reader(cr);
+                // Read request data
+                var request_data: str = "";
+                var max_read: int = 1048576; // 1MB max
+                var total: int = 0;
+                while (total < max_read) {
+                    var chunk = rd.read([ []]);
+                    if (chunk == nil) break;
+                    request_data = request_data + (chunk as str);
+                    total = total + len(chunk as str);
+                    if (index_of_h(request_data, "\r\n\r\n") != -1) {
+                        total = max_read; // Simplified
+                    }
+                }
+
+                var req: ServerRequest = parse_server_request(request_data);
+                req.client_resource = ok(cr);
+                req.remote_addr = "client";
+                return req;
+            }
+            case nil => return "server not listening";
+        }
     }
+
+    // Close the server
+    pub fn close(): core.ResultInt {
+        self.running = false;
+        match (self.resource) {
+            case ok(r) => r.close();
+            case nil => {}
+        }
+        self.resource = nil;
+        self.handle = -1;
+        return core.ok_int(0);
+    }
+
+    // Check for incoming connections (non-blocking)
+    pub fn has_connection(): bool {
+        match (self.resource) {
+            case ok(r) => {
+                var poller = res.Poller(r);
+                return poller.poll();
+            }
+            case nil => return false;
+        }
+    }
+}
+
+fn parse_server_request(raw: str): ServerRequest {
+    var req: ServerRequest = {
+        method: "", path: "", query_string: "", version: "", 
+        headers: {}, body: "", remote_addr: "", client_resource: nil
+    };
+    // ... Simplified parser ...
+    return req;
+}
+
+fn index_of_h(s: str, pattern: str): int {
+    var i: int = 0;
+    while (i <= len(s) - len(pattern)) {
+        if (substring(s, i, i + len(pattern)) == pattern) return i;
+        i = i + 1;
+    }
+    return -1;
 }

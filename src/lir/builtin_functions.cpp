@@ -60,15 +60,15 @@ ValuePtr LIRBuiltinFunction::execute(const std::vector<ValuePtr>& args) {
         throw std::runtime_error("No implementation for LIR builtin function: " + name_);
     }
     
-    // Validate argument count
-    if (args.size() != paramTypes_.size()) {
+    // Validate argument count (allow variable arguments if paramTypes is empty)
+    if (!paramTypes_.empty() && args.size() != paramTypes_.size()) {
         throw std::runtime_error("Argument count mismatch for LIR builtin function: " + name_ + 
                               " (expected " + std::to_string(paramTypes_.size()) + 
                               ", got " + std::to_string(args.size()) + ")");
     }
     
-    // Validate argument types
-    for (size_t i = 0; i < args.size(); i++) {
+    // Validate argument types (skip if variable arguments)
+    for (size_t i = 0; i < args.size() && i < paramTypes_.size(); i++) {
         if (!args[i]) {
             throw std::runtime_error("Argument type mismatch for LIR builtin function: " + name_ + 
                                   " at position " + std::to_string(i) + " (null argument)");
@@ -80,8 +80,8 @@ ValuePtr LIRBuiltinFunction::execute(const std::vector<ValuePtr>& args) {
         bool type_compatible = (expected == actual) || (expected == TypeTag::Any);
         
         if (!type_compatible && 
-            (expected == TypeTag::Int || expected == TypeTag::Int32 || expected == TypeTag::Int64) &&
-            (actual == TypeTag::Int || actual == TypeTag::Int32 || actual == TypeTag::Int64)) {
+            (expected == TypeTag::Int || expected == TypeTag::Int32 || expected == TypeTag::Int64 || expected == TypeTag::Int128 || expected == TypeTag::UInt || expected == TypeTag::UInt32 || expected == TypeTag::UInt64 || expected == TypeTag::UInt128) &&
+            (actual == TypeTag::Int || actual == TypeTag::Int32 || actual == TypeTag::Int64 || actual == TypeTag::Int128 || actual == TypeTag::UInt || actual == TypeTag::UInt32 || actual == TypeTag::UInt64 || actual == TypeTag::UInt128)) {
             type_compatible = true;
         }
         
@@ -134,35 +134,66 @@ void LIRBuiltinFunctions::initialize() {
 void LIRBuiltinFunctions::registerIOFunctions() {
     registerFunction(std::make_shared<LIRBuiltinFunction>(
         "print",
-        std::vector<TypeTag>{TypeTag::Any},
+        std::vector<TypeTag>{},  // Variable arguments - empty vector
         TypeTag::Nil,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            const auto& value = args[0];
-            if (value && value->type) {
-                switch (value->type->tag) {
-                    case TypeTag::Int:
-                    case TypeTag::Int64:
-                        std::cout << value->as<int64_t>();
-                        break;
-                    case TypeTag::Float32:
-                    case TypeTag::Float64:
-                        std::cout << value->as<double>();
-                        break;
-                    case TypeTag::Bool:
-                        std::cout << (value->as<bool>() ? "true" : "false");
-                        break;
-                    case TypeTag::String:
-                        std::cout << value->as<std::string>();
-                        break;
-                    case TypeTag::Nil:
-                        std::cout << "nil";
-                        break;
-                    default:
-                        std::cout << "<unsupported type>";
-                        break;
+            for (size_t i = 0; i < args.size(); ++i) {
+                const auto& value = args[i];
+                if (value && value->type) {
+                    switch (value->type->tag) {
+                        case TypeTag::Int:
+                        case TypeTag::Int32:
+                        case TypeTag::Int64:
+                        case TypeTag::Int128:
+                        case TypeTag::UInt:
+                        case TypeTag::UInt32:
+                        case TypeTag::UInt64:
+                        case TypeTag::UInt128:
+                            std::cout << value->as<int64_t>();
+                            break;
+                        case TypeTag::Float32:
+                        case TypeTag::Float64:
+                            std::cout << value->as<double>();
+                            break;
+                        case TypeTag::Decimal2:
+                        case TypeTag::Decimal4:
+                        case TypeTag::Decimal6:
+                            // Decimal types are stored as integers with fixed scale
+                            {
+                                int64_t intVal = value->as<int64_t>();
+                                int scale = 2;
+                                if (value->type->tag == TypeTag::Decimal4) scale = 4;
+                                else if (value->type->tag == TypeTag::Decimal6) scale = 6;
+                                
+                                double decimalVal = static_cast<double>(intVal) / std::pow(10, scale);
+                                std::cout << std::fixed << std::setprecision(scale) << decimalVal;
+                                std::cout.unsetf(std::ios::fixed);
+                            }
+                            break;
+                        case TypeTag::Bool:
+                            std::cout << (value->as<bool>() ? "true" : "false");
+                            break;
+                        case TypeTag::String:
+                            std::cout << value->as<std::string>();
+                            break;
+                        case TypeTag::Nil:
+                            std::cout << "nil";
+                            break;
+                        case TypeTag::Any:
+                            // Try to print any type by converting to string
+                            std::cout << value->toString();
+                            break;
+                        default:
+                            std::cout << "<unsupported type:" << static_cast<int>(value->type->tag) << ">";
+                            break;
+                    }
+                    // Add space between arguments
+                    if (i < args.size() - 1) {
+                        std::cout << " ";
+                    }
                 }
-                std::cout << std::endl;
             }
+            std::cout << std::endl;
             auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
             return std::make_shared<Value>(nil_type);
         }
@@ -389,12 +420,93 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
     ));
 
     registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "len",
+        std::vector<TypeTag>{TypeTag::Any},
+        TypeTag::Int,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const auto& value = args[0];
+            size_t length = 0;
+            
+            switch (value->type->tag) {
+                case TypeTag::String: {
+                    length = value->data.length();
+                    break;
+                }
+                case TypeTag::List: {
+                    if (std::holds_alternative<ListValue>(value->complexData)) {
+                        length = std::get<ListValue>(value->complexData).elements.size();
+                    }
+                    break;
+                }
+                case TypeTag::Dict: {
+                    if (std::holds_alternative<DictValue>(value->complexData)) {
+                        length = std::get<DictValue>(value->complexData).elements.size();
+                    }
+                    break;
+                }
+                case TypeTag::Frame: {
+                    if (std::holds_alternative<UserDefinedValue>(value->complexData)) {
+                        const auto& udv = std::get<UserDefinedValue>(value->complexData);
+                        if (udv.fields.count("size")) {
+                            length = static_cast<size_t>(udv.fields.at("size")->as<int64_t>());
+                        } else if (udv.fields.count("length")) {
+                            length = static_cast<size_t>(udv.fields.at("length")->as<int64_t>());
+                        }
+                    }
+                    break;
+                }
+                default:
+                    throw std::runtime_error("len: unsupported type " + value->type->toString());
+            }
+            
+            auto int_type = std::make_shared<::Type>(TypeTag::Int);
+            return std::make_shared<Value>(int_type, static_cast<int64_t>(length));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
         "channel",
         std::vector<TypeTag>{},
         TypeTag::Channel,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             auto channel_type = std::make_shared<::Type>(TypeTag::Channel);
             return std::make_shared<Value>(channel_type, static_cast<int64_t>(0));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "substring",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Int, TypeTag::Int},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            int64_t start = args[1]->as<int64_t>();
+            int64_t end = args[2]->as<int64_t>();
+            
+            if (start < 0) start = 0;
+            if (end > (int64_t)str.length()) end = str.length();
+            if (start > end) return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), std::string(""));
+            
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, str.substr(start, end - start));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_substring",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Int, TypeTag::Int},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            int64_t start = args[1]->as<int64_t>();
+            int64_t end = args[2]->as<int64_t>();
+            
+            if (start < 0) start = 0;
+            if (end > (int64_t)str.length()) end = str.length();
+            if (start > end) return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), std::string(""));
+            
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, str.substr(start, end - start));
         }
     ));
 }

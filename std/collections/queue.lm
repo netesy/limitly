@@ -1,258 +1,264 @@
-// Queue Frame - FIFO (First In, First Out) implementation
+// Standard Library Queue, PriorityQueue, Stack, and BitSet Collections
+import std.collections.vector as vector;
 
-import std.core as core;
+pub frame Queue {
+    var data: Deque;
 
-frame Queue {
-    var data: [int];
-    var front: int;
-    var back: int;
-
-    pub fn init(): Queue {
-        return Queue(data=[], front=0, back=0);
+    pub init() {
+        self.data = vector.Deque();
     }
 
-    pub fn from_array(arr: [int]): Queue {
-        return Queue(data=arr, front=0, back=arr.length);
+    pub fn enqueue(item: any) {
+        self.data.push_back(item);
     }
 
-    // Queue operations
-    pub fn enqueue(value: int): Queue {
-        var new_data: [int] = [];
-        var i: int = 0;
-        
-        // Copy existing data
-        while (i < self.data.length) {
-            new_data[i] = self.data[i];
+    pub fn dequeue(): any {
+        return self.data.pop_front();
+    }
+
+    pub fn peek(): any {
+        return self.data.peek_front();
+    }
+
+    pub fn length(): int {
+        return self.data.len();
+    }
+
+    pub fn len(): int {
+        return self.length();
+    }
+}
+
+pub frame PriorityQueue {
+    pub var heap: [any];
+    var comparator: any;
+
+    pub init(comparator: any = nil) {
+        self.heap = [];
+        self.comparator = comparator;
+    }
+
+    fn _compare(left: any, right: any): int {
+        if (self.comparator != nil) {
+            var comp = self.comparator;
+            return comp(left, right);
+        }
+        if (left < right) {
+            return -1;
+        }
+        if (left > right) {
+            return 1;
+        }
+        return 0;
+    }
+
+    pub fn insert(item: any) {
+        self.push(item);
+    }
+
+    pub fn push(item: any) {
+        self.heap = self.heap + [item];
+        self._sift_up(len(self.heap) - 1);
+    }
+
+    pub fn peek(): any {
+        if (len(self.heap) == 0) {
+            return nil;
+        }
+        return self.heap[0];
+    }
+
+    pub fn remove(): any {
+        return self.pop();
+    }
+
+    pub fn pop(): any {
+        var n = len(self.heap);
+        if (n == 0) {
+            return nil;
+        }
+        var result = self.heap[0];
+        self.heap[0] = self.heap[n - 1];
+        var next_heap: [any] = [];
+        var i = 0;
+        while (i < n - 1) {
+            next_heap = next_heap + [self.heap[i]];
             i = i + 1;
         }
-        
-        // Add new element at back
-        new_data[self.back] = value;
-        
-        return Queue(data=new_data, front=self.front, back=self.back + 1);
+        self.heap = next_heap;
+        if (len(self.heap) > 0) {
+            self._sift_down(0);
+        }
+        return result;
     }
 
-    pub fn dequeue(): int? {
-        if (self.front >= self.back) return nil;
-        
-        var value = self.data[self.front];
-        return Queue(data=self.data, front=self.front + 1, back=self.back);
+    pub fn len(): int {
+        return len(self.heap);
     }
 
-    pub fn peek(): int? {
-        if (self.front >= self.back) return nil;
-        return self.data[self.front];
+    pub fn length(): int {
+        return self.len();
     }
 
-    pub fn size(): int {
-        return self.back - self.front;
+    fn _sift_up(idx: int) {
+        while (idx > 0) {
+            var parent = (idx - 1) / 2;
+            if (self._compare(self.heap[idx], self.heap[parent]) < 0) {
+                var tmp = self.heap[idx];
+                self.heap[idx] = self.heap[parent];
+                self.heap[parent] = tmp;
+                idx = parent;
+            } else {
+                return;
+            }
+        }
     }
 
-    pub fn is_empty(): bool {
-        return self.front >= self.back;
+    fn _sift_down(idx: int) {
+        var n = len(self.heap);
+        while (true) {
+            var smallest = idx;
+            var left = 2 * idx + 1;
+            var right = 2 * idx + 2;
+            if (left < n and self._compare(self.heap[left], self.heap[smallest]) < 0) {
+                smallest = left;
+            }
+            if (right < n and self._compare(self.heap[right], self.heap[smallest]) < 0) {
+                smallest = right;
+            }
+            if (smallest != idx) {
+                var tmp = self.heap[idx];
+                self.heap[idx] = self.heap[smallest];
+                self.heap[smallest] = tmp;
+                idx = smallest;
+            } else {
+                return;
+            }
+        }
+    }
+}
+
+pub frame Stack {
+    var data: Vector;
+
+    pub init() {
+        self.data = vector.Vector();
     }
 
-    pub fn clear(): Queue {
-        return Queue(data=[], front=0, back=0);
+    pub fn push(item: any) {
+        self.data.push(item);
     }
 
-    // Advanced operations
-    pub fn peek_front(): int? {
-        return self.peek();
+    pub fn pop(): any {
+        return self.data.pop();
     }
 
-    pub fn peek_back(): int? {
-        if (self.front >= self.back) return nil;
-        return self.data[self.back - 1];
+    pub fn peek(): any {
+        return self.data.peek();
     }
 
-    pub fn contains(value: int): bool {
-        var i: int = self.front;
-        while (i < self.back) {
-            if (self.data[i] == value) return true;
+    pub fn len(): int {
+        return self.data.len();
+    }
+
+    pub fn length(): int {
+        return self.len();
+    }
+}
+
+pub frame BitSet {
+    pub var words: [int];
+    var size: int;
+
+    pub init(size: int = 64) {
+        self.words = [] as [int];
+        self.size = size;
+        if (self.size < 1) {
+            self.size = 1;
+        }
+        var word_count = (self.size + 63) / 64;
+        var i = 0;
+        while (i < word_count) {
+            self.words = self.words + [0];
             i = i + 1;
         }
-        return false;
     }
 
-    pub fn index_of(value: int): int? {
-        var i: int = self.front;
-        var index: int = 0;
-        while (i < self.back) {
-            if (self.data[i] == value) return index;
-            i = i + 1;
-            index = index + 1;
+    fn _mask(bit: int): int {
+        return 1 << (bit % 64);
+    }
+
+    fn _valid(bit: int): bool {
+        return bit >= 0 and bit < self.size;
+    }
+
+    pub fn set(bit: int) {
+        if (self._valid(bit)) {
+            var word = bit / 64;
+            self.words[word] = self.words[word] | self._mask(bit);
+        }
+    }
+
+    pub fn unset(bit: int) {
+        if (self.contains(bit)) {
+            var word = bit / 64;
+            self.words[word] = self.words[word] ^ self._mask(bit);
+        }
+    }
+
+    pub fn toggle(bit: int) {
+        if (self._valid(bit)) {
+            var word = bit / 64;
+            self.words[word] = self.words[word] ^ self._mask(bit);
+        }
+    }
+
+    pub fn contains(bit: int): bool {
+        if (not self._valid(bit)) {
+            return false;
+        }
+        var word = bit / 64;
+        return (self.words[word] & self._mask(bit)) != 0;
+    }
+
+    pub fn get(bit: int): bool {
+        return self.contains(bit);
+    }
+
+    pub fn count(): int {
+        var total = 0;
+        var bit = 0;
+        while (bit < self.size) {
+            if (self.contains(bit)) {
+                total = total + 1;
+            }
+            bit = bit + 1;
+        }
+        return total;
+    }
+
+    pub fn get_size(): int {
+        return self.size;
+    }
+
+    pub fn iterator(): BitSetIterator {
+        return BitSetIterator(bitset=self, current=0);
+    }
+}
+
+pub frame BitSetIterator {
+    var bitset: BitSet;
+    var current: int;
+
+    pub fn next(): any {
+        while (self.current < self.bitset.get_size()) {
+            if (self.bitset.contains(self.current)) {
+                var result = self.current;
+                self.current = self.current + 1;
+                return result;
+            }
+            self.current = self.current + 1;
         }
         return nil;
     }
-
-    pub fn reverse(): Queue {
-        var reversed: [int] = [];
-        var i: int = self.back - 1;
-        var j: int = 0;
-        
-        while (i >= self.front) {
-            reversed[j] = self.data[i];
-            i = i - 1;
-            j = j + 1;
-        }
-        
-        return Queue(data=reversed, front=0, front=self.back - self.front);
-    }
-
-    pub fn copy(): Queue {
-        var new_data: [int] = [];
-        var i: int = self.front;
-        var j: int = 0;
-        
-        while (i < self.back) {
-            new_data[j] = self.data[i];
-            i = i + 1;
-            j = j + 1;
-        }
-        
-        return Queue(data=new_data, front=0, back=self.back - self.front);
-    }
-
-    pub fn slice(start: int, end: int): Queue {
-        if (start < 0) start = 0;
-        if (end > self.size()) end = self.size();
-        if (start >= end) return Queue.init();
-        
-        var sliced_data: [int] = [];
-        var i: int = start;
-        var j: int = 0;
-        
-        while (i < end) {
-            sliced_data[j] = self.data[self.front + i];
-            i = i + 1;
-            j = j + 1;
-        }
-        
-        return Queue(data=sliced_data, front=0, back=end - start);
-    }
-
-    // Functional operations
-    pub fn map(f: fn(int): int): Queue {
-        var new_data: [int] = [];
-        var i: int = self.front;
-        var j: int = 0;
-        
-        while (i < self.back) {
-            new_data[j] = f(self.data[i]);
-            i = i + 1;
-            j = j + 1;
-        }
-        
-        return Queue(data=new_data, front=0, back=self.back - self.front);
-    }
-
-    pub fn filter(predicate: fn(int): bool): Queue {
-        var filtered_data: [int] = [];
-        var i: int = self.front;
-        var j: int = 0;
-        
-        while (i < self.back) {
-            if (predicate(self.data[i])) {
-                filtered_data[j] = self.data[i];
-                j = j + 1;
-            }
-            i = i + 1;
-        }
-        
-        return Queue(data=filtered_data, front=0, back=j);
-    }
-
-    pub fn fold(f: fn(int, int): int, initial: int): int {
-        var acc: int = initial;
-        var i: int = self.front;
-        
-        while (i < self.back) {
-            acc = f(acc, self.data[i]);
-            i = i + 1;
-        }
-        
-        return acc;
-    }
-
-    pub fn for_each(action: fn(int): nil): nil {
-        var i: int = self.front;
-        while (i < self.back) {
-            action(self.data[i]);
-            i = i + 1;
-        }
-    }
-
-    pub fn sum(): int {
-        return self.fold(fn(acc: int, x: int): int { return acc + x; }, 0);
-    }
-
-    pub fn product(): int {
-        return self.fold(fn(acc: int, x: int): int { return acc * x; }, 1);
-    }
-
-    pub fn min(): int? {
-        if (self.is_empty()) return nil;
-        
-        var min_val = self.data[self.front];
-        var i: int = self.front + 1;
-        
-        while (i < self.back) {
-            if (self.data[i] < min_val) min_val = self.data[i];
-            i = i + 1;
-        }
-        
-        return min_val;
-    }
-
-    pub fn max(): int? {
-        if (self.is_empty()) return nil;
-        
-        var max_val = self.data[self.front];
-        var i: int = self.front + 1;
-        
-        while (i < self.back) {
-            if (self.data[i] > max_val) max_val = self.data[i];
-            i = i + 1;
-        }
-        
-        return max_val;
-    }
-
-    pub fn to_array(): [int] {
-        var result: [int] = [];
-        var i: int = self.front;
-        var j: int = 0;
-        
-        while (i < self.back) {
-            result[j] = self.data[i];
-            i = i + 1;
-            j = j + 1;
-        }
-        
-        return result;
-    }
-
-    pub fn to_string(): str {
-        var result = "Queue[";
-        var i: int = self.front;
-        
-        while (i < self.back) {
-            if (i > self.front) result = result + ", ";
-            result = result + self.data[i] as str;
-            i = i + 1;
-        }
-        
-        result = result + "]";
-        return result;
-    }
-}
-
-// Utility functions
-fn queue(): Queue {
-    return Queue.init();
-}
-
-fn queue_from(arr: [int]): Queue {
-    return Queue.from_array(arr);
 }

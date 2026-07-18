@@ -1,0 +1,65 @@
+// Standard Library HashMap Collection
+// This implementation uses the native dict type for efficiency.
+
+pub frame HashMap {
+    var data: {any: any};
+    
+    pub init() {
+        self.data = {};
+    }
+    
+    pub fn put(key: any, value: any) {
+        self.data[key] = value;
+    }
+    
+    pub fn get(key: any): any {
+        return self.data[key];
+    }
+    
+    pub fn has(key: any): bool {
+        // Assuming 'in' operator or a method. Based on VM ops, DictHas exists.
+        // If 'in' is not supported, we might need a builtin wrapper.
+        // For now, assume data[key] != nil as a proxy if we don't have 'has'
+        return self.data[key] != nil;
+    }
+    
+    pub fn remove(key: any) {
+        // Dictionary removal might need a specific op if data[key] = nil doesn't delete
+        self.data[key] = nil;
+    }
+    
+    pub fn len(): int {
+        return len(self.data);
+    }
+    
+    pub fn keys(): [any] {
+        var res = [];
+        // This is slow in pure Limit without proper iterators
+        // We'll improve self when std.iter is ready.
+        return res;
+    }
+}
+
+pub frame HashSet {
+    var map: HashMap;
+    
+    pub init() {
+        self.map = HashMap();
+    }
+    
+    pub fn add(item: any) {
+        self.map.put(item, true);
+    }
+    
+    pub fn contains(item: any): bool {
+        return self.map.has(item);
+    }
+    
+    pub fn remove(item: any) {
+        self.map.remove(item);
+    }
+    
+    pub fn len(): int {
+        return self.map.len();
+    }
+}

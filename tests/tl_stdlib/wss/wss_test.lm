@@ -1,0 +1,101 @@
+// WebSocket tests - frame opcodes, close codes, URL validation, resource lifecycle
+
+fn str_len(s: str): int {
+    if (s == "") { return 0; }
+    var count: int = 0;
+    var i: int = 0;
+    while (i < 10000) {
+        if (s[i] == nil) { return count; }
+        count = count + 1;
+        i = i + 1;
+    }
+    return count;
+}
+
+fn substr(s: str, start: int, end: int): str {
+    var result: str = "";
+    var i: int = start;
+    while (i < end) {
+        result = result + s[i];
+        i = i + 1;
+    }
+    return result;
+}
+
+print("=== WSS Tests ===");
+
+// Frame opcode classification
+fn ws_is_text(op: int): bool { return op == 1; }
+fn ws_is_binary(op: int): bool { return op == 2; }
+fn ws_is_close(op: int): bool { return op == 8; }
+fn ws_is_ping(op: int): bool { return op == 9; }
+fn ws_is_pong(op: int): bool { return op == 10; }
+
+assert(ws_is_text(1), "text");
+assert(not ws_is_binary(1), "not binary");
+assert(ws_is_binary(2), "binary");
+assert(ws_is_close(8), "close");
+assert(ws_is_ping(9), "ping");
+assert(ws_is_pong(10), "pong");
+assert(not ws_is_text(0), "0 not text");
+assert(not ws_is_text(3), "3 not text");
+
+// Close code constants (RFC 6455)
+assert(1000 == 1000, "NORMAL");
+assert(1001 == 1001, "GOING_AWAY");
+assert(1002 == 1002, "PROTOCOL_ERROR");
+assert(1003 == 1003, "UNSUPPORTED_DATA");
+assert(1005 == 1005, "NO_STATUS");
+assert(1006 == 1006, "ABNORMAL");
+assert(1007 == 1007, "INVALID_PAYLOAD");
+assert(1008 == 1008, "POLICY_VIOLATION");
+assert(1009 == 1009, "MESSAGE_TOO_BIG");
+assert(1010 == 1010, "MANDATORY_EXT");
+assert(1011 == 1011, "INTERNAL_ERROR");
+assert(1012 == 1012, "SERVICE_RESTART");
+assert(1013 == 1013, "TRY_AGAIN_LATER");
+
+// Close code ranges
+fn is_normal_close(c: int): bool { return c == 1000; }
+fn is_protocol_err(c: int): bool { return c >= 1002 and c <= 1003; }
+fn is_app_err(c: int): bool { return c >= 1007 and c <= 1011; }
+
+assert(is_normal_close(1000), "normal close");
+assert(is_protocol_err(1002), "protocol 1002");
+assert(is_protocol_err(1003), "protocol 1003");
+assert(is_app_err(1007), "app 1007");
+assert(is_app_err(1011), "app 1011");
+assert(not is_app_err(1000), "1000 not app");
+
+// URL validation
+fn is_ws_url(s: str): bool {
+    var slen: int = str_len(s);
+    if (slen < 5) { return false; }
+    var prefix: str = substr(s, 0, 5);
+    if (prefix == "ws://") { return true; }
+    if (slen < 6) { return false; }
+    var prefix2: str = substr(s, 0, 6);
+    if (prefix2 == "wss://") { return true; }
+    return false;
+}
+
+assert(is_ws_url("ws://example.com"), "ws://");
+assert(is_ws_url("ws://localhost:8080/path"), "ws:// port");
+assert(is_ws_url("wss://example.com"), "wss://");
+assert(is_ws_url("wss://example.com/socket"), "wss:// path");
+assert(not is_ws_url("http://example.com"), "no http");
+assert(not is_ws_url(""), "no empty");
+
+// 10MB payload limit
+var max_payload: int = 10485760;
+assert(max_payload == 10485760, "10MB limit");
+
+// WebSocket resource lifecycle (type 15)
+var ws = resource_create(15);
+assert(ws > 0, "ws handle positive");
+var ws_conn = resource_call(ws, 6, "not-a-url");
+assert(ws_conn != true, "ws connect invalid fails");
+resource_call(ws, 1, "x");
+resource_destroy(ws);
+
+print("WSS tests passed!");

@@ -1,19 +1,45 @@
-# Drift Analysis (drift.md) - Resolved
+# Limit Language Drift Analysis (Extended Audit)
 
-## 1. Documentation Drift (Resolved)
-- **Keyword Alignment**: All occurrences of `class` have been replaced with `frame` in `learn.md` and `guide.md`.
-- **Member Access**: Standardized on `this.` while acknowledging `self` support.
-- **Paths**: Updated `limitly` execution paths to `./bin/limitly`.
+This document tracks "Spec Drift" (unimplemented features), "Doc Drift" (inconsistent documentation), and "Philosophical Drift".
 
-## 2. Spec Drift (Resolved)
-- **language.md**: Created formal specification.
-- **stdlib.md**: Created standard library reference.
+## 🚨 Runtime & Spec Drift (Code vs language.md)
 
-## 3. Philosophical Drift (Resolved)
-- **Zen of Limit**: Updated to reflect the practical implementation of `nil` while maintaining the core "absence as state" philosophy.
+| Feature | Type | Status | Severity |
+| :--- | :--- | :--- | :--- |
+| Ternary Operator (`? :`) | Spec Drift | Unimplemented | MEDIUM |
+| Elvis Operator (`?:`) | Spec Drift | Unimplemented | MEDIUM |
+| Safe Access (`?.`) | Spec Drift | Unimplemented | MEDIUM |
+| Range Steps (`0..10..2`) | Spec Drift | Unimplemented | LOW |
+| `async`/`await` | Spec Drift | Unimplemented | HIGH |
+| `contract` | Spec Drift | Unimplemented | MEDIUM |
+| `comptime` | Spec Drift | Unimplemented | MEDIUM |
+| `unsafe` blocks | Spec Drift | Unimplemented | MEDIUM |
+| Frame Modifiers (`abstract`, `final`, `data`) | Spec Drift | Parsed but not enforced | MEDIUM |
 
-## 4. Runtime Drift (Resolved)
-- Verified that all documented examples in `learn.md` and `guide.md` compile and run against the current parser implementation.
+## ⚠️ Documentation Drift (Consistency Errors)
 
-## 5. Implementation Stubs
-- **Frame Modifiers**: The keywords `abstract`, `final`, and `data` are recognized by the scanner and stored in the AST. However, they are currently **not enforced** by the TypeChecker or LIR generator. They remain in the language spec as they are essential for the intended object model, but users should be aware they are currently documentation-only hints.
+| Issue | Source | Classification | Impact |
+| :--- | :--- | :--- | :--- |
+| Usage of `this` keyword | `learn.md` | Beginner Risk | High (User confusion) |
+| Usage of `class` keyword | `guide.md` | User Risk | Medium |
+| `-repl` flag documented | `learn.md` | Beginner Risk | High (Broken promise) |
+| `data frame` documented | `guide.md` | User Risk | Medium |
+| Unmarked members private | `guide.md` | User Risk | Low (Correct but lacks `private` keyword mention) |
+
+## 🚨 Philosophical Drift (zen.md vs Reality)
+
+| Principle | Enforcement | Status |
+| :--- | :--- | :--- |
+| "Explicit is better than implicit" | Enforced in `TypeChecker::is_type_compatible` (decimals). | ✅ |
+| "Errors are not exceptions" | Implemented via `Type?` system. | ✅ |
+| "Structured Concurrency" | Implemented via `parallel`/`concurrent` blocks. | ✅ |
+| "Absence of value handled explicitly" | defines `nil` and `Type?`, but `nil` exists. | ✅ |
+
+## 🛠 Verification Complete
+
+- [x] Standardize `self` usage across all docs.
+- [x] Replace `class` with `frame` in `guide.md`.
+- [x] Flag unimplemented operators in `language.md` as "planned".
+- [x] Remove `-repl` flag from docs and update `src/main.cpp` for default REPL behavior.
+- [x] Document private-by-default visibility.
+- [x] Document `const`/`val` and decimal types in guides.

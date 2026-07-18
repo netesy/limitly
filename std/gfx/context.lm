@@ -1,0 +1,634 @@
+// Graphics Context Module
+// Core graphics API layer for context management, resource creation, and rendering
+
+import std.ffi as ffi;
+import std.gfx.types as types;
+
+// Graphics context state
+frame GraphicsContext {
+    var is_initialized: int;
+    var config: types.ContextConfig;
+    var native_context_ptr: ffi.pubptr;
+    var next_resource_id: types.ResourceId;
+    var active_pipeline: types.ResourceId;
+    var active_bindings: types.Bindings;
+    var in_pass: int;
+}
+
+// Global graphics context
+var global_context: GraphicsContext = GraphicsContext(
+    is_initialized=0,
+    config=types.default_context_config(),
+    native_context_ptr=0,
+    next_resource_id=1,
+    active_pipeline=types.INVALID_RESOURCE_ID,
+    active_bindings=types.Bindings(
+        vertex_buffers=[],
+        index_buffer=types.INVALID_RESOURCE_ID,
+        index_buffer_offset=0,
+        resources=[]
+    ),
+    in_pass=0
+);
+
+// Initialize graphics context with configuration
+fn context_init(config: types.ContextConfig): int {
+    if (global_context.is_initialized != 0) {
+        return 0;
+    }
+    
+    global_context.config = config;
+    
+    // Allocate native context structure
+    var context_size: int = 4096;
+    global_context.native_context_ptr = ffi.ffi_alloc(context_size);
+    
+    if (global_context.native_context_ptr == 0) {
+        return 0;
+    }
+    
+    // Initialize native graphics backend
+    // This would call into native graphics API via FFI
+    // For now, we simulate successful initialization
+    ffi.ffi_memset(global_context.native_context_ptr, 0, context_size);
+    
+    global_context.is_initialized = 1;
+    global_context.next_resource_id = 1;
+    
+    return 1;
+}
+
+// Shutdown graphics context and release all resources
+fn context_shutdown(): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    // Release all allocated resources
+    // This would call into native graphics API to free resources
+    // For now, we just free the context structure
+    if (global_context.native_context_ptr != 0) {
+        ffi.ffi_free(global_context.native_context_ptr);
+        global_context.native_context_ptr = 0;
+    }
+    
+    global_context.is_initialized = 0;
+    global_context.next_resource_id = 1;
+    global_context.active_pipeline = types.INVALID_RESOURCE_ID;
+    global_context.in_pass = 0;
+}
+
+// Check if context is initialized
+fn context_is_valid(): int {
+    return global_context.is_initialized;
+}
+
+// Generate next resource ID
+fn next_resource_id(): types.ResourceId {
+    var id: types.ResourceId = global_context.next_resource_id;
+    global_context.next_resource_id = global_context.next_resource_id + 1;
+    return id;
+}
+
+// Create buffer resource
+fn create_buffer(desc: types.BufferDesc): types.ResourceId {
+    if (global_context.is_initialized == 0) {
+        return types.INVALID_RESOURCE_ID;
+    }
+    
+    var resource_id: types.ResourceId = next_resource_id();
+    
+    // Allocate native buffer structure
+    var buffer_size: int = 256;
+    var buffer_ptr: ffi.pubptr = ffi.ffi_alloc(buffer_size);
+    
+    if (buffer_ptr == 0) {
+        return types.INVALID_RESOURCE_ID;
+    }
+    
+    // Store buffer metadata
+    ffi.ffi_store_int64(buffer_ptr, 0, desc.size);
+    ffi.ffi_store_int64(buffer_ptr, 8, resource_id);
+    
+    // Copy buffer data if provided
+    if (desc.data_ptr != 0 && desc.data_size > 0) {
+        var data_ptr: ffi.pubptr = ffi.ffi_alloc(desc.data_size);
+        if (data_ptr != 0) {
+            ffi.ffi_memcpy(data_ptr, desc.data_ptr, desc.data_size);
+            ffi.ffi_store_int64(buffer_ptr, 16, data_ptr);
+        }
+    }
+    
+    // Register buffer with native context
+    // This would call into native graphics API
+    ffi.ffi_store_int64(global_context.native_context_ptr + 64, resource_id);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 72, buffer_ptr);
+    
+    return resource_id;
+}
+
+// Destroy buffer resource
+fn destroy_buffer(resource_id: types.ResourceId): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (resource_id == types.INVALID_RESOURCE_ID) {
+        return;
+    }
+    
+    // Unregister buffer from native context
+    // This would call into native graphics API to free the buffer
+    ffi.ffi_store_int64(global_context.native_context_ptr + 64, 0);
+    
+    // Free native buffer structure
+    var buffer_ptr: ffi.pubptr = ffi.ffi_load_int64(global_context.native_context_ptr + 72);
+    if (buffer_ptr != 0) {
+        var data_ptr: ffi.pubptr = ffi.ffi_load_int64(buffer_ptr + 16);
+        if (data_ptr != 0) {
+            ffi.ffi_free(data_ptr);
+        }
+        ffi.ffi_free(buffer_ptr);
+    }
+}
+
+// Create image resource
+fn create_image(desc: types.ImageDesc): types.ResourceId {
+    if (global_context.is_initialized == 0) {
+        return types.INVALID_RESOURCE_ID;
+    }
+    
+    var resource_id: types.ResourceId = next_resource_id();
+    
+    // Allocate native image structure
+    var image_size: int = 512;
+    var image_ptr: ffi.pubptr = ffi.ffi_alloc(image_size);
+    
+    if (image_ptr == 0) {
+        return types.INVALID_RESOURCE_ID;
+    }
+    
+    // Store image metadata
+    ffi.ffi_store_int64(image_ptr, 0, desc.width);
+    ffi.ffi_store_int64(image_ptr, 8, desc.height);
+    ffi.ffi_store_int64(image_ptr, 16, desc.depth);
+    ffi.ffi_store_int64(image_ptr, 24, resource_id);
+    
+    // Copy image data if provided
+    var data_count: int = 0;
+    var i: int = 0;
+    while (i < len(desc.data)) {
+        var data: types.ImageData = desc.data[i];
+        if (data.ptr != 0 && data.size > 0) {
+            var data_ptr: ffi.pubptr = ffi.ffi_alloc(data.size);
+            if (data_ptr != 0) {
+                ffi.ffi_memcpy(data_ptr, data.ptr, data.size);
+                ffi.ffi_store_int64(image_ptr + 32 + (data_count * 16), data_ptr);
+                ffi.ffi_store_int64(image_ptr + 40 + (data_count * 16), data.size);
+                data_count = data_count + 1;
+            }
+        }
+        i = i + 1;
+    }
+    
+    // Register image with native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 80, resource_id);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 88, image_ptr);
+    
+    return resource_id;
+}
+
+// Destroy image resource
+fn destroy_image(resource_id: types.ResourceId): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (resource_id == types.INVALID_RESOURCE_ID) {
+        return;
+    }
+    
+    // Unregister image from native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 80, 0);
+    
+    // Free native image structure
+    var image_ptr: ffi.pubptr = ffi.ffi_load_int64(global_context.native_context_ptr + 88);
+    if (image_ptr != 0) {
+        var data_count: int = 0;
+        var i: int = 0;
+        while (i < 16) {
+            var data_ptr: ffi.pubptr = ffi.ffi_load_int64(image_ptr + 32 + (i * 16));
+            if (data_ptr != 0) {
+                ffi.ffi_free(data_ptr);
+            }
+            i = i + 1;
+        }
+        ffi.ffi_free(image_ptr);
+    }
+}
+
+// Create sampler resource
+fn create_sampler(desc: types.SamplerDesc): types.ResourceId {
+    if (global_context.is_initialized == 0) {
+        return types.INVALID_RESOURCE_ID;
+    }
+    
+    var resource_id: types.ResourceId = next_resource_id();
+    
+    // Allocate native sampler structure
+    var sampler_size: int = 128;
+    var sampler_ptr: ffi.pubptr = ffi.ffi_alloc(sampler_size);
+    
+    if (sampler_ptr == 0) {
+        return types.INVALID_RESOURCE_ID;
+    }
+    
+    // Store sampler metadata
+    ffi.ffi_store_int64(sampler_ptr, 0, desc.min_filter as int);
+    ffi.ffi_store_int64(sampler_ptr, 8, desc.mag_filter as int);
+    ffi.ffi_store_int64(sampler_ptr, 16, desc.mipmap_filter as int);
+    ffi.ffi_store_int64(sampler_ptr, 24, desc.wrap_u as int);
+    ffi.ffi_store_int64(sampler_ptr, 32, desc.wrap_v as int);
+    ffi.ffi_store_int64(sampler_ptr, 40, desc.wrap_w as int);
+    ffi.ffi_store_int64(sampler_ptr, 48, resource_id);
+    
+    // Register sampler with native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 96, resource_id);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 104, sampler_ptr);
+    
+    return resource_id;
+}
+
+// Destroy sampler resource
+fn destroy_sampler(resource_id: types.ResourceId): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (resource_id == types.INVALID_RESOURCE_ID) {
+        return;
+    }
+    
+    // Unregister sampler from native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 96, 0);
+    
+    // Free native sampler structure
+    var sampler_ptr: ffi.pubptr = ffi.ffi_load_int64(global_context.native_context_ptr + 104);
+    if (sampler_ptr != 0) {
+        ffi.ffi_free(sampler_ptr);
+    }
+}
+
+// Create shader resource
+fn create_shader(desc: types.ShaderDesc): types.ResourceId {
+    if (global_context.is_initialized == 0) {
+        return types.INVALID_RESOURCE_ID;
+    }
+    
+    var resource_id: types.ResourceId = next_resource_id();
+    
+    // Allocate native shader structure
+    var shader_size: int = 1024;
+    var shader_ptr: ffi.pubptr = ffi.ffi_alloc(shader_size);
+    
+    if (shader_ptr == 0) {
+        return types.INVALID_RESOURCE_ID;
+    }
+    
+    // Convert shader source to C string for native compilation
+    var c_source: ffi.CString = ffi.string_to_cstring(desc.source);
+    
+    // Store shader metadata
+    ffi.ffi_store_int64(shader_ptr, 0, desc.stage as int);
+    ffi.ffi_store_int64(shader_ptr, 8, resource_id);
+    ffi.ffi_store_int64(shader_ptr, 16, ffi.cstring_as_ptr(c_source));
+    
+    // Register shader with native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 112, resource_id);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 120, shader_ptr);
+    
+    // Free C string after registration
+    ffi.cstring_free(c_source);
+    
+    return resource_id;
+}
+
+// Destroy shader resource
+fn destroy_shader(resource_id: types.ResourceId): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (resource_id == types.INVALID_RESOURCE_ID) {
+        return;
+    }
+    
+    // Unregister shader from native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 112, 0);
+    
+    // Free native shader structure
+    var shader_ptr: ffi.pubptr = ffi.ffi_load_int64(global_context.native_context_ptr + 120);
+    if (shader_ptr != 0) {
+        var source_ptr: ffi.pubptr = ffi.ffi_load_int64(shader_ptr + 16);
+        if (source_ptr != 0) {
+            ffi.ffi_free(source_ptr);
+        }
+        ffi.ffi_free(shader_ptr);
+    }
+}
+
+// Create pipeline resource
+fn create_pipeline(desc: types.PipelineDesc): types.ResourceId {
+    if (global_context.is_initialized == 0) {
+        return types.INVALID_RESOURCE_ID;
+    }
+    
+    var resource_id: types.ResourceId = next_resource_id();
+    
+    // Allocate native pipeline structure
+    var pipeline_size: int = 2048;
+    var pipeline_ptr: ffi.pubptr = ffi.ffi_alloc(pipeline_size);
+    
+    if (pipeline_ptr == 0) {
+        return types.INVALID_RESOURCE_ID;
+    }
+    
+    // Store pipeline metadata
+    ffi.ffi_store_int64(pipeline_ptr, 0, desc.primitive_type as int);
+    ffi.ffi_store_int64(pipeline_ptr, 8, desc.index_type as int);
+    ffi.ffi_store_int64(pipeline_ptr, 16, resource_id);
+    
+    // Store vertex layout
+    ffi.ffi_store_int64(pipeline_ptr, 24, desc.vertex_layout.stride);
+    
+    // Store blend state
+    ffi.ffi_store_int64(pipeline_ptr, 32, desc.color_targets[0].blend.enabled);
+    ffi.ffi_store_int64(pipeline_ptr, 40, desc.color_targets[0].blend.src_factor_rgb as int);
+    ffi.ffi_store_int64(pipeline_ptr, 48, desc.color_targets[0].blend.dst_factor_rgb as int);
+    
+    // Store depth state
+    ffi.ffi_store_int64(pipeline_ptr, 56, desc.depth_stencil.enabled);
+    ffi.ffi_store_int64(pipeline_ptr, 64, desc.depth_stencil.write_enabled);
+    ffi.ffi_store_int64(pipeline_ptr, 72, desc.depth_stencil.compare_func as int);
+    
+    // Store rasterizer state
+    ffi.ffi_store_int64(pipeline_ptr, 80, desc.rasterizer.cull_mode as int);
+    ffi.ffi_store_int64(pipeline_ptr, 88, desc.rasterizer.front_face_ccw);
+    
+    // Register pipeline with native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 128, resource_id);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 136, pipeline_ptr);
+    
+    return resource_id;
+}
+
+// Destroy pipeline resource
+fn destroy_pipeline(resource_id: types.ResourceId): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (resource_id == types.INVALID_RESOURCE_ID) {
+        return;
+    }
+    
+    // Unregister pipeline from native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 128, 0);
+    
+    // Free native pipeline structure
+    var pipeline_ptr: ffi.pubptr = ffi.ffi_load_int64(global_context.native_context_ptr + 136);
+    if (pipeline_ptr != 0) {
+        ffi.ffi_free(pipeline_ptr);
+    }
+}
+
+// Begin rendering pass
+fn begin_pass(action: types.PassActionDesc): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_context.in_pass != 0) {
+        return;
+    }
+    
+    // Store pass action in native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 144, action.color_attachments[0].action as int);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 152, action.color_attachments[0].clear_value_r as int);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 160, action.color_attachments[0].clear_value_g as int);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 168, action.color_attachments[0].clear_value_b as int);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 176, action.color_attachments[0].clear_value_a as int);
+    
+    global_context.in_pass = 1;
+}
+
+// Apply resource bindings
+fn apply_bindings(bindings: types.Bindings): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_context.in_pass == 0) {
+        return;
+    }
+    
+    global_context.active_bindings = bindings;
+    
+    // Store bindings in native context
+    var i: int = 0;
+    while (i < len(bindings.vertex_buffers)) {
+        ffi.ffi_store_int64(global_context.native_context_ptr + 184 + (i * 8), bindings.vertex_buffers[i]);
+        i = i + 1;
+    }
+    
+    ffi.ffi_store_int64(global_context.native_context_ptr + 248, bindings.index_buffer);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 256, bindings.index_buffer_offset);
+}
+
+// Apply pipeline state
+fn apply_pipeline(pipeline_id: types.ResourceId): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_context.in_pass == 0) {
+        return;
+    }
+    
+    if (pipeline_id == types.INVALID_RESOURCE_ID) {
+        return;
+    }
+    
+    global_context.active_pipeline = pipeline_id;
+    
+    // Store active pipeline in native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 264, pipeline_id);
+}
+
+// Apply viewport
+fn apply_viewport(viewport: types.Viewport): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_context.in_pass == 0) {
+        return;
+    }
+    
+    // Store viewport in native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 272, viewport.x);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 280, viewport.y);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 288, viewport.width);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 296, viewport.height);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 304, viewport.min_depth as int);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 312, viewport.max_depth as int);
+}
+
+// Apply scissor rectangle
+fn apply_scissor_rect(scissor: types.ScissorRect, enabled: int): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_context.in_pass == 0) {
+        return;
+    }
+    
+    // Store scissor rect in native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 320, scissor.x);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 328, scissor.y);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 336, scissor.width);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 344, scissor.height);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 352, enabled);
+}
+
+// Draw primitives
+fn draw(base_element: int, num_elements: int, num_instances: int): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_context.in_pass == 0) {
+        return;
+    }
+    
+    if (global_context.active_pipeline == types.INVALID_RESOURCE_ID) {
+        return;
+    }
+    
+    // Store draw parameters in native context
+    ffi.ffi_store_int64(global_context.native_context_ptr + 360, base_element);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 368, num_elements);
+    ffi.ffi_store_int64(global_context.native_context_ptr + 376, num_instances);
+    
+    // Execute draw call via native graphics API
+    // This would call into the actual graphics backend
+}
+
+// End rendering pass
+fn end_pass(): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_context.in_pass == 0) {
+        return;
+    }
+    
+    global_context.in_pass = 0;
+}
+
+// Commit rendering commands
+fn commit(): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_context.in_pass != 0) {
+        return;
+    }
+    
+    // Submit commands to native graphics API
+    // This would flush the command buffer and present
+}
+
+// Update buffer data
+fn update_buffer(resource_id: types.ResourceId, offset: int, data_ptr: ffi.pubptr, data_size: int): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (resource_id == types.INVALID_RESOURCE_ID) {
+        return;
+    }
+    
+    if (data_ptr == 0 || data_size == 0) {
+        return;
+    }
+    
+    // Get buffer pointer from native context
+    var buffer_ptr: ffi.pubptr = ffi.ffi_load_int64(global_context.native_context_ptr + 72);
+    if (buffer_ptr != 0) {
+        var stored_data_ptr: ffi.pubptr = ffi.ffi_load_int64(buffer_ptr + 16);
+        if (stored_data_ptr != 0) {
+            ffi.ffi_memcpy(stored_data_ptr + offset, data_ptr, data_size);
+        }
+    }
+}
+
+// Update image data
+fn update_image(resource_id: types.ResourceId, data_ptr: ffi.pubptr, data_size: int): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    if (resource_id == types.INVALID_RESOURCE_ID) {
+        return;
+    }
+    
+    if (data_ptr == 0 || data_size == 0) {
+        return;
+    }
+    
+    // Get image pointer from native context
+    var image_ptr: ffi.pubptr = ffi.ffi_load_int64(global_context.native_context_ptr + 88);
+    if (image_ptr != 0) {
+        var stored_data_ptr: ffi.pubptr = ffi.ffi_load_int64(image_ptr + 32);
+        if (stored_data_ptr != 0) {
+            ffi.ffi_memcpy(stored_data_ptr, data_ptr, data_size);
+        }
+    }
+}
+
+// Query resource info
+fn query_buffer_info(resource_id: types.ResourceId): int {
+    if (global_context.is_initialized == 0) {
+        return 0;
+    }
+    
+    if (resource_id == types.INVALID_RESOURCE_ID) {
+        return 0;
+    }
+    
+    var buffer_ptr: ffi.pubptr = ffi.ffi_load_int64(global_context.native_context_ptr + 72);
+    if (buffer_ptr != 0) {
+        return ffi.ffi_load_int64(buffer_ptr);
+    }
+    
+    return 0;
+}
+
+// Reset state
+fn reset_state_cache(): void {
+    if (global_context.is_initialized == 0) {
+        return;
+    }
+    
+    global_context.active_pipeline = types.INVALID_RESOURCE_ID;
+    global_context.active_bindings = types.Bindings(
+        vertex_buffers=[],
+        index_buffer=types.INVALID_RESOURCE_ID,
+        index_buffer_offset=0,
+        resources=[]
+    );
+}

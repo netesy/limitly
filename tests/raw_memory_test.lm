@@ -1,0 +1,9 @@
+import std.ffi as ffi;
+fn main() {
+    var ptr: int = ffi.ffi_alloc(1024);
+    print("Ptr val: ");
+    print(ptr);
+    ffi.ffi_free(ptr);
+    print("Done.");
+}
+main();

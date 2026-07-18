@@ -1,0 +1,40 @@
+// Crypto random tests - ENTROPY resource (type 12)
+// Note: entropy resource has a known limitation - always returns 32 bytes regardless of requested size
+
+fn str_len(s: str): int {
+    if (s == "") { return 0; }
+    var count: int = 0;
+    var i: int = 0;
+    while (i < 10000) {
+        if (s[i] == nil) { return count; }
+        count = count + 1;
+        i = i + 1;
+    }
+    return count;
+}
+
+print("=== Crypto Random Tests ===");
+
+// Entropy resource always returns 32 bytes (known limitation)
+var e1 = resource_create(12);
+assert(e1 > 0, "handle positive");
+var raw16: str = resource_call(e1, 2, 16);
+resource_destroy(e1);
+assert(raw16 != nil, "not nil");
+assert(str_len(raw16) == 32, "32 bytes (fixed size)");
+
+// Two reads should differ
+var ea = resource_create(12);
+var ra: str = resource_call(ea, 2, 16);
+resource_destroy(ea);
+var eb = resource_create(12);
+var rb: str = resource_call(eb, 2, 16);
+resource_destroy(eb);
+assert(ra != rb, "random reads differ");
+
+// Double destroy safe
+var r1 = resource_create(12);
+resource_destroy(r1);
+resource_destroy(r1);
+
+print("Crypto random tests passed!");

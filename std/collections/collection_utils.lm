@@ -1,0 +1,12 @@
+// Utility iterator functions moved from std.iterator
+
+pub fn collect(it: any): [any] {
+    import std.collections.vector as vector;
+    var res = vector.Vector();
+    var item = it.next();
+    while (item != nil) {
+        res.push(item);
+        item = it.next();
+    }
+    return res.data;
+}

@@ -1,0 +1,27 @@
+// Test frame method compilation
+
+frame Counter {
+    pub var count: int;
+
+    pub fn init() {
+        self.count = 0;
+    }
+
+    pub fn inc() {
+        self.count = self.count + 1;
+    }
+
+    pub fn get(): int {
+        return self.count;
+    }
+}
+
+fn main(): int {
+    var c = Counter();
+    c.inc();
+    c.inc();
+    var result = c.get();
+    assert(result == 2, "Counter should be 2");
+    print("Frame method test passed!");
+    return 0;
+}

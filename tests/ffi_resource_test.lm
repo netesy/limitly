@@ -1,0 +1,14 @@
+import std.ffi as ffi;
+
+fn main() {
+    print("Test 1: Memory via ResourceCall");
+    var p: int = ffi.ffi_alloc(64);
+    print("Allocated.");
+    var p2: int = ffi.ptr_add(p, 10);
+    print("Added ptr.");
+    var diff: int = ffi.ptr_diff(p2, p);
+    print("Diff: " + diff);
+    ffi.ffi_free(p);
+    print("Done.");
+}
+main();

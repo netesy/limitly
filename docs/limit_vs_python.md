@@ -17,7 +17,7 @@ This document provides a high-level comparison between the Limit programming lan
 | **Concurrency**     | **Structured:** Built-in `parallel` and `concurrent` blocks with clear lifetimes for tasks.        | **Unstructured:** Relies on threads, `asyncio`, and other libraries. Managing task lifetimes is manual. |
 | **Null Values**     | **Null-free by design:** The `Type?` system treats absence as an error condition, not a null value.         | **`None`:** `None` is a first-class object that can be passed around freely.                       |
 | **Performance**     | **Compiled:** Compiled to efficient bytecode, with the potential for JIT/AOT compilation.         | **Interpreted:** Generally slower than compiled languages, though libraries like NumPy can be fast. |
-| **Syntax**          | C-style syntax with `fn`, `class`, and `{}` block delimiters.                                     | Indentation-based syntax.                                                                           |
+| **Syntax**          | C-style syntax with `fn`, `frame`, and `{}` block delimiters.                                     | Indentation-based syntax.                                                                           |
 
 ## Detailed Comparison
 

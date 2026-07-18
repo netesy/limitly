@@ -15,7 +15,7 @@ var b = 2;
 var result = a / b;
 print("10 / 2 = " + result);
 
-// Test with zero (this should work for now, but will generate error when built-in errors are implemented)
+// Test with zero (self should work for now, but will generate error when built-in errors are implemented)
 var c = 10;  
 var d = 0;
 var result2 = (c / d) ?else{ 0 };

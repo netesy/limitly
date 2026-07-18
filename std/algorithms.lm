@@ -1,28 +1,26 @@
 // Algorithms Module - Common algorithms and utilities
 
 import std.core as core;
-import std.collections as collections;
-import std.data_structures as data_structures;
 
 // Sorting algorithms
 frame Sorting {
     
     // Bubble sort
     pub fn bubble_sort(arr: [int]): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         
         // Copy array
-        while (i < arr.length) {
+        while (i < arr.len) {
             result[i] = arr[i];
             i = i + 1;
         }
         
         // Bubble sort
         i = 0;
-        while (i < result.length - 1) {
+        while (i < result.len - 1) {
             var j: int = 0;
-            while (j < result.length - i - 1) {
+            while (j < result.len - i - 1) {
                 if (result[j] > result[j + 1]) {
                     var temp = result[j];
                     result[j] = result[j + 1];
@@ -38,21 +36,21 @@ frame Sorting {
 
     // Selection sort
     pub fn selection_sort(arr: [int]): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         
         // Copy array
-        while (i < arr.length) {
+        while (i < arr.len) {
             result[i] = arr[i];
             i = i + 1;
         }
         
         // Selection sort
         i = 0;
-        while (i < result.length - 1) {
+        while (i < result.len - 1) {
             var min_index = i;
             var j: int = i + 1;
-            while (j < result.length) {
+            while (j < result.len) {
                 if (result[j] < result[min_index]) {
                     min_index = j;
                 }
@@ -72,18 +70,18 @@ frame Sorting {
 
     // Insertion sort
     pub fn insertion_sort(arr: [int]): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         
         // Copy array
-        while (i < arr.length) {
+        while (i < arr.len) {
             result[i] = arr[i];
             i = i + 1;
         }
         
         // Insertion sort
         i = 1;
-        while (i < result.length) {
+        while (i < result.len) {
             var key = result[i];
             var j: int = i - 1;
             
@@ -101,22 +99,22 @@ frame Sorting {
 
     // Merge sort
     pub fn merge_sort(arr: [int]): [int] {
-        if (arr.length <= 1) return arr;
+        if (arr.len <= 1) return arr;
         
-        var mid = arr.length / 2;
+        var mid = arr.len / 2;
         var left = self.merge_sort(arr.slice(0, mid));
-        var right = self.merge_sort(arr.slice(mid, arr.length));
+        var right = self.merge_sort(arr.slice(mid, arr.len));
         
         return self.merge(left, right);
     }
 
     private fn merge(left: [int], right: [int]): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         var j: int = 0;
         var k: int = 0;
         
-        while (i < left.length and j < right.length) {
+        while (i < left.len and j < right.len) {
             if (left[i] <= right[j]) {
                 result[k] = left[i];
                 i = i + 1;
@@ -127,13 +125,13 @@ frame Sorting {
             k = k + 1;
         }
         
-        while (i < left.length) {
+        while (i < left.len) {
             result[k] = left[i];
             i = i + 1;
             k = k + 1;
         }
         
-        while (j < right.length) {
+        while (j < right.len) {
             result[k] = right[j];
             j = j + 1;
             k = k + 1;
@@ -144,19 +142,19 @@ frame Sorting {
 
     // Quick sort
     pub fn quick_sort(arr: [int]): [int] {
-        if (arr.length <= 1) return arr;
+        if (arr.len <= 1) return arr;
         
-        var pivot = arr[arr.length / 2];
-        var left: [int] = [];
-        var middle: [int] = [];
-        var right: [int] = [];
+        var pivot = arr[arr.len / 2];
+        pub var left: [int] = [];
+        pub var middle: [int] = [];
+        pub var right: [int] = [];
         
         var i: int = 0;
         var left_i: int = 0;
         var middle_i: int = 0;
         var right_i: int = 0;
         
-        while (i < arr.length) {
+        while (i < arr.len) {
             if (arr[i] < pivot) {
                 left[left_i] = arr[i];
                 left_i = left_i + 1;
@@ -174,25 +172,25 @@ frame Sorting {
         var sorted_right = self.quick_sort(right);
         
         // Combine results
-        var result: [int] = [];
+        pub var result: [int] = [];
         var result_i: int = 0;
         
         i = 0;
-        while (i < sorted_left.length) {
+        while (i < sorted_left.len) {
             result[result_i] = sorted_left[i];
             i = i + 1;
             result_i = result_i + 1;
         }
         
         i = 0;
-        while (i < middle.length) {
+        while (i < middle.len) {
             result[result_i] = middle[i];
             i = i + 1;
             result_i = result_i + 1;
         }
         
         i = 0;
-        while (i < sorted_right.length) {
+        while (i < sorted_right.len) {
             result[result_i] = sorted_right[i];
             i = i + 1;
             result_i = result_i + 1;
@@ -203,17 +201,17 @@ frame Sorting {
 
     // Heap sort
     pub fn heap_sort(arr: [int]): [int] {
-        var result: [int] = [];
+        pub var result: [int] = [];
         var i: int = 0;
         
         // Copy array
-        while (i < arr.length) {
+        while (i < arr.len) {
             result[i] = arr[i];
             i = i + 1;
         }
         
         // Build max heap
-        var n = result.length;
+        var n = result.len;
         i = n / 2 - 1;
         while (i >= 0) {
             self.heapify(result, n, i);
@@ -261,7 +259,7 @@ frame Searching {
     // Linear search
     pub fn linear_search(arr: [int], target: int): int? {
         var i: int = 0;
-        while (i < arr.length) {
+        while (i < arr.len) {
             if (arr[i] == target) return i;
             i = i + 1;
         }
@@ -271,7 +269,7 @@ frame Searching {
     // Binary search (requires sorted array)
     pub fn binary_search(arr: [int], target: int): int? {
         var left = 0;
-        var right = arr.length - 1;
+        var right = arr.len - 1;
         
         while (left <= right) {
             var mid = left + (right - left) / 2;
@@ -286,7 +284,7 @@ frame Searching {
 
     // Jump search (requires sorted array)
     pub fn jump_search(arr: [int], target: int): int? {
-        var n = arr.length;
+        var n = arr.len;
         var step = (n as float).sqrt() as int;
         var prev = 0;
         
@@ -310,11 +308,15 @@ frame Searching {
     // Interpolation search (requires sorted array)
     pub fn interpolation_search(arr: [int], target: int): int? {
         var left = 0;
-        var right = arr.length - 1;
+        var right = arr.len - 1;
         
         while (left <= right and target >= arr[left] and target <= arr[right]) {
             if (left == right) {
-                return left if arr[left] == target else nil;
+                if (arr[left] == target) {
+                    return left;
+                } else {
+                    return nil;
+                }
             }
             
             var pos = left + ((target - arr[left]) * (right - left)) / (arr[right] - arr[left]);
@@ -415,7 +417,7 @@ frame MathAlgorithms {
     pub fn sieve_of_eratosthenes(n: int): [int] {
         if (n < 2) return [];
         
-        var is_prime: [bool] = [];
+        pub var is_prime: [bool] = [];
         var i: int = 0;
         while (i <= n) {
             is_prime[i] = true;
@@ -437,7 +439,7 @@ frame MathAlgorithms {
             p = p + 1;
         }
         
-        var primes: [int] = [];
+        pub var primes: [int] = [];
         i = 2;
         var prime_i: int = 0;
         while (i <= n) {
@@ -458,7 +460,7 @@ frame StringAlgorithms {
     // Check if string is palindrome
     pub fn is_palindrome(s: str): bool {
         var left = 0;
-        var right = s.length - 1;
+        var right = s.len - 1;
         
         while (left < right) {
             if (s[left] != s[right]) return false;
@@ -472,7 +474,7 @@ frame StringAlgorithms {
     // Reverse a string
     pub fn reverse_string(s: str): str {
         var result = "";
-        var i: int = s.length - 1;
+        var i: int = s.len - 1;
         
         while (i >= 0) {
             result = result + s[i];
@@ -484,13 +486,13 @@ frame StringAlgorithms {
 
     // Check if two strings are anagrams
     pub fn are_anagrams(s1: str, s2: str): bool {
-        if (s1.length != s2.length) return false;
+        if (s1.len != s2.len) return false;
         
         var count1: {str: int} = {};
         var count2: {str: int} = {};
         
         var i: int = 0;
-        while (i < s1.length) {
+        while (i < s1.len) {
             var ch1 = s1[i];
             var ch2 = s2[i];
             
@@ -504,7 +506,7 @@ frame StringAlgorithms {
         }
         
         i = 0;
-        while (i < s1.length) {
+        while (i < s1.len) {
             var ch = s1[i];
             if (count1[ch] != count2[ch]) return false;
             i = i + 1;
@@ -515,15 +517,15 @@ frame StringAlgorithms {
 
     // Find longest common prefix
     pub fn longest_common_prefix(strings: [str]): str {
-        if (strings.length == 0) return "";
-        if (strings.length == 1) return strings[0];
+        if (strings.len == 0) return "";
+        if (strings.len == 1) return strings[0];
         
         var prefix = strings[0];
         var i: int = 1;
         
-        while (i < strings.length) {
+        while (i < strings.len) {
             while (strings[i].index_of(prefix) != 0) {
-                prefix = prefix.slice(0, prefix.length - 1);
+                prefix = prefix.slice(0, prefix.len - 1);
                 if (prefix == "") return "";
             }
             i = i + 1;
@@ -534,14 +536,14 @@ frame StringAlgorithms {
 
     // Find all substrings
     pub fn all_substrings(s: str): [str] {
-        var substrings: [str] = [];
+        pub var substrings: [str] = [];
         var i: int = 0;
         var j: int = 0;
         var k: int = 0;
         
-        while (i < s.length) {
+        while (i < s.len) {
             j = i;
-            while (j < s.length) {
+            while (j < s.len) {
                 substrings[k] = s.substring(i, j + 1);
                 k = k + 1;
                 j = j + 1;
@@ -552,20 +554,20 @@ frame StringAlgorithms {
         return substrings;
     }
 
-    // Simple pattern matching (Knuth-Morris-Pratt algorithm stub)
+    // Simple pattern matching
     pub fn kmp_search(text: str, pattern: str): [int] {
-        var matches: [int] = [];
+        pub var matches: [int] = [];
         if (pattern == "" or text == "") return matches;
         
         // Simple implementation - in reality would use KMP algorithm
         var i: int = 0;
         var match_i: int = 0;
         
-        while (i <= text.length - pattern.length) {
+        while (i <= text.len - pattern.len) {
             var found = true;
             var j: int = 0;
             
-            while (j < pattern.length) {
+            while (j < pattern.len) {
                 if (text[i + j] != pattern[j]) {
                     found = false;
                     break;
@@ -586,74 +588,74 @@ frame StringAlgorithms {
 }
 
 // Utility functions
-fn bubble_sort(arr: [int]): [int] {
+pub fn bubble_sort(arr: [int]): [int] {
     return Sorting.bubble_sort(arr);
 }
 
-fn selection_sort(arr: [int]): [int] {
+pub fn selection_sort(arr: [int]): [int] {
     return Sorting.selection_sort(arr);
 }
 
-fn insertion_sort(arr: [int]): [int] {
+pub fn insertion_sort(arr: [int]): [int] {
     return Sorting.insertion_sort(arr);
 }
 
-fn merge_sort(arr: [int]): [int] {
+pub fn merge_sort(arr: [int]): [int] {
     return Sorting.merge_sort(arr);
 }
 
-fn quick_sort(arr: [int]): [int] {
+pub fn quick_sort(arr: [int]): [int] {
     return Sorting.quick_sort(arr);
 }
 
-fn heap_sort(arr: [int]): [int] {
+pub fn heap_sort(arr: [int]): [int] {
     return Sorting.heap_sort(arr);
 }
 
-fn linear_search(arr: [int], target: int): int? {
+pub fn linear_search(arr: [int], target: int): int? {
     return Searching.linear_search(arr, target);
 }
 
-fn binary_search(arr: [int], target: int): int? {
+pub fn binary_search(arr: [int], target: int): int? {
     return Searching.binary_search(arr, target);
 }
 
-fn gcd(a: int, b: int): int {
+pub fn gcd(a: int, b: int): int {
     return MathAlgorithms.gcd(a, b);
 }
 
-fn lcm(a: int, b: int): int {
+pub fn lcm(a: int, b: int): int {
     return MathAlgorithms.lcm(a, b);
 }
 
-fn power(base: int, exponent: int): int {
+pub fn power(base: int, exponent: int): int {
     return MathAlgorithms.power(base, exponent);
 }
 
-fn fibonacci(n: int): int {
+pub fn fibonacci(n: int): int {
     return MathAlgorithms.fibonacci(n);
 }
 
-fn factorial(n: int): int {
+pub fn factorial(n: int): int {
     return MathAlgorithms.factorial(n);
 }
 
-fn is_prime(n: int): bool {
+pub fn is_prime(n: int): bool {
     return MathAlgorithms.is_prime(n);
 }
 
-fn sieve_of_eratosthenes(n: int): [int] {
+pub fn sieve_of_eratosthenes(n: int): [int] {
     return MathAlgorithms.sieve_of_eratosthenes(n);
 }
 
-fn is_palindrome(s: str): bool {
+pub fn is_palindrome(s: str): bool {
     return StringAlgorithms.is_palindrome(s);
 }
 
-fn reverse_string(s: str): str {
+pub fn reverse_string(s: str): str {
     return StringAlgorithms.reverse_string(s);
 }
 
-fn are_anagrams(s1: str, s2: str): bool {
+pub fn are_anagrams(s1: str, s2: str): bool {
     return StringAlgorithms.are_anagrams(s1, s2);
 }

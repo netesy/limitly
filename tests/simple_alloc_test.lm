@@ -1,0 +1,12 @@
+import std.ffi as ffi;
+fn main() {
+    var ptr: int = ffi.ffi_alloc(1024);
+    if (ptr != 0) {
+        print("Allocated 1024 bytes");
+        ffi.ffi_free(ptr);
+        print("Freed 1024 bytes");
+    } else {
+        print("Allocation failed");
+    }
+}
+main();

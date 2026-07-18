@@ -57,7 +57,6 @@ namespace AST {
     struct ReturnStatement;
     struct BreakStatement;
     struct ContinueStatement;
-    struct PrintStatement;
     struct HandleClause;
     struct ParallelStatement;
     struct ConcurrentStatement;
@@ -177,11 +176,15 @@ namespace AST {
     // Base statement type
     struct Statement : public Node {
         std::vector<LM::Frontend::Token> annotations;
-        
+        // Module/frame-level visibility. Default private per language.md §3.3.2
+        // (no explicit 'private' keyword — vars/fns are private when neither
+        // pub nor prot is specified).
+        VisibilityLevel visibility = VisibilityLevel::Private;
+
         // inferred_type is inherited from Node
         // For statements, this typically represents the type of value produced by the statement
         // (e.g., return type for return statements, declaration type for var declarations)
-        
+
         virtual ~Statement() = default;
     };
 
@@ -437,10 +440,11 @@ namespace AST {
         std::string name;
         std::optional<std::shared_ptr<TypeAnnotation>> type;
         std::shared_ptr<Expression> initializer;
-        
+
         // Module-level visibility (for module-level variables)
         VisibilityLevel visibility = VisibilityLevel::Private;  // Default to private
         bool isStatic = false;                                  // For static variables
+        bool isConst = false;                                   // True for const/val bindings (immutable after init)
     };
 
     // Destructuring assignment (e.g., var (x, y, z) = tuple)
@@ -525,11 +529,6 @@ namespace AST {
     // Return statement
     struct ReturnStatement : public Statement {
         std::shared_ptr<Expression> value;
-    };
-
-    // Print statement
-    struct PrintStatement : public Statement {
-        std::vector<std::shared_ptr<Expression>> arguments;
     };
 
     // Concurrency constructs
@@ -635,6 +634,7 @@ namespace AST {
     // Pattern matching
     struct BindingPatternExpr;
     struct ListPatternExpr;
+    struct OrPatternExpr;  // forward-declare
 
     struct MatchCase {
         std::shared_ptr<Expression> pattern;
@@ -650,6 +650,11 @@ namespace AST {
     // Type pattern in a match statement
     struct TypePatternExpr : public Expression {
         std::shared_ptr<TypeAnnotation> type;
+    };
+
+    // Or-pattern: A | B | C — matches if any of the inner patterns matches.
+    struct OrPatternExpr : public Expression {
+        std::vector<std::shared_ptr<Expression>> patterns;
     };
 
     // Binding pattern in a match statement (e.g., Some(x))
@@ -722,13 +727,14 @@ namespace AST {
         std::shared_ptr<TypeAnnotation> type;
         VisibilityLevel visibility;
         std::shared_ptr<Expression> defaultValue;  // Optional default value
-        
-        FrameField() : visibility(VisibilityLevel::Private), defaultValue(nullptr) {}
-        FrameField(const std::string& n, std::shared_ptr<TypeAnnotation> t, 
+        bool isConst = false;                      // True for const/val fields (immutable after init)
+
+        FrameField() : visibility(VisibilityLevel::Private), defaultValue(nullptr), isConst(false) {}
+        FrameField(const std::string& n, std::shared_ptr<TypeAnnotation> t,
                    VisibilityLevel v = VisibilityLevel::Private)
-            : name(n), type(t), visibility(v), defaultValue(nullptr) {}
+            : name(n), type(t), visibility(v), defaultValue(nullptr), isConst(false) {}
     };
-    
+
     // Frame method with visibility
     struct FrameMethod : public Statement {
         std::string name;
@@ -739,11 +745,16 @@ namespace AST {
         std::shared_ptr<BlockStatement> body;
         bool isInit = false;  // Special marker for init() method
         bool isDeinit = false;  // Special marker for deinit() method
-        
-        FrameMethod() : visibility(VisibilityLevel::Private), body(nullptr), isInit(false), isDeinit(false) {}
+        bool isStatic = false;   // Static method (no self binding)
+        bool isAbstract = false; // Abstract method (no body, must be overridden)
+        bool isFinal = false;    // Final method (cannot be overridden)
+
+        FrameMethod() : visibility(VisibilityLevel::Private), body(nullptr), isInit(false), isDeinit(false),
+                        isStatic(false), isAbstract(false), isFinal(false) {}
     };
-    
-    // Frame declaration - modern OOP construct
+
+    // Frame declaration - modern OOP construct.
+    // Note: 'data' modifier was removed — traits cover the same ground.
     struct FrameDeclaration : public Statement {
         std::string name;
         std::vector<std::shared_ptr<FrameField>> fields;
@@ -751,11 +762,11 @@ namespace AST {
         std::vector<std::string> implements;  // Trait names this frame implements
         std::shared_ptr<FrameMethod> init;    // Optional init() method
         std::shared_ptr<FrameMethod> deinit;  // Optional deinit() method
-        
+
         // Visibility and modifiers
         bool isAbstract = false;
         bool isFinal = false;
-        
+
         FrameDeclaration() : init(nullptr), deinit(nullptr), isAbstract(false), isFinal(false) {}
     };
     
@@ -1003,7 +1014,6 @@ namespace AST {
         virtual std::shared_ptr<WhileStatement> optimizeWhileStatement(std::shared_ptr<WhileStatement> stmt);
         virtual std::shared_ptr<ForStatement> optimizeForStatement(std::shared_ptr<ForStatement> stmt);
         virtual std::shared_ptr<ReturnStatement> optimizeReturnStatement(std::shared_ptr<ReturnStatement> stmt);
-        virtual std::shared_ptr<PrintStatement> optimizePrintStatement(std::shared_ptr<PrintStatement> stmt);
         
         // Core optimization utilities
         std::shared_ptr<Expression> foldConstants(std::shared_ptr<Expression> expr);

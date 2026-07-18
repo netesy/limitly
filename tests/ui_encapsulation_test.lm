@@ -1,0 +1,14 @@
+import std.ui.types as ui;
+import std.gfx.types as gfx;
+
+print("Testing Simplified UI/GFX...");
+
+var c = ui.create_color(1.0);
+print("Color R: ");
+print(c.r);
+
+var pf = gfx.create_pixel_format(42);
+print("PixelFormat Value: ");
+print(pf.value);
+
+print("Test Passed!");

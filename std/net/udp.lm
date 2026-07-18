@@ -1,26 +1,105 @@
-import std.core as core;
+// Standard Library UDP Module
 
-var __udp_next_handle: int = 2000;
-var __udp_buffers: {int: str} = {};
+import std.core as core;
+import std.core show Error;
+import std.resource as res;
+import std.net.tcp as tcp;
+
+frame Datagram {
+    var resource: res.Resource;
+    pub init(r: res.Resource) { self.resource = r; }
+    pub fn send_to(addr: str, port: int, data: str): any {
+        return res._call(h=self.resource.handle, op=res.OP_SEND_TO, args=[addr, port, data]);
+    }
+    pub fn recv_from(): any {
+        return res._call(h=self.resource.handle, op=res.OP_RECV_FROM, args=[]);
+    }
+}
 
 frame UDP {
-    pub fn bind(port: int): core.ResultInt {
-        __udp_next_handle = __udp_next_handle + 1;
-        __udp_buffers[__udp_next_handle] = "";
-        return core.ok_int(__udp_next_handle);
+    var resource: res.Resource?;
+    var binder: tcp.Binder?;
+    var datagram: Datagram?;
+    var poller: res.Pollable?;
+
+    pub fn init() {
+        self.resource = nil;
+        self.binder = nil;
+        self.datagram = nil;
+        self.poller = nil;
     }
 
-    pub fn send_to(handle: int, address: str, port: int, data: str): core.ResultInt {
-        var current = __udp_buffers[handle];
-        if (current == nil) return core.err_int("invalid udp handle");
-        __udp_buffers[handle] = current + data;
-        return core.ok_int(data.length);
+    pub fn bind(address: str, port: int): int?core.Error {
+        match (res.create_udp_socket()) {
+            val r => {
+                var b = tcp.Binder(r=r);
+                if (b.bind(args=[address, port])) {
+                    self.resource = ok(r);
+                    self.binder = ok(b);
+                    self.datagram = ok(Datagram(r=r));
+                    self.poller = ok(res.Pollable(r=r));
+                    return ok(r.handle);
+                } else {
+                    r.close();
+                    return err(Error(code="ERR", message="fail"));
+                }
+            },
+            err e => return err(Error(code="ERR", message="fail"))
+        }
     }
 
-    pub fn recv_from(handle: int): core.ResultStr {
-        var current = __udp_buffers[handle];
-        if (current == nil) return core.err_str("invalid udp handle");
-        __udp_buffers[handle] = "";
-        return core.ok_str(current);
+    pub fn create(): int?core.Error {
+        match (res.create_udp_socket()) {
+            val r => {
+                self.resource = ok(r);
+                self.datagram = ok(Datagram(r=r));
+                self.poller = ok(res.Pollable(r=r));
+                return ok(r.handle);
+            },
+            err e => return err(Error(code="ERR", message="fail"))
+        }
+    }
+
+    pub fn send_to(address: str, port: int, data: str): int?core.Error {
+        match (self.datagram) {
+            val d => {
+                var result = d.send_to(addr=address, port=port, data=data);
+                if (result == nil) return err(Error(code="ERR", message="fail"));
+                return ok(result as int);
+            },
+            nil => return err(Error(code="ERR", message="fail"))
+        }
+    }
+
+    pub fn recv_from(): str?core.Error {
+        match (self.datagram) {
+            val d => {
+                var result = d.recv_from();
+                if (result == nil) return err(Error(code="ERR", message="fail"));
+                return ok(result as str);
+            },
+            nil => return err(Error(code="ERR", message="fail"))
+        }
+    }
+
+    pub fn has_data(): bool {
+        match (self.poller) {
+            val p => return p.poll(),
+            nil => return false
+        }
+    }
+
+    pub fn close(): nil?core.Error {
+        match (self.resource) {
+            val r => {
+                r.close();
+                self.resource = nil;
+                self.binder = nil;
+                self.datagram = nil;
+                self.poller = nil;
+                return ok(nil);
+            },
+            nil => return ok(nil)
+        }
     }
 }

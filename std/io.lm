@@ -1,59 +1,177 @@
-// Standard Library I/O Module (frame-first)
+// Standard Library I/O Module
 
 import std.core as core;
+import std.resource as res;
 
-type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
-type FileNotFound = { path: str };
-type PermissionDenied = { path: str, operation: str };
-type DiskFull = { path: str };
-type NetworkError = { message: str };
-type UnknownError = { message: str };
+frame FileNotFound { pub var path: str; }
+frame PermissionDenied { pub var path: str; pub var operation: str; }
+frame DiskFull { pub var path: str; }
+frame NetworkError { pub var message: str; }
+frame UnknownError { pub var message: str; }
+
+pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
+
+// Internal capability for filesystem operations
+frame FileSystem {
+    var resource: res.Resource;
+    pub init(r: res.Resource) { self.resource = r; }
+    pub fn exists(path: str): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_EXISTS, args=[path]);
+        return (result == true);
+    }
+    pub fn delete(path: str): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_DELETE, args=[path]);
+        return (result == true);
+    }
+    pub fn rename(old: str, new: str): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_RENAME, args=[old, new]);
+        return (result == true);
+    }
+    pub fn mkdir(path: str): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_MKDIR, args=[path]);
+        return (result == true);
+    }
+    pub fn readdir(path: str): any {
+        return res._call(h=self.resource.handle, op=res.OP_READDIR, args=[path]);
+    }
+}
 
 frame Console {
-    pub fn print(msg: str): nil { print(msg); }
+    var resource: res.Resource;
+    var writer: res.Writer;
+    pub init() {
+        self.resource = res.stdout;
+        self.writer = res.Writer(r=self.resource);
+    }
+    pub fn print(msg: any): nil {
+        self.writer.write(args=[msg]);
+    }
     pub fn read_line(): str { return input(""); }
 }
 
+pub var out: Console = Console();
+
 frame File {
-    var path: str;
-    var handle: int;
+    pub var path: str;
+    var resource: res.Resource;
+    var reader: res.Reader;
+    var writer: res.Writer;
+
+    pub init(p: str, r: res.Resource) {
+        self.path = p;
+        self.resource = r;
+        self.reader = res.Reader(r=r);
+        self.writer = res.Writer(r=r);
+    }
 
     pub fn read(): str?IOError {
-        if (!file_exists(self.path)) return FileNotFound { path: self.path };
-        return file_read(self.handle);
+        var r = self.reader.read(args=[]);
+        if (r == nil) return err(UnknownError(message="fail"));
+        return ok(r as str);
     }
 
     pub fn write(content: str): nil?IOError {
-        file_write(self.handle, content);
-        return nil;
-    }
-
-    pub fn append(content: str): nil?IOError {
-        var current = file_read(self.handle);
-        file_write(self.handle, current + content);
-        return nil;
+        var success = self.writer.write(args=[content]);
+        if (success == nil) return err(UnknownError(message="fail"));
+        return ok(nil);
     }
 
     pub fn close(): nil?IOError {
-        file_close(self.handle);
-        return nil;
+        match (self.resource.close()) {
+            val v => return ok(nil),
+            err e => return err(UnknownError(message="fail"))
+        }
+    }
+
+    pub fn is_open(): bool {
+        return self.resource.is_open();
     }
 }
 
-// Intrinsic wrappers (canonical boundary)
-fn open(path: str, mode: str): File?IOError {
-    if (mode == "read" and !file_exists(path)) return FileNotFound { path: path };
-
-    var mode_internal = "r";
-    if (mode == "write") mode_internal = "w";
-    if (mode == "append") mode_internal = "a+";
-
-    var h = file_open(path, mode_internal);
-    return File(path=path, handle=h);
+pub fn open(path: str, mode: str): File?IOError {
+    match (res.open_file(path=path, mode=mode)) {
+        val r => return ok(File(p=path, r=r)),
+        err e => return err(FileNotFound(path=path))
+    }
 }
 
-fn exists(path: str): bool { return file_exists(path); }
-fn delete(path: str): bool { return file_delete(path); }
-fn create_directory(path: str): nil?IOError { return nil; }
-fn list_directory(path: str): [str]?IOError { return []; }
-fn directory_exists(path: str): bool { return false; }
+pub fn print(msg: any): nil {
+    var w = res.Writer(r=res.stdout);
+    w.write(args=[msg]);
+}
+
+pub fn exists(path: str): bool {
+    match (res.create_fs_resource()) {
+        val r => {
+            var fs = FileSystem(r=r);
+            var result = fs.exists(path=path);
+            r.close();
+            return result;
+        },
+        err e => return false
+    }
+}
+
+pub fn delete(path: str): bool {
+    match (res.create_fs_resource()) {
+        val r => {
+            var fs = FileSystem(r=r);
+            var result = fs.delete(path=path);
+            r.close();
+            return result;
+        },
+        err e => return false
+    }
+}
+
+pub fn rename(old_path: str, new_path: str): bool {
+    match (res.create_fs_resource()) {
+        val r => {
+            var fs = FileSystem(r=r);
+            var result = fs.rename(old=old_path, new=new_path);
+            r.close();
+            return result;
+        },
+        err e => return false
+    }
+}
+
+pub fn create_directory(path: str): nil?IOError {
+    match (res.create_fs_resource()) {
+        val r => {
+            var fs = FileSystem(r=r);
+            var result = fs.mkdir(path=path);
+            r.close();
+            if (result) return ok(nil);
+            return err(UnknownError(message="fail"));
+        },
+        err e => return err(UnknownError(message="fail"))
+    }
+}
+
+pub fn list_directory(path: str): [str]?IOError {
+    match (res.create_fs_resource()) {
+        val r => {
+            var fs = FileSystem(r=r);
+            var result = fs.readdir(path=path);
+            r.close();
+            if (result == nil) return err(UnknownError(message="fail"));
+            
+            var s = result as str;
+            var parts: [str] = [];
+            var current = "";
+            for (var i = 0; i < len(s); i = i + 1) {
+                var ch = substring(s, i, i + 1);
+                if (ch == "\n") {
+                    if (len(current) > 0) parts = parts + [current];
+                    current = "";
+                } else {
+                    current = current + ch;
+                }
+            }
+            if (len(current) > 0) parts = parts + [current];
+            return ok(parts);
+        },
+        err e => return err(UnknownError(message="fail"))
+    }
+}

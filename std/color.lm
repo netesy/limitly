@@ -1,0 +1,62 @@
+// Standard Library Color Module
+import std.math as math;
+
+frame Color {
+    pub var r: float; // 0.0 to 1.0
+    pub var g: float;
+    pub var b: float;
+    pub var a: float;
+    
+    pub init(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0) {
+        self.r = r;
+        self.g = g;
+        self.b = b;
+        self.a = a;
+    }
+    
+    pub fn to_hex(): str {
+        var ri = (self.r * 255.0) as int;
+        var gi = (self.g * 255.0) as int;
+        var bi = (self.b * 255.0) as int;
+        if (ri < 0) ri = 0;
+        if (ri > 255) ri = 255;
+        if (gi < 0) gi = 0;
+        if (gi > 255) gi = 255;
+        if (bi < 0) bi = 0;
+        if (bi > 255) bi = 255;
+        return "#" + hex_byte(ri) + hex_byte(gi) + hex_byte(bi);
+    }
+}
+
+fn hex_digit(v: int): str {
+        if (v < 10) return v as str;
+        if (v == 10) return "a";
+        if (v == 11) return "b";
+        if (v == 12) return "c";
+        if (v == 13) return "d";
+        if (v == 14) return "e";
+        return "f";
+    }
+
+fn hex_byte(v: int): str {
+        var hi = v / 16;
+        var lo = v % 16;
+        return hex_digit(hi) + hex_digit(lo);
+    }
+
+fn rgb(r: int, g: int, b: int): Color {
+    return Color(r as float / 255.0, g as float / 255.0, b as float / 255.0, 1.0);
+}
+
+fn rgba(r: int, g: int, b: int, a: float): Color {
+    return Color(r as float / 255.0, g as float / 255.0, b as float / 255.0, a);
+}
+
+fn lerp(c1: Color, c2: Color, t: float): Color {
+    return Color(
+        c1.r + (c2.r - c1.r) * t,
+        c1.g + (c2.g - c1.g) * t,
+        c1.b + (c2.b - c1.b) * t,
+        c1.a + (c2.a - c1.a) * t
+    );
+}

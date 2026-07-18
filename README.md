@@ -40,7 +40,7 @@ The compiler currently targets the VM/register execution path and supports teste
 
 ### Prerequisites
 - CMake 3.10 or higher
-- C++17 compatible compiler
+- C++20 compatible compiler
 
 ### Build Instructions
 ```bash
@@ -60,7 +60,7 @@ build.bat
 ./limitly sample.lm
 
 # Start the REPL (interactive mode)
-./limitly -repl
+./limitly 
 ```
 
 ## Testing

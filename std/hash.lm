@@ -1,0 +1,259 @@
+// Standard Library Hash Module
+// Non-cryptographic hash functions for hash tables, checksums, and general use.
+// For cryptographic hashing (SHA-256, SHA-512, MD5, SHA-1), see std/crypto/hash.lm.
+
+import std.encoding as encoding;
+
+// ---- FNV-1a 32-bit ----
+fn fnv1a_32(data: [int]): int {
+    var h: int = 0x811C9DC5;
+    var i: int = 0;
+    while (i < len(data)) {
+        h = h ^ (data[i] & 0xFF);
+        h = (h * 0x01000193) & 0xFFFFFFFF;
+        i = i + 1;
+    }
+    return h;
+}
+
+fn fnv1a_32_str(s: str): int {
+    var h: int = 0x811C9DC5;
+    var i: int = 0;
+    while (i < len(s)) {
+        var c: int = 0;
+        var ch: str = substring(s, i, i + 1);
+        // Convert single char to byte value
+        c = byte_value(ch);
+        h = h ^ c;
+        h = (h * 0x01000193) & 0xFFFFFFFF;
+        i = i + 1;
+    }
+    return h;
+}
+
+// ---- FNV-1a 64-bit (simulated with two 32-bit halves) ----
+fn fnv1a_64_str(s: str): int {
+    var lo: int = 0xCBF29CE4;
+    var hi: int = 0x84222325;
+    var prime_lo: int = 0x000001B3;
+    var prime_hi: int = 0x00000100;
+    var i: int = 0;
+    while (i < len(s)) {
+        var c: int = byte_value(substring(s, i, i + 1));
+        // XOR low byte into low word
+        lo = lo ^ c;
+        // Multiply by FNV prime (64-bit): (hi:lo) * (prime_hi:prime_lo)
+        var old_lo: int = lo;
+        lo = (lo * prime_lo) & 0xFFFFFFFF;
+        var cross: int = (old_lo * prime_hi) & 0xFFFFFFFF;
+        lo = (lo + cross) & 0xFFFFFFFF;
+        hi = ((hi * prime_lo) & 0xFFFFFFFF) + ((hi * prime_hi) & 0xFFFFFFFF) + (lo < cross ? 1 : 0);
+        hi = hi & 0xFFFFFFFF;
+        i = i + 1;
+    }
+    // Combine into single int (lower 32 bits of the 64-bit result)
+    return lo;
+}
+
+// ---- DJB2 (Daniel J. Bernstein) ----
+fn djb2(s: str): int {
+    var h: int = 5381;
+    var i: int = 0;
+    while (i < len(s)) {
+        h = ((h << 5) + h) + byte_value(substring(s, i, i + 1));
+        h = h & 0x7FFFFFFF;
+        i = i + 1;
+    }
+    return h;
+}
+
+// ---- SDBM Hash ----
+fn sdbm(s: str): int {
+    var h: int = 0;
+    var i: int = 0;
+    while (i < len(s)) {
+        var c: int = byte_value(substring(s, i, i + 1));
+        h = c + (h << 6) + (h << 16) - h;
+        h = h & 0x7FFFFFFF;
+        i = i + 1;
+    }
+    return h;
+}
+
+// ---- Jenkins One-At-A-Time ----
+fn jenkins_oaat(s: str): int {
+    var h: int = 0;
+    var i: int = 0;
+    while (i < len(s)) {
+        h = h + byte_value(substring(s, i, i + 1));
+        h = h + (h << 10);
+        h = h ^ (h >> 6);
+        i = i + 1;
+    }
+    h = h + (h << 3);
+    h = h ^ (h >> 11);
+    h = h + (h << 15);
+    return h & 0x7FFFFFFF;
+}
+
+// ---- MurmurHash3 (32-bit, x86_32 variant) ----
+fn murmur3_32(s: str, seed: int): int {
+    var c1: int = 0xCC9E2D51;
+    var c2: int = 0x1B873593;
+    var h1: int = seed;
+    var nblocks: int = len(s) / 4;
+    var i: int = 0;
+
+    // Process 4-byte blocks
+    while (i < nblocks * 4) {
+        var k1: int = byte_value(substring(s, i, i + 1));
+        k1 = k1 | (byte_value(substring(s, i + 1, i + 2)) << 8);
+        k1 = k1 | (byte_value(substring(s, i + 2, i + 3)) << 16);
+        k1 = k1 | (byte_value(substring(s, i + 3, i + 4)) << 24);
+
+        k1 = k1 * c1;
+        k1 = ((k1 << 15) | (k1 >> 17)) & 0xFFFFFFFF;
+        k1 = k1 * c2;
+
+        h1 = h1 ^ k1;
+        h1 = ((h1 << 13) | (h1 >> 19)) & 0xFFFFFFFF;
+        h1 = (h1 * 5 + 0xE6546B64) & 0xFFFFFFFF;
+        i = i + 4;
+    }
+
+    // Process remaining bytes
+    var k1: int = 0;
+    var remaining: int = len(s) & 3;
+    if (remaining >= 3) {
+        k1 = k1 ^ (byte_value(substring(s, i + 2, i + 3)) << 16);
+    }
+    if (remaining >= 2) {
+        k1 = k1 ^ (byte_value(substring(s, i + 1, i + 2)) << 8);
+    }
+    if (remaining >= 1) {
+        k1 = k1 ^ byte_value(substring(s, i, i + 1));
+        k1 = k1 * c1;
+        k1 = ((k1 << 15) | (k1 >> 17)) & 0xFFFFFFFF;
+        k1 = k1 * c2;
+        h1 = h1 ^ k1;
+    }
+
+    // Finalization
+    h1 = h1 ^ len(s);
+    h1 = h1 ^ (h1 >> 16);
+    h1 = (h1 * 0x85EBCA6B) & 0xFFFFFFFF;
+    h1 = h1 ^ (h1 >> 13);
+    h1 = (h1 * 0xC2B2AE35) & 0xFFFFFFFF;
+    h1 = h1 ^ (h1 >> 16);
+
+    return h1;
+}
+
+// ---- CRC32 (table-based) ----
+fn crc32(s: str): int {
+    var table: [int] = [];
+    var i: int = 0;
+    while (i < 256) {
+        var c: int = i;
+        var j: int = 0;
+        while (j < 8) {
+            if (c & 1) {
+                c = 0xEDB88320 ^ (c >> 1);
+            } else {
+                c = c >> 1;
+            }
+            j = j + 1;
+        }
+        table = table + [c];
+        i = i + 1;
+    }
+
+    var crc: int = 0xFFFFFFFF;
+    var k: int = 0;
+    while (k < len(s)) {
+        var byte_val: int = byte_value(substring(s, k, k + 1));
+        var index: int = (crc ^ byte_val) & 0xFF;
+        crc = (crc >> 8) ^ table[index];
+        k = k + 1;
+    }
+    return crc ^ 0xFFFFFFFF;
+}
+
+// ---- Adler-32 Checksum ----
+fn adler32(s: str): int {
+    var a: int = 1;
+    var b: int = 0;
+    var mod: int = 65521;
+    var i: int = 0;
+    while (i < len(s)) {
+        a = (a + byte_value(substring(s, i, i + 1))) % mod;
+        b = (b + a) % mod;
+        i = i + 1;
+    }
+    return (b << 16) | a;
+}
+
+// ---- Combine / utility functions ----
+fn combine_hashes(h1: int, h2: int): int {
+    // Boost-style hash combination
+    var combined: int = h1 ^ (h2 + 0x9E3779B9 + (h1 << 6) + (h1 >> 2));
+    return combined & 0x7FFFFFFF;
+}
+
+fn hash_bytes(data: [int]): int {
+    return fnv1a_32(data);
+}
+
+fn hash_string(s: str): int {
+    return fnv1a_32_str(s);
+}
+
+fn hash_with_seed(s: str, seed: int): int {
+    return murmur3_32(s, seed);
+}
+
+// ---- Internal helper: convert single char to byte value ----
+fn byte_value(ch: str): int {
+    // Simple byte value extraction for ASCII characters
+    // Uses ordinal mapping for common characters
+    if (ch >= "a" and ch <= "z") return len(ch) == 1 ? ((ch - "a") + 97) : 0;
+    if (ch >= "A" and ch <= "Z") return len(ch) == 1 ? ((ch - "A") + 65) : 0;
+    if (ch >= "0" and ch <= "9") return len(ch) == 1 ? ((ch - "0") + 48) : 0;
+    if (ch == " ") return 32;
+    if (ch == "!") return 33;
+    if (ch == "\"") return 34;
+    if (ch == "#") return 35;
+    if (ch == "$") return 36;
+    if (ch == "%") return 37;
+    if (ch == "&") return 38;
+    if (ch == "'") return 39;
+    if (ch == "(") return 40;
+    if (ch == ")") return 41;
+    if (ch == "*") return 42;
+    if (ch == "+") return 43;
+    if (ch == ",") return 44;
+    if (ch == "-") return 45;
+    if (ch == ".") return 46;
+    if (ch == "/") return 47;
+    if (ch == ":") return 58;
+    if (ch == ";") return 59;
+    if (ch == "<") return 60;
+    if (ch == "=") return 61;
+    if (ch == ">") return 62;
+    if (ch == "?") return 63;
+    if (ch == "@") return 64;
+    if (ch == "[") return 91;
+    if (ch == "\\") return 92;
+    if (ch == "]") return 93;
+    if (ch == "^") return 94;
+    if (ch == "_") return 95;
+    if (ch == "`") return 96;
+    if (ch == "{") return 123;
+    if (ch == "|") return 124;
+    if (ch == "}") return 125;
+    if (ch == "~") return 126;
+    if (ch == "\n") return 10;
+    if (ch == "\r") return 13;
+    if (ch == "\t") return 9;
+    return 0;
+}

@@ -209,8 +209,6 @@ private:
     
     // Specific statement handlers
     void emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt);
-    void emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt);
-    void emit_print_value(Reg value);  // Helper for printing single values
     void emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt);
     void emit_destructuring_var_stmt(LM::Frontend::AST::DestructuringDeclaration& stmt);
     void emit_block_stmt(LM::Frontend::AST::BlockStatement& stmt);
@@ -346,6 +344,7 @@ private:
         size_t param_count = 0;
         bool is_function = false;
         bool is_variable = false;
+        bool is_frame = false;  // NEW: distinguish frame instantiation from functions
     };
     std::unordered_map<std::string, ModuleSymbolInfo> module_symbol_table_;
     

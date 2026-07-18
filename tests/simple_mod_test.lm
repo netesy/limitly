@@ -1,0 +1,4 @@
+import tests.modules.basic_module as lib;
+var r = lib.add(10, 20);
+print("Result: ");
+print(r);

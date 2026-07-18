@@ -1,0 +1,19 @@
+frame Range {
+    var start: int;
+    var stop: int;
+
+    pub init(start: int, stop: int) {
+        self.start = start;
+        self.stop = stop;
+    }
+
+    pub fn iter(): int {
+        return 42;
+    }
+}
+
+fn main(): int {
+    var r = Range(1, 2);
+    var x = r.iter();
+    return 0;
+}

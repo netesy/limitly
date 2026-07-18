@@ -58,14 +58,18 @@ void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
     
    // std::cout << "[DEBUG] Found " << accessed_variables.size() << " variables to share via SharedCell" << std::endl;
     
-    // 2. Allocate SharedCell IDs for each accessed variable
+    // 2. Allocate and initialize SharedCell IDs for each accessed variable
     parallel_block_cell_ids_.clear();
     for (const auto& var_name : accessed_variables) {
         Reg cell_id_reg = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::SharedCellAlloc, Type::I64, cell_id_reg, 0, 0));
         parallel_block_cell_ids_[var_name] = cell_id_reg;
         
-
+        // Initialize the SharedCell with the variable's current value from the main thread
+        Reg var_reg = resolve_variable(var_name);
+        if (var_reg != UINT32_MAX) {
+            emit_instruction(LIR_Inst(LIR_Op::SharedCellStore, var_reg, cell_id_reg, var_reg, 0));
+        }
     }
     
     // 3. Initialize parallel execution system (using available operations)
@@ -213,7 +217,8 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
        // std::cout << "[DEBUG] No channel param, allocating new channel" << std::endl;
         // Original behavior: allocate new channel
         channel_reg = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::ChannelAlloc, channel_reg, 32, 0));
+        LIR_Inst ch_inst(LIR_Op::ResourceCreate, Type::Ptr, channel_reg, 0, 0, (uint32_t)ResourceType::CHANNEL);
+        emit_instruction(ch_inst);
         bind_variable(stmt.channel, channel_reg);
         set_register_type(channel_reg, int_type);
     }
@@ -449,10 +454,6 @@ void Generator::collect_variables_from_statement(LM::Frontend::AST::Statement& s
         }
     } else if (auto expr_stmt = dynamic_cast<LM::Frontend::AST::ExprStatement*>(&stmt)) {
         collect_variables_from_expression(*expr_stmt->expression, variables);
-    } else if (auto print_stmt = dynamic_cast<LM::Frontend::AST::PrintStatement*>(&stmt)) {
-        for (const auto& arg : print_stmt->arguments) {
-            collect_variables_from_expression(*arg, variables);
-        }
     }
     // Add other statement types as needed
 }
@@ -923,6 +924,22 @@ void Generator::find_accessed_variables_recursive(const std::vector<std::shared_
         } else if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(stmt.get())) {
            // std::cout << "[DEBUG] Found BlockStatement" << std::endl;
             find_accessed_variables_recursive(block_stmt->statements, accessed_variables);
+        } else if (auto return_stmt = dynamic_cast<LM::Frontend::AST::ReturnStatement*>(stmt.get())) {
+            if (return_stmt->value) {
+                find_accessed_variables_in_expr(*return_stmt->value, accessed_variables);
+            }
+        } else if (auto if_stmt = dynamic_cast<LM::Frontend::AST::IfStatement*>(stmt.get())) {
+            if (if_stmt->condition) find_accessed_variables_in_expr(*if_stmt->condition, accessed_variables);
+            if (if_stmt->thenBranch) {
+                if (auto then_block = dynamic_cast<LM::Frontend::AST::BlockStatement*>(if_stmt->thenBranch.get())) {
+                    find_accessed_variables_recursive(then_block->statements, accessed_variables);
+                }
+            }
+            if (if_stmt->elseBranch) {
+                if (auto else_block = dynamic_cast<LM::Frontend::AST::BlockStatement*>(if_stmt->elseBranch.get())) {
+                    find_accessed_variables_recursive(else_block->statements, accessed_variables);
+                }
+            }
         } else {
            // std::cout << "[DEBUG] Statement type not handled: " << typeid(*stmt.get()).name() << std::endl;
         }
@@ -961,6 +978,11 @@ void Generator::find_accessed_variables_in_expr(const LM::Frontend::AST::Express
                 find_accessed_variables_in_expr(*arg, accessed_variables);
             }
         }
+    } else if (auto closure_call = dynamic_cast<const LM::Frontend::AST::CallClosureExpr*>(&expr)) {
+        if (closure_call->closure) find_accessed_variables_in_expr(*closure_call->closure, accessed_variables);
+        for (const auto& arg : closure_call->arguments) if (arg) find_accessed_variables_in_expr(*arg, accessed_variables);
+    } else if (auto grouping_expr = dynamic_cast<const LM::Frontend::AST::GroupingExpr*>(&expr)) {
+        if (grouping_expr->expression) find_accessed_variables_in_expr(*grouping_expr->expression, accessed_variables);
     } else if (auto interp_expr = dynamic_cast<const LM::Frontend::AST::InterpolatedStringExpr*>(&expr)) {
         for (const auto& part : interp_expr->parts) {
             if (std::holds_alternative<std::shared_ptr<LM::Frontend::AST::Expression>>(part)) {
