@@ -293,6 +293,11 @@ TypePtr TypeChecker::check_type_declaration(std::shared_ptr<LM::Frontend::AST::T
     
     // Register the type alias in the type system
     type_system.registerTypeAlias(type_decl->name, underlying_type);
+    type_system.addUserDefinedType(type_decl->name, underlying_type);
+    if (!current_module_name.empty()) {
+        type_system.registerTypeAlias(current_module_name + "." + type_decl->name, underlying_type);
+        type_system.addUserDefinedType(current_module_name + "." + type_decl->name, underlying_type);
+    }
     
     // Set the inferred type on the type declaration statement
     type_decl->inferred_type = underlying_type;

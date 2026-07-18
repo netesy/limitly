@@ -2,7 +2,7 @@
 
 import std.internal.runtime as rt;
 
-frame Resource {
+pub frame Resource {
     pub var handle: int;
     pub var kind: int;
     pub var is_open_val: bool;
@@ -13,13 +13,41 @@ frame Resource {
         self.is_open_val = (h != -1);
     }
 
-    pub fn close() {
+    pub fn close(): nil? {
         if (self.is_open_val) {
             rt.destroy(self.handle);
             self.is_open_val = false;
         }
+        return ok(nil);
+    }
+
+    pub fn is_open(): bool {
+        return self.is_open_val;
     }
 }
+
+pub frame Reader {
+    pub var resource: Resource;
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+    pub fn read(args: [any]): any {
+        return rt.call(self.resource.handle, rt.OP_READ, args);
+    }
+}
+
+pub frame Writer {
+    pub var resource: Resource;
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+    pub fn write(args: [any]): any {
+        return rt.call(self.resource.handle, rt.OP_WRITE, args);
+    }
+}
+
+pub var stdout: Resource = Resource(h=0, k=rt.RT_STDOUT);
+pub var stderr: Resource = Resource(h=1, k=rt.RT_STDERR);
 
 pub fn create_hash_engine(): Resource {
     var h = rt.create(rt.RT_HASH_ENGINE, []);
@@ -31,9 +59,35 @@ pub fn create_dns_resolver(): Resource {
     return Resource(h=h, k=rt.RT_DNS_RESOLVER);
 }
 
+pub fn open_file(path: str, mode: str): Resource? {
+    var h = rt.create(rt.RT_FILE, []);
+    if (h == -1) return err();
+    var success = rt.call(h, rt.OP_OPEN, [path, mode]);
+    if (success != true) {
+        rt.destroy(h);
+        return err();
+    }
+    return ok(Resource(h=h, k=rt.RT_FILE));
+}
+
+pub fn create_fs_resource(): Resource? {
+    var h = rt.create(rt.RT_FILE, []);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=rt.RT_FILE));
+}
+
 pub fn _call(h: int, op: int, args: [any]): any {
     return rt.call(h, op, args);
 }
 
-// Re-export essential constants for DNS and other modules
-pub var OP_RESOLVE: int = 26;
+// Re-export essential constants
+pub var OP_OPEN: int = rt.OP_OPEN;
+pub var OP_CLOSE: int = rt.OP_CLOSE;
+pub var OP_READ: int = rt.OP_READ;
+pub var OP_WRITE: int = rt.OP_WRITE;
+pub var OP_MKDIR: int = rt.OP_MKDIR;
+pub var OP_READDIR: int = rt.OP_READDIR;
+pub var OP_RENAME: int = rt.OP_RENAME;
+pub var OP_EXISTS: int = rt.OP_EXISTS;
+pub var OP_DELETE: int = rt.OP_DELETE;
+pub var OP_RESOLVE: int = rt.OP_RESOLVE;

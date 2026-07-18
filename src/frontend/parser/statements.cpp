@@ -887,16 +887,38 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::matchStatement() {
     
     pushBlockContext("match", leftBrace);
     
+    int max_cases = 1000; // Prevent infinite loop
+    int case_count = 0;
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        if (case_count >= max_cases) {
+            error("Too many match cases (possible infinite loop)", false);
+            break;
+        }
+        case_count++;
         skipTrivia();
         LM::Frontend::AST::MatchCase matchCase;
         matchCase.pattern = parsePattern();
         if (match({TokenType::WHERE})) matchCase.guard = expression();
         skipTrivia();
         consume(TokenType::ARROW, "Expected '=>' after match pattern.");
-        // Handle match case body - can be a block { ... } or an expression
+        // Handle match case body - can be a block { ... } or a statement / expression
         if (match({TokenType::LEFT_BRACE})) {
             matchCase.body = block();
+        } else if (match({TokenType::RETURN})) {
+            auto returnStmt = std::make_shared<LM::Frontend::AST::ReturnStatement>();
+            returnStmt->line = previous().line;
+            if (!check(TokenType::SEMICOLON) && !check(TokenType::COMMA) && !check(TokenType::RIGHT_BRACE)) {
+                returnStmt->value = expression();
+            }
+            matchCase.body = returnStmt;
+        } else if (match({TokenType::BREAK})) {
+            auto breakStmt = std::make_shared<LM::Frontend::AST::BreakStatement>();
+            breakStmt->line = previous().line;
+            matchCase.body = breakStmt;
+        } else if (match({TokenType::CONTINUE})) {
+            auto continueStmt = std::make_shared<LM::Frontend::AST::ContinueStatement>();
+            continueStmt->line = previous().line;
+            matchCase.body = continueStmt;
         } else {
             // Handle expressions in match cases without requiring semicolons
             auto exprStmt = createNodeWithContext<LM::Frontend::AST::ExprStatement>();
@@ -907,9 +929,9 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::matchStatement() {
         // Push the case BEFORE checking for trailing comma — the old code
         // dropped the last case when a trailing comma preceded the closing brace.
         stmt->cases.push_back(matchCase);
-        if (match({TokenType::COMMA})) {
-            if (check(TokenType::RIGHT_BRACE)) break;
-        } else {
+        // Match cases are separated by optional commas
+        match({TokenType::COMMA});
+        if (check(TokenType::RIGHT_BRACE)) {
             break;
         }
     }

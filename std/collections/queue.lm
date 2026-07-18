@@ -96,6 +96,10 @@ pub frame PriorityQueue {
         return len(self.heap);
     }
 
+    pub fn length(): int {
+        return self.len();
+    }
+
     fn _sift_up(idx: int) {
         while (idx > 0) {
             var parent = (idx - 1) / 2;
@@ -155,6 +159,10 @@ pub frame Stack {
 
     pub fn len(): int {
         return self.data.len();
+    }
+
+    pub fn length(): int {
+        return self.len();
     }
 }
 
@@ -227,5 +235,30 @@ pub frame BitSet {
             bit = bit + 1;
         }
         return total;
+    }
+
+    pub fn get_size(): int {
+        return self.size;
+    }
+
+    pub fn iterator(): BitSetIterator {
+        return BitSetIterator(bitset=self, current=0);
+    }
+}
+
+pub frame BitSetIterator {
+    var bitset: BitSet;
+    var current: int;
+
+    pub fn next(): any {
+        while (self.current < self.bitset.get_size()) {
+            if (self.bitset.contains(self.current)) {
+                var result = self.current;
+                self.current = self.current + 1;
+                return result;
+            }
+            self.current = self.current + 1;
+        }
+        return nil;
     }
 }

@@ -119,6 +119,17 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseSinglePattern() {
         varExpr->name = token.lexeme;
         return varExpr;
     }
+    // Parse literal patterns (integers, hex, floats, scientific, strings, booleans, nil, and negative numbers)
+    if (check(TokenType::INT_LITERAL) || check(TokenType::HEX_LITERAL) || check(TokenType::FLOAT_LITERAL) ||
+        check(TokenType::SCIENTIFIC_LITERAL) || check(TokenType::STRING) || check(TokenType::TRUE) ||
+        check(TokenType::FALSE) || check(TokenType::NIL) || check(TokenType::MINUS)) {
+        return expression();
+    }
+    // Fallback: if we can't parse a pattern, advance to avoid infinite loop
+    if (!isAtEnd()) {
+        error("Expected pattern in match case", false);
+        advance();
+    }
     return expression();
 }
 
@@ -230,7 +241,10 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseValPattern() {
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseErrPattern() {
     auto pattern = std::make_shared<LM::Frontend::AST::ErrPatternExpr>();
     pattern->line = previous().line;
-    pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name after 'err'.").lexeme;
+    // Variable name is optional in err patterns
+    if (check(TokenType::IDENTIFIER)) {
+        pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name after 'err'.").lexeme;
+    }
     if (match({TokenType::COLON})) pattern->errorType = consume(TokenType::IDENTIFIER, "Expected error type after ':'.").lexeme;
     return pattern;
 }

@@ -79,7 +79,6 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseUnionType() {
 std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
     auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
     if (match({TokenType::LEFT_BRACKET})) {
-        auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
         type->isList = true; type->typeName = "list";
         if (!check(TokenType::RIGHT_BRACKET)) type->elementType = parseBasicType();
         else {
@@ -87,16 +86,13 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::parseBasicType() {
             anyType->typeName = "list"; anyType->isPrimitive = true; type->elementType = anyType;
         }
         consume(TokenType::RIGHT_BRACKET, "Expected ']' after list element type.");
-        return type;
-    }
-    if (match({TokenType::LEFT_PAREN})) {
+    } else if (match({TokenType::LEFT_PAREN})) {
         type->isTuple = true; type->typeName = "tuple";
         if (!check(TokenType::RIGHT_PAREN)) { do { type->tupleTypes.push_back(parseBasicType()); } while (match({TokenType::COMMA})); }
         consume(TokenType::RIGHT_PAREN, "Expected ')' after tuple element types.");
-        return type;
-    }
-    if (match({TokenType::LEFT_BRACE})) return parseBraceType();
-    if (isIdentifierLike(peek()) && peek().type != TokenType::FN && peek().type != TokenType::FUNCTION_TYPE && !isPrimitiveType(peek().type) && !isKnownTypeName(peek().lexeme)) {
+    } else if (match({TokenType::LEFT_BRACE})) {
+        type = parseBraceType();
+    } else if (isIdentifierLike(peek()) && peek().type != TokenType::FN && peek().type != TokenType::FUNCTION_TYPE && !isPrimitiveType(peek().type) && !isKnownTypeName(peek().lexeme)) {
         type->typeName = advance().lexeme;
         while (match({TokenType::DOT})) {
             if (isIdentifierLike(peek())) {

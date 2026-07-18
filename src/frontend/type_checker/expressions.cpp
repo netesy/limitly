@@ -2046,6 +2046,13 @@ void TypeChecker::resolve_call_arguments(std::shared_ptr<LM::Frontend::AST::Call
                     size_t opt_idx = i - params.size();
                     if (opt_idx < optional_params.size() && optional_params[opt_idx].second.second) {
                         mapped_args.push_back(optional_params[opt_idx].second.second);
+                    } else if (opt_idx < optional_params.size() && optional_params[opt_idx].second.first && optional_params[opt_idx].second.first->isOptional) {
+                        // Optional type (str?) without explicit default - use nil
+                        auto nil_expr = std::make_shared<LM::Frontend::AST::LiteralExpr>();
+                        nil_expr->value = nullptr;
+                        nil_expr->literalType = LM::Frontend::TokenType::NIL;
+                        nil_expr->inferred_type = type_system.NIL_TYPE;
+                        mapped_args.push_back(nil_expr);
                     } else {
                         add_error("Missing argument for optional parameter '" + param_name + "' with no default value in call to '" + qualified_name + "'", expr->line);
                         has_errors = true;

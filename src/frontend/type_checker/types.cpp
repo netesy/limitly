@@ -8,16 +8,18 @@ namespace Frontend {
 TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::TypeAnnotation> annotation) {
     if (!annotation) return nullptr;
     
-     // Handle structural types
+    TypePtr base_type = nullptr;
+
+    // Handle structural types
     if (annotation->isStructural && !annotation->structuralFields.empty()) {
         std::vector<std::pair<std::string, TypePtr>> fields;
         for (const auto& field : annotation->structuralFields) {
             fields.push_back({field.name, resolve_type_annotation(field.type)});
         }
-        return type_system.createStructuralType(fields, annotation->hasRest);
+        base_type = type_system.createStructuralType(fields, annotation->hasRest);
     }
     // Handle union types
-    if (annotation->isUnion && !annotation->unionTypes.empty()) {
+    else if (annotation->isUnion && !annotation->unionTypes.empty()) {
         std::vector<TypePtr> union_member_types;
         
         // Resolve each type in the union
@@ -30,23 +32,23 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
         
         if (!union_member_types.empty()) {
             // Create a union type using the type system
-            return type_system.createUnionType(union_member_types);
+            base_type = type_system.createUnionType(union_member_types);
         }
     }
     
     // Handle List types (e.g., [int])
-    if (annotation->isList) {
+    else if (annotation->isList) {
         TypePtr elemType = type_system.ANY_TYPE;
         if (annotation->elementType) {
             elemType = resolve_type_annotation(annotation->elementType);
         } else if (!annotation->functionParams.empty()) {
             elemType = resolve_type_annotation(annotation->functionParams[0]);
         }
-        return type_system.createTypedListType(elemType);
+        base_type = type_system.createTypedListType(elemType);
     }
 
     // Handle Dict types (e.g., {str: int})
-    if (annotation->isDict) {
+    else if (annotation->isDict) {
         TypePtr keyType = type_system.ANY_TYPE;
         TypePtr valType = type_system.ANY_TYPE;
         if (annotation->keyType && annotation->valueType) {
@@ -56,20 +58,20 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
             keyType = resolve_type_annotation(annotation->functionParams[0]);
             valType = resolve_type_annotation(annotation->functionParams[1]);
         }
-        return type_system.createTypedDictType(keyType, valType);
+        base_type = type_system.createTypedDictType(keyType, valType);
     }
 
     // Handle Tuple types (e.g., (int, str))
-    if (annotation->isTuple) {
+    else if (annotation->isTuple) {
         std::vector<TypePtr> elementTypes;
         for (const auto& t : annotation->tupleTypes) {
             elementTypes.push_back(resolve_type_annotation(t));
         }
-        return type_system.createTupleType(elementTypes);
+        base_type = type_system.createTupleType(elementTypes);
     }
 
     // Handle Function types (e.g., fn(int, int): int)
-    if (annotation->isFunction) {
+    else if (annotation->isFunction) {
         std::vector<TypePtr> paramTypes;
         std::vector<std::string> paramNames;
         
@@ -80,14 +82,14 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
                 paramNames.push_back(p.name);
             }
             TypePtr returnType = func_annot->returnType ? resolve_type_annotation(func_annot->returnType) : type_system.NIL_TYPE;
-            return type_system.createFunctionType(paramNames, paramTypes, returnType);
+            base_type = type_system.createFunctionType(paramNames, paramTypes, returnType);
         } else if (!annotation->functionParameters.empty()) {
             for (const auto& p : annotation->functionParameters) {
                 paramTypes.push_back(resolve_type_annotation(p.type));
                 paramNames.push_back(p.name);
             }
             TypePtr returnType = annotation->returnType ? resolve_type_annotation(annotation->returnType) : type_system.NIL_TYPE;
-            return type_system.createFunctionType(paramNames, paramTypes, returnType);
+            base_type = type_system.createFunctionType(paramNames, paramTypes, returnType);
         } else {
             // Fallback for legacy functionParams
             for (const auto& p : annotation->functionParams) {
@@ -95,59 +97,60 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
                 paramNames.push_back("");
             }
             TypePtr returnType = annotation->returnType ? resolve_type_annotation(annotation->returnType) : type_system.NIL_TYPE;
-            return type_system.createFunctionType(paramNames, paramTypes, returnType);
+            base_type = type_system.createFunctionType(paramNames, paramTypes, returnType);
         }
     }
+    else {
+        std::string type_name = annotation->typeName;
+        size_t dot_pos = type_name.find('.');
+        if (dot_pos != std::string::npos) {
+            std::string alias = type_name.substr(0, dot_pos);
+            std::string member = type_name.substr(dot_pos + 1);
+            if (import_aliases.count(alias)) {
+                type_name = import_aliases[alias] + "." + member;
+            }
+        }
 
-    std::string type_name = annotation->typeName;
-    size_t dot_pos = type_name.find('.');
-    if (dot_pos != std::string::npos) {
-        std::string alias = type_name.substr(0, dot_pos);
-        std::string member = type_name.substr(dot_pos + 1);
-        if (import_aliases.count(alias)) {
-            type_name = import_aliases[alias] + "." + member;
-        }
-    }
+        // First try to get the base type from the type system (handles built-in types and aliases)
+        base_type = type_system.getType(type_name);
 
-    // First try to get the base type from the type system (handles built-in types and aliases)
-    TypePtr base_type = type_system.getType(type_name);
-    
-    // If not found with the expanded name, try the original name
-    if (!base_type || base_type->tag == TypeTag::Nil) {
-        base_type = type_system.getType(annotation->typeName);
-    }
-    
-    // Check if getType returned NIL_TYPE (which means type not found)
-    if (base_type && base_type->tag == TypeTag::Nil) {
-        // Type not found, try type alias
-        try {
-            base_type = type_system.getTypeAlias(type_name);
-        } catch (...) {
-            base_type = nullptr;
+        // If not found with the expanded name, try the original name
+        if (!base_type || base_type->tag == TypeTag::Nil) {
+            base_type = type_system.getType(annotation->typeName);
         }
-    }
-    
-    if (!base_type || base_type->tag == TypeTag::Nil) {
-        // Handle special cases that might not be in the type system yet
-        if (annotation->typeName == "atomic") {
-            // atomic is an alias for i64
-            base_type = type_system.INT64_TYPE;
-        } else if (annotation->typeName == "any") {
-            // any is the top type
-            base_type = type_system.ANY_TYPE;
-        } else if (annotation->typeName == "channel") {
-            // channel type is represented as any (channel handle)
-            base_type = type_system.ANY_TYPE;
-        } else if (annotation->typeName == "nil") {
-            base_type = type_system.NIL_TYPE;
-        } else {
-            // If it's not a built-in type, it might be a user-defined type alias or enum
-            TypePtr custom_type = type_system.getType(annotation->typeName);
-            if (custom_type && custom_type->tag != TypeTag::Nil) {
-                base_type = custom_type;
+
+        // Check if getType returned NIL_TYPE (which means type not found)
+        if (base_type && base_type->tag == TypeTag::Nil) {
+            // Type not found, try type alias
+            try {
+                base_type = type_system.getTypeAlias(type_name);
+            } catch (...) {
+                base_type = nullptr;
+            }
+        }
+
+        if (!base_type || base_type->tag == TypeTag::Nil) {
+            // Handle special cases that might not be in the type system yet
+            if (annotation->typeName == "atomic") {
+                // atomic is an alias for i64
+                base_type = type_system.INT64_TYPE;
+            } else if (annotation->typeName == "any") {
+                // any is the top type
+                base_type = type_system.ANY_TYPE;
+            } else if (annotation->typeName == "channel") {
+                // channel type is represented as any (channel handle)
+                base_type = type_system.ANY_TYPE;
+            } else if (annotation->typeName == "nil") {
+                base_type = type_system.NIL_TYPE;
             } else {
-                add_error("Unknown type: " + annotation->typeName);
-                return type_system.NIL_TYPE;
+                // If it's not a built-in type, it might be a user-defined type alias or enum
+                TypePtr custom_type = type_system.getType(annotation->typeName);
+                if (custom_type && custom_type->tag != TypeTag::Nil) {
+                    base_type = custom_type;
+                } else {
+                    add_error("Unknown type: " + annotation->typeName);
+                    return type_system.NIL_TYPE;
+                }
             }
         }
     }
@@ -180,6 +183,11 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
         return type_system.createFallibleType(base_type);
     }
     
+    // Handle specific fallible/error union types (e.g., int?DivisionByZero)
+    if (annotation->isFallible) {
+        return type_system.createErrorUnionType(base_type, annotation->errorTypes, false);
+    }
+
     return base_type;
 }
 
@@ -188,6 +196,8 @@ bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
     if (expected->tag == TypeTag::Any || actual->tag == TypeTag::Any) return true;
     // Allow nil to be compatible with function types (for optional function parameters)
     if (actual->tag == TypeTag::Nil && expected->tag == TypeTag::Function) return true;
+    // Allow nil to be compatible with fallible types (for optional parameters like str?)
+    if (actual->tag == TypeTag::Nil && type_system.isFallibleType(expected)) return true;
     if (is_numeric_type(expected) && is_numeric_type(actual)) {
         if (is_decimal_type(expected) || is_decimal_type(actual)) {
             return expected->tag == actual->tag;
@@ -537,7 +547,33 @@ void TypeChecker::validate_function_body_error_types(const std::shared_ptr<LM::F
     // If function declares specific error types, validate they can be produced
     if (!stmt->declaredErrorTypes.empty()) {
         for (const auto& declaredError : stmt->declaredErrorTypes) {
-            if (!can_function_produce_error_type(stmt->body, declaredError)) {
+            bool can_produce = false;
+            TypePtr resolved = type_system.getType(declaredError);
+            if (!resolved || resolved->tag == TypeTag::Nil) {
+                try {
+                    resolved = type_system.getTypeAlias(declaredError);
+                } catch (...) {
+                    resolved = nullptr;
+                }
+            }
+            if (resolved && resolved->tag == TypeTag::Union) {
+                if (const auto* unionPtr = std::get_if<UnionType>(&resolved->extra)) {
+                    for (const auto& variantName : unionPtr->variantNames) {
+                        std::string cleanName = variantName;
+                        if (cleanName.rfind("Frame<", 0) == 0 && cleanName.back() == '>') {
+                            cleanName = cleanName.substr(6, cleanName.size() - 7);
+                        }
+                        if (can_function_produce_error_type(stmt->body, cleanName)) {
+                            can_produce = true;
+                            break;
+                        }
+                    }
+                }
+            } else {
+                can_produce = can_function_produce_error_type(stmt->body, declaredError);
+            }
+
+            if (!can_produce) {
                 add_error("Function '" + stmt->name + "' declares error type '" + declaredError + 
                         "' but function body cannot produce this error type", stmt->line);
             }
@@ -545,7 +581,41 @@ void TypeChecker::validate_function_body_error_types(const std::shared_ptr<LM::F
         
         // Check for undeclared error types that body might produce
         for (const auto& inferredError : inferredErrorTypes) {
-            if (std::find(stmt->declaredErrorTypes.begin(), stmt->declaredErrorTypes.end(), inferredError) == stmt->declaredErrorTypes.end()) {
+            bool declared = false;
+            for (const auto& declaredError : stmt->declaredErrorTypes) {
+                if (declaredError == inferredError) {
+                    declared = true;
+                    break;
+                }
+                TypePtr resolved = type_system.getType(declaredError);
+                if (!resolved || resolved->tag == TypeTag::Nil) {
+                    try {
+                        resolved = type_system.getTypeAlias(declaredError);
+                    } catch (...) {
+                        resolved = nullptr;
+                    }
+                }
+                if (resolved && resolved->tag == TypeTag::Union) {
+                    if (const auto* unionPtr = std::get_if<UnionType>(&resolved->extra)) {
+                        bool found_in_union = false;
+                        for (const auto& variantName : unionPtr->variantNames) {
+                            std::string cleanName = variantName;
+                            if (cleanName.rfind("Frame<", 0) == 0 && cleanName.back() == '>') {
+                                cleanName = cleanName.substr(6, cleanName.size() - 7);
+                            }
+                            if (cleanName == inferredError) {
+                                found_in_union = true;
+                                break;
+                            }
+                        }
+                        if (found_in_union) {
+                            declared = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (!declared) {
                 add_error("Function '" + stmt->name + "' body can produce error type '" + inferredError + 
                         "' but it is not declared in function signature", stmt->line);
             }
@@ -578,6 +648,20 @@ std::vector<std::string> TypeChecker::infer_function_error_types(const std::shar
         // Check for fallible expressions that might propagate errors
         auto exprErrors = infer_expression_error_types(exprStmt->expression);
         errorTypes.insert(errorTypes.end(), exprErrors.begin(), exprErrors.end());
+    } else if (auto matchStmt = std::dynamic_pointer_cast<LM::Frontend::AST::MatchStatement>(body)) {
+        for (const auto& matchCase : matchStmt->cases) {
+            auto caseErrors = infer_function_error_types(matchCase.body);
+            errorTypes.insert(errorTypes.end(), caseErrors.begin(), caseErrors.end());
+        }
+    } else if (auto forStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ForStatement>(body)) {
+        auto forErrors = infer_function_error_types(forStmt->body);
+        errorTypes.insert(errorTypes.end(), forErrors.begin(), forErrors.end());
+    } else if (auto whileStmt = std::dynamic_pointer_cast<LM::Frontend::AST::WhileStatement>(body)) {
+        auto whileErrors = infer_function_error_types(whileStmt->body);
+        errorTypes.insert(errorTypes.end(), whileErrors.begin(), whileErrors.end());
+    } else if (auto iterStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IterStatement>(body)) {
+        auto iterErrors = infer_function_error_types(iterStmt->body);
+        errorTypes.insert(errorTypes.end(), iterErrors.begin(), iterErrors.end());
     }
     
     // Remove duplicates
@@ -661,6 +745,18 @@ bool TypeChecker::can_function_produce_error_type(const std::shared_ptr<LM::Fron
         // Check for fallible expressions that might propagate errors
         auto exprErrors = infer_expression_error_types(exprStmt->expression);
         return std::find(exprErrors.begin(), exprErrors.end(), errorType) != exprErrors.end();
+    } else if (auto matchStmt = std::dynamic_pointer_cast<LM::Frontend::AST::MatchStatement>(body)) {
+        for (const auto& matchCase : matchStmt->cases) {
+            if (can_function_produce_error_type(matchCase.body, errorType)) {
+                return true;
+            }
+        }
+    } else if (auto forStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ForStatement>(body)) {
+        return can_function_produce_error_type(forStmt->body, errorType);
+    } else if (auto whileStmt = std::dynamic_pointer_cast<LM::Frontend::AST::WhileStatement>(body)) {
+        return can_function_produce_error_type(whileStmt->body, errorType);
+    } else if (auto iterStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IterStatement>(body)) {
+        return can_function_produce_error_type(iterStmt->body, errorType);
     }
     
     return false;

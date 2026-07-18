@@ -251,6 +251,10 @@ pub fn to_upper(value: str): str {
     return result;
 }
 
+pub fn uppercase(value: str): str {
+    return to_upper(value);
+}
+
 pub fn compare(left: str, right: str): int {
     if (left < right) { return -1; }
     if (left > right) { return 1; }
