@@ -164,17 +164,17 @@ frame CryptoRandom {
 
 // ---- Internal helpers ----
 fn byte_ord(ch: str): int {
-    if (ch >= "a" and ch <= "z") {
-        if (len(ch) == 1) return 97 + (ch - "a");
-        return 97;
+    var alphabet = "abcdefghijklmnopqrstuvwxyz";
+    for (var i = 0; i < len(alphabet); i = i + 1) {
+        if (substring(alphabet, i, i + 1) == ch) return 97 + i;
     }
-    if (ch >= "A" and ch <= "Z") {
-        if (len(ch) == 1) return 65 + (ch - "A");
-        return 65;
+    var u_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    for (var i = 0; i < len(u_alphabet); i = i + 1) {
+        if (substring(u_alphabet, i, i + 1) == ch) return 65 + i;
     }
-    if (ch >= "0" and ch <= "9") {
-        if (len(ch) == 1) return 48 + (ch - "0");
-        return 48;
+    var digits = "0123456789";
+    for (var i = 0; i < len(digits); i = i + 1) {
+        if (substring(digits, i, i + 1) == ch) return 48 + i;
     }
     if (ch == " ") return 32;
     if (ch == "\n") return 10;
