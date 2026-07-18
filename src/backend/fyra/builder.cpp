@@ -1,6 +1,7 @@
 // builder.cpp - LIR to Fyra IR Conversion Implementation
 #include "builder.hh"
 #include "../../lir/lir.hh"
+#include "capability_mapper.hh"
 #include "ir/Module.h"
 #include "ir/Function.h"
 #include "ir/IRBuilder.h"
@@ -47,8 +48,12 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
 
     std::unordered_map<uint32_t, ir::BasicBlock*> block_map;
     if (lir_func.cfg && !lir_func.cfg->blocks.empty()) {
-        for (const auto& block : lir_func.cfg->blocks) {
-            block_map[block->id] = builder_->createBasicBlock(block->label.empty() ? "block_" + std::to_string(block->id) : block->label, main_fn);
+        for (size_t i = 0; i < lir_func.cfg->blocks.size(); ++i) {
+            if (!lir_func.cfg->blocks[i]) continue;
+            const auto& block = lir_func.cfg->blocks[i];
+            if (block->id == UINT32_MAX) continue;
+            std::string block_name = block->label.empty() ? "block_" + std::to_string(block->id) : block->label;
+            block_map[block->id] = builder_->createBasicBlock(block_name, main_fn);
         }
     } else {
         for (const auto& inst : lir_func.instructions) {
@@ -261,11 +266,135 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             }
             case LIR::LIR_Op::Return:
             case LIR::LIR_Op::Ret:
-                if (inst.a != 0 || inst.type_a != LIR::Type::Void) builder_->createRet(load_reg(inst.a, inst.type_a));
-                else builder_->createRet(context_->getConstantInt(context_->getIntegerType(64), 0));
+                if (inst.a != 0 || inst.type_a != LIR::Type::Void) {
+                    ir::Value* ret_val = load_reg(inst.a, inst.type_a);
+                    builder_->createRet(ret_val);
+                } else {
+                    builder_->createRet(context_->getConstantInt(context_->getIntegerType(64), 0));
+                }
                 terminated = true;
                 break;
             case LIR::LIR_Op::Nop: break;
+            // Memory Operations
+            case LIR::LIR_Op::MemoryAlloc: {
+                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryAlloc);
+                if (cap) {
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a)};
+                    ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
+                    store_reg(inst.dst, res, inst.result_type);
+                }
+                break;
+            }
+            case LIR::LIR_Op::MemoryFree: {
+                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryFree);
+                if (cap) {
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a)};
+                    builder_->createExternCall(cap->name, args, nullptr);
+                }
+                break;
+            }
+            case LIR::LIR_Op::MemoryResize: {
+                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryResize);
+                if (cap) {
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)};
+                    ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
+                    store_reg(inst.dst, res, inst.result_type);
+                }
+                break;
+            }
+            case LIR::LIR_Op::MemoryCopy: {
+                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryCopy);
+                if (cap) {
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm)};
+                    builder_->createExternCall(cap->name, args, nullptr);
+                }
+                break;
+            }
+            case LIR::LIR_Op::MemoryFill: {
+                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryFill);
+                if (cap) {
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm)};
+                    builder_->createExternCall(cap->name, args, nullptr);
+                }
+                break;
+            }
+            case LIR::LIR_Op::MemoryCompare: {
+                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryCompare);
+                if (cap) {
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm)};
+                    ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
+                    store_reg(inst.dst, res, inst.result_type);
+                }
+                break;
+            }
+            // Pointer Operations - use Fyra IR arithmetic directly
+            case LIR::LIR_Op::PtrAdd:
+                store_reg(inst.dst, builder_->createAdd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::PtrSub:
+                store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::PtrDiff:
+                store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::PtrAlign: {
+                // Alignment: (ptr + (alignment - 1)) & ~(alignment - 1)
+                ir::Value* align_minus_one = builder_->createSub(load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), 1));
+                ir::Value* aligned = builder_->createAdd(load_reg(inst.a, inst.type_a), align_minus_one);
+                ir::Value* mask = builder_->createXor(align_minus_one, context_->getConstantInt(context_->getIntegerType(64), -1));
+                store_reg(inst.dst, builder_->createAnd(aligned, mask), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::PtrIsAligned: {
+                // Check if (ptr & (alignment - 1)) == 0
+                ir::Value* align_minus_one = builder_->createSub(load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), 1));
+                ir::Value* masked = builder_->createAnd(load_reg(inst.a, inst.type_a), align_minus_one);
+                store_reg(inst.dst, builder_->createCeq(masked, context_->getConstantInt(context_->getIntegerType(64), 0)), inst.result_type);
+                break;
+            }
+            // Dynamic Linking Operations
+            case LIR::LIR_Op::LibraryLoad: {
+                auto cap = CapabilityMapper::map(LIR::LIR_Op::LibraryLoad);
+                if (cap) {
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a)};
+                    ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
+                    store_reg(inst.dst, res, inst.result_type);
+                }
+                break;
+            }
+            case LIR::LIR_Op::LibraryUnload: {
+                auto cap = CapabilityMapper::map(LIR::LIR_Op::LibraryUnload);
+                if (cap) {
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a)};
+                    builder_->createExternCall(cap->name, args, nullptr);
+                }
+                break;
+            }
+            case LIR::LIR_Op::LibrarySymbol: {
+                auto cap = CapabilityMapper::map(LIR::LIR_Op::LibrarySymbol);
+                if (cap) {
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)};
+                    ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
+                    store_reg(inst.dst, res, inst.result_type);
+                }
+                break;
+            }
+            // Foreign Call Operations
+            case LIR::LIR_Op::ForeignCall: {
+                std::vector<ir::Value*> args;
+                for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
+                ir::Value* callee = load_reg(inst.a, inst.type_a);
+                ir::Value* res = builder_->createCall(callee, args, lir_type_to_fyra_type(inst.result_type));
+                if (inst.dst != 0) store_reg(inst.dst, res, inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::ForeignCallDirect: {
+                std::vector<ir::Value*> args;
+                for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
+                ir::Value* res = builder_->createExternCall(inst.func_name, args, lir_type_to_fyra_type(inst.result_type));
+                if (inst.dst != 0) store_reg(inst.dst, res, inst.result_type);
+                break;
+            }
             default:
                 if (inst.dst != 0) store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
                 break;

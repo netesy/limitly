@@ -37,7 +37,19 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         if (auto enum_decl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) {
             EnumType enumTypeInfo;
             enumTypeInfo.name = name;
-            for (const auto& variant : enum_decl->variants) enumTypeInfo.addVariant(variant.first);
+            for (const auto& variant : enum_decl->variants) {
+                std::vector<TypePtr> associated;
+                for (const auto& t : variant.second) {
+                    // Try to resolve type annotation - may fail if forward reference, but that's OK
+                    try {
+                        TypePtr resolved = resolve_type_annotation(t);
+                        if (resolved) associated.push_back(resolved);
+                    } catch (...) {
+                        // If resolution fails, leave empty - will be filled in Pass 2
+                    }
+                }
+                enumTypeInfo.addVariant(variant.first, associated);
+            }
             TypePtr enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
             type_system.addUserDefinedType(name, enumType);
 

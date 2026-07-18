@@ -1,20 +1,22 @@
 // Filesystem structure module
 import std.path as path;
 import std.io as io;
-import std.io show UnknownError;
+import std.io show FileNotFound, PermissionDenied, DiskFull, NetworkError, UnknownError;
+
+pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
 
 frame FS {
     pub fn exists(p: path.Path): bool { return io.exists(p.value); }
-    pub fn create_dir(p: path.Path): nil?io.IOError { return io.create_directory(p.value); }
-    pub fn remove(p: path.Path): nil?io.IOError {
-        if (!io.delete(p.value)) return err(UnknownError { message: "failed to remove path" });
+    pub fn create_dir(p: path.Path): nil?IOError { return io.create_directory(p.value); }
+    pub fn remove(p: path.Path): nil?IOError {
+        if (!io.delete(p.value)) return err(UnknownError(message="failed to remove path"));
         return ok(nil);
     }
-    pub fn rename(from_path: path.Path, to_path: path.Path): nil?io.IOError {
-        if (!io.rename(from_path.value, to_path.value)) return err(UnknownError { message: "failed to rename path" });
+    pub fn rename(from_path: path.Path, to_path: path.Path): nil?IOError {
+        if (!io.rename(from_path.value, to_path.value)) return err(UnknownError(message="failed to rename path"));
         return ok(nil);
     }
-    pub fn list_dir(p: path.Path): [str]?io.IOError { 
+    pub fn list_dir(p: path.Path): [str]?IOError { 
         var res = io.list_directory(p.value)?;
         return ok(res);
     }

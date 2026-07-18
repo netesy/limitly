@@ -15,7 +15,7 @@ frame Path {
         
         // Handle path separators
         var separator = "/";
-        if (self.value.ends_with(separator) or other.starts_with(separator)) {
+        if (ends_with(self.value, separator) or starts_with(other, separator)) {
             return Path(value=self.value + other);
         }
         return Path(value=self.value + separator + other);
@@ -33,27 +33,30 @@ frame Path {
 
     // Path components
     pub fn parent(): Path? {
-        if (self.value == "" or self.value == "/") return nil;
+        if (self.value == "" or self.value == "/") {
+            var fallback: Path? = nil;
+            return fallback;
+        }
         
-        var last_sep = self.value.last_index_of("/");
-        if (last_sep == -1) return Path(value="");
+        var last_sep = last_index_of(self.value, "/");
+        if (last_sep == -1) return ok(Path(value=""));
         
-        var parent_path = self.value.substring(0, last_sep);
+        var parent_path = substring(self.value, 0, last_sep);
         if (parent_path != "") {
-            return Path(value=parent_path);
+            return ok(Path(value=parent_path));
         } else {
-            return Path(value="/");
+            return ok(Path(value="/"));
         }
     }
 
     pub fn basename(): str {
         if (self.value == "" or self.value == "/") return self.value;
         
-        var last_sep = self.value.last_index_of("/");
+        var last_sep = last_index_of(self.value, "/");
         if (last_sep == -1) return self.value;
         
         if (last_sep + 1 < len(self.value)) {
-            return self.value.substring(last_sep + 1, len(self.value));
+            return substring(self.value, last_sep + 1, len(self.value));
         } else {
             return "";
         }
@@ -61,18 +64,18 @@ frame Path {
 
     pub fn stem(): str {
         var base = self.basename();
-        var last_dot = base.last_index_of(".");
+        var last_dot = last_index_of(base, ".");
         if (last_dot == -1 or last_dot == 0) return base;
         
-        return base.substring(0, last_dot);
+        return substring(base, 0, last_dot);
     }
 
     pub fn extension(): str {
         var base = self.basename();
-        var last_dot = base.last_index_of(".");
+        var last_dot = last_index_of(base, ".");
         if (last_dot == -1 or last_dot == 0 or last_dot == len(base) - 1) return "";
         
-        return base.substring(last_dot + 1, len(base));
+        return substring(base, last_dot + 1, len(base));
     }
 
     // Path normalization
@@ -87,7 +90,7 @@ frame Path {
 
     // Path properties
     pub fn is_absolute(): bool {
-        return self.value.starts_with("/") or self.value.starts_with("C:") or self.value.starts_with("D:");
+        return starts_with(self.value, "/") or starts_with(self.value, "C:") or starts_with(self.value, "D:");
     }
 
     pub fn is_relative(): bool {
@@ -101,15 +104,19 @@ frame Path {
     // Path operations
     pub fn with_extension(extension: str): Path {
         var base = self.stem();
-        var parent = self.parent();
-        if (parent == nil) return Path(value=base + "." + extension);
-        return parent.join(base + "." + extension);
+        var parent_val = self.parent();
+        match (parent_val) {
+            val parent_path => return parent_path.join(base + "." + extension),
+            nil => return Path(value=base + "." + extension)
+        }
     }
 
     pub fn with_basename(basename: str): Path {
-        var parent = self.parent();
-        if (parent == nil) return Path(value=basename);
-        return parent.join(basename);
+        var parent_val = self.parent();
+        match (parent_val) {
+            val parent_path => return parent_path.join(basename),
+            nil => return Path(value=basename)
+        }
     }
 
     // Comparison
@@ -118,11 +125,11 @@ frame Path {
     }
 
     pub fn starts_with(prefix: Path): bool {
-        return self.normalize().value.starts_with(prefix.normalize().value);
+        return starts_with(self.normalize().value, prefix.normalize().value);
     }
 
     pub fn ends_with(suffix: Path): bool {
-        return self.normalize().value.ends_with(suffix.normalize().value);
+        return ends_with(self.normalize().value, suffix.normalize().value);
     }
 
     // Formatting
@@ -155,4 +162,31 @@ pub fn join(paths: [str]): Path {
 
 pub fn normalize(path_str: str): Path {
     return Path.from_string(path_str).normalize();
+}
+
+// Helper functions for string operations since primitive strings don't have methods
+fn starts_with(s: str, prefix: str): bool {
+    var plen: int = len(prefix);
+    var slen: int = len(s);
+    if (plen > slen) return false;
+    return substring(s, 0, plen) == prefix;
+}
+
+fn ends_with(s: str, suffix: str): bool {
+    var suflen: int = len(suffix);
+    var slen: int = len(s);
+    if (suflen > slen) return false;
+    return substring(s, slen - suflen, slen) == suffix;
+}
+
+fn last_index_of(s: str, pattern: str): int {
+    var plen: int = len(pattern);
+    var slen: int = len(s);
+    if (plen > slen) return -1;
+    var i: int = slen - plen;
+    while (i >= 0) {
+        if (substring(s, i, i + plen) == pattern) return i;
+        i = i - 1;
+    }
+    return -1;
 }

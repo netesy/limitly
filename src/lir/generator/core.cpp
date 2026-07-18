@@ -30,21 +30,15 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     try {
         // Set type system reference BEFORE Pass 0
         type_system_ = type_check_result.type_system;
-        
+
         // PASS 0: Collect function, frame, and module signatures only
-        std::cout << "LIR: Pass 0 - Trait" << std::endl;
         collect_trait_signatures(*type_check_result.program);
-        std::cout << "LIR: Pass 0 - Frame" << std::endl;
         collect_frame_signatures(*type_check_result.program);
-        std::cout << "LIR: Pass 0 - Function" << std::endl;
         collect_function_signatures(type_check_result);
-        std::cout << "LIR: Pass 0 - Module" << std::endl;
         collect_module_signatures(*type_check_result.program);
-        
+
         // PASS 1: Lower function bodies into separate LIR functions
-        std::cout << "LIR: Pass 1" << std::endl;
         lower_function_bodies(type_check_result);
-        std::cout << "LIR: Pass 2" << std::endl;
     
     // PASS 2: Generate main function with top-level code only
     current_module_ = "root";

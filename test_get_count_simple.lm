@@ -1,6 +1,0 @@
-// Simple test for get_count
-import test_module_frame as test;
-
-var counter = test.Counter();
-var result = counter.get_count();
-print("Result: {result}");

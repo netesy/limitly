@@ -54,6 +54,7 @@ std::string LIR_Inst::to_string() const {
             oss << " r" << a << ", " << imm;
             break;
         case LIR_Op::Call:
+        case LIR_Op::CallBuiltin:
             // Clear and rebuild to avoid "callcall" issue
             oss.str("");
             oss.clear();

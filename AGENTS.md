@@ -202,3 +202,21 @@ frame Vector {
 - **Concurrent Block**: `concurrent { ... }` handles channel-based execution.
 - **Tasks**: `task(i in 1..10) { ... }` spawns parallel tasks.
 - **Workers**: `worker(data in stream) { ... }` processes streams.
+
+==================================================
+Backend Conformance
+==================================================
+
+The redesigned LIR is the canonical language interface.
+
+Every backend must implement the complete semantics of every LIR instruction.
+
+Backends must not require changes to the generator.
+
+Backends must not introduce backend-specific LIR instructions.
+
+Backends must not expose backend-specific concepts to the frontend.
+
+If a backend cannot faithfully implement an LIR instruction, the backend must be extended rather than weakening the language abstraction.
+
+Behavioral equivalence across all supported backends is mandatory.

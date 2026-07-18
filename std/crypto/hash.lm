@@ -24,7 +24,7 @@ frame HashEngine {
     pub var resource: res.Resource;
     pub var hasher: Hasher;
     pub init(h: int) {
-        self.resource = res.Resource(h=h, k=res.KIND_HASH);
+        self.resource = res.Resource(h=h, k=res.KIND_HASH_ENGINE);
         self.hasher = Hasher(r=self.resource);
     }
 }
@@ -51,10 +51,10 @@ frame Hash {
         }
     }
 
-    pub fn sha256(data: str): str?core.Error { return self.hash(data=data, algorithm="sha256"); }
-    pub fn sha512(data: str): str?core.Error { return self.hash(data=data, algorithm="sha512"); }
-    pub fn md5(data: str): str?core.Error { return self.hash(data=data, algorithm="md5"); }
-    pub fn sha1(data: str): str?core.Error { return self.hash(data=data, algorithm="sha1"); }
+    pub fn sha256(data: str): str?core.Error { return ok(self.hash(data=data, algorithm="sha256")?); }
+    pub fn sha512(data: str): str?core.Error { return ok(self.hash(data=data, algorithm="sha512")?); }
+    pub fn md5(data: str): str?core.Error { return ok(self.hash(data=data, algorithm="md5")?); }
+    pub fn sha1(data: str): str?core.Error { return ok(self.hash(data=data, algorithm="sha1")?); }
 
     pub fn create(algorithm: str): int?core.Error {
         match (res.create_hash_engine()) {
@@ -85,15 +85,24 @@ frame Hash {
     }
 }
 
-pub fn sha256(data: str): str?core.Error { return Hash.sha256(data=data); }
-pub fn sha512(data: str): str?core.Error { return Hash.sha512(data=data); }
-pub fn md5(data: str): str?core.Error { return Hash.md5(data=data); }
-pub fn sha1(data: str): str?core.Error { return Hash.sha1(data=data); }
+pub fn sha256(data: str): str?core.Error { return ok(Hash.sha256(data=data)?); }
+pub fn sha512(data: str): str?core.Error { return ok(Hash.sha512(data=data)?); }
+pub fn md5(data: str): str?core.Error { return ok(Hash.md5(data=data)?); }
+pub fn sha1(data: str): str?core.Error { return ok(Hash.sha1(data=data)?); }
 
 fn byte_ord(ch: str): int {
-    if (ch >= "a" and ch <= "z") return 97 + (len(ch) == 1 ? (ch - "a") : 0);
-    if (ch >= "A" and ch <= "Z") return 65 + (len(ch) == 1 ? (ch - "A") : 0);
-    if (ch >= "0" and ch <= "9") return 48 + (len(ch) == 1 ? (ch - "0") : 0);
+    if (ch >= "a" and ch <= "z") {
+        if (len(ch) == 1) return 97 + (ch - "a");
+        return 97;
+    }
+    if (ch >= "A" and ch <= "Z") {
+        if (len(ch) == 1) return 65 + (ch - "A");
+        return 65;
+    }
+    if (ch >= "0" and ch <= "9") {
+        if (len(ch) == 1) return 48 + (ch - "0");
+        return 48;
+    }
     if (ch == " ") return 32;
     if (ch == "\n") return 10;
     if (ch == "\r") return 13;

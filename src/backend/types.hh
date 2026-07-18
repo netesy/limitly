@@ -127,29 +127,19 @@ private:
     if (from->tag == TypeTag::Frame && to->tag == TypeTag::Trait) {
         auto fromFrameType = std::get_if<FrameType>(&from->extra);
         auto toTraitType = std::get_if<TraitType>(&to->extra);
-        std::cerr << "[DEBUG canConvert] Frame->Trait: fromFrame=" << (fromFrameType ? fromFrameType->name : "null") 
-                  << ", toTrait=" << (toTraitType ? toTraitType->name : "null") << std::endl;
         if (fromFrameType && toTraitType) {
-            std::cerr << "[DEBUG canConvert] Frame implements: ";
-            for (const auto& t : fromFrameType->implements) std::cerr << t << " ";
-            std::cerr << std::endl;
             // Check direct implements
             for (const auto& traitName : fromFrameType->implements) {
                 if (traitName == toTraitType->name) {
-                    std::cerr << "[DEBUG canConvert] Found match!" << std::endl;
                     return true;
                 }
             }
-            
+
             // Check frame registry for more complete info
             if (frameRegistry.count(fromFrameType->name)) {
                 const auto& info = frameRegistry.at(fromFrameType->name);
-                std::cerr << "[DEBUG canConvert] Frame registry implements: ";
-                for (const auto& t : info.implements) std::cerr << t << " ";
-                std::cerr << std::endl;
                 for (const auto& traitName : info.implements) {
                     if (traitName == toTraitType->name) {
-                        std::cerr << "[DEBUG canConvert] Found match in registry!" << std::endl;
                         return true;
                     }
                 }
@@ -603,27 +593,10 @@ public:
     const std::string TIMEOUT_ERROR_STR = "TimeoutError";
 
     TypePtr getType(const std::string& name) {
-        if (name == "res.Resource" || name == "Resource") {
-            std::cerr << "[DEBUG getType] name=" << name << ", registered userDefinedTypes:" << std::endl;
-            for (const auto& kv : userDefinedTypes) {
-                std::cerr << "  - " << kv.first << std::endl;
-            }
-        }
         // 1. Check contextual scopes (inner to outer)
         for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
             auto found = it->find(name);
             if (found != it->end()) {
-                if (name == "Shape") {
-                    std::cerr << "[DEBUG getType] Shape found in scopeStack, tag=" << static_cast<int>(found->second->tag);
-                    if (found->second->tag == TypeTag::Trait) {
-                        if (const auto* traitData = std::get_if<TraitType>(&found->second->extra)) {
-                            std::cerr << ", traitName=" << traitData->name;
-                        } else {
-                            std::cerr << ", NO TraitType data!";
-                        }
-                    }
-                    std::cerr << std::endl;
-                }
                 return found->second;
             }
         }
@@ -631,24 +604,12 @@ public:
         // 2. Check user-defined types (includes traits registered in Pass 1)
         auto it = userDefinedTypes.find(name);
         if (it != userDefinedTypes.end()) {
-            if (name == "Shape") {
-                std::cerr << "[DEBUG getType] Shape found in userDefinedTypes, tag=" << static_cast<int>(it->second->tag);
-                if (it->second->tag == TypeTag::Trait) {
-                    if (const auto* traitData = std::get_if<TraitType>(&it->second->extra)) {
-                        std::cerr << ", traitName=" << traitData->name;
-                    } else {
-                        std::cerr << ", NO TraitType data!";
-                    }
-                }
-                std::cerr << std::endl;
-            }
             return it->second;
         }
-        
+
         // 3. Check persistent registries for frames/traits
         if (frameRegistry.count(name)) return createFrameType(name);
         if (traitRegistry.count(name)) {
-            std::cerr << "[DEBUG] getType('" << name << "') found in traitRegistry" << std::endl;
             return getCanonicalType("trait:" + name, [&]() {
                 TraitType traitTypeData;
                 traitTypeData.name = name;

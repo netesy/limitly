@@ -15,7 +15,7 @@ frame Resolver {
 frame DNS {
     pub fn resolve(host: str): str?core.Error {
         if (host == "") return err(Error(code="ERR", message="fail"));
-        var r = res.create_dns_resolver();
+        var r = res.create_dns_resolver()?;
         var resolver = Resolver(r=r);
         var result = resolver.resolve(host=host);
         r.close();

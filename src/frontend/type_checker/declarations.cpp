@@ -319,11 +319,15 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
             }
         }
         
+        auto prev_return_type = current_return_type;
+        current_return_type = type_system.NIL_TYPE;
+
         // Check init body
         if (frame->init->body) {
             check_statement(frame->init->body);
         }
         
+        current_return_type = prev_return_type;
         exit_scope();
     }
     
@@ -338,7 +342,10 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
         // Check deinit body
         if (frame->deinit->body) {
             enter_scope();
+            auto prev_return_type = current_return_type;
+            current_return_type = type_system.NIL_TYPE;
             check_statement(frame->deinit->body);
+            current_return_type = prev_return_type;
             exit_scope();
         }
     }
@@ -369,11 +376,17 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
             }
         }
         
+        // Set the return type of the method for return statements checked within its body
+        TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
+        auto prev_return_type = current_return_type;
+        current_return_type = return_type;
+
         // Check method body
         if (method->body) {
             check_statement(method->body);
         }
         
+        current_return_type = prev_return_type;
         exit_scope();
     }
     
