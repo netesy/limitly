@@ -1283,7 +1283,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             (func_name.length() >= 4 && func_name.substr(func_name.length()-4) == ".len") ||
             (func_name.length() >= 7 && func_name.substr(func_name.length()-7) == ".length")) {
             op = LIR_Op::CallBuiltin; vm_name = "len"; is_builtin = true;
-        } else if (func_name == "print" || func_name == "assert" || func_name == "to_upper" || func_name == "to_lower" || func_name == "trim" || func_name == "replace" || func_name == "split" || func_name == "substring") {
+        } else if (func_name == "print" || func_name == "assert") {
             op = LIR_Op::CallBuiltin; is_builtin = true;
         } else if (func_name.length() >= 9 && func_name.substr(0, 9) == "_builtin_") {
             op = LIR_Op::CallBuiltin; vm_name = func_name.substr(9); is_builtin = true;
