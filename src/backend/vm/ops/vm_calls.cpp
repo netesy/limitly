@@ -56,7 +56,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
                 }
             } else if (pc->func_name == "assert") {
-                bool condition = to_bool(registers[pc->call_args[0]]);
+                bool condition = (registers[pc->call_args[0]] == VAL_TRUE);
                 if (!condition) {
                     std::string msg = "Assertion failed";
                     if (pc->call_args.size() > 1) msg = to_string(registers[pc->call_args[1]]);
