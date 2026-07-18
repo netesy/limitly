@@ -691,6 +691,10 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::R
                 is_already_wrapped = true;
             } else if (auto ok_construct = std::dynamic_pointer_cast<LM::Frontend::AST::OkConstructExpr>(return_stmt->value)) {
                 is_already_wrapped = true;
+            } else if (type_system.isFallibleType(return_type)) {
+                is_already_wrapped = true;
+            } else if (return_type->tag == TypeTag::Nil) {
+                is_already_wrapped = true;
             }
             
             if (!is_already_wrapped) {

@@ -9,13 +9,14 @@ frame CryptoRandom {
 
     // Generate `length` random bytes, returned as a hex string.
     pub fn bytes_hex(length: int): str?core.Error {
-        if (length < 0) return err(Error { code: "ERR", message: "negative length" });
+        if (length < 0) return err(Error(code="ERR", message="negative length"));
         if (length == 0) return ok("");
-        match res.create(res.KIND_ENTROPY, []) {
-            case ok(entropy) => {
-                var raw = entropy.read([length]);
+        match (res.create(res.KIND_ENTROPY, [])) {
+            val entropy => {
+                var rd = res.Reader(r=entropy);
+                var raw = rd.read(args=[length]);
                 entropy.close();
-                if (raw == nil) return err(Error { code: "ERR", message: "entropy read failed" });
+                if (raw == nil) return err(Error(code="ERR", message="entropy read failed"));
                 // raw is a string of binary data; encode as hex
                 var result: str = "";
                 var i: int = 0;
@@ -29,20 +30,21 @@ frame CryptoRandom {
                     i = i + 1;
                 }
                 return ok(result);
-            }
-            case err(e) => return err(Error { code: "ERR", message: "entropy source unavailable" });
+            },
+            err e => return err(Error(code="ERR", message="entropy source unavailable"))
         }
     }
 
     // Generate `count` random bytes, returned as a base64 string.
     pub fn bytes_base64(count: int): str?core.Error {
-        if (count < 0) return err(Error { code: "ERR", message: "negative count" });
+        if (count < 0) return err(Error(code="ERR", message="negative count"));
         if (count == 0) return ok("");
-        match res.create(res.KIND_ENTROPY, []) {
-            case ok(entropy) => {
-                var raw = entropy.read([count]);
+        match (res.create(res.KIND_ENTROPY, [])) {
+            val entropy => {
+                var rd = res.Reader(r=entropy);
+                var raw = rd.read(args=[count]);
                 entropy.close();
-                if (raw == nil) return err(Error { code: "ERR", message: "entropy read failed" });
+                if (raw == nil) return err(Error(code="ERR", message="entropy read failed"));
                 
                 // Simple base64 encoding
                 var chars: str = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
@@ -76,21 +78,22 @@ frame CryptoRandom {
                     i = i + 3;
                 }
                 return ok(result);
-            }
-            case err(e) => return err(Error { code: "ERR", message: "entropy source unavailable" });
+            },
+            err e => return err(Error(code="ERR", message="entropy source unavailable"))
         }
     }
 
     // Generate a cryptographically secure random integer in [min, max).
     pub fn int_range(min: int, max: int): int?core.Error {
-        if (min >= max) return err(Error { code: "ERR", message: "invalid range: min must be less than max" });
+        if (min >= max) return err(Error(code="ERR", message="invalid range: min must be less than max"));
         var range_size: int = max - min;
         // Read 4 bytes for a 32-bit random value
-        match res.create(res.KIND_ENTROPY, []) {
-            case ok(entropy) => {
-                var raw = entropy.read([4]);
+        match (res.create(res.KIND_ENTROPY, [])) {
+            val entropy => {
+                var rd = res.Reader(r=entropy);
+                var raw = rd.read(args=[4]);
                 entropy.close();
-                if (raw == nil) return err(Error { code: "ERR", message: "entropy read failed" });
+                if (raw == nil) return err(Error(code="ERR", message="entropy read failed"));
                 // Use modular reduction
                 var val_int: int = 0;
                 var i: int = 0;
@@ -102,18 +105,19 @@ frame CryptoRandom {
                 }
                 if (val_int < 0) val_int = -val_int;
                 return ok(min + (val_int % range_size));
-            }
-            case err(e) => return err(Error { code: "ERR", message: "entropy source unavailable" });
+            },
+            err e => return err(Error(code="ERR", message="entropy source unavailable"))
         }
     }
 
     // Generate a UUID v4 (cryptographically random)
     pub fn uuid(): str?core.Error {
-        match res.create(res.KIND_ENTROPY, []) {
-            case ok(entropy) => {
-                var raw = entropy.read([16]);
+        match (res.create(res.KIND_ENTROPY, [])) {
+            val entropy => {
+                var rd = res.Reader(r=entropy);
+                var raw = rd.read(args=[16]);
                 entropy.close();
-                if (raw == nil) return err(Error { code: "ERR", message: "entropy read failed" });
+                if (raw == nil) return err(Error(code="ERR", message="entropy read failed"));
                 var s: str = raw as str;
                 var hex_chars: str = "0123456789abcdef";
                 var result: str = "";
@@ -136,14 +140,14 @@ frame CryptoRandom {
                     i = i + 1;
                 }
                 return ok(result);
-            }
-            case err(e) => return err(Error { code: "ERR", message: "entropy source unavailable" });
+            },
+            err e => return err(Error(code="ERR", message="entropy source unavailable"))
         }
     }
 
     // Generate a random alphanumeric string of the given length
     pub fn string(length: int, alphabet: str): str?core.Error {
-        if (length < 0) return err(Error { code: "ERR", message: "negative length" });
+        if (length < 0) return err(Error(code="ERR", message="negative length"));
         if (length == 0) return ok("");
         var alpha = alphabet;
         if (alpha == "") alpha = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
@@ -160,9 +164,18 @@ frame CryptoRandom {
 
 // ---- Internal helpers ----
 fn byte_ord(ch: str): int {
-    if (ch >= "a" and ch <= "z") return 97 + (len(ch) == 1 ? (ch - "a") : 0);
-    if (ch >= "A" and ch <= "Z") return 65 + (len(ch) == 1 ? (ch - "A") : 0);
-    if (ch >= "0" and ch <= "9") return 48 + (len(ch) == 1 ? (ch - "0") : 0);
+    var alphabet = "abcdefghijklmnopqrstuvwxyz";
+    for (var i = 0; i < len(alphabet); i = i + 1) {
+        if (substring(alphabet, i, i + 1) == ch) return 97 + i;
+    }
+    var u_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    for (var i = 0; i < len(u_alphabet); i = i + 1) {
+        if (substring(u_alphabet, i, i + 1) == ch) return 65 + i;
+    }
+    var digits = "0123456789";
+    for (var i = 0; i < len(digits); i = i + 1) {
+        if (substring(digits, i, i + 1) == ch) return 48 + i;
+    }
     if (ch == " ") return 32;
     if (ch == "\n") return 10;
     if (ch == "\r") return 13;

@@ -31,36 +31,36 @@ frame URL {
     pub fn parse(url_str: str) {
         var remaining: str = url_str;
         var i: int = 0;
-        var len: int = len(url_str);
+        var len_val: int = len(url_str);
 
         // ---- Extract fragment ----
         var frag_idx: int = find_last(remaining, "#");
         if (frag_idx != -1) {
-            self.fragment = url_decode_component(substring(remaining, frag_idx + 1, len));
+            self.fragment = url_decode_component(substring(remaining, frag_idx + 1, len_val));
             remaining = substring(remaining, 0, frag_idx);
-            len = len(remaining);
+            len_val = len(remaining);
         }
 
         // ---- Extract scheme ----
         var colon_idx: int = index_of(remaining, ":");
         if (colon_idx != -1) {
             var after_scheme: str = "";
-            if (colon_idx + 2 < len) {
+            if (colon_idx + 2 < len_val) {
                 after_scheme = substring(remaining, colon_idx + 1, colon_idx + 3);
             }
             if (after_scheme == "//") {
                 self.scheme = to_lower(substring(remaining, 0, colon_idx));
-                remaining = substring(remaining, colon_idx + 3, len);
-                len = len(remaining);
+                remaining = substring(remaining, colon_idx + 3, len_val);
+                len_val = len(remaining);
             }
         }
 
         // ---- Extract query ----
         var query_idx: int = index_of(remaining, "?");
         if (query_idx != -1) {
-            self.query = substring(remaining, query_idx + 1, len);
+            self.query = substring(remaining, query_idx + 1, len_val);
             remaining = substring(remaining, 0, query_idx);
-            len = len(remaining);
+            len_val = len(remaining);
         }
 
         // ---- Extract userinfo and host ----
@@ -68,7 +68,7 @@ frame URL {
         var authority: str = "";
         if (slash_idx != -1) {
             authority = substring(remaining, 0, slash_idx);
-            self.path = url_decode_component(substring(remaining, slash_idx, len));
+            self.path = url_decode_component(substring(remaining, slash_idx, len_val));
         } else {
             authority = remaining;
             self.path = "";
@@ -267,7 +267,7 @@ fn url_decode_component(s: str): str {
 }
 
 fn parse_query_string(qs: str): {str: str} {
-    var params: {str: str} = {};
+    var params: {str: str} = {} as {str: str};
     if (qs == "") return params;
     var pairs: [str] = split_str(qs, "&");
     var i: int = 0;
@@ -316,7 +316,13 @@ fn to_lower(s: str): str {
     while (i < len(s)) {
         var ch: str = substring(s, i, i + 1);
         if (ch >= "A" and ch <= "Z") {
-            result = result + substring("abcdefghijklmnopqrstuvwxyz", (ch - "A"), (ch - "A") + 1);
+            var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            var idx = index_of(alphabet, ch);
+            if (idx != -1) {
+                result = result + substring("abcdefghijklmnopqrstuvwxyz", idx, idx + 1);
+            } else {
+                result = result + ch;
+            }
         } else {
             result = result + ch;
         }
@@ -325,10 +331,10 @@ fn to_lower(s: str): str {
     return result;
 }
 
-fn normalize_path(path: str): str {
+fn normalize_path(path_val: str): str {
     // Remove dot segments (simplified)
     var parts: [str] = [];
-    var segments: [str] = split_str(path, "/");
+    var segments: [str] = split_str(path_val, "/");
     var i: int = 0;
     while (i < len(segments)) {
         var seg: str = segments[i];
@@ -351,7 +357,7 @@ fn normalize_path(path: str): str {
         i = i + 1;
     }
     var result: str = "";
-    if (len(path) > 0 and substring(path, 0, 1) == "/") result = "/";
+    if (len(path_val) > 0 and substring(path_val, 0, 1) == "/") result = "/";
     var k: int = 0;
     while (k < len(parts)) {
         if (k > 0 or result == "") {
@@ -399,9 +405,18 @@ fn split_str(s: str, delimiter: str): [str] {
 }
 
 fn byte_ord(ch: str): int {
-    if (ch >= "a" and ch <= "z") return 97 + (ch - "a");
-    if (ch >= "A" and ch <= "Z") return 65 + (ch - "A");
-    if (ch >= "0" and ch <= "9") return 48 + (ch - "0");
+    var alphabet = "abcdefghijklmnopqrstuvwxyz";
+    var idx = index_of(alphabet, ch);
+    if (idx != -1) return 97 + idx;
+
+    var u_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    idx = index_of(u_alphabet, ch);
+    if (idx != -1) return 65 + idx;
+
+    var digits = "0123456789";
+    idx = index_of(digits, ch);
+    if (idx != -1) return 48 + idx;
+
     if (ch == " ") return 32;
     if (ch == "\n") return 10;
     if (ch == "\r") return 13;
@@ -438,9 +453,19 @@ fn hex_to_int(hex: str): int {
     while (i < len(hex)) {
         var ch: str = substring(hex, i, i + 1);
         var val_int: int = 0;
-        if (ch >= "0" and ch <= "9") val_int = ch - "0";
-        else if (ch >= "a" and ch <= "f") val_int = 10 + (ch - "a");
-        else if (ch >= "A" and ch <= "F") val_int = 10 + (ch - "A");
+        if (ch >= "0" and ch <= "9") {
+            var digits = "0123456789";
+            var idx = index_of(digits, ch);
+            if (idx != -1) val_int = idx;
+        } else if (ch >= "a" and ch <= "f") {
+            var l_hex = "abcdef";
+            var idx = index_of(l_hex, ch);
+            if (idx != -1) val_int = 10 + idx;
+        } else if (ch >= "A" and ch <= "F") {
+            var u_hex = "ABCDEF";
+            var idx = index_of(u_hex, ch);
+            if (idx != -1) val_int = 10 + idx;
+        }
         result = result * 16 + val_int;
         i = i + 1;
     }

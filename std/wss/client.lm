@@ -7,11 +7,11 @@ import std.url as url;
 import std.resource as res;
 
 frame WebSocketClient {
-    var resource: res.Resource?;
-    var connector: res.Connector?;
-    var writer: res.Writer?;
-    var reader: res.Reader?;
-    var poller: res.Poller?;
+    pub var resource: res.Resource?;
+    pub var connector: res.Connector?;
+    pub var writer: res.Writer?;
+    pub var reader: res.Reader?;
+    pub var poller: res.Poller?;
 
     pub fn init() {
         self.resource = nil;
@@ -23,72 +23,78 @@ frame WebSocketClient {
 
     // Connect to a WebSocket server
     pub fn connect(url_str: str): int?core.Error {
-        if (url_str == "") return err(Error { code: "ERR", message: "empty URL" });
+        if (url_str == "") return err(Error(code="ERR", message="empty URL"));
 
         var parsed = url.URL(url_str);
-        if (not parsed.is_valid) return err(Error { code: "ERR", message: "invalid URL" });
+        if (not parsed.is_valid) return err(Error(code="ERR", message="invalid URL"));
 
         match (res.create_websocket()) {
-            case ok(ws) => {
-                var connector = res.Connector(ws);
-                if (not connector.connect([url_str])) {
+            val ws => {
+                var connector = res.Connector(r=ws);
+                if (not connector.connect(args=[url_str])) {
                     ws.close();
-                    return err(Error { code: "ERR", message: "WebSocket handshake failed" });
+                    return err(Error(code="ERR", message="WebSocket handshake failed"));
                 }
 
-                self.resource = ok(ws);
-                self.connector = ok(connector);
-                self.writer = ok(res.Writer(ws));
-                self.reader = ok(res.Reader(ws));
-                self.poller = ok(res.Poller(ws));
+                self.resource = ws;
+                self.connector = connector;
+                self.writer = res.Writer(r=ws);
+                self.reader = res.Reader(r=ws);
+                self.poller = res.Poller(r=ws);
                 return ok(ws._handle());
+            },
+            err e => {
+                return err(Error(code="ERR", message="failed to create WebSocket resource"));
             }
-            case err(e) => return err(Error { code: "ERR", message: "failed to create WebSocket resource" });
         }
     }
 
     // Send a text message
     pub fn send_text(message: str): int?core.Error {
         match (self.writer) {
-            case ok(w) => {
-                var result = w.write([message]);
+            val w => {
+                var result = w.write(args=[message]);
                 if (result != true) {
                     self.close();
-                    return err(Error { code: "ERR", message: "send failed" });
+                    return err(Error(code="ERR", message="send failed"));
                 }
                 return ok(len(message));
+            },
+            nil => {
+                return err(Error(code="ERR", message="not connected"));
             }
-            case nil => return err(Error { code: "ERR", message: "not connected" });
         }
     }
 
     // Receive a message (blocks until data available)
     pub fn recv(): str?core.Error {
         match (self.reader) {
-            case ok(rd) => {
-                var result = rd.read([]);
+            val rd => {
+                var result = rd.read(args=[]);
                 if (result == nil) {
                     self.close();
-                    return err(Error { code: "ERR", message: "connection closed" });
+                    return err(Error(code="ERR", message="connection closed"));
                 }
                 return ok(result as str);
+            },
+            nil => {
+                return err(Error(code="ERR", message="not connected"));
             }
-            case nil => return err(Error { code: "ERR", message: "not connected" });
         }
     }
 
     // Non-blocking check for available messages
     pub fn has_message(): bool {
         match (self.poller) {
-            case ok(p) => return p.poll();
-            case nil => return false;
+            val p => return p.poll(),
+            nil => return false
         }
     }
 
     // Close the WebSocket connection
     pub fn close(): nil?core.Error {
         match (self.resource) {
-            case ok(r) => {
+            val r => {
                 r.close();
                 self.resource = nil;
                 self.connector = nil;
@@ -96,15 +102,15 @@ frame WebSocketClient {
                 self.reader = nil;
                 self.poller = nil;
                 return ok(nil);
-            }
-            case nil => return ok(nil);
+            },
+            nil => return ok(nil)
         }
     }
 
     pub fn is_connected(): bool {
         match (self.resource) {
-            case ok(r) => return r.is_open();
-            case nil => return false;
+            val r => return r.is_open(),
+            nil => return false
         }
     }
 }
