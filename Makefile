@@ -62,7 +62,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp src/frontend/module_graph.cpp src/frontend/declaration_resolver.cpp \
               src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp
 
-BACK_SRCS := $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp,)
+BACK_SRCS := $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp src/backend/fyra/capability_mapper.cpp,)
 
 FYRA_DIR := vendor/fyra
 FYRA_SRCS := $(if $(shell [ -f "$(FYRA_DIR)/include/ir/Module.h" ] && echo yes),\

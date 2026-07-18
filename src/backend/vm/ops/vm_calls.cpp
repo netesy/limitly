@@ -15,6 +15,7 @@ namespace Register {
 void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
     ResourceManager::getInstance().setCurrentFiber(get_current_fiber());
     switch (pc->op) {
+        case LIR::LIR_Op::CallBuiltin:
         case LIR::LIR_Op::Call: {
             auto& func_manager = LIR::LIRFunctionManager::getInstance();
             if (func_manager.hasFunction(pc->func_name)) {

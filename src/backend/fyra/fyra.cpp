@@ -151,7 +151,6 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
                 relocs.push_back({reloc.offset, reloc.type, reloc.addend, reloc.symbolName, reloc.sectionName});
             }
 
-            for (const auto& sym : symbols) { if (sym.name == "_start") std::cout << "DEBUG: Found _start symbol in vector at " << sym.value << std::endl; }
             if (!elf_gen.generateFromCode(sections, symbols, relocs, options.output_file)) {
                 result.success = false;
                 result.error_message = "ELF generation failed: " + elf_gen.getLastError();

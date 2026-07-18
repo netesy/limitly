@@ -1334,27 +1334,137 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
     // Member method call: obj.method()
     else if (auto member_expr = dynamic_cast<LM::Frontend::AST::MemberExpr*>(expr.callee.get())) {
         std::string method_name = member_expr->name;
-        
+
         // Check if object is a module alias
         if (auto var_obj = dynamic_cast<LM::Frontend::AST::VariableExpr*>(member_expr->object.get())) {
-            auto alias_it = import_aliases_.find(var_obj->name);
-            if (alias_it != import_aliases_.end()) {
-                std::string qualified_name = alias_it->second + "." + method_name;
-                
+            // First check if this could be an enum variant construction (before module alias check)
+            int64_t tag = 0;
+            size_t expected_arity = 0;
+            std::string qualified_variant = var_obj->name + "." + method_name;
+            TypePtr enum_hint = member_expr->object->inferred_type;
+            if ((!enum_hint || enum_hint->tag != TypeTag::Enum) && type_system_) {
+                enum_hint = type_system_->getType(var_obj->name);
+            }
+
+            // Also check the inferred type of the entire member expression
+            if (!enum_hint && expr.inferred_type && expr.inferred_type->tag == TypeTag::Enum) {
+                enum_hint = expr.inferred_type;
+            }
+
+            // If the inferred type is an Enum, try to extract variant info from it
+            bool is_enum_variant = false;
+            if (enum_hint && enum_hint->tag == TypeTag::Enum) {
+                if (auto* enum_info = std::get_if<EnumType>(&enum_hint->extra)) {
+                    auto it = std::find(enum_info->values.begin(), enum_info->values.end(), method_name);
+                    if (it != enum_info->values.end()) {
+                        tag = static_cast<int64_t>(std::distance(enum_info->values.begin(), it));
+                        auto arity_it = enum_info->variantTypes.find(*it);
+                        expected_arity = (arity_it != enum_info->variantTypes.end()) ? arity_it->second.size() : 0;
+                        is_enum_variant = true;
+                    }
+                }
+            }
+
+            // Also try the resolver as a fallback
+            if (!is_enum_variant && resolve_enum_variant_info(type_system_.get(), enum_hint, qualified_variant, tag, expected_arity)) {
+                is_enum_variant = true;
+            }
+
+            // If still not found, try to get the enum type directly from userDefinedTypes
+            if (!is_enum_variant && type_system_) {
+                TypePtr direct_enum_type = type_system_->getType(var_obj->name);
+                if (direct_enum_type && direct_enum_type->tag == TypeTag::Enum) {
+                    if (auto* enum_info = std::get_if<EnumType>(&direct_enum_type->extra)) {
+                        auto it = std::find(enum_info->values.begin(), enum_info->values.end(), method_name);
+                        if (it != enum_info->values.end()) {
+                            tag = static_cast<int64_t>(std::distance(enum_info->values.begin(), it));
+                            auto arity_it = enum_info->variantTypes.find(*it);
+                            expected_arity = (arity_it != enum_info->variantTypes.end()) ? arity_it->second.size() : 0;
+                            // If we have arguments but type system says arity 0, use argument count instead
+                            if (expected_arity == 0 && !expr.arguments.empty()) {
+                                expected_arity = expr.arguments.size();
+                            }
+                            is_enum_variant = true;
+                        }
+                    }
+                }
+            }
+
+            // Fallback: if we have arguments and the variant name exists, treat it as enum variant
+            if (!is_enum_variant && !expr.arguments.empty() && type_system_) {
+                TypePtr direct_enum_type = type_system_->getType(var_obj->name);
+                if (direct_enum_type && direct_enum_type->tag == TypeTag::Enum) {
+                    if (auto* enum_info = std::get_if<EnumType>(&direct_enum_type->extra)) {
+                        auto it = std::find(enum_info->values.begin(), enum_info->values.end(), method_name);
+                        if (it != enum_info->values.end()) {
+                            tag = static_cast<int64_t>(std::distance(enum_info->values.begin(), it));
+                            expected_arity = expr.arguments.size(); // Use argument count as arity
+                            is_enum_variant = true;
+                        }
+                    }
+                }
+            }
+
+            if (is_enum_variant) {
+                // This is an enum variant construction
                 std::vector<Reg> arg_regs;
                 for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
                 Reg result = allocate_register();
-                
+
+                if (expected_arity == 0) {
+                    // Unit variant
+                    LIR_Inst inst(LIR_Op::MakeEnum, Type::Ptr, result, UINT32_MAX, 0, static_cast<uint32_t>(tag));
+                    inst.imm = static_cast<uint32_t>(tag);
+                    emit_instruction(inst);
+                } else {
+                    // Variant with associated values - create tuple payload
+                    Reg payload = allocate_register();
+                    // Optimization: for single-element variants, use the value directly as payload
+                    if (arg_regs.size() == 1) {
+                        payload = arg_regs[0];
+                    } else {
+                        LIR_Inst tuple_inst(LIR_Op::TupleCreate, Type::Ptr, payload);
+                        tuple_inst.imm = static_cast<uint32_t>(arg_regs.size());
+                        emit_instruction(tuple_inst);
+                        for (size_t i = 0; i < arg_regs.size(); ++i) {
+                            Reg idx_reg = allocate_register();
+                            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(static_cast<int64_t>(i))));
+                            // TupleSet: dst = tuple, a = index, b = value
+                            emit_instruction(LIR_Inst(LIR_Op::TupleSet, Type::Void, payload, idx_reg, arg_regs[i]));
+                        }
+                    }
+                    // Create enum with payload
+                    LIR_Inst inst(LIR_Op::MakeEnum, Type::Ptr, result, payload, 0, static_cast<uint32_t>(tag));
+                    inst.imm = static_cast<uint32_t>(tag);
+                    emit_instruction(inst);
+                }
+
+                if (expr.inferred_type) {
+                    set_register_language_type(result, expr.inferred_type);
+                    set_register_abi_type(result, Type::Ptr);
+                }
+                return result;
+            }
+
+            // Then check for module alias
+            auto alias_it = import_aliases_.find(var_obj->name);
+            if (alias_it != import_aliases_.end()) {
+                std::string qualified_name = alias_it->second + "." + method_name;
+
+                std::vector<Reg> arg_regs;
+                for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+                Reg result = allocate_register();
+
                 std::string vm_name = qualified_name;
                 LIR_Op op = LIR_Op::Call;
-                if (qualified_name == "len" || qualified_name == "length" || qualified_name == "_builtin_len" || 
+                if (qualified_name == "len" || qualified_name == "length" || qualified_name == "_builtin_len" ||
                     (qualified_name.length() >= 4 && qualified_name.substr(qualified_name.length()-4) == ".len") ||
                     (qualified_name.length() >= 7 && qualified_name.substr(qualified_name.length()-7) == ".length")) {
                     op = LIR_Op::CallBuiltin; vm_name = "len";
                 } else if (qualified_name.length() >= 9 && qualified_name.substr(0, 9) == "_builtin_") {
                     op = LIR_Op::CallBuiltin; vm_name = qualified_name.substr(9);
                 }
-                
+
                 LIR_Inst inst;
                 inst.op = op; inst.dst = result; inst.func_name = vm_name; inst.call_args = arg_regs;
                 if (expr.inferred_type) {

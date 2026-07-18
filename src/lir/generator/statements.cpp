@@ -1870,6 +1870,8 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
                 if (!binding->patterns.empty()) {
                     Reg payload = allocate_register();
                     emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, val_reg));
+                    // For single-element variants, payload is the value directly (optimization)
+                    // For multi-element variants, payload is a tuple
                     if (binding->patterns.size() == 1) {
                         emit_pattern_match(binding->patterns[0], payload, failure_target);
                     } else {

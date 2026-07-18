@@ -1,8 +1,0 @@
-// Test get_count from imported frame
-import test_module_frame as test;
-
-var counter = test.Counter();
-counter.increment();
-counter.increment();
-var c = counter.get_count();
-print("Count is: {c}");

@@ -349,6 +349,17 @@ TypePtr TypeChecker::check_enum_declaration(std::shared_ptr<LM::Frontend::AST::E
         }
         enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
         type_system.addUserDefinedType(enum_decl->name, enumType);
+    } else {
+        // Replace existing enum type with complete one (from Pass -1)
+        EnumType enumTypeInfo;
+        enumTypeInfo.name = enum_decl->name;
+        for (const auto& variant : enum_decl->variants) {
+            std::vector<TypePtr> associated;
+            for (const auto& t : variant.second) associated.push_back(resolve_type_annotation(t));
+            enumTypeInfo.addVariant(variant.first, associated);
+        }
+        enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
+        type_system.addUserDefinedType(enum_decl->name, enumType);
     }
 
     // Register variants (qualified only) in global maps
@@ -690,6 +701,8 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::R
             if (auto error_construct = std::dynamic_pointer_cast<LM::Frontend::AST::ErrorConstructExpr>(return_stmt->value)) {
                 is_already_wrapped = true;
             } else if (auto ok_construct = std::dynamic_pointer_cast<LM::Frontend::AST::OkConstructExpr>(return_stmt->value)) {
+                is_already_wrapped = true;
+            } else if (type_system.isFallibleType(return_type)) {
                 is_already_wrapped = true;
             }
             
