@@ -1,0 +1,37 @@
+// Test trait method dispatch through trait-typed variables
+// This tests that trait-typed variables can call trait methods
+
+trait Iterator {
+    fn next(): any;
+}
+
+frame ListIterator: Iterator {
+    var items: [any];
+    var index: int;
+
+    pub init(items: [any]) {
+        self.items = items;
+        self.index = 0;
+    }
+
+    pub fn next(): any {
+        if (self.index >= len(self.items)) {
+            return nil;
+        }
+        var item = self.items[self.index];
+        self.index = self.index + 1;
+        return item;
+    }
+}
+
+// Test at top level - trait-typed variable calling trait method
+var it: Iterator = ListIterator(items=[1, 2, 3]);
+var result = it.next();
+
+fn main(): int {
+    if (result != 1) {
+        return 1;
+    }
+    print("Trait method dispatch test passed!");
+    return 0;
+}

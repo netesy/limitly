@@ -1,0 +1,15 @@
+trait Iterator {
+    fn next(): any;
+}
+
+frame VectorIterator: Iterator {
+    pub fn next(): any {
+        return nil;
+    }
+}
+
+fn main(): int {
+    var it: Iterator = VectorIterator();
+    it.next();
+    return 0;
+}

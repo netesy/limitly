@@ -1,0 +1,27 @@
+import std.gg as gg;
+import std.ffi as ffi;
+
+fn main() {
+    print("Initializing Graphics System...");
+    gg.setup();
+    
+    var vertices = ffi.alloc(100);
+    
+    var shd = gg.make_shader("vs", "fs");
+    var pip = gg.make_pipeline(shd, 0);
+    var vbuf = gg.make_buffer(vertices, 100, false);
+    
+    print("Running Frame...");
+    gg.begin_pass(640, 480, 0.1, 0.1, 0.1, 1.0);
+    gg.apply_pipeline(pip);
+    gg.apply_bindings(vbuf, 0);
+    gg.draw(0, 3, 1);
+    gg.end_pass();
+    gg.commit();
+    
+    gg.shutdown();
+    ffi.free(vertices);
+    
+    print("GFX Smoke Test Complete!");
+}
+main();

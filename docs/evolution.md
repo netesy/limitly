@@ -8,7 +8,7 @@ This document outlines the current implementation status and future directions f
 - **Variables**: `var` declarations with inference. (Implemented)
 - **Functions**: `fn` with optional/default parameters. (Implemented)
 - **Frames**: `frame` as primary object construct. (Implemented)
-- **Loops**: `for`, `while`, `iter`, `loop`. (Implemented)
+- **Loops**: `for`, `while`, `iter`. (Implemented)
 
 ### 1.2 Type System
 - **Primitive Types**: `int`, `uint`, `float`, `bool`, `str`, `nil`. (Implemented)

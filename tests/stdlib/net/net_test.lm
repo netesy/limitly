@@ -1,0 +1,11 @@
+// Net module tests
+import std.net.dns as dns;
+
+print("=== Net Tests ===");
+
+var d = dns.DNS();
+assert(d.is_ipv4("127.0.0.1"), "valid ipv4");
+assert(not d.is_ipv4("127.0.0.256"), "invalid ipv4");
+assert(d.is_ipv6("::1"), "valid ipv6");
+
+print("Net tests passed!");

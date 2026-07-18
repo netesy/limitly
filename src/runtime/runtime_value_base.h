@@ -46,6 +46,7 @@ typedef struct {
 #define TYPE_DECIMAL  10
 #define TYPE_STRING   11
 #define TYPE_CLOSURE  12
+#define TYPE_FOREIGN_PTR 13
 
 // SMI (Small Integer) Constants - 61-bit signed
 #define MAX_SMI ((int64_t)((1ULL << 60) - 1))

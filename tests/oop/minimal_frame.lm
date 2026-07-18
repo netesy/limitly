@@ -1,7 +1,7 @@
 frame Simple {
     pub value: int;
     pub init(v: int) {
-        this.value = v;
+        self.value = v;
     }
 }
 

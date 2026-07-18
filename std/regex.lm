@@ -20,7 +20,7 @@ frame Regex {
     }
 
     pub fn find_first_match(text: str): core.ResultStr {
-        // Simple regex engine implementation - stub for basic patterns
+        // Simple regex engine implementation for basic patterns
         if (self.pattern == "" or text == "") {
             return core.err_str("empty pattern or text");
         }
@@ -34,7 +34,7 @@ frame Regex {
     }
 
     pub fn find_all_matches(text: str): [str] {
-        var matches: [str] = [];
+        pub var matches: [str] = [];
         var start_pos: int = 0;
         var i: int = 0;
 
@@ -90,7 +90,7 @@ frame Regex {
 
     // Splitting operations
     pub fn split(text: str): [str] {
-        var parts: [str] = [];
+        pub var parts: [str] = [];
         var start_pos: int = 0;
         var i: int = 0;
 
@@ -127,15 +127,23 @@ frame Regex {
     }
 
     // Private helper methods
-    private fn simple_match(text: str, start_pos: int): str? {
+    fn simple_match(text: str, start_pos: int): str? {
         // Very basic pattern matching - handles literal strings and simple wildcards
         if (self.pattern == "*") {
-            return text.substring(start_pos, start_pos + 1) if start_pos < text.length else nil;
+            if (start_pos < text.length) {
+                return text.substring(start_pos, start_pos + 1);
+            } else {
+                return nil;
+            }
         }
 
         if (self.pattern == ".*") {
             // Match any sequence
-            return text.substring(start_pos, text.length) if start_pos < text.length else nil;
+            if (start_pos < text.length) {
+                return text.substring(start_pos, text.length);
+            } else {
+                return nil;
+            }
         }
 
         // Literal string matching
@@ -157,7 +165,7 @@ frame Regex {
         return nil;
     }
 
-    private fn find_match_start(text: str, start_pos: int): int? {
+    fn find_match_start(text: str, start_pos: int): int? {
         var match = self.simple_match(text, start_pos);
         if (match == nil) return nil;
 
@@ -174,7 +182,7 @@ frame Regex {
         return text_to_search.index_of(pattern_to_use, start_pos);
     }
 
-    private fn is_balanced_pattern(): bool {
+    fn is_balanced_pattern(): bool {
         var open_parens: int = 0;
         var open_brackets: int = 0;
         var open_braces: int = 0;

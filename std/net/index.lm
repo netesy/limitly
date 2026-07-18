@@ -1,0 +1,29 @@
+// Standard Library Network Module (Index)
+// Re-exports all networking submodules for convenient access.
+//
+// Usage:
+//   import std.net as net;
+//   var result = net.DNS.resolve("example.com");
+//   var client = net.TCPClient();
+//   client.connect("127.0.0.1", 8080);
+
+pub import std.net.tcp as tcp;
+pub import std.net.udp as udp;
+pub import std.net.dns as dns;
+pub import std.net.tls as tls;
+
+// Re-export key frames and functions at the net namespace level
+// TCP
+pub type TCPClient = tcp.TCPClient;
+pub type TCPServer = tcp.TCPServer;
+
+// UDP
+pub type UDP = udp.UDP;
+
+// DNS
+pub type DNS = dns.DNS;
+
+// TLS
+pub type TLSConfig = tls.TLSConfig;
+pub type TLSClient = tls.TLSClient;
+pub type TLSServer = tls.TLSServer;

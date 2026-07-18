@@ -1,0 +1,18 @@
+import std.range as range;
+
+frame Foo {
+    pub fn bar(): int {
+        return 42;
+    }
+}
+
+fn makeFoo(): Foo {
+    return Foo();
+}
+
+fn main(): int {
+    var x = makeFoo().bar();
+    var inc = range.inclusive(1, 2);
+    return 0;
+}
+ main();

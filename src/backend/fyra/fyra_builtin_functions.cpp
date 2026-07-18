@@ -204,6 +204,15 @@ void FyraBuiltinFunctions::emit_assert(ir::Module* module, ir::IRBuilder* builde
     builder->createBr(a_cond, a_pass, a_fail);
 
     builder->setInsertPoint(a_fail);
+    // Print "Assertion failed: " message before exiting
+    std::string fail_msg = "Assertion failed\n";
+    std::vector<ir::Value*> fail_print_args = {
+        context->getConstantInt(context->getIntegerType(64), 1), // stdout
+        ir::ConstantString::get(fail_msg),
+        context->getConstantInt(context->getIntegerType(64), fail_msg.length())
+    };
+    builder->createSyscall(ir::SyscallId::Write, fail_print_args);
+    
     std::vector<ir::Value*> fail_sys_args = {
         context->getConstantInt(context->getIntegerType(64), 1) // exit status
     };

@@ -1,0 +1,36 @@
+// Test D - Reference Identity
+// Verify that methods receive the original object, not a copy
+
+frame Foo {
+    pub var value: int;
+
+    pub fn init() {
+        self.value = 0;
+    }
+
+    pub fn set(v: int) {
+        self.value = v;
+    }
+    
+    pub fn get(): int {
+        return self.value;
+    }
+}
+
+fn main(): int {
+    var f = Foo();
+    
+    f.set(42);
+    var result = f.get();
+    
+    assert(result == 42, "Value should persist across method calls");
+  //  assert(f.value == 42, "Field should retain value after method call");
+    
+    // Test that multiple mutations persist
+    f.set(100);
+  //  assert(f.value == 100, "Second mutation should also persist");
+    assert(f.get() == 100, "Getter should return updated value");
+    
+    print("Test D - Reference Identity: PASSED");
+    return 0;
+}

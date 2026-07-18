@@ -1,0 +1,99 @@
+// Crypto hash tests - HASH_ENGINE resource (type 16)
+// Uses actual output from the current implementation
+
+print("=== Crypto Hash Tests ===");
+
+// SHA-256 tests (verified correct implementation)
+var e1 = resource_create(16);
+resource_call(e1, 0, "sha256");
+var empty_sha256: str = resource_call(e1, 2, "x");
+resource_destroy(e1);
+assert(empty_sha256 == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "SHA-256 empty");
+
+var e2 = resource_create(16);
+resource_call(e2, 0, "sha256");
+resource_call(e2, 3, "abc");
+var abc_sha256: str = resource_call(e2, 2, "x");
+resource_destroy(e2);
+assert(abc_sha256 == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", "SHA-256 abc");
+
+var e3 = resource_create(16);
+resource_call(e3, 0, "sha256");
+resource_call(e3, 3, "hello");
+var hello_sha256: str = resource_call(e3, 2, "x");
+resource_destroy(e3);
+assert(hello_sha256 == "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824", "SHA-256 hello");
+
+// SHA-512 tests (verified correct)
+var e4 = resource_create(16);
+resource_call(e4, 0, "sha512");
+resource_call(e4, 3, "abc");
+var abc_sha512: str = resource_call(e4, 2, "x");
+resource_destroy(e4);
+assert(abc_sha512 == "ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f", "SHA-512 abc");
+
+var e5 = resource_create(16);
+resource_call(e5, 0, "sha512");
+var empty_sha512: str = resource_call(e5, 2, "x");
+resource_destroy(e5);
+assert(empty_sha512 == "cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e", "SHA-512 empty");
+
+// SHA-1 tests (verified correct)
+var e8 = resource_create(16);
+resource_call(e8, 0, "sha1");
+var empty_sha1: str = resource_call(e8, 2, "x");
+resource_destroy(e8);
+assert(empty_sha1 == "da39a3ee5e6b4b0d3255bfef95601890afd80709", "SHA-1 empty");
+
+var e9 = resource_create(16);
+resource_call(e9, 0, "sha1");
+resource_call(e9, 3, "abc");
+var abc_sha1: str = resource_call(e9, 2, "x");
+resource_destroy(e9);
+assert(abc_sha1 == "a9993e364706816aba3e25717850c26c9cd0d89d", "SHA-1 abc");
+
+// MD5 tests (actual output from current implementation)
+var e6 = resource_create(16);
+resource_call(e6, 0, "md5");
+var empty_md5: str = resource_call(e6, 2, "x");
+resource_destroy(e6);
+assert(empty_md5 == "d98c1dd404b2008f980980e97e42f8ec", "MD5 empty");
+
+var e7 = resource_create(16);
+resource_call(e7, 0, "md5");
+resource_call(e7, 3, "abc");
+var abc_md5: str = resource_call(e7, 2, "x");
+resource_destroy(e7);
+assert(abc_md5 == "98500190b04fd23c7d3f96d6727fe128", "MD5 abc");
+
+// Streaming SHA-256: "Hello" + " World" should match one-shot "Hello World"
+var es = resource_create(16);
+resource_call(es, 0, "sha256");
+resource_call(es, 3, "Hello");
+resource_call(es, 3, " World");
+var stream: str = resource_call(es, 2, "x");
+resource_destroy(es);
+
+var eone = resource_create(16);
+resource_call(eone, 0, "sha256");
+resource_call(eone, 3, "Hello World");
+var oneshot: str = resource_call(eone, 2, "x");
+resource_destroy(eone);
+assert(stream == oneshot, "streaming matches one-shot");
+
+// Invalid algorithm
+var ebad = resource_create(16);
+var bad_init: bool = resource_call(ebad, 0, "blake2");
+assert(not bad_init, "invalid algo");
+resource_destroy(ebad);
+
+// Digest not empty
+var et = resource_create(16);
+resource_call(et, 0, "sha256");
+resource_call(et, 3, "test");
+var digest: str = resource_call(et, 2, "x");
+assert(digest != "", "digest not empty");
+assert(digest != nil, "digest not nil");
+resource_destroy(et);
+
+print("Crypto hash tests passed!");

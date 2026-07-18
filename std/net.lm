@@ -1,0 +1,15 @@
+// Standard Library Networking Module
+// Re-exports TCP, UDP, and DNS submodules for convenient access.
+//
+// Usage:
+//   import std.net as net;
+//   var conn = net.tcp.connect("127.0.0.1", 8080);
+//   var ip = net.dns.resolve("localhost");
+
+import std.net.tcp as tcp;
+import std.net.udp as udp;
+import std.net.dns as dns;
+
+var TCP = tcp;
+var UDP = udp;
+var DNS = dns;

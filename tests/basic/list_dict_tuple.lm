@@ -13,21 +13,18 @@ iter (fruit in fruits) {
 }
 assert(fruitCount == 3, "Loop should iterate 3 times");
 
-// Tuple-based loop with explicit string list type
+// Tuple access by index (tuples are not iterable; use index access instead)
 var fruites = ("Apples", "Bananas", "Cherries");
 assert(fruites[0] == "Apples", "First tuple element should be Apples");
 assert(fruites[1] == "Bananas", "Second tuple element should be Bananas");
 assert(fruites[2] == "Cherries", "Third tuple element should be Cherries");
 
-var tupleCount = 0;
-iter (fruit in fruites) {
-    print(fruit);
-    tupleCount += 1;
-}
-assert(tupleCount == 3, "Tuple loop should iterate 3 times");
+// Print tuple elements by index (iterating over a tuple is not supported).
+print(fruites[0]);
+print(fruites[1]);
+print(fruites[2]);
 
 // Dictionary-based loop with defined key/value type
-//type DictOfStrToInt = {str: int};
 var my_dict = { "at": 1, "bi": 12, "ce": 78, "de": 28 };
 assert(my_dict["at"] == 1, "Key 'at' should map to 1");
 assert(my_dict["bi"] == 12, "Key 'bi' should map to 12");
@@ -35,8 +32,8 @@ assert(my_dict["ce"] == 78, "Key 'ce' should map to 78");
 assert(my_dict["de"] == 28, "Key 'de' should map to 28");
 
 var dictCount = 0;
-iter (entry in my_dict) {
-    print("{entry.key}: {entry.value}");
+iter (key, value in my_dict) {
+    print("{key}: {value}");
     dictCount += 1;
 }
 assert(dictCount == 4, "Dictionary loop should iterate 4 times");

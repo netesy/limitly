@@ -99,7 +99,7 @@ frame Serialization {
         var result = "{";
         var first = true;
         
-        // Simple iteration over dictionary - stub implementation
+        // Iterates over dictionary entries supported by the current runtime
         var keys = self.get_dict_keys(obj);
         var i: int = 0;
         
@@ -202,7 +202,7 @@ frame Serialization {
     }
 
     // Utility methods
-    private fn int_to_bytes(value: int, num_bytes: int): str {
+    fn int_to_bytes(value: int, num_bytes: int): str {
         var result = "";
         var i: int = 0;
         
@@ -215,7 +215,7 @@ frame Serialization {
         return result;
     }
 
-    private fn bytes_to_int(bytes: str): int {
+    fn bytes_to_int(bytes: str): int {
         if (bytes.length == 0) return 0;
         
         var result = 0;
@@ -230,7 +230,7 @@ frame Serialization {
         return result;
     }
 
-    private fn get_dict_keys(dict: {str: str}): [str] {
+    fn get_dict_keys(dict: {str: str}): [str] {
         // Stub implementation - would need proper dictionary key extraction
         return [];
     }

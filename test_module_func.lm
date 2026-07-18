@@ -1,0 +1,6 @@
+import std.range as range;
+
+fn main(): int {
+    var inc = range.inclusive(1, 2);
+    return 0;
+}

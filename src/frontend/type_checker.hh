@@ -9,6 +9,8 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <string>
+#include <cstring>
+#include "symbol_database.hh"
 
 // =============================================================================
 // TYPE CHECKER - Runs BEFORE LIR generation
@@ -28,7 +30,9 @@ class TypeChecker {
 private:
     struct Scope;
 
+
     TypeSystem& type_system;
+    SymbolDatabase& symbol_db_;
     std::vector<std::string> errors;
     
     // Symbol table for variable types
@@ -57,7 +61,7 @@ private:
         std::string name;
         std::vector<TypePtr> param_types;
         TypePtr return_type;
-        std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> declaration;
+        std::shared_ptr<LM::Frontend::AST::Statement> declaration;
         bool can_fail = false;
         std::vector<std::string> error_types;
         std::vector<bool> optional_params;
@@ -139,7 +143,13 @@ private:
     std::shared_ptr<LM::Frontend::AST::Program> current_program_ = nullptr;
     
 public:
-    explicit TypeChecker(TypeSystem& ts) : type_system(ts) {}
+    bool is_root = true;
+
+    // Constructor accepting TypeSystem and SymbolDatabase
+    explicit TypeChecker(TypeSystem& ts, SymbolDatabase& symbol_db) : type_system(ts), symbol_db_(symbol_db) {}
+
+    // Getter for SymbolDatabase
+    SymbolDatabase& get_symbol_db() const { return symbol_db_; }
     
     // Main entry point - type check entire program
     bool check_program(std::shared_ptr<LM::Frontend::AST::Program> program);
@@ -238,7 +248,6 @@ private:
     TypePtr check_task_statement(std::shared_ptr<LM::Frontend::AST::TaskStatement> task_stmt);
     TypePtr check_worker_statement(std::shared_ptr<LM::Frontend::AST::WorkerStatement> worker_stmt);
     TypePtr check_return_statement(std::shared_ptr<LM::Frontend::AST::ReturnStatement> return_stmt);
-    TypePtr check_print_statement(std::shared_ptr<LM::Frontend::AST::PrintStatement> print_stmt);
     TypePtr check_match_statement(std::shared_ptr<LM::Frontend::AST::MatchStatement> match_stmt);
     TypePtr check_contract_statement(std::shared_ptr<LM::Frontend::AST::ContractStatement> contract_stmt);
     
@@ -249,12 +258,13 @@ private:
     TypePtr check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type = nullptr);
+    void resolve_call_arguments(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, const std::string& qualified_name);
     TypePtr check_cast_expr(std::shared_ptr<LM::Frontend::AST::CastExpr> expr);
     TypePtr check_assign_expr(std::shared_ptr<LM::Frontend::AST::AssignExpr> expr);
     TypePtr check_grouping_expr(std::shared_ptr<LM::Frontend::AST::GroupingExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_member_expr(std::shared_ptr<LM::Frontend::AST::MemberExpr> expr);
     TypePtr check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexExpr> expr);
-    TypePtr check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr);
+    TypePtr check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr, TypePtr expected_type = nullptr);
     TypePtr check_tuple_expr(std::shared_ptr<LM::Frontend::AST::TupleExpr> expr);
     TypePtr check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr> expr);
     TypePtr check_range_expr(std::shared_ptr<LM::Frontend::AST::RangeExpr> expr);
@@ -381,7 +391,7 @@ namespace TypeCheckerFactory {
     TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source = "", const std::string& file_path = "");
     
     // Create type checker instance (for testing)
-    std::unique_ptr<TypeChecker> create(TypeSystem& type_system);
+    std::unique_ptr<TypeChecker> create(TypeSystem& type_system, SymbolDatabase& symbol_db);
     
     // Register builtin functions with the type checker
     void register_builtin_functions(TypeChecker& checker);

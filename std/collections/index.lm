@@ -1,27 +1,25 @@
 // Collections Module Index - Re-exports all collection frames
 
 // Import all collection frames
-import std.collections.list as list;
-import std.collections.hashmap as hashmap;
-import std.collections.set as set;
+import std.collections.linkedlist as list;
+import std.collections.hash as hash;
 import std.collections.queue as queue;
-import std.collections.stack as stack;
+import std.collections.vector as vector;
 
 // Re-export frames for easy access
-var List = list.List;
-var HashMap = hashmap.HashMap;
-var Set = set.Set;
-var Queue = queue.Queue;
-var Stack = stack.Stack;
+// In Limit, variables can hold frame types for instantiation
+pub var LinkedList = list.LinkedList;
+pub var HashMap = hash.HashMap;
+pub var HashSet = hash.HashSet;
+pub var Queue = queue.Queue;
+pub var PriorityQueue = queue.PriorityQueue;
+pub var Stack = queue.Stack;
+pub var Vector = vector.Vector;
+pub var Deque = vector.Deque;
+pub var ArrayList = vector.ArrayList;
+pub var RingBuffer = vector.RingBuffer;
+pub var BitSet = queue.BitSet;
 
-// Re-export utility functions
-var list = list.list;
-var list_from = list.list_from;
-var hashmap = hashmap.hashmap;
-var hashmap_from = hashmap.hashmap_from;
-var set = set.set;
-var set_from = set.set_from;
-var queue = queue.queue;
-var queue_from = queue.queue_from;
-var stack = stack.stack;
-var stack_from = stack.stack_from;
+fn main(): int {
+    return 0;
+}

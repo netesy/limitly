@@ -1,0 +1,4 @@
+import std.resource as res;
+print("=== Crypto Hash Tests ===");
+var r_wrap = res.create_hash_engine();
+print("Created.");

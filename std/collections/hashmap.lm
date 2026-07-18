@@ -3,8 +3,8 @@
 import std.core as core;
 
 frame HashMap {
-    var keys: [str];
-    var values: [int];
+    pub var keys: [str];
+    pub var values: [int];
 
     pub fn init(): HashMap {
         return HashMap(keys=[], values=[]);
@@ -34,7 +34,7 @@ frame HashMap {
             var new_values: [int] = [];
             var i: int = 0;
             while (i < self.values.length) {
-                new_values[i] = if (i == index) then value else self.values[i];
+                new_values[i] = (i == index) ? value : self.values[i];
                 i = i + 1;
             }
             return HashMap(keys=self.keys, values=new_values);
@@ -162,7 +162,7 @@ frame HashMap {
     }
 
     // Utility methods
-    private fn find_key_index(key: str): int? {
+    fn find_key_index(key: str): int? {
         var i: int = 0;
         while (i < self.keys.length) {
             if (self.keys[i] == key) return i;

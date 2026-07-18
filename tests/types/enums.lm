@@ -199,7 +199,7 @@ enum State {
 }
 
 // Result.Pending vs Status.Pending vs State.Pending
-// Enforced qualification should resolve this
+// Enforced qualification should resolve self
 var state1: State = State.Pending;
 var status6: Status = Status.Pending;
 var result4: Result = Result.Pending;

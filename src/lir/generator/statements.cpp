@@ -1,5 +1,6 @@
 #include "../generator.hh"
 #include "../functions.hh"
+#include "../intrinsic_registry.hh"
 #include "../../backend/vm/constant_utils.hh"
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
@@ -205,9 +206,6 @@ void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
     if (auto expr_stmt = dynamic_cast<LM::Frontend::AST::ExprStatement*>(&stmt)) {
        // std::cout << "[DEBUG] Emitting ExprStatement" << std::endl;
         emit_expr_stmt(*expr_stmt);
-    } else if (auto print_stmt = dynamic_cast<LM::Frontend::AST::PrintStatement*>(&stmt)) {
-       // std::cout << "[DEBUG] Emitting PrintStatement" << std::endl;
-        emit_print_stmt(*print_stmt);
     } else if (auto var_stmt = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(&stmt)) {
         emit_var_stmt(*var_stmt);
     } else if (auto dest_stmt = dynamic_cast<LM::Frontend::AST::DestructuringDeclaration*>(&stmt)) { 
@@ -270,131 +268,6 @@ void Generator::emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt) {
 }
 
 
-void Generator::emit_print_stmt(LM::Frontend::AST::PrintStatement& stmt) {
-    if (stmt.arguments.empty()) {
-        // Empty print statement - just print a newline
-        Reg newline_reg = allocate_register();
-        auto string_type = std::make_shared<::Type>(::TypeTag::String);
-        Backend::Value newline_val = BOX_PTR(lm_box_string("\n"));
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, newline_reg, newline_val));
-        emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, newline_reg, 0));
-        return;
-    }
-    
-    if (stmt.arguments.size() == 1) {
-        // Single argument - print it directly
-        Reg value = emit_expr(*stmt.arguments[0]);
-        emit_print_value(value);
-        return;
-    }
-    
-    // Multiple arguments - concatenate them into a single string
-    Reg result_reg = emit_expr(*stmt.arguments[0]);
-    
-    // Convert first argument to string if it's not already
-    TypePtr first_type = get_register_language_type(result_reg);
-    if (!first_type || first_type->tag != ::TypeTag::String) {
-        Reg str_reg = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, result_reg, 0));
-        auto string_type = std::make_shared<::Type>(::TypeTag::String);
-        set_register_language_type(str_reg, string_type);
-        result_reg = str_reg;
-    }
-    
-    // Concatenate remaining arguments
-    for (size_t i = 1; i < stmt.arguments.size(); ++i) {
-        Reg arg_reg = emit_expr(*stmt.arguments[i]);
-        
-        // Convert argument to string if it's not already
-        TypePtr arg_type = get_register_language_type(arg_reg);
-        if (!arg_type || arg_type->tag != ::TypeTag::String) {
-            Reg str_arg = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_arg, arg_reg, 0));
-            auto string_type = std::make_shared<::Type>(::TypeTag::String);
-            set_register_language_type(str_arg, string_type);
-            arg_reg = str_arg;
-        }
-        
-        // Add a space between arguments
-        if (i > 1 || (first_type && first_type->tag == ::TypeTag::String)) {
-            Reg space_reg = allocate_register();
-            auto string_type = std::make_shared<::Type>(::TypeTag::String);
-            Backend::Value space_val = BOX_PTR(lm_box_string(" "));
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, space_reg, space_val));
-            set_register_language_type(space_reg, string_type);
-            
-            Reg temp_reg = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, temp_reg, result_reg, space_reg));
-            set_register_language_type(temp_reg, string_type);
-            result_reg = temp_reg;
-        }
-        
-        // Concatenate the argument
-        Reg concat_reg = allocate_register();
-        auto string_type = std::make_shared<::Type>(::TypeTag::String);
-        emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, concat_reg, result_reg, arg_reg));
-        set_register_language_type(concat_reg, string_type);
-        result_reg = concat_reg;
-    }
-    
-    // Print the final concatenated string
-    emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, result_reg, 0));
-}
-
-
-void Generator::emit_print_value(Reg value) {
-    // Helper function to print a single value based on its type
-    TypePtr reg_type = get_register_language_type(value);
-    if (reg_type) {
-        switch (reg_type->tag) {
-            case ::TypeTag::Int:
-            case ::TypeTag::Int8:
-            case ::TypeTag::Int16:
-            case ::TypeTag::Int32:
-            case ::TypeTag::Int64:
-                emit_instruction(LIR_Inst(LIR_Op::PrintInt, Type::Void, 0, value, 0));
-                break;
-            case ::TypeTag::UInt:
-            case ::TypeTag::UInt8:
-            case ::TypeTag::UInt16:
-            case ::TypeTag::UInt32:
-            case ::TypeTag::UInt64:
-                emit_instruction(LIR_Inst(LIR_Op::PrintUint, Type::Void, 0, value, 0));
-                break;
-            case ::TypeTag::Float32:
-            case ::TypeTag::Float64:
-                emit_instruction(LIR_Inst(LIR_Op::PrintFloat, Type::Void, 0, value, 0));
-                break;
-            case ::TypeTag::Bool:
-                emit_instruction(LIR_Inst(LIR_Op::PrintBool, Type::Void, 0, value, 0));
-                break;
-            case ::TypeTag::String:
-                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, value, 0));
-                break;
-            default:
-                // Convert to string and print
-                Reg str_reg = allocate_register();
-                // Get the type of the value being converted
-                TypePtr val_type = get_register_language_type(value);
-                LIR::Type lir_type = language_type_to_abi_type(val_type);
-                emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, value, 0, 0, lir_type));
-                auto string_type = std::make_shared<::Type>(::TypeTag::String);
-                set_register_language_type(str_reg, string_type);
-                emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, str_reg, 0));
-                break;
-        }
-    } else {
-        // Fallback: Type is unknown (likely Any or unset)
-        // Always convert to string first, then print
-        // This handles tuples, lists, dicts, and other complex types
-        Reg str_reg = allocate_register();
-        // Assume unknown types are pointers to collections
-        emit_instruction(LIR_Inst(LIR_Op::ToString, Type::Ptr, str_reg, value, 0, 0, LIR::Type::Ptr));
-        auto string_type = std::make_shared<::Type>(::TypeTag::String);
-        set_register_language_type(str_reg, string_type);
-        emit_instruction(LIR_Inst(LIR_Op::PrintString, Type::Void, 0, str_reg, 0));
-}
-}
 
 
 
@@ -402,7 +275,8 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
    // std::cout << "[DEBUG] emit_var_stmt called for variable: " << stmt.name << std::endl;
 
     // Check if this is a module-level variable (global)
-    if (!current_module_.empty() && current_module_ != "root") {
+    // Only treat as global if: we're in a module AND we're not inside a function
+    if (!current_module_.empty() && current_module_ != "root" && current_function_ == nullptr) {
         std::string qualified_name = current_module_ + "." + stmt.name;
         Reg val_reg = 0;
         if (stmt.initializer) {
@@ -1027,6 +901,16 @@ void Generator::emit_import_stmt(LM::Frontend::AST::ImportStatement& stmt) {
     std::string alias = stmt.alias.value_or(stmt.modulePath);
     import_aliases_[alias] = stmt.modulePath;
     
+    // Ensure the imported module is initialized by calling its __init__ function
+    // This is needed because module globals are stored in the VM's globals_ map
+    // and need to be initialized before they can be accessed
+    std::string init_func_name = stmt.modulePath + ".__init__";
+    if (LIRFunctionManager::getInstance().hasFunction(init_func_name) || function_table_.count(init_func_name)) {
+        std::vector<Reg> empty_args;
+        Reg dummy_res = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Call, dummy_res, init_func_name, empty_args));
+    }
+    
    // std::cout << "[DEBUG] Import registered: " << alias << " -> " << stmt.modulePath << std::endl;
 }
 
@@ -1508,13 +1392,95 @@ void Generator::emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM:
 
 
 void Generator::emit_dict_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg dict_reg) {
-    // Convert dict to list of tuples using DictItems operation
-    // The runtime does the heavy lifting (walking the hash table)
+    // Convert dict to list of (key, value) tuples using DictItems operation.
+    // The runtime does the heavy lifting (walking the hash table).
     LIR::Reg items_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::DictItems, Type::Ptr, items_reg, dict_reg));
-    
-    // Iterate the list normally using existing list iteration
-    emit_list_var_iter_stmt(stmt, items_reg);
+
+    if (stmt.loopVars.size() == 2) {
+        // Destructuring form: iter (k, v in dict) { ... }
+        // Iterate the items list and unpack each tuple into k and v.
+        const std::string& key_var = stmt.loopVars[0];
+        const std::string& val_var = stmt.loopVars[1];
+
+        LIR_BasicBlock* header_block = create_basic_block("dict_var_iter_header");
+        LIR_BasicBlock* body_block = create_basic_block("dict_var_iter_body");
+        LIR_BasicBlock* exit_block = create_basic_block("dict_var_iter_exit");
+
+        enter_scope();
+        enter_loop();
+        set_loop_labels(header_block->id, exit_block->id, 0);
+
+        Reg key_reg = allocate_register();
+        Reg val_reg = allocate_register();
+        bind_variable(key_var, key_reg);
+        bind_variable(val_var, val_reg);
+
+        // index = 0
+        Reg index_reg = allocate_register();
+        auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index_reg, make_i64(0)));
+        set_register_type(index_reg, int_type);
+
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(get_current_block(), header_block);
+
+        set_current_block(header_block);
+        Reg len_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ListLen, Type::I64, len_reg, items_reg));
+        set_register_type(len_reg, int_type);
+
+        Reg cmp_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp_reg, index_reg, len_reg));
+        set_register_type(cmp_reg, std::make_shared<::Type>(::TypeTag::Bool));
+
+        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp_reg, 0, exit_block->id));
+        add_block_edge(header_block, body_block);
+        add_block_edge(header_block, exit_block);
+
+        set_current_block(body_block);
+        // Get the (k, v) tuple at index
+        Reg tuple_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, tuple_reg, items_reg, index_reg));
+        set_register_type(tuple_reg, std::make_shared<::Type>(::TypeTag::Any));
+
+        // Unpack: tuple[0] = key, tuple[1] = value
+        Reg idx0 = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx0, make_i64(0)));
+        set_register_type(idx0, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, key_reg, tuple_reg, idx0));
+        set_register_type(key_reg, std::make_shared<::Type>(::TypeTag::Any));
+
+        Reg idx1 = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx1, make_i64(1)));
+        set_register_type(idx1, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, val_reg, tuple_reg, idx1));
+        set_register_type(val_reg, std::make_shared<::Type>(::TypeTag::Any));
+
+        // Body
+        if (stmt.body) {
+            emit_stmt(*stmt.body);
+        }
+
+        // index++
+        Reg one_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, one_reg, make_i64(1)));
+        set_register_type(one_reg, int_type);
+        Reg next_reg = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::Add, Type::I64, next_reg, index_reg, one_reg));
+        set_register_type(next_reg, int_type);
+        emit_instruction(LIR_Inst(LIR_Op::Mov, index_reg, next_reg, 0));
+
+        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+        add_block_edge(get_current_block(), header_block);
+
+        set_current_block(exit_block);
+        exit_loop();
+        exit_scope();
+    } else {
+        // Single loop variable: iterate items list, each item is a (k, v) tuple.
+        emit_list_var_iter_stmt(stmt, items_reg);
+    }
 }
 
 

@@ -26,12 +26,12 @@ class Person{
  var age : int;
 
  fn constructor(name : str, age : int){
- this.name = name;
- this.age = age;
+ self.name = name;
+ self.age = age;
 }
 
  fn greet(): str{
- return "Hello, I'm " + this.name;
+ return "Hello, I'm " + self.name;
 }
 }
 

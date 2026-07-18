@@ -9,10 +9,16 @@ using namespace LM::Error;
 
 // Helper methods
 Token Parser::peek() {
+    if (current >= scanner.getTokens().size()) {
+        return {TokenType::EOF_TOKEN, "", 0, 0, 0, {}, {}};
+    }
     return scanner.getTokens()[current];
 }
 
 Token Parser::previous() {
+    if (current == 0 || current - 1 >= scanner.getTokens().size()) {
+        return {TokenType::EOF_TOKEN, "", 0, 0, 0, {}, {}};
+    }
     return scanner.getTokens()[current - 1];
 }
 
@@ -42,19 +48,24 @@ bool Parser::isAtEnd() {
 
 Token Parser::consume(TokenType type, const std::string &message) {
     if (check(type)) return advance();
-    
+
+    // Capture position BEFORE advancing so error messages point to the right line.
+    size_t errorLine = peek().line;
+    size_t errorStart = peek().start;
+
     // Report error but don't throw - let parser continue
     error(message);
-    
+
     // Advance to ensure progress and avoid infinite loops
     if (!isAtEnd()) advance();
 
-    // Return a dummy token to allow parsing to continue
+    // Return a dummy token to allow parsing to continue.
+    // Use the captured position (pre-advance) so error reports are accurate.
     Token dummy;
     dummy.type = type;
     dummy.lexeme = "";
-    dummy.line = peek().line;
-    dummy.start = peek().start;
+    dummy.line = errorLine;
+    dummy.start = errorStart;
     return dummy;
 }
 
@@ -76,7 +87,7 @@ void Parser::synchronize() {
             case TokenType::FOR:
             case TokenType::IF:
             case TokenType::WHILE:
-            case TokenType::PRINT:
+            // // // case TokenType::PRINT:
             case TokenType::RETURN:
             case TokenType::IMPORT:
             case TokenType::TRAIT:
@@ -361,7 +372,6 @@ CST::NodeKind Parser::mapASTNodeKind(const std::string& astNodeType) {
     if (className.find("ReturnStatement") != std::string::npos) return CST::NodeKind::RETURN_STATEMENT;
     if (className.find("BreakStatement") != std::string::npos) return CST::NodeKind::BREAK_STATEMENT;
     if (className.find("ContinueStatement") != std::string::npos) return CST::NodeKind::CONTINUE_STATEMENT;
-    if (className.find("PrintStatement") != std::string::npos) return CST::NodeKind::PRINT_STATEMENT;
     if (className.find("ParallelStatement") != std::string::npos) return CST::NodeKind::PARALLEL_STATEMENT;
     if (className.find("ConcurrentStatement") != std::string::npos) return CST::NodeKind::CONCURRENT_STATEMENT;
     if (className.find("ContractStatement") != std::string::npos) return CST::NodeKind::CONTRACT_STATEMENT;
@@ -490,7 +500,6 @@ template auto Parser::createNode<LM::Frontend::AST::IterStatement>() -> std::sha
 template auto Parser::createNode<LM::Frontend::AST::BlockStatement>() -> std::shared_ptr<LM::Frontend::AST::BlockStatement>;
 template auto Parser::createNode<LM::Frontend::AST::ExprStatement>() -> std::shared_ptr<LM::Frontend::AST::ExprStatement>;
 template auto Parser::createNode<LM::Frontend::AST::ReturnStatement>() -> std::shared_ptr<LM::Frontend::AST::ReturnStatement>;
-template auto Parser::createNode<LM::Frontend::AST::PrintStatement>() -> std::shared_ptr<LM::Frontend::AST::PrintStatement>;
 template auto Parser::createNode<LM::Frontend::AST::ContractStatement>() -> std::shared_ptr<LM::Frontend::AST::ContractStatement>;
 template auto Parser::createNode<LM::Frontend::AST::MatchStatement>() -> std::shared_ptr<LM::Frontend::AST::MatchStatement>;
 template auto Parser::createNode<LM::Frontend::AST::ConcurrentStatement>() -> std::shared_ptr<LM::Frontend::AST::ConcurrentStatement>;
@@ -521,7 +530,6 @@ template auto Parser::createNodeWithContext<LM::Frontend::AST::IterStatement>() 
 template auto Parser::createNodeWithContext<LM::Frontend::AST::BlockStatement>() -> std::shared_ptr<LM::Frontend::AST::BlockStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ExprStatement>() -> std::shared_ptr<LM::Frontend::AST::ExprStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ReturnStatement>() -> std::shared_ptr<LM::Frontend::AST::ReturnStatement>;
-template auto Parser::createNodeWithContext<LM::Frontend::AST::PrintStatement>() -> std::shared_ptr<LM::Frontend::AST::PrintStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ContractStatement>() -> std::shared_ptr<LM::Frontend::AST::ContractStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::MatchStatement>() -> std::shared_ptr<LM::Frontend::AST::MatchStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ConcurrentStatement>() -> std::shared_ptr<LM::Frontend::AST::ConcurrentStatement>;
@@ -631,15 +639,12 @@ std::shared_ptr<LM::Frontend::AST::Program> Parser::parse() {
     return program;
 }
 
-// Parse declarations
-// Helper to collect leading annotations
+// Helper to collect leading visibility tokens that were parsed as annotations
+// in older versions. With @-annotations removed and `private` no longer a
+// keyword, this is a no-op retained for ABI compatibility — visibility is
+// handled in declaration().
 std::vector<Token> Parser::collectAnnotations() {
     std::vector<Token> annotations;
-    while (check(TokenType::PUBLIC) || check(TokenType::PRIVATE) || check(TokenType::PROTECTED)) {
-        // Note: PUB, PROT, STATIC, ABSTRACT, FINAL, and DATA are not collected as annotations
-        // They are handled as visibility/class modifiers in the declaration() function
-        annotations.push_back(advance());
-    }
     return annotations;
 }
 

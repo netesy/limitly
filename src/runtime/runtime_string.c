@@ -51,7 +51,7 @@ RUNTIME_API LmString lm_int_to_string(int64_t value) {
 RUNTIME_API LmString lm_double_to_string(double value) {
     // Buffer large enough for 64-bit double
     char temp[64];
-    int len = snprintf(temp, sizeof(temp), "%.15g", value);
+    int len = snprintf(temp, sizeof(temp), "%.6g", value);
     if (len <= 0) {
         return (LmString){ NULL, 0 };
     }

@@ -1,0 +1,23 @@
+print("Start");
+
+frame Test {
+    var x: int;
+
+    pub init() {
+        self.x = 123;
+    }
+
+    pub fn get(): int {
+        return self.x;
+    }
+}
+
+print("After frame definition");
+
+var t = Test();
+print("After instantiation");
+
+var result = t.get();
+print("Got result");
+
+print(result);

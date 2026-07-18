@@ -1,180 +1,331 @@
 // Standard Library Math Module
 
-var PI: float = 3.141592653589793;
-var E: float = 2.718281828459045;
-var TAU: float = 6.283185307179586;
-var __rand_state: int = 123456789;
+var PI: float = 3.14159265358979323846;
+var E: float = 2.71828182845904523536;
+var TAU: float = 6.28318530717958647692;
+var PHI: float = 1.61803398874989484820;
+var INF: float = 1e300;
+var NAN: float = 0.0;
+var EPSILON: float = 0.00000000000000022204;
 
 frame Int {
-    var value: int;
-    pub fn add(other: int): int { return self.value + other; }
-    pub fn sub(other: int): int { return self.value - other; }
-    pub fn mul(other: int): int { return self.value * other; }
-    pub fn div(other: int): int { if (other == 0) return 0; return self.value / other; }
-    pub fn mod(other: int): int { if (other == 0) return 0; return self.value % other; }
+    pub var value: int;
+    pub init(value: int) {
+        self.value = value;
+    }
     pub fn abs(): int { if (self.value < 0) return -self.value; return self.value; }
     pub fn min(other: int): int { if (self.value < other) return self.value; return other; }
     pub fn max(other: int): int { if (self.value > other) return self.value; return other; }
 }
 
 frame Float {
-    var value: float;
-    pub fn add(other: float): float { return self.value + other; }
-    pub fn sub(other: float): float { return self.value - other; }
-    pub fn mul(other: float): float { return self.value * other; }
-    pub fn div(other: float): float { if (other == 0.0) return 0.0; return self.value / other; }
-    pub fn mod(other: float): float { if (other == 0.0) return 0.0; return self.value - floor(self.value / other) as float * other; }
+    pub var value: float;
+    pub init(value: float) {
+        self.value = value;
+    }
     pub fn abs(): float { if (self.value < 0.0) return -self.value; return self.value; }
     pub fn min(other: float): float { if (self.value < other) return self.value; return other; }
     pub fn max(other: float): float { if (self.value > other) return self.value; return other; }
     
-    // Trigonometric functions
-    pub fn sin(): float { 
-        var y: float = self.normalize_angle(); 
-        var term: float = y; 
-        var sum: float = y; 
-        var n: int = 1; 
-        while (n < 10) { 
-            var k: float = (2.0 * n) * (2.0 * n + 1.0); 
-            term = -term * y * y / k; 
-            sum = sum + term; 
-            n = n + 1; 
-        } 
-        return sum; 
+    // Rounding operations
+    pub fn floor(): int { 
+        var i: int = self.value as int; 
+        if ((i as float) > self.value) return i - 1; 
+        return i; 
     }
     
-    pub fn cos(): float { 
-        var y: float = self.normalize_angle(); 
-        var term: float = 1.0; 
-        var sum: float = 1.0; 
-        var n: int = 1; 
-        while (n < 10) { 
-            var k: float = (2.0 * n - 1.0) * (2.0 * n); 
-            term = -term * y * y / k; 
-            sum = sum + term; 
-            n = n + 1; 
-        } 
-        return sum; 
+    pub fn ceil(): int { 
+        var i: int = self.value as int; 
+        if ((i as float) < self.value) return i + 1; 
+        return i; 
     }
     
-    pub fn tan(): float { 
-        var c: float = self.cos(); 
-        if (c < 0.000000001) return 0.0; 
-        return self.sin() / c; 
+    pub fn round(): int { 
+        if (self.value >= 0.0) return Float(self.value + 0.5).floor(); 
+        return Float(self.value - 0.5).ceil(); 
     }
     
-    pub fn atan(): float { 
-        if (self.abs() > 1.0) { 
-            if (self.value > 0.0) return PI / 2.0 - Float(value=1.0 / self.value).atan(); 
-            return -PI / 2.0 - Float(value=1.0 / self.value).atan(); 
-        } 
-        var term: float = self.value; 
-        var sum: float = self.value; 
-        var n: int = 1; 
-        while (n < 20) { 
-            term = -term * self.value * self.value; 
-            sum = sum + term / (2.0 * n + 1.0); 
-            n = n + 1; 
-        } 
-        return sum; 
-    }
+    pub fn trunc(): int { return self.value as int; }
     
-    pub fn asin(): float? { 
-        if (self.value < -1.0 or self.value > 1.0) return nil; 
-        var d = Float(value=1.0 - self.value*self.value).sqrt(); 
-        if (d == nil) return nil; 
-        if (d == 0.0) { 
-            if (self.value >= 0.0) return PI/2.0; 
-            return -PI/2.0; 
-        } 
-        return Float(value=self.value / d).atan(); 
+    pub fn fract(): float { return self.value - (self.value as int as float); }
+
+    // Powers and logs
+    pub fn sqrt(): float {
+        if (self.value < 0.0) return NAN;
+        if (self.value == 0.0) return 0.0;
+        var x = self.value;
+        var y = 1.0;
+        var e = 0.000000000000001;
+        while (abs(x - y) > e) {
+            x = (x + y) / 2.0;
+            y = self.value / x;
+        }
+        return x;
     }
-    
-    pub fn acos(): float? { 
-        var a = self.asin(); 
-        if (a == nil) return nil; 
-        return PI/2.0 - a; 
+
+    pub fn cbrt(): float {
+        if (self.value == 0.0) return 0.0;
+        var x = self.value;
+        var y = 1.0;
+        if (x < 0.0) {
+            x = -x;
+            while (abs(x - y * y * y) > 0.000000000000001) {
+                y = (2.0 * y + x / (y * y)) / 3.0;
+            }
+            return -y;
+        }
+        while (abs(x - y * y * y) > 0.000000000000001) {
+            y = (2.0 * y + x / (y * y)) / 3.0;
+        }
+        return y;
     }
-    
-    // Logarithmic and exponential functions
-    pub fn exp(): float { 
-        var term: float = 1.0; 
-        var sum: float = 1.0; 
-        var n: int = 1; 
-        while (n < 30) { 
-            term = term * self.value / n; 
-            sum = sum + term; 
-            n = n + 1; 
-        } 
-        return sum; 
+
+    pub fn exp(): float {
+        var x = self.value;
+        var sum = 1.0;
+        var term = 1.0;
+        var i = 1;
+        while (i < 100) {
+            var i_f = i as float;
+            term = term * x / i_f;
+            sum = sum + term;
+            if (abs(term) < 1e-16) break;
+            i = i + 1;
+        }
+        return sum;
     }
-    
-    pub fn log(): float? { 
-        if (self.value <= 0.0) return nil; 
-        var y: float = (self.value-1.0)/(self.value+1.0); 
-        var y2: float = y*y; 
-        var term: float = y; 
-        var sum: float = 0.0; 
-        var n: int = 1; 
-        while (n < 60) { 
-            sum = sum + term / n; 
-            term = term * y2; 
-            n = n + 2; 
-        } 
-        return 2.0 * sum; 
+
+    pub fn log(): float {
+        if (self.value <= 0.0) return NAN;
+        var x = self.value;
+        var count = 0;
+        while (x > 2.0) {
+            x = x / E;
+            count = count + 1;
+        }
+        while (x < 0.5) {
+            x = x * E;
+            count = count - 1;
+        }
+        x = x - 1.0;
+        var sum = 0.0;
+        var term = x;
+        var i = 1;
+        while (i < 100) {
+            var i_f = i as float;
+            if (i % 2 == 1) sum = sum + term / i_f;
+            else sum = sum - term / i_f;
+            term = term * x;
+            if (abs(term) < 1e-16) break;
+            i = i + 1;
+        }
+        return sum + (count as float);
     }
-    
-    pub fn log10(): float? { 
-        var l = self.log(); 
-        if (l == nil) return nil; 
-        return l / 2.302585092994046; 
+
+    pub fn log2(): float { return self.log() / Float(2.0).log(); }
+    pub fn log10(): float { return self.log() / Float(10.0).log(); }
+    pub fn exp2(): float { return Float(self.value * Float(2.0).log()).exp(); }
+
+    pub fn pow(exponent: float): float {
+        if (self.value == 0.0) return 0.0;
+        if (self.value < 0.0) return NAN;
+        return Float(exponent * self.log()).exp();
     }
-    
-    pub fn sqrt(): float? { 
-        if (self.value < 0.0) return nil; 
-        if (self.value == 0.0) return 0.0; 
-        var guess: float = self.value; 
-        if (guess < 1.0) guess = 1.0; 
-        var i: int = 0; 
-        while (i < 20) { 
-            guess = 0.5 * (guess + self.value / guess); 
-            i = i + 1; 
-        } 
-        return guess; 
+
+    pub fn hypot(other: float): float {
+        return Float(self.value * self.value + other * other).sqrt();
     }
-    
-    pub fn pow(exponent: float): float { 
-        if (self.value <= 0.0) { 
-            if (self.value == 0.0 and exponent > 0.0) return 0.0; 
-            return 0.0; 
-        } 
-        var l = self.log(); 
-        if (l == nil) return 0.0; 
-        return Float(value=exponent * l).exp(); 
+
+    // Trigonometry
+    pub fn sin(): float {
+        var x = self.normalize_angle();
+        var sum = 0.0;
+        var term = x;
+        var i = 1;
+        while (i < 20) {
+            var i_f = i as float;
+            sum = sum + term;
+            term = -term * x * x / ((2.0 * i_f) * (2.0 * i_f + 1.0));
+            i = i + 1;
+        }
+        return sum;
     }
-    
+
+    pub fn cos(): float {
+        var x = self.normalize_angle();
+        var sum = 0.0;
+        var term = 1.0;
+        var i = 1;
+        while (i < 20) {
+            var i_f = i as float;
+            sum = sum + term;
+            term = -term * x * x / ((2.0 * i_f - 1.0) * (2.0 * i_f));
+            i = i + 1;
+        }
+        return sum;
+    }
+
+    pub fn tan(): float { return self.sin() / self.cos(); }
+
+    pub fn asin(): float {
+        if (self.value < -1.0 or self.value > 1.0) return NAN;
+        var x = self.value;
+        var sum = x;
+        var term = x;
+        var i = 1;
+        while (i < 50) {
+            var i_f = i as float;
+            term = term * x * x * (2.0 * i_f - 1.0) / (2.0 * i_f);
+            sum = sum + term / (2.0 * i_f + 1.0);
+            if (abs(term) < 1e-16) break;
+            i = i + 1;
+        }
+        return sum;
+    }
+
+    pub fn acos(): float { return PI / 2.0 - self.asin(); }
+
+    pub fn atan(): float {
+        var x = self.value;
+        if (abs(x) > 1.0) {
+            if (x > 0.0) return PI / 2.0 - Float(1.0 / x).atan();
+            return -PI / 2.0 - Float(1.0 / x).atan();
+        }
+        var sum = x;
+        var term = x;
+        var i = 1;
+        while (i < 50) {
+            var i_f = i as float;
+            term = -term * x * x;
+            sum = sum + term / (2.0 * i_f + 1.0);
+            if (abs(term) < 1e-16) break;
+            i = i + 1;
+        }
+        return sum;
+    }
+
+    pub fn atan2(x: float): float {
+        var y = self.value;
+        if (x > 0.0) return Float(y / x).atan();
+        if (x < 0.0 and y >= 0.0) return Float(y / x).atan() + PI;
+        if (x < 0.0 and y < 0.0) return Float(y / x).atan() - PI;
+        if (x == 0.0 and y > 0.0) return PI / 2.0;
+        if (x == 0.0 and y < 0.0) return -PI / 2.0;
+        return 0.0;
+    }
+
+    // Hyperbolic
+    pub fn sinh(): float {
+        var e = self.exp();
+        return (e - 1.0 / e) / 2.0;
+    }
+
+    pub fn cosh(): float {
+        var e = self.exp();
+        return (e + 1.0 / e) / 2.0;
+    }
+
+    pub fn tanh(): float {
+        var e = Float(2.0 * self.value).exp();
+        return (e - 1.0) / (e + 1.0);
+    }
+
     // Helper method for trigonometric functions
-    private fn normalize_angle(): float { 
+    fn normalize_angle(): float { 
         var y: float = self.value; 
         while (y > PI) { y = y - TAU; } 
         while (y < -PI) { y = y + TAU; } 
         return y; 
     }
+
+    // Floating-point helpers
+    pub fn is_nan(): bool { return self.value != self.value; }
+    pub fn is_inf(): bool { return self.value == INF or self.value == -INF; }
+    pub fn is_finite(): bool { return !self.is_nan() and !self.is_inf(); }
 }
 
-// Frame-focused math operations - use Int and Float frames directly
-// Example: Float(value=3.14).sin() instead of sin(3.14)
+// Basic operations
+pub fn abs(x: float): float { return Float(x).abs(); }
+pub fn abs_int(x: int): int { return Int(x).abs(); }
 
-// Pure utility functions that don't duplicate frame functionality
-fn floor(x: float): int { var i: int = x as int; if ((i as float) > x) return i - 1; return i; }
-fn ceil(x: float): int { var i: int = x as int; if ((i as float) < x) return i + 1; return i; }
-fn round(x: float): int { if (x >= 0.0) return floor(x + 0.5); return ceil(x - 0.5); }
+// Integer utilities
+pub fn gcd(a: int, b: int): int {
+    var x = abs_int(a);
+    var y = abs_int(b);
+    while (y != 0) {
+        var temp = y;
+        y = x % y;
+        x = temp;
+    }
+    return x;
+}
 
-// Random number generation (stateful utility, not frame method)
-fn random(): float { __rand_state = ((__rand_state * 1103515245 + 12345) % 2147483647); return (__rand_state as float) / 2147483647.0; }
-fn random_int(min: int, max: int): int { if (max <= min) return min; var range = max - min + 1; var offset = floor(random() * (range as float)); if (offset >= range) offset = range - 1; return min + offset; }
-fn random_float(min: float, max: float): float { if (max <= min) return min; return min + (max - min) * random(); }
+pub fn lcm(a: int, b: int): int {
+    if (a == 0 or b == 0) return 0;
+    return abs_int(a * b) / gcd(a, b);
+}
 
-// Utility functions that operate on multiple values
-fn clamp(value: float, min_value: float, max_value: float): float { if (value < min_value) return min_value; if (value > max_value) return max_value; return value; }
-fn lerp(start: float, end: float, t: float): float { return start + (end - start) * t; }
+pub fn factorial(n: int): int {
+    if (n < 0) return 0;
+    if (n == 0) return 1;
+    var res = 1;
+    var i = 1;
+    while (i <= n) {
+        res = res * i;
+        i = i + 1;
+    }
+    return res;
+}
+
+pub fn permutations(n: int, k: int): int {
+    if (k < 0 or k > n) return 0;
+    return factorial(n) / factorial(n - k);
+}
+
+pub fn combinations(n: int, k: int): int {
+    if (k < 0 or k > n) return 0;
+    return factorial(n) / (factorial(k) * factorial(n - k));
+}
+pub fn min(a: float, b: float): float { return Float(a).min(b); }
+pub fn max(a: float, b: float): float { return Float(a).max(b); }
+pub fn clamp(value: float, low: float, high: float): float { if (value < low) return low; if (value > high) return high; return value; }
+pub fn sign(x: float): float { if (x > 0.0) return 1.0; if (x < 0.0) return -1.0; return 0.0; }
+pub fn lerp(a: float, b: float, t: float): float { return a + (b - a) * t; }
+
+// Rounding utility functions
+pub fn floor(x: float): int { return Float(x).floor(); }
+pub fn ceil(x: float): int { return Float(x).ceil(); }
+pub fn round(x: float): int { return Float(x).round(); }
+pub fn trunc(x: float): int { return Float(x).trunc(); }
+pub fn fract(x: float): float { return Float(x).fract(); }
+
+// Powers and logs utility functions
+pub fn pow(base: float, exponent: float): float { return Float(base).pow(exponent); }
+pub fn sqrt(x: float): float { return Float(x).sqrt(); }
+pub fn cbrt(x: float): float { return Float(x).cbrt(); }
+pub fn hypot(x: float, y: float): float { return Float(x).hypot(y); }
+pub fn log(x: float): float { return Float(x).log(); }
+pub fn log2(x: float): float { return Float(x).log2(); }
+pub fn log10(x: float): float { return Float(x).log10(); }
+pub fn exp(x: float): float { return Float(x).exp(); }
+pub fn exp2(x: float): float { return Float(x).exp2(); }
+
+// Trigonometry utility functions
+pub fn sin(x: float): float { return Float(x).sin(); }
+pub fn cos(x: float): float { return Float(x).cos(); }
+pub fn tan(x: float): float { return Float(x).tan(); }
+pub fn asin(x: float): float { return Float(x).asin(); }
+pub fn acos(x: float): float { return Float(x).acos(); }
+pub fn atan(x: float): float { return Float(x).atan(); }
+pub fn atan2(y: float, x: float): float { return Float(y).atan2(x); }
+
+// Hyperbolic utility functions
+pub fn sinh(x: float): float { return Float(x).sinh(); }
+pub fn cosh(x: float): float { return Float(x).cosh(); }
+pub fn tanh(x: float): float { return Float(x).tanh(); }
+
+// Floating-point helpers
+pub fn is_nan(x: float): bool { return Float(x).is_nan(); }
+pub fn is_inf(x: float): bool { return Float(x).is_inf(); }
+pub fn is_finite(x: float): bool { return Float(x).is_finite(); }
+pub fn nearly_equal(a: float, b: float, epsilon: float = 0.000001): bool { return abs(a - b) <= epsilon; }

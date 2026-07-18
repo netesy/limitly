@@ -4,9 +4,9 @@ trait Speaker {
 
 frame Human : Speaker {
     pub name: str;
-    pub init(n: str) { this.name = n; }
+    pub init(n: str) { self.name = n; }
     pub fn speak() {
-        print("I am a human named " + this.name);
+        print("I am a human named " + self.name);
     }
 }
 

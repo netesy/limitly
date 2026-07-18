@@ -3,7 +3,7 @@
 frame String {
     var value: str;
 
-    pub fn length(): int { return self.value.length; }
+    pub fn length(): int { return len(self.value); }
     
     pub fn concat(other: str): str { 
         return String(value=self.value + other).value; 
@@ -14,15 +14,15 @@ frame String {
         if (end != nil and end < start) return nil;
         
         var result: str = "";
-        var len: int = self.value.length;
-        var end_idx: int = end if end != nil else len;
+        var len: int = len(self.value);
+        var end_idx: int = (end != nil) ? end : len;
         
         if (end_idx > len) end_idx = len;
         if (start >= len) return "";
         
         var i: int = start;
         while (i < end_idx) {
-            result = result + self.value[i];
+            result = result + substring(self.value, i, i + 1);
             i = i + 1;
         }
         return result;
@@ -31,24 +31,27 @@ frame String {
     pub fn trim(): str { 
         // Remove leading whitespace
         var start: int = 0;
-        while (start < self.value.length and (self.value[start] == " " or self.value[start] == "\t" or self.value[start] == "\n")) {
+        while (start < len(self.value) and (substring(self.value, start, start + 1) == " " or substring(self.value, start, start + 1) == "\t" or substring(self.value, start, start + 1) == "\n")) {
             start = start + 1;
         }
         
         // Remove trailing whitespace
-        var end: int = self.value.length - 1;
-        while (end >= start and (self.value[end] == " " or self.value[end] == "\t" or self.value[end] == "\n")) {
+        var end: int = len(self.value) - 1;
+        while (end >= start and (substring(self.value, end, end + 1) == " " or substring(self.value, end, end + 1) == "\t" or substring(self.value, end, end + 1) == "\n")) {
             end = end - 1;
         }
         
-        return self.substring(start, end + 1) if start <= end else "";
+        if (start > end) return "";
+        var res = self.substring(start, end + 1);
+        if (res == nil) return "";
+        return res;
     }
     
     pub fn to_upper(): str { 
         var result: str = "";
         var i: int = 0;
-        while (i < self.value.length) {
-            var ch: str = self.value[i];
+        while (i < len(self.value)) {
+            var ch: str = substring(self.value, i, i + 1);
             // Convert lowercase letters to uppercase
             if (ch >= "a" and ch <= "z") {
                 var code: int = ch as int;
@@ -64,8 +67,8 @@ frame String {
     pub fn to_lower(): str { 
         var result: str = "";
         var i: int = 0;
-        while (i < self.value.length) {
-            var ch: str = self.value[i];
+        while (i < len(self.value)) {
+            var ch: str = substring(self.value, i, i + 1);
             // Convert uppercase letters to lowercase
             if (ch >= "A" and ch <= "Z") {
                 var code: int = ch as int;
@@ -86,8 +89,8 @@ frame String {
         if (delimiter == "") {
             var result: [str] = [];
             var i: int = 0;
-            while (i < self.value.length) {
-                result[i] = self.value[i];
+            while (i < len(self.value)) {
+                result = result + [substring(self.value, i, i + 1)];
                 i = i + 1;
             }
             return result;
@@ -97,29 +100,32 @@ frame String {
         var start: int = 0;
         var i: int = 0;
         
-        while (i <= self.value.length - delimiter.length) {
-            var match: bool = true;
+        while (i <= len(self.value) - len(delimiter)) {
+            var is_match (=) true;
             var j: int = 0;
-            while (j < delimiter.length) {
-                if (self.value[i + j] != delimiter[j]) {
-                    match = false;
-                    break;
+            while (j < len(delimiter)) {
+                if (substring(self.value, i + j, i + j + 1) != substring(delimiter, j, j + 1)) {
+                    is_match (=) false;
+                    j = len(delimiter);
+                } else {
+                    j = j + 1;
                 }
-                j = j + 1;
             }
             
-            if (match) {
-                var part: str = self.substring(start, i);
-                result[result.length] = part if part != nil else "";
-                start = i + delimiter.length;
+            if (is_match) {
+                var part = self.substring(start, i);
+                if (part != nil) result = result + [part];
+                else result = result + [""];
+                start = i + len(delimiter);
                 i = start;
             } else {
                 i = i + 1;
             }
         }
         
-        var final_part: str = self.substring(start, self.value.length);
-        result[result.length] = final_part if final_part != nil else "";
+        var final_part = self.substring(start, len(self.value));
+        if (final_part != nil) result = result + [final_part];
+        else result = result + [""];
         
         return result;
     }
@@ -130,29 +136,29 @@ frame String {
         var result: str = "";
         var i: int = 0;
         
-        while (i <= self.value.length - old.length) {
-            var match: bool = true;
+        while (i <= len(self.value) - len(old)) {
+            var is_match (=) true;
             var j: int = 0;
-            while (j < old.length) {
-                if (self.value[i + j] != old[j]) {
-                    match = false;
+            while (j < len(old)) {
+                if (substring(self.value, i + j, i + j + 1) != substring(old, j, j + 1)) {
+                    is_match (=) false;
                     break;
                 }
                 j = j + 1;
             }
             
-            if (match) {
+            if (is_match) {
                 result = result + replacement;
-                i = i + old.length;
+                i = i + len(old);
             } else {
-                result = result + self.value[i];
+                result = result + substring(self.value, i, i + 1);
                 i = i + 1;
             }
         }
         
         // Add remaining characters
-        while (i < self.value.length) {
-            result = result + self.value[i];
+        while (i < len(self.value)) {
+            result = result + substring(self.value, i, i + 1);
             i = i + 1;
         }
         
@@ -161,70 +167,88 @@ frame String {
 
     pub fn index_of(substring: str): int? {
         if (substring == "") return 0;
-        if (substring.length > self.value.length) return nil;
+        if (len(substring) > len(self.value)) return nil;
         
         var i: int = 0;
-        while (i <= self.value.length - substring.length) {
-            var match: bool = true;
+        while (i <= len(self.value) - len(substring)) {
+            var is_match (=) true;
             var j: int = 0;
-            while (j < substring.length) {
-                if (self.value[i + j] != substring[j]) {
-                    match = false;
+            while (j < len(substring)) {
+                if (substring(self.value, i + j, i + j + 1) != substring(substring, j, j + 1)) {
+                    is_match (=) false;
                     break;
                 }
                 j = j + 1;
             }
-            if (match) return i;
+            if (is_match) return i;
             i = i + 1;
         }
         return nil;
     }
     
     pub fn starts_with(prefix: str): bool {
-        if (prefix.length > self.value.length) return false;
+        if (len(prefix) > len(self.value)) return false;
         var i: int = 0;
-        while (i < prefix.length) {
-            if (self.value[i] != prefix[i]) return false;
+        while (i < len(prefix)) {
+            if (substring(self.value, i, i + 1) != substring(prefix, i, i + 1)) return false;
             i = i + 1;
         }
         return true;
     }
     
     pub fn ends_with(suffix: str): bool {
-        if (suffix.length > self.value.length) return false;
-        var start: int = self.value.length - suffix.length;
+        if (len(suffix) > len(self.value)) return false;
+        var start: int = len(self.value) - len(suffix);
         var i: int = 0;
-        while (i < suffix.length) {
-            if (self.value[start + i] != suffix[i]) return false;
+        while (i < len(suffix)) {
+            if (substring(self.value, start + i, start + i + 1) != substring(suffix, i, i + 1)) return false;
             i = i + 1;
         }
         return true;
     }
     
     pub fn char_at(index: int): str? {
-        if (index < 0 or index >= self.value.length) return nil;
+        if (index < 0 or index >= len(self.value)) return nil;
         return self.value[index];
     }
     
     pub fn last_index_of(substring: str): int? {
-        if (substring == "") return self.value.length;
-        if (substring.length > self.value.length) return nil;
+        if (substring == "") return len(self.value);
+        if (len(substring) > len(self.value)) return nil;
         
-        var i: int = self.value.length - substring.length;
+        var i: int = len(self.value) - len(substring);
         while (i >= 0) {
-            var match: bool = true;
+            var is_match (=) true;
             var j: int = 0;
-            while (j < substring.length) {
-                if (self.value[i + j] != substring[j]) {
-                    match = false;
+            while (j < len(substring)) {
+                if (substring(self.value, i + j, i + j + 1) != substring(substring, j, j + 1)) {
+                    is_match (=) false;
                     break;
                 }
                 j = j + 1;
             }
-            if (match) return i;
+            if (is_match) return i;
             i = i - 1;
         }
         return nil;
+    }
+
+    pub fn repeat(count: int): str {
+        var res = "";
+        for (var i = 0; i < count; i = i + 1) res = res + self.value;
+        return res;
+    }
+
+    pub fn pad_left(width: int, fill: str = " "): str {
+        var n = width - len(self.value);
+        if (n <= 0) return self.value;
+        return String(value=fill).repeat(n) + self.value;
+    }
+
+    pub fn pad_right(width: int, fill: str = " "): str {
+        var n = width - len(self.value);
+        if (n <= 0) return self.value;
+        return self.value + String(value=fill).repeat(n);
     }
 }
 
@@ -233,13 +257,27 @@ frame String {
 
 // Pure utility functions that don't duplicate frame functionality
 fn join_strings(strings: [str], separator: str): str {
-    if (strings.length == 0) return "";
-    var result = String(value=strings[0]);
+    if (len(strings) == 0) return "";
+    var result = strings[0];
     var i: int = 1;
-    while (i < strings.length) {
-        result = String(value=result.concat(separator));
-        result = String(value=result.concat(strings[i]));
+    while (i < len(strings)) {
+        result = result + separator + strings[i];
         i = i + 1;
     }
-    return result.value;
+    return result;
+}
+
+fn split(s: str, delimiter: str): [str] {
+    return String(value=s).split(delimiter);
+}
+
+fn trim(s: str): str {
+    return String(value=s).trim();
+}
+
+fn capitalize(s: str): str {
+    if (len(s) == 0) return s;
+    var first = String(value=substring(s, 0, 1)).to_upper();
+    var rest = substring(s, 1, len(s));
+    return first + rest;
 }

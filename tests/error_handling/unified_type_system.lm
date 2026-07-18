@@ -11,7 +11,7 @@ fn divide(a: int, b: int): int? {
 
 // Function that uses the ? operator for error propagation
 fn calculate(x: int, y: int, z: int): int? {
-    var step1: int = divide(x, y)?; // If divide returns err(), this function returns err()
+    var step1: int = divide(x, y)?; // If divide returns err(), self function returns err()
     var step2: int = divide(step1, z)?; // Chain operations with error propagation
     return ok(step2); // Return success value
 }
@@ -34,7 +34,7 @@ fn to_int(s: str): int? {
 
 // Chained operations with error propagation
 fn get_number_from_string(s: str): int? {
-    var number: int = to_int(s)?; // If to_int returns err(), this function returns err()
+    var number: int = to_int(s)?; // If to_int returns err(), self function returns err()
     print("Parsing was successful!");
     return ok(number * 2); // Any value that fits the correct type becomes ok()
 }

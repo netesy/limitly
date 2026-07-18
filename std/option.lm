@@ -1,0 +1,52 @@
+// Standard Library Option Module
+
+frame Option {
+    var present: bool;
+    var value: any;
+
+    pub init(present: bool = false, value: any = nil) {
+        self.present = present;
+        self.value = value;
+    }
+
+    pub fn is_some(): bool {
+        return self.present;
+    }
+
+    pub fn is_none(): bool {
+        return not self.present;
+    }
+
+    pub fn unwrap(): any {
+        return self.value;
+    }
+
+    pub fn unwrap_or(default_value: any): any {
+        if (self.present) {
+            return self.value;
+        }
+        return default_value;
+    }
+
+    pub fn map(f: fn(any): any): Option {
+        if (self.present) {
+            return Some(f(self.value));
+        }
+        return None();
+    }
+
+    pub fn filter(predicate: fn(any): bool): Option {
+        if (self.present and predicate(self.value)) {
+            return self;
+        }
+        return None();
+    }
+}
+
+pub fn Some(value: any): Option {
+    return Option(true, value);
+}
+
+pub fn None(): Option {
+    return Option(false, nil);
+}

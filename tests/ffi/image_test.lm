@@ -1,0 +1,20 @@
+import std.ffi as ffi;
+
+fn main() {
+    print("Testing STB image FFI directly...");
+    var lib = ffi.library_load("tests/ffi/libstb_image.so");
+    var save_fn = ffi.library_get_symbol(lib, "save_image_png");
+    
+    var w = 10;
+    var h = 10;
+    var c = 3;
+    var pixels = ffi.alloc(300);
+    ffi.memset(pixels, 200, 300); 
+    
+    var res = ffi.ccall_execute5_siiip_int(save_fn, "test_std_image_final.png", w, h, c, pixels);
+    print("Final FFI save result: {res}");
+    
+    ffi.free(pixels);
+    ffi.library_unload(lib);
+}
+main();

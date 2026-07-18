@@ -1,0 +1,44 @@
+// Standard Library Internal Runtime Module
+// This module provides thin wrappers around VM builtins.
+
+pub var RT_FILE: int = 0;
+pub var RT_SOCKET: int = 1;
+pub var RT_STDOUT: int = 9;
+pub var RT_STDERR: int = 10;
+pub var RT_ENTROPY: int = 12;
+pub var RT_DNS_RESOLVER: int = 13;
+pub var RT_UDP_SOCKET: int = 14;
+pub var RT_WEBSOCKET: int = 15;
+pub var RT_HASH_ENGINE: int = 16;
+
+pub var OP_OPEN: int = 0;
+pub var OP_CLOSE: int = 1;
+pub var OP_READ: int = 2;
+pub var OP_WRITE: int = 3;
+pub var OP_CONNECT: int = 6;
+pub var OP_POLL: int = 10;
+pub var OP_BIND: int = 23;
+pub var OP_LISTEN: int = 24;
+pub var OP_ACCEPT: int = 25;
+pub var OP_RESOLVE: int = 26;
+pub var OP_SEND_TO: int = 27;
+pub var OP_RECV_FROM: int = 28;
+pub var OP_FLUSH: int = 29;
+pub var OP_MKDIR: int = 30;
+pub var OP_READDIR: int = 31;
+pub var OP_RENAME: int = 32;
+pub var OP_EXISTS: int = 33;
+pub var OP_DELETE: int = 34;
+pub var OP_HMAC: int = 35;
+
+pub fn create(type_id: int, args: any): int {
+    return resource_create(type_id, args);
+}
+
+pub fn call(handle: int, op_id: int, args: any): any {
+    return resource_call(handle, op_id, args);
+}
+
+pub fn destroy(handle: int): nil {
+    resource_destroy(handle);
+}

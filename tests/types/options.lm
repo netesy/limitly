@@ -74,7 +74,7 @@ fn processOptional(input: int): ChainResult {
 
 fn chainOptional(input: int): ChainResult {
     var first: ChainResult = processOptional(input);
-    // In a full Option implementation, this would chain properly
+    // In a full Option implementation, self would chain properly
     return first;
 }
 

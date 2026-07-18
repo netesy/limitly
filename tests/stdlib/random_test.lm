@@ -1,0 +1,23 @@
+// Random module tests
+import std.random as random;
+
+print("=== Random Tests ===");
+
+var rng = random.Random(seed=12345);
+var i1 = rng.next_int();
+var i2 = rng.next_int();
+assert(i1 != i2, "random ints should differ");
+
+var f1 = rng.next_float();
+assert(f1 >= 0.0 and f1 < 1.0, "random float range");
+
+var b1 = rng.next_bool();
+var s1 = rng.next_string(10);
+assert(len(s1) == 10, "random string length");
+
+var secure = random.SecureRandom();
+var si1 = secure.next_int();
+// Secure random might be zero but very unlikely
+assert(si1 != 0, "secure random int should be non-zero");
+
+print("Random tests passed!");

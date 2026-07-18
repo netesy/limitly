@@ -4,7 +4,7 @@ import tests.functions.basic_functions as math hide greet, greet_name;
 //print(m.message); 
 
 //m.ask(); 
-//m.greet(); //this should not show when hidden
+//m.greet(); //self should not show when hidden
 //math.greet();
 print("adding 4 and 8 is: {math.add(4,8)}");
 

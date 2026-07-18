@@ -17,6 +17,12 @@ void RegisterVM::execute_bitwise(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::Xor:
             registers[pc->dst] = make_i64(to_int(registers[pc->a]) ^ to_int(registers[pc->b]));
             break;
+        case LIR::LIR_Op::Shl:
+            registers[pc->dst] = make_i64(to_int(registers[pc->a]) << to_int(registers[pc->b]));
+            break;
+        case LIR::LIR_Op::Shr:
+            registers[pc->dst] = make_i64(to_int(registers[pc->a]) >> to_int(registers[pc->b]));
+            break;
         default:
             break;
     }

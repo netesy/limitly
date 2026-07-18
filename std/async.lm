@@ -7,8 +7,8 @@ frame Promise {
     var state: str;  // "pending", "fulfilled", "rejected"
     var value: str?;
     var error: str?;
-    var then_callbacks: [fn(str): str];
-    var catch_callbacks: [fn(str): str];
+    pub var then_callbacks: [fn(str): str];
+    pub var catch_callbacks: [fn(str): str];
 
     pub fn init(): Promise {
         return Promise(state="pending", value=nil, error=nil, then_callbacks=[], catch_callbacks=[]);
@@ -105,8 +105,8 @@ frame Promise {
     // Utility methods
     pub fn to_string(): str {
         return "Promise(state=" + self.state + 
-               (if self.value != nil then ", value=" + self.value else "") +
-               (if self.error != nil then ", error=" + self.error else "") + ")";
+               (self.value != nil ? ", value=" + self.value : "") +
+               (self.error != nil ? ", error=" + self.error : "") + ")";
     }
 }
 
@@ -202,7 +202,7 @@ frame Async {
     pub fn delay(ms: int): Promise {
         var promise = Promise.init();
         
-        // In a real implementation, this would use timers
+        // In a real implementation, self would use timers
         // For now, we'll simulate the delay
         var result = "delayed_" + ms as str;
         return promise.resolve(result);
@@ -227,7 +227,12 @@ frame Async {
             
             result.catch(fn(error: str): str {
                 if (attempt < max_attempts) {
-                    return try_operation().get_value() if try_operation().is_fulfilled() else "";
+                    var try_result = try_operation();
+                    if (try_result.is_fulfilled()) {
+                        return try_result.get_value();
+                    } else {
+                        return "";
+                    }
                 }
                 return error;
             });
@@ -316,7 +321,12 @@ frame Async {
             timeout_promise = Async.delay(delay_ms);
             timeout_promise.then(fn(_: str): str {
                 if (last_call == current_time) {
-                    return operation().get_value() if operation().is_fulfilled() else "";
+                    var operation_result = operation();
+                    if (operation_result.is_fulfilled()) {
+                        return operation_result.get_value();
+                    } else {
+                        return "";
+                    }
                 }
                 return "";
             });

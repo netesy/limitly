@@ -26,9 +26,7 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::createTypeAnnotationF
         case TokenType::BOOL_TYPE: type->typeName = "bool"; type->isPrimitive = true; break;
         case TokenType::USER_TYPE: type->typeName = token.lexeme; type->isUserDefined = true; break;
         case TokenType::FUNCTION_TYPE: type->typeName = "function"; type->isFunction = true; break;
-        case TokenType::LIST_TYPE: type->typeName = "list"; type->isList = true; break;
-        case TokenType::DICT_TYPE: type->typeName = "dict"; type->isDict = true; break;
-        case TokenType::ARRAY_TYPE: type->typeName = "array"; type->isList = true; break;
+        // LIST_TYPE, DICT_TYPE, ARRAY_TYPE removed - collection syntax uses [int], {str:int}, (int,str)
         case TokenType::ENUM_TYPE: type->typeName = "enum"; break;
         case TokenType::SUM_TYPE: type->typeName = "sum"; type->isUnion = true; break;
         case TokenType::UNION_TYPE: type->typeName = "union"; type->isUnion = true; break;
@@ -48,6 +46,21 @@ std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::createTypeAnnotationF
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
+    auto first = parseSinglePattern();
+    // Or-patterns: A | B | C
+    if (check(TokenType::PIPE)) {
+        auto orPattern = std::make_shared<LM::Frontend::AST::OrPatternExpr>();
+        orPattern->line = first->line;
+        orPattern->patterns.push_back(first);
+        while (match({TokenType::PIPE})) {
+            orPattern->patterns.push_back(parseSinglePattern());
+        }
+        return orPattern;
+    }
+    return first;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseSinglePattern() {
     if (match({TokenType::UNDERSCORE, TokenType::DEFAULT})) {
         auto varExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
         varExpr->line = previous().line;
@@ -63,8 +76,8 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
         check(TokenType::UINT32_TYPE) || check(TokenType::UINT64_TYPE) || check(TokenType::UINT128_TYPE) ||
         check(TokenType::FLOAT_TYPE) || check(TokenType::FLOAT32_TYPE) || check(TokenType::FLOAT64_TYPE) ||
         check(TokenType::STR_TYPE) || check(TokenType::BOOL_TYPE) || check(TokenType::USER_TYPE) ||
-        check(TokenType::FUNCTION_TYPE) || check(TokenType::LIST_TYPE) || check(TokenType::DICT_TYPE) ||
-        check(TokenType::ARRAY_TYPE) || check(TokenType::ENUM_TYPE) || check(TokenType::SUM_TYPE) ||
+        check(TokenType::FUNCTION_TYPE) || check(TokenType::D2_TYPE) || check(TokenType::D4_TYPE) || check(TokenType::D6_TYPE) ||
+        check(TokenType::ENUM_TYPE) || check(TokenType::SUM_TYPE) ||
         check(TokenType::UNION_TYPE) || check(TokenType::OPTION_TYPE) || check(TokenType::RESULT_TYPE) ||
         check(TokenType::ANY_TYPE) || check(TokenType::NIL_TYPE) || check(TokenType::CHANNEL_TYPE) ||
         check(TokenType::ATOMIC_TYPE)) {
@@ -105,6 +118,17 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
         varExpr->line = token.line;
         varExpr->name = token.lexeme;
         return varExpr;
+    }
+    // Parse literal patterns (integers, hex, floats, scientific, strings, booleans, nil, and negative numbers)
+    if (check(TokenType::INT_LITERAL) || check(TokenType::HEX_LITERAL) || check(TokenType::FLOAT_LITERAL) ||
+        check(TokenType::SCIENTIFIC_LITERAL) || check(TokenType::STRING) || check(TokenType::TRUE) ||
+        check(TokenType::FALSE) || check(TokenType::NIL) || check(TokenType::MINUS)) {
+        return expression();
+    }
+    // Fallback: if we can't parse a pattern, advance to avoid infinite loop
+    if (!isAtEnd()) {
+        error("Expected pattern in match case", false);
+        advance();
     }
     return expression();
 }
@@ -217,7 +241,10 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseValPattern() {
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseErrPattern() {
     auto pattern = std::make_shared<LM::Frontend::AST::ErrPatternExpr>();
     pattern->line = previous().line;
-    pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name after 'err'.").lexeme;
+    // Variable name is optional in err patterns
+    if (check(TokenType::IDENTIFIER)) {
+        pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name after 'err'.").lexeme;
+    }
     if (match({TokenType::COLON})) pattern->errorType = consume(TokenType::IDENTIFIER, "Expected error type after ':'.").lexeme;
     return pattern;
 }

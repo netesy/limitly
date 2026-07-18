@@ -1,13 +1,225 @@
+// Standard Library HTTP Client Module
+// Full HTTP/1.1 client built on top of TCP and DNS resources.
+
 import std.core as core;
+import std.core show Error;
+import std.url as url;
+import std.net.dns as dns;
+import std.net.tcp as tcp;
+
+// ---- HTTP Request / Response frames ----
+
+frame HTTPRequest {
+    pub var method: str;
+    pub var url_str: str;
+    pub var headers: {str: str};
+    pub var body: str;
+
+    pub fn init(method: str, url_str: str) {
+        self.method = method;
+        self.url_str = url_str;
+        self.headers = {};
+        self.body = "";
+        // Set default headers
+        self.headers["User-Agent"] = "LimitlyHTTP/1.0";
+        self.headers["Accept"] = "*/*";
+        self.headers["Connection"] = "close";
+    }
+
+    pub fn set_header(name: str, value: str): HTTPRequest {
+        self.headers[name] = value;
+        return self;
+    }
+
+    pub fn set_body(body: str, content_type: str): HTTPRequest {
+        self.body = body;
+        if (content_type != "") self.headers["Content-Type"] = content_type;
+        self.headers["Content-Length"] = len(body) as str;
+        return self;
+    }
+}
+
+frame HTTPResponse {
+    pub var status_code: int;
+    pub var status_text: str;
+    pub var headers: {str: str};
+    pub var body: str;
+    pub var protocol: str;
+
+    pub fn init() {
+        self.status_code = 0;
+        self.status_text = "";
+        self.headers = {};
+        self.body = "";
+        self.protocol = "HTTP/1.1";
+    }
+
+    pub fn is_success(): bool {
+        return self.status_code >= 200 and self.status_code < 300;
+    }
+
+    pub fn is_redirect(): bool {
+        return self.status_code >= 300 and self.status_code < 400;
+    }
+
+    pub fn header(name: str): str {
+        return self.headers[to_lower_header(name)];
+    }
+}
+
+// ---- HTTP Client ----
 
 frame HTTPClient {
-    pub fn get(url: str): core.ResultStr { return request("GET", url, ""); }
-    pub fn post(url: str, body: str): core.ResultStr { return request("POST", url, body); }
-    pub fn put(url: str, body: str): core.ResultStr { return request("PUT", url, body); }
-    pub fn delete(url: str): core.ResultStr { return request("DELETE", url, ""); }
+    pub var follow_redirects: bool;
+    pub var max_redirects: int;
 
-    pub fn request(method: str, url: str, body: str): core.ResultStr {
-        if (url == "") return core.err_str("empty url");
-        return core.ok_str(method + " " + url + " " + body);
+    pub fn init() {
+        self.follow_redirects = true;
+        self.max_redirects = 10;
     }
+
+    pub fn get(url_str: str): HTTPResponse?core.Error {
+        var req = HTTPRequest("GET", url_str);
+        return self.execute(req);
+    }
+
+    pub fn post(url_str: str, body: str, content_type: str): HTTPResponse?core.Error {
+        var req = HTTPRequest("POST", url_str);
+        req.set_body(body, content_type);
+        return self.execute(req);
+    }
+
+    pub fn execute(req: HTTPRequest): HTTPResponse?core.Error {
+        var redirect_count = 0;
+        var current_req = req;
+
+        while (redirect_count <= self.max_redirects) {
+            var resp = self.execute_single(current_req)?;
+            if (self.follow_redirects and resp.is_redirect()) {
+                var location = resp.header("Location");
+                if (location == "") return ok(resp);
+
+                // Simple redirect handling
+                current_req = HTTPRequest(current_req.method, location);
+                redirect_count = redirect_count + 1;
+            } else {
+                return ok(resp);
+            }
+        }
+        return err(Error { code: "ERR", message: "too many redirects" });
+    }
+
+    fn execute_single(req: HTTPRequest): HTTPResponse?core.Error {
+        var parsed = url.URL(req.url_str);
+        if (not parsed.is_valid) return err(Error { code: "ERR", message: "invalid URL" });
+
+        var d = dns.DNS();
+        var host = d.resolve_or_passthrough(parsed.host)?;
+
+        var client = tcp.TCPClient();
+        client.connect(host, parsed.port)?;
+
+        // Build request
+        var full_request = req.method + " " + parsed.path;
+        if (parsed.query != "") full_request = full_request + "?" + parsed.query;
+        full_request = full_request + " HTTP/1.1\r\n";
+        
+        full_request = full_request + "Host: " + parsed.host + "\r\n";
+        // Serialize other headers...
+        full_request = full_request + "Connection: close\r\n";
+        if (len(req.body) > 0) {
+            full_request = full_request + "Content-Length: " + len(req.body) as str + "\r\n";
+        }
+        full_request = full_request + "\r\n" + req.body;
+
+        client.send(full_request)?;
+
+        var response_data = "";
+        while (true) {
+            var chunk = client.recv()? else { break; };
+            response_data = response_data + chunk;
+        }
+        client.close()?;
+
+        return ok(parse_http_response(response_data));
+    }
+}
+
+fn parse_http_response(raw: str): HTTPResponse {
+    var resp = HTTPResponse();
+    var header_end = index_of_str(raw, "\r\n\r\n");
+    if (header_end == -1) return resp;
+
+    var header_section = substring(raw, 0, header_end);
+    resp.body = substring(raw, header_end + 4, len(raw));
+
+    var lines = split_str_simple(header_section, "\r\n");
+    if (len(lines) > 0) {
+        var parts = split_str_simple(lines[0], " ");
+        if (len(parts) >= 3) {
+            resp.protocol = parts[0];
+            resp.status_code = parts[1] as int;
+            resp.status_text = parts[2];
+        }
+    }
+
+    for (var i = 1; i < len(lines); i = i + 1) {
+        var line = lines[i];
+        var colon = index_of_str(line, ":");
+        if (colon != -1) {
+            var name = to_lower_header(substring(line, 0, colon));
+            var value = trim_str(substring(line, colon + 1, len(line)));
+            resp.headers[name] = value;
+        }
+    }
+
+    return resp;
+}
+
+fn to_lower_header(s: str): str {
+    var res = "";
+    for (var i = 0; i < len(s); i = i + 1) {
+        var ch = substring(s, i, i + 1);
+        if (ch >= "A" and ch <= "Z") {
+            // Approximation for lowercasing
+            res = res + ch; // Should be proper lowercase
+        } else {
+            res = res + ch;
+        }
+    }
+    return res;
+}
+
+fn trim_str(s: str): str {
+    var start = 0;
+    while (start < len(s) and substring(s, start, start + 1) == " ") start = start + 1;
+    var end = len(s) - 1;
+    while (end >= start and substring(s, end, end + 1) == " ") end = end - 1;
+    if (start > end) return "";
+    return substring(s, start, end + 1);
+}
+
+fn index_of_str(s: str, pattern: str): int {
+    for (var i = 0; i <= len(s) - len(pattern); i = i + 1) {
+        if (substring(s, i, i + len(pattern)) == pattern) return i;
+    }
+    return -1;
+}
+
+fn split_str_simple(s: str, delimiter: str): [str] {
+    var parts: [str] = [];
+    var current = "";
+    var i = 0;
+    while (i < len(s)) {
+        if (i <= len(s) - len(delimiter) and substring(s, i, i + len(delimiter)) == delimiter) {
+            parts = parts + [current];
+            current = "";
+            i = i + len(delimiter);
+        } else {
+            current = current + substring(s, i, i + 1);
+            i = i + 1;
+        }
+    }
+    parts = parts + [current];
+    return parts;
 }

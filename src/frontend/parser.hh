@@ -183,6 +183,21 @@ public:
     bool isKnownTypeName(const std::string& name);
     std::string tokenTypeToString(TokenType type);
     
+    bool isIdentifierLike(const Token& token) {
+        if (token.lexeme.empty()) return false;
+        char first = token.lexeme[0];
+        if (!((first >= 'a' && first <= 'z') || (first >= 'A' && first <= 'Z') || first == '_')) {
+            return false;
+        }
+        for (size_t i = 1; i < token.lexeme.size(); ++i) {
+            char c = token.lexeme[i];
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_')) {
+                return false;
+            }
+        }
+        return true;
+    }
+    
     // Function type parsing methods
     std::shared_ptr<LM::Frontend::AST::FunctionTypeAnnotation> parseFunctionTypeAnnotation();
     std::shared_ptr<LM::Frontend::AST::TypeAnnotation> parseLegacyFunctionType();
@@ -195,6 +210,10 @@ public:
     std::shared_ptr<LM::Frontend::AST::Expression> logicalOr();
     std::shared_ptr<LM::Frontend::AST::Expression> logicalAnd();
     std::shared_ptr<LM::Frontend::AST::Expression> equality();
+    std::shared_ptr<LM::Frontend::AST::Expression> bitwiseOr();
+    std::shared_ptr<LM::Frontend::AST::Expression> bitwiseXor();
+    std::shared_ptr<LM::Frontend::AST::Expression> bitwiseAnd();
+    std::shared_ptr<LM::Frontend::AST::Expression> bitwiseShift();
     std::shared_ptr<LM::Frontend::AST::Expression> comparison();
     std::shared_ptr<LM::Frontend::AST::Expression> term();
     std::shared_ptr<LM::Frontend::AST::Expression> factor();
@@ -207,6 +226,7 @@ public:
 
     // Pattern parsing methods for match statements
     std::shared_ptr<LM::Frontend::AST::Expression> parsePattern();
+    std::shared_ptr<LM::Frontend::AST::Expression> parseSinglePattern();  // one pattern, no or-pattern
     std::shared_ptr<LM::Frontend::AST::Expression> parseBindingPattern();
     std::shared_ptr<LM::Frontend::AST::Expression> parseListPattern();
     std::shared_ptr<LM::Frontend::AST::Expression> parseDictPattern();

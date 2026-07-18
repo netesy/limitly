@@ -1,8 +1,84 @@
+// Standard Library DNS Module
+
 import std.core as core;
+import std.core show Error;
+import std.resource as res;
+
+frame Resolver {
+    var resource: res.Resource;
+    pub init(r: res.Resource) { self.resource = r; }
+    pub fn resolve(host: str): any {
+        return res._call(h=self.resource.handle, op=res.OP_RESOLVE, args=[host]);
+    }
+}
 
 frame DNS {
-    pub fn resolve(host: str): core.ResultStr {
-        if (host == "") return core.err_str("empty host");
-        return core.ok_str(host);
+    pub fn resolve(host: str): str?core.Error {
+        if (host == "") return err(Error(code="ERR", message="fail"));
+        var r = res.create_dns_resolver();
+        var resolver = Resolver(r=r);
+        var result = resolver.resolve(host=host);
+        r.close();
+        if (result == nil) return err(Error(code="ERR", message="fail"));
+        return ok(result as str);
     }
+
+    pub fn is_ipv4(address: str): bool {
+        var parts: [str] = split_string(address, ".");
+        if (len(parts) != 4) return false;
+        var i: int = 0;
+        while (i < 4) {
+            var part: str = parts[i];
+            if (len(part) == 0 or len(part) > 3) return false;
+            var j: int = 0;
+            while (j < len(part)) {
+                var ch: str = substring(part, j, j + 1);
+                if (ch < "0" or ch > "9") return false;
+                j = j + 1;
+            }
+            var val_int: int = part as int;
+            if (val_int < 0 or val_int > 255) return false;
+            i = i + 1;
+        }
+        return true;
+    }
+
+    pub fn is_ipv6(address: str): bool {
+        if (len(address) < 2) return false;
+        var has_colon: bool = false;
+        var i: int = 0;
+        while (i < len(address)) {
+            var ch: str = substring(address, i, i + 1);
+            if (ch == ":") {
+                has_colon = true;
+            } elif (not ((ch >= "0" and ch <= "9") or (ch >= "a" and ch <= "f") or (ch >= "A" and ch <= "F"))) {
+                return false;
+            }
+            i = i + 1;
+        }
+        return has_colon;
+    }
+
+    pub fn resolve_or_passthrough(host: str): str?core.Error {
+        if (self.is_ipv4(host)) return ok(host);
+        if (self.is_ipv6(host)) return ok(host);
+        return self.resolve(host=host);
+    }
+}
+
+fn split_string(s: str, delimiter: str): [str] {
+    var parts: [str] = [];
+    var current: str = "";
+    var i: int = 0;
+    while (i < len(s)) {
+        if (substring(s, i, i + 1) == delimiter) {
+            parts = parts + [current];
+            current = "";
+        } else {
+            current = current + substring(s, i, i + 1);
+        }
+        i = i + 1;
+    }
+    parts = parts + [current];
+    return parts;
 }

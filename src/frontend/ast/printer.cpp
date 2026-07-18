@@ -261,7 +261,7 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
         std::cout << indentation << "  Body:" << std::endl;
         printNode(whileStmt->body, indent + 2);
     }
-    // Handle ReturnStatement and PrintStatement in their respective cases below
+    // Handle ReturnStatement in its respective case below
     else if (auto parallelStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ParallelStatement>(node)) {
         std::cout << indentation << "ParallelStatement:" << std::endl;
         printNode(parallelStmt->body, indent + 1);
@@ -572,13 +572,6 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
             printNode(returnStmt->value, indent + 2);
         } else {
             std::cout << std::endl;
-        }
-    }
-    // Consolidated PrintStatement case
-    else if (auto printStmt = std::dynamic_pointer_cast<LM::Frontend::AST::PrintStatement>(node)) {
-        std::cout << indentation << "PrintStatement:" << std::endl;
-        for (const auto& arg : printStmt->arguments) {
-            printNode(arg, indent + 1);
         }
     }
     else if (auto binaryExpr = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(node)) {
@@ -986,7 +979,7 @@ std::string ASTPrinter::tokenTypeToString(LM::Frontend::TokenType type) const {
         case LM::Frontend::TokenType::ARROW: return "->";
         case LM::Frontend::TokenType::RANGE: return "..";
         case LM::Frontend::TokenType::ELLIPSIS: return "...";
-        case LM::Frontend::TokenType::AT_SIGN: return "@";
+        case LM::Frontend::TokenType::COLON_COLON: return "::";
         
         // Operators
         case LM::Frontend::TokenType::PLUS: return "+";
@@ -1038,9 +1031,7 @@ std::string ASTPrinter::tokenTypeToString(LM::Frontend::TokenType type) const {
         case LM::Frontend::TokenType::BOOL_TYPE: return "bool";
         case LM::Frontend::TokenType::USER_TYPE: return "user_type";
         case LM::Frontend::TokenType::FUNCTION_TYPE: return "fn";
-        case LM::Frontend::TokenType::LIST_TYPE: return "list";
-        case LM::Frontend::TokenType::DICT_TYPE: return "dict";
-        case LM::Frontend::TokenType::ARRAY_TYPE: return "array";
+        // LIST_TYPE, DICT_TYPE, ARRAY_TYPE removed - collection syntax uses [int], {str:int}, (int,str)
         case LM::Frontend::TokenType::ENUM_TYPE: return "enum";
         case LM::Frontend::TokenType::SUM_TYPE: return "sum";
         case LM::Frontend::TokenType::UNION_TYPE: return "union";
@@ -1054,7 +1045,7 @@ std::string ASTPrinter::tokenTypeToString(LM::Frontend::TokenType type) const {
         // Keywords
         case LM::Frontend::TokenType::AND: return "and";
         case LM::Frontend::TokenType::OR: return "or";
-        case LM::Frontend::TokenType::CLASS: return "class";
+        case LM::Frontend::TokenType::FRAME: return "frame";
         case LM::Frontend::TokenType::FALSE: return "false";
         case LM::Frontend::TokenType::FN: return "fn";
         case LM::Frontend::TokenType::ELSE: return "else";

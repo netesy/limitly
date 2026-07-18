@@ -37,7 +37,7 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
     } else if (auto index = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
         type = check_index_expr(index);
     } else if (auto list = std::dynamic_pointer_cast<LM::Frontend::AST::ListExpr>(expr)) {
-        type = check_list_expr(list);
+        type = check_list_expr(list, expected_type);
     } else if (auto tuple = std::dynamic_pointer_cast<LM::Frontend::AST::TupleExpr>(expr)) {
         type = check_tuple_expr(tuple);
     } else if (auto dict = std::dynamic_pointer_cast<LM::Frontend::AST::DictExpr>(expr)) {
@@ -93,7 +93,7 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
     } else if (auto index = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
         type = check_index_expr(index);
     } else if (auto list = std::dynamic_pointer_cast<LM::Frontend::AST::ListExpr>(expr)) {
-        type = check_list_expr(list);
+        type = check_list_expr(list, expected_type);
     } else if (auto tuple = std::dynamic_pointer_cast<LM::Frontend::AST::TupleExpr>(expr)) {
         type = check_tuple_expr(tuple);
     } else if (auto dict = std::dynamic_pointer_cast<LM::Frontend::AST::DictExpr>(expr)) {
@@ -135,6 +135,7 @@ TypePtr TypeChecker::check_literal_expr(std::shared_ptr<LM::Frontend::AST::Liter
         // Use the token type to determine the correct type
         switch (expr->literalType) {
             case TokenType::INT_LITERAL:
+            case TokenType::HEX_LITERAL:
                 if (expected_type && is_decimal_type(expected_type)) {
                     expr->inferred_type = expected_type;
                     return expected_type;
@@ -177,7 +178,8 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::F
         
         // Use the token type to determine the correct type
         switch (expr->literalType) {
-            case TokenType::INT_LITERAL: {
+            case TokenType::INT_LITERAL:
+            case TokenType::HEX_LITERAL: {
                 // If we have an expected type and it's an integer type or decimal type, use it
                 if (expected_type && (is_integer_type(expected_type) || is_decimal_type(expected_type))) {
                     expr->inferred_type = expected_type;
@@ -403,6 +405,9 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
             } else if (expr->op == TokenType::PLUS && 
                       (is_string_type(left_base) || is_string_type(right_base))) {
                 return type_system.STRING_TYPE;
+            } else if (expr->op == TokenType::PLUS && 
+                      (left_base->tag == TypeTag::List && right_base->tag == TypeTag::List)) {
+                return type_system.getCommonType(left_base, right_base);
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
             return type_system.INT_TYPE;
@@ -431,6 +436,20 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
             add_error("Logical operations require boolean operands", expr->line);
             return type_system.BOOL_TYPE;
             
+        case TokenType::AMPERSAND:
+        case TokenType::PIPE:
+        case TokenType::CARET:
+        case TokenType::LESS_LESS:
+        case TokenType::GREATER_GREATER:
+            if (left_base->tag == TypeTag::Any || right_base->tag == TypeTag::Any) {
+                return type_system.ANY_TYPE;
+            }
+            if (is_integer_type(left_base) && is_integer_type(right_base)) {
+                return promote_numeric_types(left_base, right_base);
+            }
+            add_error("Bitwise operations require integer operands", expr->line);
+            return type_system.INT_TYPE;
+
         case TokenType::MODULUS:
         case TokenType::POWER:
             if (left_base->tag == TypeTag::Any || right_base->tag == TypeTag::Any) {
@@ -464,20 +483,29 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
     if (!expr) return nullptr;
     
     TypePtr right_type = check_expression(expr->right, expected_type);
+    if (!right_type) return type_system.ANY_TYPE;
     TypePtr right_base = type_system.unwrapRefined(right_type);
 
     switch (expr->op) {
         case TokenType::BANG:
+        case TokenType::NOT:
             // Logical NOT
-            if (!is_boolean_type(right_type)) {
+            if (right_type->tag != TypeTag::Any && !is_boolean_type(right_type)) {
                 add_type_error("bool", right_type->toString(), expr->line);
             }
             return type_system.BOOL_TYPE;
             
+        case TokenType::TILDE:
+            if (right_base->tag != TypeTag::Any && !is_integer_type(right_base)) {
+                add_type_error("integer", right_base->toString(), expr->line);
+            }
+            expr->inferred_type = right_base;
+            return right_base;
+
         case TokenType::MINUS:
         case TokenType::PLUS:
             // Numeric negation/affirmation
-            if (!is_numeric_type(right_base)) {
+            if (right_base->tag != TypeTag::Any && !is_numeric_type(right_base)) {
                 add_type_error("numeric", right_base->toString(), expr->line);
             }
             
@@ -530,8 +558,8 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
                 expr->inferred_type = right_base;
                 return right_base;
             }
-            expr->inferred_type = right_type;
-            return right_type;
+            expr->inferred_type = right_base;
+            return right_base;
             
         default:
             add_error("Unsupported unary operator", expr->line);
@@ -541,12 +569,94 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
 
 TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
+
+    std::string target_name = "";
+    if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+        target_name = var_expr->name;
+        auto frame_it = frame_declarations.find(target_name);
+        if (frame_it != frame_declarations.end()) {
+            target_name = target_name + ".init";
+        } else {
+            auto import_it = current_program_->imported_symbols.find(target_name);
+            if (import_it != current_program_->imported_symbols.end()) {
+                if (std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(import_it->second)) {
+                    target_name = target_name + ".init";
+                }
+            }
+        }
+    } else if (auto member_expr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
+        if (auto var_obj = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(member_expr->object)) {
+            auto alias_it = import_aliases.find(var_obj->name);
+            if (alias_it != import_aliases.end()) {
+                std::string qualified = alias_it->second + "." + member_expr->name;
+                auto frame_it = frame_declarations.find(qualified);
+                if (frame_it != frame_declarations.end()) {
+                    target_name = qualified + ".init";
+                } else {
+                    if (variable_types.count(qualified)) {
+                        TypePtr var_type = variable_types[qualified];
+                        if (var_type && var_type->tag == TypeTag::Frame) {
+                            auto* fData = std::get_if<FrameType>(&var_type->extra);
+                            if (fData) {
+                                target_name = fData->name + ".init";
+                            }
+                        } else {
+                            target_name = qualified;
+                        }
+                    } else {
+                        target_name = qualified;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!target_name.empty()) {
+        resolve_call_arguments(expr, target_name);
+    }
     
-    // Handle assert() specially to allow decimal comparisons
+    // Handle built-in functions with special or variadic signatures
     if (auto var_callee = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
-        if (var_callee->name == "assert" && !expr->arguments.empty()) {
-            // Re-check the first argument with awareness it's a condition
-            check_expression(expr->arguments[0], type_system.BOOL_TYPE);
+        if (var_callee->name == "print") {
+            for (auto& arg : expr->arguments) {
+                check_expression(arg);
+            }
+            expr->inferred_type = type_system.NIL_TYPE;
+            return type_system.NIL_TYPE;
+        }
+        if (var_callee->name == "assert") {
+            if (!expr->arguments.empty()) {
+                check_expression(expr->arguments[0], type_system.BOOL_TYPE);
+            }
+            if (expr->arguments.size() > 1) {
+                check_expression(expr->arguments[1], type_system.STRING_TYPE);
+            }
+            expr->inferred_type = type_system.NIL_TYPE;
+            return type_system.NIL_TYPE;
+        }
+        if (var_callee->name == "error" && expr->arguments.size() == 1) {
+             check_expression(expr->arguments[0], type_system.STRING_TYPE);
+             expr->inferred_type = type_system.NIL_TYPE;
+             return type_system.NIL_TYPE;
+        }
+        if (var_callee->name == "_builtin_len") {
+            check_expression(expr->arguments[0]);
+            expr->inferred_type = type_system.INT64_TYPE;
+            return type_system.INT64_TYPE;
+        }
+        if (var_callee->name == "_builtin_substring") {
+            for (auto& arg : expr->arguments) check_expression(arg, type_system.ANY_TYPE);
+            expr->inferred_type = type_system.STRING_TYPE;
+            return type_system.STRING_TYPE;
+        }
+        if (var_callee->name == "resource_call" || var_callee->name == "resource_create" || var_callee->name == "resource_destroy") {
+            for (auto& arg : expr->arguments) {
+                check_expression(arg);
+            }
+            TypePtr res_type = (var_callee->name == "resource_create") ? type_system.INT64_TYPE : type_system.ANY_TYPE;
+            if (var_callee->name == "resource_destroy") res_type = type_system.NIL_TYPE;
+            expr->inferred_type = res_type;
+            return res_type;
         }
     }
 
@@ -694,103 +804,183 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     if (auto member_expr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
         // Check if this is a module member access (e.g., math.add)
         if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(member_expr->object)) {
-            std::string qualified_name = var_expr->name + "." + member_expr->name;
-
-            // 1. Check if it's a frame instantiation (e.g., oop.Person())
-            auto frame_it = frame_declarations.find(qualified_name);
-            if (frame_it != frame_declarations.end()) {
-                const FrameInfo& frame_info = frame_it->second;
-                std::string init_name = qualified_name + ".init";
-                auto sig_it = function_signatures.find(init_name);
-
-                // Validate named arguments against both init parameters AND fields
-                for (const auto& [arg_name, value] : expr->namedArgs) {
-                    bool matched = false;
-                    TypePtr target_type = nullptr;
-
-                    if (frame_info.declaration && frame_info.declaration->init) {
-                        const auto& init = frame_info.declaration->init;
-                        for (const auto& p : init->parameters) {
-                            if (p.first == arg_name) { target_type = resolve_type_annotation(p.second); matched = true; break; }
-                        }
-                        if (!matched) {
-                            for (const auto& op : init->optionalParams) {
-                                if (op.first == arg_name) { target_type = resolve_type_annotation(op.second.first); matched = true; break; }
-                            }
-                        }
-                    }
-
-                    if (!matched) {
-                        for (const auto& field : frame_info.fields) {
-                            if (field.first == arg_name) { target_type = field.second; matched = true; break; }
-                        }
-                    }
-
-                    if (matched) {
-                        TypePtr val_type = check_expression(value);
-                        if (!is_type_compatible(target_type, val_type)) add_type_error(target_type->toString(), val_type->toString(), expr->line);
-                    } else {
-                        add_error("Frame '" + qualified_name + "' has no field or init parameter named '" + arg_name + "'", expr->line);
-                    }
-                }
-
-                // Validate positional arguments (passing to init)
-                if (!expr->arguments.empty() || sig_it != function_signatures.end()) {
-                    if (sig_it == function_signatures.end()) {
-                        if (!expr->arguments.empty()) add_error("Frame '" + qualified_name + "' has no init() method to accept positional arguments", expr->line);
-                    } else {
-                        std::vector<TypePtr> expected_params = sig_it->second.param_types;
-                        if (!expected_params.empty()) expected_params.erase(expected_params.begin()); // skip 'this'
-
-                        size_t satisfied_by_named = 0;
-                        size_t required_count = 0;
-                        if (frame_info.declaration && frame_info.declaration->init) {
-                            const auto& init = frame_info.declaration->init;
-                            required_count = init->parameters.size();
-                            for (size_t i = 0; i < required_count; ++i) {
-                                if (expr->namedArgs.count(init->parameters[i].first)) satisfied_by_named++;
-                            }
-                        } else {
-                            required_count = expected_params.size();
-                        }
-
-                        if (expr->arguments.size() + satisfied_by_named < required_count) {
-                             if (!expr->arguments.empty()) {
-                                 add_error("Frame '" + qualified_name + "' init method requires " + std::to_string(required_count) + " arguments, but only " +
-                                          std::to_string(expr->arguments.size() + satisfied_by_named) + " were provided", expr->line);
-                             }
-                        }
-                    }
-                }
-
-                TypePtr frame_type = type_system.createFrameType(qualified_name);
-                expr->inferred_type = frame_type;
-                return frame_type;
-            }
-
-            // 2. Check if it's a module function
-            auto sig_it = function_signatures.find(qualified_name);
-            if (sig_it == function_signatures.end()) {
-                // Try dotted name without :: if LIR generator use .
-                sig_it = function_signatures.find(var_expr->name + "." + member_expr->name);
-            }
-            if (sig_it != function_signatures.end()) {
-                validate_argument_types(sig_it->second.param_types, arg_types, qualified_name);
-                expr->inferred_type = sig_it->second.return_type;
-                return sig_it->second.return_type;
-            }
-
-            // 3. Fallback for module alias
+            // Check if this is an import alias
             auto alias_it = import_aliases.find(var_expr->name);
             if (alias_it != import_aliases.end()) {
-                std::string full_name = alias_it->second + "." + member_expr->name;
-                auto sig_it2 = function_signatures.find(full_name);
-                if (sig_it2 != function_signatures.end()) {
-                    validate_argument_types(sig_it2->second.param_types, arg_types, full_name);
-                    expr->inferred_type = sig_it2->second.return_type;
-                    return sig_it2->second.return_type;
+                // Resolve alias to full module path
+                std::string module_path = alias_it->second;
+                std::string qualified_name = module_path + "." + member_expr->name;
+
+                // 1. Check if it's a frame instantiation (e.g., test.Counter())
+                auto frame_it = frame_declarations.find(qualified_name);
+                if (frame_it != frame_declarations.end()) {
+                    const FrameInfo& frame_info = frame_it->second;
+                    std::string init_name = qualified_name + ".init";
+                    auto sig_it = function_signatures.find(init_name);
+
+                    // Validate named arguments against both init parameters AND fields
+                    for (const auto& [arg_name, value] : expr->namedArgs) {
+                        bool matched = false;
+                        TypePtr target_type = nullptr;
+
+                        if (frame_info.declaration && frame_info.declaration->init) {
+                            const auto& init = frame_info.declaration->init;
+                            for (const auto& p : init->parameters) {
+                                if (p.first == arg_name) { target_type = resolve_type_annotation(p.second); matched = true; break; }
+                            }
+                            if (!matched) {
+                                for (const auto& op : init->optionalParams) {
+                                    if (op.first == arg_name) { target_type = resolve_type_annotation(op.second.first); matched = true; break; }
+                                }
+                            }
+                        }
+
+                        if (!matched) {
+                            for (const auto& field : frame_info.fields) {
+                                if (field.first == arg_name) { target_type = field.second; matched = true; break; }
+                            }
+                        }
+
+                        if (matched) {
+                            TypePtr val_type = check_expression(value);
+                            if (!is_type_compatible(target_type, val_type)) add_type_error(target_type->toString(), val_type->toString(), expr->line);
+                        } else {
+                            add_error("Frame '" + qualified_name + "' has no field or init parameter named '" + arg_name + "'", expr->line);
+                        }
+                    }
+
+                    // Validate positional arguments (passing to init)
+                    if (!expr->arguments.empty() || sig_it != function_signatures.end()) {
+                        if (sig_it == function_signatures.end()) {
+                            if (!expr->arguments.empty()) add_error("Frame '" + qualified_name + "' has no init() method to accept positional arguments", expr->line);
+                        } else {
+                            std::vector<TypePtr> expected_params = sig_it->second.param_types;
+                            if (!expected_params.empty()) expected_params.erase(expected_params.begin()); // skip 'this'
+
+                            size_t satisfied_by_named = 0;
+                            size_t required_count = 0;
+                            if (frame_info.declaration && frame_info.declaration->init) {
+                                const auto& init = frame_info.declaration->init;
+                                required_count = init->parameters.size();
+                                for (size_t i = 0; i < required_count; ++i) {
+                                    if (expr->namedArgs.count(init->parameters[i].first)) satisfied_by_named++;
+                                }
+                            } else {
+                                required_count = expected_params.size();
+                            }
+
+                            if (expr->arguments.size() + satisfied_by_named < required_count) {
+                                 if (!expr->arguments.empty()) {
+                                     add_error("Frame '" + qualified_name + "' init method requires " + std::to_string(required_count) + " arguments, but only " +
+                                              std::to_string(expr->arguments.size() + satisfied_by_named) + " were provided", expr->line);
+                                 }
+                            }
+                        }
+                    }
+
+                    TypePtr frame_type = type_system.createFrameType(qualified_name);
+                    expr->inferred_type = frame_type;
+                    return frame_type;
                 }
-                add_error("Module '" + alias_it->second + "' has no member '" + member_expr->name + "'", expr->line);
+
+                // 2. Check if it's a module function
+                auto sig_it = function_signatures.find(qualified_name);
+                if (sig_it != function_signatures.end()) {
+                    validate_argument_types(sig_it->second.param_types, arg_types, qualified_name);
+                    expr->inferred_type = sig_it->second.return_type;
+                    return sig_it->second.return_type;
+                }
+
+                // 3. Check if it's a module variable (such as a frame reference/alias or callable/function pointer)
+                if (variable_types.count(qualified_name)) {
+                    TypePtr var_type = variable_types[qualified_name];
+                    if (var_type && var_type->tag == TypeTag::Frame) {
+                        auto* fData = std::get_if<FrameType>(&var_type->extra);
+                        if (fData) {
+                            std::string frame_name = fData->name;
+                            auto frame_it = frame_declarations.find(frame_name);
+                            if (frame_it != frame_declarations.end()) {
+                                const FrameInfo& frame_info = frame_it->second;
+                                std::string init_name = frame_name + ".init";
+                                auto sig_it_init = function_signatures.find(init_name);
+
+                                for (const auto& [arg_name, value] : expr->namedArgs) {
+                                    bool matched = false;
+                                    TypePtr target_type = nullptr;
+
+                                    if (frame_info.declaration && frame_info.declaration->init) {
+                                        const auto& init = frame_info.declaration->init;
+                                        for (const auto& p : init->parameters) {
+                                            if (p.first == arg_name) { target_type = resolve_type_annotation(p.second); matched = true; break; }
+                                        }
+                                        if (!matched) {
+                                            for (const auto& op : init->optionalParams) {
+                                                if (op.first == arg_name) { target_type = resolve_type_annotation(op.second.first); matched = true; break; }
+                                            }
+                                        }
+                                    }
+
+                                    if (!matched) {
+                                        for (const auto& field : frame_info.fields) {
+                                            if (field.first == arg_name) { target_type = field.second; matched = true; break; }
+                                        }
+                                    }
+
+                                    if (matched) {
+                                        TypePtr val_type = check_expression(value);
+                                        if (!is_type_compatible(target_type, val_type)) add_type_error(target_type->toString(), val_type->toString(), expr->line);
+                                    } else {
+                                        add_error("Frame '" + frame_name + "' has no field or init parameter named '" + arg_name + "'", expr->line);
+                                    }
+                                }
+
+                                if (!expr->arguments.empty() || sig_it_init != function_signatures.end()) {
+                                    if (sig_it_init == function_signatures.end()) {
+                                        if (!expr->arguments.empty()) add_error("Frame '" + frame_name + "' has no init() method to accept positional arguments", expr->line);
+                                    } else {
+                                        std::vector<TypePtr> expected_params = sig_it_init->second.param_types;
+                                        if (!expected_params.empty()) expected_params.erase(expected_params.begin()); // skip 'this'
+
+                                        size_t satisfied_by_named = 0;
+                                        size_t required_count = 0;
+                                        if (frame_info.declaration && frame_info.declaration->init) {
+                                            const auto& init = frame_info.declaration->init;
+                                            required_count = init->parameters.size();
+                                            for (size_t i = 0; i < required_count; ++i) {
+                                                if (expr->namedArgs.count(init->parameters[i].first)) satisfied_by_named++;
+                                            }
+                                        } else {
+                                            required_count = expected_params.size();
+                                        }
+
+                                        if (expr->arguments.size() + satisfied_by_named < required_count) {
+                                             if (!expr->arguments.empty()) {
+                                                 add_error("Frame '" + frame_name + "' init method requires " + std::to_string(required_count) + " arguments, but only " +
+                                                          std::to_string(expr->arguments.size() + satisfied_by_named) + " were provided", expr->line);
+                                             }
+                                        }
+                                    }
+                                }
+
+                                expr->inferred_type = var_type;
+                                return var_type;
+                            }
+                        }
+                    } else if (var_type && var_type->tag == TypeTag::Function) {
+                        auto* fnType = std::get_if<FunctionType>(&var_type->extra);
+                        if (fnType) {
+                            validate_argument_types(fnType->paramTypes, arg_types, qualified_name);
+                            expr->inferred_type = fnType->returnType;
+                            return fnType->returnType;
+                        }
+                    }
+
+                    expr->inferred_type = var_type;
+                    return var_type;
+                }
+
+                // No frame or function found in module
+                add_error("Module '" + module_path + "' has no member '" + member_expr->name + "'", expr->line);
                 return type_system.ANY_TYPE;
             }
         }
@@ -865,8 +1055,46 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                     }
                 }
 
+                // Check if it's a callable field (field with function type)
+                for (const auto& [field_name, field_type] : frame_info.fields) {
+                    if (field_name == method_name && field_type && field_type->tag == TypeTag::Function) {
+                        // This is a callable field - validate arguments and return function type
+                        if (auto* func_type = std::get_if<FunctionType>(&field_type->extra)) {
+                            // Validate arguments against function type
+                            if (arg_types.size() != func_type->paramTypes.size()) {
+                                add_error("Function field expects " + std::to_string(func_type->paramTypes.size()) +
+                                         " arguments, but " + std::to_string(arg_types.size()) + " were provided", expr->line);
+                            } else {
+                                for (size_t i = 0; i < arg_types.size(); ++i) {
+                                    if (!is_type_compatible(func_type->paramTypes[i], arg_types[i])) {
+                                        add_type_error(func_type->paramTypes[i]->toString(), arg_types[i]->toString(), expr->line);
+                                    }
+                                }
+                            }
+                            expr->inferred_type = func_type->returnType;
+                            return func_type->returnType;
+                        }
+                    }
+                }
+
                 add_error("Frame '" + frame_name + "' has no method '" + method_name + "'", expr->line);
                 return type_system.ANY_TYPE;
+            }
+            
+            std::string qualified_method_name = frame_name + "." + method_name;
+            size_t old_arg_count = expr->arguments.size();
+            resolve_call_arguments(expr, qualified_method_name);
+            if (expr->arguments.size() != old_arg_count || !expr->namedArgs.empty()) {
+                arg_types.clear();
+                for (size_t i = 0; i < expr->arguments.size(); ++i) {
+                    TypePtr expected_p = nullptr;
+                    if (i < method->parameters.size()) {
+                        expected_p = resolve_type_annotation(method->parameters[i].second);
+                    } else if (i - method->parameters.size() < method->optionalParams.size()) {
+                        expected_p = resolve_type_annotation(method->optionalParams[i - method->parameters.size()].second.first);
+                    }
+                    arg_types.push_back(check_expression(expr->arguments[i], expected_p));
+                }
             }
             
             // Check visibility
@@ -912,17 +1140,72 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 expr->inferred_type = type_system.NIL_TYPE;
                 return type_system.NIL_TYPE;
             }
+        } else if (object_type && object_type->tag == TypeTag::Trait) {
+            auto traitTypeData = std::get_if<TraitType>(&object_type->extra);
+            if (!traitTypeData) {
+                add_error("Invalid trait type", expr->line);
+                return type_system.ANY_TYPE;
+            }
+
+            std::string trait_name = traitTypeData->name;
+            std::string method_name = member_expr->name;
+
+            // Resolve method through trait hierarchy
+            std::vector<std::string> trait_worklist = {trait_name};
+            std::unordered_set<std::string> visited_traits;
+
+            while (!trait_worklist.empty()) {
+                std::string current_trait = trait_worklist.back();
+                trait_worklist.pop_back();
+
+                if (visited_traits.count(current_trait)) continue;
+                visited_traits.insert(current_trait);
+
+                auto trait_it = trait_declarations.find(current_trait);
+                if (trait_it != trait_declarations.end()) {
+                    for (const auto& tm : trait_it->second.declaration->methods) {
+                        if (tm->name == method_name) {
+                            // Found in trait - validate arguments
+                            std::vector<TypePtr> expected_params;
+                            for (const auto& p : tm->params) expected_params.push_back(resolve_type_annotation(p.second));
+
+                            if (arg_types.size() < expected_params.size()) {
+                                add_error("Trait method '" + method_name + "' requires " + std::to_string(expected_params.size()) +
+                                         " arguments, but " + std::to_string(arg_types.size()) + " were provided", expr->line);
+                            } else {
+                                for (size_t i = 0; i < expected_params.size(); ++i) {
+                                    if (!is_type_compatible(expected_params[i], arg_types[i])) {
+                                        add_type_error(expected_params[i]->toString(), arg_types[i]->toString(), expr->line);
+                                    }
+                                }
+                            }
+
+                            TypePtr trait_return_type = tm->returnType ? resolve_type_annotation(tm->returnType.value()) : type_system.NIL_TYPE;
+                            expr->inferred_type = trait_return_type;
+                            return trait_return_type;
+                        }
+                    }
+                    // Add parent traits
+                    for (const auto& parent : trait_it->second.extends) {
+                        trait_worklist.push_back(parent);
+                    }
+                }
+            }
+
+            add_error("Trait '" + trait_name + "' has no method '" + method_name + "'", expr->line);
+            return type_system.ANY_TYPE;
+        } else if (object_type && object_type->tag == TypeTag::Any) {
+            // Dynamic call on 'any' - allowed, returns any
+            expr->inferred_type = type_system.ANY_TYPE;
+            return type_system.ANY_TYPE;
         }
         
-        // For other types, just check the member expression
-        TypePtr result_type = check_expression(expr->callee);
-        if (result_type) {
-            expr->inferred_type = result_type;
-            return result_type;
-        }
+        // For other types (like Enum variants or module functions), 
+        // we'll fall through to the generic function call handling below
+        // which will check the callee expression and then validate the call.
     }
     
-    // If not a known function, check the callee as an expression
+    // If not a known function name, check the callee as an expression
     // But first check if it's already marked as undefined to avoid cascading errors
     if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
         if (undefined_symbols.find(var_expr->name) != undefined_symbols.end()) {
@@ -932,12 +1215,24 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     }
     
     TypePtr callee_type = check_expression(expr->callee);
-    
-    if (callee_type && callee_type->tag == TypeTag::Function) {
+    if (!callee_type) return type_system.NIL_TYPE;
+
+    if (callee_type->tag == TypeTag::Function) {
         if (auto* func_type = std::get_if<FunctionType>(&callee_type->extra)) {
-            // Validate arguments against function type
-            if (arg_types.size() != func_type->paramTypes.size()) {
-                add_error("Function expects " + std::to_string(func_type->paramTypes.size()) + 
+            // Validate argument count considering optional parameters
+            size_t min_args = 0;
+            size_t max_args = func_type->paramTypes.size();
+            
+            for (bool hasDefault : func_type->hasDefaultValues) {
+                if (!hasDefault) min_args++;
+            }
+            // If hasDefaultValues is smaller than paramTypes, assume remaining are required
+            if (func_type->hasDefaultValues.size() < max_args) {
+                min_args += (max_args - func_type->hasDefaultValues.size());
+            }
+
+            if (arg_types.size() < min_args || arg_types.size() > max_args) {
+                add_error("Function expects " + std::to_string(min_args) + (min_args == max_args ? "" : "-" + std::to_string(max_args)) +
                          " arguments, but " + std::to_string(arg_types.size()) + " were provided", expr->line);
             } else {
                 for (size_t i = 0; i < arg_types.size(); ++i) {
@@ -951,6 +1246,12 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
         }
     }
 
+    if (callee_type->tag == TypeTag::Any) {
+        // Dynamic call on 'any' - allowed, returns any
+        expr->inferred_type = type_system.ANY_TYPE;
+        return type_system.ANY_TYPE;
+    }
+
     // Only report error if the callee is not an undefined symbol
     // (to avoid cascading errors)
     if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
@@ -958,7 +1259,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             add_error("Cannot call non-function value: " + callee_type->toString(), expr->line);
         }
     } else {
-        add_error("Cannot call non-function value", expr->line);
+        add_error("Cannot call non-function value: " + callee_type->toString(), expr->line);
     }
     
     return type_system.NIL_TYPE;
@@ -1094,6 +1395,18 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
     TypePtr object_type = check_expression(expr->object);
     std::string member_name = expr->name;
     
+    if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::String)) {
+        if (member_name == "len" || member_name == "length") {
+            return type_system.createFunctionType({}, type_system.INT64_TYPE);
+        }
+        if (object_type->tag == TypeTag::List && member_name == "append") {
+            return type_system.createFunctionType({type_system.ANY_TYPE}, type_system.NIL_TYPE);
+        }
+        if (object_type->tag == TypeTag::List && member_name == "pop") {
+            return type_system.createFunctionType({}, type_system.ANY_TYPE);
+        }
+    }
+    
     // Check for module alias access
     if (object_type && object_type->tag == TypeTag::Frame) {
         auto* fData = std::get_if<FrameType>(&object_type->extra);
@@ -1117,17 +1430,16 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
     if (object_type && object_type->tag == TypeTag::Channel) {
         std::string method_name = expr->name;
         
-        // Return appropriate types for channel methods
         if (method_name == "offer") {
-            return type_system.BOOL_TYPE; // offer() returns bool
+            return type_system.createFunctionType({type_system.ANY_TYPE}, type_system.BOOL_TYPE);
         } else if (method_name == "poll") {
-            return type_system.ANY_TYPE; // poll() returns Option<T> (represented as any for now)
+            return type_system.createFunctionType({}, type_system.ANY_TYPE);
         } else if (method_name == "send") {
-            return type_system.NIL_TYPE; // send() returns nil
+            return type_system.createFunctionType({type_system.ANY_TYPE}, type_system.NIL_TYPE);
         } else if (method_name == "recv") {
-            return type_system.ANY_TYPE; // recv() returns T
+            return type_system.createFunctionType({}, type_system.ANY_TYPE);
         } else if (method_name == "close") {
-            return type_system.NIL_TYPE; // close() returns nil
+            return type_system.createFunctionType({}, type_system.NIL_TYPE);
         } else {
             add_error("Unknown channel method: " + method_name, expr->line);
             return type_system.ANY_TYPE;
@@ -1229,6 +1541,16 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
                 }
             }
         }
+
+        // Check if member is a field with function type (for callable fields)
+        for (const auto& [field_name, field_type] : frame_info.fields) {
+            if (field_name == member_name && field_type && field_type->tag == TypeTag::Function) {
+                // This is a callable field - return the function type
+                // The caller will handle the function invocation
+                expr->inferred_type = field_type;
+                return field_type;
+            }
+        }
         
         // Check if member is a method
         for (const auto& method : frame_info.declaration->methods) {
@@ -1239,16 +1561,13 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
                              " method '" + member_name + "' of frame '" + frame_name + "'", expr->line);
                 }
                 
-                // Return the method's return type
-                if (method->returnType) {
-                    TypePtr return_type = resolve_type_annotation(method->returnType);
-                    expr->inferred_type = return_type;
-                    return return_type;
-                } else {
-                    // Method has no explicit return type, assume nil
-                    expr->inferred_type = type_system.NIL_TYPE;
-                    return type_system.NIL_TYPE;
-                }
+                // Return the method as a function type
+                std::vector<TypePtr> param_types;
+                for (const auto& p : method->parameters) param_types.push_back(resolve_type_annotation(p.second));
+                TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
+                TypePtr func_type = type_system.createFunctionType(param_types, return_type);
+                expr->inferred_type = func_type;
+                return func_type;
             }
         }
         
@@ -1293,8 +1612,16 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         if (member_name == "len") return type_system.INT_TYPE;
         if (member_name == "upper" || member_name == "lower") return type_system.FUNCTION_TYPE;
     } else if (object_type->tag == TypeTag::List) {
-        if (member_name == "len") return type_system.INT_TYPE;
-        if (member_name == "append" || member_name == "pop") return type_system.FUNCTION_TYPE;
+        if (member_name == "len" || member_name == "length") return type_system.INT_TYPE;
+        if (member_name == "append" || member_name == "pop") {
+            // Create a specific function type for list methods if possible
+            if (member_name == "append") {
+                if (auto* lt = std::get_if<ListType>(&object_type->extra)) {
+                    return type_system.createFunctionType({lt->elementType}, type_system.NIL_TYPE);
+                }
+            }
+            return type_system.FUNCTION_TYPE;
+        }
     } else if (object_type->tag == TypeTag::Dict) {
         if (member_name == "len") return type_system.INT_TYPE;
         if (member_name == "keys" || member_name == "values") return type_system.FUNCTION_TYPE;
@@ -1344,11 +1671,15 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
     return type_system.ANY_TYPE;
 }
 
-TypePtr TypeChecker::check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr) {
+TypePtr TypeChecker::check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
     
     if (expr->elements.empty()) {
-        // Empty list - return generic list type
+        // Empty list - use expected type if available and it's a list type
+        if (expected_type && expected_type->tag == TypeTag::List) {
+            return expected_type;
+        }
+        // Otherwise return generic list type
         return type_system.createTypedListType(type_system.ANY_TYPE);
     }
     
@@ -1660,6 +1991,90 @@ TypePtr TypeChecker::check_cast_expr(std::shared_ptr<LM::Frontend::AST::CastExpr
 
     expr->inferred_type = target_type;
     return target_type;
+}
+
+void TypeChecker::resolve_call_arguments(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, const std::string& qualified_name) {
+    if (!expr) return;
+
+    auto sig_it = function_signatures.find(qualified_name);
+    if (sig_it == function_signatures.end()) return;
+
+    std::vector<std::pair<std::string, std::shared_ptr<LM::Frontend::AST::TypeAnnotation>>> params;
+    std::vector<std::pair<std::string, std::pair<std::shared_ptr<LM::Frontend::AST::TypeAnnotation>, std::shared_ptr<LM::Frontend::AST::Expression>>>> optional_params;
+
+    if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(sig_it->second.declaration)) {
+        params = func_decl->params;
+        optional_params = func_decl->optionalParams;
+    } else if (auto method_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameMethod>(sig_it->second.declaration)) {
+        params = method_decl->parameters;
+        optional_params = method_decl->optionalParams;
+    } else {
+        return;
+    }
+
+    std::vector<std::string> param_names;
+    for (const auto& p : params) {
+        param_names.push_back(p.first);
+    }
+    for (const auto& op : optional_params) {
+        param_names.push_back(op.first);
+    }
+
+    std::vector<std::shared_ptr<LM::Frontend::AST::Expression>> mapped_args;
+    size_t num_positional = expr->arguments.size();
+    bool has_errors = false;
+    std::unordered_set<std::string> consumed_named;
+
+    for (size_t i = 0; i < param_names.size(); ++i) {
+        const std::string& param_name = param_names[i];
+        if (i < num_positional) {
+            if (expr->namedArgs.count(param_name)) {
+                add_error("Parameter '" + param_name + "' passed both positionally and as named argument in call to '" + qualified_name + "'", expr->line);
+                has_errors = true;
+            }
+            mapped_args.push_back(expr->arguments[i]);
+        } else {
+            auto it = expr->namedArgs.find(param_name);
+            if (it != expr->namedArgs.end()) {
+                mapped_args.push_back(it->second);
+                consumed_named.insert(param_name);
+            } else {
+                if (i < params.size()) {
+                    add_error("Missing argument for required parameter '" + param_name + "' in call to '" + qualified_name + "'", expr->line);
+                    has_errors = true;
+                } else {
+                    size_t opt_idx = i - params.size();
+                    if (opt_idx < optional_params.size() && optional_params[opt_idx].second.second) {
+                        mapped_args.push_back(optional_params[opt_idx].second.second);
+                    } else if (opt_idx < optional_params.size() && optional_params[opt_idx].second.first && optional_params[opt_idx].second.first->isOptional) {
+                        // Optional type (str?) without explicit default - use nil
+                        auto nil_expr = std::make_shared<LM::Frontend::AST::LiteralExpr>();
+                        nil_expr->value = nullptr;
+                        nil_expr->literalType = LM::Frontend::TokenType::NIL;
+                        nil_expr->inferred_type = type_system.NIL_TYPE;
+                        mapped_args.push_back(nil_expr);
+                    } else {
+                        add_error("Missing argument for optional parameter '" + param_name + "' with no default value in call to '" + qualified_name + "'", expr->line);
+                        has_errors = true;
+                    }
+                }
+            }
+        }
+    }
+
+    for (const auto& [name, val] : expr->namedArgs) {
+        if (!consumed_named.count(name)) {
+            if (qualified_name.find(".init") == std::string::npos) {
+                add_error("Function '" + qualified_name + "' has no parameter named '" + name + "'", expr->line);
+                has_errors = true;
+            }
+        }
+    }
+
+    if (!has_errors) {
+        expr->arguments = mapped_args;
+        expr->namedArgs.clear();
+    }
 }
 
 } // namespace Frontend

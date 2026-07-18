@@ -1,0 +1,9 @@
+frame Color {
+    pub r: float;
+}
+
+fn create_color(r: float): Color {
+    var c = Color(r=r);
+    c.r = r;
+    return c;
+}

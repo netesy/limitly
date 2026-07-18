@@ -56,66 +56,10 @@ void TypeChecker::check_assert_call(const std::shared_ptr<LM::Frontend::AST::Cal
 }
 
 // =============================================================================
-// FUNCTION CALL VALIDATION
-// =============================================================================
-
-bool TypeChecker::check_function_call(const std::string& func_name, 
-                                     const std::vector<TypePtr>& arg_types,
-                                     TypePtr& result_type,
-                                     int line) {
-    auto it = function_signatures.find(func_name);
-    if (it == function_signatures.end()) {
-        add_error("Undefined function: " + func_name, line);
-        return false;
-    }
-    
-    const auto& sig = it->second;
-    
-    // Check argument count
-    size_t required_args = 0;
-    for (size_t i = 0; i < sig.optional_params.size(); ++i) {
-        if (!sig.optional_params[i]) {
-            required_args++;
-        }
-    }
-    
-    if (arg_types.size() < required_args || arg_types.size() > sig.param_types.size()) {
-        add_error("Function '" + func_name + "' expects " + std::to_string(required_args) + 
-                 " to " + std::to_string(sig.param_types.size()) + " arguments, got " + 
-                 std::to_string(arg_types.size()), line);
-        return false;
-    }
-    
-    // Check argument types
-    if (!validate_argument_types(sig.param_types, arg_types, func_name)) {
-        return false;
-    }
-    
-    result_type = sig.return_type;
-    return true;
-}
-
-bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
-                                         const std::vector<TypePtr>& actual,
-                                         const std::string& func_name) {
-    for (size_t i = 0; i < actual.size(); ++i) {
-        if (i >= expected.size()) {
-            add_error("Too many arguments for function '" + func_name + "'");
-            return false;
-        }
-        
-        if (!is_type_compatible(expected[i], actual[i])) {
-            add_error("Argument " + std::to_string(i + 1) + " type mismatch in call to '" + func_name + 
-                     "': expected " + expected[i]->toString() + ", got " + actual[i]->toString());
-            return false;
-        }
-    }
-    
-    return true;
-}
-
-// =============================================================================
 // CONTROL FLOW CHECKING
+//
+// NOTE: check_function_call and validate_argument_types live in types.cpp
+// (the canonical TU for type validation); do not redefine them here.
 // =============================================================================
 
 void TypeChecker::check_return_statement(TypePtr return_type, int line) {
@@ -152,132 +96,45 @@ bool TypeChecker::is_visible(const std::string& frame_name, LM::Frontend::AST::V
         visibility == LM::Frontend::AST::VisibilityLevel::Const) {
         return true;
     }
-    
-    // Private is only visible within the same frame
-    if (visibility == LM::Frontend::AST::VisibilityLevel::Private) {
-        return current_frame && current_frame->name == frame_name;
-    }
-    
-    // Protected is visible in the same frame and derived frames
-    if (visibility == LM::Frontend::AST::VisibilityLevel::Protected) {
-        if (current_frame && current_frame->name == frame_name) {
-            return true;
-        }
-        // Check if current frame derives from frame_name
-        // This would require tracking inheritance relationships
+
+    // Private and Protected require being inside the frame or a subtype
+    if (!current_frame) {
         return false;
     }
-    
+
+    // Check if we are inside the same frame
+    if (current_frame->name == frame_name) {
+        return true;
+    }
+
+    // Protected allows access from related frames (those sharing traits)
+    if (visibility == LM::Frontend::AST::VisibilityLevel::Protected) {
+        auto target_info = type_system.getFrameInfo(frame_name);
+        auto current_info = type_system.getFrameInfo(current_frame->name);
+
+        if (target_info && current_info) {
+            // Check if current frame inherits from target frame
+            if (target_info->name == current_info->name) return true;
+            for (const auto& trait_a : target_info->implements) {
+                for (const auto& trait_b : current_info->implements) {
+                    if (trait_a == trait_b) return true;
+                }
+            }
+        }
+        return false;
+    }
     return false;
 }
 
 // =============================================================================
-// ERROR TYPE INFERENCE
+// ERROR TYPE INFERENCE & LAMBDA/LITERAL TYPE INFERENCE
+//
+// These helpers (infer_function_error_types, infer_expression_error_types,
+// can_function_produce_error_type, can_propagate_error,
+// is_error_union_compatible, join_error_types, infer_lambda_return_type,
+// infer_literal_type) are defined in their canonical TUs (types.cpp and
+// patterns.cpp respectively). They must NOT be redefined here.
 // =============================================================================
-
-std::vector<std::string> TypeChecker::infer_function_error_types(const std::shared_ptr<LM::Frontend::AST::Statement>& body) {
-    std::vector<std::string> error_types;
-    if (!body) return error_types;
-    
-    // Infer error types from function body
-    if (auto block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(body)) {
-        for (const auto& stmt : block->statements) {
-            auto stmt_errors = infer_expression_error_types(nullptr);
-            error_types.insert(error_types.end(), stmt_errors.begin(), stmt_errors.end());
-        }
-    }
-    
-    return error_types;
-}
-
-std::vector<std::string> TypeChecker::infer_expression_error_types(const std::shared_ptr<LM::Frontend::AST::Expression>& expr) {
-    std::vector<std::string> error_types;
-    if (!expr) return error_types;
-    
-    // Infer error types from expression
-    if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
-        // Get function name from call expression
-        std::string func_name;
-        if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(call->callee)) {
-            func_name = var->name;
-        }
-        
-        if (!func_name.empty()) {
-            auto it = function_signatures.find(func_name);
-            if (it != function_signatures.end()) {
-                error_types = it->second.error_types;
-            }
-        }
-    }
-    
-    return error_types;
-}
-
-bool TypeChecker::can_function_produce_error_type(const std::shared_ptr<LM::Frontend::AST::Statement>& body, const std::string& error_type) {
-    if (!body) return false;
-    
-    // Check if function body can produce the given error type
-    auto inferred = infer_function_error_types(body);
-    return std::find(inferred.begin(), inferred.end(), error_type) != inferred.end();
-}
-
-bool TypeChecker::can_propagate_error(const std::vector<std::string>& source_errors, const std::vector<std::string>& target_errors) {
-    // Check if all source errors are in target errors
-    for (const auto& source_error : source_errors) {
-        if (std::find(target_errors.begin(), target_errors.end(), source_error) == target_errors.end()) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool TypeChecker::is_error_union_compatible(TypePtr from, TypePtr to) {
-    if (!from || !to) return false;
-    
-    // Check if from error union is compatible with to error union
-    if (from->tag != TypeTag::ErrorUnion || to->tag != TypeTag::ErrorUnion) {
-        return false;
-    }
-    
-    // For now, just check if they're the same type
-    return from->toString() == to->toString();
-}
-
-std::string TypeChecker::join_error_types(const std::vector<std::string>& error_types) {
-    if (error_types.empty()) return "";
-    
-    std::string result = error_types[0];
-    for (size_t i = 1; i < error_types.size(); ++i) {
-        result += " | " + error_types[i];
-    }
-    return result;
-}
-
-// =============================================================================
-// LAMBDA TYPE INFERENCE
-// =============================================================================
-
-TypePtr TypeChecker::infer_lambda_return_type(const std::shared_ptr<LM::Frontend::AST::Statement>& body) {
-    if (!body) return type_system.NIL_TYPE;
-    
-    // Infer return type from lambda body
-    if (auto block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(body)) {
-        if (!block->statements.empty()) {
-            // Return type of last statement
-            return check_statement(block->statements.back());
-        }
-    }
-    
-    return type_system.NIL_TYPE;
-}
-
-TypePtr TypeChecker::infer_literal_type(const std::shared_ptr<LM::Frontend::AST::LiteralExpr>& expr, TypePtr expected_type) {
-    if (!expr) return type_system.ANY_TYPE;
-    
-    // Infer type from literal value - LiteralExpr stores value as a variant
-    // For now, return ANY_TYPE as we need to check the actual AST structure
-    return type_system.ANY_TYPE;
-}
 
 } // namespace Frontend
 } // namespace LM

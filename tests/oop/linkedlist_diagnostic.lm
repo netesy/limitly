@@ -1,0 +1,56 @@
+// Diagnostic test for LinkedList to identify frame mutation issues
+
+import std.collections.linkedlist as ll;
+
+print("=== LinkedList Diagnostic Test ===");
+
+// Test 1: Construction
+print("\nTest 1: Construction");
+var list = ll.LinkedList();
+print("list created: {list != nil}");
+print("list.size: {list.size}");
+
+// Test 2: Push back
+print("\nTest 2: Push back");
+list.push_back(1);
+print("After push_back(1), list.size: {list.size}");
+
+list.push_back(2);
+print("After push_back(2), list.size: {list.size}");
+
+// Test 3: Check length after modifications
+print("\nTest 3: Check length");
+var len = list.length();
+print("list.length(): {len}");
+
+if (len == 2) {
+    print("OK: Length is 2");
+} else {
+    print("ERROR: Length should be 2, got {len}");
+}
+
+// Test 4: Pop back
+print("\nTest 4: Pop back");
+var popped = list.pop_back();
+print("After pop_back(), returned: {popped}");
+print("After pop_back(), list.size: {list.size}");
+
+if (list.size == 1) {
+    print("OK: Size decreased to 1");
+} else {
+    print("ERROR: Size should be 1, got {list.size}");
+}
+
+// Test 5: Pop front
+print("\nTest 5: Pop front");
+var popped2 = list.pop_front();
+print("After pop_front(), returned: {popped2}");
+print("After pop_front(), list.size: {list.size}");
+
+if (list.size == 0) {
+    print("OK: Size is 0");
+} else {
+    print("ERROR: Size should be 0, got {list.size}");
+}
+
+print("\n=== End of Diagnostic Test ===");

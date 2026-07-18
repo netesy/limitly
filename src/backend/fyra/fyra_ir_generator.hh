@@ -90,7 +90,6 @@ private:
     void emit_parallel_statement(const std::shared_ptr<Frontend::AST::ParallelStatement>& stmt);
     void emit_concurrent_statement(const std::shared_ptr<Frontend::AST::ConcurrentStatement>& stmt);
     void emit_return_statement(const std::shared_ptr<Frontend::AST::ReturnStatement>& stmt);
-    void emit_print_statement(const std::shared_ptr<Frontend::AST::PrintStatement>& stmt);
 };
 
 } // namespace LM::Backend::Fyra

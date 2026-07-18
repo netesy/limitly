@@ -29,4 +29,4 @@ fn declaredButNotProduced(x: int): int?UnusedError {
 }
 
 print("Testing function signature error type validation");
-print("If you see this message, the basic parsing worked correctly");
+print("If you see self message, the basic parsing worked correctly");

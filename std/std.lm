@@ -1,12 +1,21 @@
 // Standard Library Main Module
 
 import std.core as core;
-import std.collections as collections;
+import std.collections.index as collections;
 import std.iter as iter;
 import std.functional as functional;
 import std.math as math;
 import std.strings as strings;
+import std.string as string;
+import std.option as option;
+import std.result as result;
+import std.sort as sort;
+import std.search as search;
+import std.algorithm as algorithm;
+import std.iterator as iterator;
+import std.range as range;
 import std.io as io;
+import std.resource as resource;
 import std.time as time;
 import std.log as log;
 import std.path as path;
@@ -32,6 +41,8 @@ import std.crypto.random as crypto_random;
 import std.encoding as encoding;
 import std.serialization as serialization;
 import std.debug as debug;
+import std.ffi as ffi;
+import std.app as app;
 
 var List = collections.List;
 var Error = core.Error;
@@ -45,6 +56,7 @@ var FunctionInt = functional.FunctionInt;
 var FunctionIntBool = functional.FunctionIntBool;
 var Console = io.Console;
 var File = io.File;
+var Resource = resource.Resource;
 var Time = time.Time;
 var Logger = log.Logger;
 var Path = path.Path;
@@ -70,3 +82,7 @@ var CryptoRandom = crypto_random.CryptoRandom;
 var Encoding = encoding.Encoding;
 var Serialization = serialization.Serialization;
 var Debug = debug.Debug;
+
+var Option = option.Option;
+var Result = result.Result;
+var Range = range.Range;

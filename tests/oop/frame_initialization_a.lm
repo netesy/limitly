@@ -1,0 +1,32 @@
+// Test A: Frame Initialization
+// Minimal test for basic field initialization
+
+frame Foo {
+    pub a: int = 123;
+    pub b: str = "hello";
+}
+
+var f = Foo();
+
+print("f != nil: {f != nil}");
+print("f.a: {f.a}");
+print("f.b: {f.b}");
+
+// Assertions
+if (f == nil) {
+    print("ERROR: f is nil");
+} else {
+    print("OK: f is not nil");
+}
+
+if (f.a == 123) {
+    print("OK: f.a == 123");
+} else {
+    print("ERROR: f.a != 123, got {f.a}");
+}
+
+if (f.b == "hello") {
+    print("OK: f.b == 'hello'");
+} else {
+    print("ERROR: f.b != 'hello', got {f.b}");
+}

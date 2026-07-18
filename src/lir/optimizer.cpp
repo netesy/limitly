@@ -279,9 +279,6 @@ bool Optimizer::has_instruction_side_effects(const LIR_Inst& inst) const {
         inst.op == LIR_Op::Call || inst.op == LIR_Op::CallVoid ||
         inst.op == LIR_Op::CallIndirect || inst.op == LIR_Op::CallBuiltin ||
         inst.op == LIR_Op::CallVariadic ||
-        inst.op == LIR_Op::PrintInt || inst.op == LIR_Op::PrintUint ||
-        inst.op == LIR_Op::PrintFloat || inst.op == LIR_Op::PrintBool ||
-        inst.op == LIR_Op::PrintString ||
         inst.op == LIR_Op::Return || inst.op == LIR_Op::Ret ||
         inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || 
         inst.op == LIR_Op::JumpIfFalse ||

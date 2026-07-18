@@ -603,6 +603,12 @@ public:
     const std::string TIMEOUT_ERROR_STR = "TimeoutError";
 
     TypePtr getType(const std::string& name) {
+        if (name == "res.Resource" || name == "Resource") {
+            std::cerr << "[DEBUG getType] name=" << name << ", registered userDefinedTypes:" << std::endl;
+            for (const auto& kv : userDefinedTypes) {
+                std::cerr << "  - " << kv.first << std::endl;
+            }
+        }
         // 1. Check contextual scopes (inner to outer)
         for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
             auto found = it->find(name);

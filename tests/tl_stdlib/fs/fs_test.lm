@@ -1,0 +1,28 @@
+// Filesystem tests - resource lifecycle and type validation
+// Tests the resource system that std.fs depends on
+
+print("=== FS Tests ===");
+
+// Resource type constants (must match resource_types.hh)
+// FILE=0, SOCKET=1, HASH_ENGINE=16, ENTROPY=12, DNS=13, UDP=14, WEBSOCKET=15
+
+// FILE resource lifecycle
+var f = resource_create(0);
+assert(f > 0, "FS: file resource handle positive");
+resource_destroy(f);
+
+// Double destroy is safe
+resource_destroy(f);
+
+// Invalid resource type
+var bad = resource_create(99);
+assert(bad == -1 or bad == nil, "FS: invalid resource type returns error");
+
+// Resource handles are sequential
+var f1 = resource_create(0);
+var f2 = resource_create(0);
+assert(f2 > f1, "FS: handles are sequential");
+resource_destroy(f1);
+resource_destroy(f2);
+
+print("FS tests passed!");

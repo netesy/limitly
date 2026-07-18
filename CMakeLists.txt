@@ -48,7 +48,7 @@ set(FRONTEND_SOURCES
 
 set(BACKEND_COMMON_SOURCES
     src/backend/symbol_table.cpp
-    src/frontend/value.cpp
+    src/backend/value.cpp
     src/backend/vm/register.cpp
     src/backend/vm/register_helpers.cpp
     src/backend/vm/ops/arithmetic.cpp

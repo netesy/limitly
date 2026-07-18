@@ -39,7 +39,6 @@ namespace CST {
         RETURN_STATEMENT,
         BREAK_STATEMENT,
         CONTINUE_STATEMENT,
-        PRINT_STATEMENT,
         ATTEMPT_STATEMENT,
         HANDLE_STATEMENT,
         PARALLEL_STATEMENT,
@@ -69,9 +68,7 @@ namespace CST {
         // Types
         PRIMITIVE_TYPE,
         FUNCTION_TYPE,
-        LIST_TYPE,
-        DICT_TYPE,
-        ARRAY_TYPE,
+        // LIST_TYPE, DICT_TYPE, ARRAY_TYPE removed - collection syntax uses [int], {str:int}, (int,str)
         UNION_TYPE,
         OPTION_TYPE,
         RESULT_TYPE,

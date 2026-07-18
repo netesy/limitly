@@ -1,0 +1,25 @@
+// Test C - Member Mutation
+// Verify that member assignments modify the original object
+
+frame Foo {
+    pub var value: int;
+
+    pub fn init() {
+        self.value = 0;
+    }
+
+    pub fn inc() {
+        self.value += 1;
+    }
+}
+
+fn main(): int {
+    var f = Foo();
+    
+    f.inc() ;
+    print(f.value);
+    assert(f.value == 1, "Method should mutate the original object");
+    
+    print("Test C - Member Mutation: PASSED");
+    return 0;
+}

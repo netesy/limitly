@@ -197,23 +197,11 @@ std::shared_ptr<LM::Frontend::AST::Statement> ASTOptimizer::optimizeStatement(st
         return optimizeForStatement(forStmt);
     } else if (auto returnStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         return optimizeReturnStatement(returnStmt);
-    } else if (auto printStmt = std::dynamic_pointer_cast<LM::Frontend::AST::PrintStatement>(stmt)) {
-        return optimizePrintStatement(printStmt);
     }
     
     return stmt;
 }
 
-std::shared_ptr<LM::Frontend::AST::PrintStatement> ASTOptimizer::optimizePrintStatement(std::shared_ptr<LM::Frontend::AST::PrintStatement> stmt) {
-    if (!stmt) return nullptr;
-    
-    // Optimize all arguments
-    for (auto& arg : stmt->arguments) {
-        arg = optimizeExpression(arg);
-    }
-    
-    return stmt;
-}
 
 // ============================================================================
 // EXPRESSION OPTIMIZATIONS
@@ -1237,10 +1225,6 @@ void ASTOptimizer::preAnalyzeStatement(std::shared_ptr<LM::Frontend::AST::Statem
     } else if (auto returnStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         if (returnStmt->value) {
             preAnalyzeExpression(returnStmt->value);
-        }
-    } else if (auto printStmt = std::dynamic_pointer_cast<LM::Frontend::AST::PrintStatement>(stmt)) {
-        for (auto& arg : printStmt->arguments) {
-            preAnalyzeExpression(arg);
         }
     } else if (auto exprStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(stmt)) {
         preAnalyzeExpression(exprStmt->expression);
