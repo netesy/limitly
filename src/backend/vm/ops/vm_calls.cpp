@@ -42,6 +42,11 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 registers = saved_registers;
                 current_function_ = saved_func;
                 registers[pc->dst] = return_value;
+            } else if (pc->func_name == "channel") {
+                // Allocate a real runtime Channel pointer boxed as a pointer!
+                auto channel = std::make_unique<LM::Backend::Channel>(1024);
+                channels.push_back(std::move(channel));
+                registers[pc->dst] = BOX_PTR(channels.back().get());
             } else if (LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
                 // Handle builtin functions (print, input, etc.)
                 std::vector<ValuePtr> args;

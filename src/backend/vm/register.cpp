@@ -200,6 +200,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::CallbackDestroy:
                 execute_ffi(pc); break;
             case LIR::LIR_Op::Mov: registers[pc->dst] = registers[pc->a]; break;
+            case LIR::LIR_Op::Label: case LIR::LIR_Op::Nop: break;
             case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret: if (pc->a != UINT32_MAX) registers[0] = registers[pc->a]; return;
             default:
                 // H36: previously this printed a debug message and silently

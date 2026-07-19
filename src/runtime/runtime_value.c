@@ -340,6 +340,20 @@ RUNTIME_API LmValue lm_add(LmValue a, LmValue b) {
     if (IS_PTR(a) && IS_PTR(b)) {
         ObjHeader* h1 = (ObjHeader*)UNBOX_PTR(a);
         ObjHeader* h2 = (ObjHeader*)UNBOX_PTR(b);
+        if (h1->type_id == TYPE_LIST && h2->type_id == TYPE_LIST) {
+            LmList* l1 = (LmList*)h1;
+            LmList* l2 = (LmList*)h2;
+            LmList* result = lm_list_new();
+            if (result) {
+                for (uint64_t i = 0; i < l1->size; ++i) {
+                    lm_list_append(result, l1->data[i]);
+                }
+                for (uint64_t i = 0; i < l2->size; ++i) {
+                    lm_list_append(result, l2->data[i]);
+                }
+                return BOX_PTR(result);
+            }
+        }
         if (h1->type_id == TYPE_BOX && h2->type_id == TYPE_BOX) {
             LmBox* b1 = (LmBox*)h1;
             LmBox* b2 = (LmBox*)h2;
