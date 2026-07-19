@@ -49,6 +49,7 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
             } else if (auto trait_stmt = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) {
                 lower_trait_declaration(*trait_stmt);
             } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
+                lowered_frames_.insert(frame_stmt->name);
                 lower_frame_methods(*frame_stmt);
             }
         }
@@ -63,13 +64,12 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         std::string prev_mod = current_module_;
         current_module_ = path;
 
-        // 1. Lower module symbols
+        // 1a. First pass: Collect all function signatures in the module
         for (const auto& stmt : module->ast->statements) {
             if (auto func_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
                 std::string original_name = func_stmt->name;
                 std::string qname = path + "." + original_name;
-                if (function_table_.count(qname)) continue;
-                {
+                if (!function_table_.count(qname)) {
                     FunctionInfo info;
                     info.name = qname;
                     info.param_count = func_stmt->params.size();
@@ -79,13 +79,22 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
                     info.lir_function = nullptr;
                     function_table_[info.name] = std::move(info);
                 }
+            }
+        }
+
+        // 1b. Second pass: Lower all module symbols
+        for (const auto& stmt : module->ast->statements) {
+            if (auto func_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+                std::string original_name = func_stmt->name;
+                std::string qname = path + "." + original_name;
                 func_stmt->name = qname;
                 generate_function(*func_stmt);
                 func_stmt->name = original_name;
             } else if (auto frame_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
                 std::string original_name = frame_stmt->name;
                 std::string qname = path + "." + original_name;
-                if (frame_table_.count(qname)) continue;
+                if (lowered_frames_.count(qname)) continue;
+                lowered_frames_.insert(qname);
                 frame_stmt->name = qname;
                 lower_frame_methods(*frame_stmt);
                 frame_stmt->name = original_name;
@@ -145,19 +154,28 @@ void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<LM
         if (!stmt) continue;
 
         if (auto concurrent_stmt = dynamic_cast<LM::Frontend::AST::ConcurrentStatement*>(stmt.get())) {
+            std::string saved_channel = current_concurrent_channel_;
+            current_concurrent_channel_ = concurrent_stmt->channel;
             if (concurrent_stmt->body) {
                 lower_task_bodies_recursive(concurrent_stmt->body->statements);
             }
+            current_concurrent_channel_ = saved_channel;
         } else if (auto parallel_stmt = dynamic_cast<LM::Frontend::AST::ParallelStatement*>(stmt.get())) {
             if (parallel_stmt->body) {
                 lower_task_bodies_recursive(parallel_stmt->body->statements);
             }
         } else if (auto task_stmt = dynamic_cast<LM::Frontend::AST::TaskStatement*>(stmt.get())) {
+            if (!current_concurrent_channel_.empty()) {
+                task_stmt->channel_param = current_concurrent_channel_;
+            }
             lower_task_body(*task_stmt);
             if (task_stmt->body) {
                 lower_task_bodies_recursive(task_stmt->body->statements);
             }
         } else if (auto worker_stmt = dynamic_cast<LM::Frontend::AST::WorkerStatement*>(stmt.get())) {
+            if (!current_concurrent_channel_.empty()) {
+                worker_stmt->channel_param = current_concurrent_channel_;
+            }
             lower_worker_body(*worker_stmt);
             if (worker_stmt->body) {
                 lower_task_bodies_recursive(worker_stmt->body->statements);

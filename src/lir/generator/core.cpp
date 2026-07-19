@@ -341,6 +341,7 @@ void Generator::set_register_abi_type(Reg reg, Type abi_type) {
 
 void Generator::set_register_language_type(Reg reg, TypePtr lang_type) {
     register_language_types_[reg] = lang_type;
+    register_types_[reg] = lang_type; // Sync register_types_ for binary operator operations
     if (current_function_) {
         current_function_->set_register_language_type(reg, lang_type);
     }

@@ -805,11 +805,10 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::workerStatement() {
                 stmt->param = stmt->paramName;
                 stmt->iterable = expression();
             } else {
-                // No 'in' — firstIdent is the channel/iterable. Construct a VariableExpr.
-                auto idExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
-                idExpr->name = firstIdent.lexeme;
-                idExpr->line = firstIdent.line;
-                stmt->iterable = idExpr;
+                // No 'in' — firstIdent is the parameter name!
+                stmt->paramName = firstIdent.lexeme;
+                stmt->param = stmt->paramName;
+                stmt->iterable = nullptr; // Uses the default channel
             }
         } else {
             stmt->iterable = expression();

@@ -1,6 +1,7 @@
 #include "../register.hh"
 #include "../../../runtime/runtime.h"
 #include "../../../runtime/runtime_value.h"
+#include "../../../lir/functions.hh"
 #include <cstdio>
 #include <stdexcept>
 #include <string>
@@ -93,9 +94,61 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             // Minimal placeholder: produce a 2-field frame [instance_ptr, trait_id].
             // Full trait vtable is deferred.
             break;
-        case LIR::LIR_Op::TraitCallMethod:
-            // No-op for now; full trait method dispatch is deferred.
+        case LIR::LIR_Op::TraitCallMethod: {
+            if (pc->call_args.empty()) {
+                throw std::runtime_error("VM: TraitCallMethod requires at least one argument (the receiver object)");
+            }
+            RegisterValue obj_val = registers[pc->call_args[0]];
+            if (!IS_PTR(obj_val)) {
+                throw std::runtime_error("VM: TraitCallMethod receiver is not a pointer");
+            }
+            LmFrame* f = (LmFrame*)UNBOX_PTR(obj_val);
+            if (!f) {
+                throw std::runtime_error("VM: TraitCallMethod receiver is null");
+            }
+            std::string frame_name = f->name;
+            std::string resolved_func_name = frame_name + "." + pc->func_name;
+            
+            auto& func_manager = LIR::LIRFunctionManager::getInstance();
+            std::string final_func_name = "";
+            if (func_manager.hasFunction(resolved_func_name)) {
+                final_func_name = resolved_func_name;
+            } else {
+                std::string trait_func_name = pc->type_name + "." + pc->func_name;
+                if (func_manager.hasFunction(trait_func_name)) {
+                    final_func_name = trait_func_name;
+                }
+            }
+            
+            if (!final_func_name.empty()) {
+                auto func = func_manager.getFunction(final_func_name);
+                std::vector<RegisterValue> arg_vals;
+                for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
+
+                auto saved_registers = registers;
+                const LIR::LIR_Function* saved_func = current_function_;
+
+                registers.assign(registers.size(), VAL_NIL);
+                for (size_t i = 0; i < arg_vals.size() && i < registers.size(); ++i) {
+                    registers[i] = arg_vals[i];
+                }
+
+                LIR::LIR_Function temp_wrapper(func->getName(), static_cast<uint32_t>(arg_vals.size()));
+                temp_wrapper.instructions = func->getInstructions();
+                current_function_ = &temp_wrapper;
+
+                execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
+
+                RegisterValue return_value = registers[0];
+
+                registers = saved_registers;
+                current_function_ = saved_func;
+                registers[pc->dst] = return_value;
+            } else {
+                throw std::runtime_error("VM: TraitCallMethod: unresolved function " + resolved_func_name);
+            }
             break;
+        }
         // The following cases are routed here by the main dispatcher for
         // historical reasons; the implementations live in execute_objects.
         // We fall through to the default-throw so any future re-routing

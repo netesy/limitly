@@ -400,13 +400,18 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
             if (std::isdigit(first) || first == '+' || first == '-' || first == '.') {
                 // Check if the ENTIRE string is a valid number
                 bool hasInvalidChars = false;
+                int dotCount = 0;
                 for (char c : stringValue) {
+                    if (c == '.') dotCount++;
                     if (!std::isdigit(c) && c != '.' && c != '+' && c != '-' && 
                         c != 'e' && c != 'E' && c != 'u' && c != 'U' && 
                         c != 'l' && c != 'L' && c != 'f' && c != 'F') {
                         hasInvalidChars = true;
                         break;
                     }
+                }
+                if (dotCount > 1) {
+                    hasInvalidChars = true;
                 }
                 
                 if (!hasInvalidChars) {
@@ -1387,6 +1392,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         // --- 4. Normal function call ---
         if (!current_module_.empty() && current_module_ != "root" && func_name.find('.') == std::string::npos) {
             std::string qname = current_module_ + "." + func_name;
+            std::cout << "[DEBUG] emit_call_expr: func_name=" << func_name << ", current_module_=" << current_module_ << ", qname=" << qname << ", has_func=" << function_table_.count(qname) << std::endl;
             if (function_table_.count(qname) || LIRFunctionManager::getInstance().hasFunction(qname)) vm_name = qname;
         }
         
@@ -1637,9 +1643,36 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
         }
 
+        // Trait or TraitObject method call
+        TypePtr resolved_object_type = resolve_underlying_type(object_type);
+        if (resolved_object_type && (resolved_object_type->tag == TypeTag::Trait || resolved_object_type->tag == TypeTag::TraitObject)) {
+            std::string trait_name;
+            if (resolved_object_type->tag == TypeTag::Trait) {
+                if (auto tt = std::get_if<TraitType>(&resolved_object_type->extra)) {
+                    trait_name = tt->name;
+                }
+            } else {
+                if (auto tot = std::get_if<TraitObjectType>(&resolved_object_type->extra)) {
+                    trait_name = tot->traitName;
+                }
+            }
+            
+            if (!trait_name.empty()) {
+                if (expr.inferred_type) {
+                    set_register_language_type(result, expr.inferred_type);
+                    set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+                }
+                LIR_Inst inst(LIR_Op::TraitCallMethod, result, 0, 0);
+                inst.func_name = method_name;
+                inst.type_name = trait_name;
+                inst.call_args = arg_regs;
+                emit_instruction(inst);
+                return result;
+            }
+        }
+
         // Frame method call
         std::string full_name;
-        TypePtr resolved_object_type = resolve_underlying_type(object_type);
         if (resolved_object_type && resolved_object_type->tag == TypeTag::Frame) {
             auto ft = std::get_if<FrameType>(&resolved_object_type->extra);
             if (ft) {
@@ -2635,6 +2668,14 @@ Reg Generator::emit_cast_expr(LM::Frontend::AST::CastExpr& expr) {
         // Use DecRescale opcode for decimal rescaling
         Type abi_type = language_type_to_abi_type(target_type);
         emit_instruction(LIR_Inst(LIR_Op::DecRescale, abi_type, dst, source, 0));
+        set_register_language_type(dst, target_type);
+        set_register_type(dst, target_type);
+        return dst;
+    }
+
+    if (!source_type || !target_type || source_type->tag != target_type->tag) {
+        Type abi_type = language_type_to_abi_type(target_type);
+        emit_instruction(LIR_Inst(LIR_Op::Cast, abi_type, dst, source, 0));
         set_register_language_type(dst, target_type);
         set_register_type(dst, target_type);
         return dst;
