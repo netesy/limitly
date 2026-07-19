@@ -105,6 +105,13 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
         lir_generator.set_registered_modules(post_opt_type_check.registered_modules);
 
         auto lir_function = lir_generator.generate_program(post_opt_type_check);
+        if (lir_generator.has_errors()) {
+            std::cerr << "[ERROR] LIR generation had errors:" << std::endl;
+            for (const auto& err : lir_generator.get_errors()) {
+                std::cerr << "  " << err << std::endl;
+            }
+            return 1;
+        }
         if (!lir_function) {
             std::cerr << "[ERROR] LIR generation failed" << std::endl;
             return 1;

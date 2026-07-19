@@ -349,6 +349,17 @@ TypePtr TypeChecker::check_enum_declaration(std::shared_ptr<LM::Frontend::AST::E
         }
         enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
         type_system.addUserDefinedType(enum_decl->name, enumType);
+    } else {
+        // Replace existing enum type with complete one (from Pass -1)
+        EnumType enumTypeInfo;
+        enumTypeInfo.name = enum_decl->name;
+        for (const auto& variant : enum_decl->variants) {
+            std::vector<TypePtr> associated;
+            for (const auto& t : variant.second) associated.push_back(resolve_type_annotation(t));
+            enumTypeInfo.addVariant(variant.first, associated);
+        }
+        enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
+        type_system.addUserDefinedType(enum_decl->name, enumType);
     }
 
     // Register variants (qualified only) in global maps
