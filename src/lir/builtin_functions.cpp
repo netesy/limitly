@@ -184,7 +184,7 @@ void LIRBuiltinFunctions::registerIOFunctions() {
                             std::cout << value->toString();
                             break;
                         default:
-                            std::cout << "<unsupported type:" << static_cast<int>(value->type->tag) << ">";
+                            std::cout << value->toString();
                             break;
                     }
                     // Add space between arguments

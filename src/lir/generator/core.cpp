@@ -1007,13 +1007,16 @@ bool Generator::is_visible(LM::Frontend::AST::VisibilityLevel level, const std::
     }
 
     // Check if we are inside a method of the same frame
-    if (current_function_->name.find(frame_name + ".") == 0) {
+    size_t pos = current_function_->name.find(frame_name + ".");
+    if (pos == 0 || (pos != std::string::npos && current_function_->name[pos - 1] == '.')) {
         return true;
     }
 
     // Check for init and deinit methods too
     if (current_function_->name == frame_name + ".init" ||
-        current_function_->name == frame_name + ".deinit") {
+        current_function_->name == frame_name + ".deinit" ||
+        current_function_->name.find("." + frame_name + ".init") != std::string::npos ||
+        current_function_->name.find("." + frame_name + ".deinit") != std::string::npos) {
         return true;
     }
 

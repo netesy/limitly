@@ -428,5 +428,95 @@ void Generator::emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt) {
 }
 
 
+std::string Generator::resolve_qualified_frame_name(const std::string& name) {
+    std::cout << "[DEBUG] resolve_qualified_frame_name: " << name << " in module " << current_module_ << std::endl;
+    for (auto& alias : import_aliases_) std::cout << "  alias: " << alias.first << " -> " << alias.second << std::endl;
+    for (auto& k : frame_table_) std::cout << "  frame_table key: " << k.first << std::endl;
+    if (name.find('.') != std::string::npos) {
+        size_t dot_pos = name.find('.');
+        std::string mod_alias = name.substr(0, dot_pos);
+        std::string frame_part = name.substr(dot_pos + 1);
+        auto it = import_aliases_.find(mod_alias);
+        if (it != import_aliases_.end()) {
+            return it->second + "." + frame_part;
+        }
+        return name;
+    }
+    
+    // First try current module
+    if (!current_module_.empty() && current_module_ != "root") {
+        std::string qname = current_module_ + "." + name;
+        if (frame_table_.count(qname)) {
+            return qname;
+        }
+    }
+    
+    // Then try all imported module paths from import_aliases_
+    for (const auto& [alias, mod_path] : import_aliases_) {
+        std::string qname = mod_path + "." + name;
+        if (frame_table_.count(qname)) {
+            return qname;
+        }
+    }
+    
+    return name;
+}
+
+
+TypePtr Generator::resolve_underlying_type(TypePtr type) {
+    if (!type) return nullptr;
+    if (type->tag == TypeTag::UserDefined) {
+        auto udt = std::get_if<UserDefinedType>(&type->extra);
+        if (udt && type_system_) {
+            auto resolved = type_system_->getType(udt->name);
+            if (resolved && resolved != type) {
+                return resolve_underlying_type(resolved);
+            }
+        }
+    }
+    return type;
+}
+
+
+std::string Generator::find_frame_or_trait_method(const std::string& frame_name, const std::string& method_name) {
+    // 1. Check if method is defined directly on the frame
+    auto frame_it = frame_table_.find(frame_name);
+    if (frame_it != frame_table_.end()) {
+        for (const auto& name : frame_it->second.method_names) {
+            if (name == method_name) {
+                return frame_name + "." + method_name;
+            }
+        }
+        
+        // 2. Recursively search implemented traits and their parents
+        std::vector<std::string> traits_to_search = frame_it->second.implements;
+        std::set<std::string> searched;
+        
+        while (!traits_to_search.empty()) {
+            std::string trait_name = traits_to_search.back();
+            traits_to_search.pop_back();
+            
+            if (searched.count(trait_name)) continue;
+            searched.insert(trait_name);
+            
+            auto trait_it = trait_table_.find(trait_name);
+            if (trait_it != trait_table_.end()) {
+                // Check if this trait has a default implementation
+                std::string default_method_name = trait_name + "." + method_name;
+                if (function_table_.count(default_method_name)) {
+                    return default_method_name;
+                }
+                
+                // Add parents to search
+                for (const auto& parent : trait_it->second.extends) {
+                    traits_to_search.push_back(parent);
+                }
+            }
+        }
+    }
+    return "";
+}
+
+
 } // namespace LIR
 } // namespace LM

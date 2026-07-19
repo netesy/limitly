@@ -83,6 +83,9 @@ private:
     void lower_frame_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& method);
     void lower_frame_init_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& init_method);
     void lower_frame_deinit_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& deinit_method);
+    std::string find_frame_or_trait_method(const std::string& frame_name, const std::string& method_name);
+    std::string resolve_qualified_frame_name(const std::string& name);
+    TypePtr resolve_underlying_type(TypePtr type);
     void lower_task_body(LM::Frontend::AST::TaskStatement& stmt);
     void lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt);
     void lower_task_bodies_recursive(const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& statements);
@@ -251,7 +254,8 @@ private:
     void emit_trait_stmt(LM::Frontend::AST::TraitDeclaration& stmt);
     void emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt);
     void emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt);
-    void emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg, LIR_BasicBlock* failure_target);
+    void emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg, LIR_BasicBlock* failure_target, uint32_t failure_label = 0);
+    void emit_pattern_match_jump(LIR_Op op, Reg cond_reg, LIR_BasicBlock* failure_target, uint32_t failure_label);
     void emit_module_stmt(LM::Frontend::AST::ModuleDeclaration& stmt);
     
     // Helper functions

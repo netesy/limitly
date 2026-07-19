@@ -60,9 +60,6 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
     for (const auto& [path, module] : modules) {
         if (path == "root" || !module || !module->ast) continue;
         
-        // Skip if already lowered
-        if (function_table_.count(path + ".__init__")) continue;
-
         std::string prev_mod = current_module_;
         current_module_ = path;
 
@@ -220,6 +217,26 @@ void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
             collect_frame_signature(frame_decl);
         }
     }
+    for (const auto& [qualified_name, stmt] : program.imported_symbols) {
+        if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            collect_frame_signature(frame_decl, qualified_name);
+        }
+    }
+    
+    // Collect frame signatures from all loaded modules
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
+    auto modules = manager.get_all_modules();
+    for (const auto& [path, module] : modules) {
+        if (path == "root" || !module || !module->ast) continue;
+        for (const auto& stmt : module->ast->statements) {
+            if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+                std::string qname = path + "." + frame_decl->name;
+                if (!frame_table_.count(qname)) {
+                    collect_frame_signature(frame_decl, qname);
+                }
+            }
+        }
+    }
 }
 
 
@@ -349,6 +366,21 @@ void Generator::collect_trait_signatures(LM::Frontend::AST::Program& program) {
     for (const auto& [qualified_name, stmt] : program.imported_symbols) {
         if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
             collect_trait_signature(trait_decl, qualified_name);
+        }
+    }
+    
+    // Collect trait signatures from all loaded modules
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
+    auto modules = manager.get_all_modules();
+    for (const auto& [path, module] : modules) {
+        if (path == "root" || !module || !module->ast) continue;
+        for (const auto& stmt : module->ast->statements) {
+            if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+                std::string qname = path + "." + trait_decl->name;
+                if (!trait_table_.count(qname)) {
+                    collect_trait_signature(trait_decl, qname);
+                }
+            }
         }
     }
 }

@@ -779,28 +779,43 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
 
 Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     if (expr.op == LM::Frontend::TokenType::AND || expr.op == LM::Frontend::TokenType::OR) {
-        LIR_BasicBlock* right_block = create_basic_block("logic_right");
-        LIR_BasicBlock* end_block = create_basic_block("logic_end");
         Reg result = allocate_register();
         set_register_language_type(result, std::make_shared<::Type>(::TypeTag::Bool));
         Reg left = emit_expr(*expr.left);
-        if (expr.op == LM::Frontend::TokenType::AND) {
-            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, left, 0));
-            emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, left, 0, end_block->id));
-        } else {
-            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, left, 0));
-            emit_instruction(LIR_Inst(LIR_Op::JumpIf, 0, left, 0, end_block->id));
-        }
-        add_block_edge(get_current_block(), right_block);
-        add_block_edge(get_current_block(), end_block);
-        set_current_block(right_block);
-        Reg right = emit_expr(*expr.right);
-        emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, right, 0));
-        if (get_current_block() && !get_current_block()->has_terminator()) {
-            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, end_block->id));
+        
+        if (cfg_context_.building_cfg) {
+            LIR_BasicBlock* right_block = create_basic_block("logic_right");
+            LIR_BasicBlock* end_block = create_basic_block("logic_end");
+            if (expr.op == LM::Frontend::TokenType::AND) {
+                emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, left, 0));
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, left, 0, end_block->id));
+            } else {
+                emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, left, 0));
+                emit_instruction(LIR_Inst(LIR_Op::JumpIf, 0, left, 0, end_block->id));
+            }
+            add_block_edge(get_current_block(), right_block);
             add_block_edge(get_current_block(), end_block);
+            set_current_block(right_block);
+            Reg right = emit_expr(*expr.right);
+            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, right, 0));
+            if (get_current_block() && !get_current_block()->has_terminator()) {
+                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, end_block->id));
+                add_block_edge(get_current_block(), end_block);
+            }
+            set_current_block(end_block);
+        } else {
+            uint32_t end_label = generate_label();
+            if (expr.op == LM::Frontend::TokenType::AND) {
+                emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, left, 0));
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, Type::Void, 0, left, 0, end_label));
+            } else {
+                emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, left, 0));
+                emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, left, 0, end_label));
+            }
+            Reg right = emit_expr(*expr.right);
+            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, right, 0));
+            emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, end_label, 0, 0));
         }
-        set_current_block(end_block);
         return result;
     }
 
@@ -897,12 +912,12 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
         Reg res = allocate_register();
         auto float_type = std::make_shared<::Type>(::TypeTag::Float64);
         Reg f_left = left;
-        if (get_register_type(left)->tag != ::TypeTag::Float64) {
+        if (get_register_type(left) && get_register_type(left)->tag != ::TypeTag::Float64) {
             f_left = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::Cast, Type::F64, f_left, left, 0));
         }
         Reg f_right = right;
-        if (get_register_type(right)->tag != ::TypeTag::Float64) {
+        if (get_register_type(right) && get_register_type(right)->tag != ::TypeTag::Float64) {
             f_right = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::Cast, Type::F64, f_right, right, 0));
         }
@@ -1242,6 +1257,32 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
     if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.callee.get())) {
         std::string func_name = var_expr->name;
         
+        // --- 0. Variable / Indirect Call check ---
+        bool is_variable = (resolve_variable(func_name) != UINT32_MAX);
+        if (!is_variable && env_register_ != UINT32_MAX) {
+            if (std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), func_name) != current_lambda_captures_.end()) {
+                is_variable = true;
+            }
+        }
+        if (is_variable) {
+            Reg closure_reg = emit_variable_expr(*var_expr);
+            std::vector<Reg> arg_regs;
+            for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+            Reg result = allocate_register();
+            Type abi_type = Type::Void;
+            if (expr.inferred_type) abi_type = language_type_to_abi_type(expr.inferred_type);
+            LIR_Inst call_inst(LIR_Op::CallIndirect, abi_type, result, closure_reg, 0);
+            call_inst.call_args = arg_regs;
+            emit_instruction(call_inst);
+            if (expr.inferred_type) {
+                set_register_type(result, expr.inferred_type);
+                set_register_language_type(result, expr.inferred_type);
+            } else {
+                set_register_type(result, std::make_shared<::Type>(::TypeTag::Int));
+            }
+            return result;
+        }
+        
         // --- 1. Intrinsic lookup ---
         std::string registry_lookup_name = func_name;
         size_t d_pos = func_name.rfind('.');
@@ -1307,13 +1348,38 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             LIR_Inst new_inst(LIR_Op::NewFrame, Type::Ptr, result, 0, 0, (uint32_t)frame_it->second.total_field_size);
             new_inst.type_name = func_name;
             emit_instruction(new_inst);
+            set_register_type(result, expr.inferred_type);
             set_register_language_type(result, expr.inferred_type);
+            
+            const auto& frame_decl = frame_it->second.declaration;
+            if (frame_decl) {
+                for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
+                    const auto& field = frame_decl->fields[i];
+                    if (field->defaultValue) {
+                        Reg field_val_reg = emit_expr(*field->defaultValue);
+                        emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, result, static_cast<uint32_t>(i), field_val_reg));
+                    }
+                }
+            }
             
             if (frame_it->second.has_init) {
                 std::vector<Reg> args; args.push_back(result);
                 for (Reg r : arg_regs) args.push_back(r);
                 Reg dummy = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::Call, dummy, func_name + ".init", args));
+            } else {
+                if (frame_decl) {
+                    for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
+                        const auto& field = frame_decl->fields[i];
+                        for (const auto& [arg_name, arg_expr] : expr.namedArgs) {
+                            if (arg_name == field->name) {
+                                Reg field_val_reg = emit_expr(*arg_expr);
+                                emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, result, static_cast<uint32_t>(i), field_val_reg));
+                                break;
+                            }
+                        }
+                    }
+                }
             }
             return result;
         }
@@ -1451,6 +1517,52 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             if (alias_it != import_aliases_.end()) {
                 std::string qualified_name = alias_it->second + "." + method_name;
 
+                // Frame instantiation via module alias check
+                auto frame_it = frame_table_.find(qualified_name);
+                if (frame_it != frame_table_.end()) {
+                    std::vector<Reg> arg_regs;
+                    for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+                    Reg result = allocate_register();
+                    
+                    LIR_Inst new_inst(LIR_Op::NewFrame, Type::Ptr, result, 0, 0, (uint32_t)frame_it->second.total_field_size);
+                    new_inst.type_name = qualified_name;
+                    emit_instruction(new_inst);
+                    set_register_type(result, expr.inferred_type);
+                    set_register_language_type(result, expr.inferred_type);
+                    
+                    const auto& frame_decl = frame_it->second.declaration;
+                    if (frame_decl) {
+                        for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
+                            const auto& field = frame_decl->fields[i];
+                            if (field->defaultValue) {
+                                Reg field_val_reg = emit_expr(*field->defaultValue);
+                                emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, result, static_cast<uint32_t>(i), field_val_reg));
+                            }
+                        }
+                    }
+                    
+                    if (frame_it->second.has_init) {
+                        std::vector<Reg> args; args.push_back(result);
+                        for (Reg r : arg_regs) args.push_back(r);
+                        Reg dummy = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::Call, dummy, qualified_name + ".init", args));
+                    } else {
+                        if (frame_decl) {
+                            for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
+                                const auto& field = frame_decl->fields[i];
+                                for (const auto& [arg_name, arg_expr] : expr.namedArgs) {
+                                    if (arg_name == field->name) {
+                                        Reg field_val_reg = emit_expr(*arg_expr);
+                                        emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, result, static_cast<uint32_t>(i), field_val_reg));
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    return result;
+                }
+
                 std::vector<Reg> arg_regs;
                 for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
                 Reg result = allocate_register();
@@ -1527,9 +1639,16 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
         // Frame method call
         std::string full_name;
-        if (object_type && object_type->tag == TypeTag::Frame) {
-            auto ft = std::get_if<FrameType>(&object_type->extra);
-            if (ft) full_name = ft->name + "." + method_name;
+        TypePtr resolved_object_type = resolve_underlying_type(object_type);
+        if (resolved_object_type && resolved_object_type->tag == TypeTag::Frame) {
+            auto ft = std::get_if<FrameType>(&resolved_object_type->extra);
+            if (ft) {
+                std::string resolved_frame_name = resolve_qualified_frame_name(ft->name);
+                full_name = find_frame_or_trait_method(resolved_frame_name, method_name);
+                if (full_name.empty()) {
+                    full_name = resolved_frame_name + "." + method_name;
+                }
+            }
         }
 
         if (!full_name.empty()) {
@@ -1718,17 +1837,19 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
             
             // Get the type of the object to find the correct frame
             TypePtr object_type = expr.object->inferred_type;
-            if (object_type && object_type->tag == TypeTag::Frame) {
-                auto frame_type_info = std::get_if<FrameType>(&object_type->extra);
+            TypePtr resolved_object_type = resolve_underlying_type(object_type);
+            if (resolved_object_type && resolved_object_type->tag == TypeTag::Frame) {
+                auto frame_type_info = std::get_if<FrameType>(&resolved_object_type->extra);
                 if (frame_type_info) {
-                    auto it = frame_table_.find(frame_type_info->name);
+                    std::string resolved_name = resolve_qualified_frame_name(frame_type_info->name);
+                    auto it = frame_table_.find(resolved_name);
                     if (it != frame_table_.end()) {
                         // Check visibility
                         auto vis_it = it->second.field_visibilities.find(field_name);
                         if (vis_it != it->second.field_visibilities.end()) {
-                            if (!is_visible(vis_it->second, frame_type_info->name)) {
+                            if (!is_visible(vis_it->second, resolved_name)) {
                                 report_error("Cannot access " + LM::Frontend::AST::visibilityToString(vis_it->second) +
-                                           " field '" + field_name + "' of frame '" + frame_type_info->name + "'");
+                                           " field '" + field_name + "' of frame '" + resolved_name + "'");
                                 return 0;
                             }
                         }
@@ -1754,7 +1875,9 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 }
             } else {
                 // Fallback: search all frames
+                std::cout << "[DEBUG] Fallback searching for assignment field: " << field_name << " in module " << current_module_ << std::endl;
                 for (const auto& [frame_name, frame_info] : frame_table_) {
+                    std::cout << "  checking frame in table: " << frame_name << std::endl;
                     auto offset_it = frame_info.field_offsets.find(field_name);
                     if (offset_it != frame_info.field_offsets.end()) {
                         // Found the field - emit FrameSetField
@@ -2018,17 +2141,19 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
     
     // Get the type of the object to find the correct frame
     TypePtr object_type = expr.object->inferred_type;
-    if (object_type && object_type->tag == TypeTag::Frame) {
-        auto frame_type_info = std::get_if<FrameType>(&object_type->extra);
+    TypePtr resolved_object_type = resolve_underlying_type(object_type);
+    if (resolved_object_type && resolved_object_type->tag == TypeTag::Frame) {
+        auto frame_type_info = std::get_if<FrameType>(&resolved_object_type->extra);
         if (frame_type_info) {
-            auto it = frame_table_.find(frame_type_info->name);
+            std::string resolved_name = resolve_qualified_frame_name(frame_type_info->name);
+            auto it = frame_table_.find(resolved_name);
             if (it != frame_table_.end()) {
                 // Check visibility
                 auto vis_it = it->second.field_visibilities.find(expr.name);
                 if (vis_it != it->second.field_visibilities.end()) {
-                    if (!is_visible(vis_it->second, frame_type_info->name)) {
+                    if (!is_visible(vis_it->second, resolved_name)) {
                         report_error("Cannot access " + LM::Frontend::AST::visibilityToString(vis_it->second) +
-                                   " field '" + expr.name + "' of frame '" + frame_type_info->name + "'");
+                                   " field '" + expr.name + "' of frame '" + resolved_name + "'");
                         return 0;
                     }
                 }
