@@ -28,6 +28,10 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                         arg_vals.push_back(VAL_NIL);
                     }
                 }
+                size_t expected_total = func->getParameters().size();
+                while (arg_vals.size() < expected_total) {
+                    arg_vals.push_back(VAL_NIL);
+                }
 
                 auto saved_registers = registers;
                 const LIR::LIR_Function* saved_func = current_function_;
@@ -105,7 +109,23 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     auto func = func_manager.getFunction(func_name);
                     std::vector<RegisterValue> arg_vals;
                     for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
-                    arg_vals.insert(arg_vals.end(), closure_extra_args.begin(), closure_extra_args.end());
+                    
+                    if (!closure_extra_args.empty()) {
+                        size_t expected_total = func->getParameters().size();
+                        if (expected_total > 0) {
+                            while (arg_vals.size() < expected_total - 1) {
+                                arg_vals.push_back(VAL_NIL);
+                            }
+                            arg_vals.push_back(closure_extra_args[0]);
+                        } else {
+                            arg_vals.push_back(closure_extra_args[0]);
+                        }
+                    } else {
+                        size_t expected_total = func->getParameters().size();
+                        while (arg_vals.size() < expected_total) {
+                            arg_vals.push_back(VAL_NIL);
+                        }
+                    }
 
                     auto saved_registers = registers;
                     const LIR::LIR_Function* saved_func = current_function_;

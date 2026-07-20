@@ -30,11 +30,11 @@ pub frame Queue {
 }
 
 pub frame PriorityQueue {
-    pub var heap: [any];
+    pub var heap: vector.Vector;
     var comparator: any;
 
-    pub init(comparator: any = nil) {
-        self.heap = [];
+    pub init(comparator: any) {
+        self.heap = vector.Vector();
         self.comparator = comparator;
     }
 
@@ -57,15 +57,16 @@ pub frame PriorityQueue {
     }
 
     pub fn push(item: any) {
-        self.heap = self.heap + [item];
-        self._sift_up(len(self.heap) - 1);
+        self.heap.push(item);
+        var current_len = self.heap.len();
+        self._sift_up(current_len - 1);
     }
 
     pub fn peek(): any {
-        if (len(self.heap) == 0) {
+        if (self.heap.len() == 0) {
             return nil;
         }
-        return self.heap[0];
+        return self.heap.data[0];
     }
 
     pub fn remove(): any {
@@ -73,27 +74,21 @@ pub frame PriorityQueue {
     }
 
     pub fn pop(): any {
-        var n = len(self.heap);
+        var n = self.heap.len();
         if (n == 0) {
             return nil;
         }
-        var result = self.heap[0];
-        self.heap[0] = self.heap[n - 1];
-        var next_heap: [any] = [];
-        var i = 0;
-        while (i < n - 1) {
-            next_heap = next_heap + [self.heap[i]];
-            i = i + 1;
-        }
-        self.heap = next_heap;
-        if (len(self.heap) > 0) {
+        var result = self.heap.data[0];
+        self.heap.data[0] = self.heap.data[n - 1];
+        self.heap.pop();
+        if (self.heap.len() > 0) {
             self._sift_down(0);
         }
         return result;
     }
 
     pub fn len(): int {
-        return len(self.heap);
+        return self.heap.len();
     }
 
     pub fn length(): int {
@@ -103,10 +98,10 @@ pub frame PriorityQueue {
     fn _sift_up(idx: int) {
         while (idx > 0) {
             var parent = (idx - 1) / 2;
-            if (self._compare(self.heap[idx], self.heap[parent]) < 0) {
-                var tmp = self.heap[idx];
-                self.heap[idx] = self.heap[parent];
-                self.heap[parent] = tmp;
+            if (self._compare(self.heap.data[idx], self.heap.data[parent]) < 0) {
+                var tmp = self.heap.data[idx];
+                self.heap.data[idx] = self.heap.data[parent];
+                self.heap.data[parent] = tmp;
                 idx = parent;
             } else {
                 return;
@@ -115,21 +110,21 @@ pub frame PriorityQueue {
     }
 
     fn _sift_down(idx: int) {
-        var n = len(self.heap);
+        var n = self.heap.len();
         while (true) {
             var smallest = idx;
             var left = 2 * idx + 1;
             var right = 2 * idx + 2;
-            if (left < n and self._compare(self.heap[left], self.heap[smallest]) < 0) {
+            if (left < n and self._compare(self.heap.data[left], self.heap.data[smallest]) < 0) {
                 smallest = left;
             }
-            if (right < n and self._compare(self.heap[right], self.heap[smallest]) < 0) {
+            if (right < n and self._compare(self.heap.data[right], self.heap.data[smallest]) < 0) {
                 smallest = right;
             }
             if (smallest != idx) {
-                var tmp = self.heap[idx];
-                self.heap[idx] = self.heap[smallest];
-                self.heap[smallest] = tmp;
+                var tmp = self.heap.data[idx];
+                self.heap.data[idx] = self.heap.data[smallest];
+                self.heap.data[smallest] = tmp;
                 idx = smallest;
             } else {
                 return;
@@ -179,7 +174,7 @@ pub frame BitSet {
         var word_count = (self.size + 63) / 64;
         var i = 0;
         while (i < word_count) {
-            self.words = self.words + [0];
+            self.words.append(0);
             i = i + 1;
         }
     }

@@ -5,7 +5,7 @@ frame Result {
     var value: any;
     var error: any;
 
-    pub init(success: bool = false, value: any = nil, error: any = nil) {
+    pub init(success: bool, value: any, error: any) {
         self.success = success;
         self.value = value;
         self.error = error;
