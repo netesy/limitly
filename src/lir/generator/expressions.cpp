@@ -2070,6 +2070,11 @@ Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
 
 
 Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
+    if (!current_function_) {
+        report_error("Cannot emit member expression outside of a function context");
+        return 0;
+    }
+
     // Enum unit variant access: EnumName.Variant
     if (auto enum_obj = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.object.get())) {
         int64_t tag = 0;
