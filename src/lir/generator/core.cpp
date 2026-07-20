@@ -63,11 +63,8 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         if (module_path == "root") continue;
 
         std::string init_func_name = module_path + ".__init__";
-        if (LIRFunctionManager::getInstance().hasFunction(init_func_name) || function_table_.count(init_func_name)) {
-            std::vector<Reg> empty_args;
-            Reg dummy_res = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::Call, dummy_res, init_func_name, empty_args));
-        }
+        // Don't call module init functions during LIR generation
+        // They will be called during VM execution
     }
 
     // 2. Generate top-level statements
@@ -253,6 +250,11 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
 
 
 Reg Generator::allocate_register() {
+    if (!current_function_) {
+        // If no current function, we can't allocate registers
+        // This shouldn't happen in normal operation, but prevents crashes
+        return next_register_++;
+    }
     return next_register_++;
 }
 

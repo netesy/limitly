@@ -139,7 +139,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
     const LIR::LIR_Inst* instructions_ptr = function.instructions.data();
     const LIR::LIR_Inst* pc = instructions_ptr + start_pc;
     const LIR::LIR_Inst* end_ptr = instructions_ptr + (end_pc < function.instructions.size() ? end_pc : function.instructions.size());
-    
+
     while (pc < end_ptr) {
         instruction_count++;
         if (instruction_count > MAX_INSTRUCTIONS) { std::cerr << "Instruction limit exceeded at " << (int)pc->op << " " << instruction_count << std::endl; return; }

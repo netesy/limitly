@@ -21,7 +21,13 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
             if (func_manager.hasFunction(pc->func_name)) {
                 auto func = func_manager.getFunction(pc->func_name);
                 std::vector<RegisterValue> arg_vals;
-                for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
+                for (auto arg_reg : pc->call_args) {
+                    if (arg_reg < registers.size()) {
+                        arg_vals.push_back(registers[arg_reg]);
+                    } else {
+                        arg_vals.push_back(VAL_NIL);
+                    }
+                }
 
                 auto saved_registers = registers;
                 const LIR::LIR_Function* saved_func = current_function_;
