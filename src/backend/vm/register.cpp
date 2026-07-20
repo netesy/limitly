@@ -142,7 +142,29 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
 
     while (pc < end_ptr) {
         instruction_count++;
+        if (instruction_count >= 5000 && instruction_count < 5200) {
+            std::cout << "[DEBUG_EXEC_INF] pc=" << (pc - instructions_ptr) << " op=" << LIR::lir_op_to_string(pc->op) << " name=" << pc->func_name << " function=" << function.name << std::endl;
+        }
         if (instruction_count > MAX_INSTRUCTIONS) { std::cerr << "Instruction limit exceeded at " << (int)pc->op << " " << instruction_count << std::endl; return; }
+
+        // Bounds check for register indices
+        auto safe_reg_access = [this](uint32_t reg) -> bool {
+            return reg < registers.size();
+        };
+
+        if (!safe_reg_access(pc->dst) && pc->dst != UINT32_MAX) {
+            std::cerr << "Register bounds error: dst=" << pc->dst << " size=" << registers.size() << std::endl;
+            return;
+        }
+        if (!safe_reg_access(pc->a) && pc->a != UINT32_MAX) {
+            std::cerr << "Register bounds error: a=" << pc->a << " size=" << registers.size() << std::endl;
+            return;
+        }
+        if (!safe_reg_access(pc->b) && pc->b != UINT32_MAX) {
+            std::cerr << "Register bounds error: b=" << pc->b << " size=" << registers.size() << std::endl;
+            return;
+        }
+
                 switch (pc->op) {
             case LIR::LIR_Op::LoadConst: registers[pc->dst] = pc->const_val; break;
             case LIR::LIR_Op::Add: case LIR::LIR_Op::Sub: case LIR::LIR_Op::Mul: case LIR::LIR_Op::Div:

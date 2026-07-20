@@ -1,24 +1,21 @@
-// Collections Module Index - Re-exports all collection frames
+// Collections Module Index - Re-exports collection constructors and helpers
 
-// Import all collection frames
 import std.collections.linkedlist as list;
 import std.collections.hash as hash;
 import std.collections.queue as queue;
 import std.collections.vector as vector;
 
-// Re-export frames for easy access
-// In Limit, variables can hold frame types for instantiation
-pub var LinkedList = list.LinkedList;
-pub var HashMap = hash.HashMap;
-pub var HashSet = hash.HashSet;
-pub var Queue = queue.Queue;
-pub var PriorityQueue = queue.PriorityQueue;
-pub var Stack = queue.Stack;
-pub var Vector = vector.Vector;
-pub var Deque = vector.Deque;
-pub var ArrayList = vector.ArrayList;
-pub var RingBuffer = vector.RingBuffer;
-pub var BitSet = queue.BitSet;
+pub fn LinkedList(): list.LinkedList { return list.LinkedList(); }
+pub fn HashMap(): hash.HashMap { return hash.HashMap(); }
+pub fn HashSet(): hash.HashSet { return hash.HashSet(); }
+pub fn Queue(): queue.Queue { return queue.Queue(); }
+pub fn PriorityQueue(comparator: any): queue.PriorityQueue { return queue.PriorityQueue(comparator); }
+pub fn Stack(): queue.Stack { return queue.Stack(); }
+pub fn Vector(initial_capacity: int = 8): vector.Vector { return vector.Vector(initial_capacity); }
+pub fn Deque(): vector.Deque { return vector.Deque(); }
+pub fn ArrayList(): vector.ArrayList { return vector.ArrayList(); }
+pub fn RingBuffer(capacity: int = 16): vector.RingBuffer { return vector.RingBuffer(capacity); }
+pub fn BitSet(size: int): queue.BitSet { return queue.BitSet(size); }
 
 fn main(): int {
     return 0;

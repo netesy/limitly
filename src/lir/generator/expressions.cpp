@@ -809,17 +809,21 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
             }
             set_current_block(end_block);
         } else {
-            uint32_t end_label = generate_label();
             if (expr.op == LM::Frontend::TokenType::AND) {
                 emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, left, 0));
-                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, Type::Void, 0, left, 0, end_label));
+                size_t jump_to_patch = current_function_->instructions.size();
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, Type::Void, 0, left, 0, 0));
+                Reg right = emit_expr(*expr.right);
+                emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, right, 0));
+                current_function_->instructions[jump_to_patch].imm = current_function_->instructions.size();
             } else {
                 emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, left, 0));
-                emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, left, 0, end_label));
+                size_t jump_to_patch = current_function_->instructions.size();
+                emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, left, 0, 0));
+                Reg right = emit_expr(*expr.right);
+                emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, right, 0));
+                current_function_->instructions[jump_to_patch].imm = current_function_->instructions.size();
             }
-            Reg right = emit_expr(*expr.right);
-            emit_instruction(LIR_Inst(LIR_Op::Mov, Type::Bool, result, right, 0));
-            emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, end_label, 0, 0));
         }
         return result;
     }
@@ -1344,10 +1348,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         }
 
         // --- 3. Frame instantiation ---
-        if (expr.inferred_type && expr.inferred_type->tag == ::TypeTag::Frame) {
-            auto ft = std::get<FrameType>(expr.inferred_type->extra);
-            func_name = ft.name;
-        }
+        func_name = resolve_qualified_frame_name(func_name);
         auto frame_it = frame_table_.find(func_name);
         if (frame_it != frame_table_.end()) {
             LIR_Inst new_inst(LIR_Op::NewFrame, Type::Ptr, result, 0, 0, (uint32_t)frame_it->second.total_field_size);
@@ -1392,7 +1393,6 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         // --- 4. Normal function call ---
         if (!current_module_.empty() && current_module_ != "root" && func_name.find('.') == std::string::npos) {
             std::string qname = current_module_ + "." + func_name;
-            std::cout << "[DEBUG] emit_call_expr: func_name=" << func_name << ", current_module_=" << current_module_ << ", qname=" << qname << ", has_func=" << function_table_.count(qname) << std::endl;
             if (function_table_.count(qname) || LIRFunctionManager::getInstance().hasFunction(qname)) vm_name = qname;
         }
         
@@ -1606,7 +1606,8 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::String)) {
             if (method_name == "append") {
                 if (arg_regs.size() > 1) {
-                    emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, object_reg, arg_regs[1], 0));
+                    Reg append_result = allocate_register();
+                    emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, append_result, object_reg, arg_regs[1]));
                 }
                 return 0;
             }
@@ -1622,17 +1623,20 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         
         if (object_type && object_type->tag == TypeTag::Channel) {
             LIR_Op op = LIR_Op::Call; 
-            if (method_name == "send") op = LIR_Op::ChannelSend;
-            else if (method_name == "recv") op = LIR_Op::ChannelRecv;
+            if (method_name == "send" || method_name == "push") op = LIR_Op::ChannelSend;
+            else if (method_name == "recv" || method_name == "pop") op = LIR_Op::ChannelRecv;
             else if (method_name == "close") op = LIR_Op::ChannelClose;
+            else if (method_name == "offer") op = LIR_Op::ChannelOffer;
+            else if (method_name == "poll") op = LIR_Op::ChannelPoll;
+            else if (method_name == "has_data") op = LIR_Op::ChannelHasData;
             
             if (op != LIR_Op::Call) {
                 LIR_Inst call_inst;
                 call_inst.op = op; 
                 call_inst.dst = result;
                 call_inst.a = object_reg;
-                if (!arg_regs.empty()) {
-                    call_inst.b = arg_regs[0];
+                if (arg_regs.size() > 1) {
+                    call_inst.b = arg_regs[1];
                 } else {
                     call_inst.b = UINT32_MAX;
                 }
@@ -1908,9 +1912,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 }
             } else {
                 // Fallback: search all frames
-                std::cout << "[DEBUG] Fallback searching for assignment field: " << field_name << " in module " << current_module_ << std::endl;
                 for (const auto& [frame_name, frame_info] : frame_table_) {
-                    std::cout << "  checking frame in table: " << frame_name << std::endl;
                     auto offset_it = frame_info.field_offsets.find(field_name);
                     if (offset_it != frame_info.field_offsets.end()) {
                         // Found the field - emit FrameSetField

@@ -163,13 +163,13 @@ pub fn list_directory(path: str): [str]?IOError {
             for (var i = 0; i < len(s); i = i + 1) {
                 var ch = substring(s, i, i + 1);
                 if (ch == "\n") {
-                    if (len(current) > 0) parts = parts + [current];
+                    if (len(current) > 0) parts.append(current);
                     current = "";
                 } else {
                     current = current + ch;
                 }
             }
-            if (len(current) > 0) parts = parts + [current];
+            if (len(current) > 0) parts.append(current);
             return ok(parts);
         },
         err e => return err(UnknownError(message="fail"))

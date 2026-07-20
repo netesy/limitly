@@ -30,11 +30,6 @@ void RegisterVM::execute_comparison(const LIR::LIR_Inst* pc) {
                 LmBox* b1 = (LmBox*)h1;
                 LmBox* b2 = (LmBox*)h2;
                 if (b1->type == LM_BOX_STRING && b2->type == LM_BOX_STRING) {
-                    std::cout << "[DEBUG] execute_comparison: " << (char*)b1->value.as_ptr 
-                              << " (len=" << strlen((char*)b1->value.as_ptr) << ")"
-                              << " op " << static_cast<int>(pc->op) << " " << (char*)b2->value.as_ptr 
-                              << " (len=" << strlen((char*)b2->value.as_ptr) << ")"
-                              << " -> cmp=" << cmp << " -> result=" << result << std::endl;
                 }
             }
         }

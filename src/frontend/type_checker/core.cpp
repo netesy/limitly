@@ -158,7 +158,10 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                         }
                     }
                 }
-                for (const auto& [alias, path_] : checker.import_aliases) this->import_aliases[alias] = path_;
+                // Do not merge a dependency module's lexical import aliases into the
+                // importing/root checker. Aliases are scoped to the source file that
+                // declares the import; leaking them globally makes unrelated modules
+                // resolve through one another and weakens module namespace isolation.
             }
         }
     }

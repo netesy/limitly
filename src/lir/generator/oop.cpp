@@ -127,7 +127,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     }
     
     // Create function with parameters (including 'this' as first parameter)
-    size_t total_params = method.parameters.size() + 1; // +1 for 'this'
+    size_t total_params = method.parameters.size() + method.optionalParams.size() + 1; // +1 for 'this'
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
     next_register_ = total_params;
     next_label_ = 0;
@@ -154,6 +154,13 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     for (size_t i = 0; i < method.parameters.size(); ++i) {
         size_t reg_index = i + 1; // +1 for 'this'
         bind_variable(method.parameters[i].first, static_cast<Reg>(reg_index));
+        set_register_type(static_cast<Reg>(reg_index), nullptr);
+    }
+    
+    // Register optional parameters
+    for (size_t i = 0; i < method.optionalParams.size(); ++i) {
+        size_t reg_index = method.parameters.size() + i + 1; // +1 for 'this'
+        bind_variable(method.optionalParams[i].first, static_cast<Reg>(reg_index));
         set_register_type(static_cast<Reg>(reg_index), nullptr);
     }
     
@@ -203,6 +210,12 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
         lir_param.type = Type::I64;
         params.push_back(lir_param);
     }
+    for (const auto& optional_param : method.optionalParams) {
+        LIRParameter lir_param;
+        lir_param.name = optional_param.first;
+        lir_param.type = Type::I64;
+        params.push_back(lir_param);
+    }
     
     // Create function with I64 return type for now
     auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
@@ -229,7 +242,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     }
     
     // Create function with parameters (including 'this' as first parameter)
-    size_t total_params = init_method.parameters.size() + 1; // +1 for 'this'
+    size_t total_params = init_method.parameters.size() + init_method.optionalParams.size() + 1; // +1 for 'this'
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
     next_register_ = total_params;
     next_label_ = 0;
@@ -256,6 +269,13 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     for (size_t i = 0; i < init_method.parameters.size(); ++i) {
         size_t reg_index = i + 1; // +1 for 'this'
         bind_variable(init_method.parameters[i].first, static_cast<Reg>(reg_index));
+        set_register_type(static_cast<Reg>(reg_index), nullptr);
+    }
+    
+    // Register optional init parameters
+    for (size_t i = 0; i < init_method.optionalParams.size(); ++i) {
+        size_t reg_index = init_method.parameters.size() + i + 1; // +1 for 'this'
+        bind_variable(init_method.optionalParams[i].first, static_cast<Reg>(reg_index));
         set_register_type(static_cast<Reg>(reg_index), nullptr);
     }
     
@@ -302,6 +322,12 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
         LIRParameter lir_param;
         lir_param.name = param.first;
         // Convert type - for now use I64 as default
+        lir_param.type = Type::I64;
+        params.push_back(lir_param);
+    }
+    for (const auto& optional_param : init_method.optionalParams) {
+        LIRParameter lir_param;
+        lir_param.name = optional_param.first;
         lir_param.type = Type::I64;
         params.push_back(lir_param);
     }
@@ -429,37 +455,49 @@ void Generator::emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt) {
 
 
 std::string Generator::resolve_qualified_frame_name(const std::string& name) {
-    std::cout << "[DEBUG] resolve_qualified_frame_name: " << name << " in module " << current_module_ << std::endl;
-    for (auto& alias : import_aliases_) std::cout << "  alias: " << alias.first << " -> " << alias.second << std::endl;
-    for (auto& k : frame_table_) std::cout << "  frame_table key: " << k.first << std::endl;
+    std::string resolved = name;
     if (name.find('.') != std::string::npos) {
         size_t dot_pos = name.find('.');
         std::string mod_alias = name.substr(0, dot_pos);
         std::string frame_part = name.substr(dot_pos + 1);
         auto it = import_aliases_.find(mod_alias);
         if (it != import_aliases_.end()) {
-            return it->second + "." + frame_part;
+            resolved = it->second + "." + frame_part;
         }
-        return name;
-    }
-    
-    // First try current module
-    if (!current_module_.empty() && current_module_ != "root") {
-        std::string qname = current_module_ + "." + name;
-        if (frame_table_.count(qname)) {
-            return qname;
+    } else {
+        if (!current_module_.empty() && current_module_ != "root") {
+            std::string qname = current_module_ + "." + name;
+            if (frame_table_.count(qname)) {
+                return qname;
+            }
         }
-    }
-    
-    // Then try all imported module paths from import_aliases_
-    for (const auto& [alias, mod_path] : import_aliases_) {
-        std::string qname = mod_path + "." + name;
-        if (frame_table_.count(qname)) {
-            return qname;
+        for (const auto& [alias, mod_path] : import_aliases_) {
+            std::string qname = mod_path + "." + name;
+            if (frame_table_.count(qname)) {
+                return qname;
+            }
         }
     }
-    
-    return name;
+
+    if (frame_table_.count(resolved)) {
+        return resolved;
+    }
+
+    // Fallback: search by suffix (e.g. ".PriorityQueue" or "PriorityQueue")
+    std::string suffix = name;
+    size_t last_dot = name.rfind('.');
+    if (last_dot != std::string::npos) {
+        suffix = name.substr(last_dot + 1);
+    }
+
+    for (const auto& [frame_key, frame_info] : frame_table_) {
+        if (frame_key == suffix || (frame_key.length() > suffix.length() && 
+            frame_key.substr(frame_key.length() - suffix.length() - 1) == "." + suffix)) {
+            return frame_key;
+        }
+    }
+
+    return resolved;
 }
 
 

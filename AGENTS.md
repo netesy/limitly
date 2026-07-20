@@ -16,6 +16,11 @@ This document provides essential guidelines for AI agents generating code for th
 - [FAIL] `List<T>` / `Dict<K, V>` - Generic collections are NOT implemented (use `[int]` or `{str: int}`).
 - [FAIL] `Option<T>` / `Result<T, E>` - Generic option/result types are NOT supported as built-in generics (use option/result union types or standard library wrappers).
 
+### **List Concatenation**
+- [FAIL] `list1 + list2` - List concatenation using the `+` operator is NOT supported.
+- [OK] **Use `append(list, item)`** instead to add a single item to a list.
+- [OK] **Use `append(list, other_list)`** to append all elements from another list.
+
 ---
 
 ## [OK] **USE - Supported Features**

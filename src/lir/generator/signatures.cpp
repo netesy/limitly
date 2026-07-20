@@ -62,7 +62,23 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         if (path == "root" || !module || !module->ast) continue;
         
         std::string prev_mod = current_module_;
+        auto prev_import_aliases = import_aliases_;
         current_module_ = path;
+        import_aliases_.clear();
+        for (const auto& stmt : module->ast->statements) {
+            if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+                std::string alias;
+                if (import_stmt->alias.has_value()) {
+                    alias = import_stmt->alias.value();
+                } else {
+                    size_t last_dot = import_stmt->modulePath.find_last_of('.');
+                    alias = (last_dot != std::string::npos)
+                        ? import_stmt->modulePath.substr(last_dot + 1)
+                        : import_stmt->modulePath;
+                }
+                import_aliases_[alias] = import_stmt->modulePath;
+            }
+        }
 
         // 1a. First pass: Collect all function signatures in the module
         for (const auto& stmt : module->ast->statements) {

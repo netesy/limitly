@@ -144,6 +144,8 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     auto saved_reg_abi_types = std::move(register_abi_types_);
     auto saved_reg_lang_types = std::move(register_language_types_);
     auto saved_cfg_context = cfg_context_;
+    Reg saved_env_register = env_register_;
+    Reg saved_this_register = this_register_;
 
     // Create function with parameters (including optional parameters)
     size_t total_params = fn.params.size() + fn.optionalParams.size();
@@ -181,6 +183,12 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         size_t reg_index = fn.params.size() + i;
         bind_variable(fn.optionalParams[i].first, static_cast<Reg>(reg_index));
         set_register_type(static_cast<Reg>(reg_index), nullptr);
+    }
+    
+    // Register environment parameter if this is a closure
+    if (is_closure) {
+        bind_variable("__env", env_register_);
+        set_register_type(env_register_, nullptr);
     }
     
     // Emit function body
@@ -246,6 +254,8 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     register_abi_types_ = std::move(saved_reg_abi_types);
     register_language_types_ = std::move(saved_reg_lang_types);
     cfg_context_ = saved_cfg_context;
+    env_register_ = saved_env_register;
+    this_register_ = saved_this_register;
 }
 
 
