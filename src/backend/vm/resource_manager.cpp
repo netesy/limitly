@@ -80,6 +80,9 @@ const char* register_value_to_cstr(RegisterValue val) {
         LmBox* box = (LmBox*)h;
         if (box->type == LM_BOX_STRING) return (const char*)box->value.as_ptr;
     }
+    if (h->type_id == TYPE_STRING) {
+        return (const char*)h + sizeof(ObjHeader);
+    }
     return nullptr;
 }
 

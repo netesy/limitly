@@ -86,6 +86,10 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
         LIRParameter lir_param;
         lir_param.name = param.first;
         lir_param.type = Type::I64;
+        if (param.second) {
+            auto lang_type = convert_ast_type_to_lir_type(param.second);
+            lir_param.type = language_type_to_abi_type(lang_type);
+        }
         params.push_back(lir_param);
     }
     
@@ -154,14 +158,22 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     for (size_t i = 0; i < method.parameters.size(); ++i) {
         size_t reg_index = i + 1; // +1 for 'this'
         bind_variable(method.parameters[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr lang_type = nullptr;
+        if (method.parameters[i].second) {
+            lang_type = convert_ast_type_to_lir_type(method.parameters[i].second);
+        }
+        set_register_language_type(static_cast<Reg>(reg_index), lang_type);
     }
     
     // Register optional parameters
     for (size_t i = 0; i < method.optionalParams.size(); ++i) {
         size_t reg_index = method.parameters.size() + i + 1; // +1 for 'this'
         bind_variable(method.optionalParams[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr lang_type = nullptr;
+        if (method.optionalParams[i].second.first) {
+            lang_type = convert_ast_type_to_lir_type(method.optionalParams[i].second.first);
+        }
+        set_register_language_type(static_cast<Reg>(reg_index), lang_type);
     }
     
     // Emit method body
@@ -208,12 +220,20 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
         lir_param.name = param.first;
         // Convert type - for now use I64 as default
         lir_param.type = Type::I64;
+        if (param.second) {
+            auto lang_type = convert_ast_type_to_lir_type(param.second);
+            lir_param.type = language_type_to_abi_type(lang_type);
+        }
         params.push_back(lir_param);
     }
     for (const auto& optional_param : method.optionalParams) {
         LIRParameter lir_param;
         lir_param.name = optional_param.first;
         lir_param.type = Type::I64;
+        if (optional_param.second.first) {
+            auto lang_type = convert_ast_type_to_lir_type(optional_param.second.first);
+            lir_param.type = language_type_to_abi_type(lang_type);
+        }
         params.push_back(lir_param);
     }
     
@@ -269,14 +289,22 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     for (size_t i = 0; i < init_method.parameters.size(); ++i) {
         size_t reg_index = i + 1; // +1 for 'this'
         bind_variable(init_method.parameters[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr lang_type = nullptr;
+        if (init_method.parameters[i].second) {
+            lang_type = convert_ast_type_to_lir_type(init_method.parameters[i].second);
+        }
+        set_register_language_type(static_cast<Reg>(reg_index), lang_type);
     }
     
     // Register optional init parameters
     for (size_t i = 0; i < init_method.optionalParams.size(); ++i) {
         size_t reg_index = init_method.parameters.size() + i + 1; // +1 for 'this'
         bind_variable(init_method.optionalParams[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr lang_type = nullptr;
+        if (init_method.optionalParams[i].second.first) {
+            lang_type = convert_ast_type_to_lir_type(init_method.optionalParams[i].second.first);
+        }
+        set_register_language_type(static_cast<Reg>(reg_index), lang_type);
     }
     
     // Emit init method body
@@ -323,12 +351,20 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
         lir_param.name = param.first;
         // Convert type - for now use I64 as default
         lir_param.type = Type::I64;
+        if (param.second) {
+            auto lang_type = convert_ast_type_to_lir_type(param.second);
+            lir_param.type = language_type_to_abi_type(lang_type);
+        }
         params.push_back(lir_param);
     }
     for (const auto& optional_param : init_method.optionalParams) {
         LIRParameter lir_param;
         lir_param.name = optional_param.first;
         lir_param.type = Type::I64;
+        if (optional_param.second.first) {
+            auto lang_type = convert_ast_type_to_lir_type(optional_param.second.first);
+            lir_param.type = language_type_to_abi_type(lang_type);
+        }
         params.push_back(lir_param);
     }
     

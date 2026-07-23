@@ -136,6 +136,25 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
     size_t needed_registers = required_register_count(function);
     if (registers.size() < needed_registers) registers.resize(needed_registers, VAL_NIL);
 
+    std::unordered_map<uint32_t, size_t> saved_label_map = current_label_map_;
+    current_label_map_.clear();
+    for (size_t i = 0; i < function.instructions.size(); ++i) {
+        if (function.instructions[i].op == LIR::LIR_Op::Label) {
+            current_label_map_[function.instructions[i].dst] = i;
+        }
+    }
+
+    struct LabelMapGuard {
+        std::unordered_map<uint32_t, size_t>& map;
+        std::unordered_map<uint32_t, size_t> saved;
+        LabelMapGuard(std::unordered_map<uint32_t, size_t>& m, std::unordered_map<uint32_t, size_t> s)
+            : map(m), saved(s) {}
+        ~LabelMapGuard() {
+            map = saved;
+        }
+    };
+    LabelMapGuard label_map_guard(current_label_map_, saved_label_map);
+
     const LIR::LIR_Inst* instructions_ptr = function.instructions.data();
     const LIR::LIR_Inst* pc = instructions_ptr + start_pc;
     const LIR::LIR_Inst* end_ptr = instructions_ptr + (end_pc < function.instructions.size() ? end_pc : function.instructions.size());

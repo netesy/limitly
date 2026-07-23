@@ -159,6 +159,7 @@ private:
     std::unordered_map<int64_t, ErrorInfo> error_table;
     
     const LIR::LIR_Function* current_function_ = nullptr;
+    std::unordered_map<uint32_t, size_t> current_label_map_;
     std::unordered_map<std::string, RegisterValue> globals_;
     std::unique_ptr<TypeSystem> type_system;
     

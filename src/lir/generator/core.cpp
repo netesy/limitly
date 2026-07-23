@@ -175,14 +175,22 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     // Register regular parameters
     for (size_t i = 0; i < fn.params.size(); ++i) {
         bind_variable(fn.params[i].first, static_cast<Reg>(i));
-        set_register_type(static_cast<Reg>(i), nullptr);
+        TypePtr lang_type = nullptr;
+        if (fn.params[i].second) {
+            lang_type = convert_ast_type_to_lir_type(fn.params[i].second);
+        }
+        set_register_language_type(static_cast<Reg>(i), lang_type);
     }
     
     // Register optional parameters
     for (size_t i = 0; i < fn.optionalParams.size(); ++i) {
         size_t reg_index = fn.params.size() + i;
         bind_variable(fn.optionalParams[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr lang_type = nullptr;
+        if (fn.optionalParams[i].second.first) {
+            lang_type = convert_ast_type_to_lir_type(fn.optionalParams[i].second.first);
+        }
+        set_register_language_type(static_cast<Reg>(reg_index), lang_type);
     }
     
     // Register environment parameter if this is a closure
@@ -216,12 +224,20 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         LIRParameter lir_param;
         lir_param.name = param.first;
         lir_param.type = Type::I64;
+        if (param.second) {
+            auto lang_type = convert_ast_type_to_lir_type(param.second);
+            lir_param.type = language_type_to_abi_type(lang_type);
+        }
         params.push_back(lir_param);
     }
     for (const auto& optional_param : fn.optionalParams) {
         LIRParameter lir_param;
         lir_param.name = optional_param.first;
         lir_param.type = Type::I64;
+        if (optional_param.second.first) {
+            auto lang_type = convert_ast_type_to_lir_type(optional_param.second.first);
+            lir_param.type = language_type_to_abi_type(lang_type);
+        }
         params.push_back(lir_param);
     }
     
@@ -960,6 +976,19 @@ bool Generator::validate_cfg() {
 std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& ast_type) {
     if (!ast_type) {
         return nullptr;
+    }
+
+    if (ast_type->isList) {
+        return std::make_shared<::Type>(::TypeTag::List);
+    }
+    if (ast_type->isDict) {
+        return std::make_shared<::Type>(::TypeTag::Dict);
+    }
+    if (ast_type->isTuple) {
+        return std::make_shared<::Type>(::TypeTag::Tuple);
+    }
+    if (ast_type->isUnion) {
+        return std::make_shared<::Type>(::TypeTag::Union);
     }
     
     // Convert AST type to LIR type

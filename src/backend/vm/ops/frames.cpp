@@ -19,20 +19,30 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             break;
         case LIR::LIR_Op::FrameGetField:
             if (IS_PTR(registers[pc->a])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && pc->b >= 0 && pc->b < f->field_count) {
-                    registers[pc->dst] = f->fields[pc->b];
+                ObjHeader* header = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
+                if (header && header->type_id == TYPE_FRAME) {
+                    LmFrame* f = (LmFrame*)header;
+                    if (pc->b >= 0 && pc->b < f->field_count) {
+                        registers[pc->dst] = f->fields[pc->b];
+                    } else {
+                        registers[pc->dst] = VAL_NIL;
+                    }
                 } else {
-                    registers[pc->dst] = 0;
+                    registers[pc->dst] = VAL_NIL;
                 }
+            } else {
+                registers[pc->dst] = VAL_NIL;
             }
             break;
         case LIR::LIR_Op::FrameSetField:
             // pc->dst holds the frame pointer (container), pc->b holds the value.
             if (IS_PTR(registers[pc->dst])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->dst]);
-                if (f && pc->a >= 0 && pc->a < f->field_count) {
-                    f->fields[pc->a] = registers[pc->b];
+                ObjHeader* header = (ObjHeader*)UNBOX_PTR(registers[pc->dst]);
+                if (header && header->type_id == TYPE_FRAME) {
+                    LmFrame* f = (LmFrame*)header;
+                    if (pc->a >= 0 && pc->a < f->field_count) {
+                        f->fields[pc->a] = registers[pc->b];
+                    }
                 }
             }
             break;
@@ -41,9 +51,14 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             // (the runtime helpers are also non-atomic underneath; the
             // distinction exists for future memory-model work).
             if (IS_PTR(registers[pc->a])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && pc->b >= 0 && pc->b < f->field_count) {
-                    registers[pc->dst] = lm_frame_get_field_atomic(f, (int)pc->b);
+                ObjHeader* header = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
+                if (header && header->type_id == TYPE_FRAME) {
+                    LmFrame* f = (LmFrame*)header;
+                    if (pc->b >= 0 && pc->b < f->field_count) {
+                        registers[pc->dst] = lm_frame_get_field_atomic(f, (int)pc->b);
+                    } else {
+                        registers[pc->dst] = VAL_NIL;
+                    }
                 } else {
                     registers[pc->dst] = VAL_NIL;
                 }
@@ -53,25 +68,34 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             break;
         case LIR::LIR_Op::FrameSetFieldAtomic:
             if (IS_PTR(registers[pc->dst])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->dst]);
-                if (f && pc->a >= 0 && pc->a < f->field_count) {
-                    lm_frame_set_field_atomic(f, (int)pc->a, registers[pc->b]);
+                ObjHeader* header = (ObjHeader*)UNBOX_PTR(registers[pc->dst]);
+                if (header && header->type_id == TYPE_FRAME) {
+                    LmFrame* f = (LmFrame*)header;
+                    if (pc->a >= 0 && pc->a < f->field_count) {
+                        lm_frame_set_field_atomic(f, (int)pc->a, registers[pc->b]);
+                    }
                 }
             }
             break;
         case LIR::LIR_Op::FrameFieldAtomicAdd:
             if (IS_PTR(registers[pc->a])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && pc->b >= 0 && pc->b < f->field_count) {
-                    lm_frame_field_atomic_add(f, (int)pc->b, registers[pc->dst]);
+                ObjHeader* header = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
+                if (header && header->type_id == TYPE_FRAME) {
+                    LmFrame* f = (LmFrame*)header;
+                    if (pc->b >= 0 && pc->b < f->field_count) {
+                        lm_frame_field_atomic_add(f, (int)pc->b, registers[pc->dst]);
+                    }
                 }
             }
             break;
         case LIR::LIR_Op::FrameFieldAtomicSub:
             if (IS_PTR(registers[pc->a])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && pc->b >= 0 && pc->b < f->field_count) {
-                    lm_frame_field_atomic_sub(f, (int)pc->b, registers[pc->dst]);
+                ObjHeader* header = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
+                if (header && header->type_id == TYPE_FRAME) {
+                    LmFrame* f = (LmFrame*)header;
+                    if (pc->b >= 0 && pc->b < f->field_count) {
+                        lm_frame_field_atomic_sub(f, (int)pc->b, registers[pc->dst]);
+                    }
                 }
             }
             break;
