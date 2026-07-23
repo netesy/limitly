@@ -1,0 +1,12 @@
+import std.scene.node as node;
+import std.graphics.transform as transform;
+
+frame TransformNode {
+    pub var base_node: node.Node;
+    pub var local_transform: transform.Transform;
+
+    pub init(b: node.Node = node.Node(), t: transform.Transform = transform.Transform()) {
+        self.base_node = b;
+        self.local_transform = t;
+    }
+}

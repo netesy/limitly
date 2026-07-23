@@ -1,0 +1,77 @@
+// Standard Library Graphics Module Index
+// Re-exports all graphics primitives and types
+
+import std.graphics.canvas as canvas;
+import std.graphics.renderer as renderer;
+import std.graphics.surface as surface;
+import std.graphics.paint as paint;
+import std.graphics.brush as brush;
+import std.graphics.color as color;
+import std.graphics.gradient as gradient;
+import std.graphics.image as image;
+import std.graphics.texture as texture;
+import std.graphics.font as font;
+import std.graphics.text_layout as text_layout;
+import std.graphics.path as path;
+import std.graphics.shape as shape;
+import std.graphics.rect as rect;
+import std.graphics.circle as circle;
+import std.graphics.ellipse as ellipse;
+import std.graphics.polygon as polygon;
+import std.graphics.transform as transform;
+import std.graphics.matrix as matrix;
+import std.graphics.vector2 as vector2;
+import std.graphics.vector3 as vector3;
+import std.graphics.animation as animation;
+import std.graphics.shader as shader;
+import std.graphics.backend as backend;
+
+// Re-export common types and helper constructors
+var Canvas = canvas.Canvas;
+var Renderer = renderer.Renderer;
+var Surface = surface.Surface;
+var Paint = paint.Paint;
+var Brush = brush.Brush;
+var Color = color.Color;
+var Gradient = gradient.Gradient;
+var Image = image.Image;
+var Texture = texture.Texture;
+var Font = font.Font;
+var TextLayout = text_layout.TextLayout;
+var Path = path.Path;
+var Shape = shape.Shape;
+var Rect = rect.Rect;
+var Circle = circle.Circle;
+var Ellipse = ellipse.Ellipse;
+var Polygon = polygon.Polygon;
+var Transform = transform.Transform;
+var Matrix = matrix.Matrix;
+var Vector2 = vector2.Vector2;
+var Vector3 = vector3.Vector3;
+var Animation = animation.Animation;
+var Shader = shader.Shader;
+var Backend = backend.Backend;
+
+fn rgb(r: int, g: int, b: int): Color {
+    return color.rgb(r, g, b);
+}
+
+fn rgba(r: int, g: int, b: int, a: float): Color {
+    return color.rgba(r, g, b, a);
+}
+
+fn lerp(c1: Color, c2: Color, t: float): Color {
+    return color.lerp(c1, c2, t);
+}
+
+fn load_image(filename: str): Image {
+    return image.load(filename);
+}
+
+fn save_image_png(img: Image, filename: str): bool {
+    return image.save_png(img, filename);
+}
+
+fn free_image(img: Image): nil {
+    image.free(img);
+}

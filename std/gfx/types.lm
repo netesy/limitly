@@ -1,9 +1,0 @@
-frame PixelFormat {
-    pub value: int;
-}
-
-fn create_pixel_format(v: int): PixelFormat {
-    var pf = PixelFormat(value=v);
-    pf.value = v;
-    return pf;
-}

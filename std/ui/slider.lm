@@ -1,0 +1,17 @@
+import std.ui.widget as widget;
+
+frame Slider {
+    pub var value: float;
+    pub var min_value: float;
+    pub var max_value: float;
+
+    pub init(v: float = 0.0, mn: float = 0.0, mx: float = 1.0) {
+        self.value = v;
+        self.min_value = mn;
+        self.max_value = mx;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

@@ -1,0 +1,11 @@
+frame Texture {
+    pub var width: int;
+    pub var height: int;
+    pub var handle: int;
+
+    pub init(w: int = 0, h: int = 0, hnd: int = 0) {
+        self.width = w;
+        self.height = h;
+        self.handle = hnd;
+    }
+}

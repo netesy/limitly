@@ -1,0 +1,15 @@
+import std.ui.widget as widget;
+
+frame Radio {
+    pub var selected: bool;
+    pub var value: int;
+
+    pub init(sel: bool = false, val: int = 0) {
+        self.selected = sel;
+        self.value = val;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

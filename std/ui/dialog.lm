@@ -1,0 +1,9 @@
+frame Dialog {
+    pub var title: str;
+    pub var message: str;
+
+    pub init(t: str = "Alert", msg: str = "") {
+        self.title = t;
+        self.message = msg;
+    }
+}

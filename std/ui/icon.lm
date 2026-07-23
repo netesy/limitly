@@ -1,0 +1,15 @@
+import std.ui.widget as widget;
+
+frame Icon {
+    pub var glyph: str;
+    pub var size: float;
+
+    pub init(gl: str = "", sz: float = 24.0) {
+        self.glyph = gl;
+        self.size = sz;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

@@ -1,0 +1,11 @@
+import std.graphics.color as color;
+
+frame Theme {
+    pub var primary_color: color.Color;
+    pub var background_color: color.Color;
+
+    pub init(p: color.Color = color.Color(), bg: color.Color = color.Color()) {
+        self.primary_color = p;
+        self.background_color = bg;
+    }
+}
