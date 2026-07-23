@@ -1,0 +1,43 @@
+// Standard Library Core Module Index
+
+import std.core.error as error;
+import std.core.option as opt;
+import std.core.result as res;
+import std.core.comparable as comparable;
+import std.core.disposable as disposable;
+import std.core.cloneable as cloneable;
+import std.core.hashable as hashable;
+
+// Frames and Constructors
+pub fn Error(code: str, message: str): error.Error {
+    return error.Error(code, message);
+}
+
+pub var Option = opt.Option;
+pub var Result = res.Result;
+
+pub fn Some(value: any): opt.Option {
+    return opt.Some(value);
+}
+
+pub fn None(): opt.Option {
+    return opt.None();
+}
+
+pub fn Ok(value: any): res.Result {
+    return res.Ok(value);
+}
+
+pub fn Err(e: error.Error): res.Result {
+    return res.Err(e);
+}
+
+// Traits
+pub var Comparable = comparable.Comparable;
+pub var Disposable = disposable.Disposable;
+pub var Cloneable = cloneable.Cloneable;
+pub var Hashable = hashable.Hashable;
+
+fn main(): int {
+    return 0;
+}

@@ -48,6 +48,8 @@ void RegisterVM::execute_cast(const LIR::LIR_Inst* pc) {
                 registers[pc->dst] = make_float(as_float(val));
             } else if (pc->result_type == LIR::Type::Bool) {
                 registers[pc->dst] = to_bool(val) ? VAL_TRUE : VAL_FALSE;
+            } else {
+                registers[pc->dst] = val;
             }
             break;
         }
