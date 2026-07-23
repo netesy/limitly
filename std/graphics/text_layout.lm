@@ -1,0 +1,13 @@
+import std.graphics.font as font;
+
+frame TextLayout {
+    pub var text: str;
+    pub var font_val: font.Font;
+    pub var max_width: float;
+
+    pub init(txt: str = "", f: font.Font = font.Font(), max_w: float = 10000.0) {
+        self.text = txt;
+        self.font_val = f;
+        self.max_width = max_w;
+    }
+}

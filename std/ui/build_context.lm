@@ -1,0 +1,7 @@
+frame BuildContext {
+    pub var depth: int;
+
+    pub init(d: int = 0) {
+        self.depth = d;
+    }
+}

@@ -1,0 +1,11 @@
+frame Font {
+    pub var family: str;
+    pub var size: float;
+    pub var weight: int;
+
+    pub init(fam: str = "Sans", sz: float = 12.0, wt: int = 400) {
+        self.family = fam;
+        self.size = sz;
+        self.weight = wt;
+    }
+}

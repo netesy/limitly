@@ -1,0 +1,29 @@
+import std.ui.widget as widget;
+
+frame Navigation {
+    pub var stack: [widget.Widget];
+
+    pub init(st: [widget.Widget] = []) {
+        self.stack = st;
+    }
+
+    pub fn push(w: widget.Widget): nil {
+        self.stack = self.stack + [w];
+    }
+
+    pub fn pop(): widget.Widget {
+        var n = len(self.stack);
+        if (n == 0) {
+            return widget.Widget();
+        }
+        var last = self.stack[n - 1];
+        var next_stack: [widget.Widget] = [];
+        var i = 0;
+        while (i < n - 1) {
+            next_stack[i] = self.stack[i];
+            i = i + 1;
+        }
+        self.stack = next_stack;
+        return last;
+    }
+}

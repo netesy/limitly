@@ -1,0 +1,13 @@
+import std.ui.widget as widget;
+
+frame Spacer {
+    pub var flex: int;
+
+    pub init(f: int = 1) {
+        self.flex = f;
+    }
+
+    pub fn build(): widget.Widget {
+        return self;
+    }
+}

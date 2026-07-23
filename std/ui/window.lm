@@ -1,0 +1,15 @@
+import std.ui.widget as widget;
+
+frame Window {
+    pub var title: str;
+    pub var width: float;
+    pub var height: float;
+    pub var root_widget: widget.Widget;
+
+    pub init(t: str = "Window", w: float = 800.0, h: float = 600.0, root: widget.Widget = widget.Widget()) {
+        self.title = t;
+        self.width = w;
+        self.height = h;
+        self.root_widget = root;
+    }
+}

@@ -1,0 +1,20 @@
+frame Matrix {
+    pub var data: [float]; // 16 elements (4x4 matrix)
+
+    pub init() {
+        self.data = [
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0
+        ];
+    }
+
+    pub fn get(row: int, col: int): float {
+        return self.data[row * 4 + col];
+    }
+
+    pub fn set(row: int, col: int, val: float): nil {
+        self.data[row * 4 + col] = val;
+    }
+}

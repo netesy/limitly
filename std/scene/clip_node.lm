@@ -1,0 +1,12 @@
+import std.scene.node as node;
+import std.graphics.rect as rect;
+
+frame ClipNode {
+    pub var base_node: node.Node;
+    pub var clip_rect: rect.Rect;
+
+    pub init(b: node.Node = node.Node(), r: rect.Rect = rect.Rect()) {
+        self.base_node = b;
+        self.clip_rect = r;
+    }
+}

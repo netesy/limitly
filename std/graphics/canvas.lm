@@ -1,0 +1,20 @@
+import std.graphics.rect as rect;
+import std.graphics.paint as paint;
+import std.graphics.color as color;
+import std.graphics.path as path;
+import std.graphics.image as image;
+
+frame Canvas {
+    pub var width: float;
+    pub var height: float;
+
+    pub init(w: float = 800.0, h: float = 600.0) {
+        self.width = w;
+        self.height = h;
+    }
+
+    pub fn draw_rect(r: rect.Rect, p: paint.Paint): nil {}
+    pub fn draw_color(c: color.Color): nil {}
+    pub fn draw_image(img: image.Image, x: float, y: float): nil {}
+    pub fn draw_path(p: path.Path, paint_obj: paint.Paint): nil {}
+}

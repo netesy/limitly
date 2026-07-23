@@ -1,0 +1,23 @@
+frame Path {
+    pub var commands: [int]; // 0 = MoveTo, 1 = LineTo, 2 = QuadTo, 3 = CubicTo, 4 = Close
+    pub var points: [float];
+
+    pub init(cmds: [int] = [], pts: [float] = []) {
+        self.commands = cmds;
+        self.points = pts;
+    }
+
+    pub fn move_to(x: float, y: float): nil {
+        self.commands = self.commands + [0];
+        self.points = self.points + [x, y];
+    }
+
+    pub fn line_to(x: float, y: float): nil {
+        self.commands = self.commands + [1];
+        self.points = self.points + [x, y];
+    }
+
+    pub fn close(): nil {
+        self.commands = self.commands + [4];
+    }
+}

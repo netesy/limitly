@@ -1,0 +1,23 @@
+import std.math as math;
+
+frame Vector2 {
+    pub var x: float;
+    pub var y: float;
+    
+    pub init(x: float = 0.0, y: float = 0.0) {
+        self.x = x;
+        self.y = y;
+    }
+    
+    pub fn add(other: Vector2): Vector2 { return Vector2(self.x + other.x, self.y + other.y); }
+    pub fn sub(other: Vector2): Vector2 { return Vector2(self.x - other.x, self.y - other.y); }
+    pub fn scale(s: float): Vector2 { return Vector2(self.x * s, self.y * s); }
+    pub fn dot(other: Vector2): float { return self.x * other.x + self.y * other.y; }
+    pub fn mag(): float { return math.sqrt(self.x * self.x + self.y * self.y); }
+    
+    pub fn normalize(): Vector2 {
+        var m = self.mag();
+        if (m == 0.0) return Vector2();
+        return self.scale(1.0 / m);
+    }
+}

@@ -1,0 +1,13 @@
+frame Viewport {
+    pub var x: float;
+    pub var y: float;
+    pub var width: float;
+    pub var height: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, w: float = 800.0, h: float = 600.0) {
+        self.x = x;
+        self.y = y;
+        self.width = w;
+        self.height = h;
+    }
+}

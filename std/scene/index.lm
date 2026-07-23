@@ -1,0 +1,28 @@
+// Standard Library Scene Graph Module Index
+
+import std.scene.scene as scene;
+import std.scene.node as node;
+import std.scene.layer as layer;
+import std.scene.group as group;
+import std.scene.camera as camera;
+import std.scene.viewport as viewport;
+import std.scene.transform_node as transform_node;
+import std.scene.clip_node as clip_node;
+import std.scene.effect_node as effect_node;
+import std.scene.animation_node as animation_node;
+import std.scene.hit_test as hit_test;
+import std.scene.scene_builder as scene_builder;
+
+// Re-export frames and helpers
+var Scene = scene.Scene;
+var Node = node.Node;
+var Layer = layer.Layer;
+var Group = group.Group;
+var Camera = camera.Camera;
+var Viewport = viewport.Viewport;
+var TransformNode = transform_node.TransformNode;
+var ClipNode = clip_node.ClipNode;
+var EffectNode = effect_node.EffectNode;
+var AnimationNode = animation_node.AnimationNode;
+var HitTest = hit_test.HitTest;
+var SceneBuilder = scene_builder.SceneBuilder;

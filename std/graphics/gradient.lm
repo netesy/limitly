@@ -1,0 +1,11 @@
+import std.graphics.color as color;
+
+frame Gradient {
+    pub var colors: [color.Color];
+    pub var type_val: int; // 0 = linear, 1 = radial
+
+    pub init(cols: [color.Color] = [], t: int = 0) {
+        self.colors = cols;
+        self.type_val = t;
+    }
+}
