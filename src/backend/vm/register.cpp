@@ -142,9 +142,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
 
     while (pc < end_ptr) {
         instruction_count++;
-        if (instruction_count >= 5000 && instruction_count < 5200) {
-            std::cout << "[DEBUG_EXEC_INF] pc=" << (pc - instructions_ptr) << " op=" << LIR::lir_op_to_string(pc->op) << " name=" << pc->func_name << " function=" << function.name << std::endl;
-        }
         if (instruction_count > MAX_INSTRUCTIONS) { std::cerr << "Instruction limit exceeded at " << (int)pc->op << " " << instruction_count << std::endl; return; }
 
         // Bounds check for register indices

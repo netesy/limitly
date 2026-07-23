@@ -46,7 +46,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 }
             }
             int64_t id = rm.create(type, create_args);
-            std::cout << "[DEBUG] ResourceCreate, type = " << static_cast<int>(type) << ", id = " << id << std::endl;
             registers[pc->dst] = (id != -1) ? BOX_INT(id) : VAL_NIL;
             break;
         }
@@ -61,7 +60,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             }
             
             std::vector<RegisterValue> args;
-            std::cout << "[DEBUG] ResourceCall, pc->call_args.size() = " << pc->call_args.size() << std::endl;
             // Arguments list is in call_args[2] if called via resource_call intrinsic
             size_t args_idx = (pc->call_args.size() > 2) ? 2 : 0;
             if (!pc->call_args.empty() && pc->call_args[args_idx] != UINT32_MAX) {

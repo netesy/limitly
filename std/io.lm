@@ -2,6 +2,7 @@
 
 import std.core as core;
 import std.resource as res;
+import std.internal.runtime as rt;
 
 frame FileNotFound { pub var path: str; }
 frame PermissionDenied { pub var path: str; pub var operation: str; }
@@ -67,7 +68,7 @@ frame File {
     pub fn read(): str?IOError {
         var r = self.reader.read(args=[]);
         if (r == nil) return err(UnknownError(message="fail"));
-        return ok(r as str);
+        return ok(r);
     }
 
     pub fn write(content: str): nil?IOError {
@@ -77,10 +78,11 @@ frame File {
     }
 
     pub fn close(): nil?IOError {
-        match (self.resource.close()) {
-            val v => return ok(nil),
-            err e => return err(UnknownError(message="fail"))
+        if (self.resource.is_open_val) {
+            rt.destroy(self.resource.handle);
+            self.resource.is_open_val = false;
         }
+        return ok(nil);
     }
 
     pub fn is_open(): bool {

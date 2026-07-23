@@ -162,94 +162,81 @@ pub frame Stack {
 }
 
 pub frame BitSet {
-    pub var words: [int];
+    var w0: int;
+    var w1: int;
+    var w2: int;
+    var w3: int;
     var size: int;
+    var used: int;
 
     pub init(size: int = 64) {
-        self.words = [] as [int];
+        self.w0 = 0; self.w1 = 0; self.w2 = 0; self.w3 = 0; self.used = 0;
         self.size = size;
-        if (self.size < 1) {
-            self.size = 1;
-        }
-        var word_count = (self.size + 63) / 64;
-        var i = 0;
-        while (i < word_count) {
-            self.words.append(0);
-            i = i + 1;
-        }
+        if (self.size < 1) { self.size = 1; }
     }
 
     fn _mask(bit: int): int {
-        return 1 << (bit % 64);
+        var offset = bit % 64; var mask = 1; var i = 0;
+        while (i < offset) { mask = mask * 2; i = i + 1; }
+        return mask;
     }
 
-    fn _valid(bit: int): bool {
-        return bit >= 0 and bit < self.size;
+    fn _valid(bit: int): bool { return bit >= 0 and bit < self.size; }
+
+    fn _word_value(word: int): int {
+        if (word == 0) return self.w0; if (word == 1) return self.w1; if (word == 2) return self.w2; return self.w3;
+    }
+
+    fn _set_word(word: int, value: int) {
+        if (word == 0) { self.w0 = value; } elif (word == 1) { self.w1 = value; } elif (word == 2) { self.w2 = value; } else { self.w3 = value; }
     }
 
     pub fn set(bit: int) {
-        if (self._valid(bit)) {
-            var word = bit / 64;
-            self.words[word] = self.words[word] | self._mask(bit);
+        if (self._valid(bit) and not self.contains(bit)) {
+            var word = bit / 64; self._set_word(word, self._word_value(word) + self._mask(bit));
+            self.used = self.used + 1;
         }
     }
 
     pub fn unset(bit: int) {
         if (self.contains(bit)) {
-            var word = bit / 64;
-            self.words[word] = self.words[word] ^ self._mask(bit);
+            var word = bit / 64; self._set_word(word, self._word_value(word) - self._mask(bit));
+            self.used = self.used - 1;
         }
     }
 
     pub fn toggle(bit: int) {
-        if (self._valid(bit)) {
-            var word = bit / 64;
-            self.words[word] = self.words[word] ^ self._mask(bit);
-        }
+        if (self.contains(bit)) { self.unset(bit); } elif (self._valid(bit)) { var word = bit / 64; self._set_word(word, self._word_value(word) + self._mask(bit)); self.used = self.used + 1; }
     }
 
     pub fn contains(bit: int): bool {
-        if (not self._valid(bit)) {
-            return false;
-        }
-        var word = bit / 64;
-        return (self.words[word] & self._mask(bit)) != 0;
+        if (not self._valid(bit)) { return false; }
+        var word = bit / 64; var mask = self._mask(bit);
+        return ((self._word_value(word) / mask) % 2) == 1;
     }
 
-    pub fn get(bit: int): bool {
-        return self.contains(bit);
-    }
+    pub fn get(bit: int): bool { return self.contains(bit); }
 
-    pub fn count(): int {
-        var total = 0;
-        var bit = 0;
-        while (bit < self.size) {
-            if (self.contains(bit)) {
-                total = total + 1;
-            }
-            bit = bit + 1;
-        }
-        return total;
-    }
+    pub fn count(): int { return self.used; }
 
-    pub fn get_size(): int {
-        return self.size;
-    }
+    pub fn get_size(): int { return self.size; }
 
-    pub fn iterator(): BitSetIterator {
-        return BitSetIterator(bitset=self, current=0);
-    }
+    pub fn iterator(): BitSetIterator { return BitSetIterator(bitset=self, current=0, yielded=0); }
 }
-
 pub frame BitSetIterator {
     var bitset: BitSet;
     var current: int;
+    var yielded: int;
 
     pub fn next(): any {
+        if (self.yielded >= self.bitset.count()) {
+            return nil;
+        }
         while (self.current < self.bitset.get_size()) {
             if (self.bitset.contains(self.current)) {
                 var result = self.current;
                 self.current = self.current + 1;
+                self.yielded = self.yielded + 1;
                 return result;
             }
             self.current = self.current + 1;
