@@ -88,6 +88,8 @@ tests = [
     "tests/stdlib/sort/sort_test.lm",
     # Stdlib - Path
     "tests/stdlib/path/path_test.lm",
+    # Stdlib - SemVer
+    "tests/stdlib/semver_test.lm",
     # Stdlib - FS
     "tests/stdlib/fs/fs_test.lm",
     # Stdlib - Crypto
@@ -114,6 +116,7 @@ slow_tests = {
     "tests/stdlib/wss/wss_test.lm",
     "tests/stdlib/fs/fs_test.lm",
     "tests/stdlib/io/io_extended_test.lm",
+    "tests/stdlib/semver_test.lm",
 }
 
 passed = 0

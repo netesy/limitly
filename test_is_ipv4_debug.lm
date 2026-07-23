@@ -1,45 +1,11 @@
-import std.net.dns as dns;
+import std.semver as semver;
 
-fn debug_is_ipv4(address: str): bool {
-    var parts: [str] = dns.split_string(address, ".");
-    print("parts: ");
-    print(parts);
-    print("len: ");
-    print(len(parts));
-    if (len(parts) != 4) {
-        print("Failed len(parts) != 4");
-        return false;
-    }
-    var i: int = 0;
-    while (i < 4) {
-        var part: str = parts[i];
-        print("part i: ");
-        print(part);
-        if (len(part) == 0 or len(part) > 3) {
-            print("Failed part len");
-            return false;
-        }
-        var j: int = 0;
-        while (j < len(part)) {
-            var ch: str = _builtin_substring(part, j, j + 1);
-            print("char: ");
-            print(ch);
-            if (ch < "0" or ch > "9") {
-                print("Failed char check");
-                return false;
-            }
-            j = j + 1;
-        }
-        var val_int: int = part as int;
-        print("val_int: ");
-        print(val_int);
-        if (val_int < 0 or val_int > 255) {
-            print("Failed val_int bounds");
-            return false;
-        }
-        i = i + 1;
-    }
-    return true;
+fn main(): int {
+    var v1 = semver.parse("1.2.3-alpha.1+build.12")? else { return 0; };
+    var major = v1.major;
+    var minor = v1.minor;
+    var patch = v1.patch;
+    var res = "{major}.{minor}.{patch}";
+    print("res: "); print(res);
+    return 0;
 }
-
-print(debug_is_ipv4("127.0.0.1"));
