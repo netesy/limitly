@@ -611,7 +611,6 @@ public:
             }
             case ResourceOperation::EXISTS: {
                 const char* path = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
-                std::cout << "[DEBUG] EXISTS check for path: '" << (path ? path : "NULL") << "'" << std::endl;
                 if (!path) return VAL_FALSE;
                 return std::filesystem::exists(path) ? VAL_TRUE : VAL_FALSE;
             }
