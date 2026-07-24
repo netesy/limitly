@@ -32,6 +32,9 @@ pub frame Vector {
     }
 
     fn _grow_for(count: int) {
+        if (self.capacity < 1) {
+            self.capacity = 1;
+        }
         while (self.capacity < count) {
             self.capacity = self.capacity * 2;
         }
@@ -98,6 +101,14 @@ pub frame Vector {
     }
 
     pub fn len(): int {
+        return self.size;
+    }
+
+    pub fn length(): int {
+        return self.size;
+    }
+
+    pub fn size(): int {
         return self.size;
     }
 
@@ -240,6 +251,14 @@ pub frame Deque {
         return len(self.data);
     }
 
+    pub fn length(): int {
+        return len(self.data);
+    }
+
+    pub fn size(): int {
+        return len(self.data);
+    }
+
     pub fn iterator(): Iterator {
         return VectorIterator(self.data, len(self.data));
     }
@@ -278,6 +297,14 @@ pub frame ArrayList {
 
     pub fn len(): int {
         return self.data.len();
+    }
+
+    pub fn length(): int {
+        return self.data.length();
+    }
+
+    pub fn size(): int {
+        return self.data.size();
     }
 
     pub fn iterator(): Iterator {
@@ -322,6 +349,14 @@ pub frame RingBuffer {
     }
 
     pub fn len(): int {
+        return self.count;
+    }
+
+    pub fn length(): int {
+        return self.count;
+    }
+
+    pub fn size(): int {
         return self.count;
     }
 }

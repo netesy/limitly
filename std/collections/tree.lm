@@ -1,11 +1,11 @@
 // Standard Library TreeMap (AVL Tree implementation)
 
 frame AVLNode {
-    pub var key: any;
-    pub var value: any;
-    pub var left: any;  // AVLNode?
-    pub var right: any; // AVLNode?
-    pub var height: int;
+    pub key: any;
+    pub value: any;
+    pub left: any;  // AVLNode?
+    pub right: any; // AVLNode?
+    pub height: int;
     
     pub init(key: any, value: any) {
         self.key = key;
@@ -17,8 +17,8 @@ frame AVLNode {
 }
 
 frame TreeMap {
-    var root: any; // AVLNode?
-    var size: int;
+    pub root: any; // AVLNode?
+    pub size: int;
     
     pub init() {
         self.root = nil;
@@ -32,49 +32,58 @@ frame TreeMap {
     pub fn get(key: any): any {
         var curr = self.root;
         while (curr != nil) {
-            if (key == curr.key) return curr.value;
-            if (key < curr.key) curr = curr.left;
-            else curr = curr.right;
+            var n = curr as AVLNode;
+            if (key == n.key) return n.value;
+            if (key < n.key) curr = n.left;
+            else curr = n.right;
         }
         return nil;
     }
     
     pub fn len(): int { return self.size; }
+    pub fn length(): int { return self.size; }
     
     fn _get_height(node: any): int {
         if (node == nil) return 0;
-        return node.height;
+        var n = node as AVLNode;
+        return n.height;
     }
     
     fn _get_balance(node: any): int {
         if (node == nil) return 0;
-        return self._get_height(node.left) - self._get_height(node.right);
+        var n = node as AVLNode;
+        return self._get_height(n.left) - self._get_height(n.right);
     }
     
     fn _update_height(node: any) {
-        var hl = self._get_height(node.left);
-        var hr = self._get_height(node.right);
-        if (hl > hr) node.height = hl + 1;
-        else node.height = hr + 1;
+        var n = node as AVLNode;
+        var hl = self._get_height(n.left);
+        var hr = self._get_height(n.right);
+        if (hl > hr) n.height = hl + 1;
+        else n.height = hr + 1;
     }
     
     fn _rotate_right(y: any): any {
-        var x = y.left;
-        var T2 = x.right;
-        x.right = y;
-        y.left = T2;
-        self._update_height(y);
-        self._update_height(x);
+        var y_node = y as AVLNode;
+        var x = y_node.left;
+        var x_node = x as AVLNode;
+        var T2 = x_node.right;
+        x_node.right = y_node;
+        y_node.left = T2;
+        self._update_height(y_node);
+        self._update_height(x_node);
         return x;
     }
     
     fn _rotate_left(x: any): any {
-        var y = x.right;
-        var T2 = y.left;
-        y.left = x;
-        x.right = T2;
-        self._update_height(x);
-        self._update_height(y);
+        var x_node = x as AVLNode;
+        var y = x_node.right;
+        var y_node = y as AVLNode;
+        var T2 = y_node.left;
+        y_node.left = x_node;
+        x_node.right = T2;
+        self._update_height(x_node);
+        self._update_height(y_node);
         return y;
     }
     
@@ -84,42 +93,55 @@ frame TreeMap {
             return AVLNode(key, value);
         }
         
-        if (key < node.key) {
-            node.left = self._insert(node.left, key, value);
-        } else if (key > node.key) {
-            node.right = self._insert(node.right, key, value);
+        var n = node as AVLNode;
+        if (key < n.key) {
+            n.left = self._insert(n.left, key, value);
+        } else if (key > n.key) {
+            n.right = self._insert(n.right, key, value);
         } else {
-            node.value = value;
-            return node;
+            n.value = value;
+            return n;
         }
         
-        self._update_height(node);
-        var balance = self._get_balance(node);
+        self._update_height(n);
+        var balance = self._get_balance(n);
         
         // Left Left Case
-        if (balance > 1 and key < node.left.key) return self._rotate_right(node);
+        if (balance > 1) {
+            var n_left = n.left as AVLNode;
+            if (key < n_left.key) return self._rotate_right(n);
+        }
         
         // Right Right Case
-        if (balance < -1 and key > node.right.key) return self._rotate_left(node);
+        if (balance < -1) {
+            var n_right = n.right as AVLNode;
+            if (key > n_right.key) return self._rotate_left(n);
+        }
         
         // Left Right Case
-        if (balance > 1 and key > node.left.key) {
-            node.left = self._rotate_left(node.left);
-            return self._rotate_right(node);
+        if (balance > 1) {
+            var n_left = n.left as AVLNode;
+            if (key > n_left.key) {
+                n.left = self._rotate_left(n.left);
+                return self._rotate_right(n);
+            }
         }
         
         // Right Left Case
-        if (balance < -1 and key < node.right.key) {
-            node.right = self._rotate_right(node.right);
-            return self._rotate_left(node);
+        if (balance < -1) {
+            var n_right = n.right as AVLNode;
+            if (key < n_right.key) {
+                n.right = self._rotate_right(n.right);
+                return self._rotate_left(n);
+            }
         }
         
-        return node;
+        return n;
     }
 }
 
 frame TreeSet {
-    var map: TreeMap;
+    pub map: TreeMap;
     
     pub init() {
         self.map = TreeMap();
@@ -134,12 +156,14 @@ frame TreeSet {
     }
     
     pub fn len(): int { return self.map.len(); }
+    pub fn length(): int { return self.map.length(); }
 }
 
 frame BTree {
-    var map: TreeMap;
+    pub map: TreeMap;
     pub init() { self.map = TreeMap(); }
     pub fn put(key: any, value: any) { self.map.put(key, value); }
     pub fn get(key: any): any { return self.map.get(key); }
     pub fn len(): int { return self.map.len(); }
+    pub fn length(): int { return self.map.length(); }
 }

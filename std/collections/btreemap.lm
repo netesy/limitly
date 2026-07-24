@@ -1,0 +1,23 @@
+// Standard Library BTreeMap Collection
+
+import std.collections.tree as tree;
+
+frame BTreeMapWrapper {
+    pub impl: tree.TreeMap;
+
+    pub init() {
+        self.impl = tree.TreeMap();
+    }
+
+    pub fn put(key: any, value: any) {
+        self.impl.put(key, value);
+    }
+
+    pub fn get(key: any): any {
+        return self.impl.get(key);
+    }
+
+    pub fn length(): int {
+        return self.impl.length();
+    }
+}
