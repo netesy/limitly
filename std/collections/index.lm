@@ -1,21 +1,37 @@
 // Collections Module Index - Re-exports collection constructors and helpers
 
-import std.collections.linkedlist as list;
-import std.collections.hash as hash;
-import std.collections.queue as queue;
+import std.collections.list as list_mod;
 import std.collections.vector as vector;
+import std.collections.deque as deque;
+import std.collections.linked_list as linked_list;
+import std.collections.map as map;
+import std.collections.hashmap as hashmap;
+import std.collections.btreemap as btreemap;
+import std.collections.set as set;
+import std.collections.hashset as hashset;
+import std.collections.btreeset as btreeset;
+import std.collections.queue as queue;
+import std.collections.stack as stack;
+import std.collections.priority_queue as priority_queue;
+import std.collections.bitset as bitset;
+import std.collections.bloom_filter as bloom_filter;
 
-pub fn LinkedList(): list.LinkedList { return list.LinkedList(); }
-pub fn HashMap(): hash.HashMap { return hash.HashMap(); }
-pub fn HashSet(): hash.HashSet { return hash.HashSet(); }
-pub fn Queue(): queue.Queue { return queue.Queue(); }
-pub fn PriorityQueue(comparator: any): queue.PriorityQueue { return queue.PriorityQueue(comparator); }
-pub fn Stack(): queue.Stack { return queue.Stack(); }
-pub fn Vector(initial_capacity: int = 8): vector.Vector { return vector.Vector(initial_capacity); }
-pub fn Deque(): vector.Deque { return vector.Deque(); }
-pub fn ArrayList(): vector.ArrayList { return vector.ArrayList(); }
-pub fn RingBuffer(capacity: int = 16): vector.RingBuffer { return vector.RingBuffer(capacity); }
-pub fn BitSet(size: int): queue.BitSet { return queue.BitSet(size); }
+// Frames / Constructors
+pub fn List(): any { return list_mod.List(); }
+pub fn Vector(initial_capacity: int = 8): any { return vector.Vector(initial_capacity); }
+pub fn Deque(): any { return deque.DoubleEndedQueue(); }
+pub fn LinkedList(): any { return linked_list.DLL(); }
+pub fn Map(): any { return map.HashMapWrapper(); }
+pub fn HashMap(): any { return hashmap.HashMap(_keys=[] as [str], _values=[] as [int]); }
+pub fn BTreeMap(): any { return btreemap.BTreeMapWrapper(); }
+pub fn Set(): any { return set.Set(elements=[] as [int]); }
+pub fn HashSet(): any { return hashset.HashSetWrapper(); }
+pub fn BTreeSet(): any { return btreeset.BTreeSetWrapper(); }
+pub fn Queue(): any { return queue.Queue(); }
+pub fn Stack(): any { return stack.Stack(); }
+pub fn PriorityQueue(comparator: any): any { return priority_queue.PriorityQueueWrapper(comparator); }
+pub fn BitSet(size: int): any { return bitset.BitSetWrapper(size); }
+pub fn BloomFilter(size: int = 256, num_hashes: int = 3): any { return bloom_filter.BloomFilter(size, num_hashes); }
 
 fn main(): int {
     return 0;

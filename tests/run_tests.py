@@ -64,6 +64,7 @@ tests = [
     "tests/stdlib/core/math_test.lm",
     "tests/stdlib/core/option_result_test.lm",
     "tests/stdlib/core/string_option_result_test.lm",
+    "tests/stdlib/core_module_test.lm",
     # Stdlib - IO
     "tests/stdlib/io/io_test.lm",
     "tests/stdlib/io/io_extended_test.lm",
@@ -74,6 +75,7 @@ tests = [
     "tests/stdlib/collections/queue_stack_bitset_test.lm",
     "tests/stdlib/collections/arraylist_test.lm",
     "tests/stdlib/collections/priority_queue_test.lm",
+    "tests/stdlib/collections_module_test.lm",
     # Stdlib - Collections - Tree (skip - requires trait method dispatch support)
     # "tests/stdlib/collections/tree_test.lm",
     # Stdlib - Iterator

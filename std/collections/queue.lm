@@ -21,7 +21,7 @@ pub frame Queue {
     }
 
     pub fn length(): int {
-        return self.data.len();
+        return self.data.length();
     }
 
     pub fn len(): int {
@@ -58,12 +58,12 @@ pub frame PriorityQueue {
 
     pub fn push(item: any) {
         self.heap.push(item);
-        var current_len = self.heap.len();
+        var current_len = self.heap.length();
         self._sift_up(current_len - 1);
     }
 
     pub fn peek(): any {
-        if (self.heap.len() == 0) {
+        if (self.heap.length() == 0) {
             return nil;
         }
         return self.heap.data[0];
@@ -74,21 +74,21 @@ pub frame PriorityQueue {
     }
 
     pub fn pop(): any {
-        var n = self.heap.len();
+        var n = self.heap.length();
         if (n == 0) {
             return nil;
         }
         var result = self.heap.data[0];
         self.heap.data[0] = self.heap.data[n - 1];
         self.heap.pop();
-        if (self.heap.len() > 0) {
+        if (self.heap.length() > 0) {
             self._sift_down(0);
         }
         return result;
     }
 
     pub fn len(): int {
-        return self.heap.len();
+        return self.heap.length();
     }
 
     pub fn length(): int {
@@ -110,7 +110,7 @@ pub frame PriorityQueue {
     }
 
     fn _sift_down(idx: int) {
-        var n = self.heap.len();
+        var n = self.heap.length();
         while (true) {
             var smallest = idx;
             var left = 2 * idx + 1;
@@ -153,7 +153,7 @@ pub frame Stack {
     }
 
     pub fn len(): int {
-        return self.data.len();
+        return self.data.length();
     }
 
     pub fn length(): int {

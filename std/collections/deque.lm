@@ -1,0 +1,39 @@
+// Standard Library Deque Collection
+
+import std.collections.vector as vector;
+
+frame DoubleEndedQueue {
+    pub impl: vector.Deque;
+
+    pub init() {
+        self.impl = vector.Deque();
+    }
+
+    pub fn push_back(item: any) {
+        self.impl.push_back(item);
+    }
+
+    pub fn push_front(item: any) {
+        self.impl.push_front(item);
+    }
+
+    pub fn pop_back(): any {
+        return self.impl.pop_back();
+    }
+
+    pub fn pop_front(): any {
+        return self.impl.pop_front();
+    }
+
+    pub fn peek_back(): any {
+        return self.impl.peek_back();
+    }
+
+    pub fn peek_front(): any {
+        return self.impl.peek_front();
+    }
+
+    pub fn length(): int {
+        return self.impl.length();
+    }
+}
