@@ -1,0 +1,43 @@
+// Standard Library Algorithm Sort Module
+
+import std.sort as s;
+
+pub fn sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+    s.sort(items, descending, cmp);
+}
+
+pub fn quicksort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+    s.quicksort(items, descending, cmp);
+}
+
+pub fn mergesort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+    s.mergesort(items, descending, cmp);
+}
+
+pub fn heapsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+    s.heapsort(items, descending, cmp);
+}
+
+pub fn insertion_sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+    s.insertion_sort(items, descending, cmp);
+}
+
+pub fn counting_sort(items: [int], descending: bool = false) {
+    s.counting_sort(items, descending);
+}
+
+pub fn radix_sort(items: [int], descending: bool = false) {
+    s.radix_sort(items, descending);
+}
+
+pub fn timsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+    s.timsort(items, descending, cmp);
+}
+
+pub fn stable_sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
+    s.stable_sort(items, descending, cmp);
+}
+
+pub fn partial_sort(items: [any], count: int, descending: bool = false, cmp: fn(any, any): int = nil) {
+    s.partial_sort(items, count, descending, cmp);
+}

@@ -1,0 +1,47 @@
+// Standard Library Algorithm Search Module
+
+import std.search as s;
+
+pub fn find(items: [any], target: any): int {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (items[i] == target) return i;
+    }
+    return -1;
+}
+
+pub fn find_if(items: [any], p: fn(any): bool): int {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (p(items[i])) return i;
+    }
+    return -1;
+}
+
+pub fn any_match(items: [any], p: fn(any): bool): bool {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (p(items[i])) return true;
+    }
+    return false;
+}
+
+pub fn none(items: [any], p: fn(any): bool): bool {
+    return not any_match(items, p);
+}
+
+pub fn all(items: [any], p: fn(any): bool): bool {
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (not p(items[i])) return false;
+    }
+    return true;
+}
+
+pub fn count(items: [any], target: any): int {
+    var c = 0;
+    for (var i = 0; i < len(items); i = i + 1) {
+        if (items[i] == target) c = c + 1;
+    }
+    return c;
+}
+
+pub fn linear_search(items: [any], target: any): int {
+    return s.linear_search(items, target);
+}
