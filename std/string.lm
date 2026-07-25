@@ -1,6 +1,19 @@
 // Standard Library String Module
 // Unified implementation of string utilities
 
+fn char_code(ch: str): int {
+    var alphabet = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    var i = 0;
+    var l = len(alphabet);
+    while (i < l) {
+        if (_builtin_substring(alphabet, i, i + 1) == ch) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return 999;
+}
+
 frame String {
     pub var value: str;
 
@@ -48,6 +61,74 @@ frame String {
     
     pub fn ends_with(suffix: str): bool {
         return ends_with(self.value, suffix);
+    }
+
+    pub fn substring(start: int, end: int): str {
+        if (start < 0) return "";
+        var l = len(self.value);
+        var end_idx = end;
+        if (end_idx > l) end_idx = l;
+        if (start >= l) return "";
+        return _builtin_substring(self.value, start, end_idx);
+    }
+
+    pub fn char_at(index: int): str {
+        if (index < 0 or index >= len(self.value)) return "";
+        return _builtin_substring(self.value, index, index + 1);
+    }
+
+    pub fn repeat(count: int): str {
+        var res = "";
+        var i = 0;
+        while (i < count) {
+            res = res + self.value;
+            i = i + 1;
+        }
+        return res;
+    }
+
+    pub fn pad_left(width: int, fill: str = " "): str {
+        var n = width - len(self.value);
+        if (n <= 0) return self.value;
+        return String(value=fill).repeat(n) + self.value;
+    }
+
+    pub fn pad_right(width: int, fill: str = " "): str {
+        var n = width - len(self.value);
+        if (n <= 0) return self.value;
+        return self.value + String(value=fill).repeat(n);
+    }
+
+    pub fn index_of(sub: str): int {
+        if (sub == "") return 0;
+        var sub_len = len(sub);
+        var val_len = len(self.value);
+        if (sub_len > val_len) return -1;
+
+        var i = 0;
+        while (i <= val_len - sub_len) {
+            if (_builtin_substring(self.value, i, i + sub_len) == sub) {
+                return i;
+            }
+            i = i + 1;
+        }
+        return -1;
+    }
+
+    pub fn last_index_of(sub: str): int {
+        if (sub == "") return len(self.value);
+        var sub_len = len(sub);
+        var val_len = len(self.value);
+        if (sub_len > val_len) return -1;
+
+        var i = val_len - sub_len;
+        while (i >= 0) {
+            if (_builtin_substring(self.value, i, i + sub_len) == sub) {
+                return i;
+            }
+            i = i - 1;
+        }
+        return -1;
     }
 }
 
@@ -256,9 +337,26 @@ pub fn uppercase(value: str): str {
 }
 
 pub fn compare(left: str, right: str): int {
-    if (left < right) { return -1; }
-    if (left > right) { return 1; }
-    return 0;
+    if (left == right) return 0;
+    var len_l = len(left);
+    var len_r = len(right);
+    var min_len = len_l;
+    if (len_r < min_len) min_len = len_r;
+
+    var i = 0;
+    while (i < min_len) {
+        var ch_l = _builtin_substring(left, i, i + 1);
+        var ch_r = _builtin_substring(right, i, i + 1);
+        if (ch_l != ch_r) {
+            var code_l = char_code(ch_l);
+            var code_b = char_code(ch_r);
+            if (code_l < code_b) return -1;
+            return 1;
+        }
+        i = i + 1;
+    }
+    if (len_l < len_r) return -1;
+    return 1;
 }
 
 pub fn substr(value: str, start: int, end: int): str {

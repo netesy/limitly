@@ -1,0 +1,205 @@
+// Standard Library Regex Module
+
+import std.core as core;
+
+frame Regex {
+    pub var pattern: str;
+    pub var flags: int;  // Simple flag system: 1=case_insensitive, 2=multiline, 4=global
+
+    pub init(pattern: str, flags: int) {
+        self.pattern = pattern;
+        self.flags = flags;
+    }
+
+    // Basic pattern matching
+    pub fn matches(text: str): bool {
+        return self.find_first_match(text) != nil;
+    }
+
+    pub fn find_first_match(text: str): any {
+        // Simple regex engine implementation for basic patterns
+        if (self.pattern == "" or text == "") {
+            return nil;
+        }
+
+        var m = self.simple_match(text, 0);
+        if (m == nil) {
+            return nil;
+        }
+
+        return m;
+    }
+
+    pub fn find_all_matches(text: str): [str] {
+        var results: [str] = [];
+        var start_pos = 0;
+        var keep_going = true;
+        while (start_pos < len(text) and keep_going == true) {
+            var match_start = self.find_match_start(text, start_pos);
+            if (match_start == -1) {
+                keep_going = false;
+            } else {
+                var m = self.simple_match(text, start_pos);
+                var match_str = m as str;
+                results.append(match_str);
+                start_pos = match_start + len(match_str);
+            }
+        }
+        return results;
+    }
+
+    // Replacement operations
+    pub fn replace(text: str, replacement: str): str {
+        var result = "";
+        var start_pos = 0;
+        var keep_going = true;
+
+        while (start_pos < len(text) and keep_going == true) {
+            var m = self.simple_match(text, start_pos);
+            if (m == nil) {
+                result = result + _builtin_substring(text, start_pos, len(text));
+                keep_going = false;
+            } else {
+                var match_str = m as str;
+                var match_start = self.find_match_start(text, start_pos);
+                if (match_start == -1) {
+                    keep_going = false;
+                } else {
+                    result = result + _builtin_substring(text, start_pos, match_start);
+                    result = result + replacement;
+                    start_pos = match_start + len(match_str);
+                    if ((self.flags & 4) == 0) {
+                        result = result + _builtin_substring(text, start_pos, len(text));
+                        keep_going = false;
+                    }
+                }
+            }
+        }
+
+        return result;
+    }
+
+    pub fn replace_all(text: str, replacement: str): str {
+        var regex_with_global = Regex(pattern=self.pattern, flags=self.flags | 4);
+        return regex_with_global.replace(text, replacement);
+    }
+
+    // Splitting operations
+    pub fn split(text: str): [str] {
+        var parts: [str] = [];
+        var start_pos = 0;
+        var keep_going = true;
+
+        while (start_pos <= len(text) and keep_going == true) {
+            var m = self.simple_match(text, start_pos);
+            if (m == nil) {
+                parts.append(_builtin_substring(text, start_pos, len(text)));
+                keep_going = false;
+            } else {
+                var match_str = m as str;
+                var match_start = self.find_match_start(text, start_pos);
+                if (match_start == -1) {
+                    keep_going = false;
+                } else {
+                    parts.append(_builtin_substring(text, start_pos, match_start));
+                    start_pos = match_start + len(match_str);
+                }
+            }
+        }
+
+        return parts;
+    }
+
+    // Utility methods
+    pub fn is_valid(): bool {
+        return self.pattern != "" and self.is_balanced_pattern();
+    }
+
+    pub fn to_string(): str {
+        var flag_str = "";
+        if (self.flags & 1 != 0) flag_str = flag_str + "i";
+        if (self.flags & 2 != 0) flag_str = flag_str + "m";
+        if (self.flags & 4 != 0) flag_str = flag_str + "g";
+
+        return "/" + self.pattern + "/" + flag_str;
+    }
+
+    // Private helper methods
+    pub fn simple_match(text: str, start_pos: int): any {
+        if (self.pattern == "*") {
+            if (start_pos < len(text)) {
+                return _builtin_substring(text, start_pos, start_pos + 1);
+            } else {
+                return nil;
+            }
+        }
+
+        if (self.pattern == ".*") {
+            if (start_pos < len(text)) {
+                return _builtin_substring(text, start_pos, len(text));
+            } else {
+                return nil;
+            }
+        }
+
+        var pattern_to_use = self.pattern;
+        var pos = self.find_match_start(text, start_pos);
+        if (pos != -1 and pos >= start_pos) {
+            return _builtin_substring(text, pos, pos + len(pattern_to_use));
+        }
+
+        return nil;
+    }
+
+    pub fn find_match_start(text: str, start_pos: int): int {
+        var pattern_to_use = self.pattern;
+        var sub_len = len(pattern_to_use);
+        var text_len = len(text);
+        if (sub_len > text_len) return -1;
+
+        var i = start_pos;
+        while (i <= text_len - sub_len) {
+            if (_builtin_substring(text, i, i + sub_len) == pattern_to_use) {
+                return i;
+            }
+            i = i + 1;
+        }
+        return -1;
+    }
+
+    fn is_balanced_pattern(): bool {
+        var open_parens = 0;
+        var open_brackets = 0;
+        var open_braces = 0;
+        var i = 0;
+        var pat_len = len(self.pattern);
+
+        while (i < pat_len) {
+            var ch = _builtin_substring(self.pattern, i, i + 1);
+
+            if (ch == "(") open_parens = open_parens + 1;
+            else if (ch == ")") open_parens = open_parens - 1;
+            else if (ch == "[") open_brackets = open_brackets + 1;
+            else if (ch == "]") open_brackets = open_brackets - 1;
+            else if (ch == "{") open_braces = open_braces + 1;
+            else if (ch == "}") open_braces = open_braces - 1;
+
+            i = i + 1;
+        }
+
+        return open_parens == 0 and open_brackets == 0 and open_braces == 0;
+    }
+}
+
+frame RegexPatterns {
+    pub init() {}
+    pub fn email(): Regex {
+        return Regex(pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", flags=0);
+    }
+    pub fn url(): Regex {
+        return Regex(pattern="https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(/[^\\s]*)?", flags=0);
+    }
+    pub fn phone(): Regex {
+        return Regex(pattern="\\(?([0-9]{3})\\)?[-.\\s]?([0-9]{3})[-.\\s]?([0-9]{4})", flags=0);
+    }
+}
