@@ -1,0 +1,28 @@
+// Standard Library Skip Iterator
+
+import std.iterator.iterator as it;
+
+frame SkipIterator: it.Iterator {
+    var source: it.Iterator;
+    var remaining: int;
+
+    pub init(source: it.Iterator, count: int) {
+        self.source = source;
+        self.remaining = count;
+    }
+
+    pub fn next(): any {
+        while (self.remaining > 0) {
+            var skipped = self.source.next();
+            if (skipped == nil) {
+                return nil;
+            }
+            self.remaining = self.remaining - 1;
+        }
+        return self.source.next();
+    }
+}
+
+pub fn skip(source: it.Iterator, count: int): it.Iterator {
+    return SkipIterator(source=source, count=count);
+}

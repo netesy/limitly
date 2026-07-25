@@ -1,0 +1,199 @@
+// Standard Library Math Arithmetic Module
+
+import std.math.constants as const;
+
+frame Int {
+    pub var value: int;
+    pub init(value: int) {
+        self.value = value;
+    }
+    pub fn abs(): int { if (self.value < 0) return -self.value; return self.value; }
+    pub fn min(other: int): int { if (self.value < other) return self.value; return other; }
+    pub fn max(other: int): int { if (self.value > other) return self.value; return other; }
+}
+
+frame Float {
+    pub var value: float;
+    pub init(value: float) {
+        self.value = value;
+    }
+    pub fn abs(): float { if (self.value < 0.0) return -self.value; return self.value; }
+    pub fn min(other: float): float { if (self.value < other) return self.value; return other; }
+    pub fn max(other: float): float { if (self.value > other) return self.value; return other; }
+
+    // Rounding operations
+    pub fn floor(): int {
+        var i: int = self.value as int;
+        if ((i as float) > self.value) return i - 1;
+        return i;
+    }
+
+    pub fn ceil(): int {
+        var i: int = self.value as int;
+        if ((i as float) < self.value) return i + 1;
+        return i;
+    }
+
+    pub fn round(): int {
+        if (self.value >= 0.0) return Float(self.value + 0.5).floor();
+        return Float(self.value - 0.5).ceil();
+    }
+
+    pub fn trunc(): int { return self.value as int; }
+
+    pub fn fract(): float { return self.value - (self.value as int as float); }
+
+    // Powers and logs
+    pub fn sqrt(): float {
+        if (self.value < 0.0) return const.NAN;
+        if (self.value == 0.0) return 0.0;
+        var x = self.value;
+        var y = 1.0;
+        var e = 0.000000000000001;
+        while (abs(x - y) > e) {
+            x = (x + y) / 2.0;
+            y = self.value / x;
+        }
+        return x;
+    }
+
+    pub fn cbrt(): float {
+        if (self.value == 0.0) return 0.0;
+        var x = self.value;
+        var y = 1.0;
+        if (x < 0.0) {
+            x = -x;
+            while (abs(x - y * y * y) > 0.000000000000001) {
+                y = (2.0 * y + x / (y * y)) / 3.0;
+            }
+            return -y;
+        }
+        while (abs(x - y * y * y) > 0.000000000000001) {
+            y = (2.0 * y + x / (y * y)) / 3.0;
+        }
+        return y;
+    }
+
+    pub fn exp(): float {
+        var x = self.value;
+        var sum = 1.0;
+        var term = 1.0;
+        var i = 1;
+        while (i < 100) {
+            var i_f = i as float;
+            term = term * x / i_f;
+            sum = sum + term;
+            if (abs(term) < 1e-16) return sum;
+            i = i + 1;
+        }
+        return sum;
+    }
+
+    pub fn log(): float {
+        if (self.value <= 0.0) return const.NAN;
+        var x = self.value;
+        var count = 0;
+        while (x > 2.0) {
+            x = x / const.E;
+            count = count + 1;
+        }
+        while (x < 0.5) {
+            x = x * const.E;
+            count = count - 1;
+        }
+        x = x - 1.0;
+        var sum = 0.0;
+        var term = x;
+        var i = 1;
+        while (i < 100) {
+            var i_f = i as float;
+            if (i % 2 == 1) sum = sum + term / i_f;
+            else sum = sum - term / i_f;
+            term = term * x;
+            if (abs(term) < 1e-16) return sum + (count as float);
+            i = i + 1;
+        }
+        return sum + (count as float);
+    }
+
+    pub fn log2(): float { return self.log() / Float(2.0).log(); }
+    pub fn log10(): float { return self.log() / Float(10.0).log(); }
+    pub fn exp2(): float { return Float(self.value * Float(2.0).log()).exp(); }
+
+    pub fn pow(exponent: float): float {
+        if (self.value == 0.0) return 0.0;
+        if (self.value < 0.0) return const.NAN;
+        return Float(exponent * self.log()).exp();
+    }
+
+    pub fn hypot(other: float): float {
+        return Float(self.value * self.value + other * other).sqrt();
+    }
+}
+
+// Basic operations
+pub fn abs(x: float): float { return Float(x).abs(); }
+pub fn abs_int(x: int): int { return Int(x).abs(); }
+
+// Integer utilities
+pub fn gcd(a: int, b: int): int {
+    var x = abs_int(a);
+    var y = abs_int(b);
+    while (y != 0) {
+        var temp = y;
+        y = x % y;
+        x = temp;
+    }
+    return x;
+}
+
+pub fn lcm(a: int, b: int): int {
+    if (a == 0 or b == 0) return 0;
+    return abs_int(a * b) / gcd(a, b);
+}
+
+pub fn factorial(n: int): int {
+    if (n < 0) return 0;
+    if (n == 0) return 1;
+    var res = 1;
+    var i = 1;
+    while (i <= n) {
+        res = res * i;
+        i = i + 1;
+    }
+    return res;
+}
+
+pub fn permutations(n: int, k: int): int {
+    if (k < 0 or k > n) return 0;
+    return factorial(n) / factorial(n - k);
+}
+
+pub fn combinations(n: int, k: int): int {
+    if (k < 0 or k > n) return 0;
+    return factorial(n) / (factorial(k) * factorial(n - k));
+}
+
+pub fn min(a: float, b: float): float { return Float(a).min(b); }
+pub fn max(a: float, b: float): float { return Float(a).max(b); }
+pub fn clamp(value: float, low: float, high: float): float { if (value < low) return low; if (value > high) return high; return value; }
+pub fn sign(x: float): float { if (x > 0.0) return 1.0; if (x < 0.0) return -1.0; return 0.0; }
+pub fn lerp(a: float, b: float, t: float): float { return a + (b - a) * t; }
+
+// Rounding utility functions
+pub fn floor(x: float): int { return Float(x).floor(); }
+pub fn ceil(x: float): int { return Float(x).ceil(); }
+pub fn round(x: float): int { return Float(x).round(); }
+pub fn trunc(x: float): int { return Float(x).trunc(); }
+pub fn fract(x: float): float { return Float(x).fract(); }
+
+// Powers and logs utility functions
+pub fn pow(base: float, exponent: float): float { return Float(base).pow(exponent); }
+pub fn sqrt(x: float): float { return Float(x).sqrt(); }
+pub fn cbrt(x: float): float { return Float(x).cbrt(); }
+pub fn hypot(x: float, y: float): float { return Float(x).hypot(y); }
+pub fn log(x: float): float { return Float(x).log(); }
+pub fn log2(x: float): float { return Float(x).log2(); }
+pub fn log10(x: float): float { return Float(x).log10(); }
+pub fn exp(x: float): float { return Float(x).exp(); }
+pub fn exp2(x: float): float { return Float(x).exp2(); }

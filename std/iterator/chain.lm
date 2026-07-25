@@ -1,0 +1,30 @@
+// Standard Library Chain Iterator
+
+import std.iterator.iterator as it;
+
+frame ChainIterator: it.Iterator {
+    var left: it.Iterator;
+    var right: it.Iterator;
+    var on_left: bool;
+
+    pub init(left: it.Iterator, right: it.Iterator) {
+        self.left = left;
+        self.right = right;
+        self.on_left = true;
+    }
+
+    pub fn next(): any {
+        if (self.on_left == true) {
+            var a = self.left.next();
+            if (a != nil) {
+                return a;
+            }
+            self.on_left = false;
+        }
+        return self.right.next();
+    }
+}
+
+pub fn chain(left: it.Iterator, right: it.Iterator): it.Iterator {
+    return ChainIterator(left=left, right=right);
+}

@@ -1,0 +1,49 @@
+// Standard Library Math Statistics Module
+
+import std.math.arithmetic as arith;
+import std.sort as sort;
+
+pub fn sum(items: [any]): float {
+    var s = 0.0;
+    for (var i = 0; i < len(items); i = i + 1) {
+        s = s + items[i] as float;
+    }
+    return s;
+}
+
+pub fn mean(items: [any]): float {
+    if (len(items) == 0) return 0.0;
+    return sum(items) / (len(items) as float);
+}
+
+pub fn median(items: [any]): float {
+    var n = len(items);
+    if (n == 0) return 0.0;
+
+    // Create copy for sorting
+    var copy = [];
+    for (var i = 0; i < n; i = i + 1) copy = copy + [items[i]];
+    sort.sort(copy, false, nil);
+
+    if (n % 2 == 1) {
+        return copy[n / 2] as float;
+    } else {
+        return (copy[n / 2 - 1] as float + copy[n / 2] as float) / 2.0;
+    }
+}
+
+pub fn variance(items: [any]): float {
+    var n = len(items);
+    if (n < 2) return 0.0;
+    var m = mean(items);
+    var s = 0.0;
+    for (var i = 0; i < n; i = i + 1) {
+        var diff = (items[i] as float) - m;
+        s = s + diff * diff;
+    }
+    return s / (n as float);
+}
+
+pub fn stddev(items: [any]): float {
+    return arith.sqrt(variance(items));
+}

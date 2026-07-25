@@ -1,0 +1,41 @@
+// Standard Library 2D Vector Module
+
+import std.math.arithmetic as arith;
+
+frame Vector2 {
+    pub x: float;
+    pub y: float;
+
+    pub init(x: float, y: float) {
+        self.x = x;
+        self.y = y;
+    }
+
+    pub fn add(other: Vector2): Vector2 {
+        return Vector2(self.x + other.x, self.y + other.y);
+    }
+
+    pub fn sub(other: Vector2): Vector2 {
+        return Vector2(self.x - other.x, self.y - other.y);
+    }
+
+    pub fn scale(s: float): Vector2 {
+        return Vector2(self.x * s, self.y * s);
+    }
+
+    pub fn dot(other: Vector2): float {
+        return self.x * other.x + self.y * other.y;
+    }
+
+    pub fn mag(): float {
+        return arith.sqrt(self.x * self.x + self.y * self.y);
+    }
+
+    pub fn normalize(): Vector2 {
+        var m = self.mag();
+        if (m == 0.0) {
+            return Vector2(0.0, 0.0);
+        }
+        return self.scale(1.0 / m);
+    }
+}

@@ -1,0 +1,25 @@
+// Standard Library Take Iterator
+
+import std.iterator.iterator as it;
+
+frame TakeIterator: it.Iterator {
+    var source: it.Iterator;
+    var remaining: int;
+
+    pub init(source: it.Iterator, count: int) {
+        self.source = source;
+        self.remaining = count;
+    }
+
+    pub fn next(): any {
+        if (self.remaining <= 0) {
+            return nil;
+        }
+        self.remaining = self.remaining - 1;
+        return self.source.next();
+    }
+}
+
+pub fn take(source: it.Iterator, count: int): it.Iterator {
+    return TakeIterator(source=source, count=count);
+}

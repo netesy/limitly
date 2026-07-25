@@ -1,0 +1,9 @@
+// Standard Library Math Constants
+
+pub var PI: float = 3.14159265358979323846;
+pub var E: float = 2.71828182845904523536;
+pub var TAU: float = 6.28318530717958647692;
+pub var PHI: float = 1.61803398874989484820;
+pub var INF: float = 1e300;
+pub var NAN: float = 0.0;
+pub var EPSILON: float = 0.00000000000000022204;

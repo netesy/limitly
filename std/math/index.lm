@@ -1,0 +1,84 @@
+// Standard Library Math Entrypoint Module
+
+import std.math.constants as constants_mod;
+import std.math.arithmetic as arithmetic_mod;
+import std.math.trigonometry as trigonometry_mod;
+import std.math.statistics as statistics_mod;
+import std.math.random as random_mod;
+import std.math.vector2 as vector2_mod;
+import std.math.vector3 as vector3_mod;
+import std.math.vector4 as vector4_mod;
+import std.math.quaternion as quaternion_mod;
+import std.math.matrix as matrix_mod;
+
+// Types
+pub type Vector2 = vector2_mod.Vector2;
+pub type Vector3 = vector3_mod.Vector3;
+pub type Vector4 = vector4_mod.Vector4;
+pub type Quaternion = quaternion_mod.Quaternion;
+pub type Matrix = matrix_mod.Matrix;
+pub type Random = random_mod.Random;
+pub type SecureRandom = random_mod.SecureRandom;
+
+// Constants Re-exports
+pub var PI: float = 3.14159265358979323846;
+pub var E: float = 2.71828182845904523536;
+pub var TAU: float = 6.28318530717958647692;
+pub var PHI: float = 1.61803398874989484820;
+pub var INF: float = 1e300;
+pub var NAN: float = 0.0;
+pub var EPSILON: float = 0.00000000000000022204;
+
+// Arithmetic Re-exports
+pub fn abs(x: float): float { return arithmetic_mod.abs(x); }
+pub fn abs_int(x: int): int { return arithmetic_mod.abs_int(x); }
+pub fn gcd(a: int, b: int): int { return arithmetic_mod.gcd(a, b); }
+pub fn lcm(a: int, b: int): int { return arithmetic_mod.lcm(a, b); }
+pub fn factorial(n: int): int { return arithmetic_mod.factorial(n); }
+pub fn permutations(n: int, k: int): int { return arithmetic_mod.permutations(n, k); }
+pub fn combinations(n: int, k: int): int { return arithmetic_mod.combinations(n, k); }
+pub fn min(a: float, b: float): float { return arithmetic_mod.min(a, b); }
+pub fn max(a: float, b: float): float { return arithmetic_mod.max(a, b); }
+pub fn clamp(value: float, low: float, high: float): float { return arithmetic_mod.clamp(value, low, high); }
+pub fn sign(x: float): float { return arithmetic_mod.sign(x); }
+pub fn lerp(a: float, b: float, t: float): float { return arithmetic_mod.lerp(a, b, t); }
+pub fn floor(x: float): int { return arithmetic_mod.floor(x); }
+pub fn ceil(x: float): int { return arithmetic_mod.ceil(x); }
+pub fn round(x: float): int { return arithmetic_mod.round(x); }
+pub fn trunc(x: float): int { return arithmetic_mod.trunc(x); }
+pub fn fract(x: float): float { return arithmetic_mod.fract(x); }
+pub fn pow(base: float, exponent: float): float { return arithmetic_mod.pow(base, exponent); }
+pub fn sqrt(x: float): float { return arithmetic_mod.sqrt(x); }
+pub fn cbrt(x: float): float { return arithmetic_mod.cbrt(x); }
+pub fn hypot(x: float, y: float): float { return arithmetic_mod.hypot(x, y); }
+pub fn log(x: float): float { return arithmetic_mod.log(x); }
+pub fn log2(x: float): float { return arithmetic_mod.log2(x); }
+pub fn log10(x: float): float { return arithmetic_mod.log10(x); }
+pub fn exp(x: float): float { return arithmetic_mod.exp(x); }
+pub fn exp2(x: float): float { return arithmetic_mod.exp2(x); }
+
+// Trigonometry Re-exports
+pub fn sin(x: float): float { return trigonometry_mod.sin(x); }
+pub fn cos(x: float): float { return trigonometry_mod.cos(x); }
+pub fn tan(x: float): float { return trigonometry_mod.tan(x); }
+pub fn asin(x: float): float { return trigonometry_mod.asin(x); }
+pub fn acos(x: float): float { return trigonometry_mod.acos(x); }
+pub fn atan(x: float): float { return trigonometry_mod.atan(x); }
+pub fn atan2(y: float, x: float): float { return trigonometry_mod.atan2(y, x); }
+pub fn sinh(x: float): float { return trigonometry_mod.sinh(x); }
+pub fn cosh(x: float): float { return trigonometry_mod.cosh(x); }
+pub fn tanh(x: float): float { return trigonometry_mod.tanh(x); }
+
+// Statistics Re-exports
+pub fn sum(items: [any]): float { return statistics_mod.sum(items); }
+pub fn mean(items: [any]): float { return statistics_mod.mean(items); }
+pub fn median(items: [any]): float { return statistics_mod.median(items); }
+pub fn variance(items: [any]): float { return statistics_mod.variance(items); }
+pub fn stddev(items: [any]): float { return statistics_mod.stddev(items); }
+
+// Random Re-exports
+pub fn random_int(min: int, max: int): int { return random_mod.random_int(min, max); }
+pub fn random_float(min: float, max: float): float { return random_mod.random_float(min, max); }
+pub fn random_bool(): bool { return random_mod.random_bool(); }
+pub fn random_bytes(count: int): [int] { return random_mod.random_bytes(count); }
+pub fn random_string(len: int): str { return random_mod.random_string(len); }

@@ -1,0 +1,136 @@
+// Test Suite for Standard Library Math Module
+
+import std.math.index as math;
+
+fn nearly_equal(a: float, b: float): bool {
+    var diff = a - b;
+    if (diff < 0.0) {
+        diff = -diff;
+    }
+    return diff <= 0.0001;
+}
+
+fn test_constants(): int {
+    print("Testing Constants...");
+    assert(nearly_equal(math.PI, 3.14159), "PI failed");
+    assert(nearly_equal(math.E, 2.71828), "E failed");
+    assert(nearly_equal(math.TAU, 6.28318), "TAU failed");
+    return 1;
+}
+
+fn test_arithmetic(): int {
+    print("Testing Arithmetic...");
+    assert(math.abs(-5.5) == 5.5, "abs failed");
+    assert(math.abs_int(-10) == 10, "abs_int failed");
+    assert(math.gcd(12, 18) == 6, "gcd failed");
+    assert(math.lcm(12, 18) == 36, "lcm failed");
+    assert(math.factorial(5) == 120, "factorial failed");
+    assert(math.permutations(5, 2) == 20, "permutations failed");
+    assert(math.combinations(5, 2) == 10, "combinations failed");
+
+    assert(math.min(5.0, 10.0) == 5.0, "min failed");
+    assert(math.max(5.0, 10.0) == 10.0, "max failed");
+    assert(math.clamp(15.0, 0.0, 10.0) == 10.0, "clamp high failed");
+    assert(math.clamp(-5.0, 0.0, 10.0) == 0.0, "clamp low failed");
+    assert(math.sign(-10.5) == -1.0, "sign failed");
+    assert(math.lerp(0.0, 10.0, 0.5) == 5.0, "lerp failed");
+
+    assert(math.floor(5.7) == 5, "floor failed");
+    assert(math.ceil(5.2) == 6, "ceil failed");
+    assert(math.round(5.5) == 6, "round high failed");
+    assert(math.trunc(5.7) == 5, "trunc failed");
+    assert(nearly_equal(math.fract(5.7), 0.7), "fract failed");
+
+    assert(nearly_equal(math.sqrt(16.0), 4.0), "sqrt failed");
+    assert(nearly_equal(math.cbrt(27.0), 3.0), "cbrt failed");
+    assert(nearly_equal(math.hypot(3.0, 4.0), 5.0), "hypot failed");
+    assert(nearly_equal(math.exp(1.0), 2.71828), "exp failed");
+    return 1;
+}
+
+fn test_trigonometry(): int {
+    print("Testing Trigonometry...");
+    assert(nearly_equal(math.sin(0.0), 0.0), "sin failed");
+    assert(nearly_equal(math.cos(0.0), 1.0), "cos failed");
+    assert(nearly_equal(math.tan(0.0), 0.0), "tan failed");
+    return 1;
+}
+
+fn test_statistics(): int {
+    print("Testing Statistics...");
+    var items = [1.0, 2.0, 3.0, 4.0, 5.0];
+    assert(nearly_equal(math.sum(items), 15.0), "sum failed");
+    assert(nearly_equal(math.mean(items), 3.0), "mean failed");
+    assert(nearly_equal(math.median(items), 3.0), "median failed");
+    assert(nearly_equal(math.variance(items), 2.0), "variance failed");
+    assert(nearly_equal(math.stddev(items), 1.4142), "stddev failed");
+    return 1;
+}
+
+fn test_random(): int {
+    print("Testing Random...");
+    var r = math.random_int(1, 10);
+    assert(r >= 1 and r < 10, "random_int range failed");
+
+    var f = math.random_float(0.0, 1.0);
+    assert(f >= 0.0 and f <= 1.0, "random_float range failed");
+
+    var b = math.random_bool();
+    assert(b == true or b == false, "random_bool failed");
+
+    var s = math.random_string(5);
+    assert(length(s) == 5, "random_string len failed");
+    return 1;
+}
+
+fn test_vectors(): int {
+    print("Testing Vectors...");
+    // Vector2
+    var v2_a = math.Vector2(1.0, 2.0) as math.Vector2;
+    var v2_b = math.Vector2(3.0, 4.0) as math.Vector2;
+    var v2_c = v2_a.add(v2_b) as math.Vector2;
+    assert(v2_c.x == 4.0 and v2_c.y == 6.0, "vector2 add failed");
+    assert(nearly_equal(v2_a.mag(), 2.2360), "vector2 mag failed");
+
+    // Vector3
+    var v3_a = math.Vector3(1.0, 0.0, 0.0) as math.Vector3;
+    var v3_b = math.Vector3(0.0, 1.0, 0.0) as math.Vector3;
+    var v3_c = v3_a.cross(v3_b) as math.Vector3;
+    assert(v3_c.x == 0.0 and v3_c.y == 0.0 and v3_c.z == 1.0, "vector3 cross failed");
+
+    // Vector4
+    var v4_a = math.Vector4(1.0, 2.0, 3.0, 4.0) as math.Vector4;
+    var v4_b = v4_a.scale(2.0) as math.Vector4;
+    assert(v4_b.x == 2.0 and v4_b.w == 8.0, "vector4 scale failed");
+    return 1;
+}
+
+fn test_quaternion_and_matrix(): int {
+    print("Testing Quaternion and Matrix...");
+    // Quaternion
+    var q = math.Quaternion(0.0, 0.0, 0.0, 1.0) as math.Quaternion;
+    var q_scaled = q.scale(2.0) as math.Quaternion;
+    assert(q_scaled.w == 2.0, "quaternion scale failed");
+
+    // Matrix
+    var m = math.Matrix() as math.Matrix;
+    assert(m.get(0, 0) == 1.0, "matrix identity get failed");
+    m.set(0, 1, 5.0);
+    assert(m.get(0, 1) == 5.0, "matrix set/get failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Math Module Test Suite ===");
+
+    assert(test_constants() == 1, "Constants test failed");
+    assert(test_arithmetic() == 1, "Arithmetic test failed");
+    assert(test_trigonometry() == 1, "Trigonometry test failed");
+    assert(test_statistics() == 1, "Statistics test failed");
+    assert(test_random() == 1, "Random test failed");
+    assert(test_vectors() == 1, "Vectors test failed");
+    assert(test_quaternion_and_matrix() == 1, "Quaternion and Matrix test failed");
+
+    print("All math tests passed successfully.");
+    return 0;
+}

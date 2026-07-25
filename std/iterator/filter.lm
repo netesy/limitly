@@ -1,0 +1,30 @@
+// Standard Library Filter Iterator
+
+import std.iterator.iterator as it;
+
+frame FilterIterator: it.Iterator {
+    var source: it.Iterator;
+    var p: fn(any): bool;
+
+    pub init(source: it.Iterator, p: fn(any): bool) {
+        self.source = source;
+        self.p = p;
+    }
+
+    pub fn next(): any {
+        while (true) {
+            var item = self.source.next();
+            if (item == nil) {
+                return nil;
+            }
+            if (self.p(item)) {
+                return item;
+            }
+        }
+        return nil;
+    }
+}
+
+pub fn filter(source: it.Iterator, p: fn(any): bool): it.Iterator {
+    return FilterIterator(source=source, p=p);
+}

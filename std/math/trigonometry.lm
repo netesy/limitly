@@ -1,0 +1,122 @@
+// Standard Library Math Trigonometry Module
+
+import std.math.constants as const;
+import std.math.arithmetic as arith;
+
+frame TrigFloat {
+    pub var value: float;
+    pub init(value: float) {
+        self.value = value;
+    }
+
+    pub fn sin(): float {
+        var x = self.normalize_angle();
+        var sum = 0.0;
+        var term = x;
+        var i = 1;
+        while (i < 20) {
+            var i_f = i as float;
+            sum = sum + term;
+            term = -term * x * x / ((2.0 * i_f) * (2.0 * i_f + 1.0));
+            i = i + 1;
+        }
+        return sum;
+    }
+
+    pub fn cos(): float {
+        var x = self.normalize_angle();
+        var sum = 0.0;
+        var term = 1.0;
+        var i = 1;
+        while (i < 20) {
+            var i_f = i as float;
+            sum = sum + term;
+            term = -term * x * x / ((2.0 * i_f - 1.0) * (2.0 * i_f));
+            i = i + 1;
+        }
+        return sum;
+    }
+
+    pub fn tan(): float { return self.sin() / self.cos(); }
+
+    pub fn asin(): float {
+        if (self.value < -1.0 or self.value > 1.0) return const.NAN;
+        var x = self.value;
+        var sum = x;
+        var term = x;
+        var i = 1;
+        while (i < 50) {
+            var i_f = i as float;
+            term = term * x * x * (2.0 * i_f - 1.0) / (2.0 * i_f);
+            sum = sum + term / (2.0 * i_f + 1.0);
+            if (arith.abs(term) < 1e-16) return sum;
+            i = i + 1;
+        }
+        return sum;
+    }
+
+    pub fn acos(): float { return const.PI / 2.0 - self.asin(); }
+
+    pub fn atan(): float {
+        var x = self.value;
+        if (arith.abs(x) > 1.0) {
+            if (x > 0.0) return const.PI / 2.0 - TrigFloat(1.0 / x).atan();
+            return -const.PI / 2.0 - TrigFloat(1.0 / x).atan();
+        }
+        var sum = x;
+        var term = x;
+        var i = 1;
+        while (i < 50) {
+            var i_f = i as float;
+            term = -term * x * x;
+            sum = sum + term / (2.0 * i_f + 1.0);
+            if (arith.abs(term) < 1e-16) return sum;
+            i = i + 1;
+        }
+        return sum;
+    }
+
+    pub fn atan2(x: float): float {
+        var y = self.value;
+        if (x > 0.0) return TrigFloat(y / x).atan();
+        if (x < 0.0 and y >= 0.0) return TrigFloat(y / x).atan() + const.PI;
+        if (x < 0.0 and y < 0.0) return TrigFloat(y / x).atan() - const.PI;
+        if (x == 0.0 and y > 0.0) return const.PI / 2.0;
+        if (x == 0.0 and y < 0.0) return -const.PI / 2.0;
+        return 0.0;
+    }
+
+    pub fn sinh(): float {
+        var e = arith.exp(self.value);
+        return (e - 1.0 / e) / 2.0;
+    }
+
+    pub fn cosh(): float {
+        var e = arith.exp(self.value);
+        return (e + 1.0 / e) / 2.0;
+    }
+
+    pub fn tanh(): float {
+        var e = arith.exp(2.0 * self.value);
+        return (e - 1.0) / (e + 1.0);
+    }
+
+    fn normalize_angle(): float {
+        var y: float = self.value;
+        while (y > const.PI) { y = y - const.TAU; }
+        while (y < -const.PI) { y = y + const.TAU; }
+        return y;
+    }
+}
+
+pub fn sin(x: float): float { return TrigFloat(x).sin(); }
+pub fn cos(x: float): float { return TrigFloat(x).cos(); }
+pub fn tan(x: float): float { return TrigFloat(x).tan(); }
+pub fn asin(x: float): float { return TrigFloat(x).asin(); }
+pub fn acos(x: float): float { return TrigFloat(x).acos(); }
+pub fn atan(x: float): float { return TrigFloat(x).atan(); }
+pub fn atan2(y: float, x: float): float { return TrigFloat(y).atan2(x); }
+
+pub fn sinh(x: float): float { return TrigFloat(x).sinh(); }
+pub fn cosh(x: float): float { return TrigFloat(x).cosh(); }
+pub fn tanh(x: float): float { return TrigFloat(x).tanh(); }

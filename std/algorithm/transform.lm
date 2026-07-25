@@ -1,0 +1,38 @@
+// Standard Library Algorithm Transform Module
+
+pub fn map(items: [any], f: fn(any): any): [any] {
+    var res: [any] = [];
+    var i = 0;
+    while (i < len(items)) {
+        res.append(f(items[i]));
+        i = i + 1;
+    }
+    return res;
+}
+
+pub fn zip(left: [any], right: [any]): [any] {
+    var res: [any] = [];
+    var i = 0;
+    var count = len(left);
+    if (len(right) < count) {
+        count = len(right);
+    }
+    while (i < count) {
+        res.append((left[i], right[i]));
+        i = i + 1;
+    }
+    return res;
+}
+
+pub fn unzip(pairs: [any]): ([any], [any]) {
+    var left_res: [any] = [];
+    var right_res: [any] = [];
+    var i = 0;
+    while (i < len(pairs)) {
+        var pair = pairs[i] as (any, any);
+        left_res.append(pair[0]);
+        right_res.append(pair[1]);
+        i = i + 1;
+    }
+    return (left_res, right_res);
+}
