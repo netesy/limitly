@@ -1,0 +1,24 @@
+// Standard Library String Trim Module
+
+pub fn trim(value: str): str {
+    var vlen = len(value);
+    var start = 0;
+    while (start < vlen) {
+        var ch = _builtin_substring(value, start, start + 1);
+        if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
+            start = start + 1;
+        } else {
+            break;
+        }
+    }
+    var end = vlen;
+    while (end > start) {
+        var ch = _builtin_substring(value, end - 1, end);
+        if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
+            end = end - 1;
+        } else {
+            break;
+        }
+    }
+    return _builtin_substring(value, start, end);
+}

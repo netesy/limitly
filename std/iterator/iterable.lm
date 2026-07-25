@@ -3,5 +3,5 @@
 import std.iterator.iterator as it;
 
 trait Iterable {
-    fn iter(): it.Iterator;
+    fn to_iterator(): it.Iterator;
 }

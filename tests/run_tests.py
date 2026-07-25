@@ -85,6 +85,12 @@ tests = [
     "tests/stdlib/iterator_module_test.lm",
     # Stdlib - Math
     "tests/stdlib/math_module_test.lm",
+    # Stdlib - String
+    "tests/stdlib/string_module_test.lm",
+    # Stdlib - Unicode
+    "tests/stdlib/unicode_module_test.lm",
+    # Stdlib - Regex
+    "tests/stdlib/regex_module_test.lm",
     # Stdlib - Algorithm (skip - requires tuple type system improvements)
     # "tests/stdlib/algorithm/algorithm_test.lm",
     # Stdlib - Search
@@ -124,6 +130,7 @@ slow_tests = {
     "tests/stdlib/fs/fs_test.lm",
     "tests/stdlib/io/io_extended_test.lm",
     "tests/stdlib/semver_test.lm",
+    "tests/stdlib/math_module_test.lm",
 }
 
 passed = 0

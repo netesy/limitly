@@ -1,0 +1,58 @@
+// Test Suite for Standard Library Unicode Module
+
+import std.unicode.index as u;
+
+fn test_rune(): int {
+    print("Testing Rune...");
+    var r1 = u.Rune("a") as u.Rune;
+    var r2 = u.Rune("b") as u.Rune;
+    var r3 = u.Rune("a") as u.Rune;
+
+    assert(r1.to_string() == "a", "Rune to_string failed");
+    assert(r1.compare(r2) == -1, "Rune compare less failed");
+    assert(r2.compare(r1) == 1, "Rune compare greater failed");
+    assert(r1.compare(r3) == 0, "Rune compare equal failed");
+    return 1;
+}
+
+fn test_categories(): int {
+    print("Testing Categories...");
+    assert(u.is_upper("A") == true, "is_upper A failed");
+    assert(u.is_upper("a") == false, "is_upper a failed");
+
+    assert(u.is_lower("a") == true, "is_lower a failed");
+    assert(u.is_lower("A") == false, "is_lower A failed");
+
+    assert(u.is_digit("5") == true, "is_digit 5 failed");
+    assert(u.is_digit("a") == false, "is_digit a failed");
+
+    assert(u.is_alpha("a") == true, "is_alpha a failed");
+    assert(u.is_alpha("5") == false, "is_alpha 5 failed");
+
+    assert(u.is_alphanumeric("a") == true, "is_alphanumeric a failed");
+    assert(u.is_alphanumeric("5") == true, "is_alphanumeric 5 failed");
+    assert(u.is_alphanumeric("!") == false, "is_alphanumeric ! failed");
+
+    assert(u.is_whitespace(" ") == true, "is_whitespace space failed");
+    assert(u.is_whitespace("\n") == true, "is_whitespace newline failed");
+    assert(u.is_whitespace("a") == false, "is_whitespace a failed");
+    return 1;
+}
+
+fn test_normalize(): int {
+    print("Testing Normalize...");
+    assert(u.to_upper("hello") == "HELLO", "to_upper failed");
+    assert(u.to_lower("WORLD") == "world", "to_lower failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Unicode Module Test Suite ===");
+
+    assert(test_rune() == 1, "Rune test failed");
+    assert(test_categories() == 1, "Categories test failed");
+    assert(test_normalize() == 1, "Normalize test failed");
+
+    print("All unicode tests passed successfully.");
+    return 0;
+}

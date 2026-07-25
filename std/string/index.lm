@@ -1,0 +1,50 @@
+// Standard Library String Entrypoint Module
+
+import std.string.string as string_mod;
+import std.string.builder as builder_mod;
+import std.string.split as split_mod;
+import std.string.join as join_mod;
+import std.string.replace as replace_mod;
+import std.string.trim as trim_mod;
+
+// Types
+pub type String = string_mod.String;
+pub type StringBuilder = builder_mod.StringBuilder;
+
+// Helper functions for String construction
+pub fn String(value: str): any {
+    return string_mod.String(value);
+}
+
+pub fn StringBuilder(): any {
+    return builder_mod.StringBuilder();
+}
+
+// Submodule functions
+pub fn length(value: str): int {
+    return string_mod.length(value);
+}
+
+pub fn compare(left: str, right: str): int {
+    return string_mod.compare(left, right);
+}
+
+pub fn substring(value: str, start: int, end: int): str {
+    return string_mod.substring(value, start, end);
+}
+
+pub fn split(value: str, delimiter: str): [str] {
+    return split_mod.split(value, delimiter);
+}
+
+pub fn join(values: [str], delimiter: str): str {
+    return join_mod.join(values, delimiter);
+}
+
+pub fn replace(value: str, old: str, replacement: str): str {
+    return replace_mod.replace(value, old, replacement);
+}
+
+pub fn trim(value: str): str {
+    return trim_mod.trim(value);
+}

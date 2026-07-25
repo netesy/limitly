@@ -1,0 +1,33 @@
+// Standard Library Unicode Category Module
+
+pub fn is_upper(ch: str): bool {
+    if (len(ch) == 0) return false;
+    var c = _builtin_substring(ch, 0, 1);
+    return c >= "A" and c <= "Z";
+}
+
+pub fn is_lower(ch: str): bool {
+    if (len(ch) == 0) return false;
+    var c = _builtin_substring(ch, 0, 1);
+    return c >= "a" and c <= "z";
+}
+
+pub fn is_digit(ch: str): bool {
+    if (len(ch) == 0) return false;
+    var c = _builtin_substring(ch, 0, 1);
+    return c >= "0" and c <= "9";
+}
+
+pub fn is_alpha(ch: str): bool {
+    return is_upper(ch) or is_lower(ch);
+}
+
+pub fn is_alphanumeric(ch: str): bool {
+    return is_alpha(ch) or is_digit(ch);
+}
+
+pub fn is_whitespace(ch: str): bool {
+    if (len(ch) == 0) return false;
+    var c = _builtin_substring(ch, 0, 1);
+    return c == " " or c == "\t" or c == "\n" or c == "\r";
+}
