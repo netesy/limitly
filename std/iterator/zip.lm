@@ -1,0 +1,26 @@
+// Standard Library Zip Iterator
+
+import std.iterator.iterator as it;
+
+frame ZipIterator: it.Iterator {
+    var left: it.Iterator;
+    var right: it.Iterator;
+
+    pub init(left: it.Iterator, right: it.Iterator) {
+        self.left = left;
+        self.right = right;
+    }
+
+    pub fn next(): any {
+        var a = self.left.next();
+        var b = self.right.next();
+        if (a == nil or b == nil) {
+            return nil;
+        }
+        return (a, b);
+    }
+}
+
+pub fn zip(left: it.Iterator, right: it.Iterator): it.Iterator {
+    return ZipIterator(left=left, right=right);
+}

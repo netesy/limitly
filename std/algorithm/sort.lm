@@ -2,42 +2,46 @@
 
 import std.sort as s;
 
-pub fn sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
-    s.sort(items, descending, cmp);
+pub fn sort(items: [any]) {
+    s.sort(items, false, nil);
 }
 
-pub fn quicksort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
-    s.quicksort(items, descending, cmp);
+pub fn quicksort(items: [any]) {
+    s.quicksort(items, false, nil);
 }
 
-pub fn mergesort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
-    s.mergesort(items, descending, cmp);
+pub fn quicksort_descending(items: [any]) {
+    s.quicksort(items, true, nil);
 }
 
-pub fn heapsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
-    s.heapsort(items, descending, cmp);
+pub fn mergesort(items: [any]) {
+    s.mergesort(items, false, nil);
 }
 
-pub fn insertion_sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
-    s.insertion_sort(items, descending, cmp);
+pub fn heapsort(items: [any]) {
+    s.heapsort(items, false, nil);
 }
 
-pub fn counting_sort(items: [int], descending: bool = false) {
-    s.counting_sort(items, descending);
+pub fn insertion_sort(items: [any]) {
+    s.insertion_sort(items, false, nil);
 }
 
-pub fn radix_sort(items: [int], descending: bool = false) {
-    s.radix_sort(items, descending);
+pub fn counting_sort(items: [int]) {
+    s.counting_sort(items, false);
 }
 
-pub fn timsort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
-    s.timsort(items, descending, cmp);
+pub fn radix_sort(items: [int]) {
+    s.radix_sort(items, false);
 }
 
-pub fn stable_sort(items: [any], descending: bool = false, cmp: fn(any, any): int = nil) {
-    s.stable_sort(items, descending, cmp);
+pub fn timsort(items: [any]) {
+    s.timsort(items, false, nil);
 }
 
-pub fn partial_sort(items: [any], count: int, descending: bool = false, cmp: fn(any, any): int = nil) {
-    s.partial_sort(items, count, descending, cmp);
+pub fn stable_sort(items: [any]) {
+    s.stable_sort(items, false, nil);
+}
+
+pub fn partial_sort(items: [any], count: int) {
+    s.partial_sort(items, count, false, nil);
 }

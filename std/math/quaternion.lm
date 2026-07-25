@@ -1,0 +1,41 @@
+// Standard Library Quaternion Module
+
+import std.math.arithmetic as arith;
+
+frame Quaternion {
+    pub x: float;
+    pub y: float;
+    pub z: float;
+    pub w: float;
+
+    pub init(x: float, y: float, z: float, w: float) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+        self.w = w;
+    }
+
+    pub fn add(other: Quaternion): Quaternion {
+        return Quaternion(self.x + other.x, self.y + other.y, self.z + other.z, self.w + other.w);
+    }
+
+    pub fn sub(other: Quaternion): Quaternion {
+        return Quaternion(self.x - other.x, self.y - other.y, self.z - other.z, self.w - other.w);
+    }
+
+    pub fn scale(s: float): Quaternion {
+        return Quaternion(self.x * s, self.y * s, self.z * s, self.w * s);
+    }
+
+    pub fn mag(): float {
+        return arith.sqrt(self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w);
+    }
+
+    pub fn normalize(): Quaternion {
+        var m = self.mag();
+        if (m == 0.0) {
+            return Quaternion(0.0, 0.0, 0.0, 1.0);
+        }
+        return self.scale(1.0 / m);
+    }
+}

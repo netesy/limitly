@@ -1,0 +1,152 @@
+// Test Suite for Standard Library Iterator Module
+
+import std.iterator.index as iter;
+
+fn square(x: any): any {
+    var val_int = x as int;
+    return val_int * val_int;
+}
+
+fn is_odd(x: any): bool {
+    var val_int = x as int;
+    return val_int % 2 != 0;
+}
+
+fn test_iterator_basics(): int {
+    print("Testing Iterator Basics...");
+    var items = [1, 2, 3];
+    var it = iter.iterator(items);
+
+    assert(it.next() == 1, "next failed");
+    assert(it.next() == 2, "next failed");
+    assert(it.next() == 3, "next failed");
+    assert(it.next() == nil, "next past end failed");
+
+    var it2 = iter.iterator(items);
+    var collected = iter.collect(it2);
+    assert(len(collected) == 3, "collect length failed");
+    assert(collected[0] == 1, "collect element 0 failed");
+    return 1;
+}
+
+fn test_map(): int {
+    print("Testing Map Iterator...");
+    var items = [1, 2, 3];
+    var it = iter.iterator(items);
+    var mapped = iter.map(it, square);
+
+    assert(mapped.next() == 1, "map 1 failed");
+    assert(mapped.next() == 4, "map 2 failed");
+    assert(mapped.next() == 9, "map 3 failed");
+    assert(mapped.next() == nil, "map past end failed");
+    return 1;
+}
+
+fn test_filter(): int {
+    print("Testing Filter Iterator...");
+    var items = [1, 2, 3, 4, 5];
+    var it = iter.iterator(items);
+    var filtered = iter.filter(it, is_odd);
+
+    assert(filtered.next() == 1, "filter 1 failed");
+    assert(filtered.next() == 3, "filter 3 failed");
+    assert(filtered.next() == 5, "filter 5 failed");
+    assert(filtered.next() == nil, "filter past end failed");
+    return 1;
+}
+
+fn test_take(): int {
+    print("Testing Take Iterator...");
+    var items = [1, 2, 3, 4, 5];
+    var it = iter.iterator(items);
+    var taken = iter.take(it, 3);
+
+    assert(taken.next() == 1, "take 1 failed");
+    assert(taken.next() == 2, "take 2 failed");
+    assert(taken.next() == 3, "take 3 failed");
+    assert(taken.next() == nil, "take past limit failed");
+    return 1;
+}
+
+fn test_skip(): int {
+    print("Testing Skip Iterator...");
+    var items = [1, 2, 3, 4, 5];
+    var it = iter.iterator(items);
+    var skipped = iter.skip(it, 2);
+
+    assert(skipped.next() == 3, "skip 1 failed");
+    assert(skipped.next() == 4, "skip 2 failed");
+    assert(skipped.next() == 5, "skip 3 failed");
+    assert(skipped.next() == nil, "skip past end failed");
+    return 1;
+}
+
+fn test_zip(): int {
+    print("Testing Zip Iterator...");
+    var items1 = [1, 2];
+    var items2 = ["a", "b"];
+    var it1 = iter.iterator(items1);
+    var it2 = iter.iterator(items2);
+    var zipped = iter.zip(it1, it2);
+
+    var pair1 = zipped.next() as (any, any);
+    assert(pair1[0] == 1, "zip pair 1 left failed");
+    assert(pair1[1] == "a", "zip pair 1 right failed");
+
+    var pair2 = zipped.next() as (any, any);
+    assert(pair2[0] == 2, "zip pair 2 left failed");
+    assert(pair2[1] == "b", "zip pair 2 right failed");
+
+    assert(zipped.next() == nil, "zip past end failed");
+    return 1;
+}
+
+fn test_chain(): int {
+    print("Testing Chain Iterator...");
+    var items1 = [1, 2];
+    var items2 = [3, 4];
+    var it1 = iter.iterator(items1);
+    var it2 = iter.iterator(items2);
+    var chained = iter.chain(it1, it2);
+
+    assert(chained.next() == 1, "chain 1 failed");
+    assert(chained.next() == 2, "chain 2 failed");
+    assert(chained.next() == 3, "chain 3 failed");
+    assert(chained.next() == 4, "chain 4 failed");
+    assert(chained.next() == nil, "chain past end failed");
+    return 1;
+}
+
+fn test_enumerate(): int {
+    print("Testing Enumerate Iterator...");
+    var items = ["a", "b"];
+    var it = iter.iterator(items);
+    var enumerated = iter.enumerate(it);
+
+    var pair1 = enumerated.next() as (any, any);
+    assert(pair1[0] == 0, "enumerate 1 index failed");
+    assert(pair1[1] == "a", "enumerate 1 val failed");
+
+    var pair2 = enumerated.next() as (any, any);
+    assert(pair2[0] == 1, "enumerate 2 index failed");
+    assert(pair2[1] == "b", "enumerate 2 val failed");
+
+    assert(enumerated.next() == nil, "enumerate past end failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Iterator Module Test Suite ===");
+
+    assert(test_iterator_basics() == 1, "basics failed");
+    assert(test_map() == 1, "map failed");
+    assert(test_filter() == 1, "filter failed");
+    assert(test_take() == 1, "take failed");
+    assert(test_skip() == 1, "skip failed");
+    assert(test_zip() == 1, "zip failed");
+    assert(test_chain() == 1, "chain failed");
+    assert(test_enumerate() == 1, "enumerate failed");
+
+    print("All iterator tests passed successfully.");
+    return 0;
+}

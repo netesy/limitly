@@ -1,0 +1,15 @@
+// Standard Library Algorithm Reduce Module
+
+pub fn reduce(items: [any], f: fn(any, any): any, initial: any): any {
+    var acc = initial;
+    var i = 0;
+    while (i < len(items)) {
+        acc = f(acc, items[i]);
+        i = i + 1;
+    }
+    return acc;
+}
+
+pub fn fold(items: [any], initial: any, f: fn(any, any): any): any {
+    return reduce(items, f, initial);
+}

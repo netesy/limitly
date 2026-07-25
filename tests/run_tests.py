@@ -78,8 +78,13 @@ tests = [
     "tests/stdlib/collections_module_test.lm",
     # Stdlib - Collections - Tree (skip - requires trait method dispatch support)
     # "tests/stdlib/collections/tree_test.lm",
+    # Stdlib - Algorithm
+    "tests/stdlib/algorithm_module_test.lm",
     # Stdlib - Iterator
     "tests/stdlib/iterator/iterator_test.lm",
+    "tests/stdlib/iterator_module_test.lm",
+    # Stdlib - Math
+    "tests/stdlib/math_module_test.lm",
     # Stdlib - Algorithm (skip - requires tuple type system improvements)
     # "tests/stdlib/algorithm/algorithm_test.lm",
     # Stdlib - Search

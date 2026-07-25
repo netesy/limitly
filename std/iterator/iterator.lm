@@ -1,0 +1,64 @@
+// Standard Library Iterator Trait and Common Implementations
+
+trait Iterator {
+    fn next(): any;
+}
+
+frame ListIterator: Iterator {
+    var items: [any];
+    var index: int;
+
+    pub init(items: [any]) {
+        self.items = items;
+        self.index = 0;
+    }
+
+    pub fn next(): any {
+        if (self.index >= len(self.items)) {
+            return nil;
+        }
+        var item = self.items[self.index];
+        self.index = self.index + 1;
+        return item;
+    }
+}
+
+frame PeekableIterator: Iterator {
+    var source: Iterator;
+    var cached: any;
+
+    pub init(source: Iterator) {
+        self.source = source;
+        self.cached = nil;
+    }
+
+    pub fn peek(): any {
+        if (self.cached == nil) {
+            self.cached = self.source.next();
+        }
+        return self.cached;
+    }
+
+    pub fn next(): any {
+        if (self.cached != nil) {
+            var item = self.cached;
+            self.cached = nil;
+            return item;
+        }
+        return self.source.next();
+    }
+}
+
+pub fn iterator(items: [any]): Iterator {
+    return ListIterator(items=items);
+}
+
+pub fn collect(it: Iterator): [any] {
+    var res: [any] = [];
+    var item = it.next();
+    while (item != nil) {
+        res.append(item);
+        item = it.next();
+    }
+    return res;
+}

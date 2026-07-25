@@ -1,0 +1,53 @@
+// Standard Library Iterator Entrypoint Module
+
+import std.iterator.iterator as iterator_mod;
+import std.iterator.iterable as iterable_mod;
+import std.iterator.map as map_mod;
+import std.iterator.filter as filter_mod;
+import std.iterator.take as take_mod;
+import std.iterator.skip as skip_mod;
+import std.iterator.zip as zip_mod;
+import std.iterator.chain as chain_mod;
+import std.iterator.enumerate as enumerate_mod;
+
+// Types
+pub type Iterator = iterator_mod.Iterator;
+pub type Iterable = iterable_mod.Iterable;
+
+// Common iterator helpers
+pub fn iterator(items: [any]): Iterator {
+    return iterator_mod.iterator(items);
+}
+
+pub fn collect(it: Iterator): [any] {
+    return iterator_mod.collect(it);
+}
+
+// Submodule functions
+pub fn map(source: Iterator, f: fn(any): any): Iterator {
+    return map_mod.map(source, f);
+}
+
+pub fn filter(source: Iterator, p: fn(any): bool): Iterator {
+    return filter_mod.filter(source, p);
+}
+
+pub fn take(source: Iterator, count: int): Iterator {
+    return take_mod.take(source, count);
+}
+
+pub fn skip(source: Iterator, count: int): Iterator {
+    return skip_mod.skip(source, count);
+}
+
+pub fn zip(left: Iterator, right: Iterator): Iterator {
+    return zip_mod.zip(left, right);
+}
+
+pub fn chain(left: Iterator, right: Iterator): Iterator {
+    return chain_mod.chain(left, right);
+}
+
+pub fn enumerate(source: Iterator): Iterator {
+    return enumerate_mod.enumerate(source);
+}
