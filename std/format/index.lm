@@ -1,0 +1,64 @@
+// Standard Library Format Entrypoint Module
+
+import std.format.formatter as formatter_mod;
+import std.format.printf as printf_mod;
+
+frame Format {
+    pub init() {}
+    pub fn int(value: int): str { return formatter_mod.format_int(value); }
+    pub fn float(value: float): str { return formatter_mod.format_float(value); }
+    pub fn bool(value: bool): str { return formatter_mod.format_bool(value); }
+    pub fn pad_left(value: str, length_val: int, fill_char: str): str { return formatter_mod.pad_left(value, length_val, fill_char); }
+    pub fn pad_right(value: str, length_val: int, fill_char: str): str { return formatter_mod.pad_right(value, length_val, fill_char); }
+    pub fn center(value: str, length_val: int, fill_char: str): str { return formatter_mod.center(value, length_val, fill_char); }
+    pub fn truncate(value: str, length_val: int, ellipsis: bool): str { return formatter_mod.truncate(value, length_val, ellipsis); }
+    pub fn title_case(value: str): str { return formatter_mod.title_case(value); }
+    pub fn snake_case(value: str): str { return formatter_mod.snake_case(value); }
+    pub fn camel_case(value: str): str { return formatter_mod.camel_case(value); }
+    pub fn kebab_case(value: str): str { return formatter_mod.kebab_case(value); }
+    pub fn pascal_case(value: str): str { return formatter_mod.pascal_case(value); }
+}
+
+pub fn format_int(value: int): str {
+    return formatter_mod.format_int(value);
+}
+
+pub fn format_float(value: float): str {
+    return formatter_mod.format_float(value);
+}
+
+pub fn format_bool(value: bool): str {
+    return formatter_mod.format_bool(value);
+}
+
+pub fn pad_string(value: str, length_val: int): str {
+    return formatter_mod.pad_left(value, length_val, " ");
+}
+
+pub fn title_case(value: str): str {
+    return formatter_mod.title_case(value);
+}
+
+pub fn snake_case(value: str): str {
+    return formatter_mod.snake_case(value);
+}
+
+pub fn camel_case(value: str): str {
+    return formatter_mod.camel_case(value);
+}
+
+pub fn kebab_case(value: str): str {
+    return formatter_mod.kebab_case(value);
+}
+
+pub fn pascal_case(value: str): str {
+    return formatter_mod.pascal_case(value);
+}
+
+pub fn truncate_string(value: str, length_val: int): str {
+    return formatter_mod.truncate(value, length_val, true);
+}
+
+pub fn printf_template(template: str, args: [any]): str {
+    return printf_mod.printf_template(template, args);
+}

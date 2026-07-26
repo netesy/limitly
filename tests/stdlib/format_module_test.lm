@@ -1,0 +1,50 @@
+// Test Suite for Standard Library Format Module
+
+import std.format.index as f;
+
+fn test_format_frame(): int {
+    print("Testing Format Frame...");
+    var fmt = f.Format() as f.Format;
+    assert(fmt.int(123) == "123", "int failed");
+    assert(fmt.float(4.56) == "4.56", "float failed");
+    assert(fmt.bool(true) == "true", "bool failed");
+
+    assert(fmt.pad_left("abc", 5, "-") == "--abc", "pad_left failed");
+    assert(fmt.pad_right("abc", 5, "-") == "abc--", "pad_right failed");
+    assert(fmt.center("abc", 5, "-") == "-abc-", "center failed");
+    assert(fmt.truncate("abcdef", 5, true) == "ab...", "truncate failed");
+
+    assert(fmt.title_case("hello world") == "Hello World", "title_case failed");
+    assert(fmt.snake_case("hello world") == "hello_world", "snake_case failed");
+    assert(fmt.camel_case("hello world") == "helloWorld", "camel_case failed");
+    assert(fmt.kebab_case("hello world") == "hello-world", "kebab_case failed");
+    assert(fmt.pascal_case("hello world") == "HelloWorld", "pascal_case failed");
+    return 1;
+}
+
+fn test_format_helpers(): int {
+    print("Testing Format Helpers...");
+    assert(f.format_int(456) == "456", "format_int failed");
+    assert(f.format_float(7.89) == "7.89", "format_float failed");
+    assert(f.format_bool(false) == "false", "format_bool failed");
+
+    assert(f.pad_string("abc", 5) == "  abc", "pad_string failed");
+    assert(f.truncate_string("abcdef", 5) == "ab...", "truncate_string failed");
+
+    assert(f.title_case("hello world") == "Hello World", "title_case helper failed");
+    assert(f.snake_case("hello world") == "hello_world", "snake_case helper failed");
+    assert(f.camel_case("hello world") == "helloWorld", "camel_case helper failed");
+
+    assert(f.printf_template("hello {}, today is {}", ["world", "sunny"]) == "hello world, today is sunny", "printf_template failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Format Module Test Suite ===");
+
+    assert(test_format_frame() == 1, "Format frame test failed");
+    assert(test_format_helpers() == 1, "Format helpers test failed");
+
+    print("All format tests passed successfully.");
+    return 0;
+}

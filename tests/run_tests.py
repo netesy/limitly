@@ -103,6 +103,12 @@ tests = [
     "tests/stdlib/process_module_test.lm",
     # Stdlib - Time
     "tests/stdlib/time_module_test.lm",
+    # Stdlib - Random
+    "tests/stdlib/random_module_test.lm",
+    # Stdlib - Parse
+    "tests/stdlib/parse_module_test.lm",
+    # Stdlib - Format
+    "tests/stdlib/format_module_test.lm",
     # Stdlib - Algorithm (skip - requires tuple type system improvements)
     # "tests/stdlib/algorithm/algorithm_test.lm",
     # Stdlib - Search
@@ -149,6 +155,9 @@ slow_tests = {
     "tests/stdlib/env_module_test.lm",
     "tests/stdlib/process_module_test.lm",
     "tests/stdlib/time_module_test.lm",
+    "tests/stdlib/random_module_test.lm",
+    "tests/stdlib/parse_module_test.lm",
+    "tests/stdlib/format_module_test.lm",
 }
 
 passed = 0
