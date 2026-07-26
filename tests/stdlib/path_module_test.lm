@@ -1,0 +1,50 @@
+// Test Suite for Standard Library Path Module
+
+import std.path.index as path;
+
+fn test_path_frame(): int {
+    print("Testing Path Frame...");
+    var p = path.Path("src/main.lm") as path.Path;
+    assert(p.to_string() == "src/main.lm", "to_string failed");
+    assert(p.basename() == "main.lm", "basename failed");
+    assert(p.stem() == "main", "stem failed");
+    assert(p.extension() == "lm", "extension failed");
+
+    var p_joined = p.join("test") as path.Path;
+    assert(p_joined.to_string() == "src/main.lm/test", "join failed");
+
+    var p_parent = p.parent();
+    match (p_parent) {
+        val parent_path => {
+            var parent_obj = parent_path as path.Path;
+            assert(parent_obj.to_string() == "src", "parent failed");
+        }
+        nil => assert(false, "parent nil failed")
+    }
+
+    assert(p.is_absolute() == false, "is_absolute failed");
+    assert(p.is_relative() == true, "is_relative failed");
+    return 1;
+}
+
+fn test_path_helpers(): int {
+    print("Testing Path Helpers...");
+    var p = path.join(["src", "main.lm"]) as path.Path;
+    assert(p.to_string() == "src/main.lm", "join helper failed");
+
+    var p_norm = path.normalize("src/main.lm") as path.Path;
+    assert(p_norm.to_string() == "src/main.lm", "normalize helper failed");
+
+    assert(path.is_relative("src/main.lm") == true, "is_relative helper failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Path Module Test Suite ===");
+
+    assert(test_path_frame() == 1, "Path frame test failed");
+    assert(test_path_helpers() == 1, "Path helpers test failed");
+
+    print("All Path tests passed successfully.");
+    return 0;
+}

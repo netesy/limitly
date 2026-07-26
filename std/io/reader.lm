@@ -1,0 +1,15 @@
+// Standard Library I/O Reader Submodule
+
+import std.resource as res;
+
+frame Reader {
+    pub var r: res.Reader;
+
+    pub init(resource: res.Resource) {
+        self.r = res.Reader(r=resource);
+    }
+
+    pub fn read(args: [any]): any {
+        return self.r.read(args=args);
+    }
+}
