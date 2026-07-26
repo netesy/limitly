@@ -97,6 +97,12 @@ tests = [
     "tests/stdlib/fs_module_test.lm",
     # Stdlib - Path
     "tests/stdlib/path_module_test.lm",
+    # Stdlib - Env
+    "tests/stdlib/env_module_test.lm",
+    # Stdlib - Process
+    "tests/stdlib/process_module_test.lm",
+    # Stdlib - Time
+    "tests/stdlib/time_module_test.lm",
     # Stdlib - Algorithm (skip - requires tuple type system improvements)
     # "tests/stdlib/algorithm/algorithm_test.lm",
     # Stdlib - Search
@@ -140,6 +146,9 @@ slow_tests = {
     "tests/stdlib/io_module_test.lm",
     "tests/stdlib/fs_module_test.lm",
     "tests/stdlib/path_module_test.lm",
+    "tests/stdlib/env_module_test.lm",
+    "tests/stdlib/process_module_test.lm",
+    "tests/stdlib/time_module_test.lm",
 }
 
 passed = 0

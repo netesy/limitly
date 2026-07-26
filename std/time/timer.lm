@@ -1,0 +1,20 @@
+// Standard Library Time Timer Submodule
+
+import std.time.instant as inst;
+import std.time.duration as dur;
+
+frame Timer {
+    pub var start_time: inst.Instant;
+
+    pub init() {
+        self.start_time = inst.Instant.now();
+    }
+
+    pub fn reset() {
+        self.start_time = inst.Instant.now();
+    }
+
+    pub fn elapsed(): dur.Duration {
+        return self.start_time.elapsed();
+    }
+}

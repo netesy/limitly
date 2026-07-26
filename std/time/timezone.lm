@@ -1,0 +1,41 @@
+// Standard Library Time TimeZone Submodule
+
+import std.time.duration as dur;
+
+frame TimeZone {
+    pub var name: str;
+    pub var offset_hours: int;
+    pub var offset_minutes: int;
+
+    pub init(name: str, offset_hours: int, offset_minutes: int) {
+        self.name = name;
+        self.offset_hours = offset_hours;
+        self.offset_minutes = offset_minutes;
+    }
+
+    pub fn utc(): TimeZone {
+        return TimeZone(name="UTC", offset_hours=0, offset_minutes=0);
+    }
+
+    pub fn from_offset(offset_hours: int): TimeZone {
+        var name: str = "UTC";
+        if (offset_hours > 0) name = "UTC+" + offset_hours as str;
+        if (offset_hours < 0) name = "UTC" + offset_hours as str;
+        return TimeZone(name=name, offset_hours=offset_hours, offset_minutes=0);
+    }
+
+    pub fn to_seconds_offset(): int {
+        return self.offset_hours * 3600 + self.offset_minutes * 60;
+    }
+
+    pub fn offset_string(): str {
+        var sign: str = "+";
+        var hours: int = self.offset_hours;
+        var minutes: int = self.offset_minutes;
+        if (hours < 0) {
+            sign = "-";
+            hours = -hours;
+        }
+        return sign + dur.pad_int(hours, 2) + ":" + dur.pad_int(minutes, 2);
+    }
+}

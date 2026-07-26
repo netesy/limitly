@@ -1,7 +1,19 @@
-// Process module
+// Standard Library Process Forwarder Module
+
+import std.process.index as process_mod;
 
 frame Process {
-    pub fn exit(code: int): nil { }
-    pub fn run(command: str): int { return 0; }
-    pub fn id(): int { return 0; }
+    pub init() {}
+    pub fn exit(code: int): nil {
+        var p = process_mod.Process();
+        return p.exit(code);
+    }
+    pub fn run(command: str): int {
+        var p = process_mod.Process();
+        return p.run(command);
+    }
+    pub fn id(): int {
+        var p = process_mod.Process();
+        return p.id();
+    }
 }
