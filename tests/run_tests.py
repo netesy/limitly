@@ -91,6 +91,12 @@ tests = [
     "tests/stdlib/unicode_module_test.lm",
     # Stdlib - Regex
     "tests/stdlib/regex_module_test.lm",
+    # Stdlib - IO
+    "tests/stdlib/io_module_test.lm",
+    # Stdlib - FS
+    "tests/stdlib/fs_module_test.lm",
+    # Stdlib - Path
+    "tests/stdlib/path_module_test.lm",
     # Stdlib - Algorithm (skip - requires tuple type system improvements)
     # "tests/stdlib/algorithm/algorithm_test.lm",
     # Stdlib - Search
@@ -131,6 +137,9 @@ slow_tests = {
     "tests/stdlib/io/io_extended_test.lm",
     "tests/stdlib/semver_test.lm",
     "tests/stdlib/math_module_test.lm",
+    "tests/stdlib/io_module_test.lm",
+    "tests/stdlib/fs_module_test.lm",
+    "tests/stdlib/path_module_test.lm",
 }
 
 passed = 0

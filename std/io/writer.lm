@@ -1,0 +1,15 @@
+// Standard Library I/O Writer Submodule
+
+import std.resource as res;
+
+frame Writer {
+    pub var w: res.Writer;
+
+    pub init(resource: res.Resource) {
+        self.w = res.Writer(r=resource);
+    }
+
+    pub fn write(args: [any]): any {
+        return self.w.write(args=args);
+    }
+}
