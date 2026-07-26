@@ -1,0 +1,172 @@
+// Standard Library Format Formatter Submodule
+
+import std.string as s;
+
+pub fn format_int(value: int): str {
+    return value as str;
+}
+
+pub fn format_float(value: float): str {
+    return value as str;
+}
+
+pub fn format_bool(value: bool): str {
+    if (value) {
+        return "true";
+    } else {
+        return "false";
+    }
+}
+
+pub fn pad_left(value: str, length_val: int, fill_char: str): str {
+    if (len(value) >= length_val) return value;
+
+    var padding = length_val - len(value);
+    var pad_str = "";
+    var i = 0;
+    while (i < padding) {
+        pad_str = pad_str + fill_char;
+        i = i + 1;
+    }
+    return pad_str + value;
+}
+
+pub fn pad_right(value: str, length_val: int, fill_char: str): str {
+    if (len(value) >= length_val) return value;
+
+    var padding = length_val - len(value);
+    var pad_str = "";
+    var i = 0;
+    while (i < padding) {
+        pad_str = pad_str + fill_char;
+        i = i + 1;
+    }
+    return value + pad_str;
+}
+
+pub fn center(value: str, length_val: int, fill_char: str): str {
+    if (len(value) >= length_val) return value;
+
+    var padding = length_val - len(value);
+    var left_pad = padding / 2;
+    var right_pad = padding - left_pad;
+
+    var left_str = "";
+    var i = 0;
+    while (i < left_pad) {
+        left_str = left_str + fill_char;
+        i = i + 1;
+    }
+
+    var right_str = "";
+    i = 0;
+    while (i < right_pad) {
+        right_str = right_str + fill_char;
+        i = i + 1;
+    }
+
+    return left_str + value + right_str;
+}
+
+pub fn truncate(value: str, length_val: int, ellipsis: bool): str {
+    if (len(value) <= length_val) return value;
+
+    if (ellipsis and length_val > 3) {
+        return _builtin_substring(value, 0, length_val - 3) + "...";
+    }
+
+    return _builtin_substring(value, 0, length_val);
+}
+
+pub fn title_case(value: str): str {
+    if (value == "") return "";
+
+    var words = s.split(value, " ");
+    var result = "";
+    var i = 0;
+
+    while (i < len(words)) {
+        var word = words[i];
+        if (word == "") {
+            if (i > 0) result = result + " ";
+        } else {
+            if (i > 0) result = result + " ";
+            var first_char = s.to_upper(_builtin_substring(word, 0, 1));
+            var rest = s.to_lower(_builtin_substring(word, 1, len(word)));
+            result = result + first_char + rest;
+        }
+        i = i + 1;
+    }
+
+    return result;
+}
+
+pub fn snake_case(value: str): str {
+    var result = "";
+    var i = 0;
+    var vlen = len(value);
+
+    while (i < vlen) {
+        var ch = _builtin_substring(value, i, i + 1);
+        if (ch == " ") {
+            result = result + "_";
+        } else {
+            result = result + s.to_lower(ch);
+        }
+        i = i + 1;
+    }
+
+    return result;
+}
+
+pub fn camel_case(value: str): str {
+    var snake = snake_case(value);
+    var parts = s.split(snake, "_");
+    var result = "";
+    var i = 0;
+
+    while (i < len(parts)) {
+        var part = parts[i];
+        if (part == "") {
+            i = i + 1;
+            continue;
+        }
+
+        if (i == 0) {
+            result = result + part;
+        } else {
+            var first_char = s.to_upper(_builtin_substring(part, 0, 1));
+            var rest = _builtin_substring(part, 1, len(part));
+            result = result + first_char + rest;
+        }
+        i = i + 1;
+    }
+
+    return result;
+}
+
+pub fn kebab_case(value: str): str {
+    return s.replace(snake_case(value), "_", "-");
+}
+
+pub fn pascal_case(value: str): str {
+    var snake = snake_case(value);
+    var parts = s.split(snake, "_");
+    var result = "";
+    var i = 0;
+
+    while (i < len(parts)) {
+        var part = parts[i];
+        if (part == "") {
+            i = i + 1;
+            continue;
+        }
+
+        var first_char = s.to_upper(_builtin_substring(part, 0, 1));
+        var rest = _builtin_substring(part, 1, len(part));
+        result = result + first_char + rest;
+        i = i + 1;
+    }
+
+    return result;
+}

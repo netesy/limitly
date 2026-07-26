@@ -1,60 +1,19 @@
-// Standard Library Parse Module
-import std.core as core;
+// Standard Library Parse Forwarder Module
 
-type ResultInt = core.ResultInt;
-type ResultStr = core.ResultStr;
+import std.parse.index as parse_mod;
 
 frame Parse {
-    pub fn parse_int(value: str): ResultInt {
-        if (value == "") return core.err_int("empty int input");
-
-        var n: int = len(value);
-        var i: int = 0;
-        var sign: int = 1;
-        var result: int = 0;
-        var seen_digit: bool = false;
-
-        // Optional leading sign
-        var first: str = substring(value, 0, 1);
-        if (first == "+") {
-            i = 1;
-        } else if (first == "-") {
-            sign = -1;
-            i = 1;
-        }
-
-        if (i >= n) {
-            return core.err_int("int input has no digits");
-        }
-
-        while (i < n) {
-            var ch: str = substring(value, i, i + 1);
-            var code: int = ch as int;
-
-            // ASCII '0' = 48, '9' = 57
-            if (code < 48 or code > 57) {
-                return core.err_int("invalid digit in int input");
-            }
-
-            var digit: int = code - 48;
-            result = result * 10 + digit;
-            seen_digit = true;
-            i = i + 1;
-        }
-
-        if (!seen_digit) {
-            return core.err_int("int input has no digits");
-        }
-
-        return core.ok_int(sign * result);
+    pub init() {}
+    pub fn parse_int(value: str): any {
+        var p = parse_mod.Parse();
+        return p.parse_int(value);
     }
-
-    pub fn parse_float(value: str): ResultStr {
-        if (value == "") return core.err_str("empty float input");
-        return core.ok_str(value);
+    pub fn parse_float(value: str): any {
+        var p = parse_mod.Parse();
+        return p.parse_float(value);
     }
-
     pub fn parse_bool(value: str): bool {
-        return value == "true" or value == "1";
+        var p = parse_mod.Parse();
+        return p.parse_bool(value);
     }
 }
