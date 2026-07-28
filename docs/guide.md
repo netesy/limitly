@@ -1129,39 +1129,39 @@ match (user) {
 
 ### The `Result` Type for Operations That Can Fail
 
-For operations that can either succeed or fail, Limit uses a `Result` type (often implemented as a `Type?` or a custom enum). The common convention is:
-- **`Ok(value)`**: Represents a successful result.
-- **`Err(error)`**: Represents a failure, containing an error value.
+For standard library operations that can either succeed or fail, Limit provides a `Result` type in `std.result`. However, for native compiler-supported fallible types (like `Type?`), Limit uses the built-in fallible system with lowercase `ok(...)` and `err(...)`.
+
+Here is how you define and use native fallible functions:
 
 ```limit
 fn divide(a: int, b: int): int?DivisionByZero {
     if (b == 0) {
-        return Err(DivisionByZero("Cannot divide by zero"));
+        return err(DivisionByZero("Cannot divide by zero"));
     }
-    return Ok(a / b);
+    return ok(a / b);
 }
 
 var result = divide(10, 2);
 match (result) {
-    Ok(value) => { print("Result: {value}"); },
-    Err(e) => { print("Error: {e}"); }
+    val value => { print("Result: {value}"); },
+    err e => { print("Error: {e.message}"); }
 }
 ```
 
 ### The Unified `Type?` System
 
-For convenience, Limit provides the `Type?` syntax as a shorthand for fallible operations. The `Type?` syntax is syntactic sugar for `Result<Type, DefaultError>`.
+For convenience, Limit provides the `Type?` syntax as a shorthand for fallible operations. The `Type?` syntax conceptually represents a union of the `Type` and an error.
 - **`Type?`**: A type that can either hold a value of `Type` or an error.
 - **`ok(value)`**: Constructs a success value.
 - **`err()`**: Constructs an error value.
 
 ### The `?` Operator for Propagating Errors
 
-The `?` operator is a convenient way to propagate errors up the call stack. If a function call returns an `Err`, the `?` operator will immediately return that `Err` from the current function.
+The `?` operator is a convenient way to propagate errors up the call stack. If a function call returns an `err()`, the `?` operator will immediately return that `err()` from the current function.
 
 ```limit
 fn get_number_from_string(s: str): int? {
-    var number: int = to_int(s)?; // If to_int returns Err, this function also returns Err
+    var number: int = to_int(s)?; // If to_int returns err(), this function also returns err()
     return ok(number * 2);
 }
 ```
@@ -1296,8 +1296,8 @@ The result is a **deterministic, region-scoped runtime** that feels automatic ye
 
 The `?` operator provides a convenient way to **propagate** both errors and absent values. When you append `?` to an expression that returns a `Type?`:
 
-*   If the value is `Ok(value)`, the operator unwraps the value and the program continues.
-*   If the value is `Err`, the `?` operator will cause the current function to immediately return that `Err`.
+*   If the value is successful (i.e. `ok(value)`), the operator unwraps the value and the program continues.
+*   If the value is an error (i.e. `err()`), the `?` operator will cause the current function to immediately return that `err()`.
 
 This allows you to write cleaner code by avoiding deeply nested `match` statements when you simply want to pass an error or absent value up the call stack.
 
@@ -1309,7 +1309,7 @@ fn to_int(s: str): int? {
 
 // This function uses '?' to propagate errors/absent values from to_int
 fn get_number_from_string(s: str): int? {
-    var number: int = to_int(s)?; // If to_int returns Err, this function also returns Err
+    var number: int = to_int(s)?; // If to_int returns err(), this function also returns err()
 
     // This code only runs if to_int was successful
     print("Parsing was successful!");
@@ -1317,8 +1317,8 @@ fn get_number_from_string(s: str): int? {
 }
 
 // Example usage:
-var result1 = get_number_from_string("10"); // result1 will be Ok(20)
-var result2 = get_number_from_string("abc"); // result2 will be Err
+var result1 = get_number_from_string("10"); // result1 will be ok(20)
+var result2 = get_number_from_string("abc"); // result2 will be err()
 ```
 
 ### Inline Error Handling with `? else`
