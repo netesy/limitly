@@ -1995,6 +1995,7 @@ Reg Generator::emit_list_expr(LM::Frontend::AST::ListExpr& expr) {
     // Emit ListCreate instruction
     emit_instruction(LIR_Inst(LIR_Op::ListCreate, abi_type, list_reg, 0, 0));
     set_register_type(list_reg, expr.inferred_type);
+    set_register_language_type(list_reg, expr.inferred_type);
     
     // Append elements to the list
     for (const auto& element : expr.elements) {
@@ -2269,6 +2270,7 @@ Reg Generator::emit_tuple_expr(LM::Frontend::AST::TupleExpr& expr) {
     // Emit TupleCreate instruction with the correct size
     emit_instruction(LIR_Inst(LIR_Op::TupleCreate, abi_type, tuple_reg, 0, 0, static_cast<uint32_t>(expr.elements.size())));
     set_register_type(tuple_reg, expr.inferred_type);
+    set_register_language_type(tuple_reg, expr.inferred_type);
     
     // Use TupleSet to add elements to the tuple
     for (size_t i = 0; i < expr.elements.size(); i++) {
@@ -2293,6 +2295,7 @@ Reg Generator::emit_dict_expr(LM::Frontend::AST::DictExpr& expr) {
     // Emit DictCreate instruction with default int hash/compare functions
     emit_instruction(LIR_Inst(LIR_Op::DictCreate, abi_type, dict_reg, 0, 0));
     set_register_type(dict_reg, expr.inferred_type);
+    set_register_language_type(dict_reg, expr.inferred_type);
     
     // Add key-value pairs to the dictionary
     for (const auto& [key_expr, value_expr] : expr.entries) {

@@ -271,6 +271,17 @@ ValuePtr register_to_value_ptr(RegisterValue rv) {
             TupleValue tv;
             for (uint64_t i = 0; i < tuple->size; ++i) tv.elements.push_back(register_to_value_ptr(tuple->elements[i]));
             return std::make_shared<::Value>(tupleType, tv);
+        } else if (h->type_id == TYPE_DICT) {
+            auto dict = (LmDict*)h;
+            auto dictType = std::make_shared<::Type>(::TypeTag::Dict);
+            DictValue dv;
+            uint64_t count = 0;
+            LmValue* items = lm_dict_items(dict, &count);
+            for (uint64_t i = 0; items && i < count; ++i) {
+                dv.elements[register_to_value_ptr(items[i * 2])] = register_to_value_ptr(items[i * 2 + 1]);
+            }
+            if (items) free(items);
+            return std::make_shared<::Value>(dictType, dv);
         } else if (h->type_id == TYPE_FRAME) {
             auto frame = (LmFrame*)h;
             auto frameType = std::make_shared<::Type>(::TypeTag::Frame);

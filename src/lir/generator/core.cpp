@@ -961,6 +961,75 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
     if (!ast_type) {
         return nullptr;
     }
+
+    if (ast_type->isFallible || ast_type->isOptional) {
+        // Temporarily clear modifiers to avoid infinite recursion
+        bool saved_fallible = ast_type->isFallible;
+        bool saved_optional = ast_type->isOptional;
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isFallible = false;
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isOptional = false;
+
+        auto success = convert_ast_type_to_lir_type(ast_type);
+
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isFallible = saved_fallible;
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isOptional = saved_optional;
+
+        if (!success) success = std::make_shared<::Type>(::TypeTag::Any);
+
+        if (saved_fallible) {
+            ::ErrorUnionType eut;
+            eut.successType = success;
+            eut.errorTypes = ast_type->errorTypes;
+            return std::make_shared<::Type>(::TypeTag::ErrorUnion, eut);
+        } else {
+            // Optional: Union of success and Nil
+            ::UnionType ut;
+            ut.types.push_back(success);
+            ut.types.push_back(std::make_shared<::Type>(::TypeTag::Nil));
+            return std::make_shared<::Type>(::TypeTag::Union, ut);
+        }
+    }
+
+    if (ast_type->isUnion) {
+        ::UnionType ut;
+        for (const auto& subtype : ast_type->unionTypes) {
+            auto converted = convert_ast_type_to_lir_type(subtype);
+            if (converted) {
+                ut.types.push_back(converted);
+            }
+        }
+        return std::make_shared<::Type>(::TypeTag::Union, ut);
+    }
+
+    if (ast_type->isList) {
+        auto elem = convert_ast_type_to_lir_type(ast_type->elementType);
+        if (!elem) elem = std::make_shared<::Type>(::TypeTag::Any);
+        ::ListType lt;
+        lt.elementType = elem;
+        return std::make_shared<::Type>(::TypeTag::List, lt);
+    }
+
+    if (ast_type->isDict) {
+        auto key = convert_ast_type_to_lir_type(ast_type->keyType);
+        if (!key) key = std::make_shared<::Type>(::TypeTag::Any);
+        auto val = convert_ast_type_to_lir_type(ast_type->valueType);
+        if (!val) val = std::make_shared<::Type>(::TypeTag::Any);
+        ::DictType dt;
+        dt.keyType = key;
+        dt.valueType = val;
+        return std::make_shared<::Type>(::TypeTag::Dict, dt);
+    }
+
+    if (ast_type->isTuple) {
+        ::TupleType tt;
+        for (const auto& subtype : ast_type->tupleTypes) {
+            auto converted = convert_ast_type_to_lir_type(subtype);
+            if (converted) {
+                tt.elementTypes.push_back(converted);
+            }
+        }
+        return std::make_shared<::Type>(::TypeTag::Tuple, tt);
+    }
     
     // Convert AST type to LIR type
     std::string typeName = ast_type->typeName;

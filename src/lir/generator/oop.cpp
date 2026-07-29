@@ -503,12 +503,40 @@ std::string Generator::resolve_qualified_frame_name(const std::string& name) {
 
 TypePtr Generator::resolve_underlying_type(TypePtr type) {
     if (!type) return nullptr;
-    if (type->tag == TypeTag::UserDefined) {
-        auto udt = std::get_if<UserDefinedType>(&type->extra);
+    if (type->tag == ::TypeTag::UserDefined) {
+        auto udt = std::get_if<::UserDefinedType>(&type->extra);
         if (udt && type_system_) {
             auto resolved = type_system_->getType(udt->name);
             if (resolved && resolved != type) {
                 return resolve_underlying_type(resolved);
+            }
+        }
+    }
+    if (type->tag == ::TypeTag::ErrorUnion) {
+        auto eut = std::get_if<::ErrorUnionType>(&type->extra);
+        if (eut) {
+            return resolve_underlying_type(eut->successType);
+        }
+    }
+    if (type->tag == ::TypeTag::Union) {
+        auto ut = std::get_if<::UnionType>(&type->extra);
+        if (ut) {
+            // Find first non-Nil variant that is Frame/Trait/TraitObject/UserDefined
+            for (const auto& variant : ut->types) {
+                if (variant && variant->tag != ::TypeTag::Nil) {
+                    auto resolved = resolve_underlying_type(variant);
+                    if (resolved && (resolved->tag == ::TypeTag::Frame ||
+                                     resolved->tag == ::TypeTag::Trait ||
+                                     resolved->tag == ::TypeTag::TraitObject)) {
+                        return resolved;
+                    }
+                }
+            }
+            // Fallback: just return the first non-Nil variant's underlying type
+            for (const auto& variant : ut->types) {
+                if (variant && variant->tag != ::TypeTag::Nil) {
+                    return resolve_underlying_type(variant);
+                }
             }
         }
     }
