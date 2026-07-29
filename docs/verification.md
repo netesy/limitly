@@ -14,10 +14,10 @@ This document tracks the consistency between learning materials, usage guides, t
 | **Decimals (`d2`/`d4`/`d6`)** | ✅ | ✅ | ✅ | `tests/decimal_tests.lm` | ✅ |
 | **Frames (`frame`)** | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm` | ✅ |
 | **Self Reference (`self`)** | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm` | ✅ |
-| **Traits (`trait`)** | ❌ (Advanced) | ✅ | ✅ | `tests/oop/traits_dynamic.lm` | ⚠️ |
+| **Traits (`trait`)** | ✅ | ✅ | ✅ | `tests/oop/traits_dynamic.lm` | ✅ |
 | **Modules (`import`)** | ✅ | ✅ | ✅ | `tests/modules/*` | ✅ |
 | **Fallible (`Type?`)** | ✅ | ✅ | ✅ | `tests/error_handling/unified_type_system.lm` | ✅ |
-| **Structured Concurrency** | ❌ (Advanced) | ✅ | ✅ | `tests/concurrency/*` | ⚠️ |
+| **Structured Concurrency** | ✅ | ✅ | ✅ | `tests/concurrency/*` | ✅ |
 | **Pattern Match (`match`)** | ✅ | ✅ | ✅ | `tests/loops/match.lm` | ✅ |
 | **Ternary (`? :`)** | ❌ | ⚠️ (Planned) | ⚠️ (Planned) | ❌ | 🚨 (Spec Drift) |
 | **Safe Access (`?.`)** | ❌ | ❌ | ⚠️ (Planned) | ❌ | 🚨 (Spec Drift) |
@@ -33,8 +33,8 @@ This document tracks the consistency between learning materials, usage guides, t
 ## 🚨 2. Surfaced Violations & Gaps
 
 ### 2.1 Documentation Coverage Gaps
-- **Traits/Interfaces in Onboarding**: `learn.md` does not introduce `trait` or polymorphic composition, focusing purely on basic frames.
-- **Structured Concurrency in Onboarding**: `learn.md` lacks a dedicated introduction to structured concurrency blocks (`parallel`/`concurrent`), leaving a gap for beginner systems-level learners.
+- **Traits/Interfaces in Onboarding**: `learn.md` does not introduce `trait` or polymorphic composition, focusing purely on basic frames. *[RESOLVED]*
+- **Structured Concurrency in Onboarding**: `learn.md` lacks a dedicated introduction to structured concurrency blocks (`parallel`/`concurrent`), leaving a gap for beginner systems-level learners. *[RESOLVED]*
 
 ### 2.2 Doc ↔ Code Mismatches
 - **Ok/Err Constructors**: Prior documentation taught uppercase `Ok(value)` and `Err(error)` constructs for native `Type?` return values. In reality, the compiler and TypeChecker expect lowercase `ok(value)` and `err()` (with uppercase variants reserved for stdlib wrappers in `std.result`). *[RESOLVED]*
