@@ -639,6 +639,8 @@ Limit is an object-oriented language and supports **frames** for creating user-d
 
 Frames are defined using the `frame` keyword.
 
+> ⚠️ **Critical Visibility Rule**: Frames and traits are implicitly public at the module level. You must **never** write the `pub` keyword in front of a `frame` or `trait` definition (e.g., `pub frame Greeter` or `pub trait Speaker` are syntax errors). Visibility modifiers (like `pub` and `prot`) can only be placed on fields and methods *inside* a frame or trait.
+
 ```limit
 frame Greeter {
     var name: str = "World";
