@@ -1,4 +1,5 @@
 #include "resource_manager.hh"
+#include "register.hh"
 #include <iostream>
 #include "../channel.hh"
 #include "../fiber.hh"

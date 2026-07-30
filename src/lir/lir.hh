@@ -169,6 +169,11 @@ enum class LIR_Op : uint8_t {
     CallbackCreate,     // Create callback wrapper returning callback ID
     CallbackDestroy,    // Destroy callback wrapper
     
+    // === Region Operations ===
+    RegionEnter,        // Enter region
+    RegionExit,         // Exit region
+    RegionMove,         // Move register pointer ownership to another region
+    
 };
 
 // ============================================================================
@@ -242,6 +247,8 @@ enum class LIR_Op : uint8_t {
     X(ForeignCall) X(ForeignCallDirect) \
     /* === REDESIGNED: Callbacks === */ \
     X(CallbackCreate) X(CallbackDestroy) \
+    /* === Region Operations === */ \
+    X(RegionEnter) X(RegionExit) X(RegionMove) \
 
 struct LIR_SourceLoc {
     std::string file;

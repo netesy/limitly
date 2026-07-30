@@ -87,7 +87,13 @@ void RegisterVM::execute_extern_library_load(const LIR::LIR_Inst* pc) {
     if (!handle) { registers[pc->dst] = VAL_NIL; return; }
     std::lock_guard<std::mutex> lock(g_library_mutex);
     g_libraries[reinterpret_cast<uintptr_t>(handle)] = path;
-    registers[pc->dst] = lm_alloc_foreign_ptr(handle);
+    RegisterValue val = lm_alloc_foreign_ptr(handle);
+    registers[pc->dst] = val;
+    // Register allocation with current active region
+    if (IS_PTR(val) && !vm_region_stack.empty()) {
+        uintptr_t ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+        vm_allocation_regions[ptr] = active_region_id;
+    }
 }
 
 void RegisterVM::execute_extern_library_unload(const LIR::LIR_Inst* pc) {
@@ -115,7 +121,13 @@ void RegisterVM::execute_extern_library_get_symbol(const LIR::LIR_Inst* pc) {
     #else
     void* ptr = dlsym(handle, symbol);
     #endif
-    registers[pc->dst] = ptr ? lm_alloc_foreign_ptr(ptr) : VAL_NIL;
+    RegisterValue val = ptr ? lm_alloc_foreign_ptr(ptr) : VAL_NIL;
+    registers[pc->dst] = val;
+    // Register allocation with current active region
+    if (IS_PTR(val) && !vm_region_stack.empty()) {
+        uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+        vm_allocation_regions[ptr_val] = active_region_id;
+    }
 }
 
 void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
@@ -189,7 +201,16 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
             case LIR::Type::F32: registers[pc->dst] = make_float((double)*(float*)&result_storage); break;
             case LIR::Type::F64: registers[pc->dst] = make_float(*(double*)&result_storage); break;
             case LIR::Type::Bool: registers[pc->dst] = (*(uint8_t*)&result_storage) ? VAL_TRUE : VAL_FALSE; break;
-            case LIR::Type::Ptr:  registers[pc->dst] = lm_alloc_foreign_ptr(*(void**)&result_storage); break;
+            case LIR::Type::Ptr:  {
+                RegisterValue val = lm_alloc_foreign_ptr(*(void**)&result_storage);
+                registers[pc->dst] = val;
+                // Register allocation with current active region
+                if (IS_PTR(val) && !vm_region_stack.empty()) {
+                    uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+                    vm_allocation_regions[ptr_val] = active_region_id;
+                }
+                break;
+            }
             default: registers[pc->dst] = VAL_NIL; break;
         }
     } else registers[pc->dst] = VAL_NIL;
@@ -209,8 +230,15 @@ void RegisterVM::execute_extern_get_callback_ptr(const LIR::LIR_Inst* pc) {
     int64_t id = to_int(registers[pc->a]);
     std::lock_guard<std::mutex> lock(g_callback_mutex);
     auto it = g_callbacks.find(id);
-    if (it != g_callbacks.end()) registers[pc->dst] = lm_alloc_foreign_ptr(it->second);
-    else registers[pc->dst] = VAL_NIL;
+    if (it != g_callbacks.end()) {
+        RegisterValue val = lm_alloc_foreign_ptr(it->second);
+        registers[pc->dst] = val;
+        // Register allocation with current active region
+        if (IS_PTR(val) && !vm_region_stack.empty()) {
+            uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+            vm_allocation_regions[ptr_val] = active_region_id;
+        }
+    } else registers[pc->dst] = VAL_NIL;
 }
 
 void RegisterVM::execute_extern_ccall_frame_create(const LIR::LIR_Inst* pc) {

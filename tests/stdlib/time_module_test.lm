@@ -5,7 +5,7 @@ import std.time.index as t;
 fn test_duration(): int {
     print("Testing Duration...");
     var d1 = t.Duration(10, 0) as t.Duration;
-    var d2 = t.Duration(20, 0) as t.Duration;
+    var dt2 = t.Duration(20, 0) as t.Duration;
     var d3 = d1.add(d2) as t.Duration;
     assert(d3.seconds == 30, "duration add failed");
 

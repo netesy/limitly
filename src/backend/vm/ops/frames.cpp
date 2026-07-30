@@ -13,14 +13,26 @@ namespace Register {
 
 void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
-        case LIR::LIR_Op::NewFrame:
+        case LIR::LIR_Op::NewFrame: {
             // LIR generator puts field count in pc->imm
-            registers[pc->dst] = BOX_PTR(lm_frame_alloc(pc->type_name.c_str(), pc->imm));
+            LmFrame* frame = reinterpret_cast<LmFrame*>(lm_frame_alloc(pc->type_name.c_str(), pc->imm));
+            registers[pc->dst] = BOX_PTR(frame);
+            // Register allocation with current active region
+            if (frame && !vm_region_stack.empty()) {
+                uintptr_t ptr = reinterpret_cast<uintptr_t>(frame);
+                vm_allocation_regions[ptr] = active_region_id;
+            }
             break;
+        }
         case LIR::LIR_Op::FrameGetField:
+            std::printf("[DEBUG frames.cpp] FrameGetField: pc->a=%u registers[pc->a]=%lx\n", pc->a, (unsigned long)registers[pc->a]);
             if (IS_PTR(registers[pc->a])) {
                 LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && pc->b >= 0 && pc->b < f->field_count) {
+                if (f) {
+                    std::printf("[DEBUG frames.cpp] FrameGetField unboxed frame=%p type_id=%u field_count=%d pc->b=%d\n", (void*)f, f->header.type_id, f->field_count, (int)pc->b);
+                }
+                if (f && f->header.type_id == TYPE_FRAME && pc->b >= 0 && pc->b < f->field_count) {
+                    std::printf("[DEBUG frames.cpp] FrameGetField frame=%p (name=%s) offset=%d val=%lx\n", (void*)f, f->name ? f->name : "null", (int)pc->b, (unsigned long)f->fields[pc->b]);
                     registers[pc->dst] = f->fields[pc->b];
                 } else {
                     registers[pc->dst] = 0;
@@ -31,8 +43,12 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             // pc->dst holds the frame pointer (container), pc->b holds the value.
             if (IS_PTR(registers[pc->dst])) {
                 LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->dst]);
-                if (f && pc->a >= 0 && pc->a < f->field_count) {
+                if (f) {
+                    std::printf("[DEBUG frames.cpp] FrameSetField frame=%p type_id=%u field_count=%d pc->a=%d\n", (void*)f, f->header.type_id, f->field_count, (int)pc->a);
+                }
+                if (f && f->header.type_id == TYPE_FRAME && pc->a >= 0 && pc->a < f->field_count) {
                     f->fields[pc->a] = registers[pc->b];
+                    transfer_ownership(registers[pc->b], registers[pc->dst]);
                 }
             }
             break;
@@ -42,7 +58,7 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             // distinction exists for future memory-model work).
             if (IS_PTR(registers[pc->a])) {
                 LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && pc->b >= 0 && pc->b < f->field_count) {
+                if (f && f->header.type_id == TYPE_FRAME && pc->b >= 0 && pc->b < f->field_count) {
                     registers[pc->dst] = lm_frame_get_field_atomic(f, (int)pc->b);
                 } else {
                     registers[pc->dst] = VAL_NIL;
@@ -54,8 +70,9 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::FrameSetFieldAtomic:
             if (IS_PTR(registers[pc->dst])) {
                 LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->dst]);
-                if (f && pc->a >= 0 && pc->a < f->field_count) {
+                if (f && f->header.type_id == TYPE_FRAME && pc->a >= 0 && pc->a < f->field_count) {
                     lm_frame_set_field_atomic(f, (int)pc->a, registers[pc->b]);
+                    transfer_ownership(registers[pc->b], registers[pc->dst]);
                 }
             }
             break;
@@ -85,11 +102,36 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::FrameCallInit:
             // Init dispatch is handled at LIR-generation time; no-op here.
             break;
-        case LIR::LIR_Op::FrameCallDeinit:
-            // Deinit dispatch: no-op for now (full implementation would call
-            // the frame's deinit() method). Silently continuing is safer than
-            // throwing, which breaks programs that define deinit().
+        case LIR::LIR_Op::FrameCallDeinit: {
+            if (IS_PTR(registers[pc->a])) {
+                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
+                if (f && f->header.type_id == TYPE_FRAME && f->name) {
+                    std::string frame_name = f->name;
+                    std::string deinit_func_name = frame_name + ".deinit";
+                    auto& func_manager = LIR::LIRFunctionManager::getInstance();
+                    if (func_manager.hasFunction(deinit_func_name)) {
+                        auto func = func_manager.getFunction(deinit_func_name);
+                        
+                        // Execute deinitializer with 'this' (registers[pc->a]) as argument 0
+                        auto saved_registers = registers;
+                        const LIR::LIR_Function* saved_func = current_function_;
+
+                        registers.assign(registers.size(), VAL_NIL);
+                        registers[0] = saved_registers[pc->a]; // 'this' is in reg 0
+
+                        LIR::LIR_Function temp_wrapper(func->getName(), 1);
+                        temp_wrapper.instructions = func->getInstructions();
+                        current_function_ = &temp_wrapper;
+
+                        execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
+
+                        registers = saved_registers;
+                        current_function_ = saved_func;
+                    }
+                }
+            }
             break;
+        }
         case LIR::LIR_Op::MakeTraitObject:
             // Minimal placeholder: produce a 2-field frame [instance_ptr, trait_id].
             // Full trait vtable is deferred.

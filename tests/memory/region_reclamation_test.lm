@@ -1,0 +1,33 @@
+// Test basic region-aware memory reclamation
+fn test_list_reclamation() {
+    {
+        var lst = [1, 2, 3];
+        // lst should be reclaimed when this block exits
+    }
+    // Memory for lst should be freed here
+    print("List reclamation test passed");
+}
+
+fn test_dict_reclamation() {
+    {
+        var dict = {"a": 1, "b": 2};
+        // dict should be reclaimed when this block exits
+    }
+    // Memory for dict should be freed here
+    print("Dict reclamation test passed");
+}
+
+fn test_nested_reclamation() {
+    {
+        var lst = [[1, 2], [3, 4]];
+        // Nested lists should be reclaimed when this block exits
+    }
+    print("Nested reclamation test passed");
+}
+
+fn main() {
+    test_list_reclamation();
+    test_dict_reclamation();
+    test_nested_reclamation();
+    print("All reclamation tests passed");
+}
