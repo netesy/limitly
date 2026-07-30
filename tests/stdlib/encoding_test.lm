@@ -1,0 +1,43 @@
+// Test suite for Standard Library Encoding Module
+
+import std.encoding.index as enc;
+
+fn main(): int {
+    print("=== Encoding Module Test Suite ===");
+
+    // Test Base64
+    var bytes = [72, 101, 108, 108, 111]; // "Hello"
+    var b64_str = enc.base64_encode(bytes);
+    assert(b64_str == "SGVsbG8=", "base64 encode failed: " + b64_str);
+
+    var decoded = enc.base64_decode("SGVsbG8=");
+    assert(len(decoded) == 5, "base64 decode len failed");
+    assert(decoded[0] == 72, "decoded[0] failed");
+    assert(decoded[1] == 101, "decoded[1] failed");
+    assert(decoded[2] == 108, "decoded[2] failed");
+    assert(decoded[3] == 108, "decoded[3] failed");
+    assert(decoded[4] == 111, "decoded[4] failed");
+
+    // Test Hex
+    var hex_str = enc.hex_encode(bytes);
+    assert(hex_str == "48656c6c6f", "hex encode failed: " + hex_str);
+
+    var decoded_hex = enc.hex_decode("48656c6c6f");
+    assert(len(decoded_hex) == 5, "hex decode len failed");
+    assert(decoded_hex[0] == 72, "hex decoded[0] failed");
+    assert(decoded_hex[4] == 111, "hex decoded[4] failed");
+
+    assert(enc.byte_to_hex(255) == "ff", "byte_to_hex failed");
+    assert(enc.hex_to_byte("ff") == 255, "hex_to_byte failed");
+
+    // Test Percent
+    var url_raw = "hello world/test?key=val+res#frag";
+    var encoded_url = enc.url_encode(url_raw);
+    assert(encoded_url == "hello%20world%2Ftest%3Fkey%3Dval%2Bres%23frag", "url_encode failed: " + encoded_url);
+
+    var decoded_url = enc.url_decode(encoded_url);
+    assert(decoded_url == url_raw, "url_decode failed: " + decoded_url);
+
+    print("All encoding tests passed successfully!");
+    return 0;
+}

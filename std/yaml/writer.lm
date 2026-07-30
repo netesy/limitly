@@ -1,0 +1,32 @@
+// YAML Writer Module
+
+import std.yaml.value as val_mod;
+
+pub fn stringify(val_any: any): str {
+    var jval = val_any as val_mod.YAMLValue;
+    if (jval == nil) {
+        return "";
+    }
+
+    if (jval.type_tag == "string") {
+        return "\"" + jval.str_val + "\"";
+    } elif (jval.type_tag == "number") {
+        var num = jval.num_val;
+        return "{num}";
+    } elif (jval.type_tag == "bool") {
+        if (jval.bool_val == true) {
+            return "true";
+        }
+        return "false";
+    } elif (jval.type_tag == "object") {
+        var res = "";
+        var i = 0;
+        var keys_len = len(jval.obj_keys);
+        while (i < keys_len) {
+            res = res + jval.obj_keys[i] + ": " + stringify(jval.obj_vals[i]) + "\n";
+            i = i + 1;
+        }
+        return res;
+    }
+    return "";
+}

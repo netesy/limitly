@@ -1,0 +1,40 @@
+// XML Writer Module
+
+import std.xml.document as doc;
+
+pub fn stringify_node(val_any: any): str {
+    var node = val_any as doc.XMLNode;
+    if (node == nil) {
+        return "";
+    }
+
+    var res = "<" + node.name;
+    var i = 0;
+    var keys_len = len(node.attrs_keys);
+    while (i < keys_len) {
+        res = res + " " + node.attrs_keys[i] + "=\"" + node.attrs_vals[i] + "\"";
+        i = i + 1;
+    }
+
+    var children_len = len(node.children);
+    if (children_len == 0 and node.text == "") {
+        res = res + "/>";
+        return res;
+    }
+
+    res = res + ">";
+    res = res + node.text;
+
+    i = 0;
+    while (i < children_len) {
+        res = res + stringify_node(node.children[i]);
+        i = i + 1;
+    }
+
+    res = res + "</" + node.name + ">";
+    return res;
+}
+
+pub fn stringify(doc_val: doc.XMLDocument): str {
+    return stringify_node(doc_val.root);
+}

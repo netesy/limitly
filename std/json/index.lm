@@ -1,0 +1,12 @@
+// JSON Module Gateway Index
+
+import std.json.parser as parser_mod;
+import std.json.writer as writer_mod;
+
+pub fn parse(text: str): any {
+    return parser_mod.parse(text);
+}
+
+pub fn stringify(val_any: any): str {
+    return writer_mod.stringify(val_any);
+}

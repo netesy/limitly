@@ -1,0 +1,59 @@
+// HTML Entity Escape and Unescape Module
+
+pub fn escape(text: str): str {
+    var res = "";
+    var i = 0;
+    var length = len(text);
+    while (i < length) {
+        var ch = _builtin_substring(text, i, i + 1);
+        if (ch == "&") {
+            res = res + "&amp;";
+        } elif (ch == "<") {
+            res = res + "&lt;";
+        } elif (ch == ">") {
+            res = res + "&gt;";
+        } elif (ch == "\"") {
+            res = res + "&quot;";
+        } elif (ch == "'") {
+            res = res + "&#39;";
+        } else {
+            res = res + ch;
+        }
+        i = i + 1;
+    }
+    return res;
+}
+
+pub fn unescape(text: str): str {
+    var res = "";
+    var i = 0;
+    var length = len(text);
+    while (i < length) {
+        var ch = _builtin_substring(text, i, i + 1);
+        if (ch == "&") {
+            if (i + 4 <= length and _builtin_substring(text, i, i + 4) == "&lt;") {
+                res = res + "<";
+                i = i + 4;
+            } elif (i + 4 <= length and _builtin_substring(text, i, i + 4) == "&gt;") {
+                res = res + ">";
+                i = i + 4;
+            } elif (i + 5 <= length and _builtin_substring(text, i, i + 5) == "&amp;") {
+                res = res + "&";
+                i = i + 5;
+            } elif (i + 6 <= length and _builtin_substring(text, i, i + 6) == "&quot;") {
+                res = res + "\"";
+                i = i + 6;
+            } elif (i + 5 <= length and _builtin_substring(text, i, i + 5) == "&#39;") {
+                res = res + "'";
+                i = i + 5;
+            } else {
+                res = res + ch;
+                i = i + 1;
+            }
+        } else {
+            res = res + ch;
+            i = i + 1;
+        }
+    }
+    return res;
+}

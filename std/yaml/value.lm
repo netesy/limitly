@@ -1,0 +1,32 @@
+// YAML Value representation
+
+pub frame YAMLValue {
+    pub type_tag: str; // "object", "string", "number", "bool"
+    pub str_val: str;
+    pub num_val: int;
+    pub bool_val: bool;
+    pub obj_keys: [str];
+    pub obj_vals: [any];
+}
+
+pub fn make_string(v: str): YAMLValue {
+    var keys: [str] = [];
+    var vals: [any] = [];
+    return YAMLValue(type_tag="string", str_val=v, num_val=0, bool_val=false, obj_keys=keys, obj_vals=vals);
+}
+
+pub fn make_number(v: int): YAMLValue {
+    var keys: [str] = [];
+    var vals: [any] = [];
+    return YAMLValue(type_tag="number", str_val="", num_val=v, bool_val=false, obj_keys=keys, obj_vals=vals);
+}
+
+pub fn make_bool(v: bool): YAMLValue {
+    var keys: [str] = [];
+    var vals: [any] = [];
+    return YAMLValue(type_tag="bool", str_val="", num_val=0, bool_val=v, obj_keys=keys, obj_vals=vals);
+}
+
+pub fn make_object(k: [str], v: [any]): YAMLValue {
+    return YAMLValue(type_tag="object", str_val="", num_val=0, bool_val=false, obj_keys=k, obj_vals=v);
+}

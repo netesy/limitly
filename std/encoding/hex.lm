@@ -1,0 +1,68 @@
+// Hex Encoding Module
+
+fn hex_char_to_val(ch: str): int {
+    if (ch == "0") return 0;
+    if (ch == "1") return 1;
+    if (ch == "2") return 2;
+    if (ch == "3") return 3;
+    if (ch == "4") return 4;
+    if (ch == "5") return 5;
+    if (ch == "6") return 6;
+    if (ch == "7") return 7;
+    if (ch == "8") return 8;
+    if (ch == "9") return 9;
+    if (ch == "a" or ch == "A") return 10;
+    if (ch == "b" or ch == "B") return 11;
+    if (ch == "c" or ch == "C") return 12;
+    if (ch == "d" or ch == "D") return 13;
+    if (ch == "e" or ch == "E") return 14;
+    if (ch == "f" or ch == "F") return 15;
+    return 0;
+}
+
+pub fn to_hex(bytes: [int]): str {
+    var hex: str = "0123456789abcdef";
+    var res: str = "";
+    var i: int = 0;
+    var length = len(bytes);
+    while (i < length) {
+        var b: int = bytes[i];
+        var idx1 = (b >> 4) & 15;
+        var idx2 = b & 15;
+        res = res + _builtin_substring(hex, idx1, idx1 + 1);
+        res = res + _builtin_substring(hex, idx2, idx2 + 1);
+        i = i + 1;
+    }
+    return res;
+}
+
+pub fn from_hex(s: str): [int] {
+    var res: [int] = [];
+    var i: int = 0;
+    var length = len(s);
+    while (i < length) {
+        if (i + 1 < length) {
+            var h: int = hex_char_to_val(_builtin_substring(s, i, i + 1));
+            var l: int = hex_char_to_val(_builtin_substring(s, i + 1, i + 2));
+            res.append((h << 4) | l);
+        }
+        i = i + 2;
+    }
+    return res;
+}
+
+pub fn byte_to_hex(b: int): str {
+    var hex: str = "0123456789abcdef";
+    var hi: int = (b >> 4) & 15;
+    var lo: int = b & 15;
+    return _builtin_substring(hex, hi, hi + 1) + _builtin_substring(hex, lo, lo + 1);
+}
+
+pub fn hex_to_byte(h: str): int {
+    if (len(h) < 2) {
+        return 0;
+    }
+    var hi: int = hex_char_to_val(_builtin_substring(h, 0, 1));
+    var lo: int = hex_char_to_val(_builtin_substring(h, 1, 2));
+    return (hi << 4) | lo;
+}
