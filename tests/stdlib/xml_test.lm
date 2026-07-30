@@ -1,0 +1,24 @@
+// Test suite for Standard Library XML Module
+
+import std.xml.index as xml;
+import std.xml.document as doc;
+
+fn main(): int {
+    print("=== XML Module Test Suite ===");
+
+    var xml_str = "<user id=\"123\">John</user>";
+    var doc_val = xml.parse(xml_str) as doc.XMLDocument;
+    var root_node = doc_val.root as doc.XMLNode;
+
+    assert(root_node.name == "user", "root node name failed");
+    assert(root_node.text == "John", "root node text failed");
+    assert(len(root_node.attrs_keys) == 1, "attrs keys count failed");
+    assert(root_node.attrs_keys[0] == "id", "attr key failed");
+    assert(root_node.attrs_vals[0] == "123", "attr val failed");
+
+    var serialized = xml.stringify(root_node);
+    assert(serialized == xml_str, "xml stringify failed: " + serialized);
+
+    print("All XML tests passed successfully!");
+    return 0;
+}

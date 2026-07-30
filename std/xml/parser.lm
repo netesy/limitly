@@ -1,0 +1,140 @@
+// XML Parser Module
+
+import std.xml.document as doc;
+
+pub frame XMLParser {
+    pub idx: int;
+    pub text: str;
+
+    pub fn skip_whitespace() {
+        var length = len(self.text);
+        var skip = true;
+        while (self.idx < length and skip == true) {
+            var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+            if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
+                self.idx = self.idx + 1;
+            } else {
+                skip = false;
+            }
+        }
+    }
+
+    pub fn parse_node(): any {
+        self.skip_whitespace();
+        var length = len(self.text);
+        if (self.idx >= length) return nil;
+
+        var open_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+        if (open_ch != "<") return nil;
+        self.idx = self.idx + 1; // skip '<'
+
+        var tag_start = self.idx;
+        var find_tag_end = true;
+        while (self.idx < length and find_tag_end == true) {
+            var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+            if (ch == ">" or ch == " " or ch == "/" or ch == "\t") {
+                find_tag_end = false;
+            } else {
+                self.idx = self.idx + 1;
+            }
+        }
+        var tag_name = _builtin_substring(self.text, tag_start, self.idx);
+
+        var keys: [str] = [];
+        var vals: [str] = [];
+        var parse_attrs = true;
+        while (self.idx < length and parse_attrs == true) {
+            var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+            if (ch == ">") {
+                self.idx = self.idx + 1; // skip '>'
+                parse_attrs = false;
+            } elif (ch == "/") {
+                self.idx = self.idx + 2; // skip '/>'
+                var kids: [any] = [];
+                return doc.make_node(tag_name, "", keys, vals, kids) as any;
+            } elif (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
+                self.idx = self.idx + 1;
+            } else {
+                var attr_key_start = self.idx;
+                var find_eq = true;
+                while (self.idx < length and find_eq == true) {
+                    var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+                    if (cur_ch == "=") {
+                        find_eq = false;
+                    } else {
+                        self.idx = self.idx + 1;
+                    }
+                }
+                var attr_key = _builtin_substring(self.text, attr_key_start, self.idx);
+                self.idx = self.idx + 1; // skip '='
+
+                var quote_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+                self.idx = self.idx + 1; // skip quote
+                var attr_val_start = self.idx;
+                var find_quote = true;
+                while (self.idx < length and find_quote == true) {
+                    var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+                    if (cur_ch == quote_ch) {
+                        find_quote = false;
+                    } else {
+                        self.idx = self.idx + 1;
+                    }
+                }
+                var attr_val = _builtin_substring(self.text, attr_val_start, self.idx);
+                self.idx = self.idx + 1; // skip quote
+
+                keys.append(attr_key);
+                vals.append(attr_val);
+            }
+        }
+
+        var text_start = self.idx;
+        var find_tag_open = true;
+        while (self.idx < length and find_tag_open == true) {
+            var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+            if (ch == "<") {
+                find_tag_open = false;
+            } else {
+                self.idx = self.idx + 1;
+            }
+        }
+        var inner_text = _builtin_substring(self.text, text_start, self.idx);
+
+        var next_ch = _builtin_substring(self.text, self.idx + 1, self.idx + 2);
+        if (next_ch == "/") {
+            while (self.idx < length and _builtin_substring(self.text, self.idx, self.idx + 1) != ">") {
+                self.idx = self.idx + 1;
+            }
+            self.idx = self.idx + 1; // skip '>'
+            var kids: [any] = [];
+            return doc.make_node(tag_name, inner_text, keys, vals, kids) as any;
+        }
+
+        var children: [any] = [];
+        var parse_children = true;
+        while (self.idx < length and parse_children == true) {
+            var child = self.parse_node();
+            if (child != nil) {
+                children.append(child);
+            }
+            self.skip_whitespace();
+            var close_slash = _builtin_substring(self.text, self.idx + 1, self.idx + 2);
+            if (close_slash == "/") {
+                parse_children = false;
+            }
+        }
+
+        while (self.idx < length and _builtin_substring(self.text, self.idx, self.idx + 1) != ">") {
+            self.idx = self.idx + 1;
+        }
+        self.idx = self.idx + 1; // skip '>'
+
+        return doc.make_node(tag_name, inner_text, keys, vals, children) as any;
+    }
+}
+
+pub fn parse(text: str): doc.XMLDocument {
+    var p = XMLParser(idx=0, text=text);
+    var root = p.parse_node();
+    return doc.make_document(root);
+}
