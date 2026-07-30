@@ -1357,6 +1357,10 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             set_register_type(result, expr.inferred_type);
             set_register_language_type(result, expr.inferred_type);
             
+            if (!scope_stack_.empty() && frame_it->second.has_deinit) {
+                scope_stack_.back().frame_instances.push_back({func_name, result});
+            }
+            
             const auto& frame_decl = frame_it->second.declaration;
             if (frame_decl) {
                 for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
@@ -1536,6 +1540,10 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     set_register_type(result, expr.inferred_type);
                     set_register_language_type(result, expr.inferred_type);
                     
+                    if (!scope_stack_.empty() && frame_it->second.has_deinit) {
+                        scope_stack_.back().frame_instances.push_back({qualified_name, result});
+                    }
+                    
                     const auto& frame_decl = frame_it->second.declaration;
                     if (frame_decl) {
                         for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
@@ -1714,7 +1722,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
     if (expr.object && expr.member) {
         // Find if 'value' corresponds to a frame instance in current scope
         Reg source_reg = value;
-        
+
         // Follow Mov chains to find original allocation
         for (auto it = current_function_->instructions.rbegin(); it != current_function_->instructions.rend(); ++it) {
             if (it->op == LIR_Op::Mov && it->dst == source_reg) {
@@ -1728,6 +1736,11 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 if (it->second == source_reg) {
                     // Transfer ownership to the object field
                     scope.frame_instances.erase(it);
+                    // Emit RegionMove to transfer ownership to container's region
+                    if (!generator_region_stack_.empty()) {
+                        uint32_t target_region = generator_region_stack_.back();
+                        emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, value, target_region, 0));
+                    }
                     break;
                 }
             }
@@ -1995,6 +2008,7 @@ Reg Generator::emit_list_expr(LM::Frontend::AST::ListExpr& expr) {
     // Emit ListCreate instruction
     emit_instruction(LIR_Inst(LIR_Op::ListCreate, abi_type, list_reg, 0, 0));
     set_register_type(list_reg, expr.inferred_type);
+    set_register_language_type(list_reg, expr.inferred_type);
     
     // Append elements to the list
     for (const auto& element : expr.elements) {
@@ -2269,6 +2283,7 @@ Reg Generator::emit_tuple_expr(LM::Frontend::AST::TupleExpr& expr) {
     // Emit TupleCreate instruction with the correct size
     emit_instruction(LIR_Inst(LIR_Op::TupleCreate, abi_type, tuple_reg, 0, 0, static_cast<uint32_t>(expr.elements.size())));
     set_register_type(tuple_reg, expr.inferred_type);
+    set_register_language_type(tuple_reg, expr.inferred_type);
     
     // Use TupleSet to add elements to the tuple
     for (size_t i = 0; i < expr.elements.size(); i++) {
@@ -2293,6 +2308,7 @@ Reg Generator::emit_dict_expr(LM::Frontend::AST::DictExpr& expr) {
     // Emit DictCreate instruction with default int hash/compare functions
     emit_instruction(LIR_Inst(LIR_Op::DictCreate, abi_type, dict_reg, 0, 0));
     set_register_type(dict_reg, expr.inferred_type);
+    set_register_language_type(dict_reg, expr.inferred_type);
     
     // Add key-value pairs to the dictionary
     for (const auto& [key_expr, value_expr] : expr.entries) {

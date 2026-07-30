@@ -90,6 +90,7 @@ RUNTIME_API LmBox* lm_box_float(double value);
 RUNTIME_API LmBox* lm_box_bool(uint8_t value);
 RUNTIME_API LmBox* lm_box_string(const char* value);
 RUNTIME_API LmBox* lm_box_nullptr(void);
+RUNTIME_API void lm_box_free(LmBox* box);
 
 RUNTIME_API void* lm_frame_alloc(const char* name, int fields);
 RUNTIME_API LmValue lm_frame_get_field(void* frame, int offset);

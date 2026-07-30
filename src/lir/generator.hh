@@ -95,6 +95,12 @@ public:
     Reg allocate_register();
     void enter_scope();
     void exit_scope();
+    
+    // Memory info helpers for unified region management
+    std::optional<LM::Frontend::AST::MemoryInfo> get_memory_info_from_statement(const LM::Frontend::AST::Statement& stmt);
+    std::optional<LM::Frontend::AST::MemoryInfo> get_memory_info_from_expression(const LM::Frontend::AST::Expression& expr);
+    void emit_region_enter_from_memory_info(const LM::Frontend::AST::Statement& stmt);
+    void emit_region_exit_from_memory_info(const LM::Frontend::AST::Statement& stmt);
     void bind_variable(const std::string& name, Reg reg);
 private:
     void update_variable_binding(const std::string& name, Reg reg);
@@ -283,6 +289,7 @@ private:
         LIR_BasicBlock* entry_block = nullptr;
         LIR_BasicBlock* exit_block = nullptr;
         bool building_cfg = false;
+        bool in_control_flow = false;  // Track if we're in control flow (if/while/for/match)
     };
 
     std::unique_ptr<LIR_Function> current_function_;
@@ -298,6 +305,8 @@ private:
     static size_t lambda_counter_;
     uint32_t next_register_ = 0;
     uint32_t next_label_ = 0;
+    uint32_t generator_region_counter_ = 0;
+    std::vector<uint32_t> generator_region_stack_;
     std::map<std::string, TypePtr> variable_types_;
     std::shared_ptr<TypeSystem> type_system_;
     std::string current_function_name_;

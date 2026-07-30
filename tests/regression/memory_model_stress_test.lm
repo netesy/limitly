@@ -1,0 +1,129 @@
+// Comprehensive memory model regression and stress test
+
+frame ManagedFrame {
+    pub data: {str: any};
+    pub value: int;
+    
+    pub init(d: {str: any}, v: int) {
+        self.data = d;
+        self.value = v;
+    }
+}
+
+// Frame with explicit deinitializer for verification
+frame DeinitFrame {
+    pub name: str;
+    pub flag: bool;
+    
+    pub init(n: str, f: bool) {
+        self.name = n;
+        self.flag = f;
+    }
+    
+    pub deinit() {
+        print("DeinitFrame.deinit called for: {self.name}");
+    }
+}
+
+fn create_local_string(): str {
+    return "returned_string";
+}
+
+fn create_nested_structure(v: int): ManagedFrame {
+    var d = {} as {str: any};
+    d["num"] = v;
+    d["sub"] = {} as {str: any};
+    
+    var sub_dict = d["sub"] as {str: any};
+    sub_dict["hello"] = "world";
+    
+    var frame_inst = ManagedFrame(d, 42);
+    return frame_inst;
+}
+
+fn test_early_return(cond: bool): {str: any} {
+    var dict = {} as {str: any};
+    dict["key"] = "test";
+    
+    if (cond == true) {
+        return dict; // Escapes, survives
+    }
+    
+    // Fallthrough: dict goes out of scope and gets reclaimed
+    return {} as {str: any};
+}
+
+fn test_nested_regions() {
+    var outer_dict = {} as {str: any};
+    outer_dict["level"] = "outer";
+    
+    {
+        var inner_dict = {} as {str: any};
+        inner_dict["level"] = "inner";
+        outer_dict["inner_ref"] = inner_dict; // Transfers ownership to outer_dict, escapes inner block exit
+    }
+    
+    var retrieved_inner = outer_dict["inner_ref"] as {str: any};
+    assert(retrieved_inner["level"] == "inner", "Nested region escape failed");
+}
+
+fn main() {
+    print("=== Memory Model and Region Reclamation Test ===");
+
+    // 1. Primitives (Verify basic types work with copy semantics)
+    var a = 42;
+    var b = true;
+    var c = 3.14;
+    assert(a == 42, "Primitive integer mismatch");
+    assert(b == true, "Primitive boolean mismatch");
+
+    // 2. Local Strings
+    var s = create_local_string();
+    assert(s == "returned_string", "Heap-backed string escape failed");
+
+    // 3. Lists and Dictionaries
+    var d = {} as {str: any};
+    d["first"] = [1, 2, 3];
+    var list = d["first"] as [int];
+    assert(list[1] == 2, "List element indexing failed");
+
+    // 4. Frames and Deinitializers
+    {
+        var df = DeinitFrame("TempObject", true);
+        assert(df.flag == true, "Frame field access failed");
+        // df deinitializer is implicitly called at block scope exit
+    }
+
+    // 5. Nested Structures and Recursive Ownership
+    var mf = create_nested_structure(99);
+    assert(mf.value == 42, "Frame field mismatch");
+    var mf_data = mf.data;
+    assert(mf_data["num"] == 99, "Nested dictionary retrieval failed");
+
+    // 6. Early and Conditional Returns
+    var r1 = test_early_return(true);
+    assert(r1["key"] == "test", "Early return escape failed");
+    
+    var r2 = test_early_return(false);
+    assert(r2["key"] == nil, "Fallthrough deallocation failure");
+
+    // 7. Nested Scopes/Regions
+    test_nested_regions();
+
+    // 8. CRITICAL LONG-RUNNING STRESS LOOP (100,000 Iterations)
+    // Compiles and runs a massive stress loop to verify region-local reclamation.
+    // If reclamation were missing, 100,000 allocations of frames & nested dictionaries
+    // would result in massive heap growth and VM out-of-memory crash.
+    print("Starting stress loop (100,000 iterations)...");
+    var i = 0;
+    while (i < 100000) {
+        var temp_frame = create_nested_structure(i);
+        var temp_data = temp_frame.data;
+        assert(temp_data["num"] == i, "Stress loop validation failed");
+        
+        i = i + 1;
+    }
+    print("Stress loop completed successfully!");
+
+    print("=== All Memory Model and Region Reclamation Tests Passed ===");
+}

@@ -29,8 +29,8 @@ ifeq ($(MODE),debug)
 	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I. -Isrc
 else
-	CXXFLAGS := -std=c++20 -O3 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
-	CFLAGS := -std=c99 -O3 -fPIC -I. -Isrc
+	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CFLAGS := -std=c99 -O2 -fPIC -I. -Isrc
 endif
 
 ifeq ($(PLATFORM),windows)

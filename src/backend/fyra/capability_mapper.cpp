@@ -43,6 +43,9 @@ std::optional<CapabilityDescriptor> CapabilityMapper::map(LIR::LIR_Op op) {
         case LIR::LIR_Op::ForeignCallDirect:
         case LIR::LIR_Op::CallbackCreate:
         case LIR::LIR_Op::CallbackDestroy:
+        case LIR::LIR_Op::RegionEnter:
+        case LIR::LIR_Op::RegionExit:
+        case LIR::LIR_Op::RegionMove:
             return std::nullopt;
         
         default:

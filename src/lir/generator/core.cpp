@@ -146,6 +146,11 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     auto saved_cfg_context = cfg_context_;
     Reg saved_env_register = env_register_;
     Reg saved_this_register = this_register_;
+    uint32_t saved_region_counter = generator_region_counter_;
+    auto saved_region_stack = std::move(generator_region_stack_);
+    
+    generator_region_counter_ = 0;
+    generator_region_stack_.clear();
 
     // Create function with parameters (including optional parameters)
     size_t total_params = fn.params.size() + fn.optionalParams.size();
@@ -256,6 +261,8 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     cfg_context_ = saved_cfg_context;
     env_register_ = saved_env_register;
     this_register_ = saved_this_register;
+    generator_region_counter_ = saved_region_counter;
+    generator_region_stack_ = std::move(saved_region_stack);
 }
 
 
@@ -271,6 +278,11 @@ Reg Generator::allocate_register() {
 
 void Generator::enter_scope() {
     scope_stack_.push_back({});
+    
+    // Don't automatically create regions - rely on memory_info from memory checker
+    // This unified approach prevents premature region exits
+    // generator_region_counter_++;
+    // generator_region_stack_.push_back(generator_region_counter_);
 }
 
 
@@ -289,8 +301,45 @@ void Generator::exit_scope() {
 
         scope_stack_.pop_back();
     }
+    
+    // Unified region management: don't automatically exit regions
+    // RegionExit is emitted based on memory_info from statements
+    // if (!generator_region_stack_.empty()) {
+    //     uint32_t active_region = generator_region_stack_.back();
+    //     generator_region_stack_.pop_back();
+    //     
+    //     if (!cfg_context_.in_control_flow) {
+    //         emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, active_region, 0));
+    //     }
+    // }
 }
 
+
+// Helper function to get memory_info from a statement if available
+std::optional<LM::Frontend::AST::MemoryInfo> Generator::get_memory_info_from_statement(const LM::Frontend::AST::Statement& stmt) {
+    return stmt.memory_info.region_id > 0 ? std::optional(stmt.memory_info) : std::nullopt;
+}
+
+// Helper function to get memory_info from an expression if available
+std::optional<LM::Frontend::AST::MemoryInfo> Generator::get_memory_info_from_expression(const LM::Frontend::AST::Expression& expr) {
+    return expr.memory_info.region_id > 0 ? std::optional(expr.memory_info) : std::nullopt;
+}
+
+// Emit RegionEnter based on memory_info from statement
+void Generator::emit_region_enter_from_memory_info(const LM::Frontend::AST::Statement& stmt) {
+    auto mem_info = get_memory_info_from_statement(stmt);
+    if (mem_info && mem_info->region_id > 0) {
+        emit_instruction(LIR_Inst(LIR_Op::RegionEnter, Type::Void, 0, mem_info->region_id, 0));
+    }
+}
+
+// Emit RegionExit based on memory_info from statement
+void Generator::emit_region_exit_from_memory_info(const LM::Frontend::AST::Statement& stmt) {
+    auto mem_info = get_memory_info_from_statement(stmt);
+    if (mem_info && mem_info->region_id > 0) {
+        emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, mem_info->region_id, 0));
+    }
+}
 
 void Generator::bind_variable(const std::string& name, Reg reg) {
     //// std::cout << "[DEBUG] Binding variable '" << name << "' to register " << reg << std::endl;
@@ -960,6 +1009,75 @@ bool Generator::validate_cfg() {
 std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& ast_type) {
     if (!ast_type) {
         return nullptr;
+    }
+
+    if (ast_type->isFallible || ast_type->isOptional) {
+        // Temporarily clear modifiers to avoid infinite recursion
+        bool saved_fallible = ast_type->isFallible;
+        bool saved_optional = ast_type->isOptional;
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isFallible = false;
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isOptional = false;
+        
+        auto success = convert_ast_type_to_lir_type(ast_type);
+        
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isFallible = saved_fallible;
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isOptional = saved_optional;
+        
+        if (!success) success = std::make_shared<::Type>(::TypeTag::Any);
+        
+        if (saved_fallible) {
+            ::ErrorUnionType eut;
+            eut.successType = success;
+            eut.errorTypes = ast_type->errorTypes;
+            return std::make_shared<::Type>(::TypeTag::ErrorUnion, eut);
+        } else {
+            // Optional: Union of success and Nil
+            ::UnionType ut;
+            ut.types.push_back(success);
+            ut.types.push_back(std::make_shared<::Type>(::TypeTag::Nil));
+            return std::make_shared<::Type>(::TypeTag::Union, ut);
+        }
+    }
+
+    if (ast_type->isUnion) {
+        ::UnionType ut;
+        for (const auto& subtype : ast_type->unionTypes) {
+            auto converted = convert_ast_type_to_lir_type(subtype);
+            if (converted) {
+                ut.types.push_back(converted);
+            }
+        }
+        return std::make_shared<::Type>(::TypeTag::Union, ut);
+    }
+
+    if (ast_type->isList) {
+        auto elem = convert_ast_type_to_lir_type(ast_type->elementType);
+        if (!elem) elem = std::make_shared<::Type>(::TypeTag::Any);
+        ::ListType lt;
+        lt.elementType = elem;
+        return std::make_shared<::Type>(::TypeTag::List, lt);
+    }
+
+    if (ast_type->isDict) {
+        auto key = convert_ast_type_to_lir_type(ast_type->keyType);
+        if (!key) key = std::make_shared<::Type>(::TypeTag::Any);
+        auto val = convert_ast_type_to_lir_type(ast_type->valueType);
+        if (!val) val = std::make_shared<::Type>(::TypeTag::Any);
+        ::DictType dt;
+        dt.keyType = key;
+        dt.valueType = val;
+        return std::make_shared<::Type>(::TypeTag::Dict, dt);
+    }
+
+    if (ast_type->isTuple) {
+        ::TupleType tt;
+        for (const auto& subtype : ast_type->tupleTypes) {
+            auto converted = convert_ast_type_to_lir_type(subtype);
+            if (converted) {
+                tt.elementTypes.push_back(converted);
+            }
+        }
+        return std::make_shared<::Type>(::TypeTag::Tuple, tt);
     }
     
     // Convert AST type to LIR type

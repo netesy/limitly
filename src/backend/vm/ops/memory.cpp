@@ -156,7 +156,13 @@ void RegisterVM::execute_memory_alloc(const LIR::LIR_Inst* pc) {
     if (ptr) {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         g_memory_allocations[reinterpret_cast<uintptr_t>(ptr)] = size;
-        registers[pc->dst] = lm_alloc_foreign_ptr(ptr);
+        RegisterValue val = lm_alloc_foreign_ptr(ptr);
+        registers[pc->dst] = val;
+        // Register allocation with current active region
+        if (IS_PTR(val) && !vm_region_stack.empty()) {
+            uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+            vm_allocation_regions[ptr_val] = active_region_id;
+        }
     } else registers[pc->dst] = VAL_NIL;
 }
 
@@ -179,7 +185,13 @@ void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         g_memory_allocations.erase(reinterpret_cast<uintptr_t>(ptr));
         g_memory_allocations[reinterpret_cast<uintptr_t>(new_ptr)] = size;
-        registers[pc->dst] = lm_alloc_foreign_ptr(new_ptr);
+        RegisterValue val = lm_alloc_foreign_ptr(new_ptr);
+        registers[pc->dst] = val;
+        // Register allocation with current active region
+        if (IS_PTR(val) && !vm_region_stack.empty()) {
+            uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+            vm_allocation_regions[ptr_val] = active_region_id;
+        }
     } else registers[pc->dst] = VAL_NIL;
 }
 
@@ -188,7 +200,13 @@ void RegisterVM::execute_ptr_add(const LIR::LIR_Inst* pc) {
     if (!ptr) { registers[pc->dst] = VAL_NIL; return; }
     uint8_t* p = static_cast<uint8_t*>(ptr);
     int64_t offset = to_int(registers[pc->b]);
-    registers[pc->dst] = lm_alloc_foreign_ptr(p + offset);
+    RegisterValue val = lm_alloc_foreign_ptr(p + offset);
+    registers[pc->dst] = val;
+    // Register allocation with current active region
+    if (IS_PTR(val) && !vm_region_stack.empty()) {
+        uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+        vm_allocation_regions[ptr_val] = active_region_id;
+    }
 }
 
 void RegisterVM::execute_ptr_sub(const LIR::LIR_Inst* pc) {
@@ -196,7 +214,13 @@ void RegisterVM::execute_ptr_sub(const LIR::LIR_Inst* pc) {
     if (!ptr) { registers[pc->dst] = VAL_NIL; return; }
     uint8_t* p = static_cast<uint8_t*>(ptr);
     int64_t offset = to_int(registers[pc->b]);
-    registers[pc->dst] = lm_alloc_foreign_ptr(p - offset);
+    RegisterValue val = lm_alloc_foreign_ptr(p - offset);
+    registers[pc->dst] = val;
+    // Register allocation with current active region
+    if (IS_PTR(val) && !vm_region_stack.empty()) {
+        uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+        vm_allocation_regions[ptr_val] = active_region_id;
+    }
 }
 
 void RegisterVM::execute_ptr_diff(const LIR::LIR_Inst* pc) {
@@ -213,7 +237,13 @@ void RegisterVM::execute_ptr_align(const LIR::LIR_Inst* pc) {
     int64_t alignment = to_int(registers[pc->b]);
     if (alignment <= 0) { registers[pc->dst] = registers[pc->a]; return; }
     uintptr_t aligned = (addr + (alignment - 1)) & ~(alignment - 1);
-    registers[pc->dst] = lm_alloc_foreign_ptr(reinterpret_cast<void*>(aligned));
+    RegisterValue val = lm_alloc_foreign_ptr(reinterpret_cast<void*>(aligned));
+    registers[pc->dst] = val;
+    // Register allocation with current active region
+    if (IS_PTR(val) && !vm_region_stack.empty()) {
+        uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+        vm_allocation_regions[ptr_val] = active_region_id;
+    }
 }
 
 void RegisterVM::execute_ptr_is_aligned(const LIR::LIR_Inst* pc) {

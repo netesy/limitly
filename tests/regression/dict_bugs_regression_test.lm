@@ -1,0 +1,79 @@
+// Comprehensive regression tests for frame-backed dictionary fields and casts
+
+frame TestFrame {
+    pub data: {str: any};
+    pub field_a: int;
+    pub field_b: int;
+    pub field_c: int;
+
+    pub init(d: {str: any}, a: int, b: int, c: int) {
+        self.data = d;
+        self.field_a = a;
+        self.field_b = b;
+        self.field_c = c;
+    }
+}
+
+frame WrapperFrame {
+    pub inner_frame: TestFrame | str;
+
+    pub init(inner: TestFrame | str) {
+        self.inner_frame = inner;
+    }
+}
+
+fn main() {
+    print("=== Dict Bugs Regression Test ===");
+
+    // Test 1: Empty Dictionary
+    var dict1 = {};
+    assert(dict1 != nil, "Test 1 failed: Empty dictionary should not be Nil");
+    
+    // Test 2: Explicit Cast
+    var dict2 = {} as {str: any};
+    assert(dict2 != nil, "Test 2 failed: Cast empty dictionary should not be Nil");
+    dict2["foo"] = "bar";
+    assert(dict2["foo"] == "bar", "Test 2 failed: Key insertion did not work");
+
+    // Test 3: Dynamic Values
+    var dict3 = {} as {str: any};
+    dict3["string"] = "hello";
+    dict3["number"] = 42;
+    dict3["boolean"] = true;
+    assert(dict3["string"] == "hello", "Test 3 failed: String value mismatch");
+    assert(dict3["number"] == 42, "Test 3 failed: Number value mismatch");
+    assert(dict3["boolean"] == true, "Test 3 failed: Boolean value mismatch");
+
+    // Test 4: Frame-Backed Dictionary & Test 5: Multiple Frame Fields
+    var frame_inst = TestFrame({} as {str: any}, 100, 200, 300);
+    frame_inst.data["key"] = "value";
+    assert(frame_inst.data["key"] == "value", "Test 4 failed: Frame mutation did not persist");
+    assert(frame_inst.field_a == 100, "Test 5 failed: field_a got corrupted");
+    assert(frame_inst.field_b == 200, "Test 5 failed: field_b got corrupted");
+    assert(frame_inst.field_c == 300, "Test 5 failed: field_c got corrupted");
+
+    // Test 6: Multiple Frame Instances
+    var inst2 = TestFrame({} as {str: any}, 111, 222, 333);
+    inst2.data["key"] = "other_value";
+    assert(frame_inst.data["key"] == "value", "Test 6 failed: Instance 1 corrupted by Instance 2");
+    assert(inst2.data["key"] == "other_value", "Test 6 failed: Instance 2 key mismatch");
+
+    // Test 7: Type-Resolution Fallback (Union type unwrapping)
+    var wrapper = WrapperFrame(frame_inst as TestFrame | str);
+    var unwrapped_inner = wrapper.inner_frame as TestFrame;
+    unwrapped_inner.data["fallback_key"] = "fallback_value";
+    assert(frame_inst.data["fallback_key"] == "fallback_value", "Test 7 failed: Union fallback resolution failed");
+
+    // Test 8: Nested Dictionary Access
+    var outer_dict = {} as {str: any};
+    outer_dict["inner"] = {} as {str: any};
+    frame_inst.data["nested"] = outer_dict;
+    
+    var fetched_outer = frame_inst.data["nested"] as {str: any};
+    fetched_outer["inner"]["key"] = "nested_value";
+    
+    var retrieved_inner = fetched_outer["inner"] as {str: any};
+    assert(retrieved_inner["key"] == "nested_value", "Test 8 failed: Nested dictionary mutation did not persist");
+
+    print("=== Dict Bugs Regression Test Passed ===");
+}

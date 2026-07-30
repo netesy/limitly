@@ -202,6 +202,9 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
 
 void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
    // std::cout << "[DEBUG] emit_stmt called with type: " << typeid(stmt).name() << std::endl;
+   
+   // Unified region management: emit RegionEnter based on memory_info
+   emit_region_enter_from_memory_info(stmt);
     
     if (auto expr_stmt = dynamic_cast<LM::Frontend::AST::ExprStatement*>(&stmt)) {
        // std::cout << "[DEBUG] Emitting ExprStatement" << std::endl;
@@ -260,6 +263,9 @@ void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
     } else {
         report_error("Unsupported statement type in LIR generator");
     }
+    
+    // Unified region management: emit RegionExit based on memory_info
+    emit_region_exit_from_memory_info(stmt);
 }
 
 
@@ -436,6 +442,9 @@ void Generator::emit_block_stmt(LM::Frontend::AST::BlockStatement& stmt) {
 
 
 void Generator::emit_if_stmt(LM::Frontend::AST::IfStatement& stmt) {
+    bool prev_in_control_flow = cfg_context_.in_control_flow;
+    cfg_context_.in_control_flow = true;
+    
     if (cfg_context_.building_cfg) {
         // CFG mode: create basic blocks
         emit_if_stmt_cfg(stmt);
@@ -443,6 +452,8 @@ void Generator::emit_if_stmt(LM::Frontend::AST::IfStatement& stmt) {
         // Linear mode: use conditional jumps
         emit_if_stmt_linear(stmt);
     }
+    
+    cfg_context_.in_control_flow = prev_in_control_flow;
 }
 
 
@@ -580,6 +591,9 @@ void Generator::emit_if_stmt_linear(LM::Frontend::AST::IfStatement& stmt) {
 
 
 void Generator::emit_while_stmt(LM::Frontend::AST::WhileStatement& stmt) {
+    bool prev_in_control_flow = cfg_context_.in_control_flow;
+    cfg_context_.in_control_flow = true;
+    
     if (cfg_context_.building_cfg) {
         // CFG mode: create basic blocks
         emit_while_stmt_cfg(stmt);
@@ -587,6 +601,8 @@ void Generator::emit_while_stmt(LM::Frontend::AST::WhileStatement& stmt) {
         // Linear mode: use loop instructions
         emit_while_stmt_linear(stmt);
     }
+    
+    cfg_context_.in_control_flow = prev_in_control_flow;
 }
 
 
@@ -690,6 +706,9 @@ void Generator::emit_while_stmt_linear(LM::Frontend::AST::WhileStatement& stmt) 
 
 
 void Generator::emit_for_stmt(LM::Frontend::AST::ForStatement& stmt) {
+    bool prev_in_control_flow = cfg_context_.in_control_flow;
+    cfg_context_.in_control_flow = true;
+    
     if (cfg_context_.building_cfg) {
         // CFG mode: create basic blocks
         emit_for_stmt_cfg(stmt);
@@ -697,6 +716,8 @@ void Generator::emit_for_stmt(LM::Frontend::AST::ForStatement& stmt) {
         // Linear mode: use loop instructions
         emit_for_stmt_linear(stmt);
     }
+    
+    cfg_context_.in_control_flow = prev_in_control_flow;
 }
 
 
@@ -864,10 +885,26 @@ void Generator::emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt) {
         // Normal return statement
         if (stmt.value) {
             Reg value = emit_expr(*stmt.value);
+            
+            // Move ownership of returned value to region 0 (parent/caller region)
+            // TEMPORARY: Disable automatic region operations
+            // emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, value, 0, 0));
+            
+            // Emit RegionExit for all active scopes
+            // TEMPORARY: Disable automatic region operations
+            // for (auto it = generator_region_stack_.rbegin(); it != generator_region_stack_.rend(); ++it) {
+            //     emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, *it, 0));
+            // }
+            
             LIR_Inst ret_inst(LIR_Op::Return);
             ret_inst.a = value;
             emit_instruction(ret_inst);
         } else {
+            // Emit RegionExit for all active scopes
+            // TEMPORARY: Disable automatic region operations
+            // for (auto it = generator_region_stack_.rbegin(); it != generator_region_stack_.rend(); ++it) {
+            //     emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, *it, 0));
+            // }
             emit_instruction(LIR_Inst(LIR_Op::Return));
         }
     }
@@ -1710,6 +1747,9 @@ void Generator::emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt) {
 void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
     if (!stmt.value) return;
     
+    bool prev_in_control_flow = cfg_context_.in_control_flow;
+    cfg_context_.in_control_flow = true;
+    
     Reg value_reg = emit_expr(*stmt.value);
     
     if (cfg_context_.building_cfg) {
@@ -1823,6 +1863,8 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
         
         emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, exit_label, 0, 0));
     }
+    
+    cfg_context_.in_control_flow = prev_in_control_flow;
 }
 
 void Generator::emit_pattern_match_jump(LIR_Op op, Reg cond_reg, LIR_BasicBlock* failure_target, uint32_t failure_label) {
