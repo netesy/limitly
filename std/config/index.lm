@@ -2,6 +2,20 @@
 
 import std.env as env;
 
+fn is_digit_char(ch: str): bool {
+    if (ch == "0") return true;
+    if (ch == "1") return true;
+    if (ch == "2") return true;
+    if (ch == "3") return true;
+    if (ch == "4") return true;
+    if (ch == "5") return true;
+    if (ch == "6") return true;
+    if (ch == "7") return true;
+    if (ch == "8") return true;
+    if (ch == "9") return true;
+    return false;
+}
+
 pub frame Config {
     pub keys: [str];
     pub vals: [str];
@@ -20,9 +34,16 @@ pub frame Config {
                 var is_num = true;
                 var val_len = len(val_str);
                 if (val_len == 0) is_num = false;
+                if (val_len > 0) {
+                    var first_ch = _builtin_substring(val_str, 0, 1);
+                    if (first_ch == "-" or first_ch == "+") {
+                        j = 1;
+                        if (val_len == 1) is_num = false;
+                    }
+                }
                 while (j < val_len) {
-                    var ch = val_str[j];
-                    if (ch < "0" or ch > "9") {
+                    var ch = _builtin_substring(val_str, j, j + 1);
+                    if (is_digit_char(ch) == false) {
                         is_num = false;
                     }
                     j = j + 1;
@@ -38,16 +59,7 @@ pub frame Config {
     }
 
     pub fn set(key: str, val_any: any) {
-        var val_str = "";
-        if (val_any as str != nil) {
-            val_str = val_any as str;
-        } elif (val_any as bool == true or val_any as bool == false) {
-            var val_bool = val_any as bool;
-            val_str = "{val_bool}";
-        } else {
-            var val_int = val_any as int;
-            val_str = "{val_int}";
-        }
+        var val_str = "{val_any}";
 
         // Find existing or append
         var i = 0;
@@ -83,49 +95,79 @@ pub fn new_config(): Config {
 
 pub fn load_json(json_str: str): Config {
     var cfg = new_config();
-    // A simple parser of key-value JSON pairs
     var i: int = 0;
     var length = len(json_str);
     while (i < length) {
-        var ch = json_str[i];
+        var ch = _builtin_substring(json_str, i, i + 1);
         if (ch == "\"") {
             // Read key
             var key_start = i + 1;
             i = i + 1;
-            while (i < length and json_str[i] != "\"") {
-                i = i + 1;
+            var find_quote = true;
+            while (i < length and find_quote == true) {
+                var k_ch = _builtin_substring(json_str, i, i + 1);
+                if (k_ch == "\"") {
+                    find_quote = false;
+                } else {
+                    i = i + 1;
+                }
             }
             var key = _builtin_substring(json_str, key_start, i);
             i = i + 1; // skip closing quote
 
             // Find colon
-            while (i < length and json_str[i] != ":") {
-                i = i + 1;
+            var find_colon = true;
+            while (i < length and find_colon == true) {
+                var c_ch = _builtin_substring(json_str, i, i + 1);
+                if (c_ch == ":") {
+                    find_colon = false;
+                } else {
+                    i = i + 1;
+                }
             }
             i = i + 1; // skip colon
 
             // Skip spaces
-            while (i < length and (json_str[i] == " " or json_str[i] == "\t" or json_str[i] == "\n" or json_str[i] == "\r")) {
-                i = i + 1;
+            var skip_space = true;
+            while (i < length and skip_space == true) {
+                var s_ch = _builtin_substring(json_str, i, i + 1);
+                if (s_ch == " " or s_ch == "\t" or s_ch == "\n" or s_ch == "\r") {
+                    i = i + 1;
+                } else {
+                    skip_space = false;
+                }
             }
 
             // Read value
             if (i < length) {
-                if (json_str[i] == "\"") {
+                var first_val_ch = _builtin_substring(json_str, i, i + 1);
+                if (first_val_ch == "\"") {
                     // String value
                     var val_start = i + 1;
                     i = i + 1;
-                    while (i < length and json_str[i] != "\"") {
-                        i = i + 1;
+                    var find_val_quote = true;
+                    while (i < length and find_val_quote == true) {
+                        var v_ch = _builtin_substring(json_str, i, i + 1);
+                        if (v_ch == "\"") {
+                            find_val_quote = false;
+                        } else {
+                            i = i + 1;
+                        }
                     }
                     var val_str = _builtin_substring(json_str, val_start, i);
                     cfg.set(key, val_str);
                     i = i + 1;
-                } else if (json_str[i] == "t" or json_str[i] == "f") {
+                } else if (first_val_ch == "t" or first_val_ch == "f") {
                     // Boolean value
                     var val_start = i;
-                    while (i < length and json_str[i] >= "a" and json_str[i] <= "z") {
-                        i = i + 1;
+                    var find_bool_end = true;
+                    while (i < length and find_bool_end == true) {
+                        var b_ch = _builtin_substring(json_str, i, i + 1);
+                        if (b_ch == "," or b_ch == "}" or b_ch == " " or b_ch == "\t" or b_ch == "\n" or b_ch == "\r") {
+                            find_bool_end = false;
+                        } else {
+                            i = i + 1;
+                        }
                     }
                     var val_str = _builtin_substring(json_str, val_start, i);
                     if (val_str == "true") {
@@ -133,15 +175,26 @@ pub fn load_json(json_str: str): Config {
                     } else {
                         cfg.set(key, false);
                     }
-                } else if ((json_str[i] >= "0" and json_str[i] <= "9") or json_str[i] == "-") {
-                    // Number value
-                    var val_start = i;
-                    while (i < length and ((json_str[i] >= "0" and json_str[i] <= "9") or json_str[i] == "." or json_str[i] == "-")) {
+                } else {
+                    // Number or potential negative sign
+                    var is_num_char = true;
+                    if (first_val_ch == "-" or is_digit_char(first_val_ch) == true) {
+                        var val_start = i;
+                        var find_num_end = true;
+                        while (i < length and find_num_end == true) {
+                            var n_ch = _builtin_substring(json_str, i, i + 1);
+                            if (n_ch == "-" or n_ch == "." or is_digit_char(n_ch) == true) {
+                                i = i + 1;
+                            } else {
+                                find_num_end = false;
+                            }
+                        }
+                        var val_str = _builtin_substring(json_str, val_start, i);
+                        var val_int = val_str as int;
+                        cfg.set(key, val_int);
+                    } else {
                         i = i + 1;
                     }
-                    var val_str = _builtin_substring(json_str, val_start, i);
-                    var val_int = val_str as int;
-                    cfg.set(key, val_int);
                 }
             }
         } else {

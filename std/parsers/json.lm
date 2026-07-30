@@ -1,5 +1,5 @@
 import std.core as core;
-import std.config as config;
+import std.config.index as config;
 
 frame JSONParser {
     pub fn parse(text: str): core.ResultStr {

@@ -1,6 +1,6 @@
 // Test suite for Standard Library Config Module
 
-import std.config as config;
+import std.config.index as config;
 
 fn main(): int {
     print("=== Config Module Test Suite ===");
