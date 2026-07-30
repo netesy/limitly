@@ -1,0 +1,18 @@
+// Test suite for Standard Library HTML Module
+
+import std.html.index as html;
+
+fn main(): int {
+    print("=== HTML Module Test Suite ===");
+
+    // Test escaping/unescaping
+    var raw = "Hello & Welcome <John>!";
+    var escaped = html.escape(raw);
+    assert(escaped == "Hello &amp; Welcome &lt;John&gt;!", "html escape failed");
+
+    var unescaped = html.unescape(escaped);
+    assert(unescaped == raw, "html unescape failed");
+
+    print("All HTML tests passed successfully!");
+    return 0;
+}

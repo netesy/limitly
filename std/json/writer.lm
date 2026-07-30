@@ -1,0 +1,51 @@
+// JSON Writer Module
+
+import std.json.value as val_mod;
+
+pub fn stringify(val_any: any): str {
+    var jval = val_any as val_mod.JSONValue;
+    if (jval == nil) {
+        return "null";
+    }
+
+    if (jval.type_tag == "string") {
+        return "\"" + jval.str_val + "\"";
+    } elif (jval.type_tag == "number") {
+        var num = jval.num_val;
+        return "{num}";
+    } elif (jval.type_tag == "bool") {
+        if (jval.bool_val == true) {
+            return "true";
+        }
+        return "false";
+    } elif (jval.type_tag == "null") {
+        return "null";
+    } elif (jval.type_tag == "array") {
+        var res = "[";
+        var i = 0;
+        var list_len = len(jval.list_val);
+        while (i < list_len) {
+            res = res + stringify(jval.list_val[i]);
+            if (i < list_len - 1) {
+                res = res + ",";
+            }
+            i = i + 1;
+        }
+        res = res + "]";
+        return res;
+    } elif (jval.type_tag == "object") {
+        var res = "{";
+        var i = 0;
+        var keys_len = len(jval.obj_keys);
+        while (i < keys_len) {
+            res = res + "\"" + jval.obj_keys[i] + "\":" + stringify(jval.obj_vals[i]);
+            if (i < keys_len - 1) {
+                res = res + ",";
+            }
+            i = i + 1;
+        }
+        res = res + "}";
+        return res;
+    }
+    return "null";
+}
