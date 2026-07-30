@@ -3,7 +3,7 @@
 
 import std.core as core;
 import std.core show Error;
-import std.url as url;
+import std.url.index as url;
 import std.net.dns as dns;
 import std.net.tcp as tcp;
 
