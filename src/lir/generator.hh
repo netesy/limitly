@@ -37,6 +37,11 @@ public:
         registered_modules_ = modules;
     }
     
+    // Set current module path (for when executing module files directly)
+    void set_current_module(const std::string& module_path) {
+        current_module_ = module_path;
+    }
+    
     // Optimization control
     static void set_optimization_enabled(bool enabled) {
         optimization_enabled_ = enabled;

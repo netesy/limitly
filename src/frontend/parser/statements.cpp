@@ -731,8 +731,32 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
                 if (match({TokenType::EQUAL})) field->defaultValue = expression();
                 consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
                 frameDecl->fields.push_back(field);
-            } else { error("Expected ':' after field name in frame member declaration."); break; }
-        } else { error("Expected frame member declaration (field or method)."); break; }
+            } else { 
+                error("Expected ':' after field name in frame member declaration."); 
+                advance(); // Advance to avoid infinite loop
+                break; 
+            }
+        } else if (isBuiltInType(peek().type)) {
+            // Built-in type used as field name - report error and skip entire declaration
+            Token typeName = advance();
+            error("`" + typeName.lexeme + "` cannot be used as a field name\n\n= reason: `" + typeName.lexeme + "` is a built-in type name in Limit\n= help: choose a different field name");
+            // Skip tokens until we hit semicolon or closing brace
+            while (!isAtEnd() && peek().type != TokenType::RIGHT_BRACE && peek().type != TokenType::SEMICOLON) {
+                advance();
+            }
+            // Consume semicolon if present to move past the statement
+            if (check(TokenType::SEMICOLON)) advance();
+            break;
+        } else { 
+            error("Expected frame member declaration (field or method)."); 
+            // Skip to next statement or closing brace to avoid infinite loop
+            while (!isAtEnd() && peek().type != TokenType::RIGHT_BRACE && peek().type != TokenType::SEMICOLON) {
+                advance();
+            }
+            // If we stopped at a semicolon, consume it to move past the statement
+            if (check(TokenType::SEMICOLON)) advance();
+            break; 
+        }
     }
     consume(TokenType::RIGHT_BRACE, "Expected '}' after frame body.");
     popBlockContext();

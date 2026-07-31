@@ -9,8 +9,8 @@ fn test_duration(): int {
     var d3 = d1.add(d2) as t.Duration;
     assert(d3.seconds == 30, "duration add failed");
 
-    var d4 = t.Duration.from_seconds(5) as t.Duration;
-    assert(d4.seconds == 5, "from_seconds failed");
+    var duration4 = t.Duration.from_seconds(5) as t.Duration;
+    assert(duration4.seconds == 5, "from_seconds failed");
     return 1;
 }
 

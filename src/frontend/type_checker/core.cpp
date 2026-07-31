@@ -390,7 +390,31 @@ void TypeChecker::add_error(const std::string& message, int line, int column, co
 }
 
 void TypeChecker::add_type_error(const std::string& expected, const std::string& found, int line) {
-    add_error("Type mismatch: expected " + expected + ", found " + found, line);
+    // Generate more specific type error messages
+    std::string enhancedMessage = "type mismatch\n\n= expected: `" + expected + "`\n= found: `" + found + "`";
+    
+    // Add specific reasons for common type mismatches
+    if (found == "Any" || found == "any") {
+        enhancedMessage += "\n\n= reason: the value has type `any`, which cannot be used where a specific type is required";
+        enhancedMessage += "\n= help: provide a value of type `" + expected + "` or add explicit type annotation";
+    } else if (expected.find("List") != std::string::npos && found.find("List") != std::string::npos) {
+        enhancedMessage += "\n\n= reason: list element types do not match";
+        enhancedMessage += "\n= help: ensure all list elements have the same type";
+    } else if (expected.find("Dict") != std::string::npos && found.find("Dict") != std::string::npos) {
+        enhancedMessage += "\n\n= reason: dictionary key or value types do not match";
+        enhancedMessage += "\n= help: ensure dictionary keys and values have consistent types";
+    } else if (expected == "String" || expected == "str") {
+        enhancedMessage += "\n\n= reason: a string value is required here";
+        enhancedMessage += "\n= help: provide a string literal or convert the value to a string";
+    } else if (expected == "Int" || expected == "int" || expected.find("int") != std::string::npos) {
+        enhancedMessage += "\n\n= reason: an integer value is required here";
+        enhancedMessage += "\n= help: provide an integer literal or convert the value to an integer";
+    } else if (expected == "Bool" || expected == "bool") {
+        enhancedMessage += "\n\n= reason: a boolean value is required here";
+        enhancedMessage += "\n= help: provide a boolean literal (true or false) or a boolean expression";
+    }
+    
+    add_error(enhancedMessage, line);
 }
 
 // =============================================================================

@@ -47,14 +47,75 @@ bool Parser::isAtEnd() {
 }
 
 Token Parser::consume(TokenType type, const std::string &message) {
+    // Special case: allow SELF token when expecting IDENTIFIER for parameter names
+    if (type == TokenType::IDENTIFIER && check(TokenType::SELF)) {
+        // Check if this is in a parameter context
+        if (message.find("parameter name") != std::string::npos) {
+            return advance();  // Allow self as parameter name
+        }
+    }
+    
     if (check(type)) return advance();
 
     // Capture position BEFORE advancing so error messages point to the right line.
     size_t errorLine = peek().line;
     size_t errorStart = peek().start;
+    Token currentToken = peek();
+
+    // Generate context-aware error message for identifier-related errors
+    std::string enhancedMessage = message;
+    if (type == TokenType::IDENTIFIER) {
+        // Extract context from the generic message (e.g., "Expected variable name")
+        std::string context = "identifier";
+        if (message.find("variable name") != std::string::npos) {
+            context = "variable name";
+        } else if (message.find("function name") != std::string::npos || message.find("method name") != std::string::npos) {
+            context = "function name";
+        } else if (message.find("parameter name") != std::string::npos) {
+            context = "parameter name";
+        } else if (message.find("type name") != std::string::npos) {
+            context = "type name";
+        } else if (message.find("field name") != std::string::npos) {
+            context = "field name";
+        } else if (message.find("property name") != std::string::npos) {
+            context = "property name";
+        }
+        
+        enhancedMessage = generateIdentifierError(context, currentToken);
+    } else if (type == TokenType::RIGHT_BRACE) {
+        // Improve missing closing brace messages
+        if (message.find("Expected '}'") != std::string::npos) {
+            enhancedMessage = "expected `}` to close this block\n\n= help: add `}` to close the block";
+        }
+    } else if (type == TokenType::RIGHT_PAREN) {
+        // Improve missing closing paren messages
+        if (message.find("Expected ')'") != std::string::npos) {
+            enhancedMessage = "expected `)` to close the parentheses\n\n= help: add `)` to close the parentheses";
+        }
+    } else if (type == TokenType::RIGHT_BRACKET) {
+        // Improve missing closing bracket messages
+        if (message.find("Expected ']'") != std::string::npos) {
+            enhancedMessage = "expected `]` to close the bracket\n\n= help: add `]` to close the bracket";
+        }
+    } else if (type == TokenType::SEMICOLON) {
+        // Improve missing semicolon messages
+        if (message.find("Expected ';'") != std::string::npos) {
+            enhancedMessage = "expected `;` at the end of the statement\n\n= help: add `;` to terminate the statement";
+        }
+    } else if (type == TokenType::COLON) {
+        // Improve missing colon messages
+        if (message.find("Expected ':'") != std::string::npos) {
+            enhancedMessage = "expected `:` before the type annotation\n\n= help: add `:` followed by the type";
+        }
+    } else if (type == TokenType::EQUAL) {
+        // Improve missing equal messages
+        if (message.find("Expected '='") != std::string::npos) {
+            enhancedMessage = "expected `=` for assignment or initialization\n\n= help: add `=` followed by the value";
+        }
+    }
 
     // Report error but don't throw - let parser continue
-    error(message);
+    error(enhancedMessage);
 
     // Advance to ensure progress and avoid infinite loops
     if (!isAtEnd()) advance();
@@ -112,6 +173,25 @@ void Parser::synchronize() {
 }
 
 void Parser::error(const std::string &message, bool suppressException) {
+    // Suppress cascading errors when parser is in a broken state
+    if (inBrokenState) {
+        // Only report major structural errors even in broken state
+        if (message.find("Expected '}'") == std::string::npos &&
+            message.find("Unclosed") == std::string::npos &&
+            message.find("expected `}`") == std::string::npos) {
+            return;  // Suppress secondary cascading errors
+        }
+    }
+    
+    // Mark major structural errors that put parser in broken state
+    if (message.find("Expected '}'") != std::string::npos ||
+        message.find("Unclosed") != std::string::npos ||
+        message.find("expected `}`") != std::string::npos ||
+        message.find("frame") != std::string::npos ||
+        message.find("function") != std::string::npos) {
+        inBrokenState = true;
+    }
+    
     // Get the current token's lexeme for better error reporting
     std::string lexeme = "";
     int line = 0;
@@ -205,7 +285,10 @@ void Parser::error(const std::string &message, bool suppressException) {
     }
 
     // Collect error for multi-error reporting
-    errors.push_back(ParseError{enhancedMessage, line, column, codeContext});
+    bool isMajor = (message.find("Expected '}'") != std::string::npos ||
+                    message.find("Unclosed") != std::string::npos ||
+                    message.find("expected `}`") != std::string::npos);
+    errors.push_back(ParseError{enhancedMessage, line, column, codeContext, isMajor});
     if (errors.size() >= MAX_ERRORS) {
         throw std::runtime_error("Too many syntax errors; aborting parse.");
     }
@@ -672,5 +755,132 @@ void Parser::skipTrivia() {
         } else {
             advance(); // Just skip the trivia token
         }
+    }
+}
+
+// Helper functions for improved error messages
+bool Parser::isReservedKeyword(TokenType type) {
+    switch (type) {
+        case TokenType::AND:
+        case TokenType::AS:
+        case TokenType::FRAME:
+        case TokenType::FALSE:
+        case TokenType::FN:
+        case TokenType::ELIF:
+        case TokenType::ELSE:
+        case TokenType::FOR:
+        case TokenType::WHILE:
+        case TokenType::MATCH:
+        case TokenType::IF:
+        case TokenType::IN:
+        case TokenType::NIL:
+        case TokenType::ENUM:
+        case TokenType::NOT:
+        case TokenType::OR:
+        case TokenType::DEFAULT:
+        case TokenType::PRINT:
+        case TokenType::RETURN:
+        case TokenType::SHOW:
+        case TokenType::HIDE:
+        case TokenType::SUPER:
+        case TokenType::SELF:
+        case TokenType::TRUE:
+        case TokenType::VAR:
+        case TokenType::PARALLEL:
+        case TokenType::CONCURRENT:
+        case TokenType::TASK:
+        case TokenType::WORKER:
+        case TokenType::BREAK:
+        case TokenType::CONTINUE:
+        case TokenType::IMPORT:
+        case TokenType::TYPE:
+        case TokenType::TRAIT:
+        case TokenType::INTERFACE:
+        case TokenType::MIXIN:
+        case TokenType::IMPLEMENTS:
+        case TokenType::MODULE:
+        case TokenType::CONTRACT:
+        case TokenType::COMPTIME:
+        case TokenType::UNSAFE:
+        case TokenType::ITER:
+        case TokenType::WHERE:
+        case TokenType::ERR:
+        case TokenType::OK:
+        case TokenType::VAL:
+        case TokenType::CONST:
+        case TokenType::FROM:
+        case TokenType::PUB:
+        case TokenType::PROT:
+        case TokenType::STATIC:
+        case TokenType::ABSTRACT:
+        case TokenType::FINAL:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool Parser::isBuiltInType(TokenType type) {
+    switch (type) {
+        case TokenType::INT_TYPE:
+        case TokenType::INT8_TYPE:
+        case TokenType::INT16_TYPE:
+        case TokenType::INT32_TYPE:
+        case TokenType::INT64_TYPE:
+        case TokenType::INT128_TYPE:
+        case TokenType::UINT_TYPE:
+        case TokenType::UINT8_TYPE:
+        case TokenType::UINT16_TYPE:
+        case TokenType::UINT32_TYPE:
+        case TokenType::UINT64_TYPE:
+        case TokenType::UINT128_TYPE:
+        case TokenType::FLOAT_TYPE:
+        case TokenType::FLOAT32_TYPE:
+        case TokenType::FLOAT64_TYPE:
+        case TokenType::D2_TYPE:
+        case TokenType::D4_TYPE:
+        case TokenType::D6_TYPE:
+        case TokenType::DECIMAL_TYPE:
+        case TokenType::STR_TYPE:
+        case TokenType::BOOL_TYPE:
+        case TokenType::FUNCTION_TYPE:
+        case TokenType::OPTION_TYPE:
+        case TokenType::ANY_TYPE:
+        case TokenType::NIL_TYPE:
+        case TokenType::CHANNEL_TYPE:
+        case TokenType::ATOMIC_TYPE:
+            return true;
+        default:
+            return false;
+    }
+}
+
+std::string Parser::getIdentifierCategory(const Token& token) {
+    if (isReservedKeyword(token.type)) {
+        return "reserved keyword";
+    } else if (isBuiltInType(token.type)) {
+        return "built-in type name";
+    } else if (token.type == TokenType::IDENTIFIER) {
+        return "identifier";
+    } else {
+        return "invalid token";
+    }
+}
+
+std::string Parser::generateIdentifierError(const std::string& context, const Token& token) {
+    std::string category = getIdentifierCategory(token);
+    std::string lexeme = token.lexeme.empty() ? tokenTypeToString(token.type) : token.lexeme;
+    
+    // Special case: `self` is allowed as a parameter name in methods (canonical reference)
+    if (lexeme == "self" && context == "parameter name") {
+        return "Expected a " + context;  // Don't flag self as error for method parameters
+    }
+    
+    if (category == "reserved keyword") {
+        return "`" + lexeme + "` cannot be used as a " + context + "\n\n= reason: `" + lexeme + "` is a reserved keyword in Limit\n= help: choose a different " + context;
+    } else if (category == "built-in type name") {
+        return "`" + lexeme + "` cannot be used as a " + context + "\n\n= reason: `" + lexeme + "` is a built-in type name in Limit\n= help: choose a different " + context;
+    } else {
+        return "Expected a " + context;
     }
 }
