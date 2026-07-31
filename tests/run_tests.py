@@ -121,6 +121,12 @@ tests = [
     "tests/stdlib/path/path_test.lm",
     # Stdlib - SemVer
     "tests/stdlib/semver_test.lm",
+    # Stdlib - URL
+    "tests/stdlib/url_test.lm",
+    # Stdlib - MIME
+    "tests/stdlib/mime_test.lm",
+    # Stdlib - UUID
+    "tests/stdlib/uuid_test.lm",
     # Stdlib - FS
     "tests/stdlib/fs/fs_test.lm",
     # Stdlib - Crypto

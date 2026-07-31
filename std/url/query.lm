@@ -1,0 +1,159 @@
+// Standard Library URL Query Module
+
+import std.encoding.percent as percent;
+
+frame QueryParams {
+    pub keys: [str];
+    pub values: [str];
+
+    pub init() {
+        self.keys = [] as [str];
+        self.values = [] as [str];
+    }
+
+    pub fn get(key: str): str {
+        var i: int = 0;
+        var length: int = len(self.keys);
+        while (i < length) {
+            if (self.keys[i] == key) {
+                return self.values[i];
+            }
+            i = i + 1;
+        }
+        return "";
+    }
+
+    pub fn get_all(key: str): [str] {
+        var result: [str] = [] as [str];
+        var i: int = 0;
+        var length: int = len(self.keys);
+        while (i < length) {
+            if (self.keys[i] == key) {
+                result.append(self.values[i]);
+            }
+            i = i + 1;
+        }
+        return result;
+    }
+
+    pub fn set(key: str, value: str) {
+        var i: int = 0;
+        var length: int = len(self.keys);
+        var found: bool = false;
+        while (i < length) {
+            if (self.keys[i] == key) {
+                self.values[i] = value;
+                found = true;
+            }
+            i = i + 1;
+        }
+        if (not found) {
+            self.keys.append(key);
+            self.values.append(value);
+        }
+    }
+
+    pub fn add(key: str, value: str) {
+        self.keys.append(key);
+        self.values.append(value);
+    }
+
+    pub fn remove(key: str) {
+        var new_keys: [str] = [] as [str];
+        var new_values: [str] = [] as [str];
+        var i: int = 0;
+        var length: int = len(self.keys);
+        while (i < length) {
+            if (self.keys[i] != key) {
+                new_keys.append(self.keys[i]);
+                new_values.append(self.values[i]);
+            }
+            i = i + 1;
+        }
+        self.keys = new_keys;
+        self.values = new_values;
+    }
+
+    pub fn has(key: str): bool {
+        var i: int = 0;
+        var length: int = len(self.keys);
+        while (i < length) {
+            if (self.keys[i] == key) {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn to_string(): str {
+        var result: str = "";
+        var i: int = 0;
+        var length: int = len(self.keys);
+        while (i < length) {
+            if (i > 0) {
+                result = result + "&";
+            }
+            result = result + percent.encode(self.keys[i]) + "=" + percent.encode(self.values[i]);
+            i = i + 1;
+        }
+        return result;
+    }
+}
+
+pub fn parse(qs: str): QueryParams {
+    var qp = QueryParams();
+    if (qs == "") {
+        return qp;
+    }
+
+    var pairs: [str] = split_str(qs, "&");
+    var i: int = 0;
+    while (i < len(pairs)) {
+        var pair: str = pairs[i];
+        if (pair != "") {
+            var eq_idx: int = index_of(pair, "=");
+            if (eq_idx != -1) {
+                var key: str = percent.decode(_builtin_substring(pair, 0, eq_idx));
+                var value: str = percent.decode(_builtin_substring(pair, eq_idx + 1, len(pair)));
+                qp.add(key, value);
+            } else {
+                qp.add(percent.decode(pair), "");
+            }
+        }
+        i = i + 1;
+    }
+    return qp;
+}
+
+pub fn build(qp: QueryParams): str {
+    return qp.to_string();
+}
+
+fn index_of(s: str, pattern: str): int {
+    var i: int = 0;
+    while (i <= len(s) - len(pattern)) {
+        if (_builtin_substring(s, i, i + len(pattern)) == pattern) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+fn split_str(s: str, delimiter: str): [str] {
+    var parts: [str] = [] as [str];
+    var current: str = "";
+    var i: int = 0;
+    while (i < len(s)) {
+        if (_builtin_substring(s, i, i + 1) == delimiter) {
+            parts.append(current);
+            current = "";
+        } else {
+            current = current + _builtin_substring(s, i, i + 1);
+        }
+        i = i + 1;
+    }
+    parts.append(current);
+    return parts;
+}
