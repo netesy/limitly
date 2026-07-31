@@ -1,0 +1,107 @@
+import std.mime.index as mime;
+import std.mime.types as types_mod;
+
+fn test_parsing(): int {
+    print("Running MIME parsing tests...");
+
+    // Simple parsing
+    var m1 = mime.parse("text/html") as types_mod.MIMEType;
+    assert(m1.is_valid == true, "m1 should be valid");
+    assert(m1.main_type == "text", "m1.main_type should be text");
+    assert(m1.subtype == "html", "m1.subtype should be html");
+    assert(m1.to_string() == "text/html", "m1.to_string() failed");
+
+    // Case normalization and whitespace trimming
+    var m2 = mime.parse("  TEXT/Html; charset=utf-8; Boundary=some-boundary  ") as types_mod.MIMEType;
+    assert(m2.is_valid == true, "m2 should be valid");
+    assert(m2.main_type == "text", "m2.main_type should be text");
+    assert(m2.subtype == "html", "m2.subtype should be html");
+    assert(m2.params.get("charset") == "utf-8", "charset failed");
+    assert(m2.params.get("boundary") == "some-boundary", "boundary failed");
+
+    // Invalid MIME
+    var m3 = mime.parse("invalid-mime-no-slash") as types_mod.MIMEType;
+    assert(m3.is_valid == false, "m3 should be invalid");
+
+    var m4 = mime.parse("text/") as types_mod.MIMEType;
+    assert(m4.is_valid == false, "m4 should be invalid");
+
+    var m5 = mime.parse("/html") as types_mod.MIMEType;
+    assert(m5.is_valid == false, "m5 should be invalid");
+
+    print("Parsing tests passed!");
+    return 1;
+}
+
+fn test_classification(): int {
+    print("Running MIME classification tests...");
+
+    var text = mime.parse("text/plain") as types_mod.MIMEType;
+    var image = mime.parse("image/png") as types_mod.MIMEType;
+    var audio = mime.parse("audio/mpeg") as types_mod.MIMEType;
+    var video = mime.parse("video/mp4") as types_mod.MIMEType;
+    var app = mime.parse("application/json") as types_mod.MIMEType;
+
+    assert(text.is_text() == true, "text should be text");
+    assert(text.is_image() == false, "text should not be image");
+
+    assert(image.is_image() == true, "image should be image");
+    assert(audio.is_audio() == true, "audio should be audio");
+    assert(video.is_video() == true, "video should be video");
+    assert(app.is_application() == true, "app should be application");
+
+    print("Classification tests passed!");
+    return 1;
+}
+
+fn test_parameters(): int {
+    print("Running MIME parameters tests...");
+
+    var params = mime.MIMEParams() as types_mod.MIMEParams;
+    params.set("charset", "utf-8");
+    params.set("boundary", "xyz");
+
+    assert(params.get("charset") == "utf-8", "get charset failed");
+    assert(params.get("boundary") == "xyz", "get boundary failed");
+    assert(params.has("charset") == true, "has charset failed");
+    assert(params.has("none") == false, "has none failed");
+
+    params.remove("boundary");
+    assert(params.has("boundary") == false, "remove failed");
+
+    print("Parameters tests passed!");
+    return 1;
+}
+
+fn test_extension_mapping(): int {
+    print("Running extension mapping tests...");
+
+    // Extension to MIME
+    assert(mime.extension_to_mime("html") == "text/html", "html failed");
+    assert(mime.extension_to_mime(".css") == "text/css", ".css failed");
+    assert(mime.extension_to_mime("json") == "application/json", "json failed");
+    assert(mime.extension_to_mime("JS") == "text/javascript", "JS case failed");
+    assert(mime.extension_to_mime("unknown") == "application/octet-stream", "unknown failed");
+
+    // MIME to Extension
+    assert(mime.mime_to_extension("text/html") == ".html", "text/html failed");
+    assert(mime.mime_to_extension("application/json") == ".json", "application/json failed");
+    assert(mime.mime_to_extension("image/png") == ".png", "image/png failed");
+    assert(mime.mime_to_extension("text/plain") == ".txt", "text/plain failed");
+    assert(mime.mime_to_extension("application/unknown") == "", "unknown mime failed");
+
+    print("Extension mapping tests passed!");
+    return 1;
+}
+
+fn main(): int {
+    print("=== MIME Module Test Suite ===");
+
+    assert(test_parsing() == 1, "Parsing tests failed");
+    assert(test_classification() == 1, "Classification tests failed");
+    assert(test_parameters() == 1, "Parameters tests failed");
+    assert(test_extension_mapping() == 1, "Extension mapping tests failed");
+
+    print("All MIME tests completed successfully.");
+    return 0;
+}

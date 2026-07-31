@@ -41,6 +41,7 @@ import std.crypto.random as crypto_random;
 import std.encoding.index as encoding;
 import std.serialization as serialization;
 import std.url.index as url;
+import std.mime.index as mime;
 import std.debug as debug;
 import std.ffi as ffi;
 import std.app as app;
@@ -85,6 +86,8 @@ var Serialization = serialization.Serialization;
 var URL = url.URL;
 var URLBuilder = url.URLBuilder;
 var QueryParams = url.QueryParams;
+var MIMEType = mime.MIMEType;
+var MIMEParams = mime.MIMEParams;
 var Debug = debug.Debug;
 
 var Option = option.Option;
