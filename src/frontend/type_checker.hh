@@ -178,6 +178,20 @@ public:
                                   const std::vector<TypePtr>& param_types,
                                   TypePtr return_type);
     
+public:
+    // Diagnostic helpers & shared tracking
+    static std::unordered_set<std::string> failed_modules;
+    static std::unordered_set<std::string> failed_frames;
+
+    static int levenshtein_distance(const std::string& s1, const std::string& s2);
+    static std::string find_similar_name(const std::string& name, const std::vector<std::string>& candidates);
+    static std::vector<std::string> get_all_available_modules();
+
+    std::vector<std::string> get_visible_variables() const;
+    std::vector<std::string> get_visible_types() const;
+    std::string get_module_prefix(const std::string& name) const;
+    bool is_failed_type(const std::string& name) const;
+
 private:
     // Enhanced error reporting
     void add_error(const std::string& message, int line = 0);
@@ -296,7 +310,8 @@ private:
                             int line = 0);
     bool validate_argument_types(const std::vector<TypePtr>& expected,
                                  const std::vector<TypePtr>& actual,
-                                 const std::string& func_name);
+                                 const std::string& func_name,
+                                 int line = 0);
     
     // Control flow checking
     void check_return_statement(TypePtr return_type, int line);
