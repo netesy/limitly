@@ -42,6 +42,7 @@ import std.encoding.index as encoding;
 import std.serialization as serialization;
 import std.url.index as url;
 import std.mime.index as mime;
+import std.uuid.index as uuid;
 import std.debug as debug;
 import std.ffi as ffi;
 import std.app as app;
@@ -88,6 +89,7 @@ var URLBuilder = url.URLBuilder;
 var QueryParams = url.QueryParams;
 var MIMEType = mime.MIMEType;
 var MIMEParams = mime.MIMEParams;
+var UUID = uuid.UUID;
 var Debug = debug.Debug;
 
 var Option = option.Option;
