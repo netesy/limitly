@@ -1689,6 +1689,40 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             auto ft = std::get_if<FrameType>(&resolved_object_type->extra);
             if (ft) {
                 std::string resolved_frame_name = resolve_qualified_frame_name(ft->name);
+                
+                // Check if this is a field access (function pointer stored in a field)
+                // rather than a method call
+                auto frame_it = frame_table_.find(resolved_frame_name);
+                if (frame_it != frame_table_.end() && frame_it->second.declaration) {
+                    const auto& frame_decl = frame_it->second.declaration;
+                    for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
+                        const auto& field = frame_decl->fields[i];
+                        if (field->name == method_name) {
+                            // This is a field, not a method
+                            // Get the field value and use CallIndirect
+                            Reg field_reg = allocate_register();
+                            emit_instruction(LIR_Inst(LIR_Op::FrameGetField, Type::Ptr, field_reg, object_reg, static_cast<uint32_t>(i)));
+                            
+                            // Now call through the function pointer
+                            std::vector<Reg> indirect_args;
+                            for (const auto& arg : expr.arguments) {
+                                indirect_args.push_back(emit_expr(*arg));
+                            }
+                            
+                            Type abi_type = Type::Void;
+                            if (expr.inferred_type) {
+                                abi_type = language_type_to_abi_type(expr.inferred_type);
+                                set_register_language_type(result, expr.inferred_type);
+                            }
+                            
+                            LIR_Inst call_inst(LIR_Op::CallIndirect, abi_type, result, field_reg, 0);
+                            call_inst.call_args = indirect_args;
+                            emit_instruction(call_inst);
+                            return result;
+                        }
+                    }
+                }
+                
                 full_name = find_frame_or_trait_method(resolved_frame_name, method_name);
                 if (full_name.empty()) {
                     full_name = resolved_frame_name + "." + method_name;

@@ -3,9 +3,9 @@
 import std.iterator.iterator as it;
 
 frame ChainIterator: it.Iterator {
-    var left: it.Iterator;
-    var right: it.Iterator;
-    var on_left: bool;
+    pub left: it.Iterator;
+    pub on_left: bool;
+    pub right: it.Iterator;
 
     pub init(left: it.Iterator, right: it.Iterator) {
         self.left = left;
@@ -26,5 +26,5 @@ frame ChainIterator: it.Iterator {
 }
 
 pub fn chain(left: it.Iterator, right: it.Iterator): it.Iterator {
-    return ChainIterator(left=left, right=right);
+    return ChainIterator(left, right);
 }

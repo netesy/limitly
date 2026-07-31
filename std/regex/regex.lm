@@ -3,8 +3,8 @@
 import std.core as core;
 
 frame Regex {
-    pub var pattern: str;
-    pub var flags: int;  // Simple flag system: 1=case_insensitive, 2=multiline, 4=global
+    pub flags: int;  // Simple flag system: 1=case_insensitive, 2=multiline, 4=global
+    pub pattern: str;
 
     pub init(pattern: str, flags: int) {
         self.pattern = pattern;
@@ -80,7 +80,7 @@ frame Regex {
     }
 
     pub fn replace_all(text: str, replacement: str): str {
-        var regex_with_global = Regex(pattern=self.pattern, flags=self.flags | 4);
+        var regex_with_global = Regex(self.pattern, self.flags | 4);
         return regex_with_global.replace(text, replacement);
     }
 
@@ -194,12 +194,12 @@ frame Regex {
 frame RegexPatterns {
     pub init() {}
     pub fn email(): Regex {
-        return Regex(pattern="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", flags=0);
+        return Regex("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", 0);
     }
     pub fn url(): Regex {
-        return Regex(pattern="https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(/[^\\s]*)?", flags=0);
+        return Regex("https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(/[^\\s]*)?", 0);
     }
     pub fn phone(): Regex {
-        return Regex(pattern="\\(?([0-9]{3})\\)?[-.\\s]?([0-9]{3})[-.\\s]?([0-9]{4})", flags=0);
+        return Regex("\\(?([0-9]{3})\\)?[-.\\s]?([0-9]{3})[-.\\s]?([0-9]{4})", 0);
     }
 }

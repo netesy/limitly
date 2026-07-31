@@ -3,8 +3,8 @@
 import std.iterator.iterator as it;
 
 frame TakeIterator: it.Iterator {
-    var source: it.Iterator;
-    var remaining: int;
+    pub remaining: int;
+    pub source: it.Iterator;
 
     pub init(source: it.Iterator, count: int) {
         self.source = source;
@@ -21,5 +21,5 @@ frame TakeIterator: it.Iterator {
 }
 
 pub fn take(source: it.Iterator, count: int): it.Iterator {
-    return TakeIterator(source=source, count=count);
+    return TakeIterator(source, count);
 }

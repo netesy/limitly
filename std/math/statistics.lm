@@ -21,14 +21,18 @@ pub fn median(items: [any]): float {
     if (n == 0) return 0.0;
 
     // Create copy for sorting
-    var copy = [];
-    for (var i = 0; i < n; i = i + 1) copy = copy + [items[i]];
+    var copy: [any] = [] as [any];
+    for (var i = 0; i < n; i = i + 1) {
+        copy.append(items[i]);
+    }
     sort.sort(copy, false, nil);
 
     if (n % 2 == 1) {
         return copy[n / 2] as float;
     } else {
-        return (copy[n / 2 - 1] as float + copy[n / 2] as float) / 2.0;
+        var a = copy[n / 2 - 1] as float;
+        var b = copy[n / 2] as float;
+        return (a + b) / 2.0;
     }
 }
 

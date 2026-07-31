@@ -3,8 +3,8 @@
 import std.iterator.iterator as it;
 
 frame FilterIterator: it.Iterator {
-    var source: it.Iterator;
-    var p: fn(any): bool;
+    pub p: fn(any): bool;
+    pub source: it.Iterator;
 
     pub init(source: it.Iterator, p: fn(any): bool) {
         self.source = source;
@@ -26,5 +26,5 @@ frame FilterIterator: it.Iterator {
 }
 
 pub fn filter(source: it.Iterator, p: fn(any): bool): it.Iterator {
-    return FilterIterator(source=source, p=p);
+    return FilterIterator(source, p);
 }

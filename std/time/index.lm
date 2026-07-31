@@ -6,14 +6,7 @@ import std.time.datetime as datetime_mod;
 import std.time.timezone as timezone_mod;
 import std.time.timer as timer_mod;
 
-// Types
-pub type Instant = instant_mod.Instant;
-pub type Duration = duration_mod.Duration;
-pub type Time = datetime_mod.Time;
-pub type TimeZone = timezone_mod.TimeZone;
-pub type Timer = timer_mod.Timer;
-
-// Constructors
+// Constructors returning any to avoid cross-module type alias bugs
 pub fn Instant(timestamp_ms: float): any {
     return instant_mod.Instant(timestamp_ms);
 }
@@ -22,8 +15,9 @@ pub fn Duration(seconds: int, microseconds: int): any {
     return duration_mod.Duration(seconds, microseconds);
 }
 
-pub fn Time(timestamp: int, microseconds: int, timezone: TimeZone): any {
-    return datetime_mod.Time(timestamp, microseconds, timezone);
+pub fn Time(timestamp: int, microseconds: int, timezone: any): any {
+    var tz_obj = timezone as timezone_mod.TimeZone;
+    return datetime_mod.Time(timestamp, microseconds, tz_obj);
 }
 
 pub fn TimeZone(name: str, offset_hours: int, offset_minutes: int): any {
@@ -43,8 +37,9 @@ pub fn sleep_seconds(seconds: float): nil {
     return datetime_mod.sleep_seconds(seconds);
 }
 
-pub fn sleep_duration(duration: Duration): nil {
-    return datetime_mod.sleep_duration(duration);
+pub fn sleep_duration(duration: any): nil {
+    var d = duration as duration_mod.Duration;
+    return datetime_mod.sleep_duration(d);
 }
 
 pub fn is_leap_year(year: int): bool {

@@ -1,10 +1,9 @@
 // Standard Library Filesystem Forwarder Module
 
 import std.fs.index as fs_mod;
-import std.path as path;
+import std.path.index as path;
 
 pub type Permissions = fs_mod.Permissions;
-pub type IOError = fs_mod.IOError;
 
 frame FS {
     pub init() {}

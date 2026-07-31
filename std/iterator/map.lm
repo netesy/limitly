@@ -3,8 +3,8 @@
 import std.iterator.iterator as it;
 
 frame MapIterator: it.Iterator {
-    var source: it.Iterator;
-    var f: fn(any): any;
+    pub source: it.Iterator;
+    pub f: fn(any): any;
 
     pub init(source: it.Iterator, f: fn(any): any) {
         self.source = source;
@@ -21,5 +21,5 @@ frame MapIterator: it.Iterator {
 }
 
 pub fn map(source: it.Iterator, f: fn(any): any): it.Iterator {
-    return MapIterator(source=source, f=f);
+    return MapIterator(source, f);
 }

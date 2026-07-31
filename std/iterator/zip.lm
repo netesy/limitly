@@ -3,8 +3,8 @@
 import std.iterator.iterator as it;
 
 frame ZipIterator: it.Iterator {
-    var left: it.Iterator;
-    var right: it.Iterator;
+    pub left: it.Iterator;
+    pub right: it.Iterator;
 
     pub init(left: it.Iterator, right: it.Iterator) {
         self.left = left;
@@ -22,5 +22,5 @@ frame ZipIterator: it.Iterator {
 }
 
 pub fn zip(left: it.Iterator, right: it.Iterator): it.Iterator {
-    return ZipIterator(left=left, right=right);
+    return ZipIterator(left, right);
 }

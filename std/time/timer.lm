@@ -4,7 +4,7 @@ import std.time.instant as inst;
 import std.time.duration as dur;
 
 frame Timer {
-    pub var start_time: inst.Instant;
+    pub start_time: inst.Instant;
 
     pub init() {
         self.start_time = inst.Instant.now();
@@ -14,7 +14,7 @@ frame Timer {
         self.start_time = inst.Instant.now();
     }
 
-    pub fn elapsed(): dur.Duration {
+    pub fn elapsed(): dur.TimeDuration {
         return self.start_time.elapsed();
     }
 }

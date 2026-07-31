@@ -7,7 +7,6 @@ pub type Console = io.Console;
 pub type File = io.File;
 pub type Reader = io.Reader;
 pub type Writer = io.Writer;
-pub type IOError = io.IOError;
 
 pub var out: Console = io.out;
 

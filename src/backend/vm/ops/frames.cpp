@@ -25,14 +25,9 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::FrameGetField:
-            std::printf("[DEBUG frames.cpp] FrameGetField: pc->a=%u registers[pc->a]=%lx\n", pc->a, (unsigned long)registers[pc->a]);
             if (IS_PTR(registers[pc->a])) {
                 LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f) {
-                    std::printf("[DEBUG frames.cpp] FrameGetField unboxed frame=%p type_id=%u field_count=%d pc->b=%d\n", (void*)f, f->header.type_id, f->field_count, (int)pc->b);
-                }
                 if (f && f->header.type_id == TYPE_FRAME && pc->b >= 0 && pc->b < f->field_count) {
-                    std::printf("[DEBUG frames.cpp] FrameGetField frame=%p (name=%s) offset=%d val=%lx\n", (void*)f, f->name ? f->name : "null", (int)pc->b, (unsigned long)f->fields[pc->b]);
                     registers[pc->dst] = f->fields[pc->b];
                 } else {
                     registers[pc->dst] = 0;
@@ -43,9 +38,6 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             // pc->dst holds the frame pointer (container), pc->b holds the value.
             if (IS_PTR(registers[pc->dst])) {
                 LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->dst]);
-                if (f) {
-                    std::printf("[DEBUG frames.cpp] FrameSetField frame=%p type_id=%u field_count=%d pc->a=%d\n", (void*)f, f->header.type_id, f->field_count, (int)pc->a);
-                }
                 if (f && f->header.type_id == TYPE_FRAME && pc->a >= 0 && pc->a < f->field_count) {
                     f->fields[pc->a] = registers[pc->b];
                     transfer_ownership(registers[pc->b], registers[pc->dst]);

@@ -5,9 +5,9 @@ import std.format.printf as printf_mod;
 
 frame Format {
     pub init() {}
-    pub fn int(value: int): str { return formatter_mod.format_int(value); }
-    pub fn float(value: float): str { return formatter_mod.format_float(value); }
-    pub fn bool(value: bool): str { return formatter_mod.format_bool(value); }
+    pub fn format_int(value: int): str { return formatter_mod.format_int(value); }
+    pub fn format_float(value: float): str { return formatter_mod.format_float(value); }
+    pub fn format_bool(value: bool): str { return formatter_mod.format_bool(value); }
     pub fn pad_left(value: str, length_val: int, fill_char: str): str { return formatter_mod.pad_left(value, length_val, fill_char); }
     pub fn pad_right(value: str, length_val: int, fill_char: str): str { return formatter_mod.pad_right(value, length_val, fill_char); }
     pub fn center(value: str, length_val: int, fill_char: str): str { return formatter_mod.center(value, length_val, fill_char); }

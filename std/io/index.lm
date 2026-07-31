@@ -11,7 +11,6 @@ pub type Console = console_mod.Console;
 pub type File = file_mod.File;
 pub type Reader = reader_mod.Reader;
 pub type Writer = writer_mod.Writer;
-pub type IOError = file_mod.IOError;
 
 // Constructors
 pub fn Console(): any {
@@ -44,7 +43,7 @@ pub fn print(msg: any): nil {
 }
 
 frame FileSystem {
-    var resource: res.Resource;
+    pub resource: res.Resource;
     pub init(r: res.Resource) { self.resource = r; }
     pub fn exists(path: str): bool {
         var result = res._call(h=self.resource.handle, op=res.OP_EXISTS, args=[path]);
@@ -70,8 +69,8 @@ frame FileSystem {
 pub fn exists(path: str): bool {
     match (res.create_fs_resource()) {
         val r => {
-            var fs = FileSystem(r=r);
-            var result = fs.exists(path=path);
+            var fs = FileSystem(r);
+            var result = fs.exists(path);
             r.close();
             return result;
         },
@@ -82,8 +81,8 @@ pub fn exists(path: str): bool {
 pub fn delete(path: str): bool {
     match (res.create_fs_resource()) {
         val r => {
-            var fs = FileSystem(r=r);
-            var result = fs.delete(path=path);
+            var fs = FileSystem(r);
+            var result = fs.delete(path);
             r.close();
             return result;
         },
@@ -94,8 +93,8 @@ pub fn delete(path: str): bool {
 pub fn rename(old_path: str, new_path: str): bool {
     match (res.create_fs_resource()) {
         val r => {
-            var fs = FileSystem(r=r);
-            var result = fs.rename(old=old_path, new=new_path);
+            var fs = FileSystem(r);
+            var result = fs.rename(old_path, new_path);
             r.close();
             return result;
         },
@@ -106,39 +105,51 @@ pub fn rename(old_path: str, new_path: str): bool {
 pub fn create_directory(path: str): any {
     match (res.create_fs_resource()) {
         val r => {
-            var fs = FileSystem(r=r);
-            var result = fs.mkdir(path=path);
+            var fs = FileSystem(r);
+            var result = fs.mkdir(path);
             r.close();
             if (result) return ok(nil);
-            return err(file_mod.UnknownError(message="fail"));
+            var unknown_e = file_mod.UnknownError(message="fail");
+            return err(unknown_e);
         },
-        err e => return err(file_mod.UnknownError(message="fail"))
+        err e => {
+            var unknown_e2 = file_mod.UnknownError(message="fail");
+            return err(unknown_e2);
+        }
     }
 }
 
 pub fn list_directory(path: str): any {
+    var final_result: any = nil;
     match (res.create_fs_resource()) {
         val r => {
-            var fs = FileSystem(r=r);
-            var result = fs.readdir(path=path);
+            var fs = FileSystem(r);
+            var result = fs.readdir(path);
             r.close();
-            if (result == nil) return err(file_mod.UnknownError(message="fail"));
-
-            var s = result as str;
-            var parts: [str] = [];
-            var current = "";
-            for (var i = 0; i < len(s); i = i + 1) {
-                var ch = substring(s, i, i + 1);
-                if (ch == "\n") {
-                    if (len(current) > 0) parts.append(current);
-                    current = "";
-                } else {
-                    current = current + ch;
+            if (result == nil) {
+                var unknown_e = file_mod.UnknownError(message="fail");
+                final_result = err(unknown_e);
+            } else {
+                var s = result as str;
+                var parts: [str] = [];
+                var current = "";
+                for (var i = 0; i < len(s); i = i + 1) {
+                    var ch = substring(s, i, i + 1);
+                    if (ch == "\n") {
+                        if (len(current) > 0) parts.append(current);
+                        current = "";
+                    } else {
+                        current = current + ch;
+                    }
                 }
+                if (len(current) > 0) parts.append(current);
+                final_result = ok(parts);
             }
-            if (len(current) > 0) parts.append(current);
-            return ok(parts);
         },
-        err e => return err(file_mod.UnknownError(message="fail"))
+        err e => {
+            var unknown_e2 = file_mod.UnknownError(message="fail");
+            final_result = err(unknown_e2);
+        }
     }
+    return final_result;
 }

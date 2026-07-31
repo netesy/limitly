@@ -2,13 +2,15 @@
 
 import std.time.index as t;
 
-pub type Duration = t.Duration;
-pub type TimeZone = t.TimeZone;
-pub type Time = t.Time;
+pub fn Instant(timestamp_ms: float): any { return t.Instant(timestamp_ms); }
+pub fn Duration(seconds: int, microseconds: int): any { return t.Duration(seconds, microseconds); }
+pub fn Time(timestamp: int, microseconds: int, timezone: any): any { return t.Time(timestamp, microseconds, timezone); }
+pub fn TimeZone(name: str, offset_hours: int, offset_minutes: int): any { return t.TimeZone(name, offset_hours, offset_minutes); }
+pub fn Timer(): any { return t.Timer(); }
 
 pub fn sleep_ms(ms: int): nil { t.sleep_ms(ms); }
 pub fn sleep_seconds(seconds: float): nil { t.sleep_seconds(seconds); }
-pub fn sleep_duration(duration: Duration): nil { t.sleep_duration(duration); }
+pub fn sleep_duration(duration: any): nil { t.sleep_duration(duration); }
 
 pub fn is_leap_year(year: int): bool { return t.is_leap_year(year); }
 pub fn get_days_in_month(year: int, month: int): int { return t.get_days_in_month(year, month); }
