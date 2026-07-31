@@ -46,6 +46,25 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
     std::string filePath = find_module_file(module_path);
     std::ifstream file(filePath);
     if (!file.is_open()) {
+        if (module_path.ends_with(".index")) {
+            std::string parent_path = module_path.substr(0, module_path.length() - 6);
+            size_t last_dot = parent_path.find_last_of('.');
+            std::string last_component = (last_dot != std::string::npos) ? parent_path.substr(last_dot + 1) : parent_path;
+            std::string fallback_x_x = parent_path + "." + last_component;
+            std::string file_x_x = find_module_file(fallback_x_x);
+            file.open(file_x_x);
+            if (file.is_open()) {
+                filePath = file_x_x;
+            } else {
+                std::string file_x = find_module_file(parent_path);
+                file.open(file_x);
+                if (file.is_open()) {
+                    filePath = file_x;
+                }
+            }
+        }
+    }
+    if (!file.is_open()) {
         return nullptr;
     }
 
