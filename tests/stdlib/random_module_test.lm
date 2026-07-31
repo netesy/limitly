@@ -5,8 +5,8 @@ import std.random.index as r;
 fn test_random_frame(): int {
     print("Testing Random Frame...");
     var rng = r.Random(123456789) as r.Random;
-    var val = rng.next_int();
-    assert(val != 0, "next_int failed");
+    var value = rng.next_int();
+    assert(value != 0, "next_int failed");
 
     var f = rng.next_float();
     assert(f >= 0.0 and f <= 1.0, "next_float failed");

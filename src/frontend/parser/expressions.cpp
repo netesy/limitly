@@ -475,6 +475,12 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::finishCall(std::shared_pt
                     namedArgs[nameToken.lexeme] = expression();
                 } else { current--; arguments.push_back(expression()); }
             } else arguments.push_back(expression());
+            // If we hit an error, skip to next comma or closing paren
+            if (hadError() && !check(TokenType::COMMA) && !check(TokenType::RIGHT_PAREN)) {
+                while (!isAtEnd() && peek().type != TokenType::COMMA && peek().type != TokenType::RIGHT_PAREN && peek().type != TokenType::SEMICOLON) {
+                    advance();
+                }
+            }
             if (!match({TokenType::COMMA})) break;
             if (cstMode && config.detailedExpressionNodes) callTokens.push_back(previous());
         } while (true);
@@ -670,7 +676,17 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
     if (match({TokenType::LEFT_BRACKET})) {
         auto leftBracket = previous();
         std::vector<std::shared_ptr<LM::Frontend::AST::Expression>> elements;
-        if (!check(TokenType::RIGHT_BRACKET)) { do { elements.push_back(expression()); } while (match({TokenType::COMMA})); }
+        if (!check(TokenType::RIGHT_BRACKET)) { 
+            do { 
+                elements.push_back(expression()); 
+                // If we hit an error, skip to next comma or closing bracket
+                if (hadError() && !check(TokenType::COMMA) && !check(TokenType::RIGHT_BRACKET)) {
+                    while (!isAtEnd() && peek().type != TokenType::COMMA && peek().type != TokenType::RIGHT_BRACKET && peek().type != TokenType::SEMICOLON) {
+                        advance();
+                    }
+                }
+            } while (match({TokenType::COMMA})); 
+        }
         auto rightBracket = consume(TokenType::RIGHT_BRACKET, "Expected ']' after list elements.");
         auto listExpr = std::make_shared<LM::Frontend::AST::ListExpr>();
         listExpr->line = rightBracket.line; listExpr->elements = elements;

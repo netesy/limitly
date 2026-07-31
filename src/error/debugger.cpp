@@ -117,52 +117,129 @@ void Debugger::debugConsole(const Message &errorMessage)
     std::string bold = "\033[1m";
     std::string red = "\033[1;31m";      // Bold red for errors
     
-    // Format: error[E002]: Expected expression.
-    std::cerr << red << bold << "error";
-    if (!errorMessage.errorCode.empty()) {
-        std::cerr << "[" << errorMessage.errorCode << "]";
-    }
-    std::cerr << ": " << errorMessage.description << reset << "\n";
+    // Check if the description contains the new multi-line format with reason/help
+    bool hasMultiLineFormat = errorMessage.description.find("\n\n= reason:") != std::string::npos;
     
-    // Location: file:line:column
-    std::cerr << "  " << bold << "-->" << reset << " " << errorMessage.filePath << ":"
-              << errorMessage.line << ":" << errorMessage.column << "\n";
-    
-    // Source code snippet with line number and caret
-    if (!errorMessage.contextLines.empty()) {
-        // Show context lines
-        for (size_t i = 0; i < errorMessage.contextLines.size(); ++i) {
-            int lineNum = errorMessage.line - (errorMessage.contextLines.size() - 1) + i;
-            // Adjust for cases where we have more than 2 context lines (error line is not the last)
-            if (errorMessage.contextLines.size() > 2) {
-                lineNum += 1;
+    if (hasMultiLineFormat) {
+        // Parse the multi-line format
+        std::string mainDesc = errorMessage.description;
+        std::string reason;
+        std::string help;
+        
+        size_t reasonPos = mainDesc.find("\n\n= reason:");
+        if (reasonPos != std::string::npos) {
+            reason = mainDesc.substr(reasonPos + 11); // Skip "\n\n= reason:"
+            mainDesc = mainDesc.substr(0, reasonPos);
+            
+            size_t helpPos = reason.find("\n= help:");
+            if (helpPos != std::string::npos) {
+                help = reason.substr(helpPos + 8); // Skip "\n= help:"
+                reason = reason.substr(0, helpPos);
             }
-            std::cerr << "   " << std::setw(4) << lineNum 
-                      << " | " << errorMessage.contextLines[i] << "\n";
         }
         
-        // Show caret pointing to error location
-        std::cerr << "       | ";
-        for (int i = 1; i < errorMessage.column; ++i) {
-            std::cerr << " ";
+        // Format: error: `int` cannot be used as a variable name
+        std::cerr << red << bold << "error" << reset << ": " << mainDesc << "\n";
+        
+        // Location: file:line:column
+        std::cerr << "  " << bold << "-->" << reset << " " << errorMessage.filePath << ":"
+                  << errorMessage.line << ":" << errorMessage.column << "\n";
+        
+        // Source code snippet with line number and caret
+        if (!errorMessage.contextLines.empty()) {
+            // Show context lines
+            for (size_t i = 0; i < errorMessage.contextLines.size(); ++i) {
+                int lineNum = errorMessage.line - (errorMessage.contextLines.size() - 1) + i;
+                // Adjust for cases where we have more than 2 context lines (error line is not the last)
+                if (errorMessage.contextLines.size() > 2) {
+                    lineNum += 1;
+                }
+                std::cerr << "   " << std::setw(4) << lineNum 
+                          << " | " << errorMessage.contextLines[i] << "\n";
+            }
+            
+            // Show caret pointing to error location
+            std::cerr << "       | ";
+            for (int i = 1; i < errorMessage.column; ++i) {
+                std::cerr << " ";
+            }
+            std::cerr << "^\n";
         }
-        std::cerr << "^\n";
+        
+        // Reason section
+        if (!reason.empty()) {
+            std::cerr << "   |\n";
+            std::cerr << "   " << bold << "= reason:" << reset << " " << reason << "\n";
+        }
+        
+        // Help section
+        if (!help.empty()) {
+            std::cerr << "   " << bold << "= help:" << reset << " " << help << "\n";
+        }
+        
+        // Additional hint/suggestion from the message structure
+        if (!errorMessage.suggestion.empty()) {
+            std::cerr << "   " << bold << "help:" << reset << " " << errorMessage.suggestion << "\n";
+        }
+        
+        if (!errorMessage.hint.empty()) {
+            std::cerr << "   " << bold << "note:" << reset << " " << errorMessage.hint << "\n";
+        }
+        
+        if (!errorMessage.causedBy.empty()) {
+            std::cerr << "   " << bold << "caused by:" << reset << " " << errorMessage.causedBy << "\n";
+        }
+        
+        std::cerr << "\n";
+    } else {
+        // Original format for backward compatibility
+        // Format: error[E002]: Expected expression.
+        std::cerr << red << bold << "error";
+        if (!errorMessage.errorCode.empty()) {
+            std::cerr << "[" << errorMessage.errorCode << "]";
+        }
+        std::cerr << ": " << errorMessage.description << reset << "\n";
+        
+        // Location: file:line:column
+        std::cerr << "  " << bold << "-->" << reset << " " << errorMessage.filePath << ":"
+                  << errorMessage.line << ":" << errorMessage.column << "\n";
+        
+        // Source code snippet with line number and caret
+        if (!errorMessage.contextLines.empty()) {
+            // Show context lines
+            for (size_t i = 0; i < errorMessage.contextLines.size(); ++i) {
+                int lineNum = errorMessage.line - (errorMessage.contextLines.size() - 1) + i;
+                // Adjust for cases where we have more than 2 context lines (error line is not the last)
+                if (errorMessage.contextLines.size() > 2) {
+                    lineNum += 1;
+                }
+                std::cerr << "   " << std::setw(4) << lineNum 
+                          << " | " << errorMessage.contextLines[i] << "\n";
+            }
+            
+            // Show caret pointing to error location
+            std::cerr << "       | ";
+            for (int i = 1; i < errorMessage.column; ++i) {
+                std::cerr << " ";
+            }
+            std::cerr << "^\n";
+        }
+        
+        // Hint/suggestion
+        if (!errorMessage.suggestion.empty()) {
+            std::cerr << "   " << bold << "help:" << reset << " " << errorMessage.suggestion << "\n";
+        }
+        
+        if (!errorMessage.hint.empty()) {
+            std::cerr << "   " << bold << "note:" << reset << " " << errorMessage.hint << "\n";
+        }
+        
+        if (!errorMessage.causedBy.empty()) {
+            std::cerr << "   " << bold << "caused by:" << reset << " " << errorMessage.causedBy << "\n";
+        }
+        
+        std::cerr << "\n";
     }
-    
-    // Hint/suggestion
-    if (!errorMessage.suggestion.empty()) {
-        std::cerr << "   " << bold << "help:" << reset << " " << errorMessage.suggestion << "\n";
-    }
-    
-    if (!errorMessage.hint.empty()) {
-        std::cerr << "   " << bold << "note:" << reset << " " << errorMessage.hint << "\n";
-    }
-    
-    if (!errorMessage.causedBy.empty()) {
-        std::cerr << "   " << bold << "caused by:" << reset << " " << errorMessage.causedBy << "\n";
-    }
-    
-    std::cerr << "\n";
 }
 
 void Debugger::debugLog(const Message &errorMessage)
@@ -173,52 +250,130 @@ void Debugger::debugLog(const Message &errorMessage)
         return;
     }
 
-    // Modern compiler-style diagnostics (without colors for log file)
-    logfile << "error";
-    if (!errorMessage.errorCode.empty()) {
-        logfile << "[" << errorMessage.errorCode << "]";
-    }
-    logfile << ": " << errorMessage.description << "\n";
+    // Check if the description contains the new multi-line format with reason/help
+    bool hasMultiLineFormat = errorMessage.description.find("\n\n= reason:") != std::string::npos;
     
-    // Location: file:line:column
-    logfile << "  --> " << errorMessage.filePath << ":"
-            << errorMessage.line << ":" << errorMessage.column << "\n";
-    
-    // Source code snippet with line number and caret
-    if (!errorMessage.contextLines.empty()) {
-        // Show context lines
-        for (size_t i = 0; i < errorMessage.contextLines.size(); ++i) {
-            int lineNum = errorMessage.line - (errorMessage.contextLines.size() - 1) + i;
-            // Adjust for cases where we have more than 2 context lines (error line is not the last)
-            if (errorMessage.contextLines.size() > 2) {
-                lineNum += 1;
+    if (hasMultiLineFormat) {
+        // Parse the multi-line format
+        std::string mainDesc = errorMessage.description;
+        std::string reason;
+        std::string help;
+        
+        size_t reasonPos = mainDesc.find("\n\n= reason:");
+        if (reasonPos != std::string::npos) {
+            reason = mainDesc.substr(reasonPos + 11); // Skip "\n\n= reason:"
+            mainDesc = mainDesc.substr(0, reasonPos);
+            
+            size_t helpPos = reason.find("\n= help:");
+            if (helpPos != std::string::npos) {
+                help = reason.substr(helpPos + 8); // Skip "\n= help:"
+                reason = reason.substr(0, helpPos);
             }
-            logfile << "   " << std::setw(4) << lineNum 
-                    << " | " << errorMessage.contextLines[i] << "\n";
         }
         
-        // Show caret pointing to error location
-        logfile << "       | ";
-        for (int i = 1; i < errorMessage.column; ++i) {
-            logfile << " ";
+        // Modern compiler-style diagnostics (without colors for log file)
+        logfile << "error: " << mainDesc << "\n";
+        
+        // Location: file:line:column
+        logfile << "  --> " << errorMessage.filePath << ":"
+                << errorMessage.line << ":" << errorMessage.column << "\n";
+        
+        // Source code snippet with line number and caret
+        if (!errorMessage.contextLines.empty()) {
+            // Show context lines
+            for (size_t i = 0; i < errorMessage.contextLines.size(); ++i) {
+                int lineNum = errorMessage.line - (errorMessage.contextLines.size() - 1) + i;
+                // Adjust for cases where we have more than 2 context lines (error line is not the last)
+                if (errorMessage.contextLines.size() > 2) {
+                    lineNum += 1;
+                }
+                logfile << "   " << std::setw(4) << lineNum 
+                        << " | " << errorMessage.contextLines[i] << "\n";
+            }
+            
+            // Show caret pointing to error location
+            logfile << "       | ";
+            for (int i = 1; i < errorMessage.column; ++i) {
+                logfile << " ";
+            }
+            logfile << "^\n";
         }
-        logfile << "^\n";
+        
+        // Reason section
+        if (!reason.empty()) {
+            logfile << "   |\n";
+            logfile << "   = reason: " << reason << "\n";
+        }
+        
+        // Help section
+        if (!help.empty()) {
+            logfile << "   = help: " << help << "\n";
+        }
+        
+        // Additional hint/suggestion from the message structure
+        if (!errorMessage.suggestion.empty()) {
+            logfile << "   help: " << errorMessage.suggestion << "\n";
+        }
+        
+        if (!errorMessage.hint.empty()) {
+            logfile << "   note: " << errorMessage.hint << "\n";
+        }
+        
+        if (!errorMessage.causedBy.empty()) {
+            logfile << "   caused by: " << errorMessage.causedBy << "\n";
+        }
+        
+        logfile << "\n";
+    } else {
+        // Original format for backward compatibility
+        // Modern compiler-style diagnostics (without colors for log file)
+        logfile << "error";
+        if (!errorMessage.errorCode.empty()) {
+            logfile << "[" << errorMessage.errorCode << "]";
+        }
+        logfile << ": " << errorMessage.description << "\n";
+        
+        // Location: file:line:column
+        logfile << "  --> " << errorMessage.filePath << ":"
+                << errorMessage.line << ":" << errorMessage.column << "\n";
+        
+        // Source code snippet with line number and caret
+        if (!errorMessage.contextLines.empty()) {
+            // Show context lines
+            for (size_t i = 0; i < errorMessage.contextLines.size(); ++i) {
+                int lineNum = errorMessage.line - (errorMessage.contextLines.size() - 1) + i;
+                // Adjust for cases where we have more than 2 context lines (error line is not the last)
+                if (errorMessage.contextLines.size() > 2) {
+                    lineNum += 1;
+                }
+                logfile << "   " << std::setw(4) << lineNum 
+                        << " | " << errorMessage.contextLines[i] << "\n";
+            }
+            
+            // Show caret pointing to error location
+            logfile << "       | ";
+            for (int i = 1; i < errorMessage.column; ++i) {
+                logfile << " ";
+            }
+            logfile << "^\n";
+        }
+        
+        // Hint/suggestion
+        if (!errorMessage.suggestion.empty()) {
+            logfile << "   help: " << errorMessage.suggestion << "\n";
+        }
+        
+        if (!errorMessage.hint.empty()) {
+            logfile << "   note: " << errorMessage.hint << "\n";
+        }
+        
+        if (!errorMessage.causedBy.empty()) {
+            logfile << "   caused by: " << errorMessage.causedBy << "\n";
+        }
+        
+        logfile << "\n";
     }
     
-    // Hint/suggestion
-    if (!errorMessage.suggestion.empty()) {
-        logfile << "   help: " << errorMessage.suggestion << "\n";
-    }
-    
-    if (!errorMessage.hint.empty()) {
-        logfile << "   note: " << errorMessage.hint << "\n";
-    }
-    
-    if (!errorMessage.causedBy.empty()) {
-        logfile << "   caused by: " << errorMessage.causedBy << "\n";
-    }
-    
-    logfile << "\n";
     logfile.close();
 }
 
@@ -294,6 +449,12 @@ std::string Debugger::getTime()
 std::string Debugger::getSuggestion(const std::string &errorMessage,
                                     const std::string &expectedValue)
 {
+    // Handle new format errors with reason/help sections
+    if (errorMessage.find("cannot be used as") != std::string::npos) {
+        // These errors already have built-in help in the reason/help format
+        return ""; // Return empty to avoid duplication
+    }
+    
     // Provide suggestions based on the error message and expected value
     
     // === PARSER ERRORS ===

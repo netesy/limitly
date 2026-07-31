@@ -278,11 +278,9 @@ void Generator::emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt) {
 
 
 void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
-   // std::cout << "[DEBUG] emit_var_stmt called for variable: " << stmt.name << std::endl;
-
-    // Check if this is a module-level variable (global)
-    // Only treat as global if: we're in a module AND we're not inside a function (or inside __init__ function)
-    if (!current_module_.empty() && current_module_ != "root" && (current_function_ == nullptr || (current_function_ && current_function_->name == current_module_ + ".__init__"))) {
+   // Check if this is a module-level variable (global)
+    // Treat as global if: we're not inside a function (or inside __init__ function)
+    if (current_function_ == nullptr || (current_function_ && current_function_->name == current_module_ + ".__init__")) {
         std::string qualified_name = current_module_ + "." + stmt.name;
         Reg val_reg = 0;
         if (stmt.initializer) {

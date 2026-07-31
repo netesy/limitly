@@ -53,9 +53,11 @@ private:
         int line;
         int column;
         std::string codeContext;
+        bool isMajorError = false;  // Track if this is a major structural error
     };
     std::vector<ParseError> errors;
     static constexpr size_t MAX_ERRORS = 20;
+    bool inBrokenState = false;  // Track if parser is in a broken state due to major error
 
 public:
     const std::vector<ParseError>& getErrors() const { return errors; }
@@ -197,6 +199,12 @@ public:
         }
         return true;
     }
+
+    // Helper functions for improved error messages
+    bool isReservedKeyword(TokenType type);
+    bool isBuiltInType(TokenType type);
+    std::string getIdentifierCategory(const Token& token);
+    std::string generateIdentifierError(const std::string& context, const Token& token);
     
     // Function type parsing methods
     std::shared_ptr<LM::Frontend::AST::FunctionTypeAnnotation> parseFunctionTypeAnnotation();
