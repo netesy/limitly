@@ -1,6 +1,8 @@
 #include "module_manager.hh"
 #include "scanner.hh"
 #include "parser.hh"
+#include "type_checker.hh"
+#include "../error/debugger.hh"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -56,6 +58,14 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
     scanner.scanTokens();
     Parser parser(scanner);
     auto ast = parser.parse();
+
+    if (!ast || LM::Error::Debugger::hasError()) {
+        TypeChecker::failed_modules.insert(module_path);
+        size_t last_dot = module_path.find_last_of('.');
+        if (last_dot != std::string::npos) {
+            TypeChecker::failed_modules.insert(module_path.substr(0, last_dot));
+        }
+    }
 
     if (!ast) return nullptr;
 

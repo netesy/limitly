@@ -321,7 +321,17 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
 
     if (!type) {
         undefined_symbols.insert(expr->name);
-        add_error("Undefined variable or variant: " + expr->name, expr->line);
+        std::vector<std::string> candidates = get_visible_variables();
+        std::string suggestion = find_similar_name(expr->name, candidates);
+
+        std::string msg = "cannot find variable `" + expr->name + "`";
+        msg += "\n\n= reason: variable is not declared in this scope";
+        if (!suggestion.empty()) {
+            msg += "\n= help: did you mean `" + suggestion + "`?";
+        } else {
+            msg += "\n= help: make sure `" + expr->name + "` is declared before it is used";
+        }
+        add_error(msg, expr->line);
         return nullptr;
     }
     
@@ -1077,7 +1087,25 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                     }
                 }
 
-                add_error("Frame '" + frame_name + "' has no method '" + method_name + "'", expr->line);
+                if (is_failed_type(frame_name)) {
+                    expr->inferred_type = type_system.ANY_TYPE;
+                    return type_system.ANY_TYPE;
+                }
+
+                std::vector<std::string> method_candidates;
+                for (const auto& m : frame_info.declaration->methods) {
+                    method_candidates.push_back(m->name);
+                }
+                std::string suggestion = find_similar_name(method_name, method_candidates);
+
+                std::string msg = "frame `" + frame_name + "` has no method named `" + method_name + "`";
+                msg += "\n\n= reason: method not found on frame `" + frame_name + "`";
+                if (!suggestion.empty()) {
+                    msg += "\n= help: did you mean `" + suggestion + "`?";
+                } else {
+                    msg += "\n= help: check the frame definition or spelling";
+                }
+                add_error(msg, expr->line);
                 return type_system.ANY_TYPE;
             }
             
@@ -1192,7 +1220,23 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 }
             }
 
-            add_error("Trait '" + trait_name + "' has no method '" + method_name + "'", expr->line);
+            std::vector<std::string> trait_method_candidates;
+            auto trait_it_cand = trait_declarations.find(trait_name);
+            if (trait_it_cand != trait_declarations.end()) {
+                for (const auto& tm : trait_it_cand->second.declaration->methods) {
+                    trait_method_candidates.push_back(tm->name);
+                }
+            }
+            std::string suggestion = find_similar_name(method_name, trait_method_candidates);
+
+            std::string msg = "trait `" + trait_name + "` has no method named `" + method_name + "`";
+            msg += "\n\n= reason: method not found on trait `" + trait_name + "`";
+            if (!suggestion.empty()) {
+                msg += "\n= help: did you mean `" + suggestion + "`?";
+            } else {
+                msg += "\n= help: check the trait definition or spelling";
+            }
+            add_error(msg, expr->line);
             return type_system.ANY_TYPE;
         } else if (object_type && object_type->tag == TypeTag::Any) {
             // Dynamic call on 'any' - allowed, returns any
@@ -1517,7 +1561,28 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
             // If it's a module alias, we shouldn't fail if we just haven't found the member yet
             // but we should have found it if it exists.
             if (import_aliases.count(frame_name)) {
-                add_error("Module '" + frame_name + "' has no member '" + member_name + "'", expr->line);
+                std::vector<std::string> module_candidates;
+                std::string prefix = frame_name + ".";
+                for (const auto& pair : variable_types) {
+                    if (pair.first.rfind(prefix, 0) == 0) {
+                        module_candidates.push_back(pair.first.substr(prefix.length()));
+                    }
+                }
+                for (const auto& pair : function_signatures) {
+                    if (pair.first.rfind(prefix, 0) == 0) {
+                        module_candidates.push_back(pair.first.substr(prefix.length()));
+                    }
+                }
+                std::string suggestion = find_similar_name(member_name, module_candidates);
+
+                std::string msg = "module `" + frame_name + "` has no member named `" + member_name + "`";
+                msg += "\n\n= reason: member not found in module `" + frame_name + "`";
+                if (!suggestion.empty()) {
+                    msg += "\n= help: did you mean `" + suggestion + "`?";
+                } else {
+                    msg += "\n= help: check the module export list or spelling";
+                }
+                add_error(msg, expr->line);
             } else {
                 add_error("Invalid frame declaration for " + frame_name, expr->line);
             }
@@ -1589,7 +1654,30 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         }
         
         // Member not found
-        add_error("Frame '" + frame_name + "' has no member '" + member_name + "'", expr->line);
+        if (is_failed_type(frame_name)) {
+            expr->inferred_type = type_system.ANY_TYPE;
+            return type_system.ANY_TYPE;
+        }
+
+        std::vector<std::string> member_candidates;
+        for (const auto& [field_name, field_type] : frame_info.fields) {
+            member_candidates.push_back(field_name);
+        }
+        if (frame_info.declaration) {
+            for (const auto& method : frame_info.declaration->methods) {
+                member_candidates.push_back(method->name);
+            }
+        }
+        std::string suggestion = find_similar_name(member_name, member_candidates);
+
+        std::string msg = "frame `" + frame_name + "` has no member named `" + member_name + "`";
+        msg += "\n\n= reason: member not found on frame `" + frame_name + "`";
+        if (!suggestion.empty()) {
+            msg += "\n= help: did you mean `" + suggestion + "`?";
+        } else {
+            msg += "\n= help: check the frame definition or spelling";
+        }
+        add_error(msg, expr->line);
         return type_system.ANY_TYPE;
     }
     
@@ -1625,6 +1713,14 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
     } else if (object_type->tag == TypeTag::Dict) {
         if (member_name == "len") return type_system.INT_TYPE;
         if (member_name == "keys" || member_name == "values") return type_system.FUNCTION_TYPE;
+    }
+
+    std::string type_str = object_type->toString();
+    if (type_str.find("Frame<") == 0) {
+        std::string frame_name = type_str.substr(6, type_str.length() - 7);
+        if (is_failed_type(frame_name)) {
+            return type_system.ANY_TYPE;
+        }
     }
 
     add_error("Type '" + object_type->toString() + "' has no member '" + member_name + "'", expr->line);

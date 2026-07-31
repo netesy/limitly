@@ -1,5 +1,9 @@
 #include "../type_checker.hh"
 #include "../module_manager.hh"
+#include <filesystem>
+#include <algorithm>
+
+namespace fs = std::filesystem;
 
 using namespace LM::Frontend;
 
@@ -201,6 +205,8 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
 TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame) {
     if (!frame) return nullptr;
     
+    size_t initial_error_count = errors.size();
+
     // Set current frame context
     auto prev_frame = current_frame;
     current_frame = frame;
@@ -393,6 +399,10 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
     // Restore previous frame context
     current_frame = prev_frame;
     
+    if (errors.size() > initial_error_count) {
+        failed_frames.insert(name);
+    }
+
     return frame_type;
 }
 
@@ -572,7 +582,31 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
     auto& manager = ModuleManager::getInstance();
     auto module = manager.load_module(import_stmt->modulePath);
     if (!module) {
-        add_error("Failed to load module: " + import_stmt->modulePath, import_stmt->line);
+        std::string mod_path = import_stmt->modulePath;
+        std::string dir_path = mod_path;
+        if (dir_path.ends_with(".index")) {
+            dir_path = dir_path.substr(0, dir_path.length() - 6);
+        }
+        std::replace(dir_path.begin(), dir_path.end(), '.', '/');
+
+        std::string msg;
+        if (fs::exists(dir_path) && fs::is_directory(dir_path)) {
+            msg = "module `" + mod_path + "` was found, but its entry module could not be loaded";
+            msg += "\n\n= reason: expected `" + dir_path + "/index.lm`";
+            msg += "\n= help: check that the module contains a valid entry file";
+        } else {
+            std::vector<std::string> candidates = get_all_available_modules();
+            std::string suggestion = find_similar_name(mod_path, candidates);
+
+            msg = "cannot find module `" + mod_path + "`";
+            msg += "\n\n= reason: module was not found in import paths";
+            if (!suggestion.empty()) {
+                msg += "\n= help: did you mean `" + suggestion + "`?";
+            } else {
+                msg += "\n= help: check that the module exists and that the import path is correct";
+            }
+        }
+        add_error(msg, import_stmt->line);
         return nullptr;
     }
 

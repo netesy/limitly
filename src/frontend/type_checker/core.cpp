@@ -121,6 +121,11 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 checker.set_source_context(module->source, module->path);
                 if (!checker.check_program(module->ast)) {
                     add_error("Failed to type check module: " + path);
+                    failed_modules.insert(path);
+                    size_t last_dot = path.find_last_of('.');
+                    if (last_dot != std::string::npos) {
+                        failed_modules.insert(path.substr(0, last_dot));
+                    }
                     for (const auto& err : checker.get_errors()) {
                         std::cerr << "  Module [" << path << "] local error: " << err << std::endl;
                     }

@@ -4,8 +4,13 @@
 #include "symbol_database.hh"
 #include "declaration_resolver.hh"
 #include "trait_resolver.hh"
+#include "../error/debugger.hh"
 #include <functional>
 #include <set>
+#include <filesystem>
+#include <algorithm>
+
+namespace fs = std::filesystem;
 
 namespace LM {
 namespace Frontend {
@@ -38,6 +43,9 @@ std::unique_ptr<TypeChecker> create(TypeSystem& type_system, SymbolDatabase& sym
 TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program,
                               const std::string& source,
                               const std::string& file_path) {
+    TypeChecker::failed_modules.clear();
+    TypeChecker::failed_frames.clear();
+
     // Resolve all modules once at the beginning
     auto& manager = ModuleManager::getInstance();
     manager.clear();
@@ -55,7 +63,46 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     for (const auto& [mod_name, mod_ptr] : manager.get_all_modules()) {
         for (const auto& dep : mod_ptr->dependencies) {
             if (!manager.get_module(dep)) {
-                missing_dep_errors.push_back("Missing dependency '" + dep + "' required by module '" + mod_name + "'");
+                // Find the ImportStatement node in mod_ptr->ast
+                std::shared_ptr<LM::Frontend::AST::ImportStatement> import_node = nullptr;
+                if (mod_ptr->ast) {
+                    for (const auto& stmt : mod_ptr->ast->statements) {
+                        if (auto imp = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+                            if (imp->modulePath == dep) {
+                                import_node = imp;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                int line = import_node ? import_node->line : 1;
+                std::string dir_path = dep;
+                if (dir_path.ends_with(".index")) {
+                    dir_path = dir_path.substr(0, dir_path.length() - 6);
+                }
+                std::replace(dir_path.begin(), dir_path.end(), '.', '/');
+
+                std::string msg;
+                if (fs::exists(dir_path) && fs::is_directory(dir_path)) {
+                    msg = "module `" + dep + "` was found, but its entry module could not be loaded";
+                    msg += "\n\n= reason: expected `" + dir_path + "/index.lm`";
+                    msg += "\n= help: check that the module contains a valid entry file";
+                } else {
+                    std::vector<std::string> candidates = TypeChecker::get_all_available_modules();
+                    std::string suggestion = TypeChecker::find_similar_name(dep, candidates);
+                    msg = "cannot find module `" + dep + "`";
+                    msg += "\n\n= reason: module was not found in import paths";
+                    if (!suggestion.empty()) {
+                        msg += "\n= help: did you mean `" + suggestion + "`?";
+                    } else {
+                        msg += "\n= help: check that the module exists and that the import path is correct";
+                    }
+                }
+
+                // Report directly to Debugger
+                LM::Error::Debugger::error(msg, line, 1, InterpretationStage::SEMANTIC, mod_ptr->source, mod_ptr->path, "", "");
+                missing_dep_errors.push_back(msg);
             }
         }
     }
