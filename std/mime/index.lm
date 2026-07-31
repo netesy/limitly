@@ -1,0 +1,23 @@
+// Standard Library MIME Module Index
+
+import std.mime.types as types_mod;
+
+pub fn MIMEType(m: str, s: str, p: any, v: bool): any {
+    return types_mod.MIMEType(m, s, p as types_mod.MIMEParams, v);
+}
+
+pub fn MIMEParams(): any {
+    return types_mod.MIMEParams();
+}
+
+pub fn parse(mime_str: str): any {
+    return types_mod.parse(mime_str);
+}
+
+pub fn extension_to_mime(ext: str): str {
+    return types_mod.extension_to_mime(ext);
+}
+
+pub fn mime_to_extension(mime_str: str): str {
+    return types_mod.mime_to_extension(mime_str);
+}

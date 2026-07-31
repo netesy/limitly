@@ -1,0 +1,292 @@
+// Standard Library MIME Types Module
+
+frame MIMEParams {
+    pub keys: [str];
+    pub values: [str];
+
+    pub init() {
+        self.keys = [] as [str];
+        self.values = [] as [str];
+    }
+
+    pub fn get(key: str): str {
+        var i: int = 0;
+        var length: int = len(self.keys);
+        while (i < length) {
+            if (self.keys[i] == key) {
+                return self.values[i];
+            }
+            i = i + 1;
+        }
+        return "";
+    }
+
+    pub fn set(key: str, value: str) {
+        var i: int = 0;
+        var length: int = len(self.keys);
+        var found: bool = false;
+        while (i < length) {
+            if (self.keys[i] == key) {
+                self.values[i] = value;
+                found = true;
+            }
+            i = i + 1;
+        }
+        if (not found) {
+            self.keys.append(key);
+            self.values.append(value);
+        }
+    }
+
+    pub fn has(key: str): bool {
+        var i: int = 0;
+        var length: int = len(self.keys);
+        while (i < length) {
+            if (self.keys[i] == key) {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn add(key: str, value: str) {
+        self.keys.append(key);
+        self.values.append(value);
+    }
+
+    pub fn remove(key: str) {
+        var new_keys: [str] = [] as [str];
+        var new_values: [str] = [] as [str];
+        var i: int = 0;
+        var length: int = len(self.keys);
+        while (i < length) {
+            if (self.keys[i] != key) {
+                new_keys.append(self.keys[i]);
+                new_values.append(self.values[i]);
+            }
+            i = i + 1;
+        }
+        self.keys = new_keys;
+        self.values = new_values;
+    }
+
+    pub fn to_string(): str {
+        var result: str = "";
+        var i: int = 0;
+        var length: int = len(self.keys);
+        while (i < length) {
+            result = result + "; " + self.keys[i] + "=" + self.values[i];
+            i = i + 1;
+        }
+        return result;
+    }
+}
+
+frame MIMEType {
+    pub is_valid: bool;
+    pub main_type: str;
+    pub params: MIMEParams;
+    pub subtype: str;
+
+    pub init(m: str, s: str, p: MIMEParams, v: bool) {
+        self.is_valid = v;
+        self.main_type = m;
+        self.params = p;
+        self.subtype = s;
+    }
+
+    pub fn to_string(): str {
+        if (not self.is_valid) {
+            return "";
+        }
+        return self.main_type + "/" + self.subtype + self.params.to_string();
+    }
+
+    pub fn is_text(): bool {
+        return self.main_type == "text";
+    }
+
+    pub fn is_image(): bool {
+        return self.main_type == "image";
+    }
+
+    pub fn is_audio(): bool {
+        return self.main_type == "audio";
+    }
+
+    pub fn is_video(): bool {
+        return self.main_type == "video";
+    }
+
+    pub fn is_application(): bool {
+        return self.main_type == "application";
+    }
+}
+
+pub fn parse(mime_str: str): MIMEType {
+    var s = trim(mime_str);
+    if (s == "") {
+        return MIMEType("", "", MIMEParams(), false);
+    }
+
+    var parts = split_str(s, ";");
+    var type_part = trim(parts[0]);
+
+    var slash_idx = index_of(type_part, "/");
+    if (slash_idx == -1) {
+        return MIMEType("", "", MIMEParams(), false);
+    }
+
+    var main_type = to_lower(trim(_builtin_substring(type_part, 0, slash_idx)));
+    var subtype = to_lower(trim(_builtin_substring(type_part, slash_idx + 1, len(type_part))));
+
+    if (main_type == "" or subtype == "") {
+        return MIMEType("", "", MIMEParams(), false);
+    }
+
+    var params = MIMEParams();
+    var i = 1;
+    while (i < len(parts)) {
+        var param_part = trim(parts[i]);
+        if (param_part != "") {
+            var eq_idx = index_of(param_part, "=");
+            if (eq_idx != -1) {
+                var key = to_lower(trim(_builtin_substring(param_part, 0, eq_idx)));
+                var val_str = trim(_builtin_substring(param_part, eq_idx + 1, len(param_part)));
+                if (key != "") {
+                    // Remove quotes if present
+                    if (len(val_str) >= 2 and _builtin_substring(val_str, 0, 1) == "\"" and _builtin_substring(val_str, len(val_str) - 1, len(val_str)) == "\"") {
+                        val_str = _builtin_substring(val_str, 1, len(val_str) - 1);
+                    }
+                    params.add(key, val_str);
+                }
+            }
+        }
+        i = i + 1;
+    }
+
+    return MIMEType(main_type, subtype, params, true);
+}
+
+pub fn extension_to_mime(ext: str): str {
+    var clean_ext = to_lower(trim(ext));
+    if (len(clean_ext) > 0 and _builtin_substring(clean_ext, 0, 1) == ".") {
+        clean_ext = _builtin_substring(clean_ext, 1, len(clean_ext));
+    }
+
+    var extensions = [
+        "html", "htm", "css", "js", "json", "xml", "csv", "txt",
+        "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "tiff", "ico",
+        "mp3", "wav", "ogg", "mp4", "webm", "mpeg", "pdf", "zip", "gzip"
+    ] as [str];
+
+    var mime_types = [
+        "text/html", "text/html", "text/css", "text/javascript", "application/json", "text/xml", "text/csv", "text/plain",
+        "image/png", "image/jpeg", "image/jpeg", "image/gif", "image/webp", "image/svg+xml", "image/bmp", "image/tiff", "image/x-icon",
+        "audio/mpeg", "audio/wav", "audio/ogg", "video/mp4", "video/webm", "video/mpeg", "application/pdf", "application/zip", "application/gzip"
+    ] as [str];
+
+    var i = 0;
+    while (i < len(extensions)) {
+        if (extensions[i] == clean_ext) {
+            return mime_types[i];
+        }
+        i = i + 1;
+    }
+
+    return "application/octet-stream";
+}
+
+pub fn mime_to_extension(mime_str: str): str {
+    var parsed = parse(mime_str);
+    if (not parsed.is_valid) {
+        return "";
+    }
+    var clean_mime = parsed.main_type + "/" + parsed.subtype;
+
+    var extensions = [
+        "html", "css", "js", "json", "xml", "csv", "txt",
+        "png", "jpg", "gif", "webp", "svg", "bmp", "tiff", "ico",
+        "mp3", "wav", "ogg", "mp4", "webm", "mpeg", "pdf", "zip", "gzip"
+    ] as [str];
+
+    var mime_types = [
+        "text/html", "text/css", "text/javascript", "application/json", "text/xml", "text/csv", "text/plain",
+        "image/png", "image/jpeg", "image/gif", "image/webp", "image/svg+xml", "image/bmp", "image/tiff", "image/x-icon",
+        "audio/mpeg", "audio/wav", "audio/ogg", "video/mp4", "video/webm", "video/mpeg", "application/pdf", "application/zip", "application/gzip"
+    ] as [str];
+
+    var i = 0;
+    while (i < len(mime_types)) {
+        if (mime_types[i] == clean_mime) {
+            return "." + extensions[i];
+        }
+        i = i + 1;
+    }
+
+    return "";
+}
+
+// ---- Internal helpers ----
+
+fn trim(s: str): str {
+    var start = 0;
+    while (start < len(s) and (_builtin_substring(s, start, start + 1) == " " or _builtin_substring(s, start, start + 1) == "\t" or _builtin_substring(s, start, start + 1) == "\n" or _builtin_substring(s, start, start + 1) == "\r")) {
+        start = start + 1;
+    }
+    var end = len(s) - 1;
+    while (end >= start and (_builtin_substring(s, end, end + 1) == " " or _builtin_substring(s, end, end + 1) == "\t" or _builtin_substring(s, end, end + 1) == "\n" or _builtin_substring(s, end, end + 1) == "\r")) {
+        end = end - 1;
+    }
+    if (start > end) {
+        return "";
+    }
+    return _builtin_substring(s, start, end + 1);
+}
+
+fn to_lower(s: str): str {
+    var result: str = "";
+    var i: int = 0;
+    var alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    var lower_alphabet = "abcdefghijklmnopqrstuvwxyz";
+    while (i < len(s)) {
+        var ch: str = _builtin_substring(s, i, i + 1);
+        var idx = index_of(alphabet, ch);
+        if (idx != -1) {
+            result = result + _builtin_substring(lower_alphabet, idx, idx + 1);
+        } else {
+            result = result + ch;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+fn index_of(s: str, pattern: str): int {
+    var i: int = 0;
+    while (i <= len(s) - len(pattern)) {
+        if (_builtin_substring(s, i, i + len(pattern)) == pattern) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return -1;
+}
+
+fn split_str(s: str, delimiter: str): [str] {
+    var parts: [str] = [] as [str];
+    var current: str = "";
+    var i: int = 0;
+    while (i < len(s)) {
+        if (_builtin_substring(s, i, i + 1) == delimiter) {
+            parts.append(current);
+            current = "";
+        } else {
+            current = current + _builtin_substring(s, i, i + 1);
+        }
+        i = i + 1;
+    }
+    parts.append(current);
+    return parts;
+}
