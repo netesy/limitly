@@ -1,0 +1,79 @@
+// Standard Library URL Builder Module
+
+import std.url.url as url_mod;
+
+frame URLBuilder {
+    pub fragment: str;
+    pub host: str;
+    pub password: str;
+    pub path: str;
+    pub port: int;
+    pub query: str;
+    pub scheme: str;
+    pub username: str;
+
+    pub init() {
+        self.fragment = "";
+        self.host = "";
+        self.password = "";
+        self.path = "";
+        self.port = -1;
+        self.query = "";
+        self.scheme = "";
+        self.username = "";
+    }
+
+    pub fn set_scheme(scheme: str): URLBuilder {
+        self.scheme = scheme;
+        return self;
+    }
+
+    pub fn set_host(host: str): URLBuilder {
+        self.host = host;
+        return self;
+    }
+
+    pub fn set_port(port: int): URLBuilder {
+        self.port = port;
+        return self;
+    }
+
+    pub fn set_path(path: str): URLBuilder {
+        self.path = path;
+        return self;
+    }
+
+    pub fn set_query(query: str): URLBuilder {
+        self.query = query;
+        return self;
+    }
+
+    pub fn set_fragment(fragment: str): URLBuilder {
+        self.fragment = fragment;
+        return self;
+    }
+
+    pub fn set_username(username: str): URLBuilder {
+        self.username = username;
+        return self;
+    }
+
+    pub fn set_password(password: str): URLBuilder {
+        self.password = password;
+        return self;
+    }
+
+    pub fn build(): url_mod.URL {
+        var u = url_mod.URL("") as url_mod.URL;
+        u.scheme = self.scheme;
+        u.host = self.host;
+        u.port = self.port;
+        u.path = self.path;
+        u.query = self.query;
+        u.fragment = self.fragment;
+        u.username = self.username;
+        u.password = self.password;
+        u.is_valid = (self.host != "" or self.scheme == "file" or self.scheme == "data");
+        return u;
+    }
+}

@@ -1,0 +1,137 @@
+import std.url.index as url;
+import std.url.url as url_mod;
+import std.url.query as query_mod;
+import std.url.builder as builder_mod;
+
+fn test_parsing(): int {
+    print("Running URL parsing tests...");
+
+    // Basic URL
+    var u1 = url.URL("http://example.com/path/to/page?query=1#frag") as url_mod.URL;
+    assert(u1.scheme == "http", "u1.scheme should be http");
+    assert(u1.host == "example.com", "u1.host should be example.com");
+    assert(u1.port == 80, "u1.port should be 80");
+    assert(u1.path == "/path/to/page", "u1.path should be /path/to/page");
+    assert(u1.query == "query=1", "u1.query should be query=1");
+    assert(u1.fragment == "frag", "u1.fragment should be frag");
+    assert(u1.is_valid == true, "u1.is_valid should be true");
+
+    // HTTPS with explicit port
+    var u2 = url.URL("https://secure.example.org:8443/") as url_mod.URL;
+    assert(u2.scheme == "https", "u2.scheme should be https");
+    assert(u2.host == "secure.example.org", "u2.host should be secure.example.org");
+    assert(u2.port == 8443, "u2.port should be 8443");
+    assert(u2.path == "/", "u2.path should be /");
+
+    // URL with username and password
+    var u3 = url.URL("ftp://user:pass@ftp.example.com/dir/file.txt") as url_mod.URL;
+    assert(u3.scheme == "ftp", "u3.scheme should be ftp");
+    assert(u3.username == "user", "u3.username should be user");
+    assert(u3.password == "pass", "u3.password should be pass");
+    assert(u3.host == "ftp.example.com", "u3.host should be ftp.example.com");
+    assert(u3.path == "/dir/file.txt", "u3.path should be /dir/file.txt");
+
+    // IPv6 Address
+    var u4 = url.URL("http://[2001:db8::1]:8080/index.html") as url_mod.URL;
+    assert(u4.scheme == "http", "u4.scheme should be http");
+    assert(u4.host == "[2001:db8::1]", "u4.host should be [2001:db8::1]");
+    assert(u4.port == 8080, "u4.port should be 8080");
+
+    // Simple relative resolve
+    var resolved = u1.resolve("/new-path?new-query#new-frag") as url_mod.URL;
+    print("Resolved path: {resolved.path}");
+    print("Resolved query: {resolved.query}");
+    print("Resolved fragment: {resolved.fragment}");
+    assert(resolved.scheme == "http", "resolved.scheme should be http");
+    assert(resolved.host == "example.com", "resolved.host should be example.com");
+    assert(resolved.path == "/new-path", "resolved.path should be /new-path");
+    assert(resolved.query == "new-query", "resolved.query should be new-query");
+    assert(resolved.fragment == "new-frag", "resolved.fragment should be new-frag");
+
+    // Origin
+    assert(u1.origin() == "http://example.com", "u1.origin() failed");
+    assert(u2.origin() == "https://secure.example.org:8443", "u2.origin() failed");
+
+    print("Parsing tests passed!");
+    return 1;
+}
+
+fn test_query_params(): int {
+    print("Running URL query parameters tests...");
+
+    var qs = "a=1&b=2&a=3&c=special%20value&empty=";
+    var qp = url.parse_query(qs) as query_mod.QueryParams;
+
+    assert(qp.get("a") == "1", "qp.get('a') should return first value '1'");
+    assert(qp.get("b") == "2", "qp.get('b') should return '2'");
+    assert(qp.get("c") == "special value", "qp.get('c') should be decoded 'special value'");
+    assert(qp.get("empty") == "", "qp.get('empty') should be empty string");
+    assert(qp.get("nonexistent") == "", "qp.get('nonexistent') should be empty string");
+
+    // get_all
+    var a_all = qp.get_all("a") as [str];
+    assert(len(a_all) == 2, "qp.get_all('a') should return list of length 2");
+    assert(a_all[0] == "1", "a_all[0] should be '1'");
+    assert(a_all[1] == "3", "a_all[1] should be '3'");
+
+    // has
+    assert(qp.has("b") == true, "qp.has('b') should be true");
+    assert(qp.has("xyz") == false, "qp.has('xyz') should be false");
+
+    // set
+    qp.set("b", "99");
+    assert(qp.get("b") == "99", "qp.set('b', '99') failed");
+
+    // add
+    qp.add("d", "new");
+    assert(qp.get("d") == "new", "qp.add('d', 'new') failed");
+
+    // remove
+    qp.remove("a");
+    assert(qp.has("a") == false, "qp.remove('a') failed to remove 'a'");
+
+    // to_string (build query string)
+    // Keys left should be 'b', 'c', 'empty', 'd'
+    var built = qp.to_string();
+    assert(built == "b=99&c=special%20value&empty=&d=new", "qp.to_string() failed: " + built);
+
+    print("Query parameters tests passed!");
+    return 1;
+}
+
+fn test_builder(): int {
+    print("Running URLBuilder tests...");
+
+    var builder = url.URLBuilder() as builder_mod.URLBuilder;
+    builder.set_scheme("https");
+    builder.set_host("example.org");
+    builder.set_port(9000);
+    builder.set_path("/api/v1/resource");
+    builder.set_query("active=true");
+    builder.set_fragment("details");
+
+    var u = builder.build() as url_mod.URL;
+    assert(u.scheme == "https", "builder.build() scheme incorrect");
+    assert(u.host == "example.org", "builder.build() host incorrect");
+    assert(u.port == 9000, "builder.build() port incorrect");
+    assert(u.path == "/api/v1/resource", "builder.build() path incorrect");
+    assert(u.query == "active=true", "builder.build() query incorrect");
+    assert(u.fragment == "details", "builder.build() fragment incorrect");
+
+    var serialized = u.to_string();
+    assert(serialized == "https://example.org:9000/api/v1/resource?active=true#details", "serialized incorrect: " + serialized);
+
+    print("URLBuilder tests passed!");
+    return 1;
+}
+
+fn main(): int {
+    print("=== URL Module Test Suite ===");
+
+    assert(test_parsing() == 1, "Parsing tests failed");
+    assert(test_query_params() == 1, "Query params tests failed");
+    assert(test_builder() == 1, "Builder tests failed");
+
+    print("All URL tests completed successfully.");
+    return 0;
+}

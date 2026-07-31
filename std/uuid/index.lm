@@ -1,0 +1,16 @@
+// Standard Library UUID Module Index
+
+import std.uuid.uuid as uuid_mod;
+import std.uuid.generator as generator_mod;
+
+pub fn UUID(bytes: [int], is_valid: bool): any {
+    return uuid_mod.UUID(bytes, is_valid);
+}
+
+pub fn parse(uuid_str: str): any {
+    return uuid_mod.parse(uuid_str);
+}
+
+pub fn generate_v4(): any {
+    return generator_mod.generate_v4();
+}

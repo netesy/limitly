@@ -13,7 +13,7 @@ import std.linear_algebra as la;
 import std.geometry as geo;
 import std.color as color;
 import std.hash as hash;
-import std.url as url;
+import std.url.index as url;
 import std.cli as cli;
 import std.config as config;
 import std.archive as archive;
