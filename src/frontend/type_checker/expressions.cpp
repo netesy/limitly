@@ -1312,7 +1312,8 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::AssignExpr> expr) {
     if (!expr) return nullptr;
     
-    TypePtr value_type = check_expression(expr->value);
+    // Determine expected type before checking value expression
+    TypePtr expected_type = nullptr;
     
     // Handle member assignment (e.g., obj.field = value)
     if (expr->object && expr->member) {
@@ -1324,6 +1325,7 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             auto frameTypeData = std::get_if<FrameType>(&object_type->extra);
             if (!frameTypeData) {
                 add_error("Invalid frame type", expr->line);
+                TypePtr value_type = check_expression(expr->value);
                 return value_type;
             }
             
@@ -1334,22 +1336,25 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             auto frame_it = frame_declarations.find(frame_name);
             if (frame_it == frame_declarations.end()) {
                 add_error("Unknown frame type: " + frame_name, expr->line);
+                TypePtr value_type = check_expression(expr->value);
                 return value_type;
             }
             
             const FrameInfo& frame_info = frame_it->second;
             
-            // Find the field
+            // Find the field and get its type as expected type
             TypePtr field_type = nullptr;
             for (const auto& [fname, ftype] : frame_info.fields) {
                 if (fname == field_name) {
                     field_type = ftype;
+                    expected_type = ftype; // Use field type as expected type
                     break;
                 }
             }
             
             if (!field_type) {
                 add_error("Frame '" + frame_name + "' has no field '" + field_name + "'", expr->line);
+                TypePtr value_type = check_expression(expr->value);
                 return value_type;
             }
             
@@ -1365,6 +1370,10 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
                     }
                 }
             }
+            
+            // Now check value expression with expected type
+            TypePtr value_type = check_expression(expr->value, expected_type);
+            
             if (!is_type_compatible(field_type, value_type)) {
                 add_type_error(field_type->toString(), value_type->toString(), expr->line);
             }
@@ -1372,7 +1381,8 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             return value_type;
         }
         
-        // For other types, just return the value type
+        // For other types, check value without expected type
+        TypePtr value_type = check_expression(expr->value);
         return value_type;
     }
     
@@ -1381,6 +1391,7 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
         // Just check the object and index expressions
         check_expression(expr->object);
         check_expression(expr->index);
+        TypePtr value_type = check_expression(expr->value, expected_type);
         return value_type;
     }
     
@@ -1388,6 +1399,10 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
     if (!expr->object && !expr->member && !expr->index) {
         TypePtr var_type = lookup_variable(expr->name);
         if (var_type) {
+            // Use variable's type as expected type
+            expected_type = var_type;
+            TypePtr value_type = check_expression(expr->value, expected_type);
+            
             if (!is_type_compatible(var_type, value_type) && 
                 !(is_string_type(var_type) && is_string_type(value_type))) {
                 add_type_error(var_type->toString(), value_type->toString(), expr->line);
@@ -1413,8 +1428,10 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
                     create_reference(var_expr->name, expr->name, expr->line);
                 }
             }
+            return value_type;
         } else {
-            // Implicit variable declaration
+            // Implicit variable declaration - check value without expected type
+            TypePtr value_type = check_expression(expr->value);
             declare_variable(expr->name, value_type);
             declare_variable_memory(expr->name, value_type);  // Track memory for new variable
             
@@ -1423,9 +1440,12 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             linear_info.is_moved = false;
             linear_info.access_count = 0;
             linear_types[expr->name] = linear_info;
+            return value_type;
         }
     }
     
+    // Fallback: check value without expected type
+    TypePtr value_type = check_expression(expr->value);
     return value_type;
 }
 

@@ -3,8 +3,8 @@
 import std.iterator.iterator as it;
 
 frame SkipIterator: it.Iterator {
-    var source: it.Iterator;
-    var remaining: int;
+    pub remaining: int;
+    pub source: it.Iterator;
 
     pub init(source: it.Iterator, count: int) {
         self.source = source;
@@ -24,5 +24,5 @@ frame SkipIterator: it.Iterator {
 }
 
 pub fn skip(source: it.Iterator, count: int): it.Iterator {
-    return SkipIterator(source=source, count=count);
+    return SkipIterator(source, count);
 }

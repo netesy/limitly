@@ -1,0 +1,24 @@
+import std.iterator.iterator as it;
+
+frame Wrapper {
+    pub source: it.Iterator;
+
+    pub init(source: it.Iterator) {
+        self.source = source;
+    }
+
+    pub fn get_next(): any {
+        print("About to call self.source.next()");
+        var result = self.source.next();
+        print("Got result: {result}");
+        return result;
+    }
+}
+
+var items = [1, 2, 3];
+var my_iter = it.ListIterator(items);
+var wrapper = Wrapper(my_iter);
+
+print("Test 1:");
+var r1 = wrapper.get_next();
+print("Returned: {r1}");

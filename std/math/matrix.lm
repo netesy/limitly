@@ -16,7 +16,7 @@ frame Matrix {
         return self.data[row * 4 + col];
     }
 
-    pub fn set(row: int, col: int, val: float) {
-        self.data[row * 4 + col] = val;
+    pub fn set(row: int, col: int, value_val: float) {
+        self.data[row * 4 + col] = value_val;
     }
 }

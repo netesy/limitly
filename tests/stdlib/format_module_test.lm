@@ -5,9 +5,14 @@ import std.format.index as f;
 fn test_format_frame(): int {
     print("Testing Format Frame...");
     var fmt = f.Format() as f.Format;
-    assert(fmt.int(123) == "123", "int failed");
-    assert(fmt.float(4.56) == "4.56", "float failed");
-    assert(fmt.bool(true) == "true", "bool failed");
+    assert(fmt.format_int(123) == "123", "int failed");
+
+    var expected_float = "";
+    expected_float = expected_float + "4.";
+    expected_float = expected_float + "56";
+    assert(fmt.format_float(4.56) == expected_float, "float failed");
+
+    assert(fmt.format_bool(true) == "true", "bool failed");
 
     assert(fmt.pad_left("abc", 5, "-") == "--abc", "pad_left failed");
     assert(fmt.pad_right("abc", 5, "-") == "abc--", "pad_right failed");
@@ -25,7 +30,12 @@ fn test_format_frame(): int {
 fn test_format_helpers(): int {
     print("Testing Format Helpers...");
     assert(f.format_int(456) == "456", "format_int failed");
-    assert(f.format_float(7.89) == "7.89", "format_float failed");
+
+    var expected_float2 = "";
+    expected_float2 = expected_float2 + "7.";
+    expected_float2 = expected_float2 + "89";
+    assert(f.format_float(7.89) == expected_float2, "format_float failed");
+
     assert(f.format_bool(false) == "false", "format_bool failed");
 
     assert(f.pad_string("abc", 5) == "  abc", "pad_string failed");

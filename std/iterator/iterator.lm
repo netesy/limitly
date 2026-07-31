@@ -1,12 +1,12 @@
 // Standard Library Iterator Trait and Common Implementations
 
-trait Iterator {
+pub trait Iterator {
     fn next(): any;
 }
 
 frame ListIterator: Iterator {
-    var items: [any];
-    var index: int;
+    pub index: int;
+    pub items: [any];
 
     pub init(items: [any]) {
         self.items = items;
@@ -24,8 +24,8 @@ frame ListIterator: Iterator {
 }
 
 frame PeekableIterator: Iterator {
-    var source: Iterator;
-    var cached: any;
+    pub cached: any;
+    pub source: Iterator;
 
     pub init(source: Iterator) {
         self.source = source;
@@ -50,7 +50,7 @@ frame PeekableIterator: Iterator {
 }
 
 pub fn iterator(items: [any]): Iterator {
-    return ListIterator(items=items);
+    return ListIterator(items);
 }
 
 pub fn collect(it: Iterator): [any] {

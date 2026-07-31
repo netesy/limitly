@@ -3,8 +3,8 @@
 import std.iterator.iterator as it;
 
 frame EnumerateIterator: it.Iterator {
-    var source: it.Iterator;
-    var index: int;
+    pub index: int;
+    pub source: it.Iterator;
 
     pub init(source: it.Iterator) {
         self.source = source;
@@ -23,5 +23,5 @@ frame EnumerateIterator: it.Iterator {
 }
 
 pub fn enumerate(source: it.Iterator): it.Iterator {
-    return EnumerateIterator(source=source);
+    return EnumerateIterator(source);
 }

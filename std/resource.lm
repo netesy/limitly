@@ -50,7 +50,7 @@ pub frame Writer {
     }
 }
 
-pub frame Pollable {
+frame Pollable {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -61,7 +61,7 @@ pub frame Pollable {
     }
 }
 
-pub frame Poller {
+frame Poller {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -72,7 +72,7 @@ pub frame Poller {
     }
 }
 
-pub frame Connector {
+frame Connector {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -83,7 +83,7 @@ pub frame Connector {
     }
 }
 
-pub frame Binder {
+frame Binder {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;

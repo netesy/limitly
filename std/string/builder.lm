@@ -4,7 +4,7 @@ frame StringBuilder {
     pub var parts: [str];
 
     pub init() {
-        self.parts = [];
+        self.parts = [] as [str];
     }
 
     pub fn append(s: str) {

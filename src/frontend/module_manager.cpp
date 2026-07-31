@@ -107,6 +107,9 @@ void ModuleManager::extract_metadata(std::shared_ptr<Module> module) {
         } else if (auto enum_decl = std::dynamic_pointer_cast<AST::EnumDeclaration>(stmt)) {
             // Mandate: Enums are always public module-level symbols.
             module->public_symbols.insert(enum_decl->name);
+        } else if (auto type_decl = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) {
+            // Type aliases are always public module-level symbols
+            module->public_symbols.insert(type_decl->name);
         } else if (auto import_stmt = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {
             module->dependencies.push_back(import_stmt->modulePath);
         }

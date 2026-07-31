@@ -3,11 +3,11 @@
 import std.string as s;
 
 pub fn format_int(value: int): str {
-    return value as str;
+    return "{value}";
 }
 
 pub fn format_float(value: float): str {
-    return value as str;
+    return "{value}";
 }
 
 pub fn format_bool(value: bool): str {

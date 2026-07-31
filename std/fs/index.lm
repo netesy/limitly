@@ -2,12 +2,12 @@
 
 import std.fs.directory as directory_mod;
 import std.fs.permissions as permissions_mod;
-import std.path as path;
+import std.path.index as path_mod;
 import std.io as io;
+import std.io.file as file_mod;
 
 // Types
 pub type Permissions = permissions_mod.Permissions;
-pub type IOError = io.IOError;
 
 // Constructors
 pub fn Permissions(readonly: bool): any {
@@ -16,17 +16,23 @@ pub fn Permissions(readonly: bool): any {
 
 frame FS {
     pub init() {}
-    pub fn exists(p: path.Path): bool { return io.exists(p.value); }
-    pub fn create_dir(p: path.Path): any { return io.create_directory(p.value); }
-    pub fn remove(p: path.Path): any {
-        if (!io.delete(p.value)) return err(io.file_mod.UnknownError(message="failed to remove path"));
+    pub fn exists(p: path_mod.Path): bool { return io.exists(p.value); }
+    pub fn create_dir(p: path_mod.Path): any { return io.create_directory(p.value); }
+    pub fn remove(p: path_mod.Path): any {
+        if (!io.delete(p.value)) {
+            var e = file_mod.UnknownError(message="failed to remove path");
+            return err(e);
+        }
         return ok(nil);
     }
-    pub fn rename(from_path: path.Path, to_path: path.Path): any {
-        if (!io.rename(from_path.value, to_path.value)) return err(io.file_mod.UnknownError(message="failed to rename path"));
+    pub fn rename(from_path: path_mod.Path, to_path: path_mod.Path): any {
+        if (!io.rename(from_path.value, to_path.value)) {
+            var e = file_mod.UnknownError(message="failed to rename path");
+            return err(e);
+        }
         return ok(nil);
     }
-    pub fn list_dir(p: path.Path): any {
+    pub fn list_dir(p: path_mod.Path): any {
         return io.list_directory(p.value);
     }
 }

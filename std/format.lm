@@ -4,17 +4,17 @@ import std.format.index as format_mod;
 
 frame Format {
     pub init() {}
-    pub fn int(value: int): str {
+    pub fn format_int(value: int): str {
         var f = format_mod.Format();
-        return f.int(value);
+        return f.format_int(value);
     }
-    pub fn float(value: float): str {
+    pub fn format_float(value: float): str {
         var f = format_mod.Format();
-        return f.float(value);
+        return f.format_float(value);
     }
-    pub fn bool(value: bool): str {
+    pub fn format_bool(value: bool): str {
         var f = format_mod.Format();
-        return f.bool(value);
+        return f.format_bool(value);
     }
     pub fn pad_left(value: str, length_val: int, fill_char: str): str {
         var f = format_mod.Format();
