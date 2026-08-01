@@ -1,0 +1,9 @@
+// @error:pattern_exhaustive
+// Missing wildcard in match
+
+var value = 100;
+
+match (value) {
+    42 => { print("Answer"); }
+    // Missing wildcard (_) to catch all other values
+}

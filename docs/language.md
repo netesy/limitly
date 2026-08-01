@@ -174,10 +174,10 @@ iter (key, value in dict) { body }            // dict (key and value)
 (The `loop` keyword was removed — use `while (true)` for infinite loops.)
 
 ### 4.4 Error Handling
-- `?`: Propagation operator. If expression returns `Err`, return `Err` from current function.
+- `?`: Propagation operator. If expression returns an error, return error from current function.
 - `? else { ... }`: Inline error handling / default value.
-- `ok(value)`: Construct an Ok result.
-- `err(type)`: Construct an Err result.
+- `ok(value)`: Construct a success result.
+- `err(type)`: Construct an error result.
 
 ## 5. Modules and Imports
 

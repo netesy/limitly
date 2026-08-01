@@ -1,0 +1,6 @@
+// @error:overflow
+// Shift amount exceeds bit width
+
+var x: i8 = 5;
+var y = x << 10;  // Shift by 10 exceeds 8-bit width
+print(y);

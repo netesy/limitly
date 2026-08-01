@@ -1,0 +1,7 @@
+// @error:type_error
+// Arithmetic operation on incompatible types
+
+var x: str = "hello";
+var y: int = 5;
+var result = x + y;  // Cannot add string and int without conversion
+print(result);

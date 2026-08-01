@@ -1,0 +1,11 @@
+// @error:pattern_exhaustive
+// Non-exhaustive integer match
+
+var x = 5;
+
+match (x) {
+    1 => { print("One"); },
+    2 => { print("Two"); },
+    3 => { print("Three"); }
+    // Missing other values (4, 5, etc.)
+}

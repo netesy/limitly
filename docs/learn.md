@@ -364,11 +364,11 @@ fn do_something(): int? {
     var result = might_fail();
     
     match result {
-        Ok(value) => {
+        val value => {
             print("Got value: {value}");
             return ok(value * 2);
         },
-        Err => {
+        err => {
             print("No value available");
             return err();
         }
@@ -462,7 +462,7 @@ while (true) {
     var guess_result: int? = to_int(input_str);
 
     match (guess_result) {
-        Ok(guess) => {
+        val guess => {
             print("You guessed: {guess}");
             if (guess < secret_number) {
                 print("Too low!");
@@ -473,7 +473,7 @@ while (true) {
                 break; 
             }
         },
-        Err => {
+        err => {
             print("That's not a number! Please try again.");
         }
     }

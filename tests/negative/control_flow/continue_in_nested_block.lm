@@ -1,0 +1,8 @@
+// @error:continue_outside_loop
+// Continue in nested block outside loop
+
+fn helper() {
+    continue;  // Continue not in loop
+}
+
+helper();

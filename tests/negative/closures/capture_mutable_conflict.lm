@@ -1,0 +1,13 @@
+// @error:closure_capture
+// Capturing mutable variable in closure
+
+fn outer() {
+    var x = 10;
+    var f = fn() {
+        x = 20;  // Cannot mutate captured variable
+    };
+    f();
+    print(x);
+}
+
+outer();

@@ -1,0 +1,14 @@
+// @error:trait_not_impl
+// Method signature doesn't match trait
+
+trait Drawable {
+    fn draw(scale: int);
+}
+
+frame Shape: Drawable {
+    pub fn draw(): void {  // Missing scale parameter
+        print("Drawing");
+    }
+}
+
+var shape = Shape {};

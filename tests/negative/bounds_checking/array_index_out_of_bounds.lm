@@ -1,0 +1,6 @@
+// @error:bounds_error
+// Static array bounds violation
+
+var arr = [1, 2, 3];
+var x = arr[10];  // Index 10 is out of bounds (only 0-2 valid)
+print(x);

@@ -1,0 +1,11 @@
+// @error:use_after_free
+// Using dict after consuming it
+
+fn consume_dict(map: {str: int}) {
+    // map is consumed
+}
+
+var data = {"a": 1, "b": 2, "c": 3};
+consume_dict(data);
+var value = data["a"];  // ERROR: data already consumed
+print(value);

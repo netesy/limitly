@@ -1,0 +1,6 @@
+// @error:overflow
+// Negative shift amount
+
+var x = 5;
+var y = x << -1;  // Negative shift not allowed
+print(y);

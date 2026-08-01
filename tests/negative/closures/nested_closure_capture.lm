@@ -1,0 +1,16 @@
+// @error:closure_capture
+// Nested closure capturing same variable
+
+fn test() {
+    var data = [1, 2, 3];
+    
+    var f1 = fn() {
+        var x = data;  // Move
+    };
+    
+    var f2 = fn() {
+        var y = data;  // ERROR: data already moved
+    };
+}
+
+test();

@@ -1,0 +1,6 @@
+// @error:bounds_error
+// String index out of bounds
+
+var text = "hello";
+var char = text[10];  // Index 10 is out of bounds (only 0-4 valid)
+print(char);

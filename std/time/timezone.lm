@@ -19,8 +19,14 @@ frame TimeZone {
 
     pub fn from_offset(offset_hours: int): TimeZone {
         var name: str = "UTC";
-        if (offset_hours > 0) name = "UTC+" + offset_hours as str;
-        if (offset_hours < 0) name = "UTC" + offset_hours as str;
+        if (offset_hours > 0) {
+            var offset_str = offset_hours as str;
+            name = "UTC+" + offset_str;
+        }
+        if (offset_hours < 0) {
+            var offset_str = offset_hours as str;
+            name = "UTC" + offset_str;
+        }
         return TimeZone(name=name, offset_hours=offset_hours, offset_minutes=0);
     }
 

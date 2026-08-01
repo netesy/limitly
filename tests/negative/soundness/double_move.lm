@@ -1,0 +1,10 @@
+// @error:use_after_free
+// Moving same value twice
+
+fn consume(x: [int]) {
+    // x is consumed (moved)
+}
+
+var data = [1, 2, 3];
+consume(data);
+consume(data);  // data already moved, use-after-free

@@ -1,0 +1,12 @@
+// @error:pattern_exhaustive
+// Missing case in union type match
+
+type Result = str?Timeout;
+
+var result: Result = ok("OK");
+
+match (result) {
+    val msg => { print("Success: {msg}"); },
+    err timeout => { print("Error: {timeout}"); }
+    // Missing Timeout case
+}

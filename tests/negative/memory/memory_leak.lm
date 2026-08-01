@@ -1,0 +1,10 @@
+// @error:memory_leak
+// Resource not cleaned up - potential memory leak
+
+fn create_resource() {
+    var resource = [1, 2, 3, 4, 5];
+    // Function ends without returning or using resource
+    // Resource is dropped without being used
+}
+
+create_resource();

@@ -1,0 +1,11 @@
+// @error:pattern_exhaustive
+// Missing variant in union type match
+
+type Result = int | str;
+
+var value: Result = 42;
+
+match (value) {
+    int => { print("Integer"); }
+    // Missing str case
+}

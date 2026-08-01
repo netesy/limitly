@@ -1,0 +1,6 @@
+// @error:bounds_error
+// Dictionary key not found
+
+var map = {"a": 1, "b": 2};
+var value = map["missing_key"];  // Key doesn't exist
+print(value);

@@ -203,8 +203,8 @@ frame Vector {
 
 ### **7. Concurrency**
 
-- **Parallel Block**: `parallel { ... }` runs blocks in parallel.
-- **Concurrent Block**: `concurrent { ... }` handles channel-based execution.
+- **Parallel Block**: `parallel(cores=2) { ... }` runs blocks in parallel.
+- **Concurrent Block**: `concurrent(cores=2) { ... }` handles channel-based execution.
 - **Tasks**: `task(i in 1..10) { ... }` spawns parallel tasks.
 - **Workers**: `worker(data in stream) { ... }` processes streams.
 

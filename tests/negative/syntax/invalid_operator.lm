@@ -1,0 +1,7 @@
+// @error:syntax_error
+// Invalid operator usage
+
+var x = 5;
+var y = 10;
+var result = x <> y;  // <> is not a valid operator
+print(result);

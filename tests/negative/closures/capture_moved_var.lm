@@ -1,0 +1,17 @@
+// @error:closure_capture
+// Capturing already moved variable
+
+fn consume(x: [int]) {
+    // x is consumed
+}
+
+fn test() {
+    var data = [1, 2, 3];
+    consume(data);
+    
+    var f = fn() {
+        var x = data;  // ERROR: data already moved
+    };
+}
+
+test();

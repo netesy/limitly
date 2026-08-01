@@ -1,0 +1,9 @@
+// @error:visibility_error
+// Accessing private field from outside frame
+
+frame Person {
+    var name: str,  // private by default
+}
+
+var person = Person { name: "Alice" };
+print(person.name);  // name is private, not accessible

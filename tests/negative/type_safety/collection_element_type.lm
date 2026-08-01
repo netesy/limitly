@@ -1,0 +1,6 @@
+// @error:type_error
+// Collection element type mismatch
+
+var numbers: [int] = [1, 2, 3];
+numbers[0] = "string";  // Cannot assign string to int element
+print(numbers[0]);

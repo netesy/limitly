@@ -1,0 +1,16 @@
+// @error:race_condition
+// Nested concurrent blocks with shared state
+
+var counter = 0;
+
+concurrent {
+    task(i in 1..5) {
+        concurrent {
+            task(j in 1..5) {
+                counter = counter + 1;  // Race condition
+            }
+        }
+    }
+}
+
+print(counter);

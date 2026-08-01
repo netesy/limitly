@@ -203,7 +203,143 @@ All regressions and core changes have been fully built and verified:
 
 ---
 
-## Part 11 — Remaining Risks & Architecture Inconsistencies
+## Part 11 — Negative Test Safety Analysis
+
+### Test Results Summary
+
+The negative test suite (`tests/negative/`) contains 78 deterministic safety tests designed to verify that the compiler correctly rejects invalid programs. Results show significant gaps in safety enforcement:
+
+**Overall: 41 PASSED (52.6%), 37 FAILED (47.4%)**
+
+### Critical Safety Failures by Category
+
+#### 1. Arithmetic Safety (0% Pass Rate - 0/8)
+**Status: CRITICAL FAILURE**
+
+All arithmetic overflow/underflow tests failed:
+- `divide_by_zero_literal.lm` - Returns `nil` instead of error
+- `exponent_overflow.lm` - Returns `128` instead of catching overflow
+- `integer_overflow.lm` - Returns wrapped value instead of error
+- `modulo_by_zero.lm` - Returns `nil` instead of error
+- `multiplication_overflow.lm` - Returns `150` instead of error
+- `negative_shift.lm` - Returns `-9223372036854775808` instead of error
+- `shift_overflow.lm` - Returns `5120` instead of error
+- `subtraction_underflow.lm` - Returns `-150` instead of error
+
+**Root Cause:** The memory checker (`src/frontend/memory_checker.cpp`) does not implement arithmetic overflow/underflow detection. The checker focuses on ownership, initialization, and move semantics but lacks runtime or compile-time arithmetic safety checks. Arithmetic operations are passed through to the VM without validation.
+
+**Impact:** Programs can experience undefined behavior through integer overflow, division by zero, and invalid shift operations without compiler rejection.
+
+#### 2. Bounds Checking (12.5% Pass Rate - 1/8)
+**Status: CRITICAL FAILURE**
+
+Bounds checking tests mostly failed:
+- `array_index_out_of_bounds.lm` - Returns `nil` instead of error
+- `dict_key_not_found.lm` - Returns debug output instead of error
+- `large_negative_index.lm` - Returns `nil` instead of error
+- `negative_array_index.lm` - Returns `nil` instead of error
+- `string_bounds.lm` - Returns `nil` instead of error
+- `string_index_out_of_bounds.lm` - Returns `nil` instead of error
+- `tuple_index_out_of_bounds.lm` - Returns `nil` instead of error
+
+**Root Cause:** The memory checker does not validate array/string/dict/tuple index bounds. While it tracks variable ownership and initialization, it does not perform static bounds analysis on index operations. The runtime returns `nil` for out-of-bounds access instead of raising errors.
+
+**Impact:** Memory safety violations through buffer overflows and out-of-bounds access are not prevented at compile time.
+
+#### 3. Closure Capture Safety (14.3% Pass Rate - 1/7)
+**Status: CRITICAL FAILURE**
+
+Closure safety tests mostly failed:
+- `capture_moved_var.lm` - No error output
+- `capture_mutable_conflict.lm` - Returns `10` instead of error
+- `closure_lifetime_violation.lm` - Returns `42` instead of error
+- `move_in_closure.lm` - No error output
+- `multiple_move_in_closure.lm` - No error output
+- `nested_closure_capture.lm` - No error output
+
+**Root Cause:** The memory checker has basic closure handling in `check_function_call` but does not implement comprehensive closure capture analysis. It conservatively assumes parameters are borrowed unless explicitly marked as consuming, but lacks proper lifetime analysis for captured variables.
+
+**Impact:** Closures can capture variables with invalid lifetimes, moved variables, or create mutable aliasing violations without compiler detection.
+
+#### 4. Type Safety (50% Pass Rate - 4/8)
+**Status: MODERATE FAILURE**
+
+Type safety tests show mixed results:
+- `collection_element_type.lm` - Returns `string` instead of error
+- `dict_value_type.lm` - Returns debug output instead of error
+- `type_mismatch_arithmetic.lm` - Returns `hello5` instead of error
+- `union_type_mismatch.lm` - Returns `42 is a number` instead of error
+
+**Root Cause:** While the type checker (`src/frontend/type_checker/`) implements basic type compatibility checking, it has gaps in:
+- Collection element type enforcement
+- Dictionary value type validation
+- Arithmetic type coercion rules
+- Union type operation compatibility
+
+**Impact:** Type mismatches can slip through to runtime, causing undefined behavior or incorrect results.
+
+### Memory System Validity Assessment
+
+#### Memory Checker Implementation Analysis
+
+The memory checker (`src/frontend/memory_checker.cpp`) implements:
+
+**✅ Implemented Safety Checks:**
+1. **Variable Initialization Tracking** - Prevents use-before-init errors
+2. **Move Semantics** - Detects use-after-move for linear types
+3. **Region-based Lifetime Tracking** - Associates variables with lexical scopes
+4. **Generation Tracking** - Prevents stale references through generation mismatches
+5. **Ownership State Management** - Tracks Valid, Moved, Borrowed, Escaped states
+
+**❌ Missing Safety Checks:**
+1. **Arithmetic Overflow/Underflow** - No compile-time or runtime validation
+2. **Bounds Checking** - No static analysis of index operations
+3. **Closure Capture Analysis** - Incomplete lifetime validation for closures
+4. **Division by Zero Detection** - No compile-time constant folding for division
+5. **Shift Operation Validation** - No checking for negative/invalid shifts
+6. **Memory Leak Detection** - No analysis of resource cleanup paths
+
+#### Memory System Runtime Analysis
+
+The memory system (`src/memory/memory.hh`) implements:
+
+**✅ Implemented Features:**
+1. **Region-based Allocation** - MemoryManager::Region with generation tracking
+2. **Object Reuse Pools** - Reduces allocation overhead
+3. **Linear Type Wrappers** - Linear<T> for move semantics
+4. **Reference Counting** - Ref<T> with atomic reference counting
+5. **Generation Validation** - Ref::isValid() checks generation matching
+
+**❌ Missing Runtime Safety:**
+1. **Bounds Checking** - No runtime bounds validation on array/string access
+2. **Arithmetic Safety** - No overflow/underflow detection in arithmetic operations
+3. **Division by Zero Protection** - No runtime checks for division/modulo by zero
+4. **Shift Validation** - No runtime validation of shift amounts
+
+### Memory System Validity Conclusion
+
+**The memory system is PARTIALLY VALID but has CRITICAL GAPS in safety enforcement.**
+
+**Valid Aspects:**
+- Ownership and move semantics are correctly implemented
+- Region-based lifetime tracking prevents use-after-free in most cases
+- Generation tracking prevents stale references
+- Initialization tracking prevents use-before-init
+
+**Invalid Aspects:**
+- Arithmetic safety is completely absent (0% test pass rate)
+- Bounds checking is absent (12.5% test pass rate)
+- Closure capture safety is incomplete (14.3% test pass rate)
+- Type safety has gaps (50% test pass rate)
+
+**Recommendation:** The memory system provides a solid foundation for ownership and lifetime safety but requires significant enhancements to provide comprehensive memory safety guarantees. The current implementation prevents many classes of memory errors but fails to catch critical safety violations like arithmetic overflow and bounds violations.
+
+---
+
+## Part 12 — Remaining Risks & Architecture Inconsistencies
 
 1. **Active Drop Generation:** Because LIR generation does not emit dynamic Drops, the runtime relies on process-end cleanup. If long-running server loops allocate massive numbers of local dictionaries/lists without process exits, heap consumption could grow.
 2. **Decimal Variable Collision:** The decimal type names `d2`, `d4`, `d6` are scanner keywords, meaning local variables cannot start with `d` followed by a number (like `d2`), which throws a syntax error. We solved this in tests by utilizing safe variable names (e.g., `dict2` instead of `d2`).
+3. **Arithmetic Safety Gap:** The memory checker and runtime lack arithmetic overflow/underflow detection, creating a critical safety vulnerability.
+4. **Bounds Checking Gap:** No compile-time or runtime bounds checking on array/string/dict/tuple access, allowing buffer overflows.
+5. **Closure Lifetime Analysis:** Incomplete closure capture analysis allows lifetime violations and mutable aliasing bugs.

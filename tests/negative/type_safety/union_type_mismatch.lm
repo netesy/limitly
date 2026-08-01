@@ -1,0 +1,10 @@
+// @error:type_error
+// Union type operation on incompatible type
+
+type Number = int | float;
+
+fn process_number(n: Number): str {
+    return n + " is a number";  // Cannot concatenate union with string
+}
+
+print(process_number(42));
