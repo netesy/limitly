@@ -1,3 +1,0 @@
-import std.net.dns as dns;
-var d = dns.DNS();
-print(d.is_ipv4("127.0.0.1"));

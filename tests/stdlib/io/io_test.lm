@@ -1,4 +1,4 @@
-import std.io as io;
+import std.io.index as io;
 
 fn main(): int {
     // Basic print test (we can't easily capture output here, but we can verify it doesn't crash)

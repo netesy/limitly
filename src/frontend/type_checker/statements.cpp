@@ -461,7 +461,17 @@ TypePtr TypeChecker::check_while_statement(std::shared_ptr<LM::Frontend::AST::Wh
     // Check body
     bool was_in_loop = in_loop;
     in_loop = true;
+    
+    // NEW: Phase 2 - Control flow safety
+    // Validate scope cleanup on loop entry
+    validate_scope_cleanup_on_control_flow("while_loop", while_stmt->line);
+    
     check_statement(while_stmt->body);
+    
+    // NEW: Phase 2 - Control flow safety
+    // Validate cleanup on loop exit
+    validate_scope_cleanup_on_control_flow("while_loop_exit", while_stmt->line);
+    
     in_loop = was_in_loop;
     
     // Set the inferred type on the while statement
@@ -497,7 +507,17 @@ TypePtr TypeChecker::check_for_statement(std::shared_ptr<LM::Frontend::AST::ForS
     // Check body
     bool was_in_loop = in_loop;
     in_loop = true;
+    
+    // NEW: Phase 2 - Control flow safety
+    // Validate scope cleanup on loop entry
+    validate_scope_cleanup_on_control_flow("for_loop", for_stmt->line);
+    
     check_statement(for_stmt->body);
+    
+    // NEW: Phase 2 - Control flow safety
+    // Validate cleanup on loop exit
+    validate_scope_cleanup_on_control_flow("for_loop_exit", for_stmt->line);
+    
     in_loop = was_in_loop;
     
     exit_scope();
@@ -586,7 +606,22 @@ TypePtr TypeChecker::check_iter_statement(std::shared_ptr<LM::Frontend::AST::Ite
     // Type-check the body in the loop scope.
     bool was_in_loop = in_loop;
     in_loop = true;
+    
+    // NEW: Phase 2 - Control flow safety
+    // Check for linear type reuse in loop
+    if (iter_stmt->loopVars.size() > 0) {
+        check_linear_type_in_loop_body(iter_stmt->loopVars[0], 
+                                       {iter_stmt->body}, iter_stmt->line);
+    }
+    
+    // Validate scope cleanup on loop entry
+    validate_scope_cleanup_on_control_flow("iter_loop", iter_stmt->line);
+    
     check_statement(iter_stmt->body);
+    
+    // Validate cleanup on loop exit
+    validate_scope_cleanup_on_control_flow("iter_loop_exit", iter_stmt->line);
+    
     in_loop = was_in_loop;
 
     exit_scope();
