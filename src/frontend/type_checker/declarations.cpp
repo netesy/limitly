@@ -422,6 +422,16 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
     // This ensures module frames use their full qualified name (e.g., test_module_frame.Counter)
     std::string frame_qualified_name = frame_info.name;
     
+    // ===== NEW: MEMORY SAFETY INTEGRATION =====
+    
+    // Enter memory region for frame instantiation
+    enter_memory_region();
+    
+    // Track which fields are initialized
+    std::vector<std::string> initialized_fields;
+    
+    // ===== END NEW =====
+    
     // Check that all required fields are provided
     std::set<std::string> provided_fields;
     
@@ -450,13 +460,31 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
             continue;
         }
         
+        // ===== NEW: CHECK FIELD TYPE SAFETY =====
+        
         // Check field value type
         TypePtr actual_type = check_expression(field_value);
         if (!is_type_compatible(expected_type, actual_type)) {
             add_type_error(expected_type->toString(), actual_type->toString(), expr->line);
         }
         
+        // NEW: Check if field is linear type
+        // Linear types are tracked in the linear_types map, not through TypeTag
+        if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(field_value.get())) {
+            if (linear_types.find(var_expr->name) != linear_types.end()) {
+                // This is a linear type - mark as moved into field
+                move_linear_type(var_expr->name, expr->line);
+            }
+        }
+        
+        // NEW: Check mutable aliasing for frame fields
+        check_frame_field_mutable_aliasing(expr->frameName, field_name, 
+                                          false, expr->line);  // Fields assigned, not borrowed
+        
+        // ===== END NEW =====
+        
         provided_fields.insert(field_name);
+        initialized_fields.push_back(field_name);
     }
     
     // Check that all required fields (those without defaults) are provided
@@ -468,6 +496,22 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
             add_error("Frame instantiation missing required field: '" + field_name + "'", expr->line);
         }
     }
+    
+    // ===== NEW: COMPLETE MEMORY SAFETY SETUP =====
+    
+    // Verify all non-optional fields initialized
+    verify_frame_full_initialization(expr->frameName, initialized_fields, expr->line);
+    
+    // Register frame for automatic deinit at scope exit
+    register_frame_for_deinit(expr->frameName, current_scope_level);
+    
+    // Check for linear type fields
+    check_frame_field_linear_types(expr->frameName, frame_info.fields);
+    
+    // Exit memory region
+    exit_memory_region();
+    
+    // ===== END NEW =====
     
     // Return the frame type using the qualified name
     TypePtr frame_type = type_system.createFrameType(frame_qualified_name);
