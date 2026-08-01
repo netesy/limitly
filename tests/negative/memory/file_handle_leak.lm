@@ -1,0 +1,11 @@
+// @error:memory_leak
+// File handle not closed
+
+fn open_file() {
+    var file = std.io.open("data.txt");
+    var data = file.read();
+    // File never closed - resource leak
+    print(data);
+}
+
+open_file();

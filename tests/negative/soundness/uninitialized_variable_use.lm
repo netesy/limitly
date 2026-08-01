@@ -1,0 +1,5 @@
+// @error:uninitialized
+// Using uninitialized variable
+
+var x: int;  // Declared but not initialized
+print(x);    // Using before initialization

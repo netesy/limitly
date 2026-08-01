@@ -1,0 +1,9 @@
+// @error:type_error
+// Passing wrong argument type to function
+
+fn add_numbers(a: int, b: int): int {
+    return a + b;
+}
+
+var result = add_numbers("five", "seven");  // Strings instead of ints
+print(result);

@@ -1,0 +1,6 @@
+// @error:bounds_error
+// String indexing out of bounds
+
+var text = "hello";
+var ch = text[10];  // Index 10 out of bounds for 5-char string
+print(ch);

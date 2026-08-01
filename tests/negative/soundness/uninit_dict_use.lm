@@ -1,0 +1,6 @@
+// @error:uninitialized
+// Using uninitialized dictionary
+
+var map: {str: int};
+var value = map["key"];  // ERROR: map not initialized
+print(value);

@@ -1,0 +1,5 @@
+// @error:syntax_error
+// Using reserved keyword as identifier
+
+var pub = 5;  // pub is reserved keyword
+print(pub);

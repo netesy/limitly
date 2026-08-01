@@ -1,0 +1,13 @@
+// @error:uninitialized
+// Using uninitialized frame field
+
+frame Data {
+    pub value: int;
+}
+
+fn test() {
+    var data: Data;  // Declared but not initialized
+    print(data.value);  // ERROR: data not initialized
+}
+
+test();

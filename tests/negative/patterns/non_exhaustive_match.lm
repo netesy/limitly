@@ -1,0 +1,16 @@
+// @error:pattern_exhaustive
+// Non-exhaustive pattern match
+
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+var color = Color.Red;
+
+match (color) {
+    Color.Red => { print("Red"); },
+    Color.Green => { print("Green"); }
+    // Missing Color.Blue case - non-exhaustive!
+}

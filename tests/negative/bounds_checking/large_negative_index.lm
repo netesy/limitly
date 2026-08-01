@@ -1,0 +1,6 @@
+// @error:bounds_error
+// Very large negative index
+
+var arr = [1, 2, 3];
+var x = arr[-1000];  // Large negative index not allowed
+print(x);

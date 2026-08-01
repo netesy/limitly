@@ -413,11 +413,17 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
                 }
                 return promote_numeric_types(left_base, right_base);
             } else if (expr->op == TokenType::PLUS && 
-                      (is_string_type(left_base) || is_string_type(right_base))) {
+                      is_string_type(left_base) && is_string_type(right_base)) {
+                // String concatenation requires both operands to be strings
                 return type_system.STRING_TYPE;
             } else if (expr->op == TokenType::PLUS && 
                       (left_base->tag == TypeTag::List && right_base->tag == TypeTag::List)) {
                 return type_system.getCommonType(left_base, right_base);
+            } else if (expr->op == TokenType::PLUS && 
+                      (is_string_type(left_base) || is_string_type(right_base))) {
+                // Disallow string + non-string concatenation for type safety
+                add_error("Cannot concatenate string with non-string type", expr->line);
+                return type_system.STRING_TYPE;
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
             return type_system.INT_TYPE;
@@ -1772,13 +1778,30 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
              add_error("String index must be an integer, got " + index_type->toString(), expr->line);
         }
-        return type_system.NIL_TYPE;
+        return type_system.STRING_TYPE;
     } else if (object_type->tag == TypeTag::Tuple) {
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
              add_error("Tuple index must be an integer, got " + index_type->toString(), expr->line);
         }
         if (auto tt = std::get_if<TupleType>(&object_type->extra)) {
-            // Return the type of the indexed element (simplified - could add bounds checking)
+            // Check if index is constant and within bounds
+            if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr->index)) {
+                if (std::holds_alternative<std::string>(lit->value)) {
+                    try {
+                        int64_t idx = std::stoll(std::get<std::string>(lit->value));
+                        if (idx < 0 || idx >= (int64_t)tt->elementTypes.size()) {
+                            add_error("Tuple index out of bounds: index " + std::to_string(idx) + 
+                                     " is outside valid range [0, " + std::to_string(tt->elementTypes.size() - 1) + "]",
+                                     expr->line);
+                        }
+                        if (idx >= 0 && idx < (int64_t)tt->elementTypes.size()) {
+                            return tt->elementTypes[idx];
+                        }
+                    } catch (...) {
+                        // Invalid integer literal
+                    }
+                }
+            }
             return type_system.ANY_TYPE;
         }
     }

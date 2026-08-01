@@ -1,0 +1,8 @@
+// @error:continue_outside_loop
+// Continue statement outside of any loop
+
+fn some_function() {
+    continue;  // continue not inside loop
+}
+
+some_function();

@@ -155,34 +155,7 @@ void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement
 void MemoryChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::VarDeclaration> var_decl) {
     if (!var_decl) return;
     
-    // Check if variable has a type (should be set by type checker)
-    if (!var_decl->inferred_type) {
-        add_error("Variable '" + var_decl->name + "' has no inferred type - type checker must run first", 
-                 var_decl->line);
-        return;
-    }
-    
-    // Check if it's a linear type
-    bool is_linear = (var_decl->inferred_type->tag == TypeTag::List ||
-                      var_decl->inferred_type->tag == TypeTag::Dict ||
-                      var_decl->inferred_type->tag == TypeTag::Frame);
-    
-    // Create generation info for this variable
-    GenerationInfo gen_info;
-    gen_info.region_id = current_region_id;
-    gen_info.generation = current_generation;
-    gen_info.is_linear = is_linear;
-    gen_info.ownership_state = OwnershipState::Uninitialized;
-    gen_info.scope_depth = current_scope_depth;
-    
-    variable_generation_info[var_decl->name] = gen_info;
-    variable_regions[var_decl->name] = current_region_id;
-    variable_generations[var_decl->name] = current_generation;
-    
     // Track generation history
-    if (generation_history.find(var_decl->name) == generation_history.end()) {
-        generation_history[var_decl->name] = {};
-    }
     generation_history[var_decl->name].push_back(current_generation);
     
     // Check initializer
@@ -190,6 +163,11 @@ void MemoryChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Var
         check_expression(var_decl->initializer);
         mark_variable_initialized(var_decl->name);
         variable_generation_info[var_decl->name].ownership_state = OwnershipState::Valid;
+        
+        // Track constant variable values for arithmetic safety
+        if (is_constant_expression(var_decl->initializer)) {
+            constant_variables[var_decl->name] = evaluate_constant_int(var_decl->initializer);
+        }
         
         // Check if initializing from another variable
         // For Limit, we use COPY semantics by default, not MOVE semantics
@@ -244,8 +222,9 @@ void MemoryChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Expressi
     } else if (auto call_expr = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
         check_function_call(call_expr);
     } else if (auto binary_expr = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
-        check_expression(binary_expr->left);
-        check_expression(binary_expr->right);
+        check_binary_expression(binary_expr);
+    } else if (auto index_expr = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(expr)) {
+        check_index_expression(index_expr);
     } else if (auto unary_expr = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
         check_expression(unary_expr->right);
     } else if (auto group_expr = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
@@ -318,6 +297,249 @@ void MemoryChecker::check_function_call(std::shared_ptr<LM::Frontend::AST::CallE
             // This requires analysis of function parameter ownership semantics
             // For now, we conservatively assume parameters are borrowed (not moved)
             // unless the function is explicitly marked as consuming/linear
+        }
+    }
+}
+
+void MemoryChecker::check_binary_expression(std::shared_ptr<LM::Frontend::AST::BinaryExpr> binary) {
+    if (!binary) return;
+    
+    // First check both operands recursively
+    check_expression(binary->left);
+    check_expression(binary->right);
+    
+    // Then check arithmetic safety
+    check_arithmetic_safety(binary);
+}
+
+void MemoryChecker::check_arithmetic_safety(std::shared_ptr<LM::Frontend::AST::BinaryExpr> binary) {
+    if (!binary) return;
+    
+    // Check division by zero
+    if (binary->op == TokenType::SLASH || binary->op == TokenType::MODULUS) {
+        check_division_safety(binary);
+    }
+    
+    // Check shift operations
+    if (binary->op == TokenType::LESS_LESS || binary->op == TokenType::GREATER_GREATER) {
+        check_shift_safety(binary);
+    }
+    
+    // Check for overflow/underflow on arithmetic operations
+    if (binary->op == TokenType::PLUS || binary->op == TokenType::MINUS || 
+        binary->op == TokenType::STAR || binary->op == TokenType::POWER) {
+        // Only check constant expressions at compile time
+        if (is_constant_expression(binary->left) && is_constant_expression(binary->right)) {
+            int64_t left = evaluate_constant_int(binary->left);
+            int64_t right = evaluate_constant_int(binary->right);
+            
+            if (binary->op == TokenType::PLUS) {
+                if (check_overflow(left, right, "+")) {
+                    add_memory_error("overflow", "", 
+                                   "Integer overflow detected in addition operation",
+                                   binary->line);
+                }
+            } else if (binary->op == TokenType::MINUS) {
+                if (check_underflow(left, right, "-")) {
+                    add_memory_error("overflow", "", 
+                                   "Integer underflow detected in subtraction operation",
+                                   binary->line);
+                }
+            } else if (binary->op == TokenType::STAR) {
+                if (check_overflow(left, right, "*")) {
+                    add_memory_error("overflow", "", 
+                                   "Integer overflow detected in multiplication operation",
+                                   binary->line);
+                }
+            } else if (binary->op == TokenType::POWER) {
+                // Exponentiation overflow check
+                if (right < 0) {
+                    add_memory_error("overflow", "", 
+                                   "Negative exponent in exponentiation operation",
+                                   binary->line);
+                } else if (right > 20 && left > 1) {
+                    // Conservative check: large exponents likely overflow
+                    add_memory_error("overflow", "", 
+                                   "Potential overflow in exponentiation operation",
+                                   binary->line);
+                }
+            }
+        }
+    }
+}
+
+void MemoryChecker::check_division_safety(std::shared_ptr<LM::Frontend::AST::BinaryExpr> binary) {
+    if (!binary) return;
+    
+    // Check if divisor is constant zero
+    if (is_constant_expression(binary->right)) {
+        int64_t divisor = evaluate_constant_int(binary->right);
+        if (divisor == 0) {
+            add_memory_error("divide_by_zero", "", 
+                           "Division by zero detected",
+                           binary->line);
+        }
+    }
+}
+
+void MemoryChecker::check_shift_safety(std::shared_ptr<LM::Frontend::AST::BinaryExpr> binary) {
+    if (!binary) return;
+    
+    // Check if shift amount is constant
+    if (is_constant_expression(binary->right)) {
+        int64_t shift_amount = evaluate_constant_int(binary->right);
+        
+        if (shift_amount < 0) {
+            add_memory_error("shift_error", "", 
+                           "Negative shift amount detected",
+                           binary->line);
+        }
+        
+        if (shift_amount >= 64) {
+            add_memory_error("shift_error", "", 
+                           "Shift amount exceeds bit width (>= 64)",
+                           binary->line);
+        }
+    }
+}
+
+bool MemoryChecker::is_constant_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
+    if (!expr) return false;
+    
+    // Check for literal expression
+    if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+        return true;
+    }
+    
+    // Could extend to check for constant variable references
+    // For now, only literals are considered constant
+    
+    return false;
+}
+
+int64_t MemoryChecker::evaluate_constant_int(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
+    if (!expr) return 0;
+    
+    if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+        // Check if the literal holds an integer (stored as string in variant)
+        if (std::holds_alternative<std::string>(lit->value)) {
+            try {
+                return std::stoll(std::get<std::string>(lit->value));
+            } catch (...) {
+                return 0;
+            }
+        }
+    }
+    
+    return 0;
+}
+
+bool MemoryChecker::check_overflow(int64_t left, int64_t right, const std::string& op) {
+    if (op == "+") {
+        if (right > 0 && left > INT64_MAX - right) return true;
+        if (right < 0 && left < INT64_MIN - right) return true;
+    } else if (op == "*") {
+        if (left > 0) {
+            if (right > 0 && left > INT64_MAX / right) return true;
+            if (right < 0 && right < INT64_MIN / left) return true;
+        } else if (left < 0) {
+            if (right > 0 && left < INT64_MIN / right) return true;
+            if (right < 0 && left > INT64_MAX / right) return true;
+        }
+    }
+    
+    return false;
+}
+
+bool MemoryChecker::check_underflow(int64_t left, int64_t right, const std::string& op) {
+    if (op == "-") {
+        if (right > 0 && left < INT64_MIN + right) return true;
+        if (right < 0 && left > INT64_MAX + right) return true;
+    }
+    
+    return false;
+}
+
+void MemoryChecker::check_index_expression(std::shared_ptr<LM::Frontend::AST::IndexExpr> index) {
+    if (!index) return;
+    
+    // First check the object and index expressions recursively
+    check_expression(index->object);
+    check_expression(index->index);
+    
+    // Check bounds if we have constant expressions
+    if (auto list_expr = std::dynamic_pointer_cast<LM::Frontend::AST::ListExpr>(index->object)) {
+        check_list_bounds(index, list_expr);
+    } else if (auto str_lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(index->object)) {
+        check_string_bounds(index, str_lit);
+    } else if (auto tuple_expr = std::dynamic_pointer_cast<LM::Frontend::AST::TupleExpr>(index->object)) {
+        check_tuple_bounds(index, tuple_expr);
+    }
+}
+
+void MemoryChecker::check_list_bounds(std::shared_ptr<LM::Frontend::AST::IndexExpr> index, std::shared_ptr<LM::Frontend::AST::ListExpr> list) {
+    if (!index || !list) return;
+    
+    // Check if index is constant
+    if (is_constant_expression(index->index)) {
+        int64_t idx = evaluate_constant_int(index->index);
+        int64_t size = list->elements.size();
+        
+        if (idx < 0) {
+            add_memory_error("bounds_error", "", 
+                           "Negative list index: " + std::to_string(idx),
+                           index->line);
+        } else if (idx >= size) {
+            add_memory_error("bounds_error", "", 
+                           "List index out of bounds: index " + std::to_string(idx) + 
+                           " is outside valid range [0, " + std::to_string(size - 1) + "]",
+                           index->line);
+        }
+    }
+}
+
+void MemoryChecker::check_string_bounds(std::shared_ptr<LM::Frontend::AST::IndexExpr> index, std::shared_ptr<LM::Frontend::AST::LiteralExpr> str) {
+    if (!index || !str) return;
+    
+    // Check if index is constant
+    if (is_constant_expression(index->index)) {
+        int64_t idx = evaluate_constant_int(index->index);
+        
+        // Get string length from literal
+        if (std::holds_alternative<std::string>(str->value)) {
+            int64_t size = std::get<std::string>(str->value).length();
+            
+            if (idx < 0) {
+                add_memory_error("bounds_error", "", 
+                               "Negative string index: " + std::to_string(idx),
+                               index->line);
+            } else if (idx >= size) {
+                add_memory_error("bounds_error", "", 
+                               "String index out of bounds: index " + std::to_string(idx) + 
+                               " is outside valid range [0, " + std::to_string(size - 1) + "]",
+                               index->line);
+            }
+        }
+    }
+}
+
+void MemoryChecker::check_tuple_bounds(std::shared_ptr<LM::Frontend::AST::IndexExpr> index, std::shared_ptr<LM::Frontend::AST::TupleExpr> tuple) {
+    if (!index || !tuple) return;
+    
+    // Check if index is constant
+    if (is_constant_expression(index->index)) {
+        int64_t idx = evaluate_constant_int(index->index);
+        int64_t size = tuple->elements.size();
+        
+        if (idx < 0) {
+            add_memory_error("bounds_error", "", 
+                           "Negative tuple index: " + std::to_string(idx),
+                           index->line);
+        } else if (idx >= size) {
+            add_memory_error("bounds_error", "", 
+                           "Tuple index out of bounds: index " + std::to_string(idx) + 
+                           " is outside valid range [0, " + std::to_string(size - 1) + "]",
+                           index->line);
         }
     }
 }

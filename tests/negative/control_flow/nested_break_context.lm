@@ -1,0 +1,10 @@
+// @error:break_outside_loop
+// Break in nested function inside loop
+
+fn inner_function() {
+    break;  // Not in loop - break only applies to nearest loop
+}
+
+while (true) {
+    inner_function();
+}

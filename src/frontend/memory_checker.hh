@@ -82,6 +82,7 @@ private:
     std::unordered_set<std::string> moved_variables;
     std::unordered_set<std::string> initialized_variables;
     std::unordered_map<std::string, int> variable_generations;
+    std::unordered_map<std::string, int64_t> constant_variables;  // Track variables with constant values
     
     // Generational reference tracking
     std::deque<std::vector<std::shared_ptr<GenerationalRef>>> generation_stack;
@@ -109,6 +110,22 @@ private:
     void check_variable_access(std::shared_ptr<AST::VariableExpr> var_expr);
     void check_function_call(std::shared_ptr<AST::CallExpr> call);
     void check_block_statement(std::shared_ptr<AST::BlockStatement> block);
+    
+    // Arithmetic safety checking
+    void check_binary_expression(std::shared_ptr<AST::BinaryExpr> binary);
+    void check_arithmetic_safety(std::shared_ptr<AST::BinaryExpr> binary);
+    void check_division_safety(std::shared_ptr<AST::BinaryExpr> binary);
+    void check_shift_safety(std::shared_ptr<AST::BinaryExpr> binary);
+    bool is_constant_expression(std::shared_ptr<AST::Expression> expr);
+    int64_t evaluate_constant_int(std::shared_ptr<AST::Expression> expr);
+    bool check_overflow(int64_t left, int64_t right, const std::string& op);
+    bool check_underflow(int64_t left, int64_t right, const std::string& op);
+    
+    // Bounds checking
+    void check_index_expression(std::shared_ptr<AST::IndexExpr> index);
+    void check_list_bounds(std::shared_ptr<AST::IndexExpr> index, std::shared_ptr<AST::ListExpr> list);
+    void check_string_bounds(std::shared_ptr<AST::IndexExpr> index, std::shared_ptr<AST::LiteralExpr> str);
+    void check_tuple_bounds(std::shared_ptr<AST::IndexExpr> index, std::shared_ptr<AST::TupleExpr> tuple);
     
     // Memory operations (currently disabled - LIR generator manages regions independently)
     void insert_memory_operations(std::shared_ptr<AST::Statement> stmt);

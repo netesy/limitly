@@ -57,14 +57,14 @@ var result = divide(10, 0)? else {
 
 // Using pattern matching
 match divide(10, 0) {
-    Ok(result) => print("Success: " + result),
-    Err => print("Division failed")  // Handles both errors and absence
+    val result => print("Success: " + result),
+    err => print("Division failed")  // Handles both errors and absence
 }
 
 // Pattern matching with specific error types
 match divide_with_error(10, 0) {
-    Ok(result) => print("Success: " + result),
-    Err(DivisionByZero(msg)) => print("Division error: " + msg)
+    val result => print("Success: " + result),
+    err DivisionByZero(msg) => print("Division error: " + msg)
 }
 ```
 
@@ -257,14 +257,14 @@ The unified system works seamlessly with pattern matching:
 
 ```limit
 match some_operation() {
-    Ok(result) => handle_success(result),
-    Err => handle_absence_or_generic_error()
+    val result => handle_success(result),
+    err => handle_absence_or_generic_error()
 }
 
 match specific_operation() {
-    Ok(result) => handle_success(result),
-    Err(Error1(msg)) => handle_error1(msg),
-    Err(Error2(code, msg)) => handle_error2(code, msg)
+    val result => handle_success(result),
+    err Error1(msg) => handle_error1(msg),
+    err Error2(code, msg) => handle_error2(code, msg)
 }
 ```
 
