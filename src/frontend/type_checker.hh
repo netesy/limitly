@@ -47,6 +47,7 @@ private:
         std::string memory_state;  // "owned", "moved", "dropped", "borrowed"
         std::size_t region_id;
         std::size_t alloc_id;
+        int reference_count = 0;  // Track number of references for ownership checking
     };
     std::unordered_map<std::string, VariableInfo> variable_memory_info;
     

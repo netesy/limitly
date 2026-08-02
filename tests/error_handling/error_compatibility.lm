@@ -74,11 +74,11 @@ print("Testing error type compatibility");
 
 // Test compatible caller
 var result1 = compatibleCaller()?else err => {
-    print("Error in compatible caller: " + err);
+    print("Error in compatible caller: {err}");
     return -1;
 };
-print("Compatible result: " + result1);
+print("Compatible result: {result1}");
 
 // Test explicit handler
 var result2 = explicitHandler();
-print("Explicit handler result: " + result2);
+print("Explicit handler result: {result2}");

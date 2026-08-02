@@ -4,12 +4,12 @@ print("=== Alias Import Test ===");
 import tests.modules.math_module as math;
 
 print("Test 2.1: Access aliased module variable");
-print("PI = " + math.PI);
+print("PI = {math.PI}");
 assert(math.PI == 3.14159, "Module alias should provide access to variables");
 
 print("Test 2.2: Call aliased module function");
 var squared = math.square(5);
-print("5 squared = " + squared);
+print("5 squared = {squared}");
 assert(squared == 25, "Module alias should provide access to functions");
 
 print("Test 2.3: Call complex aliased function");
@@ -18,7 +18,7 @@ print("Test 2.3: Call complex aliased function");
 
 print("Test 2.4: Call recursive function through alias");
 var fact = math.factorial(5); 
-print("5! = " + fact);
+print("5! = {fact}");
 assert(fact == 120, "Module alias should provide access to recursive functions: 5! = 120");
 
 print("=== Alias Import Test Complete ===");

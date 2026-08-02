@@ -20,6 +20,13 @@ pub type Matrix = matrix_mod.Matrix;
 pub type Random = random_mod.Random;
 pub type SecureRandom = random_mod.SecureRandom;
 
+// Constructors
+pub fn Vector2(x: float, y: float): Vector2 { return vector2_mod.Vector2(x, y); }
+pub fn Vector3(x: float, y: float, z: float): Vector3 { return vector3_mod.Vector3(x, y, z); }
+pub fn Vector4(x: float, y: float, z: float, w: float): Vector4 { return vector4_mod.Vector4(x, y, z, w); }
+pub fn Quaternion(x: float, y: float, z: float, w: float): Quaternion { return quaternion_mod.Quaternion(x, y, z, w); }
+pub fn Matrix(): Matrix { return matrix_mod.Matrix(); }
+
 // Constants Re-exports
 pub var PI: float = 3.14159265358979323846;
 pub var E: float = 2.71828182845904523536;

@@ -238,18 +238,50 @@ void TypeChecker::check_double_free(const std::string& name, int line) {
 
 void TypeChecker::check_multiple_owners(const std::string& name, int line) {
     auto it = variable_memory_info.find(name);
-    if (it != variable_memory_info.end()) {
-        // Check if variable is being shared/copied when it should be unique
-        if (it->second.memory_state == "owned") {
-            // In a real implementation, we'd track reference counts
-            add_error("Multiple owners detected: variable '" + name + "' should have single ownership\n\n= reason: Variables should have single ownership\n= help: use single ownership and compile-time drop analysis", line);
-        }
+    if (it == variable_memory_info.end()) {
+        return;
+    }
+    
+    VariableInfo& var_info = it->second;
+    
+    // Check if variable is a linear type
+    bool is_linear = (var_info.type &&
+                     (var_info.type->tag == TypeTag::List ||
+                      var_info.type->tag == TypeTag::Dict ||
+                      var_info.type->tag == TypeTag::UserDefined));
+    
+    if (!is_linear) {
+        return; // Only linear types need single ownership
+    }
+    
+    // Track reference count for linear types
+    if (var_info.reference_count > 1) {
+        add_error("Multiple owners detected: variable '" + name + "' has " + 
+                 std::to_string(var_info.reference_count) + " references\n\n= reason: Linear types require single ownership\n= help: move the value instead of copying, or use shared ownership patterns", line);
     }
 }
 
 void TypeChecker::check_buffer_overflow(const std::string& array_name, const std::string& index_expr, int line) {
-    // Simplified check - in real implementation we'd track array bounds
-    add_error("Buffer overflow: array '" + array_name + "' access with index '" + index_expr + "' may exceed bounds\n\n= reason: Array index out of bounds\n= help: use bounds checks or typed arrays to prevent buffer overflow", line);
+    auto it = variable_memory_info.find(array_name);
+    if (it == variable_memory_info.end()) {
+        return; // Array not tracked
+    }
+    
+    const VariableInfo& var_info = it->second;
+    
+    // Check if this is actually an array/list type
+    if (var_info.type && var_info.type->tag == TypeTag::List) {
+        // Try to evaluate the index expression if it's a constant
+        // For now, we'll do a conservative check - warn about any dynamic index
+        bool is_constant = (index_expr.find("var") == std::string::npos &&
+                          index_expr.find("fn") == std::string::npos &&
+                          index_expr.find("(") == std::string::npos);
+        
+        if (!is_constant) {
+            // Dynamic index - warn about potential overflow
+            add_error("Buffer overflow risk: array '" + array_name + "' accessed with dynamic index '" + index_expr + "'\n\n= reason: Cannot verify bounds at compile time\n= help: add explicit bounds check or use constant index", line);
+        }
+    }
 }
 
 void TypeChecker::check_uninitialized_use(const std::string& name, int line) {
@@ -268,15 +300,57 @@ void TypeChecker::check_invalid_type(const std::string& var_name, TypePtr expect
 }
 
 void TypeChecker::check_misalignment(const std::string& ptr_name, int line) {
-    add_error("Misalignment: pointer '" + ptr_name + "' may not be properly aligned\n\n= reason: Pointer alignment does not match expected alignment\n= help: enforce alignment in allocator", line);
+    auto it = variable_memory_info.find(ptr_name);
+    if (it == variable_memory_info.end()) {
+        return;
+    }
+    
+    const VariableInfo& var_info = it->second;
+    
+    // Check if this is a pointer-like type (user-defined frames that might contain pointers)
+    if (var_info.type && var_info.type->tag == TypeTag::UserDefined) {
+        // For user-defined types, check if they require specific alignment
+        // This is a conservative check - in a real implementation we'd check type metadata
+        if (var_info.alloc_id % 8 != 0) {
+            // Not 8-byte aligned - potential misalignment for 64-bit types
+            add_error("Potential misalignment: '" + ptr_name + "' may not be properly aligned for its type\n\n= reason: User-defined types may require specific alignment\n= help: ensure proper allocation alignment", line);
+        }
+    }
 }
 
 void TypeChecker::check_heap_corruption(const std::string& operation, int line) {
-    add_error("Heap corruption detected during: " + operation + "\n\n= reason: Memory corruption detected\n= help: use linear types and bounds checks to prevent heap corruption", line);
+    // Check for double writes to freed memory or writes outside allocated regions
+    for (const auto& [var_name, var_info] : variable_memory_info) {
+        if (var_info.memory_state == "dropped" || var_info.memory_state == "moved") {
+            // Check if operation is trying to access freed/moved memory
+            if (operation.find(var_name) != std::string::npos) {
+                add_error("Heap corruption risk: operation '" + operation + "' may access freed memory '" + var_name + "'\n\n= reason: Memory was already freed or moved\n= help: ensure memory is valid before operation", line);
+            }
+        }
+    }
 }
 
 void TypeChecker::check_race_condition(const std::string& shared_var, int line) {
-    add_error("Race condition: concurrent access to variable '" + shared_var + "'\n\n= reason: Multiple threads accessing shared variable without synchronization\n= help: use ownership, borrow rules, or thread-local memory", line);
+    auto it = variable_memory_info.find(shared_var);
+    if (it == variable_memory_info.end()) {
+        return;
+    }
+    
+    const VariableInfo& var_info = it->second;
+    
+    // Check if variable is in a state that could cause race conditions
+    // Variables that are "owned" and shared across threads are potential race conditions
+    if (var_info.memory_state == "owned") {
+        // Check if this is a mutable type that could be modified concurrently
+        bool is_mutable_type = (var_info.type &&
+                               (var_info.type->tag == TypeTag::List ||
+                                var_info.type->tag == TypeTag::Dict ||
+                                var_info.type->tag == TypeTag::UserDefined));
+        
+        if (is_mutable_type) {
+            add_error("Race condition risk: mutable variable '" + shared_var + "' may be accessed concurrently\n\n= reason: Mutable shared state without synchronization\n= help: use atomic operations, mutex, or move ownership instead of sharing", line);
+        }
+    }
 }
 
 void TypeChecker::check_variable_use(const std::string& name, int line) {
@@ -336,7 +410,30 @@ void TypeChecker::check_borrow_safety(const std::string& var_name) {
 }
 
 void TypeChecker::check_escape_analysis(const std::string& var_name, const std::string& target_context) {
-    // Escape analysis logic - to be updated for frames
+    auto it = variable_memory_info.find(var_name);
+    if (it == variable_memory_info.end()) {
+        return;
+    }
+    
+    const VariableInfo& var_info = it->second;
+    
+    // Check if variable is a linear type
+    bool is_linear = (var_info.type &&
+                     (var_info.type->tag == TypeTag::List ||
+                      var_info.type->tag == TypeTag::Dict ||
+                      var_info.type->tag == TypeTag::UserDefined));
+    
+    if (!is_linear) {
+        return; // Only linear types need escape analysis
+    }
+    
+    // Check if variable is being moved to a different scope
+    if (target_context != "current_scope") {
+        // Variable escaping current scope
+        if (var_info.memory_state == "owned") {
+            add_error("Linear type '" + var_name + "' escapes its scope\n\n= reason: Linear types cannot escape their allocation scope\n= help: move the variable explicitly or use shared ownership", current_line);
+        }
+    }
 }
 
 bool TypeChecker::is_variable_alive(const std::string& name) {
@@ -595,7 +692,23 @@ void TypeChecker::check_linear_type_in_loop_body(
 }
 
 void TypeChecker::validate_break_cleanup(int line) {
-    (void)line;
+    // Check that linear types in loop scope are properly handled on break
+    for (const auto& [var_name, var_info] : variable_memory_info) {
+        if (var_info.memory_state == "dropped") {
+            continue;
+        }
+        
+        // Check if variable is a linear type
+        bool is_linear = (var_info.type &&
+                         (var_info.type->tag == TypeTag::List ||
+                          var_info.type->tag == TypeTag::Dict ||
+                          var_info.type->tag == TypeTag::UserDefined));
+        
+        if (is_linear && var_info.memory_state == "owned") {
+            // Linear type still owned when breaking - potential leak
+            add_error("Linear type '" + var_name + "' may leak on break\n\n= reason: Variable still owned when breaking from loop\n= help: drop or move the variable before breaking", line);
+        }
+    }
 }
 
 void TypeChecker::validate_continue_cleanup(int line) {

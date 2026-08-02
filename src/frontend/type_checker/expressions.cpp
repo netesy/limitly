@@ -686,7 +686,12 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 arg_expected = it->second.param_types[i];
             }
         }
-        arg_types.push_back(check_expression(expr->arguments[i], arg_expected));
+        TypePtr arg_type = check_expression(expr->arguments[i], arg_expected);
+        arg_types.push_back(arg_type);
+        
+        // TODO: Move semantics for function calls disabled due to regressions
+        // Need more sophisticated approach to distinguish consuming vs non-consuming functions
+        // For now, rely on explicit move syntax or borrow checker in future implementation
     }
     
     // Check if callee is a variable (could be function or frame name)
@@ -1394,10 +1399,27 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
     
     // Handle index assignment (e.g., arr[0] = value)
     if (expr->object && expr->index) {
-        // Just check the object and index expressions
-        check_expression(expr->object);
+        TypePtr object_type = check_expression(expr->object);
         check_expression(expr->index);
         TypePtr value_type = check_expression(expr->value, expected_type);
+        
+        // Check type compatibility for list/dict index assignment
+        if (object_type && object_type->tag == TypeTag::List) {
+            if (auto lt = std::get_if<ListType>(&object_type->extra)) {
+                if (!is_type_compatible(lt->elementType, value_type)) {
+                    add_error("Cannot assign value of type '" + value_type->toString() + 
+                             "' to list element of type '" + lt->elementType->toString() + "'", expr->line);
+                }
+            }
+        } else if (object_type && object_type->tag == TypeTag::Dict) {
+            if (auto dt = std::get_if<DictType>(&object_type->extra)) {
+                if (!is_type_compatible(dt->valueType, value_type)) {
+                    add_error("Cannot assign value of type '" + value_type->toString() + 
+                             "' to dictionary value of type '" + dt->valueType->toString() + "'", expr->line);
+                }
+            }
+        }
+        
         return value_type;
     }
     
