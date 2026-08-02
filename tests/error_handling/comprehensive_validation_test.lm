@@ -34,18 +34,18 @@ print("Testing correct error type propagation...");
 
 // Test successful case
 match (safeDivision(10, 2)) {
-    val result => print("Success: 10 / 2 = " + result),
+    val result => print("Success: 10 / 2 = {result}"),
     err error => print("Unexpected error")
 }
 
 // Test error case
 match (safeDivision(10, 0)) {
-    val result => print("Unexpected success: " + result),
+    val result => print("Unexpected success: {result}"),
     err error => print("Expected error: Division by zero caught")
 }
 
 // Test error handling
 var handled = handleErrors(10, 0);
-print("Handled error result: " + handled);
+print("Handled error result: {handled}");
 
 print("=== Test completed successfully ===");

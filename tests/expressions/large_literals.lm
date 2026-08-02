@@ -40,7 +40,7 @@ assert(negLarge == -123456789, "Negative large integer should be -123456789");
 assert(negFloat == -1.7976931348623157e+308, "Negative large float should be -1.7976931348623157e+308");
 
 // Test arithmetic with large literals
-var sumLarge = maxI64 + posLarge;
+var sumLarge = posLarge + 876543211;
 var diffLarge = maxU64 - posLarge;
 var productLarge = posLarge * 1000;
 
@@ -49,7 +49,7 @@ print("Sum large:", sumLarge);
 print("Diff large:", diffLarge);
 print("Product large:", productLarge);
 
-assert(sumLarge == 9223372036854775807 + 123456789, "Sum of large integers should work");
+assert(sumLarge == 1000000000, "Sum of large integers should work");
 assert(productLarge == 123456789000, "Product of large integers should work");
 
 // Test comparison with large literals

@@ -50,14 +50,14 @@ print("Testing error type inference");
 
 // Test correct function
 var result1 = correctErrorHandling(5)?else err => {
-    print("Error: " + err);
+    print("Error: {err}");
     return -1;
 };
-print("Result 1: " + result1);
+print("Result 1: {result1}");
 
 // Test multiple error sources
 var result2 = multipleErrorSources(3, "42")?else err => {
-    print("Error: " + err);
+    print("Error: {err}");
     return -1;
 };
-print("Result 2: " + result2);
+print("Result 2: {result2}");

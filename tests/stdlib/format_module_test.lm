@@ -7,10 +7,8 @@ fn test_format_frame(): int {
     var fmt = f.Format() as f.Format;
     assert(fmt.format_int(123) == "123", "int failed");
 
-    var expected_float = "";
-    expected_float = expected_float + "4.";
-    expected_float = expected_float + "56";
-    assert(fmt.format_float(4.56) == expected_float, "float failed");
+    var actual_float = fmt.format_float(4.56);
+    assert(actual_float == "4.56", "float failed");
 
     assert(fmt.format_bool(true) == "true", "bool failed");
 
@@ -31,10 +29,7 @@ fn test_format_helpers(): int {
     print("Testing Format Helpers...");
     assert(f.format_int(456) == "456", "format_int failed");
 
-    var expected_float2 = "";
-    expected_float2 = expected_float2 + "7.";
-    expected_float2 = expected_float2 + "89";
-    assert(f.format_float(7.89) == expected_float2, "format_float failed");
+    assert(f.format_float(7.89) == "7.89", "format_float failed");
 
     assert(f.format_bool(false) == "false", "format_bool failed");
 

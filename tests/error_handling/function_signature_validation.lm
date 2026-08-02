@@ -51,18 +51,18 @@ print("Testing function signature error type validation");
 
 // Test successful division
 var result1 = safeDivision(10, 2)?else err => {
-    print("Error: " + err);
+    print("Error: {err}");
     return -1;
 };
-print("Result 1: " + result1);
+print("Result 1: {result1}");
 
 // Test division by zero
 var result2 = safeDivision(10, 0)?else err => {
-    print("Caught error: " + err);
+    print("Caught error: {err}");
     return -1;
 };
-print("Result 2: " + result2);
+print("Result 2: {result2}");
 
 // Test handled division
 var result3 = handleDivision(10, 0);
-print("Result 3: " + result3);
+print("Result 3: {result3}");
