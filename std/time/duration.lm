@@ -1,5 +1,7 @@
 // Standard Library Time Duration Submodule
 
+pub type Duration = TimeDuration;
+
 pub fn pad_int(n: int, width: int): str {
     var s: str = "{n}";
     while (len(s) < width) {

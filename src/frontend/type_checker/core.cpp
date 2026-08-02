@@ -34,9 +34,14 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
 
     // PASS -1: Basic Type Discovery (Pre-registration)
     auto register_custom_type = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
+        std::string registered_name = name;
+        if (!current_module_name.empty() && name.find('.') == std::string::npos) {
+            registered_name = current_module_name + "." + name;
+        }
+
         if (auto enum_decl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) {
             EnumType enumTypeInfo;
-            enumTypeInfo.name = name;
+            enumTypeInfo.name = registered_name;
             for (const auto& variant : enum_decl->variants) {
                 std::vector<TypePtr> associated;
                 for (const auto& t : variant.second) {
@@ -51,11 +56,11 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 enumTypeInfo.addVariant(variant.first, associated);
             }
             TypePtr enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
-            type_system.addUserDefinedType(name, enumType);
+            type_system.addUserDefinedType(registered_name, enumType);
 
             // Register variants in global scope (qualified only) and track ownership
             for (const auto& variant : enum_decl->variants) {
-                std::string qualified = name + "." + variant.first;
+                std::string qualified = registered_name + "." + variant.first;
                 variant_owners[variant.first].push_back(enumType);
                 
                 if (variant.second.empty()) {
@@ -77,9 +82,9 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 }
             }
         } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
-            type_system.addUserDefinedType(name, type_system.ANY_TYPE);
+            type_system.addUserDefinedType(registered_name, type_system.ANY_TYPE);
         } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-            type_system.addUserDefinedType(name, type_system.createFrameType(name));
+            type_system.addUserDefinedType(registered_name, type_system.createFrameType(registered_name));
         }
     };
 
@@ -98,6 +103,11 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     // PASS 0: Module Resolution and Type Checking
     if (is_root) {
         auto& manager = ModuleManager::getInstance();
+        for (auto& [path, module] : manager.get_all_modules()) {
+            if (module) {
+                module->is_checked = false;
+            }
+        }
         // manager.clear(); // Removed to prevent infinite recursion
         // manager.resolve_all(program, "root"); // Handled by factory or initial call
         if (manager.has_circular_dependencies()) {
@@ -117,6 +127,11 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 module->is_checked = true;
                 TypeChecker checker(this->type_system, this->symbol_db_);
                 checker.is_root = false; // Submodules are not root checkers
+                checker.current_module_name = path; // Set module namespace
+                checker.frame_declarations = this->frame_declarations;
+                checker.trait_declarations = this->trait_declarations;
+                checker.function_signatures = this->function_signatures;
+                checker.variable_types = this->variable_types;
                 TypeCheckerFactory::register_builtin_functions(checker);
                 checker.set_source_context(module->source, module->path);
                 if (!checker.check_program(module->ast)) {
@@ -132,24 +147,27 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 }
 
                 for (const auto& [name, info] : checker.frame_declarations) {
-                    this->frame_declarations[name] = info;
-                    if (!name.starts_with(path + ".")) {
+                    if (name.starts_with(path + ".")) {
+                        this->frame_declarations[name] = info;
+                    } else {
                         FrameInfo info_copy = info;
                         info_copy.name = path + "." + name;
                         this->frame_declarations[path + "." + name] = info_copy;
                     }
                 }
                 for (const auto& [name, info] : checker.trait_declarations) {
-                    this->trait_declarations[name] = info;
-                    if (!name.starts_with(path + ".")) {
+                    if (name.starts_with(path + ".")) {
+                        this->trait_declarations[name] = info;
+                    } else {
                         TraitInfo info_copy = info;
                         info_copy.name = path + "." + name;
                         this->trait_declarations[path + "." + name] = info_copy;
                     }
                 }
                 for (const auto& [name, sig] : checker.function_signatures) {
-                    this->function_signatures[name] = sig;
-                    if (!name.starts_with(path + ".")) {
+                    if (name.starts_with(path + ".")) {
+                        this->function_signatures[name] = sig;
+                    } else {
                         FunctionSignature sig_copy = sig;
                         sig_copy.name = path + "." + name;
                         this->function_signatures[path + "." + name] = sig_copy;
@@ -157,8 +175,9 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 }
                 for (const auto& [name, type] : checker.variable_types) {
                     if (type != nullptr) {
-                        this->variable_types[name] = type;
-                        if (!name.starts_with(path + ".")) {
+                        if (name.starts_with(path + ".")) {
+                            this->variable_types[name] = type;
+                        } else {
                             this->variable_types[path + "." + name] = type;
                         }
                     }
@@ -201,10 +220,39 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     }
 
     // PASS 2: Signature Resolution (including inlined symbols)
-    auto resolve_sig = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
+    auto resolve_sig = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt, bool is_imported = false) {
+        std::string registered_name = name;
+        if (!is_imported && !current_module_name.empty() && name.find('.') == std::string::npos) {
+            registered_name = current_module_name + "." + name;
+        }
+
+        std::string frame_module = current_module_name;
+        if (is_imported) {
+            size_t last_dot_idx = name.find_last_of('.');
+            if (last_dot_idx != std::string::npos) {
+                std::string prefix = name.substr(0, last_dot_idx);
+                if (import_aliases.count(prefix)) {
+                    frame_module = import_aliases[prefix];
+                } else {
+                    frame_module = prefix;
+                }
+            }
+        }
+        struct ModuleNameGuard {
+            std::string& current_module_name;
+            std::string old_module_name;
+            ModuleNameGuard(std::string& name, const std::string& new_name)
+                : current_module_name(name), old_module_name(name) {
+                current_module_name = new_name;
+            }
+            ~ModuleNameGuard() {
+                current_module_name = old_module_name;
+            }
+        } guard(current_module_name, frame_module);
+
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
             TypeSystem::FrameInfo info;
-            info.name = name;
+            info.name = registered_name;
             info.declaration = frame_decl;
             info.implements = frame_decl->implements;
             info.hasInit = (frame_decl->init != nullptr);
@@ -219,8 +267,8 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
             }
             info.totalFieldSize = offset;
 
-            auto& fd = frame_declarations[name];
-            fd.name = name;
+            auto& fd = frame_declarations[registered_name];
+            fd.name = registered_name;
             fd.declaration = frame_decl;
             fd.fields = info.fields;
             fd.field_has_default.clear();
@@ -229,50 +277,54 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
             }
 
             if (frame_decl->init) {
-                std::string init_name = name + ".init";
+                std::string init_name = registered_name + ".init";
                 FunctionSignature sig;
                 sig.name = init_name;
                 sig.declaration = frame_decl->init;
                 sig.return_type = type_system.NIL_TYPE;
-                sig.param_types.push_back(type_system.createFrameType(name));
+                sig.param_types.push_back(type_system.createFrameType(registered_name));
                 for (const auto& p : frame_decl->init->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
                 for (const auto& op : frame_decl->init->optionalParams) sig.param_types.push_back(resolve_type_annotation(op.second.first));
                 function_signatures[init_name] = sig;
             }
             for (const auto& m : frame_decl->methods) {
-                std::string m_name = name + "." + m->name;
+                std::string m_name = registered_name + "." + m->name;
                 FunctionSignature sig;
                 sig.name = m_name;
                 sig.declaration = m;
                 sig.return_type = m->returnType ? resolve_type_annotation(m->returnType) : type_system.NIL_TYPE;
-                sig.param_types.push_back(type_system.createFrameType(name));
+                sig.param_types.push_back(type_system.createFrameType(registered_name));
                 for (const auto& p : m->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
                 for (const auto& op : m->optionalParams) sig.param_types.push_back(resolve_type_annotation(op.second.first));
                 function_signatures[m_name] = sig;
                 info.methodSignatures[m->name] = sig.return_type;
             }
             if (frame_decl->deinit) {
-                std::string deinit_name = name + ".deinit";
+                std::string deinit_name = registered_name + ".deinit";
                 FunctionSignature sig;
                 sig.name = deinit_name;
                 sig.declaration = frame_decl->deinit;
                 sig.return_type = type_system.NIL_TYPE;
-                sig.param_types.push_back(type_system.createFrameType(name));
+                sig.param_types.push_back(type_system.createFrameType(registered_name));
                 function_signatures[deinit_name] = sig;
             }
 
-            type_system.registerFrame(name, info);
-            frame_declarations[name].name = info.name;
-            frame_declarations[name].declaration = frame_decl;
-            frame_declarations[name].fields = info.fields;
+            type_system.registerFrame(registered_name, info);
+            frame_declarations[registered_name].name = info.name;
+            frame_declarations[registered_name].declaration = frame_decl;
+            frame_declarations[registered_name].fields = info.fields;
+            if (registered_name != name) {
+                type_system.registerFrame(name, info);
+                frame_declarations[name] = frame_declarations[registered_name];
+            }
 
         } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
             TypeSystem::TraitInfo info;
-            info.name = name;
+            info.name = registered_name;
             info.declaration = trait_decl;
             info.extends = trait_decl->extends;
             for (const auto& m : trait_decl->methods) {
-                std::string m_name = name + "." + m->name;
+                std::string m_name = registered_name + "." + m->name;
                 FunctionSignature sig;
                 sig.name = m_name;
                 sig.return_type = m->returnType ? resolve_type_annotation(m->returnType.value()) : type_system.NIL_TYPE;
@@ -280,11 +332,17 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 for (const auto& p : m->params) sig.param_types.push_back(resolve_type_annotation(p.second));
                 function_signatures[m_name] = sig;
                 info.methodSignatures[m->name] = sig.return_type;
+                if (registered_name != name) {
+                    function_signatures[name + "." + m->name] = sig;
+                }
             }
-            type_system.registerTrait(name, info);
+            type_system.registerTrait(registered_name, info);
+            if (registered_name != name) {
+                type_system.registerTrait(name, info);
+            }
         } else if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
             FunctionSignature sig;
-            sig.name = name;
+            sig.name = registered_name;
             if (func_decl->name == "main") {
                  sig.return_type = type_system.INT64_TYPE;
             } else {
@@ -301,7 +359,10 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 sig.param_types.push_back(resolve_type_annotation(op.second.first));
                 sig.optional_params.push_back(true);
             }
-            function_signatures[name] = sig;
+            function_signatures[registered_name] = sig;
+            if (registered_name != name) {
+                function_signatures[name] = sig;
+            }
             
             std::vector<std::string> param_names;
             std::vector<bool> has_defaults;
@@ -314,11 +375,18 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 has_defaults.push_back(op.second.second != nullptr);
             }
             TypePtr func_type = type_system.createFunctionType(param_names, sig.param_types, sig.return_type, has_defaults);
-            variable_types[name] = func_type;
-            declare_variable(name, func_type);
+            variable_types[registered_name] = func_type;
+            declare_variable(registered_name, func_type);
+            if (registered_name != name) {
+                variable_types[name] = func_type;
+                declare_variable(name, func_type);
+            }
         } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
             TypePtr var_type = (var_decl->type && var_decl->type.value()) ? resolve_type_annotation(var_decl->type.value()) : type_system.ANY_TYPE;
-            declare_variable(name, var_type);
+            declare_variable(registered_name, var_type);
+            if (registered_name != name) {
+                declare_variable(name, var_type);
+            }
         } else if (auto enum_decl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) {
             check_enum_declaration(enum_decl);
         } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
@@ -332,10 +400,10 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         else if (auto trait = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) name = trait->name;
         else if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) name = func->name;
         else if (auto enm = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) name = enm->name;
-        if (!name.empty()) resolve_sig(name, stmt);
+        if (!name.empty()) resolve_sig(name, stmt, false);
     }
     for (const auto& [name, stmt] : program->imported_symbols) {
-        resolve_sig(name, stmt);
+        resolve_sig(name, stmt, true);
     }
 
     // PASS 2.5: Global Scope Population

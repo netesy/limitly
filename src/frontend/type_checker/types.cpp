@@ -109,6 +109,13 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
             if (import_aliases.count(alias)) {
                 type_name = import_aliases[alias] + "." + member;
             }
+        } else if (!current_module_name.empty()) {
+            // Qualify unqualified local type names
+            std::string qual = current_module_name + "." + type_name;
+            TypePtr qual_type = type_system.getType(qual);
+            if (qual_type && qual_type->tag != TypeTag::Nil) {
+                type_name = qual;
+            }
         }
 
         // First try to get the base type from the type system (handles built-in types and aliases)
@@ -218,6 +225,16 @@ bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
         size_t dot = s.find_last_of(".");
         return (dot != std::string::npos) ? s.substr(dot+1) : s;
     };
+
+    if (expected->tag == TypeTag::Frame && actual->tag == TypeTag::Frame) {
+        auto* eData = std::get_if<FrameType>(&expected->extra);
+        auto* aData = std::get_if<FrameType>(&actual->extra);
+        if (eData && aData) {
+            if (get_base(eData->name) == get_base(aData->name)) {
+                return true;
+            }
+        }
+    }
 
     if (actual->tag == TypeTag::Frame && expected->tag == TypeTag::Trait) {
         auto* fData = std::get_if<FrameType>(&actual->extra);
@@ -630,7 +647,11 @@ void TypeChecker::validate_function_body_error_types(const std::shared_ptr<LM::F
         for (const auto& inferredError : inferredErrorTypes) {
             bool declared = false;
             for (const auto& declaredError : stmt->declaredErrorTypes) {
-                if (declaredError == inferredError) {
+                auto get_base = [](const std::string& s) {
+                    size_t last_dot = s.rfind('.');
+                    return (last_dot != std::string::npos) ? s.substr(last_dot + 1) : s;
+                };
+                if (get_base(declaredError) == get_base(inferredError)) {
                     declared = true;
                     break;
                 }
@@ -650,7 +671,7 @@ void TypeChecker::validate_function_body_error_types(const std::shared_ptr<LM::F
                             if (cleanName.rfind("Frame<", 0) == 0 && cleanName.back() == '>') {
                                 cleanName = cleanName.substr(6, cleanName.size() - 7);
                             }
-                            if (cleanName == inferredError) {
+                            if (get_base(cleanName) == get_base(inferredError)) {
                                 found_in_union = true;
                                 break;
                             }
@@ -783,7 +804,14 @@ bool TypeChecker::can_function_produce_error_type(const std::shared_ptr<LM::Fron
         if (returnStmt->value) {
             // Check if return expression can produce error type
             auto returnErrors = infer_expression_error_types(returnStmt->value);
-            return std::find(returnErrors.begin(), returnErrors.end(), errorType) != returnErrors.end();
+            auto get_base = [](const std::string& s) {
+                size_t last_dot = s.rfind('.');
+                return (last_dot != std::string::npos) ? s.substr(last_dot + 1) : s;
+            };
+            for (const auto& err : returnErrors) {
+                if (get_base(err) == get_base(errorType)) return true;
+            }
+            return false;
         }
     } else if (auto ifStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(body)) {
         return can_function_produce_error_type(ifStmt->thenBranch, errorType) ||
@@ -791,7 +819,14 @@ bool TypeChecker::can_function_produce_error_type(const std::shared_ptr<LM::Fron
     } else if (auto exprStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(body)) {
         // Check for fallible expressions that might propagate errors
         auto exprErrors = infer_expression_error_types(exprStmt->expression);
-        return std::find(exprErrors.begin(), exprErrors.end(), errorType) != exprErrors.end();
+        auto get_base = [](const std::string& s) {
+            size_t last_dot = s.rfind('.');
+            return (last_dot != std::string::npos) ? s.substr(last_dot + 1) : s;
+        };
+        for (const auto& err : exprErrors) {
+            if (get_base(err) == get_base(errorType)) return true;
+        }
+        return false;
     } else if (auto matchStmt = std::dynamic_pointer_cast<LM::Frontend::AST::MatchStatement>(body)) {
         for (const auto& matchCase : matchStmt->cases) {
             if (can_function_produce_error_type(matchCase.body, errorType)) {

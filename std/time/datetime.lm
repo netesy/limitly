@@ -1,5 +1,7 @@
 // Standard Library Time DateTime Submodule
 
+pub type Time = DateTime;
+
 import std.time.duration as dur;
 import std.time.timezone as tz;
 

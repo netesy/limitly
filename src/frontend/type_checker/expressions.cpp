@@ -19,7 +19,11 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
     } else if (auto this_expr = std::dynamic_pointer_cast<LM::Frontend::AST::ThisExpr>(expr)) {
         // Handle 'this' reference in frame methods
         if (current_frame) {
-            type = type_system.createFrameType(current_frame->name);
+            std::string f_name = current_frame->name;
+            if (!current_module_name.empty() && f_name.find('.') == std::string::npos) {
+                f_name = current_module_name + "." + f_name;
+            }
+            type = type_system.createFrameType(f_name);
         } else {
             add_error("'this' can only be used inside frame methods", expr->line);
             type = type_system.ANY_TYPE;
@@ -685,21 +689,29 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     
     // Check if callee is a variable (could be function or frame name)
     if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+        std::string frame_name = var_expr->name;
+        if (frame_name.find('.') == std::string::npos && !current_module_name.empty()) {
+            std::string qual = current_module_name + "." + frame_name;
+            if (frame_declarations.count(qual)) {
+                frame_name = qual;
+            }
+        }
+
         // Check if it's a frame instantiation
-        auto frame_it = frame_declarations.find(var_expr->name);
+        auto frame_it = frame_declarations.find(frame_name);
         if (frame_it == frame_declarations.end()) {
             // Try lookup in imported symbols
-            auto it = current_program_->imported_symbols.find(var_expr->name);
+            auto it = current_program_->imported_symbols.find(frame_name);
             if (it != current_program_->imported_symbols.end()) {
                  if (std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(it->second)) {
-                     frame_it = frame_declarations.find(var_expr->name);
+                     frame_it = frame_declarations.find(frame_name);
                  }
             }
         }
 
         if (frame_it != frame_declarations.end()) {
             const FrameInfo& frame_info = frame_it->second;
-            std::string init_name = var_expr->name + ".init";
+            std::string init_name = frame_name + ".init";
             auto sig_it = function_signatures.find(init_name);
 
             // Validate named arguments against both init parameters AND fields
@@ -731,14 +743,14 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                     TypePtr val_type = check_expression(value);
                     if (!is_type_compatible(target_type, val_type)) add_type_error(target_type->toString(), val_type->toString(), expr->line);
                 } else {
-                    add_error("Frame '" + var_expr->name + "' has no field or init parameter named '" + arg_name + "'", expr->line);
+                    add_error("Frame '" + frame_name + "' has no field or init parameter named '" + arg_name + "'", expr->line);
                 }
             }
 
             // Validate positional arguments (passing to init)
             if (!expr->arguments.empty() || sig_it != function_signatures.end()) {
                 if (sig_it == function_signatures.end()) {
-                    if (!expr->arguments.empty()) add_error("Frame '" + var_expr->name + "' has no init() method to accept positional arguments", expr->line);
+                    if (!expr->arguments.empty()) add_error("Frame '" + frame_name + "' has no init() method to accept positional arguments", expr->line);
                 } else {
                     std::vector<TypePtr> expected_params = sig_it->second.param_types;
                     if (!expected_params.empty()) expected_params.erase(expected_params.begin()); // skip 'this'
@@ -760,14 +772,14 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                          // Only error if we actually HAVE positional arguments,
                          // otherwise let's assume it's direct field initialization if it matches.
                          if (!expr->arguments.empty()) {
-                             add_error("Frame '" + var_expr->name + "' init method requires " + std::to_string(required_count) + " arguments, but only " +
+                             add_error("Frame '" + frame_name + "' init method requires " + std::to_string(required_count) + " arguments, but only " +
                                       std::to_string(expr->arguments.size() + satisfied_by_named) + " were provided", expr->line);
                          }
                     }
                 }
             }
 
-            TypePtr frame_type = type_system.createFrameType(var_expr->name);
+            TypePtr frame_type = type_system.createFrameType(frame_name);
             expr->inferred_type = frame_type;
             return frame_type;
         }
@@ -823,9 +835,23 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 
                 // 1. Check if it's a frame instantiation (e.g., test.Counter())
                 auto frame_it = frame_declarations.find(qualified_name);
+                std::string resolved_frame_name = qualified_name;
+                if (frame_it == frame_declarations.end()) {
+                    TypePtr alias_type = type_system.getType(qualified_name);
+                    if (alias_type && alias_type->tag != TypeTag::Nil) {
+                        TypePtr underlying = type_system.resolveTypeAlias(qualified_name);
+                        if (underlying && underlying->tag == TypeTag::Frame) {
+                            auto* fData = std::get_if<FrameType>(&underlying->extra);
+                            if (fData) {
+                                resolved_frame_name = fData->name;
+                                frame_it = frame_declarations.find(resolved_frame_name);
+                            }
+                        }
+                    }
+                }
                 if (frame_it != frame_declarations.end()) {
                     const FrameInfo& frame_info = frame_it->second;
-                    std::string init_name = qualified_name + ".init";
+                    std::string init_name = resolved_frame_name + ".init";
                     auto sig_it = function_signatures.find(init_name);
 
                     // Validate named arguments against both init parameters AND fields
@@ -888,7 +914,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                         }
                     }
 
-                    TypePtr frame_type = type_system.createFrameType(qualified_name);
+                    TypePtr frame_type = type_system.createFrameType(resolved_frame_name);
                     expr->inferred_type = frame_type;
                     return frame_type;
                 }
@@ -1012,6 +1038,13 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             
             // Look up the frame declaration
             auto frame_it = frame_declarations.find(frame_name);
+            if (frame_it == frame_declarations.end() && !current_module_name.empty()) {
+                std::string prefix = current_module_name + ".";
+                if (frame_name.starts_with(prefix)) {
+                    std::string unq = frame_name.substr(prefix.length());
+                    frame_it = frame_declarations.find(unq);
+                }
+            }
             if (frame_it == frame_declarations.end()) {
                 add_error("Unknown frame type: " + frame_name, expr->line);
                 return type_system.ANY_TYPE;
@@ -1334,6 +1367,13 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             
             // Look up the frame declaration
             auto frame_it = frame_declarations.find(frame_name);
+            if (frame_it == frame_declarations.end() && !current_module_name.empty()) {
+                std::string prefix = current_module_name + ".";
+                if (frame_name.starts_with(prefix)) {
+                    std::string unq = frame_name.substr(prefix.length());
+                    frame_it = frame_declarations.find(unq);
+                }
+            }
             if (frame_it == frame_declarations.end()) {
                 add_error("Unknown frame type: " + frame_name, expr->line);
                 TypePtr value_type = check_expression(expr->value);
@@ -1481,13 +1521,13 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
                 std::string q_low = qname; for(char& c : q_low) c = std::tolower(c);
                 for (const auto& kv : variable_types) {
                     std::string k_low = kv.first; for(char& c : k_low) c = std::tolower(c);
-                    if (k_low == q_low) return kv.second;
+                    if (k_low == q_low) {
+                        return kv.second;
+                    }
                 }
                 return nullptr;
             };
             TypePtr res = find_member(alias + "." + member_name);
-            if (!res) res = find_member(member_name);
-            if (!res) for (const auto& kv : variable_types) if (kv.first.ends_with("." + member_name)) { res = kv.second; break; }
             if (res) { expr->inferred_type = res; return res; }
         }
     }
@@ -1567,6 +1607,12 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
             if (member_type && member_type->tag != TypeTag::Nil) {
                 expr->inferred_type = member_type;
                 return member_type;
+            }
+            // Check for type alias
+            TypePtr alias_type = type_system.getType(qualified_name);
+            if (alias_type && alias_type->tag != TypeTag::Nil) {
+                expr->inferred_type = alias_type;
+                return alias_type;
             }
             // Check for functions
             if (function_signatures.count(qualified_name)) {
@@ -2113,6 +2159,12 @@ void TypeChecker::resolve_call_arguments(std::shared_ptr<LM::Frontend::AST::Call
     if (!expr) return;
 
     auto sig_it = function_signatures.find(qualified_name);
+    if (sig_it == function_signatures.end()) {
+        if (!current_module_name.empty()) {
+            std::string full_name = current_module_name + "." + qualified_name;
+            sig_it = function_signatures.find(full_name);
+        }
+    }
     if (sig_it == function_signatures.end()) return;
 
     std::vector<std::pair<std::string, std::shared_ptr<LM::Frontend::AST::TypeAnnotation>>> params;

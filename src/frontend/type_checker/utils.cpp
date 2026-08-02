@@ -303,7 +303,11 @@ bool TypeChecker::is_visible(const std::string& frame_name, LM::Frontend::AST::V
     }
 
     // Check if we are inside the same frame
-    if (current_frame->name == frame_name) {
+    std::string cur_frame_name = current_frame->name;
+    if (!current_module_name.empty() && cur_frame_name.find('.') == std::string::npos) {
+        cur_frame_name = current_module_name + "." + cur_frame_name;
+    }
+    if (cur_frame_name == frame_name) {
         return true;
     }
 
