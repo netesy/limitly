@@ -105,10 +105,135 @@ pub fn length(value: str): int {
     return len(value);
 }
 
+fn char_code(ch: str): int {
+    var alphabet = " ";
+    alphabet = alphabet + "!";
+    alphabet = alphabet + "\"";
+    alphabet = alphabet + "#";
+    alphabet = alphabet + "$";
+    alphabet = alphabet + "%";
+    alphabet = alphabet + "&";
+    alphabet = alphabet + "'";
+    alphabet = alphabet + "(";
+    alphabet = alphabet + ")";
+    alphabet = alphabet + "*";
+    alphabet = alphabet + "+";
+    alphabet = alphabet + ",";
+    alphabet = alphabet + "-";
+    alphabet = alphabet + ".";
+    alphabet = alphabet + "/";
+    alphabet = alphabet + "0";
+    alphabet = alphabet + "1";
+    alphabet = alphabet + "2";
+    alphabet = alphabet + "3";
+    alphabet = alphabet + "4";
+    alphabet = alphabet + "5";
+    alphabet = alphabet + "6";
+    alphabet = alphabet + "7";
+    alphabet = alphabet + "8";
+    alphabet = alphabet + "9";
+    alphabet = alphabet + ":";
+    alphabet = alphabet + ";";
+    alphabet = alphabet + "<";
+    alphabet = alphabet + "=";
+    alphabet = alphabet + ">";
+    alphabet = alphabet + "?";
+    alphabet = alphabet + "@";
+    alphabet = alphabet + "A";
+    alphabet = alphabet + "B";
+    alphabet = alphabet + "C";
+    alphabet = alphabet + "D";
+    alphabet = alphabet + "E";
+    alphabet = alphabet + "F";
+    alphabet = alphabet + "G";
+    alphabet = alphabet + "H";
+    alphabet = alphabet + "I";
+    alphabet = alphabet + "J";
+    alphabet = alphabet + "K";
+    alphabet = alphabet + "L";
+    alphabet = alphabet + "M";
+    alphabet = alphabet + "N";
+    alphabet = alphabet + "O";
+    alphabet = alphabet + "P";
+    alphabet = alphabet + "Q";
+    alphabet = alphabet + "R";
+    alphabet = alphabet + "S";
+    alphabet = alphabet + "T";
+    alphabet = alphabet + "U";
+    alphabet = alphabet + "V";
+    alphabet = alphabet + "W";
+    alphabet = alphabet + "X";
+    alphabet = alphabet + "Y";
+    alphabet = alphabet + "Z";
+    alphabet = alphabet + "[";
+    alphabet = alphabet + "\\";
+    alphabet = alphabet + "]";
+    alphabet = alphabet + "^";
+    alphabet = alphabet + "_";
+    alphabet = alphabet + "`";
+    alphabet = alphabet + "a";
+    alphabet = alphabet + "b";
+    alphabet = alphabet + "c";
+    alphabet = alphabet + "d";
+    alphabet = alphabet + "e";
+    alphabet = alphabet + "f";
+    alphabet = alphabet + "g";
+    alphabet = alphabet + "h";
+    alphabet = alphabet + "i";
+    alphabet = alphabet + "j";
+    alphabet = alphabet + "k";
+    alphabet = alphabet + "l";
+    alphabet = alphabet + "m";
+    alphabet = alphabet + "n";
+    alphabet = alphabet + "o";
+    alphabet = alphabet + "p";
+    alphabet = alphabet + "q";
+    alphabet = alphabet + "r";
+    alphabet = alphabet + "s";
+    alphabet = alphabet + "t";
+    alphabet = alphabet + "u";
+    alphabet = alphabet + "v";
+    alphabet = alphabet + "w";
+    alphabet = alphabet + "x";
+    alphabet = alphabet + "y";
+    alphabet = alphabet + "z";
+    alphabet = alphabet + "{";
+    alphabet = alphabet + "|";
+    alphabet = alphabet + "}";
+    alphabet = alphabet + "~";
+
+    var i = 0;
+    var l = len(alphabet);
+    while (i < l) {
+        if (_builtin_substring(alphabet, i, i + 1) == ch) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return 999;
+}
+
 pub fn compare(left: str, right: str): int {
-    if (left < right) return -1;
-    if (left > right) return 1;
-    return 0;
+    if (left == right) return 0;
+    var len_l = len(left);
+    var len_r = len(right);
+    var min_len = len_l;
+    if (len_r < min_len) min_len = len_r;
+
+    var i = 0;
+    while (i < min_len) {
+        var ch_l = _builtin_substring(left, i, i + 1);
+        var ch_r = _builtin_substring(right, i, i + 1);
+        if (ch_l != ch_r) {
+            var code_l = char_code(ch_l);
+            var code_r = char_code(ch_r);
+            if (code_l < code_r) return -1;
+            return 1;
+        }
+        i = i + 1;
+    }
+    if (len_l < len_r) return -1;
+    return 1;
 }
 
 pub fn substring(value: str, start: int, end: int): str {

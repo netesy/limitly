@@ -14,14 +14,14 @@ pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | U
 frame File {
     pub var path: str;
     var resource: res.Resource;
-    var reader: res.Reader;
-    var writer: res.Writer;
+    var reader: res.ResourceReader;
+    var writer: res.ResourceWriter;
 
     pub init(p: str, r: res.Resource) {
         self.path = p;
         self.resource = r;
-        self.reader = res.Reader(r=r);
-        self.writer = res.Writer(r=r);
+        self.reader = res.ResourceReader(r);
+        self.writer = res.ResourceWriter(r);
     }
 
     pub fn read(): str?IOError {
@@ -51,7 +51,7 @@ frame File {
 
 pub fn open(path: str, mode: str): File?IOError {
     match (res.open_file(path=path, mode=mode)) {
-        val r => return ok(File(p=path, r=r)),
+        val r => return ok(File(path, r)),
         err e => return err(FileNotFound(path=path))
     }
 }

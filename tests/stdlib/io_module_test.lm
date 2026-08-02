@@ -1,6 +1,7 @@
 // Test Suite for Standard Library I/O Module
 
 import std.io.index as io;
+import std.io.file as file_mod;
 
 fn test_console(): int {
     print("Testing Console...");
@@ -16,23 +17,23 @@ fn test_file_ops(): int {
     var non_existent = io.exists("non_existent_file_xyz.txt");
     assert(!non_existent, "io.exists fail for non-existent file");
 
-    var f_res = io.open("test_io_temp.txt", "w");
+    var f_res = file_mod.open("test_io_temp.txt", "w");
     match (f_res) {
-        val f => {
-            var f_obj = f as io.File;
-            f_obj.write("Hello Luminar");
-            f_obj.close();
+        val f_obj => {
+            var f_obj_concrete = f_obj as file_mod.File;
+            f_obj_concrete.write("Hello Luminar");
+            f_obj_concrete.close();
         }
         err e => {
             assert(false, "Failed to open file for writing");
         }
     }
 
-    var f_read_res = io.open("test_io_temp.txt", "r");
+    var f_read_res = file_mod.open("test_io_temp.txt", "r");
     match (f_read_res) {
-        val f => {
-            var f_obj = f as io.File;
-            var content_res = f_obj.read();
+        val f_obj => {
+            var f_obj_concrete = f_obj as file_mod.File;
+            var content_res = f_obj_concrete.read();
             match (content_res) {
                 val content => {
                     assert(content == "Hello Luminar", "File content mismatch");
@@ -41,7 +42,7 @@ fn test_file_ops(): int {
                     assert(false, "Failed to read file");
                 }
             }
-            f_obj.close();
+            f_obj_concrete.close();
         }
         err e => {
             assert(false, "Failed to open file for reading");

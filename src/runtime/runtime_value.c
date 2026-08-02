@@ -79,6 +79,7 @@ RUNTIME_API int64_t as_i64(LmValue v) {
         if (h->type_id == TYPE_U64) return (int64_t)((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return (int64_t)((ObjI128*)h)->value;
         if (h->type_id == TYPE_U128) return (int64_t)((ObjU128*)h)->value;
+        if (h->type_id == TYPE_FLOAT) return (int64_t)((ObjFloat*)h)->value;
         if (h->type_id == TYPE_BOX) {
             LmBox* box = (LmBox*)h;
             if (box->type == LM_BOX_INT) return box->value.as_int;
@@ -96,6 +97,7 @@ RUNTIME_API uint64_t as_u64(LmValue v) {
         if (h->type_id == TYPE_U64) return ((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return (uint64_t)((ObjI128*)h)->value;
         if (h->type_id == TYPE_U128) return (uint64_t)((ObjU128*)h)->value;
+        if (h->type_id == TYPE_FLOAT) return (uint64_t)((ObjFloat*)h)->value;
         if (h->type_id == TYPE_BOX) {
             LmBox* box = (LmBox*)h;
             if (box->type == LM_BOX_INT) return (uint64_t)box->value.as_int;
@@ -112,6 +114,7 @@ RUNTIME_API __int128 as_i128(LmValue v) {
         if (h->type_id == TYPE_U64) return (__int128)((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return ((ObjI128*)h)->value;
         if (h->type_id == TYPE_U128) return (__int128)((ObjU128*)h)->value;
+        if (h->type_id == TYPE_FLOAT) return (__int128)((ObjFloat*)h)->value;
         if (h->type_id == TYPE_BOX) {
             LmBox* box = (LmBox*)h;
             if (box->type == LM_BOX_INT) return (__int128)box->value.as_int;
@@ -129,6 +132,7 @@ RUNTIME_API unsigned __int128 as_u128(LmValue v) {
         if (h->type_id == TYPE_U64) return (unsigned __int128)((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return (unsigned __int128)((ObjI128*)h)->value;
         if (h->type_id == TYPE_U128) return ((ObjU128*)h)->value;
+        if (h->type_id == TYPE_FLOAT) return (unsigned __int128)((ObjFloat*)h)->value;
         if (h->type_id == TYPE_BOX) {
             LmBox* box = (LmBox*)h;
             if (box->type == LM_BOX_INT) return (unsigned __int128)box->value.as_int;

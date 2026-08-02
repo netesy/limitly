@@ -30,7 +30,7 @@ pub frame Resource {
     }
 }
 
-pub frame Reader {
+pub frame ResourceReader {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -40,7 +40,7 @@ pub frame Reader {
     }
 }
 
-pub frame Writer {
+pub frame ResourceWriter {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;

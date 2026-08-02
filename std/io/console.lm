@@ -4,11 +4,11 @@ import std.resource as res;
 
 frame Console {
     var resource: res.Resource;
-    var writer: res.Writer;
+    var writer: res.ResourceWriter;
 
     pub init() {
         self.resource = res.stdout;
-        self.writer = res.Writer(r=self.resource);
+        self.writer = res.ResourceWriter(r=self.resource);
     }
 
     pub fn print(msg: any): nil {

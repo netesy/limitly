@@ -1,10 +1,11 @@
 // Test Suite for Standard Library Regex Module
 
 import std.regex.index as r;
+import std.regex.regex as regex_mod;
 
 fn test_regex_frame(): int {
     print("Testing Regex Frame...");
-    var regex = r.Regex("cat", 0) as r.Regex;
+    var regex = r.Regex("cat", 0) as regex_mod.Regex;
     assert(regex.matches("the cat sat") == true, "matches true failed");
     assert(regex.matches("the dog sat") == false, "matches false failed");
 
@@ -33,8 +34,8 @@ fn test_regex_frame(): int {
 
 fn test_regex_patterns(): int {
     print("Testing Regex Patterns...");
-    var pat = r.RegexPatterns() as r.RegexPatterns;
-    var email = pat.email() as r.Regex;
+    var pat = r.RegexPatterns() as regex_mod.RegexPatterns;
+    var email = pat.email() as regex_mod.Regex;
     assert(email.pattern == "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "email pattern failed");
     return 1;
 }
