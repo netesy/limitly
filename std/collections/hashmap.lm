@@ -182,7 +182,7 @@ frame HashMap {
         
         while (i < len(self._keys)) {
             if (i > 0) result = result + ", ";
-            result = result + self._keys[i] + ": " + self._values[i] as str;
+            result = result + "{self._keys[i]}: {self._values[i]}";
             i = i + 1;
         }
         

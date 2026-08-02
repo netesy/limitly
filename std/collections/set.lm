@@ -233,7 +233,7 @@ frame Set {
         
         while (i < len(self.elements)) {
             if (i > 0) result = result + ", ";
-            result = result + self.elements[i] as str;
+            result = result + "{self.elements[i]}";
             i = i + 1;
         }
         

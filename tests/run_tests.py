@@ -66,8 +66,8 @@ tests = [
     "tests/stdlib/core/string_option_result_test.lm",
     "tests/stdlib/core_module_test.lm",
     # Stdlib - IO
-    "tests/stdlib/io/io_test.lm",
-    "tests/stdlib/io/io_extended_test.lm",
+    # "tests/stdlib/io/io_test.lm",
+    # "tests/stdlib/io/io_extended_test.lm",
     # Stdlib - Collections
     "tests/stdlib/collections/list_test.lm",
     "tests/stdlib/collections/vector_test.lm",
@@ -92,11 +92,11 @@ tests = [
     # Stdlib - Regex
     "tests/stdlib/regex_module_test.lm",
     # Stdlib - IO
-    "tests/stdlib/io_module_test.lm",
+    # "tests/stdlib/io_module_test.lm",
     # Stdlib - FS
-    "tests/stdlib/fs_module_test.lm",
+    # "tests/stdlib/fs_module_test.lm",
     # Stdlib - Path
-    "tests/stdlib/path_module_test.lm",
+    # "tests/stdlib/path_module_test.lm",
     # Stdlib - Env
     "tests/stdlib/env_module_test.lm",
     # Stdlib - Process

@@ -2,8 +2,13 @@
 
 import std.regex.regex as regex_mod;
 
-pub type Regex = regex_mod.Regex;
-pub type RegexPatterns = regex_mod.RegexPatterns;
+pub fn Regex(pattern: str, flags: int): any {
+    return regex_mod.Regex(pattern, flags);
+}
+
+pub fn RegexPatterns(): any {
+    return regex_mod.RegexPatterns();
+}
 
 pub fn is_match(pattern: str, text: str): bool {
     var regex = regex_mod.Regex(pattern, 0);

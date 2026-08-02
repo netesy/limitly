@@ -12,12 +12,12 @@ pub fn Instant(timestamp_ms: float): any {
 }
 
 pub fn Duration(seconds: int, microseconds: int): any {
-    return duration_mod.Duration(seconds, microseconds);
+    return duration_mod.TimeDuration(seconds, microseconds);
 }
 
 pub fn Time(timestamp: int, microseconds: int, timezone: any): any {
     var tz_obj = timezone as timezone_mod.TimeZone;
-    return datetime_mod.Time(timestamp, microseconds, tz_obj);
+    return datetime_mod.DateTime(timestamp, microseconds, tz_obj);
 }
 
 pub fn TimeZone(name: str, offset_hours: int, offset_minutes: int): any {
@@ -38,7 +38,7 @@ pub fn sleep_seconds(seconds: float): nil {
 }
 
 pub fn sleep_duration(duration: any): nil {
-    var d = duration as duration_mod.Duration;
+    var d = duration as duration_mod.TimeDuration;
     return datetime_mod.sleep_duration(d);
 }
 

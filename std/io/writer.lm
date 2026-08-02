@@ -3,10 +3,10 @@
 import std.resource as res;
 
 frame Writer {
-    pub var w: res.Writer;
+    pub var w: res.ResourceWriter;
 
     pub init(resource: res.Resource) {
-        self.w = res.Writer(r=resource);
+        self.w = res.ResourceWriter(r=resource);
     }
 
     pub fn write(args: [any]): any {

@@ -2,6 +2,7 @@
 // Automatically run by tests/run_tests.sh.
 
 import std.io as io;
+import std.io.file as file_mod;
 import std.crypto.random as crypto_random;
 
 fn main(): int {
@@ -28,10 +29,11 @@ fn main(): int {
     var f_write_res = io.open(file_path, "w");
     match (f_write_res) {
         val f => {
-            assert(f.is_open(), "File should be open after creation");
-            f.write(content);
-            f.close();
-            assert(!f.is_open(), "File should be closed after manual close");
+            var f_obj = f as file_mod.File;
+            assert(f_obj.is_open(), "File should be open after creation");
+            f_obj.write(content);
+            f_obj.close();
+            assert(!f_obj.is_open(), "File should be closed after manual close");
             print("Successfully wrote random seed to temp file");
         },
         err e => assert(false, "Failed to open file for writing")
@@ -41,7 +43,8 @@ fn main(): int {
     var f_read_res = io.open(file_path, "r");
     match (f_read_res) {
         val f => {
-            var read_content_res = f.read();
+            var f_obj = f as file_mod.File;
+            var read_content_res = f_obj.read();
             match (read_content_res) {
                 val read_content => {
                     assert(read_content == content, "Read content mismatch");
@@ -49,7 +52,7 @@ fn main(): int {
                 },
                 err e => assert(false, "Failed to read file content")
             }
-            f.close();
+            f_obj.close();
         },
         err e => assert(false, "Failed to open file for reading")
     }
@@ -58,11 +61,12 @@ fn main(): int {
     var double_close_f = io.open(file_path, "r");
     match (double_close_f) {
         val f => {
-            assert(f.is_open(), "is_open true on creation");
-            f.close();
-            assert(!f.is_open(), "is_open false after close");
+            var f_obj = f as file_mod.File;
+            assert(f_obj.is_open(), "is_open true on creation");
+            f_obj.close();
+            assert(!f_obj.is_open(), "is_open false after close");
             // Double close should be perfectly safe and return ok
-            f.close();
+            f_obj.close();
             print("Double close safety verified");
         },
         err e => assert(false, "Failed to open file for double-close validation")

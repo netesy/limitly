@@ -9,7 +9,7 @@ frame Random {
         if (seed == 0) {
             match (res.create_entropy()) {
                 val r => {
-                    var rd = res.Reader(r=r);
+                    var rd = res.ResourceReader(r=r);
                     var s = rd.read(args=[ []]);
                     if (s != nil) {
                         self.state = s as int;
@@ -77,12 +77,12 @@ frame Random {
 }
 
 frame SecureRandom {
-    var reader: res.Reader?;
+    var reader: res.ResourceReader?;
 
     pub init() {
         match (res.create_entropy()) {
             val r => {
-                self.reader = res.Reader(r=r);
+                self.reader = res.ResourceReader(r=r);
                 nil;
             },
             err e => {

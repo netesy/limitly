@@ -3,10 +3,10 @@
 import std.resource as res;
 
 frame Reader {
-    pub var r: res.Reader;
+    pub var r: res.ResourceReader;
 
     pub init(resource: res.Resource) {
-        self.r = res.Reader(r=resource);
+        self.r = res.ResourceReader(r=resource);
     }
 
     pub fn read(args: [any]): any {

@@ -17,7 +17,7 @@ pub fn Console(): any {
     return console_mod.Console();
 }
 
-pub fn File(p: str, r: res.Resource): any {
+pub fn create_file_resource(p: str, r: res.Resource): any {
     return file_mod.File(p, r);
 }
 
@@ -38,7 +38,7 @@ pub fn open(path: str, mode: str): any {
 }
 
 pub fn print(msg: any): nil {
-    var w = res.Writer(r=res.stdout);
+    var w = res.ResourceWriter(r=res.stdout);
     w.write(args=[msg]);
 }
 

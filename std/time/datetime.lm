@@ -3,6 +3,10 @@
 import std.time.duration as dur;
 import std.time.timezone as tz;
 
+fn to_i(s: str): int {
+    return s as int;
+}
+
 // Calendar calculation functions
 pub fn is_leap_year(year: int): bool {
     if (year % 4 != 0) return false;
@@ -123,12 +127,12 @@ frame DateTime {
         var min_str: str = _builtin_substring(datetime, 14, 16);
         var sec_str: str = _builtin_substring(datetime, 17, 19);
 
-        var year: int = year_str as int;
-        var month: int = month_str as int;
-        var day: int = day_str as int;
-        var hour: int = hour_str as int;
-        var minute: int = min_str as int;
-        var second: int = sec_str as int;
+        var year: int = to_i(year_str);
+        var month: int = to_i(month_str);
+        var day: int = to_i(day_str);
+        var hour: int = to_i(hour_str);
+        var minute: int = to_i(min_str);
+        var second: int = to_i(sec_str);
 
         var ts: int = datetime_to_timestamp(year, month, day, hour, minute, second);
         return DateTime(ts, 0, tz.TimeZone.utc());

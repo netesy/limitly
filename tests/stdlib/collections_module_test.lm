@@ -62,16 +62,21 @@ fn test_deque(): int {
 fn test_linked_list(): int {
     print("Testing LinkedList...");
     var ll_val = collections.LinkedList() as linked_list_col.DLL;
+    print("LinkedList instantiated");
     assert(ll_val.length() == 0, "LinkedList should be empty");
 
     ll_val.push_back("back1");
+    print("push_back back1");
     ll_val.push_front("front1");
+    print("push_front front1");
     assert(ll_val.length() == 2, "LinkedList length should be 2");
 
     var popped_front = ll_val.pop_front();
+    print("popped front: {popped_front}");
     assert(popped_front == "front1", "Pop front incorrect");
 
     var popped_back = ll_val.pop_back();
+    print("popped back: {popped_back}");
     assert(popped_back == "back1", "Pop back incorrect");
     return 1;
 }
