@@ -1485,6 +1485,7 @@ TypePtr TypeChecker::check_grouping_expr(std::shared_ptr<LM::Frontend::AST::Grou
 TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::MemberExpr> expr) {
     if (!expr) return nullptr;
     TypePtr object_type = check_expression(expr->object);
+    if (!object_type) return type_system.ANY_TYPE;
     std::string member_name = expr->name;
     
     if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::String)) {
@@ -1781,6 +1782,8 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
     TypePtr object_type = check_expression(expr->object);
     TypePtr index_type = check_expression(expr->index);
     
+    if (!object_type || !index_type) return type_system.ANY_TYPE;
+
     if (object_type->tag == TypeTag::List) {
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
              add_error("List index must be an integer, got " + index_type->toString(), expr->line);

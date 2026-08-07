@@ -654,6 +654,7 @@ std::shared_ptr<LM::Frontend::AST::Program> Parser::parse() {
 
     try {
         while (!isAtEnd()) {
+            size_t startTokenIdx = current;
             try {
                 auto stmt = declaration();
                 if (stmt) {
@@ -680,6 +681,9 @@ std::shared_ptr<LM::Frontend::AST::Program> Parser::parse() {
                 if (errors.size() >= MAX_ERRORS) {
                     break;
                 }
+            }
+            if (current == startTokenIdx) {
+                synchronize();
             }
         }
     } catch (const std::runtime_error& e) {
