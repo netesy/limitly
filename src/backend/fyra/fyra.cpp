@@ -111,14 +111,23 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
         sections[".text"] = generator.getAssembler().getCode();
         sections[".data"] = generator.getRodataAssembler().getCode();
         std::vector<::codegen::CodeGen::SymbolInfo> syms = generator.getSymbols();
-        ::codegen::CodeGen::SymbolInfo start_sym;
-        start_sym.name = "_start";
-        start_sym.value = 0;
-        start_sym.size = 0;
-        start_sym.type = 2; // STT_FUNC
-        start_sym.binding = 1; // STB_GLOBAL
-        start_sym.sectionName = ".text";
-        syms.push_back(start_sym);
+        bool has_start = false;
+        for (const auto& sym : syms) {
+            if (sym.name == "_start") {
+                has_start = true;
+                break;
+            }
+        }
+        if (!has_start) {
+            ::codegen::CodeGen::SymbolInfo start_sym;
+            start_sym.name = "_start";
+            start_sym.value = 0;
+            start_sym.size = 0;
+            start_sym.type = 2; // STT_FUNC
+            start_sym.binding = 1; // STB_GLOBAL
+            start_sym.sectionName = ".text";
+            syms.push_back(start_sym);
+        }
 
         if (options.platform == Platform::Windows) {
             PEGenerator pe_gen(true); // 64-bit

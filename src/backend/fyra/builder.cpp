@@ -94,9 +94,37 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             case LIR::LIR_Op::LoadConst: {
                 ir::Value* c = nullptr;
                 LmValue val = inst.const_val;
-                if (IS_INT(val)) c = context_->getConstantInt(context_->getIntegerType(64), UNBOX_INT(val));
-                else if (IS_PTR(val)) c = context_->getConstantInt(context_->getIntegerType(64), (uintptr_t)UNBOX_PTR(val));
-                else c = context_->getConstantInt(context_->getIntegerType(64), val);
+                if (IS_INT(val)) {
+                    c = context_->getConstantInt(context_->getIntegerType(64), UNBOX_INT(val));
+                } else if (IS_PTR(val)) {
+                    ObjHeader* h = (ObjHeader*)UNBOX_PTR(val);
+                    if (h->type_id == TYPE_BOX) {
+                        LmBox* box = (LmBox*)h;
+                        if (box->type == LM_BOX_STRING) {
+                            const char* s = (char*)box->value.as_ptr;
+                            ir::Value* str_const = context_->getConstantString(s);
+                            std::string name = "$str_const_" + std::to_string(label_counter_++);
+                            auto gv = std::make_unique<ir::GlobalVariable>(
+                                context_->getPointerType(context_->getIntegerType(8)),
+                                name, static_cast<ir::Constant*>(str_const), false, ".data"
+                            );
+                            c = gv.get();
+                            current_module_->addGlobalVariable(std::move(gv));
+                        } else if (box->type == LM_BOX_INT) {
+                            c = context_->getConstantInt(context_->getIntegerType(64), box->value.as_int);
+                        } else if (box->type == LM_BOX_FLOAT) {
+                            c = context_->getConstantFP(context_->getDoubleType(), box->value.as_float);
+                        } else if (box->type == LM_BOX_BOOL) {
+                            c = context_->getConstantInt(context_->getIntegerType(64), box->value.as_bool ? 1 : 0);
+                        } else {
+                            c = context_->getConstantInt(context_->getIntegerType(64), 0);
+                        }
+                    } else {
+                        c = context_->getConstantInt(context_->getIntegerType(64), 0);
+                    }
+                } else {
+                    c = context_->getConstantInt(context_->getIntegerType(64), val);
+                }
                 store_reg(inst.dst, c, inst.result_type);
                 break;
             }
@@ -104,6 +132,10 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             case LIR::LIR_Op::Sub: store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Mul: store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Div: store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::Mod: store_reg(inst.dst, builder_->createRem(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::Neg: store_reg(inst.dst, builder_->createNeg(load_reg(inst.a, inst.type_a)), inst.result_type); break;
+            case LIR::LIR_Op::Shl: store_reg(inst.dst, builder_->createShl(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::Shr: store_reg(inst.dst, builder_->createShr(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::And: store_reg(inst.dst, builder_->createAnd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Or:  store_reg(inst.dst, builder_->createOr(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Xor: store_reg(inst.dst, builder_->createXor(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
@@ -142,14 +174,28 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                         }
                     }
                 }
+
+                std::vector<ir::Value*> args;
+                for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
+
+                if (name == "print" && !args.empty()) {
+                    if (args[0]->getType()->isPointerTy()) {
+                        name = "lm_print_str";
+                    } else {
+                        name = "lm_print_int";
+                    }
+                } else if (FyraBuiltinFunctions::is_builtin(name)) {
+                    name = FyraBuiltinFunctions::get_internal_name(name);
+                }
+
+                used_builtins_.insert(name);
+
                 ir::Function* func = current_module_->getFunction(name);
                 if (!func) {
                     std::vector<ir::Type*> pts;
-                    for (size_t k = 0; k < inst.call_args.size(); ++k) pts.push_back(context_->getIntegerType(64));
+                    for (size_t k = 0; k < args.size(); ++k) pts.push_back(args[k]->getType());
                     func = builder_->createFunction(name, lir_type_to_fyra_type(inst.result_type), pts);
                 }
-                std::vector<ir::Value*> args;
-                for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
                 ir::Value* res = builder_->createCall(func, args);
                 if (inst.op == LIR::LIR_Op::Call) store_reg(inst.dst, res, inst.result_type);
                 break;
@@ -172,15 +218,28 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                         }
                     }
                 }
+
+                std::vector<ir::Value*> args;
+                for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
+
+                if (name == "print" && !args.empty()) {
+                    if (args[0]->getType()->isPointerTy()) {
+                        name = "lm_print_str";
+                    } else {
+                        name = "lm_print_int";
+                    }
+                } else if (FyraBuiltinFunctions::is_builtin(name)) {
+                    name = FyraBuiltinFunctions::get_internal_name(name);
+                }
+
                 used_builtins_.insert(name);
+
                 ir::Function* func = current_module_->getFunction(name);
                 if (!func) {
                     std::vector<ir::Type*> pts;
-                    for (size_t k = 0; k < inst.call_args.size(); ++k) pts.push_back(context_->getIntegerType(64));
+                    for (size_t k = 0; k < args.size(); ++k) pts.push_back(args[k]->getType());
                     func = builder_->createFunction(name, lir_type_to_fyra_type(inst.result_type), pts);
                 }
-                std::vector<ir::Value*> args;
-                for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
                 store_reg(inst.dst, builder_->createCall(func, args), inst.result_type);
                 break;
             }
