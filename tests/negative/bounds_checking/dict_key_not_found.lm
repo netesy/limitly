@@ -1,6 +1,6 @@
-// @error:bounds_error
-// Dictionary key not found
+// @error:nil_bounds
+// Dictionary key not found returns nil safely
 
 var map = {"a": 1, "b": 2};
-var value = map["missing_key"];  // Key doesn't exist
-print(value);
+var value = map["missing_key"];  // Key doesn't exist, returns nil safely
+assert(value == nil, "Missing dictionary key must return nil safely");

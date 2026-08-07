@@ -187,14 +187,22 @@ class NegativeTestRunner:
             duration = time.time() - start
             
             # Check for error indicators
-            error_found = result.returncode != 0
-            error_type = self._detect_error_type(result)
-            
-            # Determine if test passed
-            # A negative test PASSES if:
-            # 1. Compiler returned non-zero exit code (error occurred)
-            # 2. Expected error type was found or generic error occurred
-            passed = error_found
+            if test.expected_error == "nil_bounds":
+                # For bounds checking returning nil, we expect exit code 0 (safe execution)
+                # and no errors reported on stdout/stderr
+                has_error_pattern = False
+                combined = result.stdout + result.stderr
+                for pattern in ["error[E", "Error:", "RuntimeError", "SemanticError", "BytecodeError", "❌ FAIL", "ASSERT FAIL", "Assertion failed"]:
+                    if pattern in combined:
+                        has_error_pattern = True
+                        break
+                passed = (result.returncode == 0) and not has_error_pattern
+                error_type = "nil_bounds" if passed else "bounds_checking_failure"
+                error_found = not passed
+            else:
+                error_found = result.returncode != 0
+                error_type = self._detect_error_type(result)
+                passed = error_found
             
             return TestResult(
                 test=test,

@@ -350,8 +350,174 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     return type;
 }
 
+static bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, long long& out_int, double& out_double, bool& is_int) {
+    if (!expr) return false;
+
+    if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+        if (literal->literalType == TokenType::INT_LITERAL || literal->literalType == TokenType::HEX_LITERAL) {
+            try {
+                if (std::holds_alternative<std::string>(literal->value)) {
+                    std::string s_val = std::get<std::string>(literal->value);
+                    if (s_val.rfind("0x", 0) == 0 || s_val.rfind("0X", 0) == 0) {
+                        out_int = std::stoll(s_val, nullptr, 16);
+                    } else {
+                        out_int = std::stoll(s_val);
+                    }
+                    is_int = true;
+                    return true;
+                }
+            } catch (...) {
+                return false;
+            }
+        } else if (literal->literalType == TokenType::FLOAT_LITERAL || literal->literalType == TokenType::SCIENTIFIC_LITERAL) {
+            try {
+                if (std::holds_alternative<std::string>(literal->value)) {
+                    std::string s_val = std::get<std::string>(literal->value);
+                    out_double = std::stod(s_val);
+                    is_int = false;
+                    return true;
+                }
+            } catch (...) {
+                return false;
+            }
+        }
+    } else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
+        long long right_int = 0;
+        double right_double = 0.0;
+        bool right_is_int = false;
+        if (evaluate_const_expr(unary->right, right_int, right_double, right_is_int)) {
+            if (unary->op == TokenType::MINUS) {
+                if (right_is_int) {
+                    out_int = -right_int;
+                    is_int = true;
+                } else {
+                    out_double = -right_double;
+                    is_int = false;
+                }
+                return true;
+            } else if (unary->op == TokenType::TILDE) {
+                if (right_is_int) {
+                    out_int = ~right_int;
+                    is_int = true;
+                    return true;
+                }
+            }
+        }
+    } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
+        long long left_int = 0, right_int = 0;
+        double left_double = 0.0, right_double = 0.0;
+        bool left_is_int = false, right_is_int = false;
+
+        if (evaluate_const_expr(binary->left, left_int, left_double, left_is_int) &&
+            evaluate_const_expr(binary->right, right_int, right_double, right_is_int)) {
+
+            bool both_int = left_is_int && right_is_int;
+            if (!both_int) {
+                double l = left_is_int ? (double)left_int : left_double;
+                double r = right_is_int ? (double)right_int : right_double;
+                is_int = false;
+                switch (binary->op) {
+                    case TokenType::PLUS: out_double = l + r; return true;
+                    case TokenType::MINUS: out_double = l - r; return true;
+                    case TokenType::STAR: out_double = l * r; return true;
+                    case TokenType::SLASH:
+                        if (r == 0.0) return false;
+                        out_double = l / r; return true;
+                    default: return false;
+                }
+            } else {
+                is_int = true;
+                switch (binary->op) {
+                    case TokenType::PLUS: out_int = left_int + right_int; return true;
+                    case TokenType::MINUS: out_int = left_int - right_int; return true;
+                    case TokenType::STAR: out_int = left_int * right_int; return true;
+                    case TokenType::SLASH:
+                        if (right_int == 0) return false;
+                        out_int = left_int / right_int; return true;
+                    case TokenType::MODULUS:
+                        if (right_int == 0) return false;
+                        out_int = left_int % right_int; return true;
+                    case TokenType::LESS_LESS:
+                        out_int = left_int << right_int; return true;
+                    case TokenType::GREATER_GREATER:
+                        out_int = left_int >> right_int; return true;
+                    case TokenType::AMPERSAND:
+                        out_int = left_int & right_int; return true;
+                    case TokenType::PIPE:
+                        out_int = left_int | right_int; return true;
+                    case TokenType::CARET:
+                        out_int = left_int ^ right_int; return true;
+                    default: return false;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
+
+    // Verify compile-time constant evaluation for safety constraints (Phase 3.D)
+    long long left_int = 0, right_int = 0;
+    double left_double = 0.0, right_double = 0.0;
+    bool left_is_int = false, right_is_int = false;
+
+    bool has_left_const = evaluate_const_expr(expr->left, left_int, left_double, left_is_int);
+    bool has_right_const = evaluate_const_expr(expr->right, right_int, right_double, right_is_int);
+
+    if (has_left_const && has_right_const) {
+        bool both_int = left_is_int && right_is_int;
+        if (expr->op == TokenType::SLASH || expr->op == TokenType::MODULUS) {
+            if (both_int && right_int == 0) {
+                add_error("Division or modulo by zero", expr->line);
+            } else if (!both_int && (right_is_int ? (double)right_int : right_double) == 0.0) {
+                add_error("Division or modulo by zero", expr->line);
+            }
+        }
+        if (both_int) {
+            if (expr->op == TokenType::LESS_LESS || expr->op == TokenType::GREATER_GREATER) {
+                if (right_int < 0) {
+                    add_error("Negative shift amount", expr->line);
+                } else if (right_int >= 64) {
+                    add_error("Shift amount exceeds bit width", expr->line);
+                }
+            }
+
+            long long result = 0;
+            bool check_overflow = false;
+            if (expr->op == TokenType::PLUS) {
+                result = left_int + right_int;
+                check_overflow = true;
+            } else if (expr->op == TokenType::MINUS) {
+                result = left_int - right_int;
+                check_overflow = true;
+            } else if (expr->op == TokenType::STAR) {
+                result = left_int * right_int;
+                check_overflow = true;
+            } else if (expr->op == TokenType::POWER) {
+                result = std::pow(left_int, right_int);
+                check_overflow = true;
+            }
+
+            if (check_overflow) {
+                std::string type_name = expected_type ? expected_type->toString() : "int";
+                long long max_val = std::numeric_limits<long long>::max();
+                long long min_val = std::numeric_limits<long long>::min();
+
+                if (type_name == "i8") { max_val = 127; min_val = -128; }
+                else if (type_name == "u8") { max_val = 255; min_val = 0; }
+                else if (type_name == "i16") { max_val = 32767; min_val = -32768; }
+                else if (type_name == "u16") { max_val = 65535; min_val = 0; }
+                else if (type_name == "i32") { max_val = 2147483647; min_val = -2147483648LL; }
+                else if (type_name == "u32") { max_val = 4294967295LL; min_val = 0; }
+
+                if (result > max_val || result < min_val) {
+                    add_error("Arithmetic overflow / underflow detected", expr->line);
+                }
+            }
+        }
+    }
     
     TypePtr left_expected = nullptr;
     switch (expr->op) {
