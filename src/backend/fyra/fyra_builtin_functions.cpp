@@ -99,10 +99,11 @@ void FyraBuiltinFunctions::emit_print_int(ir::Module* module, ir::IRBuilder* bui
     }
 
     std::vector<ir::Value*> neg_sys_args = {
+        context->getConstantInt(context->getIntegerType(64), 1), // stdout
         gv_minus_ptr,
         context->getConstantInt(context->getIntegerType(64), 1)
     };
-    builder->createExternCall("io.write", neg_sys_args);
+    builder->createExternCall("io.write", neg_sys_args, context->getIntegerType(64));
     ir::Value* abs_v = builder->createNeg(val);
     builder->createStore(abs_v, val_slot);
     builder->createJmp(b_loop);
@@ -133,10 +134,11 @@ void FyraBuiltinFunctions::emit_print_int(ir::Module* module, ir::IRBuilder* bui
     ir::Value* len = builder->createSub(end_ptr, final_ptr);
 
     std::vector<ir::Value*> done_sys_args = {
+        context->getConstantInt(context->getIntegerType(64), 1), // stdout
         final_ptr,
         len
     };
-    builder->createExternCall("io.write", done_sys_args);
+    builder->createExternCall("io.write", done_sys_args, context->getIntegerType(64));
     builder->createRet(nullptr);
 }
 
@@ -172,10 +174,11 @@ void FyraBuiltinFunctions::emit_print_str(ir::Module* module, ir::IRBuilder* bui
     ir::Value* actual_len = builder->createSub(final_len, context->getConstantInt(context->getIntegerType(64), 1));
 
     std::vector<ir::Value*> ps_sys_args = {
+        context->getConstantInt(context->getIntegerType(64), 1), // stdout
         s_val,
         actual_len
     };
-    builder->createExternCall("io.write", ps_sys_args);
+    builder->createExternCall("io.write", ps_sys_args, context->getIntegerType(64));
     
     ir::GlobalVariable* gv_nl_ptr = nullptr;
     for (auto& gv : module->getGlobalVariables()) {
@@ -190,10 +193,11 @@ void FyraBuiltinFunctions::emit_print_str(ir::Module* module, ir::IRBuilder* bui
         module->addGlobalVariable(std::move(gv_nl));
     }
     std::vector<ir::Value*> nl_sys_args = {
+        context->getConstantInt(context->getIntegerType(64), 1), // stdout
         gv_nl_ptr,
         context->getConstantInt(context->getIntegerType(64), 1)
     };
-    builder->createExternCall("io.write", nl_sys_args);
+    builder->createExternCall("io.write", nl_sys_args, context->getIntegerType(64));
 
     builder->createRet(nullptr);
 }
@@ -218,15 +222,16 @@ void FyraBuiltinFunctions::emit_assert(ir::Module* module, ir::IRBuilder* builde
     // Print "Assertion failed: " message before exiting
     std::string fail_msg = "Assertion failed\n";
     std::vector<ir::Value*> fail_print_args = {
+        context->getConstantInt(context->getIntegerType(64), 1), // stdout
         ir::ConstantString::get(fail_msg),
         context->getConstantInt(context->getIntegerType(64), fail_msg.length())
     };
-    builder->createExternCall("io.write", fail_print_args);
+    builder->createExternCall("io.write", fail_print_args, context->getIntegerType(64));
     
     std::vector<ir::Value*> fail_sys_args = {
         context->getConstantInt(context->getIntegerType(64), 1) // exit status
     };
-    builder->createExternCall("process.exit", fail_sys_args);
+    builder->createExternCall("process.exit", fail_sys_args, context->getIntegerType(64));
     builder->createRet(nullptr);
 
     builder->setInsertPoint(a_pass);
