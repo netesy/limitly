@@ -353,6 +353,7 @@ std::shared_ptr<LM::Frontend::AST::BlockStatement> Parser::block() {
     }
 
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        size_t startTokenIdx = current;
         try {
             if (in_concurrent_block) {
                 // task/worker are now keywords (TASK/WORKER tokens), not identifiers.
@@ -375,6 +376,9 @@ std::shared_ptr<LM::Frontend::AST::BlockStatement> Parser::block() {
             if (std::string(e.what()).find("Too many syntax errors") != std::string::npos) throw;
             synchronize();
         } catch (const std::exception &e) {
+            synchronize();
+        }
+        if (current == startTokenIdx) {
             synchronize();
         }
     }
