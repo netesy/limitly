@@ -1,6 +1,6 @@
-// @error:bounds_error
-// String index out of bounds
+// @error:nil_bounds
+// String index out of bounds returns nil safely
 
 var text = "hello";
-var char = text[10];  // Index 10 is out of bounds (only 0-4 valid)
-print(char);
+var char = text[10];  // Index 10 is out of bounds returns nil safely
+assert(char == nil, "String index out of bounds must return nil safely");
