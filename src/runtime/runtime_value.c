@@ -386,6 +386,17 @@ RUNTIME_API LmValue lm_add(LmValue a, LmValue b) {
     return VAL_NIL;
 }
 
+RUNTIME_API LmValue lm_rt_str_format(LmValue fmt_val, LmValue arg_val) {
+    LmString fmt = lm_value_to_string(fmt_val);
+    LmString arg = lm_value_to_string(arg_val);
+    LmString res = lm_string_format(fmt, arg);
+    LmBox* box = lm_box_string(res.data);
+    lm_string_free(fmt);
+    lm_string_free(arg);
+    lm_string_free(res);
+    return BOX_PTR(box);
+}
+
 RUNTIME_API LmValue lm_sub(LmValue a, LmValue b) {
     if (is_integer(a) && is_integer(b)) {
         __int128 i1 = as_i128(a);

@@ -104,6 +104,16 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
             return result;
         }
 
+        // Dump the generated x86_64 assembly for debugging
+        {
+            std::ofstream asm_file(options.output_file + ".s");
+            if (asm_file.is_open()) {
+                ::codegen::CodeGen text_generator(*module, ::target::TargetResolver::resolve({target_arch, target_os, std::nullopt}), &asm_file);
+                text_generator.emit(true);
+                asm_file.close();
+            }
+        }
+
         ::codegen::CodeGen generator(*module, std::move(targetInfo), nullptr);
         generator.emit(true);
 

@@ -35,6 +35,7 @@ private:
 
     ir::Type* lir_type_to_fyra_type(LIR::Type lir_type);
     std::string generate_label();
+    void build_function_body(ir::Function* main_fn, const LIR::LIR_Function& lir_func);
 };
 
 } // namespace LM::Backend::Fyra
