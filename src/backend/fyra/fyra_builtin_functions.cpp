@@ -87,13 +87,13 @@ void FyraBuiltinFunctions::emit_print_int(ir::Module* module, ir::IRBuilder* bui
     builder->setInsertPoint(b_neg);
     ir::GlobalVariable* gv_minus_ptr = nullptr;
     for (auto& gv : module->getGlobalVariables()) {
-        if (gv->getName() == "$str_minus") {
+        if (gv->getName() == "str_minus") {
             gv_minus_ptr = gv.get();
             break;
         }
     }
     if (!gv_minus_ptr) {
-        auto gv_minus = std::make_unique<ir::GlobalVariable>(context->getPointerType(context->getIntegerType(8)), "$str_minus", context->getConstantString("-"), false, ".data");
+        auto gv_minus = std::make_unique<ir::GlobalVariable>(context->getPointerType(context->getIntegerType(8)), "str_minus", context->getConstantString("-"), false, ".data");
         gv_minus_ptr = gv_minus.get();
         module->addGlobalVariable(std::move(gv_minus));
     }
@@ -182,13 +182,13 @@ void FyraBuiltinFunctions::emit_print_str(ir::Module* module, ir::IRBuilder* bui
     
     ir::GlobalVariable* gv_nl_ptr = nullptr;
     for (auto& gv : module->getGlobalVariables()) {
-        if (gv->getName() == "$nl") {
+        if (gv->getName() == "nl") {
             gv_nl_ptr = gv.get();
             break;
         }
     }
     if (!gv_nl_ptr) {
-        auto gv_nl = std::make_unique<ir::GlobalVariable>(context->getPointerType(context->getIntegerType(8)), "$nl", context->getConstantString("\n"), false, ".data");
+        auto gv_nl = std::make_unique<ir::GlobalVariable>(context->getPointerType(context->getIntegerType(8)), "nl", context->getConstantString("\n"), false, ".data");
         gv_nl_ptr = gv_nl.get();
         module->addGlobalVariable(std::move(gv_nl));
     }
@@ -221,9 +221,27 @@ void FyraBuiltinFunctions::emit_assert(ir::Module* module, ir::IRBuilder* builde
     builder->setInsertPoint(a_fail);
     // Print "Assertion failed: " message before exiting
     std::string fail_msg = "Assertion failed\n";
+    ir::GlobalVariable* assert_fail_gv = nullptr;
+    for (auto& gv : module->getGlobalVariables()) {
+        if (gv->getName() == "assert_fail") {
+            assert_fail_gv = gv.get();
+            break;
+        }
+    }
+    if (!assert_fail_gv) {
+        auto gv = std::make_unique<ir::GlobalVariable>(
+            context->getPointerType(context->getIntegerType(8)),
+            "assert_fail",
+            context->getConstantString(fail_msg),
+            false,
+            ".data"
+        );
+        assert_fail_gv = gv.get();
+        module->addGlobalVariable(std::move(gv));
+    }
     std::vector<ir::Value*> fail_print_args = {
         context->getConstantInt(context->getIntegerType(64), 1), // stdout
-        ir::ConstantString::get(fail_msg),
+        assert_fail_gv,
         context->getConstantInt(context->getIntegerType(64), fail_msg.length())
     };
     builder->createExternCall("io.write", fail_print_args, context->getIntegerType(64));

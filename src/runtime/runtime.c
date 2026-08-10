@@ -56,6 +56,15 @@ RUNTIME_API LmBox* lm_box_float(double value) {
     return box;
 }
 
+RUNTIME_API LmValue lm_box_float_from_bits(uint64_t bits) {
+    union {
+        uint64_t u;
+        double d;
+    } u;
+    u.u = bits;
+    return BOX_PTR(lm_box_float(u.d));
+}
+
 RUNTIME_API LmBox* lm_box_bool(uint8_t value) {
     LmBox* box = (LmBox*)malloc(sizeof(LmBox));
     if (!box) return NULL;
