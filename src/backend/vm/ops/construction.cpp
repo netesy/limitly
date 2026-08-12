@@ -24,12 +24,13 @@ void RegisterVM::execute_construct_string_from_cstr(const LIR::LIR_Inst* pc) {
     }
     
     // Convert C string to Limitly string using runtime support
-    // TODO: Call runtime function when available
-    // LmString lm_str = lm_string_from_cstr(cstr);
-    // registers[pc->dst] = lm_str.value;
+    LmBox* box = lm_box_string(cstr);
+    registers[pc->dst] = BOX_PTR(box);
     
-    // Placeholder until runtime support integrated
-    registers[pc->dst] = VAL_NIL;
+    if (box && !vm_region_stack.empty()) {
+        uintptr_t ptr = reinterpret_cast<uintptr_t>(box);
+        vm_allocation_regions[ptr] = active_region_id;
+    }
 }
 
 // String conversion - construct C pointer view from Limitly string
@@ -43,19 +44,15 @@ void RegisterVM::execute_construct_cstr_from_string(const LIR::LIR_Inst* pc) {
     }
     
     auto* header = static_cast<ObjHeader*>(UNBOX_PTR(str_val));
-    if (header->type_id != TYPE_STRING) {
+    if (header->type_id != TYPE_BOX || reinterpret_cast<LmBox*>(header)->type != LM_BOX_STRING) {
         registers[pc->dst] = VAL_NIL;
         return;
     }
     
     // Get the string data pointer
-    // TODO: Call runtime function when available
-    // LmString lm_str = {.value = str_val};
-    // const char* cstr = lm_string_data(lm_str);
-    // registers[pc->dst] = BOX_PTR((void*)cstr);
-    
-    // Placeholder until runtime support integrated
-    registers[pc->dst] = VAL_NIL;
+    LmBox* box = reinterpret_cast<LmBox*>(header);
+    const char* cstr = (const char*)box->value.as_ptr;
+    registers[pc->dst] = BOX_PTR((void*)cstr);
 }
 
 // Free C string - helper for freeing allocated strings
