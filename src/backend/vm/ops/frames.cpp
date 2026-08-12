@@ -157,6 +157,7 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             if (!final_func_name.empty()) {
                 auto func = func_manager.getFunction(final_func_name);
                 std::vector<RegisterValue> arg_vals;
+                arg_vals.reserve(pc->call_args.size());
                 for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
 
                 auto saved_registers = registers;
