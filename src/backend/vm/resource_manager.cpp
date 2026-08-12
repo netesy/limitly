@@ -18,6 +18,8 @@
 #include <cmath>
 #include <mutex>
 #include <filesystem>
+#include <random>
+#include <stdexcept>
 
 // Platform-specific headers and macros
 #if defined(_WIN32)
@@ -145,8 +147,17 @@ static void fill_random_internal(char* out, size_t n) {
         std::fclose(f);
         if (rd == n) return;
     }
-    // Very weak fallback
-    for (size_t i = 0; i < n; ++i) out[i] = (char)(std::rand() & 0xFF);
+    // Stronger fallback using <random>
+    try {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::uniform_int_distribution<> distrib(0, 255);
+        for (size_t i = 0; i < n; ++i) {
+            out[i] = static_cast<char>(distrib(gen));
+        }
+    } catch (...) {
+        throw std::runtime_error("Failed to gather sufficient entropy");
+    }
 }
 
 // Build a heap-allocated string box from a C-string.

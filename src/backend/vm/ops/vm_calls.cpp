@@ -21,6 +21,8 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
             if (func_manager.hasFunction(pc->func_name)) {
                 auto func = func_manager.getFunction(pc->func_name);
                 std::vector<RegisterValue> arg_vals;
+                size_t expected_total = func->getParameters().size();
+                arg_vals.reserve(std::max((size_t)pc->call_args.size(), expected_total));
                 for (auto arg_reg : pc->call_args) {
                     if (arg_reg < registers.size()) {
                         arg_vals.push_back(registers[arg_reg]);
@@ -28,7 +30,6 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                         arg_vals.push_back(VAL_NIL);
                     }
                 }
-                size_t expected_total = func->getParameters().size();
                 while (arg_vals.size() < expected_total) {
                     arg_vals.push_back(VAL_NIL);
                 }
@@ -108,10 +109,11 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 if (func_manager.hasFunction(func_name)) {
                     auto func = func_manager.getFunction(func_name);
                     std::vector<RegisterValue> arg_vals;
+                    size_t expected_total = func->getParameters().size();
+                    arg_vals.reserve(std::max((size_t)pc->call_args.size() + closure_extra_args.size(), expected_total));
                     for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
                     
                     if (!closure_extra_args.empty()) {
-                        size_t expected_total = func->getParameters().size();
                         if (expected_total > 0) {
                             while (arg_vals.size() < expected_total - 1) {
                                 arg_vals.push_back(VAL_NIL);
@@ -121,7 +123,6 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                             arg_vals.push_back(closure_extra_args[0]);
                         }
                     } else {
-                        size_t expected_total = func->getParameters().size();
                         while (arg_vals.size() < expected_total) {
                             arg_vals.push_back(VAL_NIL);
                         }

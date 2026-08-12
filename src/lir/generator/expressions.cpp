@@ -1276,6 +1276,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         if (is_variable) {
             Reg closure_reg = emit_variable_expr(*var_expr);
             std::vector<Reg> arg_regs;
+            arg_regs.reserve(expr.arguments.size());
             for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
             Reg result = allocate_register();
             Type abi_type = Type::Void;
@@ -1305,6 +1306,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
         if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(registry_lookup_name)) {
             std::vector<Reg> arg_regs;
+            arg_regs.reserve(expr.arguments.size());
             for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
             Reg result = allocate_register();
             Type abi_res_type = (expr.inferred_type) ? language_type_to_abi_type(expr.inferred_type) : Type::Void;
@@ -1322,6 +1324,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
         // --- 2. Builtin Check ---
         std::vector<Reg> arg_regs;
+        arg_regs.reserve(expr.arguments.size());
         for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
         Reg result = allocate_register();
         
@@ -1484,6 +1487,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             if (is_enum_variant) {
                 // This is an enum variant construction
                 std::vector<Reg> arg_regs;
+                arg_regs.reserve(expr.arguments.size());
                 for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
                 Reg result = allocate_register();
 
@@ -1531,6 +1535,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 auto frame_it = frame_table_.find(qualified_name);
                 if (frame_it != frame_table_.end()) {
                     std::vector<Reg> arg_regs;
+                    arg_regs.reserve(expr.arguments.size());
                     for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
                     Reg result = allocate_register();
                     
@@ -1578,6 +1583,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 }
 
                 std::vector<Reg> arg_regs;
+                arg_regs.reserve(expr.arguments.size());
                 for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
                 Reg result = allocate_register();
 
@@ -1604,7 +1610,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         }
 
         Reg object_reg = emit_expr(*member_expr->object);
-        std::vector<Reg> arg_regs; arg_regs.push_back(object_reg);
+        std::vector<Reg> arg_regs;
+        arg_regs.reserve(expr.arguments.size() + 1);
+        arg_regs.push_back(object_reg);
         for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
         
         Reg result = allocate_register();
@@ -1705,6 +1713,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                             
                             // Now call through the function pointer
                             std::vector<Reg> indirect_args;
+                            indirect_args.reserve(expr.arguments.size());
                             for (const auto& arg : expr.arguments) {
                                 indirect_args.push_back(emit_expr(*arg));
                             }
@@ -1998,6 +2007,7 @@ Reg Generator::emit_call_closure_expr(LM::Frontend::AST::CallClosureExpr& expr) 
     
     // Evaluate all positional arguments
     std::vector<Reg> arg_regs;
+    arg_regs.reserve(expr.arguments.size());
     for (const auto& arg : expr.arguments) {
         Reg arg_reg = emit_expr(*arg);
         arg_regs.push_back(arg_reg);
