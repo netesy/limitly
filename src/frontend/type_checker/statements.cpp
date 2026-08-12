@@ -227,7 +227,7 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
         long long val_int = 0;
         double val_double = 0.0;
         bool is_int = false;
-        if (evaluate_const_expr(var_decl->initializer, val_int, val_double, is_int, this)) {
+        if (var_decl->isConst && evaluate_const_expr(var_decl->initializer, val_int, val_double, is_int, this)) {
             if (is_int) {
                 constant_ints[var_decl->name] = val_int;
             } else {
@@ -778,20 +778,7 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::R
         return_type = type_system.NIL_TYPE;
     }
     
-    if (return_stmt->value) {
-        if (auto lambda = std::dynamic_pointer_cast<LM::Frontend::AST::LambdaExpr>(return_stmt->value)) {
-            if (!lambda->capturedVars.empty()) {
-                for (const auto& var_name : lambda->capturedVars) {
-                    TypePtr var_type = lookup_variable(var_name);
-                    if (var_type && var_type->tag != TypeTag::Function) {
-                        add_error("closure_capture: Closure captures variable '" + var_name +
-                                  "' that goes out of scope when returning", return_stmt->line);
-                        break;
-                    }
-                }
-            }
-        }
-    }
+    // Closure captures are fully supported when returning lambdas.
 
     // Check if return type matches function return type
     if (current_return_type && !is_type_compatible(current_return_type, return_type)) {

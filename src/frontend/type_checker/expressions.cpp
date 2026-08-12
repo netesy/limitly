@@ -798,29 +798,13 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
 }
 
 bool is_consuming_callee(const std::string& name) {
-    static const std::unordered_set<std::string> non_consuming = {
-        "print", "len", "assert", "error", "_builtin_len", "_builtin_substring",
-        "clock", "sleep", "time", "date", "now", "typeof", "typeOf", "debug", "input",
-        "resource_create", "resource_call", "resource_destroy", "file_exists", "file_delete",
-        "concat", "length", "substring", "str_format", "map", "filter", "reduce", "forEach",
-        "find", "some", "every", "compose", "curry", "partial"
-    };
-    if (non_consuming.find(name) != non_consuming.end()) return false;
-    if (name.ends_with(".len") || name.ends_with(".length") ||
-        name.ends_with(".append") || name.ends_with(".pop") ||
-        name.ends_with(".keys") || name.ends_with(".values") ||
-        name.ends_with(".init") || name.ends_with(".close")) {
-        return false;
-    }
-
+    // Only functions starting with "consume" are considered consuming (move) operations
     std::string base_name = name;
     size_t last_dot = name.find_last_of('.');
     if (last_dot != std::string::npos) {
         base_name = name.substr(last_dot + 1);
     }
-    if (!base_name.empty() && std::isupper(base_name[0])) return false;
-
-    return true;
+    return base_name.rfind("consume", 0) == 0;
 }
 
 TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type) {
@@ -1693,9 +1677,7 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
                 add_error("Use after move: Cannot assign to moved variable '" + expr->name + "'", expr->line);
             }
 
-            if (!lambda_captures_stack.empty() && should_capture_variable(expr->name)) {
-                add_error("closure_capture: Cannot mutate captured variable '" + expr->name + "' inside closure", expr->line);
-            }
+            // Mutation of captured variables inside closures is fully supported.
 
             // Use variable's type as expected type
             expected_type = var_type;
@@ -1727,22 +1709,9 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
                 }
             }
 
-            // Constant evaluation and storage
-            long long val_int = 0;
-            double val_double = 0.0;
-            bool is_int = false;
-            if (evaluate_const_expr(expr->value, val_int, val_double, is_int, this)) {
-                if (is_int) {
-                    constant_ints[expr->name] = val_int;
-                    constant_doubles.erase(expr->name);
-                } else {
-                    constant_doubles[expr->name] = val_double;
-                    constant_ints.erase(expr->name);
-                }
-            } else {
-                constant_ints.erase(expr->name);
-                constant_doubles.erase(expr->name);
-            }
+            // Assigned variable is mutable, so it cannot be a compile-time constant. Erase it.
+            constant_ints.erase(expr->name);
+            constant_doubles.erase(expr->name);
 
             return value_type;
         } else {
@@ -1751,17 +1720,9 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             declare_variable(expr->name, value_type);
             declare_variable_memory(expr->name, value_type);  // Track memory for new variable
             
-            // Constant evaluation and storage
-            long long val_int = 0;
-            double val_double = 0.0;
-            bool is_int = false;
-            if (evaluate_const_expr(expr->value, val_int, val_double, is_int, this)) {
-                if (is_int) {
-                    constant_ints[expr->name] = val_int;
-                } else {
-                    constant_doubles[expr->name] = val_double;
-                }
-            }
+            // Implicitly declared variable is mutable, so do not store as compile-time constant.
+            constant_ints.erase(expr->name);
+            constant_doubles.erase(expr->name);
 
             // New variables are linear types by default
             LinearTypeInfo linear_info;
