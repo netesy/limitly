@@ -740,6 +740,7 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
     // Build format string and collect argument registers
     std::string format_string = "";
     std::vector<Reg> arg_regs;
+    arg_regs.reserve(expr.parts.size());
     
     for (const auto& part : expr.parts) {
         if (std::holds_alternative<std::string>(part)) {
@@ -1376,7 +1377,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
             
             if (frame_it->second.has_init) {
-                std::vector<Reg> args; args.push_back(result);
+                std::vector<Reg> args;
+                args.reserve(arg_regs.size() + 1);
+                args.push_back(result);
                 for (Reg r : arg_regs) args.push_back(r);
                 Reg dummy = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::Call, dummy, func_name + ".init", args));
@@ -1561,7 +1564,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     }
                     
                     if (frame_it->second.has_init) {
-                        std::vector<Reg> args; args.push_back(result);
+                        std::vector<Reg> args;
+                        args.reserve(arg_regs.size() + 1);
+                        args.push_back(result);
                         for (Reg r : arg_regs) args.push_back(r);
                         Reg dummy = allocate_register();
                         emit_instruction(LIR_Inst(LIR_Op::Call, dummy, qualified_name + ".init", args));
