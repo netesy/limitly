@@ -1,0 +1,204 @@
+// Test Suite for Standard Library Collections Module
+
+import std.collections.list as list_col;
+import std.collections.deque as deque_col;
+import std.collections.linked_list as linked_list_col;
+import std.collections.map as map_col;
+import std.collections.hashmap as hashmap_col;
+import std.collections.hashset as hashset_col;
+import std.collections.btreemap as btreemap_col;
+import std.collections.btreeset as btreeset_col;
+import std.collections.queue as queue_col;
+import std.collections.stack as stack_col;
+import std.collections.priority_queue as pq_col;
+import std.collections.bitset as bitset_col;
+import std.collections.bloom_filter as bloom_col;
+import std.collections.index as collections;
+
+fn test_list(): int {
+    print("Testing List...");
+    var list_val = collections.List() as list_col.List;
+    assert(list_val.length() == 0, "List should be empty initially");
+
+    list_val.append("first");
+    list_val.push("second");
+    assert(list_val.length() == 2, "List length should be 2");
+    assert(list_val.get(0) == "first", "First element should be 'first'");
+    assert(list_val.get(1) == "second", "Second element should be 'second'");
+
+    list_val.set(1, "updated");
+    assert(list_val.get(1) == "updated", "Set should update element");
+
+    var popped = list_val.pop();
+    assert(popped == "updated", "Pop should return last element");
+    assert(list_val.length() == 1, "List length should be 1 after pop");
+
+    list_val.clear();
+    assert(list_val.length() == 0, "List length should be 0 after clear");
+    return 1;
+}
+
+fn test_deque(): int {
+    print("Testing Deque...");
+    var deque_val = collections.Deque() as deque_col.DoubleEndedQueue;
+    assert(deque_val.length() == 0, "Deque should be empty initially");
+
+    deque_val.push_back("back1");
+    deque_val.push_front("front1");
+    assert(deque_val.length() == 2, "Deque length should be 2");
+    assert(deque_val.peek_front() == "front1", "Front peek incorrect");
+    assert(deque_val.peek_back() == "back1", "Back peek incorrect");
+
+    var popped_front = deque_val.pop_front();
+    assert(popped_front == "front1", "Pop front incorrect");
+    assert(deque_val.length() == 1, "Deque length incorrect after pop_front");
+
+    var popped_back = deque_val.pop_back();
+    assert(popped_back == "back1", "Pop back incorrect");
+    assert(deque_val.length() == 0, "Deque length incorrect after pop_back");
+    return 1;
+}
+
+fn test_linked_list(): int {
+    print("Testing LinkedList...");
+    var ll_val = collections.LinkedList() as linked_list_col.DLL;
+    print("LinkedList instantiated");
+    assert(ll_val.length() == 0, "LinkedList should be empty");
+
+    ll_val.push_back("back1");
+    print("push_back back1");
+    ll_val.push_front("front1");
+    print("push_front front1");
+    assert(ll_val.length() == 2, "LinkedList length should be 2");
+
+    var popped_front = ll_val.pop_front();
+    print("popped front: {popped_front}");
+    assert(popped_front == "front1", "Pop front incorrect");
+
+    var popped_back = ll_val.pop_back();
+    print("popped back: {popped_back}");
+    assert(popped_back == "back1", "Pop back incorrect");
+    return 1;
+}
+
+fn test_maps(): int {
+    print("Testing Maps...");
+    var map_val = collections.Map() as map_col.HashMapWrapper;
+    map_val.put("key1", 42);
+
+    var val1 = map_val.get("key1")? else {
+        assert(false, "Failed to get key1");
+        return 0;
+    };
+    assert(val1 == 42, "Map get incorrect");
+
+    var hashmap_val = collections.HashMap() as hashmap_col.HashMap;
+    hashmap_val = hashmap_val.put("key2", 100);
+
+    var val2 = hashmap_val.get("key2")? else {
+        assert(false, "Failed to get key2");
+        return 0;
+    };
+    assert(val2 == 100, "HashMap get incorrect");
+
+    var btree_val = collections.BTreeMap() as btreemap_col.BTreeMapWrapper;
+    btree_val.put("bkey", "bval");
+    assert(btree_val.get("bkey") == "bval", "BTreeMap get incorrect");
+    return 1;
+}
+
+fn test_sets(): int {
+    print("Testing Sets...");
+    var hs_val = collections.HashSet() as hashset_col.HashSetWrapper;
+    hs_val.add("item1");
+    assert(hs_val.contains("item1") == true, "HashSet contains incorrect");
+    hs_val.remove("item1");
+    assert(hs_val.contains("item1") == false, "HashSet contains after remove incorrect");
+
+    var bs_val = collections.BTreeSet() as btreeset_col.BTreeSetWrapper;
+    bs_val.add("bitem");
+    assert(bs_val.contains("bitem") == true, "BTreeSet contains incorrect");
+    return 1;
+}
+
+fn test_queue_stack(): int {
+    print("Testing Queue and Stack...");
+    var q_val = collections.Queue() as queue_col.Queue;
+    q_val.enqueue("q1");
+    assert(q_val.peek() == "q1", "Queue peek incorrect");
+    assert(q_val.dequeue() == "q1", "Queue dequeue incorrect");
+
+    var s_val = collections.Stack() as stack_col.Stack;
+    s_val.push("s1");
+    assert(s_val.peek() == "s1", "Stack peek incorrect");
+    assert(s_val.pop() == "s1", "Stack pop incorrect");
+    return 1;
+}
+
+fn compare_ints(left: any, right: any): int {
+    var l = left as int;
+    var r = right as int;
+    if (l < r) return -1;
+    if (l > r) return 1;
+    return 0;
+}
+
+fn test_priority_queue(): int {
+    print("Testing PriorityQueue...");
+    var pq_val = collections.PriorityQueue(compare_ints) as pq_col.PriorityQueueWrapper;
+    pq_val.push(5);
+    pq_val.push(3);
+    pq_val.push(10);
+
+    assert(pq_val.peek() == 3, "PriorityQueue peek should be 3");
+    assert(pq_val.pop() == 3, "PriorityQueue pop should be 3");
+    assert(pq_val.pop() == 5, "PriorityQueue pop should be 5");
+    assert(pq_val.pop() == 10, "PriorityQueue pop should be 10");
+    return 1;
+}
+
+fn test_bitset(): int {
+    print("Testing BitSet...");
+    var bs_val = collections.BitSet(128) as bitset_col.BitSetWrapper;
+    assert(bs_val.get_size() == 128, "BitSet size should be 128");
+
+    bs_val.set(10);
+    assert(bs_val.get(10) == true, "BitSet get(10) incorrect");
+    assert(bs_val.get(11) == false, "BitSet get(11) incorrect");
+
+    bs_val.unset(10);
+    assert(bs_val.get(10) == false, "BitSet get(10) after unset incorrect");
+
+    bs_val.toggle(15);
+    assert(bs_val.get(15) == true, "BitSet get(15) after toggle incorrect");
+    return 1;
+}
+
+fn test_bloom_filter(): int {
+    print("Testing BloomFilter...");
+    var bf_val = collections.BloomFilter(512, 3) as bloom_col.BloomFilter;
+    bf_val.add("hello");
+    bf_val.add("world");
+
+    assert(bf_val.contains("hello") == true, "BloomFilter should contain 'hello'");
+    assert(bf_val.contains("world") == true, "BloomFilter should contain 'world'");
+    assert(bf_val.contains("not_added") == false, "BloomFilter should not contain 'not_added'");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Collections Module Test Suite ===");
+
+    assert(test_list() == 1, "List test failed");
+    assert(test_deque() == 1, "Deque test failed");
+    assert(test_linked_list() == 1, "LinkedList test failed");
+    assert(test_maps() == 1, "Maps test failed");
+    assert(test_sets() == 1, "Sets test failed");
+    assert(test_queue_stack() == 1, "Queue/Stack test failed");
+    assert(test_priority_queue() == 1, "PriorityQueue test failed");
+    assert(test_bitset() == 1, "BitSet test failed");
+    assert(test_bloom_filter() == 1, "BloomFilter test failed");
+
+    print("All collections tests passed successfully.");
+    return 0;
+}

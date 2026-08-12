@@ -5,7 +5,7 @@
 
 namespace LM {
     struct CompileOptions {
-        std::string target = "linux";
+        std::string target = "windows";
         std::string arch = "x86_64";
         int opt_level = 2;
         std::string output_file;

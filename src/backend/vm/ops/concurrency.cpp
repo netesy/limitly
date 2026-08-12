@@ -60,9 +60,10 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             }
             
             std::vector<RegisterValue> args;
-            // Arguments list is in call_args[0]
-            if (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX) {
-                RegisterValue list_val = registers[pc->call_args[0]];
+            // Arguments list is in call_args[2] if called via resource_call intrinsic
+            size_t args_idx = (pc->call_args.size() > 2) ? 2 : 0;
+            if (!pc->call_args.empty() && pc->call_args[args_idx] != UINT32_MAX) {
+                RegisterValue list_val = registers[pc->call_args[args_idx]];
                 if (auto* list = reinterpret_cast<LmList*>(header_if_type(list_val, TYPE_LIST))) {
                     size_t len = lm_list_len(list);
                     for (size_t i = 0; i < len; ++i) {

@@ -1,0 +1,9 @@
+// XML Node re-export module
+
+import std.xml.document as doc;
+
+pub type XMLNode = doc.XMLNode;
+
+pub fn make_node(name: str, text: str, keys: [str], vals: [str], children: [any]): XMLNode {
+    return doc.make_node(name, text, keys, vals, children);
+}

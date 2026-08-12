@@ -1,0 +1,25 @@
+// Standard Library Algorithm Filter Module
+
+pub fn filter(items: [any], p: fn(any): bool): [any] {
+    var res: [any] = [];
+    var i = 0;
+    while (i < len(items)) {
+        if (p(items[i])) {
+            res.append(items[i]);
+        }
+        i = i + 1;
+    }
+    return res;
+}
+
+pub fn remove_if(items: [any], p: fn(any): bool): [any] {
+    var res: [any] = [];
+    var i = 0;
+    while (i < len(items)) {
+        if (!p(items[i])) {
+            res.append(items[i]);
+        }
+        i = i + 1;
+    }
+    return res;
+}

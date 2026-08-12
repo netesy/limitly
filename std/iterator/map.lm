@@ -1,0 +1,25 @@
+// Standard Library Map Iterator
+
+import std.iterator.iterator as it;
+
+frame MapIterator: it.Iterator {
+    pub source: it.Iterator;
+    pub f: fn(any): any;
+
+    pub init(source: it.Iterator, f: fn(any): any) {
+        self.source = source;
+        self.f = f;
+    }
+
+    pub fn next(): any {
+        var item = self.source.next();
+        if (item == nil) {
+            return nil;
+        }
+        return self.f(item);
+    }
+}
+
+pub fn map(source: it.Iterator, f: fn(any): any): it.Iterator {
+    return MapIterator(source, f);
+}

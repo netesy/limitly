@@ -1,0 +1,13 @@
+import std.ui.widget as widget;
+
+frame TreeView {
+    pub var children: [widget.Widget];
+
+    pub init(ch: [widget.Widget] = []) {
+        self.children = ch;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

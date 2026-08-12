@@ -1,0 +1,21 @@
+// Standard Library Regex Entrypoint Module
+
+import std.regex.regex as regex_mod;
+
+pub fn Regex(pattern: str, flags: int): any {
+    return regex_mod.Regex(pattern, flags);
+}
+
+pub fn RegexPatterns(): any {
+    return regex_mod.RegexPatterns();
+}
+
+pub fn is_match(pattern: str, text: str): bool {
+    var regex = regex_mod.Regex(pattern, 0);
+    return regex.matches(text);
+}
+
+pub fn replace(pattern: str, text: str, replacement: str): str {
+    var regex = regex_mod.Regex(pattern, 0);
+    return regex.replace(text, replacement);
+}

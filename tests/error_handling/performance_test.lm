@@ -66,27 +66,27 @@ fn benchmark_error_handling() {
     };
     var success_time = clock() - start_time;
     
-    print("Success path test compvared in " + success_time + " seconds");
-    print("Result: " + success_result);
+    print("Success path test compvared in {success_time} seconds");
+    print("Result: {success_result}");
     
     // Test mixed path
     var mixed_start = clock();
     var mixed_result = mixed_path_test(iterations);
     var mixed_time = clock() - mixed_start;
     
-    print("Mixed path test compvared in " + mixed_time + " seconds");
-    print("Result: " + mixed_result);
+    print("Mixed path test compvared in {mixed_time} seconds");
+    print("Result: {mixed_result}");
     
     // Calculate performance metrics
     var success_ops_per_sec = iterations / success_time;
     var mixed_ops_per_sec = iterations / mixed_time;
     
-    print("Success path: " + success_ops_per_sec + " operations/second");
-    print("Mixed path: " + mixed_ops_per_sec + " operations/second");
+    print("Success path: {success_ops_per_sec} operations/second");
+    print("Mixed path: {mixed_ops_per_sec} operations/second");
     
     // Validate zero-cost abstraction
     var overhead_ratio = mixed_time / success_time;
-    print("Overhead ratio: " + overhead_ratio);
+    print("Overhead ratio: {overhead_ratio}");
     
     if (overhead_ratio < 1.5) {
         print("✓ Zero-cost abstraction validated - low overhead");

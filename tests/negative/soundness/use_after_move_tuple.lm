@@ -1,0 +1,11 @@
+// @error:use_after_free
+// Using tuple after consuming it
+
+fn consume_tuple(t: (int, str)) {
+    // t is consumed
+}
+
+var data = (42, "hello");
+consume_tuple(data);
+var value = data.0;  // ERROR: data already consumed
+print(value);

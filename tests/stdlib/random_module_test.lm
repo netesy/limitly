@@ -1,0 +1,62 @@
+// Test Suite for Standard Library Random Module
+
+import std.random.index as r;
+
+fn test_random_frame(): int {
+    print("Testing Random Frame...");
+    var rng = r.Random(123456789) as r.Random;
+    var value = rng.next_int();
+    assert(value != 0, "next_int failed");
+
+    var f = rng.next_float();
+    assert(f >= 0.0 and f <= 1.0, "next_float failed");
+
+    var b = rng.next_bool();
+    assert(b == true or b == false, "next_bool failed");
+
+    var ri = rng.range_int(1, 10);
+    assert(ri >= 1 and ri < 10, "range_int failed");
+
+    var rf = rng.range_float(0.0, 5.0);
+    assert(rf >= 0.0 and rf <= 5.0, "range_float failed");
+
+    var bytes = rng.next_bytes(5);
+    assert(len(bytes) == 5, "next_bytes failed");
+
+    var s = rng.next_string(5);
+    assert(len(s) == 5, "next_string failed");
+    return 1;
+}
+
+fn test_distributions(): int {
+    print("Testing Distributions...");
+    var rng = r.Random(123456789) as r.Random;
+    var dist = r.Uniform(10.0, 20.0) as r.Uniform;
+    var sample = dist.sample(rng);
+    assert(sample >= 10.0 and sample <= 20.0, "Uniform sample failed");
+    return 1;
+}
+
+fn test_random_helpers(): int {
+    print("Testing Random Helpers...");
+    var ri = r.random_int(1, 10);
+    assert(ri >= 1 and ri < 10, "random_int helper failed");
+
+    var rf = r.random_float(0.0, 5.0);
+    assert(rf >= 0.0 and rf <= 5.0, "random_float helper failed");
+
+    var rb = r.random_bool();
+    assert(rb == true or rb == false, "random_bool helper failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Random Module Test Suite ===");
+
+    assert(test_random_frame() == 1, "Random frame test failed");
+    assert(test_distributions() == 1, "Distributions test failed");
+    assert(test_random_helpers() == 1, "Random helpers test failed");
+
+    print("All random tests passed successfully.");
+    return 0;
+}

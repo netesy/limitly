@@ -1,0 +1,23 @@
+// Standard Library Algorithm Shuffle Module
+
+pub fn shuffle(items: [any]) {
+    var n = len(items);
+    if (n <= 1) {
+        return;
+    }
+    // Simple LCG random number generator
+    var seed = 123456789;
+    var i = n - 1;
+    while (i > 0) {
+        seed = (seed * 1103515245 + 12345) % 2147483648;
+        var r = seed;
+        if (r < 0) {
+            r = -r;
+        }
+        var j = r % (i + 1);
+        var temp = items[i];
+        items[i] = items[j];
+        items[j] = temp;
+        i = i - 1;
+    }
+}

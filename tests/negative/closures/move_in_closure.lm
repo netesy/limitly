@@ -1,0 +1,14 @@
+// @error:closure_capture
+// Moving variable into closure
+
+fn test() {
+    var data = [1, 2, 3];
+    
+    var f = fn() {
+        var x = data;  // Move into closure
+    };
+    
+    var y = data[0];  // ERROR: data already moved
+}
+
+test();

@@ -1,0 +1,41 @@
+// Standard Library HashSet Collection
+
+frame HashSetWrapper {
+    pub elements: [any];
+
+    pub init() {
+        self.elements = [] as [any];
+    }
+
+    pub fn add(item: any) {
+        if (self.contains(item)) return;
+        self.elements.append(item);
+    }
+
+    pub fn contains(item: any): bool {
+        var i = 0;
+        while (i < len(self.elements)) {
+            if (self.elements[i] == item) return true;
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn remove(item: any) {
+        var new_elements = [] as [any];
+        var i = 0;
+        var j = 0;
+        while (i < len(self.elements)) {
+            if (self.elements[i] != item) {
+                new_elements[j] = self.elements[i];
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+        self.elements = new_elements;
+    }
+
+    pub fn length(): int {
+        return len(self.elements);
+    }
+}

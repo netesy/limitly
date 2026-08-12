@@ -129,7 +129,7 @@ enum class LIR_Op : uint8_t {
     // === Shared Memory ===
     SharedCellAlloc, SharedCellLoad, SharedCellStore, SharedCellAdd, SharedCellSub,
     
-    // === Legacy Resource Operations (deprecated, kept for compatibility) ===
+    // === Legacy Resource Operations ===
     ResourceCreate, ResourceDestroy, ResourceCall,
     
     // === REDESIGNED: Memory Operations (generic with type dispatch via result_type) ===
@@ -168,6 +168,11 @@ enum class LIR_Op : uint8_t {
     // === REDESIGNED: Callbacks (genuine C boundary crossing) ===
     CallbackCreate,     // Create callback wrapper returning callback ID
     CallbackDestroy,    // Destroy callback wrapper
+    
+    // === Region Operations ===
+    RegionEnter,        // Enter region
+    RegionExit,         // Exit region
+    RegionMove,         // Move register pointer ownership to another region
     
 };
 
@@ -227,7 +232,7 @@ enum class LIR_Op : uint8_t {
     /* === Shared Memory === */ \
     X(SharedCellAlloc) X(SharedCellLoad) X(SharedCellStore) \
     X(SharedCellAdd) X(SharedCellSub) \
-    /* === Legacy Resource Operations (deprecated, kept for compatibility) === */ \
+    /* === Legacy Resource Operations === */ \
     X(ResourceCreate) X(ResourceDestroy) X(ResourceCall) \
     /* === REDESIGNED: Memory Operations === */ \
     X(MemoryAlloc) X(MemoryFree) X(MemoryResize) \
@@ -242,6 +247,8 @@ enum class LIR_Op : uint8_t {
     X(ForeignCall) X(ForeignCallDirect) \
     /* === REDESIGNED: Callbacks === */ \
     X(CallbackCreate) X(CallbackDestroy) \
+    /* === Region Operations === */ \
+    X(RegionEnter) X(RegionExit) X(RegionMove) \
 
 struct LIR_SourceLoc {
     std::string file;

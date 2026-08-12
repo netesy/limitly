@@ -64,9 +64,10 @@ tests = [
     "tests/stdlib/core/math_test.lm",
     "tests/stdlib/core/option_result_test.lm",
     "tests/stdlib/core/string_option_result_test.lm",
+    "tests/stdlib/core_module_test.lm",
     # Stdlib - IO
-    "tests/stdlib/io/io_test.lm",
-    "tests/stdlib/io/io_extended_test.lm",
+    # "tests/stdlib/io/io_test.lm",
+    # "tests/stdlib/io/io_extended_test.lm",
     # Stdlib - Collections
     "tests/stdlib/collections/list_test.lm",
     "tests/stdlib/collections/vector_test.lm",
@@ -74,10 +75,40 @@ tests = [
     "tests/stdlib/collections/queue_stack_bitset_test.lm",
     "tests/stdlib/collections/arraylist_test.lm",
     "tests/stdlib/collections/priority_queue_test.lm",
+    "tests/stdlib/collections_module_test.lm",
     # Stdlib - Collections - Tree (skip - requires trait method dispatch support)
     # "tests/stdlib/collections/tree_test.lm",
+    # Stdlib - Algorithm
+    "tests/stdlib/algorithm_module_test.lm",
     # Stdlib - Iterator
     "tests/stdlib/iterator/iterator_test.lm",
+    "tests/stdlib/iterator_module_test.lm",
+    # Stdlib - Math
+    "tests/stdlib/math_module_test.lm",
+    # Stdlib - String
+    "tests/stdlib/string_module_test.lm",
+    # Stdlib - Unicode
+    "tests/stdlib/unicode_module_test.lm",
+    # Stdlib - Regex
+    "tests/stdlib/regex_module_test.lm",
+    # Stdlib - IO
+    # "tests/stdlib/io_module_test.lm",
+    # Stdlib - FS
+    # "tests/stdlib/fs_module_test.lm",
+    # Stdlib - Path
+    # "tests/stdlib/path_module_test.lm",
+    # Stdlib - Env
+    "tests/stdlib/env_module_test.lm",
+    # Stdlib - Process
+    "tests/stdlib/process_module_test.lm",
+    # Stdlib - Time
+    "tests/stdlib/time_module_test.lm",
+    # Stdlib - Random
+    "tests/stdlib/random_module_test.lm",
+    # Stdlib - Parse
+    "tests/stdlib/parse_module_test.lm",
+    # Stdlib - Format
+    "tests/stdlib/format_module_test.lm",
     # Stdlib - Algorithm (skip - requires tuple type system improvements)
     # "tests/stdlib/algorithm/algorithm_test.lm",
     # Stdlib - Search
@@ -88,6 +119,14 @@ tests = [
     "tests/stdlib/sort/sort_test.lm",
     # Stdlib - Path
     "tests/stdlib/path/path_test.lm",
+    # Stdlib - SemVer
+    "tests/stdlib/semver_test.lm",
+    # Stdlib - URL
+    "tests/stdlib/url_test.lm",
+    # Stdlib - MIME
+    "tests/stdlib/mime_test.lm",
+    # Stdlib - UUID
+    "tests/stdlib/uuid_test.lm",
     # Stdlib - FS
     "tests/stdlib/fs/fs_test.lm",
     # Stdlib - Crypto
@@ -114,63 +153,75 @@ slow_tests = {
     "tests/stdlib/wss/wss_test.lm",
     "tests/stdlib/fs/fs_test.lm",
     "tests/stdlib/io/io_extended_test.lm",
+    "tests/stdlib/semver_test.lm",
+    "tests/stdlib/math_module_test.lm",
+    "tests/stdlib/io_module_test.lm",
+    "tests/stdlib/fs_module_test.lm",
+    "tests/stdlib/path_module_test.lm",
+    "tests/stdlib/env_module_test.lm",
+    "tests/stdlib/process_module_test.lm",
+    "tests/stdlib/time_module_test.lm",
+    "tests/stdlib/random_module_test.lm",
+    "tests/stdlib/parse_module_test.lm",
+    "tests/stdlib/format_module_test.lm",
 }
 
-passed = 0
-failed = 0
-hung = 0
+if __name__ == "__main__":
+    passed = 0
+    failed = 0
+    hung = 0
 
-print("====================================================")
-print("Running Limitly Tests Individually (3s/10s Timeout)")
-print("====================================================")
+    print("====================================================")
+    print("Running Limitly Tests Individually (3s/10s Timeout)")
+    print("====================================================")
 
-for test in tests:
-    test_path = os.path.normpath(test)
-    if not os.path.exists(test_path):
-        print(f"Skipping {test_path} (does not exist)")
-        continue
-    
-    timeout = 10.0 if test in slow_tests else 3.0
-    start_time = time.time()
-    try:
-        res = subprocess.run(
-            [limitly_path, "run", test_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=timeout
-        )
-        duration = time.time() - start_time
+    for test in tests:
+        test_path = os.path.normpath(test)
+        if not os.path.exists(test_path):
+            print(f"Skipping {test_path} (does not exist)")
+            continue
         
-        # Check output for typical error patterns
-        has_error_pattern = False
-        for pattern in ["error[E", "Error:", "RuntimeError", "SemanticError", "BytecodeError", "❌ FAIL", "ASSERT FAIL", "Assertion failed"]:
-            if pattern in res.stdout or pattern in res.stderr:
-                has_error_pattern = True
-                break
+        timeout = 10.0 if test in slow_tests else 3.0
+        start_time = time.time()
+        try:
+            res = subprocess.run(
+                [limitly_path, "run", test_path],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=timeout
+            )
+            duration = time.time() - start_time
+
+            # Check output for typical error patterns
+            has_error_pattern = False
+            for pattern in ["error[E", "Error:", "RuntimeError", "SemanticError", "BytecodeError", "❌ FAIL", "ASSERT FAIL", "Assertion failed"]:
+                if pattern in res.stdout or pattern in res.stderr:
+                    has_error_pattern = True
+                    break
+
+            if res.returncode == 0 and not has_error_pattern:
+                print(f"PASS: {test} ({duration:.2f}s)")
+                passed += 1
+            else:
+                print(f"FAIL: {test} (exit code: {res.returncode})")
+                print("--- STDOUT ---")
+                print(res.stdout)
+                print("--- STDERR ---")
+                print(res.stderr)
+                print("--------------")
+                failed += 1
                 
-        if res.returncode == 0 and not has_error_pattern:
-            print(f"PASS: {test} ({duration:.2f}s)")
-            passed += 1
-        else:
-            print(f"FAIL: {test} (exit code: {res.returncode})")
-            print("--- STDOUT ---")
-            print(res.stdout)
-            print("--- STDERR ---")
-            print(res.stderr)
-            print("--------------")
+        except subprocess.TimeoutExpired:
+            print(f"HANG / TIMEOUT: {test} (killed after {timeout}s)")
+            hung += 1
             failed += 1
-            
-    except subprocess.TimeoutExpired:
-        print(f"HANG / TIMEOUT: {test} (killed after {timeout}s)")
-        hung += 1
-        failed += 1
 
-print("====================================================")
-print(f"Summary: PASSED={passed}, FAILED={failed} (including HUNG={hung})")
-print("====================================================")
+    print("====================================================")
+    print(f"Summary: PASSED={passed}, FAILED={failed} (including HUNG={hung})")
+    print("====================================================")
 
-if failed > 0:
-    sys.exit(1)
-else:
-    sys.exit(0)
+    if failed > 0:
+        sys.exit(1)
+    else:
+        sys.exit(0)

@@ -1,0 +1,12 @@
+// @error:race_condition
+// Shared mutation in parallel block
+
+var shared = 0;
+
+parallel {
+    task(i in 1..10) {
+        shared = shared + 1;  // Race condition
+    }
+}
+
+print(shared);

@@ -1,0 +1,121 @@
+// TOML Parser Module
+
+import std.toml.value as val_mod;
+
+fn is_digit_char(ch: str): bool {
+    if (ch == "0") return true;
+    if (ch == "1") return true;
+    if (ch == "2") return true;
+    if (ch == "3") return true;
+    if (ch == "4") return true;
+    if (ch == "5") return true;
+    if (ch == "6") return true;
+    if (ch == "7") return true;
+    if (ch == "8") return true;
+    if (ch == "9") return true;
+    return false;
+}
+
+pub frame TOMLParser {
+    pub idx: int;
+    pub text: str;
+
+    pub fn parse_value(): any {
+        var keys: [str] = [];
+        var vals: [any] = [];
+        var length = len(self.text);
+        while (self.idx < length) {
+            var ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+            if (ch == "#" or ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
+                while (self.idx < length and _builtin_substring(self.text, self.idx, self.idx + 1) != "\n") {
+                    self.idx = self.idx + 1;
+                }
+                self.idx = self.idx + 1;
+            } else {
+                var key_start = self.idx;
+                var find_eq = true;
+                while (self.idx < length and find_eq == true) {
+                    var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+                    if (cur_ch == "=") {
+                        find_eq = false;
+                    } else {
+                        self.idx = self.idx + 1;
+                    }
+                }
+                var key_raw = _builtin_substring(self.text, key_start, self.idx);
+                self.idx = self.idx + 1; // skip '='
+
+                var key = "";
+                var k_len = len(key_raw);
+                var k_idx = 0;
+                while (k_idx < k_len) {
+                    var k_ch = _builtin_substring(key_raw, k_idx, k_idx + 1);
+                    if (k_ch != " " and k_ch != "\t") {
+                        key = key + k_ch;
+                    }
+                    k_idx = k_idx + 1;
+                }
+
+                var skip_val_spaces = true;
+                while (self.idx < length and skip_val_spaces == true) {
+                    var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+                    if (cur_ch == " " or cur_ch == "\t") {
+                        self.idx = self.idx + 1;
+                    } else {
+                        skip_val_spaces = false;
+                    }
+                }
+
+                var val_start = self.idx;
+                var find_val_end = true;
+                while (self.idx < length and find_val_end == true) {
+                    var cur_ch = _builtin_substring(self.text, self.idx, self.idx + 1);
+                    if (cur_ch == "\n" or cur_ch == "\r") {
+                        find_val_end = false;
+                    } else {
+                        self.idx = self.idx + 1;
+                    }
+                }
+                var val_raw = _builtin_substring(self.text, val_start, self.idx);
+                self.idx = self.idx + 1; // skip newline
+
+                // Trim trailing space from val_raw
+                var val_trimmed = "";
+                var val_raw_len = len(val_raw);
+                var vr_idx = 0;
+                while (vr_idx < val_raw_len) {
+                    var vr_ch = _builtin_substring(val_raw, vr_idx, vr_idx + 1);
+                    if (vr_ch != " " and vr_ch != "\t" and vr_ch != "\r") {
+                        val_trimmed = val_trimmed + vr_ch;
+                    }
+                    vr_idx = vr_idx + 1;
+                }
+
+                var val_obj = val_mod.make_string("");
+                var val_len = len(val_trimmed);
+                if (val_len > 0) {
+                    var first_ch = _builtin_substring(val_trimmed, 0, 1);
+                    if (first_ch == "\"") {
+                        var inner = _builtin_substring(val_trimmed, 1, val_len - 1);
+                        val_obj = val_mod.make_string(inner);
+                    } elif (val_trimmed == "true") {
+                        val_obj = val_mod.make_bool(true);
+                    } elif (val_trimmed == "false") {
+                        val_obj = val_mod.make_bool(false);
+                    } else {
+                        var val_int = val_trimmed as int;
+                        val_obj = val_mod.make_number(val_int);
+                    }
+                    keys.append(key);
+                    vals.append(val_obj as any);
+                }
+            }
+        }
+        return val_mod.make_object(keys, vals) as any;
+    }
+}
+
+pub fn parse(text: str): any {
+    var p = TOMLParser(idx=0, text=text);
+    return p.parse_value();
+}

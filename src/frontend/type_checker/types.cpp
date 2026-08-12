@@ -148,7 +148,16 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
                 if (custom_type && custom_type->tag != TypeTag::Nil) {
                     base_type = custom_type;
                 } else {
-                    add_error("Unknown type: " + annotation->typeName);
+                    std::vector<std::string> candidates = get_visible_types();
+                    std::string suggestion = find_similar_name(annotation->typeName, candidates);
+                    std::string msg = "cannot find type `" + annotation->typeName + "`";
+                    msg += "\n\n= reason: type is not defined in this scope";
+                    if (!suggestion.empty()) {
+                        msg += "\n= help: did you mean `" + suggestion + "`?";
+                    } else {
+                        msg += "\n= help: check that the type is declared and spelled correctly";
+                    }
+                    add_error(msg);
                     return type_system.NIL_TYPE;
                 }
             }
@@ -290,9 +299,11 @@ bool TypeChecker::check_function_call(const std::string& func_name,
     if (callee_type) {
         if (callee_type->tag == TypeTag::Function) {
             if (auto* func_type = std::get_if<FunctionType>(&callee_type->extra)) {
-                if (validate_argument_types(func_type->paramTypes, arg_types, func_name)) {
+                if (validate_argument_types(func_type->paramTypes, arg_types, func_name, line)) {
                     result_type = func_type->returnType;
                     return true;
+                } else {
+                    return false;
                 }
             }
         }
@@ -305,26 +316,48 @@ bool TypeChecker::check_function_call(const std::string& func_name,
     if (it == function_signatures.end()) {
         // Track this as an undefined symbol to suppress cascading errors
         undefined_symbols.insert(func_name);
-        add_error("Undefined function: " + func_name, line);
+
+        std::vector<std::string> candidates;
+        for (const auto& pair : function_signatures) {
+            candidates.push_back(pair.first);
+            size_t dot_pos = pair.first.find_last_of('.');
+            if (dot_pos != std::string::npos) {
+                candidates.push_back(pair.first.substr(dot_pos + 1));
+            }
+        }
+        std::string suggestion = find_similar_name(func_name, candidates);
+
+        std::string msg = "cannot find function `" + func_name + "`";
+        msg += "\n\n= reason: function is not declared in this scope";
+        if (!suggestion.empty()) {
+            msg += "\n= help: did you mean `" + suggestion + "`?";
+        } else {
+            msg += "\n= help: check that the function is declared and spelled correctly";
+        }
+        add_error(msg, line);
         return false;
     }
     
     const FunctionSignature& sig = it->second;
     
-    if (!validate_argument_types(sig.param_types, arg_types, func_name)) {
+    if (!validate_argument_types(sig.param_types, arg_types, func_name, line)) {
         return false;
     }
     
     result_type = sig.return_type;
     return true;
-
-     }
+}
 
 bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
                                          const std::vector<TypePtr>& actual,
-                                         const std::string& func_name) {
+                                         const std::string& func_name,
+                                         int line) {
     // Check if we have enough arguments
     if (actual.size() > expected.size()) {
+        std::string msg = "wrong number of arguments for `" + func_name + "`";
+        msg += "\n\n= reason: expected at most " + std::to_string(expected.size()) + " arguments, but found " + std::to_string(actual.size()) + " arguments";
+        msg += "\n= help: remove extra arguments from the call";
+        add_error(msg, line);
         return false;
     }
 
@@ -332,9 +365,21 @@ bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
     auto func_it = function_signatures.find(func_name);
     if (func_it == function_signatures.end()) {
         // Might be a constructor/enum variant, check strictly
-        if (actual.size() != expected.size()) return false;
+        if (actual.size() != expected.size()) {
+            std::string msg = "wrong number of arguments for `" + func_name + "`";
+            msg += "\n\n= reason: expected exactly " + std::to_string(expected.size()) + " arguments, but found " + std::to_string(actual.size()) + " arguments";
+            msg += "\n= help: check the function arguments and call signature";
+            add_error(msg, line);
+            return false;
+        }
         for (size_t i = 0; i < actual.size(); ++i) {
-            if (!is_type_compatible(expected[i], actual[i])) return false;
+            if (!is_type_compatible(expected[i], actual[i])) {
+                std::string msg = "type mismatch for argument " + std::to_string(i + 1) + " of function `" + func_name + "`";
+                msg += "\n\n= reason: expected `" + expected[i]->toString() + "`, but found `" + actual[i]->toString() + "`";
+                msg += "\n= help: check argument type compatibility";
+                add_error(msg, line);
+                return false;
+            }
         }
         return true;
     }
@@ -345,9 +390,10 @@ bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
     if (!func_decl) {
         // Fallback to strict checking if we don't have declaration
         if (expected.size() != actual.size()) {
-            add_error("Function " + func_name + " expects " + 
-                     std::to_string(expected.size()) + " arguments, got " + 
-                     std::to_string(actual.size()));
+            std::string msg = "wrong number of arguments for `" + func_name + "`";
+            msg += "\n\n= reason: expected " + std::to_string(expected.size()) + " arguments, but found " + std::to_string(actual.size()) + " arguments";
+            msg += "\n= help: check the function arguments and call signature";
+            add_error(msg, line);
             return false;
         }
     } else {
@@ -363,15 +409,15 @@ bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
         }
         
         if (actual.size() < min_args || actual.size() > max_args) {
-            if (min_args == max_args) {
-                add_error("Function " + func_name + " expects " + 
-                         std::to_string(min_args) + " arguments, got " + 
-                         std::to_string(actual.size()));
+            std::string exp_str = (min_args == max_args) ? std::to_string(min_args) : std::to_string(min_args) + "-" + std::to_string(max_args);
+            std::string msg = "wrong number of arguments for `" + func_name + "`";
+            msg += "\n\n= reason: expected " + exp_str + " arguments, but found " + std::to_string(actual.size()) + " arguments";
+            if (actual.size() > max_args) {
+                msg += "\n= help: remove extra arguments from the call";
             } else {
-                add_error("Function " + func_name + " expects " + 
-                         std::to_string(min_args) + "-" + std::to_string(max_args) + 
-                         " arguments, got " + std::to_string(actual.size()));
+                msg += "\n= help: check the function arguments and call signature";
             }
+            add_error(msg, line);
             return false;
         }
     }
@@ -379,9 +425,10 @@ bool TypeChecker::validate_argument_types(const std::vector<TypePtr>& expected,
     // Check type compatibility for provided arguments
     for (size_t i = 0; i < actual.size() && i < expected.size(); ++i) {
         if (!is_type_compatible(expected[i], actual[i])) {
-            add_error("Argument " + std::to_string(i + 1) + " of function " + 
-                     func_name + " expects " + expected[i]->toString() +
-                     ", got " + actual[i]->toString());
+            std::string msg = "type mismatch for argument " + std::to_string(i + 1) + " of function `" + func_name + "`";
+            msg += "\n\n= reason: expected `" + expected[i]->toString() + "`, but found `" + actual[i]->toString() + "`";
+            msg += "\n= help: check argument type compatibility";
+            add_error(msg, line);
             return false;
         }
     }

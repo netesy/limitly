@@ -1,0 +1,6 @@
+// @error:divide_by_zero
+// Modulo by zero
+
+var x = 10;
+var y = x % 0;  // Modulo by zero
+print(y);

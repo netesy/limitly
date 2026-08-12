@@ -28,10 +28,10 @@ frame HTTPServer {
     var port: int;
     var handle: int;
     var running: bool;
-    var resource: res.Resource?;
-    var binder: res.Binder?;
-    var listener: res.Listener?;
-    var accepter: res.Accepter?;
+    pub var resource: res.Resource?;
+    pub var binder: res.Binder?;
+    pub var listener: res.Listener?;
+    pub var accepter: res.Accepter?;
 
     pub fn init() {
         self.host = "0.0.0.0";
@@ -39,6 +39,9 @@ frame HTTPServer {
         self.handle = -1;
         self.running = false;
         self.resource = nil;
+        self.binder = nil;
+        self.listener = nil;
+        self.accepter = nil;
     }
 
     // Bind and listen
@@ -47,46 +50,46 @@ frame HTTPServer {
         self.port = port;
 
         match (res.create_socket()) {
-            case ok(r) => {
-                var binder = res.Binder(r);
-                if (not binder.bind([host, port])) {
+            val r => {
+                var binder = res.Binder(r=r);
+                if (not binder.bind(args=[host, port])) {
                     r.close();
                     return core.err_int("failed to bind to " + host + ":" + port as str);
                 }
 
-                var listener = res.Listener(r);
-                if (not listener.listen([backlog])) {
+                var listener = res.Listener(r=r);
+                if (not listener.listen(args=[backlog])) {
                     r.close();
                     return core.err_int("listen failed on port " + port as str);
                 }
 
-                self.resource = ok(r);
-                self.binder = ok(binder);
-                self.listener = ok(listener);
-                self.accepter = ok(res.Accepter(r));
+                self.resource = r;
+                self.binder = binder;
+                self.listener = listener;
+                self.accepter = res.Accepter(r=r);
                 self.handle = r._handle();
                 self.running = true;
                 return core.ok_int(self.handle);
-            }
-            case err(e) => return core.err_int("failed to create socket");
+            },
+            err e => return core.err_int("failed to create socket")
         }
     }
 
     // Accept a single connection and process the request
     pub fn accept_request(): ResultServerRequest {
         match (self.accepter) {
-            case ok(acc) => {
+            val acc => {
                 var client_fd = acc.accept();
-                if (client_fd == -1) return "accept returned nil (no connection)";
+                if (client_fd == -1) return "accept returned nil (no connection)" as ResultServerRequest;
 
-                var cr = res.adopt_socket(client_fd);
-                var rd = res.Reader(cr);
+                var cr = res.adopt_socket(fd=client_fd);
+                var rd = res.Reader(r=cr);
                 // Read request data
                 var request_data: str = "";
                 var max_read: int = 1048576; // 1MB max
                 var total: int = 0;
                 while (total < max_read) {
-                    var chunk = rd.read([ []]);
+                    var chunk = rd.read(args=[ []]);
                     if (chunk == nil) break;
                     request_data = request_data + (chunk as str);
                     total = total + len(chunk as str);
@@ -96,11 +99,11 @@ frame HTTPServer {
                 }
 
                 var req: ServerRequest = parse_server_request(request_data);
-                req.client_resource = ok(cr);
+                req.client_resource = cr;
                 req.remote_addr = "client";
-                return req;
-            }
-            case nil => return "server not listening";
+                return req as ResultServerRequest;
+            },
+            nil => return "server not listening" as ResultServerRequest
         }
     }
 
@@ -108,8 +111,10 @@ frame HTTPServer {
     pub fn close(): core.ResultInt {
         self.running = false;
         match (self.resource) {
-            case ok(r) => r.close();
-            case nil => {}
+            val r => {
+                r.close();
+            },
+            nil => {}
         }
         self.resource = nil;
         self.handle = -1;
@@ -119,11 +124,11 @@ frame HTTPServer {
     // Check for incoming connections (non-blocking)
     pub fn has_connection(): bool {
         match (self.resource) {
-            case ok(r) => {
-                var poller = res.Poller(r);
+            val r => {
+                var poller = res.Poller(r=r);
                 return poller.poll();
-            }
-            case nil => return false;
+            },
+            nil => return false
         }
     }
 }

@@ -1,0 +1,155 @@
+// Standard Library I/O Entrypoint Module
+
+import std.io.console as console_mod;
+import std.io.file as file_mod;
+import std.io.reader as reader_mod;
+import std.io.writer as writer_mod;
+import std.resource as res;
+
+// Types
+pub type Console = console_mod.Console;
+pub type File = file_mod.File;
+pub type Reader = reader_mod.Reader;
+pub type Writer = writer_mod.Writer;
+
+// Constructors
+pub fn Console(): any {
+    return console_mod.Console();
+}
+
+pub fn create_file_resource(p: str, r: res.Resource): any {
+    return file_mod.File(p, r);
+}
+
+pub fn Reader(resource: res.Resource): any {
+    return reader_mod.Reader(resource);
+}
+
+pub fn Writer(resource: res.Resource): any {
+    return writer_mod.Writer(resource);
+}
+
+// Global Variables
+pub var out: Console = console_mod.Console();
+
+// Functions Re-exports
+pub fn open(path: str, mode: str): any {
+    return file_mod.open(path, mode);
+}
+
+pub fn print(msg: any): nil {
+    var w = res.ResourceWriter(r=res.stdout);
+    w.write(args=[msg]);
+}
+
+frame FileSystem {
+    pub resource: res.Resource;
+    pub init(r: res.Resource) { self.resource = r; }
+    pub fn exists(path: str): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_EXISTS, args=[path]);
+        return (result == true);
+    }
+    pub fn delete(path: str): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_DELETE, args=[path]);
+        return (result == true);
+    }
+    pub fn rename(old: str, new: str): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_RENAME, args=[old, new]);
+        return (result == true);
+    }
+    pub fn mkdir(path: str): bool {
+        var result = res._call(h=self.resource.handle, op=res.OP_MKDIR, args=[path]);
+        return (result == true);
+    }
+    pub fn readdir(path: str): any {
+        return res._call(h=self.resource.handle, op=res.OP_READDIR, args=[path]);
+    }
+}
+
+pub fn exists(path: str): bool {
+    match (res.create_fs_resource()) {
+        val r => {
+            var fs = FileSystem(r);
+            var result = fs.exists(path);
+            r.close();
+            return result;
+        },
+        err e => return false
+    }
+}
+
+pub fn delete(path: str): bool {
+    match (res.create_fs_resource()) {
+        val r => {
+            var fs = FileSystem(r);
+            var result = fs.delete(path);
+            r.close();
+            return result;
+        },
+        err e => return false
+    }
+}
+
+pub fn rename(old_path: str, new_path: str): bool {
+    match (res.create_fs_resource()) {
+        val r => {
+            var fs = FileSystem(r);
+            var result = fs.rename(old_path, new_path);
+            r.close();
+            return result;
+        },
+        err e => return false
+    }
+}
+
+pub fn create_directory(path: str): any {
+    match (res.create_fs_resource()) {
+        val r => {
+            var fs = FileSystem(r);
+            var result = fs.mkdir(path);
+            r.close();
+            if (result) return ok(nil);
+            var unknown_e = file_mod.UnknownError(message="fail");
+            return err(unknown_e);
+        },
+        err e => {
+            var unknown_e2 = file_mod.UnknownError(message="fail");
+            return err(unknown_e2);
+        }
+    }
+}
+
+pub fn list_directory(path: str): any {
+    var final_result: any = nil;
+    match (res.create_fs_resource()) {
+        val r => {
+            var fs = FileSystem(r);
+            var result = fs.readdir(path);
+            r.close();
+            if (result == nil) {
+                var unknown_e = file_mod.UnknownError(message="fail");
+                final_result = err(unknown_e);
+            } else {
+                var s = result as str;
+                var parts: [str] = [];
+                var current = "";
+                for (var i = 0; i < len(s); i = i + 1) {
+                    var ch = substring(s, i, i + 1);
+                    if (ch == "\n") {
+                        if (len(current) > 0) parts.append(current);
+                        current = "";
+                    } else {
+                        current = current + ch;
+                    }
+                }
+                if (len(current) > 0) parts.append(current);
+                final_result = ok(parts);
+            }
+        },
+        err e => {
+            var unknown_e2 = file_mod.UnknownError(message="fail");
+            final_result = err(unknown_e2);
+        }
+    }
+    return final_result;
+}

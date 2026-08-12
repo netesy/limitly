@@ -1,0 +1,7 @@
+// Standard Library Parse DateTime Submodule
+
+import std.time.datetime as datetime_mod;
+
+pub fn parse_datetime(value: str): any {
+    return datetime_mod.DateTime.from_string(value);
+}

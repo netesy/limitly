@@ -1,0 +1,7 @@
+frame Menu {
+    pub var items: [str];
+
+    pub init(its: [str] = []) {
+        self.items = its;
+    }
+}

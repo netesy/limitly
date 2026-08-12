@@ -1,0 +1,5 @@
+// @error:return_in_global
+// Return statement at global scope
+
+var x = 5;
+return x;  // return not inside function

@@ -37,7 +37,19 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         if (auto enum_decl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) {
             EnumType enumTypeInfo;
             enumTypeInfo.name = name;
-            for (const auto& variant : enum_decl->variants) enumTypeInfo.addVariant(variant.first);
+            for (const auto& variant : enum_decl->variants) {
+                std::vector<TypePtr> associated;
+                for (const auto& t : variant.second) {
+                    // Try to resolve type annotation - may fail if forward reference, but that's OK
+                    try {
+                        TypePtr resolved = resolve_type_annotation(t);
+                        if (resolved) associated.push_back(resolved);
+                    } catch (...) {
+                        // If resolution fails, leave empty - will be filled in Pass 2
+                    }
+                }
+                enumTypeInfo.addVariant(variant.first, associated);
+            }
             TypePtr enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
             type_system.addUserDefinedType(name, enumType);
 
@@ -109,6 +121,11 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 checker.set_source_context(module->source, module->path);
                 if (!checker.check_program(module->ast)) {
                     add_error("Failed to type check module: " + path);
+                    failed_modules.insert(path);
+                    size_t last_dot = path.find_last_of('.');
+                    if (last_dot != std::string::npos) {
+                        failed_modules.insert(path.substr(0, last_dot));
+                    }
                     for (const auto& err : checker.get_errors()) {
                         std::cerr << "  Module [" << path << "] local error: " << err << std::endl;
                     }
@@ -146,7 +163,10 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                         }
                     }
                 }
-                for (const auto& [alias, path_] : checker.import_aliases) this->import_aliases[alias] = path_;
+                // Do not merge a dependency module's lexical import aliases into the
+                // importing/root checker. Aliases are scoped to the source file that
+                // declares the import; leaking them globally makes unrelated modules
+                // resolve through one another and weakens module namespace isolation.
             }
         }
     }
@@ -375,7 +395,31 @@ void TypeChecker::add_error(const std::string& message, int line, int column, co
 }
 
 void TypeChecker::add_type_error(const std::string& expected, const std::string& found, int line) {
-    add_error("Type mismatch: expected " + expected + ", found " + found, line);
+    // Generate more specific type error messages
+    std::string enhancedMessage = "type mismatch\n\n= expected: `" + expected + "`\n= found: `" + found + "`";
+    
+    // Add specific reasons for common type mismatches
+    if (found == "Any" || found == "any") {
+        enhancedMessage += "\n\n= reason: the value has type `any`, which cannot be used where a specific type is required";
+        enhancedMessage += "\n= help: provide a value of type `" + expected + "` or add explicit type annotation";
+    } else if (expected.find("List") != std::string::npos && found.find("List") != std::string::npos) {
+        enhancedMessage += "\n\n= reason: list element types do not match";
+        enhancedMessage += "\n= help: ensure all list elements have the same type";
+    } else if (expected.find("Dict") != std::string::npos && found.find("Dict") != std::string::npos) {
+        enhancedMessage += "\n\n= reason: dictionary key or value types do not match";
+        enhancedMessage += "\n= help: ensure dictionary keys and values have consistent types";
+    } else if (expected == "String" || expected == "str") {
+        enhancedMessage += "\n\n= reason: a string value is required here";
+        enhancedMessage += "\n= help: provide a string literal or convert the value to a string";
+    } else if (expected == "Int" || expected == "int" || expected.find("int") != std::string::npos) {
+        enhancedMessage += "\n\n= reason: an integer value is required here";
+        enhancedMessage += "\n= help: provide an integer literal or convert the value to an integer";
+    } else if (expected == "Bool" || expected == "bool") {
+        enhancedMessage += "\n\n= reason: a boolean value is required here";
+        enhancedMessage += "\n= help: provide a boolean literal (true or false) or a boolean expression";
+    }
+    
+    add_error(enhancedMessage, line);
 }
 
 // =============================================================================
@@ -386,7 +430,7 @@ void TypeChecker::add_type_error(const std::string& expected, const std::string&
 
 void TypeChecker::enter_scope() {
     current_scope_level++;
-    current_scope = std::make_unique<Scope>(std::move(current_scope));
+    current_scope = std::make_unique<Scope>(std::move(current_scope), current_function);
     type_system.pushScope();
 }
 

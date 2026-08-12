@@ -1,0 +1,16 @@
+import std.graphics.color as color;
+import std.graphics.brush as brush;
+
+frame Paint {
+    pub var color_val: color.Color;
+    pub var brush_val: brush.Brush;
+    pub var stroke_width: float;
+    pub var is_stroke: bool;
+
+    pub init(c: color.Color = color.Color(), b: brush.Brush = brush.Brush(), sw: float = 1.0, stroke: bool = false) {
+        self.color_val = c;
+        self.brush_val = b;
+        self.stroke_width = sw;
+        self.is_stroke = stroke;
+    }
+}

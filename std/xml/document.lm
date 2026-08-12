@@ -1,0 +1,21 @@
+// XML Document and Node representation
+
+pub frame XMLNode {
+    pub name: str;
+    pub text: str;
+    pub attrs_keys: [str];
+    pub attrs_vals: [str];
+    pub children: [any];
+}
+
+pub frame XMLDocument {
+    pub root: any; // XMLNode as any
+}
+
+pub fn make_node(name: str, text: str, keys: [str], vals: [str], children: [any]): XMLNode {
+    return XMLNode(name=name, text=text, attrs_keys=keys, attrs_vals=vals, children=children);
+}
+
+pub fn make_document(root: any): XMLDocument {
+    return XMLDocument(root=root);
+}

@@ -202,6 +202,9 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
 
 void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
    // std::cout << "[DEBUG] emit_stmt called with type: " << typeid(stmt).name() << std::endl;
+   
+   // Unified region management: emit RegionEnter based on memory_info
+   emit_region_enter_from_memory_info(stmt);
     
     if (auto expr_stmt = dynamic_cast<LM::Frontend::AST::ExprStatement*>(&stmt)) {
        // std::cout << "[DEBUG] Emitting ExprStatement" << std::endl;
@@ -260,6 +263,9 @@ void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
     } else {
         report_error("Unsupported statement type in LIR generator");
     }
+    
+    // Unified region management: emit RegionExit based on memory_info
+    emit_region_exit_from_memory_info(stmt);
 }
 
 
@@ -272,11 +278,9 @@ void Generator::emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt) {
 
 
 void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
-   // std::cout << "[DEBUG] emit_var_stmt called for variable: " << stmt.name << std::endl;
-
-    // Check if this is a module-level variable (global)
-    // Only treat as global if: we're in a module AND we're not inside a function
-    if (!current_module_.empty() && current_module_ != "root" && current_function_ == nullptr) {
+   // Check if this is a module-level variable (global)
+    // Treat as global if: we're not inside a function (or inside __init__ function)
+    if (current_function_ == nullptr || (current_function_ && current_function_->name == current_module_ + ".__init__")) {
         std::string qualified_name = current_module_ + "." + stmt.name;
         Reg val_reg = 0;
         if (stmt.initializer) {
@@ -436,6 +440,9 @@ void Generator::emit_block_stmt(LM::Frontend::AST::BlockStatement& stmt) {
 
 
 void Generator::emit_if_stmt(LM::Frontend::AST::IfStatement& stmt) {
+    bool prev_in_control_flow = cfg_context_.in_control_flow;
+    cfg_context_.in_control_flow = true;
+    
     if (cfg_context_.building_cfg) {
         // CFG mode: create basic blocks
         emit_if_stmt_cfg(stmt);
@@ -443,6 +450,8 @@ void Generator::emit_if_stmt(LM::Frontend::AST::IfStatement& stmt) {
         // Linear mode: use conditional jumps
         emit_if_stmt_linear(stmt);
     }
+    
+    cfg_context_.in_control_flow = prev_in_control_flow;
 }
 
 
@@ -580,6 +589,9 @@ void Generator::emit_if_stmt_linear(LM::Frontend::AST::IfStatement& stmt) {
 
 
 void Generator::emit_while_stmt(LM::Frontend::AST::WhileStatement& stmt) {
+    bool prev_in_control_flow = cfg_context_.in_control_flow;
+    cfg_context_.in_control_flow = true;
+    
     if (cfg_context_.building_cfg) {
         // CFG mode: create basic blocks
         emit_while_stmt_cfg(stmt);
@@ -587,6 +599,8 @@ void Generator::emit_while_stmt(LM::Frontend::AST::WhileStatement& stmt) {
         // Linear mode: use loop instructions
         emit_while_stmt_linear(stmt);
     }
+    
+    cfg_context_.in_control_flow = prev_in_control_flow;
 }
 
 
@@ -632,8 +646,8 @@ void Generator::emit_while_stmt_cfg(LM::Frontend::AST::WhileStatement& stmt) {
     emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition_bool, 0, end_block->id));
     
     // Set up edges from header block
-    add_block_edge(header_block, body_block);  // Continue if true
-    add_block_edge(header_block, end_block);   // Exit if false
+    add_block_edge(get_current_block(), body_block);  // Continue if true
+    add_block_edge(get_current_block(), end_block);   // Exit if false
     
     // === Body Block ===
     set_current_block(body_block);
@@ -646,7 +660,7 @@ void Generator::emit_while_stmt_cfg(LM::Frontend::AST::WhileStatement& stmt) {
     // Jump back to header to continue loop
     if (get_current_block() && !get_current_block()->has_terminator()) {
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
-        add_block_edge(body_block, header_block);
+        add_block_edge(get_current_block(), header_block);
     }
     
     // === End Block: continuation ===
@@ -690,6 +704,9 @@ void Generator::emit_while_stmt_linear(LM::Frontend::AST::WhileStatement& stmt) 
 
 
 void Generator::emit_for_stmt(LM::Frontend::AST::ForStatement& stmt) {
+    bool prev_in_control_flow = cfg_context_.in_control_flow;
+    cfg_context_.in_control_flow = true;
+    
     if (cfg_context_.building_cfg) {
         // CFG mode: create basic blocks
         emit_for_stmt_cfg(stmt);
@@ -697,6 +714,8 @@ void Generator::emit_for_stmt(LM::Frontend::AST::ForStatement& stmt) {
         // Linear mode: use loop instructions
         emit_for_stmt_linear(stmt);
     }
+    
+    cfg_context_.in_control_flow = prev_in_control_flow;
 }
 
 
@@ -763,8 +782,8 @@ void Generator::emit_for_stmt_cfg(LM::Frontend::AST::ForStatement& stmt) {
     emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition, 0, end_block->id));
     
     // Set up edges from header block
-    add_block_edge(header_block, body_block);  // Continue if true
-    add_block_edge(header_block, end_block);   // Exit if false
+    add_block_edge(get_current_block(), body_block);  // Continue if true
+    add_block_edge(get_current_block(), end_block);   // Exit if false
     
     // === Body Block ===
     set_current_block(body_block);
@@ -777,7 +796,7 @@ void Generator::emit_for_stmt_cfg(LM::Frontend::AST::ForStatement& stmt) {
     // Jump to increment block
     if (get_current_block() && !get_current_block()->has_terminator()) {
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, increment_block->id));
-        add_block_edge(body_block, increment_block);
+        add_block_edge(get_current_block(), increment_block);
     }
     
     // === Increment Block ===
@@ -864,10 +883,26 @@ void Generator::emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt) {
         // Normal return statement
         if (stmt.value) {
             Reg value = emit_expr(*stmt.value);
+            
+            // Move ownership of returned value to region 0 (parent/caller region)
+            // TEMPORARY: Disable automatic region operations
+            // emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, value, 0, 0));
+            
+            // Emit RegionExit for all active scopes
+            // TEMPORARY: Disable automatic region operations
+            // for (auto it = generator_region_stack_.rbegin(); it != generator_region_stack_.rend(); ++it) {
+            //     emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, *it, 0));
+            // }
+            
             LIR_Inst ret_inst(LIR_Op::Return);
             ret_inst.a = value;
             emit_instruction(ret_inst);
         } else {
+            // Emit RegionExit for all active scopes
+            // TEMPORARY: Disable automatic region operations
+            // for (auto it = generator_region_stack_.rbegin(); it != generator_region_stack_.rend(); ++it) {
+            //     emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, *it, 0));
+            // }
             emit_instruction(LIR_Inst(LIR_Op::Return));
         }
     }
@@ -905,7 +940,7 @@ void Generator::emit_import_stmt(LM::Frontend::AST::ImportStatement& stmt) {
     // This is needed because module globals are stored in the VM's globals_ map
     // and need to be initialized before they can be accessed
     std::string init_func_name = stmt.modulePath + ".__init__";
-    if (LIRFunctionManager::getInstance().hasFunction(init_func_name) || function_table_.count(init_func_name)) {
+    if (current_function_ && (LIRFunctionManager::getInstance().hasFunction(init_func_name) || function_table_.count(init_func_name))) {
         std::vector<Reg> empty_args;
         Reg dummy_res = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::Call, dummy_res, init_func_name, empty_args));
@@ -973,7 +1008,7 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
             emit_stmt(*stmt.body);
         }
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, increment_block->id));
-        add_block_edge(body_block, increment_block);
+        add_block_edge(get_current_block(), increment_block);
 
         set_current_block(increment_block);
         Reg step_reg;
@@ -1100,7 +1135,7 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
             
             // Jump back to header
             emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
-            add_block_edge(body_block, header_block);
+            add_block_edge(get_current_block(), header_block);
 
             set_current_block(exit_block);
             exit_loop();
@@ -1201,7 +1236,7 @@ void Generator::emit_dict_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     
     // Jump back to header
     emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
-    add_block_edge(body_block, header_block);
+    add_block_edge(get_current_block(), header_block);
 
     set_current_block(exit_block);
     exit_loop();
@@ -1290,7 +1325,7 @@ void Generator::emit_list_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::
     
     // Jump back to header
     emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
-    add_block_edge(body_block, header_block);
+    add_block_edge(get_current_block(), header_block);
 
     set_current_block(exit_block);
     exit_loop();
@@ -1383,7 +1418,7 @@ void Generator::emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM:
     
     // Jump back to header
     emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
-    add_block_edge(body_block, header_block);
+    add_block_edge(get_current_block(), header_block);
 
     set_current_block(exit_block);
     exit_loop();
@@ -1569,7 +1604,7 @@ void Generator::emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
     
     // Jump back to header
     emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
-    add_block_edge(body_block, header_block);
+    add_block_edge(get_current_block(), header_block);
 
     set_current_block(exit_block);
     exit_loop();
@@ -1659,7 +1694,7 @@ void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt,
     
     // Jump back to header
     emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
-    add_block_edge(body_block, header_block);
+    add_block_edge(get_current_block(), header_block);
 
     set_current_block(exit_block);
     exit_loop();
@@ -1710,72 +1745,136 @@ void Generator::emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt) {
 void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
     if (!stmt.value) return;
     
+    bool prev_in_control_flow = cfg_context_.in_control_flow;
+    cfg_context_.in_control_flow = true;
+    
     Reg value_reg = emit_expr(*stmt.value);
-    LIR_BasicBlock* match_exit = create_basic_block("match_exit");
     
-    // Create blocks in execution order: pattern0, body0, pattern1, body1, ...
-    std::vector<LIR_BasicBlock*> pattern_blocks;
-    std::vector<LIR_BasicBlock*> body_blocks;
-    
-    for (size_t i = 0; i < stmt.cases.size(); ++i) {
-        pattern_blocks.push_back(create_basic_block("match_pattern_" + std::to_string(i)));
-        body_blocks.push_back(create_basic_block("match_body_" + std::to_string(i)));
-    }
+    if (cfg_context_.building_cfg) {
+        LIR_BasicBlock* match_exit = create_basic_block("match_exit");
+        
+        // Create blocks in execution order: pattern0, body0, pattern1, body1, ...
+        std::vector<LIR_BasicBlock*> pattern_blocks;
+        std::vector<LIR_BasicBlock*> body_blocks;
+        
+        for (size_t i = 0; i < stmt.cases.size(); ++i) {
+            pattern_blocks.push_back(create_basic_block("match_pattern_" + std::to_string(i)));
+            body_blocks.push_back(create_basic_block("match_body_" + std::to_string(i)));
+        }
 
-    // Jump to first pattern block
-    if (get_current_block() && !get_current_block()->has_terminator()) {
-        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, pattern_blocks[0]->id));
-        add_block_edge(get_current_block(), pattern_blocks[0]);
-    }
+        // Jump to first pattern block
+        if (get_current_block() && !get_current_block()->has_terminator()) {
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, pattern_blocks[0]->id));
+            add_block_edge(get_current_block(), pattern_blocks[0]);
+        }
 
-    // Generate pattern matching and body for each case
-    for (size_t i = 0; i < stmt.cases.size(); ++i) {
-        const auto& match_case = stmt.cases[i];
-        LIR_BasicBlock* pattern_block = pattern_blocks[i];
-        LIR_BasicBlock* body_block = body_blocks[i];
-        LIR_BasicBlock* next_pattern = (i + 1 < stmt.cases.size()) ? pattern_blocks[i + 1] : match_exit;
+        // Generate pattern matching and body for each case
+        for (size_t i = 0; i < stmt.cases.size(); ++i) {
+            const auto& match_case = stmt.cases[i];
+            LIR_BasicBlock* pattern_block = pattern_blocks[i];
+            LIR_BasicBlock* body_block = body_blocks[i];
+            LIR_BasicBlock* next_pattern = (i + 1 < stmt.cases.size()) ? pattern_blocks[i + 1] : match_exit;
 
-        set_current_block(pattern_block);
-        enter_scope();
+            set_current_block(pattern_block);
+            enter_scope();
 
-        // 1. Pattern Matching Logic
-        emit_pattern_match(match_case.pattern, value_reg, next_pattern);
+            // 1. Pattern Matching Logic
+            emit_pattern_match(match_case.pattern, value_reg, next_pattern, 0);
 
-        // 2. Guard Logic
-        if (match_case.guard) {
-            if (get_current_block() && !get_current_block()->has_terminator()) {
-                Reg guard_res = emit_expr(*match_case.guard);
-                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, guard_res, 0, next_pattern->id));
-                add_block_edge(get_current_block(), body_block);  // Fall-through if guard true (add first)
-                add_block_edge(get_current_block(), next_pattern);  // Jump if false (add second)
+            // 2. Guard Logic
+            if (match_case.guard) {
+                if (get_current_block() && !get_current_block()->has_terminator()) {
+                    Reg guard_res = emit_expr(*match_case.guard);
+                    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, guard_res, 0, next_pattern->id));
+                    add_block_edge(get_current_block(), body_block);  // Fall-through if guard true (add first)
+                    add_block_edge(get_current_block(), next_pattern);  // Jump if false (add second)
+                }
+            } else {
+                if (get_current_block() && !get_current_block()->has_terminator()) {
+                    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
+                    add_block_edge(get_current_block(), body_block);
+                }
             }
+
+            // 3. Body Logic
+            set_current_block(body_block);
+            bind_all_vars(this, match_case.pattern, value_reg);
+            if (match_case.body) {
+                emit_stmt(*match_case.body);
+            }
+            
+            if (get_current_block() && !get_current_block()->has_terminator()) {
+                emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, match_exit->id));
+                add_block_edge(get_current_block(), match_exit);
+            }
+            
+            exit_scope();
         }
 
-        // Jump to body if we haven't already
-        if (get_current_block() && !get_current_block()->has_terminator()) {
-            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, body_block->id));
-            add_block_edge(get_current_block(), body_block);
-        }
-
-        // 3. Body Logic
-        set_current_block(body_block);
-        bind_all_vars(this, match_case.pattern, value_reg);
-        if (match_case.body) {
-            emit_stmt(*match_case.body);
+        set_current_block(match_exit);
+    } else {
+        // Non-CFG (linear) mode: use labels
+        uint32_t exit_label = generate_label();
+        
+        std::vector<uint32_t> pattern_labels;
+        std::vector<uint32_t> body_labels;
+        
+        for (size_t i = 0; i < stmt.cases.size(); ++i) {
+            pattern_labels.push_back(generate_label());
+            body_labels.push_back(generate_label());
         }
         
-        if (get_current_block() && !get_current_block()->has_terminator()) {
-            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, match_exit->id));
-            add_block_edge(get_current_block(), match_exit);
+        // Jump to first pattern label
+        emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, pattern_labels[0]));
+        
+        for (size_t i = 0; i < stmt.cases.size(); ++i) {
+            const auto& match_case = stmt.cases[i];
+            uint32_t pattern_label = pattern_labels[i];
+            uint32_t body_label = body_labels[i];
+            uint32_t next_pattern_label = (i + 1 < stmt.cases.size()) ? pattern_labels[i + 1] : exit_label;
+            
+            emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, pattern_label, 0, 0));
+            enter_scope();
+            
+            // 1. Pattern Matching Logic
+            emit_pattern_match(match_case.pattern, value_reg, nullptr, next_pattern_label);
+            
+            // 2. Guard Logic
+            if (match_case.guard) {
+                Reg guard_res = emit_expr(*match_case.guard);
+                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, Type::Void, 0, guard_res, 0, next_pattern_label));
+            }
+            
+            // Fall-through (or jump) to body
+            emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, body_label));
+            
+            // 3. Body Logic
+            emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, body_label, 0, 0));
+            bind_all_vars(this, match_case.pattern, value_reg);
+            if (match_case.body) {
+                emit_stmt(*match_case.body);
+            }
+            
+            emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, exit_label));
+            exit_scope();
         }
         
-        exit_scope();
+        emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, exit_label, 0, 0));
     }
-
-    set_current_block(match_exit);
+    
+    cfg_context_.in_control_flow = prev_in_control_flow;
 }
 
-void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg, LIR_BasicBlock* failure_target) {
+void Generator::emit_pattern_match_jump(LIR_Op op, Reg cond_reg, LIR_BasicBlock* failure_target, uint32_t failure_label) {
+    if (cfg_context_.building_cfg) {
+        emit_instruction(LIR_Inst(op, 0, cond_reg, 0, failure_target->id));
+        add_block_edge(get_current_block(), failure_target);
+    } else {
+        emit_instruction(LIR_Inst(op, Type::Void, 0, cond_reg, 0, failure_label));
+    }
+}
+
+void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg, LIR_BasicBlock* failure_target, uint32_t failure_label) {
     auto i64_type = std::make_shared<::Type>(::TypeTag::Int64);
 
     if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(pattern.get())) {
@@ -1786,8 +1885,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             Reg cmp = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::CmpEQ, LIR::Type::Bool, cmp, val_reg, literal_reg));
             set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
-            emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, failure_target->id));
-            add_block_edge(get_current_block(), failure_target);
+            emit_pattern_match_jump(LIR_Op::JumpIfFalse, cmp, failure_target, failure_label);
         }
     } else if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(pattern.get())) {
         if (var_expr->name != "_") {
@@ -1796,53 +1894,33 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
     } else if (auto val_p = dynamic_cast<LM::Frontend::AST::ValPatternExpr*>(pattern.get())) {
          Reg is_err = allocate_register();
          emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_err, val_reg));
-         emit_instruction(LIR_Inst(LIR_Op::JumpIf, 0, is_err, 0, failure_target->id));
-         add_block_edge(get_current_block(), failure_target);
+         emit_pattern_match_jump(LIR_Op::JumpIf, is_err, failure_target, failure_label);
     } else if (auto err_p = dynamic_cast<LM::Frontend::AST::ErrPatternExpr*>(pattern.get())) {
          Reg is_err = allocate_register();
          emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_err, val_reg));
-         emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, is_err, 0, failure_target->id));
-         add_block_edge(get_current_block(), failure_target);
+         emit_pattern_match_jump(LIR_Op::JumpIfFalse, is_err, failure_target, failure_label);
     } else if (auto err_t_p = dynamic_cast<LM::Frontend::AST::ErrorTypePatternExpr*>(pattern.get())) {
          Reg is_err = allocate_register();
          emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_err, val_reg));
-         emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, is_err, 0, failure_target->id));
-         add_block_edge(get_current_block(), failure_target);
-    } else if (auto val_p = dynamic_cast<LM::Frontend::AST::ValPatternExpr*>(pattern.get())) {
-         Reg is_err = allocate_register();
-         emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_err, val_reg));
-         emit_instruction(LIR_Inst(LIR_Op::JumpIf, 0, is_err, 0, failure_target->id));
-         add_block_edge(get_current_block(), failure_target);
-    } else if (auto err_p = dynamic_cast<LM::Frontend::AST::ErrPatternExpr*>(pattern.get())) {
-         Reg is_err = allocate_register();
-         emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_err, val_reg));
-         emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, is_err, 0, failure_target->id));
-         add_block_edge(get_current_block(), failure_target);
-    } else if (auto err_t_p = dynamic_cast<LM::Frontend::AST::ErrorTypePatternExpr*>(pattern.get())) {
-         Reg is_err = allocate_register();
-         emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_err, val_reg));
-         emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, is_err, 0, failure_target->id));
-         add_block_edge(get_current_block(), failure_target);
+         emit_pattern_match_jump(LIR_Op::JumpIfFalse, is_err, failure_target, failure_label);
     } else if (auto binding = dynamic_cast<LM::Frontend::AST::BindingPatternExpr*>(pattern.get())) {
         if (binding->typeName == "val") {
              Reg is_err = allocate_register();
              emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_err, val_reg));
-             emit_instruction(LIR_Inst(LIR_Op::JumpIf, 0, is_err, 0, failure_target->id));
-             add_block_edge(get_current_block(), failure_target);
+             emit_pattern_match_jump(LIR_Op::JumpIf, is_err, failure_target, failure_label);
              if (!binding->patterns.empty()) {
                  Reg payload = allocate_register();
                  emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::Ptr, payload, val_reg));
-                 emit_pattern_match(binding->patterns[0], payload, failure_target);
+                 emit_pattern_match(binding->patterns[0], payload, failure_target, failure_label);
              }
         } else if (binding->typeName == "err") {
              Reg is_err = allocate_register();
              emit_instruction(LIR_Inst(LIR_Op::IsError, Type::Bool, is_err, val_reg));
-             emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, is_err, 0, failure_target->id));
-             add_block_edge(get_current_block(), failure_target);
+             emit_pattern_match_jump(LIR_Op::JumpIfFalse, is_err, failure_target, failure_label);
              if (!binding->patterns.empty()) {
                  Reg payload = allocate_register();
                  emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, val_reg));
-                 emit_pattern_match(binding->patterns[0], payload, failure_target);
+                 emit_pattern_match(binding->patterns[0], payload, failure_target, failure_label);
              }
         } else {
             int64_t tag = 0; size_t arity = 0;
@@ -1864,21 +1942,22 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
                 emit_instruction(LIR_Inst(LIR_Op::CmpEQ, LIR::Type::Bool, cmp, tag_reg, expected));
                 set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
 
-                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, failure_target->id));
-                add_block_edge(get_current_block(), failure_target);
+                emit_pattern_match_jump(LIR_Op::JumpIfFalse, cmp, failure_target, failure_label);
                 
                 if (!binding->patterns.empty()) {
                     Reg payload = allocate_register();
                     emit_instruction(LIR_Inst(LIR_Op::GetPayload, Type::Ptr, payload, val_reg));
+                    // For single-element variants, payload is the value directly (optimization)
+                    // For multi-element variants, payload is a tuple
                     if (binding->patterns.size() == 1) {
-                        emit_pattern_match(binding->patterns[0], payload, failure_target);
+                        emit_pattern_match(binding->patterns[0], payload, failure_target, failure_label);
                     } else {
                         for (size_t v_idx = 0; v_idx < binding->patterns.size(); ++v_idx) {
                             Reg idx_reg = allocate_register();
                             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(v_idx)));
                             Reg elem = allocate_register();
                             emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, payload, idx_reg));
-                            emit_pattern_match(binding->patterns[v_idx], elem, failure_target);
+                            emit_pattern_match(binding->patterns[v_idx], elem, failure_target, failure_label);
                         }
                     }
                 }
@@ -1888,8 +1967,12 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
                 if (binding->typeName.find('.') == std::string::npos && binding->patterns.empty() && binding->typeName != "_") {
                     bind_variable(binding->typeName, val_reg);
                 } else {
-                    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, failure_target->id));
-                    if (get_current_block()) add_block_edge(get_current_block(), failure_target);
+                    if (cfg_context_.building_cfg) {
+                        emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, failure_target->id));
+                        if (get_current_block()) add_block_edge(get_current_block(), failure_target);
+                    } else {
+                        emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, failure_label));
+                    }
                 }
             }
         }
@@ -1906,15 +1989,14 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             emit_instruction(LIR_Inst(LIR_Op::CmpEQ, LIR::Type::Bool, cmp, len_reg, expected_len));
         }
         set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
-        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, failure_target->id));
-        add_block_edge(get_current_block(), failure_target);
+        emit_pattern_match_jump(LIR_Op::JumpIfFalse, cmp, failure_target, failure_label);
 
         for (size_t i = 0; i < list_p->elements.size(); ++i) {
             Reg idx_reg = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
             Reg elem = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::ListIndex, Type::Ptr, elem, val_reg, idx_reg));
-            emit_pattern_match(list_p->elements[i], elem, failure_target);
+            emit_pattern_match(list_p->elements[i], elem, failure_target, failure_label);
         }
     } else if (auto tuple_p = dynamic_cast<LM::Frontend::AST::TuplePatternExpr*>(pattern.get())) {
         Reg len_reg = allocate_register();
@@ -1925,15 +2007,14 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
         Reg cmp = allocate_register();
         emit_instruction(LIR_Inst(LIR_Op::CmpEQ, LIR::Type::Bool, cmp, len_reg, expected_len));
         set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
-        emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, failure_target->id));
-        add_block_edge(get_current_block(), failure_target);
+        emit_pattern_match_jump(LIR_Op::JumpIfFalse, cmp, failure_target, failure_label);
 
         for (size_t i = 0; i < tuple_p->elements.size(); ++i) {
             Reg idx_reg = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(i)));
             Reg elem = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, elem, val_reg, idx_reg));
-            emit_pattern_match(tuple_p->elements[i], elem, failure_target);
+            emit_pattern_match(tuple_p->elements[i], elem, failure_target, failure_label);
         }
     } else if (auto dict_p = dynamic_cast<LM::Frontend::AST::DictPatternExpr*>(pattern.get())) {
         if (!dict_p->restBinding.has_value()) {
@@ -1945,8 +2026,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             Reg cmp = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::CmpEQ, LIR::Type::Bool, cmp, len_reg, expected_len));
             set_register_type(cmp, std::make_shared<::Type>(::TypeTag::Bool));
-            emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp, 0, failure_target->id));
-            add_block_edge(get_current_block(), failure_target);
+            emit_pattern_match_jump(LIR_Op::JumpIfFalse, cmp, failure_target, failure_label);
         }
 
         for (const auto& field : dict_p->fields) {
@@ -1956,12 +2036,11 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
             
             Reg exists = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::DictHas, LIR::Type::Bool, exists, val_reg, key_reg));
-            emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, exists, 0, failure_target->id));
-            add_block_edge(get_current_block(), failure_target);
+            emit_pattern_match_jump(LIR_Op::JumpIfFalse, exists, failure_target, failure_label);
 
             Reg elem = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::DictGet, Type::Ptr, elem, val_reg, key_reg));
-            emit_pattern_match(field.pattern, elem, failure_target);
+            emit_pattern_match(field.pattern, elem, failure_target, failure_label);
         }
     }
 }

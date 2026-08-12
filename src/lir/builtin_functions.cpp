@@ -184,7 +184,7 @@ void LIRBuiltinFunctions::registerIOFunctions() {
                             std::cout << value->toString();
                             break;
                         default:
-                            std::cout << "<unsupported type:" << static_cast<int>(value->type->tag) << ">";
+                            std::cout << value->toString();
                             break;
                     }
                     // Add space between arguments
@@ -404,20 +404,21 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
         }
     ));
     
-    registerFunction(std::make_shared<LIRBuiltinFunction>(
-        "assert",
-        std::vector<TypeTag>{TypeTag::Bool, TypeTag::String},
-        TypeTag::Nil,
-        [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            bool condition = args[0]->as<bool>();
-            std::string message = args[1]->as<std::string>();
-            if (!condition) {
-                throw std::runtime_error("Assertion failed: " + message);
-            }
-            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
-            return std::make_shared<Value>(nil_type);
-        }
-    ));
+    // Assert is handled directly by VM, not as a builtin function
+    // registerFunction(std::make_shared<LIRBuiltinFunction>(
+    //     "assert",
+    //     std::vector<TypeTag>{TypeTag::Bool, TypeTag::String},
+    //     TypeTag::Nil,
+    //     [](const std::vector<ValuePtr>& args) -> ValuePtr {
+    //         bool condition = args[0]->as<bool>();
+    //         std::string message = args[1]->as<std::string>();
+    //         if (!condition) {
+    //             throw std::runtime_error("Assertion failed: " + message);
+    //         }
+    //         auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+    //         return std::make_shared<Value>(nil_type);
+    //     }
+    // ));
 
     registerFunction(std::make_shared<LIRBuiltinFunction>(
         "len",

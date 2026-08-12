@@ -15,12 +15,23 @@ namespace Register {
 void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
     ResourceManager::getInstance().setCurrentFiber(get_current_fiber());
     switch (pc->op) {
+        case LIR::LIR_Op::CallBuiltin:
         case LIR::LIR_Op::Call: {
             auto& func_manager = LIR::LIRFunctionManager::getInstance();
             if (func_manager.hasFunction(pc->func_name)) {
                 auto func = func_manager.getFunction(pc->func_name);
                 std::vector<RegisterValue> arg_vals;
-                for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
+                for (auto arg_reg : pc->call_args) {
+                    if (arg_reg < registers.size()) {
+                        arg_vals.push_back(registers[arg_reg]);
+                    } else {
+                        arg_vals.push_back(VAL_NIL);
+                    }
+                }
+                size_t expected_total = func->getParameters().size();
+                while (arg_vals.size() < expected_total) {
+                    arg_vals.push_back(VAL_NIL);
+                }
 
                 auto saved_registers = registers;
                 const LIR::LIR_Function* saved_func = current_function_;
@@ -41,6 +52,11 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 registers = saved_registers;
                 current_function_ = saved_func;
                 registers[pc->dst] = return_value;
+            } else if (pc->func_name == "channel") {
+                // Allocate a real runtime Channel pointer boxed as a pointer!
+                auto channel = std::make_unique<LM::Backend::Channel>(1024);
+                channels.push_back(std::move(channel));
+                registers[pc->dst] = BOX_PTR(channels.back().get());
             } else if (LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
                 // Handle builtin functions (print, input, etc.)
                 std::vector<ValuePtr> args;
@@ -55,7 +71,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
                 }
             } else if (pc->func_name == "assert") {
-                bool condition = to_bool(registers[pc->call_args[0]]);
+                bool condition = (registers[pc->call_args[0]] == VAL_TRUE);
                 if (!condition) {
                     std::string msg = "Assertion failed";
                     if (pc->call_args.size() > 1) msg = to_string(registers[pc->call_args[1]]);
@@ -93,7 +109,23 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     auto func = func_manager.getFunction(func_name);
                     std::vector<RegisterValue> arg_vals;
                     for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
-                    arg_vals.insert(arg_vals.end(), closure_extra_args.begin(), closure_extra_args.end());
+                    
+                    if (!closure_extra_args.empty()) {
+                        size_t expected_total = func->getParameters().size();
+                        if (expected_total > 0) {
+                            while (arg_vals.size() < expected_total - 1) {
+                                arg_vals.push_back(VAL_NIL);
+                            }
+                            arg_vals.push_back(closure_extra_args[0]);
+                        } else {
+                            arg_vals.push_back(closure_extra_args[0]);
+                        }
+                    } else {
+                        size_t expected_total = func->getParameters().size();
+                        while (arg_vals.size() < expected_total) {
+                            arg_vals.push_back(VAL_NIL);
+                        }
+                    }
 
                     auto saved_registers = registers;
                     const LIR::LIR_Function* saved_func = current_function_;

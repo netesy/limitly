@@ -1,0 +1,13 @@
+// Standard Library Process Pipe Submodule
+
+frame Pipe {
+    pub init() {}
+
+    pub fn write(data: str) {
+        return;
+    }
+
+    pub fn read(): str {
+        return "";
+    }
+}

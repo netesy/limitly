@@ -1,0 +1,28 @@
+// Standard Library Parse Entrypoint Module
+
+import std.parse.numbers as numbers_mod;
+import std.parse.bool as bool_mod;
+import std.parse.datetime as datetime_mod;
+
+frame Parse {
+    pub init() {}
+    pub fn parse_int(value: str): any { return numbers_mod.parse_int(value); }
+    pub fn parse_float(value: str): any { return numbers_mod.parse_float(value); }
+    pub fn parse_bool(value: str): bool { return bool_mod.parse_bool(value); }
+}
+
+pub fn parse_int(value: str): any {
+    return numbers_mod.parse_int(value);
+}
+
+pub fn parse_float(value: str): any {
+    return numbers_mod.parse_float(value);
+}
+
+pub fn parse_bool(value: str): bool {
+    return bool_mod.parse_bool(value);
+}
+
+pub fn parse_datetime(value: str): any {
+    return datetime_mod.parse_datetime(value);
+}

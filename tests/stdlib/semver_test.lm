@@ -1,0 +1,189 @@
+import std.semver as semver;
+
+fn test_parsing(): int {
+    print("Running SemVer parsing tests...");
+
+    // Test simple valid versions
+    var v1 = semver.parse("1.2.3")? else {
+        assert(false, "Failed to parse 1.2.3");
+        return 0;
+    };
+    assert(v1.major == 1, "v1.major should be 1");
+    assert(v1.minor == 2, "v1.minor should be 2");
+    assert(v1.patch == 3, "v1.patch should be 3");
+    assert(v1.prerelease == "", "v1.prerelease should be empty");
+    assert(v1.build == "", "v1.build should be empty");
+
+    // Test zero versions
+    var v2 = semver.parse("0.0.0")? else {
+        assert(false, "Failed to parse 0.0.0");
+        return 0;
+    };
+    assert(v2.major == 0, "v2.major should be 0");
+    assert(v2.minor == 0, "v2.minor should be 0");
+    assert(v2.patch == 0, "v2.patch should be 0");
+
+    // Test pre-release versions
+    var v3 = semver.parse("1.2.3-alpha.1")? else {
+        assert(false, "Failed to parse 1.2.3-alpha.1");
+        return 0;
+    };
+    assert(v3.prerelease == "alpha.1", "v3.prerelease should be alpha.1");
+    assert(v3.build == "", "v3.build should be empty");
+
+    // Test build metadata versions
+    var v4 = semver.parse("1.2.3+build.12")? else {
+        assert(false, "Failed to parse 1.2.3+build.12");
+        return 0;
+    };
+    assert(v4.prerelease == "", "v4.prerelease should be empty");
+    assert(v4.build == "build.12", "v4.build should be build.12");
+
+    // Test both pre-release and build metadata
+    var v5 = semver.parse("1.2.3-beta.2+20141223")? else {
+        assert(false, "Failed to parse 1.2.3-beta.2+20141223");
+        return 0;
+    };
+    assert(v5.prerelease == "beta.2", "v5.prerelease should be beta.2");
+    assert(v5.build == "20141223", "v5.build should be 20141223");
+
+    // Test invalid inputs
+    var failed = false;
+    var e1 = semver.parse("")? else { failed = true; };
+    assert(failed, "Empty string should fail");
+
+    failed = false;
+    var e2 = semver.parse("1.2")? else { failed = true; };
+    assert(failed, "Missing patch version should fail");
+
+    failed = false;
+    var e3 = semver.parse("1.2.3.4")? else { failed = true; };
+    assert(failed, "Four parts should fail");
+
+    failed = false;
+    var e4 = semver.parse("01.2.3")? else { failed = true; };
+    assert(failed, "Leading zeroes in core version should fail");
+
+    failed = false;
+    var e5 = semver.parse("1.2.3-alpha.01")? else { failed = true; };
+    assert(failed, "Leading zeroes in numeric pre-release should fail");
+
+    failed = false;
+    var e6 = semver.parse("1.2.3-alpha..1")? else { failed = true; };
+    assert(failed, "Empty pre-release identifiers should fail");
+
+    failed = false;
+    var e7 = semver.parse("1.2.3+build..12")? else { failed = true; };
+    assert(failed, "Empty build identifiers should fail");
+
+    failed = false;
+    var e8 = semver.parse("1.2.3-alpha_1")? else { failed = true; };
+    assert(failed, "Invalid characters in pre-release should fail");
+
+    print("Parsing tests passed!");
+    return 1;
+}
+
+fn test_comparison(): int {
+    print("Running SemVer comparison tests...");
+
+    var v1 = semver.parse("1.2.3")? else { return 0; };
+    var v2 = semver.parse("2.0.0")? else { return 0; };
+    var v3 = semver.parse("1.3.0")? else { return 0; };
+    var v4 = semver.parse("1.2.4")? else { return 0; };
+
+    // Core version comparison
+    assert(v1.compare(v2) == -1, "1.2.3 < 2.0.0");
+    assert(v2.compare(v1) == 1, "2.0.0 > 1.2.3");
+    assert(v1.compare(v3) == -1, "1.2.3 < 1.3.0");
+    assert(v3.compare(v1) == 1, "1.3.0 > 1.2.3");
+    assert(v1.compare(v4) == -1, "1.2.3 < 1.2.4");
+    assert(v1.compare(v1) == 0, "1.2.3 == 1.2.3");
+
+    // Pre-release vs normal
+    var vr1 = semver.parse("1.0.0-alpha")? else { return 0; };
+    var vr2 = semver.parse("1.0.0")? else { return 0; };
+    assert(vr1.compare(vr2) == -1, "1.0.0-alpha < 1.0.0");
+    assert(vr2.compare(vr1) == 1, "1.0.0 > 1.0.0-alpha");
+
+    // Pre-release comparison
+    var vp1 = semver.parse("1.0.0-alpha")? else { return 0; };
+    var vp2 = semver.parse("1.0.0-alpha.1")? else { return 0; };
+    var vp3 = semver.parse("1.0.0-alpha.beta")? else { return 0; };
+    var vp4 = semver.parse("1.0.0-beta")? else { return 0; };
+    var vp5 = semver.parse("1.0.0-beta.2")? else { return 0; };
+    var vp6 = semver.parse("1.0.0-beta.11")? else { return 0; };
+    var vp7 = semver.parse("1.0.0-rc.1")? else { return 0; };
+
+    assert(vp1.compare(vp2) == -1, "alpha < alpha.1");
+    assert(vp2.compare(vp3) == -1, "alpha.1 < alpha.beta (numeric < non-numeric)");
+    assert(vp3.compare(vp4) == -1, "alpha.beta < beta");
+    assert(vp4.compare(vp5) == -1, "beta < beta.2");
+    assert(vp5.compare(vp6) == -1, "beta.2 < beta.11 (numeric comparison 2 < 11)");
+    assert(vp6.compare(vp7) == -1, "beta.11 < rc.1");
+
+    // Build metadata ignored in precedence
+    var vb1 = semver.parse("1.2.3+build.1")? else { return 0; };
+    var vb2 = semver.parse("1.2.3+build.2")? else { return 0; };
+    assert(vb1.compare(vb2) == 0, "1.2.3+build.1 == 1.2.3+build.2 in precedence");
+    assert(vb1.equals(vb2), "vb1 should equal vb2");
+
+    print("Comparison tests passed!");
+    return 1;
+}
+
+fn test_compatibility(): int {
+    print("Running SemVer compatibility tests...");
+
+    var v1 = semver.parse("1.2.3")? else { return 0; };
+    var v1_comp = semver.parse("1.5.0")? else { return 0; };
+    var v1_incomp = semver.parse("2.0.0")? else { return 0; };
+    var v1_old = semver.parse("1.1.0")? else { return 0; };
+
+    // Major > 0 caret compatibility
+    assert(v1.is_compatible(v1_comp), "1.5.0 should be compatible with 1.2.3");
+    assert(not v1.is_compatible(v1_incomp), "2.0.0 should not be compatible with 1.2.3");
+    assert(not v1.is_compatible(v1_old), "1.1.0 (older) should not be compatible with 1.2.3");
+
+    // Major == 0 caret compatibility
+    var v0_1 = semver.parse("0.2.3")? else { return 0; };
+    var v0_1_comp = semver.parse("0.2.5")? else { return 0; };
+    var v0_1_incomp = semver.parse("0.3.0")? else { return 0; };
+    assert(v0_1.is_compatible(v0_1_comp), "0.2.5 is compatible with 0.2.3");
+    assert(not v0_1.is_compatible(v0_1_incomp), "0.3.0 is not compatible with 0.2.3");
+
+    // Major == 0, Minor == 0
+    var v0_0 = semver.parse("0.0.5")? else { return 0; };
+    var v0_0_same = semver.parse("0.0.5")? else { return 0; };
+    var v0_0_diff = semver.parse("0.0.6")? else { return 0; };
+    assert(v0_0.is_compatible(v0_0_same), "0.0.5 is compatible with 0.0.5");
+    assert(not v0_0.is_compatible(v0_0_diff), "0.0.6 is not compatible with 0.0.5");
+
+    print("Compatibility tests passed!");
+    return 1;
+}
+
+fn test_formatting(): int {
+    print("Running SemVer formatting tests...");
+
+    var v1 = semver.parse("1.2.3-alpha.1+build.12")? else { return 0; };
+    assert(v1.to_string() == "1.2.3-alpha.1+build.12", "to_string matches input");
+
+    var v2 = semver.parse("2.0.1")? else { return 0; };
+    assert(v2.to_string() == "2.0.1", "to_string matches input (simple)");
+
+    print("Formatting tests passed!");
+    return 1;
+}
+
+fn main(): int {
+    print("=== SemVer Test Suite ===");
+
+    assert(test_parsing() == 1, "Parsing tests failed");
+    assert(test_comparison() == 1, "Comparison tests failed");
+    assert(test_compatibility() == 1, "Compatibility tests failed");
+    assert(test_formatting() == 1, "Formatting tests failed");
+
+    print("All SemVer tests completed successfully.");
+    return 0;
+}

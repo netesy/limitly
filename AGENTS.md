@@ -16,6 +16,11 @@ This document provides essential guidelines for AI agents generating code for th
 - ❌ `List<T>` / `Dict<K, V>` - Generic collections are NOT implemented (use `[int]` or `{str: int}`).
 - ❌ `Option<T>` / `Result<T, E>` - Generic option/result types are NOT supported as built-in generics (use option/result union types or standard library wrappers).
 
+### **List Concatenation**
+- ❌ `list1 + list2` - List concatenation using the `+` operator is NOT supported.
+- ✅ **Use `append(list, item)`** instead to add a single item to a list.
+- ✅ **Use `append(list, other_list)`** to append all elements from another list.
+
 ---
 
 ## ✅ **USE - Supported Features**
@@ -198,7 +203,25 @@ frame Vector {
 
 ### **7. Concurrency**
 
-- **Parallel Block**: `parallel { ... }` runs blocks in parallel.
-- **Concurrent Block**: `concurrent { ... }` handles channel-based execution.
+- **Parallel Block**: `parallel(cores=2) { ... }` runs blocks in parallel.
+- **Concurrent Block**: `concurrent(cores=2) { ... }` handles channel-based execution.
 - **Tasks**: `task(i in 1..10) { ... }` spawns parallel tasks.
 - **Workers**: `worker(data in stream) { ... }` processes streams.
+
+==================================================
+Backend Conformance
+==================================================
+
+The redesigned LIR is the canonical language interface.
+
+Every backend must implement the complete semantics of every LIR instruction.
+
+Backends must not require changes to the generator.
+
+Backends must not introduce backend-specific LIR instructions.
+
+Backends must not expose backend-specific concepts to the frontend.
+
+If a backend cannot faithfully implement an LIR instruction, the backend must be extended rather than weakening the language abstraction.
+
+Behavioral equivalence across all supported backends is mandatory.

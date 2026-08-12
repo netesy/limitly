@@ -1,0 +1,81 @@
+// Percent (URL) Encoding Module
+
+pub fn encode(s: str): str {
+    var res: str = "";
+    var i: int = 0;
+    var length = len(s);
+    while (i < length) {
+        var ch = _builtin_substring(s, i, i + 1);
+        if (ch == " ") {
+            res = res + "%20";
+        } else if (ch == "/") {
+            res = res + "%2" + "F";
+        } else if (ch == ":") {
+            res = res + "%3" + "A";
+        } else if (ch == "?") {
+            res = res + "%3" + "F";
+        } else if (ch == "=") {
+            res = res + "%3" + "D";
+        } else if (ch == "&") {
+            res = res + "%26";
+        } else if (ch == "%") {
+            res = res + "%25";
+        } else if (ch == "+") {
+            res = res + "%2" + "B";
+        } else if (ch == "#") {
+            res = res + "%23";
+        } else {
+            res = res + ch;
+        }
+        i = i + 1;
+    }
+    return res;
+}
+
+pub fn decode(s: str): str {
+    var res: str = "";
+    var i: int = 0;
+    var length = len(s);
+    while (i < length) {
+        var ch = _builtin_substring(s, i, i + 1);
+        if (ch == "%" and i + 2 < length) {
+            var h = _builtin_substring(s, i + 1, i + 3);
+            if (h == "20") {
+                res = res + " ";
+            } else if (h == "2" + "F") {
+                res = res + "/";
+            } else if (h == "2" + "f") {
+                res = res + "/";
+            } else if (h == "3" + "A") {
+                res = res + ":";
+            } else if (h == "3" + "a") {
+                res = res + ":";
+            } else if (h == "3" + "F") {
+                res = res + "?";
+            } else if (h == "3" + "f") {
+                res = res + "?";
+            } else if (h == "3" + "D") {
+                res = res + "=";
+            } else if (h == "3" + "d") {
+                res = res + "=";
+            } else if (h == "26") {
+                res = res + "&";
+            } else if (h == "25") {
+                res = res + "%";
+            } else if (h == "2" + "B") {
+                res = res + "+";
+            } else if (h == "2" + "b") {
+                res = res + "+";
+            } else if (h == "23") {
+                res = res + "#";
+            } else {
+                res = res + "%" + h;
+            }
+            i = i + 3;
+        } else {
+            res = res + ch;
+            i = i + 1;
+        }
+    }
+    return res;
+}

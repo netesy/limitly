@@ -1,0 +1,7 @@
+// HTML Parser Module
+
+import std.xml.index as xml;
+
+pub fn parse(text: str): any {
+    return xml.parse(text);
+}

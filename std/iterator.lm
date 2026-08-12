@@ -5,8 +5,8 @@ pub trait Iterator {
 }
 
 frame ListIterator: Iterator {
-    var items: [any];
-    var index: int;
+    pub index: int;
+    pub items: [any];
 
     pub init(items: [any]) {
         self.items = items;
@@ -24,8 +24,8 @@ frame ListIterator: Iterator {
 }
 
 frame MapIterator: Iterator {
-    var source: Iterator;
-    var f: fn(any): any;
+    pub f: fn(any): any;
+    pub source: Iterator;
 
     pub init(source: Iterator, f: fn(any): any) {
         self.source = source;
@@ -42,8 +42,8 @@ frame MapIterator: Iterator {
 }
 
 frame FilterIterator: Iterator {
-    var source: Iterator;
-    var p: fn(any): bool;
+    pub p: fn(any): bool;
+    pub source: Iterator;
 
     pub init(source: Iterator, p: fn(any): bool) {
         self.source = source;
@@ -65,65 +65,65 @@ frame FilterIterator: Iterator {
 }
 
 frame EnumerateIterator: Iterator {
-    var source: Iterator;
-    var index: int;
+    pub index: int;
+    pub source: Iterator;
     pub init(source: Iterator) { self.source = source; self.index = 0; }
     pub fn next(): any { var item = self.source.next(); if (item == nil) { return nil; } var pair = (self.index, item); self.index = self.index + 1; return pair; }
 }
 
 frame ZipIterator: Iterator {
-    var left: Iterator;
-    var right: Iterator;
+    pub left: Iterator;
+    pub right: Iterator;
     pub init(left: Iterator, right: Iterator) { self.left = left; self.right = right; }
     pub fn next(): any { var a = self.left.next(); var b = self.right.next(); if (a == nil or b == nil) { return nil; } return (a, b); }
 }
 
 frame ChainIterator: Iterator {
-    var left: Iterator;
-    var right: Iterator;
-    var on_left: bool;
+    pub left: Iterator;
+    pub on_left: bool;
+    pub right: Iterator;
     pub init(left: Iterator, right: Iterator) { self.left = left; self.right = right; self.on_left = true; }
     pub fn next(): any { if (self.on_left) { var a = self.left.next(); if (a != nil) { return a; } self.on_left = false; } return self.right.next(); }
 }
 
 frame SkipIterator: Iterator {
-    var source: Iterator;
-    var remaining: int;
+    pub remaining: int;
+    pub source: Iterator;
     pub init(source: Iterator, count: int) { self.source = source; self.remaining = count; }
     pub fn next(): any { while (self.remaining > 0) { var skipped = self.source.next(); if (skipped == nil) { return nil; } self.remaining = self.remaining - 1; } return self.source.next(); }
 }
 
 frame TakeIterator: Iterator {
-    var source: Iterator;
-    var remaining: int;
+    pub remaining: int;
+    pub source: Iterator;
     pub init(source: Iterator, count: int) { self.source = source; self.remaining = count; }
     pub fn next(): any { if (self.remaining <= 0) { return nil; } self.remaining = self.remaining - 1; return self.source.next(); }
 }
 
 frame StepByIterator: Iterator {
-    var source: Iterator;
-    var step: int;
+    pub source: Iterator;
+    pub step: int;
     pub init(source: Iterator, step: int) { self.source = source; self.step = step; }
     pub fn next(): any { var item = self.source.next(); var i = 1; while (i < self.step) { var skipped = self.source.next(); if (skipped == nil) { return item; } i = i + 1; } return item; }
 }
 
 frame ChunkIterator: Iterator {
-    var source: Iterator;
-    var size: int;
+    pub size: int;
+    pub source: Iterator;
     pub init(source: Iterator, size: int) { self.source = source; self.size = size; }
     pub fn next(): any { var chunk: [any] = []; var i = 0; var j = 0; while (i < self.size) { var item = self.source.next(); if (item == nil) { if (j == 0) { return nil; } return chunk; } chunk[j] = item; j = j + 1; i = i + 1; } return chunk; }
 }
 
 frame CycleIterator: Iterator {
-    var items: [any];
-    var index: int;
+    pub index: int;
+    pub items: [any];
     pub init(items: [any]) { self.items = items; self.index = 0; }
     pub fn next(): any { if (len(self.items) == 0) { return nil; } var item = self.items[self.index]; self.index = (self.index + 1) % len(self.items); return item; }
 }
 
 frame PeekableIterator: Iterator {
-    var source: Iterator;
-    var cached: any;
+    pub cached: any;
+    pub source: Iterator;
     pub init(source: Iterator) { self.source = source; self.cached = nil; }
     pub fn peek(): any { if (self.cached == nil) { self.cached = self.source.next(); } return self.cached; }
     pub fn next(): any { if (self.cached != nil) { var item = self.cached; self.cached = nil; return item; } return self.source.next(); }
@@ -141,22 +141,21 @@ pub fn collect(it: Iterator): [any] {
 
 // Factory functions
 pub fn iterator(items: [any]): Iterator {
-    return ListIterator(items=items);
+    return ListIterator(items);
 }
 
 pub fn map(it: Iterator, f: fn(any): any): Iterator {
-    return MapIterator(source=it, f=f);
+    return MapIterator(it, f);
 }
 
 pub fn filter(it: Iterator, p: fn(any): bool): Iterator {
-    return FilterIterator(source=it, p=p);
+    return FilterIterator(it, p);
 }
 
 pub fn chunk(it: Iterator, size: int): Iterator {
-    return ChunkIterator(source=it, size=size);
+    return ChunkIterator(it, size);
 }
 
 pub fn cycle(items: [any]): Iterator {
-    return CycleIterator(items=items);
+    return CycleIterator(items);
 }
-

@@ -30,21 +30,15 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     try {
         // Set type system reference BEFORE Pass 0
         type_system_ = type_check_result.type_system;
-        
+
         // PASS 0: Collect function, frame, and module signatures only
-        std::cout << "LIR: Pass 0 - Trait" << std::endl;
         collect_trait_signatures(*type_check_result.program);
-        std::cout << "LIR: Pass 0 - Frame" << std::endl;
         collect_frame_signatures(*type_check_result.program);
-        std::cout << "LIR: Pass 0 - Function" << std::endl;
         collect_function_signatures(type_check_result);
-        std::cout << "LIR: Pass 0 - Module" << std::endl;
         collect_module_signatures(*type_check_result.program);
-        
+
         // PASS 1: Lower function bodies into separate LIR functions
-        std::cout << "LIR: Pass 1" << std::endl;
         lower_function_bodies(type_check_result);
-        std::cout << "LIR: Pass 2" << std::endl;
     
     // PASS 2: Generate main function with top-level code only
     current_module_ = "root";
@@ -69,11 +63,8 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         if (module_path == "root") continue;
 
         std::string init_func_name = module_path + ".__init__";
-        if (LIRFunctionManager::getInstance().hasFunction(init_func_name) || function_table_.count(init_func_name)) {
-            std::vector<Reg> empty_args;
-            Reg dummy_res = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::Call, dummy_res, init_func_name, empty_args));
-        }
+        // Don't call module init functions during LIR generation
+        // They will be called during VM execution
     }
 
     // 2. Generate top-level statements
@@ -153,6 +144,13 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     auto saved_reg_abi_types = std::move(register_abi_types_);
     auto saved_reg_lang_types = std::move(register_language_types_);
     auto saved_cfg_context = cfg_context_;
+    Reg saved_env_register = env_register_;
+    Reg saved_this_register = this_register_;
+    uint32_t saved_region_counter = generator_region_counter_;
+    auto saved_region_stack = std::move(generator_region_stack_);
+    
+    generator_region_counter_ = 0;
+    generator_region_stack_.clear();
 
     // Create function with parameters (including optional parameters)
     size_t total_params = fn.params.size() + fn.optionalParams.size();
@@ -190,6 +188,12 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         size_t reg_index = fn.params.size() + i;
         bind_variable(fn.optionalParams[i].first, static_cast<Reg>(reg_index));
         set_register_type(static_cast<Reg>(reg_index), nullptr);
+    }
+    
+    // Register environment parameter if this is a closure
+    if (is_closure) {
+        bind_variable("__env", env_register_);
+        set_register_type(env_register_, nullptr);
     }
     
     // Emit function body
@@ -255,16 +259,30 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     register_abi_types_ = std::move(saved_reg_abi_types);
     register_language_types_ = std::move(saved_reg_lang_types);
     cfg_context_ = saved_cfg_context;
+    env_register_ = saved_env_register;
+    this_register_ = saved_this_register;
+    generator_region_counter_ = saved_region_counter;
+    generator_region_stack_ = std::move(saved_region_stack);
 }
 
 
 Reg Generator::allocate_register() {
+    if (!current_function_) {
+        // If no current function, we can't allocate registers
+        // This shouldn't happen in normal operation, but prevents crashes
+        return next_register_++;
+    }
     return next_register_++;
 }
 
 
 void Generator::enter_scope() {
     scope_stack_.push_back({});
+    
+    // Don't automatically create regions - rely on memory_info from memory checker
+    // This unified approach prevents premature region exits
+    // generator_region_counter_++;
+    // generator_region_stack_.push_back(generator_region_counter_);
 }
 
 
@@ -283,8 +301,45 @@ void Generator::exit_scope() {
 
         scope_stack_.pop_back();
     }
+    
+    // Unified region management: don't automatically exit regions
+    // RegionExit is emitted based on memory_info from statements
+    // if (!generator_region_stack_.empty()) {
+    //     uint32_t active_region = generator_region_stack_.back();
+    //     generator_region_stack_.pop_back();
+    //     
+    //     if (!cfg_context_.in_control_flow) {
+    //         emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, active_region, 0));
+    //     }
+    // }
 }
 
+
+// Helper function to get memory_info from a statement if available
+std::optional<LM::Frontend::AST::MemoryInfo> Generator::get_memory_info_from_statement(const LM::Frontend::AST::Statement& stmt) {
+    return stmt.memory_info.region_id > 0 ? std::optional(stmt.memory_info) : std::nullopt;
+}
+
+// Helper function to get memory_info from an expression if available
+std::optional<LM::Frontend::AST::MemoryInfo> Generator::get_memory_info_from_expression(const LM::Frontend::AST::Expression& expr) {
+    return expr.memory_info.region_id > 0 ? std::optional(expr.memory_info) : std::nullopt;
+}
+
+// Emit RegionEnter based on memory_info from statement
+void Generator::emit_region_enter_from_memory_info(const LM::Frontend::AST::Statement& stmt) {
+    auto mem_info = get_memory_info_from_statement(stmt);
+    if (mem_info && mem_info->region_id > 0) {
+        emit_instruction(LIR_Inst(LIR_Op::RegionEnter, Type::Void, 0, mem_info->region_id, 0));
+    }
+}
+
+// Emit RegionExit based on memory_info from statement
+void Generator::emit_region_exit_from_memory_info(const LM::Frontend::AST::Statement& stmt) {
+    auto mem_info = get_memory_info_from_statement(stmt);
+    if (mem_info && mem_info->region_id > 0) {
+        emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, mem_info->region_id, 0));
+    }
+}
 
 void Generator::bind_variable(const std::string& name, Reg reg) {
     //// std::cout << "[DEBUG] Binding variable '" << name << "' to register " << reg << std::endl;
@@ -347,6 +402,7 @@ void Generator::set_register_abi_type(Reg reg, Type abi_type) {
 
 void Generator::set_register_language_type(Reg reg, TypePtr lang_type) {
     register_language_types_[reg] = lang_type;
+    register_types_[reg] = lang_type; // Sync register_types_ for binary operator operations
     if (current_function_) {
         current_function_->set_register_language_type(reg, lang_type);
     }
@@ -954,6 +1010,75 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
     if (!ast_type) {
         return nullptr;
     }
+
+    if (ast_type->isFallible || ast_type->isOptional) {
+        // Temporarily clear modifiers to avoid infinite recursion
+        bool saved_fallible = ast_type->isFallible;
+        bool saved_optional = ast_type->isOptional;
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isFallible = false;
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isOptional = false;
+        
+        auto success = convert_ast_type_to_lir_type(ast_type);
+        
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isFallible = saved_fallible;
+        const_cast<LM::Frontend::AST::TypeAnnotation*>(ast_type.get())->isOptional = saved_optional;
+        
+        if (!success) success = std::make_shared<::Type>(::TypeTag::Any);
+        
+        if (saved_fallible) {
+            ::ErrorUnionType eut;
+            eut.successType = success;
+            eut.errorTypes = ast_type->errorTypes;
+            return std::make_shared<::Type>(::TypeTag::ErrorUnion, eut);
+        } else {
+            // Optional: Union of success and Nil
+            ::UnionType ut;
+            ut.types.push_back(success);
+            ut.types.push_back(std::make_shared<::Type>(::TypeTag::Nil));
+            return std::make_shared<::Type>(::TypeTag::Union, ut);
+        }
+    }
+
+    if (ast_type->isUnion) {
+        ::UnionType ut;
+        for (const auto& subtype : ast_type->unionTypes) {
+            auto converted = convert_ast_type_to_lir_type(subtype);
+            if (converted) {
+                ut.types.push_back(converted);
+            }
+        }
+        return std::make_shared<::Type>(::TypeTag::Union, ut);
+    }
+
+    if (ast_type->isList) {
+        auto elem = convert_ast_type_to_lir_type(ast_type->elementType);
+        if (!elem) elem = std::make_shared<::Type>(::TypeTag::Any);
+        ::ListType lt;
+        lt.elementType = elem;
+        return std::make_shared<::Type>(::TypeTag::List, lt);
+    }
+
+    if (ast_type->isDict) {
+        auto key = convert_ast_type_to_lir_type(ast_type->keyType);
+        if (!key) key = std::make_shared<::Type>(::TypeTag::Any);
+        auto val = convert_ast_type_to_lir_type(ast_type->valueType);
+        if (!val) val = std::make_shared<::Type>(::TypeTag::Any);
+        ::DictType dt;
+        dt.keyType = key;
+        dt.valueType = val;
+        return std::make_shared<::Type>(::TypeTag::Dict, dt);
+    }
+
+    if (ast_type->isTuple) {
+        ::TupleType tt;
+        for (const auto& subtype : ast_type->tupleTypes) {
+            auto converted = convert_ast_type_to_lir_type(subtype);
+            if (converted) {
+                tt.elementTypes.push_back(converted);
+            }
+        }
+        return std::make_shared<::Type>(::TypeTag::Tuple, tt);
+    }
     
     // Convert AST type to LIR type
     std::string typeName = ast_type->typeName;
@@ -1013,13 +1138,16 @@ bool Generator::is_visible(LM::Frontend::AST::VisibilityLevel level, const std::
     }
 
     // Check if we are inside a method of the same frame
-    if (current_function_->name.find(frame_name + ".") == 0) {
+    size_t pos = current_function_->name.find(frame_name + ".");
+    if (pos == 0 || (pos != std::string::npos && current_function_->name[pos - 1] == '.')) {
         return true;
     }
 
     // Check for init and deinit methods too
     if (current_function_->name == frame_name + ".init" ||
-        current_function_->name == frame_name + ".deinit") {
+        current_function_->name == frame_name + ".deinit" ||
+        current_function_->name.find("." + frame_name + ".init") != std::string::npos ||
+        current_function_->name.find("." + frame_name + ".deinit") != std::string::npos) {
         return true;
     }
 

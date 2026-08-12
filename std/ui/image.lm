@@ -1,0 +1,14 @@
+import std.graphics.image as graphics_image;
+import std.ui.widget as widget;
+
+frame Image {
+    pub var source: graphics_image.Image;
+
+    pub init(src: graphics_image.Image = graphics_image.Image()) {
+        self.source = src;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

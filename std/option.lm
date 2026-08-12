@@ -4,7 +4,7 @@ frame Option {
     var present: bool;
     var value: any;
 
-    pub init(present: bool = false, value: any = nil) {
+    pub init(present: bool, value: any) {
         self.present = present;
         self.value = value;
     }

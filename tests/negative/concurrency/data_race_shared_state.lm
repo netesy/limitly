@@ -1,0 +1,12 @@
+// @error:race_condition
+// Data race - shared mutable state in concurrent block
+
+var counter = 0;
+
+concurrent {
+    task(i in 1..10) {
+        counter = counter + 1;  // Race condition: shared mutable access
+    }
+}
+
+print(counter);

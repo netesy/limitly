@@ -1,0 +1,67 @@
+// Test Suite for Standard Library String Module
+
+import std.string.index as s;
+
+fn test_string_frame(): int {
+    print("Testing String Frame...");
+    var str_val = s.String("hello") as s.String;
+    assert(str_val.length() == 5, "length failed");
+    assert(str_val.concat(" world") == "hello world", "concat failed");
+    assert(str_val.substring(1, 4) == "ell", "substring failed");
+    assert(str_val.contains("ell") == true, "contains true failed");
+    assert(str_val.contains("xyz") == false, "contains false failed");
+    assert(str_val.starts_with("he") == true, "starts_with true failed");
+    assert(str_val.starts_with("lo") == false, "starts_with false failed");
+    assert(str_val.ends_with("lo") == true, "ends_with true failed");
+    assert(str_val.char_at(1) == "e", "char_at failed");
+    assert(str_val.repeat(2) == "hellohello", "repeat failed");
+    assert(str_val.pad_left(8, "-") == "---hello", "pad_left failed");
+    assert(str_val.pad_right(8, "-") == "hello---", "pad_right failed");
+    return 1;
+}
+
+fn test_string_builder(): int {
+    print("Testing StringBuilder...");
+    var sb = s.StringBuilder() as s.StringBuilder;
+    sb.append("hello");
+    sb.append(" ");
+    sb.append_line("world");
+    var res = sb.to_string();
+    assert(res == "hello world\n", "StringBuilder failed");
+    return 1;
+}
+
+fn test_string_helpers(): int {
+    print("Testing String Helpers...");
+    assert(s.length("abc") == 3, "length helper failed");
+    assert(s.compare("abc", "def") == -1, "compare less failed");
+    assert(s.compare("def", "abc") == 1, "compare greater failed");
+    assert(s.compare("abc", "abc") == 0, "compare equal failed");
+
+    assert(s.substring("hello", 1, 4) == "ell", "substring helper failed");
+    assert(s.trim("  hello  \n") == "hello", "trim failed");
+
+    var parts = s.split("a,b,c", ",");
+    assert(len(parts) == 3, "split length failed");
+    assert(parts[0] == "a", "split 0 failed");
+    assert(parts[1] == "b", "split 1 failed");
+    assert(parts[2] == "c", "split 2 failed");
+
+    var joined = s.join(parts, "-");
+    assert(joined == "a-b-c", "join failed");
+
+    var replaced = s.replace("hello world", "world", "everyone");
+    assert(replaced == "hello everyone", "replace failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== String Module Test Suite ===");
+
+    assert(test_string_frame() == 1, "String frame test failed");
+    assert(test_string_builder() == 1, "StringBuilder test failed");
+    assert(test_string_helpers() == 1, "String helpers test failed");
+
+    print("All string tests passed successfully.");
+    return 0;
+}

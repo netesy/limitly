@@ -1,0 +1,50 @@
+// Standard Library Algorithm Binary Search Module
+
+pub fn binary_search(items: [any], value: any): int {
+    var low = 0;
+    var high = len(items) - 1;
+    while (low <= high) {
+        var mid = (low + high) / 2;
+        if (items[mid] == value) {
+            return mid;
+        }
+        if (items[mid] < value) {
+            low = mid + 1;
+        } else {
+            high = mid - 1;
+        }
+    }
+    return -1;
+}
+
+pub fn lower_bound(items: [any], value: any): int {
+    var low = 0;
+    var high = len(items);
+    while (low < high) {
+        var mid = (low + high) / 2;
+        if (items[mid] < value) {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+    return low;
+}
+
+pub fn upper_bound(items: [any], value: any): int {
+    var low = 0;
+    var high = len(items);
+    while (low < high) {
+        var mid = (low + high) / 2;
+        if (items[mid] <= value) {
+            low = mid + 1;
+        } else {
+            high = mid;
+        }
+    }
+    return low;
+}
+
+pub fn equal_range(items: [any], value: any): (int, int) {
+    return (lower_bound(items, value), upper_bound(items, value));
+}

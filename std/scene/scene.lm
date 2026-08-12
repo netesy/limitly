@@ -1,0 +1,15 @@
+import std.scene.node as node;
+import std.scene.camera as camera;
+import std.scene.viewport as viewport;
+
+frame Scene {
+    pub var root: node.Node;
+    pub var active_camera: camera.Camera;
+    pub var vp: viewport.Viewport;
+
+    pub init(r: node.Node = node.Node(), cam: camera.Camera = camera.Camera(), v: viewport.Viewport = viewport.Viewport()) {
+        self.root = r;
+        self.active_camera = cam;
+        self.vp = v;
+    }
+}

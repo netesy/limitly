@@ -14,11 +14,11 @@ fn main(): int {
     if (s.pop() != 4) { return 4; }
 
     var bits = collections.BitSet(130);
-    bits.set(64);
+    bits.toggle(64);
     if (not bits.contains(64)) { return 5; }
     bits.toggle(64);
     if (bits.contains(64)) { return 6; }
-    bits.set(3);
+    bits.toggle(3);
     bits.unset(3);
     if (bits.count() != 0) { return 7; }
     return 0;

@@ -1,0 +1,25 @@
+// Standard Library Encoding Module
+
+import std.encoding.base64 as base64;
+import std.encoding.hex as hex;
+import std.encoding.percent as percent;
+
+frame Encoding {
+    pub static fn base64_encode(data: [int]): str { return base64.encode_base64(data); }
+    pub static fn base64_decode(data: str): [int] { return base64.decode_base64(data); }
+    pub static fn hex_encode(data: [int]): str { return hex.to_hex(data); }
+    pub static fn hex_decode(data: str): [int] { return hex.from_hex(data); }
+    pub static fn byte_to_hex(b: int): str { return hex.byte_to_hex(b); }
+    pub static fn hex_to_byte(h: str): int { return hex.hex_to_byte(h); }
+    pub static fn url_encode(s: str): str { return percent.encode(s); }
+    pub static fn url_decode(s: str): str { return percent.decode(s); }
+}
+
+pub fn base64_encode(data: [int]): str { return base64.encode_base64(data); }
+pub fn base64_decode(data: str): [int] { return base64.decode_base64(data); }
+pub fn hex_encode(data: [int]): str { return hex.to_hex(data); }
+pub fn hex_decode(data: str): [int] { return hex.from_hex(data); }
+pub fn byte_to_hex(b: int): str { return hex.byte_to_hex(b); }
+pub fn hex_to_byte(h: str): int { return hex.hex_to_byte(h); }
+pub fn url_encode(s: str): str { return percent.encode(s); }
+pub fn url_decode(s: str): str { return percent.decode(s); }

@@ -1,0 +1,13 @@
+// Standard Library String Join Module
+
+pub fn join(values: [str], delimiter: str): str {
+    var n = len(values);
+    if (n == 0) return "";
+    var result = values[0];
+    var i = 1;
+    while (i < n) {
+        result = result + delimiter + values[i];
+        i = i + 1;
+    }
+    return result;
+}

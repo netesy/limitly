@@ -1,0 +1,15 @@
+import std.ui.widget as widget;
+
+frame TextField {
+    pub var placeholder: str;
+    pub var text: str;
+
+    pub init(ph: str = "", txt: str = "") {
+        self.placeholder = ph;
+        self.text = txt;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

@@ -1,0 +1,9 @@
+// Standard Library Environment Platform Submodule
+
+pub fn args(): [str] {
+    return [] as [str];
+}
+
+pub fn cwd(): str {
+    return ".";
+}

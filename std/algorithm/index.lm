@@ -1,0 +1,131 @@
+// Standard Library Algorithm Entrypoint Module
+
+import std.algorithm.search as search_mod;
+import std.algorithm.sort as sort_mod;
+import std.algorithm.partition as partition_mod;
+import std.algorithm.transform as transform_mod;
+import std.algorithm.reduce as reduce_mod;
+import std.algorithm.filter as filter_mod;
+import std.algorithm.unique as unique_mod;
+import std.algorithm.shuffle as shuffle_mod;
+import std.algorithm.binary_search as binary_search_mod;
+
+// Search re-exports
+pub fn find(items: [any], value: any): int {
+    return search_mod.find(items, value);
+}
+pub fn find_if(items: [any], p: fn(any): bool): int {
+    return search_mod.find_if(items, p);
+}
+pub fn any_match(items: [any], p: fn(any): bool): bool {
+    return search_mod.any_match(items, p);
+}
+pub fn none(items: [any], p: fn(any): bool): bool {
+    return search_mod.none(items, p);
+}
+pub fn all(items: [any], p: fn(any): bool): bool {
+    return search_mod.all(items, p);
+}
+pub fn count(items: [any], value: any): int {
+    return search_mod.count(items, value);
+}
+pub fn linear_search(items: [any], value: any): int {
+    return search_mod.linear_search(items, value);
+}
+
+// Sort re-exports
+pub fn sort(items: [any]) {
+    sort_mod.sort(items);
+}
+pub fn quicksort(items: [any]) {
+    sort_mod.quicksort(items);
+}
+pub fn quicksort_descending(items: [any]) {
+    sort_mod.quicksort_descending(items);
+}
+pub fn mergesort(items: [any]) {
+    sort_mod.mergesort(items);
+}
+pub fn heapsort(items: [any]) {
+    sort_mod.heapsort(items);
+}
+pub fn insertion_sort(items: [any]) {
+    sort_mod.insertion_sort(items);
+}
+pub fn counting_sort(items: [int]) {
+    sort_mod.counting_sort(items);
+}
+pub fn radix_sort(items: [int]) {
+    sort_mod.radix_sort(items);
+}
+pub fn timsort(items: [any]) {
+    sort_mod.timsort(items);
+}
+pub fn stable_sort(items: [any]) {
+    sort_mod.stable_sort(items);
+}
+pub fn partial_sort(items: [any], count: int) {
+    sort_mod.partial_sort(items, count);
+}
+
+// Partition re-exports
+pub fn partition(items: [any], p: fn(any): bool): int {
+    return partition_mod.partition(items, p);
+}
+pub fn partition_copy(items: [any], p: fn(any): bool): ([any], [any]) {
+    return partition_mod.partition_copy(items, p);
+}
+pub fn is_partitioned(items: [any], p: fn(any): bool): bool {
+    return partition_mod.is_partitioned(items, p);
+}
+
+// Transform re-exports
+pub fn map(items: [any], f: fn(any): any): [any] {
+    return transform_mod.map(items, f);
+}
+pub fn zip(left: [any], right: [any]): [any] {
+    return transform_mod.zip(left, right);
+}
+pub fn unzip(pairs: [any]): ([any], [any]) {
+    return transform_mod.unzip(pairs);
+}
+
+// Reduce re-exports
+pub fn reduce(items: [any], f: fn(any, any): any, initial: any): any {
+    return reduce_mod.reduce(items, f, initial);
+}
+pub fn fold(items: [any], initial: any, f: fn(any, any): any): any {
+    return reduce_mod.fold(items, initial, f);
+}
+
+// Filter re-exports
+pub fn filter(items: [any], p: fn(any): bool): [any] {
+    return filter_mod.filter(items, p);
+}
+pub fn remove_if(items: [any], p: fn(any): bool): [any] {
+    return filter_mod.remove_if(items, p);
+}
+
+// Unique re-exports
+pub fn unique(items: [any]): [any] {
+    return unique_mod.unique(items);
+}
+
+// Shuffle re-exports
+pub fn shuffle(items: [any]) {
+    shuffle_mod.shuffle(items);
+}
+
+// Binary Search re-exports
+pub fn binary_search(items: [any], value: any): int {
+    return binary_search_mod.binary_search(items, value);
+}
+pub fn lower_bound(items: [any], value: any): int {
+    return binary_search_mod.lower_bound(items, value);
+}
+pub fn upper_bound(items: [any], value: any): int {
+    return binary_search_mod.upper_bound(items, value);
+}
+pub fn equal_range(items: [any], value: any): (int, int) {
+    return binary_search_mod.equal_range(items, value);
+}

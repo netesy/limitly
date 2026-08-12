@@ -89,7 +89,7 @@ frame Float {
             var i_f = i as float;
             term = term * x / i_f;
             sum = sum + term;
-            if (abs(term) < 1e-16) break;
+            if (abs(term) < 1e-16) return sum;
             i = i + 1;
         }
         return sum;
@@ -116,7 +116,7 @@ frame Float {
             if (i % 2 == 1) sum = sum + term / i_f;
             else sum = sum - term / i_f;
             term = term * x;
-            if (abs(term) < 1e-16) break;
+            if (abs(term) < 1e-16) return sum + (count as float);
             i = i + 1;
         }
         return sum + (count as float);
@@ -177,7 +177,7 @@ frame Float {
             var i_f = i as float;
             term = term * x * x * (2.0 * i_f - 1.0) / (2.0 * i_f);
             sum = sum + term / (2.0 * i_f + 1.0);
-            if (abs(term) < 1e-16) break;
+            if (abs(term) < 1e-16) return sum;
             i = i + 1;
         }
         return sum;
@@ -198,7 +198,7 @@ frame Float {
             var i_f = i as float;
             term = -term * x * x;
             sum = sum + term / (2.0 * i_f + 1.0);
-            if (abs(term) < 1e-16) break;
+            if (abs(term) < 1e-16) return sum;
             i = i + 1;
         }
         return sum;

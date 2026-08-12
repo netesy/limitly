@@ -1,0 +1,57 @@
+// Standard Library I/O File Submodule
+
+import std.resource as res;
+import std.internal.runtime as rt;
+
+frame FileNotFound { pub var path: str; }
+frame PermissionDenied { pub var path: str; pub var operation: str; }
+frame DiskFull { pub var path: str; }
+frame NetworkError { pub var message: str; }
+frame UnknownError { pub var message: str; }
+
+pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
+
+frame File {
+    pub var path: str;
+    var resource: res.Resource;
+    var reader: res.ResourceReader;
+    var writer: res.ResourceWriter;
+
+    pub init(p: str, r: res.Resource) {
+        self.path = p;
+        self.resource = r;
+        self.reader = res.ResourceReader(r);
+        self.writer = res.ResourceWriter(r);
+    }
+
+    pub fn read(): str?IOError {
+        var r = self.reader.read(args=[]);
+        if (r == nil) return err(UnknownError(message="fail"));
+        return ok(r as str);
+    }
+
+    pub fn write(content: str): nil?IOError {
+        var success = self.writer.write(args=[content]);
+        if (success == nil) return err(UnknownError(message="fail"));
+        return ok(nil);
+    }
+
+    pub fn close(): nil?IOError {
+        if (self.resource.is_open_val) {
+            rt.destroy(self.resource.handle);
+            self.resource.is_open_val = false;
+        }
+        return ok(nil);
+    }
+
+    pub fn is_open(): bool {
+        return self.resource.is_open();
+    }
+}
+
+pub fn open(path: str, mode: str): File?IOError {
+    match (res.open_file(path=path, mode=mode)) {
+        val r => return ok(File(path, r)),
+        err e => return err(FileNotFound(path=path))
+    }
+}

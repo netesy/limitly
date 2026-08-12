@@ -1,0 +1,8 @@
+// @error:visibility_error
+// Accessing private static member
+
+frame Utilities {
+    @static var MAX_SIZE: int = 1000;
+}
+
+print(Utilities.MAX_SIZE);  // private static not accessible

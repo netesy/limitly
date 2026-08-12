@@ -760,6 +760,14 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
         bind_variable(stmt.loopVar, static_cast<Reg>(1));
     }
     
+    // Bind channel variable if specified
+    if (!stmt.channel_param.empty()) {
+        Reg channel_reg = 2;
+        bind_variable(stmt.channel_param, channel_reg);
+        auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
+        set_register_type(channel_reg, channel_type);
+    }
+    
     auto saved_parallel_block_cell_ids = parallel_block_cell_ids_;
     // Emit task body from AST
     if (stmt.body) {
@@ -836,6 +844,14 @@ void Generator::lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt) {
     // Bind worker parameter name if specified
     if (!stmt.paramName.empty()) {
         bind_variable(stmt.paramName, static_cast<Reg>(1)); // Use loop_var register for worker parameter
+    }
+    
+    // Bind channel variable if specified
+    if (!stmt.channel_param.empty()) {
+        Reg channel_reg = 2;
+        bind_variable(stmt.channel_param, channel_reg);
+        auto channel_type = std::make_shared<::Type>(::TypeTag::Channel);
+        set_register_type(channel_reg, channel_type);
     }
     
     // Bind iterable if available for iteration

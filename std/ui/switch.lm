@@ -1,0 +1,13 @@
+import std.ui.widget as widget;
+
+frame Switch {
+    pub var active: bool;
+
+    pub init(act: bool = false) {
+        self.active = act;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

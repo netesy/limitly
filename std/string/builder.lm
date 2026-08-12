@@ -1,0 +1,28 @@
+// Standard Library StringBuilder Module
+
+frame StringBuilder {
+    pub var parts: [str];
+
+    pub init() {
+        self.parts = [] as [str];
+    }
+
+    pub fn append(s: str) {
+        self.parts.append(s);
+    }
+
+    pub fn append_line(s: str) {
+        self.parts.append(s);
+        self.parts.append("\n");
+    }
+
+    pub fn to_string(): str {
+        var res = "";
+        var i = 0;
+        while (i < len(self.parts)) {
+            res = res + self.parts[i];
+            i = i + 1;
+        }
+        return res;
+    }
+}

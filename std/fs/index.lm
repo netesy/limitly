@@ -1,0 +1,46 @@
+// Standard Library Filesystem Entrypoint Module
+
+import std.fs.directory as directory_mod;
+import std.fs.permissions as permissions_mod;
+import std.path.index as path_mod;
+import std.io as io;
+import std.io.file as file_mod;
+
+// Types
+pub type Permissions = permissions_mod.Permissions;
+
+// Constructors
+pub fn Permissions(readonly: bool): any {
+    return permissions_mod.Permissions(readonly);
+}
+
+frame FS {
+    pub init() {}
+    pub fn exists(p: path_mod.Path): bool { return io.exists(p.value); }
+    pub fn create_dir(p: path_mod.Path): any { return io.create_directory(p.value); }
+    pub fn remove(p: path_mod.Path): any {
+        if (!io.delete(p.value)) {
+            var e = file_mod.UnknownError(message="failed to remove path");
+            return err(e);
+        }
+        return ok(nil);
+    }
+    pub fn rename(from_path: path_mod.Path, to_path: path_mod.Path): any {
+        if (!io.rename(from_path.value, to_path.value)) {
+            var e = file_mod.UnknownError(message="failed to rename path");
+            return err(e);
+        }
+        return ok(nil);
+    }
+    pub fn list_dir(p: path_mod.Path): any {
+        return io.list_directory(p.value);
+    }
+}
+
+pub fn create_dir(path_str: str): any {
+    return directory_mod.create_dir(path_str);
+}
+
+pub fn list_dir(path_str: str): any {
+    return directory_mod.list_dir(path_str);
+}

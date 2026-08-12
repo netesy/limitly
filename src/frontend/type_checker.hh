@@ -47,6 +47,7 @@ private:
         std::string memory_state;  // "owned", "moved", "dropped", "borrowed"
         std::size_t region_id;
         std::size_t alloc_id;
+        int reference_count = 0;  // Track number of references for ownership checking
     };
     std::unordered_map<std::string, VariableInfo> variable_memory_info;
     
@@ -94,6 +95,29 @@ private:
     };
     std::unordered_map<std::string, TraitInfo> trait_declarations;
 
+    // =========================================================================
+    // FRAME MEMORY TRACKING (NEW)
+    // =========================================================================
+    
+    struct FrameFieldMemoryInfo {
+        std::string frame_name;
+        std::string field_name;
+        TypePtr field_type;
+        bool is_linear;                           // Is field a linear type?
+        bool is_owned;                            // Does field own its value?
+        std::unordered_set<std::string> mutable_refs;  // Variables with mutable refs
+        bool has_exclusive_ref;                   // Has exclusive mutable reference?
+    };
+    std::unordered_map<std::string, FrameFieldMemoryInfo> frame_field_memory_info;
+    
+    struct FrameAllocation {
+        std::string frame_name;
+        int line;
+        int scope_level;
+        std::vector<std::string> initialized_fields;
+    };
+    std::vector<FrameAllocation> frame_allocations_in_scope;
+
     std::unordered_map<std::string, ModuleInfo> registered_modules;
     std::unordered_map<std::string, std::string> import_aliases;
     std::string current_module_name;
@@ -137,12 +161,98 @@ private:
     std::vector<std::vector<std::string>> lambda_captures_stack;
     std::vector<Scope*> lambda_scope_markers;
     
+    // =========================================================================
+    // COMPREHENSIVE MEMORY SAFETY INFRASTRUCTURE
+    // =========================================================================
+    
+    // Current line number for error reporting
+    int current_line = 0;
+    
+    // Tracks whether we're currently in a method
+    std::string current_method_frame;  // Frame name if in method, empty otherwise
+    std::string current_method_name;   // Method name if in method, empty otherwise
+    
+    // Method-level self tracking
+    struct MethodSelfInfo {
+        std::string method_name;
+        std::string frame_name;
+        std::unordered_set<std::string> self_references;  // Variables referencing self
+        bool has_self_escape = false;                      // Whether self escapes
+        int self_scope_level = 0;
+    };
+    std::unordered_map<std::string, MethodSelfInfo> method_self_tracking;
+    
+    // Enum and variant tracking for memory safety
+    struct VariantInfo {
+        std::string enum_name;
+        std::string variant_name;
+        std::vector<TypePtr> associated_types;  // Types associated with variant
+    };
+    std::unordered_map<std::string, VariantInfo> variant_registry;  // variant_name -> VariantInfo
+    
+    // Concurrency thread safety tracking
+    struct ConcurrencyContext {
+        bool in_parallel_block = false;
+        bool in_concurrent_block = false;
+        bool in_task = false;
+        std::unordered_set<std::string> shared_variables;  // Variables accessed from multiple threads
+    };
+    ConcurrencyContext concurrency_context;
+    
+    // Captures in lambdas and closures
+    struct CaptureInfo {
+        std::string variable_name;
+        bool is_moved = false;              // Is variable moved into closure?
+        bool is_mutable_ref = false;        // Is mutable reference?
+        int line = 0;
+        TypePtr capture_type;
+    };
+    std::vector<CaptureInfo> current_lambda_captures;
+    
+    // =========================================================================
+    // PHASE 6: EXCEPTION SAFETY TRACKING
+    // =========================================================================
+    
+    // Field initialization tracking for exception safety
+    struct FieldInitializationInfo {
+        std::string field_name;
+        int initialization_line = 0;
+        bool is_initialized = false;
+        bool has_error_handling = false;  // Field init can fail
+        TypePtr field_type;
+        int init_order = -1;  // Sequence in initialization
+    };
+    std::vector<FieldInitializationInfo> current_frame_field_initializations;
+    
+    // Exception safety context
+    struct ExceptionSafetyContext {
+        std::string current_frame_name;
+        std::vector<FieldInitializationInfo> initialized_fields;
+        std::vector<std::string> exit_paths;  // return, break, continue, ?
+        bool in_init_method = false;
+        bool in_deinit_method = false;
+        std::vector<std::string> cleanup_order;  // Reverse init order
+    };
+    ExceptionSafetyContext exception_safety_context;
+    
+    // Resource cleanup tracking
+    struct ResourceCleanupInfo {
+        std::string resource_name;
+        std::string acquisition_site;
+        int acquisition_line = 0;
+        std::vector<std::string> cleanup_sites;
+        bool cleanup_guaranteed = false;
+    };
+    std::unordered_map<std::string, ResourceCleanupInfo> resource_cleanup_tracking;
+    
     // Map to track which enums define which variants
     std::unordered_map<std::string, std::vector<TypePtr>> variant_owners;
     
     std::shared_ptr<LM::Frontend::AST::Program> current_program_ = nullptr;
     
 public:
+    std::unordered_map<std::string, long long> constant_ints;
+    std::unordered_map<std::string, double> constant_doubles;
     bool is_root = true;
 
     // Constructor accepting TypeSystem and SymbolDatabase
@@ -178,6 +288,20 @@ public:
                                   const std::vector<TypePtr>& param_types,
                                   TypePtr return_type);
     
+public:
+    // Diagnostic helpers & shared tracking
+    static std::unordered_set<std::string> failed_modules;
+    static std::unordered_set<std::string> failed_frames;
+
+    static int levenshtein_distance(const std::string& s1, const std::string& s2);
+    static std::string find_similar_name(const std::string& name, const std::vector<std::string>& candidates);
+    static std::vector<std::string> get_all_available_modules();
+
+    std::vector<std::string> get_visible_variables() const;
+    std::vector<std::string> get_visible_types() const;
+    std::string get_module_prefix(const std::string& name) const;
+    bool is_failed_type(const std::string& name) const;
+
 private:
     // Enhanced error reporting
     void add_error(const std::string& message, int line = 0);
@@ -296,7 +420,8 @@ private:
                             int line = 0);
     bool validate_argument_types(const std::vector<TypePtr>& expected,
                                  const std::vector<TypePtr>& actual,
-                                 const std::string& func_name);
+                                 const std::string& func_name,
+                                 int line = 0);
     
     // Control flow checking
     void check_return_statement(TypePtr return_type, int line);
@@ -342,12 +467,114 @@ private:
     TypePtr infer_literal_type(const std::shared_ptr<LM::Frontend::AST::LiteralExpr>& expr, TypePtr expected_type = nullptr);
     bool should_capture_variable(const std::string& name) const;
     
+    // =========================================================================
+    // OOP MEMORY SAFETY METHODS (NEW)
+    // =========================================================================
+    
+    // Frame memory safety
+    void check_frame_field_mutable_aliasing(
+        const std::string& frame_var,
+        const std::string& field_name,
+        bool is_mutable,
+        int line);
+    
+    void invalidate_frame_field_references(
+        const std::string& frame_var,
+        const std::string& field_name,
+        int line);
+    
+    void verify_frame_field_exclusive_access(
+        const std::string& frame_var,
+        const std::string& field_name,
+        int line);
+    
+    // Frame initialization safety
+    void register_frame_for_deinit(
+        const std::string& frame_name,
+        int scope_level);
+    
+    void verify_frame_full_initialization(
+        const std::string& frame_name,
+        const std::vector<std::string>& initialized_fields,
+        int line);
+    
+    void check_frame_field_linear_types(
+        const std::string& frame_name,
+        const std::vector<std::pair<std::string, TypePtr>>& fields);
+    
+    // Trait implementation verification
+    void verify_trait_implementation(
+        const std::string& frame_name,
+        const std::string& trait_name,
+        const FrameInfo& frame_info);
+    
+    void validate_method_signature_compatibility(
+        std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> trait_method,
+        std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> frame_method);
+    
+    // =========================================================================
+    // PHASE 2: CONTROL FLOW SAFETY
+    // =========================================================================
+    
+    void check_linear_type_in_loop_body(
+        const std::string& loop_var,
+        const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& body_statements,
+        int line);
+    
+    void validate_break_cleanup(int line);
+    void validate_continue_cleanup(int line);
+    void validate_scope_cleanup_on_control_flow(const std::string& control_flow_type, int line);
+    
+    // =========================================================================
+    // PHASE 3: LAMBDA & CLOSURE SAFETY
+    // =========================================================================
+    
+    void analyze_lambda_captures(const std::shared_ptr<LM::Frontend::AST::LambdaExpr>& lambda);
+    void validate_capture_ownership(const std::string& capture_var, bool is_moved, int line);
+    void check_closure_lifetime(const std::string& closure_var, int line);
+    void validate_lambda_escape_analysis(const std::shared_ptr<LM::Frontend::AST::LambdaExpr>& lambda);
+    
+    // =========================================================================
+    // PHASE 4: CONCURRENCY SAFETY
+    // =========================================================================
+    
+    void check_parallel_block_thread_safety(const std::vector<std::string>& captured_vars, int line);
+    void check_concurrent_block_thread_safety(const std::vector<std::string>& captured_vars, int line);
+    void detect_data_races(const std::string& var_name, int line);
+    void validate_send_trait(TypePtr type, int line);
+    void validate_sync_trait(TypePtr type, int line);
+    void check_channel_type_safety(const std::shared_ptr<LM::Frontend::AST::CallExpr>& send_expr, int line);
+    
+    // =========================================================================
+    // PHASE 5: ENUM & PATTERN SAFETY
+    // =========================================================================
+    
+    void register_enum_variant(const std::string& enum_name, const std::string& variant_name, 
+                              const std::vector<TypePtr>& associated_types);
+    void check_variant_constructor_ownership(const std::string& variant_name, 
+                                            const std::vector<TypePtr>& arg_types, int line);
+    void validate_pattern_binding_ownership(const std::shared_ptr<LM::Frontend::AST::Expression>& pattern,
+                                           TypePtr match_type, int line);
+    void check_pattern_linear_type_move(const std::string& binding_var, TypePtr pattern_type, int line);
+    
+    // =========================================================================
+    // PHASE 6: EXCEPTION SAFETY
+    // =========================================================================
+    
+    void validate_frame_init_exception_safety(const std::string& frame_name,
+                                             const std::shared_ptr<LM::Frontend::AST::FunctionDeclaration>& init_method,
+                                             int line);
+    void track_field_initialization_order(const std::string& frame_name);
+    void validate_cleanup_on_exception(const std::vector<std::string>& initialized_fields, int line);
+    
     // Scope management
     struct Scope {
         std::unordered_map<std::string, TypePtr> variables;
         std::unique_ptr<Scope> parent;
+        std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> function = nullptr;
         
-        Scope(std::unique_ptr<Scope> p = nullptr) : parent(std::move(p)) {}
+        Scope(std::unique_ptr<Scope> p = nullptr, std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> f = nullptr)
+            : parent(std::move(p)), function(f) {}
         
         TypePtr lookup(const std::string& name) {
             auto it = variables.find(name);
@@ -364,6 +591,8 @@ private:
     
     std::unique_ptr<Scope> current_scope;
 };
+
+bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, long long& out_int, double& out_double, bool& is_int, TypeChecker* checker = nullptr);
 
 // =============================================================================
 // TYPE CHECKER RESULT - Passed to LIR Generator

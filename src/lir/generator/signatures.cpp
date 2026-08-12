@@ -49,6 +49,7 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
             } else if (auto trait_stmt = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) {
                 lower_trait_declaration(*trait_stmt);
             } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
+                lowered_frames_.insert(frame_stmt->name);
                 lower_frame_methods(*frame_stmt);
             }
         }
@@ -60,19 +61,31 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
     for (const auto& [path, module] : modules) {
         if (path == "root" || !module || !module->ast) continue;
         
-        // Skip if already lowered
-        if (function_table_.count(path + ".__init__")) continue;
-
         std::string prev_mod = current_module_;
+        auto prev_import_aliases = import_aliases_;
         current_module_ = path;
+        import_aliases_.clear();
+        for (const auto& stmt : module->ast->statements) {
+            if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+                std::string alias;
+                if (import_stmt->alias.has_value()) {
+                    alias = import_stmt->alias.value();
+                } else {
+                    size_t last_dot = import_stmt->modulePath.find_last_of('.');
+                    alias = (last_dot != std::string::npos)
+                        ? import_stmt->modulePath.substr(last_dot + 1)
+                        : import_stmt->modulePath;
+                }
+                import_aliases_[alias] = import_stmt->modulePath;
+            }
+        }
 
-        // 1. Lower module symbols
+        // 1a. First pass: Collect all function signatures in the module
         for (const auto& stmt : module->ast->statements) {
             if (auto func_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
                 std::string original_name = func_stmt->name;
                 std::string qname = path + "." + original_name;
-                if (function_table_.count(qname)) continue;
-                {
+                if (!function_table_.count(qname)) {
                     FunctionInfo info;
                     info.name = qname;
                     info.param_count = func_stmt->params.size();
@@ -82,13 +95,22 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
                     info.lir_function = nullptr;
                     function_table_[info.name] = std::move(info);
                 }
+            }
+        }
+
+        // 1b. Second pass: Lower all module symbols
+        for (const auto& stmt : module->ast->statements) {
+            if (auto func_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+                std::string original_name = func_stmt->name;
+                std::string qname = path + "." + original_name;
                 func_stmt->name = qname;
                 generate_function(*func_stmt);
                 func_stmt->name = original_name;
             } else if (auto frame_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
                 std::string original_name = frame_stmt->name;
                 std::string qname = path + "." + original_name;
-                if (frame_table_.count(qname)) continue;
+                if (lowered_frames_.count(qname)) continue;
+                lowered_frames_.insert(qname);
                 frame_stmt->name = qname;
                 lower_frame_methods(*frame_stmt);
                 frame_stmt->name = original_name;
@@ -148,19 +170,28 @@ void Generator::lower_task_bodies_recursive(const std::vector<std::shared_ptr<LM
         if (!stmt) continue;
 
         if (auto concurrent_stmt = dynamic_cast<LM::Frontend::AST::ConcurrentStatement*>(stmt.get())) {
+            std::string saved_channel = current_concurrent_channel_;
+            current_concurrent_channel_ = concurrent_stmt->channel;
             if (concurrent_stmt->body) {
                 lower_task_bodies_recursive(concurrent_stmt->body->statements);
             }
+            current_concurrent_channel_ = saved_channel;
         } else if (auto parallel_stmt = dynamic_cast<LM::Frontend::AST::ParallelStatement*>(stmt.get())) {
             if (parallel_stmt->body) {
                 lower_task_bodies_recursive(parallel_stmt->body->statements);
             }
         } else if (auto task_stmt = dynamic_cast<LM::Frontend::AST::TaskStatement*>(stmt.get())) {
+            if (!current_concurrent_channel_.empty()) {
+                task_stmt->channel_param = current_concurrent_channel_;
+            }
             lower_task_body(*task_stmt);
             if (task_stmt->body) {
                 lower_task_bodies_recursive(task_stmt->body->statements);
             }
         } else if (auto worker_stmt = dynamic_cast<LM::Frontend::AST::WorkerStatement*>(stmt.get())) {
+            if (!current_concurrent_channel_.empty()) {
+                worker_stmt->channel_param = current_concurrent_channel_;
+            }
             lower_worker_body(*worker_stmt);
             if (worker_stmt->body) {
                 lower_task_bodies_recursive(worker_stmt->body->statements);
@@ -218,6 +249,26 @@ void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
     for (const auto& stmt : program.statements) {
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
             collect_frame_signature(frame_decl);
+        }
+    }
+    for (const auto& [qualified_name, stmt] : program.imported_symbols) {
+        if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            collect_frame_signature(frame_decl, qualified_name);
+        }
+    }
+    
+    // Collect frame signatures from all loaded modules
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
+    auto modules = manager.get_all_modules();
+    for (const auto& [path, module] : modules) {
+        if (path == "root" || !module || !module->ast) continue;
+        for (const auto& stmt : module->ast->statements) {
+            if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+                std::string qname = path + "." + frame_decl->name;
+                if (!frame_table_.count(qname)) {
+                    collect_frame_signature(frame_decl, qname);
+                }
+            }
         }
     }
 }
@@ -349,6 +400,21 @@ void Generator::collect_trait_signatures(LM::Frontend::AST::Program& program) {
     for (const auto& [qualified_name, stmt] : program.imported_symbols) {
         if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
             collect_trait_signature(trait_decl, qualified_name);
+        }
+    }
+    
+    // Collect trait signatures from all loaded modules
+    auto& manager = LM::Frontend::ModuleManager::getInstance();
+    auto modules = manager.get_all_modules();
+    for (const auto& [path, module] : modules) {
+        if (path == "root" || !module || !module->ast) continue;
+        for (const auto& stmt : module->ast->statements) {
+            if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+                std::string qname = path + "." + trait_decl->name;
+                if (!trait_table_.count(qname)) {
+                    collect_trait_signature(trait_decl, qname);
+                }
+            }
         }
     }
 }

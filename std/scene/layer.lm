@@ -1,0 +1,13 @@
+import std.scene.node as node;
+
+frame Layer {
+    pub var root_node: node.Node;
+    pub var opacity: float;
+    pub var z_order: int;
+
+    pub init(r: node.Node = node.Node(), op: float = 1.0, z: int = 0) {
+        self.root_node = r;
+        self.opacity = op;
+        self.z_order = z;
+    }
+}

@@ -1,0 +1,10 @@
+// @error:use_after_free
+// Assigning to moved variable
+
+fn consume(x: [int]) {
+    // x is consumed
+}
+
+var data = [1, 2, 3];
+consume(data);
+data = [4, 5, 6];  // ERROR: data already moved

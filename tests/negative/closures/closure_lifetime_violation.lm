@@ -1,0 +1,12 @@
+// @error:closure_capture
+// Closure capturing reference that goes out of scope
+
+fn create_closure(): fn(): int {
+    var x = 42;
+    return fn() {
+        return x;  // x goes out of scope after function returns
+    };
+}
+
+var f = create_closure();
+print(f());

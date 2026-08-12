@@ -39,7 +39,25 @@ RUNTIME_API LmValue lm_list_get(LmList* list, uint64_t index) {
 }
 
 RUNTIME_API void lm_list_set(LmList* list, uint64_t index, LmValue element) {
-    if (!list || index >= list->size) return;
+    if (!list) return;
+
+    if (index >= list->capacity) {
+        uint64_t new_capacity = list->capacity ? list->capacity : 8;
+        while (index >= new_capacity) {
+            new_capacity *= 2;
+        }
+        LmValue* new_data = (LmValue*)realloc(list->data, sizeof(LmValue) * new_capacity);
+        if (!new_data) return;
+        list->data = new_data;
+        list->capacity = new_capacity;
+    }
+
+    while (list->size < index) {
+        list->data[list->size++] = VAL_NIL;
+    }
+    if (index >= list->size) {
+        list->size = index + 1;
+    }
     list->data[index] = element;
 }
 

@@ -1,0 +1,15 @@
+// @error:visibility_error
+// Calling private method from outside frame
+
+frame Calculator {
+    fn private_helper(): int {
+        return 42;
+    }
+    
+    pub fn public_method(): int {
+        return private_helper();
+    }
+}
+
+var calc = Calculator {};
+calc.private_helper();  // private method, not accessible

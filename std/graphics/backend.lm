@@ -1,0 +1,7 @@
+frame Backend {
+    pub var name: str;
+
+    pub init(n: str = "Software") {
+        self.name = n;
+    }
+}

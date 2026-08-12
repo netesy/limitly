@@ -1,0 +1,22 @@
+// Standard Library Matrix Module
+
+frame Matrix {
+    pub data: [float];
+
+    pub init() {
+        self.data = [
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0
+        ];
+    }
+
+    pub fn get(row: int, col: int): float {
+        return self.data[row * 4 + col];
+    }
+
+    pub fn set(row: int, col: int, value_val: float) {
+        self.data[row * 4 + col] = value_val;
+    }
+}

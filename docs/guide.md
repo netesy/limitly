@@ -639,6 +639,8 @@ Limit is an object-oriented language and supports **frames** for creating user-d
 
 Frames are defined using the `frame` keyword.
 
+> ⚠️ **Critical Visibility Rule**: Frames and traits are implicitly public at the module level. You must **never** write the `pub` keyword in front of a `frame` or `trait` definition (e.g., `pub frame Greeter` or `pub trait Speaker` are syntax errors). Visibility modifiers (like `pub` and `prot`) can only be placed on fields and methods *inside* a frame or trait.
+
 ```limit
 frame Greeter {
     var name: str = "World";
@@ -1130,21 +1132,21 @@ match (user) {
 ### The `Result` Type for Operations That Can Fail
 
 For operations that can either succeed or fail, Limit uses a `Result` type (often implemented as a `Type?` or a custom enum). The common convention is:
-- **`Ok(value)`**: Represents a successful result.
-- **`Err(error)`**: Represents a failure, containing an error value.
+- **`ok(value)`**: Represents a successful result.
+- **`err(error)`**: Represents a failure, containing an error value.
 
 ```limit
 fn divide(a: int, b: int): int?DivisionByZero {
     if (b == 0) {
-        return Err(DivisionByZero("Cannot divide by zero"));
+        return err(DivisionByZero("Cannot divide by zero"));
     }
-    return Ok(a / b);
+    return ok(a / b);
 }
 
 var result = divide(10, 2);
 match (result) {
-    Ok(value) => { print("Result: {value}"); },
-    Err(e) => { print("Error: {e}"); }
+    val value => { print("Result: {value}"); },
+    err e => { print("Error: {e}"); }
 }
 ```
 

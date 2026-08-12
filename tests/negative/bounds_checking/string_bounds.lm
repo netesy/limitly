@@ -1,0 +1,6 @@
+// @error:nil_bounds
+// String indexing out of bounds returns nil safely
+
+var text = "hello";
+var ch = text[10];  // Index 10 out of bounds returns nil safely
+assert(ch == nil, "String index out of bounds must return nil safely");

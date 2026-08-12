@@ -1,0 +1,11 @@
+import std.graphics.matrix as matrix;
+
+frame Camera {
+    pub var projection: matrix.Matrix;
+    pub var view: matrix.Matrix;
+
+    pub init(proj: matrix.Matrix = matrix.Matrix(), v: matrix.Matrix = matrix.Matrix()) {
+        self.projection = proj;
+        self.view = v;
+    }
+}

@@ -1,0 +1,19 @@
+import std.graphics.transform as transform;
+
+frame Node {
+    pub var id: int;
+    pub var children: [Node];
+    pub var transform_val: transform.Transform;
+    pub var visible: bool;
+
+    pub init(id: int = 0, ch: [Node] = [], t: transform.Transform = transform.Transform(), vis: bool = true) {
+        self.id = id;
+        self.children = ch;
+        self.transform_val = t;
+        self.visible = vis;
+    }
+
+    pub fn add_child(child: Node): nil {
+        self.children = self.children + [child];
+    }
+}

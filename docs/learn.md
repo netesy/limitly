@@ -308,6 +308,35 @@ greeter.say_hello(); // Output: Hello, World!
 
 What is `self`? Inside a frame's method, `self` refers to the specific object you are working with.
 
+### Traits for Shared Behavior
+
+While Limitly does not support traditional frame inheritance, it uses **traits** to define shared behavior that multiple frames can implement. This promotes composition over inheritance.
+
+> ⚠️ **Syntax Note**: Traits and frames are implicitly public in their respective modules. You must **never** write the `pub` modifier keyword in front of `frame` or `trait` declarations (e.g. `pub frame Name` or `pub trait Name` are syntax errors).
+
+Here is how you declare a trait and implement it in a frame:
+
+```limit
+trait Speaker {
+    fn speak();
+}
+
+frame Dog : Speaker {
+    pub fn speak() {
+        print("Woof!");
+    }
+}
+
+frame Cat : Speaker {
+    pub fn speak() {
+        print("Meow!");
+    }
+}
+
+var s1: Speaker = Dog();
+s1.speak(); // Output: Woof!
+```
+
 ## 🧪 Errors and Optional Values
 
 In Limit, errors and absent values are not seen as crashes, but as a normal part of a program's flow that you should plan for. The language gives you powerful tools to handle situations where things might go wrong or where values might be absent.
@@ -335,11 +364,11 @@ fn do_something(): int? {
     var result = might_fail();
     
     match result {
-        Ok(value) => {
+        val value => {
             print("Got value: {value}");
             return ok(value * 2);
         },
-        Err => {
+        err => {
             print("No value available");
             return err();
         }
@@ -386,6 +415,32 @@ var result: int = divide(10, 0)? else {
 print("The final result is: {result}"); // Output: The final result is: -1
 ```
 
+## 🚦 Structured Concurrency
+
+Limitly has first-class, built-in support for structured concurrency. In structured concurrency, the lifetime of concurrent tasks is bound to the lexical scope of a block (like `parallel` or `concurrent`). When the block completes, all spawned tasks are guaranteed to have finished, eliminating leaked threads or tasks.
+
+- **`parallel`** blocks are used to split CPU-bound workloads across multiple cores.
+- **`concurrent`** blocks are used to run asynchronous I/O-bound tasks concurrently.
+- **`channel()`** is a built-in function to safely pass messages between concurrent tasks.
+
+Here is a simple example of spawning a task inside a `concurrent` block and receiving its result via a channel:
+
+```limit
+var ch = channel();
+
+concurrent {
+    task {
+        ch.send("Hello from concurrent task!");
+    }
+}
+
+var msg: str? = ch.receive();
+match (msg) {
+    val text => { print(text); },
+    err => { print("No message received."); }
+}
+```
+
 ## 🚀 Mini Project: Number Guessing Game
 
 Now it's time to put everything you've learned together! Let's build a simple number guessing game.
@@ -407,7 +462,7 @@ while (true) {
     var guess_result: int? = to_int(input_str);
 
     match (guess_result) {
-        Ok(guess) => {
+        val guess => {
             print("You guessed: {guess}");
             if (guess < secret_number) {
                 print("Too low!");
@@ -418,7 +473,7 @@ while (true) {
                 break; 
             }
         },
-        Err => {
+        err => {
             print("That's not a number! Please try again.");
         }
     }

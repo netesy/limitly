@@ -1,0 +1,13 @@
+import std.ui.build_context as build_context;
+
+frame Widget {
+    pub var key: str;
+
+    pub init(k: str = "") {
+        self.key = k;
+    }
+
+    pub fn build(context: build_context.BuildContext): Widget {
+        return self;
+    }
+}

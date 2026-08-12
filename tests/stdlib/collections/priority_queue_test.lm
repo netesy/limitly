@@ -1,11 +1,16 @@
+import std.collections.priority_queue as pq;
 import std.collections.index as collections;
 
 fn main(): int {
-    var p = collections.PriorityQueue(); // Min-heap by default
+    var p = collections.PriorityQueue(nil) as pq.PriorityQueueWrapper; // Min-heap by default
     p.push(10);
+    print("After push 10, length: {p.length()}");
     p.push(5);
+    print("After push 5, length: {p.length()}");
     p.push(20);
+    print("After push 20, length: {p.length()}");
     p.push(1);
+    print("After push 1, length: {p.length()}");
     
     assert(p.length() == 4, "PriorityQueue length should be 4");
     assert(p.peek() == 1, "Peek should return 1 (min)");
@@ -20,7 +25,7 @@ fn main(): int {
         if (a > b) return -1;
         if (a < b) return 1;
         return 0;
-    });
+    }) as pq.PriorityQueueWrapper;
     pmax.push(10);
     pmax.push(5);
     pmax.push(20);

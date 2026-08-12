@@ -251,6 +251,22 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
             return target_type;
         }
     }
+
+    // Check if variable is defined in an outer function scope
+    Scope* outer_scope = current_scope.get();
+    while (outer_scope) {
+        auto it_var = outer_scope->variables.find(expr->name);
+        if (it_var != outer_scope->variables.end()) {
+            if (outer_scope->function != current_function && outer_scope->function != nullptr && current_function != nullptr) {
+                if (lambda_captures_stack.empty()) {
+                    add_error("closure_capture: Nested function cannot capture variable '" + expr->name + "' from outer scope. Use lambdas instead", expr->line);
+                    return nullptr;
+                }
+            }
+            break;
+        }
+        outer_scope = outer_scope->parent.get();
+    }
     
     // Check linear type access
     check_linear_type_access(expr->name, expr->line);
@@ -321,7 +337,17 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
 
     if (!type) {
         undefined_symbols.insert(expr->name);
-        add_error("Undefined variable or variant: " + expr->name, expr->line);
+        std::vector<std::string> candidates = get_visible_variables();
+        std::string suggestion = find_similar_name(expr->name, candidates);
+
+        std::string msg = "cannot find variable `" + expr->name + "`";
+        msg += "\n\n= reason: variable is not declared in this scope";
+        if (!suggestion.empty()) {
+            msg += "\n= help: did you mean `" + suggestion + "`?";
+        } else {
+            msg += "\n= help: make sure `" + expr->name + "` is declared before it is used";
+        }
+        add_error(msg, expr->line);
         return nullptr;
     }
     
@@ -340,9 +366,129 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     return type;
 }
 
+bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, long long& out_int, double& out_double, bool& is_int, TypeChecker* checker) {
+    if (!expr) return false;
+
+    if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
+        if (checker) {
+            auto it_int = checker->constant_ints.find(var->name);
+            if (it_int != checker->constant_ints.end()) {
+                out_int = it_int->second;
+                is_int = true;
+                return true;
+            }
+            auto it_double = checker->constant_doubles.find(var->name);
+            if (it_double != checker->constant_doubles.end()) {
+                out_double = it_double->second;
+                is_int = false;
+                return true;
+            }
+        }
+    } else if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+        if (literal->literalType == TokenType::INT_LITERAL || literal->literalType == TokenType::HEX_LITERAL) {
+            try {
+                if (std::holds_alternative<std::string>(literal->value)) {
+                    std::string s_val = std::get<std::string>(literal->value);
+                    if (s_val.rfind("0x", 0) == 0 || s_val.rfind("0X", 0) == 0) {
+                        out_int = std::stoll(s_val, nullptr, 16);
+                    } else {
+                        out_int = std::stoll(s_val);
+                    }
+                    is_int = true;
+                    return true;
+                }
+            } catch (...) {
+                return false;
+            }
+        } else if (literal->literalType == TokenType::FLOAT_LITERAL || literal->literalType == TokenType::SCIENTIFIC_LITERAL) {
+            try {
+                if (std::holds_alternative<std::string>(literal->value)) {
+                    std::string s_val = std::get<std::string>(literal->value);
+                    out_double = std::stod(s_val);
+                    is_int = false;
+                    return true;
+                }
+            } catch (...) {
+                return false;
+            }
+        }
+    } else if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
+        long long right_int = 0;
+        double right_double = 0.0;
+        bool right_is_int = false;
+        if (evaluate_const_expr(unary->right, right_int, right_double, right_is_int, checker)) {
+            if (unary->op == TokenType::MINUS) {
+                if (right_is_int) {
+                    out_int = -right_int;
+                    is_int = true;
+                } else {
+                    out_double = -right_double;
+                    is_int = false;
+                }
+                return true;
+            } else if (unary->op == TokenType::TILDE) {
+                if (right_is_int) {
+                    out_int = ~right_int;
+                    is_int = true;
+                    return true;
+                }
+            }
+        }
+    } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
+        long long left_int = 0, right_int = 0;
+        double left_double = 0.0, right_double = 0.0;
+        bool left_is_int = false, right_is_int = false;
+
+        if (evaluate_const_expr(binary->left, left_int, left_double, left_is_int, checker) &&
+            evaluate_const_expr(binary->right, right_int, right_double, right_is_int, checker)) {
+
+            bool both_int = left_is_int && right_is_int;
+            if (!both_int) {
+                double l = left_is_int ? (double)left_int : left_double;
+                double r = right_is_int ? (double)right_int : right_double;
+                is_int = false;
+                switch (binary->op) {
+                    case TokenType::PLUS: out_double = l + r; return true;
+                    case TokenType::MINUS: out_double = l - r; return true;
+                    case TokenType::STAR: out_double = l * r; return true;
+                    case TokenType::SLASH:
+                        if (r == 0.0) return false;
+                        out_double = l / r; return true;
+                    default: return false;
+                }
+            } else {
+                is_int = true;
+                switch (binary->op) {
+                    case TokenType::PLUS: out_int = left_int + right_int; return true;
+                    case TokenType::MINUS: out_int = left_int - right_int; return true;
+                    case TokenType::STAR: out_int = left_int * right_int; return true;
+                    case TokenType::SLASH:
+                        if (right_int == 0) return false;
+                        out_int = left_int / right_int; return true;
+                    case TokenType::MODULUS:
+                        if (right_int == 0) return false;
+                        out_int = left_int % right_int; return true;
+                    case TokenType::LESS_LESS:
+                        out_int = left_int << right_int; return true;
+                    case TokenType::GREATER_GREATER:
+                        out_int = left_int >> right_int; return true;
+                    case TokenType::AMPERSAND:
+                        out_int = left_int & right_int; return true;
+                    case TokenType::PIPE:
+                        out_int = left_int | right_int; return true;
+                    case TokenType::CARET:
+                        out_int = left_int ^ right_int; return true;
+                    default: return false;
+                }
+            }
+        }
+    }
+    return false;
+}
+
 TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
-    
+
     TypePtr left_expected = nullptr;
     switch (expr->op) {
         case TokenType::PLUS:
@@ -368,14 +514,92 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
     }
 
     TypePtr right_type = check_expression(expr->right, right_expected);
-    
+
     // Mandate 7: Automatically unwrap refined types for operations
     TypePtr left_base = type_system.unwrapRefined(left_type);
     TypePtr right_base = type_system.unwrapRefined(right_type);
 
     // If unwrapped, update the inferred type of operands for the backend
-    if (left_type->tag == TypeTag::Refined) expr->left->inferred_type = left_base;
-    if (right_type->tag == TypeTag::Refined) expr->right->inferred_type = right_base;
+    if (left_type && left_type->tag == TypeTag::Refined) expr->left->inferred_type = left_base;
+    if (right_type && right_type->tag == TypeTag::Refined) expr->right->inferred_type = right_base;
+
+    // Verify compile-time constant evaluation for safety constraints (Phase 3.D)
+    long long left_int = 0, right_int = 0;
+    double left_double = 0.0, right_double = 0.0;
+    bool left_is_int = false, right_is_int = false;
+
+    bool has_left_const = evaluate_const_expr(expr->left, left_int, left_double, left_is_int, this);
+    bool has_right_const = evaluate_const_expr(expr->right, right_int, right_double, right_is_int, this);
+
+    if (has_right_const) {
+        if (expr->op == TokenType::SLASH || expr->op == TokenType::MODULUS) {
+            if (right_is_int && right_int == 0) {
+                add_error("Division or modulo by zero", expr->line);
+            } else if (!right_is_int && right_double == 0.0) {
+                add_error("Division or modulo by zero", expr->line);
+            }
+        }
+    }
+
+    if (has_left_const && has_right_const) {
+        bool both_int = left_is_int && right_is_int;
+        if (both_int) {
+            if (expr->op == TokenType::LESS_LESS || expr->op == TokenType::GREATER_GREATER) {
+                int bit_width = 64;
+                if (left_base) {
+                    std::string type_name = left_base->toString();
+                    if (type_name == "i8" || type_name == "u8") bit_width = 8;
+                    else if (type_name == "i16" || type_name == "u16") bit_width = 16;
+                    else if (type_name == "i32" || type_name == "u32") bit_width = 32;
+                    else if (type_name == "i64" || type_name == "u64" || type_name == "int" || type_name == "uint") bit_width = 64;
+                    else if (type_name == "i128" || type_name == "u128") bit_width = 128;
+                }
+
+                if (right_int < 0) {
+                    add_error("Negative shift amount", expr->line);
+                } else if (right_int >= bit_width) {
+                    add_error("Shift amount exceeds bit width", expr->line);
+                }
+            }
+
+            long long result = 0;
+            bool check_overflow = false;
+            if (expr->op == TokenType::PLUS) {
+                result = left_int + right_int;
+                check_overflow = true;
+            } else if (expr->op == TokenType::MINUS) {
+                result = left_int - right_int;
+                check_overflow = true;
+            } else if (expr->op == TokenType::STAR) {
+                result = left_int * right_int;
+                check_overflow = true;
+            } else if (expr->op == TokenType::POWER) {
+                result = std::pow(left_int, right_int);
+                check_overflow = true;
+            }
+
+            if (check_overflow) {
+                TypePtr target_type = expected_type;
+                if (!target_type && left_base) {
+                    target_type = left_base;
+                }
+                std::string type_name = target_type ? target_type->toString() : "int";
+                long long max_val = std::numeric_limits<long long>::max();
+                long long min_val = std::numeric_limits<long long>::min();
+
+                if (type_name == "i8") { max_val = 127; min_val = -128; }
+                else if (type_name == "u8") { max_val = 255; min_val = 0; }
+                else if (type_name == "i16") { max_val = 32767; min_val = -32768; }
+                else if (type_name == "u16") { max_val = 65535; min_val = 0; }
+                else if (type_name == "i32") { max_val = 2147483647; min_val = -2147483648LL; }
+                else if (type_name == "u32") { max_val = 4294967295LL; min_val = 0; }
+
+                if (result > max_val || result < min_val) {
+                    add_error("Arithmetic overflow / underflow detected", expr->line);
+                }
+            }
+        }
+    }
 
     switch (expr->op) {
         case TokenType::PLUS:
@@ -403,11 +627,17 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
                 }
                 return promote_numeric_types(left_base, right_base);
             } else if (expr->op == TokenType::PLUS && 
-                      (is_string_type(left_base) || is_string_type(right_base))) {
+                      is_string_type(left_base) && is_string_type(right_base)) {
+                // String concatenation requires both operands to be strings
                 return type_system.STRING_TYPE;
             } else if (expr->op == TokenType::PLUS && 
                       (left_base->tag == TypeTag::List && right_base->tag == TypeTag::List)) {
                 return type_system.getCommonType(left_base, right_base);
+            } else if (expr->op == TokenType::PLUS && 
+                      (is_string_type(left_base) || is_string_type(right_base))) {
+                // Disallow string + non-string concatenation for type safety
+                add_error("Cannot concatenate string with non-string type", expr->line);
+                return type_system.STRING_TYPE;
             }
             add_error("Invalid operand types for arithmetic operation", expr->line);
             return type_system.INT_TYPE;
@@ -567,6 +797,32 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
     }
 }
 
+bool is_consuming_callee(const std::string& name) {
+    static const std::unordered_set<std::string> non_consuming = {
+        "print", "len", "assert", "error", "_builtin_len", "_builtin_substring",
+        "clock", "sleep", "time", "date", "now", "typeof", "typeOf", "debug", "input",
+        "resource_create", "resource_call", "resource_destroy", "file_exists", "file_delete",
+        "concat", "length", "substring", "str_format", "map", "filter", "reduce", "forEach",
+        "find", "some", "every", "compose", "curry", "partial"
+    };
+    if (non_consuming.find(name) != non_consuming.end()) return false;
+    if (name.ends_with(".len") || name.ends_with(".length") ||
+        name.ends_with(".append") || name.ends_with(".pop") ||
+        name.ends_with(".keys") || name.ends_with(".values") ||
+        name.ends_with(".init") || name.ends_with(".close")) {
+        return false;
+    }
+
+    std::string base_name = name;
+    size_t last_dot = name.find_last_of('.');
+    if (last_dot != std::string::npos) {
+        base_name = name.substr(last_dot + 1);
+    }
+    if (!base_name.empty() && std::isupper(base_name[0])) return false;
+
+    return true;
+}
+
 TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
 
@@ -670,7 +926,32 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 arg_expected = it->second.param_types[i];
             }
         }
-        arg_types.push_back(check_expression(expr->arguments[i], arg_expected));
+        TypePtr arg_type = check_expression(expr->arguments[i], arg_expected);
+        arg_types.push_back(arg_type);
+        
+        // Explicit Move semantics for linear types passed to consuming callees
+        if (auto arg_var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->arguments[i])) {
+            std::string callee_name = "";
+            if (auto var_callee = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+                callee_name = var_callee->name;
+            } else if (auto member_callee = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
+                callee_name = member_callee->name;
+            }
+
+            if (is_consuming_callee(callee_name)) {
+                TypePtr arg_t = lookup_variable(arg_var->name);
+                bool is_copyable = (arg_t &&
+                    (arg_t->tag == TypeTag::Function ||
+                     arg_t->tag == TypeTag::Int || arg_t->tag == TypeTag::Int64 ||
+                     arg_t->tag == TypeTag::Float32 || arg_t->tag == TypeTag::Float64 ||
+                     arg_t->tag == TypeTag::Bool || arg_t->tag == TypeTag::String ||
+                     arg_t->tag == TypeTag::Nil || arg_t->tag == TypeTag::Any));
+
+                if (!is_copyable) {
+                    check_variable_move(arg_var->name);
+                }
+            }
+        }
     }
     
     // Check if callee is a variable (could be function or frame name)
@@ -1077,7 +1358,25 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                     }
                 }
 
-                add_error("Frame '" + frame_name + "' has no method '" + method_name + "'", expr->line);
+                if (is_failed_type(frame_name)) {
+                    expr->inferred_type = type_system.ANY_TYPE;
+                    return type_system.ANY_TYPE;
+                }
+
+                std::vector<std::string> method_candidates;
+                for (const auto& m : frame_info.declaration->methods) {
+                    method_candidates.push_back(m->name);
+                }
+                std::string suggestion = find_similar_name(method_name, method_candidates);
+
+                std::string msg = "frame `" + frame_name + "` has no method named `" + method_name + "`";
+                msg += "\n\n= reason: method not found on frame `" + frame_name + "`";
+                if (!suggestion.empty()) {
+                    msg += "\n= help: did you mean `" + suggestion + "`?";
+                } else {
+                    msg += "\n= help: check the frame definition or spelling";
+                }
+                add_error(msg, expr->line);
                 return type_system.ANY_TYPE;
             }
             
@@ -1192,7 +1491,23 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 }
             }
 
-            add_error("Trait '" + trait_name + "' has no method '" + method_name + "'", expr->line);
+            std::vector<std::string> trait_method_candidates;
+            auto trait_it_cand = trait_declarations.find(trait_name);
+            if (trait_it_cand != trait_declarations.end()) {
+                for (const auto& tm : trait_it_cand->second.declaration->methods) {
+                    trait_method_candidates.push_back(tm->name);
+                }
+            }
+            std::string suggestion = find_similar_name(method_name, trait_method_candidates);
+
+            std::string msg = "trait `" + trait_name + "` has no method named `" + method_name + "`";
+            msg += "\n\n= reason: method not found on trait `" + trait_name + "`";
+            if (!suggestion.empty()) {
+                msg += "\n= help: did you mean `" + suggestion + "`?";
+            } else {
+                msg += "\n= help: check the trait definition or spelling";
+            }
+            add_error(msg, expr->line);
             return type_system.ANY_TYPE;
         } else if (object_type && object_type->tag == TypeTag::Any) {
             // Dynamic call on 'any' - allowed, returns any
@@ -1268,7 +1583,8 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::AssignExpr> expr) {
     if (!expr) return nullptr;
     
-    TypePtr value_type = check_expression(expr->value);
+    // Determine expected type before checking value expression
+    TypePtr expected_type = nullptr;
     
     // Handle member assignment (e.g., obj.field = value)
     if (expr->object && expr->member) {
@@ -1280,6 +1596,7 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             auto frameTypeData = std::get_if<FrameType>(&object_type->extra);
             if (!frameTypeData) {
                 add_error("Invalid frame type", expr->line);
+                TypePtr value_type = check_expression(expr->value);
                 return value_type;
             }
             
@@ -1290,22 +1607,25 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             auto frame_it = frame_declarations.find(frame_name);
             if (frame_it == frame_declarations.end()) {
                 add_error("Unknown frame type: " + frame_name, expr->line);
+                TypePtr value_type = check_expression(expr->value);
                 return value_type;
             }
             
             const FrameInfo& frame_info = frame_it->second;
             
-            // Find the field
+            // Find the field and get its type as expected type
             TypePtr field_type = nullptr;
             for (const auto& [fname, ftype] : frame_info.fields) {
                 if (fname == field_name) {
                     field_type = ftype;
+                    expected_type = ftype; // Use field type as expected type
                     break;
                 }
             }
             
             if (!field_type) {
                 add_error("Frame '" + frame_name + "' has no field '" + field_name + "'", expr->line);
+                TypePtr value_type = check_expression(expr->value);
                 return value_type;
             }
             
@@ -1321,6 +1641,10 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
                     }
                 }
             }
+            
+            // Now check value expression with expected type
+            TypePtr value_type = check_expression(expr->value, expected_type);
+            
             if (!is_type_compatible(field_type, value_type)) {
                 add_type_error(field_type->toString(), value_type->toString(), expr->line);
             }
@@ -1328,15 +1652,34 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             return value_type;
         }
         
-        // For other types, just return the value type
+        // For other types, check value without expected type
+        TypePtr value_type = check_expression(expr->value);
         return value_type;
     }
     
     // Handle index assignment (e.g., arr[0] = value)
     if (expr->object && expr->index) {
-        // Just check the object and index expressions
-        check_expression(expr->object);
+        TypePtr object_type = check_expression(expr->object);
         check_expression(expr->index);
+        TypePtr value_type = check_expression(expr->value, expected_type);
+        
+        // Check type compatibility for list/dict index assignment
+        if (object_type && object_type->tag == TypeTag::List) {
+            if (auto lt = std::get_if<ListType>(&object_type->extra)) {
+                if (!is_type_compatible(lt->elementType, value_type)) {
+                    add_error("Cannot assign value of type '" + value_type->toString() + 
+                             "' to list element of type '" + lt->elementType->toString() + "'", expr->line);
+                }
+            }
+        } else if (object_type && object_type->tag == TypeTag::Dict) {
+            if (auto dt = std::get_if<DictType>(&object_type->extra)) {
+                if (!is_type_compatible(dt->valueType, value_type)) {
+                    add_error("Cannot assign value of type '" + value_type->toString() + 
+                             "' to dictionary value of type '" + dt->valueType->toString() + "'", expr->line);
+                }
+            }
+        }
+        
         return value_type;
     }
     
@@ -1344,6 +1687,19 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
     if (!expr->object && !expr->member && !expr->index) {
         TypePtr var_type = lookup_variable(expr->name);
         if (var_type) {
+            auto it_mem = variable_memory_info.find(expr->name);
+            if (it_mem != variable_memory_info.end() && it_mem->second.memory_state == "moved") {
+                add_error("Use after move: Cannot assign to moved variable '" + expr->name + "'", expr->line);
+            }
+
+            if (!lambda_captures_stack.empty() && should_capture_variable(expr->name)) {
+                add_error("closure_capture: Cannot mutate captured variable '" + expr->name + "' inside closure", expr->line);
+            }
+
+            // Use variable's type as expected type
+            expected_type = var_type;
+            TypePtr value_type = check_expression(expr->value, expected_type);
+            
             if (!is_type_compatible(var_type, value_type) && 
                 !(is_string_type(var_type) && is_string_type(value_type))) {
                 add_type_error(var_type->toString(), value_type->toString(), expr->line);
@@ -1369,19 +1725,54 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
                     create_reference(var_expr->name, expr->name, expr->line);
                 }
             }
+
+            // Constant evaluation and storage
+            long long val_int = 0;
+            double val_double = 0.0;
+            bool is_int = false;
+            if (evaluate_const_expr(expr->value, val_int, val_double, is_int, this)) {
+                if (is_int) {
+                    constant_ints[expr->name] = val_int;
+                    constant_doubles.erase(expr->name);
+                } else {
+                    constant_doubles[expr->name] = val_double;
+                    constant_ints.erase(expr->name);
+                }
+            } else {
+                constant_ints.erase(expr->name);
+                constant_doubles.erase(expr->name);
+            }
+
+            return value_type;
         } else {
-            // Implicit variable declaration
+            // Implicit variable declaration - check value without expected type
+            TypePtr value_type = check_expression(expr->value);
             declare_variable(expr->name, value_type);
             declare_variable_memory(expr->name, value_type);  // Track memory for new variable
             
+            // Constant evaluation and storage
+            long long val_int = 0;
+            double val_double = 0.0;
+            bool is_int = false;
+            if (evaluate_const_expr(expr->value, val_int, val_double, is_int, this)) {
+                if (is_int) {
+                    constant_ints[expr->name] = val_int;
+                } else {
+                    constant_doubles[expr->name] = val_double;
+                }
+            }
+
             // New variables are linear types by default
             LinearTypeInfo linear_info;
             linear_info.is_moved = false;
             linear_info.access_count = 0;
             linear_types[expr->name] = linear_info;
+            return value_type;
         }
     }
     
+    // Fallback: check value without expected type
+    TypePtr value_type = check_expression(expr->value);
     return value_type;
 }
 
@@ -1393,6 +1784,7 @@ TypePtr TypeChecker::check_grouping_expr(std::shared_ptr<LM::Frontend::AST::Grou
 TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::MemberExpr> expr) {
     if (!expr) return nullptr;
     TypePtr object_type = check_expression(expr->object);
+    if (!object_type) return type_system.ANY_TYPE;
     std::string member_name = expr->name;
     
     if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::String)) {
@@ -1517,7 +1909,28 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
             // If it's a module alias, we shouldn't fail if we just haven't found the member yet
             // but we should have found it if it exists.
             if (import_aliases.count(frame_name)) {
-                add_error("Module '" + frame_name + "' has no member '" + member_name + "'", expr->line);
+                std::vector<std::string> module_candidates;
+                std::string prefix = frame_name + ".";
+                for (const auto& pair : variable_types) {
+                    if (pair.first.rfind(prefix, 0) == 0) {
+                        module_candidates.push_back(pair.first.substr(prefix.length()));
+                    }
+                }
+                for (const auto& pair : function_signatures) {
+                    if (pair.first.rfind(prefix, 0) == 0) {
+                        module_candidates.push_back(pair.first.substr(prefix.length()));
+                    }
+                }
+                std::string suggestion = find_similar_name(member_name, module_candidates);
+
+                std::string msg = "module `" + frame_name + "` has no member named `" + member_name + "`";
+                msg += "\n\n= reason: member not found in module `" + frame_name + "`";
+                if (!suggestion.empty()) {
+                    msg += "\n= help: did you mean `" + suggestion + "`?";
+                } else {
+                    msg += "\n= help: check the module export list or spelling";
+                }
+                add_error(msg, expr->line);
             } else {
                 add_error("Invalid frame declaration for " + frame_name, expr->line);
             }
@@ -1589,7 +2002,30 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         }
         
         // Member not found
-        add_error("Frame '" + frame_name + "' has no member '" + member_name + "'", expr->line);
+        if (is_failed_type(frame_name)) {
+            expr->inferred_type = type_system.ANY_TYPE;
+            return type_system.ANY_TYPE;
+        }
+
+        std::vector<std::string> member_candidates;
+        for (const auto& [field_name, field_type] : frame_info.fields) {
+            member_candidates.push_back(field_name);
+        }
+        if (frame_info.declaration) {
+            for (const auto& method : frame_info.declaration->methods) {
+                member_candidates.push_back(method->name);
+            }
+        }
+        std::string suggestion = find_similar_name(member_name, member_candidates);
+
+        std::string msg = "frame `" + frame_name + "` has no member named `" + member_name + "`";
+        msg += "\n\n= reason: member not found on frame `" + frame_name + "`";
+        if (!suggestion.empty()) {
+            msg += "\n= help: did you mean `" + suggestion + "`?";
+        } else {
+            msg += "\n= help: check the frame definition or spelling";
+        }
+        add_error(msg, expr->line);
         return type_system.ANY_TYPE;
     }
     
@@ -1627,6 +2063,14 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         if (member_name == "keys" || member_name == "values") return type_system.FUNCTION_TYPE;
     }
 
+    std::string type_str = object_type->toString();
+    if (type_str.find("Frame<") == 0) {
+        std::string frame_name = type_str.substr(6, type_str.length() - 7);
+        if (is_failed_type(frame_name)) {
+            return type_system.ANY_TYPE;
+        }
+    }
+
     add_error("Type '" + object_type->toString() + "' has no member '" + member_name + "'", expr->line);
     return type_system.ANY_TYPE;
 }
@@ -1637,6 +2081,8 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
     TypePtr object_type = check_expression(expr->object);
     TypePtr index_type = check_expression(expr->index);
     
+    if (!object_type || !index_type) return type_system.ANY_TYPE;
+
     if (object_type->tag == TypeTag::List) {
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
              add_error("List index must be an integer, got " + index_type->toString(), expr->line);
@@ -1656,13 +2102,30 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
              add_error("String index must be an integer, got " + index_type->toString(), expr->line);
         }
-        return type_system.NIL_TYPE;
+        return type_system.STRING_TYPE;
     } else if (object_type->tag == TypeTag::Tuple) {
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
              add_error("Tuple index must be an integer, got " + index_type->toString(), expr->line);
         }
         if (auto tt = std::get_if<TupleType>(&object_type->extra)) {
-            // Return the type of the indexed element (simplified - could add bounds checking)
+            // Check if index is constant and within bounds
+            if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr->index)) {
+                if (std::holds_alternative<std::string>(lit->value)) {
+                    try {
+                        int64_t idx = std::stoll(std::get<std::string>(lit->value));
+                        if (idx < 0 || idx >= (int64_t)tt->elementTypes.size()) {
+                            add_error("Tuple index out of bounds: index " + std::to_string(idx) + 
+                                     " is outside valid range [0, " + std::to_string(tt->elementTypes.size() - 1) + "]",
+                                     expr->line);
+                        }
+                        if (idx >= 0 && idx < (int64_t)tt->elementTypes.size()) {
+                            return tt->elementTypes[idx];
+                        }
+                    } catch (...) {
+                        // Invalid integer literal
+                    }
+                }
+            }
             return type_system.ANY_TYPE;
         }
     }

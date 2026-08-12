@@ -1,0 +1,6 @@
+// @error:nil_bounds
+// Negative array index returns nil safely
+
+var arr = [10, 20, 30];
+var x = arr[-1];  // Negative index returns nil safely
+assert(x == nil, "Negative array index must return nil safely");

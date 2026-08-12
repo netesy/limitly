@@ -1,0 +1,8 @@
+// @error:break_outside_loop
+// Break in if statement outside loop
+
+if (true) {
+    break;  // Not inside any loop
+}
+
+print("This should not compile");

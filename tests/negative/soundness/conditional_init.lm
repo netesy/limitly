@@ -1,0 +1,12 @@
+// @error:uninitialized
+// Variable initialized in only one branch
+
+var x: int;
+
+if (true) {
+    x = 5;
+} else {
+    // x not initialized in this branch
+}
+
+print(x);  // x might be uninitialized

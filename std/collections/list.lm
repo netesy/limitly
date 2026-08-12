@@ -1,0 +1,61 @@
+// Standard Library List Collection
+
+frame List {
+    pub data: [any];
+
+    pub init() {
+        self.data = [] as [any];
+    }
+
+    pub fn append(item: any) {
+        self.data.append(item);
+    }
+
+    pub fn push(item: any) {
+        self.data.append(item);
+    }
+
+    pub fn pop(): any {
+        var n = len(self.data);
+        if (n == 0) {
+            return nil;
+        }
+        var item = self.data[n - 1];
+
+        var new_data = [] as [any];
+        var i = 0;
+        while (i < n - 1) {
+            new_data[i] = self.data[i];
+            i = i + 1;
+        }
+        self.data = new_data;
+        return item;
+    }
+
+    pub fn get(index: int): any {
+        if (index < 0 or index >= len(self.data)) {
+            return nil;
+        }
+        return self.data[index];
+    }
+
+    pub fn set(index: int, item: any): bool {
+        if (index < 0 or index >= len(self.data)) {
+            return false;
+        }
+        self.data[index] = item;
+        return true;
+    }
+
+    pub fn len(): int {
+        return len(self.data);
+    }
+
+    pub fn length(): int {
+        return len(self.data);
+    }
+
+    pub fn clear() {
+        self.data = [] as [any];
+    }
+}

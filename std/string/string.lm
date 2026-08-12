@@ -1,0 +1,241 @@
+// Standard Library String Module
+
+frame String {
+    pub var value: str;
+
+    pub init(value: str) {
+        self.value = value;
+    }
+
+    pub fn length(): int {
+        return len(self.value);
+    }
+
+    pub fn concat(other: str): str {
+        return self.value + other;
+    }
+
+    pub fn substring(start: int, end: int): str {
+        if (start < 0) return "";
+        var l = len(self.value);
+        var end_idx = end;
+        if (end_idx > l) end_idx = l;
+        if (start >= l) return "";
+        return _builtin_substring(self.value, start, end_idx);
+    }
+
+    pub fn contains(other: str): bool {
+        return self.index_of(other) != -1;
+    }
+
+    pub fn index_of(sub: str): int {
+        if (sub == "") return 0;
+        var sub_len = len(sub);
+        var val_len = len(self.value);
+        if (sub_len > val_len) return -1;
+
+        var i = 0;
+        while (i <= val_len - sub_len) {
+            if (_builtin_substring(self.value, i, i + sub_len) == sub) {
+                return i;
+            }
+            i = i + 1;
+        }
+        return -1;
+    }
+
+    pub fn last_index_of(sub: str): int {
+        if (sub == "") return len(self.value);
+        var sub_len = len(sub);
+        var val_len = len(self.value);
+        if (sub_len > val_len) return -1;
+
+        var i = val_len - sub_len;
+        while (i >= 0) {
+            if (_builtin_substring(self.value, i, i + sub_len) == sub) {
+                return i;
+            }
+            i = i - 1;
+        }
+        return -1;
+    }
+
+    pub fn starts_with(prefix: str): bool {
+        var p_len = len(prefix);
+        if (p_len > len(self.value)) return false;
+        return _builtin_substring(self.value, 0, p_len) == prefix;
+    }
+
+    pub fn ends_with(suffix: str): bool {
+        var s_len = len(suffix);
+        var val_len = len(self.value);
+        if (s_len > val_len) return false;
+        return _builtin_substring(self.value, val_len - s_len, val_len) == suffix;
+    }
+
+    pub fn char_at(index: int): str {
+        if (index < 0 or index >= len(self.value)) return "";
+        return _builtin_substring(self.value, index, index + 1);
+    }
+
+    pub fn repeat(count: int): str {
+        var res = "";
+        var i = 0;
+        while (i < count) {
+            res = res + self.value;
+            i = i + 1;
+        }
+        return res;
+    }
+
+    pub fn pad_left(width: int, fill: str = " "): str {
+        var n = width - len(self.value);
+        if (n <= 0) return self.value;
+        return String(value=fill).repeat(n) + self.value;
+    }
+
+    pub fn pad_right(width: int, fill: str = " "): str {
+        var n = width - len(self.value);
+        if (n <= 0) return self.value;
+        return self.value + String(value=fill).repeat(n);
+    }
+}
+
+pub fn length(value: str): int {
+    return len(value);
+}
+
+fn char_code(ch: str): int {
+    var alphabet = " ";
+    alphabet = alphabet + "!";
+    alphabet = alphabet + "\"";
+    alphabet = alphabet + "#";
+    alphabet = alphabet + "$";
+    alphabet = alphabet + "%";
+    alphabet = alphabet + "&";
+    alphabet = alphabet + "'";
+    alphabet = alphabet + "(";
+    alphabet = alphabet + ")";
+    alphabet = alphabet + "*";
+    alphabet = alphabet + "+";
+    alphabet = alphabet + ",";
+    alphabet = alphabet + "-";
+    alphabet = alphabet + ".";
+    alphabet = alphabet + "/";
+    alphabet = alphabet + "0";
+    alphabet = alphabet + "1";
+    alphabet = alphabet + "2";
+    alphabet = alphabet + "3";
+    alphabet = alphabet + "4";
+    alphabet = alphabet + "5";
+    alphabet = alphabet + "6";
+    alphabet = alphabet + "7";
+    alphabet = alphabet + "8";
+    alphabet = alphabet + "9";
+    alphabet = alphabet + ":";
+    alphabet = alphabet + ";";
+    alphabet = alphabet + "<";
+    alphabet = alphabet + "=";
+    alphabet = alphabet + ">";
+    alphabet = alphabet + "?";
+    alphabet = alphabet + "@";
+    alphabet = alphabet + "A";
+    alphabet = alphabet + "B";
+    alphabet = alphabet + "C";
+    alphabet = alphabet + "D";
+    alphabet = alphabet + "E";
+    alphabet = alphabet + "F";
+    alphabet = alphabet + "G";
+    alphabet = alphabet + "H";
+    alphabet = alphabet + "I";
+    alphabet = alphabet + "J";
+    alphabet = alphabet + "K";
+    alphabet = alphabet + "L";
+    alphabet = alphabet + "M";
+    alphabet = alphabet + "N";
+    alphabet = alphabet + "O";
+    alphabet = alphabet + "P";
+    alphabet = alphabet + "Q";
+    alphabet = alphabet + "R";
+    alphabet = alphabet + "S";
+    alphabet = alphabet + "T";
+    alphabet = alphabet + "U";
+    alphabet = alphabet + "V";
+    alphabet = alphabet + "W";
+    alphabet = alphabet + "X";
+    alphabet = alphabet + "Y";
+    alphabet = alphabet + "Z";
+    alphabet = alphabet + "[";
+    alphabet = alphabet + "\\";
+    alphabet = alphabet + "]";
+    alphabet = alphabet + "^";
+    alphabet = alphabet + "_";
+    alphabet = alphabet + "`";
+    alphabet = alphabet + "a";
+    alphabet = alphabet + "b";
+    alphabet = alphabet + "c";
+    alphabet = alphabet + "d";
+    alphabet = alphabet + "e";
+    alphabet = alphabet + "f";
+    alphabet = alphabet + "g";
+    alphabet = alphabet + "h";
+    alphabet = alphabet + "i";
+    alphabet = alphabet + "j";
+    alphabet = alphabet + "k";
+    alphabet = alphabet + "l";
+    alphabet = alphabet + "m";
+    alphabet = alphabet + "n";
+    alphabet = alphabet + "o";
+    alphabet = alphabet + "p";
+    alphabet = alphabet + "q";
+    alphabet = alphabet + "r";
+    alphabet = alphabet + "s";
+    alphabet = alphabet + "t";
+    alphabet = alphabet + "u";
+    alphabet = alphabet + "v";
+    alphabet = alphabet + "w";
+    alphabet = alphabet + "x";
+    alphabet = alphabet + "y";
+    alphabet = alphabet + "z";
+    alphabet = alphabet + "{";
+    alphabet = alphabet + "|";
+    alphabet = alphabet + "}";
+    alphabet = alphabet + "~";
+
+    var i = 0;
+    var l = len(alphabet);
+    while (i < l) {
+        if (_builtin_substring(alphabet, i, i + 1) == ch) {
+            return i;
+        }
+        i = i + 1;
+    }
+    return 999;
+}
+
+pub fn compare(left: str, right: str): int {
+    if (left == right) return 0;
+    var len_l = len(left);
+    var len_r = len(right);
+    var min_len = len_l;
+    if (len_r < min_len) min_len = len_r;
+
+    var i = 0;
+    while (i < min_len) {
+        var ch_l = _builtin_substring(left, i, i + 1);
+        var ch_r = _builtin_substring(right, i, i + 1);
+        if (ch_l != ch_r) {
+            var code_l = char_code(ch_l);
+            var code_r = char_code(ch_r);
+            if (code_l < code_r) return -1;
+            return 1;
+        }
+        i = i + 1;
+    }
+    if (len_l < len_r) return -1;
+    return 1;
+}
+
+pub fn substring(value: str, start: int, end: int): str {
+    return String(value=value).substring(start, end);
+}

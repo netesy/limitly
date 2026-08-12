@@ -7,7 +7,7 @@ fn test_error_pooling() {
     
     // Create many errors to test pooling
     iter (i in 1..100) {
-        var error_result = create_test_error("TestError", "Message " + i);
+        var error_result = create_test_error("TestError", "Message {i}");
         // Errors should be pooled and reused efficiently
     }
     
@@ -24,7 +24,7 @@ fn test_error_frame_efficiency() {
         return;
     };
     
-    print("Nested function result: " + result);
+    print("Nested function result: {result}");
 }
 
 // Test zero-cost success path
@@ -42,8 +42,8 @@ fn test_zero_cost_success() {
     var end_time = clock();
     var duration = end_time - start_time;
     
-    print("Zero-cost success test compvared in " + duration + " seconds");
-    print("Average time per operation: " + (duration / iterations) + " seconds");
+    print("Zero-cost success test compvared in {duration} seconds");
+    print("Average time per operation: {duration / iterations} seconds");
 }
 
 // Test error union type layout efficiency
