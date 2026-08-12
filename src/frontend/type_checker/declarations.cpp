@@ -43,6 +43,35 @@ TypePtr TypeChecker::check_contract_statement(std::shared_ptr<LM::Frontend::AST:
     return type_system.NIL_TYPE;
 }
 
+static bool is_catch_all_pattern(std::shared_ptr<LM::Frontend::AST::Expression> pattern) {
+    if (!pattern) return false;
+
+    // Check if it is a VariableExpr
+    if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(pattern)) {
+        return true;
+    }
+
+    // Check for or pattern where at least one pattern is a catch-all
+    if (auto or_pat = std::dynamic_pointer_cast<LM::Frontend::AST::OrPatternExpr>(pattern)) {
+        for (const auto& p : or_pat->patterns) {
+            if (is_catch_all_pattern(p)) return true;
+        }
+    }
+
+    return false;
+}
+
+static void collect_matched_variants(std::shared_ptr<LM::Frontend::AST::Expression> pattern, std::unordered_set<std::string>& matched) {
+    if (!pattern) return;
+    if (auto member = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(pattern)) {
+        matched.insert(member->name);
+    } else if (auto or_pat = std::dynamic_pointer_cast<LM::Frontend::AST::OrPatternExpr>(pattern)) {
+        for (const auto& p : or_pat->patterns) {
+            collect_matched_variants(p, matched);
+        }
+    }
+}
+
 TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::MatchStatement> match_stmt) {
     if (!match_stmt) return nullptr;
     
@@ -124,6 +153,54 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
         if (!is_exhaustive_option_match(case_ptrs)) {
             add_error("Match statement is not exhaustive for Option type. Must handle both Some and None cases", 
                         match_stmt->line);
+        }
+    } else if (matchType->tag == TypeTag::Enum) {
+        // Enum type exhaustiveness checking
+        bool has_catch_all = false;
+        for (const auto& case_item : match_stmt->cases) {
+            if (is_catch_all_pattern(case_item.pattern)) {
+                has_catch_all = true;
+                break;
+            }
+        }
+
+        if (!has_catch_all) {
+            auto* enumInfoPtr = std::get_if<EnumType>(&matchType->extra);
+            if (enumInfoPtr) {
+                std::unordered_set<std::string> matched_variants;
+                for (const auto& case_item : match_stmt->cases) {
+                    collect_matched_variants(case_item.pattern, matched_variants);
+                }
+
+                std::vector<std::string> missing;
+                for (const auto& val : enumInfoPtr->values) {
+                    if (matched_variants.find(val) == matched_variants.end()) {
+                        missing.push_back(val);
+                    }
+                }
+
+                if (!missing.empty()) {
+                    std::string missing_str = "";
+                    for (size_t i = 0; i < missing.size(); ++i) {
+                        if (i > 0) missing_str += ", ";
+                        missing_str += missing[i];
+                    }
+                    add_error("pattern_exhaustive: Match statement is not exhaustive for Enum type '" + enumInfoPtr->name + "'. Missing patterns: [" + missing_str + "]", match_stmt->line);
+                }
+            }
+        }
+    } else if (is_integer_type(matchType) || is_numeric_type(matchType) || is_string_type(matchType)) {
+        // Integer and primitive matches require a catch-all wildcard
+        bool has_catch_all = false;
+        for (const auto& case_item : match_stmt->cases) {
+            if (is_catch_all_pattern(case_item.pattern)) {
+                has_catch_all = true;
+                break;
+            }
+        }
+
+        if (!has_catch_all) {
+            add_error("pattern_exhaustive: Match statement is not exhaustive for type '" + matchType->toString() + "'. A wildcard pattern (_) or default branch is required", match_stmt->line);
         }
     }
     

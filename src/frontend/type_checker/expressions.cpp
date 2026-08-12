@@ -251,6 +251,22 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
             return target_type;
         }
     }
+
+    // Check if variable is defined in an outer function scope
+    Scope* outer_scope = current_scope.get();
+    while (outer_scope) {
+        auto it_var = outer_scope->variables.find(expr->name);
+        if (it_var != outer_scope->variables.end()) {
+            if (outer_scope->function != current_function && outer_scope->function != nullptr && current_function != nullptr) {
+                if (lambda_captures_stack.empty()) {
+                    add_error("closure_capture: Nested function cannot capture variable '" + expr->name + "' from outer scope. Use lambdas instead", expr->line);
+                    return nullptr;
+                }
+            }
+            break;
+        }
+        outer_scope = outer_scope->parent.get();
+    }
     
     // Check linear type access
     check_linear_type_access(expr->name, expr->line);
@@ -350,10 +366,25 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     return type;
 }
 
-static bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, long long& out_int, double& out_double, bool& is_int) {
+bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, long long& out_int, double& out_double, bool& is_int, TypeChecker* checker) {
     if (!expr) return false;
 
-    if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+    if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
+        if (checker) {
+            auto it_int = checker->constant_ints.find(var->name);
+            if (it_int != checker->constant_ints.end()) {
+                out_int = it_int->second;
+                is_int = true;
+                return true;
+            }
+            auto it_double = checker->constant_doubles.find(var->name);
+            if (it_double != checker->constant_doubles.end()) {
+                out_double = it_double->second;
+                is_int = false;
+                return true;
+            }
+        }
+    } else if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         if (literal->literalType == TokenType::INT_LITERAL || literal->literalType == TokenType::HEX_LITERAL) {
             try {
                 if (std::holds_alternative<std::string>(literal->value)) {
@@ -385,7 +416,7 @@ static bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> e
         long long right_int = 0;
         double right_double = 0.0;
         bool right_is_int = false;
-        if (evaluate_const_expr(unary->right, right_int, right_double, right_is_int)) {
+        if (evaluate_const_expr(unary->right, right_int, right_double, right_is_int, checker)) {
             if (unary->op == TokenType::MINUS) {
                 if (right_is_int) {
                     out_int = -right_int;
@@ -408,8 +439,8 @@ static bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> e
         double left_double = 0.0, right_double = 0.0;
         bool left_is_int = false, right_is_int = false;
 
-        if (evaluate_const_expr(binary->left, left_int, left_double, left_is_int) &&
-            evaluate_const_expr(binary->right, right_int, right_double, right_is_int)) {
+        if (evaluate_const_expr(binary->left, left_int, left_double, left_is_int, checker) &&
+            evaluate_const_expr(binary->right, right_int, right_double, right_is_int, checker)) {
 
             bool both_int = left_is_int && right_is_int;
             if (!both_int) {
@@ -458,67 +489,6 @@ static bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> e
 TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::BinaryExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
 
-    // Verify compile-time constant evaluation for safety constraints (Phase 3.D)
-    long long left_int = 0, right_int = 0;
-    double left_double = 0.0, right_double = 0.0;
-    bool left_is_int = false, right_is_int = false;
-
-    bool has_left_const = evaluate_const_expr(expr->left, left_int, left_double, left_is_int);
-    bool has_right_const = evaluate_const_expr(expr->right, right_int, right_double, right_is_int);
-
-    if (has_left_const && has_right_const) {
-        bool both_int = left_is_int && right_is_int;
-        if (expr->op == TokenType::SLASH || expr->op == TokenType::MODULUS) {
-            if (both_int && right_int == 0) {
-                add_error("Division or modulo by zero", expr->line);
-            } else if (!both_int && (right_is_int ? (double)right_int : right_double) == 0.0) {
-                add_error("Division or modulo by zero", expr->line);
-            }
-        }
-        if (both_int) {
-            if (expr->op == TokenType::LESS_LESS || expr->op == TokenType::GREATER_GREATER) {
-                if (right_int < 0) {
-                    add_error("Negative shift amount", expr->line);
-                } else if (right_int >= 64) {
-                    add_error("Shift amount exceeds bit width", expr->line);
-                }
-            }
-
-            long long result = 0;
-            bool check_overflow = false;
-            if (expr->op == TokenType::PLUS) {
-                result = left_int + right_int;
-                check_overflow = true;
-            } else if (expr->op == TokenType::MINUS) {
-                result = left_int - right_int;
-                check_overflow = true;
-            } else if (expr->op == TokenType::STAR) {
-                result = left_int * right_int;
-                check_overflow = true;
-            } else if (expr->op == TokenType::POWER) {
-                result = std::pow(left_int, right_int);
-                check_overflow = true;
-            }
-
-            if (check_overflow) {
-                std::string type_name = expected_type ? expected_type->toString() : "int";
-                long long max_val = std::numeric_limits<long long>::max();
-                long long min_val = std::numeric_limits<long long>::min();
-
-                if (type_name == "i8") { max_val = 127; min_val = -128; }
-                else if (type_name == "u8") { max_val = 255; min_val = 0; }
-                else if (type_name == "i16") { max_val = 32767; min_val = -32768; }
-                else if (type_name == "u16") { max_val = 65535; min_val = 0; }
-                else if (type_name == "i32") { max_val = 2147483647; min_val = -2147483648LL; }
-                else if (type_name == "u32") { max_val = 4294967295LL; min_val = 0; }
-
-                if (result > max_val || result < min_val) {
-                    add_error("Arithmetic overflow / underflow detected", expr->line);
-                }
-            }
-        }
-    }
-    
     TypePtr left_expected = nullptr;
     switch (expr->op) {
         case TokenType::PLUS:
@@ -544,14 +514,92 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
     }
 
     TypePtr right_type = check_expression(expr->right, right_expected);
-    
+
     // Mandate 7: Automatically unwrap refined types for operations
     TypePtr left_base = type_system.unwrapRefined(left_type);
     TypePtr right_base = type_system.unwrapRefined(right_type);
 
     // If unwrapped, update the inferred type of operands for the backend
-    if (left_type->tag == TypeTag::Refined) expr->left->inferred_type = left_base;
-    if (right_type->tag == TypeTag::Refined) expr->right->inferred_type = right_base;
+    if (left_type && left_type->tag == TypeTag::Refined) expr->left->inferred_type = left_base;
+    if (right_type && right_type->tag == TypeTag::Refined) expr->right->inferred_type = right_base;
+
+    // Verify compile-time constant evaluation for safety constraints (Phase 3.D)
+    long long left_int = 0, right_int = 0;
+    double left_double = 0.0, right_double = 0.0;
+    bool left_is_int = false, right_is_int = false;
+
+    bool has_left_const = evaluate_const_expr(expr->left, left_int, left_double, left_is_int, this);
+    bool has_right_const = evaluate_const_expr(expr->right, right_int, right_double, right_is_int, this);
+
+    if (has_right_const) {
+        if (expr->op == TokenType::SLASH || expr->op == TokenType::MODULUS) {
+            if (right_is_int && right_int == 0) {
+                add_error("Division or modulo by zero", expr->line);
+            } else if (!right_is_int && right_double == 0.0) {
+                add_error("Division or modulo by zero", expr->line);
+            }
+        }
+    }
+
+    if (has_left_const && has_right_const) {
+        bool both_int = left_is_int && right_is_int;
+        if (both_int) {
+            if (expr->op == TokenType::LESS_LESS || expr->op == TokenType::GREATER_GREATER) {
+                int bit_width = 64;
+                if (left_base) {
+                    std::string type_name = left_base->toString();
+                    if (type_name == "i8" || type_name == "u8") bit_width = 8;
+                    else if (type_name == "i16" || type_name == "u16") bit_width = 16;
+                    else if (type_name == "i32" || type_name == "u32") bit_width = 32;
+                    else if (type_name == "i64" || type_name == "u64" || type_name == "int" || type_name == "uint") bit_width = 64;
+                    else if (type_name == "i128" || type_name == "u128") bit_width = 128;
+                }
+
+                if (right_int < 0) {
+                    add_error("Negative shift amount", expr->line);
+                } else if (right_int >= bit_width) {
+                    add_error("Shift amount exceeds bit width", expr->line);
+                }
+            }
+
+            long long result = 0;
+            bool check_overflow = false;
+            if (expr->op == TokenType::PLUS) {
+                result = left_int + right_int;
+                check_overflow = true;
+            } else if (expr->op == TokenType::MINUS) {
+                result = left_int - right_int;
+                check_overflow = true;
+            } else if (expr->op == TokenType::STAR) {
+                result = left_int * right_int;
+                check_overflow = true;
+            } else if (expr->op == TokenType::POWER) {
+                result = std::pow(left_int, right_int);
+                check_overflow = true;
+            }
+
+            if (check_overflow) {
+                TypePtr target_type = expected_type;
+                if (!target_type && left_base) {
+                    target_type = left_base;
+                }
+                std::string type_name = target_type ? target_type->toString() : "int";
+                long long max_val = std::numeric_limits<long long>::max();
+                long long min_val = std::numeric_limits<long long>::min();
+
+                if (type_name == "i8") { max_val = 127; min_val = -128; }
+                else if (type_name == "u8") { max_val = 255; min_val = 0; }
+                else if (type_name == "i16") { max_val = 32767; min_val = -32768; }
+                else if (type_name == "u16") { max_val = 65535; min_val = 0; }
+                else if (type_name == "i32") { max_val = 2147483647; min_val = -2147483648LL; }
+                else if (type_name == "u32") { max_val = 4294967295LL; min_val = 0; }
+
+                if (result > max_val || result < min_val) {
+                    add_error("Arithmetic overflow / underflow detected", expr->line);
+                }
+            }
+        }
+    }
 
     switch (expr->op) {
         case TokenType::PLUS:
@@ -749,6 +797,32 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
     }
 }
 
+bool is_consuming_callee(const std::string& name) {
+    static const std::unordered_set<std::string> non_consuming = {
+        "print", "len", "assert", "error", "_builtin_len", "_builtin_substring",
+        "clock", "sleep", "time", "date", "now", "typeof", "typeOf", "debug", "input",
+        "resource_create", "resource_call", "resource_destroy", "file_exists", "file_delete",
+        "concat", "length", "substring", "str_format", "map", "filter", "reduce", "forEach",
+        "find", "some", "every", "compose", "curry", "partial"
+    };
+    if (non_consuming.find(name) != non_consuming.end()) return false;
+    if (name.ends_with(".len") || name.ends_with(".length") ||
+        name.ends_with(".append") || name.ends_with(".pop") ||
+        name.ends_with(".keys") || name.ends_with(".values") ||
+        name.ends_with(".init") || name.ends_with(".close")) {
+        return false;
+    }
+
+    std::string base_name = name;
+    size_t last_dot = name.find_last_of('.');
+    if (last_dot != std::string::npos) {
+        base_name = name.substr(last_dot + 1);
+    }
+    if (!base_name.empty() && std::isupper(base_name[0])) return false;
+
+    return true;
+}
+
 TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
 
@@ -855,9 +929,29 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
         TypePtr arg_type = check_expression(expr->arguments[i], arg_expected);
         arg_types.push_back(arg_type);
         
-        // TODO: Move semantics for function calls disabled due to regressions
-        // Need more sophisticated approach to distinguish consuming vs non-consuming functions
-        // For now, rely on explicit move syntax or borrow checker in future implementation
+        // Explicit Move semantics for linear types passed to consuming callees
+        if (auto arg_var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->arguments[i])) {
+            std::string callee_name = "";
+            if (auto var_callee = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
+                callee_name = var_callee->name;
+            } else if (auto member_callee = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
+                callee_name = member_callee->name;
+            }
+
+            if (is_consuming_callee(callee_name)) {
+                TypePtr arg_t = lookup_variable(arg_var->name);
+                bool is_copyable = (arg_t &&
+                    (arg_t->tag == TypeTag::Function ||
+                     arg_t->tag == TypeTag::Int || arg_t->tag == TypeTag::Int64 ||
+                     arg_t->tag == TypeTag::Float32 || arg_t->tag == TypeTag::Float64 ||
+                     arg_t->tag == TypeTag::Bool || arg_t->tag == TypeTag::String ||
+                     arg_t->tag == TypeTag::Nil || arg_t->tag == TypeTag::Any));
+
+                if (!is_copyable) {
+                    check_variable_move(arg_var->name);
+                }
+            }
+        }
     }
     
     // Check if callee is a variable (could be function or frame name)
@@ -1593,6 +1687,15 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
     if (!expr->object && !expr->member && !expr->index) {
         TypePtr var_type = lookup_variable(expr->name);
         if (var_type) {
+            auto it_mem = variable_memory_info.find(expr->name);
+            if (it_mem != variable_memory_info.end() && it_mem->second.memory_state == "moved") {
+                add_error("Use after move: Cannot assign to moved variable '" + expr->name + "'", expr->line);
+            }
+
+            if (!lambda_captures_stack.empty() && should_capture_variable(expr->name)) {
+                add_error("closure_capture: Cannot mutate captured variable '" + expr->name + "' inside closure", expr->line);
+            }
+
             // Use variable's type as expected type
             expected_type = var_type;
             TypePtr value_type = check_expression(expr->value, expected_type);
@@ -1622,6 +1725,24 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
                     create_reference(var_expr->name, expr->name, expr->line);
                 }
             }
+
+            // Constant evaluation and storage
+            long long val_int = 0;
+            double val_double = 0.0;
+            bool is_int = false;
+            if (evaluate_const_expr(expr->value, val_int, val_double, is_int, this)) {
+                if (is_int) {
+                    constant_ints[expr->name] = val_int;
+                    constant_doubles.erase(expr->name);
+                } else {
+                    constant_doubles[expr->name] = val_double;
+                    constant_ints.erase(expr->name);
+                }
+            } else {
+                constant_ints.erase(expr->name);
+                constant_doubles.erase(expr->name);
+            }
+
             return value_type;
         } else {
             // Implicit variable declaration - check value without expected type
@@ -1629,6 +1750,18 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             declare_variable(expr->name, value_type);
             declare_variable_memory(expr->name, value_type);  // Track memory for new variable
             
+            // Constant evaluation and storage
+            long long val_int = 0;
+            double val_double = 0.0;
+            bool is_int = false;
+            if (evaluate_const_expr(expr->value, val_int, val_double, is_int, this)) {
+                if (is_int) {
+                    constant_ints[expr->name] = val_int;
+                } else {
+                    constant_doubles[expr->name] = val_double;
+                }
+            }
+
             // New variables are linear types by default
             LinearTypeInfo linear_info;
             linear_info.is_moved = false;

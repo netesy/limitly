@@ -165,15 +165,16 @@ void TypeChecker::enter_memory_region() {
 }
 
 void TypeChecker::exit_memory_region() {
+    size_t region_to_clean = current_region_id;
     if (!region_stack.empty()) {
         current_region_id = region_stack.back();
         region_stack.pop_back();
         current_generation = (current_generation > 0) ? current_generation - 1 : 0;
     }
     
-    // Drop all variables in this region that haven't been dropped
+    // Drop all variables in the exited region
     for (auto it = variable_memory_info.begin(); it != variable_memory_info.end();) {
-        if (it->second.region_id == current_region_id && it->second.memory_state != "dropped") {
+        if (it->second.region_id == region_to_clean && it->second.memory_state != "dropped") {
             it = variable_memory_info.erase(it);
         } else {
             ++it;
@@ -383,6 +384,10 @@ void TypeChecker::check_variable_move(const std::string& name) {
         } else {
             it->second.memory_state = "moved";
         }
+    }
+    // Also move in linear_types map to keep them in sync!
+    if (linear_types.find(name) != linear_types.end()) {
+        move_linear_type(name, current_line);
     }
 }
 
