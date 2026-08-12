@@ -1,0 +1,12 @@
+// CSV Module Gateway Index
+
+import std.csv.reader as reader;
+import std.csv.writer as writer;
+
+pub fn parse(text: str): [[str]] {
+    return reader.parse_csv(text);
+}
+
+pub fn stringify(rows: [[str]]): str {
+    return writer.stringify_csv(rows);
+}

@@ -1,0 +1,43 @@
+// Standard Library Map Collection
+
+import std.collections.hashmap as hashmap;
+
+frame HashMapWrapper {
+    pub impl: hashmap.HashMap;
+
+    pub init() {
+        self.impl = hashmap.HashMap(_keys=[] as [str], _values=[] as [int]);
+    }
+
+    pub fn put(key: str, value: int) {
+        self.impl = self.impl.put(key, value);
+    }
+
+    pub fn get(key: str): int? {
+        return self.impl.get(key);
+    }
+
+    pub fn remove(key: str) {
+        self.impl = self.impl.remove(key);
+    }
+
+    pub fn contains_key(key: str): bool {
+        return self.impl.contains_key(key);
+    }
+
+    pub fn size(): int {
+        return self.impl.size();
+    }
+
+    pub fn length(): int {
+        return self.impl.size();
+    }
+
+    pub fn is_empty(): bool {
+        return self.impl.is_empty();
+    }
+
+    pub fn clear() {
+        self.impl = self.impl.clear();
+    }
+}

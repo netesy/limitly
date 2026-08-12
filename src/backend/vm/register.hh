@@ -113,6 +113,12 @@ private:
     void execute_callback_create(const LIR::LIR_Inst* pc);
     void execute_callback_destroy(const LIR::LIR_Inst* pc);
     
+    // Region operations
+    void execute_regions(const LIR::LIR_Inst* pc);
+    void auto_register_output(const LIR::LIR_Inst* pc);
+    void reclaim_value(RegisterValue val);
+    void transfer_ownership(RegisterValue child, RegisterValue container);
+    
     // Data construction helpers
     void execute_construct_string_from_cstr(const LIR::LIR_Inst* pc);
     void execute_construct_cstr_from_string(const LIR::LIR_Inst* pc);
@@ -145,6 +151,12 @@ private:
     void execute_extern_get_abi_info(const LIR::LIR_Inst* pc);
 
     std::vector<RegisterValue> registers;
+    
+    // Region and memory model tracking
+    uint32_t active_region_id = 0;
+    std::vector<uint32_t> vm_region_stack;
+    std::unordered_map<uintptr_t, uint32_t> vm_allocation_regions;
+    std::unordered_map<uintptr_t, uint32_t> vm_allocation_types;
     
     struct ErrorInfo {
         std::string errorType;

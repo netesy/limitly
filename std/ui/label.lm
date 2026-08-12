@@ -1,0 +1,13 @@
+import std.ui.widget as widget;
+
+frame Label {
+    pub var text: str;
+
+    pub init(txt: str = "") {
+        self.text = txt;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

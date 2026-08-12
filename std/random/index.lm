@@ -1,0 +1,29 @@
+// Standard Library Random Entrypoint Module
+
+import std.random.random as random_mod;
+import std.random.distributions as distributions_mod;
+
+// Types
+pub type Random = random_mod.Random;
+pub type SecureRandom = random_mod.SecureRandom;
+pub type Uniform = distributions_mod.Uniform;
+
+// Constructors
+pub fn Random(seed: int): any {
+    return random_mod.Random(seed);
+}
+
+pub fn SecureRandom(): any {
+    return random_mod.SecureRandom();
+}
+
+pub fn Uniform(min_val: float, max_val: float): any {
+    return distributions_mod.Uniform(min_val, max_val);
+}
+
+// Global functions
+pub fn random_int(min_val: int, max_val: int): int { return random_mod.random_int(min_val, max_val); }
+pub fn random_float(min_val: float, max_val: float): float { return random_mod.random_float(min_val, max_val); }
+pub fn random_bool(): bool { return random_mod.random_bool(); }
+pub fn random_bytes(count: int): [int] { return random_mod.random_bytes(count); }
+pub fn random_string(len_val: int): str { return random_mod.random_string(len_val); }

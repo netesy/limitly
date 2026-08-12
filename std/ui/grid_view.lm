@@ -1,0 +1,15 @@
+import std.ui.widget as widget;
+
+frame GridView {
+    pub var children: [widget.Widget];
+    pub var columns: int;
+
+    pub init(ch: [widget.Widget] = [], cols: int = 2) {
+        self.children = ch;
+        self.columns = cols;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

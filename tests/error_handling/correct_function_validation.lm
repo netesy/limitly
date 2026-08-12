@@ -41,4 +41,4 @@ fn genericError(x: int): int? {
 
 print("Testing correct function signature error type validation");
 print("All functions should compile without errors");
-print("Result: " + safeDivision(10, 2));
+print("Result: {safeDivision(10, 2)}");

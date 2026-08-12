@@ -1,0 +1,11 @@
+import std.graphics.color as color;
+
+frame Brush {
+    pub var color_val: color.Color;
+    pub var opacity: float;
+
+    pub init(c: color.Color = color.Color(), op: float = 1.0) {
+        self.color_val = c;
+        self.opacity = op;
+    }
+}

@@ -1,0 +1,47 @@
+// Standard Library Unicode Entrypoint Module
+
+import std.unicode.rune as rune_mod;
+import std.unicode.category as category_mod;
+import std.unicode.normalize as normalize_mod;
+
+// Types
+pub type Rune = rune_mod.Rune;
+
+// Rune constructor helper
+pub fn Rune(value: str): any {
+    return rune_mod.Rune(value);
+}
+
+// Category function re-exports
+pub fn is_upper(ch: str): bool {
+    return category_mod.is_upper(ch);
+}
+
+pub fn is_lower(ch: str): bool {
+    return category_mod.is_lower(ch);
+}
+
+pub fn is_digit(ch: str): bool {
+    return category_mod.is_digit(ch);
+}
+
+pub fn is_alpha(ch: str): bool {
+    return category_mod.is_alpha(ch);
+}
+
+pub fn is_alphanumeric(ch: str): bool {
+    return category_mod.is_alphanumeric(ch);
+}
+
+pub fn is_whitespace(ch: str): bool {
+    return category_mod.is_whitespace(ch);
+}
+
+// Normalize function re-exports
+pub fn to_lower(value: str): str {
+    return normalize_mod.to_lower(value);
+}
+
+pub fn to_upper(value: str): str {
+    return normalize_mod.to_upper(value);
+}

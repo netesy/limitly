@@ -24,9 +24,13 @@ pub frame Resource {
     pub fn is_open(): bool {
         return self.is_open_val;
     }
+
+    pub fn _handle(): int {
+        return self.handle;
+    }
 }
 
-pub frame Reader {
+pub frame ResourceReader {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -36,7 +40,7 @@ pub frame Reader {
     }
 }
 
-pub frame Writer {
+pub frame ResourceWriter {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -46,17 +50,86 @@ pub frame Writer {
     }
 }
 
+frame Pollable {
+    pub var resource: Resource;
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+    pub fn poll(): bool {
+        var result = rt.call(self.resource.handle, rt.OP_POLL, []);
+        return (result == true);
+    }
+}
+
+frame Poller {
+    pub var resource: Resource;
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+    pub fn poll(): bool {
+        var result = rt.call(self.resource.handle, rt.OP_POLL, []);
+        return (result == true);
+    }
+}
+
+frame Connector {
+    pub var resource: Resource;
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+    pub fn connect(args: [any]): bool {
+        var result = rt.call(self.resource.handle, rt.OP_CONNECT, args);
+        return (result == true);
+    }
+}
+
+frame Binder {
+    pub var resource: Resource;
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+    pub fn bind(args: [any]): bool {
+        var result = rt.call(self.resource.handle, rt.OP_BIND, args);
+        return (result == true);
+    }
+}
+
+pub frame Listener {
+    pub var resource: Resource;
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+    pub fn listen(args: [any]): bool {
+        var result = rt.call(self.resource.handle, rt.OP_LISTEN, args);
+        return (result == true);
+    }
+}
+
+pub frame Accepter {
+    pub var resource: Resource;
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+    pub fn accept(): int {
+        var result = rt.call(self.resource.handle, rt.OP_ACCEPT, []);
+        if (result == nil) return -1;
+        return result as int;
+    }
+}
+
 pub var stdout: Resource = Resource(h=0, k=rt.RT_STDOUT);
 pub var stderr: Resource = Resource(h=1, k=rt.RT_STDERR);
 
-pub fn create_hash_engine(): Resource {
+pub fn create_hash_engine(): Resource? {
     var h = rt.create(rt.RT_HASH_ENGINE, []);
-    return Resource(h=h, k=rt.RT_HASH_ENGINE);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=rt.RT_HASH_ENGINE));
 }
 
-pub fn create_dns_resolver(): Resource {
+pub fn create_dns_resolver(): Resource? {
     var h = rt.create(rt.RT_DNS_RESOLVER, []);
-    return Resource(h=h, k=rt.RT_DNS_RESOLVER);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=rt.RT_DNS_RESOLVER));
 }
 
 pub fn open_file(path: str, mode: str): Resource? {
@@ -76,6 +149,40 @@ pub fn create_fs_resource(): Resource? {
     return ok(Resource(h=h, k=rt.RT_FILE));
 }
 
+pub fn create_socket(): Resource? {
+    var h = rt.create(rt.RT_SOCKET, []);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=rt.RT_SOCKET));
+}
+
+pub fn create_udp_socket(): Resource? {
+    var h = rt.create(rt.RT_UDP_SOCKET, []);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=rt.RT_UDP_SOCKET));
+}
+
+pub fn create_websocket(): Resource? {
+    var h = rt.create(rt.RT_WEBSOCKET, []);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=rt.RT_WEBSOCKET));
+}
+
+pub fn create_entropy(): Resource? {
+    var h = rt.create(rt.RT_ENTROPY, []);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=rt.RT_ENTROPY));
+}
+
+pub fn create(type_id: int, args: [any]): Resource? {
+    var h = rt.create(type_id, args);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=type_id));
+}
+
+pub fn adopt_socket(fd: int): Resource {
+    return Resource(h=fd, k=rt.RT_SOCKET);
+}
+
 pub fn _call(h: int, op: int, args: [any]): any {
     return rt.call(h, op, args);
 }
@@ -85,9 +192,27 @@ pub var OP_OPEN: int = rt.OP_OPEN;
 pub var OP_CLOSE: int = rt.OP_CLOSE;
 pub var OP_READ: int = rt.OP_READ;
 pub var OP_WRITE: int = rt.OP_WRITE;
+pub var OP_CONNECT: int = rt.OP_CONNECT;
+pub var OP_POLL: int = rt.OP_POLL;
+pub var OP_BIND: int = rt.OP_BIND;
+pub var OP_LISTEN: int = rt.OP_LISTEN;
+pub var OP_ACCEPT: int = rt.OP_ACCEPT;
+pub var OP_RESOLVE: int = rt.OP_RESOLVE;
+pub var OP_SEND_TO: int = rt.OP_SEND_TO;
+pub var OP_RECV_FROM: int = rt.OP_RECV_FROM;
+pub var OP_FLUSH: int = rt.OP_FLUSH;
 pub var OP_MKDIR: int = rt.OP_MKDIR;
 pub var OP_READDIR: int = rt.OP_READDIR;
 pub var OP_RENAME: int = rt.OP_RENAME;
 pub var OP_EXISTS: int = rt.OP_EXISTS;
 pub var OP_DELETE: int = rt.OP_DELETE;
-pub var OP_RESOLVE: int = rt.OP_RESOLVE;
+
+pub var KIND_FILE: int = rt.RT_FILE;
+pub var KIND_SOCKET: int = rt.RT_SOCKET;
+pub var KIND_STDOUT: int = rt.RT_STDOUT;
+pub var KIND_STDERR: int = rt.RT_STDERR;
+pub var KIND_ENTROPY: int = rt.RT_ENTROPY;
+pub var KIND_DNS_RESOLVER: int = rt.RT_DNS_RESOLVER;
+pub var KIND_UDP_SOCKET: int = rt.RT_UDP_SOCKET;
+pub var KIND_WEBSOCKET: int = rt.RT_WEBSOCKET;
+pub var KIND_HASH_ENGINE: int = rt.RT_HASH_ENGINE;

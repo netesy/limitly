@@ -1,0 +1,6 @@
+// @error:bounds_error
+// Tuple element index out of bounds
+
+var point = (10, 20);
+var z = point[2];  // Only 2 elements (0, 1) in tuple
+print(z);

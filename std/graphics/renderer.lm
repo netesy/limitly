@@ -1,0 +1,19 @@
+import std.graphics.canvas as canvas;
+import std.graphics.surface as surface;
+
+frame Renderer {
+    pub var is_active: bool;
+
+    pub init() {
+        self.is_active = false;
+    }
+
+    pub fn begin_frame(surf: surface.Surface): canvas.Canvas {
+        self.is_active = true;
+        return canvas.Canvas(w=surf.width, h=surf.height);
+    }
+
+    pub fn end_frame(): nil {
+        self.is_active = false;
+    }
+}

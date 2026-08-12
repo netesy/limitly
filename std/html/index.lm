@@ -1,0 +1,16 @@
+// HTML Module Gateway Index
+
+import std.html.escape as esc;
+import std.html.parser as parser_mod;
+
+pub fn escape(text: str): str {
+    return esc.escape(text);
+}
+
+pub fn unescape(text: str): str {
+    return esc.unescape(text);
+}
+
+pub fn parse(text: str): any {
+    return parser_mod.parse(text);
+}

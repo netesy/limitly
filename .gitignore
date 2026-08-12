@@ -42,12 +42,12 @@ bin/
 *.exe
 
 # Vendored dependencies (keep the structure but ignore generated files within)
-vendor/fyra/
+# vendor/fyra/
 vendor/fyra/build/
 vendor/fyra/*.a
 vendor/fyra/*.so
 vendor/fyra/*.dll
-vendor/fyra/.git/
+# vendor/fyra/.git/
 vendor/lyra/build/
 vendor/lyra/*.a
 vendor/lyra/*.so

@@ -1,0 +1,11 @@
+import std.scene.node as node;
+
+frame Group {
+    pub var root_node: node.Node;
+    pub var name: str;
+
+    pub init(r: node.Node = node.Node(), n: str = "Group") {
+        self.root_node = r;
+        self.name = n;
+    }
+}

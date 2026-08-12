@@ -1,0 +1,8 @@
+// @error:race_condition
+// Shared state in worker
+
+var buffer = [1, 2, 3];
+
+worker(item in buffer) {
+    item = item + 1;  // Race condition on shared buffer
+}

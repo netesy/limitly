@@ -1,0 +1,9 @@
+// @error:pattern_exhaustive
+// Non-exhaustive match on Option type
+
+var maybe_value: int? = 42;
+
+match (maybe_value) {
+    val x => { print("Has value: {x}"); }
+    // Missing nil case - non-exhaustive!
+}

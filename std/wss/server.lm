@@ -4,6 +4,79 @@
 import std.core as core;
 import std.resource as res;
 
+frame WSConnection {
+    pub var resource: res.Resource?;
+    pub var writer: res.Writer?;
+    pub var reader: res.Reader?;
+    pub var poller: res.Poller?;
+    pub var remote_addr: str;
+    pub var connected: bool;
+    pub var id: str;
+
+    pub fn init(handle: int) {
+        if (handle > 0) {
+            var r = res.Resource(h=handle, k=-1); // Temporary
+            self.resource = r;
+            self.writer = res.Writer(r=r);
+            self.reader = res.Reader(r=r);
+            self.poller = res.Poller(r=r);
+            self.connected = true;
+        } else {
+            self.resource = nil;
+            self.writer = nil;
+            self.reader = nil;
+            self.poller = nil;
+            self.connected = false;
+        }
+        self.remote_addr = "";
+        self.id = "";
+    }
+
+    pub fn send(message: str): core.ResultInt {
+        match (self.writer) {
+            val w => {
+                if (w.write(args=[message]) == true) {
+                    return core.ok_int(len(message));
+                }
+                self.connected = false;
+                return core.err_int("send failed");
+            },
+            nil => return core.err_int("not connected")
+        }
+    }
+
+    pub fn recv(): core.ResultStr {
+        match (self.reader) {
+            val rd => {
+                var res_val = rd.read(args=[ []]);
+                if (res_val != nil) return core.ok_str(res_val as str);
+                self.connected = false;
+                return core.err_str("connection closed");
+            },
+            nil => return core.err_str("not connected")
+        }
+    }
+
+    pub fn has_message(): bool {
+        match (self.poller) {
+            val p => return p.poll(),
+            nil => return false
+        }
+    }
+
+    pub fn close(): core.ResultInt {
+        match (self.resource) {
+            val r => {
+                r.close();
+            },
+            nil => {}
+        }
+        self.connected = false;
+        self.resource = nil;
+        return core.ok_int(0);
+    }
+}
+
 frame WSSServer {
     var host: str;
     var port: int;
@@ -11,9 +84,9 @@ frame WSSServer {
     var on_connect: str;
     var on_message: str;
     var on_disconnect: str;
-    var resource: res.Resource?;
-    var binder: res.Binder?;
-    var listener: res.Listener?;
+    pub var resource: res.Resource?;
+    pub var binder: res.Binder?;
+    pub var listener: res.Listener?;
 
     pub fn init() {
         self.host = "0.0.0.0";
@@ -37,37 +110,37 @@ frame WSSServer {
     // Start the server (bind + listen)
     pub fn start(): core.ResultInt {
         match (res.create_socket()) {
-            case ok(r) => {
-                var binder = res.Binder(r);
-                if (not binder.bind([self.host, self.port])) {
+            val r => {
+                var binder = res.Binder(r=r);
+                if (not binder.bind(args=[self.host, self.port])) {
                     r.close();
                     return core.err_int("bind failed on " + self.host + ":" + self.port as str);
                 }
 
-                var listener = res.Listener(r);
-                if (not listener.listen([128])) {
+                var listener = res.Listener(r=r);
+                if (not listener.listen(args=[128])) {
                     r.close();
                     return core.err_int("listen failed on port " + self.port as str);
                 }
 
                 self.running = true;
-                self.resource = ok(r);
-                self.binder = ok(binder);
-                self.listener = ok(listener);
+                self.resource = r;
+                self.binder = binder;
+                self.listener = listener;
                 return core.ok_int(r._handle());
-            }
-            case err(e) => return core.err_int("failed to create socket");
+            },
+            err e => return core.err_int("failed to create socket")
         }
     }
 
     // Accept a new WebSocket connection (with HTTP upgrade)
     pub fn accept(): core.ResultStr {
         match (res.create_websocket()) {
-            case ok(ws) => {
+            val ws => {
                 ws.close();
                 return core.ok_str("ws_handle");
-            }
-            case err(e) => return core.err_str("failed to create WebSocket resource");
+            },
+            err e => return core.err_str("failed to create WebSocket resource")
         }
     }
 
@@ -79,9 +152,9 @@ frame WSSServer {
         while (i < len(handles)) {
             var h: int = handles[i];
             if (h > 0) {
-                var r = res.Resource(handle=h, kind=-1); // Temporary wrapper for raw handle
-                var writer = res.Writer(r);
-                if (writer.write([message]) == true) {
+                var r = res.Resource(h=h, k=-1); // Temporary wrapper for raw handle
+                var writer = res.Writer(r=r);
+                if (writer.write(args=[message]) == true) {
                     sent = sent + 1;
                 } else {
                     failed = failed + 1;
@@ -96,8 +169,10 @@ frame WSSServer {
     // Close the server
     pub fn stop(): core.ResultInt {
         match (self.resource) {
-            case ok(r) => r.close();
-            case nil => {}
+            val r => {
+                r.close();
+            },
+            nil => {}
         }
         self.resource = nil;
         self.running = false;
@@ -105,72 +180,6 @@ frame WSSServer {
     }
 
     pub fn is_running(): bool { return self.running; }
-}
-
-frame WSConnection {
-    var resource: res.Resource?;
-    var writer: res.Writer?;
-    var reader: res.Reader?;
-    var poller: res.Poller?;
-    pub var remote_addr: str;
-    pub var connected: bool;
-    pub var id: str;
-
-    pub fn init(handle: int) {
-        if (handle > 0) {
-            var r = res.Resource(handle=handle, kind=-1); // Temporary
-            self.resource = ok(r);
-            self.writer = ok(res.Writer(r));
-            self.reader = ok(res.Reader(r));
-            self.poller = ok(res.Poller(r));
-            self.connected = true;
-        } else {
-            self.resource = nil;
-            self.connected = false;
-        }
-        self.remote_addr = "";
-        self.id = "";
-    }
-
-    pub fn send(message: str): core.ResultInt {
-        match (self.writer) {
-            case ok(w) => {
-                if (w.write([message]) == true) return core.ok_int(len(message));
-                self.connected = false;
-                return core.err_int("send failed");
-            }
-            case nil => return core.err_int("not connected");
-        }
-    }
-
-    pub fn recv(): core.ResultStr {
-        match (self.reader) {
-            case ok(rd) => {
-                var res = rd.read([ []]);
-                if (res != nil) return core.ok_str(res as str);
-                self.connected = false;
-                return core.err_str("connection closed");
-            }
-            case nil => return core.err_str("not connected");
-        }
-    }
-
-    pub fn has_message(): bool {
-        match (self.poller) {
-            case ok(p) => return p.poll();
-            case nil => return false;
-        }
-    }
-
-    pub fn close(): core.ResultInt {
-        match (self.resource) {
-            case ok(r) => r.close();
-            case nil => {}
-        }
-        self.connected = false;
-        self.resource = nil;
-        return core.ok_int(0);
-    }
 }
 
 frame WSRoom {

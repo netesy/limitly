@@ -1,0 +1,8 @@
+// @error:type_error
+// Returning wrong type from function
+
+fn get_number(): int {
+    return "this is a string";  // Should return int, not string
+}
+
+print(get_number());

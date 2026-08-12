@@ -1,14 +1,18 @@
-import std.ui.types as ui;
-import std.gfx.types as gfx;
+import std.graphics.index as graphics;
+import std.scene.index as scene;
+import std.ui.index as ui;
 
-print("Testing Simplified UI/GFX...");
+print("Testing Simplified UI/Scene/Graphics...");
 
-var c = ui.create_color(1.0);
+var c = graphics.Color(r=1.0, g=0.0, b=0.0, a=1.0);
 print("Color R: ");
 print(c.r);
 
-var pf = gfx.create_pixel_format(42);
-print("PixelFormat Value: ");
-print(pf.value);
+var s = scene.Scene();
+print("Scene camera initialized.");
+
+var app = ui.Application(n="TestApp");
+print("Application Name: ");
+print(app.name);
 
 print("Test Passed!");

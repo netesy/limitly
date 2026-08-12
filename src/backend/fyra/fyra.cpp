@@ -104,6 +104,16 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
             return result;
         }
 
+        // Dump the generated x86_64 assembly for debugging
+        {
+            std::ofstream asm_file(options.output_file + ".s");
+            if (asm_file.is_open()) {
+                ::codegen::CodeGen text_generator(*module, ::target::TargetResolver::resolve({target_arch, target_os, std::nullopt}), &asm_file);
+                text_generator.emit(true);
+                asm_file.close();
+            }
+        }
+
         ::codegen::CodeGen generator(*module, std::move(targetInfo), nullptr);
         generator.emit(true);
 
@@ -111,14 +121,23 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
         sections[".text"] = generator.getAssembler().getCode();
         sections[".data"] = generator.getRodataAssembler().getCode();
         std::vector<::codegen::CodeGen::SymbolInfo> syms = generator.getSymbols();
-        ::codegen::CodeGen::SymbolInfo start_sym;
-        start_sym.name = "_start";
-        start_sym.value = 0;
-        start_sym.size = 0;
-        start_sym.type = 2; // STT_FUNC
-        start_sym.binding = 1; // STB_GLOBAL
-        start_sym.sectionName = ".text";
-        syms.push_back(start_sym);
+        bool has_start = false;
+        for (const auto& sym : syms) {
+            if (sym.name == "_start") {
+                has_start = true;
+                break;
+            }
+        }
+        if (!has_start) {
+            ::codegen::CodeGen::SymbolInfo start_sym;
+            start_sym.name = "_start";
+            start_sym.value = 0;
+            start_sym.size = 0;
+            start_sym.type = 2; // STT_FUNC
+            start_sym.binding = 1; // STB_GLOBAL
+            start_sym.sectionName = ".text";
+            syms.push_back(start_sym);
+        }
 
         if (options.platform == Platform::Windows) {
             PEGenerator pe_gen(true); // 64-bit
@@ -151,7 +170,6 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
                 relocs.push_back({reloc.offset, reloc.type, reloc.addend, reloc.symbolName, reloc.sectionName});
             }
 
-            for (const auto& sym : symbols) { if (sym.name == "_start") std::cout << "DEBUG: Found _start symbol in vector at " << sym.value << std::endl; }
             if (!elf_gen.generateFromCode(sections, symbols, relocs, options.output_file)) {
                 result.success = false;
                 result.error_message = "ELF generation failed: " + elf_gen.getLastError();

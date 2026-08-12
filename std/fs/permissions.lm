@@ -1,0 +1,13 @@
+// Standard Library Filesystem Permissions Submodule
+
+frame Permissions {
+    pub var readonly: bool;
+
+    pub init(readonly: bool) {
+        self.readonly = readonly;
+    }
+
+    pub fn is_readonly(): bool {
+        return self.readonly;
+    }
+}

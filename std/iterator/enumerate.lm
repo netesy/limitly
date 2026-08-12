@@ -1,0 +1,27 @@
+// Standard Library Enumerate Iterator
+
+import std.iterator.iterator as it;
+
+frame EnumerateIterator: it.Iterator {
+    pub index: int;
+    pub source: it.Iterator;
+
+    pub init(source: it.Iterator) {
+        self.source = source;
+        self.index = 0;
+    }
+
+    pub fn next(): any {
+        var item = self.source.next();
+        if (item == nil) {
+            return nil;
+        }
+        var pair = (self.index, item);
+        self.index = self.index + 1;
+        return pair;
+    }
+}
+
+pub fn enumerate(source: it.Iterator): it.Iterator {
+    return EnumerateIterator(source);
+}

@@ -1,0 +1,5 @@
+// Standard Library Core Cloneable Trait
+
+trait Cloneable {
+    fn clone(): any;
+}

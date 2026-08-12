@@ -1,0 +1,21 @@
+// Standard Library Algorithm Unique Module
+
+pub fn unique(items: [any]): [any] {
+    var res: [any] = [];
+    var i = 0;
+    while (i < len(items)) {
+        var found = false;
+        var j = 0;
+        while (j < len(res)) {
+            if (res[j] == items[i]) {
+                found = true;
+            }
+            j = j + 1;
+        }
+        if (!found) {
+            res.append(items[i]);
+        }
+        i = i + 1;
+    }
+    return res;
+}

@@ -1,0 +1,13 @@
+import std.ui.widget as widget;
+
+frame ProgressBar {
+    pub var progress: float; // 0.0 to 1.0
+
+    pub init(p: float = 0.0) {
+        self.progress = p;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

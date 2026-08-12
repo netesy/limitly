@@ -1,5 +1,9 @@
 #include "../type_checker.hh"
 #include "../module_manager.hh"
+#include <filesystem>
+#include <algorithm>
+
+namespace fs = std::filesystem;
 
 using namespace LM::Frontend;
 
@@ -37,6 +41,35 @@ TypePtr TypeChecker::check_contract_statement(std::shared_ptr<LM::Frontend::AST:
     
     contract_stmt->inferred_type = type_system.NIL_TYPE;
     return type_system.NIL_TYPE;
+}
+
+static bool is_catch_all_pattern(std::shared_ptr<LM::Frontend::AST::Expression> pattern) {
+    if (!pattern) return false;
+
+    // Check if it is a VariableExpr
+    if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(pattern)) {
+        return true;
+    }
+
+    // Check for or pattern where at least one pattern is a catch-all
+    if (auto or_pat = std::dynamic_pointer_cast<LM::Frontend::AST::OrPatternExpr>(pattern)) {
+        for (const auto& p : or_pat->patterns) {
+            if (is_catch_all_pattern(p)) return true;
+        }
+    }
+
+    return false;
+}
+
+static void collect_matched_variants(std::shared_ptr<LM::Frontend::AST::Expression> pattern, std::unordered_set<std::string>& matched) {
+    if (!pattern) return;
+    if (auto member = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(pattern)) {
+        matched.insert(member->name);
+    } else if (auto or_pat = std::dynamic_pointer_cast<LM::Frontend::AST::OrPatternExpr>(pattern)) {
+        for (const auto& p : or_pat->patterns) {
+            collect_matched_variants(p, matched);
+        }
+    }
 }
 
 TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::MatchStatement> match_stmt) {
@@ -121,6 +154,54 @@ TypePtr TypeChecker::check_match_statement(std::shared_ptr<LM::Frontend::AST::Ma
             add_error("Match statement is not exhaustive for Option type. Must handle both Some and None cases", 
                         match_stmt->line);
         }
+    } else if (matchType->tag == TypeTag::Enum) {
+        // Enum type exhaustiveness checking
+        bool has_catch_all = false;
+        for (const auto& case_item : match_stmt->cases) {
+            if (is_catch_all_pattern(case_item.pattern)) {
+                has_catch_all = true;
+                break;
+            }
+        }
+
+        if (!has_catch_all) {
+            auto* enumInfoPtr = std::get_if<EnumType>(&matchType->extra);
+            if (enumInfoPtr) {
+                std::unordered_set<std::string> matched_variants;
+                for (const auto& case_item : match_stmt->cases) {
+                    collect_matched_variants(case_item.pattern, matched_variants);
+                }
+
+                std::vector<std::string> missing;
+                for (const auto& val : enumInfoPtr->values) {
+                    if (matched_variants.find(val) == matched_variants.end()) {
+                        missing.push_back(val);
+                    }
+                }
+
+                if (!missing.empty()) {
+                    std::string missing_str = "";
+                    for (size_t i = 0; i < missing.size(); ++i) {
+                        if (i > 0) missing_str += ", ";
+                        missing_str += missing[i];
+                    }
+                    add_error("pattern_exhaustive: Match statement is not exhaustive for Enum type '" + enumInfoPtr->name + "'. Missing patterns: [" + missing_str + "]", match_stmt->line);
+                }
+            }
+        }
+    } else if (is_integer_type(matchType) || is_numeric_type(matchType) || is_string_type(matchType)) {
+        // Integer and primitive matches require a catch-all wildcard
+        bool has_catch_all = false;
+        for (const auto& case_item : match_stmt->cases) {
+            if (is_catch_all_pattern(case_item.pattern)) {
+                has_catch_all = true;
+                break;
+            }
+        }
+
+        if (!has_catch_all) {
+            add_error("pattern_exhaustive: Match statement is not exhaustive for type '" + matchType->toString() + "'. A wildcard pattern (_) or default branch is required", match_stmt->line);
+        }
     }
     
     return result_type;
@@ -201,6 +282,8 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
 TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame) {
     if (!frame) return nullptr;
     
+    size_t initial_error_count = errors.size();
+
     // Set current frame context
     auto prev_frame = current_frame;
     current_frame = frame;
@@ -319,11 +402,15 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
             }
         }
         
+        auto prev_return_type = current_return_type;
+        current_return_type = type_system.NIL_TYPE;
+
         // Check init body
         if (frame->init->body) {
             check_statement(frame->init->body);
         }
         
+        current_return_type = prev_return_type;
         exit_scope();
     }
     
@@ -338,7 +425,10 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
         // Check deinit body
         if (frame->deinit->body) {
             enter_scope();
+            auto prev_return_type = current_return_type;
+            current_return_type = type_system.NIL_TYPE;
             check_statement(frame->deinit->body);
+            current_return_type = prev_return_type;
             exit_scope();
         }
     }
@@ -369,17 +459,27 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
             }
         }
         
+        // Set the return type of the method for return statements checked within its body
+        TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
+        auto prev_return_type = current_return_type;
+        current_return_type = return_type;
+
         // Check method body
         if (method->body) {
             check_statement(method->body);
         }
         
+        current_return_type = prev_return_type;
         exit_scope();
     }
     
     // Restore previous frame context
     current_frame = prev_frame;
     
+    if (errors.size() > initial_error_count) {
+        failed_frames.insert(name);
+    }
+
     return frame_type;
 }
 
@@ -398,6 +498,16 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
     // Use the qualified name from frame_declarations (which is the actual registered name)
     // This ensures module frames use their full qualified name (e.g., test_module_frame.Counter)
     std::string frame_qualified_name = frame_info.name;
+    
+    // ===== NEW: MEMORY SAFETY INTEGRATION =====
+    
+    // Enter memory region for frame instantiation
+    enter_memory_region();
+    
+    // Track which fields are initialized
+    std::vector<std::string> initialized_fields;
+    
+    // ===== END NEW =====
     
     // Check that all required fields are provided
     std::set<std::string> provided_fields;
@@ -427,13 +537,31 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
             continue;
         }
         
+        // ===== NEW: CHECK FIELD TYPE SAFETY =====
+        
         // Check field value type
         TypePtr actual_type = check_expression(field_value);
         if (!is_type_compatible(expected_type, actual_type)) {
             add_type_error(expected_type->toString(), actual_type->toString(), expr->line);
         }
         
+        // NEW: Check if field is linear type
+        // Linear types are tracked in the linear_types map, not through TypeTag
+        if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(field_value.get())) {
+            if (linear_types.find(var_expr->name) != linear_types.end()) {
+                // This is a linear type - mark as moved into field
+                move_linear_type(var_expr->name, expr->line);
+            }
+        }
+        
+        // NEW: Check mutable aliasing for frame fields
+        check_frame_field_mutable_aliasing(expr->frameName, field_name, 
+                                          false, expr->line);  // Fields assigned, not borrowed
+        
+        // ===== END NEW =====
+        
         provided_fields.insert(field_name);
+        initialized_fields.push_back(field_name);
     }
     
     // Check that all required fields (those without defaults) are provided
@@ -445,6 +573,22 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
             add_error("Frame instantiation missing required field: '" + field_name + "'", expr->line);
         }
     }
+    
+    // ===== NEW: COMPLETE MEMORY SAFETY SETUP =====
+    
+    // Verify all non-optional fields initialized
+    verify_frame_full_initialization(expr->frameName, initialized_fields, expr->line);
+    
+    // Register frame for automatic deinit at scope exit
+    register_frame_for_deinit(expr->frameName, current_scope_level);
+    
+    // Check for linear type fields
+    check_frame_field_linear_types(expr->frameName, frame_info.fields);
+    
+    // Exit memory region
+    exit_memory_region();
+    
+    // ===== END NEW =====
     
     // Return the frame type using the qualified name
     TypePtr frame_type = type_system.createFrameType(frame_qualified_name);
@@ -559,7 +703,31 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
     auto& manager = ModuleManager::getInstance();
     auto module = manager.load_module(import_stmt->modulePath);
     if (!module) {
-        add_error("Failed to load module: " + import_stmt->modulePath, import_stmt->line);
+        std::string mod_path = import_stmt->modulePath;
+        std::string dir_path = mod_path;
+        if (dir_path.ends_with(".index")) {
+            dir_path = dir_path.substr(0, dir_path.length() - 6);
+        }
+        std::replace(dir_path.begin(), dir_path.end(), '.', '/');
+
+        std::string msg;
+        if (fs::exists(dir_path) && fs::is_directory(dir_path)) {
+            msg = "module `" + mod_path + "` was found, but its entry module could not be loaded";
+            msg += "\n\n= reason: expected `" + dir_path + "/index.lm`";
+            msg += "\n= help: check that the module contains a valid entry file";
+        } else {
+            std::vector<std::string> candidates = get_all_available_modules();
+            std::string suggestion = find_similar_name(mod_path, candidates);
+
+            msg = "cannot find module `" + mod_path + "`";
+            msg += "\n\n= reason: module was not found in import paths";
+            if (!suggestion.empty()) {
+                msg += "\n= help: did you mean `" + suggestion + "`?";
+            } else {
+                msg += "\n= help: check that the module exists and that the import path is correct";
+            }
+        }
+        add_error(msg, import_stmt->line);
         return nullptr;
     }
 

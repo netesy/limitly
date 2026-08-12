@@ -21,7 +21,7 @@ pub frame Queue {
     }
 
     pub fn length(): int {
-        return self.data.len();
+        return self.data.length();
     }
 
     pub fn len(): int {
@@ -30,11 +30,11 @@ pub frame Queue {
 }
 
 pub frame PriorityQueue {
-    pub var heap: [any];
+    pub var heap: vector.Vector;
     var comparator: any;
 
-    pub init(comparator: any = nil) {
-        self.heap = [];
+    pub init(comparator: any) {
+        self.heap = vector.Vector();
         self.comparator = comparator;
     }
 
@@ -57,15 +57,16 @@ pub frame PriorityQueue {
     }
 
     pub fn push(item: any) {
-        self.heap = self.heap + [item];
-        self._sift_up(len(self.heap) - 1);
+        self.heap.push(item);
+        var current_len = self.heap.length();
+        self._sift_up(current_len - 1);
     }
 
     pub fn peek(): any {
-        if (len(self.heap) == 0) {
+        if (self.heap.length() == 0) {
             return nil;
         }
-        return self.heap[0];
+        return self.heap.data[0];
     }
 
     pub fn remove(): any {
@@ -73,27 +74,21 @@ pub frame PriorityQueue {
     }
 
     pub fn pop(): any {
-        var n = len(self.heap);
+        var n = self.heap.length();
         if (n == 0) {
             return nil;
         }
-        var result = self.heap[0];
-        self.heap[0] = self.heap[n - 1];
-        var next_heap: [any] = [];
-        var i = 0;
-        while (i < n - 1) {
-            next_heap = next_heap + [self.heap[i]];
-            i = i + 1;
-        }
-        self.heap = next_heap;
-        if (len(self.heap) > 0) {
+        var result = self.heap.data[0];
+        self.heap.data[0] = self.heap.data[n - 1];
+        self.heap.pop();
+        if (self.heap.length() > 0) {
             self._sift_down(0);
         }
         return result;
     }
 
     pub fn len(): int {
-        return len(self.heap);
+        return self.heap.length();
     }
 
     pub fn length(): int {
@@ -103,10 +98,10 @@ pub frame PriorityQueue {
     fn _sift_up(idx: int) {
         while (idx > 0) {
             var parent = (idx - 1) / 2;
-            if (self._compare(self.heap[idx], self.heap[parent]) < 0) {
-                var tmp = self.heap[idx];
-                self.heap[idx] = self.heap[parent];
-                self.heap[parent] = tmp;
+            if (self._compare(self.heap.data[idx], self.heap.data[parent]) < 0) {
+                var tmp = self.heap.data[idx];
+                self.heap.data[idx] = self.heap.data[parent];
+                self.heap.data[parent] = tmp;
                 idx = parent;
             } else {
                 return;
@@ -115,21 +110,21 @@ pub frame PriorityQueue {
     }
 
     fn _sift_down(idx: int) {
-        var n = len(self.heap);
+        var n = self.heap.length();
         while (true) {
             var smallest = idx;
             var left = 2 * idx + 1;
             var right = 2 * idx + 2;
-            if (left < n and self._compare(self.heap[left], self.heap[smallest]) < 0) {
+            if (left < n and self._compare(self.heap.data[left], self.heap.data[smallest]) < 0) {
                 smallest = left;
             }
-            if (right < n and self._compare(self.heap[right], self.heap[smallest]) < 0) {
+            if (right < n and self._compare(self.heap.data[right], self.heap.data[smallest]) < 0) {
                 smallest = right;
             }
             if (smallest != idx) {
-                var tmp = self.heap[idx];
-                self.heap[idx] = self.heap[smallest];
-                self.heap[smallest] = tmp;
+                var tmp = self.heap.data[idx];
+                self.heap.data[idx] = self.heap.data[smallest];
+                self.heap.data[smallest] = tmp;
                 idx = smallest;
             } else {
                 return;
@@ -158,7 +153,7 @@ pub frame Stack {
     }
 
     pub fn len(): int {
-        return self.data.len();
+        return self.data.length();
     }
 
     pub fn length(): int {
@@ -167,94 +162,81 @@ pub frame Stack {
 }
 
 pub frame BitSet {
-    pub var words: [int];
+    var w0: int;
+    var w1: int;
+    var w2: int;
+    var w3: int;
     var size: int;
+    var used: int;
 
     pub init(size: int = 64) {
-        self.words = [] as [int];
+        self.w0 = 0; self.w1 = 0; self.w2 = 0; self.w3 = 0; self.used = 0;
         self.size = size;
-        if (self.size < 1) {
-            self.size = 1;
-        }
-        var word_count = (self.size + 63) / 64;
-        var i = 0;
-        while (i < word_count) {
-            self.words = self.words + [0];
-            i = i + 1;
-        }
+        if (self.size < 1) { self.size = 1; }
     }
 
     fn _mask(bit: int): int {
-        return 1 << (bit % 64);
+        var offset = bit % 64; var mask = 1; var i = 0;
+        while (i < offset) { mask = mask * 2; i = i + 1; }
+        return mask;
     }
 
-    fn _valid(bit: int): bool {
-        return bit >= 0 and bit < self.size;
+    fn _valid(bit: int): bool { return bit >= 0 and bit < self.size; }
+
+    fn _word_value(word: int): int {
+        if (word == 0) return self.w0; if (word == 1) return self.w1; if (word == 2) return self.w2; return self.w3;
+    }
+
+    fn _set_word(word: int, value: int) {
+        if (word == 0) { self.w0 = value; } elif (word == 1) { self.w1 = value; } elif (word == 2) { self.w2 = value; } else { self.w3 = value; }
     }
 
     pub fn set(bit: int) {
-        if (self._valid(bit)) {
-            var word = bit / 64;
-            self.words[word] = self.words[word] | self._mask(bit);
+        if (self._valid(bit) and not self.contains(bit)) {
+            var word = bit / 64; self._set_word(word, self._word_value(word) + self._mask(bit));
+            self.used = self.used + 1;
         }
     }
 
     pub fn unset(bit: int) {
         if (self.contains(bit)) {
-            var word = bit / 64;
-            self.words[word] = self.words[word] ^ self._mask(bit);
+            var word = bit / 64; self._set_word(word, self._word_value(word) - self._mask(bit));
+            self.used = self.used - 1;
         }
     }
 
     pub fn toggle(bit: int) {
-        if (self._valid(bit)) {
-            var word = bit / 64;
-            self.words[word] = self.words[word] ^ self._mask(bit);
-        }
+        if (self.contains(bit)) { self.unset(bit); } elif (self._valid(bit)) { var word = bit / 64; self._set_word(word, self._word_value(word) + self._mask(bit)); self.used = self.used + 1; }
     }
 
     pub fn contains(bit: int): bool {
-        if (not self._valid(bit)) {
-            return false;
-        }
-        var word = bit / 64;
-        return (self.words[word] & self._mask(bit)) != 0;
+        if (not self._valid(bit)) { return false; }
+        var word = bit / 64; var mask = self._mask(bit);
+        return ((self._word_value(word) / mask) % 2) == 1;
     }
 
-    pub fn get(bit: int): bool {
-        return self.contains(bit);
-    }
+    pub fn get(bit: int): bool { return self.contains(bit); }
 
-    pub fn count(): int {
-        var total = 0;
-        var bit = 0;
-        while (bit < self.size) {
-            if (self.contains(bit)) {
-                total = total + 1;
-            }
-            bit = bit + 1;
-        }
-        return total;
-    }
+    pub fn count(): int { return self.used; }
 
-    pub fn get_size(): int {
-        return self.size;
-    }
+    pub fn get_size(): int { return self.size; }
 
-    pub fn iterator(): BitSetIterator {
-        return BitSetIterator(bitset=self, current=0);
-    }
+    pub fn iterator(): BitSetIterator { return BitSetIterator(bitset=self, current=0, yielded=0); }
 }
-
 pub frame BitSetIterator {
     var bitset: BitSet;
     var current: int;
+    var yielded: int;
 
     pub fn next(): any {
+        if (self.yielded >= self.bitset.count()) {
+            return nil;
+        }
         while (self.current < self.bitset.get_size()) {
             if (self.bitset.contains(self.current)) {
                 var result = self.current;
                 self.current = self.current + 1;
+                self.yielded = self.yielded + 1;
                 return result;
             }
             self.current = self.current + 1;

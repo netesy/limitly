@@ -9,23 +9,23 @@ fn divide(a: int, b: int): int?DivisionByZero {
 
 fn processResult(result: int?DivisionByZero): str {
     match (result) {
-        val x => "Success: " + x,
-        err e => "Error: " + e.message
+        val x => "Success: {x}",
+        err e => "Error: {e.message}"
     }
 }
 
 fn processResultSpecific(result: int?DivisionByZero): str {
     match (result) {
-        val x => "Success: " + x,
-        DivisionByZero(msg) => "Division error: " + msg
+        val x => "Success: {x}",
+        DivisionByZero(msg) => "Division error: {msg}"
     }
 }
 
 fn processMultipleErrors(result: int?DivisionByZero, IndexOutOfBounds): str {
     match (result) {
-        val x => "Success: " + x,
-        DivisionByZero(msg) => "Division error: " + msg,
-        IndexOutOfBounds(msg) => "Index error: " + msg
+        val x => "Success: {x}",
+        DivisionByZero(msg) => "Division error: {msg}",
+        IndexOutOfBounds(msg) => "Index error: {msg}"
     }
 }
 
@@ -51,11 +51,11 @@ fn testNestedErrorPatterns() {
             val x => {
                 var inner = divide(x, 2);
                 match (inner) {
-                    val y => "Nested success: " + y,
-                    err e => "Nested error: " + e.message
+                    val y => "Nested success: {y}",
+                    err e => "Nested error: {e.message}"
                 }
             },
-            err e => "Outer error: " + e.message
+            err e => "Outer error: {e.message}"
         }
     }
     
@@ -69,9 +69,9 @@ fn testNestedErrorPatterns() {
 fn testErrorPatternWithGuards() {
     fn processWithGuard(result: int?DivisionByZero): str {
         match (result) {
-            val x where x > 5 => "Large success: " + x,
-            val x => "Small success: " + x,
-            err e => "Error: " + e.message
+            val x where x > 5 => "Large success: {x}",
+            val x => "Small success: {x}",
+            err e => "Error: {e.message}"
         }
     }
     
@@ -89,8 +89,8 @@ fn testExhaustiveMatching() {
     // This should compile fine - exhaustive
     fn exhaustive(result: int?DivisionByZero): str {
         match (result) {
-            val x => "Success: " + x,
-            err e => "Error: " + e.message
+            val x => "Success: {x}",
+            err e => "Error: {e.message}"
         }
     }
     
@@ -98,7 +98,7 @@ fn testExhaustiveMatching() {
     /*
     fn notExhaustive1(result: int?DivisionByZero): str {
         match (result) {
-            val x => "Success: " + x
+            val x => "Success: {x}"
         }
     }
     */

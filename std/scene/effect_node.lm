@@ -1,0 +1,11 @@
+import std.scene.node as node;
+
+frame EffectNode {
+    pub var base_node: node.Node;
+    pub var effect_type: int; // 0 = blur, 1 = shadow, 2 = grayscale
+
+    pub init(b: node.Node = node.Node(), t: int = 0) {
+        self.base_node = b;
+        self.effect_type = t;
+    }
+}

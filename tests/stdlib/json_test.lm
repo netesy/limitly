@@ -1,0 +1,41 @@
+// Test suite for Standard Library JSON Module
+
+import std.json.index as json;
+import std.json.value as jval;
+
+fn main(): int {
+    print("=== JSON Module Test Suite ===");
+
+    var o_brace = "{";
+    var c_brace = "}";
+    var json_str = o_brace + "\"name\":\"John\",\"age\":30,\"is_valid\":true" + "}";
+
+    var parsed_any = json.parse(json_str);
+    var parsed_val = parsed_any as jval.JSONValue;
+    assert(parsed_val.type_tag == "object", "type tag should be object");
+    assert(len(parsed_val.obj_keys) == 3, "obj keys count failed");
+
+    assert(parsed_val.obj_keys[0] == "name", "key 0 failed");
+    var name_val = parsed_val.obj_vals[0] as jval.JSONValue;
+    assert(name_val.type_tag == "string", "name val type tag failed");
+    assert(name_val.str_val == "John", "name val failed");
+
+    assert(parsed_val.obj_keys[1] == "age", "key 1 failed");
+    var age_val = parsed_val.obj_vals[1] as jval.JSONValue;
+    assert(age_val.type_tag == "number", "age val type tag failed");
+
+    var actual_num = age_val.num_val;
+    assert("{actual_num}" == "30", "age val failed");
+
+    assert(parsed_val.obj_keys[2] == "is_valid", "key 2 failed");
+    var bool_val = parsed_val.obj_vals[2] as jval.JSONValue;
+    assert(bool_val.type_tag == "bool", "bool val type tag failed");
+    assert(bool_val.bool_val == true, "bool val failed");
+
+    // Test stringify
+    var serialized = json.stringify(parsed_val);
+    assert(serialized == json_str, "stringify failed: " + serialized);
+
+    print("All JSON tests passed successfully!");
+    return 0;
+}

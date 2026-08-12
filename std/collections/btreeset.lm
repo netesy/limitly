@@ -1,0 +1,23 @@
+// Standard Library BTreeSet Collection
+
+import std.collections.tree as tree;
+
+frame BTreeSetWrapper {
+    pub impl: tree.TreeSet;
+
+    pub init() {
+        self.impl = tree.TreeSet();
+    }
+
+    pub fn add(item: any) {
+        self.impl.add(item);
+    }
+
+    pub fn contains(item: any): bool {
+        return self.impl.contains(item);
+    }
+
+    pub fn length(): int {
+        return self.impl.length();
+    }
+}

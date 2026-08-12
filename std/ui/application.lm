@@ -1,0 +1,15 @@
+import std.ui.window as window;
+
+frame Application {
+    pub var name: str;
+    pub var windows: [window.Window];
+
+    pub init(n: str = "LimitApp", wins: [window.Window] = []) {
+        self.name = n;
+        self.windows = wins;
+    }
+
+    pub fn run(): nil {
+        print("Application is running.");
+    }
+}

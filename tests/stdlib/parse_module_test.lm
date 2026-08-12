@@ -1,0 +1,57 @@
+// Test Suite for Standard Library Parse Module
+
+import std.parse.index as parse;
+import std.time.datetime as dt_mod;
+
+fn test_parse_frame(): int {
+    print("Testing Parse Frame...");
+    var p = parse.Parse() as parse.Parse;
+
+    var ri = p.parse_int("123");
+    match (ri) {
+        val i => assert((i as int) == 123, "parse_int failed"),
+        err e => assert(false, "parse_int err failed")
+    }
+
+    var ri_neg = p.parse_int("-456");
+    match (ri_neg) {
+        val i => assert((i as int) == -456, "parse_int negative failed"),
+        err e => assert(false, "parse_int negative err failed")
+    }
+
+    assert(p.parse_bool("true") == true, "parse_bool failed");
+    return 1;
+}
+
+fn test_parse_helpers(): int {
+    print("Testing Parse Helpers...");
+    var ri = parse.parse_int("789");
+    match (ri) {
+        val i => assert((i as int) == 789, "parse_int helper failed"),
+        err e => assert(false, "parse_int helper err failed")
+    }
+
+    assert(parse.parse_bool("0") == false, "parse_bool helper failed");
+
+    var rdt = parse.parse_datetime("1970-01-12 13:46:40");
+    match (rdt) {
+        val dt => {
+            var dt_obj = dt as dt_mod.DateTime;
+            assert(dt_obj.year() == 1970, "parse_datetime year failed");
+            assert(dt_obj.month() == 1, "parse_datetime month failed");
+            assert(dt_obj.day() == 12, "parse_datetime day failed");
+        }
+        nil => assert(false, "parse_datetime nil failed")
+    }
+    return 1;
+}
+
+fn main(): int {
+    print("=== Parse Module Test Suite ===");
+
+    assert(test_parse_frame() == 1, "Parse frame test failed");
+    assert(test_parse_helpers() == 1, "Parse helpers test failed");
+
+    print("All parse tests passed successfully.");
+    return 0;
+}

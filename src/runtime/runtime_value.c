@@ -79,6 +79,7 @@ RUNTIME_API int64_t as_i64(LmValue v) {
         if (h->type_id == TYPE_U64) return (int64_t)((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return (int64_t)((ObjI128*)h)->value;
         if (h->type_id == TYPE_U128) return (int64_t)((ObjU128*)h)->value;
+        if (h->type_id == TYPE_FLOAT) return (int64_t)((ObjFloat*)h)->value;
         if (h->type_id == TYPE_BOX) {
             LmBox* box = (LmBox*)h;
             if (box->type == LM_BOX_INT) return box->value.as_int;
@@ -96,6 +97,7 @@ RUNTIME_API uint64_t as_u64(LmValue v) {
         if (h->type_id == TYPE_U64) return ((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return (uint64_t)((ObjI128*)h)->value;
         if (h->type_id == TYPE_U128) return (uint64_t)((ObjU128*)h)->value;
+        if (h->type_id == TYPE_FLOAT) return (uint64_t)((ObjFloat*)h)->value;
         if (h->type_id == TYPE_BOX) {
             LmBox* box = (LmBox*)h;
             if (box->type == LM_BOX_INT) return (uint64_t)box->value.as_int;
@@ -112,6 +114,7 @@ RUNTIME_API __int128 as_i128(LmValue v) {
         if (h->type_id == TYPE_U64) return (__int128)((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return ((ObjI128*)h)->value;
         if (h->type_id == TYPE_U128) return (__int128)((ObjU128*)h)->value;
+        if (h->type_id == TYPE_FLOAT) return (__int128)((ObjFloat*)h)->value;
         if (h->type_id == TYPE_BOX) {
             LmBox* box = (LmBox*)h;
             if (box->type == LM_BOX_INT) return (__int128)box->value.as_int;
@@ -129,6 +132,7 @@ RUNTIME_API unsigned __int128 as_u128(LmValue v) {
         if (h->type_id == TYPE_U64) return (unsigned __int128)((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return (unsigned __int128)((ObjI128*)h)->value;
         if (h->type_id == TYPE_U128) return ((ObjU128*)h)->value;
+        if (h->type_id == TYPE_FLOAT) return (unsigned __int128)((ObjFloat*)h)->value;
         if (h->type_id == TYPE_BOX) {
             LmBox* box = (LmBox*)h;
             if (box->type == LM_BOX_INT) return (unsigned __int128)box->value.as_int;
@@ -340,6 +344,20 @@ RUNTIME_API LmValue lm_add(LmValue a, LmValue b) {
     if (IS_PTR(a) && IS_PTR(b)) {
         ObjHeader* h1 = (ObjHeader*)UNBOX_PTR(a);
         ObjHeader* h2 = (ObjHeader*)UNBOX_PTR(b);
+        if (h1->type_id == TYPE_LIST && h2->type_id == TYPE_LIST) {
+            LmList* l1 = (LmList*)h1;
+            LmList* l2 = (LmList*)h2;
+            LmList* result = lm_list_new();
+            if (result) {
+                for (uint64_t i = 0; i < l1->size; ++i) {
+                    lm_list_append(result, l1->data[i]);
+                }
+                for (uint64_t i = 0; i < l2->size; ++i) {
+                    lm_list_append(result, l2->data[i]);
+                }
+                return BOX_PTR(result);
+            }
+        }
         if (h1->type_id == TYPE_BOX && h2->type_id == TYPE_BOX) {
             LmBox* b1 = (LmBox*)h1;
             LmBox* b2 = (LmBox*)h2;
@@ -366,6 +384,17 @@ RUNTIME_API LmValue lm_add(LmValue a, LmValue b) {
         return make_float(as_float(a) + as_float(b));
     }
     return VAL_NIL;
+}
+
+RUNTIME_API LmValue lm_rt_str_format(LmValue fmt_val, LmValue arg_val) {
+    LmString fmt = lm_value_to_string(fmt_val);
+    LmString arg = lm_value_to_string(arg_val);
+    LmString res = lm_string_format(fmt, arg);
+    LmBox* box = lm_box_string(res.data);
+    lm_string_free(fmt);
+    lm_string_free(arg);
+    lm_string_free(res);
+    return BOX_PTR(box);
 }
 
 RUNTIME_API LmValue lm_sub(LmValue a, LmValue b) {

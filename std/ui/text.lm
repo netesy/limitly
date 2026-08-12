@@ -1,0 +1,13 @@
+import std.ui.widget as widget;
+
+frame Text {
+    pub var content: str;
+
+    pub init(cnt: str = "") {
+        self.content = cnt;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

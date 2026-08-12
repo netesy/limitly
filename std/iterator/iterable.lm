@@ -1,0 +1,7 @@
+// Standard Library Iterable Trait
+
+import std.iterator.iterator as it;
+
+trait Iterable {
+    fn to_iterator(): it.Iterator;
+}

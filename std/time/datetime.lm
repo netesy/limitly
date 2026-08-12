@@ -1,0 +1,408 @@
+// Standard Library Time DateTime Submodule
+
+import std.time.duration as dur;
+import std.time.timezone as tz;
+
+fn to_i(s: str): int {
+    return s as int;
+}
+
+// Calendar calculation functions
+pub fn is_leap_year(year: int): bool {
+    if (year % 4 != 0) return false;
+    if (year % 100 != 0) return true;
+    if (year % 400 != 0) return false;
+    return true;
+}
+
+pub fn get_days_in_month(year: int, month: int): int {
+    var days: [int] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    if (month == 2 and is_leap_year(year)) return 29;
+    return days[month - 1];
+}
+
+pub fn get_days_in_year(year: int): int {
+    if (is_leap_year(year)) return 366;
+    return 365;
+}
+
+pub fn datetime_to_timestamp(year: int, month: int, day: int, hour: int, minute: int, second: int): int {
+    var total_days: int = 0;
+    var y: int = 1970;
+
+    while (y < year) {
+        total_days = total_days + get_days_in_year(y);
+        y = y + 1;
+    }
+    while (y > year) {
+        y = y - 1;
+        total_days = total_days - get_days_in_year(y);
+    }
+
+    var m: int = 1;
+    while (m < month) {
+        total_days = total_days + get_days_in_month(year, m);
+        m = m + 1;
+    }
+
+    total_days = total_days + (day - 1);
+    return total_days * 86400 + hour * 3600 + minute * 60 + second;
+}
+
+pub fn timestamp_to_year(timestamp: int): int {
+    if (timestamp >= 0) {
+        var days: int = timestamp / 86400;
+        var year: int = 1970;
+        var remaining: int = days;
+        while (remaining >= get_days_in_year(year)) {
+            remaining = remaining - get_days_in_year(year);
+            year = year + 1;
+        }
+        return year;
+    } else {
+        var days: int = -timestamp / 86400;
+        if (-timestamp % 86400 != 0) days = days + 1;
+        var year: int = 1970;
+        var remaining: int = days;
+        while (remaining >= get_days_in_year(year - 1)) {
+            year = year - 1;
+            remaining = remaining - get_days_in_year(year);
+        }
+        return year - 1;
+    }
+}
+
+pub fn timestamp_to_month(timestamp: int): int {
+    var year: int = timestamp_to_year(timestamp);
+    var year_start: int = datetime_to_timestamp(year, 1, 1, 0, 0, 0);
+    var days_in_year: int = timestamp - year_start;
+    if (days_in_year < 0) days_in_year = 0;
+    var day_of_year: int = days_in_year / 86400;
+
+    var m: int = 1;
+    while (m <= 12) {
+        var dim: int = get_days_in_month(year, m);
+        if (day_of_year < dim) return m;
+        day_of_year = day_of_year - dim;
+        m = m + 1;
+    }
+    return 12;
+}
+
+pub fn timestamp_to_day(timestamp: int): int {
+    var year: int = timestamp_to_year(timestamp);
+    var month: int = timestamp_to_month(timestamp);
+    var month_start: int = datetime_to_timestamp(year, month, 1, 0, 0, 0);
+    var days_since_month_start: int = timestamp - month_start;
+    if (days_since_month_start < 0) days_since_month_start = 0;
+    return (days_since_month_start / 86400) + 1;
+}
+
+frame DateTime {
+    pub var timestamp: int;
+    pub var microseconds: int;
+    pub var timezone: tz.TimeZone;
+
+    pub init(timestamp: int, microseconds: int, timezone: tz.TimeZone) {
+        self.timestamp = timestamp;
+        self.microseconds = microseconds;
+        self.timezone = timezone;
+    }
+
+    pub fn now(): DateTime {
+        return DateTime(time(), 0, tz.TimeZone.utc());
+    }
+
+    pub fn from_timestamp(timestamp: int): DateTime {
+        return DateTime(timestamp, 0, tz.TimeZone.utc());
+    }
+
+    pub fn from_string(datetime: str): DateTime? {
+        if (len(datetime) < 19) return nil;
+
+        var year_str: str = _builtin_substring(datetime, 0, 4);
+        var month_str: str = _builtin_substring(datetime, 5, 7);
+        var day_str: str = _builtin_substring(datetime, 8, 10);
+        var hour_str: str = _builtin_substring(datetime, 11, 13);
+        var min_str: str = _builtin_substring(datetime, 14, 16);
+        var sec_str: str = _builtin_substring(datetime, 17, 19);
+
+        var year: int = to_i(year_str);
+        var month: int = to_i(month_str);
+        var day: int = to_i(day_str);
+        var hour: int = to_i(hour_str);
+        var minute: int = to_i(min_str);
+        var second: int = to_i(sec_str);
+
+        var ts: int = datetime_to_timestamp(year, month, day, hour, minute, second);
+        return DateTime(ts, 0, tz.TimeZone.utc());
+    }
+
+    pub fn from_components(year: int, month: int, day: int, hour: int, minute: int, second: int): DateTime {
+        var ts: int = datetime_to_timestamp(year, month, day, hour, minute, second);
+        return DateTime(ts, 0, tz.TimeZone.utc());
+    }
+
+    pub fn add(duration: dur.TimeDuration): DateTime {
+        var total_us: int = self.microseconds + duration.microseconds;
+        var carry: int = 0;
+        if (total_us >= 1000000) {
+            carry = total_us / 1000000;
+            total_us = total_us % 1000000;
+        }
+        if (total_us < 0) {
+            carry = -1;
+            total_us = 1000000 + total_us;
+        }
+        return DateTime(
+            self.timestamp + duration.seconds + carry,
+            total_us,
+            self.timezone
+        );
+    }
+
+    pub fn subtract(duration: dur.TimeDuration): DateTime {
+        return self.add(dur.TimeDuration(-duration.seconds, -duration.microseconds));
+    }
+
+    pub fn difference(other: DateTime): dur.TimeDuration {
+        var sec_diff: int = self.timestamp - other.timestamp;
+        var us_diff: int = self.microseconds - other.microseconds;
+        return dur.TimeDuration(sec_diff, us_diff);
+    }
+
+    pub fn year(): int { return timestamp_to_year(self.timestamp); }
+    pub fn month(): int { return timestamp_to_month(self.timestamp); }
+    pub fn day(): int { return timestamp_to_day(self.timestamp); }
+
+    pub fn hour(): int {
+        var day_seconds: int = self.timestamp % 86400;
+        if (day_seconds < 0) day_seconds = day_seconds + 86400;
+        return day_seconds / 3600;
+    }
+
+    pub fn minute(): int {
+        var day_seconds: int = self.timestamp % 3600;
+        if (day_seconds < 0) day_seconds = day_seconds + 3600;
+        return day_seconds / 60;
+    }
+
+    pub fn second(): int {
+        var s: int = self.timestamp % 60;
+        if (s < 0) s = s + 60;
+        return s;
+    }
+
+    pub fn day_of_week(): int {
+        var days_since_epoch: int = self.timestamp / 86400;
+        if (self.timestamp < 0 and self.timestamp % 86400 != 0) {
+            days_since_epoch = days_since_epoch - 1;
+        }
+        var dow: int = (days_since_epoch + 4) % 7;
+        if (dow < 0) dow = dow + 7;
+        return dow;
+    }
+
+    pub fn day_of_year(): int {
+        var y: int = self.year();
+        var m: int = self.month();
+        var d: int = self.day();
+        var days_before: [int] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+        var doy: int = days_before[m - 1] + d;
+        if (m > 2 and is_leap_year(y)) doy = doy + 1;
+        return doy;
+    }
+
+    pub fn week_of_year(): int {
+        var doy: int = self.day_of_year();
+        var dow: int = self.day_of_week();
+        var wday_monday: int = dow;
+        if (wday_monday == 0) wday_monday = 7;
+        var week: int = (doy - wday_monday + 10) / 7;
+        if (week < 1) week = 1;
+        if (week > 53) week = 53;
+        return week;
+    }
+
+    pub fn is_leap_year(): bool { return is_leap_year(self.year()); }
+    pub fn days_in_month(): int { return get_days_in_month(self.year(), self.month()); }
+
+    pub fn quarter(): int {
+        var m: int = self.month();
+        if (m <= 3) return 1;
+        if (m <= 6) return 2;
+        if (m <= 9) return 3;
+        return 4;
+    }
+
+    pub fn with_year(year: int): DateTime {
+        return DateTime.from_components(year, self.month(), self.day(), self.hour(), self.minute(), self.second());
+    }
+
+    pub fn with_month(month: int): DateTime {
+        return DateTime.from_components(self.year(), month, self.day(), self.hour(), self.minute(), self.second());
+    }
+
+    pub fn with_day(day: int): DateTime {
+        return DateTime.from_components(self.year(), self.month(), day, self.hour(), self.minute(), self.second());
+    }
+
+    pub fn with_hour(hour: int): DateTime {
+        return DateTime.from_components(self.year(), self.month(), self.day(), hour, self.minute(), self.second());
+    }
+
+    pub fn with_minute(minute: int): DateTime {
+        return DateTime.from_components(self.year(), self.month(), self.day(), self.hour(), minute, self.second());
+    }
+
+    pub fn with_second(second: int): DateTime {
+        return DateTime.from_components(self.year(), self.month(), self.day(), self.hour(), self.minute(), second);
+    }
+
+    pub fn with_timezone(tz_val: tz.TimeZone): DateTime {
+        var offset_diff: int = tz_val.to_seconds_offset() - self.timezone.to_seconds_offset();
+        return DateTime(
+            self.timestamp + offset_diff,
+            self.microseconds,
+            tz_val
+        );
+    }
+
+    pub fn to_timezone(tz_val: tz.TimeZone): DateTime {
+        return self.with_timezone(tz_val);
+    }
+
+    pub fn equals(other: DateTime): bool {
+        var diff: dur.TimeDuration = self.difference(other);
+        return diff.seconds == 0 and diff.microseconds == 0;
+    }
+
+    pub fn greater_than(other: DateTime): bool {
+        if (self.timestamp > other.timestamp) return true;
+        if (self.timestamp < other.timestamp) return false;
+        return self.microseconds > other.microseconds;
+    }
+
+    pub fn less_than(other: DateTime): bool {
+        if (self.timestamp < other.timestamp) return true;
+        if (self.timestamp > other.timestamp) return false;
+        return self.microseconds < other.microseconds;
+    }
+
+    pub fn is_between(start: DateTime, end: DateTime): bool {
+        return self.greater_than(start) and self.less_than(end);
+    }
+
+    pub fn format(fmt: str): str {
+        var year: int = self.year();
+        var month: int = self.month();
+        var day: int = self.day();
+        var hour: int = self.hour();
+        var minute: int = self.minute();
+        var second: int = self.second();
+
+        var result: str = "";
+        var i: int = 0;
+        while (i < len(fmt)) {
+            var ch = _builtin_substring(fmt, i, i + 1);
+            if (ch == "Y") {
+                result = result + dur.pad_int(year, 4);
+                i = i + 1;
+            } else if (ch == "m") {
+                result = result + dur.pad_int(month, 2);
+                i = i + 1;
+            } else if (ch == "d") {
+                result = result + dur.pad_int(day, 2);
+                i = i + 1;
+            } else if (ch == "H") {
+                result = result + dur.pad_int(hour, 2);
+                i = i + 1;
+            } else if (ch == "i") {
+                result = result + dur.pad_int(minute, 2);
+                i = i + 1;
+            } else if (ch == "s") {
+                result = result + dur.pad_int(second, 2);
+                i = i + 1;
+            } else {
+                result = result + ch;
+                i = i + 1;
+            }
+        }
+        return result;
+    }
+
+    pub fn to_iso_string(): str { return self.format("Y-m-d H:i:s"); }
+    pub fn to_iso8601(): str { return self.format("Y-m-d") + "T" + self.format("H:i:s") + "Z"; }
+    pub fn to_date_string(): str { return self.format("Y-m-d"); }
+    pub fn to_time_string(): str { return self.format("H:i:s"); }
+
+    pub fn to_rfc2822(): str {
+        var days: [str] = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+        var months: [str] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        var dow: int = self.day_of_week();
+        var m: int = self.month();
+        var d_str = dur.pad_int(self.day(), 2);
+        var y_str = "{self.year()}";
+        var t_str = self.format("H:i:s");
+        return days[dow] + ", " + d_str + " " + months[m - 1] + " " + y_str + " " + t_str + " +0000";
+    }
+
+    pub fn to_string(): str {
+        return self.to_iso_string() + " " + self.timezone.name;
+    }
+
+    pub fn is_weekend(): bool {
+        var dow: int = self.day_of_week();
+        return dow == 0 or dow == 6;
+    }
+
+    pub fn is_weekday(): bool { return not self.is_weekend(); }
+
+    pub fn start_of_day(): DateTime {
+        var day_start: int = self.timestamp - (self.timestamp % 86400);
+        return DateTime(day_start, 0, self.timezone);
+    }
+
+    pub fn end_of_day(): DateTime {
+        var day_start: int = self.timestamp - (self.timestamp % 86400);
+        return DateTime(day_start + 86399, 999999, self.timezone);
+    }
+
+    pub fn start_of_week(): DateTime {
+        var dow: int = self.day_of_week();
+        var days_back: int = dow;
+        return self.subtract(dur.TimeDuration.from_days(days_back)).start_of_day();
+    }
+
+    pub fn start_of_month(): DateTime {
+        return DateTime.from_components(self.year(), self.month(), 1, 0, 0, 0);
+    }
+
+    pub fn end_of_month(): DateTime {
+        var days: int = get_days_in_month(self.year(), self.month());
+        return DateTime.from_components(self.year(), self.month(), days, 23, 59, 59);
+    }
+
+    pub fn start_of_year(): DateTime { return DateTime.from_components(self.year(), 1, 1, 0, 0, 0); }
+    pub fn end_of_year(): DateTime { return DateTime.from_components(self.year(), 12, 31, 23, 59, 59); }
+
+    pub fn start_of_quarter(): DateTime {
+        var q: int = self.quarter();
+        var m: int = (q - 1) * 3 + 1;
+        return DateTime.from_components(self.year(), m, 1, 0, 0, 0);
+    }
+
+    pub fn age(birthdate: DateTime): dur.TimeDuration { return self.difference(birthdate); }
+}
+
+pub fn sleep_ms(ms: int): nil {
+    sleep((ms as float) / 1000.0);
+}
+
+pub fn sleep_seconds(seconds: float): nil {
+    sleep(seconds);
+}
+
+pub fn sleep_duration(duration: dur.TimeDuration): nil {
+    sleep_ms(duration.to_milliseconds());
+}

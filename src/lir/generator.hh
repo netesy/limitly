@@ -37,6 +37,11 @@ public:
         registered_modules_ = modules;
     }
     
+    // Set current module path (for when executing module files directly)
+    void set_current_module(const std::string& module_path) {
+        current_module_ = module_path;
+    }
+    
     // Optimization control
     static void set_optimization_enabled(bool enabled) {
         optimization_enabled_ = enabled;
@@ -83,6 +88,9 @@ private:
     void lower_frame_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& method);
     void lower_frame_init_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& init_method);
     void lower_frame_deinit_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& deinit_method);
+    std::string find_frame_or_trait_method(const std::string& frame_name, const std::string& method_name);
+    std::string resolve_qualified_frame_name(const std::string& name);
+    TypePtr resolve_underlying_type(TypePtr type);
     void lower_task_body(LM::Frontend::AST::TaskStatement& stmt);
     void lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt);
     void lower_task_bodies_recursive(const std::vector<std::shared_ptr<LM::Frontend::AST::Statement>>& statements);
@@ -92,6 +100,12 @@ public:
     Reg allocate_register();
     void enter_scope();
     void exit_scope();
+    
+    // Memory info helpers for unified region management
+    std::optional<LM::Frontend::AST::MemoryInfo> get_memory_info_from_statement(const LM::Frontend::AST::Statement& stmt);
+    std::optional<LM::Frontend::AST::MemoryInfo> get_memory_info_from_expression(const LM::Frontend::AST::Expression& expr);
+    void emit_region_enter_from_memory_info(const LM::Frontend::AST::Statement& stmt);
+    void emit_region_exit_from_memory_info(const LM::Frontend::AST::Statement& stmt);
     void bind_variable(const std::string& name, Reg reg);
 private:
     void update_variable_binding(const std::string& name, Reg reg);
@@ -251,7 +265,8 @@ private:
     void emit_trait_stmt(LM::Frontend::AST::TraitDeclaration& stmt);
     void emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt);
     void emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt);
-    void emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg, LIR_BasicBlock* failure_target);
+    void emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg, LIR_BasicBlock* failure_target, uint32_t failure_label = 0);
+    void emit_pattern_match_jump(LIR_Op op, Reg cond_reg, LIR_BasicBlock* failure_target, uint32_t failure_label);
     void emit_module_stmt(LM::Frontend::AST::ModuleDeclaration& stmt);
     
     // Helper functions
@@ -279,6 +294,7 @@ private:
         LIR_BasicBlock* entry_block = nullptr;
         LIR_BasicBlock* exit_block = nullptr;
         bool building_cfg = false;
+        bool in_control_flow = false;  // Track if we're in control flow (if/while/for/match)
     };
 
     std::unique_ptr<LIR_Function> current_function_;
@@ -294,10 +310,13 @@ private:
     static size_t lambda_counter_;
     uint32_t next_register_ = 0;
     uint32_t next_label_ = 0;
+    uint32_t generator_region_counter_ = 0;
+    std::vector<uint32_t> generator_region_stack_;
     std::map<std::string, TypePtr> variable_types_;
     std::shared_ptr<TypeSystem> type_system_;
     std::string current_function_name_;
     std::set<std::string> function_names_;
+    std::set<std::string> lowered_frames_;
     std::map<std::string, std::shared_ptr<LM::Frontend::AST::Expression>> constant_expressions_;
     std::map<std::string, int64_t> constant_values_;
     std::map<std::string, Reg> variable_registers_;
@@ -305,6 +324,7 @@ private:
     std::map<std::string, uint32_t> parallel_block_cell_ids_;
     std::map<std::string, Reg> shared_cell_registers_;
     std::string current_concurrent_block_id_;
+    std::string current_concurrent_channel_ = "";
     std::map<std::string, uint64_t> task_counters_;
     bool scheduler_initialized_ = false;
     std::unordered_map<Reg, TypePtr> register_types_;

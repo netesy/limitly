@@ -1,0 +1,21 @@
+import std.math as math;
+
+frame Circle {
+    pub var x: float;
+    pub var y: float;
+    pub var r: float;
+    
+    pub init(x: float = 0.0, y: float = 0.0, r: float = 0.0) {
+        self.x = x;
+        self.y = y;
+        self.r = r;
+    }
+    
+    pub fn contains(px: float, py: float): bool {
+        var dx = px - self.x;
+        var dy = py - self.y;
+        return dx * dx + dy * dy <= self.r * self.r;
+    }
+    
+    pub fn area(): float { return math.PI * self.r * self.r; }
+}

@@ -1,4 +1,5 @@
-import std.io as io;
+import std.io.index as io;
+import std.io.file as file_mod;
 
 fn main(): int {
     // Basic print test (we can't easily capture output here, but we can verify it doesn't crash)
@@ -15,8 +16,9 @@ fn main(): int {
     var f_res = io.open("test_io_temp.txt", "w");
     match (f_res) {
         val f => {
-            f.write("Hello Luminar");
-            f.close();
+            var f_obj = f as file_mod.File;
+            f_obj.write("Hello Luminar");
+            f_obj.close();
         }
         err e => {
             assert(false, "Failed to open file for writing");
@@ -26,7 +28,8 @@ fn main(): int {
     var f_read_res = io.open("test_io_temp.txt", "r");
     match (f_read_res) {
         val f => {
-            var content_res = f.read();
+            var f_obj = f as file_mod.File;
+            var content_res = f_obj.read();
             match (content_res) {
                 val content => {
                     assert(content == "Hello Luminar", "File content mismatch");
@@ -35,7 +38,7 @@ fn main(): int {
                     assert(false, "Failed to read file");
                 }
             }
-            f.close();
+            f_obj.close();
         }
         err e => {
             assert(false, "Failed to open file for reading");

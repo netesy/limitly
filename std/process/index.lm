@@ -1,0 +1,37 @@
+// Standard Library Process Entrypoint Module
+
+import std.process.process as process_mod;
+import std.process.command as command_mod;
+import std.process.pipe as pipe_mod;
+
+// Types
+pub type Command = command_mod.Command;
+pub type Pipe = pipe_mod.Pipe;
+
+// Constructors
+pub fn Command(program: str): any {
+    return command_mod.Command(program);
+}
+
+pub fn Pipe(): any {
+    return pipe_mod.Pipe();
+}
+
+frame Process {
+    pub init() {}
+    pub fn exit(code: int): nil { return process_mod.exit(code); }
+    pub fn run(command: str): int { return process_mod.run(command); }
+    pub fn id(): int { return process_mod.id(); }
+}
+
+pub fn exit(code: int): nil {
+    return process_mod.exit(code);
+}
+
+pub fn run(command: str): int {
+    return process_mod.run(command);
+}
+
+pub fn id(): int {
+    return process_mod.id();
+}

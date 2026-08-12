@@ -1,0 +1,129 @@
+// Standard Library Math Random Module
+
+import std.resource as res;
+
+frame Random {
+    var state: int;
+
+    pub init(seed: int = 0) {
+        if (seed == 0) {
+            match (res.create_entropy()) {
+                val r => {
+                    var rd = res.ResourceReader(r=r);
+                    var s = rd.read(args=[ []]);
+                    if (s != nil) {
+                        self.state = s as int;
+                    } else {
+                        self.state = 123456789;
+                    }
+                    r.close();
+                    nil;
+                },
+                err e => {
+                    self.state = 123456789;
+                    nil;
+                }
+            }
+        } else {
+            self.state = seed;
+        }
+    }
+
+    pub fn next_int(): int {
+        var x = self.state;
+        x = x ^ (x << 13);
+        x = x ^ (x >> 7);
+        x = x ^ (x << 17);
+        self.state = x;
+        return x * 0x2545F4914F6CDD1D;
+    }
+
+    pub fn next_float(): float {
+        var i = self.next_int();
+        if (i < 0) i = -i;
+        return (i % 1000000000 as float) / 1000000000.0;
+    }
+
+    pub fn next_bool(): bool { return self.next_int() % 2 == 0; }
+
+    pub fn range_int(min: int, max: int): int {
+        if (min >= max) return min;
+        var r = self.next_int();
+        if (r < 0) r = -r;
+        return min + (r % (max - min));
+    }
+
+    pub fn range_float(min: float, max: float): float { return min + (max - min) * self.next_float(); }
+
+    pub fn next_bytes(count: int): [int] {
+        var res_bytes: [int] = [];
+        for (var i = 0; i < count; i = i + 1) {
+            var b = self.next_int();
+            if (b < 0) b = -b;
+            res_bytes = res_bytes + [b % 256];
+        }
+        return res_bytes;
+    }
+
+    pub fn next_string(len_val: int, alphabet: str = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"): str {
+        var res_str = "";
+        var a_len = len(alphabet);
+        for (var i = 0; i < len_val; i = i + 1) {
+            var idx = self.range_int(min=0, max=a_len);
+            res_str = res_str + substring(alphabet, idx, idx + 1);
+        }
+        return res_str;
+    }
+}
+
+frame SecureRandom {
+    var reader: res.ResourceReader?;
+
+    pub init() {
+        match (res.create_entropy()) {
+            val r => {
+                self.reader = res.ResourceReader(r=r);
+                nil;
+            },
+            err e => {
+                self.reader = nil;
+                nil;
+            }
+        }
+    }
+
+    pub fn next_int(): int {
+        match (self.reader) {
+            val rd => {
+                var s = rd.read(args=[ []]);
+                if (s != nil) return s as int;
+                return 0;
+            },
+            nil => return 0
+        }
+    }
+
+    pub fn next_float(): float {
+        var i = self.next_int();
+        if (i < 0) i = -i;
+        return (i % 1000000000 as float) / 1000000000.0;
+    }
+
+    pub fn next_bytes(count: int): [int] {
+        var res_bytes: [int] = [];
+        for (var i = 0; i < count; i = i + 1) {
+            var b = self.next_int();
+            if (b < 0) b = -b;
+            res_bytes = res_bytes + [b % 256];
+        }
+        return res_bytes;
+    }
+}
+
+var _default_rng: Random = Random(seed=123456789);
+
+pub fn random_int(min: int, max: int): int { return _default_rng.range_int(min=min, max=max); }
+pub fn random_float(min: float, max: float): float { return _default_rng.range_float(min=min, max=max); }
+pub fn random_bool(): bool { return _default_rng.next_bool(); }
+pub fn random_bytes(count: int): [int] { return _default_rng.next_bytes(count=count); }
+pub fn random_string(len_val: int): str { return _default_rng.next_string(len_val=len_val); }

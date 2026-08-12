@@ -43,7 +43,7 @@ type InputType = int | str;
 type OutputType = str;
 
 fn formatInput(input: InputType): OutputType {
-    return "Formatted: " + input;
+    return "Formatted: {input}";
 }
 
 var input1: InputType = 123;
@@ -71,7 +71,7 @@ print("\n--- Test 5: Type Inference with Unions ---");
 type FlexibleType = int | str | bool;
 
 fn inferType(value: FlexibleType): str {
-    return "Type inferred for: " + value;
+    return "Type inferred for: {value}";
 }
 
 var infer1 = inferType(42);

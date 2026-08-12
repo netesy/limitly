@@ -1,0 +1,28 @@
+// Standard Library Environment Entrypoint Module
+
+import std.env.variables as variables_mod;
+import std.env.platform as platform_mod;
+
+frame Env {
+    pub init() {}
+    pub fn get(key: str): str? { return variables_mod.get(key); }
+    pub fn set(key: str, value: str): nil { return variables_mod.set(key, value); }
+    pub fn args(): [str] { return platform_mod.args(); }
+    pub fn cwd(): str { return platform_mod.cwd(); }
+}
+
+pub fn get(key: str): str? {
+    return variables_mod.get(key);
+}
+
+pub fn set(key: str, value: str): nil {
+    return variables_mod.set(key, value);
+}
+
+pub fn args(): [str] {
+    return platform_mod.args();
+}
+
+pub fn cwd(): str {
+    return platform_mod.cwd();
+}

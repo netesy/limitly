@@ -31,11 +31,11 @@ print("Testing function signature validation with built-in error types");
 
 // Test the functions - these should work correctly
 match (safeDivision(10, 2)) {
-    val result => print("Division result: " + result),
-    err error => print("Division error: " + error)
+    val result => print("Division result: {result}"),
+    err error => print("Division error: {error}")
 }
 
 match (safeDivision(10, 0)) {
-    val result => print("Division result: " + result),
-    err error => print("Division error: " + error)
+    val result => print("Division result: {result}"),
+    err error => print("Division error: {error}")
 }

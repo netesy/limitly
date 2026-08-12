@@ -1,0 +1,54 @@
+// Standard Library Core Result Frame
+
+import std.core.error show Error;
+
+frame Result {
+    pub success: bool;
+    pub value: any;
+    pub error_info: Error;
+
+    pub init(success: bool, value: any, error_info: Error) {
+        self.success = success;
+        self.value = value;
+        self.error_info = error_info;
+    }
+
+    pub fn is_ok(): bool {
+        return self.success;
+    }
+
+    pub fn is_err(): bool {
+        return not self.success;
+    }
+
+    pub fn unwrap(): any {
+        return self.value;
+    }
+
+    pub fn unwrap_or(default_value: any): any {
+        if (self.success) {
+            return self.value;
+        }
+        return default_value;
+    }
+
+    pub fn unwrap_err(): Error {
+        return self.error_info;
+    }
+
+    pub fn map(f: fn(any): any): Result {
+        if (self.success) {
+            return Ok(f(self.value));
+        }
+        return self;
+    }
+}
+
+pub fn Ok(value: any): Result {
+    var empty_err = Error("", "");
+    return Result(true, value, empty_err);
+}
+
+pub fn Err(e: Error): Result {
+    return Result(false, nil, e);
+}

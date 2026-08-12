@@ -1,0 +1,15 @@
+// Standard Library Core Error Frame
+
+frame Error {
+    pub code: str;
+    pub message: str;
+
+    pub init(code: str, message: str) {
+        self.code = code;
+        self.message = message;
+    }
+
+    pub fn to_string(): str {
+        return "[{self.code}] {self.message}";
+    }
+}

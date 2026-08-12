@@ -1,0 +1,59 @@
+// Test Suite for Standard Library Regex Module
+
+import std.regex.index as r;
+import std.regex.regex as regex_mod;
+
+fn test_regex_frame(): int {
+    print("Testing Regex Frame...");
+    var regex = r.Regex("cat", 0) as regex_mod.Regex;
+    assert(regex.matches("the cat sat") == true, "matches true failed");
+    assert(regex.matches("the dog sat") == false, "matches false failed");
+
+    var first = regex.find_first_match("the cat sat");
+    assert(first == "cat", "find_first_match failed");
+
+    var all = regex.find_all_matches("cat cat dog cat");
+    assert(len(all) == 3, "find_all_matches length failed");
+    assert(all[0] == "cat", "find_all_matches 0 failed");
+
+    var replaced = regex.replace("the cat sat", "dog");
+    assert(replaced == "the dog sat", "replace failed");
+
+    var replaced_all = regex.replace_all("cat cat dog", "bird");
+    assert(replaced_all == "bird bird dog", "replace_all failed");
+
+    var parts = regex.split("the cat sat");
+    assert(len(parts) == 2, "split length failed");
+    assert(parts[0] == "the ", "split 0 failed");
+    assert(parts[1] == " sat", "split 1 failed");
+
+    assert(regex.is_valid() == true, "is_valid failed");
+    assert(regex.to_string() == "/cat/", "to_string failed");
+    return 1;
+}
+
+fn test_regex_patterns(): int {
+    print("Testing Regex Patterns...");
+    var pat = r.RegexPatterns() as regex_mod.RegexPatterns;
+    var email = pat.email() as regex_mod.Regex;
+    assert(email.pattern == "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "email pattern failed");
+    return 1;
+}
+
+fn test_regex_helpers(): int {
+    print("Testing Regex Helpers...");
+    assert(r.is_match("cat", "the cat sat") == true, "is_match helper failed");
+    assert(r.replace("cat", "the cat sat", "dog") == "the dog sat", "replace helper failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Regex Module Test Suite ===");
+
+    assert(test_regex_frame() == 1, "Regex frame test failed");
+    assert(test_regex_patterns() == 1, "Regex patterns test failed");
+    assert(test_regex_helpers() == 1, "Regex helpers test failed");
+
+    print("All regex tests passed successfully.");
+    return 0;
+}

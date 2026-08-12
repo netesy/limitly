@@ -1,0 +1,53 @@
+// Standard Library Algorithm Partition Module
+
+pub fn partition(items: [any], p: fn(any): bool): int {
+    var left = 0;
+    var right = len(items) - 1;
+    while (left <= right) {
+        while (left <= right and p(items[left])) {
+            left = left + 1;
+        }
+        while (left <= right and !p(items[right])) {
+            right = right - 1;
+        }
+        if (left < right) {
+            var temp = items[left];
+            items[left] = items[right];
+            items[right] = temp;
+            left = left + 1;
+            right = right - 1;
+        }
+    }
+    return left;
+}
+
+pub fn partition_copy(items: [any], p: fn(any): bool): ([any], [any]) {
+    var true_list: [any] = [];
+    var false_list: [any] = [];
+    var i = 0;
+    while (i < len(items)) {
+        if (p(items[i])) {
+            true_list.append(items[i]);
+        } else {
+            false_list.append(items[i]);
+        }
+        i = i + 1;
+    }
+    return (true_list, false_list);
+}
+
+pub fn is_partitioned(items: [any], p: fn(any): bool): bool {
+    var i = 0;
+    var seen_false = false;
+    while (i < len(items)) {
+        if (p(items[i])) {
+            if (seen_false) {
+                return false;
+            }
+        } else {
+            seen_false = true;
+        }
+        i = i + 1;
+    }
+    return true;
+}

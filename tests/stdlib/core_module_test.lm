@@ -1,0 +1,227 @@
+// Test Suite for Standard Library Core Module
+
+import std.core.error as error;
+import std.core.option as opt_mod;
+import std.core.result as res_mod;
+import std.core.comparable as comparable;
+import std.core.disposable as disposable;
+import std.core.cloneable as cloneable;
+import std.core.hashable as hashable;
+import std.core.index as core;
+
+// Frame implementing Comparable
+frame DummyComparable: comparable.Comparable {
+    pub value: int;
+
+    pub init(value: int) {
+        self.value = value;
+    }
+
+    pub fn compare(other: any): int {
+        var o = other as DummyComparable;
+        if (self.value > o.value) return 1;
+        if (self.value < o.value) return -1;
+        return 0;
+    }
+}
+
+// Frame implementing Disposable
+frame DummyDisposable: disposable.Disposable {
+    pub disposed: bool;
+
+    pub init() {
+        self.disposed = false;
+    }
+
+    pub fn dispose(): nil {
+        self.disposed = true;
+        return nil;
+    }
+}
+
+// Frame implementing Cloneable
+frame DummyCloneable: cloneable.Cloneable {
+    pub data: str;
+
+    pub init(data: str) {
+        self.data = data;
+    }
+
+    pub fn clone(): any {
+        return DummyCloneable(self.data);
+    }
+}
+
+// Frame implementing Hashable
+frame DummyHashable: hashable.Hashable {
+    pub key: int;
+
+    pub init(key: int) {
+        self.key = key;
+    }
+
+    pub fn hash(): int {
+        return self.key * 31;
+    }
+}
+
+fn test_error(): int {
+    print("Testing Error frame...");
+
+    // Test direct frame
+    var error_instance = error.Error("E101", "Database offline");
+    assert(error_instance.code == "E101", "error_instance.code should be E101");
+    assert(error_instance.message == "Database offline", "error_instance.message mismatch");
+    assert(error_instance.to_string() == "[E101] Database offline", "error_instance.to_string() incorrect");
+
+    // Test index alias
+    var idx_err_val = core.Error("E102", "Disk full");
+    assert(idx_err_val.code == "E102", "idx_err_val.code incorrect");
+    assert(idx_err_val.message == "Disk full", "idx_err_val.message mismatch");
+
+    print("Error frame tests passed!");
+    return 1;
+}
+
+fn map_string_len(input_value: any): any {
+    // Length of string
+    return len(input_value);
+}
+
+fn is_positive_int(input_value: any): bool {
+    return input_value > 0;
+}
+
+fn test_option(): int {
+    print("Testing Option frame...");
+
+    // Test direct Option - Some
+    var opt_some = opt_mod.Some("hello");
+    assert(opt_some.is_some() == true, "opt_some should be Some");
+    assert(opt_some.is_none() == false, "opt_some should not be None");
+    assert(opt_some.unwrap() == "hello", "opt_some unwrap failed");
+    assert(opt_some.unwrap_or("fallback") == "hello", "opt_some unwrap_or failed");
+
+    // Test direct Option - None
+    var opt_none = opt_mod.None();
+    assert(opt_none.is_some() == false, "opt_none should not be Some");
+    assert(opt_none.is_none() == true, "opt_none should be None");
+    assert(opt_none.unwrap_or("fallback") == "fallback", "opt_none unwrap_or fallback failed");
+
+    // Test Option.map
+    var opt_mapped = opt_some.map(map_string_len);
+    assert(opt_mapped.is_some() == true, "opt_mapped should be Some");
+    assert(opt_mapped.unwrap() == 5, "opt_mapped value should be 5");
+
+    var opt_none_mapped = opt_none.map(map_string_len);
+    assert(opt_none_mapped.is_none() == true, "mapped opt_none should be None");
+
+    // Test Option.filter
+    var opt_int_some = opt_mod.Some(10);
+    var opt_filtered_true = opt_int_some.filter(is_positive_int);
+    assert(opt_filtered_true.is_some() == true, "opt_filtered_true should be Some");
+    assert(opt_filtered_true.unwrap() == 10, "opt_filtered_true value incorrect");
+
+    var opt_int_neg = opt_mod.Some(-5);
+    var opt_filtered_false = opt_int_neg.filter(is_positive_int);
+    assert(opt_filtered_false.is_none() == true, "opt_filtered_false should be None");
+
+    // Test index Option aliases
+    var idx_some = core.Some(42);
+    assert(idx_some.is_some() == true, "idx_some should be Some");
+    assert(idx_some.unwrap() == 42, "idx_some value incorrect");
+
+    var idx_none = core.None();
+    assert(idx_none.is_none() == true, "idx_none should be None");
+
+    print("Option frame tests passed!");
+    return 1;
+}
+
+fn add_one(input_value: any): any {
+    return input_value + 1;
+}
+
+fn test_result(): int {
+    print("Testing Result frame...");
+
+    // Test direct Result - Ok
+    var res_ok_val = res_mod.Ok(100);
+    assert(res_ok_val.is_ok() == true, "res_ok_val should be Ok");
+    assert(res_ok_val.is_err() == false, "res_ok_val should not be Err");
+    assert(res_ok_val.unwrap() == 100, "res_ok_val unwrap failed");
+    assert(res_ok_val.unwrap_or(200) == 100, "res_ok_val unwrap_or failed");
+
+    // Test direct Result - Err
+    var error_obj = error.Error("E500", "Server Timeout");
+    var res_err_val = res_mod.Err(error_obj);
+    assert(res_err_val.is_ok() == false, "res_err_val should not be Ok");
+    assert(res_err_val.is_err() == true, "res_err_val should be Err");
+    assert(res_err_val.unwrap_or(200) == 200, "res_err_val unwrap_or fallback failed");
+
+    var unwrapped_error = res_err_val.unwrap_err();
+    assert(unwrapped_error.code == "E500", "res_err_val unwrap_err code incorrect");
+
+    // Test Result.map
+    var res_mapped = res_ok_val.map(add_one);
+    assert(res_mapped.is_ok() == true, "res_mapped should be Ok");
+    assert(res_mapped.unwrap() == 101, "res_mapped value should be 101");
+
+    var res_err_mapped = res_err_val.map(add_one);
+    assert(res_err_mapped.is_err() == true, "res_err_mapped should be Err");
+
+    // Test index Result aliases
+    var idx_ok_val = core.Ok("success");
+    assert(idx_ok_val.is_ok() == true, "idx_ok_val should be Ok");
+    assert(idx_ok_val.unwrap() == "success", "idx_ok_val unwrap failed");
+
+    var idx_err_val2 = core.Err(error.Error("E404", "Not Found"));
+    assert(idx_err_val2.is_err() == true, "idx_err_val2 should be Err");
+
+    print("Result frame tests passed!");
+    return 1;
+}
+
+fn test_traits(): int {
+    print("Testing Traits...");
+
+    // Test Comparable Trait
+    var comp1 = DummyComparable(10);
+    var comp2 = DummyComparable(20);
+    assert(comp1.compare(comp2) == -1, "10 should be less than 20");
+    assert(comp2.compare(comp1) == 1, "20 should be greater than 10");
+    assert(comp1.compare(DummyComparable(10)) == 0, "10 should equal 10");
+
+    // Test Disposable Trait
+    var disp = DummyDisposable();
+    assert(disp.disposed == false, "should not be disposed initially");
+    disp.dispose();
+    assert(disp.disposed == true, "should be disposed after calling dispose()");
+
+    // Test Cloneable Trait
+    var clone_src = DummyCloneable("cloned_data");
+    var cloned_obj = clone_src.clone() as DummyCloneable;
+    assert(cloned_obj.data == "cloned_data", "cloned data mismatch");
+    // Mutate source and ensure clone is separate
+    clone_src.data = "modified";
+    assert(cloned_obj.data == "cloned_data", "clone should be separate from source");
+
+    // Test Hashable Trait
+    var hash_obj = DummyHashable(5);
+    assert(hash_obj.hash() == 155, "hash value mismatch (5 * 31 = 155)");
+
+    print("Trait tests passed!");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Core Module Test Suite ===");
+
+    assert(test_error() == 1, "Error tests failed");
+    assert(test_option() == 1, "Option tests failed");
+    assert(test_result() == 1, "Result tests failed");
+    assert(test_traits() == 1, "Trait tests failed");
+
+    print("All standard library core tests passed successfully.");
+    return 0;
+}

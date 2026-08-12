@@ -3,44 +3,21 @@
 import std.core as core;
 
 frame Set {
-    pub var elements: [int];
-
-    pub fn init(): Set {
-        return Set(elements=[]);
-    }
-
-    pub fn from_array(arr: [int]): Set {
-        pub var elements: [int] = [];
-        var seen: {int: bool} = {};
-        var i: int = 0;
-        var j: int = 0;
-        
-        while (i < arr.length) {
-            var value = arr[i];
-            if (seen[value] == nil) {
-                elements[j] = value;
-                seen[value] = true;
-                j = j + 1;
-            }
-            i = i + 1;
-        }
-        
-        return Set(elements=elements);
-    }
+    pub elements: [int];
 
     // Basic operations
     pub fn add(value: int): Set {
         if (self.contains(value)) return self;
         
-        pub var new_elements: [int] = [];
+        var new_elements = [] as [int];
         var i: int = 0;
         
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             new_elements[i] = self.elements[i];
             i = i + 1;
         }
         
-        new_elements[self.elements.length] = value;
+        new_elements[len(self.elements)] = value;
         return Set(elements=new_elements);
     }
 
@@ -48,12 +25,13 @@ frame Set {
         var index = self.find_index(value);
         if (index == nil) return self;
         
-        pub var new_elements: [int] = [];
+        var idx = index as int;
+        var new_elements = [] as [int];
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.elements.length) {
-            if (i != index) {
+        while (i < len(self.elements)) {
+            if (i != idx) {
                 new_elements[j] = self.elements[i];
                 j = j + 1;
             }
@@ -68,23 +46,27 @@ frame Set {
     }
 
     pub fn size(): int {
-        return self.elements.length;
+        return len(self.elements);
+    }
+
+    pub fn len(): int {
+        return len(self.elements);
     }
 
     pub fn is_empty(): bool {
-        return self.elements.length == 0;
+        return len(self.elements) == 0;
     }
 
     pub fn clear(): Set {
-        return Set(elements=[]);
+        return Set(elements=[] as [int]);
     }
 
     // Set operations
     pub fn union(other: Set): Set {
-        var combined = Set.from_array(self.elements);
+        var combined = Set(elements=self.elements);
         var i: int = 0;
         
-        while (i < other.elements.length) {
+        while (i < len(other.elements)) {
             combined = combined.add(other.elements[i]);
             i = i + 1;
         }
@@ -93,11 +75,11 @@ frame Set {
     }
 
     pub fn intersection(other: Set): Set {
-        pub var result: [int] = [];
+        var result = [] as [int];
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (other.contains(self.elements[i])) {
                 result[j] = self.elements[i];
                 j = j + 1;
@@ -109,12 +91,12 @@ frame Set {
     }
 
     pub fn difference(other: Set): Set {
-        pub var result: [int] = [];
+        var result = [] as [int];
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.elements.length) {
-            if (!other.contains(self.elements[i])) {
+        while (i < len(self.elements)) {
+            if (not other.contains(self.elements[i])) {
                 result[j] = self.elements[i];
                 j = j + 1;
             }
@@ -132,8 +114,8 @@ frame Set {
 
     pub fn is_subset(other: Set): bool {
         var i: int = 0;
-        while (i < self.elements.length) {
-            if (!other.contains(self.elements[i])) return false;
+        while (i < len(self.elements)) {
+            if (not other.contains(self.elements[i])) return false;
             i = i + 1;
         }
         return true;
@@ -149,12 +131,12 @@ frame Set {
 
     // Functional operations
     pub fn map(f: fn(int): int): Set {
-        pub var result: [int] = [];
-        var seen: {int: bool} = {};
+        var result = [] as [int];
+        var seen = {} as {int: bool};
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             var mapped_value = f(self.elements[i]);
             if (seen[mapped_value] == nil) {
                 result[j] = mapped_value;
@@ -168,11 +150,11 @@ frame Set {
     }
 
     pub fn filter(predicate: fn(int): bool): Set {
-        pub var result: [int] = [];
+        var result = [] as [int];
         var i: int = 0;
         var j: int = 0;
         
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (predicate(self.elements[i])) {
                 result[j] = self.elements[i];
                 j = j + 1;
@@ -186,7 +168,7 @@ frame Set {
     pub fn fold(f: fn(int, int): int, initial: int): int {
         var acc: int = initial;
         var i: int = 0;
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             acc = f(acc, self.elements[i]);
             i = i + 1;
         }
@@ -195,7 +177,7 @@ frame Set {
 
     pub fn for_each(f: fn(int): nil): nil {
         var i: int = 0;
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             f(self.elements[i]);
             i = i + 1;
         }
@@ -210,10 +192,10 @@ frame Set {
     }
 
     pub fn min(): int? {
-        if (self.elements.length == 0) return nil;
+        if (len(self.elements) == 0) return nil;
         var min_val = self.elements[0];
         var i: int = 1;
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (self.elements[i] < min_val) min_val = self.elements[i];
             i = i + 1;
         }
@@ -221,10 +203,10 @@ frame Set {
     }
 
     pub fn max(): int? {
-        if (self.elements.length == 0) return nil;
+        if (len(self.elements) == 0) return nil;
         var max_val = self.elements[0];
         var i: int = 1;
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (self.elements[i] > max_val) max_val = self.elements[i];
             i = i + 1;
         }
@@ -234,7 +216,7 @@ frame Set {
     // Utility methods
     fn find_index(value: int): int? {
         var i: int = 0;
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (self.elements[i] == value) return i;
             i = i + 1;
         }
@@ -249,9 +231,9 @@ frame Set {
         var result = "{";
         var i: int = 0;
         
-        while (i < self.elements.length) {
+        while (i < len(self.elements)) {
             if (i > 0) result = result + ", ";
-            result = result + self.elements[i] as str;
+            result = result + "{self.elements[i]}";
             i = i + 1;
         }
         
@@ -260,11 +242,12 @@ frame Set {
     }
 }
 
-// Utility functions
-fn set(): Set {
-    return Set.init();
-}
-
-fn set_from(arr: [int]): Set {
-    return Set.from_array(arr);
+pub fn set_from_array(arr: [int]): Set {
+    var s = Set(elements=[] as [int]);
+    var i: int = 0;
+    while (i < len(arr)) {
+        s = s.add(arr[i]);
+        i = i + 1;
+    }
+    return s;
 }

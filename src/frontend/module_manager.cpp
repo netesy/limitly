@@ -1,6 +1,8 @@
 #include "module_manager.hh"
 #include "scanner.hh"
 #include "parser.hh"
+#include "type_checker.hh"
+#include "../error/debugger.hh"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -57,6 +59,14 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
     Parser parser(scanner);
     auto ast = parser.parse();
 
+    if (!ast || LM::Error::Debugger::hasError()) {
+        TypeChecker::failed_modules.insert(module_path);
+        size_t last_dot = module_path.find_last_of('.');
+        if (last_dot != std::string::npos) {
+            TypeChecker::failed_modules.insert(module_path.substr(0, last_dot));
+        }
+    }
+
     if (!ast) return nullptr;
 
     auto module = std::make_shared<Module>();
@@ -97,6 +107,9 @@ void ModuleManager::extract_metadata(std::shared_ptr<Module> module) {
         } else if (auto enum_decl = std::dynamic_pointer_cast<AST::EnumDeclaration>(stmt)) {
             // Mandate: Enums are always public module-level symbols.
             module->public_symbols.insert(enum_decl->name);
+        } else if (auto type_decl = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) {
+            // Type aliases are always public module-level symbols
+            module->public_symbols.insert(type_decl->name);
         } else if (auto import_stmt = std::dynamic_pointer_cast<AST::ImportStatement>(stmt)) {
             module->dependencies.push_back(import_stmt->modulePath);
         }

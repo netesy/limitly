@@ -1,0 +1,14 @@
+import std.scene.scene as scene;
+import std.scene.node as node;
+
+frame SceneBuilder {
+    pub var active_scene: scene.Scene;
+
+    pub init(s: scene.Scene = scene.Scene()) {
+        self.active_scene = s;
+    }
+
+    pub fn build(): scene.Scene {
+        return self.active_scene;
+    }
+}

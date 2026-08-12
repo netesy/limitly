@@ -6,7 +6,7 @@ fn main(): int {
     l.push_back(2);
     l.push_front(0);
     
-    print("LinkedList length: " + l.length());
+    print("LinkedList length: {l.length()}");
     assert(l.length() == 3, "LinkedList length should be 3");
     assert(l.pop_front() == 0, "Pop front should return 0");
     assert(l.pop_back() == 2, "Pop back should return 2");

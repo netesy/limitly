@@ -36,10 +36,6 @@ void printUsage(const char* programName) {
 }
 
 int main(int argc, char* argv[]) {
-    std::cout << "[MAIN DEBUG] argc=" << argc << std::endl << std::flush;
-    for (int i = 0; i < argc; ++i) {
-        std::cout << "  argv[" << i << "]=" << argv[i] << std::endl << std::flush;
-    }
     if (argc < 2) {
         // Default to REPL if no arguments provided
         std::cout << "Limit Programming Language REPL (planned feature)\n";
@@ -52,6 +48,11 @@ int main(int argc, char* argv[]) {
 
     if (command == "-lsp") {
         LM::LSP::run();
+        return 0;
+    }
+
+    if (command == "help" || command == "--help" || command == "-h") {
+        printUsage(argv[0]);
         return 0;
     }
 
@@ -79,13 +80,9 @@ int main(int argc, char* argv[]) {
             else if (arg[0] != '-') source_file = arg;
         }
         if (source_file.empty()) {
-            std::cout << "[MAIN DEBUG] source_file is empty!" << std::endl << std::flush;
             return 1;
         }
-        std::cout << "[MAIN DEBUG] Calling executeFile with source_file=" << source_file << std::endl << std::flush;
-        int res = LM::Compiler::executeFile(source_file, options);
-        std::cout << "[MAIN DEBUG] executeFile returned: " << res << std::endl << std::flush;
-        return res;
+        return LM::Compiler::executeFile(source_file, options);
     }
 
     if (command == "build") {
@@ -105,7 +102,14 @@ int main(int argc, char* argv[]) {
             if (dot != std::string::npos) options.output_file.erase(dot);
             if (options.target == "windows") options.output_file += ".exe";
         }
-        return LM::Compiler::executeFile(source_file, options);
+        int result = LM::Compiler::executeFile(source_file, options);
+        std::cout << "Build result: " << result << std::endl;
+        if (result == 0) {
+            std::cout << "Executable built successfully: " << options.output_file << std::endl;
+        } else {
+            std::cout << "Build failed" << std::endl;
+        }
+        return result;
 #else
         std::cerr << "Error: 'build' command requires Fyra backend (not available).\n";
         std::cerr << "Please use 'run' command with the register VM instead.\n";

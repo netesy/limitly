@@ -1,0 +1,321 @@
+// Semantic Versioning (SemVer 2.0.0) standard library module
+
+frame Version {
+    pub major: int;
+    pub minor: int;
+    pub patch: int;
+    pub prerelease: str;
+    pub build: str;
+
+    pub init(major: int, minor: int, patch: int, prerelease: str, build: str) {
+        self.major = major;
+        self.minor = minor;
+        self.patch = patch;
+        self.prerelease = prerelease;
+        self.build = build;
+    }
+
+    pub fn compare(other: Version): int {
+        if (self.major > other.major) return 1;
+        if (self.major < other.major) return -1;
+
+        if (self.minor > other.minor) return 1;
+        if (self.minor < other.minor) return -1;
+
+        if (self.patch > other.patch) return 1;
+        if (self.patch < other.patch) return -1;
+
+        // Normal version has higher precedence than pre-release version
+        if (self.prerelease == "" and other.prerelease != "") return 1;
+        if (self.prerelease != "" and other.prerelease == "") return -1;
+        if (self.prerelease == "" and other.prerelease == "") return 0;
+
+        // Compare pre-release components
+        var self_parts = split_by_dot(self.prerelease);
+        var other_parts = split_by_dot(other.prerelease);
+
+        var min_len = len(self_parts);
+        if (len(other_parts) < min_len) min_len = len(other_parts);
+
+        var i = 0;
+        while (i < min_len) {
+            var p1 = self_parts[i];
+            var p2 = other_parts[i];
+
+            var p1_num = is_numeric(p1);
+            var p2_num = is_numeric(p2);
+
+            if (p1_num and p2_num) {
+                var n1 = to_int(p1);
+                var n2 = to_int(p2);
+                if (n1 > n2) return 1;
+                if (n1 < n2) return -1;
+            } elif (p1_num and not p2_num) {
+                return -1;
+            } elif (not p1_num and p2_num) {
+                return 1;
+            } else {
+                var cmp = compare_strings(p1, p2);
+                if (cmp != 0) return cmp;
+            }
+            i = i + 1;
+        }
+
+        if (len(self_parts) > len(other_parts)) return 1;
+        if (len(self_parts) < len(other_parts)) return -1;
+
+        return 0;
+    }
+
+    pub fn equals(other: Version): bool {
+        return self.compare(other) == 0;
+    }
+
+    pub fn greater_than(other: Version): bool {
+        return self.compare(other) == 1;
+    }
+
+    pub fn less_than(other: Version): bool {
+        return self.compare(other) == -1;
+    }
+
+    pub fn is_compatible(other: Version): bool {
+        // Caret range logic: other is compatible with self if:
+        // - major > 0: other.major == self.major and other >= self
+        // - major == 0, minor > 0: other.major == 0 and other.minor == self.minor and other >= self
+        // - major == 0, minor == 0: other == self
+        if (self.major > 0) {
+            if (other.major != self.major) return false;
+            return other.compare(self) >= 0;
+        }
+        if (self.minor > 0) {
+            if (other.major != 0 or other.minor != self.minor) return false;
+            return other.compare(self) >= 0;
+        }
+        return other.compare(self) == 0;
+    }
+
+    pub fn to_string(): str {
+        var res = "{self.major}.{self.minor}.{self.patch}";
+        if (self.prerelease != "") {
+            res = res + "-" + self.prerelease;
+        }
+        if (self.build != "") {
+            res = res + "+" + self.build;
+        }
+        return res;
+    }
+}
+
+pub fn parse(s: str): Version? {
+    if (s == "") return err();
+
+    // Check for build metadata '+'
+    var plus_idx = index_of(s, "+");
+    var s_without_build = s;
+    var build = "";
+    if (plus_idx != -1) {
+        build = substring(s, plus_idx + 1, len(s));
+        s_without_build = substring(s, 0, plus_idx);
+
+        var b_parts = split_by_dot(build);
+        var i = 0;
+        while (i < len(b_parts)) {
+            if (not is_valid_build_id(b_parts[i])) return err();
+            i = i + 1;
+        }
+    }
+
+    // Check for prerelease metadata '-'
+    var dash_idx = index_of(s_without_build, "-");
+    var core_version = s_without_build;
+    var prerelease = "";
+    if (dash_idx != -1) {
+        prerelease = substring(s_without_build, dash_idx + 1, len(s_without_build));
+        core_version = substring(s_without_build, 0, dash_idx);
+
+        var p_parts = split_by_dot(prerelease);
+        var i = 0;
+        while (i < len(p_parts)) {
+            if (not is_valid_prerelease_id(p_parts[i])) return err();
+            i = i + 1;
+        }
+    }
+
+    // Parse core version (major.minor.patch)
+    var dot1 = index_of(core_version, ".");
+    if (dot1 == -1) return err();
+    var major_str = substring(core_version, 0, dot1);
+    var rest_version = substring(core_version, dot1 + 1, len(core_version));
+
+    var dot2 = index_of(rest_version, ".");
+    if (dot2 == -1) return err();
+    var minor_str = substring(rest_version, 0, dot2);
+    var patch_str = substring(rest_version, dot2 + 1, len(rest_version));
+
+    if (index_of(patch_str, ".") != -1) return err();
+
+    if (has_invalid_leading_zero(major_str) or has_invalid_leading_zero(minor_str) or has_invalid_leading_zero(patch_str)) {
+        return err();
+    }
+
+    var major = to_int(major_str);
+    if (major == -1) return err();
+    var minor = to_int(minor_str);
+    if (minor == -1) return err();
+    var patch = to_int(patch_str);
+    if (patch == -1) return err();
+
+    return ok(Version(major, minor, patch, prerelease, build));
+}
+
+pub fn compare(v1: Version, v2: Version): int {
+    return v1.compare(v2);
+}
+
+pub fn is_compatible(v1: Version, v2: Version): bool {
+    return v1.is_compatible(v2);
+}
+
+// ---- Helper functions ----
+
+fn to_int(s: str): int {
+    if (s == "") return -1;
+    var result_val: int = 0;
+    var i: int = 0;
+    while (i < len(s)) {
+        var ch = substring(s, i, i + 1);
+        if (ch == "0") { result_val = result_val * 10 + 0; }
+        elif (ch == "1") { result_val = result_val * 10 + 1; }
+        elif (ch == "2") { result_val = result_val * 10 + 2; }
+        elif (ch == "3") { result_val = result_val * 10 + 3; }
+        elif (ch == "4") { result_val = result_val * 10 + 4; }
+        elif (ch == "5") { result_val = result_val * 10 + 5; }
+        elif (ch == "6") { result_val = result_val * 10 + 6; }
+        elif (ch == "7") { result_val = result_val * 10 + 7; }
+        elif (ch == "8") { result_val = result_val * 10 + 8; }
+        elif (ch == "9") { result_val = result_val * 10 + 9; }
+        else { return -1; }
+        i = i + 1;
+    }
+    return result_val;
+}
+
+fn index_of(s: str, char: str): int {
+    var i: int = 0;
+    while (i < len(s)) {
+        if (substring(s, i, i + 1) == char) return i;
+        i = i + 1;
+    }
+    return -1;
+}
+
+fn split_by_dot(s: str): [str] {
+    var parts: [str] = [];
+    var current: str = "";
+    var i: int = 0;
+    while (i < len(s)) {
+        var ch = substring(s, i, i + 1);
+        if (ch == ".") {
+            parts.append(current);
+            current = "";
+        } else {
+            current = current + ch;
+        }
+        i = i + 1;
+    }
+    parts.append(current);
+    return parts;
+}
+
+fn is_numeric(s: str): bool {
+    if (s == "") return false;
+    var digits = "0123456789";
+    var i: int = 0;
+    while (i < len(s)) {
+        if (index_of(digits, substring(s, i, i + 1)) == -1) return false;
+        i = i + 1;
+    }
+    return true;
+}
+
+fn byte_ord(ch: str): int {
+    var alphabet = "abcdefghijklmnopqrstuvwxyz";
+    var i: int = 0;
+    while (i < len(alphabet)) {
+        if (substring(alphabet, i, i + 1) == ch) return 97 + i;
+        i = i + 1;
+    }
+    var u_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    i = 0;
+    while (i < len(u_alphabet)) {
+        if (substring(u_alphabet, i, i + 1) == ch) return 65 + i;
+        i = i + 1;
+    }
+    var digits = "0123456789";
+    i = 0;
+    while (i < len(digits)) {
+        if (substring(digits, i, i + 1) == ch) return 48 + i;
+        i = i + 1;
+    }
+    if (ch == "-") return 45;
+    if (ch == ".") return 46;
+    if (ch == "+") return 43;
+    return 0;
+}
+
+fn is_valid_char(ch: str): bool {
+    var valid_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-";
+    return index_of(valid_chars, ch) != -1;
+}
+
+fn is_valid_prerelease_id(s: str): bool {
+    if (s == "") return false;
+    var i: int = 0;
+    while (i < len(s)) {
+        if (not is_valid_char(substring(s, i, i + 1))) return false;
+        i = i + 1;
+    }
+    if (is_numeric(s)) {
+        if (len(s) > 1 and substring(s, 0, 1) == "0") return false;
+    }
+    return true;
+}
+
+fn is_valid_build_id(s: str): bool {
+    if (s == "") return false;
+    var i: int = 0;
+    while (i < len(s)) {
+        if (not is_valid_char(substring(s, i, i + 1))) return false;
+        i = i + 1;
+    }
+    return true;
+}
+
+fn has_invalid_leading_zero(s: str): bool {
+    if (len(s) > 1 and substring(s, 0, 1) == "0") return true;
+    return false;
+}
+
+fn compare_strings(s1: str, s2: str): int {
+    if (s1 == s2) return 0;
+    var len1 = len(s1);
+    var len2 = len(s2);
+    var min_len = len1;
+    if (len2 < min_len) min_len = len2;
+    var i = 0;
+    while (i < min_len) {
+        var c1 = substring(s1, i, i + 1);
+        var c2 = substring(s2, i, i + 1);
+        if (c1 != c2) {
+            var o1 = byte_ord(c1);
+            var o2 = byte_ord(c2);
+            if (o1 > o2) return 1;
+            return -1;
+        }
+        i = i + 1;
+    }
+    if (len1 > len2) return 1;
+    if (len1 < len2) return -1;
+    return 0;
+}

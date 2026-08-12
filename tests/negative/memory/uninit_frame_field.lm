@@ -1,0 +1,10 @@
+// @error:uninitialized
+// Using uninitialized frame field
+
+frame Person {
+    pub name: str;
+    pub age: int;
+}
+
+var person = Person { name: "Alice" };  // age not initialized
+print(person.age);  // Using uninitialized field

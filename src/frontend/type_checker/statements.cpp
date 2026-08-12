@@ -224,6 +224,17 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
         // Pass the declared type as expected type for better type inference
         init_type = check_expression_with_expected_type(var_decl->initializer, declared_type);
         
+        long long val_int = 0;
+        double val_double = 0.0;
+        bool is_int = false;
+        if (evaluate_const_expr(var_decl->initializer, val_int, val_double, is_int, this)) {
+            if (is_int) {
+                constant_ints[var_decl->name] = val_int;
+            } else {
+                constant_doubles[var_decl->name] = val_double;
+            }
+        }
+
         // Check if initializing from another variable (potential move)
         if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(var_decl->initializer)) {
             TypePtr rhs_type = lookup_variable(var_expr->name);
@@ -349,6 +360,17 @@ TypePtr TypeChecker::check_enum_declaration(std::shared_ptr<LM::Frontend::AST::E
         }
         enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
         type_system.addUserDefinedType(enum_decl->name, enumType);
+    } else {
+        // Replace existing enum type with complete one (from Pass -1)
+        EnumType enumTypeInfo;
+        enumTypeInfo.name = enum_decl->name;
+        for (const auto& variant : enum_decl->variants) {
+            std::vector<TypePtr> associated;
+            for (const auto& t : variant.second) associated.push_back(resolve_type_annotation(t));
+            enumTypeInfo.addVariant(variant.first, associated);
+        }
+        enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
+        type_system.addUserDefinedType(enum_decl->name, enumType);
     }
 
     // Register variants (qualified only) in global maps
@@ -450,7 +472,17 @@ TypePtr TypeChecker::check_while_statement(std::shared_ptr<LM::Frontend::AST::Wh
     // Check body
     bool was_in_loop = in_loop;
     in_loop = true;
+    
+    // NEW: Phase 2 - Control flow safety
+    // Validate scope cleanup on loop entry
+    validate_scope_cleanup_on_control_flow("while_loop", while_stmt->line);
+    
     check_statement(while_stmt->body);
+    
+    // NEW: Phase 2 - Control flow safety
+    // Validate cleanup on loop exit
+    validate_scope_cleanup_on_control_flow("while_loop_exit", while_stmt->line);
+    
     in_loop = was_in_loop;
     
     // Set the inferred type on the while statement
@@ -486,7 +518,17 @@ TypePtr TypeChecker::check_for_statement(std::shared_ptr<LM::Frontend::AST::ForS
     // Check body
     bool was_in_loop = in_loop;
     in_loop = true;
+    
+    // NEW: Phase 2 - Control flow safety
+    // Validate scope cleanup on loop entry
+    validate_scope_cleanup_on_control_flow("for_loop", for_stmt->line);
+    
     check_statement(for_stmt->body);
+    
+    // NEW: Phase 2 - Control flow safety
+    // Validate cleanup on loop exit
+    validate_scope_cleanup_on_control_flow("for_loop_exit", for_stmt->line);
+    
     in_loop = was_in_loop;
     
     exit_scope();
@@ -575,7 +617,22 @@ TypePtr TypeChecker::check_iter_statement(std::shared_ptr<LM::Frontend::AST::Ite
     // Type-check the body in the loop scope.
     bool was_in_loop = in_loop;
     in_loop = true;
+    
+    // NEW: Phase 2 - Control flow safety
+    // Check for linear type reuse in loop
+    if (iter_stmt->loopVars.size() > 0) {
+        check_linear_type_in_loop_body(iter_stmt->loopVars[0], 
+                                       {iter_stmt->body}, iter_stmt->line);
+    }
+    
+    // Validate scope cleanup on loop entry
+    validate_scope_cleanup_on_control_flow("iter_loop", iter_stmt->line);
+    
     check_statement(iter_stmt->body);
+    
+    // Validate cleanup on loop exit
+    validate_scope_cleanup_on_control_flow("iter_loop_exit", iter_stmt->line);
+    
     in_loop = was_in_loop;
 
     exit_scope();
@@ -691,6 +748,10 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::R
                 is_already_wrapped = true;
             } else if (auto ok_construct = std::dynamic_pointer_cast<LM::Frontend::AST::OkConstructExpr>(return_stmt->value)) {
                 is_already_wrapped = true;
+            } else if (type_system.isFallibleType(return_type)) {
+                is_already_wrapped = true;
+            } else if (return_type->tag == TypeTag::Nil) {
+                is_already_wrapped = true;
             }
             
             if (!is_already_wrapped) {
@@ -717,6 +778,21 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::R
         return_type = type_system.NIL_TYPE;
     }
     
+    if (return_stmt->value) {
+        if (auto lambda = std::dynamic_pointer_cast<LM::Frontend::AST::LambdaExpr>(return_stmt->value)) {
+            if (!lambda->capturedVars.empty()) {
+                for (const auto& var_name : lambda->capturedVars) {
+                    TypePtr var_type = lookup_variable(var_name);
+                    if (var_type && var_type->tag != TypeTag::Function) {
+                        add_error("closure_capture: Closure captures variable '" + var_name +
+                                  "' that goes out of scope when returning", return_stmt->line);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     // Check if return type matches function return type
     if (current_return_type && !is_type_compatible(current_return_type, return_type)) {
         add_type_error(current_return_type->toString(), return_type->toString(), return_stmt->line);

@@ -1,0 +1,27 @@
+// Standard Library Time Instant Submodule
+
+import std.time.duration as dur;
+
+frame Instant {
+    pub timestamp_ms: float;
+
+    pub init(timestamp_ms: float) {
+        self.timestamp_ms = timestamp_ms;
+    }
+
+    pub fn now(): Instant {
+        var current_time = time();
+        var current_float = current_time as float;
+        var result_ms = current_float * 1000.0;
+        return Instant(result_ms);
+    }
+
+    pub fn elapsed(): dur.TimeDuration {
+        var current_time = time();
+        var current_float = current_time as float;
+        var elapsed_ms = current_float - self.timestamp_ms;
+        if (elapsed_ms < 0.0) elapsed_ms = 0.0;
+        var elapsed_int = elapsed_ms as int;
+        return dur.TimeDuration.from_milliseconds(elapsed_int);
+    }
+}

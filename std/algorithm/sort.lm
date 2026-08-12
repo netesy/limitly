@@ -1,0 +1,47 @@
+// Standard Library Algorithm Sort Module
+
+import std.sort as s;
+
+pub fn sort(items: [any]) {
+    s.sort(items, false, nil);
+}
+
+pub fn quicksort(items: [any]) {
+    s.quicksort(items, false, nil);
+}
+
+pub fn quicksort_descending(items: [any]) {
+    s.quicksort(items, true, nil);
+}
+
+pub fn mergesort(items: [any]) {
+    s.mergesort(items, false, nil);
+}
+
+pub fn heapsort(items: [any]) {
+    s.heapsort(items, false, nil);
+}
+
+pub fn insertion_sort(items: [any]) {
+    s.insertion_sort(items, false, nil);
+}
+
+pub fn counting_sort(items: [int]) {
+    s.counting_sort(items, false);
+}
+
+pub fn radix_sort(items: [int]) {
+    s.radix_sort(items, false);
+}
+
+pub fn timsort(items: [any]) {
+    s.timsort(items, false, nil);
+}
+
+pub fn stable_sort(items: [any]) {
+    s.stable_sort(items, false, nil);
+}
+
+pub fn partial_sort(items: [any], count: int) {
+    s.partial_sort(items, count, false, nil);
+}

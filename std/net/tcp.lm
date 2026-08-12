@@ -42,10 +42,10 @@ frame Accepter {
 }
 
 frame TCPClient {
-    var resource: res.Resource?;
-    var reader: res.Reader?;
-    var writer: res.Writer?;
-    var poller: res.Pollable?;
+    pub var resource: res.Resource?;
+    pub var reader: res.Reader?;
+    pub var writer: res.Writer?;
+    pub var poller: res.Pollable?;
 
     pub fn init() {
         self.resource = nil;
@@ -59,17 +59,18 @@ frame TCPClient {
             val r => {
                 var c = Connector(r=r);
                 if (c.connect(args=[address, port])) {
-                    self.resource = ok(r);
-                    self.reader = ok(res.Reader(r=r));
-                    self.writer = ok(res.Writer(r=r));
-                    self.poller = ok(res.Pollable(r=r));
+                    self.resource = r;
+                    self.reader = res.Reader(r=r);
+                    self.writer = res.Writer(r=r);
+                    self.poller = res.Pollable(r=r);
                     return ok(r.handle);
-                } else {
-                    r.close();
-                    return err(Error(code="ERR", message="fail"));
                 }
+                r.close();
+                return err(Error(code="ERR", message="fail"));
             },
-            err e => return err(Error(code="ERR", message="fail"))
+            err e => {
+                return err(Error(code="ERR", message="fail"));
+            }
         }
     }
 
@@ -77,10 +78,14 @@ frame TCPClient {
         match (self.writer) {
             val w => {
                 var result = w.write(args=[data]);
-                if (result == true) return ok(len(data));
+                if (result == true) {
+                    return ok(len(data));
+                }
                 return err(Error(code="ERR", message="fail"));
             },
-            nil => return err(Error(code="ERR", message="fail"))
+            nil => {
+                return err(Error(code="ERR", message="fail"));
+            }
         }
     }
 
@@ -88,10 +93,14 @@ frame TCPClient {
         match (self.reader) {
             val rd => {
                 var data = rd.read(args=[]);
-                if (data == nil) return err(Error(code="ERR", message="fail"));
+                if (data == nil) {
+                    return err(Error(code="ERR", message="fail"));
+                }
                 return ok(data as str);
             },
-            nil => return err(Error(code="ERR", message="fail"))
+            nil => {
+                return err(Error(code="ERR", message="fail"));
+            }
         }
     }
 
@@ -132,10 +141,10 @@ frame TCPClient {
 }
 
 frame TCPServer {
-    var resource: res.Resource?;
-    var binder: Binder?;
-    var listener: Listener?;
-    var accepter: Accepter?;
+    pub var resource: res.Resource?;
+    pub var binder: Binder?;
+    pub var listener: Listener?;
+    pub var accepter: Accepter?;
 
     pub fn init() {
         self.resource = nil;
@@ -149,15 +158,16 @@ frame TCPServer {
             val r => {
                 var b = Binder(r=r);
                 if (b.bind(args=[address, port])) {
-                    self.resource = ok(r);
-                    self.binder = ok(b);
+                    self.resource = r;
+                    self.binder = b;
                     return ok(r.handle);
-                } else {
-                    r.close();
-                    return err(Error(code="ERR", message="fail"));
                 }
+                r.close();
+                return err(Error(code="ERR", message="fail"));
             },
-            err e => return err(Error(code="ERR", message="fail"))
+            err e => {
+                return err(Error(code="ERR", message="fail"));
+            }
         }
     }
 
@@ -166,14 +176,15 @@ frame TCPServer {
             val r => {
                 var l = Listener(r=r);
                 if (l.listen(args=[backlog])) {
-                    self.listener = ok(l);
-                    self.accepter = ok(Accepter(r=r));
+                    self.listener = l;
+                    self.accepter = Accepter(r=r);
                     return ok(r.handle);
-                } else {
-                    return err(Error(code="ERR", message="fail"));
                 }
+                return err(Error(code="ERR", message="fail"));
             },
-            nil => return err(Error(code="ERR", message="fail"))
+            nil => {
+                return err(Error(code="ERR", message="fail"));
+            }
         }
     }
 
@@ -181,16 +192,20 @@ frame TCPServer {
         match (self.accepter) {
             val acc => {
                 var fd = acc.accept();
-                if (fd == -1) return err(Error(code="ERR", message="fail"));
+                if (fd == -1) {
+                    return err(Error(code="ERR", message="fail"));
+                }
                 var cr = res.adopt_socket(fd=fd);
                 var client = TCPClient();
-                client.resource = ok(cr);
-                client.reader = ok(res.Reader(r=cr));
-                client.writer = ok(res.Writer(r=cr));
-                client.poller = ok(res.Pollable(r=cr));
+                client.resource = cr;
+                client.reader = res.Reader(r=cr);
+                client.writer = res.Writer(r=cr);
+                client.poller = res.Pollable(r=cr);
                 return ok(client);
             },
-            nil => return err(Error(code="ERR", message="fail"))
+            nil => {
+                return err(Error(code="ERR", message="fail"));
+            }
         }
     }
 

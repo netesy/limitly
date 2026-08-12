@@ -26,7 +26,7 @@ std::string FyraBuiltinFunctions::get_internal_name(const std::string& name) {
     return name;
 }
 
-void FyraBuiltinFunctions::emit_used_builtins(ir::Module* module, 
+void FyraBuiltinFunctions::emit_used_builtins(ir::Module* module,
                                              ir::IRBuilder* builder,
                                              const std::unordered_set<std::string>& used_builtins) {
     if (used_builtins.count("lm_print_int")) emit_print_int(module, builder);
@@ -35,11 +35,26 @@ void FyraBuiltinFunctions::emit_used_builtins(ir::Module* module,
     if (used_builtins.count("lm_box_string")) emit_box_string(module, builder);
     if (used_builtins.count("abs")) emit_abs(module, builder);
 
-    // External Runtime Declarations
-    decl_runtime_list(module, builder);
-    decl_runtime_tuple(module, builder);
-    decl_runtime_dict(module, builder);
-    decl_runtime_math(module, builder);
+    // External Runtime Declarations - only emit if used
+    bool needs_list = false;
+    bool needs_tuple = false;
+    bool needs_dict = false;
+    bool needs_math = false;
+
+    for (const auto& name : used_builtins) {
+        if (name.find("list") != std::string::npos) needs_list = true;
+        if (name.find("tuple") != std::string::npos) needs_tuple = true;
+        if (name.find("dict") != std::string::npos) needs_dict = true;
+        if (name == "sqrt" || name == "sin" || name == "cos" || name == "tan" ||
+            name == "asin" || name == "acos" || name == "atan" || name == "log" ||
+            name == "log10" || name == "exp" || name == "ceil" || name == "floor" ||
+            name == "round") needs_math = true;
+    }
+
+    if (needs_list) decl_runtime_list(module, builder);
+    if (needs_tuple) decl_runtime_tuple(module, builder);
+    if (needs_dict) decl_runtime_dict(module, builder);
+    if (needs_math) decl_runtime_math(module, builder);
 }
 
 void FyraBuiltinFunctions::emit_print_int(ir::Module* module, ir::IRBuilder* builder) {
@@ -72,13 +87,13 @@ void FyraBuiltinFunctions::emit_print_int(ir::Module* module, ir::IRBuilder* bui
     builder->setInsertPoint(b_neg);
     ir::GlobalVariable* gv_minus_ptr = nullptr;
     for (auto& gv : module->getGlobalVariables()) {
-        if (gv->getName() == "$str_minus") {
+        if (gv->getName() == "str_minus") {
             gv_minus_ptr = gv.get();
             break;
         }
     }
     if (!gv_minus_ptr) {
-        auto gv_minus = std::make_unique<ir::GlobalVariable>(context->getPointerType(context->getIntegerType(8)), "$str_minus", context->getConstantString("-"), false, ".data");
+        auto gv_minus = std::make_unique<ir::GlobalVariable>(context->getPointerType(context->getIntegerType(8)), "str_minus", context->getConstantString("-"), false, ".data");
         gv_minus_ptr = gv_minus.get();
         module->addGlobalVariable(std::move(gv_minus));
     }
@@ -88,7 +103,7 @@ void FyraBuiltinFunctions::emit_print_int(ir::Module* module, ir::IRBuilder* bui
         gv_minus_ptr,
         context->getConstantInt(context->getIntegerType(64), 1)
     };
-    builder->createSyscall(ir::SyscallId::Write, neg_sys_args);
+    builder->createExternCall("io.write", neg_sys_args, context->getIntegerType(64));
     ir::Value* abs_v = builder->createNeg(val);
     builder->createStore(abs_v, val_slot);
     builder->createJmp(b_loop);
@@ -123,7 +138,7 @@ void FyraBuiltinFunctions::emit_print_int(ir::Module* module, ir::IRBuilder* bui
         final_ptr,
         len
     };
-    builder->createSyscall(ir::SyscallId::Write, done_sys_args);
+    builder->createExternCall("io.write", done_sys_args, context->getIntegerType(64));
     builder->createRet(nullptr);
 }
 
@@ -163,17 +178,17 @@ void FyraBuiltinFunctions::emit_print_str(ir::Module* module, ir::IRBuilder* bui
         s_val,
         actual_len
     };
-    builder->createSyscall(ir::SyscallId::Write, ps_sys_args);
+    builder->createExternCall("io.write", ps_sys_args, context->getIntegerType(64));
     
     ir::GlobalVariable* gv_nl_ptr = nullptr;
     for (auto& gv : module->getGlobalVariables()) {
-        if (gv->getName() == "$nl") {
+        if (gv->getName() == "nl") {
             gv_nl_ptr = gv.get();
             break;
         }
     }
     if (!gv_nl_ptr) {
-        auto gv_nl = std::make_unique<ir::GlobalVariable>(context->getPointerType(context->getIntegerType(8)), "$nl", context->getConstantString("\n"), false, ".data");
+        auto gv_nl = std::make_unique<ir::GlobalVariable>(context->getPointerType(context->getIntegerType(8)), "nl", context->getConstantString("\n"), false, ".data");
         gv_nl_ptr = gv_nl.get();
         module->addGlobalVariable(std::move(gv_nl));
     }
@@ -182,7 +197,7 @@ void FyraBuiltinFunctions::emit_print_str(ir::Module* module, ir::IRBuilder* bui
         gv_nl_ptr,
         context->getConstantInt(context->getIntegerType(64), 1)
     };
-    builder->createSyscall(ir::SyscallId::Write, nl_sys_args);
+    builder->createExternCall("io.write", nl_sys_args, context->getIntegerType(64));
 
     builder->createRet(nullptr);
 }
@@ -206,17 +221,35 @@ void FyraBuiltinFunctions::emit_assert(ir::Module* module, ir::IRBuilder* builde
     builder->setInsertPoint(a_fail);
     // Print "Assertion failed: " message before exiting
     std::string fail_msg = "Assertion failed\n";
+    ir::GlobalVariable* assert_fail_gv = nullptr;
+    for (auto& gv : module->getGlobalVariables()) {
+        if (gv->getName() == "assert_fail") {
+            assert_fail_gv = gv.get();
+            break;
+        }
+    }
+    if (!assert_fail_gv) {
+        auto gv = std::make_unique<ir::GlobalVariable>(
+            context->getPointerType(context->getIntegerType(8)),
+            "assert_fail",
+            context->getConstantString(fail_msg),
+            false,
+            ".data"
+        );
+        assert_fail_gv = gv.get();
+        module->addGlobalVariable(std::move(gv));
+    }
     std::vector<ir::Value*> fail_print_args = {
         context->getConstantInt(context->getIntegerType(64), 1), // stdout
-        ir::ConstantString::get(fail_msg),
+        assert_fail_gv,
         context->getConstantInt(context->getIntegerType(64), fail_msg.length())
     };
-    builder->createSyscall(ir::SyscallId::Write, fail_print_args);
+    builder->createExternCall("io.write", fail_print_args, context->getIntegerType(64));
     
     std::vector<ir::Value*> fail_sys_args = {
         context->getConstantInt(context->getIntegerType(64), 1) // exit status
     };
-    builder->createSyscall(ir::SyscallId::Exit, fail_sys_args);
+    builder->createExternCall("process.exit", fail_sys_args, context->getIntegerType(64));
     builder->createRet(nullptr);
 
     builder->setInsertPoint(a_pass);

@@ -1,0 +1,18 @@
+// Configuration Environment Module
+
+import std.env as env;
+
+pub fn load_from_env(keys: [str]): {str: str} {
+    var result = {"_limitly_init": "nil"};
+    var e = env.Env() as env.Env;
+    var i: int = 0;
+    while (i < len(keys)) {
+        var key = keys[i];
+        var val_opt = e.get(key);
+        if (val_opt != nil) {
+            result[key] = val_opt as str;
+        }
+        i = i + 1;
+    }
+    return result;
+}

@@ -1,9 +1,0 @@
-fn main(): int {
-    var ch = "a";
-    if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
-        print("BAD");
-    } else {
-        print("GOOD");
-    }
-    return 0;
-}
