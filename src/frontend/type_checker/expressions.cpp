@@ -1466,6 +1466,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                         if (tm->name == method_name) {
                             // Found in trait - validate arguments
                             std::vector<TypePtr> expected_params;
+                            expected_params.reserve(tm->params.size());
                             for (const auto& p : tm->params) expected_params.push_back(resolve_type_annotation(p.second));
 
                             if (arg_types.size() < expected_params.size()) {
