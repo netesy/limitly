@@ -61,6 +61,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
             } else if (LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
                 // Handle builtin functions (print, input, etc.)
                 std::vector<ValuePtr> args;
+                args.reserve(pc->call_args.size());
                 for (auto arg_reg : pc->call_args) {
                     args.push_back(register_to_value_ptr(registers[arg_reg]));
                 }
@@ -112,20 +113,10 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     size_t expected_total = func->getParameters().size();
                     arg_vals.reserve(std::max((size_t)pc->call_args.size() + closure_extra_args.size(), expected_total));
                     for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
-                    
-                    if (!closure_extra_args.empty()) {
-                        if (expected_total > 0) {
-                            while (arg_vals.size() < expected_total - 1) {
-                                arg_vals.push_back(VAL_NIL);
-                            }
-                            arg_vals.push_back(closure_extra_args[0]);
-                        } else {
-                            arg_vals.push_back(closure_extra_args[0]);
-                        }
-                    } else {
-                        while (arg_vals.size() < expected_total) {
-                            arg_vals.push_back(VAL_NIL);
-                        }
+                    arg_vals.insert(arg_vals.end(), closure_extra_args.begin(), closure_extra_args.end());
+
+                    while (arg_vals.size() < expected_total) {
+                        arg_vals.push_back(VAL_NIL);
                     }
 
                     auto saved_registers = registers;
