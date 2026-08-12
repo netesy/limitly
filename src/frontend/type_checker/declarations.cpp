@@ -332,6 +332,7 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
         }
 
         // Add parent traits to verify them too
+        trait_worklist.reserve(trait_worklist.size() + trait_info.extends.size());
         for (const auto& parent : trait_info.extends) {
             trait_worklist.push_back(parent);
         }
