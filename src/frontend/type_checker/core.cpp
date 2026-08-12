@@ -430,7 +430,7 @@ void TypeChecker::add_type_error(const std::string& expected, const std::string&
 
 void TypeChecker::enter_scope() {
     current_scope_level++;
-    current_scope = std::make_unique<Scope>(std::move(current_scope));
+    current_scope = std::make_unique<Scope>(std::move(current_scope), current_function);
     type_system.pushScope();
 }
 

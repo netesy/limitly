@@ -251,6 +251,8 @@ private:
     std::shared_ptr<LM::Frontend::AST::Program> current_program_ = nullptr;
     
 public:
+    std::unordered_map<std::string, long long> constant_ints;
+    std::unordered_map<std::string, double> constant_doubles;
     bool is_root = true;
 
     // Constructor accepting TypeSystem and SymbolDatabase
@@ -569,8 +571,10 @@ private:
     struct Scope {
         std::unordered_map<std::string, TypePtr> variables;
         std::unique_ptr<Scope> parent;
+        std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> function = nullptr;
         
-        Scope(std::unique_ptr<Scope> p = nullptr) : parent(std::move(p)) {}
+        Scope(std::unique_ptr<Scope> p = nullptr, std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> f = nullptr)
+            : parent(std::move(p)), function(f) {}
         
         TypePtr lookup(const std::string& name) {
             auto it = variables.find(name);
@@ -587,6 +591,8 @@ private:
     
     std::unique_ptr<Scope> current_scope;
 };
+
+bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, long long& out_int, double& out_double, bool& is_int, TypeChecker* checker = nullptr);
 
 // =============================================================================
 // TYPE CHECKER RESULT - Passed to LIR Generator
