@@ -1,3 +1,24 @@
+global %str_const_0 = "=== Parallel Block Tests ==="
+global %str_const_1 = "Parallel processing complete"
+global %str_const_2 = "Counter: %s"
+global %str_const_3 = "Results collected: %s"
+global %str_const_4 = "First result: %s"
+global %str_const_5 = "Last result: %s"
+global %str_const_6 = "Parallel block should execute range 0..99 iterations"
+global %str_const_7 = "All range results should be collected"
+global %str_const_8 = "First result should be 0*2 = 0"
+global %str_const_9 = "Last result should be 98*2 = 196"
+global %str_const_10 = "Second parallel block complete"
+global %str_const_11 = "Tasks executed: %s"
+global %str_const_12 = "Sum of results: %s"
+global %str_const_13 = "Second parallel block should execute range 0..199 iterations"
+global %str_const_14 = "Sum should be sum of i*3 for i=0..198 = 59103"
+global %str_const_15 = "Third parallel block complete"
+global %str_const_16 = "  Result: %s"
+global %str_const_17 = "Third parallel block should execute range 0..9 iterations"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

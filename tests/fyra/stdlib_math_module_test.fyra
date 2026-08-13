@@ -1,3 +1,67 @@
+global %str_const_0 = "=== Math Module Test Suite ==="
+global %str_const_1 = "Constants test failed"
+global %str_const_2 = "Arithmetic test failed"
+global %str_const_3 = "Trigonometry test failed"
+global %str_const_4 = "Statistics test failed"
+global %str_const_5 = "Random test failed"
+global %str_const_6 = "Vectors test failed"
+global %str_const_7 = "Quaternion and Matrix test failed"
+global %str_const_8 = "All math tests passed successfully."
+global %str_const_9 = "Testing Statistics..."
+global %str_const_10 = "sum failed"
+global %str_const_11 = "mean failed"
+global %str_const_12 = "median failed"
+global %str_const_13 = "variance failed"
+global %str_const_14 = "stddev failed"
+global %str_const_15 = "Testing Quaternion and Matrix..."
+global %str_const_16 = "quaternion scale failed"
+global %str_const_17 = "matrix identity get failed"
+global %str_const_18 = "matrix set/get failed"
+global %str_const_19 = "Testing Vectors..."
+global %str_const_20 = "vector2 add failed"
+global %str_const_21 = "vector2 mag failed"
+global %str_const_22 = "vector3 cross failed"
+global %str_const_23 = "vector4 scale failed"
+global %str_const_24 = "Testing Trigonometry..."
+global %str_const_25 = "sin failed"
+global %str_const_26 = "cos failed"
+global %str_const_27 = "tan failed"
+global %str_const_28 = "Testing Constants..."
+global %str_const_29 = "PI failed"
+global %str_const_30 = "E failed"
+global %str_const_31 = "TAU failed"
+global %str_const_32 = "Testing Arithmetic..."
+global %str_const_33 = "abs failed"
+global %str_const_34 = "abs_int failed"
+global %str_const_35 = "gcd failed"
+global %str_const_36 = "lcm failed"
+global %str_const_37 = "factorial failed"
+global %str_const_38 = "permutations failed"
+global %str_const_39 = "combinations failed"
+global %str_const_40 = "min failed"
+global %str_const_41 = "max failed"
+global %str_const_42 = "clamp high failed"
+global %str_const_43 = "clamp low failed"
+global %str_const_44 = "sign failed"
+global %str_const_45 = "lerp failed"
+global %str_const_46 = "floor failed"
+global %str_const_47 = "ceil failed"
+global %str_const_48 = "round high failed"
+global %str_const_49 = "trunc failed"
+global %str_const_50 = "fract failed"
+global %str_const_51 = "sqrt failed"
+global %str_const_52 = "cbrt failed"
+global %str_const_53 = "hypot failed"
+global %str_const_54 = "exp failed"
+global %str_const_55 = "Testing Random..."
+global %str_const_56 = "random_int range failed"
+global %str_const_57 = "random_float range failed"
+global %str_const_58 = "random_bool failed"
+global %str_const_59 = "random_string len failed"
+global %str_const_60 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0
@@ -18,6 +82,89 @@ function std.math.random.random_float(i64, i64) {
 @block_0
   call %std.math.random.Random.range_float 0 %0 %1
   ret %r3
+}
+
+function std.math.trigonometry.tan(i64) {
+@entry
+@block_0
+  %r1 = alloc 16 : i64
+  call %std.math.trigonometry.TrigFloat.init %r1 %0
+  call %std.math.trigonometry.TrigFloat.tan %r1
+  ret %r3
+}
+
+function std.sort._partition(i64, i64, i64, i64, i64) {
+@entry
+@block_0
+  call %lm_list_get %0 %1
+  %r8 = sub %r10 9 : i64
+  jmp %block_7
+@block_7
+  %r11 = cslt %r10 %1 : i32
+  br %r11 %block_9 %block_25
+@block_9
+  jmp %block_9
+  call %lm_list_get %0 %r10
+  call %std.sort._compare %r13 %r5 %2 %3
+  %r16 = csle %r14 1 : i32
+  br %r16 %block_14 %block_20
+@block_14
+  jmp %block_14
+  %r20 = add %r8 9 : i64
+  call %std.sort._swap %0 %r20 %r10
+  jmp %block_20
+@block_20
+  %r24 = add %r10 9 : i64
+  jmp %block_7
+@block_25
+  %r27 = add %r20 9 : i64
+  call %std.sort._swap %0 %r27 %1
+  %r31 = add %r20 9 : i64
+  ret %r31
+}
+
+function std.math.trigonometry.cos(i64) {
+@entry
+@block_0
+  %r1 = alloc 16 : i64
+  call %std.math.trigonometry.TrigFloat.init %r1 %0
+  call %std.math.trigonometry.TrigFloat.cos %r1
+  ret %r3
+}
+
+function std.resource.create_dns_resolver() {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9 : i64
+  %r6 = ceq %r2 %r5 : i32
+  br %r6 %block_8 %block_10
+@block_8
+  jmp %block_8
+  %r8 = call %lm_error_new 0 : i8*
+  ret %r8
+@block_10
+  %r11 = alloc 16 : i64
+  call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
+}
+
+function std.math.index.variance(i64) {
+@entry
+@block_0
+  call %std.math.statistics.variance %0
+  ret %r1
+}
+
+function std.math.vector3.Vector3.normalize(i64) {
+@entry
+  ret 0
+}
+
+function std.math.trigonometry.TrigFloat.init(i64, i64) {
+@entry
+  ret 0
 }
 
 function std.math.trigonometry.TrigFloat.cos(i64) {
@@ -47,6 +194,53 @@ function std.math.arithmetic.exp2(i64) {
   %r1 = alloc 16 : i64
   call %std.math.arithmetic.Float.init %r1 %0
   call %std.math.arithmetic.Float.exp2 %r1
+  ret %r3
+}
+
+function main() {
+@entry
+@block_0
+  %r0 = call %lm_box_string %str_const_0 : i64
+  call %lm_print_int %r0
+  call %test_constants
+  %r4 = ceq %r2 9 : i32
+  %r5 = call %lm_box_string %str_const_1 : i64
+  call %lm_assert %r4 %r5
+  call %test_arithmetic
+  %r9 = ceq %r7 9 : i32
+  %r10 = call %lm_box_string %str_const_2 : i64
+  call %lm_assert %r9 %r10
+  call %test_trigonometry
+  %r14 = ceq %r12 9 : i32
+  %r15 = call %lm_box_string %str_const_3 : i64
+  call %lm_assert %r14 %r15
+  call %test_statistics
+  %r19 = ceq %r17 9 : i32
+  %r20 = call %lm_box_string %str_const_4 : i64
+  call %lm_assert %r19 %r20
+  call %test_random
+  %r24 = ceq %r22 9 : i32
+  %r25 = call %lm_box_string %str_const_5 : i64
+  call %lm_assert %r24 %r25
+  call %test_vectors
+  %r29 = ceq %r27 9 : i32
+  %r30 = call %lm_box_string %str_const_6 : i64
+  call %lm_assert %r29 %r30
+  call %test_quaternion_and_matrix
+  %r34 = ceq %r32 9 : i32
+  %r35 = call %lm_box_string %str_const_7 : i64
+  call %lm_assert %r34 %r35
+  %r37 = call %lm_box_string %str_const_8 : i64
+  call %lm_print_int %r37
+  ret 1
+}
+
+function std.math.arithmetic.log10(i64) {
+@entry
+@block_0
+  %r1 = alloc 16 : i64
+  call %std.math.arithmetic.Float.init %r1 %0
+  call %std.math.arithmetic.Float.log10 %r1
   ret %r3
 }
 
@@ -119,6 +313,34 @@ function std.resource.Listener.init(i64, i64) {
   ret 0
 }
 
+function std.math.arithmetic.abs(i64) {
+@entry
+@block_0
+  %r1 = alloc 16 : i64
+  call %std.math.arithmetic.Float.init %r1 %0
+  call %std.math.arithmetic.Float.abs %r1
+  ret %r3
+}
+
+function std.math.arithmetic.floor(i64) {
+@entry
+@block_0
+  %r1 = alloc 16 : i64
+  call %std.math.arithmetic.Float.init %r1 %0
+  call %std.math.arithmetic.Float.floor %r1
+  ret %r3
+}
+
+function std.math.arithmetic.Float.log2(i64) {
+@entry
+  ret 0
+}
+
+function std.math.vector2.Vector2.sub(i64, i64) {
+@entry
+  ret 0
+}
+
 function std.math.arithmetic.Float.round(i64) {
 @entry
   ret 0
@@ -187,6 +409,15 @@ function std.math.index.tan(i64) {
 @block_0
   call %std.math.trigonometry.tan %0
   ret %r1
+}
+
+function std.math.arithmetic.min(i64, i64) {
+@entry
+@block_0
+  %r2 = alloc 16 : i64
+  call %std.math.arithmetic.Float.init %r2 %0
+  call %std.math.arithmetic.Float.min %r2 %1
+  ret %r4
 }
 
 function std.math.arithmetic.combinations(i64, i64) {
@@ -276,17 +507,7 @@ function std.math.arithmetic.pow(i64, i64) {
   ret %r4
 }
 
-function std.math.vector3.Vector3.normalize(i64) {
-@entry
-  ret 0
-}
-
 function std.math.arithmetic.Float.hypot(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.math.vector3.Vector3.add(i64, i64) {
 @entry
   ret 0
 }
@@ -369,6 +590,11 @@ function std.resource.Binder.bind(i64, i64) {
   ret 0
 }
 
+function std.math.vector3.Vector3.add(i64, i64) {
+@entry
+  ret 0
+}
+
 function std.math.arithmetic.Float.pow(i64, i64) {
 @entry
   ret 0
@@ -381,40 +607,21 @@ function std.math.index.abs(i64) {
   ret %r1
 }
 
+function std.math.trigonometry.atan2(i64, i64) {
+@entry
+@block_0
+  %r2 = alloc 16 : i64
+  call %std.math.trigonometry.TrigFloat.init %r2 %0
+  call %std.math.trigonometry.TrigFloat.atan2 %r2 %1
+  ret %r4
+}
+
 function std.math.trigonometry.TrigFloat.atan(i64) {
 @entry
   ret 0
 }
 
 function std.math.matrix.__init__() {
-@entry
-  ret 0
-}
-
-function std.math.arithmetic.Float.log2(i64) {
-@entry
-  ret 0
-}
-
-function std.math.arithmetic.abs(i64) {
-@entry
-@block_0
-  %r1 = alloc 16 : i64
-  call %std.math.arithmetic.Float.init %r1 %0
-  call %std.math.arithmetic.Float.abs %r1
-  ret %r3
-}
-
-function std.math.arithmetic.floor(i64) {
-@entry
-@block_0
-  %r1 = alloc 16 : i64
-  call %std.math.arithmetic.Float.init %r1 %0
-  call %std.math.arithmetic.Float.floor %r1
-  ret %r3
-}
-
-function std.math.vector2.Vector2.sub(i64, i64) {
 @entry
   ret 0
 }
@@ -441,6 +648,18 @@ function std.math.arithmetic.Float.trunc(i64) {
 function std.math.arithmetic.Float.fract(i64) {
 @entry
   ret 0
+}
+
+function std.math.trigonometry.TrigFloat.tanh(i64) {
+@entry
+  ret 0
+}
+
+function std.math.index.acos(i64) {
+@entry
+@block_0
+  call %std.math.trigonometry.acos %0
+  ret %r1
 }
 
 function std.math.arithmetic.clamp(i64, i64, i64) {
@@ -481,134 +700,59 @@ function std.math.arithmetic.Float.abs(i64) {
   ret 0
 }
 
-function std.math.arithmetic.Int.min(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.math.trigonometry.TrigFloat.tan(i64) {
-@entry
-  ret 0
-}
-
-function std.math.arithmetic.Int.abs(i64) {
-@entry
-  ret 0
-}
-
-function std.resource.Poller.poll(i64) {
-@entry
-  ret 0
-}
-
-function std.sort.quicksort(i64, i64, i64) {
-@entry
-@block_0
-  call %lm_list_len %0
-  %r5 = csgt %r3 9 : i32
-  br %r5 %block_4 %block_10
-@block_4
-  jmp %block_4
-  call %lm_list_len %0
-  sub %r8 9
-  call %std.sort._quicksort_range %0 1 %r10 %1 %2
-  jmp %block_10
-@block_10
-  ret 0
-}
-
-function std.math.index.sign(i64) {
-@entry
-@block_0
-  call %std.math.arithmetic.sign %0
-  ret %r1
-}
-
-function std.math.vector3.__init__() {
-@entry
-  ret 0
-}
-
-function std.math.vector4.Vector4.sub(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.math.random.random_bool() {
-@entry
-@block_0
-  call %std.math.random.Random.next_bool 0
-  ret %r1
-}
-
-function std.math.vector3.Vector3.cross(i64, i64) {
-@entry
-  ret 0
-}
-
-function main() {
-@entry
-@block_0
-  %r0 = call %lm_box_string %str_const_0 : i64
-  call %lm_print_int %r0
-  call %test_constants
-  %r4 = ceq %r2 9 : i32
-  %r5 = call %lm_box_string %str_const_1 : i64
-  call %lm_assert %r4 %r5
-  call %test_arithmetic
-  %r9 = ceq %r7 9 : i32
-  %r10 = call %lm_box_string %str_const_2 : i64
-  call %lm_assert %r9 %r10
-  call %test_trigonometry
-  %r14 = ceq %r12 9 : i32
-  %r15 = call %lm_box_string %str_const_3 : i64
-  call %lm_assert %r14 %r15
-  call %test_statistics
-  %r19 = ceq %r17 9 : i32
-  %r20 = call %lm_box_string %str_const_4 : i64
-  call %lm_assert %r19 %r20
-  call %test_random
-  %r24 = ceq %r22 9 : i32
-  %r25 = call %lm_box_string %str_const_5 : i64
-  call %lm_assert %r24 %r25
-  call %test_vectors
-  %r29 = ceq %r27 9 : i32
-  %r30 = call %lm_box_string %str_const_6 : i64
-  call %lm_assert %r29 %r30
-  call %test_quaternion_and_matrix
-  %r34 = ceq %r32 9 : i32
-  %r35 = call %lm_box_string %str_const_7 : i64
-  call %lm_assert %r34 %r35
-  %r37 = call %lm_box_string %str_const_8 : i64
-  call %lm_print_int %r37
-  ret 1
-}
-
-function std.math.arithmetic.Float.sqrt(i64) {
-@entry
-  ret 0
-}
-
-function std.math.vector3.Vector3.scale(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.math.trigonometry.TrigFloat.sinh(i64) {
-@entry
-  ret 0
-}
-
-function std.math.index.sqrt(i64) {
-@entry
-@block_0
-  call %std.math.arithmetic.sqrt %0
-  ret %r1
-}
-
 function std.resource.Resource.close(i64) {
 @entry
   ret 0
+}
+
+function std.math.trigonometry.atan(i64) {
+@entry
+@block_0
+  %r1 = alloc 16 : i64
+  call %std.math.trigonometry.TrigFloat.init %r1 %0
+  call %std.math.trigonometry.TrigFloat.atan %r1
+  ret %r3
+}
+
+function test_statistics() {
+@entry
+@block_0
+  %r0 = call %lm_box_string %str_const_9 : i64
+  call %lm_print_int %r0
+  call %lm_list_new 0
+  call %lm_list_append %r2 2
+  call %lm_list_append %r2 2
+  call %lm_list_append %r2 2
+  call %lm_list_append %r2 2
+  call %lm_list_append %r2 2
+  call %std.math.index.sum %r2
+  call %nearly_equal %r14 2
+  %r17 = call %lm_box_string %str_const_10 : i64
+  call %lm_assert %r16 %r17
+  call %std.math.index.mean %r2
+  call %nearly_equal %r19 2
+  %r22 = call %lm_box_string %str_const_11 : i64
+  call %lm_assert %r21 %r22
+  call %std.math.index.median %r2
+  call %nearly_equal %r24 2
+  %r27 = call %lm_box_string %str_const_12 : i64
+  call %lm_assert %r26 %r27
+  call %std.math.index.variance %r2
+  call %nearly_equal %r29 2
+  %r32 = call %lm_box_string %str_const_13 : i64
+  call %lm_assert %r31 %r32
+  call %std.math.index.stddev %r2
+  call %nearly_equal %r34 2
+  %r37 = call %lm_box_string %str_const_14 : i64
+  call %lm_assert %r36 %r37
+  ret 9
+}
+
+function std.math.index.log(i64) {
+@entry
+@block_0
+  call %std.math.arithmetic.log %0
+  ret %r1
 }
 
 function std.math.arithmetic.lerp(i64, i64, i64) {
@@ -653,56 +797,6 @@ function std.sort.mergesort(i64, i64, i64) {
 function std.math.arithmetic.Float.exp(i64) {
 @entry
   ret 0
-}
-
-function test_statistics() {
-@entry
-@block_0
-  %r0 = call %lm_box_string %str_const_9 : i64
-  call %lm_print_int %r0
-  call %lm_list_new 0
-  call %lm_list_append %r2 2
-  call %lm_list_append %r2 2
-  call %lm_list_append %r2 2
-  call %lm_list_append %r2 2
-  call %lm_list_append %r2 2
-  call %std.math.index.sum %r2
-  call %nearly_equal %r14 2
-  %r17 = call %lm_box_string %str_const_10 : i64
-  call %lm_assert %r16 %r17
-  call %std.math.index.mean %r2
-  call %nearly_equal %r19 2
-  %r22 = call %lm_box_string %str_const_11 : i64
-  call %lm_assert %r21 %r22
-  call %std.math.index.median %r2
-  call %nearly_equal %r24 2
-  %r27 = call %lm_box_string %str_const_12 : i64
-  call %lm_assert %r26 %r27
-  call %std.math.index.variance %r2
-  call %nearly_equal %r29 2
-  %r32 = call %lm_box_string %str_const_13 : i64
-  call %lm_assert %r31 %r32
-  call %std.math.index.stddev %r2
-  call %nearly_equal %r34 2
-  %r37 = call %lm_box_string %str_const_14 : i64
-  call %lm_assert %r36 %r37
-  ret 9
-}
-
-function std.math.trigonometry.atan(i64) {
-@entry
-@block_0
-  %r1 = alloc 16 : i64
-  call %std.math.trigonometry.TrigFloat.init %r1 %0
-  call %std.math.trigonometry.TrigFloat.atan %r1
-  ret %r3
-}
-
-function std.math.index.log(i64) {
-@entry
-@block_0
-  call %std.math.arithmetic.log %0
-  ret %r1
 }
 
 function std.math.arithmetic.Float.min(i64, i64) {
@@ -809,6 +903,28 @@ function nearly_equal(i64, i64) {
   ret %r9
 }
 
+function std.math.trigonometry.TrigFloat.sinh(i64) {
+@entry
+  ret 0
+}
+
+function std.math.arithmetic.Float.sqrt(i64) {
+@entry
+  ret 0
+}
+
+function std.math.vector3.Vector3.scale(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.index.sqrt(i64) {
+@entry
+@block_0
+  call %std.math.arithmetic.sqrt %0
+  ret %r1
+}
+
 function std.math.quaternion.__init__() {
 @entry
   ret 0
@@ -894,38 +1010,6 @@ function std.resource.create(i64, i64) {
   %r10 = alloc 16 : i64
   call %std.resource.Resource.init %r10 %r2 %0
   ret %r10
-}
-
-function std.internal.runtime.__init__() {
-@entry
-  ret 0
-}
-
-function std.math.index.Quaternion(i64, i64, i64, i64) {
-@entry
-@block_0
-  %r4 = alloc 16 : i64
-  call %std.math.quaternion.Quaternion.init %r4 %0 %1 %2 %3
-  ret %r4
-}
-
-function std.math.trigonometry.TrigFloat.asin(i64) {
-@entry
-  ret 0
-}
-
-function std.math.index.ceil(i64) {
-@entry
-@block_0
-  call %std.math.arithmetic.ceil %0
-  ret %r1
-}
-
-function std.sort.timsort(i64, i64, i64) {
-@entry
-@block_0
-  call %std.sort.stable_sort %0 %1 %2
-  ret 0
 }
 
 function std.resource.Resource.is_open(i64) {
@@ -1027,18 +1111,6 @@ function std.math.arithmetic.abs_int(i64) {
   ret %r3
 }
 
-function std.math.random.SecureRandom.next_float(i64) {
-@entry
-  ret 0
-}
-
-function std.math.index.log10(i64) {
-@entry
-@block_0
-  call %std.math.arithmetic.log10 %0
-  ret %r1
-}
-
 function std.math.index.lerp(i64, i64, i64) {
 @entry
 @block_0
@@ -1063,6 +1135,18 @@ function std.math.arithmetic.cbrt(i64) {
 function std.math.random.SecureRandom.next_int(i64) {
 @entry
   ret 0
+}
+
+function std.math.trigonometry.TrigFloat.normalize_angle(i64) {
+@entry
+  ret 0
+}
+
+function std.math.index.min(i64, i64) {
+@entry
+@block_0
+  call %std.math.arithmetic.min %0 %1
+  ret %r2
 }
 
 function std.math.trigonometry.sin(i64) {
@@ -1101,16 +1185,12 @@ function std.math.index.combinations(i64, i64) {
   ret %r2
 }
 
-function std.internal.runtime.destroy(i64) {
+function std.math.trigonometry.asin(i64) {
 @entry
 @block_0
-  ret 0
-}
-
-function std.resource._call(i64, i64, i64) {
-@entry
-@block_0
-  call %std.internal.runtime.call %0 %1 %2
+  %r1 = alloc 16 : i64
+  call %std.math.trigonometry.TrigFloat.init %r1 %0
+  call %std.math.trigonometry.TrigFloat.asin %r1
   ret %r3
 }
 
@@ -1177,6 +1257,30 @@ function std.math.statistics.variance(i64) {
   ret %r24
 }
 
+function std.math.quaternion.Quaternion.normalize(i64) {
+@entry
+  ret 0
+}
+
+function std.math.trigonometry.acos(i64) {
+@entry
+@block_0
+  %r1 = alloc 16 : i64
+  call %std.math.trigonometry.TrigFloat.init %r1 %0
+  call %std.math.trigonometry.TrigFloat.acos %r1
+  ret %r3
+}
+
+function std.math.arithmetic.Int.min(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.trigonometry.TrigFloat.tan(i64) {
+@entry
+  ret 0
+}
+
 function std.math.trigonometry.TrigFloat.sin(i64) {
 @entry
   ret 0
@@ -1194,20 +1298,37 @@ function std.math.index.median(i64) {
   ret %r1
 }
 
-function std.math.vector3.Vector3.dot(i64, i64) {
+function std.resource.Poller.poll(i64) {
 @entry
   ret 0
 }
 
-function std.math.trigonometry.TrigFloat.atan2(i64, i64) {
+function std.math.arithmetic.Int.abs(i64) {
 @entry
   ret 0
 }
 
-function std.internal.runtime.create(i64, i64) {
+function std.sort.quicksort(i64, i64, i64) {
 @entry
 @block_0
+  call %lm_list_len %0
+  %r5 = csgt %r3 9 : i32
+  br %r5 %block_4 %block_10
+@block_4
+  jmp %block_4
+  call %lm_list_len %0
+  sub %r8 9
+  call %std.sort._quicksort_range %0 1 %r10 %1 %2
+  jmp %block_10
+@block_10
   ret 0
+}
+
+function std.math.index.sign(i64) {
+@entry
+@block_0
+  call %std.math.arithmetic.sign %0
+  ret %r1
 }
 
 function std.math.trigonometry.TrigFloat.acos(i64) {
@@ -1310,49 +1431,6 @@ function std.resource.Connector.init(i64, i64) {
   ret 0
 }
 
-function std.math.arithmetic.log10(i64) {
-@entry
-@block_0
-  %r1 = alloc 16 : i64
-  call %std.math.arithmetic.Float.init %r1 %0
-  call %std.math.arithmetic.Float.log10 %r1
-  ret %r3
-}
-
-function std.resource.create_dns_resolver() {
-@entry
-@block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 %r1
-  %r5 = neg 9 : i64
-  %r6 = ceq %r2 %r5 : i32
-  br %r6 %block_8 %block_10
-@block_8
-  jmp %block_8
-  %r8 = call %lm_error_new 0 : i8*
-  ret %r8
-@block_10
-  %r11 = alloc 16 : i64
-  call %std.resource.Resource.init %r11 %r2 0
-  ret %r11
-}
-
-function std.math.trigonometry.cos(i64) {
-@entry
-@block_0
-  %r1 = alloc 16 : i64
-  call %std.math.trigonometry.TrigFloat.init %r1 %0
-  call %std.math.trigonometry.TrigFloat.cos %r1
-  ret %r3
-}
-
-function std.math.index.variance(i64) {
-@entry
-@block_0
-  call %std.math.statistics.variance %0
-  ret %r1
-}
-
 function std.math.arithmetic.sign(i64) {
 @entry
 @block_0
@@ -1427,13 +1505,17 @@ function std.resource.ResourceReader.read(i64, i64) {
   ret 0
 }
 
-function std.math.arithmetic.min(i64, i64) {
+function std.resource._call(i64, i64, i64) {
 @entry
 @block_0
-  %r2 = alloc 16 : i64
-  call %std.math.arithmetic.Float.init %r2 %0
-  call %std.math.arithmetic.Float.min %r2 %1
-  ret %r4
+  call %std.internal.runtime.call %0 %1 %2
+  ret %r3
+}
+
+function std.internal.runtime.destroy(i64) {
+@entry
+@block_0
+  ret 0
 }
 
 function std.resource.create_websocket() {
@@ -1507,106 +1589,6 @@ function std.resource.__init__() {
   ret 0
 }
 
-function std.math.trigonometry.TrigFloat.tanh(i64) {
-@entry
-  ret 0
-}
-
-function std.math.index.acos(i64) {
-@entry
-@block_0
-  call %std.math.trigonometry.acos %0
-  ret %r1
-}
-
-function std.math.trigonometry.TrigFloat.normalize_angle(i64) {
-@entry
-  ret 0
-}
-
-function std.math.index.min(i64, i64) {
-@entry
-@block_0
-  call %std.math.arithmetic.min %0 %1
-  ret %r2
-}
-
-function std.math.trigonometry.TrigFloat.init(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.math.trigonometry.tan(i64) {
-@entry
-@block_0
-  %r1 = alloc 16 : i64
-  call %std.math.trigonometry.TrigFloat.init %r1 %0
-  call %std.math.trigonometry.TrigFloat.tan %r1
-  ret %r3
-}
-
-function std.sort._partition(i64, i64, i64, i64, i64) {
-@entry
-@block_0
-  call %lm_list_get %0 %1
-  %r8 = sub %r10 9 : i64
-  jmp %block_7
-@block_7
-  %r11 = cslt %r10 %1 : i32
-  br %r11 %block_9 %block_25
-@block_9
-  jmp %block_9
-  call %lm_list_get %0 %r10
-  call %std.sort._compare %r13 %r5 %2 %3
-  %r16 = csle %r14 1 : i32
-  br %r16 %block_14 %block_20
-@block_14
-  jmp %block_14
-  %r20 = add %r8 9 : i64
-  call %std.sort._swap %0 %r20 %r10
-  jmp %block_20
-@block_20
-  %r24 = add %r10 9 : i64
-  jmp %block_7
-@block_25
-  %r27 = add %r20 9 : i64
-  call %std.sort._swap %0 %r27 %1
-  %r31 = add %r20 9 : i64
-  ret %r31
-}
-
-function std.math.trigonometry.asin(i64) {
-@entry
-@block_0
-  %r1 = alloc 16 : i64
-  call %std.math.trigonometry.TrigFloat.init %r1 %0
-  call %std.math.trigonometry.TrigFloat.asin %r1
-  ret %r3
-}
-
-function std.math.quaternion.Quaternion.normalize(i64) {
-@entry
-  ret 0
-}
-
-function std.math.trigonometry.acos(i64) {
-@entry
-@block_0
-  %r1 = alloc 16 : i64
-  call %std.math.trigonometry.TrigFloat.init %r1 %0
-  call %std.math.trigonometry.TrigFloat.acos %r1
-  ret %r3
-}
-
-function std.math.trigonometry.atan2(i64, i64) {
-@entry
-@block_0
-  %r2 = alloc 16 : i64
-  call %std.math.trigonometry.TrigFloat.init %r2 %0
-  call %std.math.trigonometry.TrigFloat.atan2 %r2 %1
-  ret %r4
-}
-
 function std.resource.ResourceWriter.init(i64, i64) {
 @entry
   ret 0
@@ -1618,6 +1600,125 @@ function std.math.trigonometry.__init__() {
 }
 
 function std.sort.__init__() {
+@entry
+  ret 0
+}
+
+function std.internal.runtime.create(i64, i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.internal.runtime.__init__() {
+@entry
+  ret 0
+}
+
+function std.math.index.Quaternion(i64, i64, i64, i64) {
+@entry
+@block_0
+  %r4 = alloc 16 : i64
+  call %std.math.quaternion.Quaternion.init %r4 %0 %1 %2 %3
+  ret %r4
+}
+
+function std.math.trigonometry.TrigFloat.asin(i64) {
+@entry
+  ret 0
+}
+
+function std.math.index.ceil(i64) {
+@entry
+@block_0
+  call %std.math.arithmetic.ceil %0
+  ret %r1
+}
+
+function std.sort.timsort(i64, i64, i64) {
+@entry
+@block_0
+  call %std.sort.stable_sort %0 %1 %2
+  ret 0
+}
+
+function std.math.trigonometry.TrigFloat.atan2(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.vector3.Vector3.dot(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.random.SecureRandom.next_float(i64) {
+@entry
+  ret 0
+}
+
+function std.math.index.log10(i64) {
+@entry
+@block_0
+  call %std.math.arithmetic.log10 %0
+  ret %r1
+}
+
+function std.math.random.random_bool() {
+@entry
+@block_0
+  call %std.math.random.Random.next_bool 0
+  ret %r1
+}
+
+function std.math.vector3.Vector3.cross(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.vector4.Vector4.sub(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.vector3.__init__() {
+@entry
+  ret 0
+}
+
+function std.math.quaternion.Quaternion.add(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.quaternion.Quaternion.sub(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.random.__init__() {
+@entry
+  ret 0
+}
+
+function std.math.quaternion.Quaternion.mag(i64) {
+@entry
+  ret 0
+}
+
+function std.math.index.atan(i64) {
+@entry
+@block_0
+  call %std.math.trigonometry.atan %0
+  ret %r1
+}
+
+function std.math.quaternion.Quaternion.init(i64, i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.vector2.Vector2.dot(i64, i64) {
 @entry
   ret 0
 }
@@ -1704,43 +1805,6 @@ function std.math.index.__init__() {
   ret 0
 }
 
-function std.math.quaternion.Quaternion.add(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.math.quaternion.Quaternion.sub(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.math.random.__init__() {
-@entry
-  ret 0
-}
-
-function std.math.quaternion.Quaternion.mag(i64) {
-@entry
-  ret 0
-}
-
-function std.math.index.atan(i64) {
-@entry
-@block_0
-  call %std.math.trigonometry.atan %0
-  ret %r1
-}
-
-function std.math.quaternion.Quaternion.init(i64, i64, i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.math.vector2.Vector2.dot(i64, i64) {
-@entry
-  ret 0
-}
-
 function std.math.statistics.stddev(i64) {
 @entry
 @block_0
@@ -1789,121 +1853,121 @@ function std.math.vector2.Vector2.init(i64, i64, i64) {
   ret 0
 }
 
-function test_arithmetic() {
+function test_constants() {
 @entry
 @block_0
   %r0 = call %lm_box_string %str_const_28 : i64
   call %lm_print_int %r0
+  call %nearly_equal 0 2
+  %r5 = call %lm_box_string %str_const_29 : i64
+  call %lm_assert %r4 %r5
+  call %nearly_equal 0 2
+  %r10 = call %lm_box_string %str_const_30 : i64
+  call %lm_assert %r9 %r10
+  call %nearly_equal 0 2
+  %r15 = call %lm_box_string %str_const_31 : i64
+  call %lm_assert %r14 %r15
+  ret 9
+}
+
+function test_arithmetic() {
+@entry
+@block_0
+  %r0 = call %lm_box_string %str_const_32 : i64
+  call %lm_print_int %r0
   %r3 = neg 2 : i64
   call %std.math.index.abs %r3
   %r6 = ceq %r4 2 : i32
-  %r7 = call %lm_box_string %str_const_29 : i64
+  %r7 = call %lm_box_string %str_const_33 : i64
   call %lm_assert %r6 %r7
   %r10 = neg 81 : i64
   call %std.math.index.abs_int %r10
   %r13 = ceq %r11 81 : i32
-  %r14 = call %lm_box_string %str_const_30 : i64
+  %r14 = call %lm_box_string %str_const_34 : i64
   call %lm_assert %r13 %r14
   call %std.math.index.gcd 97 145
   %r20 = ceq %r18 49 : i32
-  %r21 = call %lm_box_string %str_const_31 : i64
+  %r21 = call %lm_box_string %str_const_35 : i64
   call %lm_assert %r20 %r21
   call %std.math.index.lcm 97 145
   %r27 = ceq %r25 289 : i32
-  %r28 = call %lm_box_string %str_const_32 : i64
+  %r28 = call %lm_box_string %str_const_36 : i64
   call %lm_assert %r27 %r28
   call %std.math.index.factorial 41
   %r33 = ceq %r31 961 : i32
-  %r34 = call %lm_box_string %str_const_33 : i64
+  %r34 = call %lm_box_string %str_const_37 : i64
   call %lm_assert %r33 %r34
   call %std.math.index.permutations 41 17
   %r40 = ceq %r38 161 : i32
-  %r41 = call %lm_box_string %str_const_34 : i64
+  %r41 = call %lm_box_string %str_const_38 : i64
   call %lm_assert %r40 %r41
   call %std.math.index.combinations 41 17
   %r47 = ceq %r45 81 : i32
-  %r48 = call %lm_box_string %str_const_35 : i64
+  %r48 = call %lm_box_string %str_const_39 : i64
   call %lm_assert %r47 %r48
   call %std.math.index.min 2 2
   %r54 = ceq %r52 2 : i32
-  %r55 = call %lm_box_string %str_const_36 : i64
+  %r55 = call %lm_box_string %str_const_40 : i64
   call %lm_assert %r54 %r55
   call %std.math.index.max 2 2
   %r61 = ceq %r59 2 : i32
-  %r62 = call %lm_box_string %str_const_37 : i64
+  %r62 = call %lm_box_string %str_const_41 : i64
   call %lm_assert %r61 %r62
   call %std.math.index.clamp 2 2 2
   %r69 = ceq %r67 2 : i32
-  %r70 = call %lm_box_string %str_const_38 : i64
+  %r70 = call %lm_box_string %str_const_42 : i64
   call %lm_assert %r69 %r70
   %r73 = neg 2 : i64
   call %std.math.index.clamp %r73 2 2
   %r78 = ceq %r76 2 : i32
-  %r79 = call %lm_box_string %str_const_39 : i64
+  %r79 = call %lm_box_string %str_const_43 : i64
   call %lm_assert %r78 %r79
   %r82 = neg 2 : i64
   call %std.math.index.sign %r82
   %r85 = neg 2 : i64
   %r86 = ceq %r83 %r85 : i32
-  %r87 = call %lm_box_string %str_const_40 : i64
+  %r87 = call %lm_box_string %str_const_44 : i64
   call %lm_assert %r86 %r87
   call %std.math.index.lerp 2 2 2
   %r94 = ceq %r92 2 : i32
-  %r95 = call %lm_box_string %str_const_41 : i64
+  %r95 = call %lm_box_string %str_const_45 : i64
   call %lm_assert %r94 %r95
   call %std.math.index.floor 2
   %r100 = ceq %r98 41 : i32
-  %r101 = call %lm_box_string %str_const_42 : i64
+  %r101 = call %lm_box_string %str_const_46 : i64
   call %lm_assert %r100 %r101
   call %std.math.index.ceil 2
   %r106 = ceq %r104 49 : i32
-  %r107 = call %lm_box_string %str_const_43 : i64
+  %r107 = call %lm_box_string %str_const_47 : i64
   call %lm_assert %r106 %r107
   call %std.math.index.round 2
   %r112 = ceq %r110 49 : i32
-  %r113 = call %lm_box_string %str_const_44 : i64
+  %r113 = call %lm_box_string %str_const_48 : i64
   call %lm_assert %r112 %r113
   call %std.math.index.trunc 2
   %r118 = ceq %r116 41 : i32
-  %r119 = call %lm_box_string %str_const_45 : i64
+  %r119 = call %lm_box_string %str_const_49 : i64
   call %lm_assert %r118 %r119
   call %std.math.index.fract 2
   call %nearly_equal %r122 2
-  %r125 = call %lm_box_string %str_const_46 : i64
+  %r125 = call %lm_box_string %str_const_50 : i64
   call %lm_assert %r124 %r125
   call %std.math.index.sqrt 2
   call %nearly_equal %r128 2
-  %r131 = call %lm_box_string %str_const_47 : i64
+  %r131 = call %lm_box_string %str_const_51 : i64
   call %lm_assert %r130 %r131
   call %std.math.index.cbrt 2
   call %nearly_equal %r134 2
-  %r137 = call %lm_box_string %str_const_48 : i64
+  %r137 = call %lm_box_string %str_const_52 : i64
   call %lm_assert %r136 %r137
   call %std.math.index.hypot 2 2
   call %nearly_equal %r141 2
-  %r144 = call %lm_box_string %str_const_49 : i64
+  %r144 = call %lm_box_string %str_const_53 : i64
   call %lm_assert %r143 %r144
   call %std.math.index.exp 2
   call %nearly_equal %r147 2
-  %r150 = call %lm_box_string %str_const_50 : i64
+  %r150 = call %lm_box_string %str_const_54 : i64
   call %lm_assert %r149 %r150
-  ret 9
-}
-
-function test_constants() {
-@entry
-@block_0
-  %r0 = call %lm_box_string %str_const_51 : i64
-  call %lm_print_int %r0
-  call %nearly_equal 0 2
-  %r5 = call %lm_box_string %str_const_52 : i64
-  call %lm_assert %r4 %r5
-  call %nearly_equal 0 2
-  %r10 = call %lm_box_string %str_const_53 : i64
-  call %lm_assert %r9 %r10
-  call %nearly_equal 0 2
-  %r15 = call %lm_box_string %str_const_54 : i64
-  call %lm_assert %r14 %r15
   ret 9
 }
 
@@ -2587,19 +2651,13 @@ function std.math.random.SecureRandom.next_bytes(i64, i64) {
   ret 0
 }
 
+function lm_list_get(i64, i64) {
+}
+
 function lm_list_new(i64) {
 }
 
 function lm_error_new(i64) {
-}
-
-function lm_list_len(i64) {
-}
-
-function lm_list_get(i64, i64) {
-}
-
-function lm_list_append(i64, i64) {
 }
 
 function lm_box_string(i8*) {
@@ -2653,6 +2711,12 @@ function lm_assert(i32, i64) {
   ret null
 @pass
   ret null
+}
+
+function lm_list_len(i64) {
+}
+
+function lm_list_append(i64, i64) {
 }
 
 function lm_list_set(i64, i64, i64) {

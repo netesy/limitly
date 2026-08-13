@@ -1,3 +1,97 @@
+global %str_const_0 = "Testing Error frame..."
+global %str_const_1 = "E101"
+global %str_const_2 = "Database offline"
+global %str_const_3 = "E101"
+global %str_const_4 = "error_instance.code should be E101"
+global %str_const_5 = "Database offline"
+global %str_const_6 = "error_instance.message mismatch"
+global %str_const_7 = "[E101] Database offline"
+global %str_const_8 = "error_instance.to_string() incorrect"
+global %str_const_9 = "E102"
+global %str_const_10 = "Disk full"
+global %str_const_11 = "E102"
+global %str_const_12 = "idx_err_val.code incorrect"
+global %str_const_13 = "Disk full"
+global %str_const_14 = "idx_err_val.message mismatch"
+global %str_const_15 = "Error frame tests passed!"
+global %str_const_16 = "=== Core Module Test Suite ==="
+global %str_const_17 = "Error tests failed"
+global %str_const_18 = "Option tests failed"
+global %str_const_19 = "Result tests failed"
+global %str_const_20 = "Trait tests failed"
+global %str_const_21 = "All standard library core tests passed successfully."
+global %str_const_22 = "Testing Option frame..."
+global %str_const_23 = "hello"
+global %str_const_24 = "opt_some should be Some"
+global %str_const_25 = "opt_some should not be None"
+global %str_const_26 = "hello"
+global %str_const_27 = "opt_some unwrap failed"
+global %str_const_28 = "fallback"
+global %str_const_29 = "hello"
+global %str_const_30 = "opt_some unwrap_or failed"
+global %str_const_31 = "opt_none should not be Some"
+global %str_const_32 = "opt_none should be None"
+global %str_const_33 = "fallback"
+global %str_const_34 = "fallback"
+global %str_const_35 = "opt_none unwrap_or fallback failed"
+global %str_const_36 = "map_string_len"
+global %str_const_37 = "opt_mapped should be Some"
+global %str_const_38 = "opt_mapped value should be 5"
+global %str_const_39 = "map_string_len"
+global %str_const_40 = "mapped opt_none should be None"
+global %str_const_41 = "is_positive_int"
+global %str_const_42 = "opt_filtered_true should be Some"
+global %str_const_43 = "opt_filtered_true value incorrect"
+global %str_const_44 = "is_positive_int"
+global %str_const_45 = "opt_filtered_false should be None"
+global %str_const_46 = "idx_some should be Some"
+global %str_const_47 = "idx_some value incorrect"
+global %str_const_48 = "idx_none should be None"
+global %str_const_49 = "Option frame tests passed!"
+global %str_const_50 = "Testing Result frame..."
+global %str_const_51 = "res_ok_val should be Ok"
+global %str_const_52 = "res_ok_val should not be Err"
+global %str_const_53 = "res_ok_val unwrap failed"
+global %str_const_54 = "res_ok_val unwrap_or failed"
+global %str_const_55 = "E500"
+global %str_const_56 = "Server Timeout"
+global %str_const_57 = "res_err_val should not be Ok"
+global %str_const_58 = "res_err_val should be Err"
+global %str_const_59 = "res_err_val unwrap_or fallback failed"
+global %str_const_60 = "E500"
+global %str_const_61 = "res_err_val unwrap_err code incorrect"
+global %str_const_62 = "add_one"
+global %str_const_63 = "res_mapped should be Ok"
+global %str_const_64 = "res_mapped value should be 101"
+global %str_const_65 = "add_one"
+global %str_const_66 = "res_err_mapped should be Err"
+global %str_const_67 = "success"
+global %str_const_68 = "idx_ok_val should be Ok"
+global %str_const_69 = "success"
+global %str_const_70 = "idx_ok_val unwrap failed"
+global %str_const_71 = "E404"
+global %str_const_72 = "Not Found"
+global %str_const_73 = "idx_err_val2 should be Err"
+global %str_const_74 = "Result frame tests passed!"
+global %str_const_75 = ""
+global %str_const_76 = ""
+global %str_const_77 = "Testing Traits..."
+global %str_const_78 = "10 should be less than 20"
+global %str_const_79 = "20 should be greater than 10"
+global %str_const_80 = "10 should equal 10"
+global %str_const_81 = "should not be disposed initially"
+global %str_const_82 = "should be disposed after calling dispose()"
+global %str_const_83 = "cloned_data"
+global %str_const_84 = "cloned_data"
+global %str_const_85 = "cloned data mismatch"
+global %str_const_86 = "modified"
+global %str_const_87 = "cloned_data"
+global %str_const_88 = "clone should be separate from source"
+global %str_const_89 = "hash value mismatch (5 * 31 = 155)"
+global %str_const_90 = "Trait tests passed!"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0
@@ -23,6 +117,11 @@ function std.core.error.Error.to_string(i64) {
   ret 0
 }
 
+function std.core.cloneable.__init__() {
+@entry
+  ret 0
+}
+
 function std.core.comparable.__init__() {
 @entry
   ret 0
@@ -31,13 +130,6 @@ function std.core.comparable.__init__() {
 function std.core.index.__init__() {
 @entry
   ret 0
-}
-
-function std.core.index.Err(i64) {
-@entry
-@block_0
-  call %std.core.result.Err %0
-  ret %r1
 }
 
 function is_positive_int(i64) {
@@ -170,6 +262,13 @@ function DummyComparable.init(i64, i64) {
 function std.core.result.Result.unwrap(i64) {
 @entry
   ret 0
+}
+
+function std.core.index.Err(i64) {
+@entry
+@block_0
+  call %std.core.result.Err %0
+  ret %r1
 }
 
 function DummyDisposable.init(i64) {
@@ -499,11 +598,6 @@ function std.core.option.None() {
   %r2 = alloc 16 : i64
   call %std.core.option.Option.init %r2 10 2
   ret %r2
-}
-
-function std.core.cloneable.__init__() {
-@entry
-  ret 0
 }
 
 function test_traits() {

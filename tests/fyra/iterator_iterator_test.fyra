@@ -1,3 +1,5 @@
+global %str_const_0 = "twice"
+global %str_const_1 = "even"
 function __top_level_wrapper__() {
 @entry
 @block_0

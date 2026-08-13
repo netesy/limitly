@@ -156,7 +156,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                         }
                         return 1;
                     }
-                    for (const auto& func : fyra_ir_module->getFunctions()) { if (func) { func->print(std::cout); std::cout << "\n"; } }
+                    fyra_ir_module->print(std::cout);
                     return 0;
                 }
 

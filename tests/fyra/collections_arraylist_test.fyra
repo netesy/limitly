@@ -1,3 +1,20 @@
+global %str_const_0 = ""
+global %str_const_1 = ""
+global %str_const_2 = "a"
+global %str_const_3 = "b"
+global %str_const_4 = "b"
+global %str_const_5 = "x"
+global %str_const_6 = "x"
+global %str_const_7 = ""
+global %str_const_8 = ""
+global %str_const_9 = "ERR"
+global %str_const_10 = ""
+global %str_const_11 = "ERR"
+global %str_const_12 = "ERR"
+global %str_const_13 = ""
+global %str_const_14 = ""
+global %str_const_15 = "ERR"
+global %str_const_16 = ""
 function __top_level_wrapper__() {
 @entry
 @block_0
@@ -133,6 +150,31 @@ function std.collections.deque.DoubleEndedQueue.push_front(i64, i64) {
 }
 
 function std.collections.deque.DoubleEndedQueue.push_back(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.clear(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.len(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.set(i64, i64, i64) {
 @entry
   ret 0
 }
@@ -336,46 +378,6 @@ function std.collections.map.HashMapWrapper.size(i64) {
   ret 0
 }
 
-function std.collections.map.HashMapWrapper.remove(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.map.HashMapWrapper.get(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.map.HashMapWrapper.put(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.clear(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.len(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.set(i64, i64, i64) {
-@entry
-  ret 0
-}
-
 function std.iterator.PeekableIterator.peek(i64) {
 @entry
   ret 0
@@ -406,12 +408,27 @@ function std.collections.bitset.BitSetWrapper.unset(i64, i64) {
   ret 0
 }
 
+function std.collections.list.List.append(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.SkipIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
 function std.iterator.FilterIterator.next(i64) {
 @entry
   ret 0
 }
 
 function std.collections.bloom_filter.BloomFilter.contains(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.map.HashMapWrapper.remove(i64, i64) {
 @entry
   ret 0
 }
@@ -720,6 +737,16 @@ function std.core.some_int(i64) {
   ret 0
 }
 
+function std.collections.list.List.push(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.Vector.init(i64, i64) {
+@entry
+  ret 0
+}
+
 function main() {
 @entry
 @block_0
@@ -771,17 +798,17 @@ function std.iterator.MapIterator.init(i64, i64, i64) {
   ret 0
 }
 
-function std.collections.hashmap.HashMap.contains_key(i64, i64) {
-@entry
-  ret 0
-}
-
 function std.collections.linkedlist.Iterator.next(i64) {
 @entry
   ret 0
 }
 
 function std.collections.queue.Stack.init(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.contains_key(i64, i64) {
 @entry
   ret 0
 }
@@ -907,21 +934,6 @@ function std.collections.queue.BitSet.count(i64) {
   ret 0
 }
 
-function std.collections.linkedlist.LinkedList.pop_back(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.map.HashMapWrapper.contains_key(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.SkipIterator.next(i64) {
-@entry
-  ret 0
-}
-
 function std.iterator.EnumerateIterator.next(i64) {
 @entry
   ret 0
@@ -980,6 +992,11 @@ function std.iterator.FilterIterator.init(i64, i64, i64) {
   ret 0
 }
 
+function std.collections.map.HashMapWrapper.put(i64, i64, i64) {
+@entry
+  ret 0
+}
+
 function std.collections.list.List.init(i64) {
 @entry
   ret 0
@@ -1031,16 +1048,6 @@ function std.collections.set.Set.find_index(i64, i64) {
 }
 
 function std.collections.bitset.__init__() {
-@entry
-  ret 0
-}
-
-function std.iterator.SkipIterator.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.append(i64, i64) {
 @entry
   ret 0
 }
@@ -1175,6 +1182,26 @@ function std.collections.vector.Deque.init(i64) {
   ret 0
 }
 
+function std.collections.list.List.pop(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.vector.ArrayList.remove(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.map.HashMapWrapper.get(i64, i64) {
+@entry
+  ret 0
+}
+
 function std.collections.vector.ArrayList.resize(i64, i64, i64) {
 @entry
   ret 0
@@ -1206,161 +1233,6 @@ function std.collections.vector.Deque.size(i64) {
 }
 
 function std.collections.hashset.HashSetWrapper.add(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.from_pairs(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.OptionInt.unwrap(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.contains_value(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.bitset.BitSetWrapper.init(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.get(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.remove(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeMap.put(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.stack.Stack.len(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.deque.__init__() {
-@entry
-  ret 0
-}
-
-function std.core.ResultStr.map(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.is_empty(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.stack.Stack.pop(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.clear(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.keys(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.set.Set.to_string(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.btreeset.BTreeSetWrapper.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.values(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.entries(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.put(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.map_values(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeSet.length(i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.find_key_index(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.bloom_filter.BloomFilter.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.queue.Stack.pop(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.HashMap.to_string(i64) {
-@entry
-  ret 0
-}
-
-function std.core.ResultInt.map_err(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashmap.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.tree.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.vector.ArrayList.remove(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.pop(i64) {
 @entry
   ret 0
 }
@@ -1488,6 +1360,31 @@ function std.collections.queue.PriorityQueue._sift_down(i64, i64) {
   ret 0
 }
 
+function std.collections.bloom_filter.BloomFilter.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.queue.Stack.pop(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeSet.length(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.find_key_index(i64, i64) {
+@entry
+  ret 0
+}
+
 function std.collections.queue.Stack.peek(i64) {
 @entry
   ret 0
@@ -1500,12 +1397,6 @@ function std.collections.queue.Stack.len(i64) {
 
 function std.collections.queue.Stack.length(i64) {
 @entry
-  ret 0
-}
-
-function std.core.some_str(i64) {
-@entry
-@block_0
   ret 0
 }
 
@@ -1524,6 +1415,12 @@ function std.collections.linked_list.DLL.init(i64) {
 
 function std.collections.stack.Stack.is_empty(i64) {
 @entry
+  ret 0
+}
+
+function std.core.some_str(i64) {
+@entry
+@block_0
   ret 0
 }
 
@@ -1610,6 +1507,161 @@ function std.collections.queue.__init__() {
   ret 0
 }
 
+function std.collections.hashmap.HashMap.from_pairs(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.contains_value(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.bitset.BitSetWrapper.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.get(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.remove(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeMap.put(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.stack.Stack.len(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.deque.__init__() {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.is_empty(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.stack.Stack.pop(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.clear(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.keys(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.set.Set.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.btreeset.BTreeSetWrapper.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.values(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.entries(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.put(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.map_values(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.map_err(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.priority_queue.PriorityQueueWrapper.pop(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeSet.contains(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.priority_queue.PriorityQueueWrapper.peek(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.priority_queue.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.bitset.BitSetWrapper.get_size(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.stack.Stack.push(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.stack.Stack.clear(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.stack.Stack.init(i64) {
+@entry
+  ret 0
+}
+
 function std.iterator.cycle(i64) {
 @entry
 @block_0
@@ -1638,17 +1690,12 @@ function std.core.OptionInt.is_none(i64) {
   ret 0
 }
 
-function std.core.OptionInt.unwrap_or(i64, i64) {
-@entry
-  ret 0
-}
-
 function std.core.OptionStr.is_some(i64) {
 @entry
   ret 0
 }
 
-function std.collections.stack.Stack.init(i64) {
+function std.core.OptionInt.unwrap_or(i64, i64) {
 @entry
   ret 0
 }
@@ -1825,37 +1872,12 @@ function std.collections.bitset.BitSetWrapper.get(i64, i64) {
   ret 0
 }
 
-function std.collections.bitset.BitSetWrapper.get_size(i64) {
+function std.collections.queue.Queue.dequeue(i64) {
 @entry
   ret 0
 }
 
-function std.collections.priority_queue.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.priority_queue.PriorityQueueWrapper.pop(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeSet.contains(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.priority_queue.PriorityQueueWrapper.peek(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.stack.Stack.push(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.stack.Stack.clear(i64) {
+function std.collections.btreeset.BTreeSetWrapper.contains(i64, i64) {
 @entry
   ret 0
 }
@@ -1871,16 +1893,6 @@ function std.collections.hashset.HashSetWrapper.init(i64) {
 }
 
 function std.collections.hashset.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.queue.Queue.dequeue(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.btreeset.BTreeSetWrapper.contains(i64, i64) {
 @entry
   ret 0
 }
@@ -1910,12 +1922,17 @@ function std.collections.btreemap.BTreeMapWrapper.init(i64) {
   ret 0
 }
 
-function std.collections.vector.Vector.init(i64, i64) {
+function std.collections.linkedlist.LinkedList.pop_back(i64) {
 @entry
   ret 0
 }
 
-function std.collections.list.List.push(i64, i64) {
+function std.iterator.SkipIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.map.HashMapWrapper.contains_key(i64, i64) {
 @entry
   ret 0
 }

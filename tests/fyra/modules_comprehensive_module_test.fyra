@@ -1,3 +1,73 @@
+global %str_const_0 = "========================================"
+global %str_const_1 = "Comprehensive Module System Test Suite"
+global %str_const_2 = "========================================"
+global %str_const_3 = ""
+global %str_const_4 = "Test 1: Basic Import and Variable Access"
+global %str_const_5 = "----------------------------------------"
+global %str_const_6 = "✓ Module imported successfully"
+global %str_const_7 = "✓ Module variable access: "
+global %str_const_8 = "✓ Module number access: "
+global %str_const_9 = "Hello from basic module"
+global %str_const_10 = "Module variable should be accessible"
+global %str_const_11 = "Module number should be accessible"
+global %str_const_12 = ""
+global %str_const_13 = "Test 2: Simple Function Calls"
+global %str_const_14 = "------------------------------"
+global %str_const_15 = "✓ Simple function call successful"
+global %str_const_16 = "Module function call should work"
+global %str_const_17 = ""
+global %str_const_18 = "Test 3: Module Aliasing"
+global %str_const_19 = "-----------------------"
+global %str_const_20 = "✓ Module imported with alias"
+global %str_const_21 = "✓ Aliased variable access: PI = "
+global %str_const_22 = "Module alias should work correctly"
+global %str_const_23 = ""
+global %str_const_24 = "Test 4: Multiple Module Imports"
+global %str_const_25 = "-------------------------------"
+global %str_const_26 = "✓ Multiple modules imported"
+global %str_const_27 = "✓ First module still accessible: "
+global %str_const_28 = "✓ Second module accessible: PI = "
+global %str_const_29 = "✓ Third module accessible: "
+global %str_const_30 = "Hello from basic module"
+global %str_const_31 = "Multiple imports should preserve access"
+global %str_const_32 = "Multiple imports should preserve access"
+global %str_const_33 = "Hello"
+global %str_const_34 = "Multiple imports should preserve access"
+global %str_const_35 = ""
+global %str_const_36 = "Test 5: Nested Directory Import"
+global %str_const_37 = "-------------------------------"
+global %str_const_38 = "✓ Nested module imported"
+global %str_const_39 = "✓ Nested module variable: "
+global %str_const_40 = "I'm deep in the directory structure"
+global %str_const_41 = "Nested module import should work"
+global %str_const_42 = ""
+global %str_const_43 = "Test 6: Show Filter"
+global %str_const_44 = "-------------------"
+global %str_const_45 = "✓ Module imported with show filter"
+global %str_const_46 = "✓ Shown variable accessible: "
+global %str_const_47 = "Hello"
+global %str_const_48 = "Show filter should work"
+global %str_const_49 = ""
+global %str_const_50 = "Test 7: Hide Filter"
+global %str_const_51 = "-------------------"
+global %str_const_52 = "✓ Module imported with hide filter"
+global %str_const_53 = "✓ Non-hidden variable accessible: "
+global %str_const_54 = "Hello"
+global %str_const_55 = "Hide filter should work"
+global %str_const_56 = ""
+global %str_const_57 = "Test Suite Complete!"
+global %str_const_58 = "Greetings from basic module!"
+global %str_const_59 = "Called from deep module"
+global %str_const_60 = ", "
+global %str_const_61 = "!"
+global %str_const_62 = ", "
+global %str_const_63 = "!"
+global %str_const_64 = ""
+global %str_minus = "-"
+global %nl = "
+"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0
@@ -161,16 +231,12 @@ function tests.modules.basic_module.greet() {
   ret 0
 }
 
-function tests.modules.string_module.say_goodbye(i64) {
+function tests.modules.nested.deep_module.deep_function() {
 @entry
 @block_0
-  %r2 = call %lm_box_string %str_const_59 : i64
-  %r3 = call %lm_str_concat 0 %r2 : i8*
-  %r4 = call %lm_to_string %0 : i8*
-  %r5 = call %lm_str_concat %r3 %r4 : i8*
-  %r6 = call %lm_box_string %str_const_60 : i64
-  %r7 = call %lm_str_concat %r5 %r6 : i8*
-  ret %r7
+  %r0 = call %lm_box_string %str_const_59 : i64
+  call %lm_print_int %r0
+  ret 0
 }
 
 function tests.modules.math_module.square(i64) {
@@ -183,11 +249,23 @@ function tests.modules.math_module.square(i64) {
 function tests.modules.string_module.say_hello(i64) {
 @entry
 @block_0
-  %r2 = call %lm_box_string %str_const_61 : i64
+  %r2 = call %lm_box_string %str_const_60 : i64
   %r3 = call %lm_str_concat 0 %r2 : i8*
   %r4 = call %lm_to_string %0 : i8*
   %r5 = call %lm_str_concat %r3 %r4 : i8*
-  %r6 = call %lm_box_string %str_const_62 : i64
+  %r6 = call %lm_box_string %str_const_61 : i64
+  %r7 = call %lm_str_concat %r5 %r6 : i8*
+  ret %r7
+}
+
+function tests.modules.string_module.say_goodbye(i64) {
+@entry
+@block_0
+  %r2 = call %lm_box_string %str_const_62 : i64
+  %r3 = call %lm_str_concat 0 %r2 : i8*
+  %r4 = call %lm_to_string %0 : i8*
+  %r5 = call %lm_str_concat %r3 %r4 : i8*
+  %r6 = call %lm_box_string %str_const_63 : i64
   %r7 = call %lm_str_concat %r5 %r6 : i8*
   ret %r7
 }
@@ -217,11 +295,8 @@ function tests.modules.basic_module.getModuleVar() {
   ret 0
 }
 
-function tests.modules.nested.deep_module.deep_function() {
+function tests.modules.nested.deep_module.__init__() {
 @entry
-@block_0
-  %r0 = call %lm_box_string %str_const_63 : i64
-  call %lm_print_int %r0
   ret 0
 }
 
@@ -265,34 +340,6 @@ function tests.modules.math_module.subtract(i64, i64) {
 @block_0
   %r2 = sub %0 %1 : i64
   ret %r2
-}
-
-function tests.modules.string_module.repeat_string(i64, i64) {
-@entry
-@block_0
-  %r2 = call %lm_box_string %str_const_64 : i64
-  jmp %block_4
-@block_4
-  %r5 = cslt 9 %1 : i32
-  br %r5 %block_6 %block_14
-@block_6
-  jmp %block_6
-  %r6 = call %lm_to_string %0 : i8*
-  %r7 = call %lm_str_concat %r2 %r6 : i8*
-  jmp %block_10
-@block_10
-  %r9 = add 9 9 : i64
-  jmp %block_4
-@block_14
-  ret %r7
-}
-
-function tests.modules.math_module.is_even(i64) {
-@entry
-@block_0
-  %r2 = rem %0 17 : i64
-  %r4 = ceq %r2 1 : i32
-  ret %r4
 }
 
 function tests.modules.math_module.is_odd(i64) {
@@ -345,9 +392,32 @@ function tests.modules.math_module.is_prime(i64) {
   ret 18
 }
 
-function tests.modules.nested.deep_module.__init__() {
+function tests.modules.math_module.is_even(i64) {
 @entry
-  ret 0
+@block_0
+  %r2 = rem %0 17 : i64
+  %r4 = ceq %r2 1 : i32
+  ret %r4
+}
+
+function tests.modules.string_module.repeat_string(i64, i64) {
+@entry
+@block_0
+  %r2 = call %lm_box_string %str_const_64 : i64
+  jmp %block_4
+@block_4
+  %r5 = cslt 9 %1 : i32
+  br %r5 %block_6 %block_14
+@block_6
+  jmp %block_6
+  %r6 = call %lm_to_string %0 : i8*
+  %r7 = call %lm_str_concat %r2 %r6 : i8*
+  jmp %block_10
+@block_10
+  %r9 = add 9 9 : i64
+  jmp %block_4
+@block_14
+  ret %r7
 }
 
 function lm_box_string(i8*) {

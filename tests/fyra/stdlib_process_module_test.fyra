@@ -1,3 +1,26 @@
+global %str_const_0 = "Testing Pipe Frame..."
+global %str_const_1 = "hello"
+global %str_const_2 = ""
+global %str_const_3 = "pipe read failed"
+global %str_const_4 = "Testing Process Frame..."
+global %str_const_5 = "id failed"
+global %str_const_6 = "echo hello"
+global %str_const_7 = "run failed"
+global %str_const_8 = "=== Process Module Test Suite ==="
+global %str_const_9 = "Process frame test failed"
+global %str_const_10 = "Command frame test failed"
+global %str_const_11 = "Pipe frame test failed"
+global %str_const_12 = "All process tests passed successfully."
+global %str_const_13 = "Testing Command Frame..."
+global %str_const_14 = "echo"
+global %str_const_15 = "hello"
+global %str_const_16 = "echo"
+global %str_const_17 = "program failed"
+global %str_const_18 = "args failed"
+global %str_const_19 = "execute failed"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0
