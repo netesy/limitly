@@ -1,3 +1,6 @@
+global %str_const_0 = "=== Crypto Hash Tests ==="
+global %str_const_1 = "Created."
+global %str_minus = "-"
 function __top_level_wrapper__() {
 @entry
 @block_0

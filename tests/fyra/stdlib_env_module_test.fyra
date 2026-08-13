@@ -1,3 +1,23 @@
+global %str_const_0 = "Testing Env Frame..."
+global %str_const_1 = "."
+global %str_const_2 = "cwd failed"
+global %str_const_3 = "args failed"
+global %str_const_4 = "TEST_KEY"
+global %str_const_5 = "test_value"
+global %str_const_6 = "TEST_KEY"
+global %str_const_7 = "get failed"
+global %str_const_8 = "Testing Env Helpers..."
+global %str_const_9 = "."
+global %str_const_10 = "cwd helper failed"
+global %str_const_11 = "args helper failed"
+global %str_const_12 = "=== Env Module Test Suite ==="
+global %str_const_13 = "Env frame test failed"
+global %str_const_14 = "Env helpers test failed"
+global %str_const_15 = "All env tests passed successfully."
+global %str_const_16 = "."
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

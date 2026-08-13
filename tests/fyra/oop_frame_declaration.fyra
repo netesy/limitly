@@ -1,3 +1,16 @@
+global %str_const_0 = "Alice"
+global %str_const_1 = "alice@example.com"
+global %str_const_2 = "default"
+global %str_const_3 = "Hello, Alice"
+global %str_const_4 = "Frame method should work correctly"
+global %str_const_5 = "Frame method should work: 10 + 20 = 30"
+global %str_const_6 = "Frame default value should work"
+global %str_const_7 = "Frame default value should work"
+global %str_const_8 = "Frame method should work: 5 + 3 = 8"
+global %str_const_9 = "Frame init should work correctly"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

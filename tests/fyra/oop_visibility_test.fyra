@@ -1,3 +1,9 @@
+global %str_const_0 = "MyResource"
+global %str_const_1 = "shhh"
+global %str_const_2 = "MyResource"
+global %str_const_3 = "Public field should be accessible"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

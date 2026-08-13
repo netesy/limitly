@@ -1,3 +1,24 @@
+global %str_const_0 = "Queue length should be 2"
+global %str_const_1 = "Peek should return 1"
+global %str_const_2 = "Dequeue should return 1"
+global %str_const_3 = "Dequeue should return 2"
+global %str_const_4 = "Dequeue on empty queue should return nil"
+global %str_const_5 = "Stack length should be 2"
+global %str_const_6 = "Peek should return 2"
+global %str_const_7 = "Pop should return 2"
+global %str_const_8 = "Pop should return 1"
+global %str_const_9 = "Pop on empty stack should return nil"
+global %str_const_10 = "BitSet should contain bit 10"
+global %str_const_11 = "BitSet should contain bit 20"
+global %str_const_12 = "BitSet should not contain bit 15"
+global %str_const_13 = "BitSet count should be 2"
+global %str_const_14 = "BitSet should not contain bit 10 after unset"
+global %str_const_15 = "Iterator should return bit 20"
+global %str_const_16 = "Iterator should be exhausted"
+global %str_const_17 = "Queue/Stack/BitSet tests passed!"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

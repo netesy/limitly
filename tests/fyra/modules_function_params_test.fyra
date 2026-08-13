@@ -1,3 +1,21 @@
+global %str_const_0 = "=== Function Parameters Test ==="
+global %str_const_1 = "Test 1: Function call with parameters"
+global %str_const_2 = "Expected: Function should be called with parameters"
+global %str_const_3 = "5 + 3 = %s"
+global %str_const_4 = "Module function with parameters should work: 5 + 3 = 8"
+global %str_const_5 = "Test 2: Function call with return value"
+global %str_const_6 = "Expected: Function should return a value"
+global %str_const_7 = "4 squared = %s"
+global %str_const_8 = "Module function with return value should work: 4 squared = 16"
+global %str_const_9 = "Test 3: Nested function calls "
+global %str_const_10 = "Expected: Functions should be callable in expressions"
+global %str_const_11 = "square(2) + cube(2) = %s"
+global %str_const_12 = "Nested function calls should work: square(2) + cube(2) = 4 + 8 = 12"
+global %str_const_13 = "=== Function Parameters Test Complete ==="
+global %str_const_14 = "NOTE: All tests are currently skipped due to known limitations"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

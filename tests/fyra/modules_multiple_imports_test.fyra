@@ -1,3 +1,26 @@
+global %str_const_0 = "=== Multiple Imports Test ==="
+global %str_const_1 = "Test 6.1: Use first module"
+global %str_const_2 = "First module should be accessible"
+global %str_const_3 = "Test 6.2: Use second module"
+global %str_const_4 = "4 squared = %s"
+global %str_const_5 = "Second module should work: 4 squared = 16"
+global %str_const_6 = "Test 6.3: Use third module"
+global %str_const_7 = "Multiple Modules"
+global %str_const_8 = "Hello, Multiple Modules!"
+global %str_const_9 = "Third module should work"
+global %str_const_10 = "Test 6.4: Combine results from multiple modules"
+global %str_const_11 = "square(3) + 1 = %s"
+global %str_const_12 = "Multiple modules should work together: square(3) + 1 = 9 + 1 = 10"
+global %str_const_13 = "=== Multiple Imports Test Complete ==="
+global %str_const_14 = "Greetings from basic module!"
+global %str_const_15 = ", "
+global %str_const_16 = "!"
+global %str_const_17 = ", "
+global %str_const_18 = "!"
+global %str_const_19 = ""
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

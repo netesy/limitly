@@ -1,3 +1,20 @@
+global %str_const_0 = "a"
+global %str_const_1 = "b"
+global %str_const_2 = "Collection literals: OK"
+global %str_const_3 = "a"
+global %str_const_4 = "b"
+global %str_const_5 = "hello"
+global %str_const_6 = "Collection type annotations: OK"
+global %str_const_7 = "primary"
+global %str_const_8 = "secondary"
+global %str_const_9 = "Enum compatibility with collections: OK"
+global %str_const_10 = "list/dict/array as identifiers: OK"
+global %str_const_11 = "list = "
+global %str_const_12 = "dict = "
+global %str_const_13 = "array = "
+global %str_const_14 = "Generic syntax correctly unsupported: OK"
+global %str_const_15 = "All ownership refactor tests passed!"
+global %str_minus = "-"
 function __top_level_wrapper__() {
 @entry
 @block_0

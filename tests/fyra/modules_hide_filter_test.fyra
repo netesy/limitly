@@ -1,3 +1,17 @@
+global %str_const_0 = "=== Hide Filter Test ==="
+global %str_const_1 = "Test 1: Hide single identifier"
+global %str_const_2 = "✓ Imported with hide filter"
+global %str_const_3 = "✓ Non-hidden variable accessible: PI = "
+global %str_const_4 = "Hide filter should allow access to non-hidden variables"
+global %str_const_5 = "Test 2: Hide multiple identifiers"
+global %str_const_6 = "Test 3: Access hidden variable (should fail)"
+global %str_const_7 = "Expected: Error about missing property"
+global %str_const_8 = "=== Hide Filter Test Complete ==="
+global %str_minus = "-"
+global %nl = "
+"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

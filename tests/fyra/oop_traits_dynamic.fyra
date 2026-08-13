@@ -1,3 +1,12 @@
+global %str_const_0 = "Circle"
+global %str_const_1 = "Trait method should work for Circle"
+global %str_const_2 = "Circle area should be 3*5*5 = 75"
+global %str_const_3 = "Square"
+global %str_const_4 = "Trait method should work for Square"
+global %str_const_5 = "Square area should be 10*10 = 100"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

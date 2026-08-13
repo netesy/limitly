@@ -1,3 +1,22 @@
+global %str_const_0 = "=== Show Filter Test ==="
+global %str_const_1 = "Test 1: Show single identifier"
+global %str_const_2 = "✓ Imported with show filter"
+global %str_const_3 = "✓ Shown variable accessible: PI = "
+global %str_const_4 = "Show filter should make PI accessible"
+global %str_const_5 = "Test 2: Show multiple identifiers"
+global %str_const_6 = "✓ Imported with show multiple filter"
+global %str_const_7 = "✓ First shown variable: PI = "
+global %str_const_8 = "Show filter should make PI accessible"
+global %str_const_9 = "✓ Second shown variable: E = "
+global %str_const_10 = "Show filter should make E accessible"
+global %str_const_11 = "Test 3: Access hidden variable (should fail)"
+global %str_const_12 = "Expected: Error about missing property"
+global %str_const_13 = "=== Show Filter Test Complete ==="
+global %str_minus = "-"
+global %nl = "
+"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

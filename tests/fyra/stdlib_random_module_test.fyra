@@ -1,3 +1,27 @@
+global %str_const_0 = "=== Random Module Test Suite ==="
+global %str_const_1 = "Random frame test failed"
+global %str_const_2 = "Distributions test failed"
+global %str_const_3 = "Random helpers test failed"
+global %str_const_4 = "All random tests passed successfully."
+global %str_const_5 = "Testing Random Frame..."
+global %str_const_6 = "next_int failed"
+global %str_const_7 = "next_float failed"
+global %str_const_8 = "next_bool failed"
+global %str_const_9 = "range_int failed"
+global %str_const_10 = "range_float failed"
+global %str_const_11 = "next_bytes failed"
+global %str_const_12 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+global %str_const_13 = "next_string failed"
+global %str_const_14 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+global %str_const_15 = "Testing Distributions..."
+global %str_const_16 = "Uniform sample failed"
+global %str_const_17 = "Testing Random Helpers..."
+global %str_const_18 = "random_int helper failed"
+global %str_const_19 = "random_float helper failed"
+global %str_const_20 = "random_bool helper failed"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

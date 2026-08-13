@@ -1,3 +1,4 @@
+global %str_const_0 = "reverse_cmp"
 function __top_level_wrapper__() {
 @entry
 @block_0

@@ -1,3 +1,18 @@
+global %str_const_0 = "=== Alias Import Test ==="
+global %str_const_1 = "Test 2.1: Access aliased module variable"
+global %str_const_2 = "PI = %s"
+global %str_const_3 = "Module alias should provide access to variables"
+global %str_const_4 = "Test 2.2: Call aliased module function"
+global %str_const_5 = "5 squared = %s"
+global %str_const_6 = "Module alias should provide access to functions"
+global %str_const_7 = "Test 2.3: Call complex aliased function"
+global %str_const_8 = "Test 2.4: Call recursive function through alias"
+global %str_const_9 = "5! = %s"
+global %str_const_10 = "Module alias should provide access to recursive functions: 5! = 120"
+global %str_const_11 = "=== Alias Import Test Complete ==="
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

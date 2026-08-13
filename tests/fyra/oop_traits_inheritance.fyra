@@ -1,3 +1,11 @@
+global %str_const_0 = "MyFrame"
+global %str_const_1 = "Frame should implement trait method"
+global %str_const_2 = "Frame should implement extended trait method"
+global %str_const_3 = "Hello from Base"
+global %str_const_4 = "Frame should inherit default trait implementation"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

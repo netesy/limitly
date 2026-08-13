@@ -1,3 +1,45 @@
+global %str_const_0 = " === Concurrent Block Tests === "
+global %str_const_1 = "task_0"
+global %str_const_2 = "task_1"
+global %str_const_3 = "task_2"
+global %str_const_4 = "Received result: %s"
+global %str_const_5 = "Concurrent block finished"
+global %str_const_6 = "Concurrent block should execute 3 tasks"
+global %str_const_7 = "job1"
+global %str_const_8 = "job2"
+global %str_const_9 = "job3"
+global %str_const_10 = "worker_0"
+global %str_const_11 = "Final result: %s"
+global %str_const_12 = "Worker should process 3 jobs"
+global %str_const_13 = " === Tasks seeding a worker stream === "
+global %str_const_14 = "bootstrap - 1"
+global %str_const_15 = "bootstrap - 2"
+global %str_const_16 = "worker_1"
+global %str_const_17 = "Seeded result: %s"
+global %str_const_18 = "Seeded worker should process 2 items"
+global %str_const_19 = " === Tasks seeding a worker stream === "
+global %str_const_20 = "bootstrap - 1"
+global %str_const_21 = "bootstrap - 2"
+global %str_const_22 = "worker_2"
+global %str_const_23 = "Seeded result: %s"
+global %str_const_24 = "Second seeded worker should process 2 items"
+global %str_const_25 = "Handled: %s"
+global %str_const_26 = "Handled: %s"
+global %str_const_27 = "Concurrent task %s running"
+global %str_const_28 = "Task %s completed"
+global %str_const_29 = "Concurrent task %s running"
+global %str_const_30 = "Task %s completed"
+global %str_const_31 = "Handled: %s"
+global %str_const_32 = "Processed: %s"
+global %str_const_33 = "Concurrent task %s running"
+global %str_const_34 = "Task %s completed"
+global %str_const_35 = "Processed: %s"
+global %str_const_36 = "Handled: %s"
+global %str_const_37 = "Concurrent task %s running"
+global %str_const_38 = "Task %s completed"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0
@@ -130,7 +172,7 @@ function task_1() {
   ret 0
 }
 
-function _worker_94311143798848(i64, i64, i64, i64) {
+function _worker_94233639323712(i64, i64, i64, i64) {
 @entry
 @block_0
   %r5 = call %lm_box_string %str_const_31 : i64
@@ -138,7 +180,7 @@ function _worker_94311143798848(i64, i64, i64, i64) {
   ret 0
 }
 
-function _worker_94311143811424(i64, i64, i64, i64) {
+function _worker_94233639310640(i64, i64, i64, i64) {
 @entry
 @block_0
   %r5 = call %lm_box_string %str_const_32 : i64
@@ -146,7 +188,7 @@ function _worker_94311143811424(i64, i64, i64, i64) {
   ret 0
 }
 
-function _task_94311143827680(i64, i64, i64, i64) {
+function _task_94233639352544(i64, i64, i64, i64) {
 @entry
 @block_0
   %r5 = call %lm_box_string %str_const_33 : i64
@@ -157,19 +199,19 @@ function _task_94311143827680(i64, i64, i64, i64) {
   ret 0
 }
 
-function _worker_94311143785776(i64, i64, i64, i64) {
-@entry
-@block_0
-  %r5 = call %lm_box_string %str_const_35 : i64
-  %r4 = call %lm_rt_str_format %r5 %1 : i64
-  ret 0
-}
-
 function worker_0() {
 @entry
 @block_0
-  %r71 = call %lm_box_string %str_const_36 : i64
+  %r71 = call %lm_box_string %str_const_35 : i64
   %r70 = call %lm_rt_str_format %r71 0 : i64
+  ret 0
+}
+
+function _worker_94233639336288(i64, i64, i64, i64) {
+@entry
+@block_0
+  %r5 = call %lm_box_string %str_const_36 : i64
+  %r4 = call %lm_rt_str_format %r5 %1 : i64
   ret 0
 }
 

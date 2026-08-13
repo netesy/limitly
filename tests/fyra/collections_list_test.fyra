@@ -1,3 +1,17 @@
+global %str_const_0 = "LinkedList length: %s"
+global %str_const_1 = "LinkedList length should be 3"
+global %str_const_2 = "Pop front should return 0"
+global %str_const_3 = "Pop back should return 2"
+global %str_const_4 = "Pop back should return 1"
+global %str_const_5 = "Pop back on empty list should return nil"
+global %str_const_6 = "List should be empty"
+global %str_const_7 = "First element from iterator should be 10"
+global %str_const_8 = "Second element from iterator should be 20"
+global %str_const_9 = "Iterator should be exhausted"
+global %str_const_10 = "LinkedList tests passed!"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0

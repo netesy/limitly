@@ -1,3 +1,37 @@
+global %str_const_0 = "=== Literal Value Tests ==="
+global %str_const_1 = "Integers:"
+global %str_const_2 = "Integer literal 0 should be 0"
+global %str_const_3 = "Integer literal 42 should be 42"
+global %str_const_4 = "Integer literal -17 should be -17"
+global %str_const_5 = "Integer literal 999999 should be 999999"
+global %str_const_6 = "Floats:"
+global %str_const_7 = ""
+global %str_const_8 = "Float literal 0.0 should be 0.0"
+global %str_const_9 = "Float literal 3.14159 should be 3.14159"
+global %str_const_10 = "Float literal -2.71828 should be -2.71828"
+global %str_const_11 = "Float literal 1.23e-14 should be 1.23e-14"
+global %str_const_12 = ""
+global %str_const_13 = "Empty string should be empty"
+global %str_const_14 = "Strings:"
+global %str_const_15 = "Hello, World!"
+global %str_const_16 = ""
+global %str_const_17 = "Special chars:
+	\""
+global %str_const_18 = "Hello, World!"
+global %str_const_19 = "String literal should match"
+global %str_const_20 = ""
+global %str_const_21 = "Empty string should be empty"
+global %str_const_22 = "Special chars:
+	\""
+global %str_const_23 = "Special chars string should match"
+global %str_const_24 = "Booleans:"
+global %str_const_25 = "Boolean literal true should be true"
+global %str_const_26 = "Boolean literal false should be false"
+global %str_const_27 = "Nil:"
+global %str_const_28 = "Nil literal should be nil"
+global %str_minus = "-"
+global %assert_fail = "Assertion failed
+"
 function __top_level_wrapper__() {
 @entry
 @block_0
