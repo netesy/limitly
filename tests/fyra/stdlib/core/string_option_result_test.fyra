@@ -1,0 +1,1489 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.string.__init__
+  call %std.option.__init__
+  call %std.result.__init__
+  call %main
+  ret 0
+}
+
+function std.option.__init__() {
+@entry
+  ret 0
+}
+
+function std.option.Option.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.option.Option.filter(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.option.Option.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.option.Option.is_none(i64) {
+@entry
+  ret 0
+}
+
+function std.option.Option.is_some(i64) {
+@entry
+  ret 0
+}
+
+function std.core.__init__() {
+@entry
+  ret 0
+}
+
+function std.core.ok_bool(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_0
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_1
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  cne <unnamed> 1
+  br <unnamed> %block_9 %block_16
+@block_9
+  jmp %block_9
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+@block_16
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.some_str(i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.core.some_int(i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.core.ResultStr.map_err(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.is_ok(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.is_err(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.is_err(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.is_ok(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.is_none(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.is_some(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.is_none(i64) {
+@entry
+  ret 0
+}
+
+function std.result.Err(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.result.Result.init <unnamed> 10 2 <unnamed>
+  ret <unnamed>
+}
+
+function std.result.Ok(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.result.Result.init <unnamed> 18 <unnamed> 2
+  ret <unnamed>
+}
+
+function std.core.ResultInt.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.result.Result.unwrap_err(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ok_str(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_2
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_3
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.result.Result.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.char_code(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_4
+  call %lm_list_len <unnamed>
+  jmp %block_5
+@block_5
+  cslt 1 <unnamed>
+  br <unnamed> %block_7 %block_19
+@block_7
+  jmp %block_7
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_14
+@block_13
+  jmp %block_13
+  ret 1
+@block_14
+  add 1 9
+  jmp %block_5
+@block_19
+  ret 7993
+}
+
+function std.string.length(i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  ret <unnamed>
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_5
+  call %lm_list_len <unnamed>
+  cne <unnamed> 25
+  br <unnamed> %block_5 %block_7
+@block_5
+  jmp %block_5
+  ret 9
+@block_7
+  call %lm_box_string %str_const_6
+  call %lm_box_string %str_const_7
+  call %std.string.starts_with <unnamed> <unnamed>
+  cne <unnamed> 18
+  br <unnamed> %block_13 %block_15
+@block_13
+  jmp %block_13
+  ret 17
+@block_15
+  call %lm_box_string %str_const_8
+  call %std.string.uppercase <unnamed>
+  call %lm_box_string %str_const_9
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_20 %block_22
+@block_20
+  jmp %block_20
+  ret 25
+@block_22
+  call %std.option.Some 17
+  call %lm_box_string %str_const_10
+  call %std.option.Option.map <unnamed> <unnamed>
+  call %lm_box_string %str_const_11
+  call %std.option.Option.filter <unnamed> <unnamed>
+  call %std.option.Option.unwrap <unnamed>
+  cne <unnamed> 33
+  br <unnamed> %block_33 %block_35
+@block_33
+  jmp %block_33
+  ret 33
+@block_35
+  call %std.option.None
+  call %std.option.Option.unwrap_or <unnamed> 73
+  cne <unnamed> 73
+  br <unnamed> %block_42 %block_44
+@block_42
+  jmp %block_42
+  ret 41
+@block_44
+  call %std.result.Ok 25
+  call %lm_box_string %str_const_12
+  call %std.result.Result.map <unnamed> <unnamed>
+  call %std.result.Result.unwrap <unnamed>
+  cne <unnamed> 49
+  br <unnamed> %block_53 %block_55
+@block_53
+  jmp %block_53
+  ret 49
+@block_55
+  call %lm_box_string %str_const_13
+  call %std.result.Err <unnamed>
+  call %std.result.Result.is_err <unnamed>
+  cne <unnamed> 18
+  br <unnamed> %block_62 %block_64
+@block_62
+  jmp %block_62
+  ret 57
+@block_64
+  ret 1
+}
+
+function positive(i64) {
+@entry
+@block_0
+  csgt <unnamed> 1
+  ret <unnamed>
+}
+
+function std.option.Option.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.contains(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 1
+  br <unnamed> %block_7 %block_9
+@block_7
+  jmp %block_7
+  ret 18
+@block_9
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_11 %block_13
+@block_11
+  jmp %block_11
+  ret 10
+@block_13
+  jmp %block_15
+@block_15
+  sub <unnamed> <unnamed>
+  csle 1 <unnamed>
+  br <unnamed> %block_18 %block_29
+@block_18
+  jmp %block_18
+  add 1 <unnamed>
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_22 %block_24
+@block_22
+  jmp %block_22
+  ret 18
+@block_24
+  add 1 9
+  jmp %block_15
+@block_29
+  ret 10
+}
+
+function std.core.err_str(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_14
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_15
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.string.__init__() {
+@entry
+  ret 0
+}
+
+function std.core.ok_int(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_17
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.string.join(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 1
+  br <unnamed> %block_5 %block_7
+@block_5
+  jmp %block_5
+  call %lm_box_string %str_const_18
+  ret <unnamed>
+@block_7
+  call %lm_list_get <unnamed> 1
+  jmp %block_12
+@block_12
+  cslt 9 <unnamed>
+  br <unnamed> %block_14 %block_24
+@block_14
+  jmp %block_14
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 9
+  call %lm_str_concat <unnamed> <unnamed>
+  add 9 9
+  jmp %block_12
+@block_24
+  ret <unnamed>
+}
+
+function std.string.String.replace(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.result.Result.init(i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.option.Some(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.option.Option.init <unnamed> 18 <unnamed>
+  ret <unnamed>
+}
+
+function std.string.String.to_upper(i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.concat(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.split(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  call %lm_list_new 0
+  ceq <unnamed> 1
+  br <unnamed> %block_9 %block_24
+@block_9
+  jmp %block_9
+  jmp %block_11
+@block_11
+  cslt 1 <unnamed>
+  br <unnamed> %block_13 %block_23
+@block_13
+  jmp %block_13
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_list_append <unnamed> <unnamed>
+  add 1 9
+  jmp %block_11
+@block_23
+  ret <unnamed>
+@block_24
+  jmp %block_27
+@block_27
+  sub <unnamed> <unnamed>
+  csle 1 <unnamed>
+  br <unnamed> %block_30 %block_46
+@block_30
+  jmp %block_30
+  add 1 <unnamed>
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_34 %block_40
+@block_34
+  jmp %block_34
+  call %substring <unnamed> 1 1
+  call %lm_list_append <unnamed> <unnamed>
+  add 1 <unnamed>
+  jmp %block_45
+@block_40
+  add <unnamed> 9
+  jmp %block_45
+@block_45
+  jmp %block_27
+@block_46
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_list_append <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.OptionInt.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.split(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.length(i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.index_of(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.is_some(i64) {
+@entry
+  ret 0
+}
+
+function std.string.String._builtin_substring(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.to_lower(i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.contains(i64, i64) {
+@entry
+  ret 0
+}
+
+function twice(i64) {
+@entry
+@block_0
+  mul <unnamed> 17
+  ret <unnamed>
+}
+
+function std.string._char_to_upper(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_19
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  call %lm_box_string %str_const_20
+  ret <unnamed>
+@block_5
+  call %lm_box_string %str_const_21
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  call %lm_box_string %str_const_22
+  ret <unnamed>
+@block_10
+  call %lm_box_string %str_const_23
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_15
+@block_13
+  jmp %block_13
+  call %lm_box_string %str_const_24
+  ret <unnamed>
+@block_15
+  call %lm_box_string %str_const_25
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_18 %block_20
+@block_18
+  jmp %block_18
+  call %lm_box_string %str_const_26
+  ret <unnamed>
+@block_20
+  call %lm_box_string %str_const_27
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_23 %block_25
+@block_23
+  jmp %block_23
+  call %lm_box_string %str_const_28
+  ret <unnamed>
+@block_25
+  call %lm_box_string %str_const_29
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_28 %block_30
+@block_28
+  jmp %block_28
+  call %lm_box_string %str_const_30
+  ret <unnamed>
+@block_30
+  call %lm_box_string %str_const_31
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_33 %block_35
+@block_33
+  jmp %block_33
+  call %lm_box_string %str_const_32
+  ret <unnamed>
+@block_35
+  call %lm_box_string %str_const_33
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_38 %block_40
+@block_38
+  jmp %block_38
+  call %lm_box_string %str_const_34
+  ret <unnamed>
+@block_40
+  call %lm_box_string %str_const_35
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_43 %block_45
+@block_43
+  jmp %block_43
+  call %lm_box_string %str_const_36
+  ret <unnamed>
+@block_45
+  call %lm_box_string %str_const_37
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_48 %block_50
+@block_48
+  jmp %block_48
+  call %lm_box_string %str_const_38
+  ret <unnamed>
+@block_50
+  call %lm_box_string %str_const_39
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_53 %block_55
+@block_53
+  jmp %block_53
+  call %lm_box_string %str_const_40
+  ret <unnamed>
+@block_55
+  call %lm_box_string %str_const_41
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_58 %block_60
+@block_58
+  jmp %block_58
+  call %lm_box_string %str_const_42
+  ret <unnamed>
+@block_60
+  call %lm_box_string %str_const_43
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_63 %block_65
+@block_63
+  jmp %block_63
+  call %lm_box_string %str_const_44
+  ret <unnamed>
+@block_65
+  call %lm_box_string %str_const_45
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_68 %block_70
+@block_68
+  jmp %block_68
+  call %lm_box_string %str_const_46
+  ret <unnamed>
+@block_70
+  call %lm_box_string %str_const_47
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_73 %block_75
+@block_73
+  jmp %block_73
+  call %lm_box_string %str_const_48
+  ret <unnamed>
+@block_75
+  call %lm_box_string %str_const_49
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_78 %block_80
+@block_78
+  jmp %block_78
+  call %lm_box_string %str_const_50
+  ret <unnamed>
+@block_80
+  call %lm_box_string %str_const_51
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_83 %block_85
+@block_83
+  jmp %block_83
+  call %lm_box_string %str_const_52
+  ret <unnamed>
+@block_85
+  call %lm_box_string %str_const_53
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_88 %block_90
+@block_88
+  jmp %block_88
+  call %lm_box_string %str_const_54
+  ret <unnamed>
+@block_90
+  call %lm_box_string %str_const_55
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_93 %block_95
+@block_93
+  jmp %block_93
+  call %lm_box_string %str_const_56
+  ret <unnamed>
+@block_95
+  call %lm_box_string %str_const_57
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_98 %block_100
+@block_98
+  jmp %block_98
+  call %lm_box_string %str_const_58
+  ret <unnamed>
+@block_100
+  call %lm_box_string %str_const_59
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_103 %block_105
+@block_103
+  jmp %block_103
+  call %lm_box_string %str_const_60
+  ret <unnamed>
+@block_105
+  call %lm_box_string %str_const_61
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_108 %block_110
+@block_108
+  jmp %block_108
+  call %lm_box_string %str_const_62
+  ret <unnamed>
+@block_110
+  call %lm_box_string %str_const_63
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_113 %block_115
+@block_113
+  jmp %block_113
+  call %lm_box_string %str_const_64
+  ret <unnamed>
+@block_115
+  call %lm_box_string %str_const_65
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_118 %block_120
+@block_118
+  jmp %block_118
+  call %lm_box_string %str_const_66
+  ret <unnamed>
+@block_120
+  call %lm_box_string %str_const_67
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_123 %block_125
+@block_123
+  jmp %block_123
+  call %lm_box_string %str_const_68
+  ret <unnamed>
+@block_125
+  call %lm_box_string %str_const_69
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_128 %block_130
+@block_128
+  jmp %block_128
+  call %lm_box_string %str_const_70
+  ret <unnamed>
+@block_130
+  ret 0
+}
+
+function std.string.uppercase(i64) {
+@entry
+@block_0
+  call %std.string.to_upper <unnamed>
+  ret <unnamed>
+}
+
+function std.result.__init__() {
+@entry
+  ret 0
+}
+
+function std.string._char_to_lower(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_71
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  call %lm_box_string %str_const_72
+  ret <unnamed>
+@block_5
+  call %lm_box_string %str_const_73
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  call %lm_box_string %str_const_74
+  ret <unnamed>
+@block_10
+  call %lm_box_string %str_const_75
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_15
+@block_13
+  jmp %block_13
+  call %lm_box_string %str_const_76
+  ret <unnamed>
+@block_15
+  call %lm_box_string %str_const_77
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_18 %block_20
+@block_18
+  jmp %block_18
+  call %lm_box_string %str_const_78
+  ret <unnamed>
+@block_20
+  call %lm_box_string %str_const_79
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_23 %block_25
+@block_23
+  jmp %block_23
+  call %lm_box_string %str_const_80
+  ret <unnamed>
+@block_25
+  call %lm_box_string %str_const_81
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_28 %block_30
+@block_28
+  jmp %block_28
+  call %lm_box_string %str_const_82
+  ret <unnamed>
+@block_30
+  call %lm_box_string %str_const_83
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_33 %block_35
+@block_33
+  jmp %block_33
+  call %lm_box_string %str_const_84
+  ret <unnamed>
+@block_35
+  call %lm_box_string %str_const_85
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_38 %block_40
+@block_38
+  jmp %block_38
+  call %lm_box_string %str_const_86
+  ret <unnamed>
+@block_40
+  call %lm_box_string %str_const_87
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_43 %block_45
+@block_43
+  jmp %block_43
+  call %lm_box_string %str_const_88
+  ret <unnamed>
+@block_45
+  call %lm_box_string %str_const_89
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_48 %block_50
+@block_48
+  jmp %block_48
+  call %lm_box_string %str_const_90
+  ret <unnamed>
+@block_50
+  call %lm_box_string %str_const_91
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_53 %block_55
+@block_53
+  jmp %block_53
+  call %lm_box_string %str_const_92
+  ret <unnamed>
+@block_55
+  call %lm_box_string %str_const_93
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_58 %block_60
+@block_58
+  jmp %block_58
+  call %lm_box_string %str_const_94
+  ret <unnamed>
+@block_60
+  call %lm_box_string %str_const_95
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_63 %block_65
+@block_63
+  jmp %block_63
+  call %lm_box_string %str_const_96
+  ret <unnamed>
+@block_65
+  call %lm_box_string %str_const_97
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_68 %block_70
+@block_68
+  jmp %block_68
+  call %lm_box_string %str_const_98
+  ret <unnamed>
+@block_70
+  call %lm_box_string %str_const_99
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_73 %block_75
+@block_73
+  jmp %block_73
+  call %lm_box_string %str_const_100
+  ret <unnamed>
+@block_75
+  call %lm_box_string %str_const_101
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_78 %block_80
+@block_78
+  jmp %block_78
+  call %lm_box_string %str_const_102
+  ret <unnamed>
+@block_80
+  call %lm_box_string %str_const_103
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_83 %block_85
+@block_83
+  jmp %block_83
+  call %lm_box_string %str_const_104
+  ret <unnamed>
+@block_85
+  call %lm_box_string %str_const_105
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_88 %block_90
+@block_88
+  jmp %block_88
+  call %lm_box_string %str_const_106
+  ret <unnamed>
+@block_90
+  call %lm_box_string %str_const_107
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_93 %block_95
+@block_93
+  jmp %block_93
+  call %lm_box_string %str_const_108
+  ret <unnamed>
+@block_95
+  call %lm_box_string %str_const_109
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_98 %block_100
+@block_98
+  jmp %block_98
+  call %lm_box_string %str_const_110
+  ret <unnamed>
+@block_100
+  call %lm_box_string %str_const_111
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_103 %block_105
+@block_103
+  jmp %block_103
+  call %lm_box_string %str_const_112
+  ret <unnamed>
+@block_105
+  call %lm_box_string %str_const_113
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_108 %block_110
+@block_108
+  jmp %block_108
+  call %lm_box_string %str_const_114
+  ret <unnamed>
+@block_110
+  call %lm_box_string %str_const_115
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_113 %block_115
+@block_113
+  jmp %block_113
+  call %lm_box_string %str_const_116
+  ret <unnamed>
+@block_115
+  call %lm_box_string %str_const_117
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_118 %block_120
+@block_118
+  jmp %block_118
+  call %lm_box_string %str_const_118
+  ret <unnamed>
+@block_120
+  call %lm_box_string %str_const_119
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_123 %block_125
+@block_123
+  jmp %block_123
+  call %lm_box_string %str_const_120
+  ret <unnamed>
+@block_125
+  call %lm_box_string %str_const_121
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_128 %block_130
+@block_128
+  jmp %block_128
+  call %lm_box_string %str_const_122
+  ret <unnamed>
+@block_130
+  ret 0
+}
+
+function std.core.ResultStr.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.ends_with(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.result.Result.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.substring(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.option.Option.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.map_err(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.trim(i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  jmp %block_4
+@block_4
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_39
+@block_6
+  jmp %block_6
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_123
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_19 %block_15
+@block_15
+  jmp %block_15
+  call %lm_box_string %str_const_124
+  ceq <unnamed> <unnamed>
+  jmp %block_19
+@block_19
+  br <unnamed> %block_25 %block_21
+@block_21
+  jmp %block_21
+  call %lm_box_string %str_const_125
+  ceq <unnamed> <unnamed>
+  jmp %block_25
+@block_25
+  br <unnamed> %block_31 %block_27
+@block_27
+  jmp %block_27
+  call %lm_box_string %str_const_126
+  ceq <unnamed> <unnamed>
+  jmp %block_31
+@block_31
+  br <unnamed> %block_32 %block_38
+@block_32
+  jmp %block_32
+  add 1 9
+  jmp %block_37
+@block_37
+  jmp %block_4
+@block_38
+  jmp %block_39
+@block_39
+  jmp %block_41
+@block_41
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_43 %block_74
+@block_43
+  jmp %block_43
+  sub <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_127
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_55 %block_51
+@block_51
+  jmp %block_51
+  call %lm_box_string %str_const_128
+  ceq <unnamed> <unnamed>
+  jmp %block_55
+@block_55
+  br <unnamed> %block_61 %block_57
+@block_57
+  jmp %block_57
+  call %lm_box_string %str_const_129
+  ceq <unnamed> <unnamed>
+  jmp %block_61
+@block_61
+  br <unnamed> %block_67 %block_63
+@block_63
+  jmp %block_63
+  call %lm_box_string %str_const_130
+  ceq <unnamed> <unnamed>
+  jmp %block_67
+@block_67
+  br <unnamed> %block_68 %block_73
+@block_68
+  jmp %block_68
+  sub <unnamed> 9
+  jmp %block_72
+@block_72
+  jmp %block_41
+@block_73
+  jmp %block_74
+@block_74
+  call %substring <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.string.String.pad_right(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.char_at(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.repeat(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.make_err_int(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_131
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.string.String.pad_left(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.trim(i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.last_index_of(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.option.None() {
+@entry
+@block_0
+  alloc 16
+  call %std.option.Option.init <unnamed> 10 2
+  ret <unnamed>
+}
+
+function std.string.starts_with(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 1
+  br <unnamed> %block_5 %block_7
+@block_5
+  jmp %block_5
+  ret 18
+@block_7
+  call %lm_list_len <unnamed>
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_10 %block_12
+@block_10
+  jmp %block_10
+  ret 10
+@block_12
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.ResultStr.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.ends_with(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 1
+  br <unnamed> %block_7 %block_9
+@block_7
+  jmp %block_7
+  ret 18
+@block_9
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_11 %block_13
+@block_11
+  jmp %block_11
+  ret 10
+@block_13
+  sub <unnamed> <unnamed>
+  call %substring <unnamed> <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.string.replace(i64, i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 1
+  br <unnamed> %block_7 %block_8
+@block_7
+  jmp %block_7
+  ret 0
+@block_8
+  call %lm_box_string %str_const_132
+  jmp %block_11
+@block_11
+  sub <unnamed> <unnamed>
+  csle 1 <unnamed>
+  br <unnamed> %block_14 %block_37
+@block_14
+  jmp %block_14
+  add 1 <unnamed>
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_18 %block_24
+@block_18
+  jmp %block_18
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  add 1 <unnamed>
+  jmp %block_36
+@block_24
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  add <unnamed> 9
+  jmp %block_36
+@block_36
+  jmp %block_11
+@block_37
+  jmp %block_38
+@block_38
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_40 %block_52
+@block_40
+  jmp %block_40
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  add <unnamed> 9
+  jmp %block_38
+@block_52
+  ret <unnamed>
+}
+
+function std.string.to_lower(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_133
+  call %lm_list_len <unnamed>
+  jmp %block_5
+@block_5
+  cslt 1 <unnamed>
+  br <unnamed> %block_7 %block_20
+@block_7
+  jmp %block_7
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %std.string._char_to_lower <unnamed>
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  add 1 9
+  jmp %block_5
+@block_20
+  ret <unnamed>
+}
+
+function std.string.compare(i64, i64) {
+@entry
+@block_0
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_2 %block_4
+@block_2
+  jmp %block_2
+  ret 1
+@block_4
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_11 %block_13
+@block_11
+  jmp %block_11
+  jmp %block_13
+@block_13
+  jmp %block_15
+@block_15
+  cslt 1 <unnamed>
+  br <unnamed> %block_17 %block_45
+@block_17
+  jmp %block_17
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_29 %block_40
+@block_29
+  jmp %block_29
+  call %std.string.char_code <unnamed>
+  call %std.string.char_code <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_35 %block_38
+@block_35
+  jmp %block_35
+  neg 9
+  ret <unnamed>
+@block_38
+  ret 9
+@block_40
+  add 1 9
+  jmp %block_15
+@block_45
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_47 %block_50
+@block_47
+  jmp %block_47
+  neg 9
+  ret <unnamed>
+@block_50
+  ret 9
+}
+
+function std.result.Result.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.String.starts_with(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.string.to_upper(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_134
+  call %lm_list_len <unnamed>
+  jmp %block_5
+@block_5
+  cslt 1 <unnamed>
+  br <unnamed> %block_7 %block_20
+@block_7
+  jmp %block_7
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %std.string._char_to_upper <unnamed>
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  add 1 9
+  jmp %block_5
+@block_20
+  ret <unnamed>
+}
+
+function std.core.make_err_str(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_135
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_136
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.string.substr(i64, i64, i64) {
+@entry
+@block_0
+  call %substring <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.err_int(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_137
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.OptionInt.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.string.substring(i64, i64, i64) {
+@entry
+@block_0
+  call %substring <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.result.Result.is_ok(i64) {
+@entry
+  ret 0
+}
+
+function std.result.Result.is_err(i64) {
+@entry
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_list_len(i64) {
+}
+
+function substring(i64, i64, i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_to_string(i64) {
+}
+
+function lm_str_concat(i8*, i8*) {
+}
+
+function lm_list_new(i64) {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}

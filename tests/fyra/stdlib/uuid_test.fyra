@@ -1,0 +1,1068 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.uuid.index.__init__
+  call %std.uuid.uuid.__init__
+  call %main
+  ret 0
+}
+
+function std.uuid.generator.__init__() {
+@entry
+  ret 0
+}
+
+function std.uuid.index.generate_v4() {
+@entry
+@block_0
+  call %std.uuid.generator.generate_v4
+  ret 0
+}
+
+function std.uuid.uuid.__init__() {
+@entry
+  ret 0
+}
+
+function std.uuid.uuid.index_of(i64, i64) {
+@entry
+@block_0
+  jmp %block_2
+@block_2
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  sub <unnamed> <unnamed>
+  csle 1 <unnamed>
+  br <unnamed> %block_7 %block_19
+@block_7
+  jmp %block_7
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  add 1 <unnamed>
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_14
+@block_13
+  jmp %block_13
+  ret 1
+@block_14
+  add 1 9
+  jmp %block_2
+@block_19
+  neg 9
+  ret <unnamed>
+}
+
+function std.uuid.uuid.to_lower(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_box_string %str_const_1
+  call %lm_box_string %str_const_2
+  jmp %block_5
+@block_5
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_8 %block_35
+@block_8
+  jmp %block_8
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %std.uuid.uuid.index_of <unnamed> <unnamed>
+  neg 9
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_19 %block_27
+@block_19
+  jmp %block_19
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_30
+@block_27
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_30
+@block_30
+  add 1 9
+  jmp %block_5
+@block_35
+  ret <unnamed>
+}
+
+function std.uuid.uuid.trim(i64) {
+@entry
+@block_0
+  jmp %block_2
+@block_2
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_44
+@block_6
+  jmp %block_6
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_3
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_22 %block_14
+@block_14
+  jmp %block_14
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_4
+  ceq <unnamed> <unnamed>
+  jmp %block_22
+@block_22
+  br <unnamed> %block_32 %block_24
+@block_24
+  jmp %block_24
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_5
+  ceq <unnamed> <unnamed>
+  jmp %block_32
+@block_32
+  br <unnamed> %block_42 %block_34
+@block_34
+  jmp %block_34
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_6
+  ceq <unnamed> <unnamed>
+  jmp %block_42
+@block_42
+  jmp %block_44
+@block_44
+  br <unnamed> %block_45 %block_50
+@block_45
+  jmp %block_45
+  add 1 9
+  jmp %block_2
+@block_50
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  jmp %block_55
+@block_55
+  csge <unnamed> <unnamed>
+  br <unnamed> %block_58 %block_96
+@block_58
+  jmp %block_58
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_7
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_74 %block_66
+@block_66
+  jmp %block_66
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_8
+  ceq <unnamed> <unnamed>
+  jmp %block_74
+@block_74
+  br <unnamed> %block_84 %block_76
+@block_76
+  jmp %block_76
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_9
+  ceq <unnamed> <unnamed>
+  jmp %block_84
+@block_84
+  br <unnamed> %block_94 %block_86
+@block_86
+  jmp %block_86
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_10
+  ceq <unnamed> <unnamed>
+  jmp %block_94
+@block_94
+  jmp %block_96
+@block_96
+  br <unnamed> %block_97 %block_101
+@block_97
+  jmp %block_97
+  sub <unnamed> 9
+  jmp %block_55
+@block_101
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_103 %block_105
+@block_103
+  jmp %block_103
+  call %lm_box_string %str_const_11
+  ret <unnamed>
+@block_105
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.uuid.uuid.byte_to_hex(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_12
+  shr <unnamed> 33
+  and <unnamed> 121
+  and <unnamed> 121
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  add <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.uuid.uuid.UUID.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.uuid.uuid.UUID.equals(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.uuid.uuid.UUID.variant(i64) {
+@entry
+  ret 0
+}
+
+function std.uuid.uuid.UUID.version(i64) {
+@entry
+  ret 0
+}
+
+function std.internal.runtime.create(i64, i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.random.random.__init__() {
+@entry
+  ret 0
+}
+
+function std.random.random.random_bool() {
+@entry
+@block_0
+  call %std.random.random.Random.next_bool 0
+  ret <unnamed>
+}
+
+function std.random.random.random_float(i64, i64) {
+@entry
+@block_0
+  call %std.random.random.Random.range_float 0 <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.internal.runtime.call(i64, i64, i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.random.random.SecureRandom.init(i64) {
+@entry
+  ret 0
+}
+
+function std.random.random.SecureRandom.next_bytes(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.random.random.SecureRandom.next_float(i64) {
+@entry
+  ret 0
+}
+
+function std.random.random.SecureRandom.next_int(i64) {
+@entry
+  ret 0
+}
+
+function std.internal.runtime.destroy(i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.resource.ResourceWriter.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.ResourceWriter.write(i64, i64) {
+@entry
+  ret 0
+}
+
+function test_generation() {
+@entry
+@block_0
+  call %lm_box_string %str_const_13
+  call %lm_print_int <unnamed>
+  call %std.uuid.index.generate_v4
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_14
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.version <unnamed>
+  ceq <unnamed> 33
+  call %lm_box_string %str_const_15
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.variant <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_16
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.index.generate_v4
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_17
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.version <unnamed>
+  ceq <unnamed> 33
+  call %lm_box_string %str_const_18
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.equals <unnamed> <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_19
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.to_string <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 289
+  call %lm_box_string %str_const_20
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_21
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.equals <unnamed> <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_22
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_23
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.resource.Resource._handle(i64) {
+@entry
+  ret 0
+}
+
+function std.resource.Resource.close(i64) {
+@entry
+  ret 0
+}
+
+function std.uuid.index.parse(i64) {
+@entry
+@block_0
+  call %std.uuid.uuid.parse <unnamed>
+  ret <unnamed>
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_24
+  call %lm_print_int <unnamed>
+  call %test_parsing
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_25
+  call %lm_assert <unnamed> <unnamed>
+  call %test_generation
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_26
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_27
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function test_parsing() {
+@entry
+@block_0
+  call %lm_box_string %str_const_28
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_29
+  call %std.uuid.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_30
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.to_string <unnamed>
+  call %lm_box_string %str_const_31
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_32
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.version <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_33
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.variant <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_34
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_35
+  call %lm_box_string %str_const_36
+  call %lm_box_string %str_const_37
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  call %std.uuid.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_38
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.to_string <unnamed>
+  call %lm_box_string %str_const_39
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_40
+  call %lm_assert <unnamed> <unnamed>
+  call %std.uuid.uuid.UUID.equals <unnamed> <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_41
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_42
+  call %std.uuid.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_43
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_44
+  call %std.uuid.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_45
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_46
+  call %std.uuid.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_47
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_48
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.resource.ResourceReader.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.uuid.index.UUID(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.uuid.uuid.UUID.init <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.resource.create(i64, i64) {
+@entry
+@block_0
+  call %std.internal.runtime.create <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_6 %block_8
+@block_6
+  jmp %block_6
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_8
+  alloc 16
+  call %std.resource.Resource.init <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.uuid.uuid.UUID.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.internal.runtime.__init__() {
+@entry
+  ret 0
+}
+
+function std.resource.Resource.is_open(i64) {
+@entry
+  ret 0
+}
+
+function std.resource.Poller.poll(i64) {
+@entry
+  ret 0
+}
+
+function std.uuid.generator.generate_v4() {
+@entry
+@block_0
+  call %std.random.random.random_bytes 129
+  call %lm_list_get <unnamed> 49
+  and <unnamed> 121
+  or <unnamed> 513
+  call %lm_list_get 0 65
+  and <unnamed> 505
+  or <unnamed> 1025
+  alloc 16
+  call %std.uuid.uuid.UUID.init <unnamed> 0 18
+  ret <unnamed>
+}
+
+function std.resource.Pollable.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.random.random.Random.range_int(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.random.random.random_string(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_49
+  call %std.random.random.Random.next_string 0 <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.resource.Resource.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.random.random.random_bytes(i64) {
+@entry
+@block_0
+  call %std.random.random.Random.next_bytes 0 <unnamed>
+  ret <unnamed>
+}
+
+function std.random.random.Random.next_bool(i64) {
+@entry
+  ret 0
+}
+
+function std.resource.Pollable.poll(i64) {
+@entry
+  ret 0
+}
+
+function std.uuid.index.__init__() {
+@entry
+  ret 0
+}
+
+function std.resource.Poller.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.Connector.connect(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.Accepter.accept(i64) {
+@entry
+  ret 0
+}
+
+function std.resource.create_socket() {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %std.internal.runtime.create 0 <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  call %lm_error_new 0
+  ret <unnamed>
+@block_10
+  alloc 16
+  call %std.resource.Resource.init <unnamed> <unnamed> 0
+  ret <unnamed>
+}
+
+function std.resource.Connector.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.Binder.bind(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.create_hash_engine() {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %std.internal.runtime.create 0 <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  call %lm_error_new 0
+  ret <unnamed>
+@block_10
+  alloc 16
+  call %std.resource.Resource.init <unnamed> <unnamed> 0
+  ret <unnamed>
+}
+
+function std.random.random.Random.next_bytes(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.Binder.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.Listener.listen(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.Listener.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.Accepter.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.ResourceReader.read(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.resource.create_dns_resolver() {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %std.internal.runtime.create 0 <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  call %lm_error_new 0
+  ret <unnamed>
+@block_10
+  alloc 16
+  call %std.resource.Resource.init <unnamed> <unnamed> 0
+  ret <unnamed>
+}
+
+function std.resource.create_udp_socket() {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %std.internal.runtime.create 0 <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  call %lm_error_new 0
+  ret <unnamed>
+@block_10
+  alloc 16
+  call %std.resource.Resource.init <unnamed> <unnamed> 0
+  ret <unnamed>
+}
+
+function std.resource.create_websocket() {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %std.internal.runtime.create 0 <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  call %lm_error_new 0
+  ret <unnamed>
+@block_10
+  alloc 16
+  call %std.resource.Resource.init <unnamed> <unnamed> 0
+  ret <unnamed>
+}
+
+function std.resource.open_file(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %std.internal.runtime.create 0 <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_10
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_list_append <unnamed> <unnamed>
+  call %std.internal.runtime.call <unnamed> 0 <unnamed>
+  cne <unnamed> 18
+  br <unnamed> %block_19 %block_22
+@block_19
+  jmp %block_19
+  call %std.internal.runtime.destroy <unnamed>
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_22
+  alloc 16
+  call %std.resource.Resource.init <unnamed> <unnamed> 0
+  ret <unnamed>
+}
+
+function std.resource.create_entropy() {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %std.internal.runtime.create 0 <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  call %lm_error_new 0
+  ret <unnamed>
+@block_10
+  alloc 16
+  call %std.resource.Resource.init <unnamed> <unnamed> 0
+  ret <unnamed>
+}
+
+function std.random.random.random_int(i64, i64) {
+@entry
+@block_0
+  call %std.random.random.Random.range_int 0 <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.resource.adopt_socket(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.resource.Resource.init <unnamed> <unnamed> 0
+  ret <unnamed>
+}
+
+function std.resource.create_fs_resource() {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %std.internal.runtime.create 0 <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  call %lm_error_new 0
+  ret <unnamed>
+@block_10
+  alloc 16
+  call %std.resource.Resource.init <unnamed> <unnamed> 0
+  ret <unnamed>
+}
+
+function std.resource._call(i64, i64, i64) {
+@entry
+@block_0
+  call %std.internal.runtime.call <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.uuid.uuid.parse(i64) {
+@entry
+@block_0
+  call %std.uuid.uuid.trim <unnamed>
+  call %std.uuid.uuid.to_lower <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 305
+  br <unnamed> %block_8 %block_15
+@block_8
+  jmp %block_8
+  call %substring <unnamed> 1 9
+  call %lm_box_string %str_const_50
+  ceq <unnamed> <unnamed>
+  jmp %block_15
+@block_15
+  br <unnamed> %block_17 %block_24
+@block_17
+  jmp %block_17
+  call %substring <unnamed> 297 305
+  call %lm_box_string %str_const_51
+  ceq <unnamed> <unnamed>
+  jmp %block_24
+@block_24
+  br <unnamed> %block_25 %block_30
+@block_25
+  jmp %block_25
+  call %substring <unnamed> 9 297
+  jmp %block_30
+@block_30
+  call %lm_list_len <unnamed>
+  cne <unnamed> 289
+  br <unnamed> %block_34 %block_40
+@block_34
+  jmp %block_34
+  call %lm_list_new 0
+  alloc 16
+  call %std.uuid.uuid.UUID.init <unnamed> <unnamed> 10
+  ret <unnamed>
+@block_40
+  call %substring <unnamed> 65 73
+  call %lm_box_string %str_const_52
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_54 %block_47
+@block_47
+  jmp %block_47
+  call %substring <unnamed> 105 113
+  call %lm_box_string %str_const_53
+  cne <unnamed> <unnamed>
+  jmp %block_54
+@block_54
+  br <unnamed> %block_63 %block_56
+@block_56
+  jmp %block_56
+  call %substring <unnamed> 145 153
+  call %lm_box_string %str_const_54
+  cne <unnamed> <unnamed>
+  jmp %block_63
+@block_63
+  br <unnamed> %block_72 %block_65
+@block_65
+  jmp %block_65
+  call %substring <unnamed> 185 193
+  call %lm_box_string %str_const_55
+  cne <unnamed> <unnamed>
+  jmp %block_72
+@block_72
+  br <unnamed> %block_73 %block_79
+@block_73
+  jmp %block_73
+  call %lm_list_new 0
+  alloc 16
+  call %std.uuid.uuid.UUID.init <unnamed> <unnamed> 10
+  ret <unnamed>
+@block_79
+  call %lm_list_new 0
+  call %lm_box_string %str_const_56
+  jmp %block_85
+@block_85
+  cslt 1 289
+  br <unnamed> %block_88 %block_158
+@block_88
+  jmp %block_88
+  ceq 1 65
+  br <unnamed> %block_96 %block_92
+@block_92
+  jmp %block_92
+  ceq 1 105
+  jmp %block_96
+@block_96
+  br <unnamed> %block_102 %block_98
+@block_98
+  jmp %block_98
+  ceq 1 145
+  jmp %block_102
+@block_102
+  br <unnamed> %block_108 %block_104
+@block_104
+  jmp %block_104
+  ceq 1 185
+  jmp %block_108
+@block_108
+  br <unnamed> %block_109 %block_114
+@block_109
+  jmp %block_109
+  add 1 9
+  jmp %block_157
+@block_114
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  add <unnamed> 9
+  add <unnamed> 17
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %std.uuid.uuid.index_of <unnamed> <unnamed>
+  call %std.uuid.uuid.index_of <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_141 %block_136
+@block_136
+  jmp %block_136
+  neg 9
+  ceq <unnamed> <unnamed>
+  jmp %block_141
+@block_141
+  br <unnamed> %block_142 %block_148
+@block_142
+  jmp %block_142
+  call %lm_list_new 0
+  alloc 16
+  call %std.uuid.uuid.UUID.init <unnamed> <unnamed> 10
+  ret <unnamed>
+@block_148
+  shl <unnamed> 33
+  or <unnamed> <unnamed>
+  call %lm_list_append <unnamed> <unnamed>
+  add <unnamed> 17
+  jmp %block_157
+@block_157
+  jmp %block_85
+@block_158
+  alloc 16
+  call %std.uuid.uuid.UUID.init <unnamed> <unnamed> 18
+  ret <unnamed>
+}
+
+function std.resource.__init__() {
+@entry
+  ret 0
+}
+
+function std.random.random.Random.next_int(i64) {
+@entry
+  ret 0
+}
+
+function std.random.random.Random.range_float(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.random.random.Random.next_float(i64) {
+@entry
+  ret 0
+}
+
+function std.random.random.Random.next_string(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.random.random.Random.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function lm_list_len(i64) {
+}
+
+function substring(i64, i64, i64) {
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_to_string(i64) {
+}
+
+function lm_str_concat(i8*, i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_error_new(i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_list_new(i64) {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}

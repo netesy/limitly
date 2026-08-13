@@ -1,0 +1,606 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.regex.index.__init__
+  call %std.regex.regex.__init__
+  call %main
+  ret 0
+}
+
+function std.regex.regex.RegexPatterns.phone(i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.RegexPatterns.url(i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.replace_all(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.is_ok(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.find_match_start(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.is_valid(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.map_err(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.is_none(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.is_ok(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.is_some(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.core.err_int(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_0
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.OptionStr.is_none(i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.is_balanced_pattern(i64) {
+@entry
+  ret 0
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_1
+  call %lm_print_int <unnamed>
+  call %test_regex_frame
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_2
+  call %lm_assert <unnamed> <unnamed>
+  call %test_regex_patterns
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_3
+  call %lm_assert <unnamed> <unnamed>
+  call %test_regex_helpers
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_4
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_5
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function std.core.make_err_str(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_6
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_7
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function test_regex_helpers() {
+@entry
+@block_0
+  call %lm_box_string %str_const_8
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_9
+  call %lm_box_string %str_const_10
+  call %std.regex.index.is_match <unnamed> <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_11
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_12
+  call %lm_box_string %str_const_13
+  call %lm_box_string %str_const_14
+  call %std.regex.index.replace <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_15
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_16
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.core.ResultInt.is_err(i64) {
+@entry
+  ret 0
+}
+
+function test_regex_patterns() {
+@entry
+@block_0
+  call %lm_box_string %str_const_17
+  call %lm_print_int <unnamed>
+  call %std.regex.index.RegexPatterns
+  cast <unnamed>
+  call %std.regex.regex.RegexPatterns.email <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_18
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_19
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.core.OptionStr.is_some(i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.RegexPatterns.email(i64) {
+@entry
+  ret 0
+}
+
+function std.core.some_str(i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.regex.regex.__init__() {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.simple_match(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.regex.index.Regex(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.regex.regex.Regex.init <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.regex.regex.RegexPatterns.init(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.is_err(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ok_str(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_20
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_21
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function test_regex_frame() {
+@entry
+@block_0
+  call %lm_box_string %str_const_22
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_23
+  call %std.regex.index.Regex <unnamed> 1
+  cast <unnamed>
+  call %lm_box_string %str_const_24
+  call %std.regex.regex.Regex.matches <unnamed> <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_25
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_26
+  call %std.regex.regex.Regex.matches <unnamed> <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_27
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_28
+  call %std.regex.regex.Regex.find_first_match <unnamed> <unnamed>
+  call %lm_box_string %str_const_29
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_30
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_31
+  call %std.regex.regex.Regex.find_all_matches <unnamed> <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 25
+  call %lm_box_string %str_const_32
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  call %lm_box_string %str_const_33
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_34
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_35
+  call %lm_box_string %str_const_36
+  call %std.regex.regex.Regex.replace <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_37
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_38
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_39
+  call %lm_box_string %str_const_40
+  call %std.regex.regex.Regex.replace_all <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_41
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_42
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_43
+  call %std.regex.regex.Regex.split <unnamed> <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 17
+  call %lm_box_string %str_const_44
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  call %lm_box_string %str_const_45
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_46
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 9
+  call %lm_box_string %str_const_47
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_48
+  call %lm_assert <unnamed> <unnamed>
+  call %std.regex.regex.Regex.is_valid <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_49
+  call %lm_assert <unnamed> <unnamed>
+  call %std.regex.regex.Regex.to_string <unnamed>
+  call %lm_box_string %str_const_50
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_51
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.core.make_err_int(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_52
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.ResultInt.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.map_err(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.regex.index.is_match(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.regex.regex.Regex.init <unnamed> <unnamed> 1
+  call %std.regex.regex.Regex.matches <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.some_int(i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.core.err_str(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_53
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_54
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.ResultStr.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.split(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.replace(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ok_int(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_55
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_56
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.ok_bool(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_57
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_58
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  cne <unnamed> 1
+  br <unnamed> %block_9 %block_16
+@block_9
+  jmp %block_9
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+@block_16
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.__init__() {
+@entry
+  ret 0
+}
+
+function std.regex.index.replace(i64, i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.regex.regex.Regex.init <unnamed> <unnamed> 1
+  call %std.regex.regex.Regex.replace <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.regex.index.RegexPatterns() {
+@entry
+@block_0
+  alloc 16
+  call %std.regex.regex.RegexPatterns.init <unnamed>
+  ret 0
+}
+
+function std.regex.index.__init__() {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.matches(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.find_first_match(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.regex.regex.Regex.find_all_matches(i64, i64) {
+@entry
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_list_len(void) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_list_new() {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}

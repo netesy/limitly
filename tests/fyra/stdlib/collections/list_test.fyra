@@ -1,0 +1,198 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.collections.linkedlist.__init__
+  call %main
+  ret 0
+}
+
+function std.collections.linkedlist.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.LinkedList.push_front(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.Iterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.LinkedList.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.LinkedList.pop_back(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.LinkedList.is_empty(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.LinkedList.iterator(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.Iterator.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.LinkedList.pop_front(i64) {
+@entry
+  ret 0
+}
+
+function main() {
+@entry
+@block_0
+  alloc 16
+  call %std.collections.linkedlist.LinkedList.init <unnamed>
+  call %std.collections.linkedlist.LinkedList.push_back <unnamed> 9
+  call %std.collections.linkedlist.LinkedList.push_back <unnamed> 17
+  call %std.collections.linkedlist.LinkedList.push_front <unnamed> 1
+  call %std.collections.linkedlist.LinkedList.length <unnamed>
+  call %lm_box_string %str_const_0
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %std.collections.linkedlist.LinkedList.length <unnamed>
+  ceq <unnamed> 25
+  call %lm_box_string %str_const_1
+  call %lm_assert <unnamed> <unnamed>
+  call %std.collections.linkedlist.LinkedList.pop_front <unnamed>
+  ceq <unnamed> 1
+  call %lm_box_string %str_const_2
+  call %lm_assert <unnamed> <unnamed>
+  call %std.collections.linkedlist.LinkedList.pop_back <unnamed>
+  ceq <unnamed> 17
+  call %lm_box_string %str_const_3
+  call %lm_assert <unnamed> <unnamed>
+  call %std.collections.linkedlist.LinkedList.pop_back <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_4
+  call %lm_assert <unnamed> <unnamed>
+  call %std.collections.linkedlist.LinkedList.pop_back <unnamed>
+  ceq <unnamed> 2
+  call %lm_box_string %str_const_5
+  call %lm_assert <unnamed> <unnamed>
+  call %std.collections.linkedlist.LinkedList.is_empty <unnamed>
+  call %lm_box_string %str_const_6
+  call %lm_assert <unnamed> <unnamed>
+  call %std.collections.linkedlist.LinkedList.push_back <unnamed> 81
+  call %std.collections.linkedlist.LinkedList.push_back <unnamed> 161
+  call %std.collections.linkedlist.LinkedList.iterator <unnamed>
+  call %std.collections.linkedlist.Iterator.next <unnamed>
+  ceq <unnamed> 81
+  call %lm_box_string %str_const_7
+  call %lm_assert <unnamed> <unnamed>
+  call %std.collections.linkedlist.Iterator.next <unnamed>
+  ceq <unnamed> 161
+  call %lm_box_string %str_const_8
+  call %lm_assert <unnamed> <unnamed>
+  call %std.collections.linkedlist.Iterator.next <unnamed>
+  ceq <unnamed> 2
+  call %lm_box_string %str_const_9
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_10
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function std.collections.linkedlist.Node.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.LinkedList.push_back(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.LinkedList.len(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.LinkedList.init(i64) {
+@entry
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_rt_str_format(i64, i64) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_list_new() {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}
+
+function lm_list_len(i64) {
+}

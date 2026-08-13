@@ -1,0 +1,663 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.core.error.__init__
+  call %std.core.option.__init__
+  call %std.core.result.__init__
+  call %std.core.comparable.__init__
+  call %std.core.disposable.__init__
+  call %std.core.cloneable.__init__
+  call %std.core.hashable.__init__
+  call %std.core.index.__init__
+  call %main
+  ret 0
+}
+
+function std.core.error.__init__() {
+@entry
+  ret 0
+}
+
+function std.core.error.Error.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.core.cloneable.__init__() {
+@entry
+  ret 0
+}
+
+function std.core.comparable.__init__() {
+@entry
+  ret 0
+}
+
+function std.core.index.__init__() {
+@entry
+  ret 0
+}
+
+function is_positive_int(i64) {
+@entry
+@block_0
+  csgt <unnamed> 1
+  ret <unnamed>
+}
+
+function test_error() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_1
+  call %lm_box_string %str_const_2
+  alloc 16
+  call %std.core.error.Error.init <unnamed> <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_3
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_4
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_5
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_6
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.error.Error.to_string <unnamed>
+  call %lm_box_string %str_const_7
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_8
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_9
+  call %lm_box_string %str_const_10
+  call %std.core.index.Error <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_11
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_12
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_13
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_14
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_15
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_16
+  call %lm_print_int <unnamed>
+  call %test_error
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_17
+  call %lm_assert <unnamed> <unnamed>
+  call %test_option
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_18
+  call %lm_assert <unnamed> <unnamed>
+  call %test_result
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_19
+  call %lm_assert <unnamed> <unnamed>
+  call %test_traits
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_20
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_21
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function DummyHashable.hash(i64) {
+@entry
+  ret 0
+}
+
+function std.core.index.main() {
+@entry
+@block_0
+  ret 0
+}
+
+function DummyComparable.compare(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.option.Option.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function DummyDisposable.dispose(i64) {
+@entry
+  ret 0
+}
+
+function std.core.option.Option.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.hashable.__init__() {
+@entry
+  ret 0
+}
+
+function add_one(i64) {
+@entry
+@block_0
+  add <unnamed> 9
+  ret <unnamed>
+}
+
+function DummyComparable.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.result.Result.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.core.index.Err(i64) {
+@entry
+@block_0
+  call %std.core.result.Err <unnamed>
+  ret <unnamed>
+}
+
+function DummyDisposable.init(i64) {
+@entry
+  ret 0
+}
+
+function DummyCloneable.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.option.Option.is_none(i64) {
+@entry
+  ret 0
+}
+
+function std.core.index.None() {
+@entry
+@block_0
+  call %std.core.option.None
+  ret 0
+}
+
+function test_option() {
+@entry
+@block_0
+  call %lm_box_string %str_const_22
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_23
+  call %std.core.option.Some <unnamed>
+  call %std.core.option.Option.is_some <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_24
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.option.Option.is_none <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_25
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.option.Option.unwrap <unnamed>
+  call %lm_box_string %str_const_26
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_27
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_28
+  call %std.core.option.Option.unwrap_or <unnamed> <unnamed>
+  call %lm_box_string %str_const_29
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_30
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.option.None
+  call %std.core.option.Option.is_some <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_31
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.option.Option.is_none <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_32
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_33
+  call %std.core.option.Option.unwrap_or <unnamed> <unnamed>
+  call %lm_box_string %str_const_34
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_35
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_36
+  call %std.core.option.Option.map <unnamed> <unnamed>
+  call %std.core.option.Option.is_some <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_37
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.option.Option.unwrap <unnamed>
+  ceq <unnamed> 41
+  call %lm_box_string %str_const_38
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_39
+  call %std.core.option.Option.map <unnamed> <unnamed>
+  call %std.core.option.Option.is_none <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_40
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.option.Some 81
+  call %lm_box_string %str_const_41
+  call %std.core.option.Option.filter <unnamed> <unnamed>
+  call %std.core.option.Option.is_some <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_42
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.option.Option.unwrap <unnamed>
+  ceq <unnamed> 81
+  call %lm_box_string %str_const_43
+  call %lm_assert <unnamed> <unnamed>
+  neg 41
+  call %std.core.option.Some <unnamed>
+  call %lm_box_string %str_const_44
+  call %std.core.option.Option.filter <unnamed> <unnamed>
+  call %std.core.option.Option.is_none <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_45
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.index.Some 337
+  call %std.core.option.Option.is_some <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_46
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.option.Option.unwrap <unnamed>
+  ceq <unnamed> 337
+  call %lm_box_string %str_const_47
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.index.None
+  call %std.core.option.Option.is_none <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_48
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_49
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function DummyCloneable.clone(i64) {
+@entry
+  ret 0
+}
+
+function std.core.option.__init__() {
+@entry
+  ret 0
+}
+
+function std.core.error.Error.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.result.Result.is_ok(i64) {
+@entry
+  ret 0
+}
+
+function map_string_len(i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  ret <unnamed>
+}
+
+function test_result() {
+@entry
+@block_0
+  call %lm_box_string %str_const_50
+  call %lm_print_int <unnamed>
+  call %std.core.result.Ok 801
+  call %std.core.result.Result.is_ok <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_51
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.result.Result.is_err <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_52
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.result.Result.unwrap <unnamed>
+  ceq <unnamed> 801
+  call %lm_box_string %str_const_53
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.result.Result.unwrap_or <unnamed> 1601
+  ceq <unnamed> 801
+  call %lm_box_string %str_const_54
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_55
+  call %lm_box_string %str_const_56
+  alloc 16
+  call %std.core.error.Error.init <unnamed> <unnamed> <unnamed>
+  call %std.core.result.Err <unnamed>
+  call %std.core.result.Result.is_ok <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_57
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.result.Result.is_err <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_58
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.result.Result.unwrap_or <unnamed> 1601
+  ceq <unnamed> 1601
+  call %lm_box_string %str_const_59
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.result.Result.unwrap_err <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_60
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_61
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_62
+  call %std.core.result.Result.map <unnamed> <unnamed>
+  call %std.core.result.Result.is_ok <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_63
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.result.Result.unwrap <unnamed>
+  ceq <unnamed> 809
+  call %lm_box_string %str_const_64
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_65
+  call %std.core.result.Result.map <unnamed> <unnamed>
+  call %std.core.result.Result.is_err <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_66
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_67
+  call %std.core.index.Ok <unnamed>
+  call %std.core.result.Result.is_ok <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_68
+  call %lm_assert <unnamed> <unnamed>
+  call %std.core.result.Result.unwrap <unnamed>
+  call %lm_box_string %str_const_69
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_70
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_71
+  call %lm_box_string %str_const_72
+  alloc 16
+  call %std.core.error.Error.init <unnamed> <unnamed> <unnamed>
+  call %std.core.index.Err <unnamed>
+  call %std.core.result.Result.is_err <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_73
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_74
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.core.option.Option.is_some(i64) {
+@entry
+  ret 0
+}
+
+function std.core.option.Option.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.core.option.Option.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.result.Result.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.option.Some(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.core.option.Option.init <unnamed> 18 <unnamed>
+  ret <unnamed>
+}
+
+function std.core.disposable.__init__() {
+@entry
+  ret 0
+}
+
+function std.core.option.None() {
+@entry
+@block_0
+  alloc 16
+  call %std.core.option.Option.init <unnamed> 10 2
+  ret <unnamed>
+}
+
+function std.core.result.Result.is_err(i64) {
+@entry
+  ret 0
+}
+
+function std.core.result.Result.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.option.Option.filter(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.result.Result.unwrap_err(i64) {
+@entry
+  ret 0
+}
+
+function std.core.index.Ok(i64) {
+@entry
+@block_0
+  call %std.core.result.Ok <unnamed>
+  ret <unnamed>
+}
+
+function std.core.result.Result.init(i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.result.Ok(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_75
+  call %lm_box_string %str_const_76
+  alloc 16
+  call %std.core.error.Error.init <unnamed> <unnamed> <unnamed>
+  alloc 16
+  call %std.core.result.Result.init <unnamed> 18 <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.result.Err(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.core.result.Result.init <unnamed> 10 2 <unnamed>
+  ret <unnamed>
+}
+
+function std.core.result.__init__() {
+@entry
+  ret 0
+}
+
+function test_traits() {
+@entry
+@block_0
+  call %lm_box_string %str_const_77
+  call %lm_print_int <unnamed>
+  alloc 16
+  call %DummyComparable.init <unnamed> 81
+  alloc 16
+  call %DummyComparable.init <unnamed> 161
+  call %DummyComparable.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_78
+  call %lm_assert <unnamed> <unnamed>
+  call %DummyComparable.compare <unnamed> <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_79
+  call %lm_assert <unnamed> <unnamed>
+  alloc 16
+  call %DummyComparable.init <unnamed> 81
+  call %DummyComparable.compare <unnamed> <unnamed>
+  ceq <unnamed> 1
+  call %lm_box_string %str_const_80
+  call %lm_assert <unnamed> <unnamed>
+  alloc 16
+  call %DummyDisposable.init <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_81
+  call %lm_assert <unnamed> <unnamed>
+  call %DummyDisposable.dispose <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_82
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_83
+  alloc 16
+  call %DummyCloneable.init <unnamed> <unnamed>
+  call %DummyCloneable.clone <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_84
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_85
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_86
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_87
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_88
+  call %lm_assert <unnamed> <unnamed>
+  alloc 16
+  call %DummyHashable.init <unnamed> 41
+  call %DummyHashable.hash <unnamed>
+  ceq <unnamed> 1241
+  call %lm_box_string %str_const_89
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_90
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function DummyHashable.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.index.Error(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.core.error.Error.init <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.index.Some(i64) {
+@entry
+@block_0
+  call %std.core.option.Some <unnamed>
+  ret <unnamed>
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_list_len(i64) {
+}
+
+function lm_list_new() {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}

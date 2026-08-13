@@ -1,0 +1,673 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.iterator.index.__init__
+  call %main
+  ret 0
+}
+
+function std.iterator.index.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.index.take(i64, i64) {
+@entry
+@block_0
+  call %std.iterator.take.take <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.index.filter(i64, i64) {
+@entry
+@block_0
+  call %std.iterator.filter.filter <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.index.map(i64, i64) {
+@entry
+@block_0
+  call %std.iterator.map.map <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.index.collect(i64) {
+@entry
+@block_0
+  call %std.iterator.iterator.collect <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.iterable.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.take.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.take.TakeIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function test_iterator_basics() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %std.iterator.index.iterator <unnamed>
+  ceq 0 9
+  call %lm_box_string %str_const_1
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 17
+  call %lm_box_string %str_const_2
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 25
+  call %lm_box_string %str_const_3
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 2
+  call %lm_box_string %str_const_4
+  call %lm_assert <unnamed> <unnamed>
+  call %std.iterator.index.iterator <unnamed>
+  call %std.iterator.index.collect <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 25
+  call %lm_box_string %str_const_5
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_6
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.iterator.index.iterator(i64) {
+@entry
+@block_0
+  call %std.iterator.iterator.iterator <unnamed>
+  ret <unnamed>
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_7
+  call %lm_print_int <unnamed>
+  call %test_iterator_basics
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_8
+  call %lm_assert <unnamed> <unnamed>
+  call %test_map
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_9
+  call %lm_assert <unnamed> <unnamed>
+  call %test_filter
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_10
+  call %lm_assert <unnamed> <unnamed>
+  call %test_take
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_11
+  call %lm_assert <unnamed> <unnamed>
+  call %test_skip
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_12
+  call %lm_assert <unnamed> <unnamed>
+  call %test_zip
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_13
+  call %lm_assert <unnamed> <unnamed>
+  call %test_chain
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_14
+  call %lm_assert <unnamed> <unnamed>
+  call %test_enumerate
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_15
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_16
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function test_chain() {
+@entry
+@block_0
+  call %lm_box_string %str_const_17
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 33
+  call %std.iterator.index.iterator <unnamed>
+  call %std.iterator.index.iterator <unnamed>
+  call %std.iterator.index.chain <unnamed> <unnamed>
+  ceq 0 9
+  call %lm_box_string %str_const_18
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 17
+  call %lm_box_string %str_const_19
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 25
+  call %lm_box_string %str_const_20
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 33
+  call %lm_box_string %str_const_21
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 2
+  call %lm_box_string %str_const_22
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.iterator.index.chain(i64, i64) {
+@entry
+@block_0
+  call %std.iterator.chain.chain <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function test_enumerate() {
+@entry
+@block_0
+  call %lm_box_string %str_const_23
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_box_string %str_const_24
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_25
+  call %lm_list_append <unnamed> <unnamed>
+  call %std.iterator.index.iterator <unnamed>
+  call %std.iterator.index.enumerate <unnamed>
+  cast 0
+  ceq 0 1
+  call %lm_box_string %str_const_26
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_27
+  ceq 0 <unnamed>
+  call %lm_box_string %str_const_28
+  call %lm_assert <unnamed> <unnamed>
+  cast 0
+  ceq 0 9
+  call %lm_box_string %str_const_29
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_30
+  ceq 0 <unnamed>
+  call %lm_box_string %str_const_31
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 2
+  call %lm_box_string %str_const_32
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.iterator.iterator.PeekableIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function test_zip() {
+@entry
+@block_0
+  call %lm_box_string %str_const_33
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_new 0
+  call %lm_box_string %str_const_34
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_35
+  call %lm_list_append <unnamed> <unnamed>
+  call %std.iterator.index.iterator <unnamed>
+  call %std.iterator.index.iterator <unnamed>
+  call %std.iterator.index.zip <unnamed> <unnamed>
+  cast 0
+  ceq 0 9
+  call %lm_box_string %str_const_36
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_37
+  ceq 0 <unnamed>
+  call %lm_box_string %str_const_38
+  call %lm_assert <unnamed> <unnamed>
+  cast 0
+  ceq 0 17
+  call %lm_box_string %str_const_39
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_40
+  ceq 0 <unnamed>
+  call %lm_box_string %str_const_41
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 2
+  call %lm_box_string %str_const_42
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function test_take() {
+@entry
+@block_0
+  call %lm_box_string %str_const_43
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 33
+  call %lm_list_append <unnamed> 41
+  call %std.iterator.index.iterator <unnamed>
+  call %std.iterator.index.take <unnamed> 25
+  ceq 0 9
+  call %lm_box_string %str_const_44
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 17
+  call %lm_box_string %str_const_45
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 25
+  call %lm_box_string %str_const_46
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 2
+  call %lm_box_string %str_const_47
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.iterator.index.skip(i64, i64) {
+@entry
+@block_0
+  call %std.iterator.skip.skip <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.enumerate.EnumerateIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function square(i64) {
+@entry
+@block_0
+  cast <unnamed>
+  mul <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.index.zip(i64, i64) {
+@entry
+@block_0
+  call %std.iterator.zip.zip <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.index.enumerate(i64) {
+@entry
+@block_0
+  call %std.iterator.enumerate.enumerate <unnamed>
+  ret <unnamed>
+}
+
+function test_filter() {
+@entry
+@block_0
+  call %lm_box_string %str_const_48
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 33
+  call %lm_list_append <unnamed> 41
+  call %std.iterator.index.iterator <unnamed>
+  call %lm_box_string %str_const_49
+  call %std.iterator.index.filter <unnamed> <unnamed>
+  ceq 0 9
+  call %lm_box_string %str_const_50
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 25
+  call %lm_box_string %str_const_51
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 41
+  call %lm_box_string %str_const_52
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 2
+  call %lm_box_string %str_const_53
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.iterator.map.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.zip.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.iterator.ListIterator.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.iterator.collect(i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  jmp %block_5
+@block_5
+  cne 0 2
+  br <unnamed> %block_8 %block_12
+@block_8
+  jmp %block_8
+  call %lm_list_append <unnamed> 0
+  jmp %block_5
+@block_12
+  ret <unnamed>
+}
+
+function test_skip() {
+@entry
+@block_0
+  call %lm_box_string %str_const_54
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 33
+  call %lm_list_append <unnamed> 41
+  call %std.iterator.index.iterator <unnamed>
+  call %std.iterator.index.skip <unnamed> 17
+  ceq 0 25
+  call %lm_box_string %str_const_55
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 33
+  call %lm_box_string %str_const_56
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 41
+  call %lm_box_string %str_const_57
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 2
+  call %lm_box_string %str_const_58
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.iterator.map.MapIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.take.take(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.iterator.take.TakeIterator.init <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.skip.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.chain.ChainIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.filter.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.take.TakeIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.chain.chain(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.iterator.chain.ChainIterator.init <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.chain.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.enumerate.EnumerateIterator.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.zip.ZipIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.zip.ZipIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.iterator.iterator(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.iterator.iterator.ListIterator.init <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.enumerate.enumerate(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.iterator.enumerate.EnumerateIterator.init <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function is_odd(i64) {
+@entry
+@block_0
+  cast <unnamed>
+  rem <unnamed> 17
+  cne <unnamed> 1
+  ret <unnamed>
+}
+
+function std.iterator.enumerate.__init__() {
+@entry
+  ret 0
+}
+
+function test_map() {
+@entry
+@block_0
+  call %lm_box_string %str_const_59
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %std.iterator.index.iterator <unnamed>
+  call %lm_box_string %str_const_60
+  call %std.iterator.index.map <unnamed> <unnamed>
+  ceq 0 9
+  call %lm_box_string %str_const_61
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 33
+  call %lm_box_string %str_const_62
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 73
+  call %lm_box_string %str_const_63
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 2
+  call %lm_box_string %str_const_64
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.iterator.filter.FilterIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.iterator.PeekableIterator.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.filter.FilterIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.filter.filter(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.iterator.filter.FilterIterator.init <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.skip.SkipIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.skip.skip(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.iterator.skip.SkipIterator.init <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.map.MapIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.map.map(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.iterator.map.MapIterator.init <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.iterator.iterator.ListIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.iterator.PeekableIterator.peek(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.skip.SkipIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.iterator.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.chain.ChainIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.zip.zip(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.iterator.zip.ZipIterator.init <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_list_new(i64) {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_list_len(void) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}

@@ -1,0 +1,281 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_1
+  call %lm_print_int <unnamed>
+  jmp %block_7
+@block_7
+  jmp %block_9
+@block_9
+  cslt 1 41
+  br <unnamed> %block_12 %block_22
+@block_12
+  jmp %block_12
+  call %lm_box_string %str_const_2
+  call %lm_rt_str_format <unnamed> 1
+  call %lm_print_int <unnamed>
+  add 1 9
+  add 1 1
+  jmp %block_19
+@block_19
+  add 1 9
+  jmp %block_9
+@block_22
+  ceq <unnamed> 41
+  call %lm_box_string %str_const_3
+  call %lm_assert <unnamed> <unnamed>
+  ceq <unnamed> 81
+  call %lm_box_string %str_const_4
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_5
+  call %lm_print_int <unnamed>
+  jmp %block_35
+@block_35
+  jmp %block_37
+@block_37
+  cslt 1 81
+  br <unnamed> %block_40 %block_50
+@block_40
+  jmp %block_40
+  call %lm_box_string %str_const_6
+  call %lm_rt_str_format <unnamed> 1
+  call %lm_print_int <unnamed>
+  add 1 9
+  add 1 1
+  jmp %block_47
+@block_47
+  add 1 17
+  jmp %block_37
+@block_50
+  ceq <unnamed> 41
+  call %lm_box_string %str_const_7
+  call %lm_assert <unnamed> <unnamed>
+  ceq <unnamed> 161
+  call %lm_box_string %str_const_8
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_9
+  call %lm_print_int <unnamed>
+  jmp %block_63
+@block_63
+  jmp %block_65
+@block_65
+  csgt 41 1
+  br <unnamed> %block_68 %block_78
+@block_68
+  jmp %block_68
+  call %lm_box_string %str_const_10
+  call %lm_rt_str_format <unnamed> 41
+  call %lm_print_int <unnamed>
+  add 1 9
+  add 1 41
+  jmp %block_75
+@block_75
+  sub 41 9
+  jmp %block_65
+@block_78
+  ceq <unnamed> 41
+  call %lm_box_string %str_const_11
+  call %lm_assert <unnamed> <unnamed>
+  ceq <unnamed> 121
+  call %lm_box_string %str_const_12
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_13
+  call %lm_print_int <unnamed>
+  jmp %block_91
+@block_91
+  jmp %block_93
+@block_93
+  mul 9 9
+  cslt <unnamed> 161
+  br <unnamed> %block_97 %block_110
+@block_97
+  jmp %block_97
+  mul 9 9
+  call %lm_box_string %str_const_14
+  call %lm_rt_str_format <unnamed> 9
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  add 1 9
+  add 1 9
+  jmp %block_107
+@block_107
+  add 9 9
+  jmp %block_93
+@block_110
+  ceq <unnamed> 33
+  call %lm_box_string %str_const_15
+  call %lm_assert <unnamed> <unnamed>
+  ceq <unnamed> 81
+  call %lm_box_string %str_const_16
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_17
+  call %lm_print_int <unnamed>
+  jmp %block_123
+@block_123
+  jmp %block_125
+@block_125
+  csle 1 17
+  br <unnamed> %block_128 %block_155
+@block_128
+  jmp %block_128
+  jmp %block_129
+@block_129
+  jmp %block_131
+@block_131
+  cslt 1 25
+  br <unnamed> %block_134 %block_151
+@block_134
+  jmp %block_134
+  call %lm_box_string %str_const_18
+  call %lm_rt_str_format <unnamed> 1
+  call %lm_rt_str_format <unnamed> 1
+  call %lm_print_int <unnamed>
+  add 1 9
+  mul 1 81
+  mul 1 81
+  add <unnamed> 1
+  add 1 <unnamed>
+  jmp %block_148
+@block_148
+  add 1 9
+  jmp %block_131
+@block_151
+  jmp %block_152
+@block_152
+  add 1 9
+  jmp %block_125
+@block_155
+  ceq <unnamed> 73
+  call %lm_box_string %str_const_19
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_20
+  call %lm_print_int <unnamed>
+  jmp %block_165
+@block_165
+  jmp %block_167
+@block_167
+  cslt 1 33
+  br <unnamed> %block_170 %block_194
+@block_170
+  jmp %block_170
+  mul 1 81
+  call %lm_box_string %str_const_21
+  call %lm_rt_str_format <unnamed> 801
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  add 1 9
+  add 1 <unnamed>
+  ceq 801 801
+  call %lm_box_string %str_const_22
+  call %lm_assert <unnamed> <unnamed>
+  mul 1 81
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_23
+  call %lm_assert <unnamed> <unnamed>
+  jmp %block_191
+@block_191
+  add 1 9
+  jmp %block_167
+@block_194
+  ceq <unnamed> 33
+  call %lm_box_string %str_const_24
+  call %lm_assert <unnamed> <unnamed>
+  ceq <unnamed> 481
+  call %lm_box_string %str_const_25
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_26
+  call %lm_print_int <unnamed>
+  jmp %block_206
+@block_206
+  jmp %block_208
+@block_208
+  cslt 1 81
+  br <unnamed> %block_211 %block_228
+@block_211
+  jmp %block_211
+  ceq 1 25
+  br <unnamed> %block_214 %block_215
+@block_214
+  jmp %block_214
+  jmp %block_225
+@block_215
+  ceq 1 57
+  br <unnamed> %block_218 %block_219
+@block_218
+  jmp %block_218
+  jmp %block_228
+@block_219
+  call %lm_box_string %str_const_27
+  call %lm_rt_str_format <unnamed> 1
+  call %lm_print_int <unnamed>
+  add 1 9
+  jmp %block_225
+@block_225
+  add 1 9
+  jmp %block_208
+@block_228
+  ceq <unnamed> 49
+  call %lm_box_string %str_const_28
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_29
+  call %lm_print_int <unnamed>
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_rt_str_format(i64, i64) {
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}

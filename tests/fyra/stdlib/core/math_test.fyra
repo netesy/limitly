@@ -1,0 +1,692 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.math.__init__
+  call %main
+  ret 0
+}
+
+function std.math.is_inf(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.is_inf <unnamed>
+  ret <unnamed>
+}
+
+function std.math.is_nan(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.is_nan <unnamed>
+  ret <unnamed>
+}
+
+function std.math.sinh(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.sinh <unnamed>
+  ret <unnamed>
+}
+
+function std.math.atan2(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.atan2 <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.math.acos(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.acos <unnamed>
+  ret <unnamed>
+}
+
+function std.math.is_finite(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.is_finite <unnamed>
+  ret <unnamed>
+}
+
+function std.math.asin(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.asin <unnamed>
+  ret <unnamed>
+}
+
+function std.math.tan(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.tan <unnamed>
+  ret <unnamed>
+}
+
+function std.math.__init__() {
+@entry
+  ret 0
+}
+
+function std.math.cos(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.cos <unnamed>
+  ret <unnamed>
+}
+
+function std.math.sin(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.sin <unnamed>
+  ret <unnamed>
+}
+
+function std.math.exp2(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.exp2 <unnamed>
+  ret <unnamed>
+}
+
+function std.math.log10(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.log10 <unnamed>
+  ret <unnamed>
+}
+
+function std.math.log(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.log <unnamed>
+  ret <unnamed>
+}
+
+function std.math.hypot(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.hypot <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.math.cbrt(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.cbrt <unnamed>
+  ret <unnamed>
+}
+
+function std.math.sqrt(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.sqrt <unnamed>
+  ret <unnamed>
+}
+
+function std.math.round(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.round <unnamed>
+  ret <unnamed>
+}
+
+function std.math.sign(i64) {
+@entry
+@block_0
+  csgt <unnamed> 2
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  ret 2
+@block_5
+  cslt <unnamed> 2
+  br <unnamed> %block_8 %block_11
+@block_8
+  jmp %block_8
+  neg 2
+  ret <unnamed>
+@block_11
+  ret 2
+}
+
+function std.math.exp(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.exp <unnamed>
+  ret <unnamed>
+}
+
+function std.math.clamp(i64, i64, i64) {
+@entry
+@block_0
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_2 %block_3
+@block_2
+  jmp %block_2
+  ret <unnamed>
+@block_3
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_5 %block_6
+@block_5
+  jmp %block_5
+  ret <unnamed>
+@block_6
+  ret 0
+}
+
+function std.math.max(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.max <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.math.ceil(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.ceil <unnamed>
+  ret <unnamed>
+}
+
+function std.math.min(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.min <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.math.combinations(i64, i64) {
+@entry
+@block_0
+  cslt <unnamed> 1
+  br <unnamed> %block_7 %block_4
+@block_4
+  jmp %block_4
+  csgt <unnamed> <unnamed>
+  jmp %block_7
+@block_7
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  ret 1
+@block_10
+  call %std.math.factorial <unnamed>
+  call %std.math.factorial <unnamed>
+  sub <unnamed> <unnamed>
+  call %std.math.factorial <unnamed>
+  mul <unnamed> <unnamed>
+  cast <unnamed>
+  div <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Float.fract(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.cos(i64) {
+@entry
+  ret 0
+}
+
+function std.math.cosh(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.cosh <unnamed>
+  ret <unnamed>
+}
+
+function std.math.gcd(i64, i64) {
+@entry
+@block_0
+  call %std.math.abs_int <unnamed>
+  call %std.math.abs_int <unnamed>
+  jmp %block_5
+@block_5
+  cne <unnamed> 1
+  br <unnamed> %block_8 %block_13
+@block_8
+  jmp %block_8
+  rem <unnamed> <unnamed>
+  jmp %block_5
+@block_13
+  ret <unnamed>
+}
+
+function std.math.nearly_equal(i64, i64, i64) {
+@entry
+@block_0
+  sub <unnamed> <unnamed>
+  call %std.math.abs <unnamed>
+  csle <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Float.round(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.max(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.pow(i64, i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.pow <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Int.max(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.abs_int(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Int.init <unnamed> <unnamed>
+  call %std.math.Int.abs <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Int.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function std.math.trunc(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.trunc <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Float.sinh(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Int.min(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.log2(i64) {
+@entry
+  ret 0
+}
+
+function std.math.fract(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.fract <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Float.min(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.floor(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.floor <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Int.abs(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.atan2(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.floor(i64) {
+@entry
+  ret 0
+}
+
+function std.math.lerp(i64, i64, i64) {
+@entry
+@block_0
+  sub <unnamed> <unnamed>
+  mul <unnamed> <unnamed>
+  sub <unnamed> <unnamed>
+  mul <unnamed> <unnamed>
+  add <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.math.log2(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.log2 <unnamed>
+  ret <unnamed>
+}
+
+function std.math.abs(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.abs <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Float.ceil(i64) {
+@entry
+  ret 0
+}
+
+function std.math.lcm(i64, i64) {
+@entry
+@block_0
+  ceq <unnamed> 1
+  br <unnamed> %block_8 %block_4
+@block_4
+  jmp %block_4
+  ceq <unnamed> 1
+  jmp %block_8
+@block_8
+  br <unnamed> %block_9 %block_11
+@block_9
+  jmp %block_9
+  ret 1
+@block_11
+  mul <unnamed> <unnamed>
+  call %std.math.abs_int <unnamed>
+  call %std.math.gcd <unnamed> <unnamed>
+  div <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Float.sqrt(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.exp(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.log(i64) {
+@entry
+  ret 0
+}
+
+function std.math.tanh(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.tanh <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Float.atan(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.is_finite(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.cbrt(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.log10(i64) {
+@entry
+  ret 0
+}
+
+function std.math.factorial(i64) {
+@entry
+@block_0
+  cslt <unnamed> 1
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  ret 1
+@block_5
+  ceq <unnamed> 1
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  ret 9
+@block_10
+  jmp %block_13
+@block_13
+  csle 9 <unnamed>
+  br <unnamed> %block_15 %block_22
+@block_15
+  jmp %block_15
+  mul 9 9
+  add 9 9
+  jmp %block_13
+@block_22
+  ret <unnamed>
+}
+
+function std.math.Float.exp2(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.pow(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.trunc(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.abs(i64) {
+@entry
+  ret 0
+}
+
+function std.math.permutations(i64, i64) {
+@entry
+@block_0
+  cslt <unnamed> 1
+  br <unnamed> %block_7 %block_4
+@block_4
+  jmp %block_4
+  csgt <unnamed> <unnamed>
+  jmp %block_7
+@block_7
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  ret 1
+@block_10
+  call %std.math.factorial <unnamed>
+  sub <unnamed> <unnamed>
+  call %std.math.factorial <unnamed>
+  div <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Float.hypot(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.sin(i64) {
+@entry
+  ret 0
+}
+
+function std.math.atan(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.math.Float.init <unnamed> <unnamed>
+  call %std.math.Float.atan <unnamed>
+  ret <unnamed>
+}
+
+function std.math.Float.tanh(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.tan(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.asin(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.acos(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.cosh(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.normalize_angle(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.is_nan(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.is_inf(i64) {
+@entry
+  ret 0
+}
+
+function std.math.Float.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}

@@ -1,0 +1,227 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_1
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_2
+  call %lm_box_string %str_const_3
+  call %lm_rt_str_format <unnamed> 98761
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_4
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_5
+  call %lm_rt_str_format <unnamed> 201
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_6
+  call %lm_rt_str_format <unnamed> 2
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_7
+  call %lm_rt_str_format <unnamed> 18
+  call %lm_print_int <unnamed>
+  ceq 98761 98761
+  call %lm_box_string %str_const_8
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_10
+  call %lm_assert <unnamed> <unnamed>
+  ceq 201 201
+  call %lm_box_string %str_const_11
+  call %lm_assert <unnamed> <unnamed>
+  ceq 2 2
+  call %lm_box_string %str_const_12
+  call %lm_assert <unnamed> <unnamed>
+  ceq 18 18
+  call %lm_box_string %str_const_13
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_14
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_15
+  call %lm_box_string %str_const_16
+  call %lm_rt_str_format <unnamed> 337
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_17
+  call %lm_rt_str_format <unnamed> 801
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_18
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_19
+  call %lm_rt_str_format <unnamed> 18
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_20
+  call %lm_rt_str_format <unnamed> 2
+  call %lm_print_int <unnamed>
+  ceq 337 337
+  call %lm_box_string %str_const_21
+  call %lm_assert <unnamed> <unnamed>
+  ceq 801 801
+  call %lm_box_string %str_const_22
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_23
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_24
+  call %lm_assert <unnamed> <unnamed>
+  ceq 18 18
+  call %lm_box_string %str_const_25
+  call %lm_assert <unnamed> <unnamed>
+  ceq 2 2
+  call %lm_box_string %str_const_26
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_27
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_28
+  call %lm_rt_str_format <unnamed> 8009
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_29
+  call %lm_rt_str_format <unnamed> 16017
+  call %lm_print_int <unnamed>
+  ceq 8009 8009
+  call %lm_box_string %str_const_30
+  call %lm_assert <unnamed> <unnamed>
+  ceq 16017 16017
+  call %lm_box_string %str_const_31
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_32
+  call %lm_print_int <unnamed>
+  call %calculateSpeed 2 2
+  call %lm_box_string %str_const_33
+  call %lm_rt_str_format <unnamed> 2
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_34
+  call %lm_rt_str_format <unnamed> 2
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_35
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  ceq <unnamed> 2
+  call %lm_box_string %str_const_36
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_37
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_38
+  call %lm_box_string %str_const_39
+  call %createFullName <unnamed> <unnamed>
+  call %lm_box_string %str_const_40
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_41
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_42
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_43
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_44
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_45
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_46
+  call %lm_box_string %str_const_47
+  call %lm_rt_str_format <unnamed> 7993
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_48
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  ceq 7993 7993
+  call %lm_box_string %str_const_49
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_50
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_51
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_52
+  call %lm_rt_str_format <unnamed> 7105
+  call %lm_print_int <unnamed>
+  ceq 7105 7105
+  call %lm_box_string %str_const_53
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_54
+  call %lm_print_int <unnamed>
+  ret 0
+}
+
+function createFullName(i64, i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_55
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function calculateSpeed(i64, i64) {
+@entry
+@block_0
+  csgt <unnamed> 2
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  div <unnamed> <unnamed>
+  ret <unnamed>
+@block_5
+  ret 2
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_rt_str_format(i64, i64) {
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_str_concat(i8*, i8*) {
+}
