@@ -1,0 +1,1568 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.semver.__init__
+  call %main
+  ret 0
+}
+
+function std.semver.__init__() {
+@entry
+  ret 0
+}
+
+function std.semver.is_valid_build_id(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  ret 10
+@block_5
+  jmp %block_7
+@block_7
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_10 %block_25
+@block_10
+  jmp %block_10
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %std.semver.is_valid_char <unnamed>
+  cne <unnamed> 18
+  br <unnamed> %block_18 %block_20
+@block_18
+  jmp %block_18
+  ret 10
+@block_20
+  add 1 9
+  jmp %block_7
+@block_25
+  ret 18
+}
+
+function std.semver.is_valid_prerelease_id(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_1
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  ret 10
+@block_5
+  jmp %block_7
+@block_7
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_10 %block_25
+@block_10
+  jmp %block_10
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %std.semver.is_valid_char <unnamed>
+  cne <unnamed> 18
+  br <unnamed> %block_18 %block_20
+@block_18
+  jmp %block_18
+  ret 10
+@block_20
+  add 1 9
+  jmp %block_7
+@block_25
+  call %std.semver.is_numeric <unnamed>
+  cne <unnamed> 1
+  br <unnamed> %block_29 %block_45
+@block_29
+  jmp %block_29
+  call %lm_list_len <unnamed>
+  csgt <unnamed> 9
+  br <unnamed> %block_34 %block_41
+@block_34
+  jmp %block_34
+  call %substring <unnamed> 1 9
+  call %lm_box_string %str_const_2
+  ceq <unnamed> <unnamed>
+  jmp %block_41
+@block_41
+  br <unnamed> %block_42 %block_44
+@block_42
+  jmp %block_42
+  ret 10
+@block_44
+  jmp %block_45
+@block_45
+  ret 18
+}
+
+function std.semver.byte_ord(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_3
+  jmp %block_3
+@block_3
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_21
+@block_6
+  jmp %block_6
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_12 %block_16
+@block_12
+  jmp %block_12
+  add 777 1
+  ret <unnamed>
+@block_16
+  add 1 9
+  jmp %block_3
+@block_21
+  call %lm_box_string %str_const_4
+  jmp %block_25
+@block_25
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_28 %block_43
+@block_28
+  jmp %block_28
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_34 %block_38
+@block_34
+  jmp %block_34
+  add 521 1
+  ret <unnamed>
+@block_38
+  add 1 9
+  jmp %block_25
+@block_43
+  call %lm_box_string %str_const_5
+  jmp %block_47
+@block_47
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_50 %block_65
+@block_50
+  jmp %block_50
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_56 %block_60
+@block_56
+  jmp %block_56
+  add 385 1
+  ret <unnamed>
+@block_60
+  add 1 9
+  jmp %block_47
+@block_65
+  call %lm_box_string %str_const_6
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_68 %block_70
+@block_68
+  jmp %block_68
+  ret 361
+@block_70
+  call %lm_box_string %str_const_7
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_73 %block_75
+@block_73
+  jmp %block_73
+  ret 369
+@block_75
+  call %lm_box_string %str_const_8
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_78 %block_80
+@block_78
+  jmp %block_78
+  ret 345
+@block_80
+  ret 1
+}
+
+function std.semver.is_numeric(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  ret 10
+@block_5
+  call %lm_box_string %str_const_10
+  jmp %block_8
+@block_8
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_11 %block_27
+@block_11
+  jmp %block_11
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %std.semver.index_of <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_20 %block_22
+@block_20
+  jmp %block_20
+  ret 10
+@block_22
+  add 1 9
+  jmp %block_8
+@block_27
+  ret 18
+}
+
+function std.semver.split_by_dot(i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_box_string %str_const_11
+  jmp %block_5
+@block_5
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_8 %block_28
+@block_8
+  jmp %block_8
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_12
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_16 %block_20
+@block_16
+  jmp %block_16
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_13
+  jmp %block_23
+@block_20
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_23
+@block_23
+  add 1 9
+  jmp %block_5
+@block_28
+  call %lm_list_append <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.semver.to_int(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_14
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_3 %block_6
+@block_3
+  jmp %block_3
+  neg 9
+  ret <unnamed>
+@block_6
+  jmp %block_9
+@block_9
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_12 %block_154
+@block_12
+  jmp %block_12
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_15
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_20 %block_29
+@block_20
+  jmp %block_20
+  mul 1 81
+  mul 1 81
+  add <unnamed> 1
+  jmp %block_146
+@block_29
+  call %lm_box_string %str_const_16
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_32 %block_41
+@block_32
+  jmp %block_32
+  mul <unnamed> 81
+  mul <unnamed> 81
+  add <unnamed> 9
+  jmp %block_145
+@block_41
+  call %lm_box_string %str_const_17
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_44 %block_53
+@block_44
+  jmp %block_44
+  mul <unnamed> 81
+  mul <unnamed> 81
+  add <unnamed> 17
+  jmp %block_144
+@block_53
+  call %lm_box_string %str_const_18
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_56 %block_65
+@block_56
+  jmp %block_56
+  mul <unnamed> 81
+  mul <unnamed> 81
+  add <unnamed> 25
+  jmp %block_143
+@block_65
+  call %lm_box_string %str_const_19
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_68 %block_77
+@block_68
+  jmp %block_68
+  mul <unnamed> 81
+  mul <unnamed> 81
+  add <unnamed> 33
+  jmp %block_142
+@block_77
+  call %lm_box_string %str_const_20
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_80 %block_89
+@block_80
+  jmp %block_80
+  mul <unnamed> 81
+  mul <unnamed> 81
+  add <unnamed> 41
+  jmp %block_141
+@block_89
+  call %lm_box_string %str_const_21
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_92 %block_101
+@block_92
+  jmp %block_92
+  mul <unnamed> 81
+  mul <unnamed> 81
+  add <unnamed> 49
+  jmp %block_140
+@block_101
+  call %lm_box_string %str_const_22
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_104 %block_113
+@block_104
+  jmp %block_104
+  mul <unnamed> 81
+  mul <unnamed> 81
+  add <unnamed> 57
+  jmp %block_139
+@block_113
+  call %lm_box_string %str_const_23
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_116 %block_125
+@block_116
+  jmp %block_116
+  mul <unnamed> 81
+  mul <unnamed> 81
+  add <unnamed> 65
+  jmp %block_138
+@block_125
+  call %lm_box_string %str_const_24
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_128 %block_151
+@block_128
+  jmp %block_128
+  mul <unnamed> 81
+  mul <unnamed> 81
+  add <unnamed> 73
+  jmp %block_137
+@block_137
+  jmp %block_138
+@block_138
+  jmp %block_139
+@block_139
+  jmp %block_140
+@block_140
+  jmp %block_141
+@block_141
+  jmp %block_142
+@block_142
+  jmp %block_143
+@block_143
+  jmp %block_144
+@block_144
+  jmp %block_145
+@block_145
+  jmp %block_146
+@block_146
+  add 1 9
+  jmp %block_9
+@block_151
+  neg 9
+  ret <unnamed>
+@block_154
+  ret <unnamed>
+}
+
+function std.semver.compare(i64, i64) {
+@entry
+@block_0
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function test_compatibility() {
+@entry
+@block_0
+  call %lm_box_string %str_const_25
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_26
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_7 %block_6
+@block_6
+  jmp %block_6
+  jmp %block_11
+@block_7
+  jmp %block_14
+@block_11
+  jmp %block_14
+@block_14
+  call %lm_box_string %str_const_27
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_20 %block_19
+@block_19
+  jmp %block_19
+  jmp %block_24
+@block_20
+  jmp %block_27
+@block_24
+  jmp %block_27
+@block_27
+  call %lm_box_string %str_const_28
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_33 %block_32
+@block_32
+  jmp %block_32
+  jmp %block_37
+@block_33
+  jmp %block_40
+@block_37
+  jmp %block_40
+@block_40
+  call %lm_box_string %str_const_29
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_46 %block_45
+@block_45
+  jmp %block_45
+  jmp %block_50
+@block_46
+  jmp %block_53
+@block_50
+  jmp %block_53
+@block_53
+  call %std.semver.Version.is_compatible <unnamed> <unnamed>
+  call %lm_box_string %str_const_30
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.is_compatible <unnamed> <unnamed>
+  cne <unnamed> 18
+  call %lm_box_string %str_const_31
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.is_compatible <unnamed> <unnamed>
+  cne <unnamed> 18
+  call %lm_box_string %str_const_32
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_33
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_72 %block_71
+@block_71
+  jmp %block_71
+  jmp %block_76
+@block_72
+  jmp %block_79
+@block_76
+  jmp %block_79
+@block_79
+  call %lm_box_string %str_const_34
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_85 %block_84
+@block_84
+  jmp %block_84
+  jmp %block_89
+@block_85
+  jmp %block_92
+@block_89
+  jmp %block_92
+@block_92
+  call %lm_box_string %str_const_35
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_98 %block_97
+@block_97
+  jmp %block_97
+  jmp %block_102
+@block_98
+  jmp %block_105
+@block_102
+  jmp %block_105
+@block_105
+  call %std.semver.Version.is_compatible <unnamed> <unnamed>
+  call %lm_box_string %str_const_36
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.is_compatible <unnamed> <unnamed>
+  cne <unnamed> 18
+  call %lm_box_string %str_const_37
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_38
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_119 %block_118
+@block_118
+  jmp %block_118
+  jmp %block_123
+@block_119
+  jmp %block_126
+@block_123
+  jmp %block_126
+@block_126
+  call %lm_box_string %str_const_39
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_132 %block_131
+@block_131
+  jmp %block_131
+  jmp %block_136
+@block_132
+  jmp %block_139
+@block_136
+  jmp %block_139
+@block_139
+  call %lm_box_string %str_const_40
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_145 %block_144
+@block_144
+  jmp %block_144
+  jmp %block_149
+@block_145
+  jmp %block_152
+@block_149
+  jmp %block_152
+@block_152
+  call %std.semver.Version.is_compatible <unnamed> <unnamed>
+  call %lm_box_string %str_const_41
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.is_compatible <unnamed> <unnamed>
+  cne <unnamed> 18
+  call %lm_box_string %str_const_42
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_43
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function test_comparison() {
+@entry
+@block_0
+  call %lm_box_string %str_const_44
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_45
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_7 %block_6
+@block_6
+  jmp %block_6
+  jmp %block_11
+@block_7
+  jmp %block_14
+@block_11
+  jmp %block_14
+@block_14
+  call %lm_box_string %str_const_46
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_20 %block_19
+@block_19
+  jmp %block_19
+  jmp %block_24
+@block_20
+  jmp %block_27
+@block_24
+  jmp %block_27
+@block_27
+  call %lm_box_string %str_const_47
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_33 %block_32
+@block_32
+  jmp %block_32
+  jmp %block_37
+@block_33
+  jmp %block_40
+@block_37
+  jmp %block_40
+@block_40
+  call %lm_box_string %str_const_48
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_46 %block_45
+@block_45
+  jmp %block_45
+  jmp %block_50
+@block_46
+  jmp %block_53
+@block_50
+  jmp %block_53
+@block_53
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_49
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_50
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_51
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_52
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_53
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  ceq <unnamed> 1
+  call %lm_box_string %str_const_54
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_55
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_92 %block_91
+@block_91
+  jmp %block_91
+  jmp %block_96
+@block_92
+  jmp %block_99
+@block_96
+  jmp %block_99
+@block_99
+  call %lm_box_string %str_const_56
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_105 %block_104
+@block_104
+  jmp %block_104
+  jmp %block_109
+@block_105
+  jmp %block_112
+@block_109
+  jmp %block_112
+@block_112
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_57
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_58
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_59
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_129 %block_128
+@block_128
+  jmp %block_128
+  jmp %block_133
+@block_129
+  jmp %block_136
+@block_133
+  jmp %block_136
+@block_136
+  call %lm_box_string %str_const_60
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_142 %block_141
+@block_141
+  jmp %block_141
+  jmp %block_146
+@block_142
+  jmp %block_149
+@block_146
+  jmp %block_149
+@block_149
+  call %lm_box_string %str_const_61
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_155 %block_154
+@block_154
+  jmp %block_154
+  jmp %block_159
+@block_155
+  jmp %block_162
+@block_159
+  jmp %block_162
+@block_162
+  call %lm_box_string %str_const_62
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_168 %block_167
+@block_167
+  jmp %block_167
+  jmp %block_172
+@block_168
+  jmp %block_175
+@block_172
+  jmp %block_175
+@block_175
+  call %lm_box_string %str_const_63
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_181 %block_180
+@block_180
+  jmp %block_180
+  jmp %block_185
+@block_181
+  jmp %block_188
+@block_185
+  jmp %block_188
+@block_188
+  call %lm_box_string %str_const_64
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_194 %block_193
+@block_193
+  jmp %block_193
+  jmp %block_198
+@block_194
+  jmp %block_201
+@block_198
+  jmp %block_201
+@block_201
+  call %lm_box_string %str_const_65
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_207 %block_206
+@block_206
+  jmp %block_206
+  jmp %block_211
+@block_207
+  jmp %block_214
+@block_211
+  jmp %block_214
+@block_214
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_66
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_67
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_68
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_69
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_70
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_71
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_72
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_256 %block_255
+@block_255
+  jmp %block_255
+  jmp %block_260
+@block_256
+  jmp %block_263
+@block_260
+  jmp %block_263
+@block_263
+  call %lm_box_string %str_const_73
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_269 %block_268
+@block_268
+  jmp %block_268
+  jmp %block_273
+@block_269
+  jmp %block_276
+@block_273
+  jmp %block_276
+@block_276
+  call %std.semver.Version.compare <unnamed> <unnamed>
+  ceq <unnamed> 1
+  call %lm_box_string %str_const_74
+  call %lm_assert <unnamed> <unnamed>
+  call %std.semver.Version.equals <unnamed> <unnamed>
+  call %lm_box_string %str_const_75
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_76
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.semver.is_valid_char(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_77
+  call %std.semver.index_of <unnamed> <unnamed>
+  neg 9
+  cne <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function test_formatting() {
+@entry
+@block_0
+  call %lm_box_string %str_const_78
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_79
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_7 %block_6
+@block_6
+  jmp %block_6
+  jmp %block_11
+@block_7
+  jmp %block_14
+@block_11
+  jmp %block_14
+@block_14
+  call %std.semver.Version.to_string <unnamed>
+  call %lm_box_string %str_const_80
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_81
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_82
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_25 %block_24
+@block_24
+  jmp %block_24
+  jmp %block_29
+@block_25
+  jmp %block_32
+@block_29
+  jmp %block_32
+@block_32
+  call %std.semver.Version.to_string <unnamed>
+  call %lm_box_string %str_const_83
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_84
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_85
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.semver.is_compatible(i64, i64) {
+@entry
+@block_0
+  call %std.semver.Version.is_compatible <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.semver.Version.compare(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.semver.compare_strings(i64, i64) {
+@entry
+@block_0
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_2 %block_4
+@block_2
+  jmp %block_2
+  ret 1
+@block_4
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_11 %block_13
+@block_11
+  jmp %block_11
+  jmp %block_13
+@block_13
+  jmp %block_15
+@block_15
+  cslt 1 <unnamed>
+  br <unnamed> %block_17 %block_45
+@block_17
+  jmp %block_17
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_29 %block_40
+@block_29
+  jmp %block_29
+  call %std.semver.byte_ord <unnamed>
+  call %std.semver.byte_ord <unnamed>
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_35 %block_37
+@block_35
+  jmp %block_35
+  ret 9
+@block_37
+  neg 9
+  ret <unnamed>
+@block_40
+  add 1 9
+  jmp %block_15
+@block_45
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_47 %block_49
+@block_47
+  jmp %block_47
+  ret 9
+@block_49
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_51 %block_54
+@block_51
+  jmp %block_51
+  neg 9
+  ret <unnamed>
+@block_54
+  ret 1
+}
+
+function std.semver.Version.is_compatible(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.semver.Version.less_than(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.semver.index_of(i64, i64) {
+@entry
+@block_0
+  jmp %block_2
+@block_2
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_5 %block_17
+@block_5
+  jmp %block_5
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_11 %block_12
+@block_11
+  jmp %block_11
+  ret 1
+@block_12
+  add 1 9
+  jmp %block_2
+@block_17
+  neg 9
+  ret <unnamed>
+}
+
+function std.semver.has_invalid_leading_zero(i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  csgt <unnamed> 9
+  br <unnamed> %block_5 %block_12
+@block_5
+  jmp %block_5
+  call %substring <unnamed> 1 9
+  call %lm_box_string %str_const_86
+  ceq <unnamed> <unnamed>
+  jmp %block_12
+@block_12
+  br <unnamed> %block_13 %block_15
+@block_13
+  jmp %block_13
+  ret 18
+@block_15
+  ret 10
+}
+
+function std.semver.Version.init(i64, i64, i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function test_parsing() {
+@entry
+@block_0
+  call %lm_box_string %str_const_87
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_88
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_7 %block_6
+@block_6
+  jmp %block_6
+  jmp %block_14
+@block_7
+  call %lm_box_string %str_const_89
+  call %lm_assert 10 <unnamed>
+  jmp %block_17
+@block_14
+  jmp %block_17
+@block_17
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_90
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 17
+  call %lm_box_string %str_const_91
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 25
+  call %lm_box_string %str_const_92
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_93
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_94
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_95
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_96
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_97
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_48 %block_47
+@block_47
+  jmp %block_47
+  jmp %block_55
+@block_48
+  call %lm_box_string %str_const_98
+  call %lm_assert 10 <unnamed>
+  jmp %block_58
+@block_55
+  jmp %block_58
+@block_58
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 1
+  call %lm_box_string %str_const_99
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 1
+  call %lm_box_string %str_const_100
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 1
+  call %lm_box_string %str_const_101
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_102
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_79 %block_78
+@block_78
+  jmp %block_78
+  jmp %block_86
+@block_79
+  call %lm_box_string %str_const_103
+  call %lm_assert 10 <unnamed>
+  jmp %block_89
+@block_86
+  jmp %block_89
+@block_89
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_104
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_105
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_106
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_107
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_108
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_105 %block_104
+@block_104
+  jmp %block_104
+  jmp %block_112
+@block_105
+  call %lm_box_string %str_const_109
+  call %lm_assert 10 <unnamed>
+  jmp %block_115
+@block_112
+  jmp %block_115
+@block_115
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_110
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_111
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_112
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_113
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_114
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_131 %block_130
+@block_130
+  jmp %block_130
+  jmp %block_138
+@block_131
+  call %lm_box_string %str_const_115
+  call %lm_assert 10 <unnamed>
+  jmp %block_141
+@block_138
+  jmp %block_141
+@block_141
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_116
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_117
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_118
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_119
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_120
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_158 %block_157
+@block_157
+  jmp %block_157
+  jmp %block_162
+@block_158
+  jmp %block_165
+@block_162
+  jmp %block_165
+@block_165
+  call %lm_box_string %str_const_121
+  call %lm_assert 18 <unnamed>
+  call %lm_box_string %str_const_122
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_175 %block_174
+@block_174
+  jmp %block_174
+  jmp %block_179
+@block_175
+  jmp %block_182
+@block_179
+  jmp %block_182
+@block_182
+  call %lm_box_string %str_const_123
+  call %lm_assert 18 <unnamed>
+  call %lm_box_string %str_const_124
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_192 %block_191
+@block_191
+  jmp %block_191
+  jmp %block_196
+@block_192
+  jmp %block_199
+@block_196
+  jmp %block_199
+@block_199
+  call %lm_box_string %str_const_125
+  call %lm_assert 18 <unnamed>
+  call %lm_box_string %str_const_126
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_209 %block_208
+@block_208
+  jmp %block_208
+  jmp %block_213
+@block_209
+  jmp %block_216
+@block_213
+  jmp %block_216
+@block_216
+  call %lm_box_string %str_const_127
+  call %lm_assert 18 <unnamed>
+  call %lm_box_string %str_const_128
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_226 %block_225
+@block_225
+  jmp %block_225
+  jmp %block_230
+@block_226
+  jmp %block_233
+@block_230
+  jmp %block_233
+@block_233
+  call %lm_box_string %str_const_129
+  call %lm_assert 18 <unnamed>
+  call %lm_box_string %str_const_130
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_243 %block_242
+@block_242
+  jmp %block_242
+  jmp %block_247
+@block_243
+  jmp %block_250
+@block_247
+  jmp %block_250
+@block_250
+  call %lm_box_string %str_const_131
+  call %lm_assert 18 <unnamed>
+  call %lm_box_string %str_const_132
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_260 %block_259
+@block_259
+  jmp %block_259
+  jmp %block_264
+@block_260
+  jmp %block_267
+@block_264
+  jmp %block_267
+@block_267
+  call %lm_box_string %str_const_133
+  call %lm_assert 18 <unnamed>
+  call %lm_box_string %str_const_134
+  call %std.semver.parse <unnamed>
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_277 %block_276
+@block_276
+  jmp %block_276
+  jmp %block_281
+@block_277
+  jmp %block_284
+@block_281
+  jmp %block_284
+@block_284
+  call %lm_box_string %str_const_135
+  call %lm_assert 18 <unnamed>
+  call %lm_box_string %str_const_136
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_137
+  call %lm_print_int <unnamed>
+  call %test_parsing
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_138
+  call %lm_assert <unnamed> <unnamed>
+  call %test_comparison
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_139
+  call %lm_assert <unnamed> <unnamed>
+  call %test_compatibility
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_140
+  call %lm_assert <unnamed> <unnamed>
+  call %test_formatting
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_141
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_142
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function std.semver.Version.equals(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.semver.Version.greater_than(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.semver.Version.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.semver.parse(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_143
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_5
+  call %lm_box_string %str_const_144
+  call %std.semver.index_of <unnamed> <unnamed>
+  call %lm_box_string %str_const_145
+  neg 9
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_14 %block_43
+@block_14
+  jmp %block_14
+  add <unnamed> 9
+  call %lm_list_len <unnamed>
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %substring <unnamed> 1 <unnamed>
+  call %std.semver.split_by_dot <unnamed>
+  jmp %block_27
+@block_27
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_30 %block_42
+@block_30
+  jmp %block_30
+  call %lm_list_get <unnamed> 1
+  call %std.semver.is_valid_build_id <unnamed>
+  cne <unnamed> 18
+  br <unnamed> %block_35 %block_37
+@block_35
+  jmp %block_35
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_37
+  add 1 9
+  jmp %block_27
+@block_42
+  jmp %block_43
+@block_43
+  call %lm_box_string %str_const_146
+  call %std.semver.index_of <unnamed> <unnamed>
+  call %lm_box_string %str_const_147
+  neg 9
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_52 %block_81
+@block_52
+  jmp %block_52
+  add <unnamed> 9
+  call %lm_list_len <unnamed>
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %substring <unnamed> 1 <unnamed>
+  call %std.semver.split_by_dot <unnamed>
+  jmp %block_65
+@block_65
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_68 %block_80
+@block_68
+  jmp %block_68
+  call %lm_list_get <unnamed> 1
+  call %std.semver.is_valid_prerelease_id <unnamed>
+  cne <unnamed> 18
+  br <unnamed> %block_73 %block_75
+@block_73
+  jmp %block_73
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_75
+  add 1 9
+  jmp %block_65
+@block_80
+  jmp %block_81
+@block_81
+  call %lm_box_string %str_const_148
+  call %std.semver.index_of <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_88 %block_90
+@block_88
+  jmp %block_88
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_90
+  call %substring <unnamed> 1 <unnamed>
+  add <unnamed> 9
+  call %lm_list_len <unnamed>
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_149
+  call %std.semver.index_of <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_106 %block_108
+@block_106
+  jmp %block_106
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_108
+  call %substring <unnamed> 1 <unnamed>
+  add <unnamed> 9
+  call %lm_list_len <unnamed>
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_150
+  call %std.semver.index_of <unnamed> <unnamed>
+  neg 9
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_123 %block_125
+@block_123
+  jmp %block_123
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_125
+  call %std.semver.has_invalid_leading_zero <unnamed>
+  br <unnamed> %block_131 %block_128
+@block_128
+  jmp %block_128
+  call %std.semver.has_invalid_leading_zero <unnamed>
+  jmp %block_131
+@block_131
+  br <unnamed> %block_136 %block_133
+@block_133
+  jmp %block_133
+  call %std.semver.has_invalid_leading_zero <unnamed>
+  jmp %block_136
+@block_136
+  br <unnamed> %block_137 %block_139
+@block_137
+  jmp %block_137
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_139
+  call %std.semver.to_int <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_145 %block_147
+@block_145
+  jmp %block_145
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_147
+  call %std.semver.to_int <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_153 %block_155
+@block_153
+  jmp %block_153
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_155
+  call %std.semver.to_int <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_161 %block_163
+@block_161
+  jmp %block_161
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_163
+  alloc 16
+  call %std.semver.Version.init <unnamed> <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_list_len(i64) {
+}
+
+function substring(i64, i64, i64) {
+}
+
+function lm_list_new(i64) {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_str_concat(i8*, i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(void, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_error_new(i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}

@@ -1,0 +1,537 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_1
+  call %lm_print_int <unnamed>
+  jmp %block_6
+@block_6
+  ceq 81 41
+  br <unnamed> %block_9 %block_10
+@block_9
+  jmp %block_9
+  jmp %block_21
+@block_10
+  ceq 81 81
+  br <unnamed> %block_13 %block_14
+@block_13
+  jmp %block_13
+  jmp %block_18
+@block_14
+  jmp %block_15
+@block_15
+  call %lm_box_string %str_const_2
+  call %lm_print_int <unnamed>
+  jmp %block_24
+@block_18
+  call %lm_box_string %str_const_3
+  call %lm_print_int <unnamed>
+  jmp %block_24
+@block_21
+  call %lm_box_string %str_const_4
+  call %lm_print_int <unnamed>
+  jmp %block_24
+@block_24
+  call %lm_box_string %str_const_5
+  call %lm_print_int <unnamed>
+  jmp %block_28
+@block_28
+  jmp %block_29
+@block_29
+  call %lm_box_string %str_const_6
+  call %lm_rt_str_format <unnamed> 337
+  call %lm_print_int <unnamed>
+  jmp %block_33
+@block_33
+  call %lm_box_string %str_const_7
+  call %lm_print_int <unnamed>
+  jmp %block_38
+@block_38
+  ceq 0 1
+  br <unnamed> %block_42 %block_43
+@block_42
+  jmp %block_42
+  jmp %block_63
+@block_43
+  ceq 0 9
+  br <unnamed> %block_47 %block_48
+@block_47
+  jmp %block_47
+  jmp %block_60
+@block_48
+  ceq 0 17
+  br <unnamed> %block_52 %block_53
+@block_52
+  jmp %block_52
+  jmp %block_57
+@block_53
+  jmp %block_54
+@block_54
+  call %lm_box_string %str_const_8
+  call %lm_print_int <unnamed>
+  jmp %block_66
+@block_57
+  call %lm_box_string %str_const_9
+  call %lm_print_int <unnamed>
+  jmp %block_66
+@block_60
+  call %lm_box_string %str_const_10
+  call %lm_print_int <unnamed>
+  jmp %block_66
+@block_63
+  call %lm_box_string %str_const_11
+  call %lm_print_int <unnamed>
+  jmp %block_66
+@block_66
+  call %lm_box_string %str_const_12
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_13
+  call %lm_box_string %str_const_14
+  call %describeResult 0
+  call %describeResult 0
+  call %lm_box_string %str_const_15
+  call %lm_print_int <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  jmp %block_85
+@block_85
+  jmp %block_86
+@block_86
+  add <unnamed> 0
+  load <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_16
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  jmp %block_94
+@block_94
+  call %lm_box_string %str_const_17
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_18
+  jmp %block_98
+@block_98
+  jmp %block_99
+@block_99
+  call %lm_box_string %str_const_19
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  jmp %block_103
+@block_103
+  call %lm_box_string %str_const_20
+  call %lm_print_int <unnamed>
+  jmp %block_109
+@block_109
+  ceq 0 1
+  br <unnamed> %block_113 %block_115
+@block_113
+  jmp %block_113
+  jmp %block_152
+@block_115
+  ceq 0 9
+  br <unnamed> %block_119 %block_183
+@block_119
+  jmp %block_119
+  jmp %block_121
+@block_121
+  jmp %block_123
+@block_123
+  ceq 0 1
+  br <unnamed> %block_127 %block_128
+@block_127
+  jmp %block_127
+  jmp %block_148
+@block_128
+  ceq 0 9
+  br <unnamed> %block_132 %block_133
+@block_132
+  jmp %block_132
+  jmp %block_145
+@block_133
+  ceq 0 17
+  br <unnamed> %block_137 %block_138
+@block_137
+  jmp %block_137
+  jmp %block_142
+@block_138
+  jmp %block_139
+@block_139
+  call %lm_box_string %str_const_21
+  call %lm_print_int <unnamed>
+  jmp %block_151
+@block_142
+  call %lm_box_string %str_const_22
+  call %lm_print_int <unnamed>
+  jmp %block_151
+@block_145
+  call %lm_box_string %str_const_23
+  call %lm_print_int <unnamed>
+  jmp %block_151
+@block_148
+  call %lm_box_string %str_const_24
+  call %lm_print_int <unnamed>
+  jmp %block_151
+@block_151
+  jmp %block_183
+@block_152
+  jmp %block_154
+@block_154
+  ceq 0 1
+  br <unnamed> %block_158 %block_159
+@block_158
+  jmp %block_158
+  jmp %block_179
+@block_159
+  ceq 0 9
+  br <unnamed> %block_163 %block_164
+@block_163
+  jmp %block_163
+  jmp %block_176
+@block_164
+  ceq 0 17
+  br <unnamed> %block_168 %block_169
+@block_168
+  jmp %block_168
+  jmp %block_173
+@block_169
+  jmp %block_170
+@block_170
+  call %lm_box_string %str_const_25
+  call %lm_print_int <unnamed>
+  jmp %block_182
+@block_173
+  call %lm_box_string %str_const_26
+  call %lm_print_int <unnamed>
+  jmp %block_182
+@block_176
+  call %lm_box_string %str_const_27
+  call %lm_print_int <unnamed>
+  jmp %block_182
+@block_179
+  call %lm_box_string %str_const_28
+  call %lm_print_int <unnamed>
+  jmp %block_182
+@block_182
+  jmp %block_183
+@block_183
+  call %lm_box_string %str_const_29
+  call %lm_print_int <unnamed>
+  call %getDayName 9
+  call %getDayName 41
+  call %getDayName 81
+  call %lm_box_string %str_const_30
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_31
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_32
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_33
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_34
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_35
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_36
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_37
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_38
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_39
+  call %lm_print_int <unnamed>
+  call %processMessage 0
+  call %processMessage 0
+  call %lm_box_string %str_const_40
+  call %processMessage 0
+  call %lm_box_string %str_const_41
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_42
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_43
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_44
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_45
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_46
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_47
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_48
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_49
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_50
+  call %lm_print_int <unnamed>
+  call %getGuard 81
+  call %lm_box_string %str_const_51
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_52
+  call %lm_assert <unnamed> <unnamed>
+  call %getGuard 121
+  call %lm_box_string %str_const_53
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_54
+  call %lm_assert <unnamed> <unnamed>
+  call %getGuard 41
+  call %lm_box_string %str_const_55
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_56
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_57
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_58
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_59
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_60
+  call %lm_print_int <unnamed>
+  ret 0
+}
+
+function getGuard(i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  csgt <unnamed> 81
+  br <unnamed> %block_4 %block_6
+@block_4
+  jmp %block_4
+  call %lm_box_string %str_const_61
+  ret <unnamed>
+@block_6
+  cslt <unnamed> 81
+  br <unnamed> %block_9 %block_11
+@block_9
+  jmp %block_9
+  call %lm_box_string %str_const_62
+  ret <unnamed>
+@block_11
+  jmp %block_12
+@block_12
+  call %lm_box_string %str_const_63
+  ret <unnamed>
+}
+
+function getDayName(i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  ceq <unnamed> 9
+  br <unnamed> %block_4 %block_5
+@block_4
+  jmp %block_4
+  jmp %block_44
+@block_5
+  ceq <unnamed> 17
+  br <unnamed> %block_8 %block_9
+@block_8
+  jmp %block_8
+  jmp %block_42
+@block_9
+  ceq <unnamed> 25
+  br <unnamed> %block_12 %block_13
+@block_12
+  jmp %block_12
+  jmp %block_40
+@block_13
+  ceq <unnamed> 33
+  br <unnamed> %block_16 %block_17
+@block_16
+  jmp %block_16
+  jmp %block_38
+@block_17
+  ceq <unnamed> 41
+  br <unnamed> %block_20 %block_21
+@block_20
+  jmp %block_20
+  jmp %block_36
+@block_21
+  ceq <unnamed> 49
+  br <unnamed> %block_24 %block_25
+@block_24
+  jmp %block_24
+  jmp %block_34
+@block_25
+  ceq <unnamed> 57
+  br <unnamed> %block_28 %block_29
+@block_28
+  jmp %block_28
+  jmp %block_32
+@block_29
+  jmp %block_30
+@block_30
+  call %lm_box_string %str_const_64
+  ret <unnamed>
+@block_32
+  call %lm_box_string %str_const_65
+  ret <unnamed>
+@block_34
+  call %lm_box_string %str_const_66
+  ret <unnamed>
+@block_36
+  call %lm_box_string %str_const_67
+  ret <unnamed>
+@block_38
+  call %lm_box_string %str_const_68
+  ret <unnamed>
+@block_40
+  call %lm_box_string %str_const_69
+  ret <unnamed>
+@block_42
+  call %lm_box_string %str_const_70
+  ret <unnamed>
+@block_44
+  call %lm_box_string %str_const_71
+  ret <unnamed>
+}
+
+function describeResult(i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  ceq 0 1
+  br <unnamed> %block_5 %block_7
+@block_5
+  jmp %block_5
+  jmp %block_26
+@block_7
+  ceq 0 9
+  br <unnamed> %block_11 %block_13
+@block_11
+  jmp %block_11
+  jmp %block_21
+@block_13
+  ceq 0 17
+  br <unnamed> %block_17 %block_31
+@block_17
+  jmp %block_17
+  jmp %block_18
+@block_18
+  call %lm_box_string %str_const_72
+  call %lm_print_int <unnamed>
+  jmp %block_31
+@block_21
+  call %lm_box_string %str_const_73
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  jmp %block_31
+@block_26
+  call %lm_box_string %str_const_74
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  jmp %block_31
+@block_31
+  ret 0
+}
+
+function processMessage(i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  ceq 0 1
+  br <unnamed> %block_5 %block_6
+@block_5
+  jmp %block_5
+  jmp %block_37
+@block_6
+  ceq 0 9
+  br <unnamed> %block_10 %block_16
+@block_10
+  jmp %block_10
+  jmp %block_27
+@block_16
+  ceq 0 17
+  br <unnamed> %block_20 %block_22
+@block_20
+  jmp %block_20
+  jmp %block_23
+@block_22
+  ret 0
+@block_23
+  call %lm_box_string %str_const_75
+  call %lm_rt_str_format <unnamed> 0
+  ret <unnamed>
+@block_27
+  call %lm_box_string %str_const_76
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_rt_str_format <unnamed> 0
+  ret <unnamed>
+@block_37
+  call %lm_box_string %str_const_77
+  ret <unnamed>
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_rt_str_format(i64, i64) {
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}

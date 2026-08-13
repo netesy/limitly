@@ -1,0 +1,45 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_box_string %str_const_1
+  alloc 16
+  call %Resource.init <unnamed> <unnamed> 985 <unnamed>
+  call %Resource.print_all <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_2
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_3
+  call %lm_assert <unnamed> <unnamed>
+  ret 0
+}
+
+function Resource.secret_method(i64) {
+@entry
+  ret 0
+}
+
+function Resource.init(i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function Resource.print_all(i64) {
+@entry
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}

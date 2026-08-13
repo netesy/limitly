@@ -1,0 +1,1133 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.mime.index.__init__
+  call %std.mime.types.__init__
+  call %main
+  ret 0
+}
+
+function std.mime.index.MIMEType(i64, i64, i64, i64) {
+@entry
+@block_0
+  cast <unnamed>
+  alloc 16
+  call %std.mime.types.MIMEType.init <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.mime.types.__init__() {
+@entry
+  ret 0
+}
+
+function std.mime.types.trim(i64) {
+@entry
+@block_0
+  jmp %block_2
+@block_2
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_44
+@block_6
+  jmp %block_6
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_0
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_22 %block_14
+@block_14
+  jmp %block_14
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_1
+  ceq <unnamed> <unnamed>
+  jmp %block_22
+@block_22
+  br <unnamed> %block_32 %block_24
+@block_24
+  jmp %block_24
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_2
+  ceq <unnamed> <unnamed>
+  jmp %block_32
+@block_32
+  br <unnamed> %block_42 %block_34
+@block_34
+  jmp %block_34
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_3
+  ceq <unnamed> <unnamed>
+  jmp %block_42
+@block_42
+  jmp %block_44
+@block_44
+  br <unnamed> %block_45 %block_50
+@block_45
+  jmp %block_45
+  add 1 9
+  jmp %block_2
+@block_50
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  jmp %block_55
+@block_55
+  csge <unnamed> <unnamed>
+  br <unnamed> %block_58 %block_96
+@block_58
+  jmp %block_58
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_4
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_74 %block_66
+@block_66
+  jmp %block_66
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_5
+  ceq <unnamed> <unnamed>
+  jmp %block_74
+@block_74
+  br <unnamed> %block_84 %block_76
+@block_76
+  jmp %block_76
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_6
+  ceq <unnamed> <unnamed>
+  jmp %block_84
+@block_84
+  br <unnamed> %block_94 %block_86
+@block_86
+  jmp %block_86
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_7
+  ceq <unnamed> <unnamed>
+  jmp %block_94
+@block_94
+  jmp %block_96
+@block_96
+  br <unnamed> %block_97 %block_101
+@block_97
+  jmp %block_97
+  sub <unnamed> 9
+  jmp %block_55
+@block_101
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_103 %block_105
+@block_103
+  jmp %block_103
+  call %lm_box_string %str_const_8
+  ret <unnamed>
+@block_105
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.mime.types.MIMEType.is_application(i64) {
+@entry
+  ret 0
+}
+
+function std.mime.types.MIMEType.is_video(i64) {
+@entry
+  ret 0
+}
+
+function std.mime.types.MIMEType.is_image(i64) {
+@entry
+  ret 0
+}
+
+function std.mime.types.MIMEType.is_text(i64) {
+@entry
+  ret 0
+}
+
+function std.mime.index.extension_to_mime(i64) {
+@entry
+@block_0
+  call %std.mime.types.extension_to_mime <unnamed>
+  ret <unnamed>
+}
+
+function std.mime.types.extension_to_mime(i64) {
+@entry
+@block_0
+  call %std.mime.types.trim <unnamed>
+  call %std.mime.types.to_lower <unnamed>
+  call %lm_list_len <unnamed>
+  csgt <unnamed> 1
+  br <unnamed> %block_8 %block_15
+@block_8
+  jmp %block_8
+  call %substring <unnamed> 1 9
+  call %lm_box_string %str_const_9
+  ceq <unnamed> <unnamed>
+  jmp %block_15
+@block_15
+  br <unnamed> %block_16 %block_21
+@block_16
+  jmp %block_16
+  call %lm_list_len <unnamed>
+  call %substring <unnamed> 9 <unnamed>
+  jmp %block_21
+@block_21
+  call %lm_list_new 0
+  call %lm_box_string %str_const_10
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_11
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_12
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_13
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_14
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_15
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_16
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_17
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_18
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_19
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_20
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_21
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_22
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_23
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_24
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_25
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_26
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_27
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_28
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_29
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_30
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_31
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_32
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_33
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_34
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_35
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_box_string %str_const_36
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_37
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_38
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_39
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_40
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_41
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_42
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_43
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_44
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_45
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_46
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_47
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_48
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_49
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_50
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_51
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_52
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_53
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_54
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_55
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_56
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_57
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_58
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_59
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_60
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_61
+  call %lm_list_append <unnamed> <unnamed>
+  jmp %block_133
+@block_133
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_136 %block_146
+@block_136
+  jmp %block_136
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_139 %block_141
+@block_139
+  jmp %block_139
+  call %lm_list_get <unnamed> 1
+  ret <unnamed>
+@block_141
+  add 1 9
+  jmp %block_133
+@block_146
+  call %lm_box_string %str_const_62
+  ret <unnamed>
+}
+
+function std.mime.types.MIMEParams.add(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.mime.types.index_of(i64, i64) {
+@entry
+@block_0
+  jmp %block_2
+@block_2
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  sub <unnamed> <unnamed>
+  csle 1 <unnamed>
+  br <unnamed> %block_7 %block_19
+@block_7
+  jmp %block_7
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  add 1 <unnamed>
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_14
+@block_13
+  jmp %block_13
+  ret 1
+@block_14
+  add 1 9
+  jmp %block_2
+@block_19
+  neg 9
+  ret <unnamed>
+}
+
+function std.mime.types.mime_to_extension(i64) {
+@entry
+@block_0
+  call %std.mime.types.parse <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  cne <unnamed> 18
+  br <unnamed> %block_6 %block_8
+@block_6
+  jmp %block_6
+  call %lm_box_string %str_const_63
+  ret <unnamed>
+@block_8
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_64
+  call %lm_str_concat <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_box_string %str_const_65
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_66
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_67
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_68
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_69
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_70
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_71
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_72
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_73
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_74
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_75
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_76
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_77
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_78
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_79
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_80
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_81
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_82
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_83
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_84
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_85
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_86
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_87
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_88
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_box_string %str_const_89
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_90
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_91
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_92
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_93
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_94
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_95
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_96
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_97
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_98
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_99
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_100
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_101
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_102
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_103
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_104
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_105
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_106
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_107
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_108
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_109
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_110
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_111
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_112
+  call %lm_list_append <unnamed> <unnamed>
+  jmp %block_118
+@block_118
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_121 %block_133
+@block_121
+  jmp %block_121
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_124 %block_128
+@block_124
+  jmp %block_124
+  call %lm_box_string %str_const_113
+  call %lm_list_get <unnamed> 1
+  call %lm_str_concat <unnamed> <unnamed>
+  ret <unnamed>
+@block_128
+  add 1 9
+  jmp %block_118
+@block_133
+  call %lm_box_string %str_const_114
+  ret <unnamed>
+}
+
+function std.mime.types.MIMEType.is_audio(i64) {
+@entry
+  ret 0
+}
+
+function std.mime.types.MIMEParams.get(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.mime.index.mime_to_extension(i64) {
+@entry
+@block_0
+  call %std.mime.types.mime_to_extension <unnamed>
+  ret <unnamed>
+}
+
+function std.mime.types.to_lower(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_115
+  call %lm_box_string %str_const_116
+  call %lm_box_string %str_const_117
+  jmp %block_5
+@block_5
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_8 %block_35
+@block_8
+  jmp %block_8
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %std.mime.types.index_of <unnamed> <unnamed>
+  neg 9
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_19 %block_27
+@block_19
+  jmp %block_19
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_30
+@block_27
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_30
+@block_30
+  add 1 9
+  jmp %block_5
+@block_35
+  ret <unnamed>
+}
+
+function std.mime.types.MIMEParams.init(i64) {
+@entry
+  ret 0
+}
+
+function std.mime.types.MIMEType.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.mime.index.parse(i64) {
+@entry
+@block_0
+  call %std.mime.types.parse <unnamed>
+  ret <unnamed>
+}
+
+function std.mime.types.MIMEParams.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.mime.index.MIMEParams() {
+@entry
+@block_0
+  alloc 16
+  call %std.mime.types.MIMEParams.init <unnamed>
+  ret 0
+}
+
+function test_extension_mapping() {
+@entry
+@block_0
+  call %lm_box_string %str_const_118
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_119
+  call %std.mime.index.extension_to_mime <unnamed>
+  call %lm_box_string %str_const_120
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_121
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_122
+  call %std.mime.index.extension_to_mime <unnamed>
+  call %lm_box_string %str_const_123
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_124
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_125
+  call %std.mime.index.extension_to_mime <unnamed>
+  call %lm_box_string %str_const_126
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_127
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_128
+  call %std.mime.index.extension_to_mime <unnamed>
+  call %lm_box_string %str_const_129
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_130
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_131
+  call %std.mime.index.extension_to_mime <unnamed>
+  call %lm_box_string %str_const_132
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_133
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_134
+  call %std.mime.index.mime_to_extension <unnamed>
+  call %lm_box_string %str_const_135
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_136
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_137
+  call %std.mime.index.mime_to_extension <unnamed>
+  call %lm_box_string %str_const_138
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_139
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_140
+  call %std.mime.index.mime_to_extension <unnamed>
+  call %lm_box_string %str_const_141
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_142
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_143
+  call %std.mime.index.mime_to_extension <unnamed>
+  call %lm_box_string %str_const_144
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_145
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_146
+  call %std.mime.index.mime_to_extension <unnamed>
+  call %lm_box_string %str_const_147
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_148
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_149
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.mime.index.__init__() {
+@entry
+  ret 0
+}
+
+function test_classification() {
+@entry
+@block_0
+  call %lm_box_string %str_const_150
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_151
+  call %std.mime.index.parse <unnamed>
+  cast <unnamed>
+  call %lm_box_string %str_const_152
+  call %std.mime.index.parse <unnamed>
+  cast <unnamed>
+  call %lm_box_string %str_const_153
+  call %std.mime.index.parse <unnamed>
+  cast <unnamed>
+  call %lm_box_string %str_const_154
+  call %std.mime.index.parse <unnamed>
+  cast <unnamed>
+  call %lm_box_string %str_const_155
+  call %std.mime.index.parse <unnamed>
+  cast <unnamed>
+  call %std.mime.types.MIMEType.is_text <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_156
+  call %lm_assert <unnamed> <unnamed>
+  call %std.mime.types.MIMEType.is_image <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_157
+  call %lm_assert <unnamed> <unnamed>
+  call %std.mime.types.MIMEType.is_image <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_158
+  call %lm_assert <unnamed> <unnamed>
+  call %std.mime.types.MIMEType.is_audio <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_159
+  call %lm_assert <unnamed> <unnamed>
+  call %std.mime.types.MIMEType.is_video <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_160
+  call %lm_assert <unnamed> <unnamed>
+  call %std.mime.types.MIMEType.is_application <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_161
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_162
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function test_parsing() {
+@entry
+@block_0
+  call %lm_box_string %str_const_163
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_164
+  call %std.mime.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_165
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_166
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_167
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_168
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_169
+  call %lm_assert <unnamed> <unnamed>
+  call %std.mime.types.MIMEType.to_string <unnamed>
+  call %lm_box_string %str_const_170
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_171
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_172
+  call %std.mime.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_173
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_174
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_175
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_176
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_177
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_178
+  call %std.mime.types.MIMEParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_179
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_180
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_181
+  call %std.mime.types.MIMEParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_182
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_183
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_184
+  call %std.mime.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_185
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_186
+  call %std.mime.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_187
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_188
+  call %std.mime.index.parse <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_189
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_190
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.mime.types.MIMEType.init(i64, i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function test_parameters() {
+@entry
+@block_0
+  call %lm_box_string %str_const_191
+  call %lm_print_int <unnamed>
+  call %std.mime.index.MIMEParams
+  cast <unnamed>
+  call %lm_box_string %str_const_192
+  call %lm_box_string %str_const_193
+  call %std.mime.types.MIMEParams.set <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_194
+  call %lm_box_string %str_const_195
+  call %std.mime.types.MIMEParams.set <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_196
+  call %std.mime.types.MIMEParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_197
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_198
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_199
+  call %std.mime.types.MIMEParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_200
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_201
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_202
+  call %std.mime.types.MIMEParams.has <unnamed> <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_203
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_204
+  call %std.mime.types.MIMEParams.has <unnamed> <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_205
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_206
+  call %std.mime.types.MIMEParams.remove <unnamed> <unnamed>
+  call %lm_box_string %str_const_207
+  call %std.mime.types.MIMEParams.has <unnamed> <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_208
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_209
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.mime.types.MIMEParams.remove(i64, i64) {
+@entry
+  ret 0
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_210
+  call %lm_print_int <unnamed>
+  call %test_parsing
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_211
+  call %lm_assert <unnamed> <unnamed>
+  call %test_classification
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_212
+  call %lm_assert <unnamed> <unnamed>
+  call %test_parameters
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_213
+  call %lm_assert <unnamed> <unnamed>
+  call %test_extension_mapping
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_214
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_215
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function std.mime.types.MIMEParams.has(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.mime.types.split_str(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_box_string %str_const_216
+  jmp %block_6
+@block_6
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_9 %block_32
+@block_9
+  jmp %block_9
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_15 %block_19
+@block_15
+  jmp %block_15
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_217
+  jmp %block_27
+@block_19
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_27
+@block_27
+  add 1 9
+  jmp %block_6
+@block_32
+  call %lm_list_append <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.mime.types.parse(i64) {
+@entry
+@block_0
+  call %std.mime.types.trim <unnamed>
+  call %lm_box_string %str_const_218
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_5 %block_13
+@block_5
+  jmp %block_5
+  call %lm_box_string %str_const_219
+  call %lm_box_string %str_const_220
+  alloc 16
+  call %std.mime.types.MIMEParams.init <unnamed>
+  alloc 16
+  call %std.mime.types.MIMEType.init <unnamed> <unnamed> <unnamed> <unnamed> 10
+  ret <unnamed>
+@block_13
+  call %lm_box_string %str_const_221
+  call %std.mime.types.split_str <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  call %std.mime.types.trim <unnamed>
+  call %lm_box_string %str_const_222
+  call %std.mime.types.index_of <unnamed> <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_27 %block_35
+@block_27
+  jmp %block_27
+  call %lm_box_string %str_const_223
+  call %lm_box_string %str_const_224
+  alloc 16
+  call %std.mime.types.MIMEParams.init <unnamed>
+  alloc 16
+  call %std.mime.types.MIMEType.init <unnamed> <unnamed> <unnamed> <unnamed> 10
+  ret <unnamed>
+@block_35
+  call %substring <unnamed> 1 <unnamed>
+  call %std.mime.types.trim <unnamed>
+  call %std.mime.types.to_lower <unnamed>
+  add <unnamed> 9
+  call %lm_list_len <unnamed>
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %std.mime.types.trim <unnamed>
+  call %std.mime.types.to_lower <unnamed>
+  call %lm_box_string %str_const_225
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_56 %block_52
+@block_52
+  jmp %block_52
+  call %lm_box_string %str_const_226
+  ceq <unnamed> <unnamed>
+  jmp %block_56
+@block_56
+  br <unnamed> %block_57 %block_65
+@block_57
+  jmp %block_57
+  call %lm_box_string %str_const_227
+  call %lm_box_string %str_const_228
+  alloc 16
+  call %std.mime.types.MIMEParams.init <unnamed>
+  alloc 16
+  call %std.mime.types.MIMEType.init <unnamed> <unnamed> <unnamed> <unnamed> 10
+  ret <unnamed>
+@block_65
+  alloc 16
+  call %std.mime.types.MIMEParams.init <unnamed>
+  jmp %block_70
+@block_70
+  call %lm_list_len <unnamed>
+  cslt 9 <unnamed>
+  br <unnamed> %block_73 %block_141
+@block_73
+  jmp %block_73
+  call %lm_list_get <unnamed> 9
+  call %std.mime.types.trim <unnamed>
+  call %lm_box_string %str_const_229
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_79 %block_136
+@block_79
+  jmp %block_79
+  call %lm_box_string %str_const_230
+  call %std.mime.types.index_of <unnamed> <unnamed>
+  neg 9
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_86 %block_135
+@block_86
+  jmp %block_86
+  call %substring <unnamed> 1 <unnamed>
+  call %std.mime.types.trim <unnamed>
+  call %std.mime.types.to_lower <unnamed>
+  add <unnamed> 9
+  call %lm_list_len <unnamed>
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %std.mime.types.trim <unnamed>
+  call %lm_box_string %str_const_231
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_101 %block_134
+@block_101
+  jmp %block_101
+  call %lm_list_len <unnamed>
+  csge <unnamed> 17
+  br <unnamed> %block_106 %block_113
+@block_106
+  jmp %block_106
+  call %substring <unnamed> 1 9
+  call %lm_box_string %str_const_232
+  ceq <unnamed> <unnamed>
+  jmp %block_113
+@block_113
+  br <unnamed> %block_115 %block_124
+@block_115
+  jmp %block_115
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  call %lm_list_len <unnamed>
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_233
+  ceq <unnamed> <unnamed>
+  jmp %block_124
+@block_124
+  br <unnamed> %block_125 %block_132
+@block_125
+  jmp %block_125
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  call %substring <unnamed> 9 <unnamed>
+  jmp %block_132
+@block_132
+  call %std.mime.types.MIMEParams.add <unnamed> <unnamed> <unnamed>
+  jmp %block_134
+@block_134
+  jmp %block_135
+@block_135
+  jmp %block_136
+@block_136
+  add 9 9
+  jmp %block_70
+@block_141
+  alloc 16
+  call %std.mime.types.MIMEType.init <unnamed> <unnamed> <unnamed> <unnamed> 18
+  ret <unnamed>
+}
+
+function std.mime.types.MIMEParams.set(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function lm_list_len(i64) {
+}
+
+function substring(i64, i64, i64) {
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_list_new(i64) {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_str_concat(i8*, i8*) {
+}
+
+function lm_to_string(i64) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_list_set(i64, i64, i64) {
+}

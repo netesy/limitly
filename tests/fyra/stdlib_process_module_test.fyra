@@ -1,0 +1,287 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.process.index.__init__
+  call %main
+  ret 0
+}
+
+function std.process.index.__init__() {
+@entry
+  ret 0
+}
+
+function std.process.index.id() {
+@entry
+@block_0
+  call %std.process.process.id
+  ret 0
+}
+
+function std.process.index.exit(i64) {
+@entry
+@block_0
+  call %std.process.process.exit <unnamed>
+  ret <unnamed>
+}
+
+function std.process.index.Process.init(i64) {
+@entry
+  ret 0
+}
+
+function std.process.index.Process.run(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.process.index.Pipe() {
+@entry
+@block_0
+  alloc 16
+  call %std.process.pipe.Pipe.init <unnamed>
+  ret 0
+}
+
+function std.process.index.Command(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.process.command.Command.init <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.process.process.id() {
+@entry
+@block_0
+  ret 0
+}
+
+function std.process.process.__init__() {
+@entry
+  ret 0
+}
+
+function std.process.command.__init__() {
+@entry
+  ret 0
+}
+
+function std.process.command.Command.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.process.process.exit(i64) {
+@entry
+@block_0
+  ret 2
+}
+
+function std.process.index.Process.exit(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.process.process.run(i64) {
+@entry
+@block_0
+  ret 1
+}
+
+function test_pipe_frame() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_print_int <unnamed>
+  call %std.process.index.Pipe
+  cast <unnamed>
+  call %lm_box_string %str_const_1
+  call %std.process.pipe.Pipe.write <unnamed> <unnamed>
+  call %std.process.pipe.Pipe.read <unnamed>
+  call %lm_box_string %str_const_2
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_3
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function test_process_frame() {
+@entry
+@block_0
+  call %lm_box_string %str_const_4
+  call %lm_print_int <unnamed>
+  alloc 16
+  call %std.process.index.Process.init <unnamed>
+  call %std.process.index.Process.id <unnamed>
+  ceq <unnamed> 1
+  call %lm_box_string %str_const_5
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_6
+  call %std.process.index.Process.run <unnamed> <unnamed>
+  ceq <unnamed> 1
+  call %lm_box_string %str_const_7
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.process.index.Process.id(i64) {
+@entry
+  ret 0
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_8
+  call %lm_print_int <unnamed>
+  call %test_process_frame
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_9
+  call %lm_assert <unnamed> <unnamed>
+  call %test_command_frame
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_10
+  call %lm_assert <unnamed> <unnamed>
+  call %test_pipe_frame
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_11
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_12
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function test_command_frame() {
+@entry
+@block_0
+  call %lm_box_string %str_const_13
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_14
+  call %std.process.index.Command <unnamed>
+  cast <unnamed>
+  call %lm_box_string %str_const_15
+  call %std.process.command.Command.arg <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_16
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_17
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_18
+  call %lm_assert <unnamed> <unnamed>
+  call %std.process.command.Command.execute <unnamed>
+  ceq <unnamed> 1
+  call %lm_box_string %str_const_19
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.process.pipe.Pipe.init(i64) {
+@entry
+  ret 0
+}
+
+function std.process.command.Command.execute(i64) {
+@entry
+  ret 0
+}
+
+function std.process.command.Command.arg(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.process.pipe.Pipe.read(i64) {
+@entry
+  ret 0
+}
+
+function std.process.index.run(i64) {
+@entry
+@block_0
+  call %std.process.process.run <unnamed>
+  ret <unnamed>
+}
+
+function std.process.pipe.Pipe.write(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.process.pipe.__init__() {
+@entry
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_list_len(i32) {
+}
+
+function lm_list_new() {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}

@@ -1,0 +1,420 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_1
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_2
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_3
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_4
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_5
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_6
+  call %lm_box_string %str_const_7
+  call %lm_box_string %str_const_8
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_9
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_10
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_11
+  call %lm_print_int <unnamed>
+  call %describeColor 0
+  call %describeColor 0
+  call %describeColor 0
+  call %lm_box_string %str_const_12
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_13
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_14
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_15
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_16
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_17
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_18
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_19
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_20
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_21
+  call %lm_print_int <unnamed>
+  call %isActive 0
+  call %isActive 0
+  call %isActive 0
+  call %lm_box_string %str_const_22
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_23
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_24
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_25
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_26
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_27
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_28
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_29
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_30
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_31
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_32
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 0
+  call %lm_list_append <unnamed> 0
+  call %lm_list_append <unnamed> 0
+  call %lm_list_append <unnamed> 0
+  call %lm_list_append <unnamed> 0
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 0
+  call %lm_list_append <unnamed> 0
+  call %lm_list_append <unnamed> 0
+  call %lm_list_append <unnamed> 0
+  call %lm_box_string %str_const_33
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_34
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_35
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_36
+  call %lm_print_int <unnamed>
+  call %processMessage 0
+  call %processMessage 0
+  call %lm_box_string %str_const_37
+  call %processMessage 0
+  call %processMessage 0
+  call %lm_box_string %str_const_38
+  call %lm_print_int <unnamed>
+  call %describeShapeStatus 0
+  call %describeShapeStatus 0
+  call %lm_box_string %str_const_39
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_40
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_41
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_42
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_43
+  call %lm_print_int <unnamed>
+  call %checkConnectivity 0
+  call %checkConnectivity 0
+  call %checkConnectivity 0
+  call %lm_box_string %str_const_44
+  call %lm_print_int <unnamed>
+  ret 0
+}
+
+function checkConnectivity(i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  ceq 0 1
+  br <unnamed> %block_5 %block_6
+@block_5
+  jmp %block_5
+  jmp %block_11
+@block_6
+  jmp %block_7
+@block_7
+  call %lm_box_string %str_const_45
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  jmp %block_14
+@block_11
+  call %lm_box_string %str_const_46
+  call %lm_print_int <unnamed>
+  jmp %block_14
+@block_14
+  ret 0
+}
+
+function describeShapeStatus(i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  ceq 0 1
+  br <unnamed> %block_5 %block_7
+@block_5
+  jmp %block_5
+  jmp %block_15
+@block_7
+  ceq 0 9
+  br <unnamed> %block_11 %block_50
+@block_11
+  jmp %block_11
+  jmp %block_12
+@block_12
+  call %lm_box_string %str_const_47
+  call %lm_print_int <unnamed>
+  jmp %block_50
+@block_15
+  jmp %block_17
+@block_17
+  ceq 0 1
+  br <unnamed> %block_21 %block_23
+@block_21
+  jmp %block_21
+  jmp %block_44
+@block_23
+  ceq 0 9
+  br <unnamed> %block_27 %block_49
+@block_27
+  jmp %block_27
+  jmp %block_33
+@block_33
+  call %lm_box_string %str_const_48
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  jmp %block_49
+@block_44
+  call %lm_box_string %str_const_49
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  jmp %block_49
+@block_49
+  jmp %block_50
+@block_50
+  ret 0
+}
+
+function describeColor(i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  ceq 0 1
+  br <unnamed> %block_5 %block_6
+@block_5
+  jmp %block_5
+  jmp %block_21
+@block_6
+  ceq 0 9
+  br <unnamed> %block_10 %block_11
+@block_10
+  jmp %block_10
+  jmp %block_19
+@block_11
+  ceq 0 17
+  br <unnamed> %block_15 %block_16
+@block_15
+  jmp %block_15
+  jmp %block_17
+@block_16
+  ret 0
+@block_17
+  call %lm_box_string %str_const_50
+  ret <unnamed>
+@block_19
+  call %lm_box_string %str_const_51
+  ret <unnamed>
+@block_21
+  call %lm_box_string %str_const_52
+  ret <unnamed>
+}
+
+function processMessage(i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  ceq 0 1
+  br <unnamed> %block_5 %block_6
+@block_5
+  jmp %block_5
+  jmp %block_64
+@block_6
+  ceq 0 9
+  br <unnamed> %block_10 %block_16
+@block_10
+  jmp %block_10
+  jmp %block_53
+@block_16
+  ceq 0 17
+  br <unnamed> %block_20 %block_22
+@block_20
+  jmp %block_20
+  jmp %block_48
+@block_22
+  ceq 0 25
+  br <unnamed> %block_26 %block_67
+@block_26
+  jmp %block_26
+  jmp %block_34
+@block_34
+  call %lm_box_string %str_const_53
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  jmp %block_67
+@block_48
+  call %lm_box_string %str_const_54
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  jmp %block_67
+@block_53
+  call %lm_box_string %str_const_55
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_rt_str_format <unnamed> 0
+  call %lm_print_int <unnamed>
+  jmp %block_67
+@block_64
+  call %lm_box_string %str_const_56
+  call %lm_print_int <unnamed>
+  jmp %block_67
+@block_67
+  ret 0
+}
+
+function isActive(i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  ceq 0 1
+  br <unnamed> %block_5 %block_6
+@block_5
+  jmp %block_5
+  jmp %block_9
+@block_6
+  jmp %block_7
+@block_7
+  ret 10
+@block_9
+  ret 18
+}
+
+function getColorCode(i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  ceq 0 1
+  br <unnamed> %block_5 %block_6
+@block_5
+  jmp %block_5
+  jmp %block_21
+@block_6
+  ceq 0 9
+  br <unnamed> %block_10 %block_11
+@block_10
+  jmp %block_10
+  jmp %block_19
+@block_11
+  ceq 0 17
+  br <unnamed> %block_15 %block_16
+@block_15
+  jmp %block_15
+  jmp %block_17
+@block_16
+  ret 0
+@block_17
+  ret 513
+@block_19
+  ret 1025
+@block_21
+  ret 2041
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_rt_str_format(i64, i64) {
+}
+
+function lm_list_new(i64) {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}
+
+function lm_list_len(i64) {
+}

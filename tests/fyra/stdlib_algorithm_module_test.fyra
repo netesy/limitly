@@ -1,0 +1,2241 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.algorithm.index.__init__
+  call %main
+  ret 0
+}
+
+function std.algorithm.binary_search.__init__() {
+@entry
+  ret 0
+}
+
+function std.algorithm.binary_search.lower_bound(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  jmp %block_4
+@block_4
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_21
+@block_6
+  jmp %block_6
+  add 1 <unnamed>
+  div <unnamed> 17
+  call %lm_list_get <unnamed> <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_18
+@block_13
+  jmp %block_13
+  add <unnamed> 9
+  jmp %block_20
+@block_18
+  jmp %block_20
+@block_20
+  jmp %block_4
+@block_21
+  ret <unnamed>
+}
+
+function std.algorithm.binary_search.binary_search(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  jmp %block_6
+@block_6
+  csle 1 <unnamed>
+  br <unnamed> %block_8 %block_29
+@block_8
+  jmp %block_8
+  add 1 <unnamed>
+  div <unnamed> 17
+  call %lm_list_get <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_15 %block_16
+@block_15
+  jmp %block_15
+  ret <unnamed>
+@block_16
+  call %lm_list_get <unnamed> <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_19 %block_24
+@block_19
+  jmp %block_19
+  add <unnamed> 9
+  jmp %block_28
+@block_24
+  sub <unnamed> 9
+  jmp %block_28
+@block_28
+  jmp %block_6
+@block_29
+  neg 9
+  ret <unnamed>
+}
+
+function std.search.interpolation_search(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  jmp %block_6
+@block_6
+  csle 1 <unnamed>
+  br <unnamed> %block_9 %block_13
+@block_9
+  jmp %block_9
+  call %lm_list_get <unnamed> 1
+  csge <unnamed> <unnamed>
+  jmp %block_13
+@block_13
+  br <unnamed> %block_15 %block_19
+@block_15
+  jmp %block_15
+  call %lm_list_get <unnamed> <unnamed>
+  csle <unnamed> <unnamed>
+  jmp %block_19
+@block_19
+  br <unnamed> %block_20 %block_64
+@block_20
+  jmp %block_20
+  ceq 1 <unnamed>
+  br <unnamed> %block_22 %block_29
+@block_22
+  jmp %block_22
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_25 %block_26
+@block_25
+  jmp %block_25
+  ret 1
+@block_26
+  neg 9
+  ret <unnamed>
+@block_29
+  call %lm_list_get <unnamed> 1
+  sub <unnamed> <unnamed>
+  sub <unnamed> 1
+  mul <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  sub <unnamed> <unnamed>
+  div <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  sub <unnamed> <unnamed>
+  sub <unnamed> 1
+  mul <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  sub <unnamed> <unnamed>
+  div <unnamed> <unnamed>
+  add 1 <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_50 %block_51
+@block_50
+  jmp %block_50
+  ret <unnamed>
+@block_51
+  call %lm_list_get <unnamed> <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_54 %block_59
+@block_54
+  jmp %block_54
+  add <unnamed> 9
+  jmp %block_63
+@block_59
+  sub <unnamed> 9
+  jmp %block_63
+@block_63
+  jmp %block_6
+@block_64
+  neg 9
+  ret <unnamed>
+}
+
+function std.algorithm.index.upper_bound(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.binary_search.upper_bound <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.search.upper_bound(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  jmp %block_4
+@block_4
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_21
+@block_6
+  jmp %block_6
+  add 1 <unnamed>
+  div <unnamed> 17
+  call %lm_list_get <unnamed> <unnamed>
+  csle <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_18
+@block_13
+  jmp %block_13
+  add <unnamed> 9
+  jmp %block_20
+@block_18
+  jmp %block_20
+@block_20
+  jmp %block_4
+@block_21
+  ret <unnamed>
+}
+
+function std.algorithm.filter.remove_if(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  jmp %block_4
+@block_4
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_7 %block_20
+@block_7
+  jmp %block_7
+  call %lm_list_get <unnamed> 1
+  call <unnamed> <unnamed>
+  cne <unnamed> 18
+  br <unnamed> %block_12 %block_15
+@block_12
+  jmp %block_12
+  call %lm_list_get <unnamed> 1
+  call %lm_list_append <unnamed> <unnamed>
+  jmp %block_15
+@block_15
+  add 1 9
+  jmp %block_4
+@block_20
+  ret <unnamed>
+}
+
+function std.sort.partial_sort(i64, i64, i64, i64) {
+@entry
+@block_0
+  call %std.sort.quicksort <unnamed> <unnamed> <unnamed>
+  cslt <unnamed> 1
+  br <unnamed> %block_4 %block_5
+@block_4
+  jmp %block_4
+  ret 0
+@block_5
+  ret 0
+}
+
+function std.algorithm.index.radix_sort(i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.radix_sort <unnamed>
+  ret 0
+}
+
+function std.sort.heapsort(i64, i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  csle <unnamed> 9
+  br <unnamed> %block_5 %block_6
+@block_5
+  jmp %block_5
+  ret 0
+@block_6
+  div <unnamed> 17
+  sub <unnamed> 9
+  jmp %block_12
+@block_12
+  csge <unnamed> 1
+  br <unnamed> %block_15 %block_20
+@block_15
+  jmp %block_15
+  call %std.sort._heapify <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  sub <unnamed> 9
+  jmp %block_12
+@block_20
+  sub <unnamed> 9
+  jmp %block_24
+@block_24
+  csgt <unnamed> 1
+  br <unnamed> %block_27 %block_35
+@block_27
+  jmp %block_27
+  call %std.sort._swap <unnamed> 1 <unnamed>
+  call %std.sort._heapify <unnamed> <unnamed> 1 <unnamed> <unnamed>
+  sub <unnamed> 9
+  jmp %block_24
+@block_35
+  ceq <unnamed> 10
+  br <unnamed> %block_38 %block_39
+@block_38
+  jmp %block_38
+  ret 0
+@block_39
+  sub <unnamed> 9
+  jmp %block_44
+@block_44
+  cslt 1 <unnamed>
+  br <unnamed> %block_46 %block_55
+@block_46
+  jmp %block_46
+  call %std.sort._swap <unnamed> 1 <unnamed>
+  add 1 9
+  sub <unnamed> 9
+  jmp %block_44
+@block_55
+  ret 0
+}
+
+function std.sort._heapify(i64, i64, i64, i64, i64) {
+@entry
+@block_0
+  mul 17 <unnamed>
+  mul 17 <unnamed>
+  add <unnamed> 9
+  mul 17 <unnamed>
+  mul 17 <unnamed>
+  add <unnamed> 17
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_20 %block_27
+@block_20
+  jmp %block_20
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  call %std.sort._compare <unnamed> <unnamed> <unnamed> <unnamed>
+  csgt <unnamed> 1
+  jmp %block_27
+@block_27
+  br <unnamed> %block_28 %block_30
+@block_28
+  jmp %block_28
+  jmp %block_30
+@block_30
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_33 %block_40
+@block_33
+  jmp %block_33
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  call %std.sort._compare <unnamed> <unnamed> <unnamed> <unnamed>
+  csgt <unnamed> 1
+  jmp %block_40
+@block_40
+  br <unnamed> %block_41 %block_43
+@block_41
+  jmp %block_41
+  jmp %block_43
+@block_43
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_45 %block_48
+@block_45
+  jmp %block_45
+  call %std.sort._swap <unnamed> <unnamed> <unnamed>
+  call %std.sort._heapify <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  jmp %block_48
+@block_48
+  ret 0
+}
+
+function std.sort._mergesort_range(i64, i64, i64, i64, i64) {
+@entry
+@block_0
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_2 %block_13
+@block_2
+  jmp %block_2
+  add <unnamed> <unnamed>
+  div <unnamed> 17
+  call %std.sort._mergesort_range <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  add <unnamed> 9
+  call %std.sort._mergesort_range <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  call %std.sort._merge <unnamed> <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  jmp %block_13
+@block_13
+  ret 0
+}
+
+function std.algorithm.filter.__init__() {
+@entry
+  ret 0
+}
+
+function std.sort._quicksort_range(i64, i64, i64, i64, i64) {
+@entry
+@block_0
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_2 %block_12
+@block_2
+  jmp %block_2
+  call %std.sort._partition <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  sub <unnamed> 9
+  call %std.sort._quicksort_range <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  add <unnamed> 9
+  call %std.sort._quicksort_range <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  jmp %block_12
+@block_12
+  ret 0
+}
+
+function std.sort.insertion_sort(i64, i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  jmp %block_4
+@block_4
+  cslt 9 <unnamed>
+  br <unnamed> %block_6 %block_41
+@block_6
+  jmp %block_6
+  call %lm_list_get <unnamed> 9
+  sub 9 9
+  jmp %block_12
+@block_12
+  csge <unnamed> 1
+  br <unnamed> %block_16 %block_22
+@block_16
+  jmp %block_16
+  call %lm_list_get <unnamed> <unnamed>
+  call %std.sort._compare <unnamed> <unnamed> <unnamed> <unnamed>
+  csgt <unnamed> 1
+  jmp %block_22
+@block_22
+  br <unnamed> %block_23 %block_32
+@block_23
+  jmp %block_23
+  call %lm_list_get <unnamed> <unnamed>
+  add <unnamed> 9
+  sub <unnamed> 9
+  jmp %block_12
+@block_32
+  add <unnamed> 9
+  add 9 9
+  jmp %block_4
+@block_41
+  ret 0
+}
+
+function sum_reducer(i64, i64) {
+@entry
+@block_0
+  cast <unnamed>
+  cast <unnamed>
+  add <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.partition.partition(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  jmp %block_6
+@block_6
+  csle 1 <unnamed>
+  br <unnamed> %block_8 %block_53
+@block_8
+  jmp %block_8
+  jmp %block_9
+@block_9
+  csle 1 <unnamed>
+  br <unnamed> %block_12 %block_16
+@block_12
+  jmp %block_12
+  call %lm_list_get <unnamed> 1
+  call <unnamed> <unnamed>
+  jmp %block_16
+@block_16
+  br <unnamed> %block_17 %block_22
+@block_17
+  jmp %block_17
+  add 1 9
+  jmp %block_9
+@block_22
+  jmp %block_23
+@block_23
+  csle <unnamed> <unnamed>
+  br <unnamed> %block_26 %block_32
+@block_26
+  jmp %block_26
+  call %lm_list_get <unnamed> <unnamed>
+  call <unnamed> <unnamed>
+  cne <unnamed> 18
+  jmp %block_32
+@block_32
+  br <unnamed> %block_33 %block_37
+@block_33
+  jmp %block_33
+  sub <unnamed> 9
+  jmp %block_23
+@block_37
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_39 %block_52
+@block_39
+  jmp %block_39
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  add <unnamed> 9
+  sub <unnamed> 9
+  jmp %block_52
+@block_52
+  jmp %block_6
+@block_53
+  ret <unnamed>
+}
+
+function std.algorithm.sort.counting_sort(i64) {
+@entry
+@block_0
+  call %std.sort.counting_sort <unnamed> 10
+  ret 0
+}
+
+function std.sort.__init__() {
+@entry
+  ret 0
+}
+
+function std.sort.quicksort(i64, i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  csgt <unnamed> 9
+  br <unnamed> %block_4 %block_10
+@block_4
+  jmp %block_4
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  call %std.sort._quicksort_range <unnamed> 1 <unnamed> <unnamed> <unnamed>
+  jmp %block_10
+@block_10
+  ret 0
+}
+
+function std.search.lower_bound(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  jmp %block_4
+@block_4
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_21
+@block_6
+  jmp %block_6
+  add 1 <unnamed>
+  div <unnamed> 17
+  call %lm_list_get <unnamed> <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_18
+@block_13
+  jmp %block_13
+  add <unnamed> 9
+  jmp %block_20
+@block_18
+  jmp %block_20
+@block_20
+  jmp %block_4
+@block_21
+  ret <unnamed>
+}
+
+function std.search.binary_search(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  jmp %block_6
+@block_6
+  csle 1 <unnamed>
+  br <unnamed> %block_8 %block_29
+@block_8
+  jmp %block_8
+  add 1 <unnamed>
+  div <unnamed> 17
+  call %lm_list_get <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_15 %block_16
+@block_15
+  jmp %block_15
+  ret <unnamed>
+@block_16
+  call %lm_list_get <unnamed> <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_19 %block_24
+@block_19
+  jmp %block_19
+  add <unnamed> 9
+  jmp %block_28
+@block_24
+  sub <unnamed> 9
+  jmp %block_28
+@block_28
+  jmp %block_6
+@block_29
+  neg 9
+  ret <unnamed>
+}
+
+function std.algorithm.index.count(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.search.count <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function test_transform() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_box_string %str_const_1
+  call %std.algorithm.index.map <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 89
+  call %lm_box_string %str_const_2
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 9
+  ceq <unnamed> 97
+  call %lm_box_string %str_const_3
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 17
+  ceq <unnamed> 105
+  call %lm_box_string %str_const_4
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_new 0
+  call %lm_box_string %str_const_5
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_6
+  call %lm_list_append <unnamed> <unnamed>
+  call %std.algorithm.index.zip <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  cast <unnamed>
+  ceq 0 9
+  call %lm_box_string %str_const_7
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_8
+  ceq 0 <unnamed>
+  call %lm_box_string %str_const_9
+  call %lm_assert <unnamed> <unnamed>
+  call %std.algorithm.index.unzip <unnamed>
+  cast 0
+  cast 0
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_10
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  call %lm_box_string %str_const_11
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_12
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.algorithm.search.__init__() {
+@entry
+  ret 0
+}
+
+function std.algorithm.index.partition_copy(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.partition.partition_copy <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.unique.unique(i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  jmp %block_4
+@block_4
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_7 %block_36
+@block_7
+  jmp %block_7
+  jmp %block_10
+@block_10
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_13 %block_25
+@block_13
+  jmp %block_13
+  call %lm_list_get <unnamed> 1
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_17 %block_20
+@block_17
+  jmp %block_17
+  jmp %block_20
+@block_20
+  add 1 9
+  jmp %block_10
+@block_25
+  cne 18 18
+  br <unnamed> %block_28 %block_31
+@block_28
+  jmp %block_28
+  call %lm_list_get <unnamed> 1
+  call %lm_list_append <unnamed> <unnamed>
+  jmp %block_31
+@block_31
+  add 1 9
+  jmp %block_4
+@block_36
+  ret <unnamed>
+}
+
+function std.algorithm.index.all(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.search.all <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.unique.__init__() {
+@entry
+  ret 0
+}
+
+function std.algorithm.search.count(i64, i64) {
+@entry
+@block_0
+  jmp %block_3
+@block_3
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_19
+@block_6
+  jmp %block_6
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_9 %block_14
+@block_9
+  jmp %block_9
+  add 1 9
+  jmp %block_14
+@block_14
+  add 1 9
+  jmp %block_3
+@block_19
+  ret <unnamed>
+}
+
+function std.sort.stable_sort(i64, i64, i64) {
+@entry
+@block_0
+  call %std.sort.mergesort <unnamed> <unnamed> <unnamed>
+  ret 0
+}
+
+function test_shuffle() {
+@entry
+@block_0
+  call %lm_box_string %str_const_13
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 33
+  call %lm_list_append <unnamed> 41
+  call %lm_list_append <unnamed> 49
+  call %lm_list_append <unnamed> 57
+  call %lm_list_append <unnamed> 65
+  call %lm_list_append <unnamed> 73
+  call %lm_list_append <unnamed> 81
+  call %std.algorithm.index.shuffle <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 81
+  call %lm_box_string %str_const_14
+  call %lm_assert <unnamed> <unnamed>
+  call %std.algorithm.index.count <unnamed> 41
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_15
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.algorithm.index.find_if(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.search.find_if <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.index.none(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.search.none <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.sort._merge(i64, i64, i64, i64, i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  add <unnamed> 9
+  jmp %block_8
+@block_8
+  csle <unnamed> <unnamed>
+  br <unnamed> %block_11 %block_14
+@block_11
+  jmp %block_11
+  csle <unnamed> <unnamed>
+  jmp %block_14
+@block_14
+  br <unnamed> %block_15 %block_36
+@block_15
+  jmp %block_15
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  call %std.sort._compare <unnamed> <unnamed> <unnamed> <unnamed>
+  csle <unnamed> 1
+  br <unnamed> %block_21 %block_28
+@block_21
+  jmp %block_21
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_append <unnamed> <unnamed>
+  add <unnamed> 9
+  jmp %block_35
+@block_28
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_append <unnamed> <unnamed>
+  add <unnamed> 9
+  jmp %block_35
+@block_35
+  jmp %block_8
+@block_36
+  jmp %block_37
+@block_37
+  csle <unnamed> <unnamed>
+  br <unnamed> %block_39 %block_46
+@block_39
+  jmp %block_39
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_append <unnamed> <unnamed>
+  add <unnamed> 9
+  jmp %block_37
+@block_46
+  jmp %block_47
+@block_47
+  csle <unnamed> <unnamed>
+  br <unnamed> %block_49 %block_56
+@block_49
+  jmp %block_49
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_append <unnamed> <unnamed>
+  add <unnamed> 9
+  jmp %block_47
+@block_56
+  jmp %block_58
+@block_58
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_61 %block_69
+@block_61
+  jmp %block_61
+  call %lm_list_get <unnamed> 1
+  add <unnamed> 1
+  add 1 9
+  jmp %block_58
+@block_69
+  ret 0
+}
+
+function std.algorithm.index.unzip(i64) {
+@entry
+@block_0
+  call %std.algorithm.transform.unzip <unnamed>
+  ret <unnamed>
+}
+
+function add_ten(i64) {
+@entry
+@block_0
+  cast <unnamed>
+  add <unnamed> 81
+  ret <unnamed>
+}
+
+function std.algorithm.index.sort(i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.sort <unnamed>
+  ret 0
+}
+
+function test_reduce() {
+@entry
+@block_0
+  call %lm_box_string %str_const_16
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 33
+  call %lm_box_string %str_const_17
+  call %std.algorithm.index.reduce <unnamed> <unnamed> 1
+  ceq <unnamed> 81
+  call %lm_box_string %str_const_18
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_19
+  call %std.algorithm.index.fold <unnamed> 81 <unnamed>
+  ceq <unnamed> 161
+  call %lm_box_string %str_const_20
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.search.linear_search(i64, i64) {
+@entry
+@block_0
+  jmp %block_1
+@block_1
+  jmp %block_3
+@block_3
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_16
+@block_6
+  jmp %block_6
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_9 %block_10
+@block_9
+  jmp %block_9
+  ret 1
+@block_10
+  jmp %block_11
+@block_11
+  add 1 9
+  jmp %block_3
+@block_16
+  neg 9
+  ret <unnamed>
+}
+
+function std.sort.mergesort(i64, i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  csgt <unnamed> 9
+  br <unnamed> %block_4 %block_10
+@block_4
+  jmp %block_4
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  call %std.sort._mergesort_range <unnamed> 1 <unnamed> <unnamed> <unnamed>
+  jmp %block_10
+@block_10
+  ret 0
+}
+
+function std.algorithm.sort.mergesort(i64) {
+@entry
+@block_0
+  call %std.sort.mergesort <unnamed> 10 2
+  ret 0
+}
+
+function std.algorithm.sort.partial_sort(i64, i64) {
+@entry
+@block_0
+  call %std.sort.partial_sort <unnamed> <unnamed> 10 2
+  ret 0
+}
+
+function std.algorithm.index.reduce(i64, i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.reduce.reduce <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function test_search() {
+@entry
+@block_0
+  call %lm_box_string %str_const_21
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 33
+  call %lm_list_append <unnamed> 41
+  call %std.algorithm.index.find <unnamed> 25
+  ceq <unnamed> 17
+  call %lm_box_string %str_const_22
+  call %lm_assert <unnamed> <unnamed>
+  call %std.algorithm.index.find <unnamed> 81
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_23
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_24
+  call %std.algorithm.index.find_if <unnamed> <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_25
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_26
+  call %std.algorithm.index.any_match <unnamed> <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_27
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 41
+  call %lm_box_string %str_const_28
+  call %std.algorithm.index.any_match <unnamed> <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_29
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 41
+  call %lm_box_string %str_const_30
+  call %std.algorithm.index.none <unnamed> <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_31
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_32
+  call %std.algorithm.index.none <unnamed> <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_33
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 33
+  call %lm_list_append <unnamed> 49
+  call %lm_box_string %str_const_34
+  call %std.algorithm.index.all <unnamed> <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_35
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_36
+  call %std.algorithm.index.all <unnamed> <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_37
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 17
+  call %std.algorithm.index.count <unnamed> 17
+  ceq <unnamed> 25
+  call %lm_box_string %str_const_38
+  call %lm_assert <unnamed> <unnamed>
+  call %std.algorithm.index.linear_search <unnamed> 33
+  ceq <unnamed> 25
+  call %lm_box_string %str_const_39
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.algorithm.sort.quicksort_descending(i64) {
+@entry
+@block_0
+  call %std.sort.quicksort <unnamed> 18 2
+  ret 0
+}
+
+function test_binary_search() {
+@entry
+@block_0
+  call %lm_box_string %str_const_40
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 41
+  call %lm_list_append <unnamed> 41
+  call %lm_list_append <unnamed> 57
+  call %lm_list_append <unnamed> 73
+  call %std.algorithm.index.binary_search <unnamed> 41
+  ceq <unnamed> 17
+  br <unnamed> %block_28 %block_22
+@block_22
+  jmp %block_22
+  call %std.algorithm.index.binary_search <unnamed> 41
+  ceq <unnamed> 25
+  jmp %block_28
+@block_28
+  call %lm_box_string %str_const_41
+  call %lm_assert <unnamed> <unnamed>
+  call %std.algorithm.index.binary_search <unnamed> 49
+  neg 9
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_42
+  call %lm_assert <unnamed> <unnamed>
+  call %std.algorithm.index.lower_bound <unnamed> 41
+  ceq <unnamed> 17
+  call %lm_box_string %str_const_43
+  call %lm_assert <unnamed> <unnamed>
+  call %std.algorithm.index.upper_bound <unnamed> 41
+  ceq <unnamed> 33
+  call %lm_box_string %str_const_44
+  call %lm_assert <unnamed> <unnamed>
+  call %std.algorithm.index.equal_range <unnamed> 41
+  ceq 0 17
+  call %lm_box_string %str_const_45
+  call %lm_assert <unnamed> <unnamed>
+  ceq 0 33
+  call %lm_box_string %str_const_46
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.algorithm.index.lower_bound(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.binary_search.lower_bound <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.sort.sort(i64, i64, i64) {
+@entry
+@block_0
+  call %std.sort.quicksort <unnamed> <unnamed> <unnamed>
+  ret 0
+}
+
+function std.search.equal_range(i64, i64) {
+@entry
+@block_0
+  call %std.search.lower_bound <unnamed> <unnamed>
+  call %std.search.upper_bound <unnamed> <unnamed>
+  ret 0
+}
+
+function std.algorithm.sort.stable_sort(i64) {
+@entry
+@block_0
+  call %std.sort.stable_sort <unnamed> 10 2
+  ret 0
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_47
+  call %lm_print_int <unnamed>
+  call %test_search
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_48
+  call %lm_assert <unnamed> <unnamed>
+  call %test_sort
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_49
+  call %lm_assert <unnamed> <unnamed>
+  call %test_partition
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_50
+  call %lm_assert <unnamed> <unnamed>
+  call %test_transform
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_51
+  call %lm_assert <unnamed> <unnamed>
+  call %test_reduce
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_52
+  call %lm_assert <unnamed> <unnamed>
+  call %test_filter
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_53
+  call %lm_assert <unnamed> <unnamed>
+  call %test_unique
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_54
+  call %lm_assert <unnamed> <unnamed>
+  call %test_shuffle
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_55
+  call %lm_assert <unnamed> <unnamed>
+  call %test_binary_search
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_56
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_57
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function test_unique() {
+@entry
+@block_0
+  call %lm_box_string %str_const_58
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 33
+  call %std.algorithm.index.unique <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 33
+  call %lm_box_string %str_const_59
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_60
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 9
+  ceq <unnamed> 17
+  call %lm_box_string %str_const_61
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 17
+  ceq <unnamed> 25
+  call %lm_box_string %str_const_62
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 25
+  ceq <unnamed> 33
+  call %lm_box_string %str_const_63
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.algorithm.filter.filter(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  jmp %block_4
+@block_4
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_7 %block_18
+@block_7
+  jmp %block_7
+  call %lm_list_get <unnamed> 1
+  call <unnamed> <unnamed>
+  br <unnamed> %block_10 %block_13
+@block_10
+  jmp %block_10
+  call %lm_list_get <unnamed> 1
+  call %lm_list_append <unnamed> <unnamed>
+  jmp %block_13
+@block_13
+  add 1 9
+  jmp %block_4
+@block_18
+  ret <unnamed>
+}
+
+function std.algorithm.transform.unzip(i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_list_new 0
+  jmp %block_6
+@block_6
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_9 %block_23
+@block_9
+  jmp %block_9
+  call %lm_list_get <unnamed> 1
+  cast <unnamed>
+  call %lm_list_get <unnamed> 1
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 9
+  call %lm_list_append <unnamed> <unnamed>
+  add 1 9
+  jmp %block_6
+@block_23
+  ret 0
+}
+
+function std.algorithm.partition.partition_copy(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_list_new 0
+  jmp %block_6
+@block_6
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_9 %block_23
+@block_9
+  jmp %block_9
+  call %lm_list_get <unnamed> 1
+  call <unnamed> <unnamed>
+  br <unnamed> %block_12 %block_15
+@block_12
+  jmp %block_12
+  call %lm_list_get <unnamed> 1
+  call %lm_list_append <unnamed> <unnamed>
+  jmp %block_18
+@block_15
+  call %lm_list_get <unnamed> 1
+  call %lm_list_append <unnamed> <unnamed>
+  jmp %block_18
+@block_18
+  add 1 9
+  jmp %block_6
+@block_23
+  ret 0
+}
+
+function std.algorithm.transform.__init__() {
+@entry
+  ret 0
+}
+
+function test_sort() {
+@entry
+@block_0
+  call %lm_box_string %str_const_64
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 41
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 65
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 33
+  call %std.algorithm.index.sort <unnamed>
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_65
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 9
+  ceq <unnamed> 25
+  call %lm_box_string %str_const_66
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 17
+  ceq <unnamed> 33
+  call %lm_box_string %str_const_67
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 25
+  ceq <unnamed> 41
+  call %lm_box_string %str_const_68
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 33
+  ceq <unnamed> 65
+  call %lm_box_string %str_const_69
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 41
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 65
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 33
+  call %std.algorithm.index.quicksort_descending <unnamed>
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 65
+  call %lm_box_string %str_const_70
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 41
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 65
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 33
+  call %std.algorithm.index.mergesort <unnamed>
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_71
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 41
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 65
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 33
+  call %std.algorithm.index.heapsort <unnamed>
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_72
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 41
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 65
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 33
+  call %std.algorithm.index.insertion_sort <unnamed>
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_73
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function test_filter() {
+@entry
+@block_0
+  call %lm_box_string %str_const_74
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 33
+  call %lm_list_append <unnamed> 41
+  call %lm_list_append <unnamed> 49
+  call %lm_box_string %str_const_75
+  call %std.algorithm.index.filter <unnamed> <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 25
+  call %lm_box_string %str_const_76
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 17
+  call %lm_box_string %str_const_77
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 9
+  ceq <unnamed> 33
+  call %lm_box_string %str_const_78
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 17
+  ceq <unnamed> 49
+  call %lm_box_string %str_const_79
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_80
+  call %std.algorithm.index.remove_if <unnamed> <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 25
+  call %lm_box_string %str_const_81
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_82
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.algorithm.shuffle.shuffle(i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  csle <unnamed> 9
+  br <unnamed> %block_5 %block_6
+@block_5
+  jmp %block_5
+  ret 0
+@block_6
+  sub <unnamed> 9
+  jmp %block_11
+@block_11
+  csgt <unnamed> 1
+  br <unnamed> %block_14 %block_45
+@block_14
+  jmp %block_14
+  mul 987654313 8828121961
+  mul 987654313 8828121961
+  add <unnamed> 98761
+  rem <unnamed> 17179869185
+  cslt <unnamed> 1
+  br <unnamed> %block_28 %block_31
+@block_28
+  jmp %block_28
+  neg <unnamed>
+  jmp %block_31
+@block_31
+  add <unnamed> 9
+  rem <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  sub <unnamed> 9
+  jmp %block_11
+@block_45
+  ret 0
+}
+
+function std.algorithm.search.find(i64, i64) {
+@entry
+@block_0
+  call %std.search.linear_search <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.search.find_if(i64, i64) {
+@entry
+@block_0
+  jmp %block_2
+@block_2
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_5 %block_14
+@block_5
+  jmp %block_5
+  call %lm_list_get <unnamed> 1
+  call <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_9
+@block_8
+  jmp %block_8
+  ret 1
+@block_9
+  add 1 9
+  jmp %block_2
+@block_14
+  neg 9
+  ret <unnamed>
+}
+
+function std.algorithm.search.none(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.search.any_match <unnamed> <unnamed>
+  cne <unnamed> 18
+  ret <unnamed>
+}
+
+function std.algorithm.search.all(i64, i64) {
+@entry
+@block_0
+  jmp %block_2
+@block_2
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_5 %block_17
+@block_5
+  jmp %block_5
+  call %lm_list_get <unnamed> 1
+  call <unnamed> <unnamed>
+  cne <unnamed> 18
+  br <unnamed> %block_10 %block_12
+@block_10
+  jmp %block_10
+  ret 10
+@block_12
+  add 1 9
+  jmp %block_2
+@block_17
+  ret 18
+}
+
+function std.sort._compare(i64, i64, i64, i64) {
+@entry
+@block_0
+  cne <unnamed> 2
+  br <unnamed> %block_4 %block_9
+@block_4
+  jmp %block_4
+  call <unnamed> <unnamed> <unnamed>
+  cast <unnamed>
+  jmp %block_25
+@block_9
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_11 %block_15
+@block_11
+  jmp %block_11
+  neg 9
+  jmp %block_24
+@block_15
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_17 %block_20
+@block_17
+  jmp %block_17
+  jmp %block_23
+@block_20
+  jmp %block_23
+@block_23
+  jmp %block_24
+@block_24
+  jmp %block_25
+@block_25
+  ceq <unnamed> 18
+  br <unnamed> %block_28 %block_31
+@block_28
+  jmp %block_28
+  sub 1 1
+  ret <unnamed>
+@block_31
+  ret 1
+}
+
+function std.algorithm.search.linear_search(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.search.find <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.reduce.reduce(i64, i64, i64) {
+@entry
+@block_0
+  jmp %block_3
+@block_3
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_14
+@block_6
+  jmp %block_6
+  call %lm_list_get <unnamed> 1
+  call <unnamed> <unnamed> <unnamed>
+  add 1 9
+  jmp %block_3
+@block_14
+  ret <unnamed>
+}
+
+function std.algorithm.reduce.fold(i64, i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.reduce.reduce <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.binary_search.equal_range(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.binary_search.lower_bound <unnamed> <unnamed>
+  call %std.algorithm.binary_search.upper_bound <unnamed> <unnamed>
+  ret 0
+}
+
+function std.algorithm.reduce.__init__() {
+@entry
+  ret 0
+}
+
+function std.algorithm.transform.map(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  jmp %block_4
+@block_4
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_7 %block_15
+@block_7
+  jmp %block_7
+  call %lm_list_get <unnamed> 1
+  call <unnamed> <unnamed>
+  call %lm_list_append <unnamed> <unnamed>
+  add 1 9
+  jmp %block_4
+@block_15
+  ret <unnamed>
+}
+
+function std.algorithm.sort.sort(i64) {
+@entry
+@block_0
+  call %std.sort.sort <unnamed> 10 2
+  ret 0
+}
+
+function std.algorithm.sort.quicksort(i64) {
+@entry
+@block_0
+  call %std.sort.quicksort <unnamed> 10 2
+  ret 0
+}
+
+function std.sort.counting_sort(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  csle <unnamed> 9
+  br <unnamed> %block_5 %block_6
+@block_5
+  jmp %block_5
+  ret 0
+@block_6
+  call %lm_list_get <unnamed> 1
+  call %lm_list_get <unnamed> 1
+  jmp %block_14
+@block_14
+  cslt 9 <unnamed>
+  br <unnamed> %block_16 %block_33
+@block_16
+  jmp %block_16
+  call %lm_list_get <unnamed> 9
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_19 %block_22
+@block_19
+  jmp %block_19
+  call %lm_list_get <unnamed> 9
+  jmp %block_22
+@block_22
+  call %lm_list_get <unnamed> 9
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_25 %block_28
+@block_25
+  jmp %block_25
+  call %lm_list_get <unnamed> 9
+  jmp %block_28
+@block_28
+  add 9 9
+  jmp %block_14
+@block_33
+  call %lm_list_new 0
+  jmp %block_38
+@block_38
+  sub <unnamed> <unnamed>
+  csle 1 <unnamed>
+  br <unnamed> %block_41 %block_48
+@block_41
+  jmp %block_41
+  call %lm_list_append <unnamed> 1
+  add 1 9
+  jmp %block_38
+@block_48
+  jmp %block_51
+@block_51
+  cslt 1 <unnamed>
+  br <unnamed> %block_53 %block_70
+@block_53
+  jmp %block_53
+  call %lm_list_get <unnamed> 1
+  sub <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  sub <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  add <unnamed> 9
+  call %lm_list_get <unnamed> 1
+  sub <unnamed> <unnamed>
+  add 1 9
+  jmp %block_51
+@block_70
+  jmp %block_73
+@block_73
+  call %lm_list_len 0
+  cslt 1 <unnamed>
+  br <unnamed> %block_76 %block_104
+@block_76
+  jmp %block_76
+  jmp %block_77
+@block_77
+  call %lm_list_get 0 1
+  csgt <unnamed> 1
+  br <unnamed> %block_81 %block_99
+@block_81
+  jmp %block_81
+  ceq <unnamed> 18
+  br <unnamed> %block_84 %block_87
+@block_84
+  jmp %block_84
+  sub <unnamed> 1
+  jmp %block_90
+@block_87
+  add <unnamed> 1
+  jmp %block_90
+@block_90
+  add 1 9
+  call %lm_list_get 0 1
+  sub <unnamed> 9
+  jmp %block_77
+@block_99
+  add 1 9
+  jmp %block_73
+@block_104
+  ret 0
+}
+
+function std.algorithm.sort.heapsort(i64) {
+@entry
+@block_0
+  call %std.sort.heapsort <unnamed> 10 2
+  ret 0
+}
+
+function std.algorithm.sort.insertion_sort(i64) {
+@entry
+@block_0
+  call %std.sort.insertion_sort <unnamed> 10 2
+  ret 0
+}
+
+function std.algorithm.sort.radix_sort(i64) {
+@entry
+@block_0
+  call %std.sort.radix_sort <unnamed> 10
+  ret 0
+}
+
+function std.algorithm.sort.timsort(i64) {
+@entry
+@block_0
+  call %std.sort.timsort <unnamed> 10 2
+  ret 0
+}
+
+function std.algorithm.transform.zip(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_11
+@block_8
+  jmp %block_8
+  call %lm_list_len <unnamed>
+  jmp %block_11
+@block_11
+  jmp %block_12
+@block_12
+  cslt 1 <unnamed>
+  br <unnamed> %block_14 %block_27
+@block_14
+  jmp %block_14
+  call %lm_list_get <unnamed> 1
+  call %lm_list_get <unnamed> 1
+  call %lm_list_append <unnamed> 0
+  add 1 9
+  jmp %block_12
+@block_27
+  ret <unnamed>
+}
+
+function std.algorithm.index.any_match(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.search.any_match <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.search.__init__() {
+@entry
+  ret 0
+}
+
+function std.algorithm.partition.is_partitioned(i64, i64) {
+@entry
+@block_0
+  jmp %block_3
+@block_3
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_21
+@block_6
+  jmp %block_6
+  call %lm_list_get <unnamed> 1
+  call <unnamed> <unnamed>
+  br <unnamed> %block_9 %block_13
+@block_9
+  jmp %block_9
+  br 10 %block_10 %block_12
+@block_10
+  jmp %block_10
+  ret 10
+@block_12
+  jmp %block_16
+@block_13
+  jmp %block_16
+@block_16
+  add 1 9
+  jmp %block_3
+@block_21
+  ret 18
+}
+
+function std.algorithm.partition.__init__() {
+@entry
+  ret 0
+}
+
+function std.algorithm.index.find(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.search.find <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.index.quicksort(i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.quicksort <unnamed>
+  ret 0
+}
+
+function std.algorithm.index.insertion_sort(i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.insertion_sort <unnamed>
+  ret 0
+}
+
+function std.algorithm.index.quicksort_descending(i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.quicksort_descending <unnamed>
+  ret 0
+}
+
+function std.algorithm.search.any_match(i64, i64) {
+@entry
+@block_0
+  jmp %block_2
+@block_2
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_5 %block_15
+@block_5
+  jmp %block_5
+  call %lm_list_get <unnamed> 1
+  call <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  ret 18
+@block_10
+  add 1 9
+  jmp %block_2
+@block_15
+  ret 10
+}
+
+function std.algorithm.index.mergesort(i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.mergesort <unnamed>
+  ret 0
+}
+
+function std.sort._partition(i64, i64, i64, i64, i64) {
+@entry
+@block_0
+  call %lm_list_get <unnamed> <unnamed>
+  sub <unnamed> 9
+  jmp %block_7
+@block_7
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_9 %block_25
+@block_9
+  jmp %block_9
+  call %lm_list_get <unnamed> <unnamed>
+  call %std.sort._compare <unnamed> <unnamed> <unnamed> <unnamed>
+  csle <unnamed> 1
+  br <unnamed> %block_14 %block_20
+@block_14
+  jmp %block_14
+  add <unnamed> 9
+  call %std.sort._swap <unnamed> <unnamed> <unnamed>
+  jmp %block_20
+@block_20
+  add <unnamed> 9
+  jmp %block_7
+@block_25
+  add <unnamed> 9
+  call %std.sort._swap <unnamed> <unnamed> <unnamed>
+  add <unnamed> 9
+  ret <unnamed>
+}
+
+function test_partition() {
+@entry
+@block_0
+  call %lm_box_string %str_const_83
+  call %lm_print_int <unnamed>
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 9
+  call %lm_list_append <unnamed> 17
+  call %lm_list_append <unnamed> 25
+  call %lm_list_append <unnamed> 33
+  call %lm_list_append <unnamed> 41
+  call %lm_list_append <unnamed> 49
+  call %lm_box_string %str_const_84
+  call %std.algorithm.index.partition <unnamed> <unnamed>
+  jmp %block_21
+@block_21
+  cslt 1 <unnamed>
+  br <unnamed> %block_23 %block_34
+@block_23
+  jmp %block_23
+  call %lm_list_get <unnamed> 1
+  call %is_even <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_85
+  call %lm_assert <unnamed> <unnamed>
+  add 1 9
+  jmp %block_21
+@block_34
+  jmp %block_35
+@block_35
+  call %lm_list_len <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_38 %block_49
+@block_38
+  jmp %block_38
+  call %lm_list_get <unnamed> <unnamed>
+  call %is_even <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_86
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 9
+  jmp %block_35
+@block_49
+  ret 9
+}
+
+function std.algorithm.index.heapsort(i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.heapsort <unnamed>
+  ret 0
+}
+
+function std.algorithm.index.counting_sort(i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.counting_sort <unnamed>
+  ret 0
+}
+
+function std.algorithm.index.timsort(i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.timsort <unnamed>
+  ret 0
+}
+
+function std.sort._swap(i64, i64, i64) {
+@entry
+@block_0
+  call %lm_list_get <unnamed> <unnamed>
+  call %lm_list_get <unnamed> <unnamed>
+  ret 0
+}
+
+function std.algorithm.sort.__init__() {
+@entry
+  ret 0
+}
+
+function std.algorithm.index.stable_sort(i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.stable_sort <unnamed>
+  ret 0
+}
+
+function std.algorithm.index.partial_sort(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.sort.partial_sort <unnamed> <unnamed>
+  ret 0
+}
+
+function std.algorithm.index.is_partitioned(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.partition.is_partitioned <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.index.partition(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.partition.partition <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.index.map(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.transform.map <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.binary_search.upper_bound(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  jmp %block_4
+@block_4
+  cslt 1 <unnamed>
+  br <unnamed> %block_6 %block_21
+@block_6
+  jmp %block_6
+  add 1 <unnamed>
+  div <unnamed> 17
+  call %lm_list_get <unnamed> <unnamed>
+  csle <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_18
+@block_13
+  jmp %block_13
+  add <unnamed> 9
+  jmp %block_20
+@block_18
+  jmp %block_20
+@block_20
+  jmp %block_4
+@block_21
+  ret <unnamed>
+}
+
+function std.algorithm.index.zip(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.transform.zip <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.index.fold(i64, i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.reduce.fold <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function is_even(i64) {
+@entry
+@block_0
+  cast <unnamed>
+  rem <unnamed> 17
+  ceq <unnamed> 1
+  ret <unnamed>
+}
+
+function std.algorithm.index.filter(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.filter.filter <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.sort.timsort(i64, i64, i64) {
+@entry
+@block_0
+  call %std.sort.stable_sort <unnamed> <unnamed> <unnamed>
+  ret 0
+}
+
+function std.algorithm.index.__init__() {
+@entry
+  ret 0
+}
+
+function std.algorithm.index.remove_if(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.filter.remove_if <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.index.unique(i64) {
+@entry
+@block_0
+  call %std.algorithm.unique.unique <unnamed>
+  ret <unnamed>
+}
+
+function std.sort.radix_sort(i64, i64) {
+@entry
+@block_0
+  call %std.sort.counting_sort <unnamed> <unnamed>
+  ret 0
+}
+
+function std.algorithm.index.shuffle(i64) {
+@entry
+@block_0
+  call %std.algorithm.shuffle.shuffle <unnamed>
+  ret 0
+}
+
+function std.algorithm.shuffle.__init__() {
+@entry
+  ret 0
+}
+
+function std.algorithm.index.linear_search(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.search.linear_search <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.index.binary_search(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.binary_search.binary_search <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.algorithm.index.equal_range(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.binary_search.equal_range <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function lm_list_len(i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_list_new(i64) {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_list_set(i64, i64, i64) {
+}
