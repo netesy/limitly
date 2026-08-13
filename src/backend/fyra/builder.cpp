@@ -154,6 +154,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         return context_->getConstantInt(context_->getIntegerType(64), 0);
     };
     auto store_reg = [&](uint32_t r, ir::Value* v, LIR::Type t) {
+        if (v && v->getName().empty() && !dynamic_cast<ir::Constant*>(v)) {
+            v->setName("r" + std::to_string(r));
+        }
         regs[r] = v;
     };
 
