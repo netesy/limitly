@@ -365,11 +365,50 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
 
 void TypeChecker::add_error(const std::string& message, int line) {
     errors.push_back(message);
-    // Type checker errors default to column 1 since we don't have precise token positions
+
     int column = 1;
+    std::string lexeme = "";
+    std::string context = "";
+
+    // Auto-extract context, column, and lexeme if current_source and line are available
+    if (line > 0 && !current_source.empty()) {
+        std::vector<std::string> lines = Debugger::splitLines(current_source);
+        if (line <= int(lines.size())) {
+            std::string line_text = lines[line - 1];
+            context = line_text;
+
+            // Try to find a sensible column and lexeme based on the error message
+            // E.g., if error contains "Cannot find variable `foo`" or "variable 'foo'"
+            size_t start_quote = message.find('`');
+            size_t end_quote = std::string::npos;
+            if (start_quote != std::string::npos) {
+                end_quote = message.find('`', start_quote + 1);
+            }
+            if (start_quote == std::string::npos) {
+                start_quote = message.find('\'');
+                if (start_quote != std::string::npos) {
+                    end_quote = message.find('\'', start_quote + 1);
+                }
+            }
+
+            if (start_quote != std::string::npos && end_quote != std::string::npos) {
+                lexeme = message.substr(start_quote + 1, end_quote - start_quote - 1);
+                size_t pos = line_text.find(lexeme);
+                if (pos != std::string::npos) {
+                    column = static_cast<int>(pos) + 1;
+                }
+            } else {
+                // Find first non-whitespace character as fallback
+                size_t first_non_ws = line_text.find_first_not_of(" \t");
+                if (first_non_ws != std::string::npos) {
+                    column = static_cast<int>(first_non_ws) + 1;
+                }
+            }
+        }
+    }
     
     if (line > 0 && !current_source.empty()) {
-        Debugger::error(message, line, column, InterpretationStage::SEMANTIC, current_source, current_file_path, "", "");
+        Debugger::error(message, line, column, InterpretationStage::SEMANTIC, current_source, current_file_path, lexeme, "");
     } else {
         Debugger::error(message, line, column, InterpretationStage::SEMANTIC, "(in REPL)", "(in REPL)", "", "");
     }

@@ -111,6 +111,11 @@ public:
      */
     static void enableModernDiagnostics(bool enable) { useModernDiagnostics = enable; }
 
+    /**
+     * @brief Split source code into lines
+     */
+    static std::vector<std::string> splitLines(const std::string &sourceCode);
+
 private:
     static std::vector<std::string> sourceCodeLines;
     static bool hadError;
@@ -143,7 +148,6 @@ private:
 
     // Helper methods
     static void printContextLines(std::ostream &out, int errorLine, int errorColumn);
-    static std::vector<std::string> splitLines(const std::string &sourceCode);
     static std::string getTime();
     static std::string getSuggestion(const std::string &errorMessage,
                                      const std::string &expectedValue);

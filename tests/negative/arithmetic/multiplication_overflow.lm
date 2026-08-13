@@ -1,7 +1,7 @@
 // @error:overflow
 // Multiplication overflow
 
-var x: i8 = 50;
-var y: i8 = 3;
-var result = x * y;  // 150 > 127, overflow
+const x: i8 = 50;
+const y: i8 = 3;
+const result = x * y;  // 150 > 127, overflow
 print(result);

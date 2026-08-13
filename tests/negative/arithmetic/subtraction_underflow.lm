@@ -1,7 +1,7 @@
 // @error:overflow
 // Subtraction underflow
 
-var x: i8 = -100;
-var y: i8 = 50;
-var result = x - y;  // -150 < -128, underflow
+const x: i8 = -100;
+const y: i8 = 50;
+const result = x - y;  // -150 < -128, underflow
 print(result);

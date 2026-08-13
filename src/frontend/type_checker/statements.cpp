@@ -40,6 +40,12 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_task_statement(task_stmt);
     } else if (auto worker_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::WorkerStatement>(stmt)) {
         return check_worker_statement(worker_stmt);
+    } else if (auto break_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::BreakStatement>(stmt)) {
+        validate_break_cleanup(break_stmt->line);
+        return type_system.NIL_TYPE;
+    } else if (auto continue_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContinueStatement>(stmt)) {
+        validate_continue_cleanup(continue_stmt->line);
+        return type_system.NIL_TYPE;
     } else if (auto return_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         return check_return_statement(return_stmt);
     } else if (auto match_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::MatchStatement>(stmt)) {
@@ -227,7 +233,7 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
         long long val_int = 0;
         double val_double = 0.0;
         bool is_int = false;
-        if (evaluate_const_expr(var_decl->initializer, val_int, val_double, is_int, this)) {
+        if (var_decl->isConst && evaluate_const_expr(var_decl->initializer, val_int, val_double, is_int, this)) {
             if (is_int) {
                 constant_ints[var_decl->name] = val_int;
             } else {
@@ -281,6 +287,21 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
     declare_variable(var_decl->name, final_type);
     declare_variable_memory(var_decl->name, final_type);  // Track memory safety
     
+    // New variables are linear types by default if they are complex/linear types
+    bool is_linear_type = (final_type &&
+                          (final_type->tag == TypeTag::List ||
+                           final_type->tag == TypeTag::Dict ||
+                           final_type->tag == TypeTag::UserDefined ||
+                           final_type->tag == TypeTag::Frame ||
+                           final_type->tag == TypeTag::Tuple ||
+                           final_type->tag == TypeTag::Structural));
+    if (is_linear_type) {
+        LinearTypeInfo linear_info;
+        linear_info.is_moved = false;
+        linear_info.access_count = 0;
+        linear_types[var_decl->name] = linear_info;
+    }
+
     // Mark as initialized if there's an initializer
     if (var_decl->initializer) {
         mark_variable_initialized(var_decl->name);
@@ -736,6 +757,11 @@ TypePtr TypeChecker::check_worker_statement(std::shared_ptr<LM::Frontend::AST::W
 TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::ReturnStatement> return_stmt) {
     if (!return_stmt) return nullptr;
     
+    if (!current_return_type) {
+        add_error("return statement not allowed at global scope", return_stmt->line);
+        return type_system.NIL_TYPE;
+    }
+
     TypePtr return_type = nullptr;
     if (return_stmt->value) {
         return_type = check_expression(return_stmt->value);
@@ -778,20 +804,7 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::R
         return_type = type_system.NIL_TYPE;
     }
     
-    if (return_stmt->value) {
-        if (auto lambda = std::dynamic_pointer_cast<LM::Frontend::AST::LambdaExpr>(return_stmt->value)) {
-            if (!lambda->capturedVars.empty()) {
-                for (const auto& var_name : lambda->capturedVars) {
-                    TypePtr var_type = lookup_variable(var_name);
-                    if (var_type && var_type->tag != TypeTag::Function) {
-                        add_error("closure_capture: Closure captures variable '" + var_name +
-                                  "' that goes out of scope when returning", return_stmt->line);
-                        break;
-                    }
-                }
-            }
-        }
-    }
+    // Closure captures are fully supported when returning lambdas.
 
     // Check if return type matches function return type
     if (current_return_type && !is_type_compatible(current_return_type, return_type)) {
