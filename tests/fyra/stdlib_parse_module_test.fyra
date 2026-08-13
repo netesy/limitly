@@ -1,0 +1,1450 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.parse.index.__init__
+  call %std.time.datetime.__init__
+  call %main
+  ret 0
+}
+
+function std.parse.datetime.__init__() {
+@entry
+  ret 0
+}
+
+function std.parse.datetime.parse_datetime(i64) {
+@entry
+@block_0
+  call %std.time.datetime.DateTime.from_string 0 <unnamed>
+  ret <unnamed>
+}
+
+function std.time.duration.__init__() {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.human_readable(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.to_milliseconds(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.greater_than(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.subtract(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.add(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.from_minutes(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.from_hours(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.from_days(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.pad_int(i64, i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_rt_str_format <unnamed> <unnamed>
+  jmp %block_4
+@block_4
+  call %lm_list_len <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_7 %block_11
+@block_7
+  jmp %block_7
+  call %lm_box_string %str_const_1
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_4
+@block_11
+  ret <unnamed>
+}
+
+function std.parse.index.__init__() {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.multiply(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.parse.index.parse_datetime(i64) {
+@entry
+@block_0
+  call %std.parse.datetime.parse_datetime <unnamed>
+  ret <unnamed>
+}
+
+function std.parse.index.parse_bool(i64) {
+@entry
+@block_0
+  call %std.parse.bool.parse_bool <unnamed>
+  ret <unnamed>
+}
+
+function std.core.OptionStr.is_some(i64) {
+@entry
+  ret 0
+}
+
+function std.core.__init__() {
+@entry
+  ret 0
+}
+
+function std.time.timezone.TimeZone.utc(i64) {
+@entry
+  ret 0
+}
+
+function std.time.timezone.TimeZone.offset_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.to_seconds(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.end_of_year(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ok_int(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_2
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_3
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.time.datetime.DateTime.is_between(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.err_int(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_4
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.ResultStr.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.err_str(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_5
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_6
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.parse.numbers.parse_int(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_7
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_5
+  call %lm_list_len <unnamed>
+  call %substring <unnamed> 1 9
+  call %lm_box_string %str_const_8
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_18 %block_21
+@block_18
+  jmp %block_18
+  jmp %block_31
+@block_21
+  call %lm_box_string %str_const_9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_24 %block_30
+@block_24
+  jmp %block_24
+  neg 9
+  jmp %block_30
+@block_30
+  jmp %block_31
+@block_31
+  csge 9 <unnamed>
+  br <unnamed> %block_33 %block_35
+@block_33
+  jmp %block_33
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_35
+  jmp %block_36
+@block_36
+  cslt 9 <unnamed>
+  br <unnamed> %block_38 %block_64
+@block_38
+  jmp %block_38
+  add 9 9
+  call %substring <unnamed> 9 <unnamed>
+  call %std.parse.numbers.char_to_digit <unnamed>
+  neg 9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_49 %block_51
+@block_49
+  jmp %block_49
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_51
+  mul 1 81
+  mul 1 81
+  add <unnamed> <unnamed>
+  add 9 9
+  jmp %block_36
+@block_64
+  cne 18 18
+  br <unnamed> %block_67 %block_69
+@block_67
+  jmp %block_67
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_69
+  mul <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.ResultStr.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.parse.numbers.parse_float(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_10
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  call %lm_error_new <unnamed>
+  ret <unnamed>
+@block_5
+  ret <unnamed>
+}
+
+function std.time.datetime.DateTime.day(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.__init__() {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.parse.index.parse_float(i64) {
+@entry
+@block_0
+  call %std.parse.numbers.parse_float <unnamed>
+  ret <unnamed>
+}
+
+function std.time.datetime.DateTime.day_of_year(i64) {
+@entry
+  ret 0
+}
+
+function std.parse.numbers.char_to_digit(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_11
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  ret 1
+@block_5
+  call %lm_box_string %str_const_12
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  ret 9
+@block_10
+  call %lm_box_string %str_const_13
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_15
+@block_13
+  jmp %block_13
+  ret 17
+@block_15
+  call %lm_box_string %str_const_14
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_18 %block_20
+@block_18
+  jmp %block_18
+  ret 25
+@block_20
+  call %lm_box_string %str_const_15
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_23 %block_25
+@block_23
+  jmp %block_23
+  ret 33
+@block_25
+  call %lm_box_string %str_const_16
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_28 %block_30
+@block_28
+  jmp %block_28
+  ret 41
+@block_30
+  call %lm_box_string %str_const_17
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_33 %block_35
+@block_33
+  jmp %block_33
+  ret 49
+@block_35
+  call %lm_box_string %str_const_18
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_38 %block_40
+@block_38
+  jmp %block_38
+  ret 57
+@block_40
+  call %lm_box_string %str_const_19
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_43 %block_45
+@block_43
+  jmp %block_43
+  ret 65
+@block_45
+  call %lm_box_string %str_const_20
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_48 %block_50
+@block_48
+  jmp %block_48
+  ret 73
+@block_50
+  neg 9
+  ret <unnamed>
+}
+
+function std.core.make_err_int(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_21
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function test_parse_helpers() {
+@entry
+@block_0
+  call %lm_box_string %str_const_22
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_23
+  call %std.parse.index.parse_int <unnamed>
+  jmp %block_6
+@block_6
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_9 %block_8
+@block_8
+  jmp %block_8
+  jmp %block_17
+@block_9
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_11 %block_24
+@block_11
+  jmp %block_11
+  jmp %block_12
+@block_12
+  call %lm_box_string %str_const_24
+  call %lm_assert 10 <unnamed>
+  jmp %block_24
+@block_17
+  cast <unnamed>
+  ceq <unnamed> 6313
+  call %lm_box_string %str_const_25
+  call %lm_assert <unnamed> <unnamed>
+  jmp %block_24
+@block_24
+  call %lm_box_string %str_const_26
+  call %std.parse.index.parse_bool <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_27
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_28
+  call %std.parse.index.parse_datetime <unnamed>
+  jmp %block_34
+@block_34
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_37 %block_36
+@block_36
+  jmp %block_36
+  jmp %block_42
+@block_37
+  jmp %block_38
+@block_38
+  call %lm_box_string %str_const_29
+  call %lm_assert 10 <unnamed>
+  jmp %block_61
+@block_42
+  cast <unnamed>
+  call %std.time.datetime.DateTime.year <unnamed>
+  ceq <unnamed> 15761
+  call %lm_box_string %str_const_30
+  call %lm_assert <unnamed> <unnamed>
+  call %std.time.datetime.DateTime.month <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_31
+  call %lm_assert <unnamed> <unnamed>
+  call %std.time.datetime.DateTime.day <unnamed>
+  ceq <unnamed> 97
+  call %lm_box_string %str_const_32
+  call %lm_assert <unnamed> <unnamed>
+  jmp %block_61
+@block_61
+  ret 9
+}
+
+function std.time.duration.TimeDuration.from_microseconds(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.end_of_day(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.timestamp_to_year(i64) {
+@entry
+@block_0
+  csge <unnamed> 1
+  br <unnamed> %block_3 %block_22
+@block_3
+  jmp %block_3
+  cast 691201
+  div <unnamed> <unnamed>
+  jmp %block_10
+@block_10
+  call %std.time.datetime.get_days_in_year 15761
+  csge <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_21
+@block_13
+  jmp %block_13
+  call %std.time.datetime.get_days_in_year 15761
+  sub <unnamed> <unnamed>
+  add 15761 9
+  jmp %block_10
+@block_21
+  ret <unnamed>
+@block_22
+  neg <unnamed>
+  cast 691201
+  div <unnamed> <unnamed>
+  neg <unnamed>
+  rem <unnamed> 691201
+  cne <unnamed> 1
+  br <unnamed> %block_33 %block_38
+@block_33
+  jmp %block_33
+  add <unnamed> 9
+  jmp %block_38
+@block_38
+  jmp %block_41
+@block_41
+  sub 15761 9
+  call %std.time.datetime.get_days_in_year <unnamed>
+  csge <unnamed> <unnamed>
+  br <unnamed> %block_46 %block_53
+@block_46
+  jmp %block_46
+  sub 15761 9
+  call %std.time.datetime.get_days_in_year <unnamed>
+  sub <unnamed> <unnamed>
+  jmp %block_41
+@block_53
+  sub <unnamed> 9
+  ret <unnamed>
+}
+
+function std.time.timezone.TimeZone.to_seconds_offset(i64) {
+@entry
+  ret 0
+}
+
+function std.time.timezone.TimeZone.from_offset(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_iso_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.difference(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.from_timestamp(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.get_days_in_month(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 225
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 241
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 241
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 241
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 241
+  call %lm_list_append <unnamed> 249
+  ceq <unnamed> 17
+  br <unnamed> %block_30 %block_33
+@block_30
+  jmp %block_30
+  call %std.time.datetime.is_leap_year <unnamed>
+  jmp %block_33
+@block_33
+  br <unnamed> %block_34 %block_36
+@block_34
+  jmp %block_34
+  ret 233
+@block_36
+  sub <unnamed> 9
+  call %lm_list_get <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.ok_bool(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_33
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_34
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  cne <unnamed> 1
+  br <unnamed> %block_9 %block_16
+@block_9
+  jmp %block_9
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+@block_16
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.time.datetime.DateTime.day_of_week(i64) {
+@entry
+  ret 0
+}
+
+function test_parse_frame() {
+@entry
+@block_0
+  call %lm_box_string %str_const_35
+  call %lm_print_int <unnamed>
+  alloc 16
+  call %std.parse.index.Parse.init <unnamed>
+  call %lm_box_string %str_const_36
+  call %std.parse.index.Parse.parse_int <unnamed> <unnamed>
+  jmp %block_10
+@block_10
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_13 %block_12
+@block_12
+  jmp %block_12
+  jmp %block_21
+@block_13
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_15 %block_28
+@block_15
+  jmp %block_15
+  jmp %block_16
+@block_16
+  call %lm_box_string %str_const_37
+  call %lm_assert 10 <unnamed>
+  jmp %block_28
+@block_21
+  cast <unnamed>
+  ceq <unnamed> 985
+  call %lm_box_string %str_const_38
+  call %lm_assert <unnamed> <unnamed>
+  jmp %block_28
+@block_28
+  call %lm_box_string %str_const_39
+  call %std.parse.index.Parse.parse_int <unnamed> <unnamed>
+  jmp %block_32
+@block_32
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_35 %block_34
+@block_34
+  jmp %block_34
+  jmp %block_43
+@block_35
+  csgt <unnamed> 9223372036854775807
+  br <unnamed> %block_37 %block_51
+@block_37
+  jmp %block_37
+  jmp %block_38
+@block_38
+  call %lm_box_string %str_const_40
+  call %lm_assert 10 <unnamed>
+  jmp %block_51
+@block_43
+  cast <unnamed>
+  neg 3649
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_41
+  call %lm_assert <unnamed> <unnamed>
+  jmp %block_51
+@block_51
+  call %lm_box_string %str_const_42
+  call %std.parse.index.Parse.parse_bool <unnamed> <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_43
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.core.some_str(i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.core.ResultStr.is_err(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.greater_than(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.start_of_year(i64) {
+@entry
+  ret 0
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_44
+  call %lm_print_int <unnamed>
+  call %test_parse_frame
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_45
+  call %lm_assert <unnamed> <unnamed>
+  call %test_parse_helpers
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_46
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_47
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function std.core.OptionInt.is_some(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.is_none(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.less_than(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.is_ok(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.is_err(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.timestamp_to_day(i64) {
+@entry
+@block_0
+  call %std.time.datetime.timestamp_to_year <unnamed>
+  call %std.time.datetime.timestamp_to_month <unnamed>
+  call %std.time.datetime.datetime_to_timestamp <unnamed> <unnamed> 9 1 1 1
+  sub <unnamed> <unnamed>
+  cslt <unnamed> 1
+  br <unnamed> %block_15 %block_18
+@block_15
+  jmp %block_15
+  jmp %block_18
+@block_18
+  div 1 691201
+  div 1 691201
+  add <unnamed> 9
+  ret <unnamed>
+}
+
+function std.core.make_err_str(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_48
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_49
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.core.ResultStr.map_err(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.to_microseconds(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_second(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.minute(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.timezone.__init__() {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.is_ok(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.from_seconds(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.parse.bool.parse_bool(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_50
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_8 %block_4
+@block_4
+  jmp %block_4
+  call %lm_box_string %str_const_51
+  ceq <unnamed> <unnamed>
+  jmp %block_8
+@block_8
+  ret <unnamed>
+}
+
+function std.parse.bool.__init__() {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.subtract(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.to_i(i64) {
+@entry
+@block_0
+  cast <unnamed>
+  ret <unnamed>
+}
+
+function std.time.datetime.is_leap_year(i64) {
+@entry
+@block_0
+  rem <unnamed> 33
+  cne <unnamed> 1
+  br <unnamed> %block_5 %block_7
+@block_5
+  jmp %block_5
+  ret 10
+@block_7
+  rem <unnamed> 801
+  cne <unnamed> 1
+  br <unnamed> %block_12 %block_14
+@block_12
+  jmp %block_12
+  ret 18
+@block_14
+  rem <unnamed> 3201
+  cne <unnamed> 1
+  br <unnamed> %block_19 %block_21
+@block_19
+  jmp %block_19
+  ret 10
+@block_21
+  ret 18
+}
+
+function std.time.datetime.DateTime.add(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.second(i64) {
+@entry
+  ret 0
+}
+
+function std.parse.numbers.__init__() {
+@entry
+  ret 0
+}
+
+function std.time.datetime.get_days_in_year(i64) {
+@entry
+@block_0
+  call %std.time.datetime.is_leap_year <unnamed>
+  cne <unnamed> 1
+  br <unnamed> %block_4 %block_6
+@block_4
+  jmp %block_4
+  ret 2929
+@block_6
+  ret 2921
+}
+
+function std.core.ok_str(i64) {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_52
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_53
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.time.datetime.datetime_to_timestamp(i64, i64, i64, i64, i64, i64) {
+@entry
+@block_0
+  jmp %block_3
+@block_3
+  cslt 15761 <unnamed>
+  br <unnamed> %block_5 %block_14
+@block_5
+  jmp %block_5
+  call %std.time.datetime.get_days_in_year 15761
+  call %std.time.datetime.get_days_in_year 15761
+  add 1 <unnamed>
+  add 15761 9
+  jmp %block_3
+@block_14
+  jmp %block_15
+@block_15
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_17 %block_24
+@block_17
+  jmp %block_17
+  sub <unnamed> 9
+  call %std.time.datetime.get_days_in_year <unnamed>
+  sub <unnamed> <unnamed>
+  jmp %block_15
+@block_24
+  jmp %block_26
+@block_26
+  cslt 9 <unnamed>
+  br <unnamed> %block_28 %block_37
+@block_28
+  jmp %block_28
+  call %std.time.datetime.get_days_in_month <unnamed> 9
+  call %std.time.datetime.get_days_in_month <unnamed> 9
+  add <unnamed> <unnamed>
+  add 9 9
+  jmp %block_26
+@block_37
+  sub <unnamed> 9
+  sub <unnamed> 9
+  add <unnamed> <unnamed>
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  add <unnamed> <unnamed>
+  mul <unnamed> 481
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  add <unnamed> <unnamed>
+  mul <unnamed> 481
+  add <unnamed> <unnamed>
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  add <unnamed> <unnamed>
+  mul <unnamed> 481
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  add <unnamed> <unnamed>
+  mul <unnamed> 481
+  add <unnamed> <unnamed>
+  add <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.time.datetime.DateTime.now(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_timezone(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.from_string(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.from_components(i64, i64, i64, i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.total_seconds(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.week_of_year(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.year(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.month(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.hour(i64) {
+@entry
+  ret 0
+}
+
+function std.parse.index.parse_int(i64) {
+@entry
+@block_0
+  call %std.parse.numbers.parse_int <unnamed>
+  ret <unnamed>
+}
+
+function std.time.datetime.DateTime.start_of_week(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.is_leap_year(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.days_in_month(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.sleep_duration(i64) {
+@entry
+@block_0
+  call %std.time.duration.TimeDuration.to_milliseconds <unnamed>
+  call %std.time.datetime.sleep_ms <unnamed>
+  ret 0
+}
+
+function std.core.OptionInt.is_none(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.quarter(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.map_err(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_year(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.parse.index.Parse.parse_float(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.format(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_month(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.some_int(i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_iso8601(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_day(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.parse.index.Parse.parse_int(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.sleep_seconds(i64) {
+@entry
+@block_0
+  call %sleep <unnamed>
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_hour(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.parse.index.Parse.init(i64) {
+@entry
+  ret 0
+}
+
+function std.time.timezone.TimeZone.init(i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.timestamp_to_month(i64) {
+@entry
+@block_0
+  call %std.time.datetime.timestamp_to_year <unnamed>
+  call %std.time.datetime.datetime_to_timestamp <unnamed> 9 9 1 1 1
+  sub <unnamed> <unnamed>
+  cslt <unnamed> 1
+  br <unnamed> %block_14 %block_17
+@block_14
+  jmp %block_14
+  jmp %block_17
+@block_17
+  div 1 691201
+  jmp %block_22
+@block_22
+  csle 9 97
+  br <unnamed> %block_25 %block_37
+@block_25
+  jmp %block_25
+  call %std.time.datetime.get_days_in_month <unnamed> 9
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_29 %block_30
+@block_29
+  jmp %block_29
+  ret 9
+@block_30
+  sub <unnamed> <unnamed>
+  add 9 9
+  jmp %block_22
+@block_37
+  ret 97
+}
+
+function std.time.datetime.DateTime.with_minute(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_rfc2822(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_timezone(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.equals(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.less_than(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_date_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.equals(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_time_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.is_weekend(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.init(i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.is_weekday(i64) {
+@entry
+  ret 0
+}
+
+function std.parse.index.Parse.parse_bool(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.start_of_day(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.start_of_month(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.end_of_month(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.from_milliseconds(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.start_of_quarter(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.age(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.sleep_ms(i64) {
+@entry
+@block_0
+  cast <unnamed>
+  div <unnamed> 2
+  call %sleep <unnamed>
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_rt_str_format(i64, i64) {
+}
+
+function lm_list_len(i64) {
+}
+
+function lm_str_concat(i8*, i8*) {
+}
+
+function lm_error_new(i64) {
+}
+
+function substring(i64, i64, i64) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i64, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_list_new(i64) {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function sleep(i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}

@@ -1,0 +1,1413 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.url.index.__init__
+  call %std.url.url.__init__
+  call %std.url.query.__init__
+  call %std.url.builder.__init__
+  call %main
+  ret 0
+}
+
+function std.url.index.__init__() {
+@entry
+  ret 0
+}
+
+function std.url.index.parse(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.url.url.URL.init <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.url.index.QueryParams() {
+@entry
+@block_0
+  alloc 16
+  call %std.url.query.QueryParams.init <unnamed>
+  ret 0
+}
+
+function std.url.index.URL(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.url.url.URL.init <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.url.index.parse_query(i64) {
+@entry
+@block_0
+  call %std.url.query.parse <unnamed>
+  ret <unnamed>
+}
+
+function std.url.builder.URLBuilder.init(i64) {
+@entry
+  ret 0
+}
+
+function std.url.url.URL.resolve(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.query.QueryParams.set(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.encoding.percent.encode(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_list_len <unnamed>
+  jmp %block_5
+@block_5
+  cslt 1 <unnamed>
+  br <unnamed> %block_7 %block_101
+@block_7
+  jmp %block_7
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_1
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_15 %block_19
+@block_15
+  jmp %block_15
+  call %lm_box_string %str_const_2
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_96
+@block_19
+  call %lm_box_string %str_const_3
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_22 %block_28
+@block_22
+  jmp %block_22
+  call %lm_box_string %str_const_4
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_box_string %str_const_5
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_95
+@block_28
+  call %lm_box_string %str_const_6
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_31 %block_37
+@block_31
+  jmp %block_31
+  call %lm_box_string %str_const_7
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_box_string %str_const_8
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_94
+@block_37
+  call %lm_box_string %str_const_9
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_40 %block_46
+@block_40
+  jmp %block_40
+  call %lm_box_string %str_const_10
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_box_string %str_const_11
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_93
+@block_46
+  call %lm_box_string %str_const_12
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_49 %block_55
+@block_49
+  jmp %block_49
+  call %lm_box_string %str_const_13
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_box_string %str_const_14
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_92
+@block_55
+  call %lm_box_string %str_const_15
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_58 %block_62
+@block_58
+  jmp %block_58
+  call %lm_box_string %str_const_16
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_91
+@block_62
+  call %lm_box_string %str_const_17
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_65 %block_69
+@block_65
+  jmp %block_65
+  call %lm_box_string %str_const_18
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_90
+@block_69
+  call %lm_box_string %str_const_19
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_72 %block_78
+@block_72
+  jmp %block_72
+  call %lm_box_string %str_const_20
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_box_string %str_const_21
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_89
+@block_78
+  call %lm_box_string %str_const_22
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_81 %block_85
+@block_81
+  jmp %block_81
+  call %lm_box_string %str_const_23
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_88
+@block_85
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_88
+@block_88
+  jmp %block_89
+@block_89
+  jmp %block_90
+@block_90
+  jmp %block_91
+@block_91
+  jmp %block_92
+@block_92
+  jmp %block_93
+@block_93
+  jmp %block_94
+@block_94
+  jmp %block_95
+@block_95
+  jmp %block_96
+@block_96
+  add 1 9
+  jmp %block_5
+@block_101
+  ret <unnamed>
+}
+
+function std.url.url.URL.query_params(i64) {
+@entry
+  ret 0
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_24
+  call %lm_print_int <unnamed>
+  call %test_parsing
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_25
+  call %lm_assert <unnamed> <unnamed>
+  call %test_query_params
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_26
+  call %lm_assert <unnamed> <unnamed>
+  call %test_builder
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_27
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_28
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function std.url.query.build(i64) {
+@entry
+@block_0
+  call %std.url.query.QueryParams.to_string <unnamed>
+  ret <unnamed>
+}
+
+function test_builder() {
+@entry
+@block_0
+  call %lm_box_string %str_const_29
+  call %lm_print_int <unnamed>
+  call %std.url.index.URLBuilder
+  cast <unnamed>
+  call %lm_box_string %str_const_30
+  call %std.url.builder.URLBuilder.set_scheme <unnamed> <unnamed>
+  call %lm_box_string %str_const_31
+  call %std.url.builder.URLBuilder.set_host <unnamed> <unnamed>
+  call %std.url.builder.URLBuilder.set_port <unnamed> 72001
+  call %lm_box_string %str_const_32
+  call %std.url.builder.URLBuilder.set_path <unnamed> <unnamed>
+  call %lm_box_string %str_const_33
+  call %std.url.builder.URLBuilder.set_query <unnamed> <unnamed>
+  call %lm_box_string %str_const_34
+  call %std.url.builder.URLBuilder.set_fragment <unnamed> <unnamed>
+  call %std.url.builder.URLBuilder.build <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_35
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_36
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_37
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_38
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 72001
+  call %lm_box_string %str_const_39
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_40
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_41
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_42
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_43
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_44
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_45
+  call %lm_assert <unnamed> <unnamed>
+  call %std.url.url.URL.to_string <unnamed>
+  call %lm_box_string %str_const_46
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_47
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_48
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.url.builder.__init__() {
+@entry
+  ret 0
+}
+
+function std.url.url.find_last(i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  jmp %block_5
+@block_5
+  csge <unnamed> 1
+  br <unnamed> %block_8 %block_19
+@block_8
+  jmp %block_8
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_14 %block_15
+@block_14
+  jmp %block_14
+  ret <unnamed>
+@block_15
+  sub <unnamed> 9
+  jmp %block_5
+@block_19
+  neg 9
+  ret <unnamed>
+}
+
+function std.url.url.split_str(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_box_string %str_const_49
+  jmp %block_6
+@block_6
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_9 %block_32
+@block_9
+  jmp %block_9
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_15 %block_19
+@block_15
+  jmp %block_15
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_50
+  jmp %block_27
+@block_19
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_27
+@block_27
+  add 1 9
+  jmp %block_6
+@block_32
+  call %lm_list_append <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function test_query_params() {
+@entry
+@block_0
+  call %lm_box_string %str_const_51
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_52
+  call %std.url.index.parse_query <unnamed>
+  cast <unnamed>
+  call %lm_box_string %str_const_53
+  call %std.url.query.QueryParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_54
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_55
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_56
+  call %std.url.query.QueryParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_57
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_58
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_59
+  call %std.url.query.QueryParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_60
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_61
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_62
+  call %std.url.query.QueryParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_63
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_64
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_65
+  call %std.url.query.QueryParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_66
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_67
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_68
+  call %std.url.query.QueryParams.get_all <unnamed> <unnamed>
+  call %lm_list_len <unnamed>
+  ceq <unnamed> 17
+  call %lm_box_string %str_const_69
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 1
+  call %lm_box_string %str_const_70
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_71
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_list_get <unnamed> 9
+  call %lm_box_string %str_const_72
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_73
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_74
+  call %std.url.query.QueryParams.has <unnamed> <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_75
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_76
+  call %std.url.query.QueryParams.has <unnamed> <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_77
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_78
+  call %lm_box_string %str_const_79
+  call %std.url.query.QueryParams.set <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_80
+  call %std.url.query.QueryParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_81
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_82
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_83
+  call %lm_box_string %str_const_84
+  call %std.url.query.QueryParams.add <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_85
+  call %std.url.query.QueryParams.get <unnamed> <unnamed>
+  call %lm_box_string %str_const_86
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_87
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_88
+  call %std.url.query.QueryParams.remove <unnamed> <unnamed>
+  call %lm_box_string %str_const_89
+  call %std.url.query.QueryParams.has <unnamed> <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_90
+  call %lm_assert <unnamed> <unnamed>
+  call %std.url.query.QueryParams.to_string <unnamed>
+  call %lm_box_string %str_const_91
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_92
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_93
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.url.query.__init__() {
+@entry
+  ret 0
+}
+
+function std.url.url.to_lower(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_94
+  call %lm_box_string %str_const_95
+  call %lm_box_string %str_const_96
+  jmp %block_5
+@block_5
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_8 %block_35
+@block_8
+  jmp %block_8
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %std.url.url.index_of <unnamed> <unnamed>
+  neg 9
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_19 %block_27
+@block_19
+  jmp %block_19
+  add <unnamed> 9
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_30
+@block_27
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_30
+@block_30
+  add 1 9
+  jmp %block_5
+@block_35
+  ret <unnamed>
+}
+
+function std.encoding.percent.__init__() {
+@entry
+  ret 0
+}
+
+function std.url.index.URLBuilder() {
+@entry
+@block_0
+  alloc 16
+  call %std.url.builder.URLBuilder.init <unnamed>
+  ret 0
+}
+
+function std.url.query.QueryParams.add(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.index.build(i64, i64, i64, i64, i64, i64) {
+@entry
+@block_0
+  call %std.url.url.build <unnamed> <unnamed> <unnamed> <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.url.url.URL.origin(i64) {
+@entry
+  ret 0
+}
+
+function std.url.url.URL.parse(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.url.URL.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.builder.URLBuilder.set_query(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.builder.URLBuilder.set_path(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.url.URL.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.url.builder.URLBuilder.set_scheme(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.encoding.percent.decode(i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_97
+  call %lm_list_len <unnamed>
+  jmp %block_5
+@block_5
+  cslt 1 <unnamed>
+  br <unnamed> %block_7 %block_180
+@block_7
+  jmp %block_7
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_box_string %str_const_98
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_16 %block_22
+@block_16
+  jmp %block_16
+  add 1 17
+  cslt <unnamed> <unnamed>
+  jmp %block_22
+@block_22
+  br <unnamed> %block_23 %block_172
+@block_23
+  jmp %block_23
+  add 1 9
+  add 1 25
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %lm_box_string %str_const_99
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_34 %block_38
+@block_34
+  jmp %block_34
+  call %lm_box_string %str_const_100
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_167
+@block_38
+  call %lm_box_string %str_const_101
+  call %lm_box_string %str_const_102
+  call %lm_str_concat <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_43 %block_47
+@block_43
+  jmp %block_43
+  call %lm_box_string %str_const_103
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_166
+@block_47
+  call %lm_box_string %str_const_104
+  call %lm_box_string %str_const_105
+  call %lm_str_concat <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_52 %block_56
+@block_52
+  jmp %block_52
+  call %lm_box_string %str_const_106
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_165
+@block_56
+  call %lm_box_string %str_const_107
+  call %lm_box_string %str_const_108
+  call %lm_str_concat <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_61 %block_65
+@block_61
+  jmp %block_61
+  call %lm_box_string %str_const_109
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_164
+@block_65
+  call %lm_box_string %str_const_110
+  call %lm_box_string %str_const_111
+  call %lm_str_concat <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_70 %block_74
+@block_70
+  jmp %block_70
+  call %lm_box_string %str_const_112
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_163
+@block_74
+  call %lm_box_string %str_const_113
+  call %lm_box_string %str_const_114
+  call %lm_str_concat <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_79 %block_83
+@block_79
+  jmp %block_79
+  call %lm_box_string %str_const_115
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_162
+@block_83
+  call %lm_box_string %str_const_116
+  call %lm_box_string %str_const_117
+  call %lm_str_concat <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_88 %block_92
+@block_88
+  jmp %block_88
+  call %lm_box_string %str_const_118
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_161
+@block_92
+  call %lm_box_string %str_const_119
+  call %lm_box_string %str_const_120
+  call %lm_str_concat <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_97 %block_101
+@block_97
+  jmp %block_97
+  call %lm_box_string %str_const_121
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_160
+@block_101
+  call %lm_box_string %str_const_122
+  call %lm_box_string %str_const_123
+  call %lm_str_concat <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_106 %block_110
+@block_106
+  jmp %block_106
+  call %lm_box_string %str_const_124
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_159
+@block_110
+  call %lm_box_string %str_const_125
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_113 %block_117
+@block_113
+  jmp %block_113
+  call %lm_box_string %str_const_126
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_158
+@block_117
+  call %lm_box_string %str_const_127
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_120 %block_124
+@block_120
+  jmp %block_120
+  call %lm_box_string %str_const_128
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_157
+@block_124
+  call %lm_box_string %str_const_129
+  call %lm_box_string %str_const_130
+  call %lm_str_concat <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_129 %block_133
+@block_129
+  jmp %block_129
+  call %lm_box_string %str_const_131
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_156
+@block_133
+  call %lm_box_string %str_const_132
+  call %lm_box_string %str_const_133
+  call %lm_str_concat <unnamed> <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_138 %block_142
+@block_138
+  jmp %block_138
+  call %lm_box_string %str_const_134
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_155
+@block_142
+  call %lm_box_string %str_const_135
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_145 %block_149
+@block_145
+  jmp %block_145
+  call %lm_box_string %str_const_136
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_154
+@block_149
+  call %lm_box_string %str_const_137
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_154
+@block_154
+  jmp %block_155
+@block_155
+  jmp %block_156
+@block_156
+  jmp %block_157
+@block_157
+  jmp %block_158
+@block_158
+  jmp %block_159
+@block_159
+  jmp %block_160
+@block_160
+  jmp %block_161
+@block_161
+  jmp %block_162
+@block_162
+  jmp %block_163
+@block_163
+  jmp %block_164
+@block_164
+  jmp %block_165
+@block_165
+  jmp %block_166
+@block_166
+  jmp %block_167
+@block_167
+  add 1 25
+  jmp %block_179
+@block_172
+  call %lm_str_concat <unnamed> <unnamed>
+  add <unnamed> 9
+  jmp %block_179
+@block_179
+  jmp %block_5
+@block_180
+  ret <unnamed>
+}
+
+function std.url.url.build(i64, i64, i64, i64, i64, i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_138
+  alloc 16
+  call %std.url.url.URL.init <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_139
+  cne <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.url.query.split_str(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_box_string %str_const_140
+  jmp %block_6
+@block_6
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_9 %block_32
+@block_9
+  jmp %block_9
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_15 %block_19
+@block_15
+  jmp %block_15
+  call %lm_list_append <unnamed> <unnamed>
+  call %lm_box_string %str_const_141
+  jmp %block_27
+@block_19
+  add 1 9
+  call %substring <unnamed> 1 <unnamed>
+  call %lm_to_string <unnamed>
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_27
+@block_27
+  add 1 9
+  jmp %block_6
+@block_32
+  call %lm_list_append <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.url.url.normalize_path(i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_box_string %str_const_142
+  call %std.url.url.split_str <unnamed> <unnamed>
+  jmp %block_8
+@block_8
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_11 %block_58
+@block_11
+  jmp %block_11
+  call %lm_list_get <unnamed> 1
+  call %lm_box_string %str_const_143
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_21 %block_17
+@block_17
+  jmp %block_17
+  call %lm_box_string %str_const_144
+  ceq <unnamed> <unnamed>
+  jmp %block_21
+@block_21
+  br <unnamed> %block_22 %block_23
+@block_22
+  jmp %block_22
+  jmp %block_53
+@block_23
+  call %lm_box_string %str_const_145
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_26 %block_50
+@block_26
+  jmp %block_26
+  call %lm_list_len <unnamed>
+  csgt <unnamed> 1
+  br <unnamed> %block_30 %block_49
+@block_30
+  jmp %block_30
+  call %lm_list_new 0
+  jmp %block_35
+@block_35
+  call %lm_list_len <unnamed>
+  sub <unnamed> 9
+  cslt 1 <unnamed>
+  br <unnamed> %block_40 %block_47
+@block_40
+  jmp %block_40
+  call %lm_list_get <unnamed> 1
+  call %lm_list_append <unnamed> <unnamed>
+  add 1 9
+  jmp %block_35
+@block_47
+  jmp %block_49
+@block_49
+  jmp %block_52
+@block_50
+  call %lm_list_append <unnamed> <unnamed>
+  jmp %block_52
+@block_52
+  jmp %block_53
+@block_53
+  add 1 9
+  jmp %block_8
+@block_58
+  call %lm_box_string %str_const_146
+  call %lm_list_len <unnamed>
+  csgt <unnamed> 1
+  br <unnamed> %block_64 %block_71
+@block_64
+  jmp %block_64
+  call %substring <unnamed> 1 9
+  call %lm_box_string %str_const_147
+  ceq <unnamed> <unnamed>
+  jmp %block_71
+@block_71
+  br <unnamed> %block_72 %block_75
+@block_72
+  jmp %block_72
+  call %lm_box_string %str_const_148
+  jmp %block_75
+@block_75
+  jmp %block_77
+@block_77
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_80 %block_95
+@block_80
+  jmp %block_80
+  csgt 1 1
+  br <unnamed> %block_83 %block_87
+@block_83
+  jmp %block_83
+  call %lm_box_string %str_const_149
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_87
+@block_87
+  call %lm_list_get <unnamed> 1
+  call %lm_str_concat <unnamed> <unnamed>
+  add 1 9
+  jmp %block_77
+@block_95
+  ret <unnamed>
+}
+
+function std.url.query.QueryParams.has(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.url.index_of(i64, i64) {
+@entry
+@block_0
+  jmp %block_2
+@block_2
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  sub <unnamed> <unnamed>
+  csle 1 <unnamed>
+  br <unnamed> %block_7 %block_19
+@block_7
+  jmp %block_7
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  add 1 <unnamed>
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_14
+@block_13
+  jmp %block_13
+  ret 1
+@block_14
+  add 1 9
+  jmp %block_2
+@block_19
+  neg 9
+  ret <unnamed>
+}
+
+function std.url.url.substring(i64, i64, i64) {
+@entry
+@block_0
+  call %lm_list_len <unnamed>
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_5 %block_7
+@block_5
+  jmp %block_5
+  jmp %block_7
+@block_7
+  cslt <unnamed> 1
+  br <unnamed> %block_10 %block_12
+@block_10
+  jmp %block_10
+  call %lm_box_string %str_const_150
+  ret <unnamed>
+@block_12
+  csge <unnamed> <unnamed>
+  br <unnamed> %block_14 %block_16
+@block_14
+  jmp %block_14
+  call %lm_box_string %str_const_151
+  ret <unnamed>
+@block_16
+  call %substring <unnamed> <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.url.url.__init__() {
+@entry
+  ret 0
+}
+
+function std.url.query.QueryParams.get_all(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.query.QueryParams.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.url.query.QueryParams.remove(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.query.QueryParams.init(i64) {
+@entry
+  ret 0
+}
+
+function std.url.query.parse(i64) {
+@entry
+@block_0
+  alloc 16
+  call %std.url.query.QueryParams.init <unnamed>
+  call %lm_box_string %str_const_152
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_6 %block_7
+@block_6
+  jmp %block_6
+  ret <unnamed>
+@block_7
+  call %lm_box_string %str_const_153
+  call %std.url.query.split_str <unnamed> <unnamed>
+  jmp %block_12
+@block_12
+  call %lm_list_len <unnamed>
+  cslt 1 <unnamed>
+  br <unnamed> %block_15 %block_50
+@block_15
+  jmp %block_15
+  call %lm_list_get <unnamed> 1
+  call %lm_box_string %str_const_154
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_20 %block_45
+@block_20
+  jmp %block_20
+  call %lm_box_string %str_const_155
+  call %std.url.query.index_of <unnamed> <unnamed>
+  neg 9
+  cne <unnamed> <unnamed>
+  br <unnamed> %block_27 %block_40
+@block_27
+  jmp %block_27
+  call %substring <unnamed> 1 <unnamed>
+  call %std.encoding.percent.decode <unnamed>
+  add <unnamed> 9
+  call %lm_list_len <unnamed>
+  call %substring <unnamed> <unnamed> <unnamed>
+  call %std.encoding.percent.decode <unnamed>
+  call %std.url.query.QueryParams.add <unnamed> <unnamed> <unnamed>
+  jmp %block_44
+@block_40
+  call %std.encoding.percent.decode <unnamed>
+  call %lm_box_string %str_const_156
+  call %std.url.query.QueryParams.add <unnamed> <unnamed> <unnamed>
+  jmp %block_44
+@block_44
+  jmp %block_45
+@block_45
+  add 1 9
+  jmp %block_12
+@block_50
+  ret <unnamed>
+}
+
+function std.url.builder.URLBuilder.set_password(i64, i64) {
+@entry
+  ret 0
+}
+
+function test_parsing() {
+@entry
+@block_0
+  call %lm_box_string %str_const_157
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_158
+  call %std.url.index.URL <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_159
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_160
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_161
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_162
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 641
+  call %lm_box_string %str_const_163
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_164
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_165
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_166
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_167
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_168
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_169
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 18
+  call %lm_box_string %str_const_170
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_171
+  call %std.url.index.URL <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_172
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_173
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_174
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_175
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 67545
+  call %lm_box_string %str_const_176
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_177
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_178
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_179
+  call %std.url.index.URL <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_180
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_181
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_182
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_183
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_184
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_185
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_186
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_187
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_188
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_189
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_190
+  call %std.url.index.URL <unnamed>
+  cast <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_191
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_192
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_193
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_194
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 64641
+  call %lm_box_string %str_const_195
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_196
+  call %std.url.url.URL.resolve <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_197
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_198
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_199
+  call %lm_rt_str_format <unnamed> <unnamed>
+  call %lm_print_int <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_200
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_201
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_202
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_203
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_204
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_205
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_206
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_207
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_208
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_209
+  call %lm_assert <unnamed> <unnamed>
+  call %std.url.url.URL.origin <unnamed>
+  call %lm_box_string %str_const_210
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_211
+  call %lm_assert <unnamed> <unnamed>
+  call %std.url.url.URL.origin <unnamed>
+  call %lm_box_string %str_const_212
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_213
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_214
+  call %lm_print_int <unnamed>
+  ret 9
+}
+
+function std.url.builder.URLBuilder.set_host(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.builder.URLBuilder.set_port(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.query.QueryParams.get(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.builder.URLBuilder.set_fragment(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.query.index_of(i64, i64) {
+@entry
+@block_0
+  jmp %block_2
+@block_2
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  sub <unnamed> <unnamed>
+  csle 1 <unnamed>
+  br <unnamed> %block_7 %block_19
+@block_7
+  jmp %block_7
+  call %lm_list_len <unnamed>
+  call %lm_list_len <unnamed>
+  add 1 <unnamed>
+  call %substring <unnamed> 1 <unnamed>
+  ceq <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_14
+@block_13
+  jmp %block_13
+  ret 1
+@block_14
+  add 1 9
+  jmp %block_2
+@block_19
+  neg 9
+  ret <unnamed>
+}
+
+function std.url.builder.URLBuilder.set_username(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.url.builder.URLBuilder.build(i64) {
+@entry
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_list_len(i64) {
+}
+
+function substring(i64, i64, i64) {
+}
+
+function lm_str_concat(i8*, i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_list_new(i64) {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_to_string(i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_rt_str_format(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}

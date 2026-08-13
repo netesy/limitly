@@ -1,0 +1,938 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %std.time.duration.__init__
+  call %std.time.timezone.__init__
+  call %std.time.datetime.__init__
+  call %std.time.instant.__init__
+  call %std.time.timer.__init__
+  call %main
+  ret 0
+}
+
+function std.time.duration.TimeDuration.human_readable(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.total_seconds(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.to_microseconds(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.to_seconds(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.subtract(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.add(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.from_microseconds(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.from_milliseconds(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.from_seconds(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.pad_int(i64, i64) {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_rt_str_format <unnamed> <unnamed>
+  jmp %block_4
+@block_4
+  call %lm_list_len <unnamed>
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_7 %block_11
+@block_7
+  jmp %block_7
+  call %lm_box_string %str_const_1
+  call %lm_str_concat <unnamed> <unnamed>
+  jmp %block_4
+@block_11
+  ret <unnamed>
+}
+
+function std.time.instant.__init__() {
+@entry
+  ret 0
+}
+
+function std.time.instant.Instant.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.instant.Instant.now(i64) {
+@entry
+  ret 0
+}
+
+function std.time.timer.Timer.elapsed(i64) {
+@entry
+  ret 0
+}
+
+function std.time.timer.Timer.reset(i64) {
+@entry
+  ret 0
+}
+
+function std.time.timezone.__init__() {
+@entry
+  ret 0
+}
+
+function std.time.timezone.TimeZone.init(i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.timezone.TimeZone.to_seconds_offset(i64) {
+@entry
+  ret 0
+}
+
+function std.time.timezone.TimeZone.from_offset(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.timezone.TimeZone.utc(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.sleep_ms(i64) {
+@entry
+@block_0
+  cast <unnamed>
+  div <unnamed> 2
+  call %sleep <unnamed>
+  ret 0
+}
+
+function std.time.datetime.DateTime.age(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.start_of_quarter(i64) {
+@entry
+  ret 0
+}
+
+function std.time.timezone.TimeZone.offset_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.end_of_year(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.equals(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.end_of_month(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.start_of_month(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.start_of_day(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.is_weekday(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.init(i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.is_weekend(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_time_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.instant.Instant.elapsed(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_date_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_iso_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.is_between(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_rfc2822(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.timestamp_to_month(i64) {
+@entry
+@block_0
+  call %std.time.datetime.timestamp_to_year <unnamed>
+  call %std.time.datetime.datetime_to_timestamp <unnamed> 9 9 1 1 1
+  sub <unnamed> <unnamed>
+  cslt <unnamed> 1
+  br <unnamed> %block_14 %block_17
+@block_14
+  jmp %block_14
+  jmp %block_17
+@block_17
+  div 1 691201
+  jmp %block_22
+@block_22
+  csle 9 97
+  br <unnamed> %block_25 %block_37
+@block_25
+  jmp %block_25
+  call %std.time.datetime.get_days_in_month <unnamed> 9
+  cslt <unnamed> <unnamed>
+  br <unnamed> %block_29 %block_30
+@block_29
+  jmp %block_29
+  ret 9
+@block_30
+  sub <unnamed> <unnamed>
+  add 9 9
+  jmp %block_22
+@block_37
+  ret 97
+}
+
+function std.time.datetime.get_days_in_year(i64) {
+@entry
+@block_0
+  call %std.time.datetime.is_leap_year <unnamed>
+  cne <unnamed> 1
+  br <unnamed> %block_4 %block_6
+@block_4
+  jmp %block_4
+  ret 2929
+@block_6
+  ret 2921
+}
+
+function std.time.datetime.DateTime.end_of_day(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.to_i(i64) {
+@entry
+@block_0
+  cast <unnamed>
+  ret <unnamed>
+}
+
+function std.time.datetime.timestamp_to_day(i64) {
+@entry
+@block_0
+  call %std.time.datetime.timestamp_to_year <unnamed>
+  call %std.time.datetime.timestamp_to_month <unnamed>
+  call %std.time.datetime.datetime_to_timestamp <unnamed> <unnamed> 9 1 1 1
+  sub <unnamed> <unnamed>
+  cslt <unnamed> 1
+  br <unnamed> %block_15 %block_18
+@block_15
+  jmp %block_15
+  jmp %block_18
+@block_18
+  div 1 691201
+  div 1 691201
+  add <unnamed> 9
+  ret <unnamed>
+}
+
+function std.time.datetime.timestamp_to_year(i64) {
+@entry
+@block_0
+  csge <unnamed> 1
+  br <unnamed> %block_3 %block_22
+@block_3
+  jmp %block_3
+  cast 691201
+  div <unnamed> <unnamed>
+  jmp %block_10
+@block_10
+  call %std.time.datetime.get_days_in_year 15761
+  csge <unnamed> <unnamed>
+  br <unnamed> %block_13 %block_21
+@block_13
+  jmp %block_13
+  call %std.time.datetime.get_days_in_year 15761
+  sub <unnamed> <unnamed>
+  add 15761 9
+  jmp %block_10
+@block_21
+  ret <unnamed>
+@block_22
+  neg <unnamed>
+  cast 691201
+  div <unnamed> <unnamed>
+  neg <unnamed>
+  rem <unnamed> 691201
+  cne <unnamed> 1
+  br <unnamed> %block_33 %block_38
+@block_33
+  jmp %block_33
+  add <unnamed> 9
+  jmp %block_38
+@block_38
+  jmp %block_41
+@block_41
+  sub 15761 9
+  call %std.time.datetime.get_days_in_year <unnamed>
+  csge <unnamed> <unnamed>
+  br <unnamed> %block_46 %block_53
+@block_46
+  jmp %block_46
+  sub 15761 9
+  call %std.time.datetime.get_days_in_year <unnamed>
+  sub <unnamed> <unnamed>
+  jmp %block_41
+@block_53
+  sub <unnamed> 9
+  ret <unnamed>
+}
+
+function test_instant_and_timer() {
+@entry
+@block_0
+  call %lm_box_string %str_const_2
+  call %lm_print_int <unnamed>
+  alloc 16
+  call %std.time.instant.Instant.init <unnamed> 2
+  call %std.time.instant.Instant.elapsed <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  csge <unnamed> 1
+  call %lm_box_string %str_const_3
+  call %lm_assert <unnamed> <unnamed>
+  alloc 16
+  call %std.time.timer.Timer.init <unnamed>
+  call %std.time.timer.Timer.reset <unnamed>
+  call %std.time.timer.Timer.elapsed <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  csge <unnamed> 1
+  call %lm_box_string %str_const_4
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function main() {
+@entry
+@block_0
+  call %lm_box_string %str_const_5
+  call %lm_print_int <unnamed>
+  call %test_duration
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_6
+  call %lm_assert <unnamed> <unnamed>
+  call %test_timezone
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_7
+  call %lm_assert <unnamed> <unnamed>
+  call %test_time
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_8
+  call %lm_assert <unnamed> <unnamed>
+  call %test_instant_and_timer
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_9
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_10
+  call %lm_print_int <unnamed>
+  ret 1
+}
+
+function std.time.duration.TimeDuration.from_hours(i64, i64) {
+@entry
+  ret 0
+}
+
+function test_duration() {
+@entry
+@block_0
+  call %lm_box_string %str_const_11
+  call %lm_print_int <unnamed>
+  alloc 16
+  call %std.time.duration.TimeDuration.init <unnamed> 81 1
+  alloc 16
+  call %std.time.duration.TimeDuration.init <unnamed> 161 1
+  call %std.time.duration.TimeDuration.add <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 241
+  call %lm_box_string %str_const_12
+  call %lm_assert <unnamed> <unnamed>
+  call %std.time.duration.TimeDuration.from_seconds 0 41
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 41
+  call %lm_box_string %str_const_13
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.time.datetime.DateTime.start_of_year(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_timezone(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_string(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.from_timestamp(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.start_of_week(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.hour(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.to_milliseconds(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.greater_than(i64, i64) {
+@entry
+  ret 0
+}
+
+function test_time() {
+@entry
+@block_0
+  call %lm_box_string %str_const_14
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_15
+  alloc 16
+  call %std.time.timezone.TimeZone.init <unnamed> <unnamed> 1 1
+  alloc 16
+  call %std.time.datetime.DateTime.init <unnamed> 8000001 1 <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 8000001
+  call %lm_box_string %str_const_16
+  call %lm_assert <unnamed> <unnamed>
+  call %std.time.datetime.DateTime.year <unnamed>
+  ceq <unnamed> 15761
+  call %lm_box_string %str_const_17
+  call %lm_assert <unnamed> <unnamed>
+  call %std.time.datetime.DateTime.month <unnamed>
+  ceq <unnamed> 9
+  call %lm_box_string %str_const_18
+  call %lm_assert <unnamed> <unnamed>
+  call %std.time.datetime.DateTime.day <unnamed>
+  ceq <unnamed> 97
+  call %lm_box_string %str_const_19
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.time.timer.__init__() {
+@entry
+  ret 0
+}
+
+function std.time.datetime.datetime_to_timestamp(i64, i64, i64, i64, i64, i64) {
+@entry
+@block_0
+  jmp %block_3
+@block_3
+  cslt 15761 <unnamed>
+  br <unnamed> %block_5 %block_14
+@block_5
+  jmp %block_5
+  call %std.time.datetime.get_days_in_year 15761
+  call %std.time.datetime.get_days_in_year 15761
+  add 1 <unnamed>
+  add 15761 9
+  jmp %block_3
+@block_14
+  jmp %block_15
+@block_15
+  csgt <unnamed> <unnamed>
+  br <unnamed> %block_17 %block_24
+@block_17
+  jmp %block_17
+  sub <unnamed> 9
+  call %std.time.datetime.get_days_in_year <unnamed>
+  sub <unnamed> <unnamed>
+  jmp %block_15
+@block_24
+  jmp %block_26
+@block_26
+  cslt 9 <unnamed>
+  br <unnamed> %block_28 %block_37
+@block_28
+  jmp %block_28
+  call %std.time.datetime.get_days_in_month <unnamed> 9
+  call %std.time.datetime.get_days_in_month <unnamed> 9
+  add <unnamed> <unnamed>
+  add 9 9
+  jmp %block_26
+@block_37
+  sub <unnamed> 9
+  sub <unnamed> 9
+  add <unnamed> <unnamed>
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  add <unnamed> <unnamed>
+  mul <unnamed> 481
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  add <unnamed> <unnamed>
+  mul <unnamed> 481
+  add <unnamed> <unnamed>
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  add <unnamed> <unnamed>
+  mul <unnamed> 481
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  mul <unnamed> 691201
+  mul <unnamed> 28801
+  add <unnamed> <unnamed>
+  mul <unnamed> 481
+  add <unnamed> <unnamed>
+  add <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.time.datetime.DateTime.subtract(i64, i64) {
+@entry
+  ret 0
+}
+
+function test_timezone() {
+@entry
+@block_0
+  call %lm_box_string %str_const_20
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_21
+  alloc 16
+  call %std.time.timezone.TimeZone.init <unnamed> <unnamed> 1 1
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_box_string %str_const_22
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_23
+  call %lm_assert <unnamed> <unnamed>
+  call %std.time.timezone.TimeZone.offset_string <unnamed>
+  call %lm_box_string %str_const_24
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_25
+  call %lm_assert <unnamed> <unnamed>
+  ret 9
+}
+
+function std.time.datetime.DateTime.from_string(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.year(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.sleep_seconds(i64) {
+@entry
+@block_0
+  call %sleep <unnamed>
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_day(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.week_of_year(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.from_components(i64, i64, i64, i64, i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.from_days(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.day_of_year(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.difference(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.month(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.is_leap_year(i64) {
+@entry
+@block_0
+  rem <unnamed> 33
+  cne <unnamed> 1
+  br <unnamed> %block_5 %block_7
+@block_5
+  jmp %block_5
+  ret 10
+@block_7
+  rem <unnamed> 801
+  cne <unnamed> 1
+  br <unnamed> %block_12 %block_14
+@block_12
+  jmp %block_12
+  ret 18
+@block_14
+  rem <unnamed> 3201
+  cne <unnamed> 1
+  br <unnamed> %block_19 %block_21
+@block_19
+  jmp %block_19
+  ret 10
+@block_21
+  ret 18
+}
+
+function std.time.datetime.DateTime.add(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.second(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.__init__() {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.day(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.now(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_timezone(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.from_minutes(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.minute(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.get_days_in_month(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 225
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 241
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 241
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 241
+  call %lm_list_append <unnamed> 249
+  call %lm_list_append <unnamed> 241
+  call %lm_list_append <unnamed> 249
+  ceq <unnamed> 17
+  br <unnamed> %block_30 %block_33
+@block_30
+  jmp %block_30
+  call %std.time.datetime.is_leap_year <unnamed>
+  jmp %block_33
+@block_33
+  br <unnamed> %block_34 %block_36
+@block_34
+  jmp %block_34
+  ret 233
+@block_36
+  sub <unnamed> 9
+  call %lm_list_get <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function std.time.datetime.DateTime.day_of_week(i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.multiply(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_second(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.duration.__init__() {
+@entry
+  ret 0
+}
+
+function std.time.duration.TimeDuration.less_than(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.is_leap_year(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.sleep_duration(i64) {
+@entry
+@block_0
+  call %std.time.duration.TimeDuration.to_milliseconds <unnamed>
+  call %std.time.datetime.sleep_ms <unnamed>
+  ret 0
+}
+
+function std.time.datetime.DateTime.days_in_month(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.to_iso8601(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.format(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_year(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.greater_than(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.quarter(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_month(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.timer.Timer.init(i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_hour(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.with_minute(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.equals(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.time.datetime.DateTime.less_than(i64, i64) {
+@entry
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_rt_str_format(i64, i64) {
+}
+
+function lm_list_len(i64) {
+}
+
+function lm_str_concat(i8*, i8*) {
+}
+
+function sleep(i64) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
+
+function lm_list_new(i64) {
+}
+
+function lm_list_append(i64, i64) {
+}
+
+function lm_list_get(i64, i64) {
+}
+
+function lm_list_set(i64, i64, i64) {
+}

@@ -1,0 +1,221 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  call %lm_box_string %str_const_0
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_1
+  call %lm_print_int <unnamed>
+  call %tests.modules.math_module.__init__
+  call %lm_box_string %str_const_2
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_3
+  call %lm_to_string 0
+  call %lm_str_concat <unnamed> <unnamed>
+  call %lm_print_str <unnamed>
+  ceq 0 2
+  call %lm_box_string %str_const_4
+  call %lm_assert <unnamed> <unnamed>
+  call %lm_box_string %str_const_5
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_6
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_7
+  call %lm_print_int <unnamed>
+  call %lm_box_string %str_const_8
+  call %lm_print_int <unnamed>
+  ret 0
+}
+
+function tests.modules.math_module.is_prime(i64) {
+@entry
+@block_0
+  csle <unnamed> 9
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  ret 10
+@block_5
+  ceq <unnamed> 17
+  br <unnamed> %block_8 %block_10
+@block_8
+  jmp %block_8
+  ret 18
+@block_10
+  call %tests.modules.math_module.is_even <unnamed>
+  cne <unnamed> 1
+  br <unnamed> %block_14 %block_16
+@block_14
+  jmp %block_14
+  ret 10
+@block_16
+  jmp %block_18
+@block_18
+  mul 25 25
+  csle <unnamed> <unnamed>
+  br <unnamed> %block_21 %block_30
+@block_21
+  jmp %block_21
+  rem <unnamed> 25
+  ceq <unnamed> 1
+  br <unnamed> %block_25 %block_27
+@block_25
+  jmp %block_25
+  ret 10
+@block_27
+  add 25 17
+  jmp %block_18
+@block_30
+  ret 18
+}
+
+function tests.modules.math_module.is_odd(i64) {
+@entry
+@block_0
+  call %tests.modules.math_module.is_even <unnamed>
+  cne <unnamed> 18
+  ret <unnamed>
+}
+
+function tests.modules.math_module.is_even(i64) {
+@entry
+@block_0
+  rem <unnamed> 17
+  ceq <unnamed> 1
+  ret <unnamed>
+}
+
+function tests.modules.math_module.subtract(i64, i64) {
+@entry
+@block_0
+  sub <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function tests.modules.math_module.factorial(i64) {
+@entry
+@block_0
+  csle <unnamed> 9
+  br <unnamed> %block_3 %block_5
+@block_3
+  jmp %block_3
+  ret 9
+@block_5
+  sub <unnamed> 9
+  call %tests.modules.math_module.factorial <unnamed>
+  mul <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function tests.modules.math_module.cube(i64) {
+@entry
+@block_0
+  mul <unnamed> <unnamed>
+  mul <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function tests.modules.math_module.multiply(i64, i64) {
+@entry
+@block_0
+  mul <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function tests.modules.math_module.add(i64, i64) {
+@entry
+@block_0
+  add <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function tests.modules.math_module.__init__() {
+@entry
+  ret 0
+}
+
+function tests.modules.math_module.square(i64) {
+@entry
+@block_0
+  mul <unnamed> <unnamed>
+  ret <unnamed>
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(i64) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_to_string(i64) {
+}
+
+function lm_str_concat(i8*, i8*) {
+}
+
+function lm_print_str(i8*) {
+@entry
+  alloc 8
+  store 0 <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  add <unnamed> <unnamed>
+  loadub <unnamed>
+  ceq <unnamed> 0
+  add <unnamed> 1
+  store <unnamed> <unnamed>
+  br <unnamed> %done %loop
+@done
+  load <unnamed>
+  sub <unnamed> 1
+  extern io.write(i64 1, i8* <unnamed>, i32 <unnamed>)
+  extern io.write(i64 1, i8* %nl, i64 1)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}

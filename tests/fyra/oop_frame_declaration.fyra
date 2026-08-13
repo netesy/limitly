@@ -1,0 +1,175 @@
+function __top_level_wrapper__() {
+@entry
+@block_0
+  alloc 16
+  call %lm_box_string %str_const_0
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_1
+  add <unnamed> 0
+  store 241 <unnamed>
+  call %Person.greet <unnamed>
+  call %lm_print_int <unnamed>
+  alloc 16
+  call %Point.init <unnamed> 81 161
+  call %Point.distance <unnamed>
+  call %lm_print_int <unnamed>
+  alloc 16
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  add <unnamed> 0
+  store <unnamed> <unnamed>
+  call %lm_box_string %str_const_2
+  add <unnamed> 0
+  store 241 <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_print_int <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  call %lm_print_int <unnamed>
+  alloc 16
+  call %Calculator.add <unnamed> 41 25
+  call %lm_print_int <unnamed>
+  alloc 16
+  call %Resource.init <unnamed> 985
+  call %Person.greet <unnamed>
+  call %lm_box_string %str_const_3
+  ceq <unnamed> <unnamed>
+  call %lm_box_string %str_const_4
+  call %lm_assert <unnamed> <unnamed>
+  call %Point.distance <unnamed>
+  ceq <unnamed> 241
+  call %lm_box_string %str_const_5
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 10
+  call %lm_box_string %str_const_6
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 241
+  call %lm_box_string %str_const_7
+  call %lm_assert <unnamed> <unnamed>
+  call %Calculator.add <unnamed> 41 25
+  ceq <unnamed> 65
+  call %lm_box_string %str_const_8
+  call %lm_assert <unnamed> <unnamed>
+  add <unnamed> 0
+  load <unnamed>
+  ceq <unnamed> 985
+  call %lm_box_string %str_const_9
+  call %lm_assert <unnamed> <unnamed>
+  ret 0
+}
+
+function Calculator.subtract(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function Resource.deinit(i64) {
+@entry
+  ret 0
+}
+
+function Point.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function Person.greet(i64) {
+@entry
+  ret 0
+}
+
+function Calculator.add(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function BankAccount.deposit(i64, i64) {
+@entry
+  ret 0
+}
+
+function Resource.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function Calculator.multiply(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function Person.birthday(i64) {
+@entry
+  ret 0
+}
+
+function BankAccount.calculateInterest(i64) {
+@entry
+  ret 0
+}
+
+function Point.distance(i64) {
+@entry
+  ret 0
+}
+
+function lm_box_string(i8*) {
+}
+
+function lm_print_int(void) {
+@entry
+  alloc 32
+  add <unnamed> 31
+  storeb 10 <unnamed>
+  alloc 8
+  alloc 8
+  store <unnamed> <unnamed>
+  cslt <unnamed> 0
+  br <unnamed> %neg %abs
+@neg
+  extern io.write(i64 1, i8* %str_minus, i64 1)
+  neg <unnamed>
+  store <unnamed> <unnamed>
+  jmp %loop
+@abs
+  store <unnamed> <unnamed>
+  jmp %loop
+@loop
+  load <unnamed>
+  div <unnamed> 10
+  rem <unnamed> 10
+  add <unnamed> 48
+  load <unnamed>
+  sub <unnamed> 1
+  cast <unnamed>
+  storeb <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  store <unnamed> <unnamed>
+  cuge <unnamed> 1
+  br <unnamed> %loop %done
+@done
+  load <unnamed>
+  add <unnamed> 32
+  sub <unnamed> <unnamed>
+  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  ret null
+}
+
+function lm_assert(i32, i64) {
+@entry
+  br <unnamed> %pass %fail
+@fail
+  extern io.write(i64 1, i8* %assert_fail, i64 17)
+  extern process.exit(i64 1)
+  ret null
+@pass
+  ret null
+}
