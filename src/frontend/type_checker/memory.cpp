@@ -173,11 +173,11 @@ void TypeChecker::exit_memory_region() {
     }
     
     // Drop all variables in the exited region
-    for (auto it = variable_memory_info.begin(); it != variable_memory_info.end();) {
-        if (it->second.region_id == region_to_clean && it->second.memory_state != "dropped") {
-            it = variable_memory_info.erase(it);
+    for (auto i = variable_memory_info.begin(); i != variable_memory_info.end();) {
+        if (i->second.region_id == region_to_clean && i->second.memory_state != "dropped") {
+            i = variable_memory_info.erase(i);
         } else {
-            ++it;
+            ++i;
         }
     }
 }

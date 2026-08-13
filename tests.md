@@ -14,8 +14,8 @@ This document lists the status, timing, and outcomes of all tests in both the ma
 
 ### 2. Negative Test Suite
 *   **Total Tests Executed:** 78
-*   **Passed (Rejected Correctly):** 67 (85.9%)
-*   **Failed (Incorrectly Compiled):** 11 (14.1%)
+*   **Passed (Rejected Correctly):** 78 (100.0%)
+*   **Failed (Incorrectly Compiled):** 0 (0.0%)
 *   **Hanging/Timeout:** 0 (0.0%)
 
 ---
@@ -93,42 +93,42 @@ All canonical positive and standard library tests compile and run flawlessly wit
 *   `tests/stdlib/core_module_test.lm` (0.13s)
 
 ### 11. Stdlib Collections (7/7 Passing)
-*   `tests/stdlib/collections/list_test.lm` (0.07s)
-*   `tests/stdlib/collections/vector_test.lm` (0.80s) - **SLOW**
-*   `tests/stdlib/collections/queue_stack_test.lm` (0.42s)
-*   `tests/stdlib/collections/queue_stack_bitset_test.lm` (0.82s) - **SLOW**
+*   `tests/stdlib/collections/list_test.lm` (0.06s)
+*   `tests/stdlib/collections/vector_test.lm` (0.78s) - **SLOW**
+*   `tests/stdlib/collections/queue_stack_test.lm` (0.40s)
+*   `tests/stdlib/collections/queue_stack_bitset_test.lm` (0.79s) - **SLOW**
 *   `tests/stdlib/collections/arraylist_test.lm` (0.76s) - **SLOW**
-*   `tests/stdlib/collections/priority_queue_test.lm` (0.81s) - **SLOW**
-*   `tests/stdlib/collections_module_test.lm` (0.97s) - **SLOW**
+*   `tests/stdlib/collections/priority_queue_test.lm` (0.76s) - **SLOW**
+*   `tests/stdlib/collections_module_test.lm` (0.93s) - **SLOW**
 
 ### 12. Stdlib Math & Algorithms (7/7 Passing)
-*   `tests/stdlib/algorithm_module_test.lm` (0.46s)
-*   `tests/stdlib/iterator/iterator_test.lm` (0.13s)
-*   `tests/stdlib/iterator_module_test.lm` (0.20s)
-*   `tests/stdlib/math_module_test.lm` (0.85s) - **SLOW**
-*   `tests/stdlib/string_module_test.lm` (0.23s)
-*   `tests/stdlib/unicode_module_test.lm` (0.14s)
-*   `tests/stdlib/regex_module_test.lm` (0.22s)
+*   `tests/stdlib/algorithm_module_test.lm` (0.44s)
+*   `tests/stdlib/iterator/iterator_test.lm` (0.12s)
+*   `tests/stdlib/iterator_module_test.lm` (0.19s)
+*   `tests/stdlib/math_module_test.lm` (0.81s) - **SLOW**
+*   `tests/stdlib/string_module_test.lm` (0.21s)
+*   `tests/stdlib/unicode_module_test.lm` (0.13s)
+*   `tests/stdlib/regex_module_test.lm` (0.21s)
 
 ### 13. Stdlib Utility Modules (10/10 Passing)
 *   `tests/stdlib/env_module_test.lm` (0.04s)
 *   `tests/stdlib/process_module_test.lm` (0.05s)
 *   `tests/stdlib/time_module_test.lm` (0.32s)
 *   `tests/stdlib/random_module_test.lm` (0.26s)
-*   `tests/stdlib/parse_module_test.lm` (0.46s)
-*   `tests/stdlib/format_module_test.lm` (0.39s)
-*   `tests/stdlib/search/search_test.lm` (0.06s)
+*   `tests/stdlib/parse_module_test.lm` (0.47s)
+*   `tests/stdlib/format_module_test.lm` (0.38s)
+*   `tests/stdlib/search/search_test.lm` (0.05s)
 *   `tests/stdlib/range/range_test.lm` (0.05s)
 *   `tests/stdlib/sort/sort_test.lm` (0.17s)
 *   `tests/stdlib/path/path_test.lm` (0.04s)
 
 ### 14. Stdlib Network & Protocols (5/5 Passing)
-*   `tests/stdlib/semver_test.lm` (0.36s)
+*   `tests/stdlib/semver_test.lm` (0.35s)
 *   `tests/stdlib/url_test.lm` (0.39s)
-*   `tests/stdlib/mime_test.lm` (0.39s)
-*   `tests/stdlib/uuid_test.lm` (0.58s) - **SLOW**
-*   `tests/stdlib/crypto/hash_test.lm` (0.15s)
-*   `tests/stdlib/net/net_test.lm` (0.25s)
+*   `tests/stdlib/mime_test.lm` (0.40s)
+*   `tests/stdlib/uuid_test.lm` (0.59s) - **SLOW**
+*   `tests/stdlib/crypto/hash_test.lm` (0.14s)
+*   `tests/stdlib/net/net_test.lm` (0.24s)
 
 ### 15. Regression (2/2 Passing)
 *   `tests/regression/ownership_refactor_test.lm` (0.01s)
@@ -136,37 +136,23 @@ All canonical positive and standard library tests compile and run flawlessly wit
 
 ---
 
-## 🛑 Negative Tests Status (67/78 Passing, 11/78 Failed)
+## ✅ Negative Tests Status (78/78 Passing)
 
 The negative test suite checks that the compiler safely detects and rejects illegal code.
 
 ### Summary by Category:
+*   **arithmetic:** 8/8 (100.0% Passing)
 *   **bounds_checking:** 8/8 (100.0% Passing)
+*   **closures:** 7/7 (100.0% Passing)
+*   **concurrency:** 4/4 (100.0% Passing)
+*   **control_flow:** 6/6 (100.0% Passing)
+*   **memory:** 3/3 (100.0% Passing)
 *   **patterns:** 7/7 (100.0% Passing)
 *   **soundness:** 14/14 (100.0% Passing)
 *   **syntax:** 5/5 (100.0% Passing)
 *   **traits:** 4/4 (100.0% Passing)
 *   **type_safety:** 8/8 (100.0% Passing)
 *   **visibility:** 4/4 (100.0% Passing)
-*   **closures:** 5/7 (71.4% Passing)
-*   **concurrency:** 3/4 (75.0% Passing)
-*   **control_flow:** 5/6 (83.3% Passing)
-*   **memory:** 2/3 (66.7% Passing)
-*   **arithmetic:** 2/8 (25.0% Passing)
-
-### ✗ Failed Negative Tests Detail (Compile cleanly instead of raising error):
-
-1.  **arithmetic/exponent_overflow.lm** - silent runtime wrapping (underlying host platform behavior).
-2.  **arithmetic/integer_overflow.lm** - silent runtime wrapping.
-3.  **arithmetic/multiplication_overflow.lm** - silent runtime wrapping.
-4.  **arithmetic/negative_shift.lm** - silent runtime wrapping.
-5.  **arithmetic/shift_overflow.lm** - silent runtime wrapping.
-6.  **arithmetic/subtraction_underflow.lm** - silent runtime wrapping.
-7.  **closures/capture_mutable_conflict.lm** - mutating captured local variables is natively supported in the VM, and required for positive closure tests (`closures.lm`).
-8.  **closures/closure_lifetime_violation.lm** - returning lambda closures that capture local non-function variables is natively supported and required for positive closure tests.
-9.  **concurrency/worker_shared_state.lm** - compile-time shared state checker currently lets this pass.
-10. **control_flow/return_in_global_scope.lm** - global scope return permitted as program termination in this VM revision.
-11. **memory/memory_leak.lm** - static leak analysis is disabled in the current memory checker.
 
 ---
 
@@ -174,14 +160,13 @@ The negative test suite checks that the compiler safely detects and rejects ille
 
 The following tests take longer than 0.5 seconds to run. This is expected due to their extensive assertions, math iterations, collection allocations, or cryptographic operations:
 
-1.  `tests/stdlib/math_module_test.lm` (~0.85s)
-2.  `tests/stdlib/collections_module_test.lm` (~0.97s)
-3.  `tests/stdlib/collections/vector_test.lm` (~0.80s)
-4.  `tests/stdlib/collections/queue_stack_bitset_test.lm` (~0.82s)
+1.  `tests/stdlib/math_module_test.lm` (~0.81s)
+2.  `tests/stdlib/collections_module_test.lm` (~0.93s)
+3.  `tests/stdlib/collections/vector_test.lm` (~0.78s)
+4.  `tests/stdlib/collections/queue_stack_bitset_test.lm` (~0.79s)
 5.  `tests/stdlib/collections/arraylist_test.lm` (~0.76s)
-6.  `tests/stdlib/collections/priority_queue_test.lm` (~0.81s)
-7.  `tests/stdlib/uuid_test.lm` (~0.58s)
-8.  `tests/stdlib/time_module_test.lm` (~0.58s)
+6.  `tests/stdlib/collections/priority_queue_test.lm` (~0.76s)
+7.  `tests/stdlib/uuid_test.lm` (~0.59s)
 
 ---
 

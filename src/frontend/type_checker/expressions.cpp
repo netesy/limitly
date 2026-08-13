@@ -539,29 +539,28 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
                 add_error("Division or modulo by zero", expr->line);
             }
         }
+        if (expr->op == TokenType::LESS_LESS || expr->op == TokenType::GREATER_GREATER) {
+            int bit_width = 64;
+            if (left_base) {
+                std::string type_name = left_base->toString();
+                if (type_name == "i8" || type_name == "u8" || type_name == "Int8" || type_name == "UInt8") bit_width = 8;
+                else if (type_name == "i16" || type_name == "u16" || type_name == "Int16" || type_name == "UInt16") bit_width = 16;
+                else if (type_name == "i32" || type_name == "u32" || type_name == "Int32" || type_name == "UInt32") bit_width = 32;
+                else if (type_name == "i64" || type_name == "u64" || type_name == "int" || type_name == "uint" || type_name == "Int64" || type_name == "UInt64") bit_width = 64;
+                else if (type_name == "i128" || type_name == "u128" || type_name == "Int128" || type_name == "UInt128") bit_width = 128;
+            }
+
+            if (right_int < 0) {
+                add_error("Negative shift amount", expr->line);
+            } else if (right_int >= bit_width) {
+                add_error("Shift amount exceeds bit width", expr->line);
+            }
+        }
     }
 
     if (has_left_const && has_right_const) {
         bool both_int = left_is_int && right_is_int;
         if (both_int) {
-            if (expr->op == TokenType::LESS_LESS || expr->op == TokenType::GREATER_GREATER) {
-                int bit_width = 64;
-                if (left_base) {
-                    std::string type_name = left_base->toString();
-                    if (type_name == "i8" || type_name == "u8") bit_width = 8;
-                    else if (type_name == "i16" || type_name == "u16") bit_width = 16;
-                    else if (type_name == "i32" || type_name == "u32") bit_width = 32;
-                    else if (type_name == "i64" || type_name == "u64" || type_name == "int" || type_name == "uint") bit_width = 64;
-                    else if (type_name == "i128" || type_name == "u128") bit_width = 128;
-                }
-
-                if (right_int < 0) {
-                    add_error("Negative shift amount", expr->line);
-                } else if (right_int >= bit_width) {
-                    add_error("Shift amount exceeds bit width", expr->line);
-                }
-            }
-
             long long result = 0;
             bool check_overflow = false;
             if (expr->op == TokenType::PLUS) {
@@ -587,12 +586,12 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
                 long long max_val = std::numeric_limits<long long>::max();
                 long long min_val = std::numeric_limits<long long>::min();
 
-                if (type_name == "i8") { max_val = 127; min_val = -128; }
-                else if (type_name == "u8") { max_val = 255; min_val = 0; }
-                else if (type_name == "i16") { max_val = 32767; min_val = -32768; }
-                else if (type_name == "u16") { max_val = 65535; min_val = 0; }
-                else if (type_name == "i32") { max_val = 2147483647; min_val = -2147483648LL; }
-                else if (type_name == "u32") { max_val = 4294967295LL; min_val = 0; }
+                if (type_name == "i8" || type_name == "Int8") { max_val = 127; min_val = -128; }
+                else if (type_name == "u8" || type_name == "UInt8") { max_val = 255; min_val = 0; }
+                else if (type_name == "i16" || type_name == "Int16") { max_val = 32767; min_val = -32768; }
+                else if (type_name == "u16" || type_name == "UInt16") { max_val = 65535; min_val = 0; }
+                else if (type_name == "i32" || type_name == "Int32") { max_val = 2147483647; min_val = -2147483648LL; }
+                else if (type_name == "u32" || type_name == "UInt32") { max_val = 4294967295LL; min_val = 0; }
 
                 if (result > max_val || result < min_val) {
                     add_error("Arithmetic overflow / underflow detected", expr->line);
@@ -1724,11 +1723,20 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             constant_ints.erase(expr->name);
             constant_doubles.erase(expr->name);
 
-            // New variables are linear types by default
-            LinearTypeInfo linear_info;
-            linear_info.is_moved = false;
-            linear_info.access_count = 0;
-            linear_types[expr->name] = linear_info;
+            // New variables are linear types by default if they are complex/linear types
+            bool is_linear_type = (value_type &&
+                                  (value_type->tag == TypeTag::List ||
+                                   value_type->tag == TypeTag::Dict ||
+                                   value_type->tag == TypeTag::UserDefined ||
+                                   value_type->tag == TypeTag::Frame ||
+                                   value_type->tag == TypeTag::Tuple ||
+                                   value_type->tag == TypeTag::Structural));
+            if (is_linear_type) {
+                LinearTypeInfo linear_info;
+                linear_info.is_moved = false;
+                linear_info.access_count = 0;
+                linear_types[expr->name] = linear_info;
+            }
             return value_type;
         }
     }
