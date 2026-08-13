@@ -1,57 +1,57 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.iterator.__init__
-  call %main
+  %r0 = call %std.iterator.__init__
+  %r1 = call %main
   ret 0
 }
 
 function std.iterator.cycle(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.CycleIterator.init <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.iterator.CycleIterator.init %r1 %p0
+  ret %r1
 }
 
 function std.iterator.chunk(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.ChunkIterator.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.iterator.ChunkIterator.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.iterator.filter(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.FilterIterator.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.iterator.FilterIterator.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.iterator.iterator(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.ListIterator.init <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.iterator.ListIterator.init %r1 %p0
+  ret %r1
 }
 
 function std.iterator.collect(i64) {
 @entry
 @block_0
-  call %lm_list_new 0
+  %r1 = call %lm_list_new 0
   jmp %block_5
 @block_5
-  cne 0 2
-  br <unnamed> %block_8 %block_12
+  %r6 = cne 0 2
+  br %r6 %block_8 %block_12
 @block_8
   jmp %block_8
-  call %lm_list_append <unnamed> 0
+  call %lm_list_append %r1 0
   jmp %block_5
 @block_12
-  ret <unnamed>
+  ret %r1
 }
 
 function std.iterator.PeekableIterator.peek(i64) {
@@ -127,9 +127,9 @@ function std.iterator.TakeIterator.init(i64, i64, i64) {
 function std.iterator.map(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.MapIterator.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.iterator.MapIterator.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.iterator.ListIterator.next(i64) {
@@ -150,16 +150,16 @@ function std.iterator.PeekableIterator.init(i64, i64) {
 function twice(i64) {
 @entry
 @block_0
-  mul <unnamed> 17
-  ret <unnamed>
+  %r2 = mul %p0 17
+  ret %r2
 }
 
 function even(i64) {
 @entry
 @block_0
-  rem <unnamed> 17
-  ceq <unnamed> 1
-  ret <unnamed>
+  %r2 = rem %p0 17
+  %r4 = ceq %r2 1
+  ret %r4
 }
 
 function std.iterator.CycleIterator.next(i64) {
@@ -185,55 +185,55 @@ function std.iterator.StepByIterator.init(i64, i64, i64) {
 function main() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 25
-  call %std.iterator.iterator <unnamed>
-  cne 0 9
-  br <unnamed> %block_13 %block_15
+  %r0 = call %lm_list_new 0
+  call %lm_list_append %r0 9
+  call %lm_list_append %r0 17
+  call %lm_list_append %r0 25
+  %r7 = call %std.iterator.iterator %r0
+  %r11 = cne 0 9
+  br %r11 %block_13 %block_15
 @block_13
   jmp %block_13
   ret 9
 @block_15
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %std.iterator.iterator <unnamed>
-  call %lm_box_string %str_const_0
-  call %std.iterator.map <unnamed> <unnamed>
-  call %std.iterator.collect <unnamed>
-  call %lm_list_get <unnamed> 9
-  cne <unnamed> 33
-  br <unnamed> %block_31 %block_33
+  %r14 = call %lm_list_new 0
+  call %lm_list_append %r14 9
+  call %lm_list_append %r14 17
+  %r19 = call %std.iterator.iterator %r14
+  %r20 = call %lm_box_string %str_const_0
+  %r21 = call %std.iterator.map %r19 %r20
+  %r23 = call %std.iterator.collect %r21
+  %r26 = call %lm_list_get %r23 9
+  %r28 = cne %r26 33
+  br %r28 %block_31 %block_33
 @block_31
   jmp %block_31
   ret 17
 @block_33
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 25
-  call %std.iterator.iterator <unnamed>
-  call %lm_box_string %str_const_1
-  call %std.iterator.filter <unnamed> <unnamed>
-  cne 0 17
-  br <unnamed> %block_48 %block_50
+  %r31 = call %lm_list_new 0
+  call %lm_list_append %r31 9
+  call %lm_list_append %r31 17
+  call %lm_list_append %r31 25
+  %r38 = call %std.iterator.iterator %r31
+  %r39 = call %lm_box_string %str_const_1
+  %r40 = call %std.iterator.filter %r38 %r39
+  %r44 = cne 0 17
+  br %r44 %block_48 %block_50
 @block_48
   jmp %block_48
   ret 25
 @block_50
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 25
-  call %std.iterator.iterator <unnamed>
-  call %std.iterator.chunk <unnamed> 17
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 41
-  call %std.iterator.cycle <unnamed>
-  cne 0 41
-  br <unnamed> %block_72 %block_74
+  %r47 = call %lm_list_new 0
+  call %lm_list_append %r47 9
+  call %lm_list_append %r47 17
+  call %lm_list_append %r47 25
+  %r54 = call %std.iterator.iterator %r47
+  %r56 = call %std.iterator.chunk %r54 17
+  %r60 = call %lm_list_new 0
+  call %lm_list_append %r60 41
+  %r63 = call %std.iterator.cycle %r60
+  %r67 = cne 0 41
+  br %r67 %block_72 %block_74
 @block_72
   jmp %block_72
   ret 33

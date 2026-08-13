@@ -1,8 +1,8 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.unicode.index.__init__
-  call %main
+  %r0 = call %std.unicode.index.__init__
+  %r1 = call %main
   ret 0
 }
 
@@ -14,257 +14,257 @@ function std.unicode.normalize.__init__() {
 function std.unicode.normalize.to_upper(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_list_len <unnamed>
+  %r1 = call %lm_box_string %str_const_0
+  %r3 = call %lm_list_len %p0
   jmp %block_5
 @block_5
-  cslt 1 <unnamed>
-  br <unnamed> %block_7 %block_20
+  %r5 = cslt 1 %r3
+  br %r5 %block_7 %block_20
 @block_7
   jmp %block_7
-  add 1 9
-  call %substring <unnamed> 1 <unnamed>
-  call %std.unicode.normalize._char_to_upper <unnamed>
-  call %lm_to_string <unnamed>
-  call %lm_str_concat <unnamed> <unnamed>
-  add 1 9
+  %r9 = add 1 9
+  %r10 = call %substring %p0 1 %r9
+  %r11 = call %std.unicode.normalize._char_to_upper %r10
+  %r12 = call %lm_to_string %r11
+  %r13 = call %lm_str_concat %r1 %r12
+  %r16 = add 1 9
   jmp %block_5
 @block_20
-  ret <unnamed>
+  ret %r13
 }
 
 function std.unicode.normalize.to_lower(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_1
-  call %lm_list_len <unnamed>
+  %r1 = call %lm_box_string %str_const_1
+  %r3 = call %lm_list_len %p0
   jmp %block_5
 @block_5
-  cslt 1 <unnamed>
-  br <unnamed> %block_7 %block_20
+  %r5 = cslt 1 %r3
+  br %r5 %block_7 %block_20
 @block_7
   jmp %block_7
-  add 1 9
-  call %substring <unnamed> 1 <unnamed>
-  call %std.unicode.normalize._char_to_lower <unnamed>
-  call %lm_to_string <unnamed>
-  call %lm_str_concat <unnamed> <unnamed>
-  add 1 9
+  %r9 = add 1 9
+  %r10 = call %substring %p0 1 %r9
+  %r11 = call %std.unicode.normalize._char_to_lower %r10
+  %r12 = call %lm_to_string %r11
+  %r13 = call %lm_str_concat %r1 %r12
+  %r16 = add 1 9
   jmp %block_5
 @block_20
-  ret <unnamed>
+  ret %r13
 }
 
 function std.unicode.normalize._char_to_lower(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_2
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_3 %block_5
+  %r1 = call %lm_box_string %str_const_2
+  %r2 = ceq %p0 %r1
+  br %r2 %block_3 %block_5
 @block_3
   jmp %block_3
-  call %lm_box_string %str_const_3
-  ret <unnamed>
+  %r4 = call %lm_box_string %str_const_3
+  ret %r4
 @block_5
-  call %lm_box_string %str_const_4
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r5 = call %lm_box_string %str_const_4
+  %r6 = ceq %p0 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_box_string %str_const_5
-  ret <unnamed>
+  %r8 = call %lm_box_string %str_const_5
+  ret %r8
 @block_10
-  call %lm_box_string %str_const_6
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_13 %block_15
+  %r9 = call %lm_box_string %str_const_6
+  %r10 = ceq %p0 %r9
+  br %r10 %block_13 %block_15
 @block_13
   jmp %block_13
-  call %lm_box_string %str_const_7
-  ret <unnamed>
+  %r12 = call %lm_box_string %str_const_7
+  ret %r12
 @block_15
-  call %lm_box_string %str_const_8
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_18 %block_20
+  %r13 = call %lm_box_string %str_const_8
+  %r14 = ceq %p0 %r13
+  br %r14 %block_18 %block_20
 @block_18
   jmp %block_18
-  call %lm_box_string %str_const_9
-  ret <unnamed>
+  %r16 = call %lm_box_string %str_const_9
+  ret %r16
 @block_20
-  call %lm_box_string %str_const_10
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_23 %block_25
+  %r17 = call %lm_box_string %str_const_10
+  %r18 = ceq %p0 %r17
+  br %r18 %block_23 %block_25
 @block_23
   jmp %block_23
-  call %lm_box_string %str_const_11
-  ret <unnamed>
+  %r20 = call %lm_box_string %str_const_11
+  ret %r20
 @block_25
-  call %lm_box_string %str_const_12
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_28 %block_30
+  %r21 = call %lm_box_string %str_const_12
+  %r22 = ceq %p0 %r21
+  br %r22 %block_28 %block_30
 @block_28
   jmp %block_28
-  call %lm_box_string %str_const_13
-  ret <unnamed>
+  %r24 = call %lm_box_string %str_const_13
+  ret %r24
 @block_30
-  call %lm_box_string %str_const_14
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_33 %block_35
+  %r25 = call %lm_box_string %str_const_14
+  %r26 = ceq %p0 %r25
+  br %r26 %block_33 %block_35
 @block_33
   jmp %block_33
-  call %lm_box_string %str_const_15
-  ret <unnamed>
+  %r28 = call %lm_box_string %str_const_15
+  ret %r28
 @block_35
-  call %lm_box_string %str_const_16
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_38 %block_40
+  %r29 = call %lm_box_string %str_const_16
+  %r30 = ceq %p0 %r29
+  br %r30 %block_38 %block_40
 @block_38
   jmp %block_38
-  call %lm_box_string %str_const_17
-  ret <unnamed>
+  %r32 = call %lm_box_string %str_const_17
+  ret %r32
 @block_40
-  call %lm_box_string %str_const_18
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_43 %block_45
+  %r33 = call %lm_box_string %str_const_18
+  %r34 = ceq %p0 %r33
+  br %r34 %block_43 %block_45
 @block_43
   jmp %block_43
-  call %lm_box_string %str_const_19
-  ret <unnamed>
+  %r36 = call %lm_box_string %str_const_19
+  ret %r36
 @block_45
-  call %lm_box_string %str_const_20
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_48 %block_50
+  %r37 = call %lm_box_string %str_const_20
+  %r38 = ceq %p0 %r37
+  br %r38 %block_48 %block_50
 @block_48
   jmp %block_48
-  call %lm_box_string %str_const_21
-  ret <unnamed>
+  %r40 = call %lm_box_string %str_const_21
+  ret %r40
 @block_50
-  call %lm_box_string %str_const_22
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_53 %block_55
+  %r41 = call %lm_box_string %str_const_22
+  %r42 = ceq %p0 %r41
+  br %r42 %block_53 %block_55
 @block_53
   jmp %block_53
-  call %lm_box_string %str_const_23
-  ret <unnamed>
+  %r44 = call %lm_box_string %str_const_23
+  ret %r44
 @block_55
-  call %lm_box_string %str_const_24
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_58 %block_60
+  %r45 = call %lm_box_string %str_const_24
+  %r46 = ceq %p0 %r45
+  br %r46 %block_58 %block_60
 @block_58
   jmp %block_58
-  call %lm_box_string %str_const_25
-  ret <unnamed>
+  %r48 = call %lm_box_string %str_const_25
+  ret %r48
 @block_60
-  call %lm_box_string %str_const_26
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_63 %block_65
+  %r49 = call %lm_box_string %str_const_26
+  %r50 = ceq %p0 %r49
+  br %r50 %block_63 %block_65
 @block_63
   jmp %block_63
-  call %lm_box_string %str_const_27
-  ret <unnamed>
+  %r52 = call %lm_box_string %str_const_27
+  ret %r52
 @block_65
-  call %lm_box_string %str_const_28
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_68 %block_70
+  %r53 = call %lm_box_string %str_const_28
+  %r54 = ceq %p0 %r53
+  br %r54 %block_68 %block_70
 @block_68
   jmp %block_68
-  call %lm_box_string %str_const_29
-  ret <unnamed>
+  %r56 = call %lm_box_string %str_const_29
+  ret %r56
 @block_70
-  call %lm_box_string %str_const_30
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_73 %block_75
+  %r57 = call %lm_box_string %str_const_30
+  %r58 = ceq %p0 %r57
+  br %r58 %block_73 %block_75
 @block_73
   jmp %block_73
-  call %lm_box_string %str_const_31
-  ret <unnamed>
+  %r60 = call %lm_box_string %str_const_31
+  ret %r60
 @block_75
-  call %lm_box_string %str_const_32
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_78 %block_80
+  %r61 = call %lm_box_string %str_const_32
+  %r62 = ceq %p0 %r61
+  br %r62 %block_78 %block_80
 @block_78
   jmp %block_78
-  call %lm_box_string %str_const_33
-  ret <unnamed>
+  %r64 = call %lm_box_string %str_const_33
+  ret %r64
 @block_80
-  call %lm_box_string %str_const_34
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_83 %block_85
+  %r65 = call %lm_box_string %str_const_34
+  %r66 = ceq %p0 %r65
+  br %r66 %block_83 %block_85
 @block_83
   jmp %block_83
-  call %lm_box_string %str_const_35
-  ret <unnamed>
+  %r68 = call %lm_box_string %str_const_35
+  ret %r68
 @block_85
-  call %lm_box_string %str_const_36
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_88 %block_90
+  %r69 = call %lm_box_string %str_const_36
+  %r70 = ceq %p0 %r69
+  br %r70 %block_88 %block_90
 @block_88
   jmp %block_88
-  call %lm_box_string %str_const_37
-  ret <unnamed>
+  %r72 = call %lm_box_string %str_const_37
+  ret %r72
 @block_90
-  call %lm_box_string %str_const_38
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_93 %block_95
+  %r73 = call %lm_box_string %str_const_38
+  %r74 = ceq %p0 %r73
+  br %r74 %block_93 %block_95
 @block_93
   jmp %block_93
-  call %lm_box_string %str_const_39
-  ret <unnamed>
+  %r76 = call %lm_box_string %str_const_39
+  ret %r76
 @block_95
-  call %lm_box_string %str_const_40
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_98 %block_100
+  %r77 = call %lm_box_string %str_const_40
+  %r78 = ceq %p0 %r77
+  br %r78 %block_98 %block_100
 @block_98
   jmp %block_98
-  call %lm_box_string %str_const_41
-  ret <unnamed>
+  %r80 = call %lm_box_string %str_const_41
+  ret %r80
 @block_100
-  call %lm_box_string %str_const_42
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_103 %block_105
+  %r81 = call %lm_box_string %str_const_42
+  %r82 = ceq %p0 %r81
+  br %r82 %block_103 %block_105
 @block_103
   jmp %block_103
-  call %lm_box_string %str_const_43
-  ret <unnamed>
+  %r84 = call %lm_box_string %str_const_43
+  ret %r84
 @block_105
-  call %lm_box_string %str_const_44
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_108 %block_110
+  %r85 = call %lm_box_string %str_const_44
+  %r86 = ceq %p0 %r85
+  br %r86 %block_108 %block_110
 @block_108
   jmp %block_108
-  call %lm_box_string %str_const_45
-  ret <unnamed>
+  %r88 = call %lm_box_string %str_const_45
+  ret %r88
 @block_110
-  call %lm_box_string %str_const_46
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_113 %block_115
+  %r89 = call %lm_box_string %str_const_46
+  %r90 = ceq %p0 %r89
+  br %r90 %block_113 %block_115
 @block_113
   jmp %block_113
-  call %lm_box_string %str_const_47
-  ret <unnamed>
+  %r92 = call %lm_box_string %str_const_47
+  ret %r92
 @block_115
-  call %lm_box_string %str_const_48
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_118 %block_120
+  %r93 = call %lm_box_string %str_const_48
+  %r94 = ceq %p0 %r93
+  br %r94 %block_118 %block_120
 @block_118
   jmp %block_118
-  call %lm_box_string %str_const_49
-  ret <unnamed>
+  %r96 = call %lm_box_string %str_const_49
+  ret %r96
 @block_120
-  call %lm_box_string %str_const_50
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_123 %block_125
+  %r97 = call %lm_box_string %str_const_50
+  %r98 = ceq %p0 %r97
+  br %r98 %block_123 %block_125
 @block_123
   jmp %block_123
-  call %lm_box_string %str_const_51
-  ret <unnamed>
+  %r100 = call %lm_box_string %str_const_51
+  ret %r100
 @block_125
-  call %lm_box_string %str_const_52
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_128 %block_130
+  %r101 = call %lm_box_string %str_const_52
+  %r102 = ceq %p0 %r101
+  br %r102 %block_128 %block_130
 @block_128
   jmp %block_128
-  call %lm_box_string %str_const_53
-  ret <unnamed>
+  %r104 = call %lm_box_string %str_const_53
+  ret %r104
 @block_130
   ret 0
 }
@@ -277,270 +277,270 @@ function std.unicode.index.__init__() {
 function std.unicode.index.to_lower(i64) {
 @entry
 @block_0
-  call %std.unicode.normalize.to_lower <unnamed>
-  ret <unnamed>
+  %r1 = call %std.unicode.normalize.to_lower %p0
+  ret %r1
 }
 
 function std.unicode.index.to_upper(i64) {
 @entry
 @block_0
-  call %std.unicode.normalize.to_upper <unnamed>
-  ret <unnamed>
+  %r1 = call %std.unicode.normalize.to_upper %p0
+  ret %r1
 }
 
 function std.unicode.index.is_whitespace(i64) {
 @entry
 @block_0
-  call %std.unicode.category.is_whitespace <unnamed>
-  ret <unnamed>
+  %r1 = call %std.unicode.category.is_whitespace %p0
+  ret %r1
 }
 
 function std.unicode.index.is_digit(i64) {
 @entry
 @block_0
-  call %std.unicode.category.is_digit <unnamed>
-  ret <unnamed>
+  %r1 = call %std.unicode.category.is_digit %p0
+  ret %r1
 }
 
 function std.unicode.index.is_lower(i64) {
 @entry
 @block_0
-  call %std.unicode.category.is_lower <unnamed>
-  ret <unnamed>
+  %r1 = call %std.unicode.category.is_lower %p0
+  ret %r1
 }
 
 function std.unicode.index.is_upper(i64) {
 @entry
 @block_0
-  call %std.unicode.category.is_upper <unnamed>
-  ret <unnamed>
+  %r1 = call %std.unicode.category.is_upper %p0
+  ret %r1
 }
 
 function std.unicode.index.Rune(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.unicode.rune.Rune.init <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.unicode.rune.Rune.init %r1 %p0
+  ret %r1
 }
 
 function std.unicode.index.is_alphanumeric(i64) {
 @entry
 @block_0
-  call %std.unicode.category.is_alphanumeric <unnamed>
-  ret <unnamed>
+  %r1 = call %std.unicode.category.is_alphanumeric %p0
+  ret %r1
 }
 
 function std.unicode.normalize._char_to_upper(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_54
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_3 %block_5
+  %r1 = call %lm_box_string %str_const_54
+  %r2 = ceq %p0 %r1
+  br %r2 %block_3 %block_5
 @block_3
   jmp %block_3
-  call %lm_box_string %str_const_55
-  ret <unnamed>
+  %r4 = call %lm_box_string %str_const_55
+  ret %r4
 @block_5
-  call %lm_box_string %str_const_56
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r5 = call %lm_box_string %str_const_56
+  %r6 = ceq %p0 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_box_string %str_const_57
-  ret <unnamed>
+  %r8 = call %lm_box_string %str_const_57
+  ret %r8
 @block_10
-  call %lm_box_string %str_const_58
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_13 %block_15
+  %r9 = call %lm_box_string %str_const_58
+  %r10 = ceq %p0 %r9
+  br %r10 %block_13 %block_15
 @block_13
   jmp %block_13
-  call %lm_box_string %str_const_59
-  ret <unnamed>
+  %r12 = call %lm_box_string %str_const_59
+  ret %r12
 @block_15
-  call %lm_box_string %str_const_60
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_18 %block_20
+  %r13 = call %lm_box_string %str_const_60
+  %r14 = ceq %p0 %r13
+  br %r14 %block_18 %block_20
 @block_18
   jmp %block_18
-  call %lm_box_string %str_const_61
-  ret <unnamed>
+  %r16 = call %lm_box_string %str_const_61
+  ret %r16
 @block_20
-  call %lm_box_string %str_const_62
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_23 %block_25
+  %r17 = call %lm_box_string %str_const_62
+  %r18 = ceq %p0 %r17
+  br %r18 %block_23 %block_25
 @block_23
   jmp %block_23
-  call %lm_box_string %str_const_63
-  ret <unnamed>
+  %r20 = call %lm_box_string %str_const_63
+  ret %r20
 @block_25
-  call %lm_box_string %str_const_64
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_28 %block_30
+  %r21 = call %lm_box_string %str_const_64
+  %r22 = ceq %p0 %r21
+  br %r22 %block_28 %block_30
 @block_28
   jmp %block_28
-  call %lm_box_string %str_const_65
-  ret <unnamed>
+  %r24 = call %lm_box_string %str_const_65
+  ret %r24
 @block_30
-  call %lm_box_string %str_const_66
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_33 %block_35
+  %r25 = call %lm_box_string %str_const_66
+  %r26 = ceq %p0 %r25
+  br %r26 %block_33 %block_35
 @block_33
   jmp %block_33
-  call %lm_box_string %str_const_67
-  ret <unnamed>
+  %r28 = call %lm_box_string %str_const_67
+  ret %r28
 @block_35
-  call %lm_box_string %str_const_68
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_38 %block_40
+  %r29 = call %lm_box_string %str_const_68
+  %r30 = ceq %p0 %r29
+  br %r30 %block_38 %block_40
 @block_38
   jmp %block_38
-  call %lm_box_string %str_const_69
-  ret <unnamed>
+  %r32 = call %lm_box_string %str_const_69
+  ret %r32
 @block_40
-  call %lm_box_string %str_const_70
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_43 %block_45
+  %r33 = call %lm_box_string %str_const_70
+  %r34 = ceq %p0 %r33
+  br %r34 %block_43 %block_45
 @block_43
   jmp %block_43
-  call %lm_box_string %str_const_71
-  ret <unnamed>
+  %r36 = call %lm_box_string %str_const_71
+  ret %r36
 @block_45
-  call %lm_box_string %str_const_72
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_48 %block_50
+  %r37 = call %lm_box_string %str_const_72
+  %r38 = ceq %p0 %r37
+  br %r38 %block_48 %block_50
 @block_48
   jmp %block_48
-  call %lm_box_string %str_const_73
-  ret <unnamed>
+  %r40 = call %lm_box_string %str_const_73
+  ret %r40
 @block_50
-  call %lm_box_string %str_const_74
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_53 %block_55
+  %r41 = call %lm_box_string %str_const_74
+  %r42 = ceq %p0 %r41
+  br %r42 %block_53 %block_55
 @block_53
   jmp %block_53
-  call %lm_box_string %str_const_75
-  ret <unnamed>
+  %r44 = call %lm_box_string %str_const_75
+  ret %r44
 @block_55
-  call %lm_box_string %str_const_76
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_58 %block_60
+  %r45 = call %lm_box_string %str_const_76
+  %r46 = ceq %p0 %r45
+  br %r46 %block_58 %block_60
 @block_58
   jmp %block_58
-  call %lm_box_string %str_const_77
-  ret <unnamed>
+  %r48 = call %lm_box_string %str_const_77
+  ret %r48
 @block_60
-  call %lm_box_string %str_const_78
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_63 %block_65
+  %r49 = call %lm_box_string %str_const_78
+  %r50 = ceq %p0 %r49
+  br %r50 %block_63 %block_65
 @block_63
   jmp %block_63
-  call %lm_box_string %str_const_79
-  ret <unnamed>
+  %r52 = call %lm_box_string %str_const_79
+  ret %r52
 @block_65
-  call %lm_box_string %str_const_80
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_68 %block_70
+  %r53 = call %lm_box_string %str_const_80
+  %r54 = ceq %p0 %r53
+  br %r54 %block_68 %block_70
 @block_68
   jmp %block_68
-  call %lm_box_string %str_const_81
-  ret <unnamed>
+  %r56 = call %lm_box_string %str_const_81
+  ret %r56
 @block_70
-  call %lm_box_string %str_const_82
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_73 %block_75
+  %r57 = call %lm_box_string %str_const_82
+  %r58 = ceq %p0 %r57
+  br %r58 %block_73 %block_75
 @block_73
   jmp %block_73
-  call %lm_box_string %str_const_83
-  ret <unnamed>
+  %r60 = call %lm_box_string %str_const_83
+  ret %r60
 @block_75
-  call %lm_box_string %str_const_84
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_78 %block_80
+  %r61 = call %lm_box_string %str_const_84
+  %r62 = ceq %p0 %r61
+  br %r62 %block_78 %block_80
 @block_78
   jmp %block_78
-  call %lm_box_string %str_const_85
-  ret <unnamed>
+  %r64 = call %lm_box_string %str_const_85
+  ret %r64
 @block_80
-  call %lm_box_string %str_const_86
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_83 %block_85
+  %r65 = call %lm_box_string %str_const_86
+  %r66 = ceq %p0 %r65
+  br %r66 %block_83 %block_85
 @block_83
   jmp %block_83
-  call %lm_box_string %str_const_87
-  ret <unnamed>
+  %r68 = call %lm_box_string %str_const_87
+  ret %r68
 @block_85
-  call %lm_box_string %str_const_88
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_88 %block_90
+  %r69 = call %lm_box_string %str_const_88
+  %r70 = ceq %p0 %r69
+  br %r70 %block_88 %block_90
 @block_88
   jmp %block_88
-  call %lm_box_string %str_const_89
-  ret <unnamed>
+  %r72 = call %lm_box_string %str_const_89
+  ret %r72
 @block_90
-  call %lm_box_string %str_const_90
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_93 %block_95
+  %r73 = call %lm_box_string %str_const_90
+  %r74 = ceq %p0 %r73
+  br %r74 %block_93 %block_95
 @block_93
   jmp %block_93
-  call %lm_box_string %str_const_91
-  ret <unnamed>
+  %r76 = call %lm_box_string %str_const_91
+  ret %r76
 @block_95
-  call %lm_box_string %str_const_92
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_98 %block_100
+  %r77 = call %lm_box_string %str_const_92
+  %r78 = ceq %p0 %r77
+  br %r78 %block_98 %block_100
 @block_98
   jmp %block_98
-  call %lm_box_string %str_const_93
-  ret <unnamed>
+  %r80 = call %lm_box_string %str_const_93
+  ret %r80
 @block_100
-  call %lm_box_string %str_const_94
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_103 %block_105
+  %r81 = call %lm_box_string %str_const_94
+  %r82 = ceq %p0 %r81
+  br %r82 %block_103 %block_105
 @block_103
   jmp %block_103
-  call %lm_box_string %str_const_95
-  ret <unnamed>
+  %r84 = call %lm_box_string %str_const_95
+  ret %r84
 @block_105
-  call %lm_box_string %str_const_96
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_108 %block_110
+  %r85 = call %lm_box_string %str_const_96
+  %r86 = ceq %p0 %r85
+  br %r86 %block_108 %block_110
 @block_108
   jmp %block_108
-  call %lm_box_string %str_const_97
-  ret <unnamed>
+  %r88 = call %lm_box_string %str_const_97
+  ret %r88
 @block_110
-  call %lm_box_string %str_const_98
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_113 %block_115
+  %r89 = call %lm_box_string %str_const_98
+  %r90 = ceq %p0 %r89
+  br %r90 %block_113 %block_115
 @block_113
   jmp %block_113
-  call %lm_box_string %str_const_99
-  ret <unnamed>
+  %r92 = call %lm_box_string %str_const_99
+  ret %r92
 @block_115
-  call %lm_box_string %str_const_100
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_118 %block_120
+  %r93 = call %lm_box_string %str_const_100
+  %r94 = ceq %p0 %r93
+  br %r94 %block_118 %block_120
 @block_118
   jmp %block_118
-  call %lm_box_string %str_const_101
-  ret <unnamed>
+  %r96 = call %lm_box_string %str_const_101
+  ret %r96
 @block_120
-  call %lm_box_string %str_const_102
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_123 %block_125
+  %r97 = call %lm_box_string %str_const_102
+  %r98 = ceq %p0 %r97
+  br %r98 %block_123 %block_125
 @block_123
   jmp %block_123
-  call %lm_box_string %str_const_103
-  ret <unnamed>
+  %r100 = call %lm_box_string %str_const_103
+  ret %r100
 @block_125
-  call %lm_box_string %str_const_104
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_128 %block_130
+  %r101 = call %lm_box_string %str_const_104
+  %r102 = ceq %p0 %r101
+  br %r102 %block_128 %block_130
 @block_128
   jmp %block_128
-  call %lm_box_string %str_const_105
-  ret <unnamed>
+  %r104 = call %lm_box_string %str_const_105
+  ret %r104
 @block_130
   ret 0
 }
@@ -553,70 +553,70 @@ function std.unicode.rune.Rune.init(i64, i64) {
 function test_rune() {
 @entry
 @block_0
-  call %lm_box_string %str_const_106
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_107
-  call %std.unicode.index.Rune <unnamed>
-  cast <unnamed>
-  call %lm_box_string %str_const_108
-  call %std.unicode.index.Rune <unnamed>
-  cast <unnamed>
-  call %lm_box_string %str_const_109
-  call %std.unicode.index.Rune <unnamed>
-  cast <unnamed>
-  call %std.unicode.rune.Rune.to_string <unnamed>
-  call %lm_box_string %str_const_110
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_111
-  call %lm_assert <unnamed> <unnamed>
-  call %std.unicode.rune.Rune.compare <unnamed> <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_112
-  call %lm_assert <unnamed> <unnamed>
-  call %std.unicode.rune.Rune.compare <unnamed> <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_113
-  call %lm_assert <unnamed> <unnamed>
-  call %std.unicode.rune.Rune.compare <unnamed> <unnamed>
-  ceq <unnamed> 1
-  call %lm_box_string %str_const_114
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_106
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_107
+  %r3 = call %std.unicode.index.Rune %r2
+  %r4 = cast %r3
+  %r6 = call %lm_box_string %str_const_108
+  %r7 = call %std.unicode.index.Rune %r6
+  %r8 = cast %r7
+  %r10 = call %lm_box_string %str_const_109
+  %r11 = call %std.unicode.index.Rune %r10
+  %r12 = cast %r11
+  %r14 = call %std.unicode.rune.Rune.to_string %r4
+  %r15 = call %lm_box_string %str_const_110
+  %r16 = ceq %r14 %r15
+  %r17 = call %lm_box_string %str_const_111
+  %r18 = call %lm_assert %r16 %r17
+  %r19 = call %std.unicode.rune.Rune.compare %r4 %r8
+  %r21 = neg 9
+  %r22 = ceq %r19 %r21
+  %r23 = call %lm_box_string %str_const_112
+  %r24 = call %lm_assert %r22 %r23
+  %r25 = call %std.unicode.rune.Rune.compare %r8 %r4
+  %r27 = ceq %r25 9
+  %r28 = call %lm_box_string %str_const_113
+  %r29 = call %lm_assert %r27 %r28
+  %r30 = call %std.unicode.rune.Rune.compare %r4 %r12
+  %r32 = ceq %r30 1
+  %r33 = call %lm_box_string %str_const_114
+  %r34 = call %lm_assert %r32 %r33
   ret 9
 }
 
 function std.unicode.category.is_upper(i64) {
 @entry
 @block_0
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 1
-  br <unnamed> %block_4 %block_6
+  %r1 = call %lm_list_len %p0
+  %r3 = ceq %r1 1
+  br %r3 %block_4 %block_6
 @block_4
   jmp %block_4
   ret 10
 @block_6
-  call %substring <unnamed> 1 9
-  call %lm_box_string %str_const_115
+  %r8 = call %substring %p0 1 9
+  %r10 = call %lm_box_string %str_const_115
   jmp %block_12
 @block_12
   jmp %block_14
 @block_14
-  call %lm_list_len <unnamed>
-  cslt 1 <unnamed>
-  br <unnamed> %block_17 %block_31
+  %r13 = call %lm_list_len %r10
+  %r14 = cslt 1 %r13
+  br %r14 %block_17 %block_31
 @block_17
   jmp %block_17
-  add 1 9
-  call %substring <unnamed> 1 <unnamed>
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_23 %block_25
+  %r17 = add 1 9
+  %r18 = call %substring %r10 1 %r17
+  %r19 = ceq %r18 %r8
+  br %r19 %block_23 %block_25
 @block_23
   jmp %block_23
   ret 18
 @block_25
   jmp %block_26
 @block_26
-  add 1 9
+  %r24 = add 1 9
   jmp %block_14
 @block_31
   ret 10
@@ -625,38 +625,38 @@ function std.unicode.category.is_upper(i64) {
 function std.unicode.category.is_whitespace(i64) {
 @entry
 @block_0
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 1
-  br <unnamed> %block_4 %block_6
+  %r1 = call %lm_list_len %p0
+  %r3 = ceq %r1 1
+  br %r3 %block_4 %block_6
 @block_4
   jmp %block_4
   ret 10
 @block_6
-  call %substring <unnamed> 1 9
-  call %lm_box_string %str_const_116
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_18 %block_14
+  %r8 = call %substring %p0 1 9
+  %r13 = call %lm_box_string %str_const_116
+  %r14 = ceq %r8 %r13
+  br %r14 %block_18 %block_14
 @block_14
   jmp %block_14
-  call %lm_box_string %str_const_117
-  ceq <unnamed> <unnamed>
+  %r15 = call %lm_box_string %str_const_117
+  %r16 = ceq %r8 %r15
   jmp %block_18
 @block_18
-  br <unnamed> %block_24 %block_20
+  br %r16 %block_24 %block_20
 @block_20
   jmp %block_20
-  call %lm_box_string %str_const_118
-  ceq <unnamed> <unnamed>
+  %r17 = call %lm_box_string %str_const_118
+  %r18 = ceq %r8 %r17
   jmp %block_24
 @block_24
-  br <unnamed> %block_30 %block_26
+  br %r18 %block_30 %block_26
 @block_26
   jmp %block_26
-  call %lm_box_string %str_const_119
-  ceq <unnamed> <unnamed>
+  %r19 = call %lm_box_string %str_const_119
+  %r20 = ceq %r8 %r19
   jmp %block_30
 @block_30
-  ret <unnamed>
+  ret %r20
 }
 
 function std.unicode.rune.Rune.compare(i64, i64) {
@@ -672,121 +672,121 @@ function std.unicode.rune.__init__() {
 function test_categories() {
 @entry
 @block_0
-  call %lm_box_string %str_const_120
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_121
-  call %std.unicode.index.is_upper <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_122
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_123
-  call %std.unicode.index.is_upper <unnamed>
-  ceq <unnamed> 10
-  call %lm_box_string %str_const_124
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_125
-  call %std.unicode.index.is_lower <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_126
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_127
-  call %std.unicode.index.is_lower <unnamed>
-  ceq <unnamed> 10
-  call %lm_box_string %str_const_128
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_129
-  call %std.unicode.index.is_digit <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_130
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_131
-  call %std.unicode.index.is_digit <unnamed>
-  ceq <unnamed> 10
-  call %lm_box_string %str_const_132
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_133
-  call %std.unicode.index.is_alpha <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_134
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_135
-  call %std.unicode.index.is_alpha <unnamed>
-  ceq <unnamed> 10
-  call %lm_box_string %str_const_136
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_137
-  call %std.unicode.index.is_alphanumeric <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_138
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_139
-  call %std.unicode.index.is_alphanumeric <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_140
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_141
-  call %std.unicode.index.is_alphanumeric <unnamed>
-  ceq <unnamed> 10
-  call %lm_box_string %str_const_142
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_143
-  call %std.unicode.index.is_whitespace <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_144
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_145
-  call %std.unicode.index.is_whitespace <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_146
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_147
-  call %std.unicode.index.is_whitespace <unnamed>
-  ceq <unnamed> 10
-  call %lm_box_string %str_const_148
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_120
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_121
+  %r3 = call %std.unicode.index.is_upper %r2
+  %r5 = ceq %r3 18
+  %r6 = call %lm_box_string %str_const_122
+  %r7 = call %lm_assert %r5 %r6
+  %r8 = call %lm_box_string %str_const_123
+  %r9 = call %std.unicode.index.is_upper %r8
+  %r11 = ceq %r9 10
+  %r12 = call %lm_box_string %str_const_124
+  %r13 = call %lm_assert %r11 %r12
+  %r14 = call %lm_box_string %str_const_125
+  %r15 = call %std.unicode.index.is_lower %r14
+  %r17 = ceq %r15 18
+  %r18 = call %lm_box_string %str_const_126
+  %r19 = call %lm_assert %r17 %r18
+  %r20 = call %lm_box_string %str_const_127
+  %r21 = call %std.unicode.index.is_lower %r20
+  %r23 = ceq %r21 10
+  %r24 = call %lm_box_string %str_const_128
+  %r25 = call %lm_assert %r23 %r24
+  %r26 = call %lm_box_string %str_const_129
+  %r27 = call %std.unicode.index.is_digit %r26
+  %r29 = ceq %r27 18
+  %r30 = call %lm_box_string %str_const_130
+  %r31 = call %lm_assert %r29 %r30
+  %r32 = call %lm_box_string %str_const_131
+  %r33 = call %std.unicode.index.is_digit %r32
+  %r35 = ceq %r33 10
+  %r36 = call %lm_box_string %str_const_132
+  %r37 = call %lm_assert %r35 %r36
+  %r38 = call %lm_box_string %str_const_133
+  %r39 = call %std.unicode.index.is_alpha %r38
+  %r41 = ceq %r39 18
+  %r42 = call %lm_box_string %str_const_134
+  %r43 = call %lm_assert %r41 %r42
+  %r44 = call %lm_box_string %str_const_135
+  %r45 = call %std.unicode.index.is_alpha %r44
+  %r47 = ceq %r45 10
+  %r48 = call %lm_box_string %str_const_136
+  %r49 = call %lm_assert %r47 %r48
+  %r50 = call %lm_box_string %str_const_137
+  %r51 = call %std.unicode.index.is_alphanumeric %r50
+  %r53 = ceq %r51 18
+  %r54 = call %lm_box_string %str_const_138
+  %r55 = call %lm_assert %r53 %r54
+  %r56 = call %lm_box_string %str_const_139
+  %r57 = call %std.unicode.index.is_alphanumeric %r56
+  %r59 = ceq %r57 18
+  %r60 = call %lm_box_string %str_const_140
+  %r61 = call %lm_assert %r59 %r60
+  %r62 = call %lm_box_string %str_const_141
+  %r63 = call %std.unicode.index.is_alphanumeric %r62
+  %r65 = ceq %r63 10
+  %r66 = call %lm_box_string %str_const_142
+  %r67 = call %lm_assert %r65 %r66
+  %r68 = call %lm_box_string %str_const_143
+  %r69 = call %std.unicode.index.is_whitespace %r68
+  %r71 = ceq %r69 18
+  %r72 = call %lm_box_string %str_const_144
+  %r73 = call %lm_assert %r71 %r72
+  %r74 = call %lm_box_string %str_const_145
+  %r75 = call %std.unicode.index.is_whitespace %r74
+  %r77 = ceq %r75 18
+  %r78 = call %lm_box_string %str_const_146
+  %r79 = call %lm_assert %r77 %r78
+  %r80 = call %lm_box_string %str_const_147
+  %r81 = call %std.unicode.index.is_whitespace %r80
+  %r83 = ceq %r81 10
+  %r84 = call %lm_box_string %str_const_148
+  %r85 = call %lm_assert %r83 %r84
   ret 9
 }
 
 function test_normalize() {
 @entry
 @block_0
-  call %lm_box_string %str_const_149
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_150
-  call %std.unicode.index.to_upper <unnamed>
-  call %lm_box_string %str_const_151
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_152
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_153
-  call %std.unicode.index.to_lower <unnamed>
-  call %lm_box_string %str_const_154
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_155
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_149
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_150
+  %r3 = call %std.unicode.index.to_upper %r2
+  %r4 = call %lm_box_string %str_const_151
+  %r5 = ceq %r3 %r4
+  %r6 = call %lm_box_string %str_const_152
+  %r7 = call %lm_assert %r5 %r6
+  %r8 = call %lm_box_string %str_const_153
+  %r9 = call %std.unicode.index.to_lower %r8
+  %r10 = call %lm_box_string %str_const_154
+  %r11 = ceq %r9 %r10
+  %r12 = call %lm_box_string %str_const_155
+  %r13 = call %lm_assert %r11 %r12
   ret 9
 }
 
 function std.unicode.rune.char_code(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_156
-  call %lm_list_len <unnamed>
+  %r1 = call %lm_box_string %str_const_156
+  %r3 = call %lm_list_len %r1
   jmp %block_5
 @block_5
-  cslt 1 <unnamed>
-  br <unnamed> %block_7 %block_19
+  %r5 = cslt 1 %r3
+  br %r5 %block_7 %block_19
 @block_7
   jmp %block_7
-  add 1 9
-  call %substring <unnamed> 1 <unnamed>
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_13 %block_14
+  %r9 = add 1 9
+  %r10 = call %substring %r1 1 %r9
+  %r11 = ceq %r10 %p0
+  br %r11 %block_13 %block_14
 @block_13
   jmp %block_13
   ret 1
 @block_14
-  add 1 9
+  %r15 = add 1 9
   jmp %block_5
 @block_19
   ret 7993
@@ -800,64 +800,64 @@ function std.unicode.category.__init__() {
 function main() {
 @entry
 @block_0
-  call %lm_box_string %str_const_157
-  call %lm_print_int <unnamed>
-  call %test_rune
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_158
-  call %lm_assert <unnamed> <unnamed>
-  call %test_categories
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_159
-  call %lm_assert <unnamed> <unnamed>
-  call %test_normalize
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_160
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_161
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_157
+  %r1 = call %lm_print_int %r0
+  %r2 = call %test_rune
+  %r4 = ceq %r2 9
+  %r5 = call %lm_box_string %str_const_158
+  %r6 = call %lm_assert %r4 %r5
+  %r7 = call %test_categories
+  %r9 = ceq %r7 9
+  %r10 = call %lm_box_string %str_const_159
+  %r11 = call %lm_assert %r9 %r10
+  %r12 = call %test_normalize
+  %r14 = ceq %r12 9
+  %r15 = call %lm_box_string %str_const_160
+  %r16 = call %lm_assert %r14 %r15
+  %r17 = call %lm_box_string %str_const_161
+  %r18 = call %lm_print_int %r17
   ret 1
 }
 
 function std.unicode.index.is_alpha(i64) {
 @entry
 @block_0
-  call %std.unicode.category.is_alpha <unnamed>
-  ret <unnamed>
+  %r1 = call %std.unicode.category.is_alpha %p0
+  ret %r1
 }
 
 function std.unicode.category.is_lower(i64) {
 @entry
 @block_0
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 1
-  br <unnamed> %block_4 %block_6
+  %r1 = call %lm_list_len %p0
+  %r3 = ceq %r1 1
+  br %r3 %block_4 %block_6
 @block_4
   jmp %block_4
   ret 10
 @block_6
-  call %substring <unnamed> 1 9
-  call %lm_box_string %str_const_162
+  %r8 = call %substring %p0 1 9
+  %r10 = call %lm_box_string %str_const_162
   jmp %block_12
 @block_12
   jmp %block_14
 @block_14
-  call %lm_list_len <unnamed>
-  cslt 1 <unnamed>
-  br <unnamed> %block_17 %block_31
+  %r13 = call %lm_list_len %r10
+  %r14 = cslt 1 %r13
+  br %r14 %block_17 %block_31
 @block_17
   jmp %block_17
-  add 1 9
-  call %substring <unnamed> 1 <unnamed>
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_23 %block_25
+  %r17 = add 1 9
+  %r18 = call %substring %r10 1 %r17
+  %r19 = ceq %r18 %r8
+  br %r19 %block_23 %block_25
 @block_23
   jmp %block_23
   ret 18
 @block_25
   jmp %block_26
 @block_26
-  add 1 9
+  %r24 = add 1 9
   jmp %block_14
 @block_31
   ret 10
@@ -866,61 +866,61 @@ function std.unicode.category.is_lower(i64) {
 function std.unicode.category.is_alphanumeric(i64) {
 @entry
 @block_0
-  call %std.unicode.category.is_alpha <unnamed>
-  br <unnamed> %block_6 %block_3
+  %r2 = call %std.unicode.category.is_alpha %p0
+  br %r2 %block_6 %block_3
 @block_3
   jmp %block_3
-  call %std.unicode.category.is_digit <unnamed>
+  %r3 = call %std.unicode.category.is_digit %p0
   jmp %block_6
 @block_6
-  ret <unnamed>
+  ret %r3
 }
 
 function std.unicode.category.is_alpha(i64) {
 @entry
 @block_0
-  call %std.unicode.category.is_upper <unnamed>
-  br <unnamed> %block_6 %block_3
+  %r2 = call %std.unicode.category.is_upper %p0
+  br %r2 %block_6 %block_3
 @block_3
   jmp %block_3
-  call %std.unicode.category.is_lower <unnamed>
+  %r3 = call %std.unicode.category.is_lower %p0
   jmp %block_6
 @block_6
-  ret <unnamed>
+  ret %r3
 }
 
 function std.unicode.category.is_digit(i64) {
 @entry
 @block_0
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 1
-  br <unnamed> %block_4 %block_6
+  %r1 = call %lm_list_len %p0
+  %r3 = ceq %r1 1
+  br %r3 %block_4 %block_6
 @block_4
   jmp %block_4
   ret 10
 @block_6
-  call %substring <unnamed> 1 9
-  call %lm_box_string %str_const_163
+  %r8 = call %substring %p0 1 9
+  %r10 = call %lm_box_string %str_const_163
   jmp %block_12
 @block_12
   jmp %block_14
 @block_14
-  call %lm_list_len <unnamed>
-  cslt 1 <unnamed>
-  br <unnamed> %block_17 %block_31
+  %r13 = call %lm_list_len %r10
+  %r14 = cslt 1 %r13
+  br %r14 %block_17 %block_31
 @block_17
   jmp %block_17
-  add 1 9
-  call %substring <unnamed> 1 <unnamed>
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_23 %block_25
+  %r17 = add 1 9
+  %r18 = call %substring %r10 1 %r17
+  %r19 = ceq %r18 %r8
+  br %r19 %block_23 %block_25
 @block_23
   jmp %block_23
   ret 18
 @block_25
   jmp %block_26
 @block_26
-  add 1 9
+  %r24 = add 1 9
   jmp %block_14
 @block_31
   ret 10
@@ -948,49 +948,49 @@ function lm_str_concat(i8*, i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null

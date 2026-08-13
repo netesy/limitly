@@ -1,309 +1,309 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_1
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_2
-  call %createGreeter <unnamed>
-  call %lm_box_string %str_const_3
-  call %createGreeter <unnamed>
-  call %lm_box_string %str_const_4
-  call <unnamed> <unnamed>
-  call %lm_box_string %str_const_5
-  call <unnamed> <unnamed>
-  call %lm_box_string %str_const_6
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_7
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_8
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_9
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_10
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_11
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_12
-  call %lm_print_int <unnamed>
-  call %createCounter
-  call %createCounter
-  call <unnamed>
-  call <unnamed>
-  call <unnamed>
-  call <unnamed>
-  call <unnamed>
-  call %lm_box_string %str_const_13
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_14
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_15
-  call %lm_assert <unnamed> <unnamed>
-  ceq <unnamed> 17
-  call %lm_box_string %str_const_16
-  call %lm_assert <unnamed> <unnamed>
-  ceq <unnamed> 25
-  call %lm_box_string %str_const_17
-  call %lm_assert <unnamed> <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_18
-  call %lm_assert <unnamed> <unnamed>
-  ceq <unnamed> 17
-  call %lm_box_string %str_const_19
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_20
-  call %lm_print_int <unnamed>
-  call %createCalculator 81
-  call <unnamed> 41
-  call <unnamed> 25
-  call <unnamed> 57
-  call %lm_box_string %str_const_21
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  ceq <unnamed> 121
-  call %lm_box_string %str_const_22
-  call %lm_assert <unnamed> <unnamed>
-  ceq <unnamed> 145
-  call %lm_box_string %str_const_23
-  call %lm_assert <unnamed> <unnamed>
-  ceq <unnamed> 201
-  call %lm_box_string %str_const_24
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_25
-  call %lm_print_int <unnamed>
-  call %createNestedCounter 81
-  call <unnamed>
-  call <unnamed>
-  call <unnamed>
-  call <unnamed>
-  call <unnamed>
-  call <unnamed>
-  call %lm_box_string %str_const_26
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_27
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  ceq <unnamed> 89
-  call %lm_box_string %str_const_28
-  call %lm_assert <unnamed> <unnamed>
-  ceq <unnamed> 97
-  call %lm_box_string %str_const_29
-  call %lm_assert <unnamed> <unnamed>
-  ceq <unnamed> 169
-  call %lm_box_string %str_const_30
-  call %lm_assert <unnamed> <unnamed>
-  ceq <unnamed> 177
-  call %lm_box_string %str_const_31
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_32
-  call %lm_print_int <unnamed>
-  call %createAdder 41
-  call %createMultiplier 25
-  call <unnamed> 57
-  call <unnamed> 33
-  call %lm_box_string %str_const_33
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_34
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  ceq <unnamed> 97
-  call %lm_box_string %str_const_35
-  call %lm_assert <unnamed> <unnamed>
-  ceq <unnamed> 97
-  call %lm_box_string %str_const_36
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_37
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_0
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_1
+  %r3 = call %lm_print_int %r2
+  %r4 = call %lm_box_string %str_const_2
+  %r5 = call %createGreeter %r4
+  %r7 = call %lm_box_string %str_const_3
+  %r8 = call %createGreeter %r7
+  %r10 = call %lm_box_string %str_const_4
+  %r11 = call %r5 %r10
+  %r13 = call %lm_box_string %str_const_5
+  %r14 = call %r8 %r13
+  %r17 = call %lm_box_string %str_const_6
+  %r16 = call %lm_rt_str_format %r17 %r11
+  %r18 = call %lm_print_int %r16
+  %r20 = call %lm_box_string %str_const_7
+  %r19 = call %lm_rt_str_format %r20 %r14
+  %r21 = call %lm_print_int %r19
+  %r22 = call %lm_box_string %str_const_8
+  %r23 = ceq %r11 %r22
+  %r24 = call %lm_box_string %str_const_9
+  %r25 = call %lm_assert %r23 %r24
+  %r26 = call %lm_box_string %str_const_10
+  %r27 = ceq %r14 %r26
+  %r28 = call %lm_box_string %str_const_11
+  %r29 = call %lm_assert %r27 %r28
+  %r30 = call %lm_box_string %str_const_12
+  %r31 = call %lm_print_int %r30
+  %r32 = call %createCounter
+  %r34 = call %createCounter
+  %r36 = call %r32
+  %r38 = call %r32
+  %r40 = call %r32
+  %r42 = call %r34
+  %r44 = call %r34
+  %r47 = call %lm_box_string %str_const_13
+  %r46 = call %lm_rt_str_format %r47 %r36
+  %r48 = call %lm_rt_str_format %r46 %r38
+  %r49 = call %lm_rt_str_format %r48 %r40
+  %r50 = call %lm_print_int %r49
+  %r52 = call %lm_box_string %str_const_14
+  %r51 = call %lm_rt_str_format %r52 %r42
+  %r53 = call %lm_rt_str_format %r51 %r44
+  %r54 = call %lm_print_int %r53
+  %r56 = ceq %r36 9
+  %r57 = call %lm_box_string %str_const_15
+  %r58 = call %lm_assert %r56 %r57
+  %r60 = ceq %r38 17
+  %r61 = call %lm_box_string %str_const_16
+  %r62 = call %lm_assert %r60 %r61
+  %r64 = ceq %r40 25
+  %r65 = call %lm_box_string %str_const_17
+  %r66 = call %lm_assert %r64 %r65
+  %r68 = ceq %r42 9
+  %r69 = call %lm_box_string %str_const_18
+  %r70 = call %lm_assert %r68 %r69
+  %r72 = ceq %r44 17
+  %r73 = call %lm_box_string %str_const_19
+  %r74 = call %lm_assert %r72 %r73
+  %r75 = call %lm_box_string %str_const_20
+  %r76 = call %lm_print_int %r75
+  %r78 = call %createCalculator 81
+  %r81 = call %r78 41
+  %r84 = call %r78 25
+  %r87 = call %r78 57
+  %r90 = call %lm_box_string %str_const_21
+  %r89 = call %lm_rt_str_format %r90 %r81
+  %r91 = call %lm_rt_str_format %r89 %r84
+  %r92 = call %lm_rt_str_format %r91 %r87
+  %r93 = call %lm_print_int %r92
+  %r95 = ceq %r81 121
+  %r96 = call %lm_box_string %str_const_22
+  %r97 = call %lm_assert %r95 %r96
+  %r99 = ceq %r84 145
+  %r100 = call %lm_box_string %str_const_23
+  %r101 = call %lm_assert %r99 %r100
+  %r103 = ceq %r87 201
+  %r104 = call %lm_box_string %str_const_24
+  %r105 = call %lm_assert %r103 %r104
+  %r106 = call %lm_box_string %str_const_25
+  %r107 = call %lm_print_int %r106
+  %r109 = call %createNestedCounter 81
+  %r111 = call %r109
+  %r113 = call %r109
+  %r115 = call %r111
+  %r117 = call %r111
+  %r119 = call %r113
+  %r121 = call %r113
+  %r124 = call %lm_box_string %str_const_26
+  %r123 = call %lm_rt_str_format %r124 %r115
+  %r125 = call %lm_rt_str_format %r123 %r117
+  %r126 = call %lm_print_int %r125
+  %r128 = call %lm_box_string %str_const_27
+  %r127 = call %lm_rt_str_format %r128 %r119
+  %r129 = call %lm_rt_str_format %r127 %r121
+  %r130 = call %lm_print_int %r129
+  %r132 = ceq %r115 89
+  %r133 = call %lm_box_string %str_const_28
+  %r134 = call %lm_assert %r132 %r133
+  %r136 = ceq %r117 97
+  %r137 = call %lm_box_string %str_const_29
+  %r138 = call %lm_assert %r136 %r137
+  %r140 = ceq %r119 169
+  %r141 = call %lm_box_string %str_const_30
+  %r142 = call %lm_assert %r140 %r141
+  %r144 = ceq %r121 177
+  %r145 = call %lm_box_string %str_const_31
+  %r146 = call %lm_assert %r144 %r145
+  %r147 = call %lm_box_string %str_const_32
+  %r148 = call %lm_print_int %r147
+  %r150 = call %createAdder 41
+  %r153 = call %createMultiplier 25
+  %r156 = call %r150 57
+  %r159 = call %r153 33
+  %r162 = call %lm_box_string %str_const_33
+  %r161 = call %lm_rt_str_format %r162 %r156
+  %r163 = call %lm_print_int %r161
+  %r165 = call %lm_box_string %str_const_34
+  %r164 = call %lm_rt_str_format %r165 %r159
+  %r166 = call %lm_print_int %r164
+  %r168 = ceq %r156 97
+  %r169 = call %lm_box_string %str_const_35
+  %r170 = call %lm_assert %r168 %r169
+  %r172 = ceq %r159 97
+  %r173 = call %lm_box_string %str_const_36
+  %r174 = call %lm_assert %r172 %r173
+  %r175 = call %lm_box_string %str_const_37
+  %r176 = call %lm_print_int %r175
   jmp %block_183
 @block_183
   jmp %block_185
 @block_185
-  cslt 9 41
-  br <unnamed> %block_188 %block_206
+  %r180 = cslt 9 41
+  br %r180 %block_188 %block_206
 @block_188
   jmp %block_188
-  call %createTemporaryClosure 9
-  call <unnamed>
-  call %lm_box_string %str_const_38
-  call %lm_rt_str_format <unnamed> 9
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  mul 9 17
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_39
-  call %lm_assert <unnamed> <unnamed>
+  %r181 = call %createTemporaryClosure 9
+  %r183 = call %r181
+  %r186 = call %lm_box_string %str_const_38
+  %r185 = call %lm_rt_str_format %r186 9
+  %r187 = call %lm_rt_str_format %r185 %r183
+  %r188 = call %lm_print_int %r187
+  %r190 = mul 9 17
+  %r191 = ceq %r183 %r190
+  %r192 = call %lm_box_string %str_const_39
+  %r193 = call %lm_assert %r191 %r192
   jmp %block_203
 @block_203
-  add 9 9
+  %r177 = add 9 9
   jmp %block_185
 @block_206
-  call %lm_box_string %str_const_40
-  call %lm_print_int <unnamed>
-  call %createConditionalClosure 81
-  call <unnamed> 121
-  call <unnamed> 41
-  call %lm_print_str <unnamed>
-  call %lm_print_str <unnamed>
-  call %lm_box_string %str_const_41
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_42
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_43
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_44
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_45
-  call %lm_print_int <unnamed>
+  %r195 = call %lm_box_string %str_const_40
+  %r196 = call %lm_print_int %r195
+  %r198 = call %createConditionalClosure 81
+  %r201 = call %r198 121
+  %r204 = call %r198 41
+  %r206 = call %lm_print_str %r201
+  %r207 = call %lm_print_str %r204
+  %r208 = call %lm_box_string %str_const_41
+  %r209 = ceq %r201 %r208
+  %r210 = call %lm_box_string %str_const_42
+  %r211 = call %lm_assert %r209 %r210
+  %r212 = call %lm_box_string %str_const_43
+  %r213 = ceq %r204 %r212
+  %r214 = call %lm_box_string %str_const_44
+  %r215 = call %lm_assert %r213 %r214
+  %r216 = call %lm_box_string %str_const_45
+  %r217 = call %lm_print_int %r216
   ret 0
 }
 
 function createTemporaryClosure(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_46
+  %r3 = call %lm_box_string %str_const_46
   ret 0
 }
 
 function __lambda_7() {
 @entry
 @block_0
-  mul 0 17
-  ret <unnamed>
+  %r4 = mul 0 17
+  ret %r4
 }
 
 function createCalculator(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_47
+  %r3 = call %lm_box_string %str_const_47
   ret 0
 }
 
 function createConditionalClosure(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_48
+  %r2 = call %lm_box_string %str_const_48
   ret 0
 }
 
 function __lambda_1() {
 @entry
 @block_0
-  add 0 9
+  %r7 = add 0 9
   ret 0
 }
 
 function __lambda_4() {
 @entry
 @block_0
-  add 0 9
+  %r7 = add 0 9
   ret 0
 }
 
 function __lambda_8(i64) {
 @entry
 @block_0
-  csgt <unnamed> 0
-  br <unnamed> %block_4 %block_11
+  %r4 = csgt %p0 0
+  br %r4 %block_4 %block_11
 @block_4
   jmp %block_4
-  call %lm_box_string %str_const_49
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r9 = call %lm_box_string %str_const_49
+  %r8 = call %lm_rt_str_format %r9 %p0
+  %r10 = call %lm_rt_str_format %r8 0
+  ret %r10
 @block_11
-  call %lm_box_string %str_const_50
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r14 = call %lm_box_string %str_const_50
+  %r13 = call %lm_rt_str_format %r14 %p0
+  %r15 = call %lm_rt_str_format %r13 0
+  ret %r15
 }
 
 function createNestedCounter(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_51
+  %r3 = call %lm_box_string %str_const_51
   ret 0
 }
 
 function __lambda_2(i64) {
 @entry
 @block_0
-  add 0 <unnamed>
+  %r6 = add 0 %p0
   ret 0
 }
 
 function createCounter() {
 @entry
 @block_0
-  call %lm_box_string %str_const_52
+  %r2 = call %lm_box_string %str_const_52
   ret 0
 }
 
 function __lambda_3() {
 @entry
 @block_0
-  add 0 0
-  call %lm_box_string %str_const_53
+  %r9 = add 0 0
+  %r15 = call %lm_box_string %str_const_53
   ret 0
 }
 
 function createGreeter(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_54
+  %r2 = call %lm_box_string %str_const_54
   ret 0
 }
 
 function __lambda_5(i64) {
 @entry
 @block_0
-  add 0 <unnamed>
-  ret <unnamed>
+  %r6 = add 0 %p0
+  ret %r6
 }
 
 function createAdder(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_55
+  %r2 = call %lm_box_string %str_const_55
   ret 0
 }
 
 function __lambda_0(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_56
-  call %lm_str_concat 0 <unnamed>
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_box_string %str_const_57
-  call %lm_str_concat <unnamed> <unnamed>
-  ret <unnamed>
+  %r4 = call %lm_box_string %str_const_56
+  %r5 = call %lm_str_concat 0 %r4
+  %r6 = call %lm_str_concat %r5 %p0
+  %r7 = call %lm_box_string %str_const_57
+  %r8 = call %lm_str_concat %r6 %r7
+  ret %r8
 }
 
 function __lambda_6(i64) {
 @entry
 @block_0
-  mul <unnamed> 0
-  ret <unnamed>
+  %r4 = mul %p0 0
+  ret %r4
 }
 
 function createMultiplier(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_58
+  %r2 = call %lm_box_string %str_const_58
   ret 0
 }
 
@@ -312,40 +312,40 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
@@ -354,10 +354,10 @@ function lm_rt_str_format(i64, i64) {
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null
@@ -365,22 +365,22 @@ function lm_assert(i32, i64) {
 
 function lm_print_str(i8*) {
 @entry
-  alloc 8
-  store 0 <unnamed>
+  %len_slot = alloc 8
+  store 0 %len_slot
   jmp %loop
 @loop
-  load <unnamed>
-  add <unnamed> <unnamed>
-  loadub <unnamed>
-  ceq <unnamed> 0
-  add <unnamed> 1
-  store <unnamed> <unnamed>
-  br <unnamed> %done %loop
+  %curr_len = load %len_slot
+  %ps_curr_ptr = add %s_val %curr_len
+  %curr_char = loadub %ps_curr_ptr
+  %is_null = ceq %curr_char 0
+  %next_len = add %curr_len 1
+  store %next_len %len_slot
+  br %is_null %done %loop
 @done
-  load <unnamed>
-  sub <unnamed> 1
-  extern io.write(i64 1, i8* <unnamed>, i32 <unnamed>)
-  extern io.write(i64 1, i8* %nl, i64 1)
+  %final_len = load %len_slot
+  %actual_len = sub %final_len 1
+  %write_res = extern io.write(i64 1, i8* %s_val, i32 %actual_len)
+  %write_res = extern io.write(i64 1, i8* %nl, i64 1)
   ret null
 }
 

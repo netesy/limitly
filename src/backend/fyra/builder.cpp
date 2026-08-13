@@ -141,6 +141,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     // Initialize registers from function parameters
     size_t param_idx = 0;
     for (const auto& param : main_fn->getParameters()) {
+        if (param->getName().empty()) {
+            param->setName("p" + std::to_string(param_idx));
+        }
         regs[param_idx] = param.get();
         param_idx++;
     }
@@ -153,8 +156,17 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         }
         return context_->getConstantInt(context_->getIntegerType(64), 0);
     };
+    auto name_val = [&](ir::Value* v, const std::string& prefix) -> ir::Value* {
+        if (v && v->getName().empty() && !dynamic_cast<ir::Constant*>(v)) {
+            v->setName(prefix + "_" + std::to_string(label_counter_++));
+        }
+        return v;
+    };
     auto store_reg = [&](uint32_t r, ir::Value* v, LIR::Type t) {
         regs[r] = v;
+        if (v && v->getName().empty() && !dynamic_cast<ir::Constant*>(v)) {
+            v->setName("r" + std::to_string(r));
+        }
     };
 
     bool terminated = false;
@@ -450,12 +462,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::FrameGetField: {
-                ir::Value* addr = builder_->createAdd(load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm * 8));
+                ir::Value* addr = name_val(builder_->createAdd(load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm * 8)), "addr");
                 store_reg(inst.dst, builder_->createLoad(addr), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::FrameSetField: {
-                ir::Value* addr = builder_->createAdd(load_reg(inst.dst, inst.result_type), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm * 8));
+                ir::Value* addr = name_val(builder_->createAdd(load_reg(inst.dst, inst.result_type), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm * 8)), "addr");
                 builder_->createStore(load_reg(inst.a, inst.type_a), addr);
                 break;
             }
@@ -534,16 +546,16 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             case LIR::LIR_Op::PtrAlign: {
                 // Alignment: (ptr + (alignment - 1)) & ~(alignment - 1)
-                ir::Value* align_minus_one = builder_->createSub(load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), 1));
-                ir::Value* aligned = builder_->createAdd(load_reg(inst.a, inst.type_a), align_minus_one);
-                ir::Value* mask = builder_->createXor(align_minus_one, context_->getConstantInt(context_->getIntegerType(64), -1));
+                ir::Value* align_minus_one = name_val(builder_->createSub(load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), 1)), "align_minus_one");
+                ir::Value* aligned = name_val(builder_->createAdd(load_reg(inst.a, inst.type_a), align_minus_one), "aligned");
+                ir::Value* mask = name_val(builder_->createXor(align_minus_one, context_->getConstantInt(context_->getIntegerType(64), -1)), "mask");
                 store_reg(inst.dst, builder_->createAnd(aligned, mask), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::PtrIsAligned: {
                 // Check if (ptr & (alignment - 1)) == 0
-                ir::Value* align_minus_one = builder_->createSub(load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), 1));
-                ir::Value* masked = builder_->createAnd(load_reg(inst.a, inst.type_a), align_minus_one);
+                ir::Value* align_minus_one = name_val(builder_->createSub(load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), 1)), "align_minus_one");
+                ir::Value* masked = name_val(builder_->createAnd(load_reg(inst.a, inst.type_a), align_minus_one), "masked");
                 store_reg(inst.dst, builder_->createCeq(masked, context_->getConstantInt(context_->getIntegerType(64), 0)), inst.result_type);
                 break;
             }

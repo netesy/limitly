@@ -1,81 +1,81 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.math.__init__
-  call %main
+  %r0 = call %std.math.__init__
+  %r1 = call %main
   ret 0
 }
 
 function std.math.is_inf(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.is_inf <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.is_inf %r1
+  ret %r3
 }
 
 function std.math.is_nan(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.is_nan <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.is_nan %r1
+  ret %r3
 }
 
 function std.math.sinh(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.sinh <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.sinh %r1
+  ret %r3
 }
 
 function std.math.atan2(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.atan2 <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.math.Float.init %r2 %p0
+  %r4 = call %std.math.Float.atan2 %r2 %p1
+  ret %r4
 }
 
 function std.math.acos(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.acos <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.acos %r1
+  ret %r3
 }
 
 function std.math.is_finite(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.is_finite <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.is_finite %r1
+  ret %r3
 }
 
 function std.math.asin(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.asin <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.asin %r1
+  ret %r3
 }
 
 function std.math.tan(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.tan <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.tan %r1
+  ret %r3
 }
 
 function std.math.__init__() {
@@ -86,99 +86,99 @@ function std.math.__init__() {
 function std.math.cos(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.cos <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.cos %r1
+  ret %r3
 }
 
 function std.math.sin(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.sin <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.sin %r1
+  ret %r3
 }
 
 function std.math.exp2(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.exp2 <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.exp2 %r1
+  ret %r3
 }
 
 function std.math.log10(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.log10 <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.log10 %r1
+  ret %r3
 }
 
 function std.math.log(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.log <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.log %r1
+  ret %r3
 }
 
 function std.math.hypot(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.hypot <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.math.Float.init %r2 %p0
+  %r4 = call %std.math.Float.hypot %r2 %p1
+  ret %r4
 }
 
 function std.math.cbrt(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.cbrt <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.cbrt %r1
+  ret %r3
 }
 
 function std.math.sqrt(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.sqrt <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.sqrt %r1
+  ret %r3
 }
 
 function std.math.round(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.round <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.round %r1
+  ret %r3
 }
 
 function std.math.sign(i64) {
 @entry
 @block_0
-  csgt <unnamed> 2
-  br <unnamed> %block_3 %block_5
+  %r2 = csgt %p0 2
+  br %r2 %block_3 %block_5
 @block_3
   jmp %block_3
   ret 2
 @block_5
-  cslt <unnamed> 2
-  br <unnamed> %block_8 %block_11
+  %r6 = cslt %p0 2
+  br %r6 %block_8 %block_11
 @block_8
   jmp %block_8
-  neg 2
-  ret <unnamed>
+  %r9 = neg 2
+  ret %r9
 @block_11
   ret 2
 }
@@ -186,26 +186,26 @@ function std.math.sign(i64) {
 function std.math.exp(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.exp <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.exp %r1
+  ret %r3
 }
 
 function std.math.clamp(i64, i64, i64) {
 @entry
 @block_0
-  cslt <unnamed> <unnamed>
-  br <unnamed> %block_2 %block_3
+  %r3 = cslt %p0 %p1
+  br %r3 %block_2 %block_3
 @block_2
   jmp %block_2
-  ret <unnamed>
+  ret %p1
 @block_3
-  csgt <unnamed> <unnamed>
-  br <unnamed> %block_5 %block_6
+  %r5 = csgt %p0 %p2
+  br %r5 %block_5 %block_6
 @block_5
   jmp %block_5
-  ret <unnamed>
+  ret %p2
 @block_6
   ret 0
 }
@@ -213,53 +213,53 @@ function std.math.clamp(i64, i64, i64) {
 function std.math.max(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.max <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.math.Float.init %r2 %p0
+  %r4 = call %std.math.Float.max %r2 %p1
+  ret %r4
 }
 
 function std.math.ceil(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.ceil <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.ceil %r1
+  ret %r3
 }
 
 function std.math.min(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.min <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.math.Float.init %r2 %p0
+  %r4 = call %std.math.Float.min %r2 %p1
+  ret %r4
 }
 
 function std.math.combinations(i64, i64) {
 @entry
 @block_0
-  cslt <unnamed> 1
-  br <unnamed> %block_7 %block_4
+  %r4 = cslt %p1 1
+  br %r4 %block_7 %block_4
 @block_4
   jmp %block_4
-  csgt <unnamed> <unnamed>
+  %r5 = csgt %p1 %p0
   jmp %block_7
 @block_7
-  br <unnamed> %block_8 %block_10
+  br %r5 %block_8 %block_10
 @block_8
   jmp %block_8
   ret 1
 @block_10
-  call %std.math.factorial <unnamed>
-  call %std.math.factorial <unnamed>
-  sub <unnamed> <unnamed>
-  call %std.math.factorial <unnamed>
-  mul <unnamed> <unnamed>
-  cast <unnamed>
-  div <unnamed> <unnamed>
-  ret <unnamed>
+  %r8 = call %std.math.factorial %p0
+  %r9 = call %std.math.factorial %p1
+  %r10 = sub %p0 %p1
+  %r11 = call %std.math.factorial %r10
+  %r12 = mul %r9 %r11
+  %r14 = cast %r12
+  %r13 = div %r8 %r14
+  ret %r13
 }
 
 function std.math.Float.fract(i64) {
@@ -275,36 +275,36 @@ function std.math.Float.cos(i64) {
 function std.math.cosh(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.cosh <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.cosh %r1
+  ret %r3
 }
 
 function std.math.gcd(i64, i64) {
 @entry
 @block_0
-  call %std.math.abs_int <unnamed>
-  call %std.math.abs_int <unnamed>
+  %r2 = call %std.math.abs_int %p0
+  %r4 = call %std.math.abs_int %p1
   jmp %block_5
 @block_5
-  cne <unnamed> 1
-  br <unnamed> %block_8 %block_13
+  %r7 = cne %r4 1
+  br %r7 %block_8 %block_13
 @block_8
   jmp %block_8
-  rem <unnamed> <unnamed>
+  %r10 = rem %r2 %r4
   jmp %block_5
 @block_13
-  ret <unnamed>
+  ret %r4
 }
 
 function std.math.nearly_equal(i64, i64, i64) {
 @entry
 @block_0
-  sub <unnamed> <unnamed>
-  call %std.math.abs <unnamed>
-  csle <unnamed> <unnamed>
-  ret <unnamed>
+  %r3 = sub %p0 %p1
+  %r4 = call %std.math.abs %r3
+  %r5 = csle %r4 %p2
+  ret %r5
 }
 
 function std.math.Float.round(i64) {
@@ -320,10 +320,10 @@ function std.math.Float.max(i64, i64) {
 function std.math.pow(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.pow <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.math.Float.init %r2 %p0
+  %r4 = call %std.math.Float.pow %r2 %p1
+  ret %r4
 }
 
 function std.math.Int.max(i64, i64) {
@@ -334,10 +334,10 @@ function std.math.Int.max(i64, i64) {
 function std.math.abs_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Int.init <unnamed> <unnamed>
-  call %std.math.Int.abs <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Int.init %r1 %p0
+  %r3 = call %std.math.Int.abs %r1
+  ret %r3
 }
 
 function std.math.Int.init(i64, i64) {
@@ -348,18 +348,18 @@ function std.math.Int.init(i64, i64) {
 function main() {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_0
+  %r1 = call %lm_print_int %r0
   ret 1
 }
 
 function std.math.trunc(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.trunc <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.trunc %r1
+  ret %r3
 }
 
 function std.math.Float.sinh(i64) {
@@ -380,10 +380,10 @@ function std.math.Float.log2(i64) {
 function std.math.fract(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.fract <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.fract %r1
+  ret %r3
 }
 
 function std.math.Float.min(i64, i64) {
@@ -394,10 +394,10 @@ function std.math.Float.min(i64, i64) {
 function std.math.floor(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.floor <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.floor %r1
+  ret %r3
 }
 
 function std.math.Int.abs(i64) {
@@ -418,30 +418,30 @@ function std.math.Float.floor(i64) {
 function std.math.lerp(i64, i64, i64) {
 @entry
 @block_0
-  sub <unnamed> <unnamed>
-  mul <unnamed> <unnamed>
-  sub <unnamed> <unnamed>
-  mul <unnamed> <unnamed>
-  add <unnamed> <unnamed>
-  ret <unnamed>
+  %r3 = sub %p1 %p0
+  %r4 = mul %r3 %p2
+  %r5 = sub %p1 %p0
+  %r6 = mul %r5 %p2
+  %r7 = add %p0 %r6
+  ret %r7
 }
 
 function std.math.log2(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.log2 <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.log2 %r1
+  ret %r3
 }
 
 function std.math.abs(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.abs <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.abs %r1
+  ret %r3
 }
 
 function std.math.Float.ceil(i64) {
@@ -452,23 +452,23 @@ function std.math.Float.ceil(i64) {
 function std.math.lcm(i64, i64) {
 @entry
 @block_0
-  ceq <unnamed> 1
-  br <unnamed> %block_8 %block_4
+  %r4 = ceq %p0 1
+  br %r4 %block_8 %block_4
 @block_4
   jmp %block_4
-  ceq <unnamed> 1
+  %r6 = ceq %p1 1
   jmp %block_8
 @block_8
-  br <unnamed> %block_9 %block_11
+  br %r6 %block_9 %block_11
 @block_9
   jmp %block_9
   ret 1
 @block_11
-  mul <unnamed> <unnamed>
-  call %std.math.abs_int <unnamed>
-  call %std.math.gcd <unnamed> <unnamed>
-  div <unnamed> <unnamed>
-  ret <unnamed>
+  %r9 = mul %p0 %p1
+  %r10 = call %std.math.abs_int %r9
+  %r11 = call %std.math.gcd %p0 %p1
+  %r12 = div %r10 %r11
+  ret %r12
 }
 
 function std.math.Float.sqrt(i64) {
@@ -489,10 +489,10 @@ function std.math.Float.log(i64) {
 function std.math.tanh(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.tanh <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.tanh %r1
+  ret %r3
 }
 
 function std.math.Float.atan(i64) {
@@ -518,29 +518,29 @@ function std.math.Float.log10(i64) {
 function std.math.factorial(i64) {
 @entry
 @block_0
-  cslt <unnamed> 1
-  br <unnamed> %block_3 %block_5
+  %r2 = cslt %p0 1
+  br %r2 %block_3 %block_5
 @block_3
   jmp %block_3
   ret 1
 @block_5
-  ceq <unnamed> 1
-  br <unnamed> %block_8 %block_10
+  %r6 = ceq %p0 1
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
   ret 9
 @block_10
   jmp %block_13
 @block_13
-  csle 9 <unnamed>
-  br <unnamed> %block_15 %block_22
+  %r11 = csle 9 %p0
+  br %r11 %block_15 %block_22
 @block_15
   jmp %block_15
-  mul 9 9
-  add 9 9
+  %r13 = mul 9 9
+  %r16 = add 9 9
   jmp %block_13
 @block_22
-  ret <unnamed>
+  ret %r13
 }
 
 function std.math.Float.exp2(i64) {
@@ -566,23 +566,23 @@ function std.math.Float.abs(i64) {
 function std.math.permutations(i64, i64) {
 @entry
 @block_0
-  cslt <unnamed> 1
-  br <unnamed> %block_7 %block_4
+  %r4 = cslt %p1 1
+  br %r4 %block_7 %block_4
 @block_4
   jmp %block_4
-  csgt <unnamed> <unnamed>
+  %r5 = csgt %p1 %p0
   jmp %block_7
 @block_7
-  br <unnamed> %block_8 %block_10
+  br %r5 %block_8 %block_10
 @block_8
   jmp %block_8
   ret 1
 @block_10
-  call %std.math.factorial <unnamed>
-  sub <unnamed> <unnamed>
-  call %std.math.factorial <unnamed>
-  div <unnamed> <unnamed>
-  ret <unnamed>
+  %r8 = call %std.math.factorial %p0
+  %r9 = sub %p0 %p1
+  %r10 = call %std.math.factorial %r9
+  %r11 = div %r8 %r10
+  ret %r11
 }
 
 function std.math.Float.hypot(i64, i64) {
@@ -598,10 +598,10 @@ function std.math.Float.sin(i64) {
 function std.math.atan(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.math.Float.init <unnamed> <unnamed>
-  call %std.math.Float.atan <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.math.Float.init %r1 %p0
+  %r3 = call %std.math.Float.atan %r1
+  ret %r3
 }
 
 function std.math.Float.tanh(i64) {
@@ -654,39 +654,39 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }

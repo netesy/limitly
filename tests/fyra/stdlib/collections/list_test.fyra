@@ -1,8 +1,8 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.collections.linkedlist.__init__
-  call %main
+  %r0 = call %std.collections.linkedlist.__init__
+  %r1 = call %main
   ret 0
 }
 
@@ -54,55 +54,55 @@ function std.collections.linkedlist.LinkedList.pop_front(i64) {
 function main() {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.linkedlist.LinkedList.init <unnamed>
-  call %std.collections.linkedlist.LinkedList.push_back <unnamed> 9
-  call %std.collections.linkedlist.LinkedList.push_back <unnamed> 17
-  call %std.collections.linkedlist.LinkedList.push_front <unnamed> 1
-  call %std.collections.linkedlist.LinkedList.length <unnamed>
-  call %lm_box_string %str_const_0
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %std.collections.linkedlist.LinkedList.length <unnamed>
-  ceq <unnamed> 25
-  call %lm_box_string %str_const_1
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.linkedlist.LinkedList.pop_front <unnamed>
-  ceq <unnamed> 1
-  call %lm_box_string %str_const_2
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.linkedlist.LinkedList.pop_back <unnamed>
-  ceq <unnamed> 17
-  call %lm_box_string %str_const_3
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.linkedlist.LinkedList.pop_back <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_4
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.linkedlist.LinkedList.pop_back <unnamed>
-  ceq <unnamed> 2
-  call %lm_box_string %str_const_5
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.linkedlist.LinkedList.is_empty <unnamed>
-  call %lm_box_string %str_const_6
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.linkedlist.LinkedList.push_back <unnamed> 81
-  call %std.collections.linkedlist.LinkedList.push_back <unnamed> 161
-  call %std.collections.linkedlist.LinkedList.iterator <unnamed>
-  call %std.collections.linkedlist.Iterator.next <unnamed>
-  ceq <unnamed> 81
-  call %lm_box_string %str_const_7
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.linkedlist.Iterator.next <unnamed>
-  ceq <unnamed> 161
-  call %lm_box_string %str_const_8
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.linkedlist.Iterator.next <unnamed>
-  ceq <unnamed> 2
-  call %lm_box_string %str_const_9
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_10
-  call %lm_print_int <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.collections.linkedlist.LinkedList.init %r0
+  %r4 = call %std.collections.linkedlist.LinkedList.push_back %r0 9
+  %r6 = call %std.collections.linkedlist.LinkedList.push_back %r0 17
+  %r8 = call %std.collections.linkedlist.LinkedList.push_front %r0 1
+  %r9 = call %std.collections.linkedlist.LinkedList.length %r0
+  %r11 = call %lm_box_string %str_const_0
+  %r10 = call %lm_rt_str_format %r11 %r9
+  %r12 = call %lm_print_int %r10
+  %r13 = call %std.collections.linkedlist.LinkedList.length %r0
+  %r15 = ceq %r13 25
+  %r16 = call %lm_box_string %str_const_1
+  %r17 = call %lm_assert %r15 %r16
+  %r18 = call %std.collections.linkedlist.LinkedList.pop_front %r0
+  %r20 = ceq %r18 1
+  %r21 = call %lm_box_string %str_const_2
+  %r22 = call %lm_assert %r20 %r21
+  %r23 = call %std.collections.linkedlist.LinkedList.pop_back %r0
+  %r25 = ceq %r23 17
+  %r26 = call %lm_box_string %str_const_3
+  %r27 = call %lm_assert %r25 %r26
+  %r28 = call %std.collections.linkedlist.LinkedList.pop_back %r0
+  %r30 = ceq %r28 9
+  %r31 = call %lm_box_string %str_const_4
+  %r32 = call %lm_assert %r30 %r31
+  %r33 = call %std.collections.linkedlist.LinkedList.pop_back %r0
+  %r35 = ceq %r33 2
+  %r36 = call %lm_box_string %str_const_5
+  %r37 = call %lm_assert %r35 %r36
+  %r38 = call %std.collections.linkedlist.LinkedList.is_empty %r0
+  %r39 = call %lm_box_string %str_const_6
+  %r40 = call %lm_assert %r38 %r39
+  %r42 = call %std.collections.linkedlist.LinkedList.push_back %r0 81
+  %r44 = call %std.collections.linkedlist.LinkedList.push_back %r0 161
+  %r45 = call %std.collections.linkedlist.LinkedList.iterator %r0
+  %r47 = call %std.collections.linkedlist.Iterator.next %r45
+  %r49 = ceq %r47 81
+  %r50 = call %lm_box_string %str_const_7
+  %r51 = call %lm_assert %r49 %r50
+  %r52 = call %std.collections.linkedlist.Iterator.next %r45
+  %r54 = ceq %r52 161
+  %r55 = call %lm_box_string %str_const_8
+  %r56 = call %lm_assert %r54 %r55
+  %r57 = call %std.collections.linkedlist.Iterator.next %r45
+  %r59 = ceq %r57 2
+  %r60 = call %lm_box_string %str_const_9
+  %r61 = call %lm_assert %r59 %r60
+  %r62 = call %lm_box_string %str_const_10
+  %r63 = call %lm_print_int %r62
   ret 1
 }
 
@@ -134,49 +134,49 @@ function lm_rt_str_format(i64, i64) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null

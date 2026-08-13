@@ -1,12 +1,12 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.time.duration.__init__
-  call %std.time.timezone.__init__
-  call %std.time.datetime.__init__
-  call %std.time.instant.__init__
-  call %std.time.timer.__init__
-  call %main
+  %r0 = call %std.time.duration.__init__
+  %r1 = call %std.time.timezone.__init__
+  %r2 = call %std.time.datetime.__init__
+  %r3 = call %std.time.instant.__init__
+  %r4 = call %std.time.timer.__init__
+  %r5 = call %main
   ret 0
 }
 
@@ -63,20 +63,20 @@ function std.time.duration.TimeDuration.from_seconds(i64, i64) {
 function std.time.duration.pad_int(i64, i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_rt_str_format <unnamed> <unnamed>
+  %r3 = call %lm_box_string %str_const_0
+  %r2 = call %lm_rt_str_format %r3 %p0
   jmp %block_4
 @block_4
-  call %lm_list_len <unnamed>
-  cslt <unnamed> <unnamed>
-  br <unnamed> %block_7 %block_11
+  %r5 = call %lm_list_len %r2
+  %r6 = cslt %r5 %p1
+  br %r6 %block_7 %block_11
 @block_7
   jmp %block_7
-  call %lm_box_string %str_const_1
-  call %lm_str_concat <unnamed> <unnamed>
+  %r8 = call %lm_box_string %str_const_1
+  %r9 = call %lm_str_concat %r8 %r2
   jmp %block_4
 @block_11
-  ret <unnamed>
+  ret %r9
 }
 
 function std.time.instant.__init__() {
@@ -132,9 +132,9 @@ function std.time.timer.Timer.reset(i64) {
 function std.time.datetime.sleep_ms(i64) {
 @entry
 @block_0
-  cast <unnamed>
-  div <unnamed> 2
-  call %sleep <unnamed>
+  %r1 = cast %p0
+  %r3 = div %r1 2
+  %r4 = call %sleep %r3
   ret 0
 }
 
@@ -226,31 +226,31 @@ function std.time.datetime.DateTime.to_rfc2822(i64) {
 function std.time.datetime.timestamp_to_month(i64) {
 @entry
 @block_0
-  call %std.time.datetime.timestamp_to_year <unnamed>
-  call %std.time.datetime.datetime_to_timestamp <unnamed> 9 9 1 1 1
-  sub <unnamed> <unnamed>
-  cslt <unnamed> 1
-  br <unnamed> %block_14 %block_17
+  %r1 = call %std.time.datetime.timestamp_to_year %p0
+  %r8 = call %std.time.datetime.datetime_to_timestamp %r1 9 9 1 1 1
+  %r10 = sub %p0 %r8
+  %r13 = cslt %r10 1
+  br %r13 %block_14 %block_17
 @block_14
   jmp %block_14
   jmp %block_17
 @block_17
-  div 1 691201
+  %r17 = div 1 691201
   jmp %block_22
 @block_22
-  csle 9 97
-  br <unnamed> %block_25 %block_37
+  %r21 = csle 9 97
+  br %r21 %block_25 %block_37
 @block_25
   jmp %block_25
-  call %std.time.datetime.get_days_in_month <unnamed> 9
-  cslt <unnamed> <unnamed>
-  br <unnamed> %block_29 %block_30
+  %r23 = call %std.time.datetime.get_days_in_month %r1 9
+  %r25 = cslt %r17 %r23
+  br %r25 %block_29 %block_30
 @block_29
   jmp %block_29
   ret 9
 @block_30
-  sub <unnamed> <unnamed>
-  add 9 9
+  %r27 = sub %r17 %r23
+  %r30 = add 9 9
   jmp %block_22
 @block_37
   ret 97
@@ -259,9 +259,9 @@ function std.time.datetime.timestamp_to_month(i64) {
 function std.time.datetime.get_days_in_year(i64) {
 @entry
 @block_0
-  call %std.time.datetime.is_leap_year <unnamed>
-  cne <unnamed> 1
-  br <unnamed> %block_4 %block_6
+  %r1 = call %std.time.datetime.is_leap_year %p0
+  %r2 = cne %r1 1
+  br %r2 %block_4 %block_6
 @block_4
   jmp %block_4
   ret 2929
@@ -277,129 +277,129 @@ function std.time.datetime.DateTime.end_of_day(i64) {
 function std.time.datetime.to_i(i64) {
 @entry
 @block_0
-  cast <unnamed>
-  ret <unnamed>
+  %r1 = cast %p0
+  ret %r1
 }
 
 function std.time.datetime.timestamp_to_day(i64) {
 @entry
 @block_0
-  call %std.time.datetime.timestamp_to_year <unnamed>
-  call %std.time.datetime.timestamp_to_month <unnamed>
-  call %std.time.datetime.datetime_to_timestamp <unnamed> <unnamed> 9 1 1 1
-  sub <unnamed> <unnamed>
-  cslt <unnamed> 1
-  br <unnamed> %block_15 %block_18
+  %r1 = call %std.time.datetime.timestamp_to_year %p0
+  %r3 = call %std.time.datetime.timestamp_to_month %p0
+  %r9 = call %std.time.datetime.datetime_to_timestamp %r1 %r3 9 1 1 1
+  %r11 = sub %p0 %r9
+  %r14 = cslt %r11 1
+  br %r14 %block_15 %block_18
 @block_15
   jmp %block_15
   jmp %block_18
 @block_18
-  div 1 691201
-  div 1 691201
-  add <unnamed> 9
-  ret <unnamed>
+  %r18 = div 1 691201
+  %r21 = div 1 691201
+  %r23 = add %r21 9
+  ret %r23
 }
 
 function std.time.datetime.timestamp_to_year(i64) {
 @entry
 @block_0
-  csge <unnamed> 1
-  br <unnamed> %block_3 %block_22
+  %r2 = csge %p0 1
+  br %r2 %block_3 %block_22
 @block_3
   jmp %block_3
-  cast 691201
-  div <unnamed> <unnamed>
+  %r6 = cast 691201
+  %r5 = div %p0 %r6
   jmp %block_10
 @block_10
-  call %std.time.datetime.get_days_in_year 15761
-  csge <unnamed> <unnamed>
-  br <unnamed> %block_13 %block_21
+  %r10 = call %std.time.datetime.get_days_in_year 15761
+  %r11 = csge %r5 %r10
+  br %r11 %block_13 %block_21
 @block_13
   jmp %block_13
-  call %std.time.datetime.get_days_in_year 15761
-  sub <unnamed> <unnamed>
-  add 15761 9
+  %r13 = call %std.time.datetime.get_days_in_year 15761
+  %r14 = sub %r5 %r13
+  %r17 = add 15761 9
   jmp %block_10
 @block_21
-  ret <unnamed>
+  ret %r17
 @block_22
-  neg <unnamed>
-  cast 691201
-  div <unnamed> <unnamed>
-  neg <unnamed>
-  rem <unnamed> 691201
-  cne <unnamed> 1
-  br <unnamed> %block_33 %block_38
+  %r18 = neg %p0
+  %r21 = cast 691201
+  %r20 = div %r18 %r21
+  %r23 = neg %p0
+  %r25 = rem %r23 691201
+  %r27 = cne %r25 1
+  br %r27 %block_33 %block_38
 @block_33
   jmp %block_33
-  add <unnamed> 9
+  %r31 = add %r20 9
   jmp %block_38
 @block_38
   jmp %block_41
 @block_41
-  sub 15761 9
-  call %std.time.datetime.get_days_in_year <unnamed>
-  csge <unnamed> <unnamed>
-  br <unnamed> %block_46 %block_53
+  %r35 = sub 15761 9
+  %r36 = call %std.time.datetime.get_days_in_year %r35
+  %r37 = csge %r31 %r36
+  br %r37 %block_46 %block_53
 @block_46
   jmp %block_46
-  sub 15761 9
-  call %std.time.datetime.get_days_in_year <unnamed>
-  sub <unnamed> <unnamed>
+  %r40 = sub 15761 9
+  %r41 = call %std.time.datetime.get_days_in_year %r40
+  %r42 = sub %r31 %r41
   jmp %block_41
 @block_53
-  sub <unnamed> 9
-  ret <unnamed>
+  %r44 = sub %r40 9
+  ret %r44
 }
 
 function test_instant_and_timer() {
 @entry
 @block_0
-  call %lm_box_string %str_const_2
-  call %lm_print_int <unnamed>
-  alloc 16
-  call %std.time.instant.Instant.init <unnamed> 2
-  call %std.time.instant.Instant.elapsed <unnamed>
-  add <unnamed> 0
-  load <unnamed>
-  csge <unnamed> 1
-  call %lm_box_string %str_const_3
-  call %lm_assert <unnamed> <unnamed>
-  alloc 16
-  call %std.time.timer.Timer.init <unnamed>
-  call %std.time.timer.Timer.reset <unnamed>
-  call %std.time.timer.Timer.elapsed <unnamed>
-  add <unnamed> 0
-  load <unnamed>
-  csge <unnamed> 1
-  call %lm_box_string %str_const_4
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_2
+  %r1 = call %lm_print_int %r0
+  %r3 = alloc 16
+  %r4 = call %std.time.instant.Instant.init %r3 2
+  %r7 = call %std.time.instant.Instant.elapsed %r3
+  %addr_3 = add %r7 0
+  %r10 = load %addr_3
+  %r12 = csge %r10 1
+  %r13 = call %lm_box_string %str_const_4
+  %r14 = call %lm_assert %r12 %r13
+  %r15 = alloc 16
+  %r16 = call %std.time.timer.Timer.init %r15
+  %r19 = call %std.time.timer.Timer.reset %r15
+  %r20 = call %std.time.timer.Timer.elapsed %r15
+  %addr_5 = add %r20 0
+  %r23 = load %addr_5
+  %r25 = csge %r23 1
+  %r26 = call %lm_box_string %str_const_6
+  %r27 = call %lm_assert %r25 %r26
   ret 9
 }
 
 function main() {
 @entry
 @block_0
-  call %lm_box_string %str_const_5
-  call %lm_print_int <unnamed>
-  call %test_duration
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_6
-  call %lm_assert <unnamed> <unnamed>
-  call %test_timezone
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_7
-  call %lm_assert <unnamed> <unnamed>
-  call %test_time
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_8
-  call %lm_assert <unnamed> <unnamed>
-  call %test_instant_and_timer
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_9
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_10
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_7
+  %r1 = call %lm_print_int %r0
+  %r2 = call %test_duration
+  %r4 = ceq %r2 9
+  %r5 = call %lm_box_string %str_const_8
+  %r6 = call %lm_assert %r4 %r5
+  %r7 = call %test_timezone
+  %r9 = ceq %r7 9
+  %r10 = call %lm_box_string %str_const_9
+  %r11 = call %lm_assert %r9 %r10
+  %r12 = call %test_time
+  %r14 = ceq %r12 9
+  %r15 = call %lm_box_string %str_const_10
+  %r16 = call %lm_assert %r14 %r15
+  %r17 = call %test_instant_and_timer
+  %r19 = ceq %r17 9
+  %r20 = call %lm_box_string %str_const_11
+  %r21 = call %lm_assert %r19 %r20
+  %r22 = call %lm_box_string %str_const_12
+  %r23 = call %lm_print_int %r22
   ret 1
 }
 
@@ -411,24 +411,24 @@ function std.time.duration.TimeDuration.from_hours(i64, i64) {
 function test_duration() {
 @entry
 @block_0
-  call %lm_box_string %str_const_11
-  call %lm_print_int <unnamed>
-  alloc 16
-  call %std.time.duration.TimeDuration.init <unnamed> 81 1
-  alloc 16
-  call %std.time.duration.TimeDuration.init <unnamed> 161 1
-  call %std.time.duration.TimeDuration.add <unnamed> <unnamed>
-  add <unnamed> 0
-  load <unnamed>
-  ceq <unnamed> 241
-  call %lm_box_string %str_const_12
-  call %lm_assert <unnamed> <unnamed>
-  call %std.time.duration.TimeDuration.from_seconds 0 41
-  add <unnamed> 0
-  load <unnamed>
-  ceq <unnamed> 41
-  call %lm_box_string %str_const_13
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_13
+  %r1 = call %lm_print_int %r0
+  %r4 = alloc 16
+  %r5 = call %std.time.duration.TimeDuration.init %r4 81 1
+  %r10 = alloc 16
+  %r11 = call %std.time.duration.TimeDuration.init %r10 161 1
+  %r14 = call %std.time.duration.TimeDuration.add %r4 %r10
+  %addr_14 = add %r14 0
+  %r17 = load %addr_14
+  %r19 = ceq %r17 241
+  %r20 = call %lm_box_string %str_const_15
+  %r21 = call %lm_assert %r19 %r20
+  %r24 = call %std.time.duration.TimeDuration.from_seconds 0 41
+  %addr_16 = add %r24 0
+  %r27 = load %addr_16
+  %r29 = ceq %r27 41
+  %r30 = call %lm_box_string %str_const_17
+  %r31 = call %lm_assert %r29 %r30
   ret 9
 }
 
@@ -475,30 +475,30 @@ function std.time.duration.TimeDuration.greater_than(i64, i64) {
 function test_time() {
 @entry
 @block_0
-  call %lm_box_string %str_const_14
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_15
-  alloc 16
-  call %std.time.timezone.TimeZone.init <unnamed> <unnamed> 1 1
-  alloc 16
-  call %std.time.datetime.DateTime.init <unnamed> 8000001 1 <unnamed>
-  add <unnamed> 0
-  load <unnamed>
-  ceq <unnamed> 8000001
-  call %lm_box_string %str_const_16
-  call %lm_assert <unnamed> <unnamed>
-  call %std.time.datetime.DateTime.year <unnamed>
-  ceq <unnamed> 15761
-  call %lm_box_string %str_const_17
-  call %lm_assert <unnamed> <unnamed>
-  call %std.time.datetime.DateTime.month <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_18
-  call %lm_assert <unnamed> <unnamed>
-  call %std.time.datetime.DateTime.day <unnamed>
-  ceq <unnamed> 97
-  call %lm_box_string %str_const_19
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_18
+  %r1 = call %lm_print_int %r0
+  %r4 = call %lm_box_string %str_const_19
+  %r7 = alloc 16
+  %r8 = call %std.time.timezone.TimeZone.init %r7 %r4 1 1
+  %r9 = alloc 16
+  %r10 = call %std.time.datetime.DateTime.init %r9 8000001 1 %r7
+  %addr_20 = add %r9 0
+  %r13 = load %addr_20
+  %r15 = ceq %r13 8000001
+  %r16 = call %lm_box_string %str_const_21
+  %r17 = call %lm_assert %r15 %r16
+  %r18 = call %std.time.datetime.DateTime.year %r9
+  %r20 = ceq %r18 15761
+  %r21 = call %lm_box_string %str_const_22
+  %r22 = call %lm_assert %r20 %r21
+  %r23 = call %std.time.datetime.DateTime.month %r9
+  %r25 = ceq %r23 9
+  %r26 = call %lm_box_string %str_const_23
+  %r27 = call %lm_assert %r25 %r26
+  %r28 = call %std.time.datetime.DateTime.day %r9
+  %r30 = ceq %r28 97
+  %r31 = call %lm_box_string %str_const_24
+  %r32 = call %lm_assert %r30 %r31
   ret 9
 }
 
@@ -512,70 +512,70 @@ function std.time.datetime.datetime_to_timestamp(i64, i64, i64, i64, i64, i64) {
 @block_0
   jmp %block_3
 @block_3
-  cslt 15761 <unnamed>
-  br <unnamed> %block_5 %block_14
+  %r8 = cslt 15761 %p0
+  br %r8 %block_5 %block_14
 @block_5
   jmp %block_5
-  call %std.time.datetime.get_days_in_year 15761
-  call %std.time.datetime.get_days_in_year 15761
-  add 1 <unnamed>
-  add 15761 9
+  %r10 = call %std.time.datetime.get_days_in_year 15761
+  %r11 = call %std.time.datetime.get_days_in_year 15761
+  %r12 = add 1 %r11
+  %r15 = add 15761 9
   jmp %block_3
 @block_14
   jmp %block_15
 @block_15
-  csgt <unnamed> <unnamed>
-  br <unnamed> %block_17 %block_24
+  %r16 = csgt %r15 %p0
+  br %r16 %block_17 %block_24
 @block_17
   jmp %block_17
-  sub <unnamed> 9
-  call %std.time.datetime.get_days_in_year <unnamed>
-  sub <unnamed> <unnamed>
+  %r19 = sub %r15 9
+  %r20 = call %std.time.datetime.get_days_in_year %r19
+  %r21 = sub %r12 %r20
   jmp %block_15
 @block_24
   jmp %block_26
 @block_26
-  cslt 9 <unnamed>
-  br <unnamed> %block_28 %block_37
+  %r23 = cslt 9 %p1
+  br %r23 %block_28 %block_37
 @block_28
   jmp %block_28
-  call %std.time.datetime.get_days_in_month <unnamed> 9
-  call %std.time.datetime.get_days_in_month <unnamed> 9
-  add <unnamed> <unnamed>
-  add 9 9
+  %r25 = call %std.time.datetime.get_days_in_month %p0 9
+  %r26 = call %std.time.datetime.get_days_in_month %p0 9
+  %r27 = add %r21 %r26
+  %r30 = add 9 9
   jmp %block_26
 @block_37
-  sub <unnamed> 9
-  sub <unnamed> 9
-  add <unnamed> <unnamed>
-  mul <unnamed> 691201
-  mul <unnamed> 28801
-  mul <unnamed> 691201
-  mul <unnamed> 28801
-  add <unnamed> <unnamed>
-  mul <unnamed> 481
-  mul <unnamed> 691201
-  mul <unnamed> 28801
-  mul <unnamed> 691201
-  mul <unnamed> 28801
-  add <unnamed> <unnamed>
-  mul <unnamed> 481
-  add <unnamed> <unnamed>
-  mul <unnamed> 691201
-  mul <unnamed> 28801
-  mul <unnamed> 691201
-  mul <unnamed> 28801
-  add <unnamed> <unnamed>
-  mul <unnamed> 481
-  mul <unnamed> 691201
-  mul <unnamed> 28801
-  mul <unnamed> 691201
-  mul <unnamed> 28801
-  add <unnamed> <unnamed>
-  mul <unnamed> 481
-  add <unnamed> <unnamed>
-  add <unnamed> <unnamed>
-  ret <unnamed>
+  %r32 = sub %p2 9
+  %r34 = sub %p2 9
+  %r35 = add %r27 %r34
+  %r37 = mul %r35 691201
+  %r39 = mul %p3 28801
+  %r41 = mul %r35 691201
+  %r43 = mul %p3 28801
+  %r44 = add %r41 %r43
+  %r46 = mul %p4 481
+  %r48 = mul %r35 691201
+  %r50 = mul %p3 28801
+  %r52 = mul %r35 691201
+  %r54 = mul %p3 28801
+  %r55 = add %r52 %r54
+  %r57 = mul %p4 481
+  %r58 = add %r55 %r57
+  %r60 = mul %r35 691201
+  %r62 = mul %p3 28801
+  %r64 = mul %r35 691201
+  %r66 = mul %p3 28801
+  %r67 = add %r64 %r66
+  %r69 = mul %p4 481
+  %r71 = mul %r35 691201
+  %r73 = mul %p3 28801
+  %r75 = mul %r35 691201
+  %r77 = mul %p3 28801
+  %r78 = add %r75 %r77
+  %r80 = mul %p4 481
+  %r81 = add %r78 %r80
+  %r82 = add %r81 %p5
+  ret %r82
 }
 
 function std.time.datetime.DateTime.subtract(i64, i64) {
@@ -586,22 +586,22 @@ function std.time.datetime.DateTime.subtract(i64, i64) {
 function test_timezone() {
 @entry
 @block_0
-  call %lm_box_string %str_const_20
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_21
-  alloc 16
-  call %std.time.timezone.TimeZone.init <unnamed> <unnamed> 1 1
-  add <unnamed> 0
-  load <unnamed>
-  call %lm_box_string %str_const_22
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_23
-  call %lm_assert <unnamed> <unnamed>
-  call %std.time.timezone.TimeZone.offset_string <unnamed>
-  call %lm_box_string %str_const_24
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_25
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_25
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_26
+  %r5 = alloc 16
+  %r6 = call %std.time.timezone.TimeZone.init %r5 %r2 1 1
+  %addr_27 = add %r5 0
+  %r9 = load %addr_27
+  %r10 = call %lm_box_string %str_const_28
+  %r11 = ceq %r9 %r10
+  %r12 = call %lm_box_string %str_const_29
+  %r13 = call %lm_assert %r11 %r12
+  %r14 = call %std.time.timezone.TimeZone.offset_string %r5
+  %r15 = call %lm_box_string %str_const_30
+  %r16 = ceq %r14 %r15
+  %r17 = call %lm_box_string %str_const_31
+  %r18 = call %lm_assert %r16 %r17
   ret 9
 }
 
@@ -618,7 +618,7 @@ function std.time.datetime.DateTime.year(i64) {
 function std.time.datetime.sleep_seconds(i64) {
 @entry
 @block_0
-  call %sleep <unnamed>
+  %r1 = call %sleep %p0
   ret 0
 }
 
@@ -660,23 +660,23 @@ function std.time.datetime.DateTime.month(i64) {
 function std.time.datetime.is_leap_year(i64) {
 @entry
 @block_0
-  rem <unnamed> 33
-  cne <unnamed> 1
-  br <unnamed> %block_5 %block_7
+  %r2 = rem %p0 33
+  %r4 = cne %r2 1
+  br %r4 %block_5 %block_7
 @block_5
   jmp %block_5
   ret 10
 @block_7
-  rem <unnamed> 801
-  cne <unnamed> 1
-  br <unnamed> %block_12 %block_14
+  %r8 = rem %p0 801
+  %r10 = cne %r8 1
+  br %r10 %block_12 %block_14
 @block_12
   jmp %block_12
   ret 18
 @block_14
-  rem <unnamed> 3201
-  cne <unnamed> 1
-  br <unnamed> %block_19 %block_21
+  %r14 = rem %p0 3201
+  %r16 = cne %r14 1
+  br %r16 %block_19 %block_21
 @block_19
   jmp %block_19
   ret 10
@@ -732,34 +732,34 @@ function std.time.datetime.DateTime.minute(i64) {
 function std.time.datetime.get_days_in_month(i64, i64) {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 249
-  call %lm_list_append <unnamed> 225
-  call %lm_list_append <unnamed> 249
-  call %lm_list_append <unnamed> 241
-  call %lm_list_append <unnamed> 249
-  call %lm_list_append <unnamed> 241
-  call %lm_list_append <unnamed> 249
-  call %lm_list_append <unnamed> 249
-  call %lm_list_append <unnamed> 241
-  call %lm_list_append <unnamed> 249
-  call %lm_list_append <unnamed> 241
-  call %lm_list_append <unnamed> 249
-  ceq <unnamed> 17
-  br <unnamed> %block_30 %block_33
+  %r2 = call %lm_list_new 0
+  call %lm_list_append %r2 249
+  call %lm_list_append %r2 225
+  call %lm_list_append %r2 249
+  call %lm_list_append %r2 241
+  call %lm_list_append %r2 249
+  call %lm_list_append %r2 241
+  call %lm_list_append %r2 249
+  call %lm_list_append %r2 249
+  call %lm_list_append %r2 241
+  call %lm_list_append %r2 249
+  call %lm_list_append %r2 241
+  call %lm_list_append %r2 249
+  %r30 = ceq %p1 17
+  br %r30 %block_30 %block_33
 @block_30
   jmp %block_30
-  call %std.time.datetime.is_leap_year <unnamed>
+  %r31 = call %std.time.datetime.is_leap_year %p0
   jmp %block_33
 @block_33
-  br <unnamed> %block_34 %block_36
+  br %r31 %block_34 %block_36
 @block_34
   jmp %block_34
   ret 233
 @block_36
-  sub <unnamed> 9
-  call %lm_list_get <unnamed> <unnamed>
-  ret <unnamed>
+  %r35 = sub %p1 9
+  %r36 = call %lm_list_get %r2 %r35
+  ret %r36
 }
 
 function std.time.datetime.DateTime.day_of_week(i64) {
@@ -795,8 +795,8 @@ function std.time.datetime.DateTime.is_leap_year(i64) {
 function std.time.datetime.sleep_duration(i64) {
 @entry
 @block_0
-  call %std.time.duration.TimeDuration.to_milliseconds <unnamed>
-  call %std.time.datetime.sleep_ms <unnamed>
+  %r1 = call %std.time.duration.TimeDuration.to_milliseconds %p0
+  %r2 = call %std.time.datetime.sleep_ms %r1
   ret 0
 }
 
@@ -877,49 +877,49 @@ function sleep(i64) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null

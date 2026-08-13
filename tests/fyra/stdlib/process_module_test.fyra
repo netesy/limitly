@@ -1,8 +1,8 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.process.index.__init__
-  call %main
+  %r0 = call %std.process.index.__init__
+  %r1 = call %main
   ret 0
 }
 
@@ -14,15 +14,15 @@ function std.process.index.__init__() {
 function std.process.index.id() {
 @entry
 @block_0
-  call %std.process.process.id
+  %r0 = call %std.process.process.id
   ret 0
 }
 
 function std.process.index.exit(i64) {
 @entry
 @block_0
-  call %std.process.process.exit <unnamed>
-  ret <unnamed>
+  %r1 = call %std.process.process.exit %p0
+  ret %r1
 }
 
 function std.process.index.Process.init(i64) {
@@ -38,17 +38,17 @@ function std.process.index.Process.run(i64, i64) {
 function std.process.index.Pipe() {
 @entry
 @block_0
-  alloc 16
-  call %std.process.pipe.Pipe.init <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.process.pipe.Pipe.init %r0
   ret 0
 }
 
 function std.process.index.Command(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.process.command.Command.init <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.process.command.Command.init %r1 %p0
+  ret %r1
 }
 
 function std.process.process.id() {
@@ -92,36 +92,36 @@ function std.process.process.run(i64) {
 function test_pipe_frame() {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_print_int <unnamed>
-  call %std.process.index.Pipe
-  cast <unnamed>
-  call %lm_box_string %str_const_1
-  call %std.process.pipe.Pipe.write <unnamed> <unnamed>
-  call %std.process.pipe.Pipe.read <unnamed>
-  call %lm_box_string %str_const_2
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_3
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_0
+  %r1 = call %lm_print_int %r0
+  %r2 = call %std.process.index.Pipe
+  %r3 = cast %r2
+  %r5 = call %lm_box_string %str_const_1
+  %r6 = call %std.process.pipe.Pipe.write %r3 %r5
+  %r7 = call %std.process.pipe.Pipe.read %r3
+  %r8 = call %lm_box_string %str_const_2
+  %r9 = ceq %r7 %r8
+  %r10 = call %lm_box_string %str_const_3
+  %r11 = call %lm_assert %r9 %r10
   ret 9
 }
 
 function test_process_frame() {
 @entry
 @block_0
-  call %lm_box_string %str_const_4
-  call %lm_print_int <unnamed>
-  alloc 16
-  call %std.process.index.Process.init <unnamed>
-  call %std.process.index.Process.id <unnamed>
-  ceq <unnamed> 1
-  call %lm_box_string %str_const_5
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_6
-  call %std.process.index.Process.run <unnamed> <unnamed>
-  ceq <unnamed> 1
-  call %lm_box_string %str_const_7
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_4
+  %r1 = call %lm_print_int %r0
+  %r2 = alloc 16
+  %r3 = call %std.process.index.Process.init %r2
+  %r6 = call %std.process.index.Process.id %r2
+  %r8 = ceq %r6 1
+  %r9 = call %lm_box_string %str_const_5
+  %r10 = call %lm_assert %r8 %r9
+  %r11 = call %lm_box_string %str_const_6
+  %r12 = call %std.process.index.Process.run %r2 %r11
+  %r14 = ceq %r12 1
+  %r15 = call %lm_box_string %str_const_7
+  %r16 = call %lm_assert %r14 %r15
   ret 9
 }
 
@@ -133,51 +133,51 @@ function std.process.index.Process.id(i64) {
 function main() {
 @entry
 @block_0
-  call %lm_box_string %str_const_8
-  call %lm_print_int <unnamed>
-  call %test_process_frame
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_9
-  call %lm_assert <unnamed> <unnamed>
-  call %test_command_frame
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_10
-  call %lm_assert <unnamed> <unnamed>
-  call %test_pipe_frame
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_11
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_12
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_8
+  %r1 = call %lm_print_int %r0
+  %r2 = call %test_process_frame
+  %r4 = ceq %r2 9
+  %r5 = call %lm_box_string %str_const_9
+  %r6 = call %lm_assert %r4 %r5
+  %r7 = call %test_command_frame
+  %r9 = ceq %r7 9
+  %r10 = call %lm_box_string %str_const_10
+  %r11 = call %lm_assert %r9 %r10
+  %r12 = call %test_pipe_frame
+  %r14 = ceq %r12 9
+  %r15 = call %lm_box_string %str_const_11
+  %r16 = call %lm_assert %r14 %r15
+  %r17 = call %lm_box_string %str_const_12
+  %r18 = call %lm_print_int %r17
   ret 1
 }
 
 function test_command_frame() {
 @entry
 @block_0
-  call %lm_box_string %str_const_13
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_14
-  call %std.process.index.Command <unnamed>
-  cast <unnamed>
-  call %lm_box_string %str_const_15
-  call %std.process.command.Command.arg <unnamed> <unnamed>
-  add <unnamed> 0
-  load <unnamed>
-  call %lm_box_string %str_const_16
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_17
-  call %lm_assert <unnamed> <unnamed>
-  add <unnamed> 0
-  load <unnamed>
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_18
-  call %lm_assert <unnamed> <unnamed>
-  call %std.process.command.Command.execute <unnamed>
-  ceq <unnamed> 1
-  call %lm_box_string %str_const_19
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_13
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_14
+  %r3 = call %std.process.index.Command %r2
+  %r4 = cast %r3
+  %r6 = call %lm_box_string %str_const_15
+  %r7 = call %std.process.command.Command.arg %r4 %r6
+  %addr_16 = add %r4 0
+  %r8 = load %addr_16
+  %r9 = call %lm_box_string %str_const_17
+  %r10 = ceq %r8 %r9
+  %r11 = call %lm_box_string %str_const_18
+  %r12 = call %lm_assert %r10 %r11
+  %addr_19 = add %r4 0
+  %r13 = load %addr_19
+  %r14 = call %lm_list_len %r13
+  %r16 = ceq %r14 9
+  %r17 = call %lm_box_string %str_const_20
+  %r18 = call %lm_assert %r16 %r17
+  %r19 = call %std.process.command.Command.execute %r4
+  %r21 = ceq %r19 1
+  %r22 = call %lm_box_string %str_const_21
+  %r23 = call %lm_assert %r21 %r22
   ret 9
 }
 
@@ -204,8 +204,8 @@ function std.process.pipe.Pipe.read(i64) {
 function std.process.index.run(i64) {
 @entry
 @block_0
-  call %std.process.process.run <unnamed>
-  ret <unnamed>
+  %r1 = call %std.process.process.run %p0
+  ret %r1
 }
 
 function std.process.pipe.Pipe.write(i64, i64) {
@@ -223,49 +223,49 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null

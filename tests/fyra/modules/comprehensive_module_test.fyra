@@ -1,158 +1,150 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_1
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_2
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_3
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_4
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_5
-  call %lm_print_int <unnamed>
-  call %tests.modules.basic_module.__init__
-  call %lm_box_string %str_const_6
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_7
-  call %lm_to_string 0
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_print_str <unnamed>
-  call %lm_box_string %str_const_8
-  call %lm_to_string 0
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_print_str <unnamed>
-  call %lm_box_string %str_const_9
-  ceq 0 <unnamed>
-  call %lm_box_string %str_const_10
-  call %lm_assert <unnamed> <unnamed>
-  ceq 0 337
-  call %lm_box_string %str_const_11
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_12
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_13
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_14
-  call %lm_print_int <unnamed>
-  call %tests.modules.basic_module.greet
-  call %lm_box_string %str_const_15
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_16
-  call %lm_assert 18 <unnamed>
-  call %lm_box_string %str_const_17
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_18
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_19
-  call %lm_print_int <unnamed>
-  call %tests.modules.math_module.__init__
-  call %lm_box_string %str_const_20
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_21
-  call %lm_to_string 0
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_print_str <unnamed>
-  ceq 0 2
-  call %lm_box_string %str_const_22
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_23
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_24
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_25
-  call %lm_print_int <unnamed>
-  call %tests.modules.string_module.__init__
-  call %lm_box_string %str_const_26
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_27
-  call %lm_to_string 0
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_print_str <unnamed>
-  call %lm_box_string %str_const_28
-  call %lm_to_string 0
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_print_str <unnamed>
-  call %lm_box_string %str_const_29
-  call %lm_to_string 0
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_print_str <unnamed>
-  call %lm_box_string %str_const_30
-  ceq 0 <unnamed>
-  call %lm_box_string %str_const_31
-  call %lm_assert <unnamed> <unnamed>
-  ceq 0 2
-  call %lm_box_string %str_const_32
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_33
-  ceq 0 <unnamed>
-  call %lm_box_string %str_const_34
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_35
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_36
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_37
-  call %lm_print_int <unnamed>
-  call %tests.modules.nested.deep_module.__init__
-  call %lm_box_string %str_const_38
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_39
-  call %lm_to_string 0
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_print_str <unnamed>
-  call %lm_box_string %str_const_40
-  ceq 0 <unnamed>
-  call %lm_box_string %str_const_41
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_42
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_43
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_44
-  call %lm_print_int <unnamed>
-  call %tests.modules.string_module.__init__
-  call %lm_box_string %str_const_45
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_46
-  call %lm_to_string 0
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_print_str <unnamed>
-  call %lm_box_string %str_const_47
-  ceq 0 <unnamed>
-  call %lm_box_string %str_const_48
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_49
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_50
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_51
-  call %lm_print_int <unnamed>
-  call %tests.modules.string_module.__init__
-  call %lm_box_string %str_const_52
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_53
-  call %lm_to_string 0
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_print_str <unnamed>
-  call %lm_box_string %str_const_54
-  ceq 0 <unnamed>
-  call %lm_box_string %str_const_55
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_56
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_57
-  call %lm_print_int <unnamed>
-  ret 0
-}
-
-function tests.modules.nested.deep_module.deep_function() {
-@entry
-@block_0
-  call %lm_box_string %str_const_58
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_0
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_1
+  %r3 = call %lm_print_int %r2
+  %r4 = call %lm_box_string %str_const_2
+  %r5 = call %lm_print_int %r4
+  %r6 = call %lm_box_string %str_const_3
+  %r7 = call %lm_print_int %r6
+  %r8 = call %lm_box_string %str_const_4
+  %r9 = call %lm_print_int %r8
+  %r10 = call %lm_box_string %str_const_5
+  %r11 = call %lm_print_int %r10
+  %r12 = call %tests.modules.basic_module.__init__
+  %r13 = call %lm_box_string %str_const_6
+  %r14 = call %lm_print_int %r13
+  %r15 = call %lm_box_string %str_const_7
+  %r17 = call %lm_to_string 0
+  %r18 = call %lm_str_concat %r15 %r17
+  %r19 = call %lm_print_str %r18
+  %r20 = call %lm_box_string %str_const_8
+  %r22 = call %lm_to_string 0
+  %r23 = call %lm_str_concat %r20 %r22
+  %r24 = call %lm_print_str %r23
+  %r26 = call %lm_box_string %str_const_9
+  %r27 = ceq 0 %r26
+  %r28 = call %lm_box_string %str_const_10
+  %r29 = call %lm_assert %r27 %r28
+  %r32 = ceq 0 337
+  %r33 = call %lm_box_string %str_const_11
+  %r34 = call %lm_assert %r32 %r33
+  %r35 = call %lm_box_string %str_const_12
+  %r36 = call %lm_print_int %r35
+  %r37 = call %lm_box_string %str_const_13
+  %r38 = call %lm_print_int %r37
+  %r39 = call %lm_box_string %str_const_14
+  %r40 = call %lm_print_int %r39
+  %r41 = call %tests.modules.basic_module.greet
+  %r42 = call %lm_box_string %str_const_15
+  %r43 = call %lm_print_int %r42
+  %r45 = call %lm_box_string %str_const_16
+  %r46 = call %lm_assert 18 %r45
+  %r47 = call %lm_box_string %str_const_17
+  %r48 = call %lm_print_int %r47
+  %r49 = call %lm_box_string %str_const_18
+  %r50 = call %lm_print_int %r49
+  %r51 = call %lm_box_string %str_const_19
+  %r52 = call %lm_print_int %r51
+  %r53 = call %tests.modules.math_module.__init__
+  %r54 = call %lm_box_string %str_const_20
+  %r55 = call %lm_print_int %r54
+  %r56 = call %lm_box_string %str_const_21
+  %r58 = call %lm_to_string 0
+  %r59 = call %lm_str_concat %r56 %r58
+  %r60 = call %lm_print_str %r59
+  %r63 = ceq 0 2
+  %r64 = call %lm_box_string %str_const_22
+  %r65 = call %lm_assert %r63 %r64
+  %r66 = call %lm_box_string %str_const_23
+  %r67 = call %lm_print_int %r66
+  %r68 = call %lm_box_string %str_const_24
+  %r69 = call %lm_print_int %r68
+  %r70 = call %lm_box_string %str_const_25
+  %r71 = call %lm_print_int %r70
+  %r72 = call %tests.modules.string_module.__init__
+  %r73 = call %lm_box_string %str_const_26
+  %r74 = call %lm_print_int %r73
+  %r75 = call %lm_box_string %str_const_27
+  %r77 = call %lm_to_string 0
+  %r78 = call %lm_str_concat %r75 %r77
+  %r79 = call %lm_print_str %r78
+  %r80 = call %lm_box_string %str_const_28
+  %r82 = call %lm_to_string 0
+  %r83 = call %lm_str_concat %r80 %r82
+  %r84 = call %lm_print_str %r83
+  %r85 = call %lm_box_string %str_const_29
+  %r87 = call %lm_to_string 0
+  %r88 = call %lm_str_concat %r85 %r87
+  %r89 = call %lm_print_str %r88
+  %r91 = call %lm_box_string %str_const_30
+  %r92 = ceq 0 %r91
+  %r93 = call %lm_box_string %str_const_31
+  %r94 = call %lm_assert %r92 %r93
+  %r97 = ceq 0 2
+  %r98 = call %lm_box_string %str_const_32
+  %r99 = call %lm_assert %r97 %r98
+  %r101 = call %lm_box_string %str_const_33
+  %r102 = ceq 0 %r101
+  %r103 = call %lm_box_string %str_const_34
+  %r104 = call %lm_assert %r102 %r103
+  %r105 = call %lm_box_string %str_const_35
+  %r106 = call %lm_print_int %r105
+  %r107 = call %lm_box_string %str_const_36
+  %r108 = call %lm_print_int %r107
+  %r109 = call %lm_box_string %str_const_37
+  %r110 = call %lm_print_int %r109
+  %r111 = call %tests.modules.nested.deep_module.__init__
+  %r112 = call %lm_box_string %str_const_38
+  %r113 = call %lm_print_int %r112
+  %r114 = call %lm_box_string %str_const_39
+  %r116 = call %lm_to_string 0
+  %r117 = call %lm_str_concat %r114 %r116
+  %r118 = call %lm_print_str %r117
+  %r120 = call %lm_box_string %str_const_40
+  %r121 = ceq 0 %r120
+  %r122 = call %lm_box_string %str_const_41
+  %r123 = call %lm_assert %r121 %r122
+  %r124 = call %lm_box_string %str_const_42
+  %r125 = call %lm_print_int %r124
+  %r126 = call %lm_box_string %str_const_43
+  %r127 = call %lm_print_int %r126
+  %r128 = call %lm_box_string %str_const_44
+  %r129 = call %lm_print_int %r128
+  %r130 = call %tests.modules.string_module.__init__
+  %r131 = call %lm_box_string %str_const_45
+  %r132 = call %lm_print_int %r131
+  %r133 = call %lm_box_string %str_const_46
+  %r135 = call %lm_to_string 0
+  %r136 = call %lm_str_concat %r133 %r135
+  %r137 = call %lm_print_str %r136
+  %r139 = call %lm_box_string %str_const_47
+  %r140 = ceq 0 %r139
+  %r141 = call %lm_box_string %str_const_48
+  %r142 = call %lm_assert %r140 %r141
+  %r143 = call %lm_box_string %str_const_49
+  %r144 = call %lm_print_int %r143
+  %r145 = call %lm_box_string %str_const_50
+  %r146 = call %lm_print_int %r145
+  %r147 = call %lm_box_string %str_const_51
+  %r148 = call %lm_print_int %r147
+  %r149 = call %tests.modules.string_module.__init__
+  %r150 = call %lm_box_string %str_const_52
+  %r151 = call %lm_print_int %r150
+  %r152 = call %lm_box_string %str_const_53
+  %r154 = call %lm_to_string 0
+  %r155 = call %lm_str_concat %r152 %r154
+  %r156 = call %lm_print_str %r155
+  %r158 = call %lm_box_string %str_const_54
+  %r159 = ceq 0 %r158
+  %r160 = call %lm_box_string %str_const_55
+  %r161 = call %lm_assert %r159 %r160
+  %r162 = call %lm_box_string %str_const_56
+  %r163 = call %lm_print_int %r162
+  %r164 = call %lm_box_string %str_const_57
+  %r165 = call %lm_print_int %r164
   ret 0
 }
 
@@ -164,47 +156,55 @@ function tests.modules.basic_module.__init__() {
 function tests.modules.basic_module.greet() {
 @entry
 @block_0
-  call %lm_box_string %str_const_59
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_58
+  %r1 = call %lm_print_int %r0
+  ret 0
+}
+
+function tests.modules.nested.deep_module.deep_function() {
+@entry
+@block_0
+  %r0 = call %lm_box_string %str_const_59
+  %r1 = call %lm_print_int %r0
   ret 0
 }
 
 function tests.modules.math_module.square(i64) {
 @entry
 @block_0
-  mul <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = mul %p0 %p0
+  ret %r1
 }
 
 function tests.modules.string_module.say_hello(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_60
-  call %lm_str_concat 0 <unnamed>
-  call %lm_to_string <unnamed>
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_box_string %str_const_61
-  call %lm_str_concat <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = call %lm_box_string %str_const_60
+  %r3 = call %lm_str_concat 0 %r2
+  %r4 = call %lm_to_string %p0
+  %r5 = call %lm_str_concat %r3 %r4
+  %r6 = call %lm_box_string %str_const_61
+  %r7 = call %lm_str_concat %r5 %r6
+  ret %r7
 }
 
 function tests.modules.string_module.say_goodbye(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_62
-  call %lm_str_concat 0 <unnamed>
-  call %lm_to_string <unnamed>
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_box_string %str_const_63
-  call %lm_str_concat <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = call %lm_box_string %str_const_62
+  %r3 = call %lm_str_concat 0 %r2
+  %r4 = call %lm_to_string %p0
+  %r5 = call %lm_str_concat %r3 %r4
+  %r6 = call %lm_box_string %str_const_63
+  %r7 = call %lm_str_concat %r5 %r6
+  ret %r7
 }
 
 function tests.modules.basic_module.add(i64, i64) {
 @entry
 @block_0
-  add <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = add %p0 %p1
+  ret %r2
 }
 
 function tests.modules.string_module.__init__() {
@@ -215,8 +215,8 @@ function tests.modules.string_module.__init__() {
 function tests.modules.math_module.add(i64, i64) {
 @entry
 @block_0
-  add <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = add %p0 %p1
+  ret %r2
 }
 
 function tests.modules.basic_module.getModuleVar() {
@@ -233,8 +233,8 @@ function tests.modules.nested.deep_module.__init__() {
 function tests.modules.math_module.multiply(i64, i64) {
 @entry
 @block_0
-  mul <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = mul %p0 %p1
+  ret %r2
 }
 
 function tests.modules.math_module.__init__() {
@@ -245,78 +245,78 @@ function tests.modules.math_module.__init__() {
 function tests.modules.math_module.cube(i64) {
 @entry
 @block_0
-  mul <unnamed> <unnamed>
-  mul <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = mul %p0 %p0
+  %r2 = mul %r1 %p0
+  ret %r2
 }
 
 function tests.modules.math_module.factorial(i64) {
 @entry
 @block_0
-  csle <unnamed> 9
-  br <unnamed> %block_3 %block_5
+  %r2 = csle %p0 9
+  br %r2 %block_3 %block_5
 @block_3
   jmp %block_3
   ret 9
 @block_5
-  sub <unnamed> 9
-  call %tests.modules.math_module.factorial <unnamed>
-  mul <unnamed> <unnamed>
-  ret <unnamed>
+  %r6 = sub %p0 9
+  %r7 = call %tests.modules.math_module.factorial %r6
+  %r8 = mul %p0 %r7
+  ret %r8
 }
 
 function tests.modules.math_module.subtract(i64, i64) {
 @entry
 @block_0
-  sub <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = sub %p0 %p1
+  ret %r2
 }
 
 function tests.modules.math_module.is_odd(i64) {
 @entry
 @block_0
-  call %tests.modules.math_module.is_even <unnamed>
-  cne <unnamed> 18
-  ret <unnamed>
+  %r1 = call %tests.modules.math_module.is_even %p0
+  %r2 = cne %r1 18
+  ret %r2
 }
 
 function tests.modules.math_module.is_prime(i64) {
 @entry
 @block_0
-  csle <unnamed> 9
-  br <unnamed> %block_3 %block_5
+  %r2 = csle %p0 9
+  br %r2 %block_3 %block_5
 @block_3
   jmp %block_3
   ret 10
 @block_5
-  ceq <unnamed> 17
-  br <unnamed> %block_8 %block_10
+  %r6 = ceq %p0 17
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
   ret 18
 @block_10
-  call %tests.modules.math_module.is_even <unnamed>
-  cne <unnamed> 1
-  br <unnamed> %block_14 %block_16
+  %r9 = call %tests.modules.math_module.is_even %p0
+  %r10 = cne %r9 1
+  br %r10 %block_14 %block_16
 @block_14
   jmp %block_14
   ret 10
 @block_16
   jmp %block_18
 @block_18
-  mul 25 25
-  csle <unnamed> <unnamed>
-  br <unnamed> %block_21 %block_30
+  %r14 = mul 25 25
+  %r15 = csle %r14 %p0
+  br %r15 %block_21 %block_30
 @block_21
   jmp %block_21
-  rem <unnamed> 25
-  ceq <unnamed> 1
-  br <unnamed> %block_25 %block_27
+  %r17 = rem %p0 25
+  %r19 = ceq %r17 1
+  br %r19 %block_25 %block_27
 @block_25
   jmp %block_25
   ret 10
 @block_27
-  add 25 17
+  %r13 = add 25 17
   jmp %block_18
 @block_30
   ret 18
@@ -325,29 +325,29 @@ function tests.modules.math_module.is_prime(i64) {
 function tests.modules.math_module.is_even(i64) {
 @entry
 @block_0
-  rem <unnamed> 17
-  ceq <unnamed> 1
-  ret <unnamed>
+  %r2 = rem %p0 17
+  %r4 = ceq %r2 1
+  ret %r4
 }
 
 function tests.modules.string_module.repeat_string(i64, i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_64
+  %r2 = call %lm_box_string %str_const_64
   jmp %block_4
 @block_4
-  cslt 9 <unnamed>
-  br <unnamed> %block_6 %block_14
+  %r5 = cslt 9 %p1
+  br %r5 %block_6 %block_14
 @block_6
   jmp %block_6
-  call %lm_to_string <unnamed>
-  call %lm_str_concat <unnamed> <unnamed>
+  %r6 = call %lm_to_string %p0
+  %r7 = call %lm_str_concat %r2 %r6
   jmp %block_10
 @block_10
-  add 9 9
+  %r9 = add 9 9
   jmp %block_4
 @block_14
-  ret <unnamed>
+  ret %r7
 }
 
 function lm_box_string(i8*) {
@@ -355,40 +355,40 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
@@ -400,31 +400,31 @@ function lm_str_concat(i8*, i8*) {
 
 function lm_print_str(i8*) {
 @entry
-  alloc 8
-  store 0 <unnamed>
+  %len_slot = alloc 8
+  store 0 %len_slot
   jmp %loop
 @loop
-  load <unnamed>
-  add <unnamed> <unnamed>
-  loadub <unnamed>
-  ceq <unnamed> 0
-  add <unnamed> 1
-  store <unnamed> <unnamed>
-  br <unnamed> %done %loop
+  %curr_len = load %len_slot
+  %ps_curr_ptr = add %s_val %curr_len
+  %curr_char = loadub %ps_curr_ptr
+  %is_null = ceq %curr_char 0
+  %next_len = add %curr_len 1
+  store %next_len %len_slot
+  br %is_null %done %loop
 @done
-  load <unnamed>
-  sub <unnamed> 1
-  extern io.write(i64 1, i8* <unnamed>, i32 <unnamed>)
-  extern io.write(i64 1, i8* %nl, i64 1)
+  %final_len = load %len_slot
+  %actual_len = sub %final_len 1
+  %write_res = extern io.write(i64 1, i8* %s_val, i32 %actual_len)
+  %write_res = extern io.write(i64 1, i8* %nl, i64 1)
   ret null
 }
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null

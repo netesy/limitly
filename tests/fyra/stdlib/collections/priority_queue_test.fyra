@@ -1,9 +1,9 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.collections.priority_queue.__init__
-  call %std.collections.index.__init__
-  call %main
+  %r0 = call %std.collections.priority_queue.__init__
+  %r1 = call %std.collections.index.__init__
+  %r2 = call %main
   ret 0
 }
 
@@ -45,62 +45,62 @@ function std.collections.stack.Stack.push(i64, i64) {
 function std.collections.index.BloomFilter(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.bloom_filter.BloomFilter.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.collections.bloom_filter.BloomFilter.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.collections.index.BitSet(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.bitset.BitSetWrapper.init <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.collections.bitset.BitSetWrapper.init %r1 %p0
+  ret %r1
 }
 
 function std.collections.index.PriorityQueue(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.priority_queue.PriorityQueueWrapper.init <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.collections.priority_queue.PriorityQueueWrapper.init %r1 %p0
+  ret %r1
 }
 
 function std.collections.index.HashMap() {
 @entry
 @block_0
-  alloc 16
-  call %lm_list_new 0
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_list_new 0
-  add <unnamed> 0
-  store <unnamed> <unnamed>
+  %r0 = alloc 16
+  %r1 = call %lm_list_new 0
+  %addr_0 = add %r0 0
+  store %r0 %addr_0
+  %r3 = call %lm_list_new 0
+  %addr_1 = add %r0 0
+  store %r1 %addr_1
   ret 0
 }
 
 function std.collections.index.Map() {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.map.HashMapWrapper.init <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.collections.map.HashMapWrapper.init %r0
   ret 0
 }
 
 function std.collections.index.LinkedList() {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.linked_list.DLL.init <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.collections.linked_list.DLL.init %r0
   ret 0
 }
 
 function std.collections.index.Vector(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.vector.Vector.init <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.collections.vector.Vector.init %r1 %p0
+  ret %r1
 }
 
 function std.collections.linkedlist.LinkedList.init(i64) {
@@ -129,6 +129,31 @@ function std.collections.linkedlist.LinkedList.push_back(i64, i64) {
 }
 
 function std.collections.linkedlist.Node.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.clear(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.len(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.set(i64, i64, i64) {
 @entry
   ret 0
 }
@@ -173,31 +198,6 @@ function std.collections.deque.DoubleEndedQueue.push_back(i64, i64) {
   ret 0
 }
 
-function std.collections.list.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.clear(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.len(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.set(i64, i64, i64) {
-@entry
-  ret 0
-}
-
 function std.collections.linked_list.__init__() {
 @entry
   ret 0
@@ -211,8 +211,8 @@ function std.collections.stack.Stack.is_empty(i64) {
 function std.collections.index.HashSet() {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.hashset.HashSetWrapper.init <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.collections.hashset.HashSetWrapper.init %r0
   ret 0
 }
 
@@ -254,23 +254,23 @@ function std.collections.linkedlist.LinkedList.len(i64) {
 function std.collections.set.set_from_array(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_list_new 0
-  add <unnamed> 0
-  store <unnamed> <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_list_new 0
+  %addr_2 = add %r1 0
+  store %p0 %addr_2
   jmp %block_7
 @block_7
-  call %lm_list_len <unnamed>
-  cslt 1 <unnamed>
-  br <unnamed> %block_10 %block_18
+  %r6 = call %lm_list_len %p0
+  %r7 = cslt 1 %r6
+  br %r7 %block_10 %block_18
 @block_10
   jmp %block_10
-  call %lm_list_get <unnamed> 1
-  call %std.collections.set.Set.add <unnamed> <unnamed>
-  add 1 9
+  %r9 = call %lm_list_get %p0 1
+  %r10 = call %std.collections.set.Set.add %r1 %r9
+  %r13 = add 1 9
   jmp %block_7
 @block_18
-  ret <unnamed>
+  ret %r10
 }
 
 function std.collections.set.Set.max(i64) {
@@ -286,8 +286,8 @@ function std.collections.set.Set.min(i64) {
 function __lambda_2(i64, i64) {
 @entry
 @block_0
-  mul <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = mul %p0 %p1
+  ret %r2
 }
 
 function std.collections.set.Set.product(i64) {
@@ -298,8 +298,8 @@ function std.collections.set.Set.product(i64) {
 function __lambda_1(i64, i64) {
 @entry
 @block_0
-  add <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = add %p0 %p1
+  ret %r2
 }
 
 function std.collections.set.Set.for_each(i64, i64) {
@@ -340,8 +340,8 @@ function std.collections.queue.PriorityQueue.peek(i64) {
 function std.collections.index.Queue() {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.queue.Queue.init <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.collections.queue.Queue.init %r0
   ret 0
 }
 
@@ -423,17 +423,17 @@ function std.core.OptionInt.unwrap(i64) {
 function std.iterator.chunk(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.ChunkIterator.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.iterator.ChunkIterator.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.iterator.filter(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.FilterIterator.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.iterator.FilterIterator.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.iterator.PeekableIterator.next(i64) {
@@ -499,8 +499,8 @@ function std.collections.index.__init__() {
 function std.collections.index.BTreeMap() {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.btreemap.BTreeMapWrapper.init <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.collections.btreemap.BTreeMapWrapper.init %r0
   ret 0
 }
 
@@ -582,8 +582,8 @@ function std.collections.vector.Deque.len(i64) {
 function std.collections.index.Stack() {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.stack.Stack.init <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.collections.stack.Stack.init %r0
   ret 0
 }
 
@@ -640,17 +640,17 @@ function std.collections.bitset.__init__() {
 function std.iterator.collect(i64) {
 @entry
 @block_0
-  call %lm_list_new 0
+  %r1 = call %lm_list_new 0
   jmp %block_5
 @block_5
-  cne 0 2
-  br <unnamed> %block_8 %block_12
+  %r6 = cne 0 2
+  br %r6 %block_8 %block_12
 @block_8
   jmp %block_8
-  call %lm_list_append <unnamed> 0
+  call %lm_list_append %r1 0
   jmp %block_5
 @block_12
-  ret <unnamed>
+  ret %r1
 }
 
 function std.collections.vector.Vector.remove(i64, i64) {
@@ -686,83 +686,83 @@ function std.collections.vector.Vector.init(i64, i64) {
 function main() {
 @entry
 @block_0
-  call %std.collections.index.PriorityQueue 2
-  cast <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.push <unnamed> 81
-  call %std.collections.priority_queue.PriorityQueueWrapper.length <unnamed>
-  call %lm_box_string %str_const_0
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.push <unnamed> 41
-  call %std.collections.priority_queue.PriorityQueueWrapper.length <unnamed>
-  call %lm_box_string %str_const_1
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.push <unnamed> 161
-  call %std.collections.priority_queue.PriorityQueueWrapper.length <unnamed>
-  call %lm_box_string %str_const_2
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.push <unnamed> 9
-  call %std.collections.priority_queue.PriorityQueueWrapper.length <unnamed>
-  call %lm_box_string %str_const_3
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.length <unnamed>
-  ceq <unnamed> 33
-  call %lm_box_string %str_const_4
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.peek <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_5
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.pop <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_6
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.pop <unnamed>
-  ceq <unnamed> 41
-  call %lm_box_string %str_const_7
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.pop <unnamed>
-  ceq <unnamed> 81
-  call %lm_box_string %str_const_8
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.pop <unnamed>
-  ceq <unnamed> 161
-  call %lm_box_string %str_const_9
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.pop <unnamed>
-  ceq <unnamed> 2
-  call %lm_box_string %str_const_10
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_11
-  call %std.collections.index.PriorityQueue <unnamed>
-  cast <unnamed>
-  call %std.collections.priority_queue.PriorityQueueWrapper.push <unnamed> 81
-  call %std.collections.priority_queue.PriorityQueueWrapper.push <unnamed> 41
-  call %std.collections.priority_queue.PriorityQueueWrapper.push <unnamed> 161
-  call %std.collections.priority_queue.PriorityQueueWrapper.peek <unnamed>
-  ceq <unnamed> 161
-  call %lm_box_string %str_const_12
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_13
-  call %lm_print_int <unnamed>
+  %r1 = call %std.collections.index.PriorityQueue 2
+  %r2 = cast %r1
+  %r5 = call %std.collections.priority_queue.PriorityQueueWrapper.push %r2 81
+  %r6 = call %std.collections.priority_queue.PriorityQueueWrapper.length %r2
+  %r8 = call %lm_box_string %str_const_3
+  %r7 = call %lm_rt_str_format %r8 %r6
+  %r9 = call %lm_print_int %r7
+  %r11 = call %std.collections.priority_queue.PriorityQueueWrapper.push %r2 41
+  %r12 = call %std.collections.priority_queue.PriorityQueueWrapper.length %r2
+  %r14 = call %lm_box_string %str_const_4
+  %r13 = call %lm_rt_str_format %r14 %r12
+  %r15 = call %lm_print_int %r13
+  %r17 = call %std.collections.priority_queue.PriorityQueueWrapper.push %r2 161
+  %r18 = call %std.collections.priority_queue.PriorityQueueWrapper.length %r2
+  %r20 = call %lm_box_string %str_const_5
+  %r19 = call %lm_rt_str_format %r20 %r18
+  %r21 = call %lm_print_int %r19
+  %r23 = call %std.collections.priority_queue.PriorityQueueWrapper.push %r2 9
+  %r24 = call %std.collections.priority_queue.PriorityQueueWrapper.length %r2
+  %r26 = call %lm_box_string %str_const_6
+  %r25 = call %lm_rt_str_format %r26 %r24
+  %r27 = call %lm_print_int %r25
+  %r28 = call %std.collections.priority_queue.PriorityQueueWrapper.length %r2
+  %r30 = ceq %r28 33
+  %r31 = call %lm_box_string %str_const_7
+  %r32 = call %lm_assert %r30 %r31
+  %r33 = call %std.collections.priority_queue.PriorityQueueWrapper.peek %r2
+  %r35 = ceq %r33 9
+  %r36 = call %lm_box_string %str_const_8
+  %r37 = call %lm_assert %r35 %r36
+  %r38 = call %std.collections.priority_queue.PriorityQueueWrapper.pop %r2
+  %r40 = ceq %r38 9
+  %r41 = call %lm_box_string %str_const_9
+  %r42 = call %lm_assert %r40 %r41
+  %r43 = call %std.collections.priority_queue.PriorityQueueWrapper.pop %r2
+  %r45 = ceq %r43 41
+  %r46 = call %lm_box_string %str_const_10
+  %r47 = call %lm_assert %r45 %r46
+  %r48 = call %std.collections.priority_queue.PriorityQueueWrapper.pop %r2
+  %r50 = ceq %r48 81
+  %r51 = call %lm_box_string %str_const_11
+  %r52 = call %lm_assert %r50 %r51
+  %r53 = call %std.collections.priority_queue.PriorityQueueWrapper.pop %r2
+  %r55 = ceq %r53 161
+  %r56 = call %lm_box_string %str_const_12
+  %r57 = call %lm_assert %r55 %r56
+  %r58 = call %std.collections.priority_queue.PriorityQueueWrapper.pop %r2
+  %r60 = ceq %r58 2
+  %r61 = call %lm_box_string %str_const_13
+  %r62 = call %lm_assert %r60 %r61
+  %r64 = call %lm_box_string %str_const_14
+  %r65 = call %std.collections.index.PriorityQueue %r64
+  %r66 = cast %r65
+  %r69 = call %std.collections.priority_queue.PriorityQueueWrapper.push %r66 81
+  %r71 = call %std.collections.priority_queue.PriorityQueueWrapper.push %r66 41
+  %r73 = call %std.collections.priority_queue.PriorityQueueWrapper.push %r66 161
+  %r74 = call %std.collections.priority_queue.PriorityQueueWrapper.peek %r66
+  %r76 = ceq %r74 161
+  %r77 = call %lm_box_string %str_const_15
+  %r78 = call %lm_assert %r76 %r77
+  %r79 = call %lm_box_string %str_const_16
+  %r80 = call %lm_print_int %r79
   ret 1
 }
 
 function __lambda_0(i64, i64) {
 @entry
 @block_0
-  csgt <unnamed> <unnamed>
-  br <unnamed> %block_2 %block_5
+  %r2 = csgt %p0 %p1
+  br %r2 %block_2 %block_5
 @block_2
   jmp %block_2
-  neg 9
-  ret <unnamed>
+  %r5 = neg 9
+  ret %r5
 @block_5
-  cslt <unnamed> <unnamed>
-  br <unnamed> %block_7 %block_9
+  %r6 = cslt %p0 %p1
+  br %r6 %block_7 %block_9
 @block_7
   jmp %block_7
   ret 9
@@ -795,17 +795,17 @@ function std.collections.queue.PriorityQueue.remove(i64) {
   ret 0
 }
 
-function std.collections.tree.TreeMap.init(i64) {
-@entry
-  ret 0
-}
-
 function std.core.ResultInt.unwrap(i64) {
 @entry
   ret 0
 }
 
 function std.collections.bitset.BitSetWrapper.count(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeMap.init(i64) {
 @entry
   ret 0
 }
@@ -848,16 +848,16 @@ function std.collections.vector.Deque.push_front(i64, i64) {
 function std.iterator.iterator(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.ListIterator.init <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.iterator.ListIterator.init %r1 %p0
+  ret %r1
 }
 
 function std.collections.index.List() {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.list.List.init <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.collections.list.List.init %r0
   ret 0
 }
 
@@ -979,8 +979,8 @@ function std.collections.btreeset.BTreeSetWrapper.add(i64, i64) {
 function std.collections.index.BTreeSet() {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.btreeset.BTreeSetWrapper.init <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.collections.btreeset.BTreeSetWrapper.init %r0
   ret 0
 }
 
@@ -1204,11 +1204,6 @@ function std.collections.vector.Deque.iterator(i64) {
   ret 0
 }
 
-function std.collections.map.HashMapWrapper.init(i64) {
-@entry
-  ret 0
-}
-
 function std.collections.hashmap.HashMap.get(i64, i64) {
 @entry
   ret 0
@@ -1219,12 +1214,12 @@ function std.collections.bitset.BitSetWrapper.init(i64, i64) {
   ret 0
 }
 
-function std.collections.vector.Deque.init(i64) {
+function std.collections.map.HashMapWrapper.init(i64) {
 @entry
   ret 0
 }
 
-function std.collections.map.HashMapWrapper.get(i64, i64) {
+function std.collections.vector.Deque.init(i64) {
 @entry
   ret 0
 }
@@ -1240,6 +1235,11 @@ function std.collections.hashmap.HashMap.is_empty(i64) {
 }
 
 function std.core.ResultStr.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.map.HashMapWrapper.get(i64, i64) {
 @entry
   ret 0
 }
@@ -1348,9 +1348,9 @@ function std.collections.tree.BTree.len(i64) {
 function std.iterator.map(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.MapIterator.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.iterator.MapIterator.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.collections.queue.BitSet.toggle(i64, i64) {
@@ -1366,21 +1366,21 @@ function std.collections.queue.BitSet.contains(i64, i64) {
 function std.core.err_str(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_14
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_15
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_17
+  %addr_18 = add %r1 0
+  store %p0 %addr_18
+  %addr_19 = add %r1 0
+  store %r1 %addr_19
+  %r4 = alloc 16
+  %addr_20 = add %r4 0
+  store %p0 %addr_20
+  %r6 = call %lm_box_string %str_const_21
+  %addr_22 = add %r4 0
+  store %r1 %addr_22
+  %addr_23 = add %r4 0
+  store %r2 %addr_23
+  ret %r4
 }
 
 function std.collections.queue.BitSet.get(i64, i64) {
@@ -1408,6 +1408,300 @@ function std.collections.queue.__init__() {
   ret 0
 }
 
+function std.iterator.cycle(i64) {
+@entry
+@block_0
+  %r1 = alloc 16
+  %r2 = call %std.iterator.CycleIterator.init %r1 %p0
+  ret %r1
+}
+
+function std.core.OptionInt.is_some(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.is_none(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linked_list.DLL.push_back(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.is_none(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionInt.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.is_some(i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.StepByIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.is_ok(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.bitset.BitSetWrapper.contains(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.OptionStr.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.is_err(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.set.Set.is_empty(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultInt.map(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.unwrap(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.unwrap_or(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.err_int(i64) {
+@entry
+@block_0
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_24
+  %addr_25 = add %r1 0
+  store %p0 %addr_25
+  %addr_26 = add %r1 0
+  store %r1 %addr_26
+  %r4 = alloc 16
+  %addr_27 = add %r4 0
+  store %p0 %addr_27
+  %addr_28 = add %r4 0
+  store %r1 %addr_28
+  %addr_29 = add %r4 0
+  store %r2 %addr_29
+  ret %r4
+}
+
+function std.collections.vector.Vector.clear(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ResultStr.map_err(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.ChunkIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.some_int(i64) {
+@entry
+@block_0
+  ret 0
+}
+
+function std.collections.list.List.pop(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.ArrayList.remove(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.set.Set.is_disjoint(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.make_err_int(i64) {
+@entry
+@block_0
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_30
+  %addr_31 = add %r1 0
+  store %p0 %addr_31
+  %addr_32 = add %r1 0
+  store %r1 %addr_32
+  %r4 = alloc 16
+  %addr_33 = add %r4 0
+  store %p0 %addr_33
+  %addr_34 = add %r4 0
+  store %r1 %addr_34
+  %addr_35 = add %r4 0
+  store %r2 %addr_35
+  ret %r4
+}
+
+function std.iterator.CycleIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.core.ok_str(i64) {
+@entry
+@block_0
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_36
+  %addr_37 = add %r1 0
+  store %p0 %addr_37
+  %r3 = call %lm_box_string %str_const_38
+  %addr_39 = add %r1 0
+  store %r1 %addr_39
+  %r5 = alloc 16
+  %addr_40 = add %r5 0
+  store %p0 %addr_40
+  %addr_41 = add %r5 0
+  store %r1 %addr_41
+  %addr_42 = add %r5 0
+  store %r2 %addr_42
+  ret %r5
+}
+
+function std.core.make_err_str(i64) {
+@entry
+@block_0
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_43
+  %addr_44 = add %r1 0
+  store %p0 %addr_44
+  %addr_45 = add %r1 0
+  store %r1 %addr_45
+  %r4 = alloc 16
+  %addr_46 = add %r4 0
+  store %p0 %addr_46
+  %r6 = call %lm_box_string %str_const_47
+  %addr_48 = add %r4 0
+  store %r1 %addr_48
+  %addr_49 = add %r4 0
+  store %r2 %addr_49
+  ret %r4
+}
+
+function std.core.ok_bool(i64) {
+@entry
+@block_0
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_50
+  %addr_51 = add %r1 0
+  store %p0 %addr_51
+  %r3 = call %lm_box_string %str_const_52
+  %addr_53 = add %r1 0
+  store %r1 %addr_53
+  %r5 = cne %p0 1
+  br %r5 %block_9 %block_16
+@block_9
+  jmp %block_9
+  %r7 = alloc 16
+  %addr_54 = add %r7 0
+  store %p0 %addr_54
+  %addr_55 = add %r7 0
+  store %r1 %addr_55
+  %addr_56 = add %r7 0
+  store %r2 %addr_56
+  ret %r7
+@block_16
+  %r10 = alloc 16
+  %addr_57 = add %r10 0
+  store %p0 %addr_57
+  %addr_58 = add %r10 0
+  store %r1 %addr_58
+  %addr_59 = add %r10 0
+  store %r2 %addr_59
+  ret %r10
+}
+
+function std.iterator.ZipIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeMap._rotate_left(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.index.main() {
+@entry
+@block_0
+  ret 0
+}
+
+function std.core.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.bitset.BitSetWrapper.toggle(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.map.HashMapWrapper.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.index.Deque() {
+@entry
+@block_0
+  %r0 = alloc 16
+  %r1 = call %std.collections.deque.DoubleEndedQueue.init %r0
+  ret 0
+}
+
+function std.collections.bitset.BitSetWrapper.get(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.bitset.BitSetWrapper.get_size(i64) {
+@entry
+  ret 0
+}
+
 function std.collections.linkedlist.LinkedList.pop_back(i64) {
 @entry
   ret 0
@@ -1424,16 +1718,6 @@ function std.collections.map.HashMapWrapper.contains_key(i64, i64) {
 }
 
 function std.collections.map.HashMapWrapper.size(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.map.HashMapWrapper.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.bitset.BitSetWrapper.toggle(i64, i64) {
 @entry
   ret 0
 }
@@ -1528,49 +1812,6 @@ function std.collections.tree.TreeMap._rotate_right(i64, i64) {
   ret 0
 }
 
-function std.iterator.ZipIterator.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeMap._rotate_left(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.ok_bool(i64) {
-@entry
-@block_0
-  alloc 16
-  call %lm_box_string %str_const_16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_17
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  cne <unnamed> 1
-  br <unnamed> %block_9 %block_16
-@block_9
-  jmp %block_9
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
-@block_16
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
-}
-
 function std.collections.tree.TreeMap._insert(i64, i64, i64, i64) {
 @entry
   ret 0
@@ -1579,21 +1820,21 @@ function std.collections.tree.TreeMap._insert(i64, i64, i64, i64) {
 function std.core.ok_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_18
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_19
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_60
+  %addr_61 = add %r1 0
+  store %p0 %addr_61
+  %r3 = call %lm_box_string %str_const_62
+  %addr_63 = add %r1 0
+  store %r1 %addr_63
+  %r5 = alloc 16
+  %addr_64 = add %r5 0
+  store %p0 %addr_64
+  %addr_65 = add %r5 0
+  store %r1 %addr_65
+  %addr_66 = add %r5 0
+  store %r2 %addr_66
+  ret %r5
 }
 
 function std.collections.queue.PriorityQueue.init(i64, i64) {
@@ -1641,32 +1882,6 @@ function std.collections.hashset.HashSetWrapper.remove(i64, i64) {
   ret 0
 }
 
-function std.collections.list.List.pop(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.ArrayList.remove(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.__init__() {
-@entry
-  ret 0
-}
-
-function std.iterator.ChunkIterator.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.some_int(i64) {
-@entry
-@block_0
-  ret 0
-}
-
 function std.collections.bloom_filter.BloomFilter.hash(i64, i64, i64) {
 @entry
   ret 0
@@ -1675,10 +1890,10 @@ function std.collections.bloom_filter.BloomFilter.hash(i64, i64, i64) {
 function std.collections.index.Set() {
 @entry
 @block_0
-  alloc 16
-  call %lm_list_new 0
-  add <unnamed> 0
-  store <unnamed> <unnamed>
+  %r0 = alloc 16
+  %r1 = call %lm_list_new 0
+  %addr_67 = add %r0 0
+  store %r0 %addr_67
   ret 0
 }
 
@@ -1747,221 +1962,6 @@ function std.collections.btreemap.BTreeMapWrapper.init(i64) {
   ret 0
 }
 
-function std.iterator.cycle(i64) {
-@entry
-@block_0
-  alloc 16
-  call %std.iterator.CycleIterator.init <unnamed> <unnamed>
-  ret <unnamed>
-}
-
-function std.core.OptionInt.is_some(i64) {
-@entry
-  ret 0
-}
-
-function std.core.OptionStr.is_none(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.linked_list.DLL.push_back(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.OptionInt.is_none(i64) {
-@entry
-  ret 0
-}
-
-function std.core.OptionInt.unwrap_or(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.OptionStr.is_some(i64) {
-@entry
-  ret 0
-}
-
-function std.core.OptionStr.unwrap(i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.StepByIterator.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.ResultInt.is_ok(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.bitset.BitSetWrapper.contains(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.OptionStr.unwrap_or(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.ResultInt.is_err(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.set.Set.is_empty(i64) {
-@entry
-  ret 0
-}
-
-function std.core.ResultInt.map(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.ResultStr.unwrap(i64) {
-@entry
-  ret 0
-}
-
-function std.core.ResultStr.unwrap_or(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.err_int(i64) {
-@entry
-@block_0
-  alloc 16
-  call %lm_box_string %str_const_20
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
-}
-
-function std.collections.vector.Vector.clear(i64) {
-@entry
-  ret 0
-}
-
-function std.core.ResultStr.map_err(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.set.Set.is_disjoint(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.make_err_int(i64) {
-@entry
-@block_0
-  alloc 16
-  call %lm_box_string %str_const_21
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
-}
-
-function std.iterator.CycleIterator.next(i64) {
-@entry
-  ret 0
-}
-
-function std.core.ok_str(i64) {
-@entry
-@block_0
-  alloc 16
-  call %lm_box_string %str_const_22
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_23
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
-}
-
-function std.core.make_err_str(i64) {
-@entry
-@block_0
-  alloc 16
-  call %lm_box_string %str_const_24
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_25
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
-}
-
-function std.collections.index.main() {
-@entry
-@block_0
-  ret 0
-}
-
-function std.core.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.index.Deque() {
-@entry
-@block_0
-  alloc 16
-  call %std.collections.deque.DoubleEndedQueue.init <unnamed>
-  ret 0
-}
-
-function std.collections.bitset.BitSetWrapper.get(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.bitset.BitSetWrapper.get_size(i64) {
-@entry
-  ret 0
-}
-
 function std.collections.set.Set.add(i64, i64) {
 @entry
   ret 0
@@ -1992,49 +1992,49 @@ function lm_rt_str_format(i64, i64) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null

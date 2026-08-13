@@ -1,8 +1,8 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.collections.queue.__init__
-  call %main
+  %r0 = call %std.collections.queue.__init__
+  %r1 = call %main
   ret 0
 }
 
@@ -59,17 +59,17 @@ function std.collections.vector.ArrayList.remove(i64, i64) {
 function std.iterator.collect(i64) {
 @entry
 @block_0
-  call %lm_list_new 0
+  %r1 = call %lm_list_new 0
   jmp %block_5
 @block_5
-  cne 0 2
-  br <unnamed> %block_8 %block_12
+  %r6 = cne 0 2
+  br %r6 %block_8 %block_12
 @block_8
   jmp %block_8
-  call %lm_list_append <unnamed> 0
+  call %lm_list_append %r1 0
   jmp %block_5
 @block_12
-  ret <unnamed>
+  ret %r1
 }
 
 function std.collections.vector.Vector.push(i64, i64) {
@@ -80,25 +80,25 @@ function std.collections.vector.Vector.push(i64, i64) {
 function std.iterator.cycle(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.CycleIterator.init <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.iterator.CycleIterator.init %r1 %p0
+  ret %r1
 }
 
 function std.iterator.filter(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.FilterIterator.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.iterator.FilterIterator.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.iterator.iterator(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.ListIterator.init <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %std.iterator.ListIterator.init %r1 %p0
+  ret %r1
 }
 
 function std.collections.vector.Vector.append(i64, i64) {
@@ -219,9 +219,9 @@ function std.collections.vector.Vector.len(i64) {
 function std.iterator.chunk(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.ChunkIterator.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.iterator.ChunkIterator.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.collections.vector.Vector.size(i64) {
@@ -232,9 +232,9 @@ function std.collections.vector.Vector.size(i64) {
 function std.iterator.map(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.iterator.MapIterator.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.iterator.MapIterator.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.collections.vector.__init__() {
@@ -310,88 +310,88 @@ function std.collections.queue.BitSet.unset(i64, i64) {
 function main() {
 @entry
 @block_0
-  alloc 16
-  call %std.collections.queue.Queue.init <unnamed>
-  call %std.collections.queue.Queue.enqueue <unnamed> 9
-  call %std.collections.queue.Queue.enqueue <unnamed> 17
-  call %std.collections.queue.Queue.length <unnamed>
-  ceq <unnamed> 17
-  call %lm_box_string %str_const_0
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.Queue.peek <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_1
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.Queue.dequeue <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_2
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.Queue.dequeue <unnamed>
-  ceq <unnamed> 17
-  call %lm_box_string %str_const_3
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.Queue.dequeue <unnamed>
-  ceq <unnamed> 2
-  call %lm_box_string %str_const_4
-  call %lm_assert <unnamed> <unnamed>
-  alloc 16
-  call %std.collections.queue.Stack.init <unnamed>
-  call %std.collections.queue.Stack.push <unnamed> 9
-  call %std.collections.queue.Stack.push <unnamed> 17
-  call %std.collections.queue.Stack.length <unnamed>
-  ceq <unnamed> 17
-  call %lm_box_string %str_const_5
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.Stack.peek <unnamed>
-  ceq <unnamed> 17
-  call %lm_box_string %str_const_6
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.Stack.pop <unnamed>
-  ceq <unnamed> 17
-  call %lm_box_string %str_const_7
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.Stack.pop <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_8
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.Stack.pop <unnamed>
-  ceq <unnamed> 2
-  call %lm_box_string %str_const_9
-  call %lm_assert <unnamed> <unnamed>
-  alloc 16
-  call %std.collections.queue.BitSet.init <unnamed> 801
-  call %std.collections.queue.BitSet.toggle <unnamed> 81
-  call %std.collections.queue.BitSet.toggle <unnamed> 161
-  call %std.collections.queue.BitSet.contains <unnamed> 81
-  call %lm_box_string %str_const_10
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.BitSet.contains <unnamed> 161
-  call %lm_box_string %str_const_11
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.BitSet.contains <unnamed> 121
-  cne <unnamed> 18
-  call %lm_box_string %str_const_12
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.BitSet.count <unnamed>
-  ceq <unnamed> 17
-  call %lm_box_string %str_const_13
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.BitSet.unset <unnamed> 81
-  call %std.collections.queue.BitSet.contains <unnamed> 81
-  cne <unnamed> 18
-  call %lm_box_string %str_const_14
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.BitSet.iterator <unnamed>
-  call %std.collections.queue.BitSetIterator.next <unnamed>
-  ceq <unnamed> 161
-  call %lm_box_string %str_const_15
-  call %lm_assert <unnamed> <unnamed>
-  call %std.collections.queue.BitSetIterator.next <unnamed>
-  ceq <unnamed> 2
-  call %lm_box_string %str_const_16
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_17
-  call %lm_print_int <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.collections.queue.Queue.init %r0
+  %r4 = call %std.collections.queue.Queue.enqueue %r0 9
+  %r6 = call %std.collections.queue.Queue.enqueue %r0 17
+  %r7 = call %std.collections.queue.Queue.length %r0
+  %r9 = ceq %r7 17
+  %r10 = call %lm_box_string %str_const_0
+  %r11 = call %lm_assert %r9 %r10
+  %r12 = call %std.collections.queue.Queue.peek %r0
+  %r14 = ceq %r12 9
+  %r15 = call %lm_box_string %str_const_1
+  %r16 = call %lm_assert %r14 %r15
+  %r17 = call %std.collections.queue.Queue.dequeue %r0
+  %r19 = ceq %r17 9
+  %r20 = call %lm_box_string %str_const_2
+  %r21 = call %lm_assert %r19 %r20
+  %r22 = call %std.collections.queue.Queue.dequeue %r0
+  %r24 = ceq %r22 17
+  %r25 = call %lm_box_string %str_const_3
+  %r26 = call %lm_assert %r24 %r25
+  %r27 = call %std.collections.queue.Queue.dequeue %r0
+  %r29 = ceq %r27 2
+  %r30 = call %lm_box_string %str_const_4
+  %r31 = call %lm_assert %r29 %r30
+  %r32 = alloc 16
+  %r33 = call %std.collections.queue.Stack.init %r32
+  %r36 = call %std.collections.queue.Stack.push %r32 9
+  %r38 = call %std.collections.queue.Stack.push %r32 17
+  %r39 = call %std.collections.queue.Stack.length %r32
+  %r41 = ceq %r39 17
+  %r42 = call %lm_box_string %str_const_5
+  %r43 = call %lm_assert %r41 %r42
+  %r44 = call %std.collections.queue.Stack.peek %r32
+  %r46 = ceq %r44 17
+  %r47 = call %lm_box_string %str_const_6
+  %r48 = call %lm_assert %r46 %r47
+  %r49 = call %std.collections.queue.Stack.pop %r32
+  %r51 = ceq %r49 17
+  %r52 = call %lm_box_string %str_const_7
+  %r53 = call %lm_assert %r51 %r52
+  %r54 = call %std.collections.queue.Stack.pop %r32
+  %r56 = ceq %r54 9
+  %r57 = call %lm_box_string %str_const_8
+  %r58 = call %lm_assert %r56 %r57
+  %r59 = call %std.collections.queue.Stack.pop %r32
+  %r61 = ceq %r59 2
+  %r62 = call %lm_box_string %str_const_9
+  %r63 = call %lm_assert %r61 %r62
+  %r65 = alloc 16
+  %r66 = call %std.collections.queue.BitSet.init %r65 801
+  %r69 = call %std.collections.queue.BitSet.toggle %r65 81
+  %r71 = call %std.collections.queue.BitSet.toggle %r65 161
+  %r73 = call %std.collections.queue.BitSet.contains %r65 81
+  %r74 = call %lm_box_string %str_const_10
+  %r75 = call %lm_assert %r73 %r74
+  %r77 = call %std.collections.queue.BitSet.contains %r65 161
+  %r78 = call %lm_box_string %str_const_11
+  %r79 = call %lm_assert %r77 %r78
+  %r81 = call %std.collections.queue.BitSet.contains %r65 121
+  %r82 = cne %r81 18
+  %r84 = call %lm_box_string %str_const_12
+  %r85 = call %lm_assert %r82 %r84
+  %r86 = call %std.collections.queue.BitSet.count %r65
+  %r88 = ceq %r86 17
+  %r89 = call %lm_box_string %str_const_13
+  %r90 = call %lm_assert %r88 %r89
+  %r92 = call %std.collections.queue.BitSet.unset %r65 81
+  %r94 = call %std.collections.queue.BitSet.contains %r65 81
+  %r95 = cne %r94 18
+  %r97 = call %lm_box_string %str_const_14
+  %r98 = call %lm_assert %r95 %r97
+  %r99 = call %std.collections.queue.BitSet.iterator %r65
+  %r101 = call %std.collections.queue.BitSetIterator.next %r99
+  %r103 = ceq %r101 161
+  %r104 = call %lm_box_string %str_const_15
+  %r105 = call %lm_assert %r103 %r104
+  %r106 = call %std.collections.queue.BitSetIterator.next %r99
+  %r108 = ceq %r106 2
+  %r109 = call %lm_box_string %str_const_16
+  %r110 = call %lm_assert %r108 %r109
+  %r111 = call %lm_box_string %str_const_17
+  %r112 = call %lm_print_int %r111
   ret 1
 }
 
@@ -731,10 +731,10 @@ function lm_box_string(i8*) {
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null
@@ -742,40 +742,40 @@ function lm_assert(i32, i64) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 

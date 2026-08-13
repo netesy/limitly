@@ -1,9 +1,9 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.regex.index.__init__
-  call %std.regex.regex.__init__
-  call %main
+  %r0 = call %std.regex.index.__init__
+  %r1 = call %std.regex.regex.__init__
+  %r2 = call %main
   ret 0
 }
 
@@ -90,20 +90,20 @@ function std.core.OptionInt.unwrap(i64) {
 function std.core.err_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_0
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_0
+  %addr_1 = add %r1 0
+  store %p0 %addr_1
+  %addr_2 = add %r1 0
+  store %r1 %addr_2
+  %r4 = alloc 16
+  %addr_3 = add %r4 0
+  store %p0 %addr_3
+  %addr_4 = add %r4 0
+  store %r1 %addr_4
+  %addr_5 = add %r4 0
+  store %r2 %addr_5
+  ret %r4
 }
 
 function std.core.OptionStr.is_none(i64) {
@@ -119,64 +119,64 @@ function std.regex.regex.Regex.is_balanced_pattern(i64) {
 function main() {
 @entry
 @block_0
-  call %lm_box_string %str_const_1
-  call %lm_print_int <unnamed>
-  call %test_regex_frame
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_2
-  call %lm_assert <unnamed> <unnamed>
-  call %test_regex_patterns
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_3
-  call %lm_assert <unnamed> <unnamed>
-  call %test_regex_helpers
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_4
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_5
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_6
+  %r1 = call %lm_print_int %r0
+  %r2 = call %test_regex_frame
+  %r4 = ceq %r2 9
+  %r5 = call %lm_box_string %str_const_7
+  %r6 = call %lm_assert %r4 %r5
+  %r7 = call %test_regex_patterns
+  %r9 = ceq %r7 9
+  %r10 = call %lm_box_string %str_const_8
+  %r11 = call %lm_assert %r9 %r10
+  %r12 = call %test_regex_helpers
+  %r14 = ceq %r12 9
+  %r15 = call %lm_box_string %str_const_9
+  %r16 = call %lm_assert %r14 %r15
+  %r17 = call %lm_box_string %str_const_10
+  %r18 = call %lm_print_int %r17
   ret 1
 }
 
 function std.core.make_err_str(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_6
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_7
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_11
+  %addr_12 = add %r1 0
+  store %p0 %addr_12
+  %addr_13 = add %r1 0
+  store %r1 %addr_13
+  %r4 = alloc 16
+  %addr_14 = add %r4 0
+  store %p0 %addr_14
+  %r6 = call %lm_box_string %str_const_15
+  %addr_16 = add %r4 0
+  store %r1 %addr_16
+  %addr_17 = add %r4 0
+  store %r2 %addr_17
+  ret %r4
 }
 
 function test_regex_helpers() {
 @entry
 @block_0
-  call %lm_box_string %str_const_8
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_9
-  call %lm_box_string %str_const_10
-  call %std.regex.index.is_match <unnamed> <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_11
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_12
-  call %lm_box_string %str_const_13
-  call %lm_box_string %str_const_14
-  call %std.regex.index.replace <unnamed> <unnamed> <unnamed>
-  call %lm_box_string %str_const_15
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_16
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_18
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_19
+  %r3 = call %lm_box_string %str_const_20
+  %r4 = call %std.regex.index.is_match %r2 %r3
+  %r6 = ceq %r4 18
+  %r7 = call %lm_box_string %str_const_21
+  %r8 = call %lm_assert %r6 %r7
+  %r9 = call %lm_box_string %str_const_22
+  %r10 = call %lm_box_string %str_const_23
+  %r11 = call %lm_box_string %str_const_24
+  %r12 = call %std.regex.index.replace %r9 %r10 %r11
+  %r13 = call %lm_box_string %str_const_25
+  %r14 = ceq %r12 %r13
+  %r15 = call %lm_box_string %str_const_26
+  %r16 = call %lm_assert %r14 %r15
   ret 9
 }
 
@@ -188,17 +188,17 @@ function std.core.ResultInt.is_err(i64) {
 function test_regex_patterns() {
 @entry
 @block_0
-  call %lm_box_string %str_const_17
-  call %lm_print_int <unnamed>
-  call %std.regex.index.RegexPatterns
-  cast <unnamed>
-  call %std.regex.regex.RegexPatterns.email <unnamed>
-  add <unnamed> 0
-  load <unnamed>
-  call %lm_box_string %str_const_18
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_19
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_27
+  %r1 = call %lm_print_int %r0
+  %r2 = call %std.regex.index.RegexPatterns
+  %r3 = cast %r2
+  %r5 = call %std.regex.regex.RegexPatterns.email %r3
+  %addr_28 = add %r5 0
+  %r8 = load %addr_28
+  %r9 = call %lm_box_string %str_const_29
+  %r10 = ceq %r8 %r9
+  %r11 = call %lm_box_string %str_const_30
+  %r12 = call %lm_assert %r10 %r11
   ret 9
 }
 
@@ -231,9 +231,9 @@ function std.regex.regex.Regex.simple_match(i64, i64, i64) {
 function std.regex.index.Regex(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.regex.regex.Regex.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.regex.regex.Regex.init %r2 %p0 %p1
+  ret %r2
 }
 
 function std.regex.regex.RegexPatterns.init(i64) {
@@ -259,117 +259,117 @@ function std.core.OptionStr.unwrap(i64) {
 function std.core.ok_str(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_20
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_21
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_31
+  %addr_32 = add %r1 0
+  store %p0 %addr_32
+  %r3 = call %lm_box_string %str_const_33
+  %addr_34 = add %r1 0
+  store %r1 %addr_34
+  %r5 = alloc 16
+  %addr_35 = add %r5 0
+  store %p0 %addr_35
+  %addr_36 = add %r5 0
+  store %r1 %addr_36
+  %addr_37 = add %r5 0
+  store %r2 %addr_37
+  ret %r5
 }
 
 function test_regex_frame() {
 @entry
 @block_0
-  call %lm_box_string %str_const_22
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_23
-  call %std.regex.index.Regex <unnamed> 1
-  cast <unnamed>
-  call %lm_box_string %str_const_24
-  call %std.regex.regex.Regex.matches <unnamed> <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_25
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_26
-  call %std.regex.regex.Regex.matches <unnamed> <unnamed>
-  ceq <unnamed> 10
-  call %lm_box_string %str_const_27
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_28
-  call %std.regex.regex.Regex.find_first_match <unnamed> <unnamed>
-  call %lm_box_string %str_const_29
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_30
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_31
-  call %std.regex.regex.Regex.find_all_matches <unnamed> <unnamed>
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 25
-  call %lm_box_string %str_const_32
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_list_get <unnamed> 1
-  call %lm_box_string %str_const_33
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_34
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_35
-  call %lm_box_string %str_const_36
-  call %std.regex.regex.Regex.replace <unnamed> <unnamed> <unnamed>
-  call %lm_box_string %str_const_37
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_38
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_39
-  call %lm_box_string %str_const_40
-  call %std.regex.regex.Regex.replace_all <unnamed> <unnamed> <unnamed>
-  call %lm_box_string %str_const_41
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_42
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_43
-  call %std.regex.regex.Regex.split <unnamed> <unnamed>
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 17
-  call %lm_box_string %str_const_44
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_list_get <unnamed> 1
-  call %lm_box_string %str_const_45
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_46
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_list_get <unnamed> 9
-  call %lm_box_string %str_const_47
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_48
-  call %lm_assert <unnamed> <unnamed>
-  call %std.regex.regex.Regex.is_valid <unnamed>
-  ceq <unnamed> 18
-  call %lm_box_string %str_const_49
-  call %lm_assert <unnamed> <unnamed>
-  call %std.regex.regex.Regex.to_string <unnamed>
-  call %lm_box_string %str_const_50
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_51
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_38
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_39
+  %r4 = call %std.regex.index.Regex %r2 1
+  %r5 = cast %r4
+  %r7 = call %lm_box_string %str_const_40
+  %r8 = call %std.regex.regex.Regex.matches %r5 %r7
+  %r10 = ceq %r8 18
+  %r11 = call %lm_box_string %str_const_41
+  %r12 = call %lm_assert %r10 %r11
+  %r13 = call %lm_box_string %str_const_42
+  %r14 = call %std.regex.regex.Regex.matches %r5 %r13
+  %r16 = ceq %r14 10
+  %r17 = call %lm_box_string %str_const_43
+  %r18 = call %lm_assert %r16 %r17
+  %r19 = call %lm_box_string %str_const_44
+  %r20 = call %std.regex.regex.Regex.find_first_match %r5 %r19
+  %r22 = call %lm_box_string %str_const_45
+  %r23 = ceq %r20 %r22
+  %r24 = call %lm_box_string %str_const_46
+  %r25 = call %lm_assert %r23 %r24
+  %r26 = call %lm_box_string %str_const_47
+  %r27 = call %std.regex.regex.Regex.find_all_matches %r5 %r26
+  %r29 = call %lm_list_len %r27
+  %r31 = ceq %r29 25
+  %r32 = call %lm_box_string %str_const_48
+  %r33 = call %lm_assert %r31 %r32
+  %r35 = call %lm_list_get %r27 1
+  %r36 = call %lm_box_string %str_const_49
+  %r37 = ceq %r35 %r36
+  %r38 = call %lm_box_string %str_const_50
+  %r39 = call %lm_assert %r37 %r38
+  %r40 = call %lm_box_string %str_const_51
+  %r41 = call %lm_box_string %str_const_52
+  %r42 = call %std.regex.regex.Regex.replace %r5 %r40 %r41
+  %r44 = call %lm_box_string %str_const_53
+  %r45 = ceq %r42 %r44
+  %r46 = call %lm_box_string %str_const_54
+  %r47 = call %lm_assert %r45 %r46
+  %r48 = call %lm_box_string %str_const_55
+  %r49 = call %lm_box_string %str_const_56
+  %r50 = call %std.regex.regex.Regex.replace_all %r5 %r48 %r49
+  %r52 = call %lm_box_string %str_const_57
+  %r53 = ceq %r50 %r52
+  %r54 = call %lm_box_string %str_const_58
+  %r55 = call %lm_assert %r53 %r54
+  %r56 = call %lm_box_string %str_const_59
+  %r57 = call %std.regex.regex.Regex.split %r5 %r56
+  %r59 = call %lm_list_len %r57
+  %r61 = ceq %r59 17
+  %r62 = call %lm_box_string %str_const_60
+  %r63 = call %lm_assert %r61 %r62
+  %r65 = call %lm_list_get %r57 1
+  %r66 = call %lm_box_string %str_const_61
+  %r67 = ceq %r65 %r66
+  %r68 = call %lm_box_string %str_const_62
+  %r69 = call %lm_assert %r67 %r68
+  %r71 = call %lm_list_get %r57 9
+  %r72 = call %lm_box_string %str_const_63
+  %r73 = ceq %r71 %r72
+  %r74 = call %lm_box_string %str_const_64
+  %r75 = call %lm_assert %r73 %r74
+  %r76 = call %std.regex.regex.Regex.is_valid %r5
+  %r78 = ceq %r76 18
+  %r79 = call %lm_box_string %str_const_65
+  %r80 = call %lm_assert %r78 %r79
+  %r81 = call %std.regex.regex.Regex.to_string %r5
+  %r82 = call %lm_box_string %str_const_66
+  %r83 = ceq %r81 %r82
+  %r84 = call %lm_box_string %str_const_67
+  %r85 = call %lm_assert %r83 %r84
   ret 9
 }
 
 function std.core.make_err_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_52
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_68
+  %addr_69 = add %r1 0
+  store %p0 %addr_69
+  %addr_70 = add %r1 0
+  store %r1 %addr_70
+  %r4 = alloc 16
+  %addr_71 = add %r4 0
+  store %p0 %addr_71
+  %addr_72 = add %r4 0
+  store %r1 %addr_72
+  %addr_73 = add %r4 0
+  store %r2 %addr_73
+  ret %r4
 }
 
 function std.core.ResultInt.unwrap_or(i64, i64) {
@@ -390,10 +390,10 @@ function std.core.ResultStr.unwrap(i64) {
 function std.regex.index.is_match(i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.regex.regex.Regex.init <unnamed> <unnamed> 1
-  call %std.regex.regex.Regex.matches <unnamed> <unnamed>
-  ret <unnamed>
+  %r3 = alloc 16
+  %r4 = call %std.regex.regex.Regex.init %r3 %p0 1
+  %r6 = call %std.regex.regex.Regex.matches %r3 %p1
+  ret %r6
 }
 
 function std.core.some_int(i64) {
@@ -405,21 +405,21 @@ function std.core.some_int(i64) {
 function std.core.err_str(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_53
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_54
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_74
+  %addr_75 = add %r1 0
+  store %p0 %addr_75
+  %addr_76 = add %r1 0
+  store %r1 %addr_76
+  %r4 = alloc 16
+  %addr_77 = add %r4 0
+  store %p0 %addr_77
+  %r6 = call %lm_box_string %str_const_78
+  %addr_79 = add %r4 0
+  store %r1 %addr_79
+  %addr_80 = add %r4 0
+  store %r2 %addr_80
+  ret %r4
 }
 
 function std.core.ResultStr.unwrap_or(i64, i64) {
@@ -445,54 +445,54 @@ function std.regex.regex.Regex.replace(i64, i64, i64) {
 function std.core.ok_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_55
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_56
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_81
+  %addr_82 = add %r1 0
+  store %p0 %addr_82
+  %r3 = call %lm_box_string %str_const_83
+  %addr_84 = add %r1 0
+  store %r1 %addr_84
+  %r5 = alloc 16
+  %addr_85 = add %r5 0
+  store %p0 %addr_85
+  %addr_86 = add %r5 0
+  store %r1 %addr_86
+  %addr_87 = add %r5 0
+  store %r2 %addr_87
+  ret %r5
 }
 
 function std.core.ok_bool(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_57
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_58
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  cne <unnamed> 1
-  br <unnamed> %block_9 %block_16
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_88
+  %addr_89 = add %r1 0
+  store %p0 %addr_89
+  %r3 = call %lm_box_string %str_const_90
+  %addr_91 = add %r1 0
+  store %r1 %addr_91
+  %r5 = cne %p0 1
+  br %r5 %block_9 %block_16
 @block_9
   jmp %block_9
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r7 = alloc 16
+  %addr_92 = add %r7 0
+  store %p0 %addr_92
+  %addr_93 = add %r7 0
+  store %r1 %addr_93
+  %addr_94 = add %r7 0
+  store %r2 %addr_94
+  ret %r7
 @block_16
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r10 = alloc 16
+  %addr_95 = add %r10 0
+  store %p0 %addr_95
+  %addr_96 = add %r10 0
+  store %r1 %addr_96
+  %addr_97 = add %r10 0
+  store %r2 %addr_97
+  ret %r10
 }
 
 function std.core.__init__() {
@@ -503,17 +503,17 @@ function std.core.__init__() {
 function std.regex.index.replace(i64, i64, i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.regex.regex.Regex.init <unnamed> <unnamed> 1
-  call %std.regex.regex.Regex.replace <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r4 = alloc 16
+  %r5 = call %std.regex.regex.Regex.init %r4 %p0 1
+  %r7 = call %std.regex.regex.Regex.replace %r4 %p1 %p2
+  ret %r7
 }
 
 function std.regex.index.RegexPatterns() {
 @entry
 @block_0
-  alloc 16
-  call %std.regex.regex.RegexPatterns.init <unnamed>
+  %r0 = alloc 16
+  %r1 = call %std.regex.regex.RegexPatterns.init %r0
   ret 0
 }
 
@@ -542,49 +542,49 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null

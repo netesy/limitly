@@ -1,25 +1,25 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.net.dns.__init__
-  call %lm_box_string %str_const_0
-  call %lm_print_int <unnamed>
-  alloc 16
-  call %lm_box_string %str_const_1
-  call %std.net.dns.DNS.is_ipv4 <unnamed> <unnamed>
-  call %lm_box_string %str_const_2
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_3
-  call %std.net.dns.DNS.is_ipv4 <unnamed> <unnamed>
-  cne <unnamed> 18
-  call %lm_box_string %str_const_4
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_5
-  call %std.net.dns.DNS.is_ipv6 <unnamed> <unnamed>
-  call %lm_box_string %str_const_6
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_7
-  call %lm_print_int <unnamed>
+  %r0 = call %std.net.dns.__init__
+  %r1 = call %lm_box_string %str_const_0
+  %r2 = call %lm_print_int %r1
+  %r3 = alloc 16
+  %r5 = call %lm_box_string %str_const_1
+  %r6 = call %std.net.dns.DNS.is_ipv4 %r3 %r5
+  %r7 = call %lm_box_string %str_const_2
+  %r8 = call %lm_assert %r6 %r7
+  %r9 = call %lm_box_string %str_const_3
+  %r10 = call %std.net.dns.DNS.is_ipv4 %r3 %r9
+  %r11 = cne %r10 18
+  %r13 = call %lm_box_string %str_const_4
+  %r14 = call %lm_assert %r11 %r13
+  %r15 = call %lm_box_string %str_const_5
+  %r16 = call %std.net.dns.DNS.is_ipv6 %r3 %r15
+  %r17 = call %lm_box_string %str_const_6
+  %r18 = call %lm_assert %r16 %r17
+  %r19 = call %lm_box_string %str_const_7
+  %r20 = call %lm_print_int %r19
   ret 0
 }
 
@@ -31,93 +31,93 @@ function std.net.dns.__init__() {
 function std.net.dns.is_hex_digit(i64) {
 @entry
 @block_0
-  call %std.net.dns.is_digit <unnamed>
-  cne <unnamed> 1
-  br <unnamed> %block_4 %block_6
+  %r1 = call %std.net.dns.is_digit %p0
+  %r2 = cne %r1 1
+  br %r2 %block_4 %block_6
 @block_4
   jmp %block_4
   ret 18
 @block_6
-  call %lm_box_string %str_const_8
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_14 %block_10
+  %r10 = call %lm_box_string %str_const_8
+  %r11 = ceq %p0 %r10
+  br %r11 %block_14 %block_10
 @block_10
   jmp %block_10
-  call %lm_box_string %str_const_9
-  ceq <unnamed> <unnamed>
+  %r12 = call %lm_box_string %str_const_9
+  %r13 = ceq %p0 %r12
   jmp %block_14
 @block_14
-  br <unnamed> %block_20 %block_16
+  br %r13 %block_20 %block_16
 @block_16
   jmp %block_16
-  call %lm_box_string %str_const_10
-  ceq <unnamed> <unnamed>
+  %r14 = call %lm_box_string %str_const_10
+  %r15 = ceq %p0 %r14
   jmp %block_20
 @block_20
-  br <unnamed> %block_26 %block_22
+  br %r15 %block_26 %block_22
 @block_22
   jmp %block_22
-  call %lm_box_string %str_const_11
-  ceq <unnamed> <unnamed>
+  %r16 = call %lm_box_string %str_const_11
+  %r17 = ceq %p0 %r16
   jmp %block_26
 @block_26
-  br <unnamed> %block_32 %block_28
+  br %r17 %block_32 %block_28
 @block_28
   jmp %block_28
-  call %lm_box_string %str_const_12
-  ceq <unnamed> <unnamed>
+  %r18 = call %lm_box_string %str_const_12
+  %r19 = ceq %p0 %r18
   jmp %block_32
 @block_32
-  br <unnamed> %block_38 %block_34
+  br %r19 %block_38 %block_34
 @block_34
   jmp %block_34
-  call %lm_box_string %str_const_13
-  ceq <unnamed> <unnamed>
+  %r20 = call %lm_box_string %str_const_13
+  %r21 = ceq %p0 %r20
   jmp %block_38
 @block_38
-  br <unnamed> %block_39 %block_41
+  br %r21 %block_39 %block_41
 @block_39
   jmp %block_39
   ret 18
 @block_41
-  call %lm_box_string %str_const_14
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_49 %block_45
+  %r29 = call %lm_box_string %str_const_14
+  %r30 = ceq %p0 %r29
+  br %r30 %block_49 %block_45
 @block_45
   jmp %block_45
-  call %lm_box_string %str_const_15
-  ceq <unnamed> <unnamed>
+  %r31 = call %lm_box_string %str_const_15
+  %r32 = ceq %p0 %r31
   jmp %block_49
 @block_49
-  br <unnamed> %block_55 %block_51
+  br %r32 %block_55 %block_51
 @block_51
   jmp %block_51
-  call %lm_box_string %str_const_16
-  ceq <unnamed> <unnamed>
+  %r33 = call %lm_box_string %str_const_16
+  %r34 = ceq %p0 %r33
   jmp %block_55
 @block_55
-  br <unnamed> %block_61 %block_57
+  br %r34 %block_61 %block_57
 @block_57
   jmp %block_57
-  call %lm_box_string %str_const_17
-  ceq <unnamed> <unnamed>
+  %r35 = call %lm_box_string %str_const_17
+  %r36 = ceq %p0 %r35
   jmp %block_61
 @block_61
-  br <unnamed> %block_67 %block_63
+  br %r36 %block_67 %block_63
 @block_63
   jmp %block_63
-  call %lm_box_string %str_const_18
-  ceq <unnamed> <unnamed>
+  %r37 = call %lm_box_string %str_const_18
+  %r38 = ceq %p0 %r37
   jmp %block_67
 @block_67
-  br <unnamed> %block_73 %block_69
+  br %r38 %block_73 %block_69
 @block_69
   jmp %block_69
-  call %lm_box_string %str_const_19
-  ceq <unnamed> <unnamed>
+  %r39 = call %lm_box_string %str_const_19
+  %r40 = ceq %p0 %r39
   jmp %block_73
 @block_73
-  br <unnamed> %block_74 %block_76
+  br %r40 %block_74 %block_76
 @block_74
   jmp %block_74
   ret 18
@@ -128,72 +128,72 @@ function std.net.dns.is_hex_digit(i64) {
 function std.net.dns.is_digit(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_20
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_3 %block_5
+  %r1 = call %lm_box_string %str_const_20
+  %r2 = ceq %p0 %r1
+  br %r2 %block_3 %block_5
 @block_3
   jmp %block_3
   ret 18
 @block_5
-  call %lm_box_string %str_const_21
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r5 = call %lm_box_string %str_const_21
+  %r6 = ceq %p0 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
   ret 18
 @block_10
-  call %lm_box_string %str_const_22
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_13 %block_15
+  %r9 = call %lm_box_string %str_const_22
+  %r10 = ceq %p0 %r9
+  br %r10 %block_13 %block_15
 @block_13
   jmp %block_13
   ret 18
 @block_15
-  call %lm_box_string %str_const_23
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_18 %block_20
+  %r13 = call %lm_box_string %str_const_23
+  %r14 = ceq %p0 %r13
+  br %r14 %block_18 %block_20
 @block_18
   jmp %block_18
   ret 18
 @block_20
-  call %lm_box_string %str_const_24
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_23 %block_25
+  %r17 = call %lm_box_string %str_const_24
+  %r18 = ceq %p0 %r17
+  br %r18 %block_23 %block_25
 @block_23
   jmp %block_23
   ret 18
 @block_25
-  call %lm_box_string %str_const_25
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_28 %block_30
+  %r21 = call %lm_box_string %str_const_25
+  %r22 = ceq %p0 %r21
+  br %r22 %block_28 %block_30
 @block_28
   jmp %block_28
   ret 18
 @block_30
-  call %lm_box_string %str_const_26
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_33 %block_35
+  %r25 = call %lm_box_string %str_const_26
+  %r26 = ceq %p0 %r25
+  br %r26 %block_33 %block_35
 @block_33
   jmp %block_33
   ret 18
 @block_35
-  call %lm_box_string %str_const_27
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_38 %block_40
+  %r29 = call %lm_box_string %str_const_27
+  %r30 = ceq %p0 %r29
+  br %r30 %block_38 %block_40
 @block_38
   jmp %block_38
   ret 18
 @block_40
-  call %lm_box_string %str_const_28
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_43 %block_45
+  %r33 = call %lm_box_string %str_const_28
+  %r34 = ceq %p0 %r33
+  br %r34 %block_43 %block_45
 @block_43
   jmp %block_43
   ret 18
 @block_45
-  call %lm_box_string %str_const_29
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_48 %block_50
+  %r37 = call %lm_box_string %str_const_29
+  %r38 = ceq %p0 %r37
+  br %r38 %block_48 %block_50
 @block_48
   jmp %block_48
   ret 18
@@ -204,44 +204,44 @@ function std.net.dns.is_digit(i64) {
 function std.net.dns.split_string(i64, i64) {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %lm_box_string %str_const_30
+  %r2 = call %lm_list_new 0
+  %r4 = call %lm_box_string %str_const_30
   jmp %block_5
 @block_5
-  call %lm_list_len <unnamed>
-  cslt 1 <unnamed>
-  br <unnamed> %block_8 %block_36
+  %r6 = call %lm_list_len %p0
+  %r7 = cslt 1 %r6
+  br %r7 %block_8 %block_36
 @block_8
   jmp %block_8
-  add 1 9
-  call %substring <unnamed> 1 <unnamed>
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_14 %block_23
+  %r11 = add 1 9
+  %r12 = call %substring %p0 1 %r11
+  %r13 = ceq %r12 %p1
+  br %r13 %block_14 %block_23
 @block_14
   jmp %block_14
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> <unnamed>
-  add <unnamed> <unnamed>
-  call %lm_box_string %str_const_31
+  %r15 = call %lm_list_new 0
+  call %lm_list_append %r15 %r4
+  %r17 = call %lm_list_new 0
+  call %lm_list_append %r17 %r4
+  %r19 = add %r2 %r17
+  %r20 = call %lm_box_string %str_const_31
   jmp %block_31
 @block_23
-  add 1 9
-  call %substring <unnamed> 1 <unnamed>
-  call %lm_to_string <unnamed>
-  call %lm_str_concat <unnamed> <unnamed>
+  %r23 = add 1 9
+  %r24 = call %substring %p0 1 %r23
+  %r25 = call %lm_to_string %r24
+  %r26 = call %lm_str_concat %r20 %r25
   jmp %block_31
 @block_31
-  add 1 9
+  %r29 = add 1 9
   jmp %block_5
 @block_36
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> <unnamed>
-  add <unnamed> <unnamed>
-  ret <unnamed>
+  %r30 = call %lm_list_new 0
+  call %lm_list_append %r30 %r26
+  %r32 = call %lm_list_new 0
+  call %lm_list_append %r32 %r26
+  %r34 = add %r19 %r32
+  ret %r34
 }
 
 function std.net.dns.DNS.is_ipv4(i64, i64) {
@@ -267,113 +267,113 @@ function std.core.__init__() {
 function std.core.ok_bool(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_32
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_33
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  cne <unnamed> 1
-  br <unnamed> %block_9 %block_16
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_32
+  %addr_33 = add %r1 0
+  store %p0 %addr_33
+  %r3 = call %lm_box_string %str_const_34
+  %addr_35 = add %r1 0
+  store %r1 %addr_35
+  %r5 = cne %p0 1
+  br %r5 %block_9 %block_16
 @block_9
   jmp %block_9
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r7 = alloc 16
+  %addr_36 = add %r7 0
+  store %p0 %addr_36
+  %addr_37 = add %r7 0
+  store %r1 %addr_37
+  %addr_38 = add %r7 0
+  store %r2 %addr_38
+  ret %r7
 @block_16
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r10 = alloc 16
+  %addr_39 = add %r10 0
+  store %p0 %addr_39
+  %addr_40 = add %r10 0
+  store %r1 %addr_40
+  %addr_41 = add %r10 0
+  store %r2 %addr_41
+  ret %r10
 }
 
 function std.core.err_str(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_34
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_35
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_42
+  %addr_43 = add %r1 0
+  store %p0 %addr_43
+  %addr_44 = add %r1 0
+  store %r1 %addr_44
+  %r4 = alloc 16
+  %addr_45 = add %r4 0
+  store %p0 %addr_45
+  %r6 = call %lm_box_string %str_const_46
+  %addr_47 = add %r4 0
+  store %r1 %addr_47
+  %addr_48 = add %r4 0
+  store %r2 %addr_48
+  ret %r4
 }
 
 function std.core.make_err_str(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_36
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_37
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_49
+  %addr_50 = add %r1 0
+  store %p0 %addr_50
+  %addr_51 = add %r1 0
+  store %r1 %addr_51
+  %r4 = alloc 16
+  %addr_52 = add %r4 0
+  store %p0 %addr_52
+  %r6 = call %lm_box_string %str_const_53
+  %addr_54 = add %r4 0
+  store %r1 %addr_54
+  %addr_55 = add %r4 0
+  store %r2 %addr_55
+  ret %r4
 }
 
 function std.core.ok_str(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_38
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_39
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_56
+  %addr_57 = add %r1 0
+  store %p0 %addr_57
+  %r3 = call %lm_box_string %str_const_58
+  %addr_59 = add %r1 0
+  store %r1 %addr_59
+  %r5 = alloc 16
+  %addr_60 = add %r5 0
+  store %p0 %addr_60
+  %addr_61 = add %r5 0
+  store %r1 %addr_61
+  %addr_62 = add %r5 0
+  store %r2 %addr_62
+  ret %r5
 }
 
 function std.core.make_err_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_40
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_63
+  %addr_64 = add %r1 0
+  store %p0 %addr_64
+  %addr_65 = add %r1 0
+  store %r1 %addr_65
+  %r4 = alloc 16
+  %addr_66 = add %r4 0
+  store %p0 %addr_66
+  %addr_67 = add %r4 0
+  store %r1 %addr_67
+  %addr_68 = add %r4 0
+  store %r2 %addr_68
+  ret %r4
 }
 
 function std.core.some_str(i64) {
@@ -471,18 +471,18 @@ function std.resource.ResourceReader.init(i64, i64) {
 function std.resource.create(i64, i64) {
 @entry
 @block_0
-  call %std.internal.runtime.create <unnamed> <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_6 %block_8
+  %r2 = call %std.internal.runtime.create %p0 %p1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_6 %block_8
 @block_6
   jmp %block_6
-  call %lm_error_new <unnamed>
-  ret <unnamed>
+  %r8 = call %lm_error_new %p0
+  ret %r8
 @block_8
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r10 = alloc 16
+  %r11 = call %std.resource.Resource.init %r10 %r2 %p0
+  ret %r10
 }
 
 function std.resource.ResourceWriter.init(i64, i64) {
@@ -551,21 +551,21 @@ function std.resource.Pollable.poll(i64) {
 function std.core.ok_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_41
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_42
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_69
+  %addr_70 = add %r1 0
+  store %p0 %addr_70
+  %r3 = call %lm_box_string %str_const_71
+  %addr_72 = add %r1 0
+  store %r1 %addr_72
+  %r5 = alloc 16
+  %addr_73 = add %r5 0
+  store %p0 %addr_73
+  %addr_74 = add %r5 0
+  store %r1 %addr_74
+  %addr_75 = add %r5 0
+  store %r2 %addr_75
+  ret %r5
 }
 
 function std.resource.Resource.is_open(i64) {
@@ -596,19 +596,19 @@ function std.resource.Accepter.accept(i64) {
 function std.resource.create_socket() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.core.ResultInt.unwrap_or(i64, i64) {
@@ -629,19 +629,19 @@ function std.resource.Binder.bind(i64, i64) {
 function std.resource.create_hash_engine() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource.Binder.init(i64, i64) {
@@ -682,112 +682,112 @@ function std.resource.ResourceReader.read(i64, i64) {
 function std.resource.create_dns_resolver() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource.create_websocket() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource.open_file(i64, i64) {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r3 = call %lm_list_new 0
+  %r4 = call %std.internal.runtime.create 0 %r3
+  %r7 = neg 9
+  %r8 = ceq %r4 %r7
+  br %r8 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new <unnamed>
-  ret <unnamed>
+  %r10 = call %lm_error_new %p0
+  ret %r10
 @block_10
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> <unnamed>
-  call %lm_list_append <unnamed> <unnamed>
-  call %std.internal.runtime.call <unnamed> 0 <unnamed>
-  cne <unnamed> 18
-  br <unnamed> %block_19 %block_22
+  %r12 = call %lm_list_new 0
+  call %lm_list_append %r12 %p0
+  call %lm_list_append %r12 %p1
+  %r15 = call %std.internal.runtime.call %r4 0 %r12
+  %r18 = cne %r15 18
+  br %r18 %block_19 %block_22
 @block_19
   jmp %block_19
-  call %std.internal.runtime.destroy <unnamed>
-  call %lm_error_new <unnamed>
-  ret <unnamed>
+  %r20 = call %std.internal.runtime.destroy %r4
+  %r21 = call %lm_error_new %p0
+  ret %r21
 @block_22
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r24 = alloc 16
+  %r25 = call %std.resource.Resource.init %r24 %r4 0
+  ret %r24
 }
 
 function std.resource.create_entropy() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource.adopt_socket(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.resource.Resource.init %r2 %p0 0
+  ret %r2
 }
 
 function std.core.err_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_43
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_76
+  %addr_77 = add %r1 0
+  store %p0 %addr_77
+  %addr_78 = add %r1 0
+  store %r1 %addr_78
+  %r4 = alloc 16
+  %addr_79 = add %r4 0
+  store %p0 %addr_79
+  %addr_80 = add %r4 0
+  store %r1 %addr_80
+  %addr_81 = add %r4 0
+  store %r2 %addr_81
+  ret %r4
 }
 
 function std.core.OptionInt.unwrap(i64) {
@@ -798,26 +798,26 @@ function std.core.OptionInt.unwrap(i64) {
 function std.resource.create_fs_resource() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource._call(i64, i64, i64) {
 @entry
 @block_0
-  call %std.internal.runtime.call <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r3 = call %std.internal.runtime.call %p0 %p1 %p2
+  ret %r3
 }
 
 function std.resource.__init__() {
@@ -838,19 +838,19 @@ function std.core.OptionInt.is_some(i64) {
 function std.resource.create_udp_socket() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.core.OptionInt.is_none(i64) {
@@ -863,49 +863,49 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
 function lm_assert(void, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null

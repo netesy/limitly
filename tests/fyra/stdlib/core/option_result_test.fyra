@@ -1,9 +1,9 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.option.__init__
-  call %std.result.__init__
-  call %main
+  %r0 = call %std.option.__init__
+  %r1 = call %std.result.__init__
+  %r2 = call %main
   ret 0
 }
 
@@ -15,9 +15,9 @@ function std.option.__init__() {
 function std.option.None() {
 @entry
 @block_0
-  alloc 16
-  call %std.option.Option.init <unnamed> 10 2
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.option.Option.init %r2 10 2
+  ret %r2
 }
 
 function std.option.Option.init(i64, i64, i64) {
@@ -68,50 +68,50 @@ function std.result.Result.is_ok(i64) {
 function main() {
 @entry
 @block_0
-  call %std.option.Some 337
-  call %std.option.None
-  call %std.option.Option.is_some <unnamed>
-  call %lm_box_string %str_const_0
-  call %lm_assert <unnamed> <unnamed>
-  call %std.option.Option.is_none <unnamed>
-  call %lm_box_string %str_const_1
-  call %lm_assert <unnamed> <unnamed>
-  call %std.option.Option.unwrap <unnamed>
-  ceq <unnamed> 337
-  call %lm_box_string %str_const_2
-  call %lm_assert <unnamed> <unnamed>
-  call %std.option.Option.unwrap_or <unnamed> 81
-  ceq <unnamed> 81
-  call %lm_box_string %str_const_3
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_4
-  call %std.option.Option.map <unnamed> <unnamed>
-  call %std.option.Option.unwrap <unnamed>
-  ceq <unnamed> 345
-  call %lm_box_string %str_const_5
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_6
-  call %std.result.Ok <unnamed>
-  call %lm_box_string %str_const_7
-  call %std.result.Err <unnamed>
-  call %std.result.Result.is_ok <unnamed>
-  call %lm_box_string %str_const_8
-  call %lm_assert <unnamed> <unnamed>
-  call %std.result.Result.is_err <unnamed>
-  call %lm_box_string %str_const_9
-  call %lm_assert <unnamed> <unnamed>
-  call %std.result.Result.unwrap <unnamed>
-  call %lm_box_string %str_const_10
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_11
-  call %lm_assert <unnamed> <unnamed>
-  call %std.result.Result.unwrap_err <unnamed>
-  call %lm_box_string %str_const_12
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_13
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_14
-  call %lm_print_int <unnamed>
+  %r1 = call %std.option.Some 337
+  %r3 = call %std.option.None
+  %r5 = call %std.option.Option.is_some %r1
+  %r6 = call %lm_box_string %str_const_0
+  %r7 = call %lm_assert %r5 %r6
+  %r8 = call %std.option.Option.is_none %r3
+  %r9 = call %lm_box_string %str_const_1
+  %r10 = call %lm_assert %r8 %r9
+  %r11 = call %std.option.Option.unwrap %r1
+  %r13 = ceq %r11 337
+  %r14 = call %lm_box_string %str_const_2
+  %r15 = call %lm_assert %r13 %r14
+  %r17 = call %std.option.Option.unwrap_or %r3 81
+  %r19 = ceq %r17 81
+  %r20 = call %lm_box_string %str_const_3
+  %r21 = call %lm_assert %r19 %r20
+  %r23 = call %lm_box_string %str_const_4
+  %r24 = call %std.option.Option.map %r1 %r23
+  %r26 = call %std.option.Option.unwrap %r24
+  %r28 = ceq %r26 345
+  %r29 = call %lm_box_string %str_const_5
+  %r30 = call %lm_assert %r28 %r29
+  %r31 = call %lm_box_string %str_const_6
+  %r32 = call %std.result.Ok %r31
+  %r34 = call %lm_box_string %str_const_7
+  %r35 = call %std.result.Err %r34
+  %r37 = call %std.result.Result.is_ok %r32
+  %r38 = call %lm_box_string %str_const_8
+  %r39 = call %lm_assert %r37 %r38
+  %r40 = call %std.result.Result.is_err %r35
+  %r41 = call %lm_box_string %str_const_9
+  %r42 = call %lm_assert %r40 %r41
+  %r43 = call %std.result.Result.unwrap %r32
+  %r44 = call %lm_box_string %str_const_10
+  %r45 = ceq %r43 %r44
+  %r46 = call %lm_box_string %str_const_11
+  %r47 = call %lm_assert %r45 %r46
+  %r48 = call %std.result.Result.unwrap_err %r35
+  %r49 = call %lm_box_string %str_const_12
+  %r50 = ceq %r48 %r49
+  %r51 = call %lm_box_string %str_const_13
+  %r52 = call %lm_assert %r50 %r51
+  %r53 = call %lm_box_string %str_const_14
+  %r54 = call %lm_print_int %r53
   ret 1
 }
 
@@ -129,17 +129,17 @@ function std.core.some_str(i64) {
 function std.option.Some(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.option.Option.init <unnamed> 18 <unnamed>
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.option.Option.init %r2 18 %p0
+  ret %r2
 }
 
 function std.result.Ok(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.result.Result.init <unnamed> 18 <unnamed> 2
-  ret <unnamed>
+  %r3 = alloc 16
+  %r4 = call %std.result.Result.init %r3 18 %p0 2
+  ret %r3
 }
 
 function std.result.Result.map(i64, i64) {
@@ -170,9 +170,9 @@ function std.core.ResultInt.unwrap(i64) {
 function std.result.Err(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.result.Result.init <unnamed> 10 2 <unnamed>
-  ret <unnamed>
+  %r3 = alloc 16
+  %r4 = call %std.result.Result.init %r3 10 2 %p0
+  ret %r3
 }
 
 function std.core.ResultInt.is_err(i64) {
@@ -183,29 +183,29 @@ function std.core.ResultInt.is_err(i64) {
 function __lambda_0(i64) {
 @entry
 @block_0
-  cast <unnamed>
-  cast <unnamed>
-  add <unnamed> 9
-  ret <unnamed>
+  %r1 = cast %p0
+  %r3 = cast %p0
+  %r5 = add %r3 9
+  ret %r5
 }
 
 function std.core.make_err_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_15
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_15
+  %addr_16 = add %r1 0
+  store %p0 %addr_16
+  %addr_17 = add %r1 0
+  store %r1 %addr_17
+  %r4 = alloc 16
+  %addr_18 = add %r4 0
+  store %p0 %addr_18
+  %addr_19 = add %r4 0
+  store %r1 %addr_19
+  %addr_20 = add %r4 0
+  store %r2 %addr_20
+  ret %r4
 }
 
 function std.result.__init__() {
@@ -226,20 +226,20 @@ function std.core.ResultStr.is_ok(i64) {
 function std.core.err_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_21
+  %addr_22 = add %r1 0
+  store %p0 %addr_22
+  %addr_23 = add %r1 0
+  store %r1 %addr_23
+  %r4 = alloc 16
+  %addr_24 = add %r4 0
+  store %p0 %addr_24
+  %addr_25 = add %r4 0
+  store %r1 %addr_25
+  %addr_26 = add %r4 0
+  store %r2 %addr_26
+  ret %r4
 }
 
 function std.core.OptionInt.unwrap(i64) {
@@ -255,21 +255,21 @@ function std.core.ResultStr.map_err(i64, i64) {
 function std.core.make_err_str(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_17
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_18
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_27
+  %addr_28 = add %r1 0
+  store %p0 %addr_28
+  %addr_29 = add %r1 0
+  store %r1 %addr_29
+  %r4 = alloc 16
+  %addr_30 = add %r4 0
+  store %p0 %addr_30
+  %r6 = call %lm_box_string %str_const_31
+  %addr_32 = add %r4 0
+  store %r1 %addr_32
+  %addr_33 = add %r4 0
+  store %r2 %addr_33
+  ret %r4
 }
 
 function std.core.OptionInt.unwrap_or(i64, i64) {
@@ -295,21 +295,21 @@ function std.result.Result.unwrap_or(i64, i64) {
 function std.core.ok_str(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_19
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_20
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_34
+  %addr_35 = add %r1 0
+  store %p0 %addr_35
+  %r3 = call %lm_box_string %str_const_36
+  %addr_37 = add %r1 0
+  store %r1 %addr_37
+  %r5 = alloc 16
+  %addr_38 = add %r5 0
+  store %p0 %addr_38
+  %addr_39 = add %r5 0
+  store %r1 %addr_39
+  %addr_40 = add %r5 0
+  store %r2 %addr_40
+  ret %r5
 }
 
 function std.core.OptionStr.unwrap_or(i64, i64) {
@@ -361,21 +361,21 @@ function std.core.some_int(i64) {
 function std.core.err_str(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_21
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_22
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_41
+  %addr_42 = add %r1 0
+  store %p0 %addr_42
+  %addr_43 = add %r1 0
+  store %r1 %addr_43
+  %r4 = alloc 16
+  %addr_44 = add %r4 0
+  store %p0 %addr_44
+  %r6 = call %lm_box_string %str_const_45
+  %addr_46 = add %r4 0
+  store %r1 %addr_46
+  %addr_47 = add %r4 0
+  store %r2 %addr_47
+  ret %r4
 }
 
 function std.core.ResultStr.unwrap_or(i64, i64) {
@@ -391,54 +391,54 @@ function std.core.ResultStr.map(i64, i64) {
 function std.core.ok_int(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_23
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_24
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_48
+  %addr_49 = add %r1 0
+  store %p0 %addr_49
+  %r3 = call %lm_box_string %str_const_50
+  %addr_51 = add %r1 0
+  store %r1 %addr_51
+  %r5 = alloc 16
+  %addr_52 = add %r5 0
+  store %p0 %addr_52
+  %addr_53 = add %r5 0
+  store %r1 %addr_53
+  %addr_54 = add %r5 0
+  store %r2 %addr_54
+  ret %r5
 }
 
 function std.core.ok_bool(i64) {
 @entry
 @block_0
-  alloc 16
-  call %lm_box_string %str_const_25
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %lm_box_string %str_const_26
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  cne <unnamed> 1
-  br <unnamed> %block_9 %block_16
+  %r1 = alloc 16
+  %r2 = call %lm_box_string %str_const_55
+  %addr_56 = add %r1 0
+  store %p0 %addr_56
+  %r3 = call %lm_box_string %str_const_57
+  %addr_58 = add %r1 0
+  store %r1 %addr_58
+  %r5 = cne %p0 1
+  br %r5 %block_9 %block_16
 @block_9
   jmp %block_9
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r7 = alloc 16
+  %addr_59 = add %r7 0
+  store %p0 %addr_59
+  %addr_60 = add %r7 0
+  store %r1 %addr_60
+  %addr_61 = add %r7 0
+  store %r2 %addr_61
+  ret %r7
 @block_16
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  ret <unnamed>
+  %r10 = alloc 16
+  %addr_62 = add %r10 0
+  store %p0 %addr_62
+  %addr_63 = add %r10 0
+  store %r1 %addr_63
+  %addr_64 = add %r10 0
+  store %r2 %addr_64
+  ret %r10
 }
 
 function std.core.__init__() {
@@ -451,10 +451,10 @@ function lm_box_string(i8*) {
 
 function lm_assert(void, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null
@@ -462,39 +462,39 @@ function lm_assert(void, i64) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }

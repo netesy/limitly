@@ -1,8 +1,8 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.search.__init__
-  call %main
+  %r0 = call %std.search.__init__
+  %r1 = call %main
   ret 0
 }
 
@@ -14,174 +14,174 @@ function std.search.__init__() {
 function std.search.equal_range(i64, i64) {
 @entry
 @block_0
-  call %std.search.lower_bound <unnamed> <unnamed>
-  call %std.search.upper_bound <unnamed> <unnamed>
+  %r3 = call %std.search.lower_bound %p0 %p1
+  %r5 = call %std.search.upper_bound %p0 %p1
   ret 0
 }
 
 function std.search.interpolation_search(i64, i64) {
 @entry
 @block_0
-  call %lm_list_len <unnamed>
-  sub <unnamed> 9
+  %r3 = call %lm_list_len %p0
+  %r5 = sub %r3 9
   jmp %block_6
 @block_6
-  csle 1 <unnamed>
-  br <unnamed> %block_9 %block_13
+  %r9 = csle 1 %r5
+  br %r9 %block_9 %block_13
 @block_9
   jmp %block_9
-  call %lm_list_get <unnamed> 1
-  csge <unnamed> <unnamed>
+  %r10 = call %lm_list_get %p0 1
+  %r11 = csge %p1 %r10
   jmp %block_13
 @block_13
-  br <unnamed> %block_15 %block_19
+  br %r11 %block_15 %block_19
 @block_15
   jmp %block_15
-  call %lm_list_get <unnamed> <unnamed>
-  csle <unnamed> <unnamed>
+  %r12 = call %lm_list_get %p0 %r5
+  %r13 = csle %p1 %r12
   jmp %block_19
 @block_19
-  br <unnamed> %block_20 %block_64
+  br %r13 %block_20 %block_64
 @block_20
   jmp %block_20
-  ceq 1 <unnamed>
-  br <unnamed> %block_22 %block_29
+  %r15 = ceq 1 %r5
+  br %r15 %block_22 %block_29
 @block_22
   jmp %block_22
-  call %lm_list_get <unnamed> 1
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_25 %block_26
+  %r17 = call %lm_list_get %p0 1
+  %r18 = ceq %r17 %p1
+  br %r18 %block_25 %block_26
 @block_25
   jmp %block_25
   ret 1
 @block_26
-  neg 9
-  ret <unnamed>
+  %r21 = neg 9
+  ret %r21
 @block_29
-  call %lm_list_get <unnamed> 1
-  sub <unnamed> <unnamed>
-  sub <unnamed> 1
-  mul <unnamed> <unnamed>
-  call %lm_list_get <unnamed> <unnamed>
-  call %lm_list_get <unnamed> 1
-  sub <unnamed> <unnamed>
-  div <unnamed> <unnamed>
-  call %lm_list_get <unnamed> 1
-  sub <unnamed> <unnamed>
-  sub <unnamed> 1
-  mul <unnamed> <unnamed>
-  call %lm_list_get <unnamed> <unnamed>
-  call %lm_list_get <unnamed> 1
-  sub <unnamed> <unnamed>
-  div <unnamed> <unnamed>
-  add 1 <unnamed>
-  call %lm_list_get <unnamed> <unnamed>
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_50 %block_51
+  %r22 = call %lm_list_get %p0 1
+  %r23 = sub %p1 %r22
+  %r24 = sub %r5 1
+  %r25 = mul %r23 %r24
+  %r26 = call %lm_list_get %p0 %r5
+  %r27 = call %lm_list_get %p0 1
+  %r28 = sub %r26 %r27
+  %r29 = div %r25 %r28
+  %r30 = call %lm_list_get %p0 1
+  %r31 = sub %p1 %r30
+  %r32 = sub %r5 1
+  %r33 = mul %r31 %r32
+  %r34 = call %lm_list_get %p0 %r5
+  %r35 = call %lm_list_get %p0 1
+  %r36 = sub %r34 %r35
+  %r37 = div %r33 %r36
+  %r38 = add 1 %r37
+  %r40 = call %lm_list_get %p0 %r38
+  %r41 = ceq %r40 %p1
+  br %r41 %block_50 %block_51
 @block_50
   jmp %block_50
-  ret <unnamed>
+  ret %r38
 @block_51
-  call %lm_list_get <unnamed> <unnamed>
-  cslt <unnamed> <unnamed>
-  br <unnamed> %block_54 %block_59
+  %r43 = call %lm_list_get %p0 %r38
+  %r44 = cslt %r43 %p1
+  br %r44 %block_54 %block_59
 @block_54
   jmp %block_54
-  add <unnamed> 9
+  %r48 = add %r38 9
   jmp %block_63
 @block_59
-  sub <unnamed> 9
+  %r50 = sub %r38 9
   jmp %block_63
 @block_63
   jmp %block_6
 @block_64
-  neg 9
-  ret <unnamed>
+  %r52 = neg 9
+  ret %r52
 }
 
 function std.search.binary_search(i64, i64) {
 @entry
 @block_0
-  call %lm_list_len <unnamed>
-  sub <unnamed> 9
+  %r3 = call %lm_list_len %p0
+  %r5 = sub %r3 9
   jmp %block_6
 @block_6
-  csle 1 <unnamed>
-  br <unnamed> %block_8 %block_29
+  %r7 = csle 1 %r5
+  br %r7 %block_8 %block_29
 @block_8
   jmp %block_8
-  add 1 <unnamed>
-  div <unnamed> 17
-  call %lm_list_get <unnamed> <unnamed>
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_15 %block_16
+  %r9 = add 1 %r5
+  %r11 = div %r9 17
+  %r13 = call %lm_list_get %p0 %r11
+  %r14 = ceq %r13 %p1
+  br %r14 %block_15 %block_16
 @block_15
   jmp %block_15
-  ret <unnamed>
+  ret %r11
 @block_16
-  call %lm_list_get <unnamed> <unnamed>
-  cslt <unnamed> <unnamed>
-  br <unnamed> %block_19 %block_24
+  %r16 = call %lm_list_get %p0 %r11
+  %r17 = cslt %r16 %p1
+  br %r17 %block_19 %block_24
 @block_19
   jmp %block_19
-  add <unnamed> 9
+  %r21 = add %r11 9
   jmp %block_28
 @block_24
-  sub <unnamed> 9
+  %r23 = sub %r11 9
   jmp %block_28
 @block_28
   jmp %block_6
 @block_29
-  neg 9
-  ret <unnamed>
+  %r25 = neg 9
+  ret %r25
 }
 
 function main() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 25
-  call %lm_list_append <unnamed> 33
-  call %std.search.linear_search <unnamed> 25
-  cne <unnamed> 25
-  br <unnamed> %block_17 %block_19
+  %r0 = call %lm_list_new 0
+  call %lm_list_append %r0 9
+  call %lm_list_append %r0 17
+  call %lm_list_append %r0 17
+  call %lm_list_append %r0 25
+  call %lm_list_append %r0 33
+  %r13 = call %std.search.linear_search %r0 25
+  %r15 = cne %r13 25
+  br %r15 %block_17 %block_19
 @block_17
   jmp %block_17
   ret 9
 @block_19
-  call %std.search.binary_search <unnamed> 33
-  cne <unnamed> 33
-  br <unnamed> %block_24 %block_26
+  %r19 = call %std.search.binary_search %r0 33
+  %r21 = cne %r19 33
+  br %r21 %block_24 %block_26
 @block_24
   jmp %block_24
   ret 17
 @block_26
-  call %std.search.lower_bound <unnamed> 17
-  cne <unnamed> 9
-  br <unnamed> %block_31 %block_33
+  %r25 = call %std.search.lower_bound %r0 17
+  %r27 = cne %r25 9
+  br %r27 %block_31 %block_33
 @block_31
   jmp %block_31
   ret 25
 @block_33
-  call %std.search.upper_bound <unnamed> 17
-  cne <unnamed> 25
-  br <unnamed> %block_38 %block_40
+  %r31 = call %std.search.upper_bound %r0 17
+  %r33 = cne %r31 25
+  br %r33 %block_38 %block_40
 @block_38
   jmp %block_38
   ret 33
 @block_40
-  call %std.search.equal_range <unnamed> 17
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 25
-  call %lm_list_append <unnamed> 41
-  call %lm_list_append <unnamed> 57
-  call %std.search.interpolation_search <unnamed> 41
-  cne <unnamed> 17
-  br <unnamed> %block_57 %block_59
+  %r37 = call %std.search.equal_range %r0 17
+  %r39 = call %lm_list_new 0
+  call %lm_list_append %r39 9
+  call %lm_list_append %r39 25
+  call %lm_list_append %r39 41
+  call %lm_list_append %r39 57
+  %r49 = call %std.search.interpolation_search %r39 41
+  %r51 = cne %r49 17
+  br %r51 %block_57 %block_59
 @block_57
   jmp %block_57
   ret 41
@@ -192,28 +192,28 @@ function main() {
 function std.search.upper_bound(i64, i64) {
 @entry
 @block_0
-  call %lm_list_len <unnamed>
+  %r3 = call %lm_list_len %p0
   jmp %block_4
 @block_4
-  cslt 1 <unnamed>
-  br <unnamed> %block_6 %block_21
+  %r5 = cslt 1 %r3
+  br %r5 %block_6 %block_21
 @block_6
   jmp %block_6
-  add 1 <unnamed>
-  div <unnamed> 17
-  call %lm_list_get <unnamed> <unnamed>
-  csle <unnamed> <unnamed>
-  br <unnamed> %block_13 %block_18
+  %r7 = add 1 %r3
+  %r9 = div %r7 17
+  %r11 = call %lm_list_get %p0 %r9
+  %r12 = csle %r11 %p1
+  br %r12 %block_13 %block_18
 @block_13
   jmp %block_13
-  add <unnamed> 9
+  %r16 = add %r9 9
   jmp %block_20
 @block_18
   jmp %block_20
 @block_20
   jmp %block_4
 @block_21
-  ret <unnamed>
+  ret %r16
 }
 
 function std.search.linear_search(i64, i64) {
@@ -223,52 +223,52 @@ function std.search.linear_search(i64, i64) {
 @block_1
   jmp %block_3
 @block_3
-  call %lm_list_len <unnamed>
-  cslt 1 <unnamed>
-  br <unnamed> %block_6 %block_16
+  %r4 = call %lm_list_len %p0
+  %r5 = cslt 1 %r4
+  br %r5 %block_6 %block_16
 @block_6
   jmp %block_6
-  call %lm_list_get <unnamed> 1
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_9 %block_10
+  %r6 = call %lm_list_get %p0 1
+  %r7 = ceq %r6 %p1
+  br %r7 %block_9 %block_10
 @block_9
   jmp %block_9
   ret 1
 @block_10
   jmp %block_11
 @block_11
-  add 1 9
+  %r11 = add 1 9
   jmp %block_3
 @block_16
-  neg 9
-  ret <unnamed>
+  %r13 = neg 9
+  ret %r13
 }
 
 function std.search.lower_bound(i64, i64) {
 @entry
 @block_0
-  call %lm_list_len <unnamed>
+  %r3 = call %lm_list_len %p0
   jmp %block_4
 @block_4
-  cslt 1 <unnamed>
-  br <unnamed> %block_6 %block_21
+  %r5 = cslt 1 %r3
+  br %r5 %block_6 %block_21
 @block_6
   jmp %block_6
-  add 1 <unnamed>
-  div <unnamed> 17
-  call %lm_list_get <unnamed> <unnamed>
-  cslt <unnamed> <unnamed>
-  br <unnamed> %block_13 %block_18
+  %r7 = add 1 %r3
+  %r9 = div %r7 17
+  %r11 = call %lm_list_get %p0 %r9
+  %r12 = cslt %r11 %p1
+  br %r12 %block_13 %block_18
 @block_13
   jmp %block_13
-  add <unnamed> 9
+  %r16 = add %r9 9
   jmp %block_20
 @block_18
   jmp %block_20
 @block_20
   jmp %block_4
 @block_21
-  ret <unnamed>
+  ret %r16
 }
 
 function lm_list_len(i64) {

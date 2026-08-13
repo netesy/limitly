@@ -1,125 +1,125 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_1
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_2
-  call %greetOptional <unnamed>
-  call %greetOptional 2
-  call %lm_box_string %str_const_3
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_4
-  call %greetWithDefault <unnamed>
-  call %lm_box_string %str_const_5
-  call %greetWithDefault <unnamed>
-  call %lm_box_string %str_const_6
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_7
-  call %createUser <unnamed> 145 18
-  call %lm_box_string %str_const_8
-  call %createUser <unnamed> 201 18
-  call %lm_box_string %str_const_9
-  call %createUser <unnamed> 241 10
-  call %lm_box_string %str_const_10
-  call %lm_print_int <unnamed>
-  call %power 25 17
-  call %power 25 33
-  call %lm_box_string %str_const_11
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_12
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_13
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_14
-  call %processData <unnamed> 10 9
-  call %lm_box_string %str_const_15
-  call %processData <unnamed> 18 9
-  call %lm_box_string %str_const_16
-  call %processData <unnamed> 10 17
-  call %lm_box_string %str_const_17
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_18
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_19
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_20
-  call %lm_print_int <unnamed>
-  call %formatNumber 337
-  call %formatFloat 2
-  call %formatBool 18
-  call %lm_print_int <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_21
-  call %lm_print_int <unnamed>
-  call %addOne 41
-  call %double <unnamed>
-  call %double 41
-  call %addOne <unnamed>
-  call %lm_box_string %str_const_22
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_23
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_24
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_0
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_1
+  %r3 = call %lm_print_int %r2
+  %r4 = call %lm_box_string %str_const_2
+  %r5 = call %greetOptional %r4
+  %r7 = call %greetOptional 2
+  %r8 = call %lm_box_string %str_const_3
+  %r9 = call %lm_print_int %r8
+  %r10 = call %lm_box_string %str_const_4
+  %r11 = call %greetWithDefault %r10
+  %r12 = call %lm_box_string %str_const_5
+  %r13 = call %greetWithDefault %r12
+  %r14 = call %lm_box_string %str_const_6
+  %r15 = call %lm_print_int %r14
+  %r16 = call %lm_box_string %str_const_7
+  %r19 = call %createUser %r16 145 18
+  %r20 = call %lm_box_string %str_const_8
+  %r23 = call %createUser %r20 201 18
+  %r24 = call %lm_box_string %str_const_9
+  %r27 = call %createUser %r24 241 10
+  %r28 = call %lm_box_string %str_const_10
+  %r29 = call %lm_print_int %r28
+  %r32 = call %power 25 17
+  %r36 = call %power 25 33
+  %r39 = call %lm_box_string %str_const_11
+  %r38 = call %lm_rt_str_format %r39 %r32
+  %r40 = call %lm_print_int %r38
+  %r42 = call %lm_box_string %str_const_12
+  %r41 = call %lm_rt_str_format %r42 %r36
+  %r43 = call %lm_print_int %r41
+  %r44 = call %lm_box_string %str_const_13
+  %r45 = call %lm_print_int %r44
+  %r46 = call %lm_box_string %str_const_14
+  %r49 = call %processData %r46 10 9
+  %r51 = call %lm_box_string %str_const_15
+  %r54 = call %processData %r51 18 9
+  %r56 = call %lm_box_string %str_const_16
+  %r59 = call %processData %r56 10 17
+  %r62 = call %lm_box_string %str_const_17
+  %r61 = call %lm_rt_str_format %r62 %r49
+  %r63 = call %lm_print_int %r61
+  %r65 = call %lm_box_string %str_const_18
+  %r64 = call %lm_rt_str_format %r65 %r54
+  %r66 = call %lm_print_int %r64
+  %r68 = call %lm_box_string %str_const_19
+  %r67 = call %lm_rt_str_format %r68 %r59
+  %r69 = call %lm_print_int %r67
+  %r70 = call %lm_box_string %str_const_20
+  %r71 = call %lm_print_int %r70
+  %r73 = call %formatNumber 337
+  %r76 = call %formatFloat 2
+  %r79 = call %formatBool 18
+  %r81 = call %lm_print_int %r73
+  %r82 = call %lm_print_int %r76
+  %r83 = call %lm_print_int %r79
+  %r84 = call %lm_box_string %str_const_21
+  %r85 = call %lm_print_int %r84
+  %r87 = call %addOne 41
+  %r88 = call %double %r87
+  %r91 = call %double 41
+  %r92 = call %addOne %r91
+  %r95 = call %lm_box_string %str_const_22
+  %r94 = call %lm_rt_str_format %r95 %r88
+  %r96 = call %lm_print_int %r94
+  %r98 = call %lm_box_string %str_const_23
+  %r97 = call %lm_rt_str_format %r98 %r92
+  %r99 = call %lm_print_int %r97
+  %r100 = call %lm_box_string %str_const_24
+  %r101 = call %lm_print_int %r100
   ret 0
 }
 
 function double(i64) {
 @entry
 @block_0
-  mul <unnamed> 17
-  ret <unnamed>
+  %r2 = mul %p0 17
+  ret %r2
 }
 
 function formatBool(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_25
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = call %lm_box_string %str_const_25
+  %r1 = call %lm_rt_str_format %r2 %p0
+  ret %r1
 }
 
 function processData(i64, i64, i64) {
 @entry
 @block_0
-  br <unnamed> %block_2 %block_6
+  br %p1 %block_2 %block_6
 @block_2
   jmp %block_2
-  call %lm_box_string %str_const_26
-  call %lm_str_concat <unnamed> <unnamed>
+  %r5 = call %lm_box_string %str_const_26
+  %r6 = call %lm_str_concat %r5 %p0
   jmp %block_6
 @block_6
-  csgt <unnamed> 9
-  br <unnamed> %block_9 %block_25
+  %r8 = csgt %p2 9
+  br %r8 %block_9 %block_25
 @block_9
   jmp %block_9
   jmp %block_13
 @block_13
-  cslt 17 <unnamed>
-  br <unnamed> %block_15 %block_24
+  %r13 = cslt 17 %p2
+  br %r13 %block_15 %block_24
 @block_15
   jmp %block_15
-  call %lm_box_string %str_const_27
-  call %lm_str_concat <unnamed> <unnamed>
-  call %lm_str_concat <unnamed> <unnamed>
+  %r14 = call %lm_box_string %str_const_27
+  %r15 = call %lm_str_concat %r6 %r14
+  %r16 = call %lm_str_concat %r15 %r6
   jmp %block_20
 @block_20
-  add 17 9
+  %r18 = add 17 9
   jmp %block_13
 @block_24
   jmp %block_25
 @block_25
-  ret <unnamed>
+  ret %r16
 }
 
 function power(i64, i64) {
@@ -127,42 +127,42 @@ function power(i64, i64) {
 @block_0
   jmp %block_4
 @block_4
-  cslt 9 <unnamed>
-  br <unnamed> %block_6 %block_13
+  %r5 = cslt 9 %p1
+  br %r5 %block_6 %block_13
 @block_6
   jmp %block_6
-  mul 9 <unnamed>
+  %r6 = mul 9 %p0
   jmp %block_9
 @block_9
-  add 9 9
+  %r8 = add 9 9
   jmp %block_4
 @block_13
-  ret <unnamed>
+  ret %r6
 }
 
 function greetWithDefault(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_28
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
+  %r2 = call %lm_box_string %str_const_28
+  %r1 = call %lm_rt_str_format %r2 %p0
+  %r3 = call %lm_print_int %r1
   ret 0
 }
 
 function greetOptional(i64) {
 @entry
 @block_0
-  cne <unnamed> 1
-  br <unnamed> %block_3 %block_7
+  %r1 = cne %p0 1
+  br %r1 %block_3 %block_7
 @block_3
   jmp %block_3
-  call %lm_box_string %str_const_29
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
+  %r4 = call %lm_box_string %str_const_29
+  %r3 = call %lm_rt_str_format %r4 %p0
+  %r5 = call %lm_print_int %r3
   jmp %block_10
 @block_7
-  call %lm_box_string %str_const_30
-  call %lm_print_int <unnamed>
+  %r6 = call %lm_box_string %str_const_30
+  %r7 = call %lm_print_int %r6
   jmp %block_10
 @block_10
   ret 0
@@ -171,35 +171,35 @@ function greetOptional(i64) {
 function formatNumber(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_31
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = call %lm_box_string %str_const_31
+  %r1 = call %lm_rt_str_format %r2 %p0
+  ret %r1
 }
 
 function createUser(i64, i64, i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_32
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
+  %r4 = call %lm_box_string %str_const_32
+  %r3 = call %lm_rt_str_format %r4 %p0
+  %r5 = call %lm_rt_str_format %r3 %p1
+  %r6 = call %lm_rt_str_format %r5 %p2
+  %r7 = call %lm_print_int %r6
   ret 0
 }
 
 function addOne(i64) {
 @entry
 @block_0
-  add <unnamed> 9
-  ret <unnamed>
+  %r3 = add %p0 9
+  ret %r3
 }
 
 function formatFloat(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_33
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = call %lm_box_string %str_const_33
+  %r1 = call %lm_rt_str_format %r2 %p0
+  ret %r1
 }
 
 function lm_box_string(i8*) {
@@ -207,40 +207,40 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 

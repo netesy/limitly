@@ -1,320 +1,320 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_1
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_2
-  call %lm_box_string %str_const_3
-  call %lm_box_string %str_const_4
-  call %testRecordDestructuring 0
-  call %lm_box_string %str_const_5
-  call %lm_box_string %str_const_6
-  call %lm_box_string %str_const_7
-  call %lm_box_string %str_const_8
-  call %lm_box_string %str_const_9
-  call %testRecordDestructuring 0
-  call %lm_box_string %str_const_10
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_11
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_12
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_13
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_14
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_15
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_16
-  call %lm_print_int <unnamed>
-  call %lm_list_new 0
-  call %testListDestructuring <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %testListDestructuring <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %testListDestructuring <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 25
-  call %lm_list_append <unnamed> 33
-  call %lm_list_append <unnamed> 41
-  call %testListDestructuring <unnamed>
-  call %lm_box_string %str_const_17
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_18
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_19
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_20
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_21
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_22
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_23
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_24
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_25
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_26
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_27
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_28
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_29
-  call %lm_print_int <unnamed>
-  call %testTupleDestructuring 0
-  call %testTupleDestructuring 0
-  call %lm_box_string %str_const_30
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_31
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_32
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_33
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_34
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_35
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_36
-  call %lm_print_int <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 81
-  call %lm_list_append <unnamed> 161
-  call %testNestedDestructuring 0
-  call %lm_box_string %str_const_37
-  call %lm_box_string %str_const_38
-  call %lm_box_string %str_const_39
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 761
-  call %lm_list_append <unnamed> 697
-  call %testNestedDestructuring 0
-  call %lm_box_string %str_const_40
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_41
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_42
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_43
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_44
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_45
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_46
-  call %lm_print_int <unnamed>
-  call %describeShape 0
-  call %describeShape 0
-  call %describeShape 0
-  call %lm_box_string %str_const_47
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_48
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_49
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_50
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_51
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_52
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_53
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_54
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_55
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_56
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_57
-  call %lm_box_string %str_const_58
-  call %lm_box_string %str_const_59
-  call %testDestructuringWithGuards 0
-  call %lm_box_string %str_const_60
-  call %lm_box_string %str_const_61
-  call %lm_box_string %str_const_62
-  call %testDestructuringWithGuards 0
-  call %lm_box_string %str_const_63
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_64
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_65
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_66
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_67
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_68
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_69
-  call %lm_print_int <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 25
-  call %lm_list_append <unnamed> 33
-  call %lm_list_append <unnamed> 41
-  call %testSpreadDestructuring <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 801
-  call %testSpreadDestructuring <unnamed>
-  call %lm_box_string %str_const_70
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_71
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_72
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_73
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_74
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_75
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_76
-  call %lm_print_int <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 25
-  call %testNestedTupleList 0
-  call %lm_box_string %str_const_77
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_78
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_79
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_80
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_81
-  call %lm_box_string %str_const_82
-  call %lm_box_string %str_const_83
-  call %lm_box_string %str_const_84
-  call %lm_box_string %str_const_85
-  call %testOptionalFields 0
-  call %lm_box_string %str_const_86
-  call %lm_box_string %str_const_87
-  call %lm_box_string %str_const_88
-  call %testOptionalFields 0
-  call %lm_box_string %str_const_89
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_90
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_91
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_92
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_93
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_94
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_95
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_96
-  call %lm_box_string %str_const_97
-  call %lm_box_string %str_const_98
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 81
-  call %lm_list_append <unnamed> 161
-  call %testComplexNested 0
-  call %lm_box_string %str_const_99
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_100
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_101
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_102
-  call %lm_print_int <unnamed>
-  call %processCommand 0
-  call %processCommand 0
-  call %processCommand 0
-  call %lm_box_string %str_const_103
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_104
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_105
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_106
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_107
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_108
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_109
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_110
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_111
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_112
-  call %lm_print_int <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 161
-  call %testNestedDestructure 0
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 241
-  call %testNestedDestructure 0
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 41
-  call %lm_list_append <unnamed> 321
-  call %testNestedDestructure 0
-  call %lm_box_string %str_const_113
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_114
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_115
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_116
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_117
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_118
-  call %lm_assert <unnamed> <unnamed>
-  call %lm_box_string %str_const_119
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_120
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_121
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_122
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_0
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_1
+  %r3 = call %lm_print_int %r2
+  %r5 = call %lm_box_string %str_const_2
+  %r6 = call %lm_box_string %str_const_3
+  %r7 = call %lm_box_string %str_const_4
+  %r9 = call %testRecordDestructuring 0
+  %r12 = call %lm_box_string %str_const_5
+  %r13 = call %lm_box_string %str_const_6
+  %r14 = call %lm_box_string %str_const_7
+  %r16 = call %lm_box_string %str_const_8
+  %r17 = call %lm_box_string %str_const_9
+  %r18 = call %testRecordDestructuring 0
+  %r20 = call %lm_box_string %str_const_10
+  %r21 = ceq %r9 %r20
+  %r22 = call %lm_box_string %str_const_11
+  %r23 = call %lm_assert %r21 %r22
+  %r24 = call %lm_box_string %str_const_12
+  %r25 = ceq %r18 %r24
+  %r26 = call %lm_box_string %str_const_13
+  %r27 = call %lm_assert %r25 %r26
+  %r29 = call %lm_box_string %str_const_14
+  %r28 = call %lm_rt_str_format %r29 %r9
+  %r30 = call %lm_print_int %r28
+  %r32 = call %lm_box_string %str_const_15
+  %r31 = call %lm_rt_str_format %r32 %r18
+  %r33 = call %lm_print_int %r31
+  %r34 = call %lm_box_string %str_const_16
+  %r35 = call %lm_print_int %r34
+  %r36 = call %lm_list_new 0
+  %r37 = call %testListDestructuring %r36
+  %r39 = call %lm_list_new 0
+  call %lm_list_append %r39 9
+  %r42 = call %testListDestructuring %r39
+  %r44 = call %lm_list_new 0
+  call %lm_list_append %r44 9
+  call %lm_list_append %r44 17
+  %r49 = call %testListDestructuring %r44
+  %r51 = call %lm_list_new 0
+  call %lm_list_append %r51 9
+  call %lm_list_append %r51 17
+  call %lm_list_append %r51 25
+  call %lm_list_append %r51 33
+  call %lm_list_append %r51 41
+  %r62 = call %testListDestructuring %r51
+  %r64 = call %lm_box_string %str_const_17
+  %r65 = ceq %r37 %r64
+  %r66 = call %lm_box_string %str_const_18
+  %r67 = call %lm_assert %r65 %r66
+  %r68 = call %lm_box_string %str_const_19
+  %r69 = ceq %r42 %r68
+  %r70 = call %lm_box_string %str_const_20
+  %r71 = call %lm_assert %r69 %r70
+  %r72 = call %lm_box_string %str_const_21
+  %r73 = ceq %r49 %r72
+  %r74 = call %lm_box_string %str_const_22
+  %r75 = call %lm_assert %r73 %r74
+  %r76 = call %lm_box_string %str_const_23
+  %r77 = ceq %r62 %r76
+  %r78 = call %lm_box_string %str_const_24
+  %r79 = call %lm_assert %r77 %r78
+  %r81 = call %lm_box_string %str_const_25
+  %r80 = call %lm_rt_str_format %r81 %r37
+  %r82 = call %lm_print_int %r80
+  %r84 = call %lm_box_string %str_const_26
+  %r83 = call %lm_rt_str_format %r84 %r42
+  %r85 = call %lm_print_int %r83
+  %r87 = call %lm_box_string %str_const_27
+  %r86 = call %lm_rt_str_format %r87 %r49
+  %r88 = call %lm_print_int %r86
+  %r90 = call %lm_box_string %str_const_28
+  %r89 = call %lm_rt_str_format %r90 %r62
+  %r91 = call %lm_print_int %r89
+  %r92 = call %lm_box_string %str_const_29
+  %r93 = call %lm_print_int %r92
+  %r99 = call %testTupleDestructuring 0
+  %r108 = call %testTupleDestructuring 0
+  %r110 = call %lm_box_string %str_const_30
+  %r111 = ceq %r99 %r110
+  %r112 = call %lm_box_string %str_const_31
+  %r113 = call %lm_assert %r111 %r112
+  %r114 = call %lm_box_string %str_const_32
+  %r115 = ceq %r108 %r114
+  %r116 = call %lm_box_string %str_const_33
+  %r117 = call %lm_assert %r115 %r116
+  %r119 = call %lm_box_string %str_const_34
+  %r118 = call %lm_rt_str_format %r119 %r99
+  %r120 = call %lm_print_int %r118
+  %r122 = call %lm_box_string %str_const_35
+  %r121 = call %lm_rt_str_format %r122 %r108
+  %r123 = call %lm_print_int %r121
+  %r124 = call %lm_box_string %str_const_36
+  %r125 = call %lm_print_int %r124
+  %r129 = call %lm_list_new 0
+  call %lm_list_append %r129 81
+  call %lm_list_append %r129 161
+  %r135 = call %testNestedDestructuring 0
+  %r138 = call %lm_box_string %str_const_37
+  %r139 = call %lm_box_string %str_const_38
+  %r140 = call %lm_box_string %str_const_39
+  %r141 = call %lm_list_new 0
+  call %lm_list_append %r141 761
+  call %lm_list_append %r141 697
+  %r146 = call %testNestedDestructuring 0
+  %r148 = call %lm_box_string %str_const_40
+  %r149 = ceq %r135 %r148
+  %r150 = call %lm_box_string %str_const_41
+  %r151 = call %lm_assert %r149 %r150
+  %r152 = call %lm_box_string %str_const_42
+  %r153 = ceq %r146 %r152
+  %r154 = call %lm_box_string %str_const_43
+  %r155 = call %lm_assert %r153 %r154
+  %r157 = call %lm_box_string %str_const_44
+  %r156 = call %lm_rt_str_format %r157 %r135
+  %r158 = call %lm_print_int %r156
+  %r160 = call %lm_box_string %str_const_45
+  %r159 = call %lm_rt_str_format %r160 %r146
+  %r161 = call %lm_print_int %r159
+  %r162 = call %lm_box_string %str_const_46
+  %r163 = call %lm_print_int %r162
+  %r167 = call %describeShape 0
+  %r175 = call %describeShape 0
+  %r183 = call %describeShape 0
+  %r185 = call %lm_box_string %str_const_47
+  %r186 = ceq %r167 %r185
+  %r187 = call %lm_box_string %str_const_48
+  %r188 = call %lm_assert %r186 %r187
+  %r189 = call %lm_box_string %str_const_49
+  %r190 = ceq %r175 %r189
+  %r191 = call %lm_box_string %str_const_50
+  %r192 = call %lm_assert %r190 %r191
+  %r193 = call %lm_box_string %str_const_51
+  %r194 = ceq %r183 %r193
+  %r195 = call %lm_box_string %str_const_52
+  %r196 = call %lm_assert %r194 %r195
+  %r198 = call %lm_box_string %str_const_53
+  %r197 = call %lm_rt_str_format %r198 %r167
+  %r199 = call %lm_print_int %r197
+  %r201 = call %lm_box_string %str_const_54
+  %r200 = call %lm_rt_str_format %r201 %r175
+  %r202 = call %lm_print_int %r200
+  %r204 = call %lm_box_string %str_const_55
+  %r203 = call %lm_rt_str_format %r204 %r183
+  %r205 = call %lm_print_int %r203
+  %r206 = call %lm_box_string %str_const_56
+  %r207 = call %lm_print_int %r206
+  %r209 = call %lm_box_string %str_const_57
+  %r210 = call %lm_box_string %str_const_58
+  %r211 = call %lm_box_string %str_const_59
+  %r213 = call %testDestructuringWithGuards 0
+  %r216 = call %lm_box_string %str_const_60
+  %r217 = call %lm_box_string %str_const_61
+  %r218 = call %lm_box_string %str_const_62
+  %r220 = call %testDestructuringWithGuards 0
+  %r222 = call %lm_box_string %str_const_63
+  %r223 = ceq %r213 %r222
+  %r224 = call %lm_box_string %str_const_64
+  %r225 = call %lm_assert %r223 %r224
+  %r226 = call %lm_box_string %str_const_65
+  %r227 = ceq %r220 %r226
+  %r228 = call %lm_box_string %str_const_66
+  %r229 = call %lm_assert %r227 %r228
+  %r231 = call %lm_box_string %str_const_67
+  %r230 = call %lm_rt_str_format %r231 %r213
+  %r232 = call %lm_print_int %r230
+  %r234 = call %lm_box_string %str_const_68
+  %r233 = call %lm_rt_str_format %r234 %r220
+  %r235 = call %lm_print_int %r233
+  %r236 = call %lm_box_string %str_const_69
+  %r237 = call %lm_print_int %r236
+  %r238 = call %lm_list_new 0
+  call %lm_list_append %r238 9
+  call %lm_list_append %r238 17
+  call %lm_list_append %r238 25
+  call %lm_list_append %r238 33
+  call %lm_list_append %r238 41
+  %r249 = call %testSpreadDestructuring %r238
+  %r251 = call %lm_list_new 0
+  call %lm_list_append %r251 801
+  %r254 = call %testSpreadDestructuring %r251
+  %r256 = call %lm_box_string %str_const_70
+  %r257 = ceq %r249 %r256
+  %r258 = call %lm_box_string %str_const_71
+  %r259 = call %lm_assert %r257 %r258
+  %r260 = call %lm_box_string %str_const_72
+  %r261 = ceq %r254 %r260
+  %r262 = call %lm_box_string %str_const_73
+  %r263 = call %lm_assert %r261 %r262
+  %r265 = call %lm_box_string %str_const_74
+  %r264 = call %lm_rt_str_format %r265 %r249
+  %r266 = call %lm_print_int %r264
+  %r268 = call %lm_box_string %str_const_75
+  %r267 = call %lm_rt_str_format %r268 %r254
+  %r269 = call %lm_print_int %r267
+  %r270 = call %lm_box_string %str_const_76
+  %r271 = call %lm_print_int %r270
+  %r275 = call %lm_list_new 0
+  call %lm_list_append %r275 9
+  call %lm_list_append %r275 17
+  call %lm_list_append %r275 25
+  %r283 = call %testNestedTupleList 0
+  %r285 = call %lm_box_string %str_const_77
+  %r286 = ceq %r283 %r285
+  %r287 = call %lm_box_string %str_const_78
+  %r288 = call %lm_assert %r286 %r287
+  %r290 = call %lm_box_string %str_const_79
+  %r289 = call %lm_rt_str_format %r290 %r283
+  %r291 = call %lm_print_int %r289
+  %r292 = call %lm_box_string %str_const_80
+  %r293 = call %lm_print_int %r292
+  %r295 = call %lm_box_string %str_const_81
+  %r296 = call %lm_box_string %str_const_82
+  %r297 = call %lm_box_string %str_const_83
+  %r299 = call %lm_box_string %str_const_84
+  %r300 = call %lm_box_string %str_const_85
+  %r301 = call %testOptionalFields 0
+  %r304 = call %lm_box_string %str_const_86
+  %r305 = call %lm_box_string %str_const_87
+  %r306 = call %lm_box_string %str_const_88
+  %r308 = call %testOptionalFields 0
+  %r310 = call %lm_box_string %str_const_89
+  %r311 = ceq %r301 %r310
+  %r312 = call %lm_box_string %str_const_90
+  %r313 = call %lm_assert %r311 %r312
+  %r314 = call %lm_box_string %str_const_91
+  %r315 = ceq %r308 %r314
+  %r316 = call %lm_box_string %str_const_92
+  %r317 = call %lm_assert %r315 %r316
+  %r319 = call %lm_box_string %str_const_93
+  %r318 = call %lm_rt_str_format %r319 %r301
+  %r320 = call %lm_print_int %r318
+  %r322 = call %lm_box_string %str_const_94
+  %r321 = call %lm_rt_str_format %r322 %r308
+  %r323 = call %lm_print_int %r321
+  %r324 = call %lm_box_string %str_const_95
+  %r325 = call %lm_print_int %r324
+  %r330 = call %lm_box_string %str_const_96
+  %r331 = call %lm_box_string %str_const_97
+  %r332 = call %lm_box_string %str_const_98
+  %r333 = call %lm_list_new 0
+  call %lm_list_append %r333 81
+  call %lm_list_append %r333 161
+  %r339 = call %testComplexNested 0
+  %r341 = call %lm_box_string %str_const_99
+  %r342 = ceq %r339 %r341
+  %r343 = call %lm_box_string %str_const_100
+  %r344 = call %lm_assert %r342 %r343
+  %r346 = call %lm_box_string %str_const_101
+  %r345 = call %lm_rt_str_format %r346 %r339
+  %r347 = call %lm_print_int %r345
+  %r348 = call %lm_box_string %str_const_102
+  %r349 = call %lm_print_int %r348
+  %r356 = call %processCommand 0
+  %r364 = call %processCommand 0
+  %r374 = call %processCommand 0
+  %r376 = call %lm_box_string %str_const_103
+  %r377 = ceq %r356 %r376
+  %r378 = call %lm_box_string %str_const_104
+  %r379 = call %lm_assert %r377 %r378
+  %r380 = call %lm_box_string %str_const_105
+  %r381 = ceq %r364 %r380
+  %r382 = call %lm_box_string %str_const_106
+  %r383 = call %lm_assert %r381 %r382
+  %r384 = call %lm_box_string %str_const_107
+  %r385 = ceq %r374 %r384
+  %r386 = call %lm_box_string %str_const_108
+  %r387 = call %lm_assert %r385 %r386
+  %r389 = call %lm_box_string %str_const_109
+  %r388 = call %lm_rt_str_format %r389 %r356
+  %r390 = call %lm_print_int %r388
+  %r392 = call %lm_box_string %str_const_110
+  %r391 = call %lm_rt_str_format %r392 %r364
+  %r393 = call %lm_print_int %r391
+  %r395 = call %lm_box_string %str_const_111
+  %r394 = call %lm_rt_str_format %r395 %r374
+  %r396 = call %lm_print_int %r394
+  %r397 = call %lm_box_string %str_const_112
+  %r398 = call %lm_print_int %r397
+  %r402 = call %lm_list_new 0
+  call %lm_list_append %r402 9
+  call %lm_list_append %r402 161
+  %r408 = call %testNestedDestructure 0
+  %r413 = call %lm_list_new 0
+  call %lm_list_append %r413 17
+  call %lm_list_append %r413 241
+  %r419 = call %testNestedDestructure 0
+  %r424 = call %lm_list_new 0
+  call %lm_list_append %r424 41
+  call %lm_list_append %r424 321
+  %r430 = call %testNestedDestructure 0
+  %r432 = call %lm_box_string %str_const_113
+  %r433 = ceq %r408 %r432
+  %r434 = call %lm_box_string %str_const_114
+  %r435 = call %lm_assert %r433 %r434
+  %r436 = call %lm_box_string %str_const_115
+  %r437 = ceq %r419 %r436
+  %r438 = call %lm_box_string %str_const_116
+  %r439 = call %lm_assert %r437 %r438
+  %r440 = call %lm_box_string %str_const_117
+  %r441 = ceq %r430 %r440
+  %r442 = call %lm_box_string %str_const_118
+  %r443 = call %lm_assert %r441 %r442
+  %r445 = call %lm_box_string %str_const_119
+  %r444 = call %lm_rt_str_format %r445 %r408
+  %r446 = call %lm_print_int %r444
+  %r448 = call %lm_box_string %str_const_120
+  %r447 = call %lm_rt_str_format %r448 %r419
+  %r449 = call %lm_print_int %r447
+  %r451 = call %lm_box_string %str_const_121
+  %r450 = call %lm_rt_str_format %r451 %r430
+  %r452 = call %lm_print_int %r450
+  %r453 = call %lm_box_string %str_const_122
+  %r454 = call %lm_print_int %r453
   ret 0
 }
 
@@ -323,54 +323,54 @@ function testNestedDestructure(i64) {
 @block_0
   jmp %block_1
 @block_1
-  ceq 0 17
-  br <unnamed> %block_5 %block_18
+  %r3 = ceq 0 17
+  br %r3 %block_5 %block_18
 @block_5
   jmp %block_5
-  call %lm_list_len 0
-  ceq <unnamed> 17
-  br <unnamed> %block_13 %block_18
+  %r8 = call %lm_list_len 0
+  %r10 = ceq %r8 17
+  br %r10 %block_13 %block_18
 @block_13
   jmp %block_13
-  call %lm_list_get 0 1
-  call %lm_list_get 0 9
+  %r12 = call %lm_list_get 0 1
+  %r14 = call %lm_list_get 0 9
   jmp %block_19
 @block_18
   ret 0
 @block_19
-  call %lm_list_get 0 1
-  call %lm_list_get 0 9
+  %r20 = call %lm_list_get 0 1
+  %r22 = call %lm_list_get 0 9
   jmp %block_28
 @block_28
-  ceq <unnamed> 9
-  br <unnamed> %block_31 %block_32
+  %r24 = ceq %r20 9
+  br %r24 %block_31 %block_32
 @block_31
   jmp %block_31
   jmp %block_48
 @block_32
-  ceq <unnamed> 17
-  br <unnamed> %block_35 %block_36
+  %r29 = ceq %r20 17
+  br %r29 %block_35 %block_36
 @block_35
   jmp %block_35
   jmp %block_43
 @block_36
   jmp %block_37
 @block_37
-  call %lm_box_string %str_const_123
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r34 = call %lm_box_string %str_const_123
+  %r33 = call %lm_rt_str_format %r34 0
+  %r35 = call %lm_rt_str_format %r33 %r20
+  %r36 = call %lm_rt_str_format %r35 %r22
+  ret %r36
 @block_43
-  call %lm_box_string %str_const_124
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r31 = call %lm_box_string %str_const_124
+  %r30 = call %lm_rt_str_format %r31 0
+  %r32 = call %lm_rt_str_format %r30 %r22
+  ret %r32
 @block_48
-  call %lm_box_string %str_const_125
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r26 = call %lm_box_string %str_const_125
+  %r25 = call %lm_rt_str_format %r26 0
+  %r27 = call %lm_rt_str_format %r25 %r22
+  ret %r27
 }
 
 function testDestructuringWithGuards(i64) {
@@ -378,51 +378,51 @@ function testDestructuringWithGuards(i64) {
 @block_0
   jmp %block_1
 @block_1
-  ceq 0 17
-  br <unnamed> %block_5 %block_25
+  %r3 = ceq 0 17
+  br %r3 %block_5 %block_25
 @block_5
   jmp %block_5
-  call %lm_box_string %str_const_126
+  %r4 = call %lm_box_string %str_const_126
   br 0 %block_8 %block_25
 @block_8
   jmp %block_8
-  call %lm_box_string %str_const_127
+  %r7 = call %lm_box_string %str_const_127
   br 0 %block_12 %block_25
 @block_12
   jmp %block_12
-  csgt 0 145
-  br <unnamed> %block_16 %block_25
+  %r11 = csgt 0 145
+  br %r11 %block_16 %block_25
 @block_16
   jmp %block_16
-  call %lm_box_string %str_const_128
-  call %lm_box_string %str_const_129
-  call %lm_box_string %str_const_130
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r12 = call %lm_box_string %str_const_128
+  %r14 = call %lm_box_string %str_const_129
+  %r17 = call %lm_box_string %str_const_130
+  %r16 = call %lm_rt_str_format %r17 0
+  %r18 = call %lm_rt_str_format %r16 0
+  ret %r18
 @block_25
-  ceq 0 17
-  br <unnamed> %block_29 %block_49
+  %r21 = ceq 0 17
+  br %r21 %block_29 %block_49
 @block_29
   jmp %block_29
-  call %lm_box_string %str_const_131
+  %r22 = call %lm_box_string %str_const_131
   br 0 %block_32 %block_49
 @block_32
   jmp %block_32
-  call %lm_box_string %str_const_132
+  %r25 = call %lm_box_string %str_const_132
   br 0 %block_36 %block_49
 @block_36
   jmp %block_36
-  cslt 0 145
-  br <unnamed> %block_40 %block_49
+  %r29 = cslt 0 145
+  br %r29 %block_40 %block_49
 @block_40
   jmp %block_40
-  call %lm_box_string %str_const_133
-  call %lm_box_string %str_const_134
-  call %lm_box_string %str_const_135
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r30 = call %lm_box_string %str_const_133
+  %r32 = call %lm_box_string %str_const_134
+  %r35 = call %lm_box_string %str_const_135
+  %r34 = call %lm_rt_str_format %r35 0
+  %r36 = call %lm_rt_str_format %r34 0
+  ret %r36
 @block_49
   ret 0
 }
@@ -432,44 +432,44 @@ function testSpreadDestructuring(i64) {
 @block_0
   jmp %block_1
 @block_1
-  call %lm_list_len <unnamed>
-  csge <unnamed> 9
-  br <unnamed> %block_5 %block_8
+  %r1 = call %lm_list_len %p0
+  %r3 = csge %r1 9
+  br %r3 %block_5 %block_8
 @block_5
   jmp %block_5
-  call %lm_list_get <unnamed> 1
+  %r5 = call %lm_list_get %p0 1
   jmp %block_16
 @block_8
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 1
-  br <unnamed> %block_12 %block_13
+  %r19 = call %lm_list_len %p0
+  %r21 = ceq %r19 1
+  br %r21 %block_12 %block_13
 @block_12
   jmp %block_12
   jmp %block_14
 @block_13
   ret 0
 @block_14
-  call %lm_box_string %str_const_136
-  ret <unnamed>
+  %r22 = call %lm_box_string %str_const_136
+  ret %r22
 @block_16
-  call %lm_list_get <unnamed> 1
-  call %lm_list_new 0
-  call %lm_list_len <unnamed>
+  %r7 = call %lm_list_get %p0 1
+  %r8 = call %lm_list_new 0
+  %r9 = call %lm_list_len %p0
   jmp %block_22
 @block_22
-  cslt 9 <unnamed>
-  br <unnamed> %block_24 %block_30
+  %r11 = cslt 9 %r9
+  br %r11 %block_24 %block_30
 @block_24
   jmp %block_24
-  call %lm_list_get <unnamed> 9
-  call %lm_list_append <unnamed> <unnamed>
-  add 9 9
+  %r12 = call %lm_list_get %p0 9
+  call %lm_list_append %r8 %r12
+  %r14 = add 9 9
   jmp %block_22
 @block_30
-  call %lm_box_string %str_const_137
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r17 = call %lm_box_string %str_const_137
+  %r16 = call %lm_rt_str_format %r17 %r7
+  %r18 = call %lm_rt_str_format %r16 %r8
+  ret %r18
 }
 
 function testNestedDestructuring(i64) {
@@ -477,59 +477,59 @@ function testNestedDestructuring(i64) {
 @block_0
   jmp %block_1
 @block_1
-  ceq 0 17
-  br <unnamed> %block_5 %block_18
+  %r3 = ceq 0 17
+  br %r3 %block_5 %block_18
 @block_5
   jmp %block_5
-  call %lm_list_len 0
-  ceq <unnamed> 17
-  br <unnamed> %block_13 %block_18
+  %r8 = call %lm_list_len 0
+  %r10 = ceq %r8 17
+  br %r10 %block_13 %block_18
 @block_13
   jmp %block_13
-  call %lm_list_get 0 1
-  call %lm_list_get 0 9
+  %r12 = call %lm_list_get 0 1
+  %r14 = call %lm_list_get 0 9
   jmp %block_54
 @block_18
-  ceq 0 17
-  br <unnamed> %block_22 %block_39
+  %r29 = ceq 0 17
+  br %r29 %block_22 %block_39
 @block_22
   jmp %block_22
-  call %lm_box_string %str_const_138
+  %r30 = call %lm_box_string %str_const_138
   br 0 %block_25 %block_39
 @block_25
   jmp %block_25
-  call %lm_box_string %str_const_139
+  %r33 = call %lm_box_string %str_const_139
   br 0 %block_29 %block_39
 @block_29
   jmp %block_29
-  call %lm_list_len 0
-  ceq <unnamed> 17
-  br <unnamed> %block_34 %block_39
+  %r36 = call %lm_list_len 0
+  %r38 = ceq %r36 17
+  br %r38 %block_34 %block_39
 @block_34
   jmp %block_34
-  call %lm_list_get 0 1
-  call %lm_list_get 0 9
+  %r40 = call %lm_list_get 0 1
+  %r42 = call %lm_list_get 0 9
   jmp %block_40
 @block_39
   ret 0
 @block_40
-  call %lm_box_string %str_const_140
-  call %lm_box_string %str_const_141
-  call %lm_list_get 0 1
-  call %lm_list_get 0 9
-  call %lm_box_string %str_const_142
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r43 = call %lm_box_string %str_const_140
+  %r45 = call %lm_box_string %str_const_141
+  %r48 = call %lm_list_get 0 1
+  %r50 = call %lm_list_get 0 9
+  %r52 = call %lm_box_string %str_const_142
+  %r51 = call %lm_rt_str_format %r52 0
+  %r53 = call %lm_rt_str_format %r51 %r48
+  %r54 = call %lm_rt_str_format %r53 %r50
+  ret %r54
 @block_54
-  call %lm_list_get 0 1
-  call %lm_list_get 0 9
-  call %lm_box_string %str_const_143
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r20 = call %lm_list_get 0 1
+  %r22 = call %lm_list_get 0 9
+  %r24 = call %lm_box_string %str_const_143
+  %r23 = call %lm_rt_str_format %r24 0
+  %r25 = call %lm_rt_str_format %r23 %r20
+  %r26 = call %lm_rt_str_format %r25 %r22
+  ret %r26
 }
 
 function testTupleDestructuring(i64) {
@@ -537,30 +537,30 @@ function testTupleDestructuring(i64) {
 @block_0
   jmp %block_1
 @block_1
-  ceq 0 17
-  br <unnamed> %block_5 %block_10
+  %r3 = ceq 0 17
+  br %r3 %block_5 %block_10
 @block_5
   jmp %block_5
   jmp %block_34
 @block_10
-  ceq 0 25
-  br <unnamed> %block_14 %block_21
+  %r17 = ceq 0 25
+  br %r17 %block_14 %block_21
 @block_14
   jmp %block_14
   jmp %block_22
 @block_21
   ret 0
 @block_22
-  call %lm_box_string %str_const_144
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r31 = call %lm_box_string %str_const_144
+  %r30 = call %lm_rt_str_format %r31 0
+  %r32 = call %lm_rt_str_format %r30 0
+  %r33 = call %lm_rt_str_format %r32 0
+  ret %r33
 @block_34
-  call %lm_box_string %str_const_145
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r13 = call %lm_box_string %str_const_145
+  %r12 = call %lm_rt_str_format %r13 0
+  %r14 = call %lm_rt_str_format %r12 0
+  ret %r14
 }
 
 function testListDestructuring(i64) {
@@ -568,73 +568,73 @@ function testListDestructuring(i64) {
 @block_0
   jmp %block_1
 @block_1
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 1
-  br <unnamed> %block_5 %block_6
+  %r1 = call %lm_list_len %p0
+  %r3 = ceq %r1 1
+  br %r3 %block_5 %block_6
 @block_5
   jmp %block_5
   jmp %block_63
 @block_6
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 9
-  br <unnamed> %block_10 %block_13
+  %r5 = call %lm_list_len %p0
+  %r7 = ceq %r5 9
+  br %r7 %block_10 %block_13
 @block_10
   jmp %block_10
-  call %lm_list_get <unnamed> 1
+  %r9 = call %lm_list_get %p0 1
   jmp %block_58
 @block_13
-  call %lm_list_len <unnamed>
-  ceq <unnamed> 17
-  br <unnamed> %block_17 %block_22
+  %r14 = call %lm_list_len %p0
+  %r16 = ceq %r14 17
+  br %r16 %block_17 %block_22
 @block_17
   jmp %block_17
-  call %lm_list_get <unnamed> 1
-  call %lm_list_get <unnamed> 9
+  %r18 = call %lm_list_get %p0 1
+  %r20 = call %lm_list_get %p0 9
   jmp %block_49
 @block_22
-  call %lm_list_len <unnamed>
-  csge <unnamed> 9
-  br <unnamed> %block_26 %block_29
+  %r28 = call %lm_list_len %p0
+  %r30 = csge %r28 9
+  br %r30 %block_26 %block_29
 @block_26
   jmp %block_26
-  call %lm_list_get <unnamed> 1
+  %r32 = call %lm_list_get %p0 1
   jmp %block_30
 @block_29
   ret 0
 @block_30
-  call %lm_list_get <unnamed> 1
-  call %lm_list_new 0
-  call %lm_list_len <unnamed>
+  %r34 = call %lm_list_get %p0 1
+  %r35 = call %lm_list_new 0
+  %r36 = call %lm_list_len %p0
   jmp %block_36
 @block_36
-  cslt 9 <unnamed>
-  br <unnamed> %block_38 %block_44
+  %r38 = cslt 9 %r36
+  br %r38 %block_38 %block_44
 @block_38
   jmp %block_38
-  call %lm_list_get <unnamed> 9
-  call %lm_list_append <unnamed> <unnamed>
-  add 9 9
+  %r39 = call %lm_list_get %p0 9
+  call %lm_list_append %r35 %r39
+  %r41 = add 9 9
   jmp %block_36
 @block_44
-  call %lm_box_string %str_const_146
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r44 = call %lm_box_string %str_const_146
+  %r43 = call %lm_rt_str_format %r44 %r34
+  %r45 = call %lm_rt_str_format %r43 %r35
+  ret %r45
 @block_49
-  call %lm_list_get <unnamed> 1
-  call %lm_list_get <unnamed> 9
-  call %lm_box_string %str_const_147
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r22 = call %lm_list_get %p0 1
+  %r24 = call %lm_list_get %p0 9
+  %r26 = call %lm_box_string %str_const_147
+  %r25 = call %lm_rt_str_format %r26 %r22
+  %r27 = call %lm_rt_str_format %r25 %r24
+  ret %r27
 @block_58
-  call %lm_list_get <unnamed> 1
-  call %lm_box_string %str_const_148
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r11 = call %lm_list_get %p0 1
+  %r13 = call %lm_box_string %str_const_148
+  %r12 = call %lm_rt_str_format %r13 %r11
+  ret %r12
 @block_63
-  call %lm_box_string %str_const_149
-  ret <unnamed>
+  %r4 = call %lm_box_string %str_const_149
+  ret %r4
 }
 
 function testRecordDestructuring(i64) {
@@ -642,33 +642,33 @@ function testRecordDestructuring(i64) {
 @block_0
   jmp %block_1
 @block_1
-  ceq 0 17
-  br <unnamed> %block_5 %block_14
+  %r3 = ceq 0 17
+  br %r3 %block_5 %block_14
 @block_5
   jmp %block_5
-  call %lm_box_string %str_const_150
+  %r4 = call %lm_box_string %str_const_150
   br 0 %block_8 %block_14
 @block_8
   jmp %block_8
-  call %lm_box_string %str_const_151
+  %r7 = call %lm_box_string %str_const_151
   br 0 %block_12 %block_14
 @block_12
   jmp %block_12
   jmp %block_44
 @block_14
-  ceq 0 25
-  br <unnamed> %block_18 %block_31
+  %r19 = ceq 0 25
+  br %r19 %block_18 %block_31
 @block_18
   jmp %block_18
-  call %lm_box_string %str_const_152
+  %r20 = call %lm_box_string %str_const_152
   br 0 %block_21 %block_31
 @block_21
   jmp %block_21
-  call %lm_box_string %str_const_153
+  %r23 = call %lm_box_string %str_const_153
   br 0 %block_25 %block_31
 @block_25
   jmp %block_25
-  call %lm_box_string %str_const_154
+  %r26 = call %lm_box_string %str_const_154
   br 0 %block_29 %block_31
 @block_29
   jmp %block_29
@@ -676,21 +676,21 @@ function testRecordDestructuring(i64) {
 @block_31
   ret 0
 @block_32
-  call %lm_box_string %str_const_155
-  call %lm_box_string %str_const_156
-  call %lm_box_string %str_const_157
-  call %lm_box_string %str_const_158
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r29 = call %lm_box_string %str_const_155
+  %r31 = call %lm_box_string %str_const_156
+  %r33 = call %lm_box_string %str_const_157
+  %r36 = call %lm_box_string %str_const_158
+  %r35 = call %lm_rt_str_format %r36 0
+  %r37 = call %lm_rt_str_format %r35 0
+  %r38 = call %lm_rt_str_format %r37 0
+  ret %r38
 @block_44
-  call %lm_box_string %str_const_159
-  call %lm_box_string %str_const_160
-  call %lm_box_string %str_const_161
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r10 = call %lm_box_string %str_const_159
+  %r12 = call %lm_box_string %str_const_160
+  %r15 = call %lm_box_string %str_const_161
+  %r14 = call %lm_rt_str_format %r15 0
+  %r16 = call %lm_rt_str_format %r14 0
+  ret %r16
 }
 
 function processCommand(i64) {
@@ -698,41 +698,41 @@ function processCommand(i64) {
 @block_0
   jmp %block_1
 @block_1
-  ceq 0 1
-  br <unnamed> %block_5 %block_11
+  %r3 = ceq 0 1
+  br %r3 %block_5 %block_11
 @block_5
   jmp %block_5
   jmp %block_57
 @block_11
-  ceq 0 9
-  br <unnamed> %block_15 %block_21
+  %r19 = ceq 0 9
+  br %r19 %block_15 %block_21
 @block_15
   jmp %block_15
   jmp %block_47
 @block_21
-  ceq 0 17
-  br <unnamed> %block_25 %block_33
+  %r35 = ceq 0 17
+  br %r35 %block_25 %block_33
 @block_25
   jmp %block_25
   jmp %block_34
 @block_33
   ret 0
 @block_34
-  call %lm_box_string %str_const_162
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r51 = call %lm_box_string %str_const_162
+  %r50 = call %lm_rt_str_format %r51 0
+  %r52 = call %lm_rt_str_format %r50 0
+  %r53 = call %lm_rt_str_format %r52 0
+  ret %r53
 @block_47
-  call %lm_box_string %str_const_163
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r31 = call %lm_box_string %str_const_163
+  %r30 = call %lm_rt_str_format %r31 0
+  %r32 = call %lm_rt_str_format %r30 0
+  ret %r32
 @block_57
-  call %lm_box_string %str_const_164
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r15 = call %lm_box_string %str_const_164
+  %r14 = call %lm_rt_str_format %r15 0
+  %r16 = call %lm_rt_str_format %r14 0
+  ret %r16
 }
 
 function testComplexNested(i64) {
@@ -740,43 +740,43 @@ function testComplexNested(i64) {
 @block_0
   jmp %block_1
 @block_1
-  ceq 0 17
-  br <unnamed> %block_5 %block_30
+  %r3 = ceq 0 17
+  br %r3 %block_5 %block_30
 @block_5
   jmp %block_5
-  ceq 0 17
-  br <unnamed> %block_13 %block_30
+  %r10 = ceq 0 17
+  br %r10 %block_13 %block_30
 @block_13
   jmp %block_13
-  call %lm_box_string %str_const_165
+  %r11 = call %lm_box_string %str_const_165
   br 0 %block_16 %block_30
 @block_16
   jmp %block_16
-  call %lm_box_string %str_const_166
+  %r14 = call %lm_box_string %str_const_166
   br 0 %block_20 %block_30
 @block_20
   jmp %block_20
-  call %lm_list_len 0
-  ceq <unnamed> 17
-  br <unnamed> %block_25 %block_30
+  %r17 = call %lm_list_len 0
+  %r19 = ceq %r17 17
+  br %r19 %block_25 %block_30
 @block_25
   jmp %block_25
-  call %lm_list_get 0 1
-  call %lm_list_get 0 9
+  %r21 = call %lm_list_get 0 1
+  %r23 = call %lm_list_get 0 9
   jmp %block_31
 @block_30
   ret 0
 @block_31
-  call %lm_box_string %str_const_167
-  call %lm_box_string %str_const_168
-  call %lm_list_get 0 1
-  call %lm_list_get 0 9
-  call %lm_box_string %str_const_169
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r28 = call %lm_box_string %str_const_167
+  %r30 = call %lm_box_string %str_const_168
+  %r33 = call %lm_list_get 0 1
+  %r35 = call %lm_list_get 0 9
+  %r37 = call %lm_box_string %str_const_169
+  %r36 = call %lm_rt_str_format %r37 0
+  %r38 = call %lm_rt_str_format %r36 0
+  %r39 = call %lm_rt_str_format %r38 %r33
+  %r40 = call %lm_rt_str_format %r39 %r35
+  ret %r40
 }
 
 function testOptionalFields(i64) {
@@ -784,33 +784,33 @@ function testOptionalFields(i64) {
 @block_0
   jmp %block_1
 @block_1
-  ceq 0 25
-  br <unnamed> %block_5 %block_18
+  %r3 = ceq 0 25
+  br %r3 %block_5 %block_18
 @block_5
   jmp %block_5
-  call %lm_box_string %str_const_170
+  %r4 = call %lm_box_string %str_const_170
   br 0 %block_8 %block_18
 @block_8
   jmp %block_8
-  call %lm_box_string %str_const_171
+  %r7 = call %lm_box_string %str_const_171
   br 0 %block_12 %block_18
 @block_12
   jmp %block_12
-  call %lm_box_string %str_const_172
+  %r10 = call %lm_box_string %str_const_172
   br 0 %block_16 %block_18
 @block_16
   jmp %block_16
   jmp %block_41
 @block_18
-  ceq 0 17
-  br <unnamed> %block_22 %block_31
+  %r25 = ceq 0 17
+  br %r25 %block_22 %block_31
 @block_22
   jmp %block_22
-  call %lm_box_string %str_const_173
+  %r26 = call %lm_box_string %str_const_173
   br 0 %block_25 %block_31
 @block_25
   jmp %block_25
-  call %lm_box_string %str_const_174
+  %r29 = call %lm_box_string %str_const_174
   br 0 %block_29 %block_31
 @block_29
   jmp %block_29
@@ -818,21 +818,21 @@ function testOptionalFields(i64) {
 @block_31
   ret 0
 @block_32
-  call %lm_box_string %str_const_175
-  call %lm_box_string %str_const_176
-  call %lm_box_string %str_const_177
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r32 = call %lm_box_string %str_const_175
+  %r34 = call %lm_box_string %str_const_176
+  %r37 = call %lm_box_string %str_const_177
+  %r36 = call %lm_rt_str_format %r37 0
+  %r38 = call %lm_rt_str_format %r36 0
+  ret %r38
 @block_41
-  call %lm_box_string %str_const_178
-  call %lm_box_string %str_const_179
-  call %lm_box_string %str_const_180
-  call %lm_box_string %str_const_181
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r13 = call %lm_box_string %str_const_178
+  %r15 = call %lm_box_string %str_const_179
+  %r17 = call %lm_box_string %str_const_180
+  %r20 = call %lm_box_string %str_const_181
+  %r19 = call %lm_rt_str_format %r20 0
+  %r21 = call %lm_rt_str_format %r19 0
+  %r22 = call %lm_rt_str_format %r21 0
+  ret %r22
 }
 
 function describeShape(i64) {
@@ -840,39 +840,39 @@ function describeShape(i64) {
 @block_0
   jmp %block_1
 @block_1
-  ceq 0 1
-  br <unnamed> %block_5 %block_7
+  %r3 = ceq 0 1
+  br %r3 %block_5 %block_7
 @block_5
   jmp %block_5
   jmp %block_48
 @block_7
-  ceq 0 9
-  br <unnamed> %block_11 %block_17
+  %r10 = ceq 0 9
+  br %r10 %block_11 %block_17
 @block_11
   jmp %block_11
   jmp %block_38
 @block_17
-  ceq 0 17
-  br <unnamed> %block_21 %block_27
+  %r26 = ceq 0 17
+  br %r26 %block_21 %block_27
 @block_21
   jmp %block_21
   jmp %block_28
 @block_27
   ret 0
 @block_28
-  call %lm_box_string %str_const_182
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r38 = call %lm_box_string %str_const_182
+  %r37 = call %lm_rt_str_format %r38 0
+  %r39 = call %lm_rt_str_format %r37 0
+  ret %r39
 @block_38
-  call %lm_box_string %str_const_183
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r22 = call %lm_box_string %str_const_183
+  %r21 = call %lm_rt_str_format %r22 0
+  %r23 = call %lm_rt_str_format %r21 0
+  ret %r23
 @block_48
-  call %lm_box_string %str_const_184
-  call %lm_rt_str_format <unnamed> 0
-  ret <unnamed>
+  %r7 = call %lm_box_string %str_const_184
+  %r6 = call %lm_rt_str_format %r7 0
+  ret %r6
 }
 
 function testNestedTupleList(i64) {
@@ -880,31 +880,31 @@ function testNestedTupleList(i64) {
 @block_0
   jmp %block_1
 @block_1
-  ceq 0 17
-  br <unnamed> %block_5 %block_20
+  %r3 = ceq 0 17
+  br %r3 %block_5 %block_20
 @block_5
   jmp %block_5
-  call %lm_list_len 0
-  ceq <unnamed> 25
-  br <unnamed> %block_13 %block_20
+  %r8 = call %lm_list_len 0
+  %r10 = ceq %r8 25
+  br %r10 %block_13 %block_20
 @block_13
   jmp %block_13
-  call %lm_list_get 0 1
-  call %lm_list_get 0 9
-  call %lm_list_get 0 17
+  %r12 = call %lm_list_get 0 1
+  %r14 = call %lm_list_get 0 9
+  %r16 = call %lm_list_get 0 17
   jmp %block_21
 @block_20
   ret 0
 @block_21
-  call %lm_list_get 0 1
-  call %lm_list_get 0 9
-  call %lm_list_get 0 17
-  call %lm_box_string %str_const_185
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r22 = call %lm_list_get 0 1
+  %r24 = call %lm_list_get 0 9
+  %r26 = call %lm_list_get 0 17
+  %r28 = call %lm_box_string %str_const_185
+  %r27 = call %lm_rt_str_format %r28 0
+  %r29 = call %lm_rt_str_format %r27 %r22
+  %r30 = call %lm_rt_str_format %r29 %r24
+  %r31 = call %lm_rt_str_format %r30 %r26
+  ret %r31
 }
 
 function lm_box_string(i8*) {
@@ -912,49 +912,49 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null

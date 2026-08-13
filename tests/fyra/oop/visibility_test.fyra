@@ -1,17 +1,17 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_box_string %str_const_1
-  alloc 16
-  call %Resource.init <unnamed> <unnamed> 985 <unnamed>
-  call %Resource.print_all <unnamed>
-  add <unnamed> 0
-  load <unnamed>
-  call %lm_box_string %str_const_2
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_3
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = call %lm_box_string %str_const_0
+  %r2 = call %lm_box_string %str_const_1
+  %r3 = alloc 16
+  %r4 = call %Resource.init %r3 %r0 985 %r2
+  %r6 = call %Resource.print_all %r3
+  %addr_2 = add %r3 0
+  %r7 = load %addr_2
+  %r8 = call %lm_box_string %str_const_3
+  %r9 = ceq %r7 %r8
+  %r10 = call %lm_box_string %str_const_4
+  %r11 = call %lm_assert %r9 %r10
   ret 0
 }
 
@@ -35,10 +35,10 @@ function lm_box_string(i8*) {
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null

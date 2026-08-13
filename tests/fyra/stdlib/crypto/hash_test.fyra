@@ -1,12 +1,12 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %std.resource.__init__
-  call %lm_box_string %str_const_0
-  call %lm_print_int <unnamed>
-  call %std.resource.create_hash_engine
-  call %lm_box_string %str_const_1
-  call %lm_print_int <unnamed>
+  %r0 = call %std.resource.__init__
+  %r1 = call %lm_box_string %str_const_0
+  %r2 = call %lm_print_int %r1
+  %r3 = call %std.resource.create_hash_engine
+  %r5 = call %lm_box_string %str_const_1
+  %r6 = call %lm_print_int %r5
   ret 0
 }
 
@@ -18,88 +18,88 @@ function std.resource.__init__() {
 function std.resource._call(i64, i64, i64) {
 @entry
 @block_0
-  call %std.internal.runtime.call <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r3 = call %std.internal.runtime.call %p0 %p1 %p2
+  ret %r3
 }
 
 function std.resource.adopt_socket(i64) {
 @entry
 @block_0
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r2 = alloc 16
+  %r3 = call %std.resource.Resource.init %r2 %p0 0
+  ret %r2
 }
 
 function std.resource.create_entropy() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource.create_websocket() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource.create_fs_resource() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource.create_dns_resolver() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource.Accepter.init(i64, i64) {
@@ -125,19 +125,19 @@ function std.resource.Binder.init(i64, i64) {
 function std.resource.create_hash_engine() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource.Binder.bind(i64, i64) {
@@ -153,19 +153,19 @@ function std.resource.Connector.init(i64, i64) {
 function std.resource.create_socket() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.resource.Accepter.accept(i64) {
@@ -196,31 +196,31 @@ function std.resource.Pollable.poll(i64) {
 function std.resource.open_file(i64, i64) {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r3 = call %lm_list_new 0
+  %r4 = call %std.internal.runtime.create 0 %r3
+  %r7 = neg 9
+  %r8 = ceq %r4 %r7
+  br %r8 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new <unnamed>
-  ret <unnamed>
+  %r10 = call %lm_error_new %p0
+  ret %r10
 @block_10
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> <unnamed>
-  call %lm_list_append <unnamed> <unnamed>
-  call %std.internal.runtime.call <unnamed> 0 <unnamed>
-  cne <unnamed> 18
-  br <unnamed> %block_19 %block_22
+  %r12 = call %lm_list_new 0
+  call %lm_list_append %r12 %p0
+  call %lm_list_append %r12 %p1
+  %r15 = call %std.internal.runtime.call %r4 0 %r12
+  %r18 = cne %r15 18
+  br %r18 %block_19 %block_22
 @block_19
   jmp %block_19
-  call %std.internal.runtime.destroy <unnamed>
-  call %lm_error_new <unnamed>
-  ret <unnamed>
+  %r20 = call %std.internal.runtime.destroy %r4
+  %r21 = call %lm_error_new %p0
+  ret %r21
 @block_22
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r24 = alloc 16
+  %r25 = call %std.resource.Resource.init %r24 %r4 0
+  ret %r24
 }
 
 function std.resource.Poller.poll(i64) {
@@ -242,19 +242,19 @@ function std.internal.runtime.create(i64, i64) {
 function std.resource.create_udp_socket() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %std.internal.runtime.create 0 <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_8 %block_10
+  %r1 = call %lm_list_new 0
+  %r2 = call %std.internal.runtime.create 0 %r1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_error_new 0
-  ret <unnamed>
+  %r8 = call %lm_error_new 0
+  ret %r8
 @block_10
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> 0
-  ret <unnamed>
+  %r11 = alloc 16
+  %r12 = call %std.resource.Resource.init %r11 %r2 0
+  ret %r11
 }
 
 function std.internal.runtime.call(i64, i64, i64) {
@@ -282,18 +282,18 @@ function std.resource.Resource.is_open(i64) {
 function std.resource.create(i64, i64) {
 @entry
 @block_0
-  call %std.internal.runtime.create <unnamed> <unnamed>
-  neg 9
-  ceq <unnamed> <unnamed>
-  br <unnamed> %block_6 %block_8
+  %r2 = call %std.internal.runtime.create %p0 %p1
+  %r5 = neg 9
+  %r6 = ceq %r2 %r5
+  br %r6 %block_6 %block_8
 @block_6
   jmp %block_6
-  call %lm_error_new <unnamed>
-  ret <unnamed>
+  %r8 = call %lm_error_new %p0
+  ret %r8
 @block_8
-  alloc 16
-  call %std.resource.Resource.init <unnamed> <unnamed> <unnamed>
-  ret <unnamed>
+  %r10 = alloc 16
+  %r11 = call %std.resource.Resource.init %r10 %r2 %p0
+  ret %r10
 }
 
 function std.resource.ResourceReader.init(i64, i64) {
@@ -331,40 +331,40 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 

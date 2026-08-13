@@ -1,43 +1,43 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 25
-  call %lm_box_string %str_const_0
-  call %lm_box_string %str_const_1
-  call %lm_box_string %str_const_2
-  call %lm_print_int <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 25
-  call %lm_box_string %str_const_3
-  call %lm_box_string %str_const_4
-  call %lm_box_string %str_const_5
-  call %lm_box_string %str_const_6
-  call %lm_print_int <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 0
-  call %lm_list_append <unnamed> 0
-  call %lm_list_append <unnamed> 0
-  call %lm_box_string %str_const_7
-  call %lm_box_string %str_const_8
-  call %lm_box_string %str_const_9
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_10
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_11
-  call %lm_print_int <unnamed> 41
-  call %lm_box_string %str_const_12
-  call %lm_print_int <unnamed> 81
-  call %lm_box_string %str_const_13
-  call %lm_print_int <unnamed> 121
-  call %lm_box_string %str_const_14
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_15
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_list_new 0
+  call %lm_list_append %r0 9
+  call %lm_list_append %r0 17
+  call %lm_list_append %r0 25
+  %r9 = call %lm_box_string %str_const_0
+  %r11 = call %lm_box_string %str_const_1
+  %r20 = call %lm_box_string %str_const_2
+  %r21 = call %lm_print_int %r20
+  %r22 = call %lm_list_new 0
+  call %lm_list_append %r22 9
+  call %lm_list_append %r22 17
+  call %lm_list_append %r22 25
+  %r31 = call %lm_box_string %str_const_3
+  %r33 = call %lm_box_string %str_const_4
+  %r39 = call %lm_box_string %str_const_5
+  %r42 = call %lm_box_string %str_const_6
+  %r43 = call %lm_print_int %r42
+  %r44 = call %lm_list_new 0
+  call %lm_list_append %r44 0
+  call %lm_list_append %r44 0
+  call %lm_list_append %r44 0
+  %r53 = call %lm_box_string %str_const_7
+  %r55 = call %lm_box_string %str_const_8
+  %r64 = call %lm_box_string %str_const_9
+  %r65 = call %lm_print_int %r64
+  %r69 = call %lm_box_string %str_const_10
+  %r70 = call %lm_print_int %r69
+  %r71 = call %lm_box_string %str_const_11
+  %r72 = call %lm_print_int %r71 41
+  %r73 = call %lm_box_string %str_const_12
+  %r74 = call %lm_print_int %r73 81
+  %r75 = call %lm_box_string %str_const_13
+  %r76 = call %lm_print_int %r75 121
+  %r77 = call %lm_box_string %str_const_14
+  %r78 = call %lm_print_int %r77
+  %r79 = call %lm_box_string %str_const_15
+  %r80 = call %lm_print_int %r79
   ret 0
 }
 
@@ -52,40 +52,40 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 

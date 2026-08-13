@@ -1,223 +1,223 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_1
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_2
-  call %lm_rt_str_format <unnamed> 8001
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_3
-  call %lm_rt_str_format <unnamed> 16001
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_4
-  call %lm_rt_str_format <unnamed> 24001
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_5
-  call %lm_rt_str_format <unnamed> 32001
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_6
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_7
-  call %lm_box_string %str_const_8
-  call %lm_rt_str_format <unnamed> 337
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_9
-  call %lm_rt_str_format <unnamed> 2
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_10
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_11
-  call %lm_rt_str_format <unnamed> 18
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_12
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_13
-  call %formatInput 985
-  call %formatInput <unnamed>
-  call %lm_box_string %str_const_14
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_15
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_16
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_17
-  call %lm_box_string %str_const_18
-  call %lm_rt_str_format <unnamed> 801
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_19
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_20
-  call %lm_print_int <unnamed>
-  call %inferType 337
-  call %lm_box_string %str_const_21
-  call %inferType <unnamed>
-  call %inferType 18
-  call %lm_box_string %str_const_22
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_23
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_24
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_25
-  call %lm_print_int <unnamed>
-  call %processData 9
-  call %processData 17
-  call %processData 25
-  call %lm_box_string %str_const_26
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_27
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_28
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_29
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_30
-  call %lm_box_string %str_const_31
-  call %lm_rt_str_format <unnamed> 985
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_32
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_33
-  call %lm_rt_str_format <unnamed> 18
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_34
-  call %lm_rt_str_format <unnamed> 2
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_35
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_36
-  call %lm_box_string %str_const_37
-  call %lm_rt_str_format <unnamed> 7993
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_38
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_39
-  call %lm_rt_str_format <unnamed> 10
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_40
-  call %lm_rt_str_format <unnamed> 2
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_41
-  call %lm_print_int <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> 25
-  call %lm_list_append <unnamed> 33
-  call %lm_list_append <unnamed> 41
-  call %lm_list_new 0
-  call %lm_box_string %str_const_42
-  call %lm_list_append <unnamed> <unnamed>
-  call %lm_box_string %str_const_43
-  call %lm_list_append <unnamed> <unnamed>
-  call %lm_box_string %str_const_44
-  call %lm_list_append <unnamed> <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 18
-  call %lm_list_append <unnamed> 10
-  call %lm_list_append <unnamed> 18
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 2
-  call %lm_list_append <unnamed> 2
-  call %lm_list_append <unnamed> 2
-  call %lm_box_string %str_const_45
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_46
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_47
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_48
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_49
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_50
-  call %lm_box_string %str_const_51
-  call %lm_box_string %str_const_52
-  call %lm_box_string %str_const_53
-  call %lm_box_string %str_const_54
-  call %lm_box_string %str_const_55
-  call %lm_box_string %str_const_56
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_57
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_58
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_59
-  call %lm_print_int <unnamed>
-  call %lm_list_new 0
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 9
-  call %lm_list_append <unnamed> 17
-  call %lm_list_append <unnamed> <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 25
-  call %lm_list_append <unnamed> 33
-  call %lm_list_append <unnamed> <unnamed>
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 41
-  call %lm_list_append <unnamed> 49
-  call %lm_list_append <unnamed> <unnamed>
-  call %lm_box_string %str_const_60
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 2
-  call %lm_list_append <unnamed> 2
-  call %lm_list_append <unnamed> 2
-  call %lm_box_string %str_const_61
-  call %lm_list_new 0
-  call %lm_list_append <unnamed> 2
-  call %lm_list_append <unnamed> 2
-  call %lm_list_append <unnamed> 2
-  call %lm_box_string %str_const_62
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_63
-  call %lm_rt_str_format <unnamed> 0
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_64
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_65
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_66
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_0
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_1
+  %r3 = call %lm_print_int %r2
+  %r9 = call %lm_box_string %str_const_2
+  %r8 = call %lm_rt_str_format %r9 8001
+  %r10 = call %lm_print_int %r8
+  %r12 = call %lm_box_string %str_const_3
+  %r11 = call %lm_rt_str_format %r12 16001
+  %r13 = call %lm_print_int %r11
+  %r15 = call %lm_box_string %str_const_4
+  %r14 = call %lm_rt_str_format %r15 24001
+  %r16 = call %lm_print_int %r14
+  %r18 = call %lm_box_string %str_const_5
+  %r17 = call %lm_rt_str_format %r18 32001
+  %r19 = call %lm_print_int %r17
+  %r20 = call %lm_box_string %str_const_6
+  %r21 = call %lm_print_int %r20
+  %r24 = call %lm_box_string %str_const_7
+  %r27 = call %lm_box_string %str_const_8
+  %r26 = call %lm_rt_str_format %r27 337
+  %r28 = call %lm_print_int %r26
+  %r30 = call %lm_box_string %str_const_9
+  %r29 = call %lm_rt_str_format %r30 2
+  %r31 = call %lm_print_int %r29
+  %r33 = call %lm_box_string %str_const_10
+  %r32 = call %lm_rt_str_format %r33 %r24
+  %r34 = call %lm_print_int %r32
+  %r36 = call %lm_box_string %str_const_11
+  %r35 = call %lm_rt_str_format %r36 18
+  %r37 = call %lm_print_int %r35
+  %r38 = call %lm_box_string %str_const_12
+  %r39 = call %lm_print_int %r38
+  %r41 = call %lm_box_string %str_const_13
+  %r42 = call %formatInput 985
+  %r44 = call %formatInput %r41
+  %r47 = call %lm_box_string %str_const_14
+  %r46 = call %lm_rt_str_format %r47 %r42
+  %r48 = call %lm_print_int %r46
+  %r50 = call %lm_box_string %str_const_15
+  %r49 = call %lm_rt_str_format %r50 %r44
+  %r51 = call %lm_print_int %r49
+  %r52 = call %lm_box_string %str_const_16
+  %r53 = call %lm_print_int %r52
+  %r55 = call %lm_box_string %str_const_17
+  %r57 = call %lm_box_string %str_const_18
+  %r56 = call %lm_rt_str_format %r57 801
+  %r58 = call %lm_print_int %r56
+  %r60 = call %lm_box_string %str_const_19
+  %r59 = call %lm_rt_str_format %r60 %r55
+  %r61 = call %lm_print_int %r59
+  %r62 = call %lm_box_string %str_const_20
+  %r63 = call %lm_print_int %r62
+  %r65 = call %inferType 337
+  %r67 = call %lm_box_string %str_const_21
+  %r68 = call %inferType %r67
+  %r71 = call %inferType 18
+  %r74 = call %lm_box_string %str_const_22
+  %r73 = call %lm_rt_str_format %r74 %r65
+  %r75 = call %lm_print_int %r73
+  %r77 = call %lm_box_string %str_const_23
+  %r76 = call %lm_rt_str_format %r77 %r68
+  %r78 = call %lm_print_int %r76
+  %r80 = call %lm_box_string %str_const_24
+  %r79 = call %lm_rt_str_format %r80 %r71
+  %r81 = call %lm_print_int %r79
+  %r82 = call %lm_box_string %str_const_25
+  %r83 = call %lm_print_int %r82
+  %r85 = call %processData 9
+  %r88 = call %processData 17
+  %r91 = call %processData 25
+  %r94 = call %lm_box_string %str_const_26
+  %r93 = call %lm_rt_str_format %r94 %r85
+  %r95 = call %lm_print_int %r93
+  %r97 = call %lm_box_string %str_const_27
+  %r96 = call %lm_rt_str_format %r97 %r88
+  %r98 = call %lm_print_int %r96
+  %r100 = call %lm_box_string %str_const_28
+  %r99 = call %lm_rt_str_format %r100 %r91
+  %r101 = call %lm_print_int %r99
+  %r102 = call %lm_box_string %str_const_29
+  %r103 = call %lm_print_int %r102
+  %r105 = call %lm_box_string %str_const_30
+  %r109 = call %lm_box_string %str_const_31
+  %r108 = call %lm_rt_str_format %r109 985
+  %r110 = call %lm_print_int %r108
+  %r112 = call %lm_box_string %str_const_32
+  %r111 = call %lm_rt_str_format %r112 %r105
+  %r113 = call %lm_print_int %r111
+  %r115 = call %lm_box_string %str_const_33
+  %r114 = call %lm_rt_str_format %r115 18
+  %r116 = call %lm_print_int %r114
+  %r118 = call %lm_box_string %str_const_34
+  %r117 = call %lm_rt_str_format %r118 2
+  %r119 = call %lm_print_int %r117
+  %r120 = call %lm_box_string %str_const_35
+  %r121 = call %lm_print_int %r120
+  %r123 = call %lm_box_string %str_const_36
+  %r127 = call %lm_box_string %str_const_37
+  %r126 = call %lm_rt_str_format %r127 7993
+  %r128 = call %lm_print_int %r126
+  %r130 = call %lm_box_string %str_const_38
+  %r129 = call %lm_rt_str_format %r130 %r123
+  %r131 = call %lm_print_int %r129
+  %r133 = call %lm_box_string %str_const_39
+  %r132 = call %lm_rt_str_format %r133 10
+  %r134 = call %lm_print_int %r132
+  %r136 = call %lm_box_string %str_const_40
+  %r135 = call %lm_rt_str_format %r136 2
+  %r137 = call %lm_print_int %r135
+  %r138 = call %lm_box_string %str_const_41
+  %r139 = call %lm_print_int %r138
+  %r140 = call %lm_list_new 0
+  call %lm_list_append %r140 9
+  call %lm_list_append %r140 17
+  call %lm_list_append %r140 25
+  call %lm_list_append %r140 33
+  call %lm_list_append %r140 41
+  %r152 = call %lm_list_new 0
+  %r153 = call %lm_box_string %str_const_42
+  call %lm_list_append %r152 %r153
+  %r155 = call %lm_box_string %str_const_43
+  call %lm_list_append %r152 %r155
+  %r157 = call %lm_box_string %str_const_44
+  call %lm_list_append %r152 %r157
+  %r160 = call %lm_list_new 0
+  call %lm_list_append %r160 18
+  call %lm_list_append %r160 10
+  call %lm_list_append %r160 18
+  %r168 = call %lm_list_new 0
+  call %lm_list_append %r168 2
+  call %lm_list_append %r168 2
+  call %lm_list_append %r168 2
+  %r177 = call %lm_box_string %str_const_45
+  %r176 = call %lm_rt_str_format %r177 %r140
+  %r178 = call %lm_print_int %r176
+  %r180 = call %lm_box_string %str_const_46
+  %r179 = call %lm_rt_str_format %r180 %r152
+  %r181 = call %lm_print_int %r179
+  %r183 = call %lm_box_string %str_const_47
+  %r182 = call %lm_rt_str_format %r183 %r160
+  %r184 = call %lm_print_int %r182
+  %r186 = call %lm_box_string %str_const_48
+  %r185 = call %lm_rt_str_format %r186 %r168
+  %r187 = call %lm_print_int %r185
+  %r188 = call %lm_box_string %str_const_49
+  %r189 = call %lm_print_int %r188
+  %r191 = call %lm_box_string %str_const_50
+  %r193 = call %lm_box_string %str_const_51
+  %r195 = call %lm_box_string %str_const_52
+  %r208 = call %lm_box_string %str_const_53
+  %r210 = call %lm_box_string %str_const_54
+  %r212 = call %lm_box_string %str_const_55
+  %r215 = call %lm_box_string %str_const_56
+  %r214 = call %lm_rt_str_format %r215 0
+  %r216 = call %lm_print_int %r214
+  %r218 = call %lm_box_string %str_const_57
+  %r217 = call %lm_rt_str_format %r218 0
+  %r219 = call %lm_print_int %r217
+  %r221 = call %lm_box_string %str_const_58
+  %r220 = call %lm_rt_str_format %r221 0
+  %r222 = call %lm_print_int %r220
+  %r223 = call %lm_box_string %str_const_59
+  %r224 = call %lm_print_int %r223
+  %r225 = call %lm_list_new 0
+  %r226 = call %lm_list_new 0
+  call %lm_list_append %r226 9
+  call %lm_list_append %r226 17
+  call %lm_list_append %r225 %r226
+  %r232 = call %lm_list_new 0
+  call %lm_list_append %r232 25
+  call %lm_list_append %r232 33
+  call %lm_list_append %r225 %r232
+  %r238 = call %lm_list_new 0
+  call %lm_list_append %r238 41
+  call %lm_list_append %r238 49
+  call %lm_list_append %r225 %r238
+  %r246 = call %lm_box_string %str_const_60
+  %r247 = call %lm_list_new 0
+  call %lm_list_append %r247 2
+  call %lm_list_append %r247 2
+  call %lm_list_append %r247 2
+  %r254 = call %lm_box_string %str_const_61
+  %r255 = call %lm_list_new 0
+  call %lm_list_append %r255 2
+  call %lm_list_append %r255 2
+  call %lm_list_append %r255 2
+  %r264 = call %lm_box_string %str_const_62
+  %r263 = call %lm_rt_str_format %r264 %r225
+  %r265 = call %lm_print_int %r263
+  %r267 = call %lm_box_string %str_const_63
+  %r266 = call %lm_rt_str_format %r267 0
+  %r268 = call %lm_print_int %r266
+  %r269 = call %lm_box_string %str_const_64
+  %r270 = call %lm_print_int %r269
+  %r271 = call %lm_box_string %str_const_65
+  %r272 = call %lm_print_int %r271
+  %r273 = call %lm_box_string %str_const_66
+  %r274 = call %lm_print_int %r273
   ret 0
 }
 
 function processData(i64) {
 @entry
 @block_0
-  ceq <unnamed> 9
-  br <unnamed> %block_3 %block_5
+  %r2 = ceq %p0 9
+  br %r2 %block_3 %block_5
 @block_3
   jmp %block_3
   ret 337
 @block_5
-  ceq <unnamed> 17
-  br <unnamed> %block_8 %block_10
+  %r6 = ceq %p0 17
+  br %r6 %block_8 %block_10
 @block_8
   jmp %block_8
-  call %lm_box_string %str_const_67
-  ret <unnamed>
+  %r8 = call %lm_box_string %str_const_67
+  ret %r8
 @block_10
   ret 18
 }
@@ -225,17 +225,17 @@ function processData(i64) {
 function inferType(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_68
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = call %lm_box_string %str_const_68
+  %r1 = call %lm_rt_str_format %r2 %p0
+  ret %r1
 }
 
 function formatInput(i64) {
 @entry
 @block_0
-  call %lm_box_string %str_const_69
-  call %lm_rt_str_format <unnamed> <unnamed>
-  ret <unnamed>
+  %r2 = call %lm_box_string %str_const_69
+  %r1 = call %lm_rt_str_format %r2 %p0
+  ret %r1
 }
 
 function lm_box_string(i8*) {
@@ -243,40 +243,40 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 

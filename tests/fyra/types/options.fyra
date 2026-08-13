@@ -1,124 +1,124 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %lm_box_string %str_const_0
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_1
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_2
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_3
-  call %lm_box_string %str_const_4
-  call %lm_box_string %str_const_5
-  call %lm_rt_str_format <unnamed> 337
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_6
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_7
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_8
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_9
-  call %greetOptional <unnamed>
-  call %lm_box_string %str_const_10
-  call %lm_print_int <unnamed>
-  call %findInArray 41
-  neg 9
-  call %findInArray <unnamed>
-  call %lm_box_string %str_const_11
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_12
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_13
-  call %lm_print_int <unnamed>
-  call %chainOptional 121
-  call %chainOptional 41
-  call %lm_box_string %str_const_14
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_15
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_16
-  call %lm_print_int <unnamed>
-  call %safeDivide 81 17
-  call %safeDivide 81 1
-  call %lm_box_string %str_const_17
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_18
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_19
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_20
-  call %lm_box_string %str_const_21
-  call %lm_rt_str_format <unnamed> 337
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_22
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_23
-  call %lm_rt_str_format <unnamed> 18
-  call %lm_print_int <unnamed>
-  call %lm_box_string %str_const_24
-  call %lm_print_int <unnamed>
+  %r0 = call %lm_box_string %str_const_0
+  %r1 = call %lm_print_int %r0
+  %r2 = call %lm_box_string %str_const_1
+  %r3 = call %lm_print_int %r2
+  %r4 = call %lm_box_string %str_const_2
+  %r5 = call %lm_print_int %r4
+  %r6 = call %lm_box_string %str_const_3
+  %r8 = call %lm_box_string %str_const_4
+  %r10 = call %lm_box_string %str_const_5
+  %r9 = call %lm_rt_str_format %r10 337
+  %r11 = call %lm_print_int %r9
+  %r13 = call %lm_box_string %str_const_6
+  %r12 = call %lm_rt_str_format %r13 %r8
+  %r14 = call %lm_print_int %r12
+  %r16 = call %lm_box_string %str_const_7
+  %r15 = call %lm_rt_str_format %r16 %r6
+  %r17 = call %lm_print_int %r15
+  %r18 = call %lm_box_string %str_const_8
+  %r19 = call %lm_print_int %r18
+  %r20 = call %lm_box_string %str_const_9
+  %r21 = call %greetOptional %r20
+  %r22 = call %lm_box_string %str_const_10
+  %r23 = call %lm_print_int %r22
+  %r25 = call %findInArray 41
+  %r28 = neg 9
+  %r29 = call %findInArray %r28
+  %r32 = call %lm_box_string %str_const_11
+  %r31 = call %lm_rt_str_format %r32 %r25
+  %r33 = call %lm_print_int %r31
+  %r35 = call %lm_box_string %str_const_12
+  %r34 = call %lm_rt_str_format %r35 %r29
+  %r36 = call %lm_print_int %r34
+  %r37 = call %lm_box_string %str_const_13
+  %r38 = call %lm_print_int %r37
+  %r40 = call %chainOptional 121
+  %r43 = call %chainOptional 41
+  %r46 = call %lm_box_string %str_const_14
+  %r45 = call %lm_rt_str_format %r46 %r40
+  %r47 = call %lm_print_int %r45
+  %r49 = call %lm_box_string %str_const_15
+  %r48 = call %lm_rt_str_format %r49 %r43
+  %r50 = call %lm_print_int %r48
+  %r51 = call %lm_box_string %str_const_16
+  %r52 = call %lm_print_int %r51
+  %r55 = call %safeDivide 81 17
+  %r59 = call %safeDivide 81 1
+  %r62 = call %lm_box_string %str_const_17
+  %r61 = call %lm_rt_str_format %r62 %r55
+  %r63 = call %lm_print_int %r61
+  %r65 = call %lm_box_string %str_const_18
+  %r64 = call %lm_rt_str_format %r65 %r59
+  %r66 = call %lm_print_int %r64
+  %r67 = call %lm_box_string %str_const_19
+  %r68 = call %lm_print_int %r67
+  %r70 = call %lm_box_string %str_const_20
+  %r73 = call %lm_box_string %str_const_21
+  %r72 = call %lm_rt_str_format %r73 337
+  %r74 = call %lm_print_int %r72
+  %r76 = call %lm_box_string %str_const_22
+  %r75 = call %lm_rt_str_format %r76 %r70
+  %r77 = call %lm_print_int %r75
+  %r79 = call %lm_box_string %str_const_23
+  %r78 = call %lm_rt_str_format %r79 18
+  %r80 = call %lm_print_int %r78
+  %r81 = call %lm_box_string %str_const_24
+  %r82 = call %lm_print_int %r81
   ret 0
 }
 
 function safeDivide(i64, i64) {
 @entry
 @block_0
-  cne <unnamed> 1
-  br <unnamed> %block_3 %block_5
+  %r3 = cne %p1 1
+  br %r3 %block_3 %block_5
 @block_3
   jmp %block_3
-  div <unnamed> <unnamed>
-  ret <unnamed>
+  %r5 = div %p0 %p1
+  ret %r5
 @block_5
-  call %lm_box_string %str_const_25
-  ret <unnamed>
+  %r6 = call %lm_box_string %str_const_25
+  ret %r6
 }
 
 function chainOptional(i64) {
 @entry
 @block_0
-  call %processOptional <unnamed>
-  ret <unnamed>
+  %r1 = call %processOptional %p0
+  ret %r1
 }
 
 function processOptional(i64) {
 @entry
 @block_0
-  csgt <unnamed> 81
-  br <unnamed> %block_3 %block_6
+  %r2 = csgt %p0 81
+  br %r2 %block_3 %block_6
 @block_3
   jmp %block_3
-  mul <unnamed> 17
-  ret <unnamed>
+  %r5 = mul %p0 17
+  ret %r5
 @block_6
-  call %lm_box_string %str_const_26
-  ret <unnamed>
+  %r6 = call %lm_box_string %str_const_26
+  ret %r6
 }
 
 function greetOptional(i64) {
 @entry
 @block_0
-  cne <unnamed> 1
-  br <unnamed> %block_3 %block_7
+  %r1 = cne %p0 1
+  br %r1 %block_3 %block_7
 @block_3
   jmp %block_3
-  call %lm_box_string %str_const_27
-  call %lm_rt_str_format <unnamed> <unnamed>
-  call %lm_print_int <unnamed>
+  %r4 = call %lm_box_string %str_const_27
+  %r3 = call %lm_rt_str_format %r4 %p0
+  %r5 = call %lm_print_int %r3
   jmp %block_10
 @block_7
-  call %lm_box_string %str_const_28
-  call %lm_print_int <unnamed>
+  %r6 = call %lm_box_string %str_const_28
+  %r7 = call %lm_print_int %r6
   jmp %block_10
 @block_10
   ret 0
@@ -127,14 +127,14 @@ function greetOptional(i64) {
 function findInArray(i64) {
 @entry
 @block_0
-  csgt <unnamed> 1
-  br <unnamed> %block_3 %block_4
+  %r2 = csgt %p0 1
+  br %r2 %block_3 %block_4
 @block_3
   jmp %block_3
   ret 0
 @block_4
-  call %lm_box_string %str_const_29
-  ret <unnamed>
+  %r4 = call %lm_box_string %str_const_29
+  ret %r4
 }
 
 function lm_box_string(i8*) {
@@ -142,40 +142,40 @@ function lm_box_string(i8*) {
 
 function lm_print_int(i64) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 

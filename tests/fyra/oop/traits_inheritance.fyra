@@ -1,37 +1,37 @@
 function __top_level_wrapper__() {
 @entry
 @block_0
-  call %main
-  call %main
+  %r0 = call %main
+  %r1 = call %main
   ret 0
 }
 
 function main() {
 @entry
 @block_0
-  alloc 16
-  add <unnamed> 0
-  store <unnamed> <unnamed>
-  call %MyFrame.name <unnamed>
-  call %lm_print_int <unnamed>
-  call %MyFrame.version <unnamed>
-  call %lm_print_int <unnamed>
-  call %Base.greet <unnamed>
-  call %lm_print_int <unnamed>
-  call %MyFrame.name <unnamed>
-  call %lm_box_string %str_const_0
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_1
-  call %lm_assert <unnamed> <unnamed>
-  call %MyFrame.version <unnamed>
-  ceq <unnamed> 9
-  call %lm_box_string %str_const_2
-  call %lm_assert <unnamed> <unnamed>
-  call %Base.greet <unnamed>
-  call %lm_box_string %str_const_3
-  ceq <unnamed> <unnamed>
-  call %lm_box_string %str_const_4
-  call %lm_assert <unnamed> <unnamed>
+  %r0 = alloc 16
+  %addr_0 = add %r0 0
+  store %r0 %addr_0
+  %r3 = call %MyFrame.name %r0
+  %r4 = call %lm_print_int %r3
+  %r5 = call %MyFrame.version %r0
+  %r6 = call %lm_print_int %r5
+  %r7 = call %Base.greet %r0
+  %r8 = call %lm_print_int %r7
+  %r9 = call %MyFrame.name %r0
+  %r10 = call %lm_box_string %str_const_1
+  %r11 = ceq %r9 %r10
+  %r12 = call %lm_box_string %str_const_2
+  %r13 = call %lm_assert %r11 %r12
+  %r14 = call %MyFrame.version %r0
+  %r16 = ceq %r14 9
+  %r17 = call %lm_box_string %str_const_3
+  %r18 = call %lm_assert %r16 %r17
+  %r19 = call %Base.greet %r0
+  %r20 = call %lm_box_string %str_const_4
+  %r21 = ceq %r19 %r20
+  %r22 = call %lm_box_string %str_const_5
+  %r23 = call %lm_assert %r21 %r22
   ret 0
 }
 
@@ -52,40 +52,40 @@ function MyFrame.version(i64) {
 
 function lm_print_int(void) {
 @entry
-  alloc 32
-  add <unnamed> 31
-  storeb 10 <unnamed>
-  alloc 8
-  alloc 8
-  store <unnamed> <unnamed>
-  cslt <unnamed> 0
-  br <unnamed> %neg %abs
+  %buf = alloc 32
+  %ptr = add %buf 31
+  storeb 10 %ptr
+  %val_slot = alloc 8
+  %ptr_slot = alloc 8
+  store %ptr %ptr_slot
+  %is_neg = cslt %val 0
+  br %is_neg %neg %abs
 @neg
-  extern io.write(i64 1, i8* %str_minus, i64 1)
-  neg <unnamed>
-  store <unnamed> <unnamed>
+  %write_neg = extern io.write(i64 1, i8* %str_minus, i64 1)
+  %abs_v = neg %val
+  store %abs_v %val_slot
   jmp %loop
 @abs
-  store <unnamed> <unnamed>
+  store %val %val_slot
   jmp %loop
 @loop
-  load <unnamed>
-  div <unnamed> 10
-  rem <unnamed> 10
-  add <unnamed> 48
-  load <unnamed>
-  sub <unnamed> 1
-  cast <unnamed>
-  storeb <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  store <unnamed> <unnamed>
-  cuge <unnamed> 1
-  br <unnamed> %loop %done
+  %curr_val = load %val_slot
+  %next_val = div %curr_val 10
+  %rem = rem %curr_val 10
+  %ascii = add %rem 48
+  %curr_ptr = load %ptr_slot
+  %next_ptr = sub %curr_ptr 1
+  %cast_ascii = cast %ascii
+  storeb %cast_ascii %next_ptr
+  store %next_val %val_slot
+  store %next_ptr %ptr_slot
+  %cond = cuge %next_val 1
+  br %cond %loop %done
 @done
-  load <unnamed>
-  add <unnamed> 32
-  sub <unnamed> <unnamed>
-  extern io.write(i64 1, i32 <unnamed>, i64 <unnamed>)
+  %final_ptr = load %ptr_slot
+  %end_ptr = add %buf 32
+  %len = sub %end_ptr %final_ptr
+  %write_done = extern io.write(i64 1, i32 %final_ptr, i64 %len)
   ret null
 }
 
@@ -94,10 +94,10 @@ function lm_box_string(i8*) {
 
 function lm_assert(i32, i64) {
 @entry
-  br <unnamed> %pass %fail
+  br %a_cond %pass %fail
 @fail
-  extern io.write(i64 1, i8* %assert_fail, i64 17)
-  extern process.exit(i64 1)
+  %fail_write = extern io.write(i64 1, i8* %assert_fail, i64 17)
+  %fail_exit = extern process.exit(i64 1)
   ret null
 @pass
   ret null
