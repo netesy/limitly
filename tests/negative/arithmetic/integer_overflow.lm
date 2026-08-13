@@ -1,6 +1,6 @@
 // @error:overflow
 // Integer overflow in arithmetic
 
-var x: i8 = 127;  // Max i8 value
-var y = x + 1;     // Overflow: 128 > 127
+const x: i8 = 127;  // Max i8 value
+const y = x + 1;     // Overflow: 128 > 127
 print(y);

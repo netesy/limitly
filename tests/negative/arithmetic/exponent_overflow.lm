@@ -1,6 +1,6 @@
 // @error:overflow
 // Exponentiation overflow
 
-var x: i8 = 2;
-var result = x ** 10;  // 1024 > 127, overflow
+const x: i8 = 2;
+const result = x ** 10;  // 1024 > 127, overflow
 print(result);

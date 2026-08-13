@@ -1,10 +1,11 @@
 // @error:memory_leak
-// Resource not cleaned up - potential memory leak
+// Linear type may leak on break
 
-fn create_resource() {
-    var resource = [1, 2, 3, 4, 5];
-    // Function ends without returning or using resource
-    // Resource is dropped without being used
+fn test_loop() {
+    var data = [1, 2, 3];
+    while (true) {
+        break;  // ERROR: data may leak on break
+    }
 }
 
-create_resource();
+test_loop();

@@ -65,6 +65,14 @@ static void collect_matched_variants(std::shared_ptr<LM::Frontend::AST::Expressi
     if (!pattern) return;
     if (auto member = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(pattern)) {
         matched.insert(member->name);
+    } else if (auto binding = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(pattern)) {
+        std::string typeName = binding->typeName;
+        size_t last_dot = typeName.find_last_of('.');
+        if (last_dot != std::string::npos) {
+            matched.insert(typeName.substr(last_dot + 1));
+        } else {
+            matched.insert(typeName);
+        }
     } else if (auto or_pat = std::dynamic_pointer_cast<LM::Frontend::AST::OrPatternExpr>(pattern)) {
         for (const auto& p : or_pat->patterns) {
             collect_matched_variants(p, matched);

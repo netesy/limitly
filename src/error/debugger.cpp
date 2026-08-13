@@ -455,6 +455,22 @@ std::string Debugger::getSuggestion(const std::string &errorMessage,
         return ""; // Return empty to avoid duplication
     }
     
+    // Custom hints and corrections for enhanced error handling
+    if (errorMessage.find("cannot find variable") != std::string::npos) {
+        return "Check the spelling of the variable name, or make sure it has been declared in this scope.";
+    } else if (errorMessage.find("cannot find function") != std::string::npos) {
+        return "Check the spelling of the function name, or make sure it has been declared or imported before use.";
+    } else if (errorMessage.find("cannot find type") != std::string::npos) {
+        return "Check that the type is declared, imported, or spelled correctly.";
+    } else if (errorMessage.find("cannot find module") != std::string::npos) {
+        return "Check that the module is installed, exists in your import path, or spelled correctly.";
+    } else if (errorMessage.find("pattern_exhaustive: Match statement is not exhaustive") != std::string::npos ||
+               errorMessage.find("Match statement is not exhaustive") != std::string::npos) {
+        return "Match statements must be exhaustive. Add the missing patterns or a wildcard catch-all (`_ => { ... }`) case.";
+    } else if (errorMessage.find("Mixed decimal and non-decimal") != std::string::npos) {
+        return "Disallow mixing decimal scales or decimal and non-decimal types. Cast the values explicitly using `as`.";
+    }
+
     // Provide suggestions based on the error message and expected value
     
     // === PARSER ERRORS ===
