@@ -24,16 +24,16 @@ global %str_const_22 = "worker_2"
 global %str_const_23 = "Seeded result: %s"
 global %str_const_24 = "Second seeded worker should process 2 items"
 global %str_const_25 = "Handled: %s"
-global %str_const_26 = "Handled: %s"
-global %str_const_27 = "Concurrent task %s running"
-global %str_const_28 = "Task %s completed"
-global %str_const_29 = "Concurrent task %s running"
-global %str_const_30 = "Task %s completed"
+global %str_const_26 = "Concurrent task %s running"
+global %str_const_27 = "Task %s completed"
+global %str_const_28 = "Concurrent task %s running"
+global %str_const_29 = "Task %s completed"
+global %str_const_30 = "Processed: %s"
 global %str_const_31 = "Handled: %s"
-global %str_const_32 = "Processed: %s"
-global %str_const_33 = "Concurrent task %s running"
-global %str_const_34 = "Task %s completed"
-global %str_const_35 = "Processed: %s"
+global %str_const_32 = "Concurrent task %s running"
+global %str_const_33 = "Task %s completed"
+global %str_const_34 = "Processed: %s"
+global %str_const_35 = "Handled: %s"
 global %str_const_36 = "Handled: %s"
 global %str_const_37 = "Concurrent task %s running"
 global %str_const_38 = "Task %s completed"
@@ -134,18 +134,10 @@ function __top_level_wrapper__() {
   ret 0
 }
 
-function worker_2() {
-@entry
-@block_0
-  %r141 = call %lm_box_string %str_const_25 : i64
-  %r140 = call %lm_rt_str_format %r141 0 : i64
-  ret 0
-}
-
 function worker_1() {
 @entry
 @block_0
-  %r106 = call %lm_box_string %str_const_26 : i64
+  %r106 = call %lm_box_string %str_const_25 : i64
   %r105 = call %lm_rt_str_format %r106 0 : i64
   ret 0
 }
@@ -153,10 +145,10 @@ function worker_1() {
 function task_2() {
 @entry
 @block_0
-  %r30 = call %lm_box_string %str_const_27 : i64
+  %r30 = call %lm_box_string %str_const_26 : i64
   %r29 = call %lm_rt_str_format %r30 0 : i64
   call %lm_print_int %r29
-  %r33 = call %lm_box_string %str_const_28 : i64
+  %r33 = call %lm_box_string %str_const_27 : i64
   %r32 = call %lm_rt_str_format %r33 0 : i64
   ret 0
 }
@@ -164,37 +156,37 @@ function task_2() {
 function task_1() {
 @entry
 @block_0
-  %r18 = call %lm_box_string %str_const_29 : i64
+  %r18 = call %lm_box_string %str_const_28 : i64
   %r17 = call %lm_rt_str_format %r18 0 : i64
   call %lm_print_int %r17
-  %r21 = call %lm_box_string %str_const_30 : i64
+  %r21 = call %lm_box_string %str_const_29 : i64
   %r20 = call %lm_rt_str_format %r21 0 : i64
   ret 0
 }
 
-function _worker_94233639323712(i64, i64, i64, i64) {
+function _worker_94732052391216(i64, i64, i64, i64) {
 @entry
 @block_0
-  %r5 = call %lm_box_string %str_const_31 : i64
+  %r5 = call %lm_box_string %str_const_30 : i64
   %r4 = call %lm_rt_str_format %r5 %1 : i64
   ret 0
 }
 
-function _worker_94233639310640(i64, i64, i64, i64) {
+function worker_2() {
+@entry
+@block_0
+  %r141 = call %lm_box_string %str_const_31 : i64
+  %r140 = call %lm_rt_str_format %r141 0 : i64
+  ret 0
+}
+
+function _task_94732052433120(i64, i64, i64, i64) {
 @entry
 @block_0
   %r5 = call %lm_box_string %str_const_32 : i64
   %r4 = call %lm_rt_str_format %r5 %1 : i64
-  ret 0
-}
-
-function _task_94233639352544(i64, i64, i64, i64) {
-@entry
-@block_0
-  %r5 = call %lm_box_string %str_const_33 : i64
-  %r4 = call %lm_rt_str_format %r5 %1 : i64
   call %lm_print_int %r4
-  %r8 = call %lm_box_string %str_const_34 : i64
+  %r8 = call %lm_box_string %str_const_33 : i64
   %r7 = call %lm_rt_str_format %r8 %1 : i64
   ret 0
 }
@@ -202,12 +194,20 @@ function _task_94233639352544(i64, i64, i64, i64) {
 function worker_0() {
 @entry
 @block_0
-  %r71 = call %lm_box_string %str_const_35 : i64
+  %r71 = call %lm_box_string %str_const_34 : i64
   %r70 = call %lm_rt_str_format %r71 0 : i64
   ret 0
 }
 
-function _worker_94233639336288(i64, i64, i64, i64) {
+function _worker_94732052416864(i64, i64, i64, i64) {
+@entry
+@block_0
+  %r5 = call %lm_box_string %str_const_35 : i64
+  %r4 = call %lm_rt_str_format %r5 %1 : i64
+  ret 0
+}
+
+function _worker_94732052404288(i64, i64, i64, i64) {
 @entry
 @block_0
   %r5 = call %lm_box_string %str_const_36 : i64

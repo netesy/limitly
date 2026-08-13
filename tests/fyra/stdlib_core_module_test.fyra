@@ -117,11 +117,6 @@ function std.core.error.Error.to_string(i64) {
   ret 0
 }
 
-function std.core.cloneable.__init__() {
-@entry
-  ret 0
-}
-
 function std.core.comparable.__init__() {
 @entry
   ret 0
@@ -130,6 +125,13 @@ function std.core.comparable.__init__() {
 function std.core.index.__init__() {
 @entry
   ret 0
+}
+
+function std.core.index.Err(i64) {
+@entry
+@block_0
+  call %std.core.result.Err %0
+  ret %r1
 }
 
 function is_positive_int(i64) {
@@ -262,13 +264,6 @@ function DummyComparable.init(i64, i64) {
 function std.core.result.Result.unwrap(i64) {
 @entry
   ret 0
-}
-
-function std.core.index.Err(i64) {
-@entry
-@block_0
-  call %std.core.result.Err %0
-  ret %r1
 }
 
 function DummyDisposable.init(i64) {
@@ -598,6 +593,11 @@ function std.core.option.None() {
   %r2 = alloc 16 : i64
   call %std.core.option.Option.init %r2 10 2
   ret %r2
+}
+
+function std.core.cloneable.__init__() {
+@entry
+  ret 0
 }
 
 function test_traits() {

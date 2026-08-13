@@ -109,71 +109,6 @@ function std.collections.linkedlist.Node.init(i64, i64) {
   ret 0
 }
 
-function std.collections.deque.DoubleEndedQueue.init(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.deque.DoubleEndedQueue.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.linkedlist.Iterator.init(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.deque.DoubleEndedQueue.peek_front(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.deque.DoubleEndedQueue.peek_back(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.deque.DoubleEndedQueue.pop_back(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.deque.DoubleEndedQueue.push_front(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.deque.DoubleEndedQueue.push_back(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.clear(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.len(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.set(i64, i64, i64) {
-@entry
-  ret 0
-}
-
 function std.collections.linked_list.__init__() {
 @entry
   ret 0
@@ -343,6 +278,71 @@ function std.collections.set.Set.add(i64, i64) {
   ret 0
 }
 
+function std.collections.deque.DoubleEndedQueue.init(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.deque.DoubleEndedQueue.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.Iterator.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.deque.DoubleEndedQueue.peek_front(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.deque.DoubleEndedQueue.peek_back(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.deque.DoubleEndedQueue.pop_back(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.deque.DoubleEndedQueue.push_front(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.deque.DoubleEndedQueue.push_back(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.clear(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.len(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.set(i64, i64, i64) {
+@entry
+  ret 0
+}
+
 function std.collections.map.__init__() {
 @entry
   ret 0
@@ -433,219 +433,7 @@ function std.iterator.MapIterator.next(i64) {
   ret 0
 }
 
-function std.collections.bloom_filter.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.linkedlist.LinkedList.is_empty(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.bloom_filter.BloomFilter.add(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.queue.BitSet._set_word(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.bloom_filter.BloomFilter.hash(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.chunk(i64, i64) {
-@entry
-@block_0
-  %r2 = alloc 16 : i64
-  call %std.iterator.ChunkIterator.init %r2 %0 %1
-  ret %r2
-}
-
-function std.iterator.filter(i64, i64) {
-@entry
-@block_0
-  %r2 = alloc 16 : i64
-  call %std.iterator.FilterIterator.init %r2 %0 %1
-  ret %r2
-}
-
-function std.collections.tree.BTree.len(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.queue.BitSet.set(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.BTree.get(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.BTree.put(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.TakeIterator.next(i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.PeekableIterator.next(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeSet.len(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeMap._insert(i64, i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.index.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.index.BTreeMap() {
-@entry
-@block_0
-  %r0 = alloc 16 : i64
-  call %std.collections.btreemap.BTreeMapWrapper.init %r0
-  ret 0
-}
-
-function std.iterator.ZipIterator.next(i64) {
-@entry
-  ret 0
-}
-
-function std.core.ok_bool(i64) {
-@entry
-@block_0
-  %r1 = alloc 16 : i64
-  %r2 = call %lm_box_string %str_const_0 : i64
-  %1 = add %r1 0 : i64
-  store %0 %1
-  %r3 = call %lm_box_string %str_const_1 : i64
-  %3 = add %r1 0 : i64
-  store %r1 %3
-  %r5 = cne %0 1 : i32
-  br %r5 %block_9 %block_16
-@block_9
-  jmp %block_9
-  %r7 = alloc 16 : i64
-  %7 = add %r7 0 : i64
-  store %0 %7
-  %9 = add %r7 0 : i64
-  store %r1 %9
-  %11 = add %r7 0 : i64
-  store %r2 %11
-  ret %r7
-@block_16
-  %r10 = alloc 16 : i64
-  %14 = add %r10 0 : i64
-  store %0 %14
-  %16 = add %r10 0 : i64
-  store %r1 %16
-  %18 = add %r10 0 : i64
-  store %r2 %18
-  ret %r10
-}
-
-function std.collections.tree.BTree.init(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashset.HashSetWrapper.remove(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeMap._update_height(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.linkedlist.LinkedList.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeMap._get_height(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeMap.len(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeMap.init(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.set.Set.sum(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.queue.PriorityQueue.remove(i64) {
-@entry
-  ret 0
-}
-
-function std.core.ResultInt.unwrap(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.bitset.BitSetWrapper.count(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.RingBuffer.size(i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.StepByIterator.next(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Vector.resize(i64, i64, i64) {
-@entry
-  ret 0
-}
-
 function std.collections.vector.RingBuffer.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Vector.size(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Deque.len(i64) {
 @entry
   ret 0
 }
@@ -670,28 +458,187 @@ function std.collections.vector.RingBuffer.push(i64, i64) {
   ret 0
 }
 
+function std.iterator.ChainIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.ArrayList.iterator(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.set.Set.find_index(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.bitset.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.vector.ArrayList.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.ArrayList.len(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.ArrayList.resize(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.btreeset.BTreeSetWrapper.init(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.Deque.init(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.Deque.iterator(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.set.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeMap.get(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.EnumerateIterator.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.btreeset.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.TakeIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.Deque.peek_back(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.Iterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.queue.Stack.init(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashmap.HashMap.contains_key(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.stack.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.set.Set.to_array(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.VectorIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.queue.BitSet._word_value(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.VectorIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashset.HashSetWrapper.contains(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.list.List.push(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.Vector.init(i64, i64) {
+@entry
+  ret 0
+}
+
 function std.collections.vector.Vector.iterator(i64) {
 @entry
   ret 0
 }
 
-function std.iterator.collect(i64) {
+function std.iterator.StepByIterator.next(i64) {
 @entry
-@block_0
-  call %lm_list_new 0
-  jmp %block_5
-@block_5
-  %r6 = cne 0 2 : i32
-  br %r6 %block_8 %block_12
-@block_8
-  jmp %block_8
-  call %lm_list_append %r1 0
-  jmp %block_5
-@block_12
-  ret %r1
+  ret 0
 }
 
-function std.collections.vector.Vector.remove(i64, i64) {
+function std.collections.vector.Vector.resize(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.RingBuffer.size(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.Vector.reserve(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.set.Set.symmetric_difference(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.RingBuffer.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeMap.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.ArrayList.pop(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeMap._insert(i64, i64, i64, i64) {
 @entry
   ret 0
 }
@@ -701,7 +648,7 @@ function std.iterator.ChainIterator.init(i64, i64, i64) {
   ret 0
 }
 
-function std.collections.vector.ArrayList.length(i64) {
+function std.collections.vector.Vector.remove(i64, i64) {
 @entry
   ret 0
 }
@@ -717,27 +664,6 @@ function std.collections.set.Set.is_superset(i64, i64) {
 }
 
 function std.collections.hashmap.HashMap.filter(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.ChunkIterator.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.core.some_int(i64) {
-@entry
-@block_0
-  ret 0
-}
-
-function std.collections.list.List.push(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Vector.init(i64, i64) {
 @entry
   ret 0
 }
@@ -801,6 +727,213 @@ function std.collections.queue.BitSet.unset(i64, i64) {
   ret 0
 }
 
+function std.collections.tree.TreeMap._update_height(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.BTree.init(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashset.HashSetWrapper.remove(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.linkedlist.LinkedList.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeMap._get_height(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.ArrayList.init(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.Deque.push_back(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.Vector.insert(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.queue.PriorityQueue.len(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.index.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.index.BTreeMap() {
+@entry
+@block_0
+  %r0 = alloc 16 : i64
+  call %std.collections.btreemap.BTreeMapWrapper.init %r0
+  ret 0
+}
+
+function std.iterator.ZipIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.ZipIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeMap._rotate_left(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.core.ok_bool(i64) {
+@entry
+@block_0
+  %r1 = alloc 16 : i64
+  %r2 = call %lm_box_string %str_const_0 : i64
+  %1 = add %r1 0 : i64
+  store %0 %1
+  %r3 = call %lm_box_string %str_const_1 : i64
+  %3 = add %r1 0 : i64
+  store %r1 %3
+  %r5 = cne %0 1 : i32
+  br %r5 %block_9 %block_16
+@block_9
+  jmp %block_9
+  %r7 = alloc 16 : i64
+  %7 = add %r7 0 : i64
+  store %0 %7
+  %9 = add %r7 0 : i64
+  store %r1 %9
+  %11 = add %r7 0 : i64
+  store %r2 %11
+  ret %r7
+@block_16
+  %r10 = alloc 16 : i64
+  %14 = add %r10 0 : i64
+  store %0 %14
+  %16 = add %r10 0 : i64
+  store %r1 %16
+  %18 = add %r10 0 : i64
+  store %r2 %18
+  ret %r10
+}
+
+function std.collections.tree.TreeMap.len(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.ArrayList.size(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.Deque.size(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.hashset.HashSetWrapper.add(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.stack.Stack.length(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.AVLNode.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.set.Set.sum(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeMap.init(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.queue.PriorityQueue.remove(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.chunk(i64, i64) {
+@entry
+@block_0
+  %r2 = alloc 16 : i64
+  call %std.iterator.ChunkIterator.init %r2 %0 %1
+  ret %r2
+}
+
+function std.collections.vector.Deque.len(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.vector.Vector.size(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.filter(i64, i64) {
+@entry
+@block_0
+  %r2 = alloc 16 : i64
+  call %std.iterator.FilterIterator.init %r2 %0 %1
+  ret %r2
+}
+
+function std.collections.tree.BTree.len(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.queue.BitSet.set(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.EnumerateIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.priority_queue.PriorityQueueWrapper.push(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.ListIterator.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.ChunkIterator.next(i64) {
+@entry
+  ret 0
+}
+
 function std.collections.vector.Vector.push(i64, i64) {
 @entry
   ret 0
@@ -811,47 +944,66 @@ function std.iterator.MapIterator.init(i64, i64, i64) {
   ret 0
 }
 
-function std.collections.linkedlist.Iterator.next(i64) {
+function std.collections.queue.Queue.len(i64) {
 @entry
   ret 0
 }
 
-function std.collections.queue.Stack.init(i64) {
+function std.core.ResultStr.is_ok(i64) {
 @entry
   ret 0
 }
 
-function std.collections.hashmap.HashMap.contains_key(i64, i64) {
+function std.iterator.collect(i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  jmp %block_5
+@block_5
+  %r6 = cne 0 2 : i32
+  br %r6 %block_8 %block_12
+@block_8
+  jmp %block_8
+  call %lm_list_append %r1 0
+  jmp %block_5
+@block_12
+  ret %r1
+}
+
+function std.collections.bloom_filter.__init__() {
 @entry
   ret 0
 }
 
-function std.collections.stack.__init__() {
+function std.collections.vector.Deque.pop_front(i64) {
 @entry
   ret 0
 }
 
-function std.iterator.ChunkIterator.next(i64) {
+function std.collections.btreeset.BTreeSetWrapper.add(i64, i64) {
 @entry
   ret 0
 }
 
-function std.collections.vector.ArrayList.pop(i64) {
+function std.collections.index.BTreeSet() {
+@entry
+@block_0
+  %r0 = alloc 16 : i64
+  call %std.collections.btreeset.BTreeSetWrapper.init %r0
+  ret 0
+}
+
+function std.collections.vector.Vector.pop(i64) {
 @entry
   ret 0
 }
 
-function std.collections.vector.Vector._grow_for(i64, i64) {
+function std.collections.vector.Vector.length(i64) {
 @entry
   ret 0
 }
 
-function std.collections.vector.Vector.is_empty(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.ArrayList.len(i64) {
+function std.collections.queue.BitSet.count(i64) {
 @entry
   ret 0
 }
@@ -867,16 +1019,6 @@ function std.iterator.TakeIterator.init(i64, i64, i64) {
 }
 
 function std.collections.vector.Deque.push_front(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.BTree.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.priority_queue.PriorityQueueWrapper.init(i64, i64) {
 @entry
   ret 0
 }
@@ -922,80 +1064,68 @@ function std.collections.vector.Vector.append(i64, i64) {
   ret 0
 }
 
-function std.collections.vector.ArrayList.size(i64) {
+function std.iterator.PeekableIterator.next(i64) {
 @entry
   ret 0
 }
 
-function std.core.ResultStr.is_ok(i64) {
+function std.collections.bitset.BitSetWrapper.count(i64) {
 @entry
   ret 0
 }
 
-function std.collections.queue.Queue.len(i64) {
+function std.core.ResultInt.unwrap(i64) {
 @entry
   ret 0
 }
 
-function std.collections.vector.Vector.length(i64) {
+function std.collections.tree.TreeSet.len(i64) {
 @entry
   ret 0
 }
 
-function std.collections.queue.BitSet.count(i64) {
+function std.collections.tree.BTree.put(i64, i64, i64) {
 @entry
   ret 0
 }
 
-function std.iterator.EnumerateIterator.next(i64) {
+function std.collections.tree.BTree.get(i64, i64) {
 @entry
   ret 0
 }
 
-function std.collections.priority_queue.PriorityQueueWrapper.push(i64, i64) {
+function std.collections.vector.Vector.is_empty(i64) {
 @entry
   ret 0
 }
 
-function std.iterator.ListIterator.init(i64, i64) {
+function std.collections.vector.Vector._grow_for(i64, i64) {
 @entry
   ret 0
 }
 
-function std.collections.set.Set.symmetric_difference(i64, i64) {
+function std.collections.priority_queue.PriorityQueueWrapper.init(i64, i64) {
 @entry
   ret 0
 }
 
-function std.collections.vector.RingBuffer.init(i64, i64) {
+function std.collections.tree.BTree.length(i64) {
 @entry
   ret 0
 }
 
-function std.collections.vector.Deque.pop_front(i64) {
+function std.iterator.ChunkIterator.init(i64, i64, i64) {
 @entry
   ret 0
 }
 
-function std.collections.btreeset.BTreeSetWrapper.add(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.index.BTreeSet() {
+function std.core.some_int(i64) {
 @entry
 @block_0
-  %r0 = alloc 16 : i64
-  call %std.collections.btreeset.BTreeSetWrapper.init %r0
   ret 0
 }
 
-function std.collections.vector.Vector.pop(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Deque.peek_back(i64) {
+function std.collections.bloom_filter.BloomFilter.hash(i64, i64, i64) {
 @entry
   ret 0
 }
@@ -1020,12 +1150,17 @@ function std.collections.vector.RingBuffer.pop(i64) {
   ret 0
 }
 
-function std.collections.vector.Vector.set(i64, i64, i64) {
+function std.collections.linkedlist.LinkedList.is_empty(i64) {
 @entry
   ret 0
 }
 
-function std.collections.vector.Vector.reserve(i64, i64) {
+function std.collections.bloom_filter.BloomFilter.add(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.queue.BitSet._set_word(i64, i64, i64) {
 @entry
   ret 0
 }
@@ -1035,92 +1170,42 @@ function std.collections.vector.__init__() {
   ret 0
 }
 
-function std.collections.vector.Vector.len(i64) {
+function std.collections.list.List.pop(i64) {
 @entry
   ret 0
 }
 
-function std.collections.btreeset.__init__() {
+function std.collections.tree.__init__() {
 @entry
   ret 0
 }
 
-function std.iterator.ChainIterator.next(i64) {
+function std.collections.vector.ArrayList.remove(i64, i64) {
 @entry
   ret 0
 }
 
-function std.collections.vector.ArrayList.iterator(i64) {
+function std.collections.map.HashMapWrapper.get(i64, i64) {
 @entry
   ret 0
 }
 
-function std.collections.set.Set.find_index(i64, i64) {
+function std.collections.vector.Vector.set(i64, i64, i64) {
 @entry
   ret 0
 }
 
-function std.collections.bitset.__init__() {
+function std.collections.vector.Vector.get(i64, i64) {
 @entry
   ret 0
 }
 
-function std.collections.vector.VectorIterator.next(i64) {
+function std.collections.tree.TreeMap._rotate_right(i64, i64) {
 @entry
   ret 0
 }
 
-function std.collections.hashset.HashSetWrapper.contains(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.set.Set.to_array(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.VectorIterator.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.queue.BitSet._word_value(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.ArrayList.init(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Deque.push_back(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.set.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeMap.get(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.EnumerateIterator.init(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.queue.PriorityQueue.len(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Vector.insert(i64, i64, i64) {
+function std.collections.vector.Deque.length(i64) {
 @entry
   ret 0
 }
@@ -1160,92 +1245,7 @@ function std.collections.queue.BitSetIterator.next(i64) {
   ret 0
 }
 
-function std.collections.tree.TreeMap._rotate_right(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Vector.get(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Deque.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeMap._rotate_left(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.ZipIterator.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Deque.iterator(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Deque.init(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.list.List.pop(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.__init__() {
-@entry
-  ret 0
-}
-
-function std.collections.vector.ArrayList.remove(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.map.HashMapWrapper.get(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.ArrayList.resize(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.btreeset.BTreeSetWrapper.init(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeMap.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.stack.Stack.length(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.AVLNode.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.vector.Deque.size(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.hashset.HashSetWrapper.add(i64, i64) {
+function std.collections.vector.Vector.len(i64) {
 @entry
   ret 0
 }
@@ -1860,31 +1860,6 @@ function std.collections.priority_queue.__init__() {
   ret 0
 }
 
-function std.collections.priority_queue.PriorityQueueWrapper.pop(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.tree.TreeSet.contains(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.priority_queue.PriorityQueueWrapper.peek(i64) {
-@entry
-  ret 0
-}
-
-function std.collections.stack.Stack.push(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.collections.stack.Stack.clear(i64) {
-@entry
-  ret 0
-}
-
 function std.collections.btreemap.BTreeMapWrapper.put(i64, i64, i64) {
 @entry
   ret 0
@@ -1931,6 +1906,31 @@ function std.collections.hashset.HashSetWrapper.init(i64) {
 }
 
 function std.collections.hashset.__init__() {
+@entry
+  ret 0
+}
+
+function std.collections.stack.Stack.push(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.stack.Stack.clear(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.priority_queue.PriorityQueueWrapper.pop(i64) {
+@entry
+  ret 0
+}
+
+function std.collections.tree.TreeSet.contains(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.collections.priority_queue.PriorityQueueWrapper.peek(i64) {
 @entry
   ret 0
 }

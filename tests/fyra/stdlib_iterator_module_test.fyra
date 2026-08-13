@@ -490,6 +490,60 @@ function std.iterator.chain.__init__() {
   ret 0
 }
 
+function std.iterator.chain.chain(i64, i64) {
+@entry
+@block_0
+  %r2 = alloc 16 : i64
+  call %std.iterator.chain.ChainIterator.init %r2 %0 %1
+  ret %r2
+}
+
+function std.iterator.take.TakeIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.iterator.PeekableIterator.peek(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.take.TakeIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.skip.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.chain.ChainIterator.next(i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.take.take(i64, i64) {
+@entry
+@block_0
+  %r2 = alloc 16 : i64
+  call %std.iterator.take.TakeIterator.init %r2 %0 %1
+  ret %r2
+}
+
+function std.iterator.take.__init__() {
+@entry
+  ret 0
+}
+
+function std.iterator.filter.filter(i64, i64) {
+@entry
+@block_0
+  %r2 = alloc 16 : i64
+  call %std.iterator.filter.FilterIterator.init %r2 %0 %1
+  ret %r2
+}
+
 function std.iterator.skip.SkipIterator.next(i64) {
 @entry
   ret 0
@@ -503,25 +557,35 @@ function std.iterator.skip.skip(i64, i64) {
   ret %r2
 }
 
-function std.iterator.iterator.ListIterator.next(i64) {
+function std.iterator.zip.ZipIterator.next(i64) {
 @entry
   ret 0
 }
 
-function std.iterator.iterator.PeekableIterator.peek(i64) {
+function std.iterator.zip.ZipIterator.init(i64, i64, i64) {
 @entry
   ret 0
 }
 
-function std.iterator.chain.chain(i64, i64) {
+function std.iterator.enumerate.EnumerateIterator.init(i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.chain.ChainIterator.init(i64, i64, i64) {
+@entry
+  ret 0
+}
+
+function std.iterator.zip.zip(i64, i64) {
 @entry
 @block_0
   %r2 = alloc 16 : i64
-  call %std.iterator.chain.ChainIterator.init %r2 %0 %1
+  call %std.iterator.zip.ZipIterator.init %r2 %0 %1
   ret %r2
 }
 
-function std.iterator.take.TakeIterator.next(i64) {
+function std.iterator.iterator.ListIterator.next(i64) {
 @entry
   ret 0
 }
@@ -566,70 +630,6 @@ function std.iterator.skip.SkipIterator.init(i64, i64, i64) {
 function std.iterator.iterator.__init__() {
 @entry
   ret 0
-}
-
-function std.iterator.zip.ZipIterator.next(i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.zip.ZipIterator.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.enumerate.EnumerateIterator.init(i64, i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.chain.ChainIterator.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.zip.zip(i64, i64) {
-@entry
-@block_0
-  %r2 = alloc 16 : i64
-  call %std.iterator.zip.ZipIterator.init %r2 %0 %1
-  ret %r2
-}
-
-function std.iterator.take.TakeIterator.init(i64, i64, i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.skip.__init__() {
-@entry
-  ret 0
-}
-
-function std.iterator.chain.ChainIterator.next(i64) {
-@entry
-  ret 0
-}
-
-function std.iterator.take.take(i64, i64) {
-@entry
-@block_0
-  %r2 = alloc 16 : i64
-  call %std.iterator.take.TakeIterator.init %r2 %0 %1
-  ret %r2
-}
-
-function std.iterator.take.__init__() {
-@entry
-  ret 0
-}
-
-function std.iterator.filter.filter(i64, i64) {
-@entry
-@block_0
-  %r2 = alloc 16 : i64
-  call %std.iterator.filter.FilterIterator.init %r2 %0 %1
-  ret %r2
 }
 
 function std.iterator.iterator.iterator(i64) {

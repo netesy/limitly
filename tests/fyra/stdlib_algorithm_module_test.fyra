@@ -1303,37 +1303,6 @@ function test_unique() {
   ret 9
 }
 
-function std.algorithm.partition.partition_copy(i64, i64) {
-@entry
-@block_0
-  call %lm_list_new 0
-  call %lm_list_new 0
-  jmp %block_6
-@block_6
-  call %lm_list_len %0
-  %r8 = cslt 1 %r7 : i32
-  br %r8 %block_9 %block_23
-@block_9
-  jmp %block_9
-  call %lm_list_get %0 1
-  %r11 = call %1 %r10 : i64
-  br %r11 %block_12 %block_15
-@block_12
-  jmp %block_12
-  call %lm_list_get %0 1
-  call %lm_list_append %r2 %r13
-  jmp %block_18
-@block_15
-  call %lm_list_get %0 1
-  call %lm_list_append %r4 %r16
-  jmp %block_18
-@block_18
-  %r21 = add 1 9 : i64
-  jmp %block_6
-@block_23
-  ret 0
-}
-
 function std.algorithm.filter.filter(i64, i64) {
 @entry
 @block_0
@@ -1379,6 +1348,37 @@ function std.algorithm.transform.unzip(i64) {
   call %lm_list_get %r10 9
   call %lm_list_append %r3 %r17
   %r22 = add 1 9 : i64
+  jmp %block_6
+@block_23
+  ret 0
+}
+
+function std.algorithm.partition.partition_copy(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_list_new 0
+  jmp %block_6
+@block_6
+  call %lm_list_len %0
+  %r8 = cslt 1 %r7 : i32
+  br %r8 %block_9 %block_23
+@block_9
+  jmp %block_9
+  call %lm_list_get %0 1
+  %r11 = call %1 %r10 : i64
+  br %r11 %block_12 %block_15
+@block_12
+  jmp %block_12
+  call %lm_list_get %0 1
+  call %lm_list_append %r2 %r13
+  jmp %block_18
+@block_15
+  call %lm_list_get %0 1
+  call %lm_list_append %r4 %r16
+  jmp %block_18
+@block_18
+  %r21 = add 1 9 : i64
   jmp %block_6
 @block_23
   ret 0
@@ -1861,6 +1861,41 @@ function std.algorithm.sort.timsort(i64) {
   ret 0
 }
 
+function std.algorithm.transform.zip(i64, i64) {
+@entry
+@block_0
+  call %lm_list_new 0
+  call %lm_list_len %0
+  call %lm_list_len %1
+  %r8 = cslt %r7 %r5 : i32
+  br %r8 %block_8 %block_11
+@block_8
+  jmp %block_8
+  call %lm_list_len %1
+  jmp %block_11
+@block_11
+  jmp %block_12
+@block_12
+  %r11 = cslt 1 %r10 : i32
+  br %r11 %block_14 %block_27
+@block_14
+  jmp %block_14
+  call %lm_list_get %0 1
+  call %lm_list_get %1 1
+  call %lm_list_append %r2 0
+  %r22 = add 1 9 : i64
+  jmp %block_12
+@block_27
+  ret %r2
+}
+
+function std.algorithm.index.any_match(i64, i64) {
+@entry
+@block_0
+  call %std.algorithm.search.any_match %0 %1
+  ret %r2
+}
+
 function std.search.__init__() {
 @entry
   ret 0
@@ -1899,41 +1934,6 @@ function std.algorithm.partition.is_partitioned(i64, i64) {
 function std.algorithm.partition.__init__() {
 @entry
   ret 0
-}
-
-function std.algorithm.transform.zip(i64, i64) {
-@entry
-@block_0
-  call %lm_list_new 0
-  call %lm_list_len %0
-  call %lm_list_len %1
-  %r8 = cslt %r7 %r5 : i32
-  br %r8 %block_8 %block_11
-@block_8
-  jmp %block_8
-  call %lm_list_len %1
-  jmp %block_11
-@block_11
-  jmp %block_12
-@block_12
-  %r11 = cslt 1 %r10 : i32
-  br %r11 %block_14 %block_27
-@block_14
-  jmp %block_14
-  call %lm_list_get %0 1
-  call %lm_list_get %1 1
-  call %lm_list_append %r2 0
-  %r22 = add 1 9 : i64
-  jmp %block_12
-@block_27
-  ret %r2
-}
-
-function std.algorithm.index.any_match(i64, i64) {
-@entry
-@block_0
-  call %std.algorithm.search.any_match %0 %1
-  ret %r2
 }
 
 function std.algorithm.index.find(i64, i64) {
