@@ -209,6 +209,9 @@ bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
     if (actual->tag == TypeTag::Nil && type_system.isFallibleType(expected)) return true;
     if (is_numeric_type(expected) && is_numeric_type(actual)) {
         if (is_decimal_type(expected) || is_decimal_type(actual)) {
+            if (is_decimal_type(expected) && is_numeric_type(actual)) {
+                return true;
+            }
             return expected->tag == actual->tag;
         }
         return true;

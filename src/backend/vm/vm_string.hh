@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "runtime_value_base.h"
+#include "vm_value_base.hh"
 
 #ifdef __cplusplus
 extern "C" {

@@ -1,0 +1,2 @@
+val a = "hello";
+print(a);

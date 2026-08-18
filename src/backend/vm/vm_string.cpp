@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-#include "runtime_string.h"
+#include "vm_string.hh"
 
 // String concatenation function
 RUNTIME_API LmString lm_string_concat(LmString a, LmString b) {

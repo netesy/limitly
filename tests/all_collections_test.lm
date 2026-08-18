@@ -1,0 +1,13 @@
+val pair = (10, 20);
+print(pair[0]);
+print(pair[1]);
+
+var list = [100, 200];
+list.append(300);
+print(list[0]);
+print(list[1]);
+print(list[2]);
+
+var dict = { "one": 1, "two": 2 };
+print(dict["one"]);
+print(dict["two"]);

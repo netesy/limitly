@@ -1,9 +1,9 @@
 #define STB_IMAGE_IMPLEMENTATION
-#include "../../vendor/stb/stb_image.h"
+#include "../../../vendor/stb/stb_image.h"
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include "../../vendor/stb/stb_image_write.h"
-#include "runtime.h"
-#include "runtime_value.h"
+#include "../../../vendor/stb/stb_image_write.h"
+#include "vm_runtime.hh"
+#include "vm_value.hh"
 
 RUNTIME_API LmValue lm_image_load(const char* filename, int* w, int* h, int* c) {
     unsigned char* data = stbi_load(filename, w, h, c, 0);

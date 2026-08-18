@@ -9,11 +9,11 @@
 #include "../../lir/functions.hh"
 #include "../../lir/function_registry.hh"
 #include "../../lir/builtin_functions.hh"
-#include "../../runtime/runtime.h"
-#include "../../runtime/runtime_list.h"
-#include "../../runtime/runtime_dict.h"
-#include "../../runtime/runtime_tuple.h"
-#include "../../runtime/runtime_value.h"
+#include "vm_runtime.hh"
+#include "vm_list.hh"
+#include "vm_dict.hh"
+#include "vm_tuple.hh"
+#include "vm_value.hh"
 
 namespace LM {
 namespace Backend {

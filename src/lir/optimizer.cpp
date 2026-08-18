@@ -1,5 +1,5 @@
 #include "optimizer.hh"
-#include "runtime/runtime_value.h"
+#include "backend/vm/vm_value.hh"
 #include <unordered_set>
 #include <algorithm>
 #include <queue>

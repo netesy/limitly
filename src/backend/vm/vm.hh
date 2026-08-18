@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include "runtime_value_base.h"
-#include "runtime_string.h"
+#include "vm_value_base.hh"
+#include "vm_string.hh"
 
 #ifndef RUNTIME_API
     #define RUNTIME_API

@@ -2,8 +2,8 @@
 // These are generic data conversion operations
 
 #include "../register.hh"
-#include "../../../runtime/runtime.h"
-#include "../../../runtime/runtime_value.h"
+#include "../vm_runtime.hh"
+#include "../vm_value.hh"
 
 namespace LM {
 namespace Backend {

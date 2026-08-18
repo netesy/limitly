@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 #include <mutex>
-#include "../runtime/runtime_value_base.h"
+#include "backend/vm/vm_value_base.hh"
 
 namespace LM {
 namespace Backend {

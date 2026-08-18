@@ -20,20 +20,21 @@ public:
     static bool is_builtin(const std::string& name);
     static std::string get_internal_name(const std::string& name);
 
+    static void emit_print_str_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* char_ptr);
+    static void emit_print_int_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
+    static void emit_print_bool_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
+    static void emit_print_decimal_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val, int scale);
+    static void emit_str_concat_ir(ir::Module* module, ir::IRBuilder* builder);
+    static void emit_list_ir(ir::Module* module, ir::IRBuilder* builder);
+    static void emit_tuple_ir(ir::Module* module, ir::IRBuilder* builder);
+    static void emit_dict_ir(ir::Module* module, ir::IRBuilder* builder);
+
 private:
-    static void emit_print_int(ir::Module* module, ir::IRBuilder* builder);
-    static void emit_print_str(ir::Module* module, ir::IRBuilder* builder);
     static void emit_assert(ir::Module* module, ir::IRBuilder* builder);
-    static void emit_box_string(ir::Module* module, ir::IRBuilder* builder);
     static void emit_abs(ir::Module* module, ir::IRBuilder* builder);
     
     // External Runtime Declarations
-    static void decl_runtime_list(ir::Module* module, ir::IRBuilder* builder);
-    static void decl_runtime_dict(ir::Module* module, ir::IRBuilder* builder);
-    static void decl_runtime_tuple(ir::Module* module, ir::IRBuilder* builder);
     static void decl_runtime_math(ir::Module* module, ir::IRBuilder* builder);
-    static void decl_runtime_string(ir::Module* module, ir::IRBuilder* builder);
-    static void decl_runtime_utility(ir::Module* module, ir::IRBuilder* builder);
 };
 
 } // namespace LM::Backend::Fyra

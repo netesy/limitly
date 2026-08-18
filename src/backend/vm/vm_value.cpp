@@ -1,12 +1,12 @@
 #define BUILDING_RUNTIME
 #define _POSIX_C_SOURCE 200809L
-#include "runtime_value.h"
-#include "runtime_value_base.h"
-#include "runtime_list.h"
-#include "runtime_dict.h"
-#include "runtime_tuple.h"
-#include "runtime_string.h"
-#include "runtime.h"
+#include "vm_value.hh"
+#include "vm_value_base.hh"
+#include "vm_list.hh"
+#include "vm_dict.hh"
+#include "vm_tuple.hh"
+#include "vm_string.hh"
+#include "vm_runtime.hh"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>

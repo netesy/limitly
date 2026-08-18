@@ -59,12 +59,12 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     auto sorted_modules = manager.get_topological_order();
     
     for (const auto& module_path : sorted_modules) {
-        // Skip root as it is the current program
-        if (module_path == "root") continue;
-
         std::string init_func_name = module_path + ".__init__";
-        // Don't call module init functions during LIR generation
-        // They will be called during VM execution
+        if (LIRFunctionManager::getInstance().hasFunction(init_func_name)) {
+            std::vector<Reg> empty_args;
+            Reg init_res = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::Call, init_res, init_func_name, empty_args));
+        }
     }
 
     // 2. Generate top-level statements

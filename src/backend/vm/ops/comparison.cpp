@@ -1,5 +1,5 @@
 #include "../register.hh"
-#include "../../../runtime/runtime_value.h"
+#include "../vm_value.hh"
 
 namespace LM {
 namespace Backend {

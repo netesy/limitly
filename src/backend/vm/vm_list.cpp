@@ -1,5 +1,5 @@
 #define BUILDING_RUNTIME
-#include "runtime_list.h"
+#include "vm_list.hh"
 #include <string.h>
 
 RUNTIME_API LmList* lm_list_new(void) {

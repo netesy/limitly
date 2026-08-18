@@ -277,7 +277,9 @@ fn is_valid_prerelease_id(s: str): bool {
         i = i + 1;
     }
     if (is_numeric(s)) {
-        if (len(s) > 1 and substring(s, 0, 1) == "0") return false;
+        if (len(s) > 1) {
+            if (substring(s, 0, 1) == "0") return false;
+        }
     }
     return true;
 }
@@ -293,7 +295,9 @@ fn is_valid_build_id(s: str): bool {
 }
 
 fn has_invalid_leading_zero(s: str): bool {
-    if (len(s) > 1 and substring(s, 0, 1) == "0") return true;
+    if (len(s) > 1) {
+        if (substring(s, 0, 1) == "0") return true;
+    }
     return false;
 }
 

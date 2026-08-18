@@ -286,18 +286,12 @@ ir::Value* FyraIRGenerator::emit_literal_expr(
              }
              return context_->getConstantInt(context_->getIntegerType(64), val);
         } else {
-             used_builtins_.insert("lm_box_string");
-             ir::Function* box_string = current_module_->getFunction("lm_box_string");
-             if (!box_string) {
-                 box_string = builder_->createFunction("lm_box_string", context_->getPointerType(context_->getIntegerType(8)), {context_->getPointerType(context_->getIntegerType(8))});
-             }
              ir::Value* str_const = context_->getConstantString(s);
              std::string name = "$str" + std::to_string(label_counter_++);
              auto gv = std::make_unique<ir::GlobalVariable>(context_->getPointerType(context_->getIntegerType(8)), name, static_cast<ir::Constant*>(str_const), false, ".data");
              ir::GlobalVariable* gv_ptr = gv.get();
              current_module_->addGlobalVariable(std::move(gv));
-             std::vector<ir::Value*> args = {gv_ptr};
-             return builder_->createCall(box_string, args);
+             return gv_ptr;
         }
     } else if (std::holds_alternative<bool>(expr->value)) {
         return context_->getConstantInt(context_->getIntegerType(64), std::get<bool>(expr->value) ? 1 : 0);
@@ -354,10 +348,11 @@ ir::Value* FyraIRGenerator::emit_call_expr(
         if (func_name == "print") {
             ir::Value* arg = emit_expression(expr->arguments[0]);
             if (arg->getType()->isPointerTy()) {
-                 func_name = "lm_print_str";
+                 FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), arg);
             } else {
-                 func_name = "lm_print_int";
+                 FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg);
             }
+            return nullptr;
         } else {
             func_name = FyraBuiltinFunctions::get_internal_name(func_name);
         }

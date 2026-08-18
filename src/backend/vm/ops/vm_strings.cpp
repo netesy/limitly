@@ -1,7 +1,7 @@
 #include "../register.hh"
-#include "../../../runtime/runtime.h"
-#include "../../../runtime/runtime_string.h"
-#include "../../../runtime/runtime_value.h"
+#include "../vm_runtime.hh"
+#include "../vm_string.hh"
+#include "../vm_value.hh"
 #include <cstring>
 
 namespace LM {

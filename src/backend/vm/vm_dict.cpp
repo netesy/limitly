@@ -1,7 +1,7 @@
 #define BUILDING_RUNTIME
-#include "runtime_dict.h"
-#include "runtime_value.h"
-#include "runtime.h"
+#include "vm_dict.hh"
+#include "vm_value.hh"
+#include "vm_runtime.hh"
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>

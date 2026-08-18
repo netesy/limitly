@@ -2,7 +2,7 @@
 #define RUNTIME_DICT_H
 
 #include <stdint.h>
-#include "runtime_value_base.h"
+#include "vm_value_base.hh"
 
 // For static linking, define as empty
 #ifndef RUNTIME_API

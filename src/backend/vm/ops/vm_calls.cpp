@@ -2,9 +2,9 @@
 #include "../resource_manager.hh"
 #include "../../../lir/function_registry.hh"
 #include "../../../lir/builtin_functions.hh"
-#include "../../../runtime/runtime.h"
-#include "../../../runtime/runtime_value.h"
-#include "../../../runtime/runtime_tuple.h"
+#include "../vm_runtime.hh"
+#include "../vm_value.hh"
+#include "../vm_tuple.hh"
 #include "../constant_utils.hh"
 
 namespace LM {
@@ -18,7 +18,23 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::CallBuiltin:
         case LIR::LIR_Op::Call: {
             auto& func_manager = LIR::LIRFunctionManager::getInstance();
-            if (func_manager.hasFunction(pc->func_name)) {
+            bool is_builtin_target = (pc->op == LIR::LIR_Op::CallBuiltin) ||
+                                     (pc->func_name.rfind("_builtin_", 0) == 0);
+
+            if (is_builtin_target && LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
+                // Handle builtin functions (print, input, _builtin_substring, etc.)
+                std::vector<ValuePtr> args;
+                args.reserve(pc->call_args.size());
+                for (auto arg_reg : pc->call_args) {
+                    args.push_back(register_to_value_ptr(registers[arg_reg]));
+                }
+                try {
+                    ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(pc->func_name, args);
+                    registers[pc->dst] = LM::Backend::VM::compiler_value_to_backend_value(result);
+                } catch (const std::exception& e) {
+                    throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
+                }
+            } else if (func_manager.hasFunction(pc->func_name)) {
                 auto func = func_manager.getFunction(pc->func_name);
                 std::vector<RegisterValue> arg_vals;
                 size_t expected_total = func->getParameters().size();
@@ -92,6 +108,8 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(func_obj);
                 if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
                     func_name = (char*)((LmBox*)h)->value.as_ptr;
+                } else if (h->type_id == TYPE_STRING) {
+                    func_name = ((LmString*)h)->data;
                 } else if (h->type_id == TYPE_TUPLE) {
                     LmTuple* closure_tuple = (LmTuple*)h;
                     RegisterValue name_value = lm_tuple_get(closure_tuple, 0);
@@ -99,6 +117,9 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                         ObjHeader* name_header = (ObjHeader*)UNBOX_PTR(name_value);
                         if (name_header->type_id == TYPE_BOX && ((LmBox*)name_header)->type == LM_BOX_STRING) {
                             func_name = (char*)((LmBox*)name_header)->value.as_ptr;
+                            closure_extra_args.push_back(func_obj);
+                        } else if (name_header->type_id == TYPE_STRING) {
+                            func_name = ((LmString*)name_header)->data;
                             closure_extra_args.push_back(func_obj);
                         }
                     }
@@ -122,7 +143,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     auto saved_registers = registers;
                     const LIR::LIR_Function* saved_func = current_function_;
 
-                    registers.assign(registers.size(), VAL_NIL);
+                    registers.assign(256, VAL_NIL);
                     for (size_t i = 0; i < arg_vals.size() && i < registers.size(); ++i) {
                         registers[i] = arg_vals[i];
                     }
