@@ -113,7 +113,7 @@ RUNTIME_API LmString lm_string_format(LmString format_str, LmString arg_str) {
     
     // Find %s in format
     const char* placeholder = "%s";
-    char* pos = strstr(format, placeholder);
+    const char* pos = strstr(format, placeholder);
     
     if (pos) {
         size_t placeholder_len = pos - format;
