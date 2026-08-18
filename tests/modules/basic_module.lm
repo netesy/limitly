@@ -6,7 +6,7 @@ pub fn greet() {
     print("Greetings from basic module!");
 }
 
-pub fn add(a, b) {
+pub fn add(a: int, b: int): int {
     return a + b;
 }
 

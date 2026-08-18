@@ -3,8 +3,8 @@
 
 #include "frontend/value.hh"
 #include "backend/value.hh"
-#include "runtime/runtime.h"
-#include "runtime/runtime_value.h"
+#include "backend/vm/vm_runtime.hh"
+#include "backend/vm/vm_value.hh"
 
 namespace LM {
 namespace Backend {
@@ -37,8 +37,56 @@ inline LM::Backend::Value compiler_value_to_backend_value(const std::shared_ptr<
         case ::TypeTag::Int8:
         case ::TypeTag::Int16:
         case ::TypeTag::Int32:
-        case ::TypeTag::Int64:
-            return make_i128(parse_i128_literal(cv->data));
+        case ::TypeTag::Int64: {
+            try {
+                return make_i64(std::stoll(cv->data));
+            } catch (...) {
+                try {
+                    return make_u64(std::stoull(cv->data));
+                } catch (...) {
+                    return make_i128(parse_i128_literal(cv->data));
+                }
+            }
+        }
+        case ::TypeTag::Decimal2: {
+            size_t dot = cv->data.find('.');
+            int64_t scaled = 0;
+            if (dot == std::string::npos) scaled = std::stoll(cv->data) * 100;
+            else {
+                std::string ip = cv->data.substr(0, dot);
+                std::string fp = cv->data.substr(dot + 1);
+                while (fp.length() < 2) fp += '0';
+                if (fp.length() > 2) fp = fp.substr(0, 2);
+                scaled = (ip.empty() ? 0 : std::stoll(ip)) * 100 + (fp.empty() ? 0 : std::stoll(fp));
+            }
+            return make_i64(scaled);
+        }
+        case ::TypeTag::Decimal4: {
+            size_t dot = cv->data.find('.');
+            int64_t scaled = 0;
+            if (dot == std::string::npos) scaled = std::stoll(cv->data) * 10000;
+            else {
+                std::string ip = cv->data.substr(0, dot);
+                std::string fp = cv->data.substr(dot + 1);
+                while (fp.length() < 4) fp += '0';
+                if (fp.length() > 4) fp = fp.substr(0, 4);
+                scaled = (ip.empty() ? 0 : std::stoll(ip)) * 10000 + (fp.empty() ? 0 : std::stoll(fp));
+            }
+            return make_i64(scaled);
+        }
+        case ::TypeTag::Decimal6: {
+            size_t dot = cv->data.find('.');
+            int64_t scaled = 0;
+            if (dot == std::string::npos) scaled = std::stoll(cv->data) * 1000000;
+            else {
+                std::string ip = cv->data.substr(0, dot);
+                std::string fp = cv->data.substr(dot + 1);
+                while (fp.length() < 6) fp += '0';
+                if (fp.length() > 6) fp = fp.substr(0, 6);
+                scaled = (ip.empty() ? 0 : std::stoll(ip)) * 1000000 + (fp.empty() ? 0 : std::stoll(fp));
+            }
+            return make_i64(scaled);
+        }
         case ::TypeTag::Int128:
             return make_i128(parse_i128_literal(cv->data));
         case ::TypeTag::UInt:

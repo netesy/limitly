@@ -278,31 +278,9 @@ void Generator::emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt) {
 
 
 void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
-   // Check if this is a module-level variable (global)
-    // Treat as global if: we're not inside a function (or inside __init__ function)
-    if (current_function_ == nullptr || (current_function_ && current_function_->name == current_module_ + ".__init__")) {
-        std::string qualified_name = current_module_ + "." + stmt.name;
-        Reg val_reg = 0;
-        if (stmt.initializer) {
-            val_reg = emit_expr(*stmt.initializer);
-        } else {
-            val_reg = allocate_register();
-            Backend::Value nil_val = VAL_NIL;
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, val_reg, nil_val));
-        }
-        LIR_Inst store_inst(LIR_Op::StoreGlobal, Type::Void, 0, val_reg, 0);
-        store_inst.func_name = qualified_name;
-        emit_instruction(store_inst);
-        return;
-    }
-
-    Reg value_reg;
-    
     // Determine the declared type first, before processing the initializer
     TypePtr declared_type = nullptr;
     if (stmt.type.has_value()) {
-       // std::cout << "[DEBUG] Variable has explicit type" << std::endl;
-        // Convert TypeAnnotation to Type - handle all basic types including 128-bit
         auto type_annotation = *stmt.type.value();
         if (type_annotation.typeName == "u32") {
             declared_type = std::make_shared<::Type>(::TypeTag::UInt32);
@@ -332,12 +310,49 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
             declared_type = std::make_shared<::Type>(::TypeTag::Float32);
         } else if (type_annotation.typeName == "bool") {
             declared_type = std::make_shared<::Type>(::TypeTag::Bool);
+        } else if (type_annotation.typeName == "d2") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Decimal2);
+        } else if (type_annotation.typeName == "d4") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Decimal4);
+        } else if (type_annotation.typeName == "d6") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Decimal6);
+        } else if (type_annotation.typeName == "decimal") {
+            declared_type = std::make_shared<::Type>(::TypeTag::Decimal2);
         } else if (type_annotation.typeName == "string") {
             declared_type = std::make_shared<::Type>(::TypeTag::String);
         } else if (type_annotation.typeName == "any") {
             declared_type = std::make_shared<::Type>(::TypeTag::Any);
         }
     }
+
+    // Check if this is a module-level variable (global)
+    // Treat as global if: we're not inside a function (or inside __init__ function)
+    if (current_function_ == nullptr || (current_function_ && current_function_->name == current_module_ + ".__init__")) {
+        std::string qualified_name = current_module_ + "." + stmt.name;
+        Reg val_reg = 0;
+        if (stmt.initializer) {
+            if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(stmt.initializer.get())) {
+                val_reg = emit_literal_expr(*literal, declared_type);
+            } else {
+                val_reg = emit_expr(*stmt.initializer);
+            }
+        } else {
+            val_reg = allocate_register();
+            Backend::Value nil_val = VAL_NIL;
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, val_reg, nil_val));
+        }
+        bind_variable(stmt.name, val_reg);
+        if (declared_type) {
+            set_register_language_type(val_reg, declared_type);
+            set_register_abi_type(val_reg, language_type_to_abi_type(declared_type));
+        }
+        LIR_Inst store_inst(LIR_Op::StoreGlobal, Type::Void, 0, val_reg, 0);
+        store_inst.func_name = qualified_name;
+        emit_instruction(store_inst);
+        return;
+    }
+
+    Reg value_reg;
     
    // std::cout << "[DEBUG] Checking if variable has initializer" << std::endl;
     if (stmt.initializer) {
@@ -463,22 +478,7 @@ void Generator::emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt) {
     
     // Emit condition check in current block
     Reg condition = emit_expr(*stmt.condition);
-    Reg condition_bool = allocate_register();
-    
-    // For boolean conditions, use them directly
-    TypePtr condition_type = get_register_type(condition);
-    if (condition_type && condition_type->tag == ::TypeTag::Bool) {
-        condition_bool = condition;
-    } else {
-        // Convert non-boolean condition to boolean
-        Reg zero_reg = allocate_register();
-        auto int_type = std::make_shared<::Type>(::TypeTag::Int);
-        Backend::Value zero_val = make_i64(0);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
-        set_register_type(zero_reg, int_type);
-        emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
-        set_register_type(condition_bool, std::make_shared<::Type>(::TypeTag::Bool));
-    }
+    Reg condition_bool = condition;
     
     // Conditional jump: if false, go to else (or end if no else)
     uint32_t false_target = else_block ? else_block->id : end_block->id;
@@ -538,24 +538,8 @@ void Generator::emit_if_stmt_cfg(LM::Frontend::AST::IfStatement& stmt) {
 
 
 void Generator::emit_if_stmt_linear(LM::Frontend::AST::IfStatement& stmt) {
-    // Emit condition
     Reg condition = emit_expr(*stmt.condition);
-    Reg condition_bool = allocate_register();
-    
-    // Convert condition to boolean if needed
-    TypePtr condition_type = get_register_type(condition);
-    if (condition_type && condition_type->tag == ::TypeTag::Bool) {
-        condition_bool = condition;
-    } else {
-        // Convert non-boolean condition to boolean
-        Reg zero_reg = allocate_register();
-        auto int_type = std::make_shared<::Type>(::TypeTag::Int);
-        Backend::Value zero_val = make_i64(0);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
-        set_register_type(zero_reg, int_type);
-        emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
-        set_register_type(condition_bool, std::make_shared<::Type>(::TypeTag::Bool));
-    }
+    Reg condition_bool = condition;
     
     // Reserve space for jump instructions
     size_t false_jump_pc = current_function_->instructions.size();
@@ -625,22 +609,7 @@ void Generator::emit_while_stmt_cfg(LM::Frontend::AST::WhileStatement& stmt) {
     
     // Emit loop condition
     Reg condition = emit_expr(*stmt.condition);
-    Reg condition_bool = allocate_register();
-    
-    // For boolean conditions, use them directly
-    TypePtr condition_type = get_register_type(condition);
-    if (condition_type && condition_type->tag == ::TypeTag::Bool) {
-        condition_bool = condition;
-    } else {
-        // Convert non-boolean condition to boolean
-        Reg zero_reg = allocate_register();
-        auto int_type = std::make_shared<::Type>(::TypeTag::Int);
-        Backend::Value zero_val = make_i64(0);
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
-        set_register_type(zero_reg, int_type);
-        emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition_bool, condition, zero_reg));
-        set_register_type(condition_bool, std::make_shared<::Type>(::TypeTag::Bool));
-    }
+    Reg condition_bool = condition;
     
     // Conditional jump: if false, exit loop
     emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, condition_bool, 0, end_block->id));
@@ -754,22 +723,7 @@ void Generator::emit_for_stmt_cfg(LM::Frontend::AST::ForStatement& stmt) {
     // Emit condition check
     Reg condition = allocate_register();
     if (stmt.condition) {
-        Reg condition_expr = emit_expr(*stmt.condition);
-        
-        // For boolean conditions, use them directly
-        TypePtr condition_type = get_register_type(condition_expr);
-        if (condition_type && condition_type->tag == ::TypeTag::Bool) {
-            condition = condition_expr;
-        } else {
-            // Convert non-boolean condition to boolean
-            Reg zero_reg = allocate_register();
-            auto int_type = std::make_shared<::Type>(::TypeTag::Int);
-            Backend::Value zero_val = make_i64(0);
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, zero_reg, zero_val));
-            set_register_type(zero_reg, int_type);
-            emit_instruction(LIR_Inst(LIR_Op::CmpNEQ, condition, condition_expr, zero_reg));
-            set_register_type(condition, std::make_shared<::Type>(::TypeTag::Bool));
-        }
+        condition = emit_expr(*stmt.condition);
     } else {
         // No condition - always true
         auto bool_type = std::make_shared<::Type>(::TypeTag::Bool);

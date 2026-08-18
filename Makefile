@@ -47,10 +47,10 @@ RSP_DIR := build/rsp
 # =============================
 # Runtime library configuration
 # =============================
-RUNTIME_DIR := src/runtime
-RUNTIME_LIB := $(OBJ_DIR)/limitly_runtime.a
-RUNTIME_SRCS := $(wildcard $(RUNTIME_DIR)/*.c)
-RUNTIME_OBJS := $(patsubst $(RUNTIME_DIR)/%.c,$(OBJ_DIR)/runtime/%.o,$(RUNTIME_SRCS))
+
+
+
+
 
 # =============================
 # Sources
@@ -106,7 +106,7 @@ LYRA_SRCS := $(wildcard $(LYRA_DIR)/src/*.cpp)
 LYRA_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_SRCS))
 LYRA_BIN := $(BIN_DIR)/lyra$(EXE_EXT)
 
-REGISTER_SRCS := src/backend/vm/resource_manager.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp
+REGISTER_SRCS := src/backend/vm/resource_manager.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp src/backend/vm/vm_dict.cpp src/backend/vm/vm_image.cpp src/backend/vm/vm_list.cpp src/backend/vm/vm_runtime.cpp src/backend/vm/vm_string.cpp src/backend/vm/vm_tuple.cpp src/backend/vm/vm_value.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
                  src/lir/builtin_functions.cpp src/lir/intrinsic_registry.cpp src/lir/verifier.cpp src/lir/lir_types.cpp src/lir/generator.cpp \
@@ -203,9 +203,9 @@ $(OBJ_DIR)/runtime/%.o: $(RUNTIME_DIR)/%.c | $(OBJ_DIR)/runtime
 # =============================
 # Runtime library
 # =============================
-runtime: $(RUNTIME_LIB)
 
-$(RUNTIME_LIB): $(RUNTIME_OBJS)
+
+: $(RUNTIME_OBJS)
 	@echo "Building runtime library: $@"
 	@mkdir -p $(dir $@)
 	$(AR) rcs $@ $^
@@ -264,19 +264,19 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 liblimitly: $(OBJ_DIR)/libLimitly.a
 
-$(OBJ_DIR)/libLimitly.a: $(LIB_LIMITLY_OBJS) $(RUNTIME_LIB) $(FYRA_LIB)
+$(OBJ_DIR)/libLimitly.a: $(LIB_LIMITLY_OBJS) $(FYRA_LIB)
 	@echo "🔨 Building libLimitly.a ..."
 	@mkdir -p $(dir $@)
 	$(AR) rcs $@ $(LIB_LIMITLY_OBJS)
 
 windows: $(BIN_DIR) $(MAIN_RSP) liblimitly $(LYRA_BIN)
 	@echo "🔨 Linking limitly.exe ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLimitly.a $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "✅ limitly.exe built."
 
 linux: $(BIN_DIR) $(MAIN_RSP) liblimitly
 	@echo "🔨 Linking limitly ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -lpthread
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLimitly.a $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -lpthread
 	@echo "✅ limitly built."
 
 # =============================
@@ -339,9 +339,9 @@ parser: $(BIN_DIR) $(TEST_RSP)
 # LIR Round-Trip Test Target (C17)
 # =============================
 .PHONY: lir-test
-lir-test: $(BIN_DIR) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) $(LIR_TEST_OBJS)
+lir-test: $(BIN_DIR) $(OBJ_DIR)/libLimitly.a $(LIR_TEST_OBJS)
 	@echo "\360\237\223\260 Linking lir_test ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIR_TEST_OBJS) $(OBJ_DIR)/libLimitly.a $(RUNTIME_LIB) -o $(BIN_DIR)/lir_test $(LIBS) -lpthread
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIR_TEST_OBJS) $(OBJ_DIR)/libLimitly.a -o $(BIN_DIR)/lir_test $(LIBS) -lpthread
 	@echo "\342\234\205 lir_test built."
 	@echo "\360\237\247\252 Running lir_test ..."
 	./bin/lir_test

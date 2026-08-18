@@ -48,11 +48,11 @@ vendor/fyra/*.a
 vendor/fyra/*.so
 vendor/fyra/*.dll
 # vendor/fyra/.git/
-vendor/lyra/build/
+# vendor/lyra/build/
 vendor/lyra/*.a
 vendor/lyra/*.so
 vendor/lyra/*.dll
-vendor/lyra/.git/
+# vendor/lyra/.git/
 
 # qtcreator generated files
 *.pro.user*

@@ -140,7 +140,7 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
         }
 
         if (options.platform == Platform::Windows) {
-            PEGenerator pe_gen(true); // 64-bit
+            PEGenerator pe_gen(true, 0x140000000); // 64-bit, base address
             std::vector<PEGenerator::Symbol> symbols;
             for (const auto& sym : syms) {
                 symbols.push_back({sym.name, sym.value, sym.size, static_cast<uint8_t>(sym.type), static_cast<uint8_t>(sym.binding), sym.sectionName});

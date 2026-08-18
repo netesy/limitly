@@ -2,7 +2,7 @@
 #define CALLSTACK_H
 
 #include "../../lir/lir.hh"
-#include "../../runtime/runtime_value_base.h"
+#include "backend/vm/vm_value_base.hh"
 #include <vector>
 #include <memory>
 #include <cstdint>

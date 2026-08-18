@@ -360,8 +360,8 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
     Reg dst = allocate_register();
     
     // CRITICAL FIX: Use AST's inferred type first, then expected type, then default inference
-    // This ensures that types preserved from constant propagation are respected
-    TypePtr target_type = expr.inferred_type ? expr.inferred_type : expected_type;
+    // For decimals, prioritize explicit expected_type context
+    TypePtr target_type = (expected_type && is_decimal_type(expected_type)) ? expected_type : (expr.inferred_type ? expr.inferred_type : expected_type);
     
     // Create ValuePtr based on literal value
     ValuePtr const_val;
@@ -370,32 +370,24 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
         std::string stringValue = std::get<std::string>(expr.value);
 
         if (target_type && is_decimal_type(target_type)) {
-            // Context-typed decimal literal parsing
             int scale = get_decimal_scale(target_type);
-            size_t dot_pos = stringValue.find('.');
-            int64_t scaled_val = 0;
-            if (dot_pos == std::string::npos) {
-                scaled_val = std::stoll(stringValue) * static_cast<int64_t>(std::pow(10, scale));
-            } else {
-                std::string integer_part = stringValue.substr(0, dot_pos);
-                std::string fractional_part = stringValue.substr(dot_pos + 1);
-                while (fractional_part.length() < (size_t)scale) fractional_part += '0';
-                if (fractional_part.length() > (size_t)scale) fractional_part = fractional_part.substr(0, scale);
-                scaled_val = std::stoll(integer_part) * static_cast<int64_t>(std::pow(10, scale)) + std::stoll(fractional_part);
-            }
-            const_val = std::make_shared<Value>(target_type, scaled_val);
+            const_val = std::make_shared<Value>(target_type, stringValue);
             Type abi_type = Type::I64;
             set_register_language_type(dst, target_type);
-            set_register_type(dst, target_type);
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, LM::Backend::VM::compiler_value_to_backend_value(const_val)));
+            LIR_Inst inst(LIR_Op::LoadConst, abi_type, dst, LM::Backend::VM::compiler_value_to_backend_value(const_val));
+            inst.type_name = "d" + std::to_string(scale);
+            emit_instruction(inst);
             return dst;
         }
+        
+        bool isStringLiteral = (expr.literalType == LM::Frontend::TokenType::STRING) ||
+                              (expr.inferred_type && expr.inferred_type->tag == ::TypeTag::String);
         
         // Try to determine if this string represents a pure number
         bool isNumeric = false;
         bool isFloat = false;
         
-        if (!stringValue.empty()) {
+        if (!isStringLiteral && !stringValue.empty()) {
             char first = stringValue[0];
             if (std::isdigit(first) || first == '+' || first == '-' || first == '.') {
                 // Check if the ENTIRE string is a valid number
@@ -555,7 +547,11 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
             const_val->type = target_type;
         }
         
-        emit_instruction(LIR_Inst(LIR_Op::LoadConst, abi_type, dst, LM::Backend::VM::compiler_value_to_backend_value(const_val)));
+        LIR_Inst inst(LIR_Op::LoadConst, abi_type, dst, LM::Backend::VM::compiler_value_to_backend_value(const_val));
+        if (final_type && is_decimal_type(final_type)) {
+            inst.type_name = "d" + std::to_string(get_decimal_scale(final_type));
+        }
+        emit_instruction(inst);
     } else {
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Void, dst, LM::Backend::VM::compiler_value_to_backend_value(const_val)));
     }
@@ -590,22 +586,23 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
         }
     }
 
-    // Check if it's a global module variable accessed directly (e.g. within the module itself)
-    if (!current_module_.empty() && current_module_ != "root") {
-        std::string qualified_name = current_module_ + "." + expr.name;
-        Reg reg = resolve_variable(expr.name);
-        if (reg != UINT32_MAX) return reg;
+    // Check regular variable scope
+    Reg reg = resolve_variable(expr.name);
+    if (reg != UINT32_MAX) return reg;
 
-        // If not local, try LoadGlobal
-        Reg result = allocate_register();
-        LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
-        load_inst.func_name = qualified_name;
-        emit_instruction(load_inst);
-        if (expr.inferred_type) {
-            set_register_language_type(result, expr.inferred_type);
-            set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-        }
-        return result;
+    // Check if it's a function name used as a value (first-class functions)
+    if (function_table_.find(expr.name) != function_table_.end() || 
+        LIRFunctionManager::getInstance().hasFunction(expr.name)) {
+        
+        Reg func_reg = allocate_register();
+        auto func_type = std::make_shared<::Type>(::TypeTag::Function);
+        // In our LIR/VM, functions are referred to by name strings
+        auto string_type = std::make_shared<::Type>(::TypeTag::String);
+        Backend::Value name_val = BOX_PTR(lm_box_string(expr.name.c_str()));
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, func_reg, name_val));
+        set_register_language_type(func_reg, func_type);
+        set_register_abi_type(func_reg, Type::Ptr);
+        return func_reg;
     }
 
     // First check if this is a module variable access (e.g., "math.pi")
@@ -634,33 +631,26 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
             LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
             load_inst.func_name = qualified_name;
             emit_instruction(load_inst);
-            // Note: Module variable type information is not available in ModuleSymbolInfo
-            // Type information should be obtained from the module's type system
             return result;
         }
     }
-    
-    // Check regular variable scope
-    Reg reg = resolve_variable(expr.name);
-    if (reg == UINT32_MAX) {
-        // Check if it's a function name used as a value (first-class functions)
-        if (function_table_.find(expr.name) != function_table_.end() || 
-            LIRFunctionManager::getInstance().hasFunction(expr.name)) {
-            
-            Reg func_reg = allocate_register();
-            auto func_type = std::make_shared<::Type>(::TypeTag::Function);
-            // In our LIR/VM, functions are referred to by name strings
-            auto string_type = std::make_shared<::Type>(::TypeTag::String);
-            Backend::Value name_val = BOX_PTR(lm_box_string(expr.name.c_str()));
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, func_reg, name_val));
-            set_register_language_type(func_reg, func_type);
-            set_register_abi_type(func_reg, Type::Ptr);
-            return func_reg;
-        }
 
-        report_error("Undefined variable: " + expr.name);
-        return 0;
+    // Check if it's a global module variable accessed directly (e.g. within the module itself)
+    if (!current_module_.empty() && current_module_ != "root") {
+        std::string qualified_name = current_module_ + "." + expr.name;
+        Reg result = allocate_register();
+        LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
+        load_inst.func_name = qualified_name;
+        emit_instruction(load_inst);
+        if (expr.inferred_type) {
+            set_register_language_type(result, expr.inferred_type);
+            set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+        }
+        return result;
     }
+
+    report_error("Undefined variable: " + expr.name);
+    return 0;
     
     // === SHARED CELL TASK BODY HANDLING ===
     // Check if we're in a task body and this variable is a shared variable
@@ -1338,15 +1328,32 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             (func_name.length() >= 7 && func_name.substr(func_name.length()-7) == ".length")) {
             op = LIR_Op::CallBuiltin; vm_name = "len"; is_builtin = true;
         } else if (func_name == "print" || func_name == "assert") {
-            op = LIR_Op::CallBuiltin; is_builtin = true;
+            op = LIR_Op::CallBuiltin; vm_name = func_name; is_builtin = true;
         } else if (func_name.length() >= 9 && func_name.substr(0, 9) == "_builtin_") {
-            op = LIR_Op::CallBuiltin; vm_name = func_name.substr(9); is_builtin = true;
+            op = LIR_Op::CallBuiltin;
+            if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) {
+                vm_name = func_name;
+            } else {
+                vm_name = func_name.substr(9);
+            }
+            is_builtin = true;
         }
         
         if (is_builtin) {
             LIR_Inst inst;
             inst.op = op; inst.dst = result; inst.func_name = vm_name; inst.call_args = arg_regs;
             inst.result_type = (expr.inferred_type) ? language_type_to_abi_type(expr.inferred_type) : Type::I64;
+            for (size_t i = 0; i < arg_regs.size(); ++i) {
+                Type arg_abi = Type::I64;
+                if (expr.arguments[i] && expr.arguments[i]->inferred_type) {
+                    arg_abi = language_type_to_abi_type(expr.arguments[i]->inferred_type);
+                } else if (auto lang_type = get_register_language_type(arg_regs[i])) {
+                    arg_abi = language_type_to_abi_type(lang_type);
+                } else {
+                    arg_abi = get_register_abi_type(arg_regs[i]);
+                }
+                inst.call_arg_types.push_back(arg_abi);
+            }
             emit_instruction(inst);
             return result;
         }
@@ -1408,6 +1415,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         
         LIR_Inst inst(LIR_Op::Call, result, vm_name, arg_regs);
         inst.func_name = vm_name;
+        for (size_t i = 0; i < arg_regs.size(); ++i) {
+            inst.call_arg_types.push_back(expr.arguments[i] && expr.arguments[i]->inferred_type ? language_type_to_abi_type(expr.arguments[i]->inferred_type) : Type::I64);
+        }
         if (expr.inferred_type) inst.result_type = language_type_to_abi_type(expr.inferred_type);
         emit_instruction(inst);
         return result;
@@ -1599,7 +1609,12 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     (qualified_name.length() >= 7 && qualified_name.substr(qualified_name.length()-7) == ".length")) {
                     op = LIR_Op::CallBuiltin; vm_name = "len";
                 } else if (qualified_name.length() >= 9 && qualified_name.substr(0, 9) == "_builtin_") {
-                    op = LIR_Op::CallBuiltin; vm_name = qualified_name.substr(9);
+                    op = LIR_Op::CallBuiltin;
+                    if (LIR::BuiltinUtils::isBuiltinFunction(qualified_name)) {
+                        vm_name = qualified_name;
+                    } else {
+                        vm_name = qualified_name.substr(9);
+                    }
                 }
 
                 LIR_Inst inst;
@@ -1627,10 +1642,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::String)) {
             if (method_name == "append") {
                 if (arg_regs.size() > 1) {
-                    Reg append_result = allocate_register();
-                    emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, append_result, object_reg, arg_regs[1]));
+                    emit_instruction(LIR_Inst(LIR_Op::ListAppend, Type::Void, result, object_reg, arg_regs[1]));
                 }
-                return 0;
+                return result;
             }
             if (method_name == "len" || method_name == "length") {
                 LIR_Inst inst;
@@ -2099,12 +2113,16 @@ Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
     
     // Check the object type to use the appropriate operation
     TypePtr object_type = get_register_language_type(object_reg);
-    if (object_type && object_type->tag == ::TypeTag::Tuple) {
+    if (!object_type && expr.object && expr.object->inferred_type) {
+        object_type = expr.object->inferred_type;
+    }
+    if (object_type && (object_type->tag == ::TypeTag::Tuple || object_type->tag == ::TypeTag::Frame)) {
         // Use TupleGet for tuples
         Reg result_reg = allocate_register();
         Type abi_type = language_type_to_abi_type(result_type);
         emit_instruction(LIR_Inst(LIR_Op::TupleGet, abi_type, result_reg, object_reg, index_reg));
         set_register_type(result_reg, result_type);
+        set_register_language_type(result_reg, result_type);
         return result_reg;
     } else if (object_type && object_type->tag == ::TypeTag::Dict) {
         // Use DictGet for dictionaries

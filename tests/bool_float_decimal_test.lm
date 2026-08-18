@@ -1,0 +1,7 @@
+var b1: bool = true;
+var b2: bool = false;
+print(b1);
+print(b2);
+
+var f: float = 3.14;
+print(f);

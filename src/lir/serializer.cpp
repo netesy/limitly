@@ -1,6 +1,6 @@
 #include "serializer.hh"
-#include "../runtime/runtime.h"
-#include "../runtime/runtime_value.h"
+#include "backend/vm/vm_runtime.hh"
+#include "backend/vm/vm_value.hh"
 #include <cstring>
 #include <cstdint>
 #include <stdexcept>

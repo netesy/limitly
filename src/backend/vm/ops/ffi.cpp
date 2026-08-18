@@ -1,6 +1,6 @@
 #include "../register.hh"
-#include "../../../runtime/runtime.h"
-#include "../../../runtime/runtime_value.h"
+#include "../vm_runtime.hh"
+#include "../vm_value.hh"
 #include <cstdlib>
 #include <cstring>
 #include <memory>

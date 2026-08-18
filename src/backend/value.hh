@@ -1,7 +1,7 @@
 #ifndef LIMITLY_BACKEND_VALUE_H
 #define LIMITLY_BACKEND_VALUE_H
 
-#include "../runtime/runtime_value_base.h"
+#include "backend/vm/vm_value_base.hh"
 
 namespace LM {
 namespace Backend {

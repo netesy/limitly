@@ -1,0 +1,4 @@
+val a = "hello ";
+val b = "world";
+val c = a + b;
+print(c);

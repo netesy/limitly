@@ -3,8 +3,8 @@
 #include <iostream>
 #include "../channel.hh"
 #include "../fiber.hh"
-#include "../../runtime/runtime.h"
-#include "../../runtime/runtime_value.h"
+#include "vm_runtime.hh"
+#include "vm_value.hh"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
