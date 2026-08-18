@@ -25,9 +25,13 @@ namespace Backend {
 namespace VM {
 namespace Register {
 
+inline bool is_decimal_type(const TypePtr& type) {
+    return type && (type->tag == ::TypeTag::Decimal2 || type->tag == ::TypeTag::Decimal4 || type->tag == ::TypeTag::Decimal6);
+}
+
 void* box_register_value(const RegisterValue& value);
 RegisterValue unbox_register_value(void* boxed_value);
-ValuePtr register_to_value_ptr(RegisterValue rv);
+ValuePtr register_to_value_ptr(RegisterValue rv, TypePtr lang_type = nullptr);
 
 class RegisterVM {
 public:
@@ -202,6 +206,11 @@ private:
         if (!current_function_) return LIR::Type::Void;
         auto it = current_function_->register_types.find(reg);
         return (it != current_function_->register_types.end()) ? it->second : LIR::Type::Void;
+    }
+    
+    inline TypePtr get_register_language_type(LIR::Reg reg) const {
+        if (!current_function_) return nullptr;
+        return current_function_->get_register_language_type(reg);
     }
     
     inline bool is_numeric(const RegisterValue& value) const {

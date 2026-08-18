@@ -26,7 +26,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 std::vector<ValuePtr> args;
                 args.reserve(pc->call_args.size());
                 for (auto arg_reg : pc->call_args) {
-                    args.push_back(register_to_value_ptr(registers[arg_reg]));
+                    args.push_back(register_to_value_ptr(registers[arg_reg], get_register_language_type(arg_reg)));
                 }
                 try {
                     ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(pc->func_name, args);
@@ -79,7 +79,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 std::vector<ValuePtr> args;
                 args.reserve(pc->call_args.size());
                 for (auto arg_reg : pc->call_args) {
-                    args.push_back(register_to_value_ptr(registers[arg_reg]));
+                    args.push_back(register_to_value_ptr(registers[arg_reg], get_register_language_type(arg_reg)));
                 }
                 try {
                     ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(pc->func_name, args);
