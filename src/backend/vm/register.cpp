@@ -435,13 +435,13 @@ void RegisterVM::transfer_ownership(RegisterValue child, RegisterValue container
     }
 }
 
-ValuePtr register_to_value_ptr(RegisterValue rv) {
+ValuePtr register_to_value_ptr(RegisterValue rv, TypePtr lang_type) {
     if (is_integer(rv)) {
         LmString s = lm_value_to_string(rv);
         std::string str(s.data ? s.data : "0");
         lm_string_free(s);
-        auto intType = std::make_shared<::Type>(::TypeTag::Int128);
-        return std::make_shared<::Value>(intType, str);
+        TypePtr val_type = (lang_type && is_decimal_type(lang_type)) ? lang_type : std::make_shared<::Type>(::TypeTag::Int128);
+        return std::make_shared<::Value>(val_type, str);
     } else if (IS_BOOL(rv)) {
         auto boolType = std::make_shared<::Type>(::TypeTag::Bool);
         return std::make_shared<::Value>(boolType, UNBOX_BOOL(rv) ? "true" : "false");

@@ -3,6 +3,8 @@
 #include "backend/env.hh"
 #include "backend/vm/register.hh"
 #include <sstream>
+#include <iomanip>
+#include <cmath>
 
 // Helper function to check if a type is an integer type
 static bool isIntegerType(TypePtr type) {
@@ -367,6 +369,19 @@ std::string Value::toString() const {
     } else if (type->tag == TypeTag::Float32 || type->tag == TypeTag::Float64) {
         // Handle all float types
         oss << as<double>();
+    } else if (type->tag == TypeTag::Decimal2 || type->tag == TypeTag::Decimal4 || type->tag == TypeTag::Decimal6) {
+        int scale = 2;
+        if (type->tag == TypeTag::Decimal4) scale = 4;
+        else if (type->tag == TypeTag::Decimal6) scale = 6;
+        try {
+            int64_t intVal = as<int64_t>();
+            double decimalVal = static_cast<double>(intVal) / std::pow(10, scale);
+            std::ostringstream dec_oss;
+            dec_oss << std::fixed << std::setprecision(scale) << decimalVal;
+            oss << dec_oss.str();
+        } catch (...) {
+            oss << data;
+        }
     } else {
         // Handle complex types using complexData
         std::visit(overloaded{
