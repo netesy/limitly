@@ -25,6 +25,10 @@ public:
     static void emit_print_bool_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
     static void emit_print_decimal_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val, int scale);
     static void emit_str_concat_ir(ir::Module* module, ir::IRBuilder* builder);
+    static void emit_str_format_ir(ir::Module* module, ir::IRBuilder* builder);
+    static void emit_substring_ir(ir::Module* module, ir::IRBuilder* builder);
+    static void emit_to_string_ir(ir::Module* module, ir::IRBuilder* builder);
+    static void emit_error_new_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_list_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_tuple_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_dict_ir(ir::Module* module, ir::IRBuilder* builder);
