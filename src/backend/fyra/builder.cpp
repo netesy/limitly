@@ -185,6 +185,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         switch (inst.op) {
             case LIR::LIR_Op::Mov:
                 if (reg_decimal_scales.count(inst.a)) reg_decimal_scales[inst.dst] = reg_decimal_scales[inst.a];
+                if (reg_types.count(inst.a)) reg_types[inst.dst] = reg_types[inst.a];
                 store_reg(inst.dst, load_reg(inst.a, inst.type_a), inst.result_type);
                 break;
             case LIR::LIR_Op::LoadConst: {
@@ -193,9 +194,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 else if (inst.type_name == "d6") reg_decimal_scales[inst.dst] = 6;
 
                 LmValue val = inst.const_val;
-                if (IS_INT(val)) {
-                    // If target is I64, we need raw unboxed integer
-                    uint64_t actual_val = (inst.result_type == LIR::Type::I64) ? UNBOX_INT(val) : val;
+                if (IS_NIL(val) || val == 0) {
+                    ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), VAL_NIL);
+                    reg_types[inst.dst] = LIR::Type::Ptr;
+                    store_reg(inst.dst, c, LIR::Type::Ptr);
+                } else if (IS_INT(val) && (((val >> 3) << 3) | TAG_INT) == val) {
+                    int64_t actual_val = UNBOX_INT(val);
                     ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), actual_val);
                     store_reg(inst.dst, c, inst.result_type);
                 } else if (IS_BOOL(val)) {
@@ -225,20 +229,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             store_reg(inst.dst, c, inst.result_type);
                         } else if (box->type == LM_BOX_FLOAT) {
                             double fval = box->value.as_float;
-                            char buf[64];
-                            snprintf(buf, sizeof(buf), "%g", fval);
-                            if (!strchr(buf, '.')) {
-                                strncat(buf, ".0", sizeof(buf) - strlen(buf) - 1);
-                            }
-                            ir::Value* str_const = context_->getConstantString(buf);
-                            std::string name = "str_float_" + std::to_string(label_counter_++);
-                            auto gv = std::make_unique<ir::GlobalVariable>(
-                                context_->getPointerType(context_->getIntegerType(8)),
-                                name, static_cast<ir::Constant*>(str_const), false, ".data"
-                            );
-                            ir::Value* raw_str_ptr = gv.get();
-                            current_module_->addGlobalVariable(std::move(gv));
-                            store_reg(inst.dst, raw_str_ptr, LIR::Type::Ptr);
+                            uint64_t bits;
+                            memcpy(&bits, &fval, sizeof(bits));
+                            ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), bits);
+                            reg_types[inst.dst] = LIR::Type::F64;
+                            store_reg(inst.dst, c, LIR::Type::F64);
                         } else if (box->type == LM_BOX_BOOL) {
                             ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), box->value.as_bool ? 1 : 0);
                             store_reg(inst.dst, c, LIR::Type::Bool);
@@ -248,25 +243,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         }
                     } else if (h->type_id == TYPE_FLOAT) {
                         double fval = ((ObjFloat*)h)->value;
-                        char buf[64];
-                        snprintf(buf, sizeof(buf), "%g", fval);
-                        if (!strchr(buf, '.')) {
-                            strncat(buf, ".0", sizeof(buf) - strlen(buf) - 1);
-                        }
-                        ir::Value* str_const = context_->getConstantString(buf);
-                        std::string name = "str_float_" + std::to_string(label_counter_++);
-                        auto gv = std::make_unique<ir::GlobalVariable>(
-                            context_->getPointerType(context_->getIntegerType(8)),
-                            name, static_cast<ir::Constant*>(str_const), false, ".data"
-                        );
-                        ir::Value* raw_str_ptr = gv.get();
-                        current_module_->addGlobalVariable(std::move(gv));
-                        store_reg(inst.dst, raw_str_ptr, LIR::Type::Ptr);
+                        uint64_t bits;
+                        memcpy(&bits, &fval, sizeof(bits));
+                        ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), bits);
+                        reg_types[inst.dst] = LIR::Type::F64;
+                        store_reg(inst.dst, c, LIR::Type::F64);
                     } else {
                         ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), VAL_NIL);
                         store_reg(inst.dst, c, inst.result_type);
                     }
                 } else {
+                    if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) {
+                        reg_types[inst.dst] = inst.result_type;
+                    }
                     ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), val);
                     store_reg(inst.dst, c, inst.result_type);
                 }
@@ -406,23 +395,74 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
 
                 if (name == "print" && !args.empty()) {
-                    LIR::Type arg_type = inst.call_arg_types.empty() ? LIR::Type::I64 : inst.call_arg_types[0];
-                    if (!inst.call_args.empty() && reg_types.count(inst.call_args[0])) {
-                        LIR::Type reg_t = reg_types[inst.call_args[0]];
-                        if (reg_t == LIR::Type::Bool || reg_t == LIR::Type::Ptr || reg_t == LIR::Type::F64 || reg_t == LIR::Type::F32) {
-                            arg_type = reg_t;
+                    fprintf(stderr, "[FYRA BUILDER DEBUG] print call args count: %zu\n", args.size());
+                    for (size_t ai = 0; ai < args.size(); ++ai) {
+                        if (ai > 0) {
+                            ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
+                            builder_->createExternCall("io.write", {
+                                context_->getConstantInt(context_->getIntegerType(64), 1),
+                                gv_sp,
+                                context_->getConstantInt(context_->getIntegerType(64), 1)
+                            }, context_->getIntegerType(64));
+                        }
+                        LIR::Type arg_type = (ai < inst.call_arg_types.size()) ? inst.call_arg_types[ai] : LIR::Type::I64;
+                        if (ai < inst.call_args.size() && reg_types.count(inst.call_args[ai])) {
+                            LIR::Type reg_t = reg_types[inst.call_args[ai]];
+                            if (reg_t == LIR::Type::Bool || reg_t == LIR::Type::Ptr || reg_t == LIR::Type::F64 || reg_t == LIR::Type::F32) {
+                                arg_type = reg_t;
+                            }
+                        }
+                        if (arg_type == LIR::Type::Ptr) {
+                            std::string prid = std::to_string(ai) + "_" + std::to_string(rand() % 10000);
+                            ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                            ir::BasicBlock* b_pr_nil = builder_->createBasicBlock("pr_nil_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_nonnil = builder_->createBasicBlock("pr_nonnil_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_str = builder_->createBasicBlock("pr_str_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_int = builder_->createBasicBlock("pr_int_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_next = builder_->createBasicBlock("pr_next_" + prid, cur_fn);
+
+                            ir::Value* is_nil = builder_->createCeq(args[ai], context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
+                            builder_->createBr(is_nil, b_pr_nil, b_pr_nonnil);
+
+                            builder_->setInsertPoint(b_pr_nil);
+                            FyraBuiltinFunctions::emit_print_nil_inline(current_module_.get(), builder_.get());
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_nonnil);
+                            ir::Value* is_str_ptr = builder_->createCuge(args[ai], context_->getConstantInt(context_->getIntegerType(64), 65536));
+                            builder_->createBr(is_str_ptr, b_pr_str, b_pr_int);
+
+                            builder_->setInsertPoint(b_pr_str);
+                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), args[ai]);
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_int);
+                            FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), args[ai]);
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_next);
+                        } else if (arg_type == LIR::Type::Bool) {
+                            FyraBuiltinFunctions::emit_print_bool_inline(current_module_.get(), builder_.get(), args[ai]);
+                        } else if (arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
+                            FyraBuiltinFunctions::emit_print_float_inline(current_module_.get(), builder_.get(), args[ai]);
+                        } else if (ai < inst.call_args.size() && reg_decimal_scales.count(inst.call_args[ai]) && reg_decimal_scales[inst.call_args[ai]] > 0) {
+                            FyraBuiltinFunctions::emit_print_decimal_inline(current_module_.get(), builder_.get(), args[ai], reg_decimal_scales[inst.call_args[ai]]);
+                        } else {
+                            FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), args[ai]);
                         }
                     }
-                    if (arg_type == LIR::Type::Ptr || arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
-                        FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), args[0]);
-                    } else if (arg_type == LIR::Type::Bool) {
-                        FyraBuiltinFunctions::emit_print_bool_inline(current_module_.get(), builder_.get(), args[0]);
-                    } else if (!inst.call_args.empty() && reg_decimal_scales.count(inst.call_args[0]) && reg_decimal_scales[inst.call_args[0]] > 0) {
-                        FyraBuiltinFunctions::emit_print_decimal_inline(current_module_.get(), builder_.get(), args[0], reg_decimal_scales[inst.call_args[0]]);
-                    } else {
-                        FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), args[0]);
-                    }
+                    ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
+                    builder_->createExternCall("io.write", {
+                        context_->getConstantInt(context_->getIntegerType(64), 1),
+                        gv_nl,
+                        context_->getConstantInt(context_->getIntegerType(64), 1)
+                    }, context_->getIntegerType(64));
+
                     if (inst.op == LIR::LIR_Op::Call) store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
+                    break;
+                } else if (name == "sleep" || name == "time.sleep" || name == "sleep_ms" || name == "time_sleep") {
+                    ir::Value* res = builder_->createExternCall("process.sleep", args, lir_type_to_fyra_type(inst.result_type));
+                    if (inst.op == LIR::LIR_Op::Call && inst.dst != 0) store_reg(inst.dst, res, inst.result_type);
                     break;
                 } else if (FyraBuiltinFunctions::is_builtin(name)) {
                     name = FyraBuiltinFunctions::get_internal_name(name);
@@ -468,23 +508,96 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
 
                 if (name == "print" && !args.empty()) {
-                    LIR::Type arg_type = inst.call_arg_types.empty() ? LIR::Type::I64 : inst.call_arg_types[0];
-                    if (!inst.call_args.empty() && reg_types.count(inst.call_args[0])) {
-                        LIR::Type reg_t = reg_types[inst.call_args[0]];
-                        if (reg_t == LIR::Type::Bool || reg_t == LIR::Type::Ptr || reg_t == LIR::Type::F64 || reg_t == LIR::Type::F32) {
-                            arg_type = reg_t;
+                    for (size_t ai = 0; ai < args.size(); ++ai) {
+                        if (ai > 0) {
+                            ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
+                            builder_->createExternCall("io.write", {
+                                context_->getConstantInt(context_->getIntegerType(64), 1),
+                                gv_sp,
+                                context_->getConstantInt(context_->getIntegerType(64), 1)
+                            }, context_->getIntegerType(64));
+                        }
+                        LIR::Type arg_type = (ai < inst.call_arg_types.size()) ? inst.call_arg_types[ai] : LIR::Type::I64;
+                        if (ai < inst.call_args.size() && reg_types.count(inst.call_args[ai])) {
+                            LIR::Type reg_t = reg_types[inst.call_args[ai]];
+                            if (reg_t == LIR::Type::Bool || reg_t == LIR::Type::Ptr || reg_t == LIR::Type::F64 || reg_t == LIR::Type::F32) {
+                                arg_type = reg_t;
+                            }
+                        }
+                        if (arg_type == LIR::Type::Ptr) {
+                            std::string prid = std::to_string(ai) + "_" + std::to_string(rand() % 10000);
+                            ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                            ir::BasicBlock* b_pr_nil = builder_->createBasicBlock("pr_nil_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_nonnil = builder_->createBasicBlock("pr_nonnil_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_str = builder_->createBasicBlock("pr_str_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_int = builder_->createBasicBlock("pr_int_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_next = builder_->createBasicBlock("pr_next_" + prid, cur_fn);
+
+                            ir::Value* is_nil = builder_->createCeq(args[ai], context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
+                            builder_->createBr(is_nil, b_pr_nil, b_pr_nonnil);
+
+                            builder_->setInsertPoint(b_pr_nil);
+                            FyraBuiltinFunctions::emit_print_nil_inline(current_module_.get(), builder_.get());
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_nonnil);
+                            ir::Value* is_str_ptr = builder_->createCuge(args[ai], context_->getConstantInt(context_->getIntegerType(64), 65536));
+                            builder_->createBr(is_str_ptr, b_pr_str, b_pr_int);
+
+                            builder_->setInsertPoint(b_pr_str);
+                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), args[ai]);
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_int);
+                            FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), args[ai]);
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_next);
+                        } else if (arg_type == LIR::Type::Bool) {
+                            FyraBuiltinFunctions::emit_print_bool_inline(current_module_.get(), builder_.get(), args[ai]);
+                        } else if (arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
+                            FyraBuiltinFunctions::emit_print_float_inline(current_module_.get(), builder_.get(), args[ai]);
+                        } else if (ai < inst.call_args.size() && reg_decimal_scales.count(inst.call_args[ai]) && reg_decimal_scales[inst.call_args[ai]] > 0) {
+                            FyraBuiltinFunctions::emit_print_decimal_inline(current_module_.get(), builder_.get(), args[ai], reg_decimal_scales[inst.call_args[ai]]);
+                        } else {
+                            FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), args[ai]);
                         }
                     }
-                    if (arg_type == LIR::Type::Ptr || arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
-                        FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), args[0]);
-                    } else if (arg_type == LIR::Type::Bool) {
-                        FyraBuiltinFunctions::emit_print_bool_inline(current_module_.get(), builder_.get(), args[0]);
-                    } else if (!inst.call_args.empty() && reg_decimal_scales.count(inst.call_args[0]) && reg_decimal_scales[inst.call_args[0]] > 0) {
-                        FyraBuiltinFunctions::emit_print_decimal_inline(current_module_.get(), builder_.get(), args[0], reg_decimal_scales[inst.call_args[0]]);
+                    ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
+                    builder_->createExternCall("io.write", {
+                        context_->getConstantInt(context_->getIntegerType(64), 1),
+                        gv_nl,
+                        context_->getConstantInt(context_->getIntegerType(64), 1)
+                    }, context_->getIntegerType(64));
+
+                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
+                    break;
+                } else if (name == "assert" && !args.empty()) {
+                    std::string aid = std::to_string(label_counter_++);
+                    ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                    ir::BasicBlock* b_pass = builder_->createBasicBlock("assert_pass_" + aid, cur_fn);
+                    ir::BasicBlock* b_fail = builder_->createBasicBlock("assert_fail_" + aid, cur_fn);
+
+                    builder_->createBr(args[0], b_pass, b_fail);
+
+                    builder_->setInsertPoint(b_fail);
+                    if (args.size() > 1) {
+                        FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), args[1]);
                     } else {
-                        FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), args[0]);
+                        ir::GlobalVariable* gv_fail = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "assert_msg", "Assertion failed\n");
+                        builder_->createExternCall("io.write", {
+                            context_->getConstantInt(context_->getIntegerType(64), 1),
+                            gv_fail,
+                            context_->getConstantInt(context_->getIntegerType(64), 17)
+                        }, context_->getIntegerType(64));
                     }
-                    store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
+                    builder_->createExternCall("process.exit", {
+                        context_->getConstantInt(context_->getIntegerType(64), 1)
+                    }, context_->getIntegerType(64));
+                    builder_->createJmp(b_pass);
+
+                    builder_->setInsertPoint(b_pass);
+                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
                     break;
                 } else if (FyraBuiltinFunctions::is_builtin(name)) {
                     name = FyraBuiltinFunctions::get_internal_name(name);
@@ -620,24 +733,31 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::NewFrame: {
                 std::string name = inst.func_name; if (name.empty()) name = "Frame";
+                uint32_t fields = static_cast<uint32_t>(inst.imm);
+                uint32_t bytes = (fields > 0 ? fields : 2) * 8;
                 ir::Type* type = current_module_->getType(name);
                 if (!type) { ir::StructType* st = context_->createStructType(name); st->setBody({context_->getIntegerType(64), context_->getIntegerType(64)}); current_module_->addType(name, st); type = st; }
-                store_reg(inst.dst, builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 16), type), inst.result_type);
+                store_reg(inst.dst, builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), bytes), type), inst.result_type);
                 break;
             }
-            case LIR::LIR_Op::FrameGetField: {
-                ir::Value* addr = builder_->createAdd(load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm * 8));
+            case LIR::LIR_Op::FrameGetField:
+            case LIR::LIR_Op::FrameGetFieldAtomic: {
+                uint32_t field_idx = (inst.b != UINT32_MAX) ? inst.b : static_cast<uint32_t>(inst.imm);
+                ir::Value* addr = builder_->createAdd(load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
                 store_reg(inst.dst, builder_->createLoad(addr), inst.result_type);
                 break;
             }
-            case LIR::LIR_Op::FrameSetField: {
-                ir::Value* addr = builder_->createAdd(load_reg(inst.dst, inst.result_type), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm * 8));
-                builder_->createStore(load_reg(inst.a, inst.type_a), addr);
+            case LIR::LIR_Op::FrameSetField:
+            case LIR::LIR_Op::FrameSetFieldAtomic: {
+                uint32_t field_idx = inst.a;
+                ir::Value* val = load_reg(inst.b, inst.type_b);
+                ir::Value* addr = builder_->createAdd(load_reg(inst.dst, inst.result_type), context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
+                builder_->createStore(val, addr);
                 break;
             }
             case LIR::LIR_Op::Return:
             case LIR::LIR_Op::Ret:
-                if (inst.a != 0 || inst.type_a != LIR::Type::Void) {
+                if (inst.type_a != LIR::Type::Void) {
                     ir::Value* ret_val = load_reg(inst.a, inst.type_a);
                     builder_->createRet(ret_val);
                 } else {

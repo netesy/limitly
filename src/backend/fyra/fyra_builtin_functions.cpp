@@ -1,13 +1,7 @@
-// fyra_builtin_functions.cpp
-// All core builtins are now INLINED at call sites in builder.cpp.
-// This file only handles:
-//   - Runtime declarations for collections / math (still need runtime lib)
-//   - lm_assert (tiny, keeps its own function for now)
-//   - abs helper
-
 #include "fyra_builtin_functions.hh"
 #include "ir/Constant.h"
 #include "ir/Type.h"
+#include "ir/PhiNode.h"
 
 namespace LM::Backend::Fyra {
 
@@ -66,7 +60,7 @@ void FyraBuiltinFunctions::emit_used_builtins(ir::Module* module,
 // ---------------------------------------------------------------------------
 // Helper: look-up or create a global string constant.
 // ---------------------------------------------------------------------------
-static ir::GlobalVariable* get_or_create_global_str(ir::Module* module,
+ir::GlobalVariable* FyraBuiltinFunctions::get_or_create_global_str(ir::Module* module,
                                                       ir::IRBuilder* builder,
                                                       const std::string& name,
                                                       const std::string& value) {
@@ -92,37 +86,27 @@ static int g_print_int_counter = 0;
 void FyraBuiltinFunctions::emit_print_str_inline(
         ir::Module* module, ir::IRBuilder* builder, ir::Value* char_ptr) {
     auto ctx = module->getContextShared();
-
-    // --- strlen inline loop ---
-    // Allocate a counter slot on the Fyra bump heap
-    ir::Instruction* len_slot = builder->createAlloc(
-        ctx->getConstantInt(ctx->getIntegerType(64), 8),
-        ctx->getIntegerType(64));
-    builder->createStore(ctx->getConstantInt(ctx->getIntegerType(64), 0), len_slot);
-
-    // We need basic blocks — get current function
     ir::Function* fn = builder->getInsertPoint()->getParent();
     std::string id = std::to_string(++g_print_str_counter);
+    ir::BasicBlock* current_bb = builder->getInsertPoint();
     ir::BasicBlock* b_loop = builder->createBasicBlock("ps_loop_" + id, fn);
     ir::BasicBlock* b_done = builder->createBasicBlock("ps_done_" + id, fn);
 
     builder->createJmp(b_loop);
 
     builder->setInsertPoint(b_loop);
-    ir::Value* cur_len  = builder->createLoad(len_slot);
-    ir::Value* char_ptr2 = builder->createAdd(char_ptr, cur_len);
+    ir::PhiNode* len_phi = builder->createPhi(ctx->getIntegerType(64), 2, nullptr);
+    len_phi->addIncoming(ctx->getConstantInt(ctx->getIntegerType(64), 0), current_bb);
+
+    ir::Value* char_ptr2 = builder->createAdd(char_ptr, len_phi);
     ir::Value* ch        = builder->createLoadub(char_ptr2);
-    ir::Value* is_null   = builder->createCeq(
-        ch, ctx->getConstantInt(ctx->getIntegerType(8), 0));
-    ir::Value* next_len  = builder->createAdd(
-        cur_len, ctx->getConstantInt(ctx->getIntegerType(64), 1));
-    builder->createStore(next_len, len_slot);
+    ir::Value* is_null   = builder->createCeq(ch, ctx->getConstantInt(ctx->getIntegerType(8), 0));
+    ir::Value* next_len  = builder->createAdd(len_phi, ctx->getConstantInt(ctx->getIntegerType(64), 1));
+    len_phi->addIncoming(next_len, b_loop);
     builder->createBr(is_null, b_done, b_loop);
 
     builder->setInsertPoint(b_done);
-    ir::Value* final_len = builder->createLoad(len_slot);
-    ir::Value* actual_len = builder->createSub(
-        final_len, ctx->getConstantInt(ctx->getIntegerType(64), 1));
+    ir::Value* actual_len = len_phi;
 
     // io.write(1, char_ptr, actual_len)
     builder->createExternCall("io.write", {
@@ -130,47 +114,26 @@ void FyraBuiltinFunctions::emit_print_str_inline(
         char_ptr,
         actual_len
     }, ctx->getIntegerType(64));
-
-    // io.write(1, "\n", 1)
-    ir::GlobalVariable* gv_nl = get_or_create_global_str(module, builder, "nl", "\n");
-    builder->createExternCall("io.write", {
-        ctx->getConstantInt(ctx->getIntegerType(64), 1),
-        gv_nl,
-        ctx->getConstantInt(ctx->getIntegerType(64), 1)
-    }, ctx->getIntegerType(64));
 }
 
-// ---------------------------------------------------------------------------
-// emit_print_int_inline  —  inline int-to-ASCII + io.write for an i64
-// ---------------------------------------------------------------------------
 void FyraBuiltinFunctions::emit_print_int_inline(
         ir::Module* module, ir::IRBuilder* builder, ir::Value* val) {
     auto ctx = module->getContextShared();
     ir::Function* fn = builder->getInsertPoint()->getParent();
     std::string id = std::to_string(++g_print_int_counter);
 
+    ir::BasicBlock* current_bb = builder->getInsertPoint();
     ir::BasicBlock* b_neg  = builder->createBasicBlock("pi_neg_" + id,  fn);
     ir::BasicBlock* b_abs  = builder->createBasicBlock("pi_abs_" + id,  fn);
     ir::BasicBlock* b_loop = builder->createBasicBlock("pi_loop_" + id, fn);
     ir::BasicBlock* b_emit = builder->createBasicBlock("pi_emit_" + id, fn);
 
-    // 32-byte buffer at end of bump heap
-    ir::Value* buf = builder->createAlloc(
-        ctx->getConstantInt(ctx->getIntegerType(64), 32),
-        ctx->getIntegerType(64));
-    ir::Value* end_ptr = builder->createAdd(
-        buf, ctx->getConstantInt(ctx->getIntegerType(64), 31));
-    // Null-terminate with '\n'
-    builder->createStoreb(ctx->getConstantInt(ctx->getIntegerType(8), 10), end_ptr);
+    // Static 64-byte print buffer in global BSS
+    ir::GlobalVariable* buf = get_or_create_global_str(module, builder, "print_int_buf_" + id, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
+    ir::Value* end_ptr = builder->createAdd(buf, ctx->getConstantInt(ctx->getIntegerType(64), 31));
+    builder->createStoreb(ctx->getConstantInt(ctx->getIntegerType(8), 0), end_ptr);
 
-    ir::Instruction* val_slot = builder->createAlloc(
-        ctx->getConstantInt(ctx->getIntegerType(64), 8), ctx->getIntegerType(64));
-    ir::Instruction* ptr_slot = builder->createAlloc(
-        ctx->getConstantInt(ctx->getIntegerType(64), 8), ctx->getIntegerType(64));
-    builder->createStore(end_ptr, ptr_slot);
-
-    ir::Value* is_neg = builder->createCslt(
-        val, ctx->getConstantInt(ctx->getIntegerType(64), 0));
+    ir::Value* is_neg = builder->createCslt(val, ctx->getConstantInt(ctx->getIntegerType(64), 0));
     builder->createBr(is_neg, b_neg, b_abs);
 
     // negative branch: print '-', negate
@@ -182,42 +145,46 @@ void FyraBuiltinFunctions::emit_print_int_inline(
         ctx->getConstantInt(ctx->getIntegerType(64), 1)
     }, ctx->getIntegerType(64));
     ir::Value* abs_v = builder->createNeg(val);
-    builder->createStore(abs_v, val_slot);
     builder->createJmp(b_loop);
 
     builder->setInsertPoint(b_abs);
-    builder->createStore(val, val_slot);
     builder->createJmp(b_loop);
 
-    // digit extraction loop
+    // digit extraction loop with PhiNodes
     builder->setInsertPoint(b_loop);
-    ir::Value* curr_val = builder->createLoad(val_slot);
-    ir::Value* next_val = builder->createDiv(
-        curr_val, ctx->getConstantInt(ctx->getIntegerType(64), 10));
-    ir::Value* rem      = builder->createRem(
-        curr_val, ctx->getConstantInt(ctx->getIntegerType(64), 10));
-    ir::Value* ascii    = builder->createAdd(
-        rem, ctx->getConstantInt(ctx->getIntegerType(64), 48));
-    ir::Value* curr_ptr = builder->createLoad(ptr_slot);
-    ir::Value* next_ptr = builder->createSub(
-        curr_ptr, ctx->getConstantInt(ctx->getIntegerType(64), 1));
+    ir::PhiNode* val_phi = builder->createPhi(ctx->getIntegerType(64), 2, nullptr);
+    val_phi->addIncoming(abs_v, b_neg);
+    val_phi->addIncoming(val, b_abs);
+
+    ir::PhiNode* ptr_phi = builder->createPhi(ctx->getIntegerType(64), 2, nullptr);
+    ptr_phi->addIncoming(end_ptr, b_neg);
+    ptr_phi->addIncoming(end_ptr, b_abs);
+
+    ir::Value* next_val = builder->createDiv(val_phi, ctx->getConstantInt(ctx->getIntegerType(64), 10));
+    ir::Value* rem      = builder->createRem(val_phi, ctx->getConstantInt(ctx->getIntegerType(64), 10));
+    ir::Value* ascii    = builder->createAdd(rem, ctx->getConstantInt(ctx->getIntegerType(64), 48));
+    ir::Value* next_ptr = builder->createSub(ptr_phi, ctx->getConstantInt(ctx->getIntegerType(64), 1));
     builder->createStoreb(ascii, next_ptr);
-    builder->createStore(next_val, val_slot);
-    builder->createStore(next_ptr, ptr_slot);
-    ir::Value* cond = builder->createCuge(
-        next_val, ctx->getConstantInt(ctx->getIntegerType(64), 1));
+
+    val_phi->addIncoming(next_val, b_loop);
+    ptr_phi->addIncoming(next_ptr, b_loop);
+    ir::Value* cond = builder->createCuge(next_val, ctx->getConstantInt(ctx->getIntegerType(64), 1));
     builder->createBr(cond, b_loop, b_emit);
 
+    ir::BasicBlock* b_done = builder->createBasicBlock("pi_done_" + id, fn);
+
     builder->setInsertPoint(b_emit);
-    ir::Value* final_ptr  = builder->createLoad(ptr_slot);
-    ir::Value* full_end   = builder->createAdd(
-        buf, ctx->getConstantInt(ctx->getIntegerType(64), 32));
+    ir::Value* final_ptr  = next_ptr;
+    ir::Value* full_end   = builder->createAdd(buf, ctx->getConstantInt(ctx->getIntegerType(64), 31));
     ir::Value* len = builder->createSub(full_end, final_ptr);
     builder->createExternCall("io.write", {
         ctx->getConstantInt(ctx->getIntegerType(64), 1),
         final_ptr,
         len
     }, ctx->getIntegerType(64));
+    builder->createJmp(b_done);
+
+    builder->setInsertPoint(b_done);
 }
 
 // ---------------------------------------------------------------------------
@@ -241,24 +208,55 @@ void FyraBuiltinFunctions::emit_print_bool_inline(ir::Module* module,
     builder->createBr(cond, b_true, b_false);
 
     builder->setInsertPoint(b_true);
-    ir::GlobalVariable* gv_true = get_or_create_global_str(module, builder, "str_true", "true\n");
+    ir::GlobalVariable* gv_true = get_or_create_global_str(module, builder, "str_true", "true");
     builder->createExternCall("io.write", {
         ctx->getConstantInt(i64, 1),
         gv_true,
-        ctx->getConstantInt(i64, 5)
+        ctx->getConstantInt(i64, 4)
     }, i64);
     builder->createJmp(b_done);
 
     builder->setInsertPoint(b_false);
-    ir::GlobalVariable* gv_false = get_or_create_global_str(module, builder, "str_false", "false\n");
+    ir::GlobalVariable* gv_false = get_or_create_global_str(module, builder, "str_false", "false");
     builder->createExternCall("io.write", {
         ctx->getConstantInt(i64, 1),
         gv_false,
-        ctx->getConstantInt(i64, 6)
+        ctx->getConstantInt(i64, 5)
     }, i64);
     builder->createJmp(b_done);
 
     builder->setInsertPoint(b_done);
+}
+
+void FyraBuiltinFunctions::emit_print_nil_inline(ir::Module* module,
+                                                 ir::IRBuilder* builder) {
+    auto ctx = module->getContextShared();
+    auto i64 = ctx->getIntegerType(64);
+    ir::GlobalVariable* gv_nil = get_or_create_global_str(module, builder, "str_nil", "nil");
+    builder->createExternCall("io.write", {
+        ctx->getConstantInt(i64, 1),
+        gv_nil,
+        ctx->getConstantInt(i64, 3)
+    }, i64);
+}
+
+void FyraBuiltinFunctions::emit_print_float_inline(ir::Module* module,
+                                                   ir::IRBuilder* builder,
+                                                   ir::Value* val) {
+    auto ctx = module->getContextShared();
+    auto i64 = ctx->getIntegerType(64);
+    ir::Instruction* buf_ptr = builder->createAlloc(ctx->getConstantInt(i64, 64), i64);
+    ir::GlobalVariable* fmt_gv = get_or_create_global_str(module, builder, "fmt_float", "%g");
+    
+    // snprintf(buf_ptr, 64, "%g", val)
+    builder->createExternCall("snprintf", {
+        buf_ptr,
+        ctx->getConstantInt(i64, 64),
+        fmt_gv,
+        val
+    }, i64);
+
+    emit_print_str_inline(module, builder, buf_ptr);
 }
 
 // ---------------------------------------------------------------------------
@@ -278,8 +276,7 @@ void FyraBuiltinFunctions::emit_print_decimal_inline(ir::Module* module,
 
     // 1. Allocate buffer and all local slots upfront
     ir::Instruction* buf_ptr = builder->createAlloc(ctx->getConstantInt(i64, 64), i64);
-    ir::Value* p_end = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, 63));
-    builder->createStoreb(ctx->getConstantInt(i8, 10), p_end);
+    ir::Value* p_end = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, 64));
 
     ir::Instruction* v_cur_ptr = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
     builder->createStore(p_end, v_cur_ptr);
@@ -373,6 +370,8 @@ void FyraBuiltinFunctions::emit_print_decimal_inline(ir::Module* module,
     ir::Value* w_more = builder->createCsge(w_next, ctx->getConstantInt(i64, 1));
     builder->createBr(w_more, b_whole_loop, b_emit);
 
+    ir::BasicBlock* b_done = builder->createBasicBlock("pd_done_" + s_uid, cur_fn);
+
     // Emit WriteFile
     builder->setInsertPoint(b_emit);
     ir::Value* final_start = builder->createLoad(v_cur_ptr);
@@ -384,6 +383,9 @@ void FyraBuiltinFunctions::emit_print_decimal_inline(ir::Module* module,
         final_start,
         len
     }, i64);
+    builder->createJmp(b_done);
+
+    builder->setInsertPoint(b_done);
 }
 
 // ---------------------------------------------------------------------------
@@ -518,12 +520,27 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* list_ptr = it->get();
         it++;
         ir::Value* index = it->get();
+
         ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
         ir::Value* data = builder->createLoad(data_ptr_slot);
+        ir::Value* is_tuple = builder->createCult(data, ctx->getConstantInt(i64, 65536));
+
+        ir::BasicBlock* b_list = builder->createBasicBlock("get_list", fn_get);
+        ir::BasicBlock* b_tuple = builder->createBasicBlock("get_tuple", fn_get);
+        builder->createBr(is_tuple, b_tuple, b_list);
+
+        builder->setInsertPoint(b_list);
         ir::Value* offset = builder->createMul(index, ctx->getConstantInt(i64, 8));
         ir::Value* elem_ptr = builder->createAdd(data, offset);
         ir::Value* val = builder->createLoad(elem_ptr);
         builder->createRet(val);
+
+        builder->setInsertPoint(b_tuple);
+        ir::Value* slot_idx = builder->createAdd(index, ctx->getConstantInt(i64, 1));
+        ir::Value* t_offset = builder->createMul(slot_idx, ctx->getConstantInt(i64, 8));
+        ir::Value* t_elem_ptr = builder->createAdd(list_ptr, t_offset);
+        ir::Value* t_val = builder->createLoad(t_elem_ptr);
+        builder->createRet(t_val);
     }
 
     // 4. lm_list_set(list_ptr: i64, index: i64, val: i64) -> void
@@ -705,8 +722,8 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         builder->createBr(ptr_eq, b_ret_true, b_ptrcmp);
 
         builder->setInsertPoint(b_ptrcmp);
-        ir::Value* k1_small = builder->createCslt(k1, ctx->getConstantInt(i64, 65536));
-        ir::Value* k2_small = builder->createCslt(k2, ctx->getConstantInt(i64, 65536));
+        ir::Value* k1_small = builder->createCult(k1, ctx->getConstantInt(i64, 65536));
+        ir::Value* k2_small = builder->createCult(k2, ctx->getConstantInt(i64, 65536));
         ir::Value* either_small = builder->createOr(k1_small, k2_small);
         builder->createBr(either_small, b_ret_false, b_loop_init);
 
@@ -884,6 +901,11 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* k_addr = builder->createAdd(keys, k_off);
         ir::Value* curr_k = builder->createLoad(k_addr);
 
+        ir::Value* is_null = builder->createCeq(curr_k, ctx->getConstantInt(i64, 0));
+        ir::BasicBlock* b_cmp = builder->createBasicBlock("dict_get_cmp", fn_get);
+        builder->createBr(is_null, b_next, b_cmp);
+
+        builder->setInsertPoint(b_cmp);
         ir::Value* is_match = builder->createCall(fn_eq, {curr_k, key});
         builder->createBr(is_match, b_found, b_next);
 
