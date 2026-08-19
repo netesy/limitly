@@ -15,6 +15,9 @@
 #include <unordered_map>
 #include <string>
 #include <vector>
+#include <sstream>
+#include <iomanip>
+#include <cmath>
 #include "../../lir/function_registry.hh"
 #include "../../lir/builtin_functions.hh"
 
@@ -140,6 +143,42 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     std::unordered_map<uint32_t, ir::Value*> regs;
     std::unordered_map<uint32_t, LIR::Type> reg_types;
     std::unordered_map<uint32_t, int> reg_decimal_scales;
+    std::unordered_map<uint32_t, int64_t> reg_int_values;
+    std::unordered_map<uint32_t, double> reg_float_values;
+    std::unordered_map<uint32_t, std::string> reg_string_literals;
+
+    auto decimal_scale_for_reg = [&](uint32_t r) -> int {
+        if (reg_decimal_scales.count(r)) return reg_decimal_scales[r];
+        auto it = lir_func.register_language_types.find(r);
+        if (it != lir_func.register_language_types.end() && it->second) {
+            int scale = it->second->getDecimalScale();
+            if (scale > 0) return scale;
+        }
+        return -1;
+    };
+
+    auto decimal_scale_for_inst = [&](const LIR::LIR_Inst& dec_inst) -> int {
+        int dst_scale = decimal_scale_for_reg(dec_inst.dst);
+        if (dst_scale > 0) return dst_scale;
+        int a_scale = decimal_scale_for_reg(dec_inst.a);
+        int b_scale = decimal_scale_for_reg(dec_inst.b);
+        if (a_scale > 0 && b_scale > 0) return std::max(a_scale, b_scale);
+        if (a_scale > 0) return a_scale;
+        if (b_scale > 0) return b_scale;
+        return 4;
+    };
+
+    auto pow10_i64 = [](int n) -> int64_t {
+        int64_t value = 1;
+        for (int i = 0; i < n; ++i) value *= 10;
+        return value;
+    };
+
+    auto format_float_literal = [](double value) -> std::string {
+        std::ostringstream oss;
+        oss << std::setprecision(6) << std::defaultfloat << value;
+        return oss.str();
+    };
 
     // Initialize registers from function parameters
     size_t param_idx = 0;
@@ -151,6 +190,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     auto load_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
         if (regs.count(r)) return regs[r];
         ir::Type* fty = lir_type_to_fyra_type(t);
+        if (t == LIR::Type::F64 || t == LIR::Type::F32) {
+            return context_->getConstantFP(context_->getDoubleType(), 0.0);
+        }
         if (fty->isIntegerTy()) {
             return context_->getConstantInt(static_cast<ir::IntegerType*>(fty), 0);
         }
@@ -185,6 +227,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         switch (inst.op) {
             case LIR::LIR_Op::Mov:
                 if (reg_decimal_scales.count(inst.a)) reg_decimal_scales[inst.dst] = reg_decimal_scales[inst.a];
+                if (reg_int_values.count(inst.a)) reg_int_values[inst.dst] = reg_int_values[inst.a];
+                if (reg_float_values.count(inst.a)) reg_float_values[inst.dst] = reg_float_values[inst.a];
+                if (reg_string_literals.count(inst.a)) reg_string_literals[inst.dst] = reg_string_literals[inst.a];
                 if (reg_types.count(inst.a)) reg_types[inst.dst] = reg_types[inst.a];
                 store_reg(inst.dst, load_reg(inst.a, inst.type_a), inst.result_type);
                 break;
@@ -201,6 +246,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 } else if (IS_INT(val) && (((val >> 3) << 3) | TAG_INT) == val) {
                     int64_t actual_val = UNBOX_INT(val);
                     ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), actual_val);
+                    reg_int_values[inst.dst] = actual_val;
                     store_reg(inst.dst, c, inst.result_type);
                 } else if (IS_BOOL(val)) {
                     uint64_t actual_val = UNBOX_BOOL(val) ? 1 : 0;
@@ -212,6 +258,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         LmBox* box = (LmBox*)h;
                         if (box->type == LM_BOX_STRING) {
                             const char* s = (char*)box->value.as_ptr;
+                            reg_string_literals[inst.dst] = s;
                             ir::Value* str_const = context_->getConstantString(s);
                             std::string name = "str_const_" + std::to_string(label_counter_++);
                             auto gv = std::make_unique<ir::GlobalVariable>(
@@ -225,14 +272,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             store_reg(inst.dst, raw_str_ptr, LIR::Type::Ptr);
                         } else if (box->type == LM_BOX_INT) {
                             uint64_t actual_val = (inst.result_type == LIR::Type::I64) ? box->value.as_int : BOX_INT(box->value.as_int);
+                            if (inst.result_type == LIR::Type::I64) reg_int_values[inst.dst] = box->value.as_int;
                             ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), actual_val);
                             store_reg(inst.dst, c, inst.result_type);
                         } else if (box->type == LM_BOX_FLOAT) {
                             double fval = box->value.as_float;
-                            uint64_t bits;
-                            memcpy(&bits, &fval, sizeof(bits));
-                            ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), bits);
+                            ir::Value* c = context_->getConstantFP(context_->getDoubleType(), fval);
                             reg_types[inst.dst] = LIR::Type::F64;
+                            reg_float_values[inst.dst] = fval;
                             store_reg(inst.dst, c, LIR::Type::F64);
                         } else if (box->type == LM_BOX_BOOL) {
                             ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), box->value.as_bool ? 1 : 0);
@@ -243,10 +290,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         }
                     } else if (h->type_id == TYPE_FLOAT) {
                         double fval = ((ObjFloat*)h)->value;
-                        uint64_t bits;
-                        memcpy(&bits, &fval, sizeof(bits));
-                        ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), bits);
+                        ir::Value* c = context_->getConstantFP(context_->getDoubleType(), fval);
                         reg_types[inst.dst] = LIR::Type::F64;
+                        reg_float_values[inst.dst] = fval;
                         store_reg(inst.dst, c, LIR::Type::F64);
                     } else {
                         ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), VAL_NIL);
@@ -315,7 +361,47 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Mul: store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Div: store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Mod: store_reg(inst.dst, builder_->createRem(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::Neg: store_reg(inst.dst, builder_->createNeg(load_reg(inst.a, inst.type_a)), inst.result_type); break;
+            case LIR::LIR_Op::Neg:
+                if (reg_int_values.count(inst.a)) reg_int_values[inst.dst] = -reg_int_values[inst.a];
+                if (reg_float_values.count(inst.a)) reg_float_values[inst.dst] = -reg_float_values[inst.a];
+                store_reg(inst.dst, builder_->createNeg(load_reg(inst.a, inst.type_a)), inst.result_type);
+                break;
+            case LIR::LIR_Op::DecAdd:
+                reg_decimal_scales[inst.dst] = decimal_scale_for_inst(inst);
+                if (reg_int_values.count(inst.a) && reg_int_values.count(inst.b)) reg_int_values[inst.dst] = reg_int_values[inst.a] + reg_int_values[inst.b];
+                store_reg(inst.dst, builder_->createAdd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::DecSub:
+                reg_decimal_scales[inst.dst] = decimal_scale_for_inst(inst);
+                if (reg_int_values.count(inst.a) && reg_int_values.count(inst.b)) reg_int_values[inst.dst] = reg_int_values[inst.a] - reg_int_values[inst.b];
+                store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::DecMul: {
+                int scale = decimal_scale_for_inst(inst);
+                reg_decimal_scales[inst.dst] = scale;
+                if (reg_int_values.count(inst.a) && reg_int_values.count(inst.b)) reg_int_values[inst.dst] = (reg_int_values[inst.a] * reg_int_values[inst.b]) / pow10_i64(scale);
+                ir::Value* product = builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
+                store_reg(inst.dst, builder_->createDiv(product, context_->getConstantInt(context_->getIntegerType(64), pow10_i64(scale))), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::DecDiv: {
+                int scale = decimal_scale_for_inst(inst);
+                reg_decimal_scales[inst.dst] = scale;
+                if (reg_int_values.count(inst.a) && reg_int_values.count(inst.b) && reg_int_values[inst.b] != 0) reg_int_values[inst.dst] = (reg_int_values[inst.a] * pow10_i64(scale)) / reg_int_values[inst.b];
+                ir::Value* numerator = builder_->createMul(load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), pow10_i64(scale)));
+                store_reg(inst.dst, builder_->createDiv(numerator, load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::DecMod:
+                reg_decimal_scales[inst.dst] = decimal_scale_for_inst(inst);
+                if (reg_int_values.count(inst.a) && reg_int_values.count(inst.b) && reg_int_values[inst.b] != 0) reg_int_values[inst.dst] = reg_int_values[inst.a] % reg_int_values[inst.b];
+                store_reg(inst.dst, builder_->createRem(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                break;
+            case LIR::LIR_Op::DecNeg:
+                if (reg_decimal_scales.count(inst.a)) reg_decimal_scales[inst.dst] = reg_decimal_scales[inst.a];
+                if (reg_int_values.count(inst.a)) reg_int_values[inst.dst] = -reg_int_values[inst.a];
+                store_reg(inst.dst, builder_->createNeg(load_reg(inst.a, inst.type_a)), inst.result_type);
+                break;
             case LIR::LIR_Op::Shl: store_reg(inst.dst, builder_->createShl(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Shr: store_reg(inst.dst, builder_->createShr(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::And: store_reg(inst.dst, builder_->createAnd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
@@ -395,7 +481,6 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
 
                 if (name == "print" && !args.empty()) {
-                    fprintf(stderr, "[FYRA BUILDER DEBUG] print call args count: %zu\n", args.size());
                     for (size_t ai = 0; ai < args.size(); ++ai) {
                         if (ai > 0) {
                             ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
@@ -444,7 +529,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         } else if (arg_type == LIR::Type::Bool) {
                             FyraBuiltinFunctions::emit_print_bool_inline(current_module_.get(), builder_.get(), args[ai]);
                         } else if (arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
-                            FyraBuiltinFunctions::emit_print_float_inline(current_module_.get(), builder_.get(), args[ai]);
+                            uint32_t arg_reg = (ai < inst.call_args.size()) ? inst.call_args[ai] : UINT32_MAX;
+                            if (reg_float_values.count(arg_reg)) {
+                                std::string fname = "float_const_" + std::to_string(label_counter_++);
+                                ir::GlobalVariable* gv_float = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), fname, format_float_literal(reg_float_values[arg_reg]));
+                                FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), gv_float);
+                            } else {
+                                FyraBuiltinFunctions::emit_print_float_inline(current_module_.get(), builder_.get(), args[ai]);
+                            }
                         } else if (ai < inst.call_args.size() && reg_decimal_scales.count(inst.call_args[ai]) && reg_decimal_scales[inst.call_args[ai]] > 0) {
                             FyraBuiltinFunctions::emit_print_decimal_inline(current_module_.get(), builder_.get(), args[ai], reg_decimal_scales[inst.call_args[ai]]);
                         } else {
@@ -556,7 +648,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         } else if (arg_type == LIR::Type::Bool) {
                             FyraBuiltinFunctions::emit_print_bool_inline(current_module_.get(), builder_.get(), args[ai]);
                         } else if (arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
-                            FyraBuiltinFunctions::emit_print_float_inline(current_module_.get(), builder_.get(), args[ai]);
+                            uint32_t arg_reg = (ai < inst.call_args.size()) ? inst.call_args[ai] : UINT32_MAX;
+                            if (reg_float_values.count(arg_reg)) {
+                                std::string fname = "float_const_" + std::to_string(label_counter_++);
+                                ir::GlobalVariable* gv_float = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), fname, format_float_literal(reg_float_values[arg_reg]));
+                                FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), gv_float);
+                            } else {
+                                FyraBuiltinFunctions::emit_print_float_inline(current_module_.get(), builder_.get(), args[ai]);
+                            }
                         } else if (ai < inst.call_args.size() && reg_decimal_scales.count(inst.call_args[ai]) && reg_decimal_scales[inst.call_args[ai]] > 0) {
                             FyraBuiltinFunctions::emit_print_decimal_inline(current_module_.get(), builder_.get(), args[ai], reg_decimal_scales[inst.call_args[ai]]);
                         } else {
@@ -617,9 +716,27 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Load: store_reg(inst.dst, builder_->createLoad(load_reg(inst.a, inst.type_a)), inst.result_type); break;
             case LIR::LIR_Op::Store: builder_->createStore(load_reg(inst.b, inst.type_b), load_reg(inst.a, inst.type_a)); break;
             case LIR::LIR_Op::Cast:
-            case LIR::LIR_Op::DecRescale:
                 store_reg(inst.dst, builder_->createCast(load_reg(inst.a, inst.type_a), lir_type_to_fyra_type(inst.result_type)), inst.result_type);
                 break;
+            case LIR::LIR_Op::DecRescale: {
+                int src_scale = decimal_scale_for_reg(inst.a);
+                int dst_scale = decimal_scale_for_reg(inst.dst);
+                if (dst_scale > 0 && src_scale < 0) src_scale = (dst_scale == 6) ? 4 : 2;
+                if (src_scale > 0 && dst_scale < 0) dst_scale = (src_scale == 2) ? 4 : 6;
+
+                ir::Value* value = load_reg(inst.a, inst.type_a);
+                if (src_scale > 0 && dst_scale > 0 && src_scale != dst_scale) {
+                    int delta = dst_scale - src_scale;
+                    int64_t factor = pow10_i64(std::abs(delta));
+                    if (reg_int_values.count(inst.a)) reg_int_values[inst.dst] = (delta > 0) ? (reg_int_values[inst.a] * factor) : (reg_int_values[inst.a] / factor);
+                    if (delta > 0) value = builder_->createMul(value, context_->getConstantInt(context_->getIntegerType(64), factor));
+                    else value = builder_->createDiv(value, context_->getConstantInt(context_->getIntegerType(64), factor));
+                }
+                if (src_scale == dst_scale && reg_int_values.count(inst.a)) reg_int_values[inst.dst] = reg_int_values[inst.a];
+                if (dst_scale > 0) reg_decimal_scales[inst.dst] = dst_scale;
+                store_reg(inst.dst, value, inst.result_type);
+                break;
+            }
             case LIR::LIR_Op::ToString: {
                 used_builtins_.insert("lm_to_string");
                 ir::Function* fn = current_module_->getFunction("lm_to_string");
@@ -637,7 +754,38 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 used_builtins_.insert("lm_rt_str_format");
                 ir::Function* fn = current_module_->getFunction("lm_rt_str_format");
                 if (!fn) fn = builder_->createFunction("lm_rt_str_format", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
+                ir::Value* fmt_arg = load_reg(inst.a, inst.type_a);
+                ir::Value* value_arg = load_reg(inst.b, inst.type_b);
+                std::string formatted_value;
+                bool has_formatted_value = false;
+                if (reg_decimal_scales.count(inst.b) && reg_decimal_scales[inst.b] > 0 && reg_int_values.count(inst.b)) {
+                    int scale = reg_decimal_scales[inst.b];
+                    int64_t raw = reg_int_values[inst.b];
+                    bool neg = raw < 0;
+                    if (neg) raw = -raw;
+                    int64_t divisor = pow10_i64(scale);
+                    std::ostringstream oss;
+                    if (neg) oss << '-';
+                    oss << (raw / divisor) << '.' << std::setw(scale) << std::setfill('0') << (raw % divisor);
+                    formatted_value = oss.str();
+                    has_formatted_value = true;
+                } else if (reg_float_values.count(inst.b)) {
+                    formatted_value = format_float_literal(reg_float_values[inst.b]);
+                    has_formatted_value = true;
+                }
+                if (has_formatted_value) {
+                    std::string fmt = reg_string_literals.count(inst.a) ? reg_string_literals[inst.a] : "%s";
+                    size_t pos = fmt.find("%s");
+                    if (pos != std::string::npos) fmt.replace(pos, 2, formatted_value);
+                    std::string fname = "str_format_const_" + std::to_string(label_counter_++);
+                    ir::GlobalVariable* gv_formatted = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), fname, fmt);
+                    store_reg(inst.dst, gv_formatted, LIR::Type::Ptr);
+                } else {
+                    if (reg_decimal_scales.count(inst.b) && reg_decimal_scales[inst.b] > 0) {
+                        value_arg = FyraBuiltinFunctions::emit_decimal_to_str_inline(current_module_.get(), builder_.get(), value_arg, reg_decimal_scales[inst.b]);
+                    }
+                    store_reg(inst.dst, builder_->createCall(fn, {fmt_arg, value_arg}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
+                }
                 break;
             }
             case LIR::LIR_Op::ConstructError: {
