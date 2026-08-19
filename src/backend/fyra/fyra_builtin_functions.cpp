@@ -129,9 +129,8 @@ void FyraBuiltinFunctions::emit_print_int_inline(
     ir::BasicBlock* b_loop = builder->createBasicBlock("pi_loop_" + id, fn);
     ir::BasicBlock* b_emit = builder->createBasicBlock("pi_emit_" + id, fn);
 
-    // Static 64-byte print buffer in global BSS
-    ir::GlobalVariable* buf = get_or_create_global_str(module, builder, "print_int_buf_" + id, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0");
-    ir::Value* end_ptr = builder->createAdd(buf, ctx->getConstantInt(ctx->getIntegerType(64), 31));
+    ir::Instruction* buf = builder->createAlloc(ctx->getConstantInt(ctx->getIntegerType(64), 64), ctx->getIntegerType(64));
+    ir::Value* end_ptr = builder->createAdd(buf, ctx->getConstantInt(ctx->getIntegerType(64), 63));
     builder->createStoreb(ctx->getConstantInt(ctx->getIntegerType(8), 0), end_ptr);
 
     ir::Value* is_neg = builder->createCslt(val, ctx->getConstantInt(ctx->getIntegerType(64), 0));
@@ -176,7 +175,7 @@ void FyraBuiltinFunctions::emit_print_int_inline(
 
     builder->setInsertPoint(b_emit);
     ir::Value* final_ptr  = next_ptr;
-    ir::Value* full_end   = builder->createAdd(buf, ctx->getConstantInt(ctx->getIntegerType(64), 31));
+    ir::Value* full_end   = builder->createAdd(buf, ctx->getConstantInt(ctx->getIntegerType(64), 63));
     ir::Value* len = builder->createSub(full_end, final_ptr);
     builder->createExternCall("io.write", {
         ctx->getConstantInt(ctx->getIntegerType(64), 1),
