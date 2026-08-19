@@ -247,7 +247,6 @@ static LmString format_tuple(LmTuple* tuple) {
         append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
         lm_string_free(s);
     }
-    if (tuple->size == 1) append_to_buffer(&buf, &pos, &capacity, ",");
     append_to_buffer(&buf, &pos, &capacity, ")");
     buf[pos] = 0;
     return (LmString){ buf, pos };
@@ -266,6 +265,30 @@ static LmString format_list(LmList* list) {
         lm_string_free(s);
     }
     append_to_buffer(&buf, &pos, &capacity, "]");
+    buf[pos] = 0;
+    return (LmString){ buf, pos };
+}
+
+static LmString format_dict(LmDict* dict) {
+    uint64_t capacity = 256;
+    char* buf = (char*)malloc(capacity);
+    uint64_t pos = 0;
+    buf[0] = 0;
+    append_to_buffer(&buf, &pos, &capacity, "{");
+    uint64_t count = 0;
+    LmValue* items = lm_dict_items(dict, &count);
+    for (uint64_t i = 0; i < count; i++) {
+        if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
+        LmString k = format_value(items[i * 2]);
+        append_to_buffer(&buf, &pos, &capacity, k.data ? k.data : "nil");
+        lm_string_free(k);
+        append_to_buffer(&buf, &pos, &capacity, ": ");
+        LmString v = format_value(items[i * 2 + 1]);
+        append_to_buffer(&buf, &pos, &capacity, v.data ? v.data : "nil");
+        lm_string_free(v);
+    }
+    if (items) free(items);
+    append_to_buffer(&buf, &pos, &capacity, "}");
     buf[pos] = 0;
     return (LmString){ buf, pos };
 }
@@ -309,8 +332,61 @@ static LmString format_value(LmValue value) {
             case TYPE_FLOAT: return lm_double_to_string(((ObjFloat*)h)->value);
             case TYPE_LIST: return format_list((LmList*)h);
             case TYPE_TUPLE: return format_tuple((LmTuple*)h);
+            case TYPE_DICT: return format_dict((LmDict*)h);
             case TYPE_FRAME: {
                 LmFrame* f = (LmFrame*)h;
+                if (f->name && strcmp(f->name, "__lir_internal_enum__") == 0) {
+                    int64_t tag = as_i64(f->fields[0]);
+                    LmValue payload = f->field_count > 1 ? f->fields[1] : VAL_NIL;
+                    uint64_t capacity = 128;
+                    char* buf = (char*)malloc(capacity);
+                    uint64_t pos = 0;
+                    buf[0] = 0;
+                    char tag_str[32];
+                    snprintf(tag_str, sizeof(tag_str), "Enum(%lld", (long long)tag);
+                    append_to_buffer(&buf, &pos, &capacity, tag_str);
+                    if (!IS_NIL(payload)) {
+                        append_to_buffer(&buf, &pos, &capacity, ", ");
+                        LmString s = format_value(payload);
+                        append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
+                        lm_string_free(s);
+                    }
+                    append_to_buffer(&buf, &pos, &capacity, ")");
+                    buf[pos] = 0;
+                    return (LmString){ buf, pos };
+                }
+                if (f->name && strcmp(f->name, "__lir_internal_ok__") == 0) {
+                    LmValue payload = f->field_count > 1 ? f->fields[1] : VAL_NIL;
+                    uint64_t capacity = 128;
+                    char* buf = (char*)malloc(capacity);
+                    uint64_t pos = 0;
+                    buf[0] = 0;
+                    append_to_buffer(&buf, &pos, &capacity, "ok(");
+                    if (!IS_NIL(payload)) {
+                        LmString s = format_value(payload);
+                        append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
+                        lm_string_free(s);
+                    }
+                    append_to_buffer(&buf, &pos, &capacity, ")");
+                    buf[pos] = 0;
+                    return (LmString){ buf, pos };
+                }
+                if (f->name && strcmp(f->name, "__lir_internal_error__") == 0) {
+                    LmValue payload = f->field_count > 1 ? f->fields[1] : VAL_NIL;
+                    uint64_t capacity = 128;
+                    char* buf = (char*)malloc(capacity);
+                    uint64_t pos = 0;
+                    buf[0] = 0;
+                    append_to_buffer(&buf, &pos, &capacity, "err(");
+                    if (!IS_NIL(payload)) {
+                        LmString s = format_value(payload);
+                        append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
+                        lm_string_free(s);
+                    }
+                    append_to_buffer(&buf, &pos, &capacity, ")");
+                    buf[pos] = 0;
+                    return (LmString){ buf, pos };
+                }
                 uint64_t capacity = 128;
                 char* buf = (char*)malloc(capacity);
                 uint64_t pos = 0;
@@ -319,8 +395,6 @@ static LmString format_value(LmValue value) {
                 append_to_buffer(&buf, &pos, &capacity, "{");
                 for (int i = 0; i < f->field_count; i++) {
                     if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
-                    char idx[16]; sprintf(idx, "%d: ", i);
-                    append_to_buffer(&buf, &pos, &capacity, idx);
                     LmString s = format_value(f->fields[i]);
                     append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
                     lm_string_free(s);

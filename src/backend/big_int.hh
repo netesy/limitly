@@ -958,30 +958,24 @@ public:
 
     // String conversion
     std::string to_string() const {
-        std::cout << "[DEBUG BigInt::to_string] storage_type = " << static_cast<int>(storage_type) << ", is_float_type = " << is_float_type() << std::endl;
         if (is_float_type()) {
             // Convert float to string with appropriate precision
             std::ostringstream oss;
             switch (storage_type) {
                 case TYPE_F32:
-                    std::cout << "[DEBUG BigInt::to_string] TYPE_F32, f32_val = " << f32_val << std::endl;
                     oss << std::setprecision(7) << std::fixed << f32_val;
                     break;
                 case TYPE_F64:
-                    std::cout << "[DEBUG BigInt::to_string] TYPE_F64, f64_val = " << f64_val << std::endl;
                     oss << std::setprecision(15) << std::fixed << f64_val;
                     break;
                 case TYPE_F128:
-                    std::cout << "[DEBUG BigInt::to_string] TYPE_F128, f128_val = " << f128_val << std::endl;
                     oss << std::setprecision(18) << std::fixed << f128_val;
                     break;
                 default:
-                    std::cout << "[DEBUG BigInt::to_string] DEFAULT, get_value_as_f128 = " << get_value_as_f128() << std::endl;
                     oss << std::setprecision(15) << std::fixed << get_value_as_f128();
                     break;
             }
             std::string result = oss.str();
-            std::cout << "[DEBUG BigInt::to_string] raw result = " << result << std::endl;
             
             // Remove trailing zeros and decimal point if not needed
             if (result.find('.') != std::string::npos) {
@@ -990,7 +984,6 @@ public:
                     result.pop_back();
                 }
             }
-            std::cout << "[DEBUG BigInt::to_string] final result = " << result << std::endl;
             
             return result;
         }
