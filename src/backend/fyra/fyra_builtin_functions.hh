@@ -20,9 +20,13 @@ public:
     static bool is_builtin(const std::string& name);
     static std::string get_internal_name(const std::string& name);
 
+    static ir::GlobalVariable* get_or_create_global_str(ir::Module* module, ir::IRBuilder* builder, const std::string& name, const std::string& str_val);
+
     static void emit_print_str_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* char_ptr);
     static void emit_print_int_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
     static void emit_print_bool_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
+    static void emit_print_nil_inline(ir::Module* module, ir::IRBuilder* builder);
+    static void emit_print_float_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
     static void emit_print_decimal_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val, int scale);
     static void emit_str_concat_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_str_format_ir(ir::Module* module, ir::IRBuilder* builder);
