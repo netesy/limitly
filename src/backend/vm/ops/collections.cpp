@@ -65,7 +65,6 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             if (IS_PTR(registers[pc->dst])) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->dst]);
                 if (h->type_id == TYPE_DICT) {
-                    std::printf("[DEBUG collections.cpp] DictSet dict=%p key=%lx val=%lx\n", (void*)h, (unsigned long)registers[pc->a], (unsigned long)registers[pc->b]);
                     lm_dict_set((LmDict*)h, registers[pc->a], registers[pc->b]);
                     transfer_ownership(registers[pc->a], registers[pc->dst]);
                     transfer_ownership(registers[pc->b], registers[pc->dst]);
@@ -83,7 +82,6 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::DictGet:
             if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->a], TYPE_DICT))) {
                 RegisterValue res = lm_dict_get(dict, registers[pc->b]);
-                std::printf("[DEBUG collections.cpp] DictGet dict=%p key=%lx res=%lx\n", (void*)dict, (unsigned long)registers[pc->b], (unsigned long)res);
                 registers[pc->dst] = res;
             } else {
                 registers[pc->dst] = VAL_NIL;

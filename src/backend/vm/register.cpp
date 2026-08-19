@@ -315,7 +315,6 @@ void RegisterVM::execute_regions(const LIR::LIR_Inst* pc) {
         }
         case LIR::LIR_Op::RegionExit: {
             uint32_t region_to_exit = pc->imm;
-            std::printf("[DEBUG RegionExit] Exiting region %u\n", region_to_exit);
             
             // Remove region from vm_region_stack
             auto it = std::find(vm_region_stack.begin(), vm_region_stack.end(), region_to_exit);
