@@ -56,6 +56,24 @@ RUNTIME_API LmString lm_double_to_string(double value) {
         return (LmString){ NULL, 0 };
     }
     
+    // Ensure floating point numbers always include a decimal point or scientific notation (e.g., "0.0" instead of "0")
+    bool has_decimal_or_exp = false;
+    for (int i = 0; i < len; i++) {
+        if (temp[i] == '.' || temp[i] == 'e' || temp[i] == 'E' || temp[i] == 'n' || temp[i] == 'N') {
+            has_decimal_or_exp = true;
+            break;
+        }
+    }
+
+    if (!has_decimal_or_exp) {
+        if (len + 2 < (int)sizeof(temp)) {
+            temp[len] = '.';
+            temp[len + 1] = '0';
+            temp[len + 2] = '\0';
+            len += 2;
+        }
+    }
+
     char* buf = (char*)malloc(len + 1);
     if (!buf) {
         return (LmString){ NULL, 0 };
