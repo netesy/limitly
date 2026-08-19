@@ -71,6 +71,15 @@ public:
     // LIR instruction access
     const std::vector<LIR::LIR_Inst>& getInstructions() const { return instructions_; }
     void setInstructions(const std::vector<LIR::LIR_Inst>& instructions) { instructions_ = instructions; }
+
+    std::unordered_map<Reg, TypePtr> register_language_types_;
+    std::unordered_map<Reg, Type> register_types_;
+
+    const std::unordered_map<Reg, TypePtr>& getRegisterLanguageTypes() const { return register_language_types_; }
+    void setRegisterLanguageTypes(const std::unordered_map<Reg, TypePtr>& m) { register_language_types_ = m; }
+
+    const std::unordered_map<Reg, Type>& getRegisterTypes() const { return register_types_; }
+    void setRegisterTypes(const std::unordered_map<Reg, Type>& m) { register_types_ = m; }
 };
 
 // Manager for LIR-specific functions

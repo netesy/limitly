@@ -238,6 +238,8 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
 
     auto lir_func = std::make_shared<LIRFunction>(fn.name, params, return_abi_type, nullptr);
     lir_func->setInstructions(result->instructions);
+    lir_func->setRegisterLanguageTypes(result->register_language_types);
+    lir_func->setRegisterTypes(result->register_types);
     
     // Optimize the generated LIR for this function
     if (false && Generator::is_optimization_enabled()) {
@@ -379,6 +381,9 @@ Reg Generator::resolve_variable(const std::string& name) {
 
 void Generator::set_register_type(Reg reg, TypePtr type) {
     register_types_[reg] = type;
+    if (type) {
+        set_register_language_type(reg, type);
+    }
 }
 
 

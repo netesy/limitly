@@ -449,13 +449,19 @@ ValuePtr register_to_value_ptr(RegisterValue rv, TypePtr lang_type) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(rv);
         if (h->type_id == TYPE_FLOAT) {
             auto floatType = std::make_shared<::Type>(::TypeTag::Float64);
-            return std::make_shared<::Value>(floatType, std::to_string(((ObjFloat*)h)->value));
+            LmString s = lm_double_to_string(((ObjFloat*)h)->value);
+            std::string str(s.data ? s.data : "0");
+            lm_string_free(s);
+            return std::make_shared<::Value>(floatType, str);
         } else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
             auto stringType = std::make_shared<::Type>(::TypeTag::String);
             return std::make_shared<::Value>(stringType, (char*)((LmBox*)h)->value.as_ptr);
         } else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_FLOAT) {
-             auto floatType = std::make_shared<::Type>(::TypeTag::Float64);
-             return std::make_shared<::Value>(floatType, std::to_string(((LmBox*)h)->value.as_float));
+            auto floatType = std::make_shared<::Type>(::TypeTag::Float64);
+            LmString s = lm_double_to_string(((LmBox*)h)->value.as_float);
+            std::string str(s.data ? s.data : "0");
+            lm_string_free(s);
+            return std::make_shared<::Value>(floatType, str);
         } else if (h->type_id == TYPE_FOREIGN_PTR) {
              auto ptrType = std::make_shared<::Type>(::TypeTag::Int128);
              char buf[32]; sprintf(buf, "%p", ((ObjForeignPtr*)h)->ptr);

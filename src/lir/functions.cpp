@@ -134,6 +134,7 @@ void LIRFunctionManager::registerFunction(std::shared_ptr<LIRFunction> function)
     
     // Copy instructions if available
     lir_func->instructions = function->getInstructions();
+    lir_func->register_language_types = function->getRegisterLanguageTypes();
     
     registry.registerFunction(name, std::move(lir_func));
 }
