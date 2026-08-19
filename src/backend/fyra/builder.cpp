@@ -180,14 +180,35 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         return oss.str();
     };
 
+    size_t max_reg = lir_func.register_count;
+    for (const auto& inst : lir_func.instructions) {
+        if (inst.dst != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.dst);
+        if (inst.a != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.a);
+        if (inst.b != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.b);
+        for (auto arg : inst.call_args) max_reg = std::max(max_reg, (size_t)arg);
+    }
+    std::unordered_map<uint32_t, ir::Instruction*> reg_slots;
+    for (size_t r = 0; r <= max_reg + 10; ++r) {
+        reg_slots[r] = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+        builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), reg_slots[r]);
+    }
+
     // Initialize registers from function parameters
     size_t param_idx = 0;
     for (const auto& param : main_fn->getParameters()) {
+        builder_->createStore(param.get(), reg_slots[param_idx]);
         regs[param_idx] = param.get();
         param_idx++;
     }
 
+    if (block_map.count(0)) {
+        builder_->createJmp(block_map[0]);
+    }
+
     auto load_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
+        if (reg_slots.count(r)) {
+            return builder_->createLoad(reg_slots[r]);
+        }
         if (regs.count(r)) return regs[r];
         ir::Type* fty = lir_type_to_fyra_type(t);
         if (t == LIR::Type::F64 || t == LIR::Type::F32) {
@@ -198,9 +219,15 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         }
         return context_->getConstantInt(context_->getIntegerType(64), 0);
     };
+
     auto store_reg = [&](uint32_t r, ir::Value* v, LIR::Type t) {
-        if (v && v->getName().empty() && !dynamic_cast<ir::Constant*>(v)) {
-            v->setName("r" + std::to_string(r));
+        if (v) {
+            if (v->getName().empty() && !dynamic_cast<ir::Constant*>(v)) {
+                v->setName("r" + std::to_string(r));
+            }
+            if (reg_slots.count(r)) {
+                builder_->createStore(v, reg_slots[r]);
+            }
         }
         regs[r] = v;
         reg_types[r] = t;
@@ -457,6 +484,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     if (inst.op == LIR::LIR_Op::JumpIfFalse) builder_->createBr(cond, fallthrough, target);
                     else builder_->createBr(cond, target, fallthrough);
                     builder_->setInsertPoint(fallthrough);
+                    terminated = true;
                 } else errors_.push_back("Cond jump to unknown target: " + std::to_string(inst.imm));
                 break;
             }
@@ -877,6 +905,26 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Function* fn = current_module_->getFunction("lm_dict_get");
                 if (!fn) fn = builder_->createFunction("lm_dict_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
                 store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::DictLen: {
+                ir::Value* count = builder_->createLoad(load_reg(inst.a, inst.type_a));
+                store_reg(inst.dst, count, inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::DictHas: {
+                used_builtins_.insert("lm_dict_has");
+                ir::Function* fn = current_module_->getFunction("lm_dict_has");
+                if (!fn) fn = builder_->createFunction("lm_dict_has", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
+                store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::DictItems: {
+                used_builtins_.insert("lm_dict_items");
+                uint32_t dict_reg = (inst.a != UINT32_MAX && inst.a != 0) ? inst.a : (!inst.call_args.empty() ? inst.call_args[0] : UINT32_MAX);
+                ir::Function* fn = current_module_->getFunction("lm_dict_items");
+                if (!fn) fn = builder_->createFunction("lm_dict_items", context_->getIntegerType(64), {context_->getIntegerType(64)});
+                store_reg(inst.dst, builder_->createCall(fn, {load_reg(dict_reg, LIR::Type::Ptr)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::NewFrame: {

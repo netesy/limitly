@@ -1107,6 +1107,18 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         builder->createStore(key, k_addr);
         ir::Value* v_addr = builder->createAdd(vals, k_off);
         builder->createStore(val, v_addr);
+
+        ir::BasicBlock* b_inc = builder->createBasicBlock("inc_cnt", fn_set);
+        ir::BasicBlock* b_store_ret = builder->createBasicBlock("store_ret", fn_set);
+        builder->createBr(is_empty, b_inc, b_store_ret);
+
+        builder->setInsertPoint(b_inc);
+        ir::Value* cur_cnt = builder->createLoad(dict_ptr);
+        ir::Value* new_cnt = builder->createAdd(cur_cnt, ctx->getConstantInt(i64, 1));
+        builder->createStore(new_cnt, dict_ptr);
+        builder->createJmp(b_store_ret);
+
+        builder->setInsertPoint(b_store_ret);
         builder->createRet(nullptr);
 
         builder->setInsertPoint(b_next);
@@ -1175,6 +1187,134 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
 
         builder->setInsertPoint(b_not_found);
         builder->createRet(ctx->getConstantInt(i64, 0));
+    }
+
+    // 4. lm_dict_has(dict_ptr: i64, key: i64) -> i64
+    ir::Function* fn_has = module->getFunction("lm_dict_has");
+    if (!fn_has) fn_has = builder->createFunction("lm_dict_has", i64, {i64, i64});
+    if (fn_has->getBasicBlocks().empty()) {
+        ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_has);
+        ir::BasicBlock* b_loop = builder->createBasicBlock("loop", fn_has);
+        ir::BasicBlock* b_check = builder->createBasicBlock("check", fn_has);
+        ir::BasicBlock* b_found = builder->createBasicBlock("found", fn_has);
+        ir::BasicBlock* b_next = builder->createBasicBlock("next", fn_has);
+        ir::BasicBlock* b_not_found = builder->createBasicBlock("not_found", fn_has);
+
+        builder->setInsertPoint(b_entry);
+        auto it = fn_has->getParameters().begin();
+        ir::Value* dict_ptr = it->get(); it++;
+        ir::Value* key = it->get();
+
+        ir::Value* keys_slot = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* keys = builder->createLoad(keys_slot);
+        ir::Value* cap_ptr = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 8));
+        ir::Value* cap = builder->createLoad(cap_ptr);
+
+        ir::Instruction* i_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        builder->createStore(ctx->getConstantInt(i64, 0), i_slot);
+        builder->createJmp(b_loop);
+
+        builder->setInsertPoint(b_loop);
+        ir::Value* i = builder->createLoad(i_slot);
+        ir::Value* cond = builder->createCslt(i, cap);
+        builder->createBr(cond, b_check, b_not_found);
+
+        builder->setInsertPoint(b_check);
+        ir::Value* k_off = builder->createMul(i, ctx->getConstantInt(i64, 8));
+        ir::Value* k_addr = builder->createAdd(keys, k_off);
+        ir::Value* curr_k = builder->createLoad(k_addr);
+
+        ir::Value* is_null = builder->createCeq(curr_k, ctx->getConstantInt(i64, 0));
+        ir::BasicBlock* b_cmp = builder->createBasicBlock("dict_has_cmp", fn_has);
+        builder->createBr(is_null, b_next, b_cmp);
+
+        builder->setInsertPoint(b_cmp);
+        ir::Value* is_match = builder->createCall(fn_eq, {curr_k, key});
+        builder->createBr(is_match, b_found, b_next);
+
+        builder->setInsertPoint(b_found);
+        builder->createRet(ctx->getConstantInt(i64, 1));
+
+        builder->setInsertPoint(b_next);
+        ir::Value* next_i = builder->createAdd(i, ctx->getConstantInt(i64, 1));
+        builder->createStore(next_i, i_slot);
+        builder->createJmp(b_loop);
+
+        builder->setInsertPoint(b_not_found);
+        builder->createRet(ctx->getConstantInt(i64, 0));
+    }
+
+    // 5. lm_dict_items(dict_ptr: i64) -> i64
+    ir::Function* fn_items = module->getFunction("lm_dict_items");
+    if (!fn_items) fn_items = builder->createFunction("lm_dict_items", i64, {i64});
+    if (fn_items->getBasicBlocks().empty()) {
+        emit_list_ir(module, builder);
+        emit_tuple_ir(module, builder);
+
+        ir::Function* fn_list_new = module->getFunction("lm_list_new");
+        if (!fn_list_new) fn_list_new = builder->createFunction("lm_list_new", i64, {i64});
+        ir::Function* fn_list_app = module->getFunction("lm_list_append");
+        if (!fn_list_app) fn_list_app = builder->createFunction("lm_list_append", void_ty, {i64, i64});
+        ir::Function* fn_tup_new = module->getFunction("lm_tuple_new");
+        if (!fn_tup_new) fn_tup_new = builder->createFunction("lm_tuple_new", i64, {i64});
+        ir::Function* fn_tup_set = module->getFunction("lm_tuple_set");
+        if (!fn_tup_set) fn_tup_set = builder->createFunction("lm_tuple_set", void_ty, {i64, i64, i64});
+
+        ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_items);
+        ir::BasicBlock* b_loop = builder->createBasicBlock("loop", fn_items);
+        ir::BasicBlock* b_check = builder->createBasicBlock("check", fn_items);
+        ir::BasicBlock* b_add_item = builder->createBasicBlock("add_item", fn_items);
+        ir::BasicBlock* b_next = builder->createBasicBlock("next", fn_items);
+        ir::BasicBlock* b_done = builder->createBasicBlock("done", fn_items);
+
+        builder->setInsertPoint(b_entry);
+        ir::Value* dict_ptr = fn_items->getParameters().front().get();
+
+        ir::Value* count = builder->createLoad(dict_ptr);
+        ir::Value* list_ptr = builder->createCall(fn_list_new, {count});
+
+        ir::Value* cap_ptr = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 8));
+        ir::Value* cap = builder->createLoad(cap_ptr);
+        ir::Value* keys_slot = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* keys = builder->createLoad(keys_slot);
+        ir::Value* vals_slot = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 24));
+        ir::Value* vals = builder->createLoad(vals_slot);
+
+        ir::Instruction* i_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        builder->createStore(ctx->getConstantInt(i64, 0), i_slot);
+        builder->createJmp(b_loop);
+
+        builder->setInsertPoint(b_loop);
+        ir::Value* i = builder->createLoad(i_slot);
+        ir::Value* cond = builder->createCslt(i, cap);
+        builder->createBr(cond, b_check, b_done);
+
+        builder->setInsertPoint(b_check);
+        ir::Value* k_off = builder->createMul(i, ctx->getConstantInt(i64, 8));
+        ir::Value* k_addr = builder->createAdd(keys, k_off);
+        ir::Value* curr_k = builder->createLoad(k_addr);
+
+        ir::Value* is_null = builder->createCeq(curr_k, ctx->getConstantInt(i64, 0));
+        builder->createBr(is_null, b_next, b_add_item);
+
+        builder->setInsertPoint(b_add_item);
+        ir::Value* v_addr = builder->createAdd(vals, k_off);
+        ir::Value* curr_v = builder->createLoad(v_addr);
+
+        ir::Value* tup_ptr = builder->createCall(fn_tup_new, {ctx->getConstantInt(i64, 2)});
+        builder->createCall(fn_tup_set, {tup_ptr, ctx->getConstantInt(i64, 0), curr_k});
+        builder->createCall(fn_tup_set, {tup_ptr, ctx->getConstantInt(i64, 1), curr_v});
+
+        builder->createCall(fn_list_app, {list_ptr, tup_ptr});
+        builder->createJmp(b_next);
+
+        builder->setInsertPoint(b_next);
+        ir::Value* next_i = builder->createAdd(i, ctx->getConstantInt(i64, 1));
+        builder->createStore(next_i, i_slot);
+        builder->createJmp(b_loop);
+
+        builder->setInsertPoint(b_done);
+        builder->createRet(list_ptr);
     }
 
     if (old_bb) builder->setInsertPoint(old_bb);
