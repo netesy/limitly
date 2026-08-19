@@ -16,12 +16,8 @@ namespace {
 // associated with a language type. Returns -1 for non-decimal types.
 int decimal_scale_of(const ::TypePtr& t) {
     if (!t) return -1;
-    switch (t->tag) {
-        case ::TypeTag::Decimal2: return 2;
-        case ::TypeTag::Decimal4: return 4;
-        case ::TypeTag::Decimal6: return 6;
-        default: return -1;
-    }
+    int s = t->getDecimalScale();
+    return (s > 0) ? s : -1;
 }
 
 // Compute 10^n for small non-negative n.
@@ -67,13 +63,36 @@ void RegisterVM::execute_arithmetic(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::DecSub:
             registers[pc->dst] = lm_sub(registers[pc->a], registers[pc->b]);
             break;
-        case LIR::LIR_Op::DecMul:
-            // Simplified: decimal multiply needs rescaling, but let's use runtime
-            registers[pc->dst] = lm_mul(registers[pc->a], registers[pc->b]);
+        case LIR::LIR_Op::DecMul: {
+            int scale = 4;
+            TypePtr lang_a = get_register_language_type(pc->a);
+            TypePtr lang_b = get_register_language_type(pc->b);
+            TypePtr lang_dst = get_register_language_type(pc->dst);
+            if (lang_a && is_decimal_type(lang_a)) scale = decimal_scale_of(lang_a);
+            else if (lang_b && is_decimal_type(lang_b)) scale = decimal_scale_of(lang_b);
+            else if (lang_dst && is_decimal_type(lang_dst)) scale = decimal_scale_of(lang_dst);
+
+            int64_t factor = pow10_i64(scale);
+            int64_t va = as_i64(registers[pc->a]);
+            int64_t vb = as_i64(registers[pc->b]);
+            registers[pc->dst] = factor == 0 ? VAL_NIL : make_i64((va * vb) / factor);
             break;
-        case LIR::LIR_Op::DecDiv:
-            registers[pc->dst] = lm_div(registers[pc->a], registers[pc->b]);
+        }
+        case LIR::LIR_Op::DecDiv: {
+            int scale = 4;
+            TypePtr lang_a = get_register_language_type(pc->a);
+            TypePtr lang_b = get_register_language_type(pc->b);
+            TypePtr lang_dst = get_register_language_type(pc->dst);
+            if (lang_a && is_decimal_type(lang_a)) scale = decimal_scale_of(lang_a);
+            else if (lang_b && is_decimal_type(lang_b)) scale = decimal_scale_of(lang_b);
+            else if (lang_dst && is_decimal_type(lang_dst)) scale = decimal_scale_of(lang_dst);
+
+            int64_t factor = pow10_i64(scale);
+            int64_t va = as_i64(registers[pc->a]);
+            int64_t vb = as_i64(registers[pc->b]);
+            registers[pc->dst] = vb == 0 ? VAL_NIL : make_i64((va * factor) / vb);
             break;
+        }
         case LIR::LIR_Op::DecMod:
             if (is_integer(registers[pc->a]) && is_integer(registers[pc->b])) {
                 __int128 divisor = as_i128(registers[pc->b]);
@@ -108,6 +127,12 @@ void RegisterVM::execute_arithmetic(const LIR::LIR_Inst* pc) {
                 if (dst_it != current_function_->register_language_types.end()) {
                     dst_scale = decimal_scale_of(dst_it->second);
                 }
+            }
+            if (dst_scale > 0 && src_scale < 0) {
+                src_scale = (dst_scale == 6) ? 4 : 2;
+            }
+            if (src_scale > 0 && dst_scale < 0) {
+                dst_scale = (src_scale == 2) ? 4 : 6;
             }
 
             RegisterValue src = registers[pc->a];

@@ -113,6 +113,8 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
 
                         LIR::LIR_Function temp_wrapper(func->getName(), 1);
                         temp_wrapper.instructions = func->getInstructions();
+                        temp_wrapper.register_language_types = func->getRegisterLanguageTypes();
+                        temp_wrapper.register_types = func->getRegisterTypes();
                         current_function_ = &temp_wrapper;
 
                         execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
@@ -170,6 +172,8 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
 
                 LIR::LIR_Function temp_wrapper(func->getName(), static_cast<uint32_t>(arg_vals.size()));
                 temp_wrapper.instructions = func->getInstructions();
+                temp_wrapper.register_language_types = func->getRegisterLanguageTypes();
+                temp_wrapper.register_types = func->getRegisterTypes();
                 current_function_ = &temp_wrapper;
 
                 execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
