@@ -388,6 +388,261 @@ void FyraBuiltinFunctions::emit_print_decimal_inline(ir::Module* module,
 }
 
 // ---------------------------------------------------------------------------
+static int g_d2s_counter = 0;
+static int g_i2s_counter = 0;
+static int g_b2s_counter = 0;
+
+ir::Value* FyraBuiltinFunctions::emit_decimal_to_str_inline(ir::Module* module,
+                                                            ir::IRBuilder* builder,
+                                                            ir::Value* val,
+                                                            int scale) {
+    auto ctx = module->getContextShared();
+    auto i64 = ctx->getIntegerType(64);
+    auto i8 = ctx->getIntegerType(8);
+
+    int uid = ++g_d2s_counter;
+    std::string s_uid = std::to_string(uid);
+
+    ir::BasicBlock* cur_bb = builder->getInsertPoint();
+    ir::Function* cur_fn = cur_bb->getParent();
+
+    ir::Instruction* buf_ptr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 64)}, i64);
+    ir::Value* p_end = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, 63));
+    builder->createStoreb(ctx->getConstantInt(i8, 0), p_end);
+
+    ir::Instruction* v_cur_ptr = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(p_end, v_cur_ptr);
+
+    ir::Instruction* v_whole = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    ir::Instruction* v_frac = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    ir::Instruction* v_scale_count = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    ir::Instruction* v_is_neg = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+
+    ir::BasicBlock* b_neg  = builder->createBasicBlock("d2s_neg_" + s_uid, cur_fn);
+    ir::BasicBlock* b_abs  = builder->createBasicBlock("d2s_abs_" + s_uid, cur_fn);
+    ir::BasicBlock* b_prep = builder->createBasicBlock("d2s_prep_" + s_uid, cur_fn);
+    ir::BasicBlock* b_frac_loop = builder->createBasicBlock("d2s_frac_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_dot  = builder->createBasicBlock("d2s_dot_" + s_uid, cur_fn);
+    ir::BasicBlock* b_whole_loop = builder->createBasicBlock("d2s_whole_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_sign_check = builder->createBasicBlock("d2s_sign_" + s_uid, cur_fn);
+    ir::BasicBlock* b_add_minus = builder->createBasicBlock("d2s_minus_" + s_uid, cur_fn);
+    ir::BasicBlock* b_done = builder->createBasicBlock("d2s_done_" + s_uid, cur_fn);
+
+    ir::Value* is_neg = builder->createCslt(val, ctx->getConstantInt(i64, 0));
+    builder->createBr(is_neg, b_neg, b_abs);
+
+    builder->setInsertPoint(b_neg);
+    builder->createStore(ctx->getConstantInt(i64, 1), v_is_neg);
+    ir::Value* neg_v = builder->createNeg(val);
+    builder->createStore(neg_v, v_whole);
+    builder->createJmp(b_prep);
+
+    builder->setInsertPoint(b_abs);
+    builder->createStore(ctx->getConstantInt(i64, 0), v_is_neg);
+    builder->createStore(val, v_whole);
+    builder->createJmp(b_prep);
+
+    builder->setInsertPoint(b_prep);
+    ir::Value* abs_v = builder->createLoad(v_whole);
+
+    int64_t divisor_val = 1;
+    for (int i = 0; i < scale; ++i) divisor_val *= 10;
+    ir::Value* divisor = ctx->getConstantInt(i64, divisor_val);
+
+    ir::Value* whole = builder->createDiv(abs_v, divisor);
+    ir::Value* frac = builder->createRem(abs_v, divisor);
+
+    builder->createStore(whole, v_whole);
+    builder->createStore(frac, v_frac);
+    builder->createStore(ctx->getConstantInt(i64, scale), v_scale_count);
+    builder->createJmp(b_frac_loop);
+
+    // Frac loop
+    builder->setInsertPoint(b_frac_loop);
+    ir::Value* f_val = builder->createLoad(v_frac);
+    ir::Value* f_d = builder->createRem(f_val, ctx->getConstantInt(i64, 10));
+    ir::Value* f_next = builder->createDiv(f_val, ctx->getConstantInt(i64, 10));
+    builder->createStore(f_next, v_frac);
+
+    ir::Value* f_char = builder->createAdd(f_d, ctx->getConstantInt(i64, 48));
+    ir::Value* cur_p1 = builder->createLoad(v_cur_ptr);
+    ir::Value* new_p1 = builder->createSub(cur_p1, ctx->getConstantInt(i64, 1));
+    builder->createStoreb(f_char, new_p1);
+    builder->createStore(new_p1, v_cur_ptr);
+
+    ir::Value* sc = builder->createLoad(v_scale_count);
+    ir::Value* next_sc = builder->createSub(sc, ctx->getConstantInt(i64, 1));
+    builder->createStore(next_sc, v_scale_count);
+    ir::Value* sc_more = builder->createCsgt(next_sc, ctx->getConstantInt(i64, 0));
+    builder->createBr(sc_more, b_frac_loop, b_dot);
+
+    // Place '.'
+    builder->setInsertPoint(b_dot);
+    ir::Value* cur_p2 = builder->createLoad(v_cur_ptr);
+    ir::Value* new_p2 = builder->createSub(cur_p2, ctx->getConstantInt(i64, 1));
+    builder->createStoreb(ctx->getConstantInt(i8, 46), new_p2);
+    builder->createStore(new_p2, v_cur_ptr);
+    builder->createJmp(b_whole_loop);
+
+    // Whole loop
+    builder->setInsertPoint(b_whole_loop);
+    ir::Value* w_val = builder->createLoad(v_whole);
+    ir::Value* w_d = builder->createRem(w_val, ctx->getConstantInt(i64, 10));
+    ir::Value* w_next = builder->createDiv(w_val, ctx->getConstantInt(i64, 10));
+    builder->createStore(w_next, v_whole);
+
+    ir::Value* w_char = builder->createAdd(w_d, ctx->getConstantInt(i64, 48));
+    ir::Value* cur_p3 = builder->createLoad(v_cur_ptr);
+    ir::Value* new_p3 = builder->createSub(cur_p3, ctx->getConstantInt(i64, 1));
+    builder->createStoreb(w_char, new_p3);
+    builder->createStore(new_p3, v_cur_ptr);
+
+    ir::Value* w_more = builder->createCsge(w_next, ctx->getConstantInt(i64, 1));
+    builder->createBr(w_more, b_whole_loop, b_sign_check);
+
+    builder->setInsertPoint(b_sign_check);
+    ir::Value* was_neg = builder->createLoad(v_is_neg);
+    ir::Value* neg_cond = builder->createCeq(was_neg, ctx->getConstantInt(i64, 1));
+    builder->createBr(neg_cond, b_add_minus, b_done);
+
+    builder->setInsertPoint(b_add_minus);
+    ir::Value* cur_p4 = builder->createLoad(v_cur_ptr);
+    ir::Value* new_p4 = builder->createSub(cur_p4, ctx->getConstantInt(i64, 1));
+    builder->createStoreb(ctx->getConstantInt(i8, 45), new_p4);
+    builder->createStore(new_p4, v_cur_ptr);
+    builder->createJmp(b_done);
+
+    builder->setInsertPoint(b_done);
+    return builder->createLoad(v_cur_ptr);
+}
+
+ir::Value* FyraBuiltinFunctions::emit_int_to_str_inline(ir::Module* module,
+                                                     ir::IRBuilder* builder,
+                                                     ir::Value* val) {
+    auto ctx = module->getContextShared();
+    auto i64 = ctx->getIntegerType(64);
+    auto i8 = ctx->getIntegerType(8);
+
+    int uid = ++g_i2s_counter;
+    std::string s_uid = std::to_string(uid);
+
+    ir::BasicBlock* cur_bb = builder->getInsertPoint();
+    ir::Function* cur_fn = cur_bb->getParent();
+
+    ir::Instruction* buf_ptr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 64)}, i64);
+    ir::Value* p_end = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, 63));
+    builder->createStoreb(ctx->getConstantInt(i8, 0), p_end);
+
+    ir::Instruction* v_cur_ptr = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(p_end, v_cur_ptr);
+
+    ir::Instruction* v_val = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    ir::Instruction* v_is_neg = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+
+    ir::BasicBlock* b_neg = builder->createBasicBlock("i2s_neg_" + s_uid, cur_fn);
+    ir::BasicBlock* b_pos = builder->createBasicBlock("i2s_pos_" + s_uid, cur_fn);
+    ir::BasicBlock* b_loop = builder->createBasicBlock("i2s_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_sign_check = builder->createBasicBlock("i2s_sign_" + s_uid, cur_fn);
+    ir::BasicBlock* b_add_minus = builder->createBasicBlock("i2s_minus_" + s_uid, cur_fn);
+    ir::BasicBlock* b_done = builder->createBasicBlock("i2s_done_" + s_uid, cur_fn);
+
+    ir::Value* is_neg = builder->createCslt(val, ctx->getConstantInt(i64, 0));
+    builder->createBr(is_neg, b_neg, b_pos);
+
+    builder->setInsertPoint(b_neg);
+    builder->createStore(ctx->getConstantInt(i64, 1), v_is_neg);
+    builder->createStore(builder->createNeg(val), v_val);
+    builder->createJmp(b_loop);
+
+    builder->setInsertPoint(b_pos);
+    builder->createStore(ctx->getConstantInt(i64, 0), v_is_neg);
+    builder->createStore(val, v_val);
+    builder->createJmp(b_loop);
+
+    builder->setInsertPoint(b_loop);
+    ir::Value* cur_n = builder->createLoad(v_val);
+    ir::Value* d = builder->createRem(cur_n, ctx->getConstantInt(i64, 10));
+    ir::Value* next_n = builder->createDiv(cur_n, ctx->getConstantInt(i64, 10));
+    builder->createStore(next_n, v_val);
+
+    ir::Value* ch = builder->createAdd(d, ctx->getConstantInt(i64, 48));
+    ir::Value* cur_p = builder->createLoad(v_cur_ptr);
+    ir::Value* new_p = builder->createSub(cur_p, ctx->getConstantInt(i64, 1));
+    builder->createStoreb(ch, new_p);
+    builder->createStore(new_p, v_cur_ptr);
+
+    ir::Value* more = builder->createCsge(next_n, ctx->getConstantInt(i64, 1));
+    builder->createBr(more, b_loop, b_sign_check);
+
+    builder->setInsertPoint(b_sign_check);
+    ir::Value* was_neg = builder->createLoad(v_is_neg);
+    ir::Value* neg_cond = builder->createCeq(was_neg, ctx->getConstantInt(i64, 1));
+    builder->createBr(neg_cond, b_add_minus, b_done);
+
+    builder->setInsertPoint(b_add_minus);
+    ir::Value* cur_p2 = builder->createLoad(v_cur_ptr);
+    ir::Value* new_p2 = builder->createSub(cur_p2, ctx->getConstantInt(i64, 1));
+    builder->createStoreb(ctx->getConstantInt(i8, 45), new_p2);
+    builder->createStore(new_p2, v_cur_ptr);
+    builder->createJmp(b_done);
+
+    builder->setInsertPoint(b_done);
+    return builder->createLoad(v_cur_ptr);
+}
+
+ir::Value* FyraBuiltinFunctions::emit_float_to_str_inline(ir::Module* module,
+                                                       ir::IRBuilder* builder,
+                                                       ir::Value* val) {
+    auto ctx = module->getContextShared();
+    auto i64 = ctx->getIntegerType(64);
+    ir::Instruction* buf_ptr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 64)}, i64);
+    ir::GlobalVariable* fmt_gv = get_or_create_global_str(module, builder, "fmt_float", "%g");
+    
+    builder->createExternCall("snprintf", {
+        buf_ptr,
+        ctx->getConstantInt(i64, 64),
+        fmt_gv,
+        val
+    }, i64);
+
+    return buf_ptr;
+}
+
+ir::Value* FyraBuiltinFunctions::emit_bool_to_str_inline(ir::Module* module,
+                                                      ir::IRBuilder* builder,
+                                                      ir::Value* val) {
+    auto ctx = module->getContextShared();
+    auto i64 = ctx->getIntegerType(64);
+    int uid = ++g_b2s_counter;
+    std::string s_uid = std::to_string(uid);
+
+    ir::BasicBlock* cur_bb = builder->getInsertPoint();
+    ir::Function* cur_fn = cur_bb->getParent();
+
+    ir::Instruction* res_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+
+    ir::BasicBlock* b_true  = builder->createBasicBlock("b2s_true_" + s_uid, cur_fn);
+    ir::BasicBlock* b_false = builder->createBasicBlock("b2s_false_" + s_uid, cur_fn);
+    ir::BasicBlock* b_done  = builder->createBasicBlock("b2s_done_" + s_uid, cur_fn);
+
+    ir::Value* cond = builder->createCne(val, ctx->getConstantInt(i64, 0));
+    builder->createBr(cond, b_true, b_false);
+
+    builder->setInsertPoint(b_true);
+    ir::GlobalVariable* gv_true = get_or_create_global_str(module, builder, "str_true", "true");
+    builder->createStore(gv_true, res_slot);
+    builder->createJmp(b_done);
+
+    builder->setInsertPoint(b_false);
+    ir::GlobalVariable* gv_false = get_or_create_global_str(module, builder, "str_false", "false");
+    builder->createStore(gv_false, res_slot);
+    builder->createJmp(b_done);
+
+    builder->setInsertPoint(b_done);
+    return builder->createLoad(res_slot);
+}
+
+// ---------------------------------------------------------------------------
 void FyraBuiltinFunctions::emit_assert(ir::Module* module, ir::IRBuilder* builder) {
     auto ctx = module->getContextShared();
     ir::Function* fn = module->getFunction("lm_assert");
