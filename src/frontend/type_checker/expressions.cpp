@@ -2089,7 +2089,7 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
              add_error("String index must be an integer, got " + index_type->toString(), expr->line);
         }
-        return type_system.STRING_TYPE;
+        return type_system.INT64_TYPE;
     } else if (object_type->tag == TypeTag::Tuple) {
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
              add_error("Tuple index must be an integer, got " + index_type->toString(), expr->line);

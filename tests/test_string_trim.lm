@@ -1,0 +1,9 @@
+import std.string as string;
+
+fn main() {
+    var text = "  Hello, Limitly World!  ";
+    var trimmed = string.trim(text);
+    print(trimmed);
+}
+
+main();

@@ -1,0 +1,15 @@
+import std.string as string;
+
+fn main() {
+    var lower = string.to_lower("LIMITLY");
+    print("Lower:");
+    print(lower);
+    assert(lower == "limitly", "Lower failure");
+
+    var upper = string.to_upper("limitly");
+    print("Upper:");
+    print(upper);
+    assert(upper == "LIMITLY", "Upper failure");
+}
+
+main();

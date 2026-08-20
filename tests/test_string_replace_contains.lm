@@ -1,0 +1,15 @@
+import std.string as string;
+
+fn main() {
+    var text = "  Hello, Limitly World!  ";
+    var trimmed = string.trim(text);
+    var replaced = string.replace(trimmed, "World", "Language");
+    print("Testing contains on replaced...");
+    var res = string.contains(replaced, "Language");
+    print("Contains res:");
+    print(res);
+    assert(res == true, "Contains failure");
+    print("Passed!");
+}
+
+main();
