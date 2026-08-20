@@ -3,6 +3,8 @@
 import std.encoding.base64 as base64;
 import std.encoding.hex as hex;
 import std.encoding.percent as percent;
+import std.encoding.utf16 as utf16;
+import std.encoding.utf32 as utf32;
 
 frame Encoding {
     pub static fn base64_encode(data: [int]): str { return base64.encode_base64(data); }
@@ -13,6 +15,20 @@ frame Encoding {
     pub static fn hex_to_byte(h: str): int { return hex.hex_to_byte(h); }
     pub static fn url_encode(s: str): str { return percent.encode(s); }
     pub static fn url_decode(s: str): str { return percent.decode(s); }
+
+    pub static fn utf16_encode(s: str): [int] { return utf16.encode_utf16(s); }
+    pub static fn utf16_encode_be(s: str): [int] { return utf16.encode_utf16_be(s); }
+    pub static fn utf16_encode_le(s: str): [int] { return utf16.encode_utf16_le(s); }
+    pub static fn utf16_decode(units: [int]): str { return utf16.decode_utf16(units); }
+    pub static fn utf16_decode_be(bytes: [int]): str { return utf16.decode_utf16_be(bytes); }
+    pub static fn utf16_decode_le(bytes: [int]): str { return utf16.decode_utf16_le(bytes); }
+
+    pub static fn utf32_encode(s: str): [int] { return utf32.encode_utf32(s); }
+    pub static fn utf32_encode_be(s: str): [int] { return utf32.encode_utf32_be(s); }
+    pub static fn utf32_encode_le(s: str): [int] { return utf32.encode_utf32_le(s); }
+    pub static fn utf32_decode(cps: [int]): str { return utf32.decode_utf32(cps); }
+    pub static fn utf32_decode_be(bytes: [int]): str { return utf32.decode_utf32_be(bytes); }
+    pub static fn utf32_decode_le(bytes: [int]): str { return utf32.decode_utf32_le(bytes); }
 }
 
 pub fn base64_encode(data: [int]): str { return base64.encode_base64(data); }
@@ -23,3 +39,17 @@ pub fn byte_to_hex(b: int): str { return hex.byte_to_hex(b); }
 pub fn hex_to_byte(h: str): int { return hex.hex_to_byte(h); }
 pub fn url_encode(s: str): str { return percent.encode(s); }
 pub fn url_decode(s: str): str { return percent.decode(s); }
+
+pub fn utf16_encode(s: str): [int] { return utf16.encode_utf16(s); }
+pub fn utf16_encode_be(s: str): [int] { return utf16.encode_utf16_be(s); }
+pub fn utf16_encode_le(s: str): [int] { return utf16.encode_utf16_le(s); }
+pub fn utf16_decode(units: [int]): str { return utf16.decode_utf16(units); }
+pub fn utf16_decode_be(bytes: [int]): str { return utf16.decode_utf16_be(bytes); }
+pub fn utf16_decode_le(bytes: [int]): str { return utf16.decode_utf16_le(bytes); }
+
+pub fn utf32_encode(s: str): [int] { return utf32.encode_utf32(s); }
+pub fn utf32_encode_be(s: str): [int] { return utf32.encode_utf32_be(s); }
+pub fn utf32_encode_le(s: str): [int] { return utf32.encode_utf32_le(s); }
+pub fn utf32_decode(cps: [int]): str { return utf32.decode_utf32(cps); }
+pub fn utf32_decode_be(bytes: [int]): str { return utf32.decode_utf32_be(bytes); }
+pub fn utf32_decode_le(bytes: [int]): str { return utf32.decode_utf32_le(bytes); }

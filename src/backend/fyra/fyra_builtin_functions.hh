@@ -48,6 +48,7 @@ public:
     static void emit_string_to_lower_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_string_to_upper_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_string_replace_ir(ir::Module* module, ir::IRBuilder* builder);
+    static void emit_string_from_bytes_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_to_string_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_error_new_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_list_ir(ir::Module* module, ir::IRBuilder* builder);

@@ -884,6 +884,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             return type_system.INT64_TYPE;
         }
         if (var_callee->name == "_builtin_substring" ||
+            var_callee->name == "_builtin_string_from_bytes" ||
             var_callee->name == "_builtin_string_replace" ||
             var_callee->name == "_builtin_string_trim" ||
             var_callee->name == "_builtin_string_to_lower" ||

@@ -1,0 +1,130 @@
+// Standard Library UTF-16 Encoding Module
+
+fn cp_to_utf8_bytes(cp: int): [int] {
+    var bytes: [int] = [];
+    if (cp < 128) {
+        bytes.append(cp);
+    } elif (cp < 2048) {
+        bytes.append(192 | (cp >> 6));
+        bytes.append(128 | (cp & 63));
+    } elif (cp < 65536) {
+        bytes.append(224 | (cp >> 12));
+        bytes.append(128 | ((cp >> 6) & 63));
+        bytes.append(128 | (cp & 63));
+    } else {
+        bytes.append(240 | (cp >> 18));
+        bytes.append(128 | ((cp >> 12) & 63));
+        bytes.append(128 | ((cp >> 6) & 63));
+        bytes.append(128 | (cp & 63));
+    }
+    return bytes;
+}
+
+pub fn encode_utf16(s: str): [int] {
+    var units: [int] = [];
+    iter (cp in s) {
+        if (cp < 65536) {
+            units.append(cp);
+        } else {
+            var cp_prime = cp - 65536;
+            var high = 55296 + (cp_prime >> 10);
+            var low = 56320 + (cp_prime & 1023);
+            units.append(high);
+            units.append(low);
+        }
+    }
+    return units;
+}
+
+pub fn encode_utf16_be(s: str): [int] {
+    var units: [int] = encode_utf16(s);
+    var bytes: [int] = [];
+    var i = 0;
+    var length = len(units);
+    while (i < length) {
+        var u = units[i];
+        bytes.append((u >> 8) & 255);
+        bytes.append(u & 255);
+        i = i + 1;
+    }
+    return bytes;
+}
+
+pub fn encode_utf16_le(s: str): [int] {
+    var units: [int] = encode_utf16(s);
+    var bytes: [int] = [];
+    var i = 0;
+    var length = len(units);
+    while (i < length) {
+        var u = units[i];
+        bytes.append(u & 255);
+        bytes.append((u >> 8) & 255);
+        i = i + 1;
+    }
+    return bytes;
+}
+
+pub fn decode_utf16(units: [int]): str {
+    var utf8_bytes: [int] = [];
+    var i = 0;
+    var length = len(units);
+    while (i < length) {
+        var unit = units[i];
+        if (unit >= 55296 and unit <= 56319 and i + 1 < length) {
+            var next_unit = units[i + 1];
+            if (next_unit >= 56320 and next_unit <= 57343) {
+                var cp = 65536 + (((unit - 55296) << 10) | (next_unit - 56320));
+                var b = cp_to_utf8_bytes(cp);
+                var j = 0;
+                while (j < len(b)) {
+                    utf8_bytes.append(b[j]);
+                    j = j + 1;
+                }
+                i = i + 2;
+            } else {
+                var b = cp_to_utf8_bytes(unit);
+                var j = 0;
+                while (j < len(b)) {
+                    utf8_bytes.append(b[j]);
+                    j = j + 1;
+                }
+                i = i + 1;
+            }
+        } else {
+            var b = cp_to_utf8_bytes(unit);
+            var j = 0;
+            while (j < len(b)) {
+                utf8_bytes.append(b[j]);
+                j = j + 1;
+            }
+            i = i + 1;
+        }
+    }
+    return _builtin_string_from_bytes(utf8_bytes);
+}
+
+pub fn decode_utf16_be(bytes: [int]): str {
+    var units: [int] = [];
+    var i = 0;
+    var length = len(bytes);
+    while (i + 1 < length) {
+        var hi = bytes[i];
+        var lo = bytes[i + 1];
+        units.append((hi << 8) | lo);
+        i = i + 2;
+    }
+    return decode_utf16(units);
+}
+
+pub fn decode_utf16_le(bytes: [int]): str {
+    var units: [int] = [];
+    var i = 0;
+    var length = len(bytes);
+    while (i + 1 < length) {
+        var lo = bytes[i];
+        var hi = bytes[i + 1];
+        units.append((hi << 8) | lo);
+        i = i + 2;
+    }
+    return decode_utf16(units);
+}

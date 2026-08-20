@@ -1,0 +1,50 @@
+import std.encoding.utf16 as utf16;
+import std.encoding.utf32 as utf32;
+
+fn main() {
+    print("=== TEST UTF-16 & UTF-32 ENCODING/DECODING ===");
+
+    var text = "Hello, é 🌍!";
+
+    // Test UTF-16
+    var u16_units = utf16.encode_utf16(text);
+    print("UTF-16 units count:");
+    print(len(u16_units));
+    assert(len(u16_units) == 12, "UTF-16 units count mismatch");
+
+    var u16_decoded = utf16.decode_utf16(u16_units);
+    print("UTF-16 decoded:");
+    print(u16_decoded);
+    assert(u16_decoded == text, "UTF-16 roundtrip failure");
+
+    var u16_be_bytes = utf16.encode_utf16_be(text);
+    var u16_be_decoded = utf16.decode_utf16_be(u16_be_bytes);
+    assert(u16_be_decoded == text, "UTF-16 BE roundtrip failure");
+
+    var u16_le_bytes = utf16.encode_utf16_le(text);
+    var u16_le_decoded = utf16.decode_utf16_le(u16_le_bytes);
+    assert(u16_le_decoded == text, "UTF-16 LE roundtrip failure");
+
+    // Test UTF-32
+    var u32_cps = utf32.encode_utf32(text);
+    print("UTF-32 codepoints count:");
+    print(len(u32_cps));
+    assert(len(u32_cps) == 11, "UTF-32 codepoints count mismatch");
+
+    var u32_decoded = utf32.decode_utf32(u32_cps);
+    print("UTF-32 decoded:");
+    print(u32_decoded);
+    assert(u32_decoded == text, "UTF-32 roundtrip failure");
+
+    var u32_be_bytes = utf32.encode_utf32_be(text);
+    var u32_be_decoded = utf32.decode_utf32_be(u32_be_bytes);
+    assert(u32_be_decoded == text, "UTF-32 BE roundtrip failure");
+
+    var u32_le_bytes = utf32.encode_utf32_le(text);
+    var u32_le_decoded = utf32.decode_utf32_le(u32_le_bytes);
+    assert(u32_le_decoded == text, "UTF-32 LE roundtrip failure");
+
+    print("=== ALL UTF-16 AND UTF-32 TESTS PASSED ===");
+}
+
+main();

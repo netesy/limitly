@@ -167,6 +167,19 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("length", {ts.STRING_TYPE}, ts.INT_TYPE);
     checker.register_builtin_function("substring", {ts.STRING_TYPE, ts.INT_TYPE, ts.INT_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("_builtin_substring", {ts.STRING_TYPE, ts.INT_TYPE, ts.INT_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("_builtin_string_from_bytes", {ts.createTypedListType(ts.INT_TYPE)}, ts.STRING_TYPE);
+    checker.register_builtin_function("_builtin_string_from_bytes", {ts.ANY_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("_builtin_string_byte_len", {ts.STRING_TYPE}, ts.INT_TYPE);
+    checker.register_builtin_function("_builtin_string_decode_next", {ts.STRING_TYPE, ts.INT_TYPE}, ts.INT_TYPE);
+    checker.register_builtin_function("_builtin_string_byte_at", {ts.STRING_TYPE, ts.INT_TYPE}, ts.INT_TYPE);
+    checker.register_builtin_function("_builtin_string_index_of", {ts.STRING_TYPE, ts.STRING_TYPE}, ts.INT_TYPE);
+    checker.register_builtin_function("_builtin_string_contains", {ts.STRING_TYPE, ts.STRING_TYPE}, ts.BOOL_TYPE);
+    checker.register_builtin_function("_builtin_string_starts_with", {ts.STRING_TYPE, ts.STRING_TYPE}, ts.BOOL_TYPE);
+    checker.register_builtin_function("_builtin_string_ends_with", {ts.STRING_TYPE, ts.STRING_TYPE}, ts.BOOL_TYPE);
+    checker.register_builtin_function("_builtin_string_replace", {ts.STRING_TYPE, ts.STRING_TYPE, ts.STRING_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("_builtin_string_trim", {ts.STRING_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("_builtin_string_to_lower", {ts.STRING_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("_builtin_string_to_upper", {ts.STRING_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("str_format", {ts.STRING_TYPE, ts.ANY_TYPE}, ts.STRING_TYPE);
     // Utility len functions
     checker.register_builtin_function("len", {ts.STRING_TYPE}, ts.INT_TYPE);
