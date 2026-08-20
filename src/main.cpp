@@ -93,6 +93,9 @@ int main(int argc, char* argv[]) {
             if (arg == "-target" && i + 1 < argc) options.target = argv[++i];
             else if (arg == "-o" && i + 1 < argc) options.output_file = argv[++i];
             else if (arg == "-O" && i + 1 < argc) options.opt_level = std::stoi(argv[++i]);
+            else if (arg == "windows" || arg == "linux" || arg == "macos" || arg == "wasm") options.target = arg;
+            else if (arg == "x86_64" || arg == "aarch64" || arg == "wasm32") options.arch = arg;
+            else if (arg == "0" || arg == "1" || arg == "2" || arg == "3") options.opt_level = std::stoi(arg);
             else if (arg[0] != '-') source_file = arg;
         }
         if (source_file.empty()) return 1;

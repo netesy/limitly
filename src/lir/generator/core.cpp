@@ -183,14 +183,18 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     // Register regular parameters
     for (size_t i = 0; i < fn.params.size(); ++i) {
         bind_variable(fn.params[i].first, static_cast<Reg>(i));
-        set_register_type(static_cast<Reg>(i), nullptr);
+        TypePtr p_type = fn.params[i].second ? convert_ast_type_to_lir_type(fn.params[i].second) : nullptr;
+        set_register_language_type(static_cast<Reg>(i), p_type);
+        set_register_type(static_cast<Reg>(i), p_type);
     }
     
     // Register optional parameters
     for (size_t i = 0; i < fn.optionalParams.size(); ++i) {
         size_t reg_index = fn.params.size() + i;
         bind_variable(fn.optionalParams[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr p_type = fn.optionalParams[i].second.first ? convert_ast_type_to_lir_type(fn.optionalParams[i].second.first) : nullptr;
+        set_register_language_type(static_cast<Reg>(reg_index), p_type);
+        set_register_type(static_cast<Reg>(reg_index), p_type);
     }
     
     // Register environment parameter if this is a closure

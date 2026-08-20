@@ -1,0 +1,110 @@
+// Standard Library UTF-32 Encoding Module
+
+fn cp_to_utf8_bytes(cp: int): [int] {
+    var bytes: [int] = [];
+    if (cp < 128) {
+        bytes.append(cp);
+    } elif (cp < 2048) {
+        bytes.append(192 | (cp >> 6));
+        bytes.append(128 | (cp & 63));
+    } elif (cp < 65536) {
+        bytes.append(224 | (cp >> 12));
+        bytes.append(128 | ((cp >> 6) & 63));
+        bytes.append(128 | (cp & 63));
+    } else {
+        bytes.append(240 | (cp >> 18));
+        bytes.append(128 | ((cp >> 12) & 63));
+        bytes.append(128 | ((cp >> 6) & 63));
+        bytes.append(128 | (cp & 63));
+    }
+    return bytes;
+}
+
+pub fn encode_utf32(s: str): [int] {
+    var codepoints: [int] = [];
+    iter (cp in s) {
+        codepoints.append(cp);
+    }
+    return codepoints;
+}
+
+pub fn encode_utf32_be(s: str): [int] {
+    var codepoints: [int] = encode_utf32(s);
+    var bytes: [int] = [];
+    var i = 0;
+    var length = len(codepoints);
+    while (i < length) {
+        var cp = codepoints[i];
+        bytes.append((cp >> 24) & 255);
+        bytes.append((cp >> 16) & 255);
+        bytes.append((cp >> 8) & 255);
+        bytes.append(cp & 255);
+        i = i + 1;
+    }
+    return bytes;
+}
+
+pub fn encode_utf32_le(s: str): [int] {
+    var codepoints: [int] = encode_utf32(s);
+    var bytes: [int] = [];
+    var i = 0;
+    var length = len(codepoints);
+    while (i < length) {
+        var cp = codepoints[i];
+        bytes.append(cp & 255);
+        bytes.append((cp >> 8) & 255);
+        bytes.append((cp >> 16) & 255);
+        bytes.append((cp >> 24) & 255);
+        i = i + 1;
+    }
+    return bytes;
+}
+
+pub fn decode_utf32(codepoints: [int]): str {
+    var utf8_bytes: [int] = [];
+    var i = 0;
+    var length = len(codepoints);
+    while (i < length) {
+        var cp = codepoints[i];
+        var b = cp_to_utf8_bytes(cp);
+        var j = 0;
+        while (j < len(b)) {
+            utf8_bytes.append(b[j]);
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return _builtin_string_from_bytes(utf8_bytes);
+}
+
+pub fn decode_utf32_be(bytes: [int]): str {
+    var codepoints: [int] = [];
+    var i = 0;
+    var length = len(bytes);
+    while (i + 3 < length) {
+        var b0 = bytes[i];
+        var b1 = bytes[i + 1];
+        var b2 = bytes[i + 2];
+        var b3 = bytes[i + 3];
+        var cp = (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
+        codepoints.append(cp);
+        i = i + 4;
+    }
+    return decode_utf32(codepoints);
+}
+
+pub fn decode_utf32_le(bytes: [int]): str {
+    var codepoints: [int] = [];
+    var i = 0;
+    var length = len(bytes);
+    while (i + 3 < length) {
+        var b0 = bytes[i];
+        var b1 = bytes[i + 1];
+        var b2 = bytes[i + 2];
+        var b3 = bytes[i + 3];
+        var cp = b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+        codepoints.append(cp);
+        i = i + 4;
+    }
+    return decode_utf32(codepoints);
+}

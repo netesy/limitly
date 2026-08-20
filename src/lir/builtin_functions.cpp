@@ -655,6 +655,26 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
     ));
 
     registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_from_bytes",
+        std::vector<TypeTag>{TypeTag::List},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string res = "";
+            if (args[0] && std::holds_alternative<ListValue>(args[0]->complexData)) {
+                const auto& elements = std::get<ListValue>(args[0]->complexData).elements;
+                res.reserve(elements.size());
+                for (const auto& elem : elements) {
+                    if (elem) {
+                        res.push_back(static_cast<char>((uint8_t)elem->as<int64_t>()));
+                    }
+                }
+            }
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
         "_builtin_string_codepoints",
         std::vector<TypeTag>{TypeTag::String},
         TypeTag::List,

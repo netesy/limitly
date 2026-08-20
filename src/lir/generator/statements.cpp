@@ -1008,6 +1008,12 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
         // Get the type of the iterable variable
         TypePtr iterable_type = get_register_type(iterable_reg);
         if (!iterable_type) {
+            iterable_type = get_register_language_type(iterable_reg);
+        }
+        if (!iterable_type && var_expr->inferred_type) {
+            iterable_type = var_expr->inferred_type;
+        }
+        if (!iterable_type) {
             report_error("Cannot determine type of variable: " + var_expr->name);
             return;
         }
