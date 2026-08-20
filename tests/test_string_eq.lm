@@ -1,0 +1,15 @@
+import std.string as string;
+
+fn main() {
+    var text = "  Hello, Limitly World!  ";
+    var trimmed = string.trim(text);
+    var replaced = string.replace(trimmed, "World", "Language");
+    print("Checking eq:");
+    var is_eq = (replaced == "Hello, Limitly Language!");
+    print("is_eq:");
+    print(is_eq);
+    assert(replaced == "Hello, Limitly Language!", "Replace failure");
+    print("Assert passed!");
+}
+
+main();

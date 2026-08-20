@@ -1,0 +1,26 @@
+import std.string as string;
+
+fn main() {
+    var text = "  Hello, Limitly World!  ";
+    var trimmed = string.trim(text);
+    var replaced = string.replace(trimmed, "World", "Language");
+
+    print("Checking contains...");
+    assert(string.contains(replaced, "Language") == true, "Contains failure");
+    print("Checking starts_with...");
+    assert(string.starts_with(replaced, "Hello") == true, "Starts with failure");
+    print("Checking ends_with...");
+    assert(string.ends_with(replaced, "Language!") == true, "Ends with failure");
+
+    print("Checking to_lower...");
+    var lower = string.to_lower("LIMITLY");
+    assert(lower == "limitly", "Lower failure");
+
+    print("Checking to_upper...");
+    var upper = string.to_upper("limitly");
+    assert(upper == "LIMITLY", "Upper failure");
+
+    print("ALL PASSED");
+}
+
+main();

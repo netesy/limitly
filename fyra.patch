@@ -1,0 +1,13 @@
+diff --git a/src/target/architecture/x64/X64Architecture.cpp b/src/target/architecture/x64/X64Architecture.cpp
+index 12d9342..1f6e711 100644
+--- a/src/target/architecture/x64/X64Architecture.cpp
++++ b/src/target/architecture/x64/X64Architecture.cpp
+@@ -1165,6 +1165,8 @@ void X64Architecture::emitExternCall(CodeGen& cg, ir::Instruction& i, const Oper
+                 *os << "  movq %rax, " << formatStackOperand(cg.getStackOffsets()[&i]) << "\n";
+             else
+                 *os << "  mov " << formatStackOperand(cg.getStackOffsets()[&i]) << ", rax\n";
++        } else {
++            emitStoreResult(cg, i, 0);
+         }
+     }
+ }
