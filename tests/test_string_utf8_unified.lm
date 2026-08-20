@@ -1,0 +1,60 @@
+import std.string as string;
+
+
+
+fn main() {
+    print("=== TEST 1: RAW BYTE INDEXING vs CODEPOINT ITERATION ===");
+    var e_accent = "é";
+    
+    // Test raw byte indexing s[i]
+    var byte0 = e_accent[0];
+    var byte1 = e_accent[1];
+    print("byte 0 of 'é':");
+    print(byte0);
+    print("byte 1 of 'é':");
+    print(byte1);
+    
+    // 0xC3 == 195, 0xA9 == 169
+    assert(byte0 == 195, "Byte 0 of 'é' must be 195 (0xC3)");
+    assert(byte1 == 169, "Byte 1 of 'é' must be 169 (0xA9)");
+
+    // Test codepoint iteration iter (ch in s)
+    var count = 0;
+    var last_cp = 0;
+    iter (cp in e_accent) {
+        count = count + 1;
+        last_cp = cp;
+    }
+    print("Codepoint count of 'é':");
+    print(count);
+    print("Codepoint value:");
+    print(last_cp);
+    assert(count == 1, "Codepoint count of 'é' must be 1");
+    assert(last_cp == 233, "Codepoint value of 'é' must be 233 (U+00E9)");
+
+    print("=== TEST 2: NATIVE STRING UTILITIES ===");
+    var text = "  Hello, Limitly World!  ";
+    var trimmed = string.trim(text);
+    print("Trimmed text:");
+    print(trimmed);
+    assert(trimmed == "Hello, Limitly World!", "Trim failure");
+
+    var replaced = string.replace(trimmed, "World", "Language");
+    print("Replaced text:");
+    print(replaced);
+    assert(replaced == "Hello, Limitly Language!", "Replace failure");
+
+    assert(string.contains(replaced, "Language") == true, "Contains failure");
+    assert(string.starts_with(replaced, "Hello") == true, "Starts with failure");
+    assert(string.ends_with(replaced, "Language!") == true, "Ends with failure");
+
+    var lower = string.to_lower("LIMITLY");
+    assert(lower == "limitly", "Lower failure");
+
+    var upper = string.to_upper("limitly");
+    assert(upper == "LIMITLY", "Upper failure");
+
+    print("=== ALL UNIFIED STRING ARCHITECTURE TESTS PASSED ===");
+}
+
+main();
