@@ -582,6 +582,11 @@ TypePtr TypeChecker::check_iter_statement(std::shared_ptr<LM::Frontend::AST::Ite
                 key_type = element_type;
                 recognized = true;
                 break;
+            case TypeTag::String:
+                element_type = type_system.INT64_TYPE;
+                key_type = element_type;
+                recognized = true;
+                break;
             case TypeTag::Dict: {
                 auto kv = type_system.getDictTypes(iterable_type);
                 key_type = kv.first;

@@ -1,5 +1,6 @@
 #include "../register.hh"
 #include "../vm_value.hh"
+#include "../vm_string.hh"
 #include <string>
 #include <cstdlib>
 
@@ -15,16 +16,18 @@ void RegisterVM::execute_cast(const LIR::LIR_Inst* pc) {
             if (pc->result_type == LIR::Type::I64) {
                 if (IS_PTR(val)) {
                     ObjHeader* h = (ObjHeader*)UNBOX_PTR(val);
-                    if (h->type_id == TYPE_BOX) {
-                        LmBox* box = (LmBox*)h;
-                        if (box->type == LM_BOX_STRING) {
-                            const char* str = (const char*)box->value.as_ptr;
-                            if (str) {
-                                try {
-                                    registers[pc->dst] = make_i64(std::stoll(str));
-                                    break;
-                                } catch (...) {}
-                            }
+                    if (h) {
+                        const char* str = nullptr;
+                        if (h->type_id == TYPE_STRING) {
+                            str = ((LmStringHeader*)h)->data;
+                        } else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                            str = (const char*)((LmBox*)h)->value.as_ptr;
+                        }
+                        if (str) {
+                            try {
+                                registers[pc->dst] = make_i64(std::stoll(str));
+                                break;
+                            } catch (...) {}
                         }
                     }
                 }
@@ -32,16 +35,18 @@ void RegisterVM::execute_cast(const LIR::LIR_Inst* pc) {
             } else if (pc->result_type == LIR::Type::F64) {
                 if (IS_PTR(val)) {
                     ObjHeader* h = (ObjHeader*)UNBOX_PTR(val);
-                    if (h->type_id == TYPE_BOX) {
-                        LmBox* box = (LmBox*)h;
-                        if (box->type == LM_BOX_STRING) {
-                            const char* str = (const char*)box->value.as_ptr;
-                            if (str) {
-                                try {
-                                    registers[pc->dst] = make_float(std::stod(str));
-                                    break;
-                                } catch (...) {}
-                            }
+                    if (h) {
+                        const char* str = nullptr;
+                        if (h->type_id == TYPE_STRING) {
+                            str = ((LmStringHeader*)h)->data;
+                        } else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                            str = (const char*)((LmBox*)h)->value.as_ptr;
+                        }
+                        if (str) {
+                            try {
+                                registers[pc->dst] = make_float(std::stod(str));
+                                break;
+                            } catch (...) {}
                         }
                     }
                 }

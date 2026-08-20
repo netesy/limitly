@@ -41,6 +41,7 @@ public:
     static void emit_list_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_tuple_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_dict_ir(ir::Module* module, ir::IRBuilder* builder);
+    static void emit_enum_ir(ir::Module* module, ir::IRBuilder* builder);
 
 private:
     static void emit_assert(ir::Module* module, ir::IRBuilder* builder);

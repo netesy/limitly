@@ -47,6 +47,7 @@ set(FRONTEND_SOURCES
 )
 
 set(BACKEND_COMMON_SOURCES
+    src/backend/utf8.cpp
     src/backend/symbol_table.cpp
     src/backend/value.cpp
     src/backend/vm/register.cpp

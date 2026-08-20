@@ -141,7 +141,7 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
     } else if (auto dict_p = std::dynamic_pointer_cast<LM::Frontend::AST::DictPatternExpr>(pattern)) {
         for (const auto& field : dict_p->fields) {
             Reg key_reg = gen->allocate_register();
-            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_reg, BOX_PTR(lm_box_string(field.key.c_str()))));
+            gen->emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_reg, BOX_PTR(lm_str_from_cstr(field.key.c_str()))));
             Reg elem = gen->allocate_register();
             gen->emit_instruction(LIR_Inst(LIR_Op::DictGet, Type::Ptr, elem, val_reg, key_reg));
             bind_all_vars(gen, field.pattern, elem);
@@ -1016,6 +1016,9 @@ void Generator::emit_iter_stmt(LM::Frontend::AST::IterStatement& stmt) {
         if (iterable_type->tag == TypeTag::List) {
             emit_list_var_iter_stmt(stmt, iterable_reg);
             
+        } else if (iterable_type->tag == TypeTag::String) {
+            emit_string_var_iter_stmt(stmt, iterable_reg);
+            
         } else if (iterable_type->tag == TypeTag::Dict) {
             emit_dict_var_iter_stmt(stmt, iterable_reg);
             
@@ -1565,6 +1568,85 @@ void Generator::emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, 
     exit_scope();
 }
 
+void Generator::emit_string_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg str_reg) {
+    if (stmt.loopVars.size() != 1) {
+        report_error("string iteration supports exactly one loop variable");
+        return;
+    }
+    const std::string& loop_var_name = stmt.loopVars[0];
+
+    Reg offset_reg = allocate_register();
+    auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
+    Backend::Value zero_val = make_i64(0);
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, offset_reg, zero_val));
+    set_register_type(offset_reg, int_type);
+
+    Reg len_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::CallBuiltin, len_reg, "_builtin_string_byte_len", {str_reg}));
+    set_register_type(len_reg, int_type);
+
+    LIR_BasicBlock* header_block = create_basic_block("string_iter_header");
+    LIR_BasicBlock* body_block = create_basic_block("string_iter_body");
+    LIR_BasicBlock* exit_block = create_basic_block("string_iter_exit");
+
+    enter_scope();
+    enter_loop();
+    set_loop_labels(header_block->id, exit_block->id, 0);
+
+    Reg loop_var_reg = allocate_register();
+    set_register_type(loop_var_reg, int_type);
+    bind_variable(loop_var_name, loop_var_reg);
+
+    // Jump to header
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    add_block_edge(get_current_block(), header_block);
+
+    // Header block: check offset < len
+    set_current_block(header_block);
+    Reg cmp_reg = allocate_register();
+    set_register_type(cmp_reg, std::make_shared<::Type>(::TypeTag::Bool));
+    emit_instruction(LIR_Inst(LIR_Op::CmpLT, cmp_reg, offset_reg, len_reg));
+
+    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, cmp_reg, 0, exit_block->id));
+    add_block_edge(header_block, body_block);
+    add_block_edge(header_block, exit_block);
+
+    // Body block: decode next codepoint
+    set_current_block(body_block);
+    Reg res_reg = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::CallBuiltin, res_reg, "_builtin_string_decode_next", {str_reg, offset_reg}));
+    
+    // cp = res >> 8
+    Reg shift_const = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, shift_const, make_i64(8)));
+    emit_instruction(LIR_Inst(LIR_Op::Shr, loop_var_reg, res_reg, shift_const));
+
+    // consumed = res & 0xFF
+    Reg consumed_reg = allocate_register();
+    Reg mask_const = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, mask_const, make_i64(0xFF)));
+    emit_instruction(LIR_Inst(LIR_Op::And, consumed_reg, res_reg, mask_const));
+
+    // offset = offset + consumed
+    Reg next_offset = allocate_register();
+    set_register_type(next_offset, int_type);
+    emit_instruction(LIR_Inst(LIR_Op::Add, next_offset, offset_reg, consumed_reg));
+    emit_instruction(LIR_Inst(LIR_Op::Mov, offset_reg, next_offset, 0));
+
+    // Execute loop body statements
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
+
+    emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, header_block->id));
+    add_block_edge(get_current_block(), header_block);
+
+    // Exit block
+    set_current_block(exit_block);
+    exit_loop();
+    exit_scope();
+}
+
 
 void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg tuple_reg, int64_t tuple_len) {
     // Handle tuple iteration for variables (similar to list)
@@ -1986,7 +2068,7 @@ void Generator::emit_pattern_match(std::shared_ptr<LM::Frontend::AST::Expression
         for (const auto& field : dict_p->fields) {
             Reg key_reg = allocate_register();
             auto str_type = std::make_shared<::Type>(::TypeTag::String);
-            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_reg, BOX_PTR(lm_box_string(field.key.c_str()))));
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, key_reg, BOX_PTR(lm_str_from_cstr(field.key.c_str()))));
             
             Reg exists = allocate_register();
             emit_instruction(LIR_Inst(LIR_Op::DictHas, LIR::Type::Bool, exists, val_reg, key_reg));

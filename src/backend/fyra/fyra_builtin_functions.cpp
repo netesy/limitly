@@ -1,4 +1,11 @@
 #include "fyra_builtin_functions.hh"
+#include "backend/vm/vm_string.hh"
+#include "backend/vm/vm_list.hh"
+#include "backend/utf8.hh"
+#include "ir/IRBuilder.h"
+#include "ir/IRContext.h"
+#include "ir/PhiNode.h"
+#include <cstring>
 #include "ir/Constant.h"
 #include "ir/Type.h"
 #include "ir/PhiNode.h"
@@ -39,12 +46,14 @@ void FyraBuiltinFunctions::emit_used_builtins(ir::Module* module,
     bool needs_list  = false;
     bool needs_tuple = false;
     bool needs_dict  = false;
+    bool needs_enum  = false;
     bool needs_math  = false;
 
     for (const auto& name : used_builtins) {
         if (name.find("list")  != std::string::npos) needs_list  = true;
         if (name.find("tuple") != std::string::npos) needs_tuple = true;
         if (name.find("dict")  != std::string::npos) needs_dict  = true;
+        if (name.find("enum")  != std::string::npos) needs_enum  = true;
         if (name == "sqrt" || name == "sin" || name == "cos" || name == "tan" ||
             name == "asin" || name == "acos" || name == "atan" || name == "log" ||
             name == "log10" || name == "exp" || name == "ceil" || name == "floor" ||
@@ -54,6 +63,7 @@ void FyraBuiltinFunctions::emit_used_builtins(ir::Module* module,
     if (needs_list)  emit_list_ir(module, builder);
     if (needs_tuple) emit_tuple_ir(module, builder);
     if (needs_dict)  emit_dict_ir(module, builder);
+    if (needs_enum)  emit_enum_ir(module, builder);
     if (needs_math)  decl_runtime_math(module, builder);
 }
 
@@ -590,22 +600,29 @@ ir::Value* FyraBuiltinFunctions::emit_int_to_str_inline(ir::Module* module,
     return builder->createLoad(v_cur_ptr);
 }
 
+extern "C" char* lm_float_to_str(uint64_t bits) {
+    double d;
+    memcpy(&d, &bits, sizeof(d));
+    char* buf = (char*)malloc(64);
+    snprintf(buf, 64, "%g", d);
+    if (strchr(buf, '.') == NULL && strchr(buf, 'e') == NULL && strchr(buf, 'E') == NULL) {
+        strcat(buf, ".0");
+    }
+    return buf;
+}
+
 ir::Value* FyraBuiltinFunctions::emit_float_to_str_inline(ir::Module* module,
                                                        ir::IRBuilder* builder,
                                                        ir::Value* val) {
     auto ctx = module->getContextShared();
     auto i64 = ctx->getIntegerType(64);
-    ir::Instruction* buf_ptr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 64)}, i64);
-    ir::GlobalVariable* fmt_gv = get_or_create_global_str(module, builder, "fmt_float", "%g");
-    
-    builder->createExternCall("snprintf", {
-        buf_ptr,
-        ctx->getConstantInt(i64, 64),
-        fmt_gv,
-        val
-    }, i64);
+    ir::Function* fn = module->getFunction("lm_float_to_str");
+    if (!fn) fn = builder->createFunction("lm_float_to_str", i64, {i64});
+    return builder->createCall(fn, {val});
+}
 
-    return buf_ptr;
+extern "C" const char* fyra_lm_bool_to_str(uint64_t val) {
+    return val ? "true" : "false";
 }
 
 ir::Value* FyraBuiltinFunctions::emit_bool_to_str_inline(ir::Module* module,
@@ -613,33 +630,9 @@ ir::Value* FyraBuiltinFunctions::emit_bool_to_str_inline(ir::Module* module,
                                                       ir::Value* val) {
     auto ctx = module->getContextShared();
     auto i64 = ctx->getIntegerType(64);
-    int uid = ++g_b2s_counter;
-    std::string s_uid = std::to_string(uid);
-
-    ir::BasicBlock* cur_bb = builder->getInsertPoint();
-    ir::Function* cur_fn = cur_bb->getParent();
-
-    ir::Instruction* res_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
-
-    ir::BasicBlock* b_true  = builder->createBasicBlock("b2s_true_" + s_uid, cur_fn);
-    ir::BasicBlock* b_false = builder->createBasicBlock("b2s_false_" + s_uid, cur_fn);
-    ir::BasicBlock* b_done  = builder->createBasicBlock("b2s_done_" + s_uid, cur_fn);
-
-    ir::Value* cond = builder->createCne(val, ctx->getConstantInt(i64, 0));
-    builder->createBr(cond, b_true, b_false);
-
-    builder->setInsertPoint(b_true);
-    ir::GlobalVariable* gv_true = get_or_create_global_str(module, builder, "str_true", "true");
-    builder->createStore(gv_true, res_slot);
-    builder->createJmp(b_done);
-
-    builder->setInsertPoint(b_false);
-    ir::GlobalVariable* gv_false = get_or_create_global_str(module, builder, "str_false", "false");
-    builder->createStore(gv_false, res_slot);
-    builder->createJmp(b_done);
-
-    builder->setInsertPoint(b_done);
-    return builder->createLoad(res_slot);
+    ir::Function* fn = module->getFunction("fyra_lm_bool_to_str");
+    if (!fn) fn = builder->createFunction("fyra_lm_bool_to_str", i64, {i64});
+    return builder->createCall(fn, {val});
 }
 
 // ---------------------------------------------------------------------------
@@ -886,6 +879,108 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->createRet(nullptr);
     }
 
+    // 6. lm_list_to_str(list_ptr: i64) -> i64
+    ir::Function* fn_l2s = module->getFunction("lm_list_to_str");
+    if (!fn_l2s) fn_l2s = builder->createFunction("lm_list_to_str", i64, {i64});
+    if (fn_l2s->getBasicBlocks().empty()) {
+        emit_str_concat_ir(module, builder);
+        ir::Function* fn_concat = module->getFunction("lm_str_concat");
+
+        ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_l2s);
+        ir::BasicBlock* b_loop = builder->createBasicBlock("loop", fn_l2s);
+        ir::BasicBlock* b_body = builder->createBasicBlock("body", fn_l2s);
+        ir::BasicBlock* b_next = builder->createBasicBlock("next", fn_l2s);
+        ir::BasicBlock* b_done = builder->createBasicBlock("done", fn_l2s);
+
+        builder->setInsertPoint(b_entry);
+        ir::Value* list_ptr = fn_l2s->getParameters().front().get();
+
+        ir::Instruction* res_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        ir::Instruction* i_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        ir::Instruction* elem_str_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+
+        ir::Value* count = builder->createLoad(list_ptr);
+        ir::Value* data_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* data = builder->createLoad(data_slot);
+
+        ir::GlobalVariable* gv_lbracket = get_or_create_global_str(module, builder, "list_lbracket", "[");
+        builder->createStore(gv_lbracket, res_slot);
+        builder->createStore(ctx->getConstantInt(i64, 0), i_slot);
+        builder->createJmp(b_loop);
+
+        builder->setInsertPoint(b_loop);
+        ir::Value* i = builder->createLoad(i_slot);
+        ir::Value* cond = builder->createCslt(i, count);
+        builder->createBr(cond, b_body, b_done);
+
+        builder->setInsertPoint(b_body);
+        ir::BasicBlock* b_sep = builder->createBasicBlock("sep", fn_l2s);
+        ir::BasicBlock* b_elem = builder->createBasicBlock("elem", fn_l2s);
+
+        ir::Value* is_first = builder->createCeq(i, ctx->getConstantInt(i64, 0));
+        builder->createBr(is_first, b_elem, b_sep);
+
+        builder->setInsertPoint(b_sep);
+        ir::GlobalVariable* gv_comma = get_or_create_global_str(module, builder, "list_comma", ", ");
+        ir::Value* cur_res = builder->createLoad(res_slot);
+        ir::Value* new_res = builder->createCall(fn_concat, {cur_res, gv_comma});
+        builder->createStore(new_res, res_slot);
+        builder->createJmp(b_elem);
+
+        builder->setInsertPoint(b_elem);
+        ir::Value* elem_off = builder->createMul(i, ctx->getConstantInt(i64, 8));
+        ir::Value* elem_addr = builder->createAdd(data, elem_off);
+        ir::Value* elem_val = builder->createLoad(elem_addr);
+
+        ir::BasicBlock* b_e_num = builder->createBasicBlock("e_num", fn_l2s);
+        ir::BasicBlock* b_e_ptr = builder->createBasicBlock("e_ptr", fn_l2s);
+        ir::BasicBlock* b_e_done = builder->createBasicBlock("e_done", fn_l2s);
+
+        ir::Value* e_small = builder->createCult(elem_val, ctx->getConstantInt(i64, 65536));
+        builder->createBr(e_small, b_e_num, b_e_ptr);
+
+        builder->setInsertPoint(b_e_num);
+        ir::Value* estr_num = emit_int_to_str_inline(module, builder, elem_val);
+        builder->createStore(estr_num, elem_str_slot);
+        builder->createJmp(b_e_done);
+
+        builder->setInsertPoint(b_e_ptr);
+        ir::BasicBlock* b_e_enum = builder->createBasicBlock("e_enum", fn_l2s);
+        ir::BasicBlock* b_e_str = builder->createBasicBlock("e_str", fn_l2s);
+
+        ir::Value* e_magic = builder->createLoad(elem_val);
+        ir::Value* e_is_enum = builder->createCeq(e_magic, ctx->getConstantInt(i64, 0x454E554D));
+        builder->createBr(e_is_enum, b_e_enum, b_e_str);
+
+        builder->setInsertPoint(b_e_enum);
+        emit_enum_ir(module, builder);
+        ir::Function* fn_enum_to_str = module->getFunction("lm_enum_to_str");
+        ir::Value* estr_enum = builder->createCall(fn_enum_to_str, {elem_val});
+        builder->createStore(estr_enum, elem_str_slot);
+        builder->createJmp(b_e_done);
+
+        builder->setInsertPoint(b_e_str);
+        builder->createStore(elem_val, elem_str_slot);
+        builder->createJmp(b_e_done);
+
+        builder->setInsertPoint(b_e_done);
+        ir::Value* formatted_elem = builder->createLoad(elem_str_slot);
+        ir::Value* acc_res = builder->createLoad(res_slot);
+        ir::Value* combined = builder->createCall(fn_concat, {acc_res, formatted_elem});
+        builder->createStore(combined, res_slot);
+        builder->createJmp(b_next);
+
+        builder->setInsertPoint(b_next);
+        ir::Value* next_i = builder->createAdd(i, ctx->getConstantInt(i64, 1));
+        builder->createStore(next_i, i_slot);
+        builder->createJmp(b_loop);
+
+        builder->setInsertPoint(b_done);
+        ir::GlobalVariable* gv_rbracket = get_or_create_global_str(module, builder, "list_rbracket", "]");
+        ir::Value* final_res = builder->createCall(fn_concat, {builder->createLoad(res_slot), gv_rbracket});
+        builder->createRet(final_res);
+    }
+
     if (old_bb) builder->setInsertPoint(old_bb);
 }
 
@@ -979,7 +1074,37 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* k1_small = builder->createCult(k1, ctx->getConstantInt(i64, 65536));
         ir::Value* k2_small = builder->createCult(k2, ctx->getConstantInt(i64, 65536));
         ir::Value* either_small = builder->createOr(k1_small, k2_small);
-        builder->createBr(either_small, b_ret_false, b_loop_init);
+        ir::BasicBlock* b_chk_enum = builder->createBasicBlock("chk_enum", fn_eq);
+        builder->createBr(either_small, b_ret_false, b_chk_enum);
+
+        builder->setInsertPoint(b_chk_enum);
+        ir::Value* m1 = builder->createLoad(k1);
+        ir::Value* m2 = builder->createLoad(k2);
+        ir::Value* is_enum1 = builder->createCeq(m1, ctx->getConstantInt(i64, 0x454E554D));
+        ir::Value* is_enum2 = builder->createCeq(m2, ctx->getConstantInt(i64, 0x454E554D));
+        ir::Value* both_enum = builder->createAnd(is_enum1, is_enum2);
+        ir::Value* either_enum = builder->createOr(is_enum1, is_enum2);
+
+        ir::BasicBlock* b_enum_only = builder->createBasicBlock("enum_only", fn_eq);
+        builder->createBr(either_enum, b_enum_only, b_loop_init);
+
+        builder->setInsertPoint(b_enum_only);
+        ir::BasicBlock* b_enum_cmp = builder->createBasicBlock("enum_cmp", fn_eq);
+        builder->createBr(both_enum, b_enum_cmp, b_ret_false);
+
+        builder->setInsertPoint(b_enum_cmp);
+        ir::Value* t1 = builder->createLoad(builder->createAdd(k1, ctx->getConstantInt(i64, 8)));
+        ir::Value* t2 = builder->createLoad(builder->createAdd(k2, ctx->getConstantInt(i64, 8)));
+        ir::Value* tags_eq = builder->createCeq(t1, t2);
+
+        ir::BasicBlock* b_pay_cmp = builder->createBasicBlock("pay_cmp", fn_eq);
+        builder->createBr(tags_eq, b_pay_cmp, b_ret_false);
+
+        builder->setInsertPoint(b_pay_cmp);
+        ir::Value* pay1 = builder->createLoad(builder->createAdd(k1, ctx->getConstantInt(i64, 16)));
+        ir::Value* pay2 = builder->createLoad(builder->createAdd(k2, ctx->getConstantInt(i64, 16)));
+        ir::Value* pays_eq = builder->createCall(fn_eq, {pay1, pay2});
+        builder->createRet(pays_eq);
 
         builder->setInsertPoint(b_loop_init);
         ir::Instruction* idx_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
@@ -1320,6 +1445,148 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
     if (old_bb) builder->setInsertPoint(old_bb);
 }
 
+void FyraBuiltinFunctions::emit_enum_ir(ir::Module* module, ir::IRBuilder* builder) {
+    auto ctx = module->getContextShared();
+    auto i64 = ctx->getIntegerType(64);
+    ir::BasicBlock* old_bb = builder->getInsertPoint();
+
+    // 1. lm_enum_new(tag: i64, payload: i64, vname: i64) -> i64
+    ir::Function* fn_new = module->getFunction("lm_enum_new");
+    if (!fn_new) fn_new = builder->createFunction("lm_enum_new", i64, {i64, i64, i64});
+    if (fn_new->getBasicBlocks().empty()) {
+        ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_new);
+        builder->setInsertPoint(b_entry);
+        auto it = fn_new->getParameters().begin();
+        ir::Value* tag = it->get(); it++;
+        ir::Value* payload = it->get(); it++;
+        ir::Value* vname = it->get();
+
+        // Enum header: 32 bytes (magic: 0x454E554D, tag: i64, payload: i64, vname: i64)
+        ir::Instruction* ptr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 32)}, i64);
+        builder->createStore(ctx->getConstantInt(i64, 0x454E554D), ptr);
+        ir::Value* tag_ptr = builder->createAdd(ptr, ctx->getConstantInt(i64, 8));
+        builder->createStore(tag, tag_ptr);
+        ir::Value* pay_ptr = builder->createAdd(ptr, ctx->getConstantInt(i64, 16));
+        builder->createStore(payload, pay_ptr);
+        ir::Value* vn_ptr = builder->createAdd(ptr, ctx->getConstantInt(i64, 24));
+        builder->createStore(vname, vn_ptr);
+        builder->createRet(ptr);
+    }
+
+    // 2. lm_enum_tag(enum_ptr: i64) -> i64
+    ir::Function* fn_tag = module->getFunction("lm_enum_tag");
+    if (!fn_tag) fn_tag = builder->createFunction("lm_enum_tag", i64, {i64});
+    if (fn_tag->getBasicBlocks().empty()) {
+        ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_tag);
+        builder->setInsertPoint(b_entry);
+        ir::Value* enum_ptr = fn_tag->getParameters().front().get();
+        ir::Value* tag_ptr = builder->createAdd(enum_ptr, ctx->getConstantInt(i64, 8));
+        ir::Value* tag = builder->createLoad(tag_ptr);
+        builder->createRet(tag);
+    }
+
+    // 3. lm_enum_payload(enum_ptr: i64) -> i64
+    ir::Function* fn_payload = module->getFunction("lm_enum_payload");
+    if (!fn_payload) fn_payload = builder->createFunction("lm_enum_payload", i64, {i64});
+    if (fn_payload->getBasicBlocks().empty()) {
+        ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_payload);
+        builder->setInsertPoint(b_entry);
+        ir::Value* enum_ptr = fn_payload->getParameters().front().get();
+        ir::Value* pay_ptr = builder->createAdd(enum_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* payload = builder->createLoad(pay_ptr);
+        builder->createRet(payload);
+    }
+
+    // 4. lm_enum_to_str(enum_ptr: i64) -> i64
+    ir::Function* fn_to_str = module->getFunction("lm_enum_to_str");
+    if (!fn_to_str) fn_to_str = builder->createFunction("lm_enum_to_str", i64, {i64});
+    if (fn_to_str->getBasicBlocks().empty()) {
+        emit_str_concat_ir(module, builder);
+
+        ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_to_str);
+        ir::BasicBlock* b_no_pay = builder->createBasicBlock("no_pay", fn_to_str);
+        ir::BasicBlock* b_has_vname = builder->createBasicBlock("has_vname", fn_to_str);
+        ir::BasicBlock* b_no_vname = builder->createBasicBlock("no_vname", fn_to_str);
+        ir::BasicBlock* b_has_pay = builder->createBasicBlock("has_pay", fn_to_str);
+        ir::BasicBlock* b_pay_int = builder->createBasicBlock("pay_int", fn_to_str);
+        ir::BasicBlock* b_pay_ptr = builder->createBasicBlock("pay_ptr", fn_to_str);
+        ir::BasicBlock* b_pay_enum = builder->createBasicBlock("pay_enum", fn_to_str);
+        ir::BasicBlock* b_pay_rawstr = builder->createBasicBlock("pay_rawstr", fn_to_str);
+        ir::BasicBlock* b_build_pay = builder->createBasicBlock("build_pay", fn_to_str);
+
+        builder->setInsertPoint(b_entry);
+        ir::Value* enum_ptr = fn_to_str->getParameters().front().get();
+        ir::Instruction* pay_str_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+
+        ir::Value* tag_ptr = builder->createAdd(enum_ptr, ctx->getConstantInt(i64, 8));
+        ir::Value* tag = builder->createLoad(tag_ptr);
+        ir::Value* pay_ptr_loc = builder->createAdd(enum_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* payload = builder->createLoad(pay_ptr_loc);
+        ir::Value* vn_ptr_loc = builder->createAdd(enum_ptr, ctx->getConstantInt(i64, 24));
+        ir::Value* vname = builder->createLoad(vn_ptr_loc);
+
+        ir::Value* is_no_pay1 = builder->createCeq(payload, ctx->getConstantInt(i64, 0));
+        ir::Value* is_no_pay2 = builder->createCeq(payload, ctx->getConstantInt(i64, UINT64_MAX));
+        ir::Value* is_no_pay = builder->createOr(is_no_pay1, is_no_pay2);
+        builder->createBr(is_no_pay, b_no_pay, b_has_pay);
+
+        builder->setInsertPoint(b_no_pay);
+        ir::Value* has_vn = builder->createCne(vname, ctx->getConstantInt(i64, 0));
+        builder->createBr(has_vn, b_has_vname, b_no_vname);
+
+        builder->setInsertPoint(b_has_vname);
+        builder->createRet(vname);
+
+        builder->setInsertPoint(b_no_vname);
+        ir::Value* tag_str = emit_int_to_str_inline(module, builder, tag);
+        builder->createRet(tag_str);
+
+        builder->setInsertPoint(b_has_pay);
+        ir::BasicBlock* b_pay_float = builder->createBasicBlock("pay_float", fn_to_str);
+        ir::BasicBlock* b_pay_i64 = builder->createBasicBlock("pay_i64", fn_to_str);
+
+        ir::Value* is_large_enough = builder->createCuge(payload, ctx->getConstantInt(i64, 65536));
+        ir::Value* high_bits = builder->createShr(payload, ctx->getConstantInt(i64, 48));
+        ir::Value* high_is_zero = builder->createCeq(high_bits, ctx->getConstantInt(i64, 0));
+        ir::Value* is_pay_ptr = builder->createAnd(is_large_enough, high_is_zero);
+        builder->createBr(is_pay_ptr, b_pay_ptr, b_pay_int);
+
+        builder->setInsertPoint(b_pay_int);
+        ir::Value* is_float = builder->createCne(high_bits, ctx->getConstantInt(i64, 0));
+        builder->createBr(is_float, b_pay_float, b_pay_i64);
+
+        builder->setInsertPoint(b_pay_float);
+        ir::Value* pay_str_float = emit_float_to_str_inline(module, builder, payload);
+        builder->createStore(pay_str_float, pay_str_slot);
+        builder->createJmp(b_build_pay);
+
+        builder->setInsertPoint(b_pay_i64);
+        ir::Value* pay_str_int = emit_int_to_str_inline(module, builder, payload);
+        builder->createStore(pay_str_int, pay_str_slot);
+        builder->createJmp(b_build_pay);
+
+        builder->setInsertPoint(b_pay_ptr);
+        ir::Value* magic = builder->createLoad(payload);
+        ir::Value* is_enum = builder->createCeq(magic, ctx->getConstantInt(i64, 0x454E554D));
+        builder->createBr(is_enum, b_pay_enum, b_pay_rawstr);
+
+        builder->setInsertPoint(b_pay_enum);
+        ir::Value* pay_str_enum = builder->createCall(fn_to_str, {payload});
+        builder->createStore(pay_str_enum, pay_str_slot);
+        builder->createJmp(b_build_pay);
+
+        builder->setInsertPoint(b_pay_rawstr);
+        builder->createStore(payload, pay_str_slot);
+        builder->createJmp(b_build_pay);
+
+        builder->setInsertPoint(b_build_pay);
+        ir::Value* pay_str_val = builder->createLoad(pay_str_slot);
+        builder->createRet(pay_str_val);
+    }
+
+    if (old_bb) builder->setInsertPoint(old_bb);
+}
+
 void FyraBuiltinFunctions::decl_runtime_math(ir::Module* module, ir::IRBuilder* builder) {
     auto ctx = module->getContextShared();
     auto f64 = ctx->getDoubleType();
@@ -1448,16 +1715,29 @@ void FyraBuiltinFunctions::emit_str_format_ir(ir::Module* module, ir::IRBuilder*
     ir::Instruction* arg_len_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
 
     ir::BasicBlock* b_is_num = builder->createBasicBlock("fmt_is_num", fn);
+    ir::BasicBlock* b_is_float = builder->createBasicBlock("fmt_is_float", fn);
+    ir::BasicBlock* b_is_int = builder->createBasicBlock("fmt_is_int", fn);
     ir::BasicBlock* b_is_str = builder->createBasicBlock("fmt_is_str", fn);
     ir::BasicBlock* b_fmt_proc = builder->createBasicBlock("fmt_proc", fn);
+    ir::BasicBlock* b_slen_prep = builder->createBasicBlock("fmt_slen_prep", fn);
 
-    ir::Value* is_small = builder->createCslt(arg_val, ctx->getConstantInt(i64, 65536));
-    ir::Value* is_nonneg = builder->createCsge(arg_val, ctx->getConstantInt(i64, 0));
-    ir::Value* is_int_arg = builder->createAnd(is_small, is_nonneg);
-    builder->createBr(is_int_arg, b_is_num, b_is_str);
+    ir::Value* is_large_enough = builder->createCuge(arg_val, ctx->getConstantInt(i64, 65536));
+    ir::Value* high_bits = builder->createShr(arg_val, ctx->getConstantInt(i64, 48));
+    ir::Value* high_is_zero = builder->createCeq(high_bits, ctx->getConstantInt(i64, 0));
+    ir::Value* is_valid_ptr = builder->createAnd(is_large_enough, high_is_zero);
+    builder->createBr(is_valid_ptr, b_is_str, b_is_num);
+
+    builder->setInsertPoint(b_is_num);
+    ir::Value* is_float = builder->createCne(high_bits, ctx->getConstantInt(i64, 0));
+    builder->createBr(is_float, b_is_float, b_is_int);
+
+    builder->setInsertPoint(b_is_float);
+    ir::Value* float_str = emit_float_to_str_inline(module, builder, arg_val);
+    builder->createStore(float_str, arg_str_slot);
+    builder->createJmp(b_slen_prep);
 
     // Number conversion branch: format integer arg_val into ASCII buffer
-    builder->setInsertPoint(b_is_num);
+    builder->setInsertPoint(b_is_int);
     ir::Instruction* num_buf = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 32)}, i64);
     ir::Value* num_end = builder->createAdd(num_buf, ctx->getConstantInt(i64, 31));
     builder->createStoreb(ctx->getConstantInt(i8, 0), num_end);
@@ -1491,10 +1771,42 @@ void FyraBuiltinFunctions::emit_str_format_ir(ir::Module* module, ir::IRBuilder*
     builder->createStore(num_len, arg_len_slot);
     builder->createJmp(b_fmt_proc);
 
-    // String branch: arg_val is already an i8* string pointer
+    // String / Heap object branch: arg_val is Enum, List, or C string pointer
     builder->setInsertPoint(b_is_str);
+    ir::BasicBlock* b_fmt_enum = builder->createBasicBlock("fmt_is_enum", fn);
+    ir::BasicBlock* b_fmt_list_chk = builder->createBasicBlock("fmt_list_chk", fn);
+    ir::BasicBlock* b_fmt_list = builder->createBasicBlock("fmt_is_list", fn);
+    ir::BasicBlock* b_fmt_rawstr = builder->createBasicBlock("fmt_is_rawstr", fn);
+
+    ir::Value* magic_fmt = builder->createLoad(arg_val);
+    ir::Value* is_enum_fmt = builder->createCeq(magic_fmt, ctx->getConstantInt(i64, 0x454E554D));
+    builder->createBr(is_enum_fmt, b_fmt_enum, b_fmt_list_chk);
+
+    builder->setInsertPoint(b_fmt_enum);
+    emit_enum_ir(module, builder);
+    ir::Function* fn_enum_str = module->getFunction("lm_enum_to_str");
+    ir::Value* enum_str_fmt = builder->createCall(fn_enum_str, {arg_val});
+    builder->createStore(enum_str_fmt, arg_str_slot);
+    builder->createJmp(b_slen_prep);
+
+    builder->setInsertPoint(b_fmt_list_chk);
+    ir::Value* is_small_cnt = builder->createCslt(magic_fmt, ctx->getConstantInt(i64, 65536));
+    builder->createBr(is_small_cnt, b_fmt_list, b_fmt_rawstr);
+
+    builder->setInsertPoint(b_fmt_list);
+    emit_list_ir(module, builder);
+    ir::Function* fn_list_str = module->getFunction("lm_list_to_str");
+    ir::Value* list_str_fmt = builder->createCall(fn_list_str, {arg_val});
+    builder->createStore(list_str_fmt, arg_str_slot);
+    builder->createJmp(b_slen_prep);
+
+    builder->setInsertPoint(b_fmt_rawstr);
     builder->createStore(arg_val, arg_str_slot);
-    // Find length of arg_val string
+    builder->createJmp(b_slen_prep);
+
+    builder->setInsertPoint(b_slen_prep);
+    ir::Value* target_str_ptr = builder->createLoad(arg_str_slot);
+    // Find length of target_str_ptr string
     ir::Instruction* slen_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
     builder->createStore(ctx->getConstantInt(i64, 0), slen_slot);
     ir::BasicBlock* b_slen_loop = builder->createBasicBlock("fmt_slen_loop", fn);
@@ -1503,7 +1815,7 @@ void FyraBuiltinFunctions::emit_str_format_ir(ir::Module* module, ir::IRBuilder*
 
     builder->setInsertPoint(b_slen_loop);
     ir::Value* cur_slen = builder->createLoad(slen_slot);
-    ir::Value* slen_ch = builder->createLoadub(builder->createAdd(arg_val, cur_slen));
+    ir::Value* slen_ch = builder->createLoadub(builder->createAdd(target_str_ptr, cur_slen));
     builder->createStore(builder->createAdd(cur_slen, ctx->getConstantInt(i64, 1)), slen_slot);
     builder->createBr(builder->createCeq(slen_ch, ctx->getConstantInt(i8, 0)), b_slen_done, b_slen_loop);
 
@@ -1756,3 +2068,26 @@ void FyraBuiltinFunctions::emit_error_new_ir(ir::Module* module, ir::IRBuilder* 
     if (old_bb) builder->setInsertPoint(old_bb);
 }
 } // namespace LM::Backend::Fyra
+
+extern "C" {
+uint64_t lm_string_byte_at_ffi(const char* str, uint64_t index) {
+    if (!str) return 0;
+    size_t len = strlen(str);
+    if (index >= len) return 0;
+    return (uint8_t)str[index];
+}
+
+void* lm_string_to_codepoint_list(const char* str) {
+    LmList* list = lm_list_new();
+    if (!str) return list;
+    uint64_t len = strlen(str);
+    uint64_t offset = 0;
+    uint32_t cp = 0;
+    uint8_t consumed = 0;
+    while (offset < len) {
+        if (!utf8_decode_next(str, len, &offset, &cp, &consumed)) break;
+        lm_list_append(list, BOX_INT((int64_t)cp));
+    }
+    return list;
+}
+}

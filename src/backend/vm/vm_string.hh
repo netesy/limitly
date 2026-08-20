@@ -14,27 +14,39 @@ extern "C" {
     #define RUNTIME_API
 #endif
 
+// Canonical Limitly Native String Representation
 typedef struct {
-    const char* data;
-    uint64_t len;
-} LmString;
+    ObjHeader header;   // type_id = TYPE_STRING (11)
+    uint64_t len;       // Authoritative UTF-8 byte length
+    uint64_t cap;       // Allocated capacity (excluding trailing NUL)
+    char data[];        // Contiguous UTF-8 byte payload + '\0' at data[len]
+} LmStringHeader;
 
-// Header-only string structure for heap objects
-typedef struct {
-    ObjHeader header;
-    char data[0];
-} LmStringObj;
+// Native String Allocation & Management Primitives
+RUNTIME_API LmStringHeader* lm_str_alloc(uint64_t cap);
+RUNTIME_API LmStringHeader* lm_str_from_bytes(const char* data, uint64_t len);
+RUNTIME_API LmStringHeader* lm_str_from_cstr(const char* cstr);
+RUNTIME_API void lm_str_free(LmStringHeader* str);
 
-// String management functions
-RUNTIME_API LmString lm_string_concat(LmString a, LmString b);
-RUNTIME_API LmString lm_int_to_string(int64_t value);
-RUNTIME_API LmString lm_double_to_string(double value);
-RUNTIME_API LmString lm_bool_to_string(uint8_t value);
-RUNTIME_API const char* lm_string_get_data(LmString str);
-RUNTIME_API LmString lm_string_from_cstr(const char* cstr);
-RUNTIME_API LmString lm_string_format(LmString format, LmString arg);
-RUNTIME_API LmString lm_string_interpolate(LmString format, LmString* args, uint64_t arg_count);
-RUNTIME_API void lm_string_free(LmString str);
+// Native String Operation Primitives
+RUNTIME_API LmStringHeader* lm_str_concat(const LmStringHeader* a, const LmStringHeader* b);
+RUNTIME_API LmStringHeader* lm_str_substring(const LmStringHeader* str, int64_t start, int64_t end);
+RUNTIME_API uint8_t lm_str_byte_at(const LmStringHeader* str, uint64_t index);
+RUNTIME_API int64_t lm_str_index_of(const LmStringHeader* str, const LmStringHeader* needle);
+RUNTIME_API bool lm_str_contains(const LmStringHeader* str, const LmStringHeader* needle);
+RUNTIME_API bool lm_str_starts_with(const LmStringHeader* str, const LmStringHeader* prefix);
+RUNTIME_API bool lm_str_ends_with(const LmStringHeader* str, const LmStringHeader* suffix);
+RUNTIME_API LmStringHeader* lm_str_trim(const LmStringHeader* str);
+RUNTIME_API LmStringHeader* lm_str_to_lower(const LmStringHeader* str);
+RUNTIME_API LmStringHeader* lm_str_to_upper(const LmStringHeader* str);
+RUNTIME_API LmStringHeader* lm_str_replace(const LmStringHeader* str, const LmStringHeader* old_sub, const LmStringHeader* new_sub);
+RUNTIME_API uint64_t lm_str_decode_next(const LmStringHeader* str, uint64_t offset);
+
+// Formatting helpers
+RUNTIME_API LmStringHeader* lm_int_to_str(int64_t value);
+RUNTIME_API LmStringHeader* lm_double_to_str(double value);
+RUNTIME_API LmStringHeader* lm_bool_to_str(uint8_t value);
+RUNTIME_API LmStringHeader* lm_str_format(const LmStringHeader* format, const LmStringHeader* arg);
 
 #ifdef __cplusplus
 }

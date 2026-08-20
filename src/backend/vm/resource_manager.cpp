@@ -648,11 +648,11 @@ public:
     RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
         if (op == ResourceOperation::WRITE) {
             if (args.empty()) return VAL_FALSE;
-            LmString s = lm_value_to_string(args[0]);
-            if (s.data) {
-                std::fputs(s.data, stdout);
+            LmStringHeader* s = lm_value_to_string(args[0]);
+            if (s && s->data) {
+                std::fwrite(s->data, 1, s->len, stdout);
                 std::fflush(stdout);
-                lm_string_free(s);
+                lm_str_free(s);
                 return VAL_TRUE;
             }
             return VAL_FALSE;
@@ -667,11 +667,11 @@ public:
     RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
         if (op == ResourceOperation::WRITE) {
             if (args.empty()) return VAL_FALSE;
-            LmString s = lm_value_to_string(args[0]);
-            if (s.data) {
-                std::fputs(s.data, stderr);
+            LmStringHeader* s = lm_value_to_string(args[0]);
+            if (s && s->data) {
+                std::fwrite(s->data, 1, s->len, stderr);
                 std::fflush(stderr);
-                lm_string_free(s);
+                lm_str_free(s);
                 return VAL_TRUE;
             }
             return VAL_FALSE;

@@ -22,17 +22,122 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                                      (pc->func_name.rfind("_builtin_", 0) == 0);
 
             if (is_builtin_target && LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
-                // Handle builtin functions (print, input, _builtin_substring, etc.)
-                std::vector<ValuePtr> args;
-                args.reserve(pc->call_args.size());
-                for (auto arg_reg : pc->call_args) {
-                    args.push_back(register_to_value_ptr(registers[arg_reg], get_register_language_type(arg_reg)));
+                // Native fast-path for LmStringHeader string builtins
+                auto get_hdr = [this](uint32_t r) -> LmStringHeader* {
+                    RegisterValue val = registers[r];
+                    if (!IS_PTR(val)) return nullptr;
+                    ObjHeader* h = (ObjHeader*)UNBOX_PTR(val);
+                    if (!h) return nullptr;
+                    if (h->type_id == TYPE_STRING) return (LmStringHeader*)h;
+                    if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                        const char* cstr = (const char*)((LmBox*)h)->value.as_ptr;
+                        return lm_str_from_bytes(cstr ? cstr : "", cstr ? strlen(cstr) : 0);
+                    }
+                    return nullptr;
+                };
+
+                const std::string& fname = pc->func_name;
+                bool handled = false;
+                if (fname == "_builtin_substring" && pc->call_args.size() >= 3) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    int64_t start = as_i64(registers[pc->call_args[1]]);
+                    int64_t end = as_i64(registers[pc->call_args[2]]);
+                    LmStringHeader* res = lm_str_substring(str, start, end);
+                    registers[pc->dst] = BOX_PTR(res);
+                    if (res && !vm_region_stack.empty()) {
+                        uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
+                        vm_allocation_regions[ptr] = active_region_id;
+                        vm_allocation_types[ptr] = TYPE_STRING;
+                    }
+                    handled = true;
+                } else if (fname == "_builtin_string_byte_at" && pc->call_args.size() >= 2) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    int64_t idx = as_i64(registers[pc->call_args[1]]);
+                    registers[pc->dst] = make_i64(lm_str_byte_at(str, idx >= 0 ? (uint64_t)idx : UINT64_MAX));
+                    handled = true;
+                } else if (fname == "_builtin_string_index_of" && pc->call_args.size() >= 2) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    LmStringHeader* sub = get_hdr(pc->call_args[1]);
+                    registers[pc->dst] = make_i64(lm_str_index_of(str, sub));
+                    handled = true;
+                } else if (fname == "_builtin_string_contains" && pc->call_args.size() >= 2) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    LmStringHeader* sub = get_hdr(pc->call_args[1]);
+                    registers[pc->dst] = lm_str_contains(str, sub) ? VAL_TRUE : VAL_FALSE;
+                    handled = true;
+                } else if (fname == "_builtin_string_starts_with" && pc->call_args.size() >= 2) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    LmStringHeader* pre = get_hdr(pc->call_args[1]);
+                    registers[pc->dst] = lm_str_starts_with(str, pre) ? VAL_TRUE : VAL_FALSE;
+                    handled = true;
+                } else if (fname == "_builtin_string_ends_with" && pc->call_args.size() >= 2) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    LmStringHeader* sfx = get_hdr(pc->call_args[1]);
+                    registers[pc->dst] = lm_str_ends_with(str, sfx) ? VAL_TRUE : VAL_FALSE;
+                    handled = true;
+                } else if (fname == "_builtin_string_trim" && pc->call_args.size() >= 1) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    LmStringHeader* res = lm_str_trim(str);
+                    registers[pc->dst] = BOX_PTR(res);
+                    if (res && !vm_region_stack.empty()) {
+                        uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
+                        vm_allocation_regions[ptr] = active_region_id;
+                        vm_allocation_types[ptr] = TYPE_STRING;
+                    }
+                    handled = true;
+                } else if (fname == "_builtin_string_to_lower" && pc->call_args.size() >= 1) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    LmStringHeader* res = lm_str_to_lower(str);
+                    registers[pc->dst] = BOX_PTR(res);
+                    if (res && !vm_region_stack.empty()) {
+                        uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
+                        vm_allocation_regions[ptr] = active_region_id;
+                        vm_allocation_types[ptr] = TYPE_STRING;
+                    }
+                    handled = true;
+                } else if (fname == "_builtin_string_to_upper" && pc->call_args.size() >= 1) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    LmStringHeader* res = lm_str_to_upper(str);
+                    registers[pc->dst] = BOX_PTR(res);
+                    if (res && !vm_region_stack.empty()) {
+                        uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
+                        vm_allocation_regions[ptr] = active_region_id;
+                        vm_allocation_types[ptr] = TYPE_STRING;
+                    }
+                    handled = true;
+                } else if (fname == "_builtin_string_replace" && pc->call_args.size() >= 3) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    LmStringHeader* old_sub = get_hdr(pc->call_args[1]);
+                    LmStringHeader* new_sub = get_hdr(pc->call_args[2]);
+                    LmStringHeader* res = lm_str_replace(str, old_sub, new_sub);
+                    registers[pc->dst] = BOX_PTR(res);
+                    if (res && !vm_region_stack.empty()) {
+                        uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
+                        vm_allocation_regions[ptr] = active_region_id;
+                        vm_allocation_types[ptr] = TYPE_STRING;
+                    }
+                    handled = true;
+                } else if (fname == "_builtin_string_decode_next" && pc->call_args.size() >= 2) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    int64_t offset = as_i64(registers[pc->call_args[1]]);
+                    uint64_t res = lm_str_decode_next(str, offset >= 0 ? (uint64_t)offset : 0);
+                    registers[pc->dst] = make_i64((int64_t)res);
+                    handled = true;
                 }
-                try {
-                    ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(pc->func_name, args);
-                    registers[pc->dst] = LM::Backend::VM::compiler_value_to_backend_value(result);
-                } catch (const std::exception& e) {
-                    throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
+
+                if (!handled) {
+                    // Fallback for general builtins (print, input, time, etc.)
+                    std::vector<ValuePtr> args;
+                    args.reserve(pc->call_args.size());
+                    for (auto arg_reg : pc->call_args) {
+                        args.push_back(register_to_value_ptr(registers[arg_reg], get_register_language_type(arg_reg)));
+                    }
+                    try {
+                        ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(pc->func_name, args);
+                        registers[pc->dst] = LM::Backend::VM::compiler_value_to_backend_value(result);
+                    } catch (const std::exception& e) {
+                        throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
+                    }
                 }
             } else if (func_manager.hasFunction(pc->func_name)) {
                 auto func = func_manager.getFunction(pc->func_name);
@@ -111,7 +216,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
                     func_name = (char*)((LmBox*)h)->value.as_ptr;
                 } else if (h->type_id == TYPE_STRING) {
-                    func_name = ((LmString*)h)->data;
+                    func_name = ((LmStringHeader*)h)->data;
                 } else if (h->type_id == TYPE_TUPLE) {
                     LmTuple* closure_tuple = (LmTuple*)h;
                     RegisterValue name_value = lm_tuple_get(closure_tuple, 0);
@@ -121,7 +226,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                             func_name = (char*)((LmBox*)name_header)->value.as_ptr;
                             closure_extra_args.push_back(func_obj);
                         } else if (name_header->type_id == TYPE_STRING) {
-                            func_name = ((LmString*)name_header)->data;
+                            func_name = ((LmStringHeader*)name_header)->data;
                             closure_extra_args.push_back(func_obj);
                         }
                     }

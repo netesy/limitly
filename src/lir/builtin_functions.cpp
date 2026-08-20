@@ -1,6 +1,7 @@
 #include "builtin_functions.hh"
 #include "function_registry.hh"
 #include "lir.hh"
+#include "backend/utf8.hh"
 #include <iostream>
 #include <memory>
 #include <string>
@@ -508,6 +509,168 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
             
             auto string_type = std::make_shared<::Type>(TypeTag::String);
             return std::make_shared<Value>(string_type, str.substr(start, end - start));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_byte_at",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Int},
+        TypeTag::Int,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            int64_t index = args[1]->as<int64_t>();
+            uint8_t byte_val = (index >= 0 && (size_t)index < str.length()) ? (uint8_t)str[index] : 0;
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int), (int64_t)byte_val);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_index_of",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String},
+        TypeTag::Int,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            std::string sub = args[1]->as<std::string>();
+            size_t pos = str.find(sub);
+            int64_t res = (pos != std::string::npos) ? (int64_t)pos : -1;
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int), res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_contains",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String},
+        TypeTag::Bool,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            std::string sub = args[1]->as<std::string>();
+            bool res = (str.find(sub) != std::string::npos);
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Bool), res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_starts_with",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String},
+        TypeTag::Bool,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            std::string prefix = args[1]->as<std::string>();
+            bool res = (str.rfind(prefix, 0) == 0);
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Bool), res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_ends_with",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String},
+        TypeTag::Bool,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            std::string suffix = args[1]->as<std::string>();
+            bool res = (str.length() >= suffix.length() && str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0);
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Bool), res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_replace",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String, TypeTag::String},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            std::string old_sub = args[1]->as<std::string>();
+            std::string new_sub = args[2]->as<std::string>();
+            if (old_sub.empty()) return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), str);
+            size_t pos = 0;
+            while ((pos = str.find(old_sub, pos)) != std::string::npos) {
+                str.replace(pos, old_sub.length(), new_sub);
+                pos += new_sub.length();
+            }
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), str);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_trim",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            size_t start = str.find_first_not_of(" \t\n\r\f\v");
+            if (start == std::string::npos) return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), std::string(""));
+            size_t end = str.find_last_not_of(" \t\n\r\f\v");
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), str.substr(start, end - start + 1));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_to_lower",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            for (char& c : str) if (c >= 'A' && c <= 'Z') c += ('a' - 'A');
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), str);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_to_upper",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            for (char& c : str) if (c >= 'a' && c <= 'z') c -= ('a' - 'A');
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), str);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_decode_next",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Int64},
+        TypeTag::Int64,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            int64_t offset_val = args[1]->as<int64_t>();
+            uint64_t offset = offset_val >= 0 ? (uint64_t)offset_val : 0;
+            uint32_t cp = 0;
+            uint8_t consumed = 0;
+            if (!utf8_decode_next(str.c_str(), str.length(), &offset, &cp, &consumed)) {
+                return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int64), (int64_t)0);
+            }
+            uint64_t res = ((uint64_t)cp << 8) | (uint64_t)consumed;
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int64), (int64_t)res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_byte_len",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::Int64,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int64), (int64_t)str.length());
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_codepoints",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::List,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            ListValue list_val;
+            uint64_t offset = 0;
+            uint32_t cp = 0;
+            uint8_t consumed = 0;
+            auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+            while (offset < str.length()) {
+                if (!utf8_decode_next(str.c_str(), str.length(), &offset, &cp, &consumed)) break;
+                list_val.elements.push_back(std::make_shared<Value>(int_type, (int64_t)cp));
+            }
+            auto list_type = std::make_shared<::Type>(TypeTag::List, ListType(int_type));
+            return std::make_shared<Value>(list_type, list_val);
         }
     ));
 }

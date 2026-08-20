@@ -46,7 +46,7 @@ RUNTIME_API int lm_value_eq(LmValue v1, LmValue v2);
 RUNTIME_API int numeric_compare(LmValue a, LmValue b);
 
 // Convert any value to a printable string
-RUNTIME_API LmString lm_value_to_string(LmValue value);
+RUNTIME_API LmStringHeader* lm_value_to_string(LmValue value);
 
 #ifdef __cplusplus
 }
