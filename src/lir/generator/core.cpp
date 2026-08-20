@@ -103,10 +103,13 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     
 
     // Optimize the generated LIR (but NOT for top-level wrapper)
+    Optimizer optimizer(*current_function_);
     if (current_function_->name != "__top_level_wrapper__") {
-        Optimizer optimizer(*current_function_);
         optimizer.optimize();
+    }else{
+        optimizer.remove_redundant_entry_calls();
     }
+
 
     // Collect metrics
     auto metrics = MetricsCollector::collect(*current_function_);
