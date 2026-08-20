@@ -84,11 +84,13 @@ bool Optimizer::optimize() {
         bool cf = constant_folding();
         bool po = peephole_optimize();
         bool dce = dead_code_elimination();
+        bool rc = remove_redundant_entry_calls();
 
         pass_changed |= ur;
         pass_changed |= cf;
         pass_changed |= po;
         pass_changed |= dce;
+        pass_changed |= rc;
 
         changed |= pass_changed;
         pass_count++;
@@ -570,6 +572,42 @@ bool Optimizer::constant_folding() {
         }
     }
 
+    return changed;
+}
+
+bool Optimizer::remove_redundant_entry_calls() {
+    if (func_.instructions.empty()) return false;
+    
+    // Only apply this optimization to the top-level wrapper function
+    if (func_.name != "__top_level_wrapper__") return false;
+    
+    bool changed = false;
+    
+    // Look for pattern: call <func>; call <same_func>; with no intervening side effects
+    for (size_t i = 0; i + 1 < func_.instructions.size(); ++i) {
+        const auto& first = func_.instructions[i];
+        const auto& second = func_.instructions[i + 1];
+        
+        // Check if both are calls to the same function
+        if ((first.op == LIR_Op::Call || first.op == LIR_Op::CallVoid) &&
+            (second.op == LIR_Op::Call || second.op == LIR_Op::CallVoid)) {
+            
+            // Check if they call the same function
+            if (first.func_name == second.func_name && !first.func_name.empty()) {
+                // Check if there are no intervening instructions with side effects
+                // (Since we're checking consecutive instructions, there are none)
+                
+                // Remove the second call (it's redundant)
+                func_.instructions.erase(func_.instructions.begin() + i + 1);
+                changed = true;
+                
+                // After removal, we need to re-check from this position
+                // since the next instruction might now be another redundant call
+                --i;
+            }
+        }
+    }
+    
     return changed;
 }
 

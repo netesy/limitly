@@ -47,6 +47,12 @@ public:
      */
     bool constant_folding();
 
+    /**
+     * @brief Remove redundant consecutive calls to the same function at entry point
+     * @return true if instructions were removed
+     */
+    bool remove_redundant_entry_calls();
+
 private:
     LIR_Function& func_;
 
