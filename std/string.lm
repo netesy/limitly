@@ -2,16 +2,8 @@
 // Unified implementation of string utilities
 
 fn char_code(ch: str): int {
-    var alphabet = " abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    var i = 0;
-    var l = len(alphabet);
-    while (i < l) {
-        if (_builtin_substring(alphabet, i, i + 1) == ch) {
-            return i;
-        }
-        i = i + 1;
-    }
-    return 999;
+    if (len(ch) == 0) return 0;
+    return _builtin_string_byte_at(ch, 0);
 }
 
 frame String {
@@ -32,19 +24,19 @@ frame String {
     }
 
     pub fn trim(): str { 
-        return trim(self.value);
+        return _builtin_string_trim(self.value);
     }
     
     pub fn to_upper(): str { 
-        return to_upper(self.value);
+        return _builtin_string_to_upper(self.value);
     }
     
     pub fn to_lower(): str { 
-        return to_lower(self.value);
+        return _builtin_string_to_lower(self.value);
     }
 
     pub fn contains(needle: str): bool {
-        return contains(self.value, needle);
+        return _builtin_string_contains(self.value, needle);
     }
 
     pub fn split(delimiter: str): [str] {
@@ -52,15 +44,15 @@ frame String {
     }
 
     pub fn replace(old: str, replacement: str): str {
-        return replace(self.value, old, replacement);
+        return _builtin_string_replace(self.value, old, replacement);
     }
 
     pub fn starts_with(prefix: str): bool {
-        return starts_with(self.value, prefix);
+        return _builtin_string_starts_with(self.value, prefix);
     }
     
     pub fn ends_with(suffix: str): bool {
-        return ends_with(self.value, suffix);
+        return _builtin_string_ends_with(self.value, suffix);
     }
 
     pub fn substring(start: int, end: int): str {
@@ -75,6 +67,10 @@ frame String {
     pub fn char_at(index: int): str {
         if (index < 0 or index >= len(self.value)) return "";
         return _builtin_substring(self.value, index, index + 1);
+    }
+
+    pub fn byte_at(index: int): int {
+        return _builtin_string_byte_at(self.value, index);
     }
 
     pub fn repeat(count: int): str {
@@ -100,19 +96,7 @@ frame String {
     }
 
     pub fn index_of(sub: str): int {
-        if (sub == "") return 0;
-        var sub_len = len(sub);
-        var val_len = len(self.value);
-        if (sub_len > val_len) return -1;
-
-        var i = 0;
-        while (i <= val_len - sub_len) {
-            if (_builtin_substring(self.value, i, i + sub_len) == sub) {
-                return i;
-            }
-            i = i + 1;
-        }
-        return -1;
+        return _builtin_string_index_of(self.value, sub);
     }
 
     pub fn last_index_of(sub: str): int {
@@ -137,33 +121,15 @@ pub fn length(value: str): int {
 }
 
 pub fn contains(value: str, needle: str): bool {
-    var nlen = len(needle);
-    var vlen = len(value);
-    if (nlen == 0) { return true; }
-    if (nlen > vlen) { return false; }
-    var i = 0;
-    while (i <= vlen - nlen) {
-        if (_builtin_substring(value, i, i + nlen) == needle) {
-            return true;
-        }
-        i = i + 1;
-    }
-    return false;
+    return _builtin_string_contains(value, needle);
 }
 
 pub fn starts_with(value: str, prefix: str): bool {
-    var plen = len(prefix);
-    if (plen == 0) { return true; }
-    if (plen > len(value)) { return false; }
-    return _builtin_substring(value, 0, plen) == prefix;
+    return _builtin_string_starts_with(value, prefix);
 }
 
 pub fn ends_with(value: str, suffix: str): bool {
-    var slen = len(suffix);
-    var vlen = len(value);
-    if (slen == 0) { return true; }
-    if (slen > vlen) { return false; }
-    return _builtin_substring(value, vlen - slen, vlen) == suffix;
+    return _builtin_string_ends_with(value, suffix);
 }
 
 pub fn split(value: str, delimiter: str): [str] {
@@ -206,134 +172,27 @@ pub fn join(values: [str], delimiter: str): str {
 }
 
 pub fn trim(value: str): str { 
-    var vlen = len(value);
-    var start = 0;
-    while (start < vlen) {
-        var ch = _builtin_substring(value, start, start + 1);
-        if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
-            start = start + 1;
-        } else {
-            break;
-        }
-    }
-    var end = vlen;
-    while (end > start) {
-        var ch = _builtin_substring(value, end - 1, end);
-        if (ch == " " or ch == "\t" or ch == "\n" or ch == "\r") {
-            end = end - 1;
-        } else {
-            break;
-        }
-    }
-    return _builtin_substring(value, start, end);
+    return _builtin_string_trim(value);
 }
 
 pub fn replace(value: str, old: str, replacement: str): str {
-    var olen = len(old);
-    var vlen = len(value);
-    if (olen == 0) { return value; }
-    var result = "";
-    var i = 0;
-    while (i <= vlen - olen) {
-        if (_builtin_substring(value, i, i + olen) == old) {
-            result = result + replacement;
-            i = i + olen;
-        } else {
-            result = result + _builtin_substring(value, i, i + 1);
-            i = i + 1;
-        }
-    }
-    while (i < vlen) {
-        result = result + _builtin_substring(value, i, i + 1);
-        i = i + 1;
-    }
-    return result;
-}
-
-fn _char_to_lower(ch: str): str {
-    if (ch == "A") { return "a"; }
-    if (ch == "B") { return "b"; }
-    if (ch == "C") { return "c"; }
-    if (ch == "D") { return "d"; }
-    if (ch == "E") { return "e"; }
-    if (ch == "F") { return "f"; }
-    if (ch == "G") { return "g"; }
-    if (ch == "H") { return "h"; }
-    if (ch == "I") { return "i"; }
-    if (ch == "J") { return "j"; }
-    if (ch == "K") { return "k"; }
-    if (ch == "L") { return "l"; }
-    if (ch == "M") { return "m"; }
-    if (ch == "N") { return "n"; }
-    if (ch == "O") { return "o"; }
-    if (ch == "P") { return "p"; }
-    if (ch == "Q") { return "q"; }
-    if (ch == "R") { return "r"; }
-    if (ch == "S") { return "s"; }
-    if (ch == "T") { return "t"; }
-    if (ch == "U") { return "u"; }
-    if (ch == "V") { return "v"; }
-    if (ch == "W") { return "w"; }
-    if (ch == "X") { return "x"; }
-    if (ch == "Y") { return "y"; }
-    if (ch == "Z") { return "z"; }
-    return ch;
-}
-
-fn _char_to_upper(ch: str): str {
-    if (ch == "a") { return "A"; }
-    if (ch == "b") { return "B"; }
-    if (ch == "c") { return "C"; }
-    if (ch == "d") { return "D"; }
-    if (ch == "e") { return "E"; }
-    if (ch == "f") { return "F"; }
-    if (ch == "g") { return "G"; }
-    if (ch == "h") { return "H"; }
-    if (ch == "i") { return "I"; }
-    if (ch == "j") { return "J"; }
-    if (ch == "k") { return "K"; }
-    if (ch == "l") { return "L"; }
-    if (ch == "m") { return "M"; }
-    if (ch == "n") { return "N"; }
-    if (ch == "o") { return "O"; }
-    if (ch == "p") { return "P"; }
-    if (ch == "q") { return "Q"; }
-    if (ch == "r") { return "R"; }
-    if (ch == "s") { return "S"; }
-    if (ch == "t") { return "T"; }
-    if (ch == "u") { return "U"; }
-    if (ch == "v") { return "V"; }
-    if (ch == "w") { return "W"; }
-    if (ch == "x") { return "X"; }
-    if (ch == "y") { return "Y"; }
-    if (ch == "z") { return "Z"; }
-    return ch;
+    return _builtin_string_replace(value, old, replacement);
 }
 
 pub fn to_lower(value: str): str {
-    var result = "";
-    var i = 0;
-    var vlen = len(value);
-    while (i < vlen) {
-        result = result + _char_to_lower(_builtin_substring(value, i, i + 1));
-        i = i + 1;
-    }
-    return result;
+    return _builtin_string_to_lower(value);
 }
 
 pub fn to_upper(value: str): str {
-    var result = "";
-    var i = 0;
-    var vlen = len(value);
-    while (i < vlen) {
-        result = result + _char_to_upper(_builtin_substring(value, i, i + 1));
-        i = i + 1;
-    }
-    return result;
+    return _builtin_string_to_upper(value);
 }
 
 pub fn uppercase(value: str): str {
-    return to_upper(value);
+    return _builtin_string_to_upper(value);
+}
+
+pub fn byte_at(value: str, index: int): int {
+    return _builtin_string_byte_at(value, index);
 }
 
 pub fn compare(left: str, right: str): int {
@@ -345,12 +204,10 @@ pub fn compare(left: str, right: str): int {
 
     var i = 0;
     while (i < min_len) {
-        var ch_l = _builtin_substring(left, i, i + 1);
-        var ch_r = _builtin_substring(right, i, i + 1);
-        if (ch_l != ch_r) {
-            var code_l = char_code(ch_l);
-            var code_b = char_code(ch_r);
-            if (code_l < code_b) return -1;
+        var b_l = _builtin_string_byte_at(left, i);
+        var b_r = _builtin_string_byte_at(right, i);
+        if (b_l != b_r) {
+            if (b_l < b_r) return -1;
             return 1;
         }
         i = i + 1;

@@ -10,6 +10,7 @@
 #include "../../lir/function_registry.hh"
 #include "../../lir/builtin_functions.hh"
 #include "vm_runtime.hh"
+#include "vm_string.hh"
 #include "vm_list.hh"
 #include "vm_dict.hh"
 #include "vm_tuple.hh"
@@ -64,9 +65,9 @@ void RegisterVM::reset() {
 }
 
 std::string RegisterVM::to_string(const RegisterValue& value) const {
-    LmString s = lm_value_to_string(value);
-    std::string result(s.data ? s.data : "nil");
-    lm_string_free(s);
+    LmStringHeader* s = lm_value_to_string(value);
+    std::string result(s ? std::string(s->data, s->len) : "nil");
+    lm_str_free(s);
     return result;
 }
 
@@ -245,7 +246,7 @@ void RegisterVM::auto_register_output(const LIR::LIR_Inst* pc) {
             ObjHeader* header = (ObjHeader*)UNBOX_PTR(val);
             if (header) {
                 uint32_t type_id = header->type_id;
-                if (type_id == TYPE_LIST || type_id == TYPE_DICT || type_id == TYPE_TUPLE || type_id == TYPE_FRAME || type_id == TYPE_BOX) {
+                if (type_id == TYPE_LIST || type_id == TYPE_DICT || type_id == TYPE_TUPLE || type_id == TYPE_FRAME || type_id == TYPE_BOX || type_id == TYPE_STRING) {
                     uintptr_t ptr = reinterpret_cast<uintptr_t>(header);
                     if (vm_allocation_regions.find(ptr) == vm_allocation_regions.end()) {
                         vm_allocation_regions[ptr] = active_region_id;
@@ -293,6 +294,8 @@ void RegisterVM::reclaim_value(RegisterValue val) {
             reclaim_value(tuple->elements[i]);
         }
         lm_tuple_free(tuple);
+    } else if (header->type_id == TYPE_STRING) {
+        lm_str_free(reinterpret_cast<LmStringHeader*>(header));
     } else if (header->type_id == TYPE_BOX) {
         lm_box_free(reinterpret_cast<LmBox*>(header));
     } else if (header->type_id == TYPE_FRAME) {
@@ -435,10 +438,31 @@ void RegisterVM::transfer_ownership(RegisterValue child, RegisterValue container
 }
 
 ValuePtr register_to_value_ptr(RegisterValue rv, TypePtr lang_type) {
+    if (IS_PTR(rv)) {
+        ObjHeader* h = (ObjHeader*)UNBOX_PTR(rv);
+        if (h && h->type_id == TYPE_STRING) {
+            auto stringType = std::make_shared<::Type>(::TypeTag::String);
+            LmStringHeader* sh = (LmStringHeader*)h;
+            return std::make_shared<::Value>(stringType, std::string(sh->data, sh->len));
+        }
+    }
+    if (lang_type && lang_type->tag == ::TypeTag::String) {
+        if (IS_PTR(rv)) {
+            ObjHeader* h = (ObjHeader*)UNBOX_PTR(rv);
+            if (h && h->type_id == TYPE_STRING) {
+                LmStringHeader* sh = (LmStringHeader*)h;
+                return std::make_shared<::Value>(lang_type, std::string(sh->data, sh->len));
+            }
+        }
+        LmStringHeader* s = lm_value_to_string(rv);
+        std::string str(s ? std::string(s->data, s->len) : "");
+        lm_str_free(s);
+        return std::make_shared<::Value>(lang_type, str);
+    }
     if (is_integer(rv)) {
-        LmString s = lm_value_to_string(rv);
-        std::string str(s.data ? s.data : "0");
-        lm_string_free(s);
+        LmStringHeader* s = lm_value_to_string(rv);
+        std::string str(s ? std::string(s->data, s->len) : "0");
+        lm_str_free(s);
         TypePtr val_type = (lang_type && is_decimal_type(lang_type)) ? lang_type : std::make_shared<::Type>(::TypeTag::Int128);
         return std::make_shared<::Value>(val_type, str);
     } else if (IS_BOOL(rv)) {
@@ -446,20 +470,24 @@ ValuePtr register_to_value_ptr(RegisterValue rv, TypePtr lang_type) {
         return std::make_shared<::Value>(boolType, UNBOX_BOOL(rv) ? "true" : "false");
     } else if (IS_PTR(rv)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(rv);
-        if (h->type_id == TYPE_FLOAT) {
+        if (h->type_id == TYPE_STRING) {
+            auto stringType = std::make_shared<::Type>(::TypeTag::String);
+            LmStringHeader* sh = (LmStringHeader*)h;
+            return std::make_shared<::Value>(stringType, std::string(sh->data, sh->len));
+        } else if (h->type_id == TYPE_FLOAT) {
             auto floatType = std::make_shared<::Type>(::TypeTag::Float64);
-            LmString s = lm_double_to_string(((ObjFloat*)h)->value);
-            std::string str(s.data ? s.data : "0");
-            lm_string_free(s);
+            LmStringHeader* s = lm_double_to_str(((ObjFloat*)h)->value);
+            std::string str(s ? std::string(s->data, s->len) : "0");
+            lm_str_free(s);
             return std::make_shared<::Value>(floatType, str);
         } else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
             auto stringType = std::make_shared<::Type>(::TypeTag::String);
             return std::make_shared<::Value>(stringType, (char*)((LmBox*)h)->value.as_ptr);
         } else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_FLOAT) {
             auto floatType = std::make_shared<::Type>(::TypeTag::Float64);
-            LmString s = lm_double_to_string(((LmBox*)h)->value.as_float);
-            std::string str(s.data ? s.data : "0");
-            lm_string_free(s);
+            LmStringHeader* s = lm_double_to_str(((LmBox*)h)->value.as_float);
+            std::string str(s ? std::string(s->data, s->len) : "0");
+            lm_str_free(s);
             return std::make_shared<::Value>(floatType, str);
         } else if (h->type_id == TYPE_FOREIGN_PTR) {
              auto ptrType = std::make_shared<::Type>(::TypeTag::Int128);

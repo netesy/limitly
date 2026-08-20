@@ -1,6 +1,7 @@
 #include "../register.hh"
 #include "../vm_runtime.hh"
 #include "../vm_value.hh"
+#include "../vm_string.hh"
 #include <stdexcept>
 #include <string>
 
@@ -12,11 +13,11 @@ namespace Register {
 void RegisterVM::execute_objects(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
         case LIR::LIR_Op::MakeEnum: {
-            // In the unified model, Enum can be a specialized LmFrame or its own type.
-            // For now, let's use a Frame with 2 fields: [tag, payload]
-            void* enum_obj = lm_frame_alloc("__lir_internal_enum__", 2);
+            // In the unified model, Enum is a specialized LmFrame with 3 fields: [tag, payload, variant_name]
+            void* enum_obj = lm_frame_alloc("__lir_internal_enum__", 3);
             lm_frame_set_field(enum_obj, 0, make_i64(static_cast<int64_t>(pc->imm)));
             lm_frame_set_field(enum_obj, 1, pc->a == UINT32_MAX ? VAL_NIL : registers[pc->a]);
+            lm_frame_set_field(enum_obj, 2, pc->func_name.empty() ? VAL_NIL : BOX_PTR(lm_str_from_cstr(pc->func_name.c_str())));
             registers[pc->dst] = BOX_PTR(enum_obj);
             break;
         }

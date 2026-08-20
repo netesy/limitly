@@ -258,6 +258,7 @@ private:
     void emit_tuple_iter_stmt(LM::Frontend::AST::IterStatement& stmt, LM::Frontend::AST::TupleExpr& tuple_expr);
     void emit_dict_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg dict_reg);
     void emit_list_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg list_reg);
+    void emit_string_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg str_reg);
     void emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt, Reg tuple_reg, int64_t tuple_len);
     void emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt);
     void emit_continue_stmt(LM::Frontend::AST::ContinueStatement& stmt);

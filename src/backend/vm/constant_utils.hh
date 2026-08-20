@@ -5,6 +5,7 @@
 #include "backend/value.hh"
 #include "backend/vm/vm_runtime.hh"
 #include "backend/vm/vm_value.hh"
+#include "backend/vm/vm_list.hh"
 
 namespace LM {
 namespace Backend {
@@ -103,8 +104,19 @@ inline LM::Backend::Value compiler_value_to_backend_value(const std::shared_ptr<
         default:
             break;
     }
+    if (cv->type->tag == ::TypeTag::List) {
+        if (std::holds_alternative<ListValue>(cv->complexData)) {
+            const auto& elements = std::get<ListValue>(cv->complexData).elements;
+            LmList* list = lm_list_new();
+            for (const auto& elem : elements) {
+                lm_list_append(list, compiler_value_to_backend_value(elem));
+            }
+            return BOX_PTR(list);
+        }
+        return BOX_PTR(lm_list_new());
+    }
     if (cv->type->tag == ::TypeTag::String) {
-        return BOX_PTR(lm_box_string(cv->data.c_str()));
+        return BOX_PTR(lm_str_from_bytes(cv->data.data(), cv->data.length()));
     }
     if (cv->type->tag == ::TypeTag::Bool) {
         return (cv->data == "true") ? VAL_TRUE : VAL_FALSE;

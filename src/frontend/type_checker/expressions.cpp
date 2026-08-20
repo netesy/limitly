@@ -883,10 +883,27 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             expr->inferred_type = type_system.INT64_TYPE;
             return type_system.INT64_TYPE;
         }
-        if (var_callee->name == "_builtin_substring") {
+        if (var_callee->name == "_builtin_substring" ||
+            var_callee->name == "_builtin_string_replace" ||
+            var_callee->name == "_builtin_string_trim" ||
+            var_callee->name == "_builtin_string_to_lower" ||
+            var_callee->name == "_builtin_string_to_upper") {
             for (auto& arg : expr->arguments) check_expression(arg, type_system.ANY_TYPE);
             expr->inferred_type = type_system.STRING_TYPE;
             return type_system.STRING_TYPE;
+        }
+        if (var_callee->name == "_builtin_string_byte_at" ||
+            var_callee->name == "_builtin_string_index_of") {
+            for (auto& arg : expr->arguments) check_expression(arg, type_system.ANY_TYPE);
+            expr->inferred_type = type_system.INT64_TYPE;
+            return type_system.INT64_TYPE;
+        }
+        if (var_callee->name == "_builtin_string_contains" ||
+            var_callee->name == "_builtin_string_starts_with" ||
+            var_callee->name == "_builtin_string_ends_with") {
+            for (auto& arg : expr->arguments) check_expression(arg, type_system.ANY_TYPE);
+            expr->inferred_type = type_system.BOOL_TYPE;
+            return type_system.BOOL_TYPE;
         }
         if (var_callee->name == "resource_call" || var_callee->name == "resource_create" || var_callee->name == "resource_destroy") {
             for (auto& arg : expr->arguments) {

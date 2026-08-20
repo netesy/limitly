@@ -15,18 +15,19 @@ void RegisterVM::execute_strings(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = VAL_NIL;
             if (IS_PTR(registers[pc->a])) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
-                if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                if (h && h->type_id == TYPE_STRING) {
+                    LmStringHeader* str = (LmStringHeader*)h;
+                    int64_t index = as_i64(registers[pc->b]);
+                    if (index >= 0 && (uint64_t)index < str->len) {
+                        registers[pc->dst] = make_i64((uint8_t)str->data[index]);
+                    }
+                } else if (h && h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
                     const char* text = static_cast<const char*>(((LmBox*)h)->value.as_ptr);
                     int64_t index = as_i64(registers[pc->b]);
-                    size_t len = std::strlen(text);
-                    if (index >= 0 && static_cast<size_t>(index) < len) {
-                        char out[2] = { text[index], '\0' };
-                        LmBox* box = lm_box_string(out);
-                        registers[pc->dst] = BOX_PTR(box);
-                        // Register allocation with current active region
-                        if (box && !vm_region_stack.empty()) {
-                            uintptr_t ptr = reinterpret_cast<uintptr_t>(box);
-                            vm_allocation_regions[ptr] = active_region_id;
+                    if (text && index >= 0) {
+                        size_t len = std::strlen(text);
+                        if (static_cast<size_t>(index) < len) {
+                            registers[pc->dst] = make_i64(static_cast<uint8_t>(text[index]));
                         }
                     }
                 }
@@ -40,67 +41,111 @@ void RegisterVM::execute_strings(const LIR::LIR_Inst* pc) {
                 ValuePtr v = register_to_value_ptr(registers[pc->a], lang_type);
                 str_val = v->toString();
             } else {
-                LmString s = lm_value_to_string(registers[pc->a]);
-                str_val = s.data ? s.data : "";
-                lm_string_free(s);
+                LmStringHeader* s = lm_value_to_string(registers[pc->a]);
+                str_val = s ? std::string(s->data, s->len) : "";
+                lm_str_free(s);
             }
-            LmBox* box = lm_box_string(str_val.c_str());
-            registers[pc->dst] = BOX_PTR(box);
-            if (box && !vm_region_stack.empty()) {
-                uintptr_t ptr = reinterpret_cast<uintptr_t>(box);
+            LmStringHeader* res = lm_str_from_bytes(str_val.data(), str_val.length());
+            registers[pc->dst] = BOX_PTR(res);
+            if (res && !vm_region_stack.empty()) {
+                uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
                 vm_allocation_regions[ptr] = active_region_id;
+                vm_allocation_types[ptr] = TYPE_STRING;
             }
             break;
         }
         case LIR::LIR_Op::STR_CONCAT: {
-            LmString s1 = lm_value_to_string(registers[pc->a]);
-            LmString s2 = lm_value_to_string(registers[pc->b]);
-            LmString res = lm_string_concat(s1, s2);
-            LmBox* box = lm_box_string(res.data);
-            registers[pc->dst] = BOX_PTR(box);
-            if (box && !vm_region_stack.empty()) {
-                uintptr_t ptr = reinterpret_cast<uintptr_t>(box);
-                vm_allocation_regions[ptr] = active_region_id;
+            LmStringHeader* str_a = nullptr;
+            LmStringHeader* str_b = nullptr;
+            bool free_a = false, free_b = false;
+
+            if (IS_PTR(registers[pc->a])) {
+                ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
+                if (h && h->type_id == TYPE_STRING) {
+                    str_a = (LmStringHeader*)h;
+                }
             }
-            lm_string_free(s1);
-            lm_string_free(s2);
-            lm_string_free(res);
+            if (IS_PTR(registers[pc->b])) {
+                ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->b]);
+                if (h && h->type_id == TYPE_STRING) {
+                    str_b = (LmStringHeader*)h;
+                }
+            }
+
+            if (!str_a) {
+                if (is_integer(registers[pc->a]) && str_b != nullptr) {
+                    int64_t byte_val = as_i64(registers[pc->a]);
+                    if (byte_val >= 0 && byte_val <= 255) {
+                        char byte_char[2] = { (char)byte_val, '\0' };
+                        str_a = lm_str_from_bytes(byte_char, 1);
+                    } else {
+                        str_a = lm_value_to_string(registers[pc->a]);
+                    }
+                } else {
+                    str_a = lm_value_to_string(registers[pc->a]);
+                }
+                free_a = true;
+            }
+            if (!str_b) {
+                if (is_integer(registers[pc->b]) && str_a != nullptr) {
+                    int64_t byte_val = as_i64(registers[pc->b]);
+                    if (byte_val >= 0 && byte_val <= 255) {
+                        char byte_char[2] = { (char)byte_val, '\0' };
+                        str_b = lm_str_from_bytes(byte_char, 1);
+                    } else {
+                        str_b = lm_value_to_string(registers[pc->b]);
+                    }
+                } else {
+                    str_b = lm_value_to_string(registers[pc->b]);
+                }
+                free_b = true;
+            }
+
+            LmStringHeader* res = lm_str_concat(str_a, str_b);
+            if (free_a) lm_str_free(str_a);
+            if (free_b) lm_str_free(str_b);
+
+            registers[pc->dst] = BOX_PTR(res);
+            if (res && !vm_region_stack.empty()) {
+                uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
+                vm_allocation_regions[ptr] = active_region_id;
+                vm_allocation_types[ptr] = TYPE_STRING;
+            }
             break;
         }
         case LIR::LIR_Op::STR_FORMAT: {
-            TypePtr fmt_lang_type = get_register_language_type(pc->a);
-            TypePtr arg_lang_type = get_register_language_type(pc->b);
-            
-            std::string fmt_str;
-            if (fmt_lang_type && is_decimal_type(fmt_lang_type)) {
-                fmt_str = register_to_value_ptr(registers[pc->a], fmt_lang_type)->toString();
-            } else {
-                LmString s = lm_value_to_string(registers[pc->a]);
-                fmt_str = s.data ? s.data : "";
-                lm_string_free(s);
+            LmStringHeader* fmt_hdr = nullptr;
+            LmStringHeader* arg_hdr = nullptr;
+            bool free_fmt = false, free_arg = false;
+
+            if (IS_PTR(registers[pc->a])) {
+                ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
+                if (h && h->type_id == TYPE_STRING) fmt_hdr = (LmStringHeader*)h;
             }
-            
-            std::string arg_str;
-            if (arg_lang_type && is_decimal_type(arg_lang_type)) {
-                arg_str = register_to_value_ptr(registers[pc->b], arg_lang_type)->toString();
-            } else {
-                LmString s = lm_value_to_string(registers[pc->b]);
-                arg_str = s.data ? s.data : "";
-                lm_string_free(s);
+            if (IS_PTR(registers[pc->b])) {
+                ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->b]);
+                if (h && h->type_id == TYPE_STRING) arg_hdr = (LmStringHeader*)h;
             }
 
-            LmString fmt = lm_string_from_cstr(fmt_str.c_str());
-            LmString arg = lm_string_from_cstr(arg_str.c_str());
-            LmString res = lm_string_format(fmt, arg);
-            LmBox* box = lm_box_string(res.data);
-            registers[pc->dst] = BOX_PTR(box);
-            if (box && !vm_region_stack.empty()) {
-                uintptr_t ptr = reinterpret_cast<uintptr_t>(box);
-                vm_allocation_regions[ptr] = active_region_id;
+            if (!fmt_hdr) {
+                fmt_hdr = lm_value_to_string(registers[pc->a]);
+                free_fmt = true;
             }
-            lm_string_free(fmt);
-            lm_string_free(arg);
-            lm_string_free(res);
+            if (!arg_hdr) {
+                arg_hdr = lm_value_to_string(registers[pc->b]);
+                free_arg = true;
+            }
+
+            LmStringHeader* res = lm_str_format(fmt_hdr, arg_hdr);
+            if (free_fmt) lm_str_free(fmt_hdr);
+            if (free_arg) lm_str_free(arg_hdr);
+
+            registers[pc->dst] = BOX_PTR(res);
+            if (res && !vm_region_stack.empty()) {
+                uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
+                vm_allocation_regions[ptr] = active_region_id;
+                vm_allocation_types[ptr] = TYPE_STRING;
+            }
             break;
         }
         default:

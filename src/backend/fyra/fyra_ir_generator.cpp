@@ -419,12 +419,19 @@ ir::Value* FyraIRGenerator::emit_assign_expr(
 
 ir::Value* FyraIRGenerator::emit_index_expr(
     const std::shared_ptr<Frontend::AST::IndexExpr>& expr) {
-    used_builtins_.insert("lm_list_get");
     ir::Value* obj = emit_expression(expr->object);
     ir::Value* idx = emit_expression(expr->index);
-    ir::Function* list_get = current_module_->getFunction("lm_list_get");
-    if (!list_get) list_get = builder_->createFunction("lm_list_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-    return builder_->createCall(list_get, {obj, idx});
+    if (expr->object && expr->object->inferred_type && expr->object->inferred_type->tag == ::TypeTag::String) {
+        used_builtins_.insert("lm_string_byte_at_ffi");
+        ir::Function* byte_at = current_module_->getFunction("lm_string_byte_at_ffi");
+        if (!byte_at) byte_at = builder_->createFunction("lm_string_byte_at_ffi", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
+        return builder_->createCall(byte_at, {obj, idx});
+    } else {
+        used_builtins_.insert("lm_list_get");
+        ir::Function* list_get = current_module_->getFunction("lm_list_get");
+        if (!list_get) list_get = builder_->createFunction("lm_list_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
+        return builder_->createCall(list_get, {obj, idx});
+    }
 }
 
 ir::Value* FyraIRGenerator::emit_member_expr(
@@ -604,7 +611,14 @@ void FyraIRGenerator::emit_iter_statement(
     const std::shared_ptr<Frontend::AST::IterStatement>& stmt) {
     used_builtins_.insert("lm_list_len");
     used_builtins_.insert("lm_list_get");
-    ir::Value* iterable = emit_expression(stmt->iterable);
+    ir::Value* raw_iterable = emit_expression(stmt->iterable);
+    ir::Value* iterable = raw_iterable;
+    if (stmt->iterable && stmt->iterable->inferred_type && stmt->iterable->inferred_type->tag == ::TypeTag::String) {
+        used_builtins_.insert("lm_string_to_codepoint_list");
+        ir::Function* to_list = current_module_->getFunction("lm_string_to_codepoint_list");
+        if (!to_list) to_list = builder_->createFunction("lm_string_to_codepoint_list", context_->getIntegerType(64), {context_->getIntegerType(64)});
+        iterable = builder_->createCall(to_list, {raw_iterable});
+    }
     ir::Function* func = builder_->getInsertPoint()->getParent();
     ir::Function* list_len = current_module_->getFunction("lm_list_len");
     if (!list_len) list_len = builder_->createFunction("lm_list_len", context_->getIntegerType(64), {context_->getIntegerType(64)});

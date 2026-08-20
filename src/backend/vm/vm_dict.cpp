@@ -1,6 +1,7 @@
 #define BUILDING_RUNTIME
 #include "vm_dict.hh"
 #include "vm_value.hh"
+#include "vm_string.hh"
 #include "vm_runtime.hh"
 #include <stdlib.h>
 #include <string.h>
@@ -129,13 +130,22 @@ RUNTIME_API uint64_t lm_hash_int(LmValue key) {
 
 RUNTIME_API uint64_t lm_hash_string(LmValue key) {
     if (!IS_PTR(key)) return 0;
-    LmBox* box = (LmBox*)UNBOX_PTR(key);
-    if (box->header.type_id != TYPE_BOX || box->type != LM_BOX_STRING) return 0;
-    const char* str = (const char*)box->value.as_ptr;
+    ObjHeader* h = (ObjHeader*)UNBOX_PTR(key);
+    if (!h) return 0;
+    const char* str = nullptr;
+    uint64_t len = 0;
+    if (h->type_id == TYPE_STRING) {
+        LmStringHeader* sh = (LmStringHeader*)h;
+        str = sh->data;
+        len = sh->len;
+    } else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+        str = (const char*)((LmBox*)h)->value.as_ptr;
+        if (str) len = strlen(str);
+    }
+    if (!str) return 0;
     uint64_t hash = 5381;
-    int c;
-    while ((c = *str++)) {
-        hash = ((hash << 5) + hash) + c;
+    for (uint64_t i = 0; i < len; i++) {
+        hash = ((hash << 5) + hash) + (uint8_t)str[i];
     }
     return hash;
 }
@@ -148,11 +158,22 @@ RUNTIME_API int lm_cmp_int(LmValue k1, LmValue k2) {
 
 RUNTIME_API int lm_cmp_string(LmValue k1, LmValue k2) {
     if (!IS_PTR(k1) || !IS_PTR(k2)) return (k1 > k2) - (k1 < k2);
-    LmBox* b1 = (LmBox*)UNBOX_PTR(k1);
-    LmBox* b2 = (LmBox*)UNBOX_PTR(k2);
-    if (b1->header.type_id != TYPE_BOX || b1->type != LM_BOX_STRING) return 1;
-    if (b2->header.type_id != TYPE_BOX || b2->type != LM_BOX_STRING) return -1;
-    return strcmp((const char*)b1->value.as_ptr, (const char*)b2->value.as_ptr);
+    ObjHeader* h1 = (ObjHeader*)UNBOX_PTR(k1);
+    ObjHeader* h2 = (ObjHeader*)UNBOX_PTR(k2);
+    if (!h1 || !h2) return (k1 > k2) - (k1 < k2);
+
+    const char* str1 = nullptr;
+    const char* str2 = nullptr;
+
+    if (h1->type_id == TYPE_STRING) str1 = ((LmStringHeader*)h1)->data;
+    else if (h1->type_id == TYPE_BOX && ((LmBox*)h1)->type == LM_BOX_STRING) str1 = (const char*)((LmBox*)h1)->value.as_ptr;
+
+    if (h2->type_id == TYPE_STRING) str2 = ((LmStringHeader*)h2)->data;
+    else if (h2->type_id == TYPE_BOX && ((LmBox*)h2)->type == LM_BOX_STRING) str2 = (const char*)((LmBox*)h2)->value.as_ptr;
+
+    if (!str1) return 1;
+    if (!str2) return -1;
+    return strcmp(str1, str2);
 }
 
 RUNTIME_API uint64_t hash_boxed_value(LmValue key) {
@@ -161,7 +182,9 @@ RUNTIME_API uint64_t hash_boxed_value(LmValue key) {
     if (IS_NIL(key)) return 0;
     if (IS_PTR(key)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(key);
-        if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) return lm_hash_string(key);
+        if (h && (h->type_id == TYPE_STRING || (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING))) {
+            return lm_hash_string(key);
+        }
         return (uint64_t)h;
     }
     return (uint64_t)key;

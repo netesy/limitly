@@ -115,7 +115,7 @@ LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
                  src/lir/generator/modules.cpp src/lir/function_registry.cpp \
                  src/lir/optimizer.cpp src/lir/metrics.cpp src/lir/serializer.cpp
 
-BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/frontend/value.cpp 
+BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/frontend/value.cpp src/backend/utf8.cpp 
 
 ERROR_SRCS := src/error/debugger.cpp
 

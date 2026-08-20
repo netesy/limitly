@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <math.h>
+#include <string>
 
 // Phase 6: Centralized Runtime Constructors
 RUNTIME_API LmValue make_i64(int64_t v) {
@@ -177,7 +178,40 @@ RUNTIME_API int numeric_compare(LmValue a, LmValue b) {
 }
 
 RUNTIME_API int lm_value_eq(LmValue v1, LmValue v2) {
-    if (v1 == v2) return 1; if (IS_PTR(v1) && IS_PTR(v2)) { ObjHeader* h1 = (ObjHeader*)UNBOX_PTR(v1); ObjHeader* h2 = (ObjHeader*)UNBOX_PTR(v2); if (h1->type_id == h2->type_id && h1->type_id == TYPE_BOX) { LmBox* b1 = (LmBox*)h1; LmBox* b2 = (LmBox*)h2; if (b1->type == b2->type && b1->type == LM_BOX_STRING) return strcmp((char*)b1->value.as_ptr, (char*)b2->value.as_ptr) == 0; } }
+    if (v1 == v2) return 1;
+    if (IS_PTR(v1) && IS_PTR(v2)) {
+        ObjHeader* h1 = (ObjHeader*)UNBOX_PTR(v1);
+        ObjHeader* h2 = (ObjHeader*)UNBOX_PTR(v2);
+        if (h1 && h2) {
+            if (h1->type_id == TYPE_STRING && h2->type_id == TYPE_STRING) {
+                LmStringHeader* s1 = (LmStringHeader*)h1;
+                LmStringHeader* s2 = (LmStringHeader*)h2;
+                if (s1->len != s2->len) return 0;
+                return memcmp(s1->data, s2->data, s1->len) == 0;
+            }
+            if (h1->type_id == TYPE_BOX && h2->type_id == TYPE_BOX) {
+                LmBox* b1 = (LmBox*)h1;
+                LmBox* b2 = (LmBox*)h2;
+                if (b1->type == b2->type && b1->type == LM_BOX_STRING) {
+                    return strcmp((char*)b1->value.as_ptr, (char*)b2->value.as_ptr) == 0;
+                }
+            }
+        }
+    }
+    if (IS_INT(v1) && IS_PTR(v2)) {
+        ObjHeader* h2 = (ObjHeader*)UNBOX_PTR(v2);
+        if (h2 && h2->type_id == TYPE_STRING) {
+            LmStringHeader* s2 = (LmStringHeader*)h2;
+            if (s2->len == 1 && (uint8_t)s2->data[0] == (uint8_t)UNBOX_INT(v1)) return 1;
+        }
+    }
+    if (IS_PTR(v1) && IS_INT(v2)) {
+        ObjHeader* h1 = (ObjHeader*)UNBOX_PTR(v1);
+        if (h1 && h1->type_id == TYPE_STRING) {
+            LmStringHeader* s1 = (LmStringHeader*)h1;
+            if (s1->len == 1 && (uint8_t)s1->data[0] == (uint8_t)UNBOX_INT(v2)) return 1;
+        }
+    }
     if (is_numeric_internal(v1) && is_numeric_internal(v2)) {
         if (is_float(v1) || is_float(v2)) {
             return as_float(v1) == as_float(v2);
@@ -233,9 +267,9 @@ static char* uint128_to_str(unsigned __int128 n) {
     return res;
 }
 
-static LmString format_value(LmValue value);
+static LmStringHeader* format_value(LmValue value);
 
-static LmString format_tuple(LmTuple* tuple) {
+static LmStringHeader* format_tuple(LmTuple* tuple) {
     uint64_t capacity = 256;
     char* buf = (char*)malloc(capacity);
     uint64_t pos = 0;
@@ -243,16 +277,18 @@ static LmString format_tuple(LmTuple* tuple) {
     append_to_buffer(&buf, &pos, &capacity, "(");
     for (uint64_t i = 0; i < tuple->size; i++) {
         if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
-        LmString s = format_value(tuple->elements[i]);
-        append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
-        lm_string_free(s);
+        LmStringHeader* s = format_value(tuple->elements[i]);
+        append_to_buffer(&buf, &pos, &capacity, s && s->data ? s->data : "nil");
+        lm_str_free(s);
     }
     append_to_buffer(&buf, &pos, &capacity, ")");
     buf[pos] = 0;
-    return (LmString){ buf, pos };
+    LmStringHeader* res = lm_str_from_bytes(buf, pos);
+    free(buf);
+    return res;
 }
 
-static LmString format_list(LmList* list) {
+static LmStringHeader* format_list(LmList* list) {
     uint64_t capacity = 256;
     char* buf = (char*)malloc(capacity);
     uint64_t pos = 0;
@@ -260,16 +296,18 @@ static LmString format_list(LmList* list) {
     append_to_buffer(&buf, &pos, &capacity, "[");
     for (uint64_t i = 0; i < list->size; i++) {
         if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
-        LmString s = format_value(list->data[i]);
-        append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
-        lm_string_free(s);
+        LmStringHeader* s = format_value(list->data[i]);
+        append_to_buffer(&buf, &pos, &capacity, s && s->data ? s->data : "nil");
+        lm_str_free(s);
     }
     append_to_buffer(&buf, &pos, &capacity, "]");
     buf[pos] = 0;
-    return (LmString){ buf, pos };
+    LmStringHeader* res = lm_str_from_bytes(buf, pos);
+    free(buf);
+    return res;
 }
 
-static LmString format_dict(LmDict* dict) {
+static LmStringHeader* format_dict(LmDict* dict) {
     uint64_t capacity = 256;
     char* buf = (char*)malloc(capacity);
     uint64_t pos = 0;
@@ -279,57 +317,63 @@ static LmString format_dict(LmDict* dict) {
     LmValue* items = lm_dict_items(dict, &count);
     for (uint64_t i = 0; i < count; i++) {
         if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
-        LmString k = format_value(items[i * 2]);
-        append_to_buffer(&buf, &pos, &capacity, k.data ? k.data : "nil");
-        lm_string_free(k);
+        LmStringHeader* k = format_value(items[i * 2]);
+        append_to_buffer(&buf, &pos, &capacity, k && k->data ? k->data : "nil");
+        lm_str_free(k);
         append_to_buffer(&buf, &pos, &capacity, ": ");
-        LmString v = format_value(items[i * 2 + 1]);
-        append_to_buffer(&buf, &pos, &capacity, v.data ? v.data : "nil");
-        lm_string_free(v);
+        LmStringHeader* v = format_value(items[i * 2 + 1]);
+        append_to_buffer(&buf, &pos, &capacity, v && v->data ? v->data : "nil");
+        lm_str_free(v);
     }
     if (items) free(items);
     append_to_buffer(&buf, &pos, &capacity, "}");
     buf[pos] = 0;
-    return (LmString){ buf, pos };
+    LmStringHeader* res = lm_str_from_bytes(buf, pos);
+    free(buf);
+    return res;
 }
 
-static LmString format_value(LmValue value) {
-    if (IS_INT(value)) return lm_int_to_string(UNBOX_INT(value));
-    if (IS_NIL(value)) return lm_string_from_cstr("nil");
-    if (IS_BOOL(value)) return lm_bool_to_string(UNBOX_BOOL(value) ? 1 : 0);
+static LmStringHeader* format_value(LmValue value) {
+    if (IS_INT(value)) return lm_int_to_str(UNBOX_INT(value));
+    if (IS_NIL(value)) return lm_str_from_cstr("nil");
+    if (IS_BOOL(value)) return lm_bool_to_str(UNBOX_BOOL(value) ? 1 : 0);
     if (IS_PTR(value)) {
         ObjHeader* h = (ObjHeader*)UNBOX_PTR(value);
         switch (h->type_id) {
+            case TYPE_STRING: {
+                LmStringHeader* sh = (LmStringHeader*)h;
+                return lm_str_from_bytes(sh->data, sh->len);
+            }
             case TYPE_BOX: {
                 LmBox* box = (LmBox*)h;
                 switch (box->type) {
-                    case LM_BOX_INT: return lm_int_to_string(box->value.as_int);
-                    case LM_BOX_FLOAT: return lm_double_to_string(box->value.as_float);
-                    case LM_BOX_BOOL: return lm_bool_to_string(box->value.as_bool);
-                    case LM_BOX_STRING: return lm_string_from_cstr((char*)box->value.as_ptr);
-                    case LM_BOX_NULLPTR: return lm_string_from_cstr("nil");
+                    case LM_BOX_INT: return lm_int_to_str(box->value.as_int);
+                    case LM_BOX_FLOAT: return lm_double_to_str(box->value.as_float);
+                    case LM_BOX_BOOL: return lm_bool_to_str(box->value.as_bool);
+                    case LM_BOX_STRING: return lm_str_from_cstr((char*)box->value.as_ptr);
+                    case LM_BOX_NULLPTR: return lm_str_from_cstr("nil");
                 }
                 break;
             }
-            case TYPE_I64: return lm_int_to_string(((ObjI64*)h)->value);
+            case TYPE_I64: return lm_int_to_str(((ObjI64*)h)->value);
             case TYPE_U64: {
                 char b[64];
                 snprintf(b, sizeof(b), "%" PRIu64, ((ObjU64*)h)->value);
-                return lm_string_from_cstr(b);
+                return lm_str_from_cstr(b);
             }
             case TYPE_I128: {
                 char* s = int128_to_str(((ObjI128*)h)->value);
-                LmString res = lm_string_from_cstr(s);
+                LmStringHeader* res = lm_str_from_cstr(s);
                 free(s);
                 return res;
             }
             case TYPE_U128: {
                 char* s = uint128_to_str(((ObjU128*)h)->value);
-                LmString res = lm_string_from_cstr(s);
+                LmStringHeader* res = lm_str_from_cstr(s);
                 free(s);
                 return res;
             }
-            case TYPE_FLOAT: return lm_double_to_string(((ObjFloat*)h)->value);
+            case TYPE_FLOAT: return lm_double_to_str(((ObjFloat*)h)->value);
             case TYPE_LIST: return format_list((LmList*)h);
             case TYPE_TUPLE: return format_tuple((LmTuple*)h);
             case TYPE_DICT: return format_dict((LmDict*)h);
@@ -338,22 +382,30 @@ static LmString format_value(LmValue value) {
                 if (f->name && strcmp(f->name, "__lir_internal_enum__") == 0) {
                     int64_t tag = as_i64(f->fields[0]);
                     LmValue payload = f->field_count > 1 ? f->fields[1] : VAL_NIL;
-                    uint64_t capacity = 128;
-                    char* buf = (char*)malloc(capacity);
-                    uint64_t pos = 0;
-                    buf[0] = 0;
-                    char tag_str[32];
-                    snprintf(tag_str, sizeof(tag_str), "Enum(%lld", (long long)tag);
-                    append_to_buffer(&buf, &pos, &capacity, tag_str);
-                    if (!IS_NIL(payload)) {
-                        append_to_buffer(&buf, &pos, &capacity, ", ");
-                        LmString s = format_value(payload);
-                        append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
-                        lm_string_free(s);
+                    LmValue variant_name_val = f->field_count > 2 ? f->fields[2] : VAL_NIL;
+
+                    LmStringHeader* vname_hdr = nullptr;
+                    if (!IS_NIL(variant_name_val) && IS_PTR(variant_name_val)) {
+                        ObjHeader* vhdr = (ObjHeader*)UNBOX_PTR(variant_name_val);
+                        if (vhdr && vhdr->type_id == TYPE_STRING) {
+                            vname_hdr = (LmStringHeader*)vhdr;
+                        }
                     }
-                    append_to_buffer(&buf, &pos, &capacity, ")");
-                    buf[pos] = 0;
-                    return (LmString){ buf, pos };
+
+                    if (!IS_NIL(payload)) {
+                        LmStringHeader* payload_str = format_value(payload);
+                        if (vname_hdr) {
+                            std::string res_str = std::string(vname_hdr->data, vname_hdr->len) + "(" + (payload_str ? std::string(payload_str->data, payload_str->len) : "nil") + ")";
+                            if (payload_str) lm_str_free(payload_str);
+                            return lm_str_from_bytes(res_str.data(), res_str.length());
+                        }
+                        return payload_str;
+                    } else if (vname_hdr) {
+                        return lm_str_from_bytes(vname_hdr->data, vname_hdr->len);
+                    }
+                    char tag_str[32];
+                    snprintf(tag_str, sizeof(tag_str), "%lld", (long long)tag);
+                    return lm_str_from_cstr(tag_str);
                 }
                 if (f->name && strcmp(f->name, "__lir_internal_ok__") == 0) {
                     LmValue payload = f->field_count > 1 ? f->fields[1] : VAL_NIL;
@@ -363,13 +415,15 @@ static LmString format_value(LmValue value) {
                     buf[0] = 0;
                     append_to_buffer(&buf, &pos, &capacity, "ok(");
                     if (!IS_NIL(payload)) {
-                        LmString s = format_value(payload);
-                        append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
-                        lm_string_free(s);
+                        LmStringHeader* s = format_value(payload);
+                        append_to_buffer(&buf, &pos, &capacity, s && s->data ? s->data : "nil");
+                        lm_str_free(s);
                     }
                     append_to_buffer(&buf, &pos, &capacity, ")");
                     buf[pos] = 0;
-                    return (LmString){ buf, pos };
+                    LmStringHeader* res = lm_str_from_bytes(buf, pos);
+                    free(buf);
+                    return res;
                 }
                 if (f->name && strcmp(f->name, "__lir_internal_error__") == 0) {
                     LmValue payload = f->field_count > 1 ? f->fields[1] : VAL_NIL;
@@ -379,13 +433,15 @@ static LmString format_value(LmValue value) {
                     buf[0] = 0;
                     append_to_buffer(&buf, &pos, &capacity, "err(");
                     if (!IS_NIL(payload)) {
-                        LmString s = format_value(payload);
-                        append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
-                        lm_string_free(s);
+                        LmStringHeader* s = format_value(payload);
+                        append_to_buffer(&buf, &pos, &capacity, s && s->data ? s->data : "nil");
+                        lm_str_free(s);
                     }
                     append_to_buffer(&buf, &pos, &capacity, ")");
                     buf[pos] = 0;
-                    return (LmString){ buf, pos };
+                    LmStringHeader* res = lm_str_from_bytes(buf, pos);
+                    free(buf);
+                    return res;
                 }
                 uint64_t capacity = 128;
                 char* buf = (char*)malloc(capacity);
@@ -395,21 +451,23 @@ static LmString format_value(LmValue value) {
                 append_to_buffer(&buf, &pos, &capacity, "{");
                 for (int i = 0; i < f->field_count; i++) {
                     if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
-                    LmString s = format_value(f->fields[i]);
-                    append_to_buffer(&buf, &pos, &capacity, s.data ? s.data : "nil");
-                    lm_string_free(s);
+                    LmStringHeader* s = format_value(f->fields[i]);
+                    append_to_buffer(&buf, &pos, &capacity, s && s->data ? s->data : "nil");
+                    lm_str_free(s);
                 }
                 append_to_buffer(&buf, &pos, &capacity, "}");
                 buf[pos] = 0;
-                return (LmString){ buf, pos };
+                LmStringHeader* res = lm_str_from_bytes(buf, pos);
+                free(buf);
+                return res;
             }
             default: break;
         }
     }
-    return lm_string_from_cstr("<unknown>");
+    return lm_str_from_cstr("<unknown>");
 }
 
-RUNTIME_API LmString lm_value_to_string(LmValue value) {
+RUNTIME_API LmStringHeader* lm_value_to_string(LmValue value) {
     return format_value(value);
 }
 
@@ -432,18 +490,22 @@ RUNTIME_API LmValue lm_add(LmValue a, LmValue b) {
                 return BOX_PTR(result);
             }
         }
+        if (h1->type_id == TYPE_STRING && h2->type_id == TYPE_STRING) {
+            LmStringHeader* s1 = (LmStringHeader*)h1;
+            LmStringHeader* s2 = (LmStringHeader*)h2;
+            LmStringHeader* combined = lm_str_concat(s1, s2);
+            return BOX_PTR(combined);
+        }
         if (h1->type_id == TYPE_BOX && h2->type_id == TYPE_BOX) {
             LmBox* b1 = (LmBox*)h1;
             LmBox* b2 = (LmBox*)h2;
             if (b1->type == LM_BOX_STRING && b2->type == LM_BOX_STRING) {
-                LmString s1 = lm_string_from_cstr((const char*)b1->value.as_ptr);
-                LmString s2 = lm_string_from_cstr((const char*)b2->value.as_ptr);
-                LmString combined = lm_string_concat(s1, s2);
-                LmValue result = BOX_PTR(lm_box_string(combined.data));
-                lm_string_free(s1);
-                lm_string_free(s2);
-                lm_string_free(combined);
-                return result;
+                LmStringHeader* s1 = lm_str_from_cstr((const char*)b1->value.as_ptr);
+                LmStringHeader* s2 = lm_str_from_cstr((const char*)b2->value.as_ptr);
+                LmStringHeader* combined = lm_str_concat(s1, s2);
+                lm_str_free(s1);
+                lm_str_free(s2);
+                return BOX_PTR(combined);
             }
         }
     }
@@ -461,14 +523,12 @@ RUNTIME_API LmValue lm_add(LmValue a, LmValue b) {
 }
 
 RUNTIME_API LmValue lm_rt_str_format(LmValue fmt_val, LmValue arg_val) {
-    LmString fmt = lm_value_to_string(fmt_val);
-    LmString arg = lm_value_to_string(arg_val);
-    LmString res = lm_string_format(fmt, arg);
-    LmBox* box = lm_box_string(res.data);
-    lm_string_free(fmt);
-    lm_string_free(arg);
-    lm_string_free(res);
-    return BOX_PTR(box);
+    LmStringHeader* fmt = lm_value_to_string(fmt_val);
+    LmStringHeader* arg = lm_value_to_string(arg_val);
+    LmStringHeader* res = lm_str_format(fmt, arg);
+    lm_str_free(fmt);
+    lm_str_free(arg);
+    return BOX_PTR(res);
 }
 
 RUNTIME_API LmValue lm_sub(LmValue a, LmValue b) {

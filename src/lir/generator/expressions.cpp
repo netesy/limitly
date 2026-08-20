@@ -598,7 +598,7 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
         auto func_type = std::make_shared<::Type>(::TypeTag::Function);
         // In our LIR/VM, functions are referred to by name strings
         auto string_type = std::make_shared<::Type>(::TypeTag::String);
-        Backend::Value name_val = BOX_PTR(lm_box_string(expr.name.c_str()));
+        Backend::Value name_val = BOX_PTR(lm_str_from_cstr(expr.name.c_str()));
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, func_reg, name_val));
         set_register_language_type(func_reg, func_type);
         set_register_abi_type(func_reg, Type::Ptr);
@@ -698,7 +698,7 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
 
     if (expr.parts.empty()) {
         Reg result = allocate_register();
-        Backend::Value result_val = BOX_PTR(lm_box_string(""));
+        Backend::Value result_val = BOX_PTR(lm_str_from_cstr(""));
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, result, result_val));
         set_register_language_type(result, string_type);
         return result;
@@ -720,7 +720,7 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
     // Constant folding: if all parts are string literals, fold them
     if (all_parts_are_string_literals) {
         Reg result = allocate_register();
-        Backend::Value result_val = BOX_PTR(lm_box_string(folded_result.c_str()));
+        Backend::Value result_val = BOX_PTR(lm_str_from_cstr(folded_result.c_str()));
         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, result, result_val));
         set_register_language_type(result, string_type);
         return result;
@@ -746,7 +746,7 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
     // Emit STR_FORMAT instruction
     Reg result = allocate_register();
     Reg format_reg = allocate_register();
-    Backend::Value format_val = BOX_PTR(lm_box_string(format_string.c_str()));
+    Backend::Value format_val = BOX_PTR(lm_str_from_cstr(format_string.c_str()));
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, format_reg, format_val));
     
     // Handle multiple arguments by chaining STR_FORMAT calls
@@ -1508,6 +1508,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     // Unit variant
                     LIR_Inst inst(LIR_Op::MakeEnum, Type::Ptr, result, UINT32_MAX, 0, static_cast<uint32_t>(tag));
                     inst.imm = static_cast<uint32_t>(tag);
+                    inst.func_name = method_name;
                     emit_instruction(inst);
                 } else {
                     // Variant with associated values - create tuple payload
@@ -1529,6 +1530,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     // Create enum with payload
                     LIR_Inst inst(LIR_Op::MakeEnum, Type::Ptr, result, payload, 0, static_cast<uint32_t>(tag));
                     inst.imm = static_cast<uint32_t>(tag);
+                    inst.func_name = method_name;
                     emit_instruction(inst);
                 }
 
@@ -2170,7 +2172,10 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
 
         if (resolve_enum_variant_info(type_system_.get(), enum_hint, qualified_variant, tag, expected_arity) && expected_arity == 0) {
             Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::MakeEnum, Type::Ptr, result, UINT32_MAX, 0, static_cast<uint32_t>(tag)));
+            LIR_Inst inst(LIR_Op::MakeEnum, Type::Ptr, result, UINT32_MAX, 0, static_cast<uint32_t>(tag));
+            inst.imm = static_cast<uint32_t>(tag);
+            inst.func_name = expr.name;
+            emit_instruction(inst);
             if (expr.inferred_type) {
                 set_register_language_type(result, expr.inferred_type);
                 set_register_abi_type(result, Type::Ptr);
@@ -2435,7 +2440,7 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
     // Create the lambda/closure object
     Reg func_reg = allocate_register();
     auto string_type = std::make_shared<::Type>(::TypeTag::String);
-    Backend::Value name_val = BOX_PTR(lm_box_string(lambda_name.c_str()));
+    Backend::Value name_val = BOX_PTR(lm_str_from_cstr(lambda_name.c_str()));
     Reg name_reg = allocate_register();
     emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, name_reg, name_val));
 
