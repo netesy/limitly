@@ -1343,6 +1343,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             LIR_Inst inst;
             inst.op = op; inst.dst = result; inst.func_name = vm_name; inst.call_args = arg_regs;
             inst.result_type = (expr.inferred_type) ? language_type_to_abi_type(expr.inferred_type) : Type::I64;
+            if (expr.inferred_type) set_register_type(result, expr.inferred_type);
             for (size_t i = 0; i < arg_regs.size(); ++i) {
                 Type arg_abi = Type::I64;
                 if (expr.arguments[i] && expr.arguments[i]->inferred_type) {
@@ -1418,7 +1419,10 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         for (size_t i = 0; i < arg_regs.size(); ++i) {
             inst.call_arg_types.push_back(expr.arguments[i] && expr.arguments[i]->inferred_type ? language_type_to_abi_type(expr.arguments[i]->inferred_type) : Type::I64);
         }
-        if (expr.inferred_type) inst.result_type = language_type_to_abi_type(expr.inferred_type);
+        if (expr.inferred_type) {
+            inst.result_type = language_type_to_abi_type(expr.inferred_type);
+            set_register_type(result, expr.inferred_type);
+        }
         emit_instruction(inst);
         return result;
     } 
@@ -1761,11 +1765,26 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         }
 
         if (!full_name.empty()) {
+            LIR_Inst inst(LIR_Op::Call, result, full_name, arg_regs);
+            inst.func_name = full_name;
+            for (size_t i = 0; i < arg_regs.size(); ++i) {
+                Type arg_abi = Type::I64;
+                if (i > 0 && i - 1 < expr.arguments.size() && expr.arguments[i - 1] && expr.arguments[i - 1]->inferred_type) {
+                    arg_abi = language_type_to_abi_type(expr.arguments[i - 1]->inferred_type);
+                } else if (auto lang_type = get_register_language_type(arg_regs[i])) {
+                    arg_abi = language_type_to_abi_type(lang_type);
+                } else {
+                    arg_abi = get_register_abi_type(arg_regs[i]);
+                }
+                inst.call_arg_types.push_back(arg_abi);
+            }
             if (expr.inferred_type) {
+                inst.result_type = language_type_to_abi_type(expr.inferred_type);
+                set_register_type(result, expr.inferred_type);
                 set_register_language_type(result, expr.inferred_type);
                 set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
             }
-            emit_instruction(LIR_Inst(LIR_Op::Call, result, full_name, arg_regs));
+            emit_instruction(inst);
             return result;
         }
 

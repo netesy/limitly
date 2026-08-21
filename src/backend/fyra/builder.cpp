@@ -511,6 +511,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Or:  store_reg(inst.dst, builder_->createOr(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Xor: store_reg(inst.dst, builder_->createXor(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::CmpEQ: {
+                reg_types[inst.dst] = LIR::Type::Bool;
                 bool is_ptr = (inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr ||
                                (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
                                (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
@@ -526,6 +527,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::CmpNEQ: {
+                reg_types[inst.dst] = LIR::Type::Bool;
                 bool is_ptr = (inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr ||
                                (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
                                (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
@@ -605,6 +607,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                                 arg_type = reg_t;
                             }
                         }
+                        if (arg_type == LIR::Type::I64 && (inst.call_arg_types.size() > ai && inst.call_arg_types[ai] == LIR::Type::Bool)) {
+                            arg_type = LIR::Type::Bool;
+                        }
                         if (arg_type == LIR::Type::Ptr) {
                             std::string prid = std::to_string(ai) + "_" + std::to_string(rand() % 10000);
                             ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
@@ -669,7 +674,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     func = builder_->createFunction(name, lir_type_to_fyra_type(inst.result_type), pts);
                 }
                 ir::Value* res = builder_->createCall(func, args);
-                if (inst.op == LIR::LIR_Op::Call) store_reg(inst.dst, res, inst.result_type);
+                if (inst.op == LIR::LIR_Op::Call) {
+                    reg_types[inst.dst] = inst.result_type;
+                    store_reg(inst.dst, res, inst.result_type);
+                }
                 break;
             }
             case LIR::LIR_Op::CallIndirect: {
@@ -677,7 +685,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
                 ir::Value* callee = load_reg(inst.a, inst.type_a);
                 ir::Value* res = builder_->createCall(callee, args, lir_type_to_fyra_type(inst.result_type));
-                if (inst.dst != 0) store_reg(inst.dst, res, inst.result_type);
+                if (inst.dst != 0) {
+                    reg_types[inst.dst] = inst.result_type;
+                    store_reg(inst.dst, res, inst.result_type);
+                }
                 break;
             }
             case LIR::LIR_Op::CallBuiltin: {
@@ -717,6 +728,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             if (reg_t == LIR::Type::Bool || reg_t == LIR::Type::Ptr || reg_t == LIR::Type::F64 || reg_t == LIR::Type::F32) {
                                 arg_type = reg_t;
                             }
+                        }
+                        if (arg_type == LIR::Type::I64 && (inst.call_arg_types.size() > ai && inst.call_arg_types[ai] == LIR::Type::Bool)) {
+                            arg_type = LIR::Type::Bool;
                         }
                         if (arg_type == LIR::Type::Ptr) {
                             std::string prid = std::to_string(ai) + "_" + std::to_string(rand() % 10000);
