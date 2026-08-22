@@ -11,6 +11,12 @@
 
 namespace LM::Backend::Fyra {
 
+namespace FyraString {
+    constexpr uint64_t PTR_OFFSET = 0;   // Offset of ptr field
+    constexpr uint64_t LEN_OFFSET = 8;   // Offset of len field
+    constexpr uint64_t STRUCT_SIZE = 16; // sizeof(ptr) + sizeof(len)
+}
+
 class FyraBuiltinFunctions {
 public:
     static void emit_used_builtins(ir::Module* module, 
@@ -55,6 +61,9 @@ public:
     static void emit_tuple_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_dict_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_enum_ir(ir::Module* module, ir::IRBuilder* builder);
+
+    static ir::Value* create_string_header(ir::Module* module, ir::IRBuilder* builder, ir::Value* data_ptr, ir::Value* len_val);
+    static ir::Value* create_string_header(ir::Module* module, ir::IRBuilder* builder, ir::Value* data_ptr, uint64_t len);
 
 private:
     static void emit_assert(ir::Module* module, ir::IRBuilder* builder);
