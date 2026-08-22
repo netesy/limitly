@@ -339,40 +339,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             reg_string_literals[inst.dst] = s;
                             reg_types[inst.dst] = LIR::Type::Ptr;
 
-                            auto i8_ty  = context_->getIntegerType(8);
-
-                            std::vector<ir::Constant*> elems;
-                            auto add_u32 = [&](uint32_t val) {
-                                elems.push_back(context_->getConstantInt(i8_ty, (uint8_t)(val & 0xFF)));
-                                elems.push_back(context_->getConstantInt(i8_ty, (uint8_t)((val >> 8) & 0xFF)));
-                                elems.push_back(context_->getConstantInt(i8_ty, (uint8_t)((val >> 16) & 0xFF)));
-                                elems.push_back(context_->getConstantInt(i8_ty, (uint8_t)((val >> 24) & 0xFF)));
-                            };
-                            auto add_u64 = [&](uint64_t val) {
-                                for (int b = 0; b < 8; ++b) {
-                                    elems.push_back(context_->getConstantInt(i8_ty, (uint8_t)((val >> (b * 8)) & 0xFF)));
-                                }
-                            };
-
-                            add_u32(11); // TYPE_STRING
-                            add_u32(0);  // metadata
-                            add_u64(s_len);
-                            add_u64(s_len);
-
-                            for (size_t i = 0; i <= s_len; ++i) {
-                                elems.push_back(context_->getConstantInt(i8_ty, (uint8_t)s[i]));
-                            }
-
-                            auto arr_ty = context_->getArrayType(i8_ty, elems.size());
-                            ir::Value* arr_const = context_->getConstantArray(arr_ty, elems);
-                            std::string name = "str_hdr_" + std::to_string(label_counter_++);
-                            auto gv = std::make_unique<ir::GlobalVariable>(
-                                context_->getPointerType(i8_ty),
-                                name, static_cast<ir::Constant*>(arr_const), false, ".data"
+                            std::string gv_name = "str_data_" + std::to_string(label_counter_++);
+                            ir::GlobalVariable* gv_bytes = FyraBuiltinFunctions::get_or_create_global_str(
+                                current_module_.get(), builder_.get(), gv_name, s
                             );
-                            ir::Value* raw_str_ptr = gv.get();
-                            current_module_->addGlobalVariable(std::move(gv));
-                            store_reg(inst.dst, raw_str_ptr, LIR::Type::Ptr);
+                            ir::Value* str_hdr = FyraBuiltinFunctions::create_string_header(
+                                current_module_.get(), builder_.get(), gv_bytes, s_len
+                            );
+                            store_reg(inst.dst, str_hdr, LIR::Type::Ptr);
                         } else if (box->type == LM_BOX_INT) {
                             uint64_t actual_val = (inst.result_type == LIR::Type::I64) ? box->value.as_int : BOX_INT(box->value.as_int);
                             if (inst.result_type == LIR::Type::I64) reg_int_values[inst.dst] = box->value.as_int;
@@ -596,7 +570,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
                             builder_->createExternCall("io.write", {
                                 context_->getConstantInt(context_->getIntegerType(64), 1),
-                                builder_->createAdd(gv_sp, context_->getConstantInt(context_->getIntegerType(64), 24)), // DATA_OFFSET from StringABI
+                                gv_sp,
                                 context_->getConstantInt(context_->getIntegerType(64), 1)
                             }, context_->getIntegerType(64));
                         }
@@ -634,9 +608,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         } else if (arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
                             uint32_t arg_reg = (ai < inst.call_args.size()) ? inst.call_args[ai] : UINT32_MAX;
                             if (reg_float_values.count(arg_reg)) {
+                                std::string float_str = format_float_literal(reg_float_values[arg_reg]);
                                 std::string fname = "float_const_" + std::to_string(label_counter_++);
-                                ir::GlobalVariable* gv_float = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), fname, format_float_literal(reg_float_values[arg_reg]));
-                                FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), gv_float);
+                                ir::GlobalVariable* gv_float = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), fname, float_str);
+                                ir::Value* str_hdr = FyraBuiltinFunctions::create_string_header(current_module_.get(), builder_.get(), gv_float, float_str.length());
+                                FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), str_hdr);
                             } else {
                                 FyraBuiltinFunctions::emit_print_float_inline(current_module_.get(), builder_.get(), args[ai]);
                             }
@@ -649,7 +625,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
                     builder_->createExternCall("io.write", {
                         context_->getConstantInt(context_->getIntegerType(64), 1),
-                        builder_->createAdd(gv_nl, context_->getConstantInt(context_->getIntegerType(64), 24)), // DATA_OFFSET from StringABI
+                        gv_nl,
                         context_->getConstantInt(context_->getIntegerType(64), 1)
                     }, context_->getIntegerType(64));
 
@@ -718,7 +694,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
                             builder_->createExternCall("io.write", {
                                 context_->getConstantInt(context_->getIntegerType(64), 1),
-                                builder_->createAdd(gv_sp, context_->getConstantInt(context_->getIntegerType(64), 24)), // DATA_OFFSET from StringABI
+                                gv_sp,
                                 context_->getConstantInt(context_->getIntegerType(64), 1)
                             }, context_->getIntegerType(64));
                         }
@@ -771,7 +747,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
                     builder_->createExternCall("io.write", {
                         context_->getConstantInt(context_->getIntegerType(64), 1),
-                        builder_->createAdd(gv_nl, context_->getConstantInt(context_->getIntegerType(64), 24)), // DATA_OFFSET from StringABI
+                        gv_nl,
                         context_->getConstantInt(context_->getIntegerType(64), 1)
                     }, context_->getIntegerType(64));
 
@@ -792,7 +768,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         ir::GlobalVariable* gv_fail = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "assert_msg", "Assertion failed\n");
                         builder_->createExternCall("io.write", {
                             context_->getConstantInt(context_->getIntegerType(64), 1),
-                            builder_->createAdd(gv_fail, context_->getConstantInt(context_->getIntegerType(64), 24)), // DATA_OFFSET from StringABI
+                            gv_fail,
                             context_->getConstantInt(context_->getIntegerType(64), 16)
                         }, context_->getIntegerType(64));
                     }
@@ -887,7 +863,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     if (pos != std::string::npos) fmt.replace(pos, 2, formatted_value);
                     std::string fname = "str_format_const_" + std::to_string(label_counter_++);
                     ir::GlobalVariable* gv_formatted = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), fname, fmt);
-                    store_reg(inst.dst, gv_formatted, LIR::Type::Ptr);
+                    ir::Value* str_hdr = FyraBuiltinFunctions::create_string_header(current_module_.get(), builder_.get(), gv_formatted, fmt.length());
+                    store_reg(inst.dst, str_hdr, LIR::Type::Ptr);
                 } else {
                     if (inst.type_b == LIR::Type::Bool || (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Bool)) {
                         value_arg = FyraBuiltinFunctions::emit_bool_to_str_inline(current_module_.get(), builder_.get(), value_arg);

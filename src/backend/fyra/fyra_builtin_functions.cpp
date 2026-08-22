@@ -12,16 +12,7 @@
 
 namespace LM::Backend::Fyra {
 
-// ============================================================================
-// Fyra-Native String Representation
-// ============================================================================
-// Fyra strings use a simple struct layout: { ptr: i8*, len: i64 }
-// This replaces the VM's LmStringHeader with a Fyra-native representation
-namespace FyraString {
-    constexpr uint64_t PTR_OFFSET = 0;   // Offset of ptr field
-    constexpr uint64_t LEN_OFFSET = 8;   // Offset of len field
-    constexpr uint64_t STRUCT_SIZE = 16; // sizeof(ptr) + sizeof(len)
-}
+// FyraString is defined in fyra_builtin_functions.hh
 
 // ============================================================================
 // Legacy VM String ABI (being phased out)
@@ -101,6 +92,24 @@ void FyraBuiltinFunctions::emit_used_builtins(ir::Module* module,
     if (needs_dict)  emit_dict_ir(module, builder);
     if (needs_enum)  emit_enum_ir(module, builder);
     if (needs_math)  decl_runtime_math(module, builder);
+}
+
+// ---------------------------------------------------------------------------
+// Helper: create a 16-byte FyraString struct header { ptr: i8*, len: i64 } on heap
+// ---------------------------------------------------------------------------
+ir::Value* FyraBuiltinFunctions::create_string_header(ir::Module* module, ir::IRBuilder* builder, ir::Value* data_ptr, ir::Value* len_val) {
+    auto ctx = module->getContextShared();
+    auto i64 = ctx->getIntegerType(64);
+    ir::Instruction* hdr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, FyraString::STRUCT_SIZE)}, ctx->getPointerType(ctx->getIntegerType(8)));
+    builder->createStore(data_ptr, hdr); // ptr at offset 0
+    builder->createStore(len_val, builder->createAdd(hdr, ctx->getConstantInt(i64, FyraString::LEN_OFFSET))); // len at offset 8
+    return hdr;
+}
+
+ir::Value* FyraBuiltinFunctions::create_string_header(ir::Module* module, ir::IRBuilder* builder, ir::Value* data_ptr, uint64_t len) {
+    auto ctx = module->getContextShared();
+    auto i64 = ctx->getIntegerType(64);
+    return create_string_header(module, builder, data_ptr, ctx->getConstantInt(i64, len));
 }
 
 // ---------------------------------------------------------------------------
