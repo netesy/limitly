@@ -11,6 +11,12 @@
 
 namespace LM::Backend::Fyra {
 
+// Canonical Limitly LmStringHeader Memory Layout
+constexpr uint64_t LM_STRING_HEADER_LEN_OFFSET = 8;
+constexpr uint64_t LM_STRING_HEADER_CAP_OFFSET = 16;
+constexpr uint64_t LM_STRING_HEADER_PAYLOAD_OFFSET = 24;
+constexpr uint32_t LM_STRING_TYPE_ID = 11;
+
 class FyraBuiltinFunctions {
 public:
     static void emit_used_builtins(ir::Module* module, 

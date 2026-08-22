@@ -2142,8 +2142,8 @@ void FyraBuiltinFunctions::emit_substring_ir(ir::Module* module, ir::IRBuilder* 
         builder->setInsertPoint(b_alloc_sub);
         ir::Value* sub_len = builder->createLoad(len_slot);
         ir::Value* new_hdr = builder->createCall(alloc_fn, {sub_len});
-        ir::Value* src_data = builder->createAdd(str_ptr, ctx->getConstantInt(i64, 24));
-        ir::Value* dst_data = builder->createAdd(new_hdr, ctx->getConstantInt(i64, 24));
+        ir::Value* src_data = builder->createAdd(str_ptr, ctx->getConstantInt(i64, LM_STRING_HEADER_PAYLOAD_OFFSET));
+        ir::Value* dst_data = builder->createAdd(new_hdr, ctx->getConstantInt(i64, LM_STRING_HEADER_PAYLOAD_OFFSET));
 
         ir::Instruction* i_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
         builder->createStore(zero, i_slot);
@@ -2168,7 +2168,7 @@ void FyraBuiltinFunctions::emit_substring_ir(ir::Module* module, ir::IRBuilder* 
 
         builder->setInsertPoint(b_done);
         builder->createStoreb(ctx->getConstantInt(ctx->getIntegerType(8), 0), builder->createAdd(dst_data, sub_len));
-        builder->createStore(sub_len, builder->createAdd(new_hdr, ctx->getConstantInt(i64, 8))); // update len
+        builder->createStore(sub_len, builder->createAdd(new_hdr, ctx->getConstantInt(i64, LM_STRING_HEADER_LEN_OFFSET))); // update len
         builder->createRet(new_hdr);
     };
 
@@ -2192,7 +2192,7 @@ void FyraBuiltinFunctions::emit_string_byte_len_ir(ir::Module* module, ir::IRBui
     builder->setInsertPoint(b_entry);
     ir::Value* str_ptr = fn->getParameters().front().get();
 
-    ir::Value* raw_len = builder->createLoad(builder->createAdd(str_ptr, ctx->getConstantInt(i64, 8)));
+    ir::Value* raw_len = builder->createLoad(builder->createAdd(str_ptr, ctx->getConstantInt(i64, LM_STRING_HEADER_LEN_OFFSET)));
     builder->createRet(raw_len);
 
     if (old_bb) builder->setInsertPoint(old_bb);
@@ -2215,7 +2215,7 @@ void FyraBuiltinFunctions::emit_string_byte_at_ir(ir::Module* module, ir::IRBuil
     ir::Value* raw_idx = it->get();
 
     ir::Value* idx = unbox_i64(builder, ctx, raw_idx);
-    ir::Value* data_ptr = builder->createAdd(str_ptr, ctx->getConstantInt(i64, 24));
+    ir::Value* data_ptr = builder->createAdd(str_ptr, ctx->getConstantInt(i64, LM_STRING_HEADER_PAYLOAD_OFFSET));
     ir::Value* ch = builder->createLoadub(builder->createAdd(data_ptr, idx));
     ir::Value* raw_ch = builder->createCast(ch, i64);
     builder->createRet(raw_ch);
@@ -2248,7 +2248,7 @@ void FyraBuiltinFunctions::emit_string_decode_next_ir(ir::Module* module, ir::IR
     ir::Value* raw_off = it->get();
 
     ir::Value* offset  = unbox_i64(builder, ctx, raw_off);
-    ir::Value* data_ptr = builder->createAdd(str_ptr, ctx->getConstantInt(i64, 24));
+    ir::Value* data_ptr = builder->createAdd(str_ptr, ctx->getConstantInt(i64, LM_STRING_HEADER_PAYLOAD_OFFSET));
     ir::Instruction* res_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
     builder->createStore(ctx->getConstantInt(i64, 0), res_slot);
 
