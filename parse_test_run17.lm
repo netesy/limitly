@@ -1,0 +1,5 @@
+fn main(): int {
+    var list = 5;
+    print("list = ", list);
+    return 0;
+}
