@@ -596,7 +596,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
                             builder_->createExternCall("io.write", {
                                 context_->getConstantInt(context_->getIntegerType(64), 1),
-                                builder_->createAdd(gv_sp, context_->getConstantInt(context_->getIntegerType(64), 24)),
+                                builder_->createAdd(gv_sp, context_->getConstantInt(context_->getIntegerType(64), 24)), // DATA_OFFSET from StringABI
                                 context_->getConstantInt(context_->getIntegerType(64), 1)
                             }, context_->getIntegerType(64));
                         }
@@ -649,7 +649,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
                     builder_->createExternCall("io.write", {
                         context_->getConstantInt(context_->getIntegerType(64), 1),
-                        builder_->createAdd(gv_nl, context_->getConstantInt(context_->getIntegerType(64), 24)),
+                        builder_->createAdd(gv_nl, context_->getConstantInt(context_->getIntegerType(64), 24)), // DATA_OFFSET from StringABI
                         context_->getConstantInt(context_->getIntegerType(64), 1)
                     }, context_->getIntegerType(64));
 
@@ -718,7 +718,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
                             builder_->createExternCall("io.write", {
                                 context_->getConstantInt(context_->getIntegerType(64), 1),
-                                builder_->createAdd(gv_sp, context_->getConstantInt(context_->getIntegerType(64), 24)),
+                                builder_->createAdd(gv_sp, context_->getConstantInt(context_->getIntegerType(64), 24)), // DATA_OFFSET from StringABI
                                 context_->getConstantInt(context_->getIntegerType(64), 1)
                             }, context_->getIntegerType(64));
                         }
@@ -771,7 +771,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
                     builder_->createExternCall("io.write", {
                         context_->getConstantInt(context_->getIntegerType(64), 1),
-                        builder_->createAdd(gv_nl, context_->getConstantInt(context_->getIntegerType(64), 24)),
+                        builder_->createAdd(gv_nl, context_->getConstantInt(context_->getIntegerType(64), 24)), // DATA_OFFSET from StringABI
                         context_->getConstantInt(context_->getIntegerType(64), 1)
                     }, context_->getIntegerType(64));
 
@@ -792,8 +792,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         ir::GlobalVariable* gv_fail = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "assert_msg", "Assertion failed\n");
                         builder_->createExternCall("io.write", {
                             context_->getConstantInt(context_->getIntegerType(64), 1),
-                            builder_->createAdd(gv_fail, context_->getConstantInt(context_->getIntegerType(64), 24)),
-                            context_->getConstantInt(context_->getIntegerType(64), 17)
+                            builder_->createAdd(gv_fail, context_->getConstantInt(context_->getIntegerType(64), 24)), // DATA_OFFSET from StringABI
+                            context_->getConstantInt(context_->getIntegerType(64), 16)
                         }, context_->getIntegerType(64));
                     }
                     builder_->createExternCall("process.exit", {
