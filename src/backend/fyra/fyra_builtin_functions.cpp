@@ -396,12 +396,52 @@ ir::Value* FyraBuiltinFunctions::emit_decimal_to_str_inline(ir::Module* module,
     builder->createStore(str_len, builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET))); // len
     builder->createStore(str_len, builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::CAP_OFFSET))); // cap
     
-    // Use Fyra-native blit to move characters to start of payload (including null terminator)
-    builder->createBlit(
-        builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET)),
-        str_start,
-        builder->createAdd(str_len, ctx->getConstantInt(i64, 1))
-    );
+    ir::Value* dst_start_d = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+    ir::Instruction* copy_idx_d = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx_d);
+    ir::Value* copy_len_d = builder->createAdd(str_len, ctx->getConstantInt(i64, 1));
+
+    ir::BasicBlock* b_copy_loop_d = builder->createBasicBlock("d2s_copy_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_body_d = builder->createBasicBlock("d2s_copy_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_done_d = builder->createBasicBlock("d2s_copy_done_" + s_uid, cur_fn);
+
+    builder->createJmp(b_copy_loop_d);
+
+    builder->setInsertPoint(b_copy_loop_d);
+    ir::Value* c_i_d = builder->createLoad(copy_idx_d);
+    ir::Value* c_cond_d = builder->createCslt(c_i_d, copy_len_d);
+    builder->createBr(c_cond_d, b_copy_body_d, b_copy_done_d);
+
+    builder->setInsertPoint(b_copy_body_d);
+    ir::Value* ch_d = builder->createLoadub(builder->createAdd(str_start, c_i_d));
+    builder->createStoreb(ch_d, builder->createAdd(dst_start_d, c_i_d));
+    builder->createStore(builder->createAdd(c_i_d, ctx->getConstantInt(i64, 1)), copy_idx_d);
+    builder->createJmp(b_copy_loop_d);
+
+    builder->setInsertPoint(b_copy_done_d);
+    ir::Value* dst_start = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+    ir::Instruction* copy_idx = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx);
+    ir::Value* copy_len = builder->createAdd(str_len, ctx->getConstantInt(i64, 1));
+
+    ir::BasicBlock* b_copy_loop = builder->createBasicBlock("i2s_copy_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_body = builder->createBasicBlock("i2s_copy_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_done = builder->createBasicBlock("i2s_copy_done_" + s_uid, cur_fn);
+
+    builder->createJmp(b_copy_loop);
+
+    builder->setInsertPoint(b_copy_loop);
+    ir::Value* c_i = builder->createLoad(copy_idx);
+    ir::Value* c_cond = builder->createCslt(c_i, copy_len);
+    builder->createBr(c_cond, b_copy_body, b_copy_done);
+
+    builder->setInsertPoint(b_copy_body);
+    ir::Value* ch_i = builder->createLoadub(builder->createAdd(str_start, c_i));
+    builder->createStoreb(ch_i, builder->createAdd(dst_start, c_i));
+    builder->createStore(builder->createAdd(c_i, ctx->getConstantInt(i64, 1)), copy_idx);
+    builder->createJmp(b_copy_loop);
+
+    builder->setInsertPoint(b_copy_done);
 
     return buf_ptr;
 }
@@ -487,12 +527,52 @@ ir::Value* FyraBuiltinFunctions::emit_int_to_str_inline(ir::Module* module,
     builder->createStore(str_len, builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET))); // len
     builder->createStore(str_len, builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::CAP_OFFSET))); // cap
     
-    // Use Fyra-native blit to move characters to start of payload (including null terminator)
-    builder->createBlit(
-        builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET)),
-        str_start,
-        builder->createAdd(str_len, ctx->getConstantInt(i64, 1))
-    );
+    ir::Value* dst_start_d = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+    ir::Instruction* copy_idx_d = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx_d);
+    ir::Value* copy_len_d = builder->createAdd(str_len, ctx->getConstantInt(i64, 1));
+
+    ir::BasicBlock* b_copy_loop_d = builder->createBasicBlock("d2s_copy_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_body_d = builder->createBasicBlock("d2s_copy_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_done_d = builder->createBasicBlock("d2s_copy_done_" + s_uid, cur_fn);
+
+    builder->createJmp(b_copy_loop_d);
+
+    builder->setInsertPoint(b_copy_loop_d);
+    ir::Value* c_i_d = builder->createLoad(copy_idx_d);
+    ir::Value* c_cond_d = builder->createCslt(c_i_d, copy_len_d);
+    builder->createBr(c_cond_d, b_copy_body_d, b_copy_done_d);
+
+    builder->setInsertPoint(b_copy_body_d);
+    ir::Value* ch_d = builder->createLoadub(builder->createAdd(str_start, c_i_d));
+    builder->createStoreb(ch_d, builder->createAdd(dst_start_d, c_i_d));
+    builder->createStore(builder->createAdd(c_i_d, ctx->getConstantInt(i64, 1)), copy_idx_d);
+    builder->createJmp(b_copy_loop_d);
+
+    builder->setInsertPoint(b_copy_done_d);
+    ir::Value* dst_start = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+    ir::Instruction* copy_idx = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx);
+    ir::Value* copy_len = builder->createAdd(str_len, ctx->getConstantInt(i64, 1));
+
+    ir::BasicBlock* b_copy_loop = builder->createBasicBlock("i2s_copy_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_body = builder->createBasicBlock("i2s_copy_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_done = builder->createBasicBlock("i2s_copy_done_" + s_uid, cur_fn);
+
+    builder->createJmp(b_copy_loop);
+
+    builder->setInsertPoint(b_copy_loop);
+    ir::Value* c_i = builder->createLoad(copy_idx);
+    ir::Value* c_cond = builder->createCslt(c_i, copy_len);
+    builder->createBr(c_cond, b_copy_body, b_copy_done);
+
+    builder->setInsertPoint(b_copy_body);
+    ir::Value* ch_i = builder->createLoadub(builder->createAdd(str_start, c_i));
+    builder->createStoreb(ch_i, builder->createAdd(dst_start, c_i));
+    builder->createStore(builder->createAdd(c_i, ctx->getConstantInt(i64, 1)), copy_idx);
+    builder->createJmp(b_copy_loop);
+
+    builder->setInsertPoint(b_copy_done);
 
     return buf_ptr;
 }
@@ -513,28 +593,44 @@ ir::Value* FyraBuiltinFunctions::emit_float_to_str_inline(ir::Module* module,
                                                        ir::Value* val) {
     auto ctx = module->getContextShared();
     auto i64 = ctx->getIntegerType(64);
-    auto i32 = ctx->getIntegerType(32);
     
-    // Allocate 64 bytes total (HEADER_SIZE + 40 byte string payload)
-    ir::Instruction* buf_ptr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 64)}, i64);
-    builder->createStore(ctx->getConstantInt(i32, StringABI::TYPE_ID), buf_ptr); // type_id
+    ir::Instruction* cstr = builder->createExternCall("lm_float_to_str", {val}, ctx->getPointerType(ctx->getIntegerType(8)));
+    ir::Instruction* slen = builder->createExternCall("strlen", {cstr}, i64);
 
-    ir::GlobalVariable* fmt_gv = get_or_create_global_str(module, builder, "fmt_float", "%g");
-    ir::Value* str_payload_ptr = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
-    
-    // snprintf(buf_ptr + DATA_OFFSET, 40, "%g", val)
-    // NOTE: This uses external snprintf - requires native implementation per task requirements
-    ir::Instruction* len_val = builder->createExternCall("snprintf", {
-        str_payload_ptr,
-        ctx->getConstantInt(i64, 40),
-        builder->createAdd(fmt_gv, ctx->getConstantInt(i64, StringABI::DATA_OFFSET)), // Use the payload of the global string
-        val
-    }, i64);
+    emit_str_alloc_ir(module, builder);
+    ir::Function* alloc_fn = module->getFunction("lm_str_alloc");
+    ir::Value* new_hdr = builder->createCall(alloc_fn, {slen});
+    ir::Value* dst_data = builder->createAdd(new_hdr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
 
-    builder->createStore(len_val, builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET))); // len
-    builder->createStore(len_val, builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::CAP_OFFSET))); // cap
+    ir::Instruction* copy_idx = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx);
+    ir::Value* copy_len = builder->createAdd(slen, ctx->getConstantInt(i64, 1));
 
-    return buf_ptr;
+    ir::Function* cur_fn = builder->getInsertPoint()->getParent();
+    static int f2s_cnt = 0;
+    std::string s_uid = std::to_string(++f2s_cnt);
+
+    ir::BasicBlock* b_copy_loop = builder->createBasicBlock("f2s_copy_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_body = builder->createBasicBlock("f2s_copy_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_done = builder->createBasicBlock("f2s_copy_done_" + s_uid, cur_fn);
+
+    builder->createJmp(b_copy_loop);
+
+    builder->setInsertPoint(b_copy_loop);
+    ir::Value* c_i = builder->createLoad(copy_idx);
+    ir::Value* c_cond = builder->createCslt(c_i, copy_len);
+    builder->createBr(c_cond, b_copy_body, b_copy_done);
+
+    builder->setInsertPoint(b_copy_body);
+    ir::Value* ch = builder->createLoadub(builder->createAdd(cstr, c_i));
+    builder->createStoreb(ch, builder->createAdd(dst_data, c_i));
+    builder->createStore(builder->createAdd(c_i, ctx->getConstantInt(i64, 1)), copy_idx);
+    builder->createJmp(b_copy_loop);
+
+    builder->setInsertPoint(b_copy_done);
+    builder->createExternCall("free", {cstr}, ctx->getVoidType());
+
+    return new_hdr;
 }
 
 ir::Value* FyraBuiltinFunctions::emit_bool_to_str_inline(ir::Module* module,
@@ -1009,11 +1105,19 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         builder->createBr(ptr_eq, b_ret_true, b_ptrcmp);
 
         builder->setInsertPoint(b_ptrcmp);
-        ir::Value* k1_small = builder->createCult(k1, ctx->getConstantInt(i64, 65536));
-        ir::Value* k2_small = builder->createCult(k2, ctx->getConstantInt(i64, 65536));
-        ir::Value* either_small = builder->createOr(k1_small, k2_small);
+        ir::Value* k1_ge = builder->createCuge(k1, ctx->getConstantInt(i64, 65536));
+        ir::Value* k1_hi = builder->createShr(k1, ctx->getConstantInt(i64, 48));
+        ir::Value* k1_hi_z = builder->createCeq(k1_hi, ctx->getConstantInt(i64, 0));
+        ir::Value* is_ptr1 = builder->createAnd(k1_ge, k1_hi_z);
+
+        ir::Value* k2_ge = builder->createCuge(k2, ctx->getConstantInt(i64, 65536));
+        ir::Value* k2_hi = builder->createShr(k2, ctx->getConstantInt(i64, 48));
+        ir::Value* k2_hi_z = builder->createCeq(k2_hi, ctx->getConstantInt(i64, 0));
+        ir::Value* is_ptr2 = builder->createAnd(k2_ge, k2_hi_z);
+
+        ir::Value* both_ptr = builder->createAnd(is_ptr1, is_ptr2);
         ir::BasicBlock* b_chk_enum = builder->createBasicBlock("chk_enum", fn_eq);
-        builder->createBr(either_small, b_ret_false, b_chk_enum);
+        builder->createBr(both_ptr, b_chk_enum, b_ret_false);
 
         builder->setInsertPoint(b_chk_enum);
         ir::Value* t1_raw = builder->createLoad(k1);
@@ -1650,10 +1754,48 @@ void FyraBuiltinFunctions::emit_str_concat_ir(ir::Module* module, ir::IRBuilder*
     ir::Value* s1_data = builder->createAdd(s1, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
     ir::Value* s2_data = builder->createAdd(s2, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
 
-    // Use Fyra-native blit instead of memcpy
-    builder->createBlit(out_data, s1_data, len1);
-    builder->createBlit(builder->createAdd(out_data, len1), s2_data, len2);
-    builder->createStoreb(ctx->getConstantInt(ctx->getIntegerType(8), 0), builder->createAdd(out_data, final_len)); // null terminator
+    ir::Instruction* ci = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), ci);
+
+    ir::BasicBlock* b_c1_loop = builder->createBasicBlock("concat_c1_loop", fn);
+    ir::BasicBlock* b_c1_body = builder->createBasicBlock("concat_c1_body", fn);
+    ir::BasicBlock* b_c1_done = builder->createBasicBlock("concat_c1_done", fn);
+
+    builder->createJmp(b_c1_loop);
+
+    builder->setInsertPoint(b_c1_loop);
+    ir::Value* idx1 = builder->createLoad(ci);
+    ir::Value* cond1 = builder->createCslt(idx1, len1);
+    builder->createBr(cond1, b_c1_body, b_c1_done);
+
+    builder->setInsertPoint(b_c1_body);
+    ir::Value* ch1 = builder->createLoadub(builder->createAdd(s1_data, idx1));
+    builder->createStoreb(ch1, builder->createAdd(out_data, idx1));
+    builder->createStore(builder->createAdd(idx1, ctx->getConstantInt(i64, 1)), ci);
+    builder->createJmp(b_c1_loop);
+
+    builder->setInsertPoint(b_c1_done);
+    builder->createStore(ctx->getConstantInt(i64, 0), ci);
+
+    ir::BasicBlock* b_c2_loop = builder->createBasicBlock("concat_c2_loop", fn);
+    ir::BasicBlock* b_c2_body = builder->createBasicBlock("concat_c2_body", fn);
+    ir::BasicBlock* b_c2_done = builder->createBasicBlock("concat_c2_done", fn);
+
+    builder->createJmp(b_c2_loop);
+
+    builder->setInsertPoint(b_c2_loop);
+    ir::Value* idx2 = builder->createLoad(ci);
+    ir::Value* cond2 = builder->createCslt(idx2, len2);
+    builder->createBr(cond2, b_c2_body, b_c2_done);
+
+    builder->setInsertPoint(b_c2_body);
+    ir::Value* ch2 = builder->createLoadub(builder->createAdd(s2_data, idx2));
+    builder->createStoreb(ch2, builder->createAdd(out_data, builder->createAdd(len1, idx2)));
+    builder->createStore(builder->createAdd(idx2, ctx->getConstantInt(i64, 1)), ci);
+    builder->createJmp(b_c2_loop);
+
+    builder->setInsertPoint(b_c2_done);
+    builder->createStoreb(ctx->getConstantInt(ctx->getIntegerType(8), 0), builder->createAdd(out_data, final_len));
     builder->createJmp(b_done);
 
     builder->setInsertPoint(b_done);
