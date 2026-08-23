@@ -2,8 +2,8 @@
 
 ## Summary
 - **Total tests:** 80
-- **Passed:** 21
-- **Failed:** 59 (0 Build Failures, 32 Runtime Failures/Crashes, 26 Output Mismatches, 1 Timeout)
+- **Passed:** 23
+- **Failed:** 57 (0 Build Failures, 32 Runtime Failures/Crashes, 24 Output Mismatches, 1 Timeout)
 
 ---
 
@@ -70,7 +70,7 @@
 18. [ ] `tests/strings/simple_string_test.lm` - Output Mismatch: Basic string format output diff.
 19. [ ] `tests/strings/string_runtime_test.lm` - Output Mismatch: String runtime format output diff.
 20. [ ] `tests/strings/lstring_api_test.lm` - Output Mismatch: Limit string API format output diff.
-21. [ ] `tests/strings/test_string_interpolation.lm` - Output Mismatch: String interpolation format output diff.
+21. [x] `tests/strings/test_string_interpolation.lm` - PASS
 22. [ ] `tests/stdlib/format_module_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in string format helper).
 23. [ ] `tests/stdlib/string_module_test.lm` - Output Mismatch: String module helper function output diff.
 24. [ ] `tests/stdlib/parse_module_test.lm` - Output Mismatch: String parsing helper output diff.
@@ -85,7 +85,7 @@
 27. [ ] `tests/modules/basic_import_test.lm` - Output Mismatch: Imported function call print output diff.
 28. [ ] `tests/modules/alias_import_test.lm` - Output Mismatch: Alias import symbol resolution output diff.
 29. [ ] `tests/modules/comprehensive_module_test.lm` - Output Mismatch: Comprehensive module symbol resolution diff.
-30. [ ] `tests/modules/function_params_test.lm` - Output Mismatch: Module function parameter passing diff.
+30. [x] `tests/modules/function_params_test.lm` - PASS
 31. [ ] `tests/modules/hide_filter_test.lm` - Output Mismatch: Module filter export output diff.
 32. [ ] `tests/modules/module_caching_test.lm` - Output Mismatch: Module caching symbol resolution output diff.
 33. [ ] `tests/modules/multiple_imports_test.lm` - Output Mismatch: Multiple module import symbol resolution output diff.
