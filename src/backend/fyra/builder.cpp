@@ -584,7 +584,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         if (arg_type == LIR::Type::I64 && (inst.call_arg_types.size() > ai && inst.call_arg_types[ai] == LIR::Type::Bool)) {
                             arg_type = LIR::Type::Bool;
                         }
-                        std::string prid = std::to_string(ai) + "_" + std::to_string(rand() % 100000);
+                        std::string prid = std::to_string(ai) + "_" + std::to_string(label_counter_++);
                         ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
 
                         if (arg_type == LIR::Type::Ptr || arg_type == LIR::Type::I64) {
@@ -600,11 +600,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             ir::Value* high_zero = builder_->createCeq(high_bits, context_->getConstantInt(context_->getIntegerType(64), 0));
                             ir::Value* is_valid_ptr = builder_->createAnd(is_ge_ptr, high_zero);
 
-                            if (arg_type == LIR::Type::Ptr) {
-                                builder_->createBr(is_valid_ptr, b_pr_ptr, b_pr_int);
-                            } else {
-                                builder_->createBr(is_valid_ptr, b_pr_ptr, b_pr_int);
-                            }
+                            builder_->createBr(is_valid_ptr, b_pr_ptr, b_pr_int);
 
                             // Branch: scalar int
                             builder_->setInsertPoint(b_pr_int);
@@ -764,7 +760,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         if (arg_type == LIR::Type::I64 && (inst.call_arg_types.size() > ai && inst.call_arg_types[ai] == LIR::Type::Bool)) {
                             arg_type = LIR::Type::Bool;
                         }
-                        std::string prid = std::to_string(ai) + "_" + std::to_string(rand() % 100000);
+                        std::string prid = std::to_string(ai) + "_" + std::to_string(label_counter_++);
                         ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
 
                         if (arg_type == LIR::Type::Ptr || arg_type == LIR::Type::I64) {
@@ -789,7 +785,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                             // Branch: pointer candidate
                             builder_->setInsertPoint(b_pr_ptr);
-                            ir::Value* is_nil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
+                            ir::Value* is_zero_nil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), 0));
+                            ir::Value* is_val_nil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
+                            ir::Value* is_nil = builder_->createOr(is_zero_nil, is_val_nil);
                             builder_->createBr(is_nil, b_pr_nil, b_pr_obj);
 
                             builder_->setInsertPoint(b_pr_nil);
