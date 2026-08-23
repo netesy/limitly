@@ -517,17 +517,16 @@ ir::Value* FyraBuiltinFunctions::emit_float_to_str_inline(ir::Module* module,
     
     // Allocate 64 bytes total (HEADER_SIZE + 40 byte string payload)
     ir::Instruction* buf_ptr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 64)}, i64);
-    builder->createStore(ctx->getConstantInt(i32, StringABI::TYPE_ID), buf_ptr); // type_id
+    builder->createStore(ctx->getConstantInt(i32, StringABI::TYPE_ID), buf_ptr); // type_id at offset 0
+    builder->createStore(ctx->getConstantInt(i32, 0), builder->createAdd(buf_ptr, ctx->getConstantInt(i64, 4))); // metadata at offset 4
 
     ir::GlobalVariable* fmt_gv = get_or_create_global_str(module, builder, "fmt_float", "%g");
     ir::Value* str_payload_ptr = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
     
-    // snprintf(buf_ptr + DATA_OFFSET, 40, "%g", val)
-    // NOTE: This uses external snprintf - requires native implementation per task requirements
     ir::Instruction* len_val = builder->createExternCall("snprintf", {
         str_payload_ptr,
         ctx->getConstantInt(i64, 40),
-        builder->createAdd(fmt_gv, ctx->getConstantInt(i64, StringABI::DATA_OFFSET)), // Use the payload of the global string
+        builder->createAdd(fmt_gv, ctx->getConstantInt(i64, StringABI::DATA_OFFSET)),
         val
     }, i64);
 

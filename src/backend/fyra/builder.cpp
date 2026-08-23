@@ -73,10 +73,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         builder_->createFunction(ir_name, ret_type, param_types);
     }
 
-    // 2. Build the top-level main function body
-    build_function_body(main_fn, lir_func);
-
-    // 3. Build the bodies of all other registered functions
+    // 2. Build the bodies of all other registered functions first
     for (const auto& func_name : registry.getFunctionNames()) {
         if (func_name == lir_func.name) continue;
         if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) continue;
@@ -93,6 +90,9 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             build_function_body(fn, *f);
         }
     }
+
+    // 3. Build the top-level main function body
+    build_function_body(main_fn, lir_func);
 
     FyraBuiltinFunctions::emit_used_builtins(current_module_.get(), builder_.get(), used_builtins_);
     return current_module_;
@@ -964,11 +964,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (has_formatted_value) {
                     std::string fmt = reg_string_literals.count(inst.a) ? reg_string_literals[inst.a] : "%s";
                     size_t pos = fmt.find("%s");
+                    if (pos == std::string::npos) pos = fmt.find("{}");
                     if (pos != std::string::npos) fmt.replace(pos, 2, formatted_value);
                     std::string fname = "str_format_const_" + std::to_string(label_counter_++);
                     ir::GlobalVariable* gv_formatted = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), fname, fmt);
-                    ir::Value* str_hdr = FyraBuiltinFunctions::create_string_header(current_module_.get(), builder_.get(), gv_formatted, fmt.length());
-                    store_reg(inst.dst, str_hdr, LIR::Type::Ptr);
+                    store_reg(inst.dst, gv_formatted, LIR::Type::Ptr);
                 } else {
                     if (inst.type_b == LIR::Type::Bool || (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Bool)) {
                         value_arg = FyraBuiltinFunctions::emit_bool_to_str_inline(current_module_.get(), builder_.get(), value_arg);

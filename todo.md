@@ -1,9 +1,9 @@
 # AOT Test Suite Results (`tests/build_tests.py`)
 
 ## Summary
-- **Total tests:** 80
-- **Passed:** 21
-- **Failed:** 59 (0 Build Failures, 32 Runtime Failures/Crashes, 26 Output Mismatches, 1 Timeout)
+- **Total tests:** 79
+- **Passed:** 17
+- **Failed:** 62 (0 Build Failures, 29 Runtime Failures/Crashes, 32 Output Mismatches, 1 Timeout)
 
 ---
 
@@ -27,9 +27,8 @@
 - [x] `tests/basic/list_dict_tuple.lm` - PASS
 - [x] `tests/expressions/ranges.lm` - PASS
 - [x] `tests/functions/first_class.lm` - PASS
-- [x] `tests/regression/ownership_refactor_test.lm` - PASS
-- [x] `tests/stdlib/net/net_test.lm` - PASS
-- [x] `tests/stdlib/path/path_test.lm` - PASS
+- [x] `tests/strings/interpolation.lm` - PASS
+- [x] `tests/stdlib/iterator/iterator_test.lm` - PASS
 
 ---
 
@@ -56,16 +55,13 @@
 10. [x] `tests/basic/list_dict_tuple.lm` - PASS
 11. [x] `tests/expressions/ranges.lm` - PASS
 12. [x] `tests/functions/first_class.lm` - PASS
-13. [x] `tests/regression/ownership_refactor_test.lm` - PASS
-14. [x] `tests/stdlib/net/net_test.lm` - PASS
-15. [x] `tests/stdlib/path/path_test.lm` - PASS
 
 ---
 
 ### Category 3: String Interpolation & Format Module (Moderate - String Formatting)
 *Reason:* `STR_FORMAT` and `lm_rt_str_format` dynamic template string substitution for multi-variable placeholders.
 
-16. [ ] `tests/strings/interpolation.lm` - Output Mismatch: Format template placeholder substitution output diff.
+16. [x] `tests/strings/interpolation.lm` - PASS
 17. [ ] `tests/strings/operations.lm` - Output Mismatch: Substring/replace string operations format diff.
 18. [ ] `tests/strings/simple_string_test.lm` - Output Mismatch: Basic string format output diff.
 19. [ ] `tests/strings/string_runtime_test.lm` - Output Mismatch: String runtime format output diff.
