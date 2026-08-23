@@ -354,7 +354,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             store_reg(inst.dst, c, inst.result_type);
                         } else if (box->type == LM_BOX_FLOAT) {
                             double fval = box->value.as_float;
-                            ir::Value* c = context_->getConstantFP(context_->getDoubleType(), fval);
+                            uint64_t float_bits;
+                            memcpy(&float_bits, &fval, sizeof(double));
+                            ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), float_bits);
                             reg_types[inst.dst] = LIR::Type::F64;
                             reg_float_values[inst.dst] = fval;
                             store_reg(inst.dst, c, LIR::Type::F64);
@@ -367,7 +369,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         }
                     } else if (h->type_id == TYPE_FLOAT) {
                         double fval = ((ObjFloat*)h)->value;
-                        ir::Value* c = context_->getConstantFP(context_->getDoubleType(), fval);
+                        uint64_t float_bits;
+                        memcpy(&float_bits, &fval, sizeof(double));
+                        ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), float_bits);
                         reg_types[inst.dst] = LIR::Type::F64;
                         reg_float_values[inst.dst] = fval;
                         store_reg(inst.dst, c, LIR::Type::F64);
@@ -944,39 +948,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (!fn) fn = builder_->createFunction("lm_rt_str_format", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
                 ir::Value* fmt_arg = load_reg(inst.a, inst.type_a);
                 ir::Value* value_arg = load_reg(inst.b, inst.type_b);
-                std::string formatted_value;
-                bool has_formatted_value = false;
-                if (reg_decimal_scales.count(inst.b) && reg_decimal_scales[inst.b] > 0 && reg_int_values.count(inst.b)) {
-                    int scale = reg_decimal_scales[inst.b];
-                    int64_t raw = reg_int_values[inst.b];
-                    bool neg = raw < 0;
-                    if (neg) raw = -raw;
-                    int64_t divisor = pow10_i64(scale);
-                    std::ostringstream oss;
-                    if (neg) oss << '-';
-                    oss << (raw / divisor) << '.' << std::setw(scale) << std::setfill('0') << (raw % divisor);
-                    formatted_value = oss.str();
-                    has_formatted_value = true;
-                } else if (reg_float_values.count(inst.b)) {
-                    formatted_value = format_float_literal(reg_float_values[inst.b]);
-                    has_formatted_value = true;
+                if (inst.type_b == LIR::Type::Bool || (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Bool)) {
+                    value_arg = FyraBuiltinFunctions::emit_bool_to_str_inline(current_module_.get(), builder_.get(), value_arg);
+                } else if (reg_decimal_scales.count(inst.b) && reg_decimal_scales[inst.b] > 0) {
+                    value_arg = FyraBuiltinFunctions::emit_decimal_to_str_inline(current_module_.get(), builder_.get(), value_arg, reg_decimal_scales[inst.b]);
                 }
-                if (has_formatted_value) {
-                    std::string fmt = reg_string_literals.count(inst.a) ? reg_string_literals[inst.a] : "%s";
-                    size_t pos = fmt.find("%s");
-                    if (pos != std::string::npos) fmt.replace(pos, 2, formatted_value);
-                    std::string fname = "str_format_const_" + std::to_string(label_counter_++);
-                    ir::GlobalVariable* gv_formatted = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), fname, fmt);
-                    ir::Value* str_hdr = FyraBuiltinFunctions::create_string_header(current_module_.get(), builder_.get(), gv_formatted, fmt.length());
-                    store_reg(inst.dst, str_hdr, LIR::Type::Ptr);
-                } else {
-                    if (inst.type_b == LIR::Type::Bool || (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Bool)) {
-                        value_arg = FyraBuiltinFunctions::emit_bool_to_str_inline(current_module_.get(), builder_.get(), value_arg);
-                    } else if (reg_decimal_scales.count(inst.b) && reg_decimal_scales[inst.b] > 0) {
-                        value_arg = FyraBuiltinFunctions::emit_decimal_to_str_inline(current_module_.get(), builder_.get(), value_arg, reg_decimal_scales[inst.b]);
-                    }
-                    store_reg(inst.dst, builder_->createCall(fn, {fmt_arg, value_arg}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
-                }
+                store_reg(inst.dst, builder_->createCall(fn, {fmt_arg, value_arg}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::ConstructError: {
