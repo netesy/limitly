@@ -570,7 +570,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
                             builder_->createExternCall("io.write", {
                                 context_->getConstantInt(context_->getIntegerType(64), 1),
-                                gv_sp,
+                                builder_->createAdd(gv_sp, context_->getConstantInt(context_->getIntegerType(64), 24)),
                                 context_->getConstantInt(context_->getIntegerType(64), 1)
                             }, context_->getIntegerType(64));
                         }
@@ -584,22 +584,78 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         if (arg_type == LIR::Type::I64 && (inst.call_arg_types.size() > ai && inst.call_arg_types[ai] == LIR::Type::Bool)) {
                             arg_type = LIR::Type::Bool;
                         }
-                        if (arg_type == LIR::Type::Ptr) {
-                            std::string prid = std::to_string(ai) + "_" + std::to_string(rand() % 10000);
-                            ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                        std::string prid = std::to_string(ai) + "_" + std::to_string(rand() % 100000);
+                        ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+
+                        if (arg_type == LIR::Type::Ptr || arg_type == LIR::Type::I64) {
+                            ir::BasicBlock* b_pr_ptr = builder_->createBasicBlock("pr_ptr_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_int = builder_->createBasicBlock("pr_int_" + prid, cur_fn);
                             ir::BasicBlock* b_pr_nil = builder_->createBasicBlock("pr_nil_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_str = builder_->createBasicBlock("pr_str_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_obj = builder_->createBasicBlock("pr_obj_" + prid, cur_fn);
                             ir::BasicBlock* b_pr_next = builder_->createBasicBlock("pr_next_" + prid, cur_fn);
 
-                            ir::Value* is_nil = builder_->createCeq(args[ai], context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
-                            builder_->createBr(is_nil, b_pr_nil, b_pr_str);
+                            ir::Value* arg_val = args[ai];
+                            ir::Value* is_ge_ptr = builder_->createCuge(arg_val, context_->getConstantInt(context_->getIntegerType(64), 65536));
+                            ir::Value* high_bits = builder_->createShr(arg_val, context_->getConstantInt(context_->getIntegerType(64), 48));
+                            ir::Value* high_zero = builder_->createCeq(high_bits, context_->getConstantInt(context_->getIntegerType(64), 0));
+                            ir::Value* is_valid_ptr = builder_->createAnd(is_ge_ptr, high_zero);
+
+                            if (arg_type == LIR::Type::Ptr) {
+                                builder_->createBr(is_valid_ptr, b_pr_ptr, b_pr_int);
+                            } else {
+                                builder_->createBr(is_valid_ptr, b_pr_ptr, b_pr_int);
+                            }
+
+                            // Branch: scalar int
+                            builder_->setInsertPoint(b_pr_int);
+                            FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg_val);
+                            builder_->createJmp(b_pr_next);
+
+                            // Branch: pointer candidate
+                            builder_->setInsertPoint(b_pr_ptr);
+                            ir::Value* is_zero_nil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), 0));
+                            ir::Value* is_val_nil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
+                            ir::Value* is_nil = builder_->createOr(is_zero_nil, is_val_nil);
+                            builder_->createBr(is_nil, b_pr_nil, b_pr_obj);
 
                             builder_->setInsertPoint(b_pr_nil);
                             FyraBuiltinFunctions::emit_print_nil_inline(current_module_.get(), builder_.get());
                             builder_->createJmp(b_pr_next);
 
+                            builder_->setInsertPoint(b_pr_obj);
+                            ir::Value* magic = builder_->createLoad(arg_val);
+                            ir::Value* type_id = builder_->createAnd(magic, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
+
+                            ir::BasicBlock* b_pr_str = builder_->createBasicBlock("pr_str_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_enum = builder_->createBasicBlock("pr_enum_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_list = builder_->createBasicBlock("pr_list_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_non_str = builder_->createBasicBlock("pr_nonstr_" + prid, cur_fn);
+
+                            ir::Value* is_str = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), 11));
+                            builder_->createBr(is_str, b_pr_str, b_pr_non_str);
+
                             builder_->setInsertPoint(b_pr_str);
-                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), args[ai]);
+                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), arg_val);
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_non_str);
+                            ir::Value* is_enum = builder_->createCeq(magic, context_->getConstantInt(context_->getIntegerType(64), 0x454E554D));
+                            builder_->createBr(is_enum, b_pr_enum, b_pr_list);
+
+                            builder_->setInsertPoint(b_pr_enum);
+                            used_builtins_.insert("lm_enum_new");
+                            FyraBuiltinFunctions::emit_enum_ir(current_module_.get(), builder_.get());
+                            ir::Function* fn_enum_str = current_module_->getFunction("lm_enum_to_str");
+                            ir::Value* enum_s = builder_->createCall(fn_enum_str, {arg_val});
+                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), enum_s);
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_list);
+                            used_builtins_.insert("lm_list_new");
+                            FyraBuiltinFunctions::emit_list_ir(current_module_.get(), builder_.get());
+                            ir::Function* fn_list_str = current_module_->getFunction("lm_list_to_str");
+                            ir::Value* list_s = builder_->createCall(fn_list_str, {arg_val});
+                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), list_s);
                             builder_->createJmp(b_pr_next);
 
                             builder_->setInsertPoint(b_pr_next);
@@ -625,7 +681,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
                     builder_->createExternCall("io.write", {
                         context_->getConstantInt(context_->getIntegerType(64), 1),
-                        gv_nl,
+                        builder_->createAdd(gv_nl, context_->getConstantInt(context_->getIntegerType(64), 24)),
                         context_->getConstantInt(context_->getIntegerType(64), 1)
                     }, context_->getIntegerType(64));
 
@@ -694,7 +750,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
                             builder_->createExternCall("io.write", {
                                 context_->getConstantInt(context_->getIntegerType(64), 1),
-                                gv_sp,
+                                builder_->createAdd(gv_sp, context_->getConstantInt(context_->getIntegerType(64), 24)),
                                 context_->getConstantInt(context_->getIntegerType(64), 1)
                             }, context_->getIntegerType(64));
                         }
@@ -708,22 +764,72 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         if (arg_type == LIR::Type::I64 && (inst.call_arg_types.size() > ai && inst.call_arg_types[ai] == LIR::Type::Bool)) {
                             arg_type = LIR::Type::Bool;
                         }
-                        if (arg_type == LIR::Type::Ptr) {
-                            std::string prid = std::to_string(ai) + "_" + std::to_string(rand() % 10000);
-                            ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                        std::string prid = std::to_string(ai) + "_" + std::to_string(rand() % 100000);
+                        ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+
+                        if (arg_type == LIR::Type::Ptr || arg_type == LIR::Type::I64) {
+                            ir::BasicBlock* b_pr_ptr = builder_->createBasicBlock("pr_ptr_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_int = builder_->createBasicBlock("pr_int_" + prid, cur_fn);
                             ir::BasicBlock* b_pr_nil = builder_->createBasicBlock("pr_nil_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_str = builder_->createBasicBlock("pr_str_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_obj = builder_->createBasicBlock("pr_obj_" + prid, cur_fn);
                             ir::BasicBlock* b_pr_next = builder_->createBasicBlock("pr_next_" + prid, cur_fn);
 
-                            ir::Value* is_nil = builder_->createCeq(args[ai], context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
-                            builder_->createBr(is_nil, b_pr_nil, b_pr_str);
+                            ir::Value* arg_val = args[ai];
+                            ir::Value* is_ge_ptr = builder_->createCuge(arg_val, context_->getConstantInt(context_->getIntegerType(64), 65536));
+                            ir::Value* high_bits = builder_->createShr(arg_val, context_->getConstantInt(context_->getIntegerType(64), 48));
+                            ir::Value* high_zero = builder_->createCeq(high_bits, context_->getConstantInt(context_->getIntegerType(64), 0));
+                            ir::Value* is_valid_ptr = builder_->createAnd(is_ge_ptr, high_zero);
+
+                            builder_->createBr(is_valid_ptr, b_pr_ptr, b_pr_int);
+
+                            // Branch: scalar int
+                            builder_->setInsertPoint(b_pr_int);
+                            FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg_val);
+                            builder_->createJmp(b_pr_next);
+
+                            // Branch: pointer candidate
+                            builder_->setInsertPoint(b_pr_ptr);
+                            ir::Value* is_nil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
+                            builder_->createBr(is_nil, b_pr_nil, b_pr_obj);
 
                             builder_->setInsertPoint(b_pr_nil);
                             FyraBuiltinFunctions::emit_print_nil_inline(current_module_.get(), builder_.get());
                             builder_->createJmp(b_pr_next);
 
+                            builder_->setInsertPoint(b_pr_obj);
+                            ir::Value* magic = builder_->createLoad(arg_val);
+                            ir::Value* type_id = builder_->createAnd(magic, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
+
+                            ir::BasicBlock* b_pr_str = builder_->createBasicBlock("pr_str_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_enum = builder_->createBasicBlock("pr_enum_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_list = builder_->createBasicBlock("pr_list_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_non_str = builder_->createBasicBlock("pr_nonstr_" + prid, cur_fn);
+
+                            ir::Value* is_str = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), 11));
+                            builder_->createBr(is_str, b_pr_str, b_pr_non_str);
+
                             builder_->setInsertPoint(b_pr_str);
-                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), args[ai]);
+                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), arg_val);
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_non_str);
+                            ir::Value* is_enum = builder_->createCeq(magic, context_->getConstantInt(context_->getIntegerType(64), 0x454E554D));
+                            builder_->createBr(is_enum, b_pr_enum, b_pr_list);
+
+                            builder_->setInsertPoint(b_pr_enum);
+                            used_builtins_.insert("lm_enum_new");
+                            FyraBuiltinFunctions::emit_enum_ir(current_module_.get(), builder_.get());
+                            ir::Function* fn_enum_str = current_module_->getFunction("lm_enum_to_str");
+                            ir::Value* enum_s = builder_->createCall(fn_enum_str, {arg_val});
+                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), enum_s);
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_list);
+                            used_builtins_.insert("lm_list_new");
+                            FyraBuiltinFunctions::emit_list_ir(current_module_.get(), builder_.get());
+                            ir::Function* fn_list_str = current_module_->getFunction("lm_list_to_str");
+                            ir::Value* list_s = builder_->createCall(fn_list_str, {arg_val});
+                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), list_s);
                             builder_->createJmp(b_pr_next);
 
                             builder_->setInsertPoint(b_pr_next);
@@ -747,7 +853,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
                     builder_->createExternCall("io.write", {
                         context_->getConstantInt(context_->getIntegerType(64), 1),
-                        gv_nl,
+                        builder_->createAdd(gv_nl, context_->getConstantInt(context_->getIntegerType(64), 24)),
                         context_->getConstantInt(context_->getIntegerType(64), 1)
                     }, context_->getIntegerType(64));
 

@@ -2,8 +2,8 @@
 
 ## Summary
 - **Total tests:** 80
-- **Passed:** 6
-- **Failed:** 74 (0 Build Failures, 32 Runtime Failures/Crashes, 41 Output Mismatches, 1 Timeout)
+- **Passed:** 21
+- **Failed:** 59 (0 Build Failures, 32 Runtime Failures/Crashes, 26 Output Mismatches, 1 Timeout)
 
 ---
 
@@ -15,6 +15,21 @@
 - [x] `tests/loops/while_loops.lm` - PASS
 - [x] `tests/stdlib/search/search_test.lm` - PASS
 - [x] `tests/stdlib/range/range_test.lm` - PASS
+- [x] `tests/basic/print_statements.lm` - PASS
+- [x] `tests/basic/variables.lm` - PASS
+- [x] `tests/basic/control_flow.lm` - PASS
+- [x] `tests/expressions/arithmetic.lm` - PASS
+- [x] `tests/expressions/large_literals.lm` - PASS
+- [x] `tests/expressions/scientific_notation.lm` - PASS
+- [x] `tests/functions/basic.lm` - PASS
+- [x] `tests/stdlib/core/math_test.lm` - PASS
+- [x] `tests/stdlib/crypto/hash_test.lm` - PASS
+- [x] `tests/basic/list_dict_tuple.lm` - PASS
+- [x] `tests/expressions/ranges.lm` - PASS
+- [x] `tests/functions/first_class.lm` - PASS
+- [x] `tests/regression/ownership_refactor_test.lm` - PASS
+- [x] `tests/stdlib/net/net_test.lm` - PASS
+- [x] `tests/stdlib/path/path_test.lm` - PASS
 
 ---
 
@@ -23,27 +38,27 @@
 ### Category 1: Newline Character Output Differences (Easiest - Print formatting & newline alignment)
 *Reason:* In string print statements, newlines or spaces are appended with vertical tab / non-standard newline byte representation instead of standard `\n`.
 
-1. [ ] `tests/basic/print_statements.lm` - Output Mismatch: Extra/missing newline formatting.
-2. [ ] `tests/basic/variables.lm` - Output Mismatch: Output formatting differs by newline character.
-3. [ ] `tests/basic/control_flow.lm` - Output Mismatch: Output formatting differs by newline character.
-4. [ ] `tests/expressions/arithmetic.lm` - Output Mismatch: Newline character alignment in printed arithmetic results.
-5. [ ] `tests/expressions/large_literals.lm` - Output Mismatch: Formatting output mismatch on printed large numbers.
-6. [ ] `tests/expressions/scientific_notation.lm` - Output Mismatch: Formatting output mismatch on floating point printing.
-7. [ ] `tests/functions/basic.lm` - Output Mismatch: Newline character mismatch on function print outputs.
-8. [ ] `tests/stdlib/core/math_test.lm` - Output Mismatch: Formatting mismatch on printed math results.
-9. [ ] `tests/stdlib/crypto/hash_test.lm` - Output Mismatch: Output newline mismatch.
+1. [x] `tests/basic/print_statements.lm` - PASS
+2. [x] `tests/basic/variables.lm` - PASS
+3. [x] `tests/basic/control_flow.lm` - PASS
+4. [x] `tests/expressions/arithmetic.lm` - PASS
+5. [x] `tests/expressions/large_literals.lm` - PASS
+6. [x] `tests/expressions/scientific_notation.lm` - PASS
+7. [x] `tests/functions/basic.lm` - PASS
+8. [x] `tests/stdlib/core/math_test.lm` - PASS
+9. [x] `tests/stdlib/crypto/hash_test.lm` - PASS
 
 ---
 
 ### Category 2: Multiple Print Arguments & Tuple/List Inlining (Easy - Print handling)
 *Reason:* `print(a, b, c)` statement lowering in `builder.cpp` handles single register arguments cleanly, but multi-argument calls or list/tuple register printing require pointer dereference fixes.
 
-10. [ ] `tests/basic/list_dict_tuple.lm` - Output Mismatch: List/dict/tuple print formatting output mismatch.
-11. [ ] `tests/expressions/ranges.lm` - Output Mismatch: Range object print output mismatch.
-12. [ ] `tests/functions/first_class.lm` - Output Mismatch: Function reference print output mismatch.
-13. [ ] `tests/regression/ownership_refactor_test.lm` - Output Mismatch: Printed integers/strings from multi-arg print statements evaluate as null pointers.
-14. [ ] `tests/stdlib/net/net_test.lm` - Output Mismatch: Multi-argument print output spacing/newline mismatch.
-15. [ ] `tests/stdlib/path/path_test.lm` - Output Mismatch: String path concatenation print output mismatch.
+10. [x] `tests/basic/list_dict_tuple.lm` - PASS
+11. [x] `tests/expressions/ranges.lm` - PASS
+12. [x] `tests/functions/first_class.lm` - PASS
+13. [x] `tests/regression/ownership_refactor_test.lm` - PASS
+14. [x] `tests/stdlib/net/net_test.lm` - PASS
+15. [x] `tests/stdlib/path/path_test.lm` - PASS
 
 ---
 
