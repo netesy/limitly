@@ -2,8 +2,8 @@
 
 ## Summary
 - **Total tests:** 80
-- **Passed:** 27
-- **Failed:** 53 (0 Build Failures, 32 Runtime Failures/Crashes, 20 Output Mismatches, 1 Timeout)
+- **Passed:** 36
+- **Failed:** 44 (0 Build Failures, 26 Runtime Failures/Crashes, 17 Output Mismatches, 1 Timeout)
 
 ---
 
@@ -35,6 +35,15 @@
 - [x] `tests/strings/simple_string_test.lm` - PASS
 - [x] `tests/strings/string_runtime_test.lm` - PASS
 - [x] `tests/strings/lstring_api_test.lm` - PASS
+- [x] `tests/loops/match.lm` - PASS
+- [x] `tests/loops/match_advanced.lm` - PASS
+- [x] `tests/types/basic.lm` - PASS
+- [x] `tests/types/enums.lm` - PASS
+- [x] `tests/types/options.lm` - PASS
+- [x] `tests/types/advanced.lm` - PASS
+- [x] `tests/types/refined_types.lm` - PASS
+- [x] `tests/types/structural_type_tests.lm` - PASS
+- [x] `tests/types/unions.lm` - PASS
 
 ---
 
@@ -101,15 +110,15 @@
 ### Category 5: Pattern Matching & Enums (Hard - Control Flow & Data Layout)
 *Reason:* Enum tag and payload layout in Fyra IR branch lowering.
 
-35. [ ] `tests/loops/match.lm` - Output Mismatch: Pattern match branch output diff.
-36. [ ] `tests/loops/match_advanced.lm` - Output Mismatch: Advanced pattern match branch output diff.
-37. [ ] `tests/types/basic.lm` - Output Mismatch: Basic type check output diff.
-38. [ ] `tests/types/enums.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in enum tag dispatch).
-39. [ ] `tests/types/options.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in Option unwrap).
-40. [ ] `tests/types/advanced.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in structural type dispatch).
-41. [ ] `tests/types/refined_types.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in refined type assertion).
-42. [ ] `tests/types/structural_type_tests.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in structural type matching).
-43. [ ] `tests/types/unions.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in union type dispatch).
+35. [x] `tests/loops/match.lm` - PASS
+36. [x] `tests/loops/match_advanced.lm` - PASS
+37. [x] `tests/types/basic.lm` - PASS
+38. [x] `tests/types/enums.lm` - PASS
+39. [x] `tests/types/options.lm` - PASS
+40. [x] `tests/types/advanced.lm` - PASS
+41. [x] `tests/types/refined_types.lm` - PASS
+42. [x] `tests/types/structural_type_tests.lm` - PASS
+43. [x] `tests/types/unions.lm` - PASS
 
 ---
 
