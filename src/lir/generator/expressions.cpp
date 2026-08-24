@@ -1694,7 +1694,6 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
         }
 
-        // Trait or TraitObject method call
         TypePtr resolved_object_type = resolve_underlying_type(object_type);
         if (resolved_object_type && (resolved_object_type->tag == TypeTag::Trait || resolved_object_type->tag == TypeTag::TraitObject)) {
             std::string trait_name;
@@ -1707,16 +1706,16 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     trait_name = tot->traitName;
                 }
             }
-            
+
             if (!trait_name.empty()) {
                 if (expr.inferred_type) {
                     set_register_language_type(result, expr.inferred_type);
                     set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
                 }
-                LIR_Inst inst(LIR_Op::TraitCallMethod, result, 0, 0);
-                inst.func_name = method_name;
-                inst.type_name = trait_name;
-                inst.call_args = arg_regs;
+                std::string full_method = find_frame_or_trait_method(trait_name, method_name);
+                if (full_method.empty()) full_method = trait_name + "." + method_name;
+                LIR_Inst inst(LIR_Op::Call, result, full_method, arg_regs);
+                inst.func_name = full_method;
                 emit_instruction(inst);
                 return result;
             }
