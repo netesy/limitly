@@ -1,0 +1,5505 @@
+.section .rodata
+.Lproc_environ:
+  .string "/proc/self/environ"
+.Lproc_cmdline:
+  .string "/proc/self/cmdline"
+.section .data
+.align 8
+heap_ptr:
+  .quad __fyra_heap
+.section .bss
+.align 16
+__fyra_heap:
+  .zero 1048576
+.text
+
+.data
+.align 16
+__heap_base:
+  .zero 1048576
+.align 8
+__heap_ptr:
+  .quad __heap_base
+.align 8
+str_hdr_0:
+  .byte 11
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 13
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 13
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 83
+  .byte 105
+  .byte 109
+  .byte 112
+  .byte 108
+  .byte 101
+  .byte 32
+  .byte 115
+  .byte 116
+  .byte 114
+  .byte 105
+  .byte 110
+  .byte 103
+  .byte 0
+.align 8
+str_nil:
+  .byte 11
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 3
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 3
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 110
+  .byte 105
+  .byte 108
+  .byte 0
+.align 8
+list_lbracket:
+  .byte 11
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 1
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 1
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 91
+  .byte 0
+.align 8
+list_comma:
+  .byte 11
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 2
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 2
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 44
+  .byte 32
+  .byte 0
+.align 8
+list_rbracket:
+  .byte 11
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 1
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 1
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 93
+  .byte 0
+.align 8
+nl:
+  .byte 11
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 1
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 1
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 10
+  .byte 0
+.align 8
+str_hdr_2:
+  .byte 11
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 14
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 14
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 86
+  .byte 97
+  .byte 108
+  .byte 117
+  .byte 101
+  .byte 32
+  .byte 111
+  .byte 102
+  .byte 32
+  .byte 105
+  .byte 58
+  .byte 32
+  .byte 37
+  .byte 115
+  .byte 0
+.align 8
+str_hdr_4:
+  .byte 11
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 14
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 14
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 86
+  .byte 97
+  .byte 108
+  .byte 117
+  .byte 101
+  .byte 115
+  .byte 58
+  .byte 32
+  .byte 37
+  .byte 115
+  .byte 44
+  .byte 32
+  .byte 37
+  .byte 115
+  .byte 0
+.align 8
+str_hdr_6:
+  .byte 11
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 14
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 14
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 69
+  .byte 120
+  .byte 112
+  .byte 114
+  .byte 101
+  .byte 115
+  .byte 115
+  .byte 105
+  .byte 111
+  .byte 110
+  .byte 58
+  .byte 32
+  .byte 37
+  .byte 115
+  .byte 0
+.align 8
+str_hdr_8:
+  .byte 11
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 6
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 6
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 0
+  .byte 37
+  .byte 115
+  .byte 44
+  .byte 32
+  .byte 37
+  .byte 115
+  .byte 0
+.text
+.globl main
+.globl _start
+_start:
+  call main
+  movq %rax, %rdi
+  movq $60, %rax
+  syscall
+
+.globl main
+main:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $3480, %rsp
+main_entry:
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -48(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -48(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -56(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -64(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -64(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -72(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -72(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -80(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -80(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -88(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -88(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -96(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -96(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -104(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -104(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -112(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -112(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -120(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -120(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -128(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -128(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -136(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -136(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -144(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -144(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -152(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -152(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -160(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -160(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -168(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -168(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -176(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -176(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -184(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -184(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -192(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -192(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -200(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -200(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -208(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -208(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -216(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -216(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -224(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -224(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -232(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -232(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -240(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -240(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -248(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -248(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -256(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -256(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -264(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -264(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -272(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -272(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -280(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -280(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_block_0
+main_block_0:
+  movq $5, %rax
+  movq -48(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq $10, %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  leaq str_hdr_0(%rip), %rax
+  movq -64(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -64(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -288(%rbp)
+  movq -288(%rbp), %rax
+  cmpq $65536, %rax
+  setae %al
+  movzbq %al, %rax
+  movq %rax, -296(%rbp)
+  movq -288(%rbp), %rax
+  movq $48, %rcx
+  shrq %cl, %rax
+  movq %rax, -304(%rbp)
+  movq -304(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -312(%rbp)
+  movq -296(%rbp), %rax
+  andq -312(%rbp), %rax
+  movq %rax, -320(%rbp)
+  movq -320(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_ptr_0_1
+  jmp main_pr_int_0_1
+main_pr_ptr_0_1:
+  movq -288(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -328(%rbp)
+  movq -288(%rbp), %rax
+  cmpq $2, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -336(%rbp)
+  movq -328(%rbp), %rax
+  orq -336(%rbp), %rax
+  movq %rax, -344(%rbp)
+  movq -344(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_nil_0_1
+  jmp main_pr_obj_0_1
+main_pr_int_0_1:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $64, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -352(%rbp)
+  movq $11, %rax
+  movq -352(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -352(%rbp), %rax
+  addq $4, %rax
+  movq %rax, -360(%rbp)
+  movq $0, %rax
+  movq -360(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -352(%rbp), %rax
+  addq $63, %rax
+  movq %rax, -368(%rbp)
+  movq $0, %rax
+  movq -368(%rbp), %rdx
+  movb %al, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -376(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -368(%rbp), %rax
+  movq -376(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -384(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -392(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -288(%rbp), %rax
+  cmpq $0, %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -400(%rbp)
+  movq -400(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_neg_1
+  jmp main_i2s_pos_1
+main_pr_nil_0_1:
+  leaq str_nil(%rip), %rax
+  addq $24, %rax
+  movq %rax, -408(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -408(%rbp), %rsi
+  movq $3, %rdx
+  syscall
+  movq %rax, -416(%rbp)
+  jmp main_pr_next_0_1
+main_pr_obj_0_1:
+  movq -288(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -424(%rbp)
+  movq -424(%rbp), %rax
+  andq $4294967295, %rax
+  movq %rax, -432(%rbp)
+  movq -432(%rbp), %rax
+  cmpq $11, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -440(%rbp)
+  movq -440(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_str_0_1
+  jmp main_pr_nonstr_0_1
+main_pr_next_0_1:
+  leaq nl(%rip), %rax
+  addq $24, %rax
+  movq %rax, -448(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -448(%rbp), %rsi
+  movq $1, %rdx
+  syscall
+  movq %rax, -456(%rbp)
+  movq $0, %rax
+  movq -72(%rbp), %rdx
+  movq %rax, (%rdx)
+  leaq str_hdr_2(%rip), %rax
+  movq -88(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -88(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -464(%rbp)
+  movq -48(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -472(%rbp)
+  movq -472(%rbp), %rdi
+  call lm_to_string
+  mov -480(%rbp), rax
+  movq -464(%rbp), %rdi
+  movq -480(%rbp), %rsi
+  call lm_rt_str_format
+  mov -488(%rbp), rax
+  movq -488(%rbp), %rax
+  movq -80(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -80(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -496(%rbp)
+  movq -496(%rbp), %rax
+  cmpq $65536, %rax
+  setae %al
+  movzbq %al, %rax
+  movq %rax, -504(%rbp)
+  movq -496(%rbp), %rax
+  movq $48, %rcx
+  shrq %cl, %rax
+  movq %rax, -512(%rbp)
+  movq -512(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -520(%rbp)
+  movq -504(%rbp), %rax
+  andq -520(%rbp), %rax
+  movq %rax, -528(%rbp)
+  movq -528(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_ptr_0_3
+  jmp main_pr_int_0_3
+main_i2s_neg_1:
+  movq $1, %rax
+  movq -392(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -288(%rbp), %rax
+  negq %rax
+  movq %rax, -536(%rbp)
+  movq -536(%rbp), %rax
+  movq -384(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_loop_1
+main_i2s_pos_1:
+  movq $0, %rax
+  movq -392(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -288(%rbp), %rax
+  movq -384(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_loop_1
+main_i2s_loop_1:
+  movq -384(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -544(%rbp)
+  movq -544(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rdx, -552(%rbp)
+  movq -544(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rax, -560(%rbp)
+  movq -560(%rbp), %rax
+  movq -384(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -552(%rbp), %rax
+  addq $48, %rax
+  movq %rax, -568(%rbp)
+  movq -376(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -576(%rbp)
+  movq -576(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -584(%rbp)
+  movq -568(%rbp), %rax
+  movq -584(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -584(%rbp), %rax
+  movq -376(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -544(%rbp), %rax
+  cmpq $10, %rax
+  setge %al
+  movzbq %al, %rax
+  movq %rax, -592(%rbp)
+  movq -592(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_loop_1
+  jmp main_i2s_sign_1
+main_i2s_sign_1:
+  movq -392(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -600(%rbp)
+  movq -600(%rbp), %rax
+  cmpq $1, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -608(%rbp)
+  movq -608(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_minus_1
+  jmp main_i2s_done_1
+main_i2s_minus_1:
+  movq -376(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -616(%rbp)
+  movq -616(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -624(%rbp)
+  movq $45, %rax
+  movq -624(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -624(%rbp), %rax
+  movq -376(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_done_1
+main_i2s_done_1:
+  movq -376(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -632(%rbp)
+  movq -368(%rbp), %rax
+  subq -632(%rbp), %rax
+  movq %rax, -640(%rbp)
+  movq -352(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -648(%rbp)
+  movq -640(%rbp), %rax
+  movq -648(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -352(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -656(%rbp)
+  movq -640(%rbp), %rax
+  movq -656(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -352(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -664(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -672(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -672(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -640(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -680(%rbp)
+  jmp main_d2s_copy_loop_1
+main_d2s_copy_loop_1:
+  movq -672(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -688(%rbp)
+  movq -688(%rbp), %rax
+  cmpq -680(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -696(%rbp)
+  movq -696(%rbp), %rax
+  testq %rax, %rax
+  jne main_d2s_copy_body_1
+  jmp main_d2s_copy_done_1
+main_d2s_copy_body_1:
+  movq -632(%rbp), %rax
+  addq -688(%rbp), %rax
+  movq %rax, -704(%rbp)
+  movq -704(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -712(%rbp)
+  movq -664(%rbp), %rax
+  addq -688(%rbp), %rax
+  movq %rax, -720(%rbp)
+  movq -712(%rbp), %rax
+  movq -720(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -688(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -728(%rbp)
+  movq -728(%rbp), %rax
+  movq -672(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_d2s_copy_loop_1
+main_d2s_copy_done_1:
+  movq -352(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -736(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -744(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -744(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -640(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -752(%rbp)
+  jmp main_i2s_copy_loop_1
+main_i2s_copy_loop_1:
+  movq -744(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -760(%rbp)
+  movq -760(%rbp), %rax
+  cmpq -752(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -768(%rbp)
+  movq -768(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_copy_body_1
+  jmp main_i2s_copy_done_1
+main_i2s_copy_body_1:
+  movq -632(%rbp), %rax
+  addq -760(%rbp), %rax
+  movq %rax, -776(%rbp)
+  movq -776(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -784(%rbp)
+  movq -736(%rbp), %rax
+  addq -760(%rbp), %rax
+  movq %rax, -792(%rbp)
+  movq -784(%rbp), %rax
+  movq -792(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -760(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -800(%rbp)
+  movq -800(%rbp), %rax
+  movq -744(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_copy_loop_1
+main_i2s_copy_done_1:
+  movq -352(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -808(%rbp)
+  movq -808(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -816(%rbp)
+  movq -352(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -824(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -824(%rbp), %rsi
+  movq -816(%rbp), %rdx
+  syscall
+  movq %rax, -832(%rbp)
+  jmp main_pr_next_0_1
+main_pr_str_0_1:
+  movq -288(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -840(%rbp)
+  movq -840(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -848(%rbp)
+  movq -288(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -856(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -856(%rbp), %rsi
+  movq -848(%rbp), %rdx
+  syscall
+  movq %rax, -864(%rbp)
+  jmp main_pr_next_0_1
+main_pr_enum_0_1:
+  movq -288(%rbp), %rdi
+  call lm_enum_to_str
+  mov -872(%rbp), rax
+  movq -872(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -880(%rbp)
+  movq -880(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -888(%rbp)
+  movq -872(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -896(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -896(%rbp), %rsi
+  movq -888(%rbp), %rdx
+  syscall
+  movq %rax, -904(%rbp)
+  jmp main_pr_next_0_1
+main_pr_list_0_1:
+  movq -288(%rbp), %rdi
+  call lm_list_to_str
+  mov -912(%rbp), rax
+  movq -912(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -920(%rbp)
+  movq -920(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -928(%rbp)
+  movq -912(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -936(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -936(%rbp), %rsi
+  movq -928(%rbp), %rdx
+  syscall
+  movq %rax, -944(%rbp)
+  jmp main_pr_next_0_1
+main_pr_nonstr_0_1:
+  movq -424(%rbp), %rax
+  cmpq $1162761549, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -952(%rbp)
+  movq -952(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_enum_0_1
+  jmp main_pr_list_0_1
+main_pr_ptr_0_3:
+  movq -496(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -960(%rbp)
+  movq -496(%rbp), %rax
+  cmpq $2, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -968(%rbp)
+  movq -960(%rbp), %rax
+  orq -968(%rbp), %rax
+  movq %rax, -976(%rbp)
+  movq -976(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_nil_0_3
+  jmp main_pr_obj_0_3
+main_pr_int_0_3:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $64, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -984(%rbp)
+  movq $11, %rax
+  movq -984(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -984(%rbp), %rax
+  addq $4, %rax
+  movq %rax, -992(%rbp)
+  movq $0, %rax
+  movq -992(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -984(%rbp), %rax
+  addq $63, %rax
+  movq %rax, -1000(%rbp)
+  movq $0, %rax
+  movq -1000(%rbp), %rdx
+  movb %al, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -1008(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -1000(%rbp), %rax
+  movq -1008(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -1016(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -1024(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -496(%rbp), %rax
+  cmpq $0, %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -1032(%rbp)
+  movq -1032(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_neg_5
+  jmp main_i2s_pos_5
+main_pr_nil_0_3:
+  leaq str_nil(%rip), %rax
+  addq $24, %rax
+  movq %rax, -1040(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -1040(%rbp), %rsi
+  movq $3, %rdx
+  syscall
+  movq %rax, -1048(%rbp)
+  jmp main_pr_next_0_3
+main_pr_obj_0_3:
+  movq -496(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1056(%rbp)
+  movq -1056(%rbp), %rax
+  andq $4294967295, %rax
+  movq %rax, -1064(%rbp)
+  movq -1064(%rbp), %rax
+  cmpq $11, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -1072(%rbp)
+  movq -1072(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_str_0_3
+  jmp main_pr_nonstr_0_3
+main_pr_next_0_3:
+  leaq nl(%rip), %rax
+  addq $24, %rax
+  movq %rax, -1080(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -1080(%rbp), %rsi
+  movq $1, %rdx
+  syscall
+  movq %rax, -1088(%rbp)
+  movq $0, %rax
+  movq -96(%rbp), %rdx
+  movq %rax, (%rdx)
+  leaq str_hdr_4(%rip), %rax
+  movq -112(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -112(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1096(%rbp)
+  movq -48(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1104(%rbp)
+  movq -1104(%rbp), %rdi
+  call lm_to_string
+  mov -1112(%rbp), rax
+  movq -1096(%rbp), %rdi
+  movq -1112(%rbp), %rsi
+  call lm_rt_str_format
+  mov -1120(%rbp), rax
+  movq -1120(%rbp), %rax
+  movq -104(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -104(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1128(%rbp)
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1136(%rbp)
+  movq -1136(%rbp), %rdi
+  call lm_to_string
+  mov -1144(%rbp), rax
+  movq -1128(%rbp), %rdi
+  movq -1144(%rbp), %rsi
+  call lm_rt_str_format
+  mov -1152(%rbp), rax
+  movq -1152(%rbp), %rax
+  movq -120(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -120(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1160(%rbp)
+  movq -1160(%rbp), %rax
+  movq -104(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -104(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1168(%rbp)
+  movq -1168(%rbp), %rax
+  cmpq $65536, %rax
+  setae %al
+  movzbq %al, %rax
+  movq %rax, -1176(%rbp)
+  movq -1168(%rbp), %rax
+  movq $48, %rcx
+  shrq %cl, %rax
+  movq %rax, -1184(%rbp)
+  movq -1184(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -1192(%rbp)
+  movq -1176(%rbp), %rax
+  andq -1192(%rbp), %rax
+  movq %rax, -1200(%rbp)
+  movq -1200(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_ptr_0_5
+  jmp main_pr_int_0_5
+main_i2s_neg_5:
+  movq $1, %rax
+  movq -1024(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -496(%rbp), %rax
+  negq %rax
+  movq %rax, -1208(%rbp)
+  movq -1208(%rbp), %rax
+  movq -1016(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_loop_5
+main_i2s_pos_5:
+  movq $0, %rax
+  movq -1024(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -496(%rbp), %rax
+  movq -1016(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_loop_5
+main_i2s_loop_5:
+  movq -1016(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1216(%rbp)
+  movq -1216(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rdx, -1224(%rbp)
+  movq -1216(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rax, -1232(%rbp)
+  movq -1232(%rbp), %rax
+  movq -1016(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1224(%rbp), %rax
+  addq $48, %rax
+  movq %rax, -1240(%rbp)
+  movq -1008(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1248(%rbp)
+  movq -1248(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -1256(%rbp)
+  movq -1240(%rbp), %rax
+  movq -1256(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -1256(%rbp), %rax
+  movq -1008(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1216(%rbp), %rax
+  cmpq $10, %rax
+  setge %al
+  movzbq %al, %rax
+  movq %rax, -1264(%rbp)
+  movq -1264(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_loop_5
+  jmp main_i2s_sign_5
+main_i2s_sign_5:
+  movq -1024(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1272(%rbp)
+  movq -1272(%rbp), %rax
+  cmpq $1, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -1280(%rbp)
+  movq -1280(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_minus_5
+  jmp main_i2s_done_5
+main_i2s_minus_5:
+  movq -1008(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1288(%rbp)
+  movq -1288(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -1296(%rbp)
+  movq $45, %rax
+  movq -1296(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -1296(%rbp), %rax
+  movq -1008(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_done_5
+main_i2s_done_5:
+  movq -1008(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1304(%rbp)
+  movq -1000(%rbp), %rax
+  subq -1304(%rbp), %rax
+  movq %rax, -1312(%rbp)
+  movq -984(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -1320(%rbp)
+  movq -1312(%rbp), %rax
+  movq -1320(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -984(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -1328(%rbp)
+  movq -1312(%rbp), %rax
+  movq -1328(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -984(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -1336(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -1344(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -1344(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1312(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -1352(%rbp)
+  jmp main_d2s_copy_loop_5
+main_d2s_copy_loop_5:
+  movq -1344(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1360(%rbp)
+  movq -1360(%rbp), %rax
+  cmpq -1352(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -1368(%rbp)
+  movq -1368(%rbp), %rax
+  testq %rax, %rax
+  jne main_d2s_copy_body_5
+  jmp main_d2s_copy_done_5
+main_d2s_copy_body_5:
+  movq -1304(%rbp), %rax
+  addq -1360(%rbp), %rax
+  movq %rax, -1376(%rbp)
+  movq -1376(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -1384(%rbp)
+  movq -1336(%rbp), %rax
+  addq -1360(%rbp), %rax
+  movq %rax, -1392(%rbp)
+  movq -1384(%rbp), %rax
+  movq -1392(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -1360(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -1400(%rbp)
+  movq -1400(%rbp), %rax
+  movq -1344(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_d2s_copy_loop_5
+main_d2s_copy_done_5:
+  movq -984(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -1408(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -1416(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -1416(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1312(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -1424(%rbp)
+  jmp main_i2s_copy_loop_5
+main_i2s_copy_loop_5:
+  movq -1416(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1432(%rbp)
+  movq -1432(%rbp), %rax
+  cmpq -1424(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -1440(%rbp)
+  movq -1440(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_copy_body_5
+  jmp main_i2s_copy_done_5
+main_i2s_copy_body_5:
+  movq -1304(%rbp), %rax
+  addq -1432(%rbp), %rax
+  movq %rax, -1448(%rbp)
+  movq -1448(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -1456(%rbp)
+  movq -1408(%rbp), %rax
+  addq -1432(%rbp), %rax
+  movq %rax, -1464(%rbp)
+  movq -1456(%rbp), %rax
+  movq -1464(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -1432(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -1472(%rbp)
+  movq -1472(%rbp), %rax
+  movq -1416(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_copy_loop_5
+main_i2s_copy_done_5:
+  movq -984(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -1480(%rbp)
+  movq -1480(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1488(%rbp)
+  movq -984(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -1496(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -1496(%rbp), %rsi
+  movq -1488(%rbp), %rdx
+  syscall
+  movq %rax, -1504(%rbp)
+  jmp main_pr_next_0_3
+main_pr_str_0_3:
+  movq -496(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -1512(%rbp)
+  movq -1512(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1520(%rbp)
+  movq -496(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -1528(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -1528(%rbp), %rsi
+  movq -1520(%rbp), %rdx
+  syscall
+  movq %rax, -1536(%rbp)
+  jmp main_pr_next_0_3
+main_pr_enum_0_3:
+  movq -496(%rbp), %rdi
+  call lm_enum_to_str
+  mov -1544(%rbp), rax
+  movq -1544(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -1552(%rbp)
+  movq -1552(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1560(%rbp)
+  movq -1544(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -1568(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -1568(%rbp), %rsi
+  movq -1560(%rbp), %rdx
+  syscall
+  movq %rax, -1576(%rbp)
+  jmp main_pr_next_0_3
+main_pr_list_0_3:
+  movq -496(%rbp), %rdi
+  call lm_list_to_str
+  mov -1584(%rbp), rax
+  movq -1584(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -1592(%rbp)
+  movq -1592(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1600(%rbp)
+  movq -1584(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -1608(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -1608(%rbp), %rsi
+  movq -1600(%rbp), %rdx
+  syscall
+  movq %rax, -1616(%rbp)
+  jmp main_pr_next_0_3
+main_pr_nonstr_0_3:
+  movq -1056(%rbp), %rax
+  cmpq $1162761549, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -1624(%rbp)
+  movq -1624(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_enum_0_3
+  jmp main_pr_list_0_3
+main_pr_ptr_0_5:
+  movq -1168(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -1632(%rbp)
+  movq -1168(%rbp), %rax
+  cmpq $2, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -1640(%rbp)
+  movq -1632(%rbp), %rax
+  orq -1640(%rbp), %rax
+  movq %rax, -1648(%rbp)
+  movq -1648(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_nil_0_5
+  jmp main_pr_obj_0_5
+main_pr_int_0_5:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $64, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -1656(%rbp)
+  movq $11, %rax
+  movq -1656(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -1656(%rbp), %rax
+  addq $4, %rax
+  movq %rax, -1664(%rbp)
+  movq $0, %rax
+  movq -1664(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -1656(%rbp), %rax
+  addq $63, %rax
+  movq %rax, -1672(%rbp)
+  movq $0, %rax
+  movq -1672(%rbp), %rdx
+  movb %al, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -1680(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -1672(%rbp), %rax
+  movq -1680(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -1688(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -1696(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -1168(%rbp), %rax
+  cmpq $0, %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -1704(%rbp)
+  movq -1704(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_neg_6
+  jmp main_i2s_pos_6
+main_pr_nil_0_5:
+  leaq str_nil(%rip), %rax
+  addq $24, %rax
+  movq %rax, -1712(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -1712(%rbp), %rsi
+  movq $3, %rdx
+  syscall
+  movq %rax, -1720(%rbp)
+  jmp main_pr_next_0_5
+main_pr_obj_0_5:
+  movq -1168(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1728(%rbp)
+  movq -1728(%rbp), %rax
+  andq $4294967295, %rax
+  movq %rax, -1736(%rbp)
+  movq -1736(%rbp), %rax
+  cmpq $11, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -1744(%rbp)
+  movq -1744(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_str_0_5
+  jmp main_pr_nonstr_0_5
+main_pr_next_0_5:
+  leaq nl(%rip), %rax
+  addq $24, %rax
+  movq %rax, -1752(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -1752(%rbp), %rsi
+  movq $1, %rdx
+  syscall
+  movq %rax, -1760(%rbp)
+  movq $0, %rax
+  movq -128(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1768(%rbp)
+  movq -48(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1776(%rbp)
+  movq -1776(%rbp), %rax
+  addq -1768(%rbp), %rax
+  movq %rax, -1784(%rbp)
+  movq -1784(%rbp), %rax
+  movq -136(%rbp), %rdx
+  movq %rax, (%rdx)
+  leaq str_hdr_6(%rip), %rax
+  movq -152(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -152(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1792(%rbp)
+  movq -136(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1800(%rbp)
+  movq -1800(%rbp), %rdi
+  call lm_to_string
+  mov -1808(%rbp), rax
+  movq -1792(%rbp), %rdi
+  movq -1808(%rbp), %rsi
+  call lm_rt_str_format
+  mov -1816(%rbp), rax
+  movq -1816(%rbp), %rax
+  movq -144(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -144(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1824(%rbp)
+  movq -1824(%rbp), %rax
+  cmpq $65536, %rax
+  setae %al
+  movzbq %al, %rax
+  movq %rax, -1832(%rbp)
+  movq -1824(%rbp), %rax
+  movq $48, %rcx
+  shrq %cl, %rax
+  movq %rax, -1840(%rbp)
+  movq -1840(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -1848(%rbp)
+  movq -1832(%rbp), %rax
+  andq -1848(%rbp), %rax
+  movq %rax, -1856(%rbp)
+  movq -1856(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_ptr_0_7
+  jmp main_pr_int_0_7
+main_i2s_neg_6:
+  movq $1, %rax
+  movq -1696(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1168(%rbp), %rax
+  negq %rax
+  movq %rax, -1864(%rbp)
+  movq -1864(%rbp), %rax
+  movq -1688(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_loop_6
+main_i2s_pos_6:
+  movq $0, %rax
+  movq -1696(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1168(%rbp), %rax
+  movq -1688(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_loop_6
+main_i2s_loop_6:
+  movq -1688(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1872(%rbp)
+  movq -1872(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rdx, -1880(%rbp)
+  movq -1872(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rax, -1888(%rbp)
+  movq -1888(%rbp), %rax
+  movq -1688(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1880(%rbp), %rax
+  addq $48, %rax
+  movq %rax, -1896(%rbp)
+  movq -1680(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1904(%rbp)
+  movq -1904(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -1912(%rbp)
+  movq -1896(%rbp), %rax
+  movq -1912(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -1912(%rbp), %rax
+  movq -1680(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1872(%rbp), %rax
+  cmpq $10, %rax
+  setge %al
+  movzbq %al, %rax
+  movq %rax, -1920(%rbp)
+  movq -1920(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_loop_6
+  jmp main_i2s_sign_6
+main_i2s_sign_6:
+  movq -1696(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1928(%rbp)
+  movq -1928(%rbp), %rax
+  cmpq $1, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -1936(%rbp)
+  movq -1936(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_minus_6
+  jmp main_i2s_done_6
+main_i2s_minus_6:
+  movq -1680(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1944(%rbp)
+  movq -1944(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -1952(%rbp)
+  movq $45, %rax
+  movq -1952(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -1952(%rbp), %rax
+  movq -1680(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_done_6
+main_i2s_done_6:
+  movq -1680(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -1960(%rbp)
+  movq -1672(%rbp), %rax
+  subq -1960(%rbp), %rax
+  movq %rax, -1968(%rbp)
+  movq -1656(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -1976(%rbp)
+  movq -1968(%rbp), %rax
+  movq -1976(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1656(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -1984(%rbp)
+  movq -1968(%rbp), %rax
+  movq -1984(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1656(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -1992(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -2000(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -2000(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1968(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -2008(%rbp)
+  jmp main_d2s_copy_loop_6
+main_d2s_copy_loop_6:
+  movq -2000(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2016(%rbp)
+  movq -2016(%rbp), %rax
+  cmpq -2008(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -2024(%rbp)
+  movq -2024(%rbp), %rax
+  testq %rax, %rax
+  jne main_d2s_copy_body_6
+  jmp main_d2s_copy_done_6
+main_d2s_copy_body_6:
+  movq -1960(%rbp), %rax
+  addq -2016(%rbp), %rax
+  movq %rax, -2032(%rbp)
+  movq -2032(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -2040(%rbp)
+  movq -1992(%rbp), %rax
+  addq -2016(%rbp), %rax
+  movq %rax, -2048(%rbp)
+  movq -2040(%rbp), %rax
+  movq -2048(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -2016(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -2056(%rbp)
+  movq -2056(%rbp), %rax
+  movq -2000(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_d2s_copy_loop_6
+main_d2s_copy_done_6:
+  movq -1656(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2064(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -2072(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -2072(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1968(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -2080(%rbp)
+  jmp main_i2s_copy_loop_6
+main_i2s_copy_loop_6:
+  movq -2072(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2088(%rbp)
+  movq -2088(%rbp), %rax
+  cmpq -2080(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -2096(%rbp)
+  movq -2096(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_copy_body_6
+  jmp main_i2s_copy_done_6
+main_i2s_copy_body_6:
+  movq -1960(%rbp), %rax
+  addq -2088(%rbp), %rax
+  movq %rax, -2104(%rbp)
+  movq -2104(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -2112(%rbp)
+  movq -2064(%rbp), %rax
+  addq -2088(%rbp), %rax
+  movq %rax, -2120(%rbp)
+  movq -2112(%rbp), %rax
+  movq -2120(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -2088(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -2128(%rbp)
+  movq -2128(%rbp), %rax
+  movq -2072(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_copy_loop_6
+main_i2s_copy_done_6:
+  movq -1656(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -2136(%rbp)
+  movq -2136(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2144(%rbp)
+  movq -1656(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2152(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -2152(%rbp), %rsi
+  movq -2144(%rbp), %rdx
+  syscall
+  movq %rax, -2160(%rbp)
+  jmp main_pr_next_0_5
+main_pr_str_0_5:
+  movq -1168(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -2168(%rbp)
+  movq -2168(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2176(%rbp)
+  movq -1168(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2184(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -2184(%rbp), %rsi
+  movq -2176(%rbp), %rdx
+  syscall
+  movq %rax, -2192(%rbp)
+  jmp main_pr_next_0_5
+main_pr_enum_0_5:
+  movq -1168(%rbp), %rdi
+  call lm_enum_to_str
+  mov -2200(%rbp), rax
+  movq -2200(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -2208(%rbp)
+  movq -2208(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2216(%rbp)
+  movq -2200(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2224(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -2224(%rbp), %rsi
+  movq -2216(%rbp), %rdx
+  syscall
+  movq %rax, -2232(%rbp)
+  jmp main_pr_next_0_5
+main_pr_list_0_5:
+  movq -1168(%rbp), %rdi
+  call lm_list_to_str
+  mov -2240(%rbp), rax
+  movq -2240(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -2248(%rbp)
+  movq -2248(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2256(%rbp)
+  movq -2240(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2264(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -2264(%rbp), %rsi
+  movq -2256(%rbp), %rdx
+  syscall
+  movq %rax, -2272(%rbp)
+  jmp main_pr_next_0_5
+main_pr_nonstr_0_5:
+  movq -1728(%rbp), %rax
+  cmpq $1162761549, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -2280(%rbp)
+  movq -2280(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_enum_0_5
+  jmp main_pr_list_0_5
+main_pr_ptr_0_7:
+  movq -1824(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -2288(%rbp)
+  movq -1824(%rbp), %rax
+  cmpq $2, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -2296(%rbp)
+  movq -2288(%rbp), %rax
+  orq -2296(%rbp), %rax
+  movq %rax, -2304(%rbp)
+  movq -2304(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_nil_0_7
+  jmp main_pr_obj_0_7
+main_pr_int_0_7:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $64, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -2312(%rbp)
+  movq $11, %rax
+  movq -2312(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -2312(%rbp), %rax
+  addq $4, %rax
+  movq %rax, -2320(%rbp)
+  movq $0, %rax
+  movq -2320(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -2312(%rbp), %rax
+  addq $63, %rax
+  movq %rax, -2328(%rbp)
+  movq $0, %rax
+  movq -2328(%rbp), %rdx
+  movb %al, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -2336(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -2328(%rbp), %rax
+  movq -2336(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -2344(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -2352(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -1824(%rbp), %rax
+  cmpq $0, %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -2360(%rbp)
+  movq -2360(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_neg_7
+  jmp main_i2s_pos_7
+main_pr_nil_0_7:
+  leaq str_nil(%rip), %rax
+  addq $24, %rax
+  movq %rax, -2368(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -2368(%rbp), %rsi
+  movq $3, %rdx
+  syscall
+  movq %rax, -2376(%rbp)
+  jmp main_pr_next_0_7
+main_pr_obj_0_7:
+  movq -1824(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2384(%rbp)
+  movq -2384(%rbp), %rax
+  andq $4294967295, %rax
+  movq %rax, -2392(%rbp)
+  movq -2392(%rbp), %rax
+  cmpq $11, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -2400(%rbp)
+  movq -2400(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_str_0_7
+  jmp main_pr_nonstr_0_7
+main_pr_next_0_7:
+  leaq nl(%rip), %rax
+  addq $24, %rax
+  movq %rax, -2408(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -2408(%rbp), %rsi
+  movq $1, %rdx
+  syscall
+  movq %rax, -2416(%rbp)
+  movq $0, %rax
+  movq -160(%rbp), %rdx
+  movq %rax, (%rdx)
+  leaq str_hdr_8(%rip), %rax
+  movq -176(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -176(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2424(%rbp)
+  movq -48(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2432(%rbp)
+  movq -2432(%rbp), %rdi
+  call lm_to_string
+  mov -2440(%rbp), rax
+  movq -2424(%rbp), %rdi
+  movq -2440(%rbp), %rsi
+  call lm_rt_str_format
+  mov -2448(%rbp), rax
+  movq -2448(%rbp), %rax
+  movq -168(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -168(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2456(%rbp)
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2464(%rbp)
+  movq -2464(%rbp), %rdi
+  call lm_to_string
+  mov -2472(%rbp), rax
+  movq -2456(%rbp), %rdi
+  movq -2472(%rbp), %rsi
+  call lm_rt_str_format
+  mov -2480(%rbp), rax
+  movq -2480(%rbp), %rax
+  movq -184(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -184(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2488(%rbp)
+  movq -2488(%rbp), %rax
+  movq -168(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -168(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2496(%rbp)
+  movq -2496(%rbp), %rax
+  cmpq $65536, %rax
+  setae %al
+  movzbq %al, %rax
+  movq %rax, -2504(%rbp)
+  movq -2496(%rbp), %rax
+  movq $48, %rcx
+  shrq %cl, %rax
+  movq %rax, -2512(%rbp)
+  movq -2512(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -2520(%rbp)
+  movq -2504(%rbp), %rax
+  andq -2520(%rbp), %rax
+  movq %rax, -2528(%rbp)
+  movq -2528(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_ptr_0_9
+  jmp main_pr_int_0_9
+main_i2s_neg_7:
+  movq $1, %rax
+  movq -2352(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1824(%rbp), %rax
+  negq %rax
+  movq %rax, -2536(%rbp)
+  movq -2536(%rbp), %rax
+  movq -2344(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_loop_7
+main_i2s_pos_7:
+  movq $0, %rax
+  movq -2352(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -1824(%rbp), %rax
+  movq -2344(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_loop_7
+main_i2s_loop_7:
+  movq -2344(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2544(%rbp)
+  movq -2544(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rdx, -2552(%rbp)
+  movq -2544(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rax, -2560(%rbp)
+  movq -2560(%rbp), %rax
+  movq -2344(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -2552(%rbp), %rax
+  addq $48, %rax
+  movq %rax, -2568(%rbp)
+  movq -2336(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2576(%rbp)
+  movq -2576(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -2584(%rbp)
+  movq -2568(%rbp), %rax
+  movq -2584(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -2584(%rbp), %rax
+  movq -2336(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -2544(%rbp), %rax
+  cmpq $10, %rax
+  setge %al
+  movzbq %al, %rax
+  movq %rax, -2592(%rbp)
+  movq -2592(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_loop_7
+  jmp main_i2s_sign_7
+main_i2s_sign_7:
+  movq -2352(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2600(%rbp)
+  movq -2600(%rbp), %rax
+  cmpq $1, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -2608(%rbp)
+  movq -2608(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_minus_7
+  jmp main_i2s_done_7
+main_i2s_minus_7:
+  movq -2336(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2616(%rbp)
+  movq -2616(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -2624(%rbp)
+  movq $45, %rax
+  movq -2624(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -2624(%rbp), %rax
+  movq -2336(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_done_7
+main_i2s_done_7:
+  movq -2336(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2632(%rbp)
+  movq -2328(%rbp), %rax
+  subq -2632(%rbp), %rax
+  movq %rax, -2640(%rbp)
+  movq -2312(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -2648(%rbp)
+  movq -2640(%rbp), %rax
+  movq -2648(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -2312(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -2656(%rbp)
+  movq -2640(%rbp), %rax
+  movq -2656(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -2312(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2664(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -2672(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -2672(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -2640(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -2680(%rbp)
+  jmp main_d2s_copy_loop_7
+main_d2s_copy_loop_7:
+  movq -2672(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2688(%rbp)
+  movq -2688(%rbp), %rax
+  cmpq -2680(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -2696(%rbp)
+  movq -2696(%rbp), %rax
+  testq %rax, %rax
+  jne main_d2s_copy_body_7
+  jmp main_d2s_copy_done_7
+main_d2s_copy_body_7:
+  movq -2632(%rbp), %rax
+  addq -2688(%rbp), %rax
+  movq %rax, -2704(%rbp)
+  movq -2704(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -2712(%rbp)
+  movq -2664(%rbp), %rax
+  addq -2688(%rbp), %rax
+  movq %rax, -2720(%rbp)
+  movq -2712(%rbp), %rax
+  movq -2720(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -2688(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -2728(%rbp)
+  movq -2728(%rbp), %rax
+  movq -2672(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_d2s_copy_loop_7
+main_d2s_copy_done_7:
+  movq -2312(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2736(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -2744(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -2744(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -2640(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -2752(%rbp)
+  jmp main_i2s_copy_loop_7
+main_i2s_copy_loop_7:
+  movq -2744(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2760(%rbp)
+  movq -2760(%rbp), %rax
+  cmpq -2752(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -2768(%rbp)
+  movq -2768(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_copy_body_7
+  jmp main_i2s_copy_done_7
+main_i2s_copy_body_7:
+  movq -2632(%rbp), %rax
+  addq -2760(%rbp), %rax
+  movq %rax, -2776(%rbp)
+  movq -2776(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -2784(%rbp)
+  movq -2736(%rbp), %rax
+  addq -2760(%rbp), %rax
+  movq %rax, -2792(%rbp)
+  movq -2784(%rbp), %rax
+  movq -2792(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -2760(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -2800(%rbp)
+  movq -2800(%rbp), %rax
+  movq -2744(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_copy_loop_7
+main_i2s_copy_done_7:
+  movq -2312(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -2808(%rbp)
+  movq -2808(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2816(%rbp)
+  movq -2312(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2824(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -2824(%rbp), %rsi
+  movq -2816(%rbp), %rdx
+  syscall
+  movq %rax, -2832(%rbp)
+  jmp main_pr_next_0_7
+main_pr_str_0_7:
+  movq -1824(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -2840(%rbp)
+  movq -2840(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2848(%rbp)
+  movq -1824(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2856(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -2856(%rbp), %rsi
+  movq -2848(%rbp), %rdx
+  syscall
+  movq %rax, -2864(%rbp)
+  jmp main_pr_next_0_7
+main_pr_enum_0_7:
+  movq -1824(%rbp), %rdi
+  call lm_enum_to_str
+  mov -2872(%rbp), rax
+  movq -2872(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -2880(%rbp)
+  movq -2880(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2888(%rbp)
+  movq -2872(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2896(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -2896(%rbp), %rsi
+  movq -2888(%rbp), %rdx
+  syscall
+  movq %rax, -2904(%rbp)
+  jmp main_pr_next_0_7
+main_pr_list_0_7:
+  movq -1824(%rbp), %rdi
+  call lm_list_to_str
+  mov -2912(%rbp), rax
+  movq -2912(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -2920(%rbp)
+  movq -2920(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -2928(%rbp)
+  movq -2912(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -2936(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -2936(%rbp), %rsi
+  movq -2928(%rbp), %rdx
+  syscall
+  movq %rax, -2944(%rbp)
+  jmp main_pr_next_0_7
+main_pr_nonstr_0_7:
+  movq -2384(%rbp), %rax
+  cmpq $1162761549, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -2952(%rbp)
+  movq -2952(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_enum_0_7
+  jmp main_pr_list_0_7
+main_pr_ptr_0_9:
+  movq -2496(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -2960(%rbp)
+  movq -2496(%rbp), %rax
+  cmpq $2, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -2968(%rbp)
+  movq -2960(%rbp), %rax
+  orq -2968(%rbp), %rax
+  movq %rax, -2976(%rbp)
+  movq -2976(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_nil_0_9
+  jmp main_pr_obj_0_9
+main_pr_int_0_9:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $64, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -2984(%rbp)
+  movq $11, %rax
+  movq -2984(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -2984(%rbp), %rax
+  addq $4, %rax
+  movq %rax, -2992(%rbp)
+  movq $0, %rax
+  movq -2992(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -2984(%rbp), %rax
+  addq $63, %rax
+  movq %rax, -3000(%rbp)
+  movq $0, %rax
+  movq -3000(%rbp), %rdx
+  movb %al, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -3008(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -3000(%rbp), %rax
+  movq -3008(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -3016(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -3024(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -2496(%rbp), %rax
+  cmpq $0, %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -3032(%rbp)
+  movq -3032(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_neg_8
+  jmp main_i2s_pos_8
+main_pr_nil_0_9:
+  leaq str_nil(%rip), %rax
+  addq $24, %rax
+  movq %rax, -3040(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -3040(%rbp), %rsi
+  movq $3, %rdx
+  syscall
+  movq %rax, -3048(%rbp)
+  jmp main_pr_next_0_9
+main_pr_obj_0_9:
+  movq -2496(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3056(%rbp)
+  movq -3056(%rbp), %rax
+  andq $4294967295, %rax
+  movq %rax, -3064(%rbp)
+  movq -3064(%rbp), %rax
+  cmpq $11, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -3072(%rbp)
+  movq -3072(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_str_0_9
+  jmp main_pr_nonstr_0_9
+main_pr_next_0_9:
+  leaq nl(%rip), %rax
+  addq $24, %rax
+  movq %rax, -3080(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -3080(%rbp), %rsi
+  movq $1, %rdx
+  syscall
+  movq %rax, -3088(%rbp)
+  movq $0, %rax
+  movq -192(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq $0, %rax
+  jmp main_epilogue
+main_i2s_neg_8:
+  movq $1, %rax
+  movq -3024(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -2496(%rbp), %rax
+  negq %rax
+  movq %rax, -3096(%rbp)
+  movq -3096(%rbp), %rax
+  movq -3016(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_loop_8
+main_i2s_pos_8:
+  movq $0, %rax
+  movq -3024(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -2496(%rbp), %rax
+  movq -3016(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_loop_8
+main_i2s_loop_8:
+  movq -3016(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3104(%rbp)
+  movq -3104(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rdx, -3112(%rbp)
+  movq -3104(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rax, -3120(%rbp)
+  movq -3120(%rbp), %rax
+  movq -3016(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -3112(%rbp), %rax
+  addq $48, %rax
+  movq %rax, -3128(%rbp)
+  movq -3008(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3136(%rbp)
+  movq -3136(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -3144(%rbp)
+  movq -3128(%rbp), %rax
+  movq -3144(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -3144(%rbp), %rax
+  movq -3008(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -3104(%rbp), %rax
+  cmpq $10, %rax
+  setge %al
+  movzbq %al, %rax
+  movq %rax, -3152(%rbp)
+  movq -3152(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_loop_8
+  jmp main_i2s_sign_8
+main_i2s_sign_8:
+  movq -3024(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3160(%rbp)
+  movq -3160(%rbp), %rax
+  cmpq $1, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -3168(%rbp)
+  movq -3168(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_minus_8
+  jmp main_i2s_done_8
+main_i2s_minus_8:
+  movq -3008(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3176(%rbp)
+  movq -3176(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -3184(%rbp)
+  movq $45, %rax
+  movq -3184(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -3184(%rbp), %rax
+  movq -3008(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_done_8
+main_i2s_done_8:
+  movq -3008(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3192(%rbp)
+  movq -3000(%rbp), %rax
+  subq -3192(%rbp), %rax
+  movq %rax, -3200(%rbp)
+  movq -2984(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -3208(%rbp)
+  movq -3200(%rbp), %rax
+  movq -3208(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -2984(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -3216(%rbp)
+  movq -3200(%rbp), %rax
+  movq -3216(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -2984(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -3224(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -3232(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -3232(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -3200(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -3240(%rbp)
+  jmp main_d2s_copy_loop_8
+main_d2s_copy_loop_8:
+  movq -3232(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3248(%rbp)
+  movq -3248(%rbp), %rax
+  cmpq -3240(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -3256(%rbp)
+  movq -3256(%rbp), %rax
+  testq %rax, %rax
+  jne main_d2s_copy_body_8
+  jmp main_d2s_copy_done_8
+main_d2s_copy_body_8:
+  movq -3192(%rbp), %rax
+  addq -3248(%rbp), %rax
+  movq %rax, -3264(%rbp)
+  movq -3264(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -3272(%rbp)
+  movq -3224(%rbp), %rax
+  addq -3248(%rbp), %rax
+  movq %rax, -3280(%rbp)
+  movq -3272(%rbp), %rax
+  movq -3280(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -3248(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -3288(%rbp)
+  movq -3288(%rbp), %rax
+  movq -3232(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_d2s_copy_loop_8
+main_d2s_copy_done_8:
+  movq -2984(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -3296(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -3304(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -3304(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -3200(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -3312(%rbp)
+  jmp main_i2s_copy_loop_8
+main_i2s_copy_loop_8:
+  movq -3304(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3320(%rbp)
+  movq -3320(%rbp), %rax
+  cmpq -3312(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -3328(%rbp)
+  movq -3328(%rbp), %rax
+  testq %rax, %rax
+  jne main_i2s_copy_body_8
+  jmp main_i2s_copy_done_8
+main_i2s_copy_body_8:
+  movq -3192(%rbp), %rax
+  addq -3320(%rbp), %rax
+  movq %rax, -3336(%rbp)
+  movq -3336(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -3344(%rbp)
+  movq -3296(%rbp), %rax
+  addq -3320(%rbp), %rax
+  movq %rax, -3352(%rbp)
+  movq -3344(%rbp), %rax
+  movq -3352(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -3320(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -3360(%rbp)
+  movq -3360(%rbp), %rax
+  movq -3304(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp main_i2s_copy_loop_8
+main_i2s_copy_done_8:
+  movq -2984(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -3368(%rbp)
+  movq -3368(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3376(%rbp)
+  movq -2984(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -3384(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -3384(%rbp), %rsi
+  movq -3376(%rbp), %rdx
+  syscall
+  movq %rax, -3392(%rbp)
+  jmp main_pr_next_0_9
+main_pr_str_0_9:
+  movq -2496(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -3400(%rbp)
+  movq -3400(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3408(%rbp)
+  movq -2496(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -3416(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -3416(%rbp), %rsi
+  movq -3408(%rbp), %rdx
+  syscall
+  movq %rax, -3424(%rbp)
+  jmp main_pr_next_0_9
+main_pr_enum_0_9:
+  movq -2496(%rbp), %rdi
+  call lm_enum_to_str
+  mov -3432(%rbp), rax
+  movq -3432(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -3440(%rbp)
+  movq -3440(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3448(%rbp)
+  movq -3432(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -3456(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -3456(%rbp), %rsi
+  movq -3448(%rbp), %rdx
+  syscall
+  movq %rax, -3464(%rbp)
+  jmp main_pr_next_0_9
+main_pr_list_0_9:
+  movq -2496(%rbp), %rdi
+  call lm_list_to_str
+  mov -3472(%rbp), rax
+  movq -3472(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -3480(%rbp)
+  movq -3480(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -3488(%rbp)
+  movq -3472(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -3496(%rbp)
+  movq $1, %rax
+  movq $1, %rdi
+  movq -3496(%rbp), %rsi
+  movq -3488(%rbp), %rdx
+  syscall
+  movq %rax, -3504(%rbp)
+  jmp main_pr_next_0_9
+main_pr_nonstr_0_9:
+  movq -3056(%rbp), %rax
+  cmpq $1162761549, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -3512(%rbp)
+  movq -3512(%rbp), %rax
+  testq %rax, %rax
+  jne main_pr_enum_0_9
+  jmp main_pr_list_0_9
+main_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_main:
+
+.globl lm_enum_new
+lm_enum_new:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $72, %rsp
+  movq %rdi, -48(%rbp)
+  movq %rsi, -56(%rbp)
+  movq %rdx, -64(%rbp)
+lm_enum_new_entry:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $32, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -72(%rbp)
+  movq $1162761549, %rax
+  movq -72(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -72(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -80(%rbp)
+  movq -48(%rbp), %rax
+  movq -80(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -72(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -88(%rbp)
+  movq -56(%rbp), %rax
+  movq -88(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -72(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -96(%rbp)
+  movq -64(%rbp), %rax
+  movq -96(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -72(%rbp), %rax
+  jmp lm_enum_new_epilogue
+lm_enum_new_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_enum_new:
+
+.globl lm_enum_tag
+lm_enum_tag:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $40, %rsp
+  movq %rdi, -48(%rbp)
+lm_enum_tag_entry:
+  movq -48(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -56(%rbp)
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -64(%rbp)
+  movq -64(%rbp), %rax
+  jmp lm_enum_tag_epilogue
+lm_enum_tag_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_enum_tag:
+
+.globl lm_enum_payload
+lm_enum_payload:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $40, %rsp
+  movq %rdi, -48(%rbp)
+lm_enum_payload_entry:
+  movq -48(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -56(%rbp)
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -64(%rbp)
+  movq -64(%rbp), %rax
+  jmp lm_enum_payload_epilogue
+lm_enum_payload_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_enum_payload:
+
+.globl lm_enum_to_str
+lm_enum_to_str:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $936, %rsp
+  movq %rdi, -48(%rbp)
+lm_enum_to_str_entry:
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -56(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -48(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -64(%rbp)
+  movq -64(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -72(%rbp)
+  movq -48(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -80(%rbp)
+  movq -80(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -88(%rbp)
+  movq -48(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -96(%rbp)
+  movq -96(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -104(%rbp)
+  movq -88(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -112(%rbp)
+  movq -88(%rbp), %rax
+  cmpq $18446744073709551615, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -120(%rbp)
+  movq -112(%rbp), %rax
+  orq -120(%rbp), %rax
+  movq %rax, -128(%rbp)
+  movq -128(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_no_pay
+  jmp lm_enum_to_str_has_pay
+lm_enum_to_str_no_pay:
+  movq -104(%rbp), %rax
+  cmpq $0, %rax
+  setne %al
+  movzbq %al, %rax
+  movq %rax, -136(%rbp)
+  movq -136(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_has_vname
+  jmp lm_enum_to_str_no_vname
+lm_enum_to_str_has_vname:
+  movq -104(%rbp), %rax
+  jmp lm_enum_to_str_epilogue
+lm_enum_to_str_no_vname:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $64, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -144(%rbp)
+  movq $11, %rax
+  movq -144(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -144(%rbp), %rax
+  addq $4, %rax
+  movq %rax, -152(%rbp)
+  movq $0, %rax
+  movq -152(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -144(%rbp), %rax
+  addq $63, %rax
+  movq %rax, -160(%rbp)
+  movq $0, %rax
+  movq -160(%rbp), %rdx
+  movb %al, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -168(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -160(%rbp), %rax
+  movq -168(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -176(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -184(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -72(%rbp), %rax
+  cmpq $0, %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -192(%rbp)
+  movq -192(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_i2s_neg_2
+  jmp lm_enum_to_str_i2s_pos_2
+lm_enum_to_str_has_pay:
+  movq -88(%rbp), %rax
+  cmpq $65536, %rax
+  setae %al
+  movzbq %al, %rax
+  movq %rax, -200(%rbp)
+  movq -88(%rbp), %rax
+  movq $48, %rcx
+  shrq %cl, %rax
+  movq %rax, -208(%rbp)
+  movq -208(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -216(%rbp)
+  movq -200(%rbp), %rax
+  andq -216(%rbp), %rax
+  movq %rax, -224(%rbp)
+  movq -224(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_pay_ptr
+  jmp lm_enum_to_str_pay_int
+lm_enum_to_str_pay_int:
+  movq -208(%rbp), %rax
+  cmpq $0, %rax
+  setne %al
+  movzbq %al, %rax
+  movq %rax, -232(%rbp)
+  movq -232(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_pay_float
+  jmp lm_enum_to_str_pay_i64
+lm_enum_to_str_pay_ptr:
+  movq -88(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -240(%rbp)
+  movq -240(%rbp), %rax
+  cmpq $1162761549, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -248(%rbp)
+  movq -248(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_pay_enum
+  jmp lm_enum_to_str_pay_rawstr
+lm_enum_to_str_pay_enum:
+  movq -88(%rbp), %rdi
+  call lm_enum_to_str
+  mov -256(%rbp), rax
+  movq -256(%rbp), %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_build_pay
+lm_enum_to_str_pay_rawstr:
+  movq -88(%rbp), %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_build_pay
+lm_enum_to_str_build_pay:
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -264(%rbp)
+  movq -264(%rbp), %rax
+  jmp lm_enum_to_str_epilogue
+lm_enum_to_str_i2s_neg_2:
+  movq $1, %rax
+  movq -184(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -72(%rbp), %rax
+  negq %rax
+  movq %rax, -272(%rbp)
+  movq -272(%rbp), %rax
+  movq -176(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_i2s_loop_2
+lm_enum_to_str_i2s_pos_2:
+  movq $0, %rax
+  movq -184(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -72(%rbp), %rax
+  movq -176(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_i2s_loop_2
+lm_enum_to_str_i2s_loop_2:
+  movq -176(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -280(%rbp)
+  movq -280(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rdx, -288(%rbp)
+  movq -280(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rax, -296(%rbp)
+  movq -296(%rbp), %rax
+  movq -176(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -288(%rbp), %rax
+  addq $48, %rax
+  movq %rax, -304(%rbp)
+  movq -168(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -312(%rbp)
+  movq -312(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -320(%rbp)
+  movq -304(%rbp), %rax
+  movq -320(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -320(%rbp), %rax
+  movq -168(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -280(%rbp), %rax
+  cmpq $10, %rax
+  setge %al
+  movzbq %al, %rax
+  movq %rax, -328(%rbp)
+  movq -328(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_i2s_loop_2
+  jmp lm_enum_to_str_i2s_sign_2
+lm_enum_to_str_i2s_sign_2:
+  movq -184(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -336(%rbp)
+  movq -336(%rbp), %rax
+  cmpq $1, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -344(%rbp)
+  movq -344(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_i2s_minus_2
+  jmp lm_enum_to_str_i2s_done_2
+lm_enum_to_str_i2s_minus_2:
+  movq -168(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -352(%rbp)
+  movq -352(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -360(%rbp)
+  movq $45, %rax
+  movq -360(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -360(%rbp), %rax
+  movq -168(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_i2s_done_2
+lm_enum_to_str_i2s_done_2:
+  movq -168(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -368(%rbp)
+  movq -160(%rbp), %rax
+  subq -368(%rbp), %rax
+  movq %rax, -376(%rbp)
+  movq -144(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -384(%rbp)
+  movq -376(%rbp), %rax
+  movq -384(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -144(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -392(%rbp)
+  movq -376(%rbp), %rax
+  movq -392(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -144(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -400(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -408(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -408(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -376(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -416(%rbp)
+  jmp lm_enum_to_str_d2s_copy_loop_2
+lm_enum_to_str_d2s_copy_loop_2:
+  movq -408(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -424(%rbp)
+  movq -424(%rbp), %rax
+  cmpq -416(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -432(%rbp)
+  movq -432(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_d2s_copy_body_2
+  jmp lm_enum_to_str_d2s_copy_done_2
+lm_enum_to_str_d2s_copy_body_2:
+  movq -368(%rbp), %rax
+  addq -424(%rbp), %rax
+  movq %rax, -440(%rbp)
+  movq -440(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -448(%rbp)
+  movq -400(%rbp), %rax
+  addq -424(%rbp), %rax
+  movq %rax, -456(%rbp)
+  movq -448(%rbp), %rax
+  movq -456(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -424(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -464(%rbp)
+  movq -464(%rbp), %rax
+  movq -408(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_d2s_copy_loop_2
+lm_enum_to_str_d2s_copy_done_2:
+  movq -144(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -472(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -480(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -480(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -376(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -488(%rbp)
+  jmp lm_enum_to_str_i2s_copy_loop_2
+lm_enum_to_str_i2s_copy_loop_2:
+  movq -480(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -496(%rbp)
+  movq -496(%rbp), %rax
+  cmpq -488(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -504(%rbp)
+  movq -504(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_i2s_copy_body_2
+  jmp lm_enum_to_str_i2s_copy_done_2
+lm_enum_to_str_i2s_copy_body_2:
+  movq -368(%rbp), %rax
+  addq -496(%rbp), %rax
+  movq %rax, -512(%rbp)
+  movq -512(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -520(%rbp)
+  movq -472(%rbp), %rax
+  addq -496(%rbp), %rax
+  movq %rax, -528(%rbp)
+  movq -520(%rbp), %rax
+  movq -528(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -496(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -536(%rbp)
+  movq -536(%rbp), %rax
+  movq -480(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_i2s_copy_loop_2
+lm_enum_to_str_i2s_copy_done_2:
+  movq -144(%rbp), %rax
+  jmp lm_enum_to_str_epilogue
+lm_enum_to_str_pay_float:
+  movq $184614912, %rax
+  movq %rax, -544(%rbp)
+  movq $184614912, %rax
+  movq %rax, -552(%rbp)
+  movq -552(%rbp), %rdi
+  call lm_str_alloc
+  mov -560(%rbp), rax
+  movq -560(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -568(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -576(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -576(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -552(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -584(%rbp)
+  jmp lm_enum_to_str_f2s_copy_loop_1
+lm_enum_to_str_pay_i64:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $64, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -592(%rbp)
+  movq $11, %rax
+  movq -592(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -592(%rbp), %rax
+  addq $4, %rax
+  movq %rax, -600(%rbp)
+  movq $0, %rax
+  movq -600(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -592(%rbp), %rax
+  addq $63, %rax
+  movq %rax, -608(%rbp)
+  movq $0, %rax
+  movq -608(%rbp), %rdx
+  movb %al, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -616(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -608(%rbp), %rax
+  movq -616(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -624(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -632(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -88(%rbp), %rax
+  cmpq $0, %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -640(%rbp)
+  movq -640(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_i2s_neg_3
+  jmp lm_enum_to_str_i2s_pos_3
+lm_enum_to_str_f2s_copy_loop_1:
+  movq -576(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -648(%rbp)
+  movq -648(%rbp), %rax
+  cmpq -584(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -656(%rbp)
+  movq -656(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_f2s_copy_body_1
+  jmp lm_enum_to_str_f2s_copy_done_1
+lm_enum_to_str_f2s_copy_body_1:
+  movq -544(%rbp), %rax
+  addq -648(%rbp), %rax
+  movq %rax, -664(%rbp)
+  movq -664(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -672(%rbp)
+  movq -568(%rbp), %rax
+  addq -648(%rbp), %rax
+  movq %rax, -680(%rbp)
+  movq -672(%rbp), %rax
+  movq -680(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -648(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -688(%rbp)
+  movq -688(%rbp), %rax
+  movq -576(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_f2s_copy_loop_1
+lm_enum_to_str_f2s_copy_done_1:
+  movq $184614912, %rax
+  movq -560(%rbp), %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_build_pay
+lm_enum_to_str_i2s_neg_3:
+  movq $1, %rax
+  movq -632(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -88(%rbp), %rax
+  negq %rax
+  movq %rax, -696(%rbp)
+  movq -696(%rbp), %rax
+  movq -624(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_i2s_loop_3
+lm_enum_to_str_i2s_pos_3:
+  movq $0, %rax
+  movq -632(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -88(%rbp), %rax
+  movq -624(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_i2s_loop_3
+lm_enum_to_str_i2s_loop_3:
+  movq -624(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -704(%rbp)
+  movq -704(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rdx, -712(%rbp)
+  movq -704(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rax, -720(%rbp)
+  movq -720(%rbp), %rax
+  movq -624(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -712(%rbp), %rax
+  addq $48, %rax
+  movq %rax, -728(%rbp)
+  movq -616(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -736(%rbp)
+  movq -736(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -744(%rbp)
+  movq -728(%rbp), %rax
+  movq -744(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -744(%rbp), %rax
+  movq -616(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -704(%rbp), %rax
+  cmpq $10, %rax
+  setge %al
+  movzbq %al, %rax
+  movq %rax, -752(%rbp)
+  movq -752(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_i2s_loop_3
+  jmp lm_enum_to_str_i2s_sign_3
+lm_enum_to_str_i2s_sign_3:
+  movq -632(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -760(%rbp)
+  movq -760(%rbp), %rax
+  cmpq $1, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -768(%rbp)
+  movq -768(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_i2s_minus_3
+  jmp lm_enum_to_str_i2s_done_3
+lm_enum_to_str_i2s_minus_3:
+  movq -616(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -776(%rbp)
+  movq -776(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -784(%rbp)
+  movq $45, %rax
+  movq -784(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -784(%rbp), %rax
+  movq -616(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_i2s_done_3
+lm_enum_to_str_i2s_done_3:
+  movq -616(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -792(%rbp)
+  movq -608(%rbp), %rax
+  subq -792(%rbp), %rax
+  movq %rax, -800(%rbp)
+  movq -592(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -808(%rbp)
+  movq -800(%rbp), %rax
+  movq -808(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -592(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -816(%rbp)
+  movq -800(%rbp), %rax
+  movq -816(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -592(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -824(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -832(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -832(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -800(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -840(%rbp)
+  jmp lm_enum_to_str_d2s_copy_loop_3
+lm_enum_to_str_d2s_copy_loop_3:
+  movq -832(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -848(%rbp)
+  movq -848(%rbp), %rax
+  cmpq -840(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -856(%rbp)
+  movq -856(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_d2s_copy_body_3
+  jmp lm_enum_to_str_d2s_copy_done_3
+lm_enum_to_str_d2s_copy_body_3:
+  movq -792(%rbp), %rax
+  addq -848(%rbp), %rax
+  movq %rax, -864(%rbp)
+  movq -864(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -872(%rbp)
+  movq -824(%rbp), %rax
+  addq -848(%rbp), %rax
+  movq %rax, -880(%rbp)
+  movq -872(%rbp), %rax
+  movq -880(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -848(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -888(%rbp)
+  movq -888(%rbp), %rax
+  movq -832(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_d2s_copy_loop_3
+lm_enum_to_str_d2s_copy_done_3:
+  movq -592(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -896(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -904(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -904(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -800(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -912(%rbp)
+  jmp lm_enum_to_str_i2s_copy_loop_3
+lm_enum_to_str_i2s_copy_loop_3:
+  movq -904(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -920(%rbp)
+  movq -920(%rbp), %rax
+  cmpq -912(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -928(%rbp)
+  movq -928(%rbp), %rax
+  testq %rax, %rax
+  jne lm_enum_to_str_i2s_copy_body_3
+  jmp lm_enum_to_str_i2s_copy_done_3
+lm_enum_to_str_i2s_copy_body_3:
+  movq -792(%rbp), %rax
+  addq -920(%rbp), %rax
+  movq %rax, -936(%rbp)
+  movq -936(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -944(%rbp)
+  movq -896(%rbp), %rax
+  addq -920(%rbp), %rax
+  movq %rax, -952(%rbp)
+  movq -944(%rbp), %rax
+  movq -952(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -920(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -960(%rbp)
+  movq -960(%rbp), %rax
+  movq -904(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_i2s_copy_loop_3
+lm_enum_to_str_i2s_copy_done_3:
+  movq -592(%rbp), %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_enum_to_str_build_pay
+lm_enum_to_str_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_enum_to_str:
+
+.globl lm_str_concat
+lm_str_concat:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $248, %rsp
+  movq %rdi, -48(%rbp)
+  movq %rsi, -56(%rbp)
+lm_str_concat_entry:
+  movq -48(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -64(%rbp)
+  movq -64(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -72(%rbp)
+  movq -56(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -80(%rbp)
+  movq -80(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -88(%rbp)
+  movq -72(%rbp), %rax
+  addq -88(%rbp), %rax
+  movq %rax, -96(%rbp)
+  movq -96(%rbp), %rax
+  addq $25, %rax
+  movq %rax, -104(%rbp)
+  movq $9, %rax
+  movq $0, %rdi
+  movq -104(%rbp), %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -112(%rbp)
+  movq $11, %rax
+  movq -112(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -112(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -120(%rbp)
+  movq -96(%rbp), %rax
+  movq -120(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -112(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -128(%rbp)
+  movq -96(%rbp), %rax
+  movq -128(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -112(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -136(%rbp)
+  movq -48(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -144(%rbp)
+  movq -56(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -152(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -160(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -160(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_str_concat_concat_c1_loop
+lm_str_concat_done:
+  movq -112(%rbp), %rax
+  jmp lm_str_concat_epilogue
+lm_str_concat_concat_c1_loop:
+  movq -160(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -168(%rbp)
+  movq -168(%rbp), %rax
+  cmpq -72(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -176(%rbp)
+  movq -176(%rbp), %rax
+  testq %rax, %rax
+  jne lm_str_concat_concat_c1_body
+  jmp lm_str_concat_concat_c1_done
+lm_str_concat_concat_c1_body:
+  movq -144(%rbp), %rax
+  addq -168(%rbp), %rax
+  movq %rax, -184(%rbp)
+  movq -184(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -192(%rbp)
+  movq -136(%rbp), %rax
+  addq -168(%rbp), %rax
+  movq %rax, -200(%rbp)
+  movq -192(%rbp), %rax
+  movq -200(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -168(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -208(%rbp)
+  movq -208(%rbp), %rax
+  movq -160(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_str_concat_concat_c1_loop
+lm_str_concat_concat_c1_done:
+  movq $0, %rax
+  movq -160(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_str_concat_concat_c2_loop
+lm_str_concat_concat_c2_loop:
+  movq -160(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -216(%rbp)
+  movq -216(%rbp), %rax
+  cmpq -88(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -224(%rbp)
+  movq -224(%rbp), %rax
+  testq %rax, %rax
+  jne lm_str_concat_concat_c2_body
+  jmp lm_str_concat_concat_c2_done
+lm_str_concat_concat_c2_body:
+  movq -152(%rbp), %rax
+  addq -216(%rbp), %rax
+  movq %rax, -232(%rbp)
+  movq -232(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -240(%rbp)
+  movq -72(%rbp), %rax
+  addq -216(%rbp), %rax
+  movq %rax, -248(%rbp)
+  movq -136(%rbp), %rax
+  addq -248(%rbp), %rax
+  movq %rax, -256(%rbp)
+  movq -240(%rbp), %rax
+  movq -256(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -216(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -264(%rbp)
+  movq -264(%rbp), %rax
+  movq -160(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_str_concat_concat_c2_loop
+lm_str_concat_concat_c2_done:
+  movq -136(%rbp), %rax
+  addq -96(%rbp), %rax
+  movq %rax, -272(%rbp)
+  movq $0, %rax
+  movq -272(%rbp), %rdx
+  movb %al, (%rdx)
+  jmp lm_str_concat_done
+lm_str_concat_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_str_concat:
+
+.globl lm_str_alloc
+lm_str_alloc:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $72, %rsp
+  movq %rdi, -48(%rbp)
+lm_str_alloc_entry:
+  movq -48(%rbp), %rax
+  addq $25, %rax
+  movq %rax, -56(%rbp)
+  movq $9, %rax
+  movq $0, %rdi
+  movq -56(%rbp), %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -64(%rbp)
+  movq $11, %rax
+  movq -64(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -64(%rbp), %rax
+  addq $4, %rax
+  movq %rax, -72(%rbp)
+  movq $0, %rax
+  movq -72(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -64(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -80(%rbp)
+  movq $0, %rax
+  movq -80(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -64(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -88(%rbp)
+  movq -48(%rbp), %rax
+  movq -88(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -64(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -96(%rbp)
+  movq $0, %rax
+  movq -96(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -64(%rbp), %rax
+  jmp lm_str_alloc_epilogue
+lm_str_alloc_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_str_alloc:
+
+.globl lm_list_new
+lm_list_new:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $88, %rsp
+  movq %rdi, -48(%rbp)
+lm_list_new_entry:
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -56(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -48(%rbp), %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -48(%rbp), %rax
+  cmpq $0, %rax
+  setle %al
+  movzbq %al, %rax
+  movq %rax, -64(%rbp)
+  movq -64(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_new_def_cap
+  jmp lm_list_new_alloc
+lm_list_new_def_cap:
+  movq $8, %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_new_alloc
+lm_list_new_alloc:
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -72(%rbp)
+  movq $9, %rax
+  movq $0, %rdi
+  movq $24, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -80(%rbp)
+  movq -72(%rbp), %rax
+  imulq $8, %rax
+  movq %rax, -88(%rbp)
+  movq $9, %rax
+  movq $0, %rdi
+  movq -88(%rbp), %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -96(%rbp)
+  movq $0, %rax
+  movq -80(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -80(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -104(%rbp)
+  movq -72(%rbp), %rax
+  movq -104(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -80(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -112(%rbp)
+  movq -96(%rbp), %rax
+  movq -112(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -80(%rbp), %rax
+  jmp lm_list_new_epilogue
+lm_list_new_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_list_new:
+
+.globl lm_list_len
+lm_list_len:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $24, %rsp
+  movq %rdi, -48(%rbp)
+lm_list_len_entry:
+  movq -48(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -56(%rbp)
+  movq -56(%rbp), %rax
+  jmp lm_list_len_epilogue
+lm_list_len_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_list_len:
+
+.globl lm_list_get
+lm_list_get:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $104, %rsp
+  movq %rdi, -48(%rbp)
+  movq %rsi, -56(%rbp)
+lm_list_get_entry:
+  movq -48(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -64(%rbp)
+  movq -64(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -72(%rbp)
+  movq -72(%rbp), %rax
+  cmpq $65536, %rax
+  setb %al
+  movzbq %al, %rax
+  movq %rax, -80(%rbp)
+  movq -80(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_get_get_tuple
+  jmp lm_list_get_get_list
+lm_list_get_get_list:
+  movq -56(%rbp), %rax
+  imulq $8, %rax
+  movq %rax, -88(%rbp)
+  movq -72(%rbp), %rax
+  addq -88(%rbp), %rax
+  movq %rax, -96(%rbp)
+  movq -96(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -104(%rbp)
+  movq -104(%rbp), %rax
+  jmp lm_list_get_epilogue
+lm_list_get_get_tuple:
+  movq -56(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -112(%rbp)
+  movq -112(%rbp), %rax
+  imulq $8, %rax
+  movq %rax, -120(%rbp)
+  movq -48(%rbp), %rax
+  addq -120(%rbp), %rax
+  movq %rax, -128(%rbp)
+  movq -128(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -136(%rbp)
+  movq -136(%rbp), %rax
+  jmp lm_list_get_epilogue
+lm_list_get_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_list_get:
+
+.globl lm_list_set
+lm_list_set:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $72, %rsp
+  movq %rdi, -48(%rbp)
+  movq %rsi, -56(%rbp)
+  movq %rdx, -64(%rbp)
+lm_list_set_entry:
+  movq -48(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -72(%rbp)
+  movq -72(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -80(%rbp)
+  movq -56(%rbp), %rax
+  imulq $8, %rax
+  movq %rax, -88(%rbp)
+  movq -80(%rbp), %rax
+  addq -88(%rbp), %rax
+  movq %rax, -96(%rbp)
+  movq -64(%rbp), %rax
+  movq -96(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq $0, %rax
+  jmp lm_list_set_epilogue
+lm_list_set_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_list_set:
+
+.globl lm_list_append
+lm_list_append:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $216, %rsp
+  movq %rdi, -48(%rbp)
+  movq %rsi, -56(%rbp)
+lm_list_append_entry:
+  movq -48(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -64(%rbp)
+  movq -48(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -72(%rbp)
+  movq -72(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -80(%rbp)
+  movq -64(%rbp), %rax
+  cmpq -80(%rbp), %rax
+  setge %al
+  movzbq %al, %rax
+  movq %rax, -88(%rbp)
+  movq -88(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_append_realloc
+  jmp lm_list_append_insert
+lm_list_append_realloc:
+  movq -80(%rbp), %rax
+  imulq $2, %rax
+  movq %rax, -96(%rbp)
+  movq -96(%rbp), %rax
+  imulq $8, %rax
+  movq %rax, -104(%rbp)
+  movq $9, %rax
+  movq $0, %rdi
+  movq -104(%rbp), %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -112(%rbp)
+  movq -48(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -120(%rbp)
+  movq -120(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -128(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -136(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -136(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_append_copy_loop
+lm_list_append_copy_loop:
+  movq -136(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -144(%rbp)
+  movq -144(%rbp), %rax
+  cmpq -64(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -152(%rbp)
+  movq -152(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_append_copy_body
+  jmp lm_list_append_copy_done
+lm_list_append_copy_body:
+  movq -144(%rbp), %rax
+  imulq $8, %rax
+  movq %rax, -160(%rbp)
+  movq -128(%rbp), %rax
+  addq -160(%rbp), %rax
+  movq %rax, -168(%rbp)
+  movq -168(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -176(%rbp)
+  movq -112(%rbp), %rax
+  addq -160(%rbp), %rax
+  movq %rax, -184(%rbp)
+  movq -176(%rbp), %rax
+  movq -184(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -144(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -192(%rbp)
+  movq -192(%rbp), %rax
+  movq -136(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_append_copy_loop
+lm_list_append_copy_done:
+  movq -96(%rbp), %rax
+  movq -72(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -112(%rbp), %rax
+  movq -120(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_append_insert
+lm_list_append_insert:
+  movq -48(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -200(%rbp)
+  movq -48(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -208(%rbp)
+  movq -208(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -216(%rbp)
+  movq -200(%rbp), %rax
+  imulq $8, %rax
+  movq %rax, -224(%rbp)
+  movq -216(%rbp), %rax
+  addq -224(%rbp), %rax
+  movq %rax, -232(%rbp)
+  movq -56(%rbp), %rax
+  movq -232(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -200(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -240(%rbp)
+  movq -240(%rbp), %rax
+  movq -48(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq $0, %rax
+  jmp lm_list_append_epilogue
+lm_list_append_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_list_append:
+
+.globl lm_list_to_str
+lm_list_to_str:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $536, %rsp
+  movq %rdi, -48(%rbp)
+lm_list_to_str_entry:
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -56(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -64(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -72(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -48(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -80(%rbp)
+  movq -48(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -88(%rbp)
+  movq -88(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -96(%rbp)
+  leaq list_lbracket(%rip), %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq $0, %rax
+  movq -64(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_loop
+lm_list_to_str_loop:
+  movq -64(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -104(%rbp)
+  movq -104(%rbp), %rax
+  cmpq -80(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -112(%rbp)
+  movq -112(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_to_str_body
+  jmp lm_list_to_str_done
+lm_list_to_str_body:
+  movq -104(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -120(%rbp)
+  movq -120(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_to_str_elem
+  jmp lm_list_to_str_sep
+lm_list_to_str_next:
+  movq -104(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -128(%rbp)
+  movq -128(%rbp), %rax
+  movq -64(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_loop
+lm_list_to_str_done:
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -136(%rbp)
+  movq -136(%rbp), %rdi
+  leaq list_rbracket(%rip), %rsi
+  call lm_str_concat
+  mov -144(%rbp), rax
+  movq -144(%rbp), %rax
+  jmp lm_list_to_str_epilogue
+lm_list_to_str_sep:
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -152(%rbp)
+  movq -152(%rbp), %rdi
+  leaq list_comma(%rip), %rsi
+  call lm_str_concat
+  mov -160(%rbp), rax
+  movq -160(%rbp), %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_elem
+lm_list_to_str_elem:
+  movq -104(%rbp), %rax
+  imulq $8, %rax
+  movq %rax, -168(%rbp)
+  movq -96(%rbp), %rax
+  addq -168(%rbp), %rax
+  movq %rax, -176(%rbp)
+  movq -176(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -184(%rbp)
+  movq -184(%rbp), %rax
+  cmpq $65536, %rax
+  setb %al
+  movzbq %al, %rax
+  movq %rax, -192(%rbp)
+  movq -192(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_to_str_e_num
+  jmp lm_list_to_str_e_ptr
+lm_list_to_str_e_num:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $64, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -200(%rbp)
+  movq $11, %rax
+  movq -200(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -200(%rbp), %rax
+  addq $4, %rax
+  movq %rax, -208(%rbp)
+  movq $0, %rax
+  movq -208(%rbp), %rdx
+  movl %eax, (%rdx)
+  movq -200(%rbp), %rax
+  addq $63, %rax
+  movq %rax, -216(%rbp)
+  movq $0, %rax
+  movq -216(%rbp), %rdx
+  movb %al, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -224(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -216(%rbp), %rax
+  movq -224(%rbp), %rdx
+  movq %rax, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -232(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -240(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -184(%rbp), %rax
+  cmpq $0, %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -248(%rbp)
+  movq -248(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_to_str_i2s_neg_4
+  jmp lm_list_to_str_i2s_pos_4
+lm_list_to_str_e_ptr:
+  movq -184(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -256(%rbp)
+  movq -256(%rbp), %rax
+  cmpq $1162761549, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -264(%rbp)
+  movq -264(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_to_str_e_enum
+  jmp lm_list_to_str_e_str
+lm_list_to_str_e_done:
+  movq -72(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -272(%rbp)
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -280(%rbp)
+  movq -280(%rbp), %rdi
+  movq -272(%rbp), %rsi
+  call lm_str_concat
+  mov -288(%rbp), rax
+  movq -288(%rbp), %rax
+  movq -56(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_next
+lm_list_to_str_i2s_neg_4:
+  movq $1, %rax
+  movq -240(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -184(%rbp), %rax
+  negq %rax
+  movq %rax, -296(%rbp)
+  movq -296(%rbp), %rax
+  movq -232(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_i2s_loop_4
+lm_list_to_str_i2s_pos_4:
+  movq $0, %rax
+  movq -240(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -184(%rbp), %rax
+  movq -232(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_i2s_loop_4
+lm_list_to_str_i2s_loop_4:
+  movq -232(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -304(%rbp)
+  movq -304(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rdx, -312(%rbp)
+  movq -304(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rax, -320(%rbp)
+  movq -320(%rbp), %rax
+  movq -232(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -312(%rbp), %rax
+  addq $48, %rax
+  movq %rax, -328(%rbp)
+  movq -224(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -336(%rbp)
+  movq -336(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -344(%rbp)
+  movq -328(%rbp), %rax
+  movq -344(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -344(%rbp), %rax
+  movq -224(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -304(%rbp), %rax
+  cmpq $10, %rax
+  setge %al
+  movzbq %al, %rax
+  movq %rax, -352(%rbp)
+  movq -352(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_to_str_i2s_loop_4
+  jmp lm_list_to_str_i2s_sign_4
+lm_list_to_str_i2s_sign_4:
+  movq -240(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -360(%rbp)
+  movq -360(%rbp), %rax
+  cmpq $1, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -368(%rbp)
+  movq -368(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_to_str_i2s_minus_4
+  jmp lm_list_to_str_i2s_done_4
+lm_list_to_str_i2s_minus_4:
+  movq -224(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -376(%rbp)
+  movq -376(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -384(%rbp)
+  movq $45, %rax
+  movq -384(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -384(%rbp), %rax
+  movq -224(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_i2s_done_4
+lm_list_to_str_i2s_done_4:
+  movq -224(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -392(%rbp)
+  movq -216(%rbp), %rax
+  subq -392(%rbp), %rax
+  movq %rax, -400(%rbp)
+  movq -200(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -408(%rbp)
+  movq -400(%rbp), %rax
+  movq -408(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -200(%rbp), %rax
+  addq $16, %rax
+  movq %rax, -416(%rbp)
+  movq -400(%rbp), %rax
+  movq -416(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -200(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -424(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -432(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -432(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -400(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -440(%rbp)
+  jmp lm_list_to_str_d2s_copy_loop_4
+lm_list_to_str_d2s_copy_loop_4:
+  movq -432(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -448(%rbp)
+  movq -448(%rbp), %rax
+  cmpq -440(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -456(%rbp)
+  movq -456(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_to_str_d2s_copy_body_4
+  jmp lm_list_to_str_d2s_copy_done_4
+lm_list_to_str_d2s_copy_body_4:
+  movq -392(%rbp), %rax
+  addq -448(%rbp), %rax
+  movq %rax, -464(%rbp)
+  movq -464(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -472(%rbp)
+  movq -424(%rbp), %rax
+  addq -448(%rbp), %rax
+  movq %rax, -480(%rbp)
+  movq -472(%rbp), %rax
+  movq -480(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -448(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -488(%rbp)
+  movq -488(%rbp), %rax
+  movq -432(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_d2s_copy_loop_4
+lm_list_to_str_d2s_copy_done_4:
+  movq -200(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -496(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -504(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -504(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -400(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -512(%rbp)
+  jmp lm_list_to_str_i2s_copy_loop_4
+lm_list_to_str_i2s_copy_loop_4:
+  movq -504(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -520(%rbp)
+  movq -520(%rbp), %rax
+  cmpq -512(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -528(%rbp)
+  movq -528(%rbp), %rax
+  testq %rax, %rax
+  jne lm_list_to_str_i2s_copy_body_4
+  jmp lm_list_to_str_i2s_copy_done_4
+lm_list_to_str_i2s_copy_body_4:
+  movq -392(%rbp), %rax
+  addq -520(%rbp), %rax
+  movq %rax, -536(%rbp)
+  movq -536(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -544(%rbp)
+  movq -496(%rbp), %rax
+  addq -520(%rbp), %rax
+  movq %rax, -552(%rbp)
+  movq -544(%rbp), %rax
+  movq -552(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -520(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -560(%rbp)
+  movq -560(%rbp), %rax
+  movq -504(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_i2s_copy_loop_4
+lm_list_to_str_i2s_copy_done_4:
+  movq -200(%rbp), %rax
+  movq -72(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_e_done
+lm_list_to_str_e_enum:
+  movq -184(%rbp), %rdi
+  call lm_enum_to_str
+  mov -568(%rbp), rax
+  movq -568(%rbp), %rax
+  movq -72(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_e_done
+lm_list_to_str_e_str:
+  movq -184(%rbp), %rax
+  movq -72(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_list_to_str_e_done
+lm_list_to_str_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_list_to_str:
+
+.globl lm_rt_str_format
+lm_rt_str_format:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $808, %rsp
+  movq %rdi, -48(%rbp)
+  movq %rsi, -56(%rbp)
+lm_rt_str_format_entry:
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -64(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -72(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -56(%rbp), %rax
+  cmpq $65536, %rax
+  setae %al
+  movzbq %al, %rax
+  movq %rax, -80(%rbp)
+  movq -56(%rbp), %rax
+  movq $48, %rcx
+  shrq %cl, %rax
+  movq %rax, -88(%rbp)
+  movq -88(%rbp), %rax
+  cmpq $0, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -96(%rbp)
+  movq -80(%rbp), %rax
+  andq -96(%rbp), %rax
+  movq %rax, -104(%rbp)
+  movq -104(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_fmt_is_str
+  jmp lm_rt_str_format_fmt_is_num
+lm_rt_str_format_fmt_is_num:
+  movq -88(%rbp), %rax
+  cmpq $0, %rax
+  setne %al
+  movzbq %al, %rax
+  movq %rax, -112(%rbp)
+  movq -112(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_fmt_is_float
+  jmp lm_rt_str_format_fmt_is_int
+lm_rt_str_format_fmt_is_float:
+  movq $184614912, %rax
+  movq %rax, -120(%rbp)
+  movq $184614912, %rax
+  movq %rax, -128(%rbp)
+  movq -128(%rbp), %rdi
+  call lm_str_alloc
+  mov -136(%rbp), rax
+  movq -136(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -144(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -152(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -152(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -128(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -160(%rbp)
+  jmp lm_rt_str_format_f2s_copy_loop_2
+lm_rt_str_format_fmt_is_int:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $32, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -168(%rbp)
+  movq -168(%rbp), %rax
+  addq $31, %rax
+  movq %rax, -176(%rbp)
+  movq $0, %rax
+  movq -176(%rbp), %rdx
+  movb %al, (%rdx)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -184(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -192(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq -56(%rbp), %rax
+  movq -184(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -176(%rbp), %rax
+  movq -192(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_num_loop
+lm_rt_str_format_fmt_is_str:
+  movq -56(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -200(%rbp)
+  movq -200(%rbp), %rax
+  andq $4294967295, %rax
+  movq %rax, -208(%rbp)
+  movq -208(%rbp), %rax
+  cmpq $11, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -216(%rbp)
+  movq -216(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_fmt_is_rawstr
+  jmp lm_rt_str_format_fmt_is_enum_c
+lm_rt_str_format_fmt_proc:
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -224(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -224(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -48(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -232(%rbp)
+  movq -48(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -240(%rbp)
+  movq -240(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -248(%rbp)
+  jmp lm_rt_str_format_fmt_scan_loop
+lm_rt_str_format_fmt_slen_prep:
+  movq -64(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -256(%rbp)
+  movq -256(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -264(%rbp)
+  movq -264(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -272(%rbp)
+  movq -256(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -280(%rbp)
+  movq -280(%rbp), %rax
+  movq -64(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -272(%rbp), %rax
+  movq -72(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_proc
+lm_rt_str_format_f2s_copy_loop_2:
+  movq -152(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -288(%rbp)
+  movq -288(%rbp), %rax
+  cmpq -160(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -296(%rbp)
+  movq -296(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_f2s_copy_body_2
+  jmp lm_rt_str_format_f2s_copy_done_2
+lm_rt_str_format_f2s_copy_body_2:
+  movq -120(%rbp), %rax
+  addq -288(%rbp), %rax
+  movq %rax, -304(%rbp)
+  movq -304(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -312(%rbp)
+  movq -144(%rbp), %rax
+  addq -288(%rbp), %rax
+  movq %rax, -320(%rbp)
+  movq -312(%rbp), %rax
+  movq -320(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -288(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -328(%rbp)
+  movq -328(%rbp), %rax
+  movq -152(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_f2s_copy_loop_2
+lm_rt_str_format_f2s_copy_done_2:
+  movq $184614912, %rax
+  movq -136(%rbp), %rax
+  movq -64(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_slen_prep
+lm_rt_str_format_fmt_num_loop:
+  movq -184(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -336(%rbp)
+  movq -336(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rdx, -344(%rbp)
+  movq -336(%rbp), %rax
+  cqto
+  movq $10, %rcx
+  idivq %rcx
+  movq %rax, -352(%rbp)
+  movq -344(%rbp), %rax
+  addq $48, %rax
+  movq %rax, -360(%rbp)
+  movq -192(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -368(%rbp)
+  movq -368(%rbp), %rax
+  subq $1, %rax
+  movq %rax, -376(%rbp)
+  movq -360(%rbp), %rax
+  movq -376(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -352(%rbp), %rax
+  movq -184(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -376(%rbp), %rax
+  movq -192(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -352(%rbp), %rax
+  cmpq $1, %rax
+  setae %al
+  movzbq %al, %rax
+  movq %rax, -384(%rbp)
+  movq -384(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_fmt_num_loop
+  jmp lm_rt_str_format_fmt_num_done
+lm_rt_str_format_fmt_num_done:
+  movq -192(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -392(%rbp)
+  movq -176(%rbp), %rax
+  subq -392(%rbp), %rax
+  movq %rax, -400(%rbp)
+  movq -392(%rbp), %rax
+  movq -64(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -400(%rbp), %rax
+  movq -72(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_proc
+lm_rt_str_format_fmt_is_enum_p:
+  movq -56(%rbp), %rdi
+  call lm_enum_to_str
+  mov -408(%rbp), rax
+  movq -408(%rbp), %rax
+  movq -64(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_slen_prep
+lm_rt_str_format_fmt_is_enum_c:
+  movq -200(%rbp), %rax
+  cmpq $1162761549, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -416(%rbp)
+  movq -416(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_fmt_is_enum_p
+  jmp lm_rt_str_format_fmt_is_list
+lm_rt_str_format_fmt_is_list:
+  movq -56(%rbp), %rdi
+  call lm_list_to_str
+  mov -424(%rbp), rax
+  movq -424(%rbp), %rax
+  movq -64(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_slen_prep
+lm_rt_str_format_fmt_is_rawstr:
+  movq -56(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -432(%rbp)
+  movq -56(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -440(%rbp)
+  movq -440(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -448(%rbp)
+  movq -432(%rbp), %rax
+  movq -64(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -448(%rbp), %rax
+  movq -72(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_proc
+lm_rt_str_format_fmt_scan_loop:
+  movq -224(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -456(%rbp)
+  movq -456(%rbp), %rax
+  cmpq -248(%rbp), %rax
+  setge %al
+  movzbq %al, %rax
+  movq %rax, -464(%rbp)
+  movq -464(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_fmt_no_pct
+  jmp lm_rt_str_format_fmt_check_s
+lm_rt_str_format_fmt_check_s:
+  movq -232(%rbp), %rax
+  addq -456(%rbp), %rax
+  movq %rax, -472(%rbp)
+  movq -472(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -480(%rbp)
+  movq -480(%rbp), %rax
+  cmpq $37, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -488(%rbp)
+  movq -456(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -496(%rbp)
+  movq -232(%rbp), %rax
+  addq -496(%rbp), %rax
+  movq %rax, -504(%rbp)
+  movq -504(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -512(%rbp)
+  movq -512(%rbp), %rax
+  cmpq $115, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -520(%rbp)
+  movq -488(%rbp), %rax
+  andq -520(%rbp), %rax
+  movq %rax, -528(%rbp)
+  movq -480(%rbp), %rax
+  cmpq $123, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -536(%rbp)
+  movq -512(%rbp), %rax
+  cmpq $125, %rax
+  sete %al
+  movzbq %al, %rax
+  movq %rax, -544(%rbp)
+  movq -536(%rbp), %rax
+  andq -544(%rbp), %rax
+  movq %rax, -552(%rbp)
+  movq -528(%rbp), %rax
+  orq -552(%rbp), %rax
+  movq %rax, -560(%rbp)
+  movq -560(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_fmt_do_replace
+  jmp lm_rt_str_format_fmt_scan_next
+lm_rt_str_format_fmt_scan_next:
+  movq -456(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -568(%rbp)
+  movq -568(%rbp), %rax
+  movq -224(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_scan_loop
+lm_rt_str_format_fmt_no_pct:
+  movq -48(%rbp), %rax
+  jmp lm_rt_str_format_epilogue
+lm_rt_str_format_fmt_do_replace:
+  movq -64(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -576(%rbp)
+  movq -72(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -584(%rbp)
+  movq -456(%rbp), %rax
+  addq $2, %rax
+  movq %rax, -592(%rbp)
+  movq -248(%rbp), %rax
+  subq -592(%rbp), %rax
+  movq %rax, -600(%rbp)
+  movq -456(%rbp), %rax
+  addq -584(%rbp), %rax
+  movq %rax, -608(%rbp)
+  movq -608(%rbp), %rax
+  addq -600(%rbp), %rax
+  movq %rax, -616(%rbp)
+  movq -616(%rbp), %rdi
+  call lm_str_alloc
+  mov -624(%rbp), rax
+  movq -624(%rbp), %rax
+  addq $24, %rax
+  movq %rax, -632(%rbp)
+  # Bump Allocation: 8 bytes
+  movq heap_ptr(%rip), %rax
+  movq %rax, -640(%rbp)
+  addq $8, %rax
+  movq %rax, heap_ptr(%rip)
+  movq $0, %rax
+  movq -640(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_c1_loop
+lm_rt_str_format_fmt_c1_loop:
+  movq -640(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -648(%rbp)
+  movq -648(%rbp), %rax
+  cmpq -456(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -656(%rbp)
+  movq -656(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_fmt_c1_body
+  jmp lm_rt_str_format_fmt_c1_done
+lm_rt_str_format_fmt_c1_body:
+  movq -232(%rbp), %rax
+  addq -648(%rbp), %rax
+  movq %rax, -664(%rbp)
+  movq -664(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -672(%rbp)
+  movq -632(%rbp), %rax
+  addq -648(%rbp), %rax
+  movq %rax, -680(%rbp)
+  movq -672(%rbp), %rax
+  movq -680(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -648(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -688(%rbp)
+  movq -688(%rbp), %rax
+  movq -640(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_c1_loop
+lm_rt_str_format_fmt_c1_done:
+  movq $0, %rax
+  movq -640(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_c2_loop
+lm_rt_str_format_fmt_c2_loop:
+  movq -640(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -696(%rbp)
+  movq -696(%rbp), %rax
+  cmpq -584(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -704(%rbp)
+  movq -704(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_fmt_c2_body
+  jmp lm_rt_str_format_fmt_c2_done
+lm_rt_str_format_fmt_c2_body:
+  movq -576(%rbp), %rax
+  addq -696(%rbp), %rax
+  movq %rax, -712(%rbp)
+  movq -712(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -720(%rbp)
+  movq -456(%rbp), %rax
+  addq -696(%rbp), %rax
+  movq %rax, -728(%rbp)
+  movq -632(%rbp), %rax
+  addq -728(%rbp), %rax
+  movq %rax, -736(%rbp)
+  movq -720(%rbp), %rax
+  movq -736(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -696(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -744(%rbp)
+  movq -744(%rbp), %rax
+  movq -640(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_c2_loop
+lm_rt_str_format_fmt_c2_done:
+  movq $0, %rax
+  movq -640(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_c3_loop
+lm_rt_str_format_fmt_c3_loop:
+  movq -640(%rbp), %rax
+  movq (%rax), %rax
+  movq %rax, -752(%rbp)
+  movq -752(%rbp), %rax
+  cmpq -600(%rbp), %rax
+  setl %al
+  movzbq %al, %rax
+  movq %rax, -760(%rbp)
+  movq -760(%rbp), %rax
+  testq %rax, %rax
+  jne lm_rt_str_format_fmt_c3_body
+  jmp lm_rt_str_format_fmt_c3_done
+lm_rt_str_format_fmt_c3_body:
+  movq -456(%rbp), %rax
+  addq $2, %rax
+  movq %rax, -768(%rbp)
+  movq -768(%rbp), %rax
+  addq -752(%rbp), %rax
+  movq %rax, -776(%rbp)
+  movq -232(%rbp), %rax
+  addq -776(%rbp), %rax
+  movq %rax, -784(%rbp)
+  movq -784(%rbp), %rax
+  movzbq (%rax), %rax
+  movq %rax, -792(%rbp)
+  movq -456(%rbp), %rax
+  addq -584(%rbp), %rax
+  movq %rax, -800(%rbp)
+  movq -800(%rbp), %rax
+  addq -752(%rbp), %rax
+  movq %rax, -808(%rbp)
+  movq -632(%rbp), %rax
+  addq -808(%rbp), %rax
+  movq %rax, -816(%rbp)
+  movq -792(%rbp), %rax
+  movq -816(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -752(%rbp), %rax
+  addq $1, %rax
+  movq %rax, -824(%rbp)
+  movq -824(%rbp), %rax
+  movq -640(%rbp), %rdx
+  movq %rax, (%rdx)
+  jmp lm_rt_str_format_fmt_c3_loop
+lm_rt_str_format_fmt_c3_done:
+  movq -632(%rbp), %rax
+  addq -616(%rbp), %rax
+  movq %rax, -832(%rbp)
+  movq $0, %rax
+  movq -832(%rbp), %rdx
+  movb %al, (%rdx)
+  movq -624(%rbp), %rax
+  addq $8, %rax
+  movq %rax, -840(%rbp)
+  movq -616(%rbp), %rax
+  movq -840(%rbp), %rdx
+  movq %rax, (%rdx)
+  movq -624(%rbp), %rax
+  jmp lm_rt_str_format_epilogue
+lm_rt_str_format_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_rt_str_format:
+
+.globl lm_to_string
+lm_to_string:
+  .cfi_startproc
+  pushq %rbp
+  .cfi_def_cfa_offset 16
+  .cfi_offset 6, -16
+  movq %rsp, %rbp
+  .cfi_def_cfa_register 6
+  pushq %rbx
+  .cfi_offset 3, -24
+  pushq %r12
+  .cfi_offset 12, -32
+  pushq %r13
+  .cfi_offset 13, -40
+  pushq %r14
+  .cfi_offset 14, -48
+  pushq %r15
+  .cfi_offset 15, -56
+  subq $24, %rsp
+  movq %rdi, -48(%rbp)
+lm_to_string_entry:
+  movq $9, %rax
+  movq $0, %rdi
+  movq $32, %rsi
+  movq $3, %rdx
+  movq $34, %r10
+  movq $18446744073709551615, %r8
+  movq $0, %r9
+  syscall
+  movq %rax, -56(%rbp)
+  movq -48(%rbp), %rax
+  jmp lm_to_string_epilogue
+lm_to_string_epilogue:
+  leaq -40(%rbp), %rsp
+  popq %r15
+  popq %r14
+  popq %r13
+  popq %r12
+  popq %rbx
+  popq %rbp
+  .cfi_def_cfa 7, 8
+  ret
+  .cfi_endproc
+.Lfunc_end_lm_to_string:

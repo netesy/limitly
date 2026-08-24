@@ -2,8 +2,8 @@
 
 ## Summary
 - **Total tests:** 80
-- **Passed:** 22
-- **Failed:** 58 (0 Build Failures, 32 Runtime Failures/Crashes, 25 Output Mismatches, 1 Timeout)
+- **Passed:** 27
+- **Failed:** 53 (0 Build Failures, 32 Runtime Failures/Crashes, 20 Output Mismatches, 1 Timeout)
 
 ---
 
@@ -30,6 +30,11 @@
 - [x] `tests/regression/ownership_refactor_test.lm` - PASS
 - [x] `tests/stdlib/net/net_test.lm` - PASS
 - [x] `tests/stdlib/path/path_test.lm` - PASS
+- [x] `tests/strings/interpolation.lm` - PASS
+- [x] `tests/strings/operations.lm` - PASS
+- [x] `tests/strings/simple_string_test.lm` - PASS
+- [x] `tests/strings/string_runtime_test.lm` - PASS
+- [x] `tests/strings/lstring_api_test.lm` - PASS
 
 ---
 
@@ -65,11 +70,11 @@
 ### Category 3: String Interpolation & Format Module (Moderate - String Formatting)
 *Reason:* `STR_FORMAT` and `lm_rt_str_format` dynamic template string substitution for multi-variable placeholders.
 
-16. [ ] `tests/strings/interpolation.lm` - Output Mismatch: Format template placeholder substitution output diff.
-17. [ ] `tests/strings/operations.lm` - Output Mismatch: Substring/replace string operations format diff.
-18. [ ] `tests/strings/simple_string_test.lm` - Output Mismatch: Basic string format output diff.
-19. [ ] `tests/strings/string_runtime_test.lm` - Output Mismatch: String runtime format output diff.
-20. [ ] `tests/strings/lstring_api_test.lm` - Output Mismatch: Limit string API format output diff.
+16. [x] `tests/strings/interpolation.lm` - PASS
+17. [x] `tests/strings/operations.lm` - PASS
+18. [x] `tests/strings/simple_string_test.lm` - PASS
+19. [x] `tests/strings/string_runtime_test.lm` - PASS
+20. [x] `tests/strings/lstring_api_test.lm` - PASS
 21. [x] `tests/strings/test_string_interpolation.lm` - PASS
 22. [ ] `tests/stdlib/format_module_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in string format helper).
 23. [ ] `tests/stdlib/string_module_test.lm` - Output Mismatch: String module helper function output diff.
