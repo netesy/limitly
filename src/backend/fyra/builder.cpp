@@ -73,10 +73,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         builder_->createFunction(ir_name, ret_type, param_types);
     }
 
-    // 2. Build the top-level main function body
-    build_function_body(main_fn, lir_func);
-
-    // 3. Build the bodies of all other registered functions
+    // 2. Build the bodies of all registered functions FIRST (so module .__init__ functions are populated)
     for (const auto& func_name : registry.getFunctionNames()) {
         if (func_name == lir_func.name) continue;
         if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) continue;
@@ -93,6 +90,9 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             build_function_body(fn, *f);
         }
     }
+
+    // 3. Build the top-level main function body
+    build_function_body(main_fn, lir_func);
 
     FyraBuiltinFunctions::emit_used_builtins(current_module_.get(), builder_.get(), used_builtins_);
     return current_module_;
@@ -209,6 +209,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         builder_->createStore(param.get(), reg_slots[param_idx]);
         regs[param_idx] = param.get();
         param_idx++;
+    }
+
+    if (main_fn->getName() == "main") {
+        auto& registry = LIR::FunctionRegistry::getInstance();
+        for (const auto& func_name : registry.getFunctionNames()) {
+            if (func_name.ends_with(".__init__")) {
+                ir::Function* init_fn = current_module_->getFunction(func_name);
+                if (init_fn) {
+                    builder_->createCall(init_fn, {});
+                }
+            }
+        }
     }
 
     if (block_map.count(0)) {
