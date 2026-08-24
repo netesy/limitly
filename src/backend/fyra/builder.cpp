@@ -952,6 +952,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     value_arg = FyraBuiltinFunctions::emit_bool_to_str_inline(current_module_.get(), builder_.get(), value_arg);
                 } else if (reg_decimal_scales.count(inst.b) && reg_decimal_scales[inst.b] > 0) {
                     value_arg = FyraBuiltinFunctions::emit_decimal_to_str_inline(current_module_.get(), builder_.get(), value_arg, reg_decimal_scales[inst.b]);
+                } else if (inst.type_b != LIR::Type::Ptr && (!reg_types.count(inst.b) || reg_types[inst.b] != LIR::Type::Ptr)) {
+                    used_builtins_.insert("lm_to_string");
+                    ir::Function* fn_to_str = current_module_->getFunction("lm_to_string");
+                    if (!fn_to_str) fn_to_str = builder_->createFunction("lm_to_string", context_->getPointerType(context_->getIntegerType(8)), {context_->getIntegerType(64)});
+                    value_arg = builder_->createCall(fn_to_str, {value_arg});
                 }
                 store_reg(inst.dst, builder_->createCall(fn, {fmt_arg, value_arg}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
                 break;
@@ -1113,15 +1118,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::FrameGetField:
             case LIR::LIR_Op::FrameGetFieldAtomic: {
                 uint32_t field_idx = (inst.b != UINT32_MAX) ? inst.b : static_cast<uint32_t>(inst.imm);
-                ir::Value* addr = builder_->createAdd(load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
+                ir::Value* frame_ptr = load_reg(inst.a, LIR::Type::Ptr);
+                ir::Value* addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
                 store_reg(inst.dst, builder_->createLoad(addr), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::FrameSetField:
             case LIR::LIR_Op::FrameSetFieldAtomic: {
-                uint32_t field_idx = inst.a;
+                // In LIR_Inst for FrameSetField:
+                // dst = frame_ptr (object_reg), a = field_idx (offset), b = value_reg
+                ir::Value* frame_ptr = load_reg(inst.dst, LIR::Type::Ptr);
                 ir::Value* val = load_reg(inst.b, inst.type_b);
-                ir::Value* addr = builder_->createAdd(load_reg(inst.dst, inst.result_type), context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
+                uint32_t field_idx = inst.a;
+                ir::Value* addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
                 builder_->createStore(val, addr);
                 break;
             }
