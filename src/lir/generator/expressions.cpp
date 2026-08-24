@@ -628,9 +628,14 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
             
             // Load the actual module variable value using LoadGlobal
             Reg result = allocate_register();
-            LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
+            Type abi_type = expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::I64;
+            LIR_Inst load_inst(LIR_Op::LoadGlobal, abi_type, result, 0, 0);
             load_inst.func_name = qualified_name;
             emit_instruction(load_inst);
+            if (expr.inferred_type) {
+                set_register_language_type(result, expr.inferred_type);
+                set_register_abi_type(result, abi_type);
+            }
             return result;
         }
     }
@@ -639,12 +644,13 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
     if (!current_module_.empty() && current_module_ != "root") {
         std::string qualified_name = current_module_ + "." + expr.name;
         Reg result = allocate_register();
-        LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
+        Type abi_type = expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::I64;
+        LIR_Inst load_inst(LIR_Op::LoadGlobal, abi_type, result, 0, 0);
         load_inst.func_name = qualified_name;
         emit_instruction(load_inst);
         if (expr.inferred_type) {
             set_register_language_type(result, expr.inferred_type);
-            set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+            set_register_abi_type(result, abi_type);
         }
         return result;
     }
