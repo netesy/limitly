@@ -988,6 +988,63 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->createRet(nullptr);
     }
 
+    // 5b. lm_channel_pop(list_ptr: i64) -> i64
+    ir::Function* fn_pop = module->getFunction("lm_channel_pop");
+    if (!fn_pop) fn_pop = builder->createFunction("lm_channel_pop", i64, {i64});
+    if (fn_pop->getBasicBlocks().empty()) {
+        ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_pop);
+        ir::BasicBlock* b_empty = builder->createBasicBlock("empty", fn_pop);
+        ir::BasicBlock* b_pop   = builder->createBasicBlock("pop", fn_pop);
+        ir::BasicBlock* b_shift_loop = builder->createBasicBlock("shift_loop", fn_pop);
+        ir::BasicBlock* b_shift_body = builder->createBasicBlock("shift_body", fn_pop);
+        ir::BasicBlock* b_shift_done = builder->createBasicBlock("shift_done", fn_pop);
+
+        builder->setInsertPoint(b_entry);
+        ir::Value* list_ptr = fn_pop->getParameters().front().get();
+
+        ir::Value* len = builder->createLoad(list_ptr);
+        ir::Value* is_empty = builder->createCsle(len, ctx->getConstantInt(i64, 0));
+        builder->createBr(is_empty, b_empty, b_pop);
+
+        builder->setInsertPoint(b_empty);
+        // Return VAL_NIL (0x7FFFFFFFFFFFFFFF) when empty
+        builder->createRet(ctx->getConstantInt(i64, 0x7FFFFFFFFFFFFFFF));
+
+        builder->setInsertPoint(b_pop);
+        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* data = builder->createLoad(data_ptr_slot);
+        ir::Value* ret_val = builder->createLoad(data);
+
+        ir::Value* new_len = builder->createSub(len, ctx->getConstantInt(i64, 1));
+        builder->createStore(new_len, list_ptr);
+
+        ir::Instruction* k_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        builder->createStore(ctx->getConstantInt(i64, 0), k_slot);
+        builder->createJmp(b_shift_loop);
+
+        builder->setInsertPoint(b_shift_loop);
+        ir::Value* k = builder->createLoad(k_slot);
+        ir::Value* cond = builder->createCslt(k, new_len);
+        builder->createBr(cond, b_shift_body, b_shift_done);
+
+        builder->setInsertPoint(b_shift_body);
+        ir::Value* src_idx = builder->createAdd(k, ctx->getConstantInt(i64, 1));
+        ir::Value* src_off = builder->createMul(src_idx, ctx->getConstantInt(i64, 8));
+        ir::Value* src_ptr = builder->createAdd(data, src_off);
+        ir::Value* item = builder->createLoad(src_ptr);
+
+        ir::Value* dst_off = builder->createMul(k, ctx->getConstantInt(i64, 8));
+        ir::Value* dst_ptr = builder->createAdd(data, dst_off);
+        builder->createStore(item, dst_ptr);
+
+        ir::Value* next_k = builder->createAdd(k, ctx->getConstantInt(i64, 1));
+        builder->createStore(next_k, k_slot);
+        builder->createJmp(b_shift_loop);
+
+        builder->setInsertPoint(b_shift_done);
+        builder->createRet(ret_val);
+    }
+
     // 6. lm_list_to_str(list_ptr: i64) -> i64
     ir::Function* fn_l2s = module->getFunction("lm_list_to_str");
     if (!fn_l2s) fn_l2s = builder->createFunction("lm_list_to_str", i64, {i64});

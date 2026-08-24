@@ -2,8 +2,8 @@
 
 ## Summary
 - **Total tests:** 80
-- **Passed:** 38
-- **Failed:** 42 (0 Build Failures, 24 Runtime Failures/Crashes, 17 Output Mismatches, 1 Timeout)
+- **Passed:** 57
+- **Failed:** 23 (0 Build Failures)
 
 ---
 
