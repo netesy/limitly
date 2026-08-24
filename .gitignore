@@ -40,6 +40,7 @@ qrc_*.cpp
 build/
 bin/
 *.exe
+*.s
 
 # Vendored dependencies (keep the structure but ignore generated files within)
 # vendor/fyra/

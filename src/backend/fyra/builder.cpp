@@ -932,7 +932,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::ToString: {
                 used_builtins_.insert("lm_to_string");
                 ir::Function* fn = current_module_->getFunction("lm_to_string");
-                if (!fn) fn = builder_->createFunction("lm_to_string", context_->getPointerType(context_->getIntegerType(8)), {context_->getIntegerType(64)});
+                if (!fn) fn = builder_->createFunction("lm_to_string", context_->getIntegerType(64), {context_->getIntegerType(64)});
                 store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
                 break;
             }
