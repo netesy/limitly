@@ -87,14 +87,14 @@
 ### Category 4: Module Import & Variable Scoping (Moderate - Codegen & Globals)
 *Reason:* Global variable scoping and module symbol relocation in AOT generated executables.
 
-27. [ ] `tests/modules/basic_import_test.lm` - Output Mismatch: Imported function call print output diff.
-28. [ ] `tests/modules/alias_import_test.lm` - Output Mismatch: Alias import symbol resolution output diff.
-29. [ ] `tests/modules/comprehensive_module_test.lm` - Output Mismatch: Comprehensive module symbol resolution diff.
+27. [x] `tests/modules/basic_import_test.lm` - PASS
+28. [x] `tests/modules/alias_import_test.lm` - PASS
+29. [x] `tests/modules/comprehensive_module_test.lm` - PASS
 30. [x] `tests/modules/function_params_test.lm` - PASS
-31. [ ] `tests/modules/hide_filter_test.lm` - Output Mismatch: Module filter export output diff.
-32. [ ] `tests/modules/module_caching_test.lm` - Output Mismatch: Module caching symbol resolution output diff.
-33. [ ] `tests/modules/multiple_imports_test.lm` - Output Mismatch: Multiple module import symbol resolution output diff.
-34. [ ] `tests/modules/show_filter_test.lm` - Output Mismatch: Show filter export output diff.
+31. [x] `tests/modules/hide_filter_test.lm` - PASS
+32. [x] `tests/modules/module_caching_test.lm` - PASS
+33. [x] `tests/modules/multiple_imports_test.lm` - PASS
+34. [x] `tests/modules/show_filter_test.lm` - PASS
 
 ---
 
