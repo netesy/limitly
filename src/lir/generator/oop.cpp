@@ -44,9 +44,10 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     cfg_context_.building_cfg = false;
     cfg_context_.current_block = nullptr;
     
-    // Register 'this' parameter as first parameter (register 0)
+    // Register 'this' and 'self' parameter as first parameter (register 0)
     this_register_ = 0;
     bind_variable("this", 0);
+    bind_variable("self", 0);
     auto any_type = std::make_shared<::Type>(::TypeTag::Any);
     set_register_language_type(0, any_type);
     set_register_abi_type(0, Type::Ptr);
@@ -91,6 +92,7 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     
     auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
     lir_func->setInstructions(result->instructions);
+    func_manager.registerFunction(lir_func);
 }
 
 
@@ -156,6 +158,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
         bind_variable(method.parameters[i].first, static_cast<Reg>(reg_index));
         set_register_type(static_cast<Reg>(reg_index), nullptr);
     }
+    bind_variable("self", 0);
     
     // Register optional parameters
     for (size_t i = 0; i < method.optionalParams.size(); ++i) {
@@ -222,6 +225,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
+    func_manager.registerFunction(lir_func);
 
     // Update function table
     auto& func_info = function_table_[full_method_name];
@@ -271,6 +275,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
         bind_variable(init_method.parameters[i].first, static_cast<Reg>(reg_index));
         set_register_type(static_cast<Reg>(reg_index), nullptr);
     }
+    bind_variable("self", 0);
     
     // Register optional init parameters
     for (size_t i = 0; i < init_method.optionalParams.size(); ++i) {
@@ -337,6 +342,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
+    func_manager.registerFunction(lir_func);
 
     // Update function table
     auto& func_info = function_table_[full_method_name];
@@ -380,6 +386,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     set_register_language_type(0, frame_type);
     set_register_abi_type(0, Type::Ptr);
     
+    bind_variable("self", 0);
     // 1. Recursive cleanup: Call deinit on all frame-typed fields
     auto frame_it = frame_table_.find(frame_name);
     if (frame_it != frame_table_.end()) {
@@ -435,6 +442,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
+    func_manager.registerFunction(lir_func);
 
     // Update function table
     auto& func_info = function_table_[full_method_name];
