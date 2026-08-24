@@ -91,6 +91,9 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     
     auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
     lir_func->setInstructions(result->instructions);
+
+    // Register in FunctionRegistry so builder.cpp generates code for it
+    FunctionRegistry::getInstance().registerFunction(full_method_name, std::move(result));
 }
 
 
@@ -223,6 +226,9 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
 
+    // Register in FunctionRegistry so builder.cpp generates code for it
+    FunctionRegistry::getInstance().registerFunction(full_method_name, std::move(result));
+
     // Update function table
     auto& func_info = function_table_[full_method_name];
     func_info.lir_function = nullptr; // Not needed since FunctionRegistry manages it
@@ -338,6 +344,9 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
 
+    // Register in FunctionRegistry so builder.cpp generates code for it
+    FunctionRegistry::getInstance().registerFunction(full_method_name, std::move(result));
+
     // Update function table
     auto& func_info = function_table_[full_method_name];
     func_info.lir_function = nullptr; // Not needed since FunctionRegistry manages it
@@ -435,6 +444,9 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     
     // Copy the instructions from our LIR_Function
     lir_func->setInstructions(result->instructions);
+
+    // Register in FunctionRegistry so builder.cpp generates code for it
+    FunctionRegistry::getInstance().registerFunction(full_method_name, std::move(result));
 
     // Update function table
     auto& func_info = function_table_[full_method_name];

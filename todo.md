@@ -2,8 +2,8 @@
 
 ## Summary
 - **Total tests:** 80
-- **Passed:** 36
-- **Failed:** 44 (0 Build Failures, 26 Runtime Failures/Crashes, 17 Output Mismatches, 1 Timeout)
+- **Passed:** 41
+- **Failed:** 39 (0 Build Failures, 26 Runtime Failures/Crashes, 12 Output Mismatches, 1 Timeout)
 
 ---
 
@@ -44,6 +44,11 @@
 - [x] `tests/types/refined_types.lm` - PASS
 - [x] `tests/types/structural_type_tests.lm` - PASS
 - [x] `tests/types/unions.lm` - PASS
+- [x] `tests/oop/frame_declaration.lm` - PASS
+- [x] `tests/oop/composition_test.lm` - PASS
+- [x] `tests/oop/traits_inheritance.lm` - PASS
+- [x] `tests/oop/visibility_test.lm` - PASS
+- [x] `tests/regression/trait_dispatch_test.lm` - PASS
 
 ---
 
@@ -125,12 +130,12 @@
 ### Category 6: OOP & Frame Field Lowering (Hard - Memory & Vtables)
 *Reason:* Frame field offset calculations and dynamic trait/method dispatch.
 
-44. [ ] `tests/oop/frame_declaration.lm` - Output Mismatch: Frame instance field access output diff.
-45. [ ] `tests/oop/composition_test.lm` - Output Mismatch: Composed frame method call output diff.
+44. [x] `tests/oop/frame_declaration.lm` - PASS
+45. [x] `tests/oop/composition_test.lm` - PASS
 46. [ ] `tests/oop/traits_dynamic.lm` - Output Mismatch: Dynamic trait dispatch output diff.
-47. [ ] `tests/oop/traits_inheritance.lm` - Output Mismatch: Trait inheritance output diff.
-48. [ ] `tests/oop/visibility_test.lm` - Output Mismatch: Frame visibility check output diff.
-49. [ ] `tests/regression/trait_dispatch_test.lm` - Output Mismatch: Trait dispatch output diff.
+47. [x] `tests/oop/traits_inheritance.lm` - PASS
+48. [x] `tests/oop/visibility_test.lm` - PASS
+49. [x] `tests/regression/trait_dispatch_test.lm` - PASS
 
 ---
 
