@@ -171,7 +171,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::DecRescale: execute_arithmetic(pc); break;
             case LIR::LIR_Op::CmpEQ: case LIR::LIR_Op::CmpNEQ: case LIR::LIR_Op::CmpLT: case LIR::LIR_Op::CmpLE:
             case LIR::LIR_Op::CmpGT: case LIR::LIR_Op::CmpGE: execute_comparison(pc); break;
-            case LIR::LIR_Op::ListCreate: case LIR::LIR_Op::ListAppend: case LIR::LIR_Op::ListLen: case LIR::LIR_Op::ListIndex:
+            case LIR::LIR_Op::ListCreate: case LIR::LIR_Op::ListAppend: case LIR::LIR_Op::ListLen: case LIR::LIR_Op::ListIndex: case LIR::LIR_Op::ListSet:
             case LIR::LIR_Op::DictCreate: case LIR::LIR_Op::DictSet: case LIR::LIR_Op::DictGet: case LIR::LIR_Op::DictHas:
             case LIR::LIR_Op::DictLen: case LIR::LIR_Op::DictItems: case LIR::LIR_Op::TupleCreate: case LIR::LIR_Op::TupleSet:
             case LIR::LIR_Op::TupleGet: case LIR::LIR_Op::TupleLen: execute_collections(pc); break;

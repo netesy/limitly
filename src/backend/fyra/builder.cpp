@@ -355,10 +355,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             ir::GlobalVariable* gv_bytes = FyraBuiltinFunctions::get_or_create_global_str(
                                 current_module_.get(), builder_.get(), gv_name, s
                             );
-                            ir::Value* str_hdr = FyraBuiltinFunctions::create_string_header(
-                                current_module_.get(), builder_.get(), gv_bytes, s_len
-                            );
-                            store_reg(inst.dst, str_hdr, LIR::Type::Ptr);
+                            store_reg(inst.dst, gv_bytes, LIR::Type::Ptr);
                         } else if (box->type == LM_BOX_INT) {
                             uint64_t actual_val = (inst.result_type == LIR::Type::I64) ? box->value.as_int : BOX_INT(box->value.as_int);
                             if (inst.result_type == LIR::Type::I64) reg_int_values[inst.dst] = box->value.as_int;
@@ -728,10 +725,94 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 std::vector<ir::Value*> args;
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
                 ir::Value* callee = load_reg(inst.a, inst.type_a);
-                ir::Value* res = builder_->createCall(callee, args, lir_type_to_fyra_type(inst.result_type));
+
+                std::string cid = std::to_string(label_counter_++);
+                ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                ir::BasicBlock* b_dispatch = builder_->createBasicBlock("ind_disp_" + cid, cur_fn);
+                ir::BasicBlock* b_raw_call = builder_->createBasicBlock("ind_raw_" + cid, cur_fn);
+                ir::BasicBlock* b_done = builder_->createBasicBlock("ind_done_" + cid, cur_fn);
+
+                ir::Instruction* res_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), res_slot);
+
+                ir::Value* is_ge_ptr = builder_->createCuge(callee, context_->getConstantInt(context_->getIntegerType(64), 65536));
+                ir::Value* high_bits = builder_->createShr(callee, context_->getConstantInt(context_->getIntegerType(64), 48));
+                ir::Value* high_zero = builder_->createCeq(high_bits, context_->getConstantInt(context_->getIntegerType(64), 0));
+                ir::Value* is_valid_ptr = builder_->createAnd(is_ge_ptr, high_zero);
+
+                builder_->createBr(is_valid_ptr, b_dispatch, b_raw_call);
+
+                builder_->setInsertPoint(b_dispatch);
+                ir::Value* magic = builder_->createLoad(callee);
+                ir::Value* type_id = builder_->createAnd(magic, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
+                ir::Value* is_str = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), 11));
+
+                ir::BasicBlock* b_str_dispatch = builder_->createBasicBlock("ind_str_" + cid, cur_fn);
+                builder_->createBr(is_str, b_str_dispatch, b_raw_call);
+
+                builder_->setInsertPoint(b_str_dispatch);
+                used_builtins_.insert("lm_key_eq");
+                ir::Function* fn_eq = current_module_->getFunction("lm_key_eq");
+                if (!fn_eq) fn_eq = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
+
+                std::vector<ir::Function*> cand_funcs;
+                for (const auto& f : current_module_->getFunctions()) {
+                    if (f->getName() != "main" && !f->getName().starts_with("lm_") && !f->getName().starts_with("_builtin_")) {
+                        cand_funcs.push_back(f.get());
+                    }
+                }
+
+                ir::BasicBlock* cur_check_bb = b_str_dispatch;
+                for (size_t fi = 0; fi < cand_funcs.size(); ++fi) {
+                    ir::Function* target_f = cand_funcs[fi];
+                    std::string f_name = target_f->getName();
+
+                    builder_->setInsertPoint(cur_check_bb);
+                    ir::GlobalVariable* gv_fname = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "fn_str_" + f_name, f_name);
+                    ir::Value* eq_res = builder_->createCall(fn_eq, {callee, gv_fname});
+                    ir::Value* is_match = builder_->createCne(eq_res, context_->getConstantInt(context_->getIntegerType(64), 0));
+
+                    // Also check unqualified suffix match if qualified
+                    size_t dot_p = f_name.rfind('.');
+                    if (dot_p != std::string::npos) {
+                        std::string unq_name = f_name.substr(dot_p + 1);
+                        ir::GlobalVariable* gv_unq = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "fn_unq_" + unq_name + "_" + std::to_string(fi), unq_name);
+                        ir::Value* unq_eq = builder_->createCall(fn_eq, {callee, gv_unq});
+                        ir::Value* unq_match = builder_->createCne(unq_eq, context_->getConstantInt(context_->getIntegerType(64), 0));
+                        is_match = builder_->createOr(is_match, unq_match);
+                    }
+
+                    ir::BasicBlock* b_match = builder_->createBasicBlock("ind_m_" + std::to_string(fi) + "_" + cid, cur_fn);
+                    ir::BasicBlock* b_next_check = builder_->createBasicBlock("ind_next_" + std::to_string(fi) + "_" + cid, cur_fn);
+
+                    builder_->createBr(is_match, b_match, b_next_check);
+
+                    builder_->setInsertPoint(b_match);
+                    std::vector<ir::Value*> call_args_matching;
+                    for (size_t k = 0; k < target_f->getParameters().size(); ++k) {
+                        if (k < args.size()) call_args_matching.push_back(args[k]);
+                        else call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
+                    }
+                    ir::Value* call_res = builder_->createCall(target_f, call_args_matching);
+                    builder_->createStore(call_res, res_slot);
+                    builder_->createJmp(b_done);
+
+                    cur_check_bb = b_next_check;
+                }
+
+                builder_->setInsertPoint(cur_check_bb);
+                builder_->createJmp(b_raw_call);
+
+                builder_->setInsertPoint(b_raw_call);
+                ir::Value* raw_res = builder_->createCall(callee, args, lir_type_to_fyra_type(inst.result_type));
+                builder_->createStore(raw_res, res_slot);
+                builder_->createJmp(b_done);
+
+                builder_->setInsertPoint(b_done);
+                ir::Value* final_res = builder_->createLoad(res_slot);
                 if (inst.dst != 0) {
                     reg_types[inst.dst] = inst.result_type;
-                    store_reg(inst.dst, res, inst.result_type);
+                    store_reg(inst.dst, final_res, inst.result_type);
                 }
                 break;
             }
@@ -1013,7 +1094,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 used_builtins_.insert("lm_list_set");
                 ir::Function* fn = current_module_->getFunction("lm_list_set");
                 if (!fn) fn = builder_->createFunction("lm_list_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
-                builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), load_reg(inst.dst, inst.result_type)});
+                builder_->createCall(fn, {load_reg(inst.dst, inst.result_type), load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)});
                 break;
             }
             case LIR::LIR_Op::StringIndex: {
@@ -1131,7 +1212,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 uint32_t bytes = (fields > 0 ? fields : 2) * 8;
                 ir::Type* type = current_module_->getType(name);
                 if (!type) { ir::StructType* st = context_->createStructType(name); st->setBody({context_->getIntegerType(64), context_->getIntegerType(64)}); current_module_->addType(name, st); type = st; }
-                store_reg(inst.dst, builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), bytes), type), inst.result_type);
+                ir::Value* frame_ptr = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), bytes)}, lir_type_to_fyra_type(inst.result_type));
+                // Zero out allocated frame memory
+                for (uint32_t f_idx = 0; f_idx < (fields > 0 ? fields : 2); ++f_idx) {
+                    ir::Value* addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), f_idx * 8));
+                    builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), addr);
+                }
+                store_reg(inst.dst, frame_ptr, inst.result_type);
                 break;
             }
             case LIR::LIR_Op::FrameGetField:

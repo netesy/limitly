@@ -2,8 +2,8 @@
 
 ## Summary
 - **Total tests:** 80
-- **Passed:** 41
-- **Failed:** 39 (0 Build Failures, 26 Runtime Failures/Crashes, 12 Output Mismatches, 1 Timeout)
+- **Passed:** 50
+- **Failed:** 30 (0 Build Failures, 18 Runtime Failures/Crashes, 11 Output Mismatches, 1 Timeout)
 
 ---
 
@@ -49,6 +49,15 @@
 - [x] `tests/oop/traits_inheritance.lm` - PASS
 - [x] `tests/oop/visibility_test.lm` - PASS
 - [x] `tests/regression/trait_dispatch_test.lm` - PASS
+- [x] `tests/stdlib/collections/list_test.lm` - PASS
+- [x] `tests/stdlib/collections/vector_test.lm` - PASS
+- [x] `tests/stdlib/collections/arraylist_test.lm` - PASS
+- [x] `tests/stdlib/collections/queue_stack_test.lm` - PASS
+- [x] `tests/stdlib/collections/queue_stack_bitset_test.lm` - PASS
+- [x] `tests/stdlib/collections/priority_queue_test.lm` - PASS
+- [x] `tests/stdlib/collections_module_test.lm` - PASS
+- [x] `tests/stdlib/algorithm_module_test.lm` - PASS
+- [x] `tests/stdlib/sort/sort_test.lm` - PASS
 
 ---
 
@@ -142,15 +151,15 @@
 ### Category 7: Standard Library Collections & Algorithms (Hard - Memory Allocation & Collections)
 *Reason:* Dynamic array reallocation and list/dict/tuple memory layout in Fyra IR runtime functions.
 
-50. [ ] `tests/stdlib/collections/list_test.lm` - Output Mismatch: List operation diff.
-51. [ ] `tests/stdlib/collections/vector_test.lm` - Output Mismatch: Vector operation diff.
-52. [ ] `tests/stdlib/collections/arraylist_test.lm` - Output Mismatch: ArrayList operation diff.
-53. [ ] `tests/stdlib/collections/queue_stack_test.lm` - Output Mismatch: Queue/Stack operation diff.
-54. [ ] `tests/stdlib/collections/queue_stack_bitset_test.lm` - Output Mismatch: BitSet operation diff.
-55. [ ] `tests/stdlib/collections/priority_queue_test.lm` - Output Mismatch: PriorityQueue operation diff.
-56. [ ] `tests/stdlib/collections_module_test.lm` - Output Mismatch: Collections module operation diff.
-57. [ ] `tests/stdlib/algorithm_module_test.lm` - Output Mismatch: Algorithm module operation diff.
-58. [ ] `tests/stdlib/sort/sort_test.lm` - Output Mismatch: Sorting algorithm operation diff.
+50. [x] `tests/stdlib/collections/list_test.lm` - PASS
+51. [x] `tests/stdlib/collections/vector_test.lm` - PASS
+52. [x] `tests/stdlib/collections/arraylist_test.lm` - PASS
+53. [x] `tests/stdlib/collections/queue_stack_test.lm` - PASS
+54. [x] `tests/stdlib/collections/queue_stack_bitset_test.lm` - PASS
+55. [x] `tests/stdlib/collections/priority_queue_test.lm` - PASS
+56. [x] `tests/stdlib/collections_module_test.lm` - PASS
+57. [x] `tests/stdlib/algorithm_module_test.lm` - PASS
+58. [x] `tests/stdlib/sort/sort_test.lm` - PASS
 
 ---
 
