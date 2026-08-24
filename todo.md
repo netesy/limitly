@@ -142,15 +142,15 @@
 ### Category 7: Standard Library Collections & Algorithms (Hard - Memory Allocation & Collections)
 *Reason:* Dynamic array reallocation and list/dict/tuple memory layout in Fyra IR runtime functions.
 
-50. [ ] `tests/stdlib/collections/list_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in list append/get).
-51. [ ] `tests/stdlib/collections/vector_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in vector resize).
-52. [ ] `tests/stdlib/collections/arraylist_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in arraylist).
-53. [ ] `tests/stdlib/collections/queue_stack_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in queue/stack push/pop).
-54. [ ] `tests/stdlib/collections/queue_stack_bitset_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in bitset operations).
-55. [ ] `tests/stdlib/collections/priority_queue_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in priority queue heapify).
-56. [ ] `tests/stdlib/collections_module_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in collections module).
-57. [ ] `tests/stdlib/algorithm_module_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in algorithm sort/search).
-58. [ ] `tests/stdlib/sort/sort_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in sorting algorithm).
+50. [ ] `tests/stdlib/collections/list_test.lm` - Output Mismatch: List operation diff.
+51. [ ] `tests/stdlib/collections/vector_test.lm` - Output Mismatch: Vector operation diff.
+52. [ ] `tests/stdlib/collections/arraylist_test.lm` - Output Mismatch: ArrayList operation diff.
+53. [ ] `tests/stdlib/collections/queue_stack_test.lm` - Output Mismatch: Queue/Stack operation diff.
+54. [ ] `tests/stdlib/collections/queue_stack_bitset_test.lm` - Output Mismatch: BitSet operation diff.
+55. [ ] `tests/stdlib/collections/priority_queue_test.lm` - Output Mismatch: PriorityQueue operation diff.
+56. [ ] `tests/stdlib/collections_module_test.lm` - Output Mismatch: Collections module operation diff.
+57. [ ] `tests/stdlib/algorithm_module_test.lm` - Output Mismatch: Algorithm module operation diff.
+58. [ ] `tests/stdlib/sort/sort_test.lm` - Output Mismatch: Sorting algorithm operation diff.
 
 ---
 

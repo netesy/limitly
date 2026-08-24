@@ -419,6 +419,29 @@ ir::Value* FyraBuiltinFunctions::emit_decimal_to_str_inline(ir::Module* module,
     builder->createJmp(b_copy_loop_d);
 
     builder->setInsertPoint(b_copy_done_d);
+    ir::Value* dst_start = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+    ir::Instruction* copy_idx = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx);
+    ir::Value* copy_len = builder->createAdd(str_len, ctx->getConstantInt(i64, 1));
+
+    ir::BasicBlock* b_copy_loop = builder->createBasicBlock("i2s_copy_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_body = builder->createBasicBlock("i2s_copy_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_done = builder->createBasicBlock("i2s_copy_done_" + s_uid, cur_fn);
+
+    builder->createJmp(b_copy_loop);
+
+    builder->setInsertPoint(b_copy_loop);
+    ir::Value* c_i = builder->createLoad(copy_idx);
+    ir::Value* c_cond = builder->createCslt(c_i, copy_len);
+    builder->createBr(c_cond, b_copy_body, b_copy_done);
+
+    builder->setInsertPoint(b_copy_body);
+    ir::Value* ch_i = builder->createLoadub(builder->createAdd(str_start, c_i));
+    builder->createStoreb(ch_i, builder->createAdd(dst_start, c_i));
+    builder->createStore(builder->createAdd(c_i, ctx->getConstantInt(i64, 1)), copy_idx);
+    builder->createJmp(b_copy_loop);
+
+    builder->setInsertPoint(b_copy_done);
 
     return buf_ptr;
 }
@@ -527,6 +550,29 @@ ir::Value* FyraBuiltinFunctions::emit_int_to_str_inline(ir::Module* module,
     builder->createJmp(b_copy_loop_d);
 
     builder->setInsertPoint(b_copy_done_d);
+    ir::Value* dst_start = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+    ir::Instruction* copy_idx = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx);
+    ir::Value* copy_len = builder->createAdd(str_len, ctx->getConstantInt(i64, 1));
+
+    ir::BasicBlock* b_copy_loop = builder->createBasicBlock("i2s_copy_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_body = builder->createBasicBlock("i2s_copy_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_done = builder->createBasicBlock("i2s_copy_done_" + s_uid, cur_fn);
+
+    builder->createJmp(b_copy_loop);
+
+    builder->setInsertPoint(b_copy_loop);
+    ir::Value* c_i = builder->createLoad(copy_idx);
+    ir::Value* c_cond = builder->createCslt(c_i, copy_len);
+    builder->createBr(c_cond, b_copy_body, b_copy_done);
+
+    builder->setInsertPoint(b_copy_body);
+    ir::Value* ch_i = builder->createLoadub(builder->createAdd(str_start, c_i));
+    builder->createStoreb(ch_i, builder->createAdd(dst_start, c_i));
+    builder->createStore(builder->createAdd(c_i, ctx->getConstantInt(i64, 1)), copy_idx);
+    builder->createJmp(b_copy_loop);
+
+    builder->setInsertPoint(b_copy_done);
 
     return buf_ptr;
 }
@@ -1240,6 +1286,11 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* key = it->get(); it++;
         ir::Value* val = it->get();
 
+        ir::Value* dict_is_null = builder->createCeq(dict_ptr, ctx->getConstantInt(i64, 0));
+        ir::BasicBlock* b_valid_dict = builder->createBasicBlock("valid_dict", fn_set);
+        builder->createBr(dict_is_null, b_done, b_valid_dict);
+
+        builder->setInsertPoint(b_valid_dict);
         ir::Value* keys_slot = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 16));
         ir::Value* keys = builder->createLoad(keys_slot);
         ir::Value* vals_slot = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 24));
@@ -1309,6 +1360,11 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* dict_ptr = it->get(); it++;
         ir::Value* key = it->get();
 
+        ir::Value* get_dict_null = builder->createCeq(dict_ptr, ctx->getConstantInt(i64, 0));
+        ir::BasicBlock* b_valid_get = builder->createBasicBlock("valid_get", fn_get);
+        builder->createBr(get_dict_null, b_not_found, b_valid_get);
+
+        builder->setInsertPoint(b_valid_get);
         ir::Value* keys_slot = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 16));
         ir::Value* keys = builder->createLoad(keys_slot);
         ir::Value* vals_slot = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 24));
