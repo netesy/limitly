@@ -829,18 +829,93 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
     if (!fn_set) fn_set = builder->createFunction("lm_list_set", void_ty, {i64, i64, i64});
     if (fn_set->getBasicBlocks().empty()) {
         ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_set);
+        ir::BasicBlock* b_realloc = builder->createBasicBlock("set_realloc", fn_set);
+        ir::BasicBlock* b_copy_loop = builder->createBasicBlock("set_copy_loop", fn_set);
+        ir::BasicBlock* b_copy_body = builder->createBasicBlock("set_copy_body", fn_set);
+        ir::BasicBlock* b_copy_done = builder->createBasicBlock("set_copy_done", fn_set);
+        ir::BasicBlock* b_update_len = builder->createBasicBlock("set_update_len", fn_set);
+        ir::BasicBlock* b_store_elem = builder->createBasicBlock("set_store_elem", fn_set);
+
         builder->setInsertPoint(b_entry);
         auto it = fn_set->getParameters().begin();
-        ir::Value* list_ptr = it->get();
-        it++;
-        ir::Value* index = it->get();
-        it++;
+        ir::Value* list_ptr = it->get(); it++;
+        ir::Value* index = it->get(); it++;
         ir::Value* val = it->get();
+
+        ir::Value* len = builder->createLoad(list_ptr);
+        ir::Value* cap_ptr = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
+        ir::Value* cap = builder->createLoad(cap_ptr);
+
+        ir::Value* need_grow = builder->createCsge(index, cap);
+        builder->createBr(need_grow, b_realloc, b_update_len);
+
+        // Grow buffer
+        builder->setInsertPoint(b_realloc);
+        ir::Value* double_cap = builder->createMul(cap, ctx->getConstantInt(i64, 2));
+        ir::Value* idx_plus_one = builder->createAdd(index, ctx->getConstantInt(i64, 1));
+        ir::Value* is_double_larger = builder->createCsgt(double_cap, idx_plus_one);
+        ir::Instruction* new_cap_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        builder->createStore(double_cap, new_cap_slot);
+
+        ir::BasicBlock* b_cap_double = builder->createBasicBlock("cap_double", fn_set);
+        ir::BasicBlock* b_cap_idx = builder->createBasicBlock("cap_idx", fn_set);
+        builder->createBr(is_double_larger, b_cap_double, b_cap_idx);
+
+        builder->setInsertPoint(b_cap_idx);
+        builder->createStore(idx_plus_one, new_cap_slot);
+        builder->createJmp(b_cap_double);
+
+        builder->setInsertPoint(b_cap_double);
+        ir::Value* new_cap = builder->createLoad(new_cap_slot);
+        ir::Value* new_bytes = builder->createMul(new_cap, ctx->getConstantInt(i64, 8));
+        ir::Instruction* new_data = builder->createExternCall("memory.alloc", {new_bytes}, i64);
+
         ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
-        ir::Value* data = builder->createLoad(data_ptr_slot);
-        ir::Value* offset = builder->createMul(index, ctx->getConstantInt(i64, 8));
-        ir::Value* elem_ptr = builder->createAdd(data, offset);
-        builder->createStore(val, elem_ptr);
+        ir::Value* old_data = builder->createLoad(data_ptr_slot);
+
+        ir::Instruction* k_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        builder->createStore(ctx->getConstantInt(i64, 0), k_slot);
+        builder->createJmp(b_copy_loop);
+
+        builder->setInsertPoint(b_copy_loop);
+        ir::Value* k = builder->createLoad(k_slot);
+        ir::Value* cond = builder->createCslt(k, len);
+        builder->createBr(cond, b_copy_body, b_copy_done);
+
+        builder->setInsertPoint(b_copy_body);
+        ir::Value* k_off = builder->createMul(k, ctx->getConstantInt(i64, 8));
+        ir::Value* src_p = builder->createAdd(old_data, k_off);
+        ir::Value* item = builder->createLoad(src_p);
+        ir::Value* dst_p = builder->createAdd(new_data, k_off);
+        builder->createStore(item, dst_p);
+        ir::Value* k_next = builder->createAdd(k, ctx->getConstantInt(i64, 1));
+        builder->createStore(k_next, k_slot);
+        builder->createJmp(b_copy_loop);
+
+        builder->setInsertPoint(b_copy_done);
+        builder->createStore(new_cap, cap_ptr);
+        builder->createStore(new_data, data_ptr_slot);
+        builder->createJmp(b_update_len);
+
+        // Update len
+        builder->setInsertPoint(b_update_len);
+        ir::Value* cur_len = builder->createLoad(list_ptr);
+        ir::Value* len_needed = builder->createAdd(index, ctx->getConstantInt(i64, 1));
+        ir::Value* need_len_update = builder->createCsge(index, cur_len);
+
+        ir::BasicBlock* b_do_update_len = builder->createBasicBlock("do_update_len", fn_set);
+        builder->createBr(need_len_update, b_do_update_len, b_store_elem);
+
+        builder->setInsertPoint(b_do_update_len);
+        builder->createStore(len_needed, list_ptr);
+        builder->createJmp(b_store_elem);
+
+        builder->setInsertPoint(b_store_elem);
+        ir::Value* cur_data_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* cur_data = builder->createLoad(cur_data_slot);
+        ir::Value* ins_off = builder->createMul(index, ctx->getConstantInt(i64, 8));
+        ir::Value* ins_ptr = builder->createAdd(cur_data, ins_off);
+        builder->createStore(val, ins_ptr);
         builder->createRet(nullptr);
     }
 

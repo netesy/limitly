@@ -1,13 +1,33 @@
-diff --git a/src/target/architecture/x64/X64Architecture.cpp b/src/target/architecture/x64/X64Architecture.cpp
-index 12d9342..1f6e711 100644
---- a/src/target/architecture/x64/X64Architecture.cpp
-+++ b/src/target/architecture/x64/X64Architecture.cpp
-@@ -1165,6 +1165,8 @@ void X64Architecture::emitExternCall(CodeGen& cg, ir::Instruction& i, const Oper
-                 *os << "  movq %rax, " << formatStackOperand(cg.getStackOffsets()[&i]) << "\n";
-             else
-                 *os << "  mov " << formatStackOperand(cg.getStackOffsets()[&i]) << ", rax\n";
-+        } else {
-+            emitStoreResult(cg, i, 0);
-         }
+diff --git a/src/codegen/CodeGen.cpp b/src/codegen/CodeGen.cpp
+index ad0b474..bb83025 100644
+--- a/src/codegen/CodeGen.cpp
++++ b/src/codegen/CodeGen.cpp
+@@ -388,13 +388,13 @@ void CodeGen::emitDataSection() {
+                 rodataAssembler->emitByte(0);
+                 heap_base_offset = rodataAssembler->getCodeSize();
+             }
+-            for(int i=0; i<1048576; ++i) rodataAssembler->emitByte(0);
++            for(int i=0; i<67108864; ++i) rodataAssembler->emitByte(0);
+
+             SymbolInfo hb_sym;
+             hb_sym.name = "__fyra_heap";
+             hb_sym.sectionName = ".data";
+             hb_sym.value = heap_base_offset;
+-            hb_sym.size = 1048576;
++            hb_sym.size = 67108864;
+             hb_sym.binding = 1;
+             addSymbol(hb_sym);
+
+diff --git a/src/target/os/linux/LinuxOS.cpp b/src/target/os/linux/LinuxOS.cpp
+index 8180d75..6f60abc 100644
+--- a/src/target/os/linux/LinuxOS.cpp
++++ b/src/target/os/linux/LinuxOS.cpp
+@@ -394,7 +394,7 @@ void LinuxOS::emitHeader(CodeGen& cg) {
+         *os << ".section .rodata\n.Lproc_environ:\n  .string \"/proc/self/environ\"\n";
+         *os << ".Lproc_cmdline:\n  .string \"/proc/self/cmdline\"\n";
+         *os << ".section .data\n.align 8\nheap_ptr:\n  .quad __fyra_heap\n";
+-        *os << ".section .bss\n.align 16\n__fyra_heap:\n  .zero 1048576\n";
++        *os << ".section .bss\n.align 16\n__fyra_heap:\n  .zero 67108864\n";
+         *os << ".text\n";
      }
  }

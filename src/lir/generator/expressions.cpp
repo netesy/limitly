@@ -1725,8 +1725,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 
                 // Check if this is a field access (function pointer stored in a field)
                 // rather than a method call
+                std::string frame_method_name = find_frame_or_trait_method(resolved_frame_name, method_name);
                 auto frame_it = frame_table_.find(resolved_frame_name);
-                if (frame_it != frame_table_.end() && frame_it->second.declaration) {
+                if (frame_method_name.empty() && frame_it != frame_table_.end() && frame_it->second.declaration) {
                     const auto& frame_decl = frame_it->second.declaration;
                     for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
                         const auto& field = frame_decl->fields[i];

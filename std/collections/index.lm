@@ -19,6 +19,7 @@ import std.collections.bloom_filter as bloom_filter;
 // Frames / Constructors
 pub fn List(): any { return list_mod.List(); }
 pub fn Vector(initial_capacity: int = 8): any { return vector.Vector(initial_capacity); }
+pub fn ArrayList(): any { return vector.ArrayList(); }
 pub fn Deque(): any { return deque.DoubleEndedQueue(); }
 pub fn LinkedList(): any { return linked_list.DLL(); }
 pub fn Map(): any { return map.HashMapWrapper(); }
