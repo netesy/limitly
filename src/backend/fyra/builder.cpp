@@ -1134,7 +1134,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::NewFrame: {
                 std::string name = inst.func_name; if (name.empty()) name = "Frame";
                 uint32_t fields = static_cast<uint32_t>(inst.imm);
-                uint32_t bytes = (fields > 0 ? fields : 2) * 8;
+                uint32_t bytes = std::max((uint32_t)2, fields + 1) * 8;
                 ir::Type* type = current_module_->getType(name);
                 if (!type) { ir::StructType* st = context_->createStructType(name); st->setBody({context_->getIntegerType(64), context_->getIntegerType(64)}); current_module_->addType(name, st); type = st; }
                 store_reg(inst.dst, builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), bytes), type), inst.result_type);

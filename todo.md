@@ -126,11 +126,11 @@
 *Reason:* Frame field offset calculations and dynamic trait/method dispatch.
 
 44. [ ] `tests/oop/frame_declaration.lm` - Output Mismatch: Frame instance field access output diff.
-45. [ ] `tests/oop/composition_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in composed frame access).
-46. [ ] `tests/oop/traits_dynamic.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in dynamic trait dispatch).
-47. [ ] `tests/oop/traits_inheritance.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in trait inheritance dispatch).
-48. [ ] `tests/oop/visibility_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in frame visibility check).
-49. [ ] `tests/regression/trait_dispatch_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in trait vtable dispatch).
+45. [ ] `tests/oop/composition_test.lm` - Output Mismatch: Composed frame method call output diff.
+46. [ ] `tests/oop/traits_dynamic.lm` - Output Mismatch: Dynamic trait dispatch output diff.
+47. [ ] `tests/oop/traits_inheritance.lm` - Output Mismatch: Trait inheritance output diff.
+48. [ ] `tests/oop/visibility_test.lm` - Output Mismatch: Frame visibility check output diff.
+49. [ ] `tests/regression/trait_dispatch_test.lm` - Output Mismatch: Trait dispatch output diff.
 
 ---
 
