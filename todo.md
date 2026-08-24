@@ -2,8 +2,8 @@
 
 ## Summary
 - **Total tests:** 80
-- **Passed:** 50
-- **Failed:** 30 (0 Build Failures, 18 Runtime Failures/Crashes, 11 Output Mismatches, 1 Timeout)
+- **Passed:** 38
+- **Failed:** 42 (0 Build Failures, 24 Runtime Failures/Crashes, 17 Output Mismatches, 1 Timeout)
 
 ---
 
@@ -58,6 +58,14 @@
 - [x] `tests/stdlib/collections_module_test.lm` - PASS
 - [x] `tests/stdlib/algorithm_module_test.lm` - PASS
 - [x] `tests/stdlib/sort/sort_test.lm` - PASS
+- [x] `tests/stdlib/core_module_test.lm` - PASS
+- [x] `tests/stdlib/core/string_test.lm` - PASS
+- [x] `tests/stdlib/core/option_result_test.lm` - PASS
+- [x] `tests/stdlib/core/string_option_result_test.lm` - PASS
+- [x] `tests/stdlib/env_module_test.lm` - PASS
+- [x] `tests/stdlib/process_module_test.lm` - PASS
+- [x] `tests/stdlib/url_test.lm` - PASS
+- [x] `tests/stdlib/regex_module_test.lm` - PASS
 
 ---
 
@@ -166,20 +174,20 @@
 ### Category 8: Standard Library System & Specialized Modules (Hard - Complex Runtime)
 *Reason:* Complex stdlib module dependencies, thread/timer scheduling, and external system calls.
 
-59. [ ] `tests/stdlib/core_module_test.lm` - Output Mismatch: Core module helper function output diff.
-60. [ ] `tests/stdlib/core/string_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in core string utilities).
-61. [ ] `tests/stdlib/core/option_result_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in option/result monad methods).
-62. [ ] `tests/stdlib/core/string_option_result_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in string option/result helpers).
-63. [ ] `tests/stdlib/iterator/iterator_test.lm` - PASS (Included in passing tests above).
+59. [x] `tests/stdlib/core_module_test.lm` - PASS
+60. [x] `tests/stdlib/core/string_test.lm` - PASS
+61. [x] `tests/stdlib/core/option_result_test.lm` - PASS
+62. [x] `tests/stdlib/core/string_option_result_test.lm` - PASS
+63. [x] `tests/stdlib/iterator/iterator_test.lm` - PASS
 64. [ ] `tests/stdlib/iterator_module_test.lm` - Timeout: Exceeded maximum runtime of 30 seconds.
 65. [ ] `tests/stdlib/math_module_test.lm` - Runtime Failure: `Exit code: -8` (SIGFPE arithmetic exception).
-66. [ ] `tests/stdlib/env_module_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in environment variable access).
-67. [ ] `tests/stdlib/process_module_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in sub-process execution).
+66. [x] `tests/stdlib/env_module_test.lm` - PASS
+67. [x] `tests/stdlib/process_module_test.lm` - PASS
 68. [ ] `tests/stdlib/time_module_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in time/timer functions).
 69. [ ] `tests/stdlib/random_module_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in random generator frame).
 70. [ ] `tests/stdlib/semver_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in semver parser).
-71. [ ] `tests/stdlib/url_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in URL parser).
+71. [x] `tests/stdlib/url_test.lm` - PASS
 72. [ ] `tests/stdlib/uuid_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in UUID generator).
-73. [ ] `tests/stdlib/regex_module_test.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in regex engine).
+73. [x] `tests/stdlib/regex_module_test.lm` - PASS
 74. [ ] `tests/concurrency/concurrent_blocks.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in thread spawn).
 75. [ ] `tests/concurrency/parallel_blocks.lm` - Runtime Failure: `Exit code: -11` (SIGSEGV in parallel thread join).

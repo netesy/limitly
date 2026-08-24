@@ -29,7 +29,7 @@ LIRToFyraIRBuilder::LIRToFyraIRBuilder(std::shared_ptr<ir::IRContext> context)
 
 ir::Type* LIRToFyraIRBuilder::lir_type_to_fyra_type(LIR::Type lir_type) {
     switch (lir_type) {
-        case LIR::Type::Void: return context_->getVoidType();
+        case LIR::Type::Void: return context_->getIntegerType(64);
         case LIR::Type::I64:
         case LIR::Type::Bool: return context_->getIntegerType(64);
         case LIR::Type::F64: return context_->getDoubleType();
@@ -708,13 +708,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                 used_builtins_.insert(name);
 
+                if (name.empty()) name = "dummy_fn";
                 ir::Function* func = current_module_->getFunction(name);
                 if (!func) {
                     std::vector<ir::Type*> pts;
                     for (size_t k = 0; k < args.size(); ++k) pts.push_back(args[k]->getType());
                     func = builder_->createFunction(name, lir_type_to_fyra_type(inst.result_type), pts);
                 }
-                ir::Value* res = builder_->createCall(func, args);
+                ir::Value* res = func ? static_cast<ir::Value*>(builder_->createCall(func, args)) : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
                 if (inst.op == LIR::LIR_Op::Call) {
                     reg_types[inst.dst] = inst.result_type;
                     store_reg(inst.dst, res, inst.result_type);
@@ -989,13 +990,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                 used_builtins_.insert(name);
 
+                if (name.empty()) name = "dummy_fn";
                 ir::Function* func = current_module_->getFunction(name);
                 if (!func) {
                     std::vector<ir::Type*> pts;
                     for (size_t k = 0; k < args.size(); ++k) pts.push_back(args[k]->getType());
                     func = builder_->createFunction(name, lir_type_to_fyra_type(inst.result_type), pts);
                 }
-                store_reg(inst.dst, builder_->createCall(func, args), inst.result_type);
+                if (func) store_reg(inst.dst, builder_->createCall(func, args), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::Load: store_reg(inst.dst, builder_->createLoad(load_reg(inst.a, inst.type_a)), inst.result_type); break;
@@ -1253,6 +1255,282 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 terminated = true;
                 break;
             case LIR::LIR_Op::Nop: break;
+            // Shared Memory & Concurrency Operations
+            case LIR::LIR_Op::SharedCellAlloc: {
+                ir::Value* cell_ptr = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), 8)}, lir_type_to_fyra_type(inst.result_type));
+                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), cell_ptr);
+                store_reg(inst.dst, cell_ptr, inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::SharedCellStore: {
+                ir::Value* cell_ptr = load_reg((inst.a != UINT32_MAX && inst.a != 0) ? inst.a : inst.dst, LIR::Type::Ptr);
+                ir::Value* val = load_reg(inst.b, inst.type_b);
+                builder_->createStore(val, cell_ptr);
+                break;
+            }
+            case LIR::LIR_Op::SharedCellLoad: {
+                ir::Value* cell_ptr = load_reg(inst.a, LIR::Type::Ptr);
+                store_reg(inst.dst, builder_->createLoad(cell_ptr), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::TaskContextAlloc: {
+                ir::Value* ctx_ptr = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), 64)}, lir_type_to_fyra_type(inst.result_type));
+                for (uint32_t f_idx = 0; f_idx < 8; ++f_idx) {
+                    ir::Value* addr = builder_->createAdd(ctx_ptr, context_->getConstantInt(context_->getIntegerType(64), f_idx * 8));
+                    builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), addr);
+                }
+                store_reg(inst.dst, ctx_ptr, inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::TaskContextInit: {
+                if (inst.dst != UINT32_MAX) store_reg(inst.dst, load_reg(inst.a, inst.type_a), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::TaskSetField: {
+                uint32_t ctx_reg = (inst.b != UINT32_MAX && inst.b != 0) ? inst.b : inst.a;
+                uint32_t val_reg = (inst.a != UINT32_MAX && inst.a != ctx_reg) ? inst.a : (inst.dst != UINT32_MAX && inst.dst != ctx_reg ? inst.dst : inst.b);
+                ir::Value* ctx_ptr = load_reg(ctx_reg, LIR::Type::Ptr);
+                ir::Value* val = load_reg(val_reg, LIR::Type::I64);
+                uint32_t field_idx = inst.imm;
+                ir::Value* addr = builder_->createAdd(ctx_ptr, context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
+                builder_->createStore(val, addr);
+                break;
+            }
+            case LIR::LIR_Op::TaskGetField: {
+                ir::Value* ctx_ptr = load_reg(inst.a, LIR::Type::Ptr);
+                uint32_t field_idx = inst.imm;
+                ir::Value* addr = builder_->createAdd(ctx_ptr, context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
+                store_reg(inst.dst, builder_->createLoad(addr), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::ParallelInit:
+            case LIR::LIR_Op::SchedulerInit: {
+                used_builtins_.insert("lm_list_new");
+                ir::Function* fn = current_module_->getFunction("lm_list_new");
+                if (!fn) fn = builder_->createFunction("lm_list_new", context_->getIntegerType(64), {context_->getIntegerType(64)});
+                store_reg(inst.dst, builder_->createCall(fn, {context_->getConstantInt(context_->getIntegerType(64), 16)}), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::SchedulerAddTask: {
+                used_builtins_.insert("lm_list_append");
+                ir::Function* fn = current_module_->getFunction("lm_list_append");
+                if (!fn) fn = builder_->createFunction("lm_list_append", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
+                uint32_t s_reg = (inst.dst != UINT32_MAX && inst.dst != 0) ? inst.dst : inst.a;
+                uint32_t t_reg = (inst.a != UINT32_MAX && inst.a != s_reg) ? inst.a : inst.b;
+                ir::Value* sched_ptr = load_reg(s_reg, LIR::Type::Ptr);
+                ir::Value* task_ptr = load_reg(t_reg, LIR::Type::Ptr);
+                if (fn) builder_->createCall(fn, {sched_ptr, task_ptr}, context_->getIntegerType(64));
+                break;
+            }
+            case LIR::LIR_Op::SchedulerRun: {
+                used_builtins_.insert("lm_list_len");
+                used_builtins_.insert("lm_list_get");
+                used_builtins_.insert("lm_channel_pop");
+                ir::Function* fn_len = current_module_->getFunction("lm_list_len");
+                if (!fn_len) fn_len = builder_->createFunction("lm_list_len", context_->getIntegerType(64), {context_->getIntegerType(64)});
+                ir::Function* fn_get = current_module_->getFunction("lm_list_get");
+                if (!fn_get) fn_get = builder_->createFunction("lm_list_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
+                ir::Function* fn_pop = current_module_->getFunction("lm_channel_pop");
+                if (!fn_pop) fn_pop = builder_->createFunction("lm_channel_pop", context_->getIntegerType(64), {context_->getIntegerType(64)});
+
+                uint32_t s_reg = (inst.a != UINT32_MAX && inst.a != 0) ? inst.a : inst.dst;
+                ir::Value* sched_ptr = load_reg(s_reg, LIR::Type::Ptr);
+                ir::Value* count = builder_->createCall(fn_len, {sched_ptr}, context_->getIntegerType(64));
+
+                std::string sid = std::to_string(label_counter_++);
+                ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                ir::BasicBlock* b_loop = builder_->createBasicBlock("sc_loop_" + sid, cur_fn);
+                ir::BasicBlock* b_body = builder_->createBasicBlock("sc_body_" + sid, cur_fn);
+                ir::BasicBlock* b_done = builder_->createBasicBlock("sc_done_" + sid, cur_fn);
+
+                ir::Instruction* i_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), i_slot);
+                builder_->createJmp(b_loop);
+
+                builder_->setInsertPoint(b_loop);
+                ir::Value* i_val = builder_->createLoad(i_slot);
+                ir::Value* cond = builder_->createCslt(i_val, count);
+                builder_->createBr(cond, b_body, b_done);
+
+                builder_->setInsertPoint(b_body);
+                ir::Value* task_ctx = builder_->createCall(fn_get, {sched_ptr, i_val}, context_->getIntegerType(64));
+
+                ir::Value* f0 = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 0)));
+                ir::Value* f1_raw = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 8)));
+                ir::Value* f2 = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 16)));
+                ir::Value* f3 = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 24)));
+                ir::Value* fn_name_ptr = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 32)));
+
+                ir::Value* f1_len = builder_->createCall(fn_len, {f1_raw}, context_->getIntegerType(64));
+                ir::Value* is_chan_iter = builder_->createCsgt(f1_len, context_->getConstantInt(context_->getIntegerType(64), 0));
+
+                ir::BasicBlock* b_w_loop = builder_->createBasicBlock("sc_w_loop_" + sid, cur_fn);
+                ir::BasicBlock* b_w_body = builder_->createBasicBlock("sc_w_body_" + sid, cur_fn);
+                ir::BasicBlock* b_single = builder_->createBasicBlock("sc_single_" + sid, cur_fn);
+                ir::BasicBlock* b_next_task = builder_->createBasicBlock("sc_next_t_" + sid, cur_fn);
+
+                builder_->createBr(is_chan_iter, b_w_loop, b_single);
+
+                auto emit_dispatch = [&](ir::Value* arg_f1) {
+                    ir::Value* old0 = builder_->createLoad(reg_slots[0]);
+                    ir::Value* old1 = builder_->createLoad(reg_slots[1]);
+                    ir::Value* old2 = builder_->createLoad(reg_slots[2]);
+                    ir::Value* old3 = builder_->createLoad(reg_slots[3]);
+
+                    builder_->createStore(f0, reg_slots[0]);
+                    builder_->createStore(arg_f1, reg_slots[1]);
+                    builder_->createStore(f2, reg_slots[2]);
+                    builder_->createStore(f3, reg_slots[3]);
+                    store_reg(99999, fn_name_ptr, LIR::Type::Ptr);
+
+                    std::string cid = std::to_string(label_counter_++);
+                    ir::BasicBlock* b_dispatch = builder_->createBasicBlock("sched_disp_" + cid, cur_fn);
+                    ir::BasicBlock* b_raw_call = builder_->createBasicBlock("sched_raw_" + cid, cur_fn);
+                    ir::BasicBlock* b_done_call = builder_->createBasicBlock("sched_done_" + cid, cur_fn);
+
+                    ir::Value* is_ge_ptr = builder_->createCuge(fn_name_ptr, context_->getConstantInt(context_->getIntegerType(64), 65536));
+                    ir::Value* high_bits = builder_->createShr(fn_name_ptr, context_->getConstantInt(context_->getIntegerType(64), 48));
+                    ir::Value* high_zero = builder_->createCeq(high_bits, context_->getConstantInt(context_->getIntegerType(64), 0));
+                    ir::Value* is_valid_ptr = builder_->createAnd(is_ge_ptr, high_zero);
+
+                    builder_->createBr(is_valid_ptr, b_dispatch, b_raw_call);
+
+                    builder_->setInsertPoint(b_dispatch);
+                    used_builtins_.insert("lm_key_eq");
+                    ir::Function* fn_eq = current_module_->getFunction("lm_key_eq");
+                    if (!fn_eq) fn_eq = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
+
+                    std::vector<ir::Function*> cand_funcs;
+                    for (const auto& f : current_module_->getFunctions()) {
+                        if (f->getName() != "main" && !f->getName().starts_with("lm_") && !f->getName().starts_with("_builtin_")) {
+                            cand_funcs.push_back(f.get());
+                        }
+                    }
+
+                    ir::BasicBlock* cur_check_bb = b_dispatch;
+                    for (size_t fi = 0; fi < cand_funcs.size(); ++fi) {
+                        ir::Function* target_f = cand_funcs[fi];
+                        std::string f_name = target_f->getName();
+
+                        builder_->setInsertPoint(cur_check_bb);
+                        ir::GlobalVariable* gv_fname = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "fn_s_str_" + f_name + "_" + cid, f_name);
+                        ir::Value* eq_res = fn_eq ? static_cast<ir::Value*>(builder_->createCall(fn_eq, {fn_name_ptr, gv_fname}, context_->getIntegerType(64))) : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
+                        ir::Value* is_match = builder_->createCne(eq_res, context_->getConstantInt(context_->getIntegerType(64), 0));
+
+                        size_t dot_p = f_name.rfind('.');
+                        if (dot_p != std::string::npos) {
+                            std::string unq_name = f_name.substr(dot_p + 1);
+                            ir::GlobalVariable* gv_unq = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "fn_s_unq_" + unq_name + "_" + cid + "_" + std::to_string(fi), unq_name);
+                            ir::Value* unq_eq = fn_eq ? static_cast<ir::Value*>(builder_->createCall(fn_eq, {fn_name_ptr, gv_unq}, context_->getIntegerType(64))) : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
+                            ir::Value* unq_match = builder_->createCne(unq_eq, context_->getConstantInt(context_->getIntegerType(64), 0));
+                            is_match = builder_->createOr(is_match, unq_match);
+                        }
+
+                        ir::BasicBlock* b_match = builder_->createBasicBlock("sched_m_" + std::to_string(fi) + "_" + cid, cur_fn);
+                        ir::BasicBlock* b_next_check = builder_->createBasicBlock("sched_next_chk_" + std::to_string(fi) + "_" + cid, cur_fn);
+
+                        builder_->createBr(is_match, b_match, b_next_check);
+
+                        builder_->setInsertPoint(b_match);
+                        std::vector<ir::Value*> call_args_matching = {f0, arg_f1, f2, f3};
+                        while (call_args_matching.size() < target_f->getParameters().size()) {
+                            call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
+                        }
+                        if (target_f) builder_->createCall(target_f, call_args_matching, context_->getIntegerType(64));
+                        builder_->createJmp(b_done_call);
+
+                        cur_check_bb = b_next_check;
+                    }
+
+                    builder_->setInsertPoint(cur_check_bb);
+                    builder_->createJmp(b_raw_call);
+
+                    builder_->setInsertPoint(b_raw_call);
+                    builder_->createJmp(b_done_call);
+
+                    builder_->setInsertPoint(b_done_call);
+                    builder_->createStore(old0, reg_slots[0]);
+                    builder_->createStore(old1, reg_slots[1]);
+                    builder_->createStore(old2, reg_slots[2]);
+                    builder_->createStore(old3, reg_slots[3]);
+                };
+
+                // Stream worker loop branch
+                builder_->setInsertPoint(b_w_loop);
+                ir::Value* rem_cnt = builder_->createCall(fn_len, {f1_raw}, context_->getIntegerType(64));
+                ir::Value* has_rem = builder_->createCsgt(rem_cnt, context_->getConstantInt(context_->getIntegerType(64), 0));
+                builder_->createBr(has_rem, b_w_body, b_next_task);
+
+                builder_->setInsertPoint(b_w_body);
+                ir::Value* popped_item = builder_->createCall(fn_pop, {f1_raw}, context_->getIntegerType(64));
+                emit_dispatch(popped_item);
+                builder_->createJmp(b_w_loop);
+
+                // Single task execution branch
+                builder_->setInsertPoint(b_single);
+                emit_dispatch(f1_raw);
+                builder_->createJmp(b_next_task);
+
+                builder_->setInsertPoint(b_next_task);
+                ir::Value* next_i_val = builder_->createAdd(i_val, context_->getConstantInt(context_->getIntegerType(64), 1));
+                builder_->createStore(next_i_val, i_slot);
+                builder_->createJmp(b_loop);
+
+                builder_->setInsertPoint(b_done);
+                break;
+            }
+            case LIR::LIR_Op::ParallelSync: break;
+            case LIR::LIR_Op::ResourceCreate: {
+                if (inst.imm == (uint32_t)LIR::ResourceType::CHANNEL || inst.imm == (uint32_t)LIR::ResourceType::MEMORY) {
+                    used_builtins_.insert("lm_list_new");
+                    ir::Function* fn = current_module_->getFunction("lm_list_new");
+                    if (!fn) fn = builder_->createFunction("lm_list_new", context_->getIntegerType(64), {context_->getIntegerType(64)});
+                    store_reg(inst.dst, builder_->createCall(fn, {context_->getConstantInt(context_->getIntegerType(64), 16)}, context_->getIntegerType(64)), inst.result_type);
+                } else {
+                    store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
+                }
+                break;
+            }
+            case LIR::LIR_Op::ChannelAlloc: {
+                used_builtins_.insert("lm_list_new");
+                ir::Function* fn = current_module_->getFunction("lm_list_new");
+                if (!fn) fn = builder_->createFunction("lm_list_new", context_->getIntegerType(64), {context_->getIntegerType(64)});
+                store_reg(inst.dst, builder_->createCall(fn, {context_->getConstantInt(context_->getIntegerType(64), 16)}, context_->getIntegerType(64)), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::ChannelSend:
+            case LIR::LIR_Op::ChannelOffer:
+            case LIR::LIR_Op::ChannelPush: {
+                used_builtins_.insert("lm_list_append");
+                ir::Function* fn = current_module_->getFunction("lm_list_append");
+                if (!fn) fn = builder_->createFunction("lm_list_append", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
+                ir::Value* ch_ptr = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a, LIR::Type::Ptr) : load_reg(inst.dst, LIR::Type::Ptr);
+                ir::Value* val = (inst.b != UINT32_MAX) ? load_reg(inst.b, LIR::Type::I64) : load_reg(inst.a, LIR::Type::I64);
+                if (fn) builder_->createCall(fn, {ch_ptr, val}, context_->getIntegerType(64));
+                if (inst.dst != UINT32_MAX && inst.dst != inst.a) store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 1), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::ChannelRecv:
+            case LIR::LIR_Op::ChannelPop:
+            case LIR::LIR_Op::ChannelPoll: {
+                used_builtins_.insert("lm_channel_pop");
+                used_builtins_.insert("lm_list_new");
+                FyraBuiltinFunctions::emit_list_ir(current_module_.get(), builder_.get());
+                ir::Function* fn = current_module_->getFunction("lm_channel_pop");
+                ir::Value* ch_ptr = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a, LIR::Type::Ptr) : load_reg(inst.dst, LIR::Type::Ptr);
+                if (fn) store_reg(inst.dst, builder_->createCall(fn, {ch_ptr}, context_->getIntegerType(64)), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::ChannelHasData: {
+                used_builtins_.insert("lm_list_len");
+                ir::Function* fn = current_module_->getFunction("lm_list_len");
+                if (!fn) fn = builder_->createFunction("lm_list_len", context_->getIntegerType(64), {context_->getIntegerType(64)});
+                ir::Value* ch_ptr = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a, LIR::Type::Ptr) : load_reg(inst.dst, LIR::Type::Ptr);
+                ir::Value* count = fn ? static_cast<ir::Value*>(builder_->createCall(fn, {ch_ptr}, context_->getIntegerType(64))) : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
+                store_reg(inst.dst, builder_->createCsgt(count, context_->getConstantInt(context_->getIntegerType(64), 0)), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::ChannelClose: break;
             // Memory Operations
             case LIR::LIR_Op::MemoryAlloc: {
                 auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryAlloc);

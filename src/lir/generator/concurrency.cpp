@@ -112,7 +112,7 @@ void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
         // Store it back to the original variable
         Reg var_reg = resolve_variable(var_name);
         if (var_reg != UINT32_MAX) {
-            emit_instruction(LIR_Inst(LIR_Op::Store, var_reg, current_value_reg, 0));
+            emit_instruction(LIR_Inst(LIR_Op::Mov, var_reg, current_value_reg, 0));
 
         }
     }
@@ -290,7 +290,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
                                     emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, task_name_reg, context_id_reg, 0, 4));
                                     
                                     // Add task to scheduler
-                                    emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, context_id_reg, task_context_reg, 0));
+                                    emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, scheduler_reg, task_context_reg, 0));
                                 }
                             }
                         }
@@ -358,7 +358,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
                        // std::cout << "[DEBUG] Worker function name field set" << std::endl;
                         
                         // Add worker to scheduler
-                        emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, context_id_reg, worker_context_reg, 0));
+                        emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, scheduler_reg, worker_context_reg, 0));
                        // std::cout << "[DEBUG] Worker added to scheduler" << std::endl;
                     } else {
                        // std::cout << "[DEBUG] Worker has no iterable, creating single worker" << std::endl;
@@ -388,7 +388,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
                         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::Ptr, worker_name_reg, worker_name_val));
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, worker_name_reg, context_id_reg, 0, 4));
                         
-                        emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, context_id_reg, worker_context_reg, 0));
+                        emit_instruction(LIR_Inst(LIR_Op::SchedulerAddTask, Type::Void, scheduler_reg, worker_context_reg, 0));
                        // std::cout << "[DEBUG] Single worker added to scheduler" << std::endl;
                     }
                    // std::cout << "[DEBUG] Worker processing completed" << std::endl;
