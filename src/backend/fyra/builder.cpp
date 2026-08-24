@@ -190,6 +190,30 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         return oss.str();
     };
 
+    auto is_float_op = [&](const LIR::LIR_Inst& inst) -> bool {
+        if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) return true;
+        if (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32) return true;
+        if (inst.type_b == LIR::Type::F64 || inst.type_b == LIR::Type::F32) return true;
+        if (inst.a != UINT32_MAX && reg_types.count(inst.a) && (reg_types[inst.a] == LIR::Type::F64 || reg_types[inst.a] == LIR::Type::F32)) return true;
+        if (inst.b != UINT32_MAX && reg_types.count(inst.b) && (reg_types[inst.b] == LIR::Type::F64 || reg_types[inst.b] == LIR::Type::F32)) return true;
+
+        auto is_reg_float = [&](uint32_t r) {
+            if (r == UINT32_MAX) return false;
+            auto it = lir_func.register_language_types.find(r);
+            if (it != lir_func.register_language_types.end() && it->second) {
+                return it->second->tag == ::TypeTag::Float64 || it->second->tag == ::TypeTag::Float32;
+            }
+            auto it2 = lir_func.register_types.find(r);
+            if (it2 != lir_func.register_types.end()) {
+                return it2->second == LIR::Type::F64 || it2->second == LIR::Type::F32;
+            }
+            return false;
+        };
+
+        if (is_reg_float(inst.a) || is_reg_float(inst.b) || is_reg_float(inst.dst)) return true;
+        return false;
+    };
+
     size_t max_reg = lir_func.register_count;
     for (const auto& inst : lir_func.instructions) {
         if (inst.dst != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.dst);
@@ -208,6 +232,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     for (const auto& param : main_fn->getParameters()) {
         builder_->createStore(param.get(), reg_slots[param_idx]);
         regs[param_idx] = param.get();
+        auto it = lir_func.register_types.find(param_idx);
+        if (it != lir_func.register_types.end()) {
+            reg_types[param_idx] = it->second;
+        }
         param_idx++;
     }
 
@@ -253,6 +281,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         }
         regs[r] = v;
         reg_types[r] = t;
+    };
+
+    auto load_float_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
+        return load_reg(r, t);
+    };
+
+    auto store_float_reg = [&](uint32_t r, ir::Value* fval) {
+        store_reg(r, fval, LIR::Type::F64);
     };
 
     bool terminated = false;
@@ -412,12 +448,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         false,
                         ".data"
                     );
-                    gv = new_gv.get();
+                    ir::GlobalVariable* raw_gv = new_gv.get();
                     current_module_->addGlobalVariable(std::move(new_gv));
+                    gv = raw_gv;
                 }
                 builder_->createStore(load_reg(inst.a, inst.type_a), gv);
                 if (reg_decimal_scales.count(inst.a)) {
                     global_decimal_scales_[gname] = reg_decimal_scales[inst.a];
+                }
+                if (reg_types.count(inst.a)) {
+                    global_types_[gname] = reg_types[inst.a];
+                } else if (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32) {
+                    global_types_[gname] = inst.type_a;
                 }
                 break;
             }
@@ -436,25 +478,58 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         false,
                         ".data"
                     );
-                    gv = new_gv.get();
+                    ir::GlobalVariable* raw_gv = new_gv.get();
                     current_module_->addGlobalVariable(std::move(new_gv));
+                    gv = raw_gv;
                 }
                 ir::Value* loaded = builder_->createLoad(gv);
-                store_reg(inst.dst, loaded, inst.result_type);
+                LIR::Type loaded_type = inst.result_type;
+                if (global_types_.count(gname)) {
+                    loaded_type = global_types_[gname];
+                }
+                store_reg(inst.dst, loaded, loaded_type);
                 if (global_decimal_scales_.count(gname)) {
                     reg_decimal_scales[inst.dst] = global_decimal_scales_[gname];
                 }
                 break;
             }
-            case LIR::LIR_Op::Add: store_reg(inst.dst, builder_->createAdd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::Sub: store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::Mul: store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::Div: store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::Add:
+                if (is_float_op(inst)) {
+                    store_float_reg(inst.dst, builder_->createFAdd(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
+                } else {
+                    store_reg(inst.dst, builder_->createAdd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                }
+                break;
+            case LIR::LIR_Op::Sub:
+                if (is_float_op(inst)) {
+                    store_float_reg(inst.dst, builder_->createFSub(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
+                } else {
+                    store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                }
+                break;
+            case LIR::LIR_Op::Mul:
+                if (is_float_op(inst)) {
+                    store_float_reg(inst.dst, builder_->createFMul(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
+                } else {
+                    store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                }
+                break;
+            case LIR::LIR_Op::Div:
+                if (is_float_op(inst)) {
+                    store_float_reg(inst.dst, builder_->createFDiv(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
+                } else {
+                    store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                }
+                break;
             case LIR::LIR_Op::Mod: store_reg(inst.dst, builder_->createRem(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Neg:
                 if (reg_int_values.count(inst.a)) reg_int_values[inst.dst] = -reg_int_values[inst.a];
                 if (reg_float_values.count(inst.a)) reg_float_values[inst.dst] = -reg_float_values[inst.a];
-                store_reg(inst.dst, builder_->createNeg(load_reg(inst.a, inst.type_a)), inst.result_type);
+                if (is_float_op(inst)) {
+                    store_float_reg(inst.dst, builder_->createFSub(context_->getConstantFP(context_->getDoubleType(), 0.0), load_float_reg(inst.a, inst.type_a)));
+                } else {
+                    store_reg(inst.dst, builder_->createNeg(load_reg(inst.a, inst.type_a)), inst.result_type);
+                }
                 break;
             case LIR::LIR_Op::DecAdd:
                 reg_decimal_scales[inst.dst] = decimal_scale_for_inst(inst);
@@ -507,9 +582,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     used_builtins_.insert("lm_key_eq");
                     ir::Function* fn = current_module_->getFunction("lm_key_eq");
                     if (!fn) fn = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                    store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}), inst.result_type);
+                    store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}), LIR::Type::Bool);
+                } else if (is_float_op(inst)) {
+                    ir::Value* c = builder_->createCeqf(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else {
-                    store_reg(inst.dst, builder_->createCeq(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                    ir::Value* c = builder_->createCeq(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 }
                 break;
             }
@@ -524,16 +603,52 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::Function* fn = current_module_->getFunction("lm_key_eq");
                     if (!fn) fn = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
                     ir::Value* eq_res = builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)});
-                    store_reg(inst.dst, builder_->createCeq(eq_res, context_->getConstantInt(context_->getIntegerType(64), 0)), inst.result_type);
+                    store_reg(inst.dst, builder_->createCeq(eq_res, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
+                } else if (is_float_op(inst)) {
+                    ir::Value* c = builder_->createCnef(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else {
-                    store_reg(inst.dst, builder_->createCne(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                    ir::Value* c = builder_->createCne(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 }
                 break;
             }
-            case LIR::LIR_Op::CmpLT: store_reg(inst.dst, builder_->createCslt(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::CmpLE: store_reg(inst.dst, builder_->createCsle(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::CmpGT: store_reg(inst.dst, builder_->createCsgt(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
-            case LIR::LIR_Op::CmpGE: store_reg(inst.dst, builder_->createCsge(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::CmpLT:
+                if (is_float_op(inst)) {
+                    ir::Value* c = builder_->createClt(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else {
+                    ir::Value* c = builder_->createCslt(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                }
+                break;
+            case LIR::LIR_Op::CmpLE:
+                if (is_float_op(inst)) {
+                    ir::Value* c = builder_->createCle(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else {
+                    ir::Value* c = builder_->createCsle(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                }
+                break;
+            case LIR::LIR_Op::CmpGT:
+                if (is_float_op(inst)) {
+                    ir::Value* c = builder_->createCgt(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else {
+                    ir::Value* c = builder_->createCsgt(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                }
+                break;
+            case LIR::LIR_Op::CmpGE:
+                if (is_float_op(inst)) {
+                    ir::Value* c = builder_->createCge(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else {
+                    ir::Value* c = builder_->createCsge(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                }
+                break;
             case LIR::LIR_Op::Jump: {
                 ir::BasicBlock* target = get_target_block(inst.imm, i);
                 if (target) {
@@ -1381,7 +1496,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     builder_->createStore(arg_f1, reg_slots[1]);
                     builder_->createStore(f2, reg_slots[2]);
                     builder_->createStore(f3, reg_slots[3]);
-                    store_reg(99999, fn_name_ptr, LIR::Type::Ptr);
+                    store_reg(max_reg + 1, fn_name_ptr, LIR::Type::Ptr);
 
                     std::string cid = std::to_string(label_counter_++);
                     ir::BasicBlock* b_dispatch = builder_->createBasicBlock("sched_disp_" + cid, cur_fn);

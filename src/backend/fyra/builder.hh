@@ -31,6 +31,7 @@ private:
     std::unique_ptr<ir::IRBuilder> builder_;
     std::unordered_set<std::string> used_builtins_;
     std::unordered_map<std::string, int> global_decimal_scales_;
+    std::unordered_map<std::string, LIR::Type> global_types_;
     std::vector<std::string> errors_;
     int label_counter_ = 0;
 
