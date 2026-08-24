@@ -114,7 +114,7 @@ enum class LIR_Op : uint8_t {
     GetTickCount, DelayUntil, ParallelInit, ParallelSync,
     
     // === Collections ===
-    ListCreate, ListAppend, ListIndex, ListLen,
+    ListCreate, ListAppend, ListIndex, ListSet, ListLen,
     DictCreate, DictSet, DictGet, DictHas, DictLen, DictItems,
     TupleCreate, TupleGet, TupleSet, TupleLen,
     
@@ -217,7 +217,7 @@ enum class LIR_Op : uint8_t {
     X(SchedulerInit) X(SchedulerRun) X(SchedulerTick) X(SchedulerAddTask) \
     X(GetTickCount) X(DelayUntil) X(ParallelInit) X(ParallelSync) \
     /* === Collections === */ \
-    X(ListCreate) X(ListAppend) X(ListIndex) X(ListLen) \
+    X(ListCreate) X(ListAppend) X(ListIndex) X(ListSet) X(ListLen) \
     X(DictCreate) X(DictSet) X(DictGet) X(DictHas) X(DictLen) X(DictItems) \
     X(TupleCreate) X(TupleGet) X(TupleSet) X(TupleLen) \
     /* === Object-Oriented === */ \

@@ -628,14 +628,9 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
             
             // Load the actual module variable value using LoadGlobal
             Reg result = allocate_register();
-            Type abi_type = expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::I64;
-            LIR_Inst load_inst(LIR_Op::LoadGlobal, abi_type, result, 0, 0);
+            LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
             load_inst.func_name = qualified_name;
             emit_instruction(load_inst);
-            if (expr.inferred_type) {
-                set_register_language_type(result, expr.inferred_type);
-                set_register_abi_type(result, abi_type);
-            }
             return result;
         }
     }
@@ -644,13 +639,12 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
     if (!current_module_.empty() && current_module_ != "root") {
         std::string qualified_name = current_module_ + "." + expr.name;
         Reg result = allocate_register();
-        Type abi_type = expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::I64;
-        LIR_Inst load_inst(LIR_Op::LoadGlobal, abi_type, result, 0, 0);
+        LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
         load_inst.func_name = qualified_name;
         emit_instruction(load_inst);
         if (expr.inferred_type) {
             set_register_language_type(result, expr.inferred_type);
-            set_register_abi_type(result, abi_type);
+            set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
         }
         return result;
     }
@@ -1694,6 +1688,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
         }
 
+        // Trait or TraitObject method call
         TypePtr resolved_object_type = resolve_underlying_type(object_type);
         if (resolved_object_type && (resolved_object_type->tag == TypeTag::Trait || resolved_object_type->tag == TypeTag::TraitObject)) {
             std::string trait_name;
@@ -1712,10 +1707,10 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     set_register_language_type(result, expr.inferred_type);
                     set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
                 }
-                std::string full_method = find_frame_or_trait_method(trait_name, method_name);
-                if (full_method.empty()) full_method = trait_name + "." + method_name;
-                LIR_Inst inst(LIR_Op::Call, result, full_method, arg_regs);
-                inst.func_name = full_method;
+                LIR_Inst inst(LIR_Op::TraitCallMethod, result, 0, 0);
+                inst.func_name = method_name;
+                inst.type_name = trait_name;
+                inst.call_args = arg_regs;
                 emit_instruction(inst);
                 return result;
             }
@@ -2030,10 +2025,19 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
             Reg object_reg = emit_expr(*expr.object);
             Reg index_reg = emit_expr(*expr.index);
             
-            // Use DictSet operation for dictionary assignment
-            Reg result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::DictSet, Type::Ptr, object_reg, index_reg, value));
-            set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
+            TypePtr object_type = get_register_language_type(object_reg);
+            if (!object_type && expr.object && expr.object->inferred_type) {
+                object_type = expr.object->inferred_type;
+            }
+
+            if (object_type && object_type->tag == ::TypeTag::List) {
+                emit_instruction(LIR_Inst(LIR_Op::ListSet, Type::Void, object_reg, index_reg, value));
+            } else {
+                // Use DictSet operation for dictionary assignment
+                Reg result = allocate_register();
+                emit_instruction(LIR_Inst(LIR_Op::DictSet, Type::Ptr, object_reg, index_reg, value));
+                set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
+            }
             return value;
         }
     } else {

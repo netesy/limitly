@@ -942,24 +942,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::ToString: {
-                ir::Value* val = load_reg(inst.a, inst.type_a);
-                ir::Value* res = nullptr;
-                if (inst.type_a == LIR::Type::Bool || (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Bool)) {
-                    res = FyraBuiltinFunctions::emit_bool_to_str_inline(current_module_.get(), builder_.get(), val);
-                } else if (reg_decimal_scales.count(inst.a) && reg_decimal_scales[inst.a] > 0) {
-                    res = FyraBuiltinFunctions::emit_decimal_to_str_inline(current_module_.get(), builder_.get(), val, reg_decimal_scales[inst.a]);
-                } else if (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32 || (reg_types.count(inst.a) && (reg_types[inst.a] == LIR::Type::F64 || reg_types[inst.a] == LIR::Type::F32))) {
-                    res = FyraBuiltinFunctions::emit_float_to_str_inline(current_module_.get(), builder_.get(), val);
-                } else if (inst.type_a != LIR::Type::Ptr && (!reg_types.count(inst.a) || reg_types[inst.a] != LIR::Type::Ptr)) {
-                    res = FyraBuiltinFunctions::emit_int_to_str_inline(current_module_.get(), builder_.get(), val);
-                } else {
-                    used_builtins_.insert("lm_to_string");
-                    ir::Function* fn = current_module_->getFunction("lm_to_string");
-                    if (!fn) fn = builder_->createFunction("lm_to_string", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                    res = builder_->createCall(fn, {val}, lir_type_to_fyra_type(inst.result_type));
-                }
-                reg_types[inst.dst] = LIR::Type::Ptr;
-                store_reg(inst.dst, res, inst.result_type);
+                used_builtins_.insert("lm_to_string");
+                ir::Function* fn = current_module_->getFunction("lm_to_string");
+                if (!fn) fn = builder_->createFunction("lm_to_string", context_->getIntegerType(64), {context_->getIntegerType(64)});
+                store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::STR_CONCAT: {
@@ -978,10 +964,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     value_arg = FyraBuiltinFunctions::emit_bool_to_str_inline(current_module_.get(), builder_.get(), value_arg);
                 } else if (reg_decimal_scales.count(inst.b) && reg_decimal_scales[inst.b] > 0) {
                     value_arg = FyraBuiltinFunctions::emit_decimal_to_str_inline(current_module_.get(), builder_.get(), value_arg, reg_decimal_scales[inst.b]);
-                } else if (inst.type_b == LIR::Type::F64 || inst.type_b == LIR::Type::F32 || (reg_types.count(inst.b) && (reg_types[inst.b] == LIR::Type::F64 || reg_types[inst.b] == LIR::Type::F32))) {
-                    value_arg = FyraBuiltinFunctions::emit_float_to_str_inline(current_module_.get(), builder_.get(), value_arg);
                 } else if (inst.type_b != LIR::Type::Ptr && (!reg_types.count(inst.b) || reg_types[inst.b] != LIR::Type::Ptr)) {
-                    value_arg = FyraBuiltinFunctions::emit_int_to_str_inline(current_module_.get(), builder_.get(), value_arg);
+                    used_builtins_.insert("lm_to_string");
+                    ir::Function* fn_to_str = current_module_->getFunction("lm_to_string");
+                    if (!fn_to_str) fn_to_str = builder_->createFunction("lm_to_string", context_->getPointerType(context_->getIntegerType(8)), {context_->getIntegerType(64)});
+                    value_arg = builder_->createCall(fn_to_str, {value_arg});
                 }
                 store_reg(inst.dst, builder_->createCall(fn, {fmt_arg, value_arg}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
                 break;
@@ -1020,6 +1007,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Function* fn = current_module_->getFunction("lm_list_get");
                 if (!fn) fn = builder_->createFunction("lm_list_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
                 store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::ListSet: {
+                used_builtins_.insert("lm_list_set");
+                ir::Function* fn = current_module_->getFunction("lm_list_set");
+                if (!fn) fn = builder_->createFunction("lm_list_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
+                builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), load_reg(inst.dst, inst.result_type)});
                 break;
             }
             case LIR::LIR_Op::StringIndex: {
@@ -1134,7 +1128,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::NewFrame: {
                 std::string name = inst.func_name; if (name.empty()) name = "Frame";
                 uint32_t fields = static_cast<uint32_t>(inst.imm);
-                uint32_t bytes = std::max((uint32_t)2, fields + 1) * 8;
+                uint32_t bytes = (fields > 0 ? fields : 2) * 8;
                 ir::Type* type = current_module_->getType(name);
                 if (!type) { ir::StructType* st = context_->createStructType(name); st->setBody({context_->getIntegerType(64), context_->getIntegerType(64)}); current_module_->addType(name, st); type = st; }
                 store_reg(inst.dst, builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), bytes), type), inst.result_type);
