@@ -17,17 +17,3 @@ index ad0b474..bb83025 100644
 +            hb_sym.size = 67108864;
              hb_sym.binding = 1;
              addSymbol(hb_sym);
-
-diff --git a/src/target/os/linux/LinuxOS.cpp b/src/target/os/linux/LinuxOS.cpp
-index 8180d75..6f60abc 100644
---- a/src/target/os/linux/LinuxOS.cpp
-+++ b/src/target/os/linux/LinuxOS.cpp
-@@ -394,7 +394,7 @@ void LinuxOS::emitHeader(CodeGen& cg) {
-         *os << ".section .rodata\n.Lproc_environ:\n  .string \"/proc/self/environ\"\n";
-         *os << ".Lproc_cmdline:\n  .string \"/proc/self/cmdline\"\n";
-         *os << ".section .data\n.align 8\nheap_ptr:\n  .quad __fyra_heap\n";
--        *os << ".section .bss\n.align 16\n__fyra_heap:\n  .zero 1048576\n";
-+        *os << ".section .bss\n.align 16\n__fyra_heap:\n  .zero 67108864\n";
-         *os << ".text\n";
-     }
- }
