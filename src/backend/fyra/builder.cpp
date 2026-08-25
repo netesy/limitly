@@ -316,7 +316,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (reg_float_values.count(inst.a)) reg_float_values[inst.dst] = reg_float_values[inst.a];
                 if (reg_string_literals.count(inst.a)) reg_string_literals[inst.dst] = reg_string_literals[inst.a];
                 if (reg_types.count(inst.a)) reg_types[inst.dst] = reg_types[inst.a];
-                store_reg(inst.dst, load_reg(inst.a, inst.type_a), inst.result_type);
+                else if (inst.type_a != LIR::Type::Void) reg_types[inst.dst] = inst.type_a;
+                store_reg(inst.dst, load_reg(inst.a, inst.type_a), (reg_types.count(inst.dst) ? reg_types[inst.dst] : inst.result_type));
                 break;
             case LIR::LIR_Op::LoadConst: {
                 if (inst.type_name == "d2" || inst.type_name == "decimal") reg_decimal_scales[inst.dst] = 2;
