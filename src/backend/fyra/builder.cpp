@@ -332,7 +332,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     int64_t actual_val = UNBOX_INT(val);
                     ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), actual_val);
                     reg_int_values[inst.dst] = actual_val;
-                    store_reg(inst.dst, c, inst.result_type);
+                    reg_types[inst.dst] = LIR::Type::I64;
+                    store_reg(inst.dst, c, LIR::Type::I64);
                 } else if (IS_BOOL(val)) {
                     uint64_t actual_val = UNBOX_BOOL(val) ? 1 : 0;
                     ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), actual_val);
@@ -518,10 +519,57 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     store_float_reg(inst.dst, builder_->createFDiv(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
                 } else {
-                    store_reg(inst.dst, builder_->createDiv(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
+                    ir::Value* num = load_reg(inst.a, inst.type_a);
+                    ir::Value* den = load_reg(inst.b, inst.type_b);
+                    ir::Value* is_zero = builder_->createCeq(den, context_->getConstantInt(context_->getIntegerType(64), 0));
+
+                    std::string div_id = std::to_string(label_counter_++);
+                    ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                    ir::BasicBlock* b_safe = builder_->createBasicBlock("div_safe_" + div_id, cur_fn);
+                    ir::BasicBlock* b_zero = builder_->createBasicBlock("div_zero_" + div_id, cur_fn);
+                    ir::BasicBlock* b_done = builder_->createBasicBlock("div_done_" + div_id, cur_fn);
+                    ir::Instruction* res_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+
+                    builder_->createBr(is_zero, b_zero, b_safe);
+
+                    builder_->setInsertPoint(b_zero);
+                    builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), res_slot);
+                    builder_->createJmp(b_done);
+
+                    builder_->setInsertPoint(b_safe);
+                    builder_->createStore(builder_->createDiv(num, den), res_slot);
+                    builder_->createJmp(b_done);
+
+                    builder_->setInsertPoint(b_done);
+                    store_reg(inst.dst, builder_->createLoad(res_slot), inst.result_type);
                 }
                 break;
-            case LIR::LIR_Op::Mod: store_reg(inst.dst, builder_->createRem(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::Mod: {
+                ir::Value* num = load_reg(inst.a, inst.type_a);
+                ir::Value* den = load_reg(inst.b, inst.type_b);
+                ir::Value* is_zero = builder_->createCeq(den, context_->getConstantInt(context_->getIntegerType(64), 0));
+
+                std::string mod_id = std::to_string(label_counter_++);
+                ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                ir::BasicBlock* b_safe = builder_->createBasicBlock("mod_safe_" + mod_id, cur_fn);
+                ir::BasicBlock* b_zero = builder_->createBasicBlock("mod_zero_" + mod_id, cur_fn);
+                ir::BasicBlock* b_done = builder_->createBasicBlock("mod_done_" + mod_id, cur_fn);
+                ir::Instruction* res_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+
+                builder_->createBr(is_zero, b_zero, b_safe);
+
+                builder_->setInsertPoint(b_zero);
+                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), res_slot);
+                builder_->createJmp(b_done);
+
+                builder_->setInsertPoint(b_safe);
+                builder_->createStore(builder_->createRem(num, den), res_slot);
+                builder_->createJmp(b_done);
+
+                builder_->setInsertPoint(b_done);
+                store_reg(inst.dst, builder_->createLoad(res_slot), inst.result_type);
+                break;
+            }
             case LIR::LIR_Op::Neg:
                 if (reg_int_values.count(inst.a)) reg_int_values[inst.dst] = -reg_int_values[inst.a];
                 if (reg_float_values.count(inst.a)) reg_float_values[inst.dst] = -reg_float_values[inst.a];
@@ -708,6 +756,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             if (reg_t == LIR::Type::Bool || reg_t == LIR::Type::Ptr || reg_t == LIR::Type::F64 || reg_t == LIR::Type::F32) {
                                 arg_type = reg_t;
                             }
+                        }
+                        if (ai < inst.call_args.size() && reg_string_literals.count(inst.call_args[ai])) {
+                            arg_type = LIR::Type::Ptr;
+                        }
+                        if (ai < inst.call_args.size() && (reg_int_values.count(inst.call_args[ai]) || (inst.call_arg_types.size() > ai && inst.call_arg_types[ai] == LIR::Type::I64 && !reg_types.count(inst.call_args[ai])))) {
+                            arg_type = LIR::Type::I64;
                         }
                         if (arg_type == LIR::Type::I64 && (inst.call_arg_types.size() > ai && inst.call_arg_types[ai] == LIR::Type::Bool)) {
                             arg_type = LIR::Type::Bool;
@@ -969,6 +1023,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             if (reg_t == LIR::Type::Bool || reg_t == LIR::Type::Ptr || reg_t == LIR::Type::F64 || reg_t == LIR::Type::F32) {
                                 arg_type = reg_t;
                             }
+                        }
+                        if (ai < inst.call_args.size() && reg_string_literals.count(inst.call_args[ai])) {
+                            arg_type = LIR::Type::Ptr;
+                        }
+                        if (ai < inst.call_args.size() && (reg_int_values.count(inst.call_args[ai]) || (inst.call_arg_types.size() > ai && inst.call_arg_types[ai] == LIR::Type::I64 && !reg_types.count(inst.call_args[ai])))) {
+                            arg_type = LIR::Type::I64;
                         }
                         if (arg_type == LIR::Type::I64 && (inst.call_arg_types.size() > ai && inst.call_arg_types[ai] == LIR::Type::Bool)) {
                             arg_type = LIR::Type::Bool;
