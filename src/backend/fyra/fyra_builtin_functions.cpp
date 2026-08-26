@@ -579,9 +579,13 @@ ir::Value* FyraBuiltinFunctions::emit_int_to_str_inline(ir::Module* module,
 
 extern "C" char* lm_float_to_str(uint64_t bits) {
     double d;
-    memcpy(&d, &bits, sizeof(d));
+    if ((bits & 0x7) == 0x2) {
+        d = (double)(int64_t)(bits >> 3);
+    } else {
+        memcpy(&d, &bits, sizeof(d));
+    }
     char* buf = (char*)malloc(64);
-    snprintf(buf, 64, "%g", d);
+    snprintf(buf, 64, "%.6g", d);
     if (strchr(buf, '.') == NULL && strchr(buf, 'e') == NULL && strchr(buf, 'E') == NULL) {
         strcat(buf, ".0");
     }
