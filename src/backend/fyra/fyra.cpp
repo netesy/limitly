@@ -159,6 +159,7 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
             elf_gen.setMachine(62); // EM_X86_64
             elf_gen.setBaseAddress(0x400000);
             elf_gen.setEntryPointName("_start");
+            elf_gen.setStrip(options.strip);
 
             std::vector<ElfGenerator::Symbol> symbols;
             for (const auto& sym : syms) {
