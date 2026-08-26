@@ -50,6 +50,7 @@ struct FyraCompileOptions {
     bool debug_info = false;
     bool verbose = false;
     bool dump_intermediate = false;  // Dump .s or .wat files
+    bool strip = false;               // Omit symbol/string table from executable
     std::string triple;  // Target triple (e.g., "x86_64-pc-windows-gnu")
 };
 

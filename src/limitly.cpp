@@ -144,6 +144,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                 fyra_options.arch = LM::Backend::Fyra::Architecture::X86_64;
                 fyra_options.opt_level = (LM::Backend::Fyra::OptimizationLevel)options.opt_level;
                 fyra_options.output_file = options.output_file;
+                fyra_options.strip = options.strip;
 
                 if (options.print_fyra_ir) {
                     auto ir_context = std::make_shared<ir::IRContext>();

@@ -48,14 +48,56 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     builder_->setModule(current_module_.get());
     used_builtins_.clear();
 
+    auto& registry = LIR::FunctionRegistry::getInstance();
+
+    // Perform reachability analysis starting from the entry function
+    std::unordered_set<std::string> reachable_funcs;
+    std::vector<std::string> worklist;
+
+    reachable_funcs.insert(lir_func.name);
+    worklist.push_back(lir_func.name);
+
+    if (lir_func.name == "__top_level_wrapper__" && registry.getFunction("main")) {
+        reachable_funcs.insert("main");
+        worklist.push_back("main");
+    }
+
+    auto inspect_instructions = [&](const LIR::LIR_Function& f) {
+        for (const auto& inst : f.instructions) {
+            std::string callee = inst.func_name;
+            if (callee.empty() && inst.const_val && IS_PTR(inst.const_val)) {
+                ObjHeader* h = (ObjHeader*)UNBOX_PTR(inst.const_val);
+                if (h->type_id == TYPE_STRING) callee = ((LmStringHeader*)h)->data;
+            }
+            if (!callee.empty() && registry.getFunction(callee)) {
+                if (reachable_funcs.find(callee) == reachable_funcs.end()) {
+                    reachable_funcs.insert(callee);
+                    worklist.push_back(callee);
+                }
+            }
+        }
+    };
+
+    size_t work_idx = 0;
+    while (work_idx < worklist.size()) {
+        std::string fname = worklist[work_idx++];
+        if (fname == lir_func.name) {
+            inspect_instructions(lir_func);
+        } else {
+            auto* f = registry.getFunction(fname);
+            if (f) inspect_instructions(*f);
+        }
+    }
+
     std::string main_name = lir_func.name;
     if (main_name == "__top_level_wrapper__") main_name = "main";
     ir::Function* main_fn = builder_->createFunction(main_name, context_->getIntegerType(64));
 
-    auto& registry = LIR::FunctionRegistry::getInstance();
+    // 1. Declare only reachable registered functions
     for (const auto& func_name : registry.getFunctionNames()) {
         if (func_name == lir_func.name) continue;
         if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) continue;
+        if (reachable_funcs.find(func_name) == reachable_funcs.end()) continue;
         auto* f = registry.getFunction(func_name);
         if (!f) continue;
 
@@ -73,10 +115,11 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         builder_->createFunction(ir_name, ret_type, param_types);
     }
 
-    // 2. Build the bodies of all registered functions FIRST (so module .__init__ functions are populated)
+    // 2. Build the bodies of reachable registered functions
     for (const auto& func_name : registry.getFunctionNames()) {
         if (func_name == lir_func.name) continue;
         if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) continue;
+        if (reachable_funcs.find(func_name) == reachable_funcs.end()) continue;
         auto* f = registry.getFunction(func_name);
         if (!f) continue;
 
@@ -847,11 +890,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             builder_->createBr(is_enum, b_pr_enum, b_pr_list);
 
                             builder_->setInsertPoint(b_pr_enum);
-                            used_builtins_.insert("lm_enum_new");
-                            FyraBuiltinFunctions::emit_enum_ir(current_module_.get(), builder_.get());
                             ir::Function* fn_enum_str = current_module_->getFunction("lm_enum_to_str");
-                            ir::Value* enum_s = builder_->createCall(fn_enum_str, {arg_val});
-                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), enum_s);
+                            if (fn_enum_str) {
+                                ir::Value* enum_s = builder_->createCall(fn_enum_str, {arg_val});
+                                FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), enum_s);
+                            } else {
+                                FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg_val);
+                            }
                             builder_->createJmp(b_pr_next);
 
                             builder_->setInsertPoint(b_pr_list);
@@ -859,11 +904,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             builder_->createBr(is_list, b_pr_dict, b_pr_fallback);
 
                             builder_->setInsertPoint(b_pr_dict);
-                            used_builtins_.insert("lm_list_new");
-                            FyraBuiltinFunctions::emit_list_ir(current_module_.get(), builder_.get());
                             ir::Function* fn_list_str = current_module_->getFunction("lm_list_to_str");
-                            ir::Value* list_s = builder_->createCall(fn_list_str, {arg_val});
-                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), list_s);
+                            if (fn_list_str) {
+                                ir::Value* list_s = builder_->createCall(fn_list_str, {arg_val});
+                                FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), list_s);
+                            } else {
+                                FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg_val);
+                            }
                             builder_->createJmp(b_pr_next);
 
                             builder_->setInsertPoint(b_pr_fallback);
@@ -1175,19 +1222,23 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             builder_->createBr(is_enum, b_pr_enum, b_pr_list);
 
                             builder_->setInsertPoint(b_pr_enum);
-                            used_builtins_.insert("lm_enum_new");
-                            FyraBuiltinFunctions::emit_enum_ir(current_module_.get(), builder_.get());
                             ir::Function* fn_enum_str = current_module_->getFunction("lm_enum_to_str");
-                            ir::Value* enum_s = builder_->createCall(fn_enum_str, {arg_val});
-                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), enum_s);
+                            if (fn_enum_str) {
+                                ir::Value* enum_s = builder_->createCall(fn_enum_str, {arg_val});
+                                FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), enum_s);
+                            } else {
+                                FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg_val);
+                            }
                             builder_->createJmp(b_pr_next);
 
                             builder_->setInsertPoint(b_pr_list);
-                            used_builtins_.insert("lm_list_new");
-                            FyraBuiltinFunctions::emit_list_ir(current_module_.get(), builder_.get());
                             ir::Function* fn_list_str = current_module_->getFunction("lm_list_to_str");
-                            ir::Value* list_s = builder_->createCall(fn_list_str, {arg_val});
-                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), list_s);
+                            if (fn_list_str) {
+                                ir::Value* list_s = builder_->createCall(fn_list_str, {arg_val});
+                                FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), list_s);
+                            } else {
+                                FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg_val);
+                            }
                             builder_->createJmp(b_pr_next);
 
                             builder_->setInsertPoint(b_pr_next);
@@ -1787,7 +1838,6 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::ChannelPoll: {
                 used_builtins_.insert("lm_channel_pop");
                 used_builtins_.insert("lm_list_new");
-                FyraBuiltinFunctions::emit_list_ir(current_module_.get(), builder_.get());
                 ir::Function* fn = current_module_->getFunction("lm_channel_pop");
                 ir::Value* ch_ptr = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a, LIR::Type::Ptr) : load_reg(inst.dst, LIR::Type::Ptr);
                 if (fn) store_reg(inst.dst, builder_->createCall(fn, {ch_ptr}, context_->getIntegerType(64)), inst.result_type);
