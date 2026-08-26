@@ -593,44 +593,319 @@ ir::Value* FyraBuiltinFunctions::emit_float_to_str_inline(ir::Module* module,
                                                        ir::Value* val) {
     auto ctx = module->getContextShared();
     auto i64 = ctx->getIntegerType(64);
-    
-    ir::Instruction* cstr = builder->createExternCall("lm_float_to_str", {val}, ctx->getPointerType(ctx->getIntegerType(8)));
-    ir::Instruction* slen = builder->createExternCall("strlen", {cstr}, i64);
-
-    emit_str_alloc_ir(module, builder);
-    ir::Function* alloc_fn = module->getFunction("lm_str_alloc");
-    ir::Value* new_hdr = builder->createCall(alloc_fn, {slen});
-    ir::Value* dst_data = builder->createAdd(new_hdr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
-
-    ir::Instruction* copy_idx = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
-    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx);
+    auto i8 = ctx->getIntegerType(8);
+    auto i32 = ctx->getIntegerType(32);
 
     ir::Function* cur_fn = builder->getInsertPoint()->getParent();
     static int f2s_cnt = 0;
     std::string s_uid = std::to_string(++f2s_cnt);
 
-    ir::BasicBlock* b_copy_loop = builder->createBasicBlock("f2s_copy_loop_" + s_uid, cur_fn);
-    ir::BasicBlock* b_copy_body = builder->createBasicBlock("f2s_copy_body_" + s_uid, cur_fn);
-    ir::BasicBlock* b_copy_done = builder->createBasicBlock("f2s_copy_done_" + s_uid, cur_fn);
+    ir::Instruction* buf_ptr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 64)}, i64);
+    builder->createStore(ctx->getConstantInt(i32, StringABI::TYPE_ID), buf_ptr); // type_id at offset 0
+    builder->createStore(ctx->getConstantInt(i32, 0), builder->createAdd(buf_ptr, ctx->getConstantInt(i64, 4))); // metadata at offset 4
 
-    builder->createJmp(b_copy_loop);
+    ir::Value* p_end = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, 63));
+    builder->createStoreb(ctx->getConstantInt(i8, 0), p_end); // null terminator
 
-    builder->setInsertPoint(b_copy_loop);
-    ir::Value* c_i = builder->createLoad(copy_idx);
-    ir::Value* c_cond = builder->createCslt(c_i, slen);
-    builder->createBr(c_cond, b_copy_body, b_copy_done);
+    ir::Instruction* v_cur_ptr = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(p_end, v_cur_ptr);
 
-    builder->setInsertPoint(b_copy_body);
-    ir::Value* ch = builder->createLoadub(builder->createAdd(cstr, c_i));
-    builder->createStoreb(ch, builder->createAdd(dst_data, c_i));
-    builder->createStore(builder->createAdd(c_i, ctx->getConstantInt(i64, 1)), copy_idx);
-    builder->createJmp(b_copy_loop);
+    ir::Value* is_neg = builder->createCne(builder->createAnd(builder->createShr(val, ctx->getConstantInt(i64, 63)), ctx->getConstantInt(i64, 1)), ctx->getConstantInt(i64, 0));
+    ir::Value* exp_raw = builder->createAnd(builder->createShr(val, ctx->getConstantInt(i64, 52)), ctx->getConstantInt(i64, 0x7FF));
+    ir::Value* mant = builder->createAnd(val, ctx->getConstantInt(i64, 0x000FFFFFFFFFFFFF));
 
-    builder->setInsertPoint(b_copy_done);
-    builder->createStoreb(ctx->getConstantInt(ctx->getIntegerType(8), 0), builder->createAdd(dst_data, slen));
-    builder->createExternCall("free", {cstr}, ctx->getVoidType());
+    ir::BasicBlock* b_zero = builder->createBasicBlock("f2s_zero_" + s_uid, cur_fn);
+    ir::BasicBlock* b_special = builder->createBasicBlock("f2s_spec_" + s_uid, cur_fn);
+    ir::BasicBlock* b_normal = builder->createBasicBlock("f2s_norm_" + s_uid, cur_fn);
+    ir::BasicBlock* b_done = builder->createBasicBlock("f2s_done_" + s_uid, cur_fn);
 
-    return new_hdr;
+    ir::Value* is_zero_exp = builder->createCeq(exp_raw, ctx->getConstantInt(i64, 0));
+    ir::Value* is_zero_mant = builder->createCeq(mant, ctx->getConstantInt(i64, 0));
+    ir::Value* is_zero = builder->createAnd(is_zero_exp, is_zero_mant);
+
+    ir::Value* is_spec = builder->createCeq(exp_raw, ctx->getConstantInt(i64, 0x7FF));
+
+    builder->createBr(is_zero, b_zero, b_special);
+
+    // Branch: Zero (0.0 or -0.0)
+    builder->setInsertPoint(b_zero);
+    ir::BasicBlock* b_z_neg = builder->createBasicBlock("f2s_z_neg_" + s_uid, cur_fn);
+    ir::BasicBlock* b_z_pos = builder->createBasicBlock("f2s_z_pos_" + s_uid, cur_fn);
+    builder->createBr(is_neg, b_z_neg, b_z_pos);
+
+    builder->setInsertPoint(b_z_neg);
+    ir::Value* dst_zneg = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+    builder->createStore(ctx->getConstantInt(i64, 4), builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET)));
+    builder->createStore(ctx->getConstantInt(i64, 4), builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::CAP_OFFSET)));
+    for (int k = 0; k < 5; ++k) {
+        builder->createStoreb(ctx->getConstantInt(i8, "-0.0"[k]), builder->createAdd(dst_zneg, ctx->getConstantInt(i64, k)));
+    }
+    builder->createJmp(b_done);
+
+    builder->setInsertPoint(b_z_pos);
+    ir::Value* dst_zpos = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+    builder->createStore(ctx->getConstantInt(i64, 3), builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET)));
+    builder->createStore(ctx->getConstantInt(i64, 3), builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::CAP_OFFSET)));
+    for (int k = 0; k < 4; ++k) {
+        builder->createStoreb(ctx->getConstantInt(i8, "0.0"[k]), builder->createAdd(dst_zpos, ctx->getConstantInt(i64, k)));
+    }
+    builder->createJmp(b_done);
+
+    // Branch: Special (NaN / Inf) or Normal
+    builder->setInsertPoint(b_special);
+    ir::BasicBlock* b_inf = builder->createBasicBlock("f2s_inf_" + s_uid, cur_fn);
+    ir::BasicBlock* b_nan = builder->createBasicBlock("f2s_nan_" + s_uid, cur_fn);
+
+    ir::Value* is_inf = builder->createCeq(mant, ctx->getConstantInt(i64, 0));
+    builder->createBr(is_spec, b_inf, b_normal);
+
+    builder->setInsertPoint(b_inf);
+    ir::Value* dst_inf = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+    builder->createStore(ctx->getConstantInt(i64, 3), builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET)));
+    builder->createStore(ctx->getConstantInt(i64, 3), builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::CAP_OFFSET)));
+    builder->createStoreb(ctx->getConstantInt(i8, 'i'), builder->createAdd(dst_inf, ctx->getConstantInt(i64, 0)));
+    builder->createStoreb(ctx->getConstantInt(i8, 'n'), builder->createAdd(dst_inf, ctx->getConstantInt(i64, 1)));
+    builder->createStoreb(ctx->getConstantInt(i8, 'f'), builder->createAdd(dst_inf, ctx->getConstantInt(i64, 2)));
+    builder->createStoreb(ctx->getConstantInt(i8, 0), builder->createAdd(dst_inf, ctx->getConstantInt(i64, 3)));
+    builder->createJmp(b_done);
+
+    builder->setInsertPoint(b_nan);
+    ir::Value* dst_nan = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+    builder->createStore(ctx->getConstantInt(i64, 3), builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET)));
+    builder->createStore(ctx->getConstantInt(i64, 3), builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::CAP_OFFSET)));
+    builder->createStoreb(ctx->getConstantInt(i8, 'n'), builder->createAdd(dst_nan, ctx->getConstantInt(i64, 0)));
+    builder->createStoreb(ctx->getConstantInt(i8, 'a'), builder->createAdd(dst_nan, ctx->getConstantInt(i64, 1)));
+    builder->createStoreb(ctx->getConstantInt(i8, 'n'), builder->createAdd(dst_nan, ctx->getConstantInt(i64, 2)));
+    builder->createStoreb(ctx->getConstantInt(i8, 0), builder->createAdd(dst_nan, ctx->getConstantInt(i64, 3)));
+    builder->createJmp(b_done);
+
+    // Branch: Normal numbers
+    builder->setInsertPoint(b_normal);
+    ir::Instruction* v_whole = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    ir::Instruction* v_frac  = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+
+    ir::Value* exp = builder->createSub(exp_raw, ctx->getConstantInt(i64, 1023));
+    ir::Value* frac_bits = builder->createOr(mant, ctx->getConstantInt(i64, 0x0010000000000000));
+
+    ir::BasicBlock* b_exp_ge0 = builder->createBasicBlock("f2s_exp_ge0_" + s_uid, cur_fn);
+    ir::BasicBlock* b_exp_lt0 = builder->createBasicBlock("f2s_exp_lt0_" + s_uid, cur_fn);
+    ir::BasicBlock* b_fmt_digits = builder->createBasicBlock("f2s_fmt_" + s_uid, cur_fn);
+
+    ir::Value* is_exp_ge0 = builder->createCsge(exp, ctx->getConstantInt(i64, 0));
+    builder->createBr(is_exp_ge0, b_exp_ge0, b_exp_lt0);
+
+    // Sub-branch exp >= 0
+    builder->setInsertPoint(b_exp_ge0);
+    ir::BasicBlock* b_exp_ge52 = builder->createBasicBlock("f2s_exp_ge52_" + s_uid, cur_fn);
+    ir::BasicBlock* b_exp_lt52 = builder->createBasicBlock("f2s_exp_lt52_" + s_uid, cur_fn);
+    ir::Value* is_exp_ge52 = builder->createCsge(exp, ctx->getConstantInt(i64, 52));
+    builder->createBr(is_exp_ge52, b_exp_ge52, b_exp_lt52);
+
+    builder->setInsertPoint(b_exp_ge52);
+    builder->createStore(builder->createShl(frac_bits, builder->createSub(exp, ctx->getConstantInt(i64, 52))), v_whole);
+    builder->createStore(ctx->getConstantInt(i64, 0), v_frac);
+    builder->createJmp(b_fmt_digits);
+
+    builder->setInsertPoint(b_exp_lt52);
+    ir::Value* shift1 = builder->createSub(ctx->getConstantInt(i64, 52), exp);
+    builder->createStore(builder->createShr(frac_bits, shift1), v_whole);
+    ir::Value* mask1 = builder->createSub(builder->createShl(ctx->getConstantInt(i64, 1), shift1), ctx->getConstantInt(i64, 1));
+    ir::Value* rem1 = builder->createAnd(mant, mask1);
+
+    ir::Instruction* v_r = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(rem1, v_r);
+    ir::Instruction* v_frac_acc = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), v_frac_acc);
+
+    for (int k = 0; k < 6; ++k) {
+        ir::Value* cur_r = builder->createMul(builder->createLoad(v_r), ctx->getConstantInt(i64, 10));
+        ir::Value* digit = builder->createShr(cur_r, shift1);
+        ir::Value* next_r = builder->createAnd(cur_r, mask1);
+        builder->createStore(next_r, v_r);
+        ir::Value* cur_acc = builder->createLoad(v_frac_acc);
+        ir::Value* next_acc = builder->createAdd(builder->createMul(cur_acc, ctx->getConstantInt(i64, 10)), digit);
+        builder->createStore(next_acc, v_frac_acc);
+    }
+    // 7th digit for rounding
+    ir::Value* cur_r7 = builder->createMul(builder->createLoad(v_r), ctx->getConstantInt(i64, 10));
+    ir::Value* digit7 = builder->createShr(cur_r7, shift1);
+    ir::Value* is_r7_ge5 = builder->createCsge(digit7, ctx->getConstantInt(i64, 5));
+
+    ir::BasicBlock* b_round_up = builder->createBasicBlock("f2s_round_up_" + s_uid, cur_fn);
+    ir::BasicBlock* b_round_done = builder->createBasicBlock("f2s_round_done_" + s_uid, cur_fn);
+    builder->createBr(is_r7_ge5, b_round_up, b_round_done);
+
+    builder->setInsertPoint(b_round_up);
+    builder->createStore(builder->createAdd(builder->createLoad(v_frac_acc), ctx->getConstantInt(i64, 1)), v_frac_acc);
+    builder->createJmp(b_round_done);
+
+    builder->setInsertPoint(b_round_done);
+    builder->createStore(builder->createLoad(v_frac_acc), v_frac);
+    builder->createJmp(b_fmt_digits);
+
+    // Sub-branch exp < 0
+    builder->setInsertPoint(b_exp_lt0);
+    builder->createStore(ctx->getConstantInt(i64, 0), v_whole);
+    ir::Value* shift2 = builder->createSub(ctx->getConstantInt(i64, 52), exp);
+    ir::Value* is_shift_lt62 = builder->createCslt(shift2, ctx->getConstantInt(i64, 62));
+
+    ir::BasicBlock* b_s_lt62 = builder->createBasicBlock("f2s_s_lt62_" + s_uid, cur_fn);
+    ir::BasicBlock* b_s_ge62 = builder->createBasicBlock("f2s_s_ge62_" + s_uid, cur_fn);
+    builder->createBr(is_shift_lt62, b_s_lt62, b_s_ge62);
+
+    builder->setInsertPoint(b_s_lt62);
+    ir::Value* mask2 = builder->createSub(builder->createShl(ctx->getConstantInt(i64, 1), shift2), ctx->getConstantInt(i64, 1));
+    ir::Instruction* v_r2 = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(frac_bits, v_r2);
+    ir::Instruction* v_frac_acc2 = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), v_frac_acc2);
+
+    for (int k = 0; k < 6; ++k) {
+        ir::Value* cur_r = builder->createMul(builder->createLoad(v_r2), ctx->getConstantInt(i64, 10));
+        ir::Value* digit = builder->createShr(cur_r, shift2);
+        ir::Value* next_r = builder->createAnd(cur_r, mask2);
+        builder->createStore(next_r, v_r2);
+        ir::Value* cur_acc = builder->createLoad(v_frac_acc2);
+        ir::Value* next_acc = builder->createAdd(builder->createMul(cur_acc, ctx->getConstantInt(i64, 10)), digit);
+        builder->createStore(next_acc, v_frac_acc2);
+    }
+    builder->createStore(builder->createLoad(v_frac_acc2), v_frac);
+    builder->createJmp(b_fmt_digits);
+
+    builder->setInsertPoint(b_s_ge62);
+    builder->createStore(ctx->getConstantInt(i64, 0), v_frac);
+    builder->createJmp(b_fmt_digits);
+
+    // Formatting digits into buffer
+    builder->setInsertPoint(b_fmt_digits);
+    ir::Instruction* v_f_rem = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(builder->createLoad(v_frac), v_f_rem);
+
+    ir::Instruction* v_digit_cnt = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 6), v_digit_cnt);
+
+    ir::Instruction* v_has_non_zero = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), v_has_non_zero);
+
+    ir::BasicBlock* b_frac_loop = builder->createBasicBlock("f2s_frac_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_frac_body = builder->createBasicBlock("f2s_frac_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_dot = builder->createBasicBlock("f2s_dot_" + s_uid, cur_fn);
+
+    builder->createJmp(b_frac_loop);
+
+    builder->setInsertPoint(b_frac_loop);
+    ir::Value* dc = builder->createLoad(v_digit_cnt);
+    ir::Value* dc_more = builder->createCsgt(dc, ctx->getConstantInt(i64, 0));
+    builder->createBr(dc_more, b_frac_body, b_dot);
+
+    builder->setInsertPoint(b_frac_body);
+    ir::Value* fr_v = builder->createLoad(v_f_rem);
+    ir::Value* fd = builder->createRem(fr_v, ctx->getConstantInt(i64, 10));
+    ir::Value* fr_next = builder->createDiv(fr_v, ctx->getConstantInt(i64, 10));
+    builder->createStore(fr_next, v_f_rem);
+
+    ir::Value* is_fd_nz = builder->createCne(fd, ctx->getConstantInt(i64, 0));
+    ir::Value* is_dc_1 = builder->createCeq(dc, ctx->getConstantInt(i64, 1));
+    ir::Value* is_first_digit = builder->createOr(is_fd_nz, is_dc_1);
+
+    ir::Value* cur_has_nz = builder->createLoad(v_has_non_zero);
+    ir::Value* new_has_nz = builder->createOr(cur_has_nz, is_first_digit);
+    builder->createStore(new_has_nz, v_has_non_zero);
+
+    ir::BasicBlock* b_emit_f_digit = builder->createBasicBlock("f2s_emit_fd_" + s_uid, cur_fn);
+    ir::BasicBlock* b_skip_f_digit = builder->createBasicBlock("f2s_skip_fd_" + s_uid, cur_fn);
+
+    builder->createBr(new_has_nz, b_emit_f_digit, b_skip_f_digit);
+
+    builder->setInsertPoint(b_emit_f_digit);
+    ir::Value* f_char = builder->createAdd(fd, ctx->getConstantInt(i64, 48));
+    ir::Value* cur_p1 = builder->createLoad(v_cur_ptr);
+    ir::Value* new_p1 = builder->createSub(cur_p1, ctx->getConstantInt(i64, 1));
+    builder->createStoreb(f_char, new_p1);
+    builder->createStore(new_p1, v_cur_ptr);
+    builder->createJmp(b_skip_f_digit);
+
+    builder->setInsertPoint(b_skip_f_digit);
+    builder->createStore(builder->createSub(dc, ctx->getConstantInt(i64, 1)), v_digit_cnt);
+    builder->createJmp(b_frac_loop);
+
+    // Place '.'
+    builder->setInsertPoint(b_dot);
+    ir::Value* cur_p2 = builder->createLoad(v_cur_ptr);
+    ir::Value* new_p2 = builder->createSub(cur_p2, ctx->getConstantInt(i64, 1));
+    builder->createStoreb(ctx->getConstantInt(i8, 46), new_p2); // '.'
+    builder->createStore(new_p2, v_cur_ptr);
+
+    // Format whole part
+    ir::BasicBlock* b_whole_loop = builder->createBasicBlock("f2s_w_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_whole_body = builder->createBasicBlock("f2s_w_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_sign_check = builder->createBasicBlock("f2s_sign_" + s_uid, cur_fn);
+    ir::BasicBlock* b_minus = builder->createBasicBlock("f2s_minus_" + s_uid, cur_fn);
+    ir::BasicBlock* b_copy_out = builder->createBasicBlock("f2s_copy_out_" + s_uid, cur_fn);
+
+    builder->createJmp(b_whole_loop);
+
+    builder->setInsertPoint(b_whole_loop);
+    ir::Value* wv = builder->createLoad(v_whole);
+    ir::Value* wd = builder->createRem(wv, ctx->getConstantInt(i64, 10));
+    ir::Value* w_next = builder->createDiv(wv, ctx->getConstantInt(i64, 10));
+    builder->createStore(w_next, v_whole);
+
+    ir::Value* w_char = builder->createAdd(wd, ctx->getConstantInt(i64, 48));
+    ir::Value* cur_p3 = builder->createLoad(v_cur_ptr);
+    ir::Value* new_p3 = builder->createSub(cur_p3, ctx->getConstantInt(i64, 1));
+    builder->createStoreb(w_char, new_p3);
+    builder->createStore(new_p3, v_cur_ptr);
+
+    ir::Value* w_more = builder->createCsge(w_next, ctx->getConstantInt(i64, 1));
+    builder->createBr(w_more, b_whole_loop, b_sign_check);
+
+    builder->setInsertPoint(b_sign_check);
+    builder->createBr(is_neg, b_minus, b_copy_out);
+
+    builder->setInsertPoint(b_minus);
+    ir::Value* cur_p4 = builder->createLoad(v_cur_ptr);
+    ir::Value* new_p4 = builder->createSub(cur_p4, ctx->getConstantInt(i64, 1));
+    builder->createStoreb(ctx->getConstantInt(i8, 45), new_p4); // '-'
+    builder->createStore(new_p4, v_cur_ptr);
+    builder->createJmp(b_copy_out);
+
+    // Copy to buf_ptr + DATA_OFFSET
+    builder->setInsertPoint(b_copy_out);
+    ir::Value* str_start = builder->createLoad(v_cur_ptr);
+    ir::Value* str_len = builder->createSub(p_end, str_start);
+
+    builder->createStore(str_len, builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET)));
+    builder->createStore(str_len, builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::CAP_OFFSET)));
+
+    ir::Value* dst_data = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+
+    ir::Instruction* copy_idx = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx);
+    ir::Value* copy_len = builder->createAdd(str_len, ctx->getConstantInt(i64, 1));
+
+    ir::BasicBlock* b_c_loop = builder->createBasicBlock("f2s_c_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_c_body = builder->createBasicBlock("f2s_c_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_c_done = builder->createBasicBlock("f2s_c_done_" + s_uid, cur_fn);
+
+    builder->createJmp(b_c_loop);
+
+    builder->setInsertPoint(b_c_loop);
+    ir::Value* ci = builder->createLoad(copy_idx);
+    ir::Value* c_cond = builder->createCslt(ci, copy_len);
+    builder->createBr(c_cond, b_c_body, b_c_done);
+
+    builder->setInsertPoint(b_c_body);
+    ir::Value* ch = builder->createLoadub(builder->createAdd(str_start, ci));
+    builder->createStoreb(ch, builder->createAdd(dst_data, ci));
+    builder->createStore(builder->createAdd(ci, ctx->getConstantInt(i64, 1)), copy_idx);
+    builder->createJmp(b_c_loop);
+
+    builder->setInsertPoint(b_c_done);
+    builder->createJmp(b_done);
+
+    builder->setInsertPoint(b_done);
+    return buf_ptr;
 }
 
 ir::Value* FyraBuiltinFunctions::emit_bool_to_str_inline(ir::Module* module,
