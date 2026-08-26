@@ -1324,7 +1324,7 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         builder->setInsertPoint(b_pay_cmp);
         ir::Value* pay1 = builder->createLoad(builder->createAdd(k1, ctx->getConstantInt(i64, 16)));
         ir::Value* pay2 = builder->createLoad(builder->createAdd(k2, ctx->getConstantInt(i64, 16)));
-        ir::Value* pays_eq = builder->createCall(fn_eq, {pay1, pay2});
+        ir::Value* pays_eq = builder->createCeq(pay1, pay2);
         builder->createRet(pays_eq);
 
         builder->setInsertPoint(b_loop_init);
