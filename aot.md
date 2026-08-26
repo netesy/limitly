@@ -226,8 +226,8 @@ Comparing native Linux ELF execution against Windows PE execution under Wine rev
 
 ## Technical Root Cause Analysis of AOT Compiler Deficiencies
 
-1. **Float Packing Bit Casts**:
-   - Updated `lm_float_to_str` in `src/backend/fyra/fyra_builtin_functions.cpp` to correctly handle tagged ints, heap pointers (`LmBox`), and raw IEEE-754 bitcast values.
+1. **Float Packing & Constant Literal Formatting**:
+   - Refactored `src/backend/fyra/builder.cpp` to create string headers for float literal constants (`format_float_literal`) and `lm_float_to_str` in `src/backend/fyra/fyra_builtin_functions.cpp` to safely convert bitcast IEEE-754 double floats.
 2. **Closure Environment Allocation**:
    - Dynamic functions and closures require passing env pointers in registers.
 3. **Dictionary Key Iteration Order**:
