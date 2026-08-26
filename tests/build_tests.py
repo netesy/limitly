@@ -4,6 +4,7 @@ import os
 import subprocess
 import time
 import difflib
+import argparse
 
 # Add project root and script directory to sys.path to allow imports
 script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,8 +20,19 @@ except ImportError:
     # Fallback/Direct import if run_tests is in the current directory
     from run_tests import tests, slow_tests, limitly_path
 
+parser = argparse.ArgumentParser(description="Run Limitly AOT Validation Tests")
+parser.add_argument(
+    "-target", "--target",
+    default=None,
+    choices=["windows", "linux", "macos"],
+    help="Target platform to build and validate for (windows, linux, macos)"
+)
+args = parser.parse_args()
+
 # Target platform detection
-if os.name == 'nt':
+if args.target:
+    target_platform = args.target.lower()
+elif os.name == 'nt':
     target_platform = "windows"
 elif sys.platform == 'darwin':
     target_platform = "macos"
@@ -72,7 +84,7 @@ for test in tests:
 
     # 2. Determine platform-specific executable name
     output_bin = test_path[:-3] # remove '.lm'
-    if os.name == 'nt':
+    if target_platform == 'windows' or os.name == 'nt':
         output_bin += ".exe"
     output_bin = os.path.abspath(output_bin)
 
@@ -129,14 +141,23 @@ for test in tests:
     run_timeout = False
     run_exception = None
 
+    # Setup execution environment and command
+    run_env = os.environ.copy()
+    if target_platform == "windows" and os.name != "nt":
+        run_cmd = ["wine", output_bin]
+        run_env["WINEDEBUG"] = "-all"
+    else:
+        run_cmd = [output_bin]
+
     try:
         # Enforce maximum runtime of 30 seconds
         run_res = subprocess.run(
-            [output_bin],
+            run_cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            timeout=30.0
+            timeout=30.0,
+            env=run_env
         )
         actual_stdout = run_res.stdout
         actual_stderr = run_res.stderr
@@ -239,7 +260,7 @@ for test in tests:
         failed += 1
 
 print("\n====================================================")
-print("AOT Validation Summary:")
+print(f"AOT Validation Summary ({target_platform.upper()}):")
 print("====================================================")
 print(f"Total tests:       {total}")
 print(f"Passed:            {passed}")
