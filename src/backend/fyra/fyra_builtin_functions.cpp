@@ -1,6 +1,7 @@
 #include "fyra_builtin_functions.hh"
 #include "backend/vm/vm_string.hh"
 #include "backend/vm/vm_list.hh"
+#include "backend/vm/vm_runtime.hh"
 #include "backend/utf8.hh"
 #include "ir/IRBuilder.h"
 #include "ir/IRContext.h"
@@ -579,11 +580,7 @@ ir::Value* FyraBuiltinFunctions::emit_int_to_str_inline(ir::Module* module,
 
 extern "C" char* lm_float_to_str(uint64_t bits) {
     double d;
-    if ((bits & 0x7) == 0x2) {
-        d = (double)(int64_t)(bits >> 3);
-    } else {
-        memcpy(&d, &bits, sizeof(d));
-    }
+    memcpy(&d, &bits, sizeof(d));
     char* buf = (char*)malloc(64);
     snprintf(buf, 64, "%.6g", d);
     if (strchr(buf, '.') == NULL && strchr(buf, 'e') == NULL && strchr(buf, 'E') == NULL) {

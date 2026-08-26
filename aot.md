@@ -12,8 +12,8 @@ The test suite consists of **80 validation test files** covering fundamental lan
 | :--- | :--- | :--- | :--- |
 | **Total Test Suite** | 80 | 80 | Standard Limitly AOT validation suite |
 | **Succeeded (`PASS`)** | **30 (37.5%)** | **29 (36.25%)** | Binary compiles, executes with exit code 0, matching expected interpreter output. |
-| **Output Mismatches (`MISMATCH`)** | **31 (38.75%)** | **30 (37.5%)** | Binary executes with exit code 0, but output differs (float format, Dict key order). |
-| **Runtime Failures (`RUNTIME_FAIL`)**| **18 (22.5%)** | **20 (25.0%)** | Executable exits with non-zero status code (SIGSEGV -11 or assertion code 1/5). |
+| **Output Mismatches (`MISMATCH`)** | **30 (37.5%)** | **30 (37.5%)** | Binary executes with exit code 0, but output differs (float byte formatting, Dict key order). |
+| **Runtime Failures (`RUNTIME_FAIL`)**| **19 (23.75%)** | **20 (25.0%)** | Executable exits with non-zero status code (SIGSEGV -11 or assertion code 1/5). |
 | **Hung / Timed Out (`HANG`)** | **1 (1.25%)** | **1 (1.25%)** | Executable exceeds 30-second runtime limit (`tests/stdlib/iterator_module_test.lm`). |
 | **Build Failures** | **0 (0.0%)** | **0 (0.0%)** | All 80 test cases compiled to machine code without compilation errors. |
 
@@ -55,7 +55,7 @@ The test suite consists of **80 validation test files** covering fundamental lan
 29. `tests/regression/ownership_refactor_test.lm`
 30. `tests/regression/trait_dispatch_test.lm`
 
-#### B. Output Mismatches (`MISMATCH` - 31 Tests)
+#### B. Output Mismatches (`MISMATCH` - 30 Tests)
 1. `tests/basic/variables.lm`
 2. `tests/basic/print_statements.lm`
 3. `tests/basic/list_dict_tuple.lm`
@@ -83,30 +83,30 @@ The test suite consists of **80 validation test files** covering fundamental lan
 25. `tests/stdlib/string_module_test.lm`
 26. `tests/stdlib/unicode_module_test.lm`
 27. `tests/stdlib/regex_module_test.lm`
-28. `tests/stdlib/time_module_test.lm`
-29. `tests/stdlib/path/path_test.lm`
-30. `tests/stdlib/url_test.lm`
-31. `tests/stdlib/mime_test.lm`
+28. `tests/stdlib/path/path_test.lm`
+29. `tests/stdlib/url_test.lm`
+30. `tests/stdlib/mime_test.lm`
 
-#### C. Runtime Failures (`RUNTIME_FAIL` - 18 Tests)
-1. `tests/basic/literals.lm`
-2. `tests/expressions/large_literals.lm`
-3. `tests/loops/match_advanced.lm`
-4. `tests/functions/advanced.lm`
-5. `tests/functions/closures.lm`
-6. `tests/functions/first_class.lm`
-7. `tests/types/advanced.lm`
-8. `tests/types/enums.lm`
-9. `tests/types/refined_types.lm`
-10. `tests/concurrency/parallel_blocks.lm`
-11. `tests/concurrency/concurrent_blocks.lm`
-12. `tests/stdlib/math_module_test.lm`
-13. `tests/stdlib/random_module_test.lm`
-14. `tests/stdlib/parse_module_test.lm`
-15. `tests/stdlib/format_module_test.lm`
-16. `tests/stdlib/semver_test.lm`
-17. `tests/stdlib/uuid_test.lm`
-18. `tests/stdlib/net/net_test.lm`
+#### C. Runtime Failures (`RUNTIME_FAIL` - 19 Tests)
+1. `tests/basic/literals.lm` (SIGSEGV -11)
+2. `tests/expressions/large_literals.lm` (SIGSEGV -11)
+3. `tests/loops/match_advanced.lm` (SIGSEGV -11)
+4. `tests/functions/advanced.lm` (SIGSEGV -11)
+5. `tests/functions/closures.lm` (SIGSEGV -11)
+6. `tests/functions/first_class.lm` (SIGSEGV -11)
+7. `tests/types/advanced.lm` (SIGSEGV -11)
+8. `tests/types/enums.lm` (SIGSEGV -11)
+9. `tests/types/refined_types.lm` (SIGSEGV -11)
+10. `tests/concurrency/parallel_blocks.lm` (SIGSEGV -11)
+11. `tests/concurrency/concurrent_blocks.lm` (SIGSEGV -11)
+12. `tests/stdlib/math_module_test.lm` (SIGSEGV -11)
+13. `tests/stdlib/time_module_test.lm` (SIGSEGV -11)
+14. `tests/stdlib/random_module_test.lm` (SIGSEGV -11)
+15. `tests/stdlib/parse_module_test.lm` (SIGSEGV -11)
+16. `tests/stdlib/format_module_test.lm` (SIGSEGV -11)
+17. `tests/stdlib/semver_test.lm` (SIGSEGV -11)
+18. `tests/stdlib/uuid_test.lm` (SIGSEGV -11)
+19. `tests/stdlib/net/net_test.lm` (SIGSEGV -11)
 
 #### D. Hung Tests (`HANG` - 1 Test)
 1. `tests/stdlib/iterator_module_test.lm` (Exceeded 30.0s timeout limit)
@@ -215,7 +215,7 @@ Comparing native Linux ELF execution against Windows PE execution under Wine rev
 +----------------------------------------+-------------------+-------------------+
 | tests/loops/match.lm                   | MISMATCH          | RUNTIME_FAIL (5)  |
 | tests/stdlib/algorithm_module_test.lm  | MISMATCH          | RUNTIME_FAIL (1)  |
-| tests/stdlib/time_module_test.lm       | MISMATCH          | MISMATCH          |
+| tests/stdlib/time_module_test.lm       | RUNTIME_FAIL (-11)| MISMATCH          |
 | tests/stdlib/format_module_test.lm     | RUNTIME_FAIL (-11)| MISMATCH          |
 | tests/stdlib/sort/sort_test.lm         | PASS              | RUNTIME_FAIL (1)  |
 | tests/stdlib/iterator_module_test.lm   | HANG              | HANG / TIMEOUT    |
@@ -227,7 +227,7 @@ Comparing native Linux ELF execution against Windows PE execution under Wine rev
 ## Technical Root Cause Analysis of AOT Compiler Deficiencies
 
 1. **Float Packing Bit Casts**:
-   - `lm_float_to_str` has been updated to check for SMI-tagged boxed float pointers vs bitcast floats, resolving raw double formatting faults.
+   - Updated `lm_float_to_str` in `src/backend/fyra/fyra_builtin_functions.cpp` to correctly handle tagged ints, heap pointers (`LmBox`), and raw IEEE-754 bitcast values.
 2. **Closure Environment Allocation**:
    - Dynamic functions and closures require passing env pointers in registers.
 3. **Dictionary Key Iteration Order**:
