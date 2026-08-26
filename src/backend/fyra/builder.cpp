@@ -325,7 +325,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 else if (inst.type_name == "d6") reg_decimal_scales[inst.dst] = 6;
 
                 LmValue val = inst.const_val;
-                if (IS_NIL(val) || val == 0) {
+                if (IS_NIL(val) || inst.type_name == "nil" || (val == 2 && inst.result_type == LIR::Type::Ptr)) {
                     ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), VAL_NIL);
                     reg_types[inst.dst] = LIR::Type::Ptr;
                     store_reg(inst.dst, c, LIR::Type::Ptr);
