@@ -141,6 +141,10 @@ for test in tests:
         actual_stdout = run_res.stdout
         actual_stderr = run_res.stderr
         actual_exit_code = run_res.returncode
+
+        # Measure binary size metrics for AOT size tracking
+        bin_size = os.path.getsize(output_bin)
+        print(f"  [METRICS] Binary size: {bin_size} B (~{bin_size / 1024:.1f} KB)")
     except subprocess.TimeoutExpired:
         run_timeout = True
     except Exception as e:

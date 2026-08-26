@@ -225,3 +225,7 @@ Backends must not expose backend-specific concepts to the frontend.
 If a backend cannot faithfully implement an LIR instruction, the backend must be extended rather than weakening the language abstraction.
 
 Behavioral equivalence across all supported backends is mandatory.
+
+When modifying Fyra, treat it as an independent repository. Commit and push the Fyra changes to the Fyra repository first, then update the Limitly superproject's Fyra gitlink and commit/push that change. Do not merely commit the modified submodule state in Limitly. Verify git status in both repositories before finishing.
+ 
+Run `git submodule update --init` in Limitly after updating the Fyra gitlink and before building/testing. Verify that the Fyra version in Limitly's git status matches the intended version.

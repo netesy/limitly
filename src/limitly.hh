@@ -24,6 +24,7 @@ namespace LM {
         bool print_lir = false;
         bool print_fyra_ir = false;
         bool disable_opt = false;
+        bool strip = false;
     };
 
     class Compiler {

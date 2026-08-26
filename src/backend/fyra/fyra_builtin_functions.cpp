@@ -1124,10 +1124,13 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->createBr(e_is_enum, b_e_enum, b_e_str);
 
         builder->setInsertPoint(b_e_enum);
-        emit_enum_ir(module, builder);
         ir::Function* fn_enum_to_str = module->getFunction("lm_enum_to_str");
-        ir::Value* estr_enum = builder->createCall(fn_enum_to_str, {elem_val});
-        builder->createStore(estr_enum, elem_str_slot);
+        if (fn_enum_to_str) {
+            ir::Value* estr_enum = builder->createCall(fn_enum_to_str, {elem_val});
+            builder->createStore(estr_enum, elem_str_slot);
+        } else {
+            builder->createStore(elem_val, elem_str_slot);
+        }
         builder->createJmp(b_e_done);
 
         builder->setInsertPoint(b_e_str);
@@ -2073,17 +2076,23 @@ void FyraBuiltinFunctions::emit_str_format_ir(ir::Module* module, ir::IRBuilder*
     builder->createBr(is_enum_fmt, b_fmt_enum_proc, b_fmt_list);
 
     builder->setInsertPoint(b_fmt_enum_proc);
-    emit_enum_ir(module, builder);
     ir::Function* fn_enum_str = module->getFunction("lm_enum_to_str");
-    ir::Value* enum_str_fmt = builder->createCall(fn_enum_str, {arg_val});
-    builder->createStore(enum_str_fmt, arg_str_slot);
+    if (fn_enum_str) {
+        ir::Value* enum_str_fmt = builder->createCall(fn_enum_str, {arg_val});
+        builder->createStore(enum_str_fmt, arg_str_slot);
+    } else {
+        builder->createStore(arg_val, arg_str_slot);
+    }
     builder->createJmp(b_slen_prep);
 
     builder->setInsertPoint(b_fmt_list);
-    emit_list_ir(module, builder);
     ir::Function* fn_list_str = module->getFunction("lm_list_to_str");
-    ir::Value* list_str_fmt = builder->createCall(fn_list_str, {arg_val});
-    builder->createStore(list_str_fmt, arg_str_slot);
+    if (fn_list_str) {
+        ir::Value* list_str_fmt = builder->createCall(fn_list_str, {arg_val});
+        builder->createStore(list_str_fmt, arg_str_slot);
+    } else {
+        builder->createStore(arg_val, arg_str_slot);
+    }
     builder->createJmp(b_slen_prep);
 
     builder->setInsertPoint(b_fmt_rawstr);
