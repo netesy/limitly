@@ -1,7 +1,16 @@
 diff --git a/src/codegen/CodeGen.cpp b/src/codegen/CodeGen.cpp
-index ad0b474..bb83025 100644
+index ad0b474..240a457 100644
 --- a/src/codegen/CodeGen.cpp
 +++ b/src/codegen/CodeGen.cpp
+@@ -346,7 +346,7 @@ void CodeGen::emitDataSection() {
+     if (os) {
+         *os << "\n.data\n";
+         if (usesHeap) {
+-            *os << ".align 16\n__heap_base:\n  .zero 1048576\n";
++            *os << ".align 16\n__heap_base:\n  .zero 67108864\n";
+             *os << ".align 8\n__heap_ptr:\n  .quad __heap_base\n";
+         }
+         for (auto& gv : module.getGlobalVariables()) {
 @@ -388,13 +388,13 @@ void CodeGen::emitDataSection() {
                  rodataAssembler->emitByte(0);
                  heap_base_offset = rodataAssembler->getCodeSize();
@@ -17,3 +26,70 @@ index ad0b474..bb83025 100644
 +            hb_sym.size = 67108864;
              hb_sym.binding = 1;
              addSymbol(hb_sym);
+
+diff --git a/src/target/architecture/x64/X64Architecture.cpp b/src/target/architecture/x64/X64Architecture.cpp
+index 1f6e711..d79ae65 100644
+--- a/src/target/architecture/x64/X64Architecture.cpp
++++ b/src/target/architecture/x64/X64Architecture.cpp
+@@ -950,13 +950,44 @@ void X64Architecture::emitAlloc(CodeGen& cg, ir::Instruction& i) {
+     else if (!i.getOperands().empty()) { if (auto* sizeConst = dynamic_cast<ir::ConstantInt*>(i.getOperands()[0]->get())) size = sizeConst->getValue(); }
+     uint64_t alignedSize = (size + 7) & ~7;
+     std::string rax = (abi == X64ABI::SystemV) ? "%rax" : "rax";
++    std::string rbx = (abi == X64ABI::SystemV) ? "%rbx" : "rbx";
+     if (auto* os = cg.getTextStream()) {
+-        *os << "  # Bump Allocation: " << size << " bytes\n";
++        *os << "  # Bump Allocation with bounds check: " << size << " bytes\n";
+         if (abi == X64ABI::SystemV) {
++            static uint64_t allocLabelIdx = 0;
++            std::string slowLabel = ".L_alloc_slow_" + std::to_string(++allocLabelIdx);
++            std::string doneLabel = ".L_alloc_done_" + std::to_string(allocLabelIdx);
++
++            *os << "  pushq %rbx\n";
+             *os << "  movq heap_ptr(%rip), " << rax << "\n";
++            *os << "  movq " << rax << ", " << rbx << "\n";
++            *os << "  addq $" << alignedSize << ", " << rbx << "\n";
++            *os << "  cmpq heap_end(%rip), " << rbx << "\n";
++            *os << "  ja " << slowLabel << "\n";
+             *os << "  movq " << rax << ", " << formatStackOperand(pointerOffset) << "\n";
+-            *os << "  addq $" << alignedSize << ", " << rax << "\n";
+-            *os << "  movq " << rax << ", heap_ptr(%rip)\n";
++            *os << "  movq " << rbx << ", heap_ptr(%rip)\n";
++            *os << "  popq %rbx\n";
++            *os << "  jmp " << doneLabel << "\n";
++            *os << slowLabel << ":\n";
++            *os << "  popq %rbx\n";
++            // Dynamic allocation via mmap syscall (sys_mmap = 9) when heap fills up
++            *os << "  pushq %rcx\n  pushq %r11\n  pushq %rdi\n  pushq %rsi\n  pushq %rdx\n  pushq %r10\n  pushq %r8\n  pushq %r9\n";
++            *os << "  movq $9, %rax\n";          // sys_mmap
++            *os << "  movq $0, %rdi\n";          // addr = NULL
++            *os << "  movq $67108864, %rsi\n";   // len = 64MB
++            *os << "  movq $3, %rdx\n";          // PROT_READ | PROT_WRITE
++            *os << "  movq $34, %r10\n";         // MAP_PRIVATE | MAP_ANONYMOUS
++            *os << "  movq $-1, %r8\n";          // fd = -1
++            *os << "  movq $0, %r9\n";           // offset = 0
++            *os << "  syscall\n";
++            *os << "  popq %r9\n  popq %r8\n  popq %r10\n  popq %rdx\n  popq %rsi\n  popq %rdi\n  popq %r11\n  popq %rcx\n";
++            *os << "  movq %rax, " << formatStackOperand(pointerOffset) << "\n";
++            *os << "  movq %rax, %r11\n";
++            *os << "  addq $" << alignedSize << ", %rax\n";
++            *os << "  movq %rax, heap_ptr(%rip)\n";
++            *os << "  addq $67108864, %r11\n";
++            *os << "  movq %r11, heap_end(%rip)\n";
++            *os << doneLabel << ":\n";
+         } else {
+             *os << "  mov rax, [rip + heap_ptr]\n";
+             *os << "  mov " << formatStackOperand(pointerOffset) << ", rax\n";
+diff --git a/src/target/os/linux/LinuxOS.cpp b/src/target/os/linux/LinuxOS.cpp
+index 8180d75..11219f4 100644
+--- a/src/target/os/linux/LinuxOS.cpp
++++ b/src/target/os/linux/LinuxOS.cpp
+@@ -394,7 +394,8 @@ void LinuxOS::emitHeader(CodeGen& cg) {
+         *os << ".section .rodata\n.Lproc_environ:\n  .string \"/proc/self/environ\"\n";
+         *os << ".Lproc_cmdline:\n  .string \"/proc/self/cmdline\"\n";
+         *os << ".section .data\n.align 8\nheap_ptr:\n  .quad __fyra_heap\n";
+-        *os << ".section .bss\n.align 16\n__fyra_heap:\n  .zero 1048576\n";
++        *os << ".align 8\nheap_end:\n  .quad __fyra_heap + 67108864\n";
++        *os << ".section .bss\n.align 16\n__fyra_heap:\n  .zero 67108864\n";
+         *os << ".text\n";
+     }
+ }

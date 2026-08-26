@@ -2040,8 +2040,10 @@ void FyraBuiltinFunctions::emit_str_format_ir(ir::Module* module, ir::IRBuilder*
     builder->createBr(is_valid_ptr, b_is_str, b_is_num);
 
     builder->setInsertPoint(b_is_num);
-    ir::Value* is_float = builder->createCne(high_bits, ctx->getConstantInt(i64, 0));
-    builder->createBr(is_float, b_is_float, b_is_int);
+    ir::Value* is_ffff = builder->createCeq(high_bits, ctx->getConstantInt(i64, 0xFFFF));
+    ir::Value* is_zero_hb = builder->createCeq(high_bits, ctx->getConstantInt(i64, 0));
+    ir::Value* is_int_hb = builder->createOr(is_ffff, is_zero_hb);
+    builder->createBr(is_int_hb, b_is_int, b_is_float);
 
     builder->setInsertPoint(b_is_float);
     ir::Value* float_str = emit_float_to_str_inline(module, builder, arg_val);
@@ -2050,38 +2052,9 @@ void FyraBuiltinFunctions::emit_str_format_ir(ir::Module* module, ir::IRBuilder*
 
     // Number conversion branch: format integer arg_val into ASCII buffer
     builder->setInsertPoint(b_is_int);
-    ir::Instruction* num_buf = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 32)}, i64);
-    ir::Value* num_end = builder->createAdd(num_buf, ctx->getConstantInt(i64, 31));
-    builder->createStoreb(ctx->getConstantInt(i8, 0), num_end);
-
-    ir::Instruction* v_num = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
-    ir::Instruction* v_ptr = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
-    builder->createStore(arg_val, v_num);
-    builder->createStore(num_end, v_ptr);
-
-    ir::BasicBlock* b_num_loop = builder->createBasicBlock("fmt_num_loop", fn);
-    ir::BasicBlock* b_num_done = builder->createBasicBlock("fmt_num_done", fn);
-    builder->createJmp(b_num_loop);
-
-    builder->setInsertPoint(b_num_loop);
-    ir::Value* cur_n = builder->createLoad(v_num);
-    ir::Value* rem = builder->createRem(cur_n, ctx->getConstantInt(i64, 10));
-    ir::Value* next_n = builder->createDiv(cur_n, ctx->getConstantInt(i64, 10));
-    ir::Value* ascii_ch = builder->createAdd(rem, ctx->getConstantInt(i64, 48));
-    ir::Value* cur_p = builder->createLoad(v_ptr);
-    ir::Value* next_p = builder->createSub(cur_p, ctx->getConstantInt(i64, 1));
-    builder->createStoreb(ascii_ch, next_p);
-    builder->createStore(next_n, v_num);
-    builder->createStore(next_p, v_ptr);
-    ir::Value* num_cond = builder->createCuge(next_n, ctx->getConstantInt(i64, 1));
-    builder->createBr(num_cond, b_num_loop, b_num_done);
-
-    builder->setInsertPoint(b_num_done);
-    ir::Value* final_num_str = builder->createLoad(v_ptr);
-    ir::Value* num_len = builder->createSub(num_end, final_num_str);
-    builder->createStore(final_num_str, arg_str_slot);
-    builder->createStore(num_len, arg_len_slot);
-    builder->createJmp(b_fmt_proc);
+    ir::Value* int_str = emit_int_to_str_inline(module, builder, arg_val);
+    builder->createStore(int_str, arg_str_slot);
+    builder->createJmp(b_slen_prep);
 
     // String / Heap object branch: arg_val is String, Enum, or List pointer
     builder->setInsertPoint(b_is_str);
