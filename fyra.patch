@@ -1,95 +1,202 @@
-diff --git a/src/codegen/CodeGen.cpp b/src/codegen/CodeGen.cpp
-index ad0b474..240a457 100644
---- a/src/codegen/CodeGen.cpp
-+++ b/src/codegen/CodeGen.cpp
-@@ -346,7 +346,7 @@ void CodeGen::emitDataSection() {
-     if (os) {
-         *os << "\n.data\n";
-         if (usesHeap) {
--            *os << ".align 16\n__heap_base:\n  .zero 1048576\n";
-+            *os << ".align 16\n__heap_base:\n  .zero 67108864\n";
-             *os << ".align 8\n__heap_ptr:\n  .quad __heap_base\n";
-         }
-         for (auto& gv : module.getGlobalVariables()) {
-@@ -388,13 +388,13 @@ void CodeGen::emitDataSection() {
-                 rodataAssembler->emitByte(0);
-                 heap_base_offset = rodataAssembler->getCodeSize();
-             }
--            for(int i=0; i<1048576; ++i) rodataAssembler->emitByte(0);
-+            for(int i=0; i<67108864; ++i) rodataAssembler->emitByte(0);
+diff --git a/include/target/artifact/executable/elf.hh b/include/target/artifact/executable/elf.hh
+index 1b29a75..322cc6b 100644
+--- a/include/target/artifact/executable/elf.hh
++++ b/include/target/artifact/executable/elf.hh
+@@ -91,6 +91,12 @@ public:
+      */
+     void setMachine(uint16_t machine);
 
-             SymbolInfo hb_sym;
-             hb_sym.name = "__fyra_heap";
-             hb_sym.sectionName = ".data";
-             hb_sym.value = heap_base_offset;
--            hb_sym.size = 1048576;
-+            hb_sym.size = 67108864;
-             hb_sym.binding = 1;
-             addSymbol(hb_sym);
-
++    /**
++     * @brief Enables or disables symbol/metadata stripping.
++     * @param strip If true, omits .symtab and .strtab from the generated ELF file.
++     */
++    void setStrip(bool strip);
++
+     /**
+      * @brief Retrieves the last error message.
+      * @return A string containing the last error, or an empty string if no error occurred.
 diff --git a/src/target/architecture/x64/X64Architecture.cpp b/src/target/architecture/x64/X64Architecture.cpp
-index 1f6e711..d79ae65 100644
+index 1f6e711..f7bafb3 100644
 --- a/src/target/architecture/x64/X64Architecture.cpp
 +++ b/src/target/architecture/x64/X64Architecture.cpp
-@@ -950,13 +950,44 @@ void X64Architecture::emitAlloc(CodeGen& cg, ir::Instruction& i) {
-     else if (!i.getOperands().empty()) { if (auto* sizeConst = dynamic_cast<ir::ConstantInt*>(i.getOperands()[0]->get())) size = sizeConst->getValue(); }
-     uint64_t alignedSize = (size + 7) & ~7;
-     std::string rax = (abi == X64ABI::SystemV) ? "%rax" : "rax";
-+    std::string rbx = (abi == X64ABI::SystemV) ? "%rbx" : "rbx";
-     if (auto* os = cg.getTextStream()) {
--        *os << "  # Bump Allocation: " << size << " bytes\n";
-+        *os << "  # Bump Allocation with bounds check: " << size << " bytes\n";
-         if (abi == X64ABI::SystemV) {
-+            static uint64_t allocLabelIdx = 0;
-+            std::string slowLabel = ".L_alloc_slow_" + std::to_string(++allocLabelIdx);
-+            std::string doneLabel = ".L_alloc_done_" + std::to_string(allocLabelIdx);
-+
-+            *os << "  pushq %rbx\n";
-             *os << "  movq heap_ptr(%rip), " << rax << "\n";
-+            *os << "  movq " << rax << ", " << rbx << "\n";
-+            *os << "  addq $" << alignedSize << ", " << rbx << "\n";
-+            *os << "  cmpq heap_end(%rip), " << rbx << "\n";
-+            *os << "  ja " << slowLabel << "\n";
-             *os << "  movq " << rax << ", " << formatStackOperand(pointerOffset) << "\n";
--            *os << "  addq $" << alignedSize << ", " << rax << "\n";
--            *os << "  movq " << rax << ", heap_ptr(%rip)\n";
-+            *os << "  movq " << rbx << ", heap_ptr(%rip)\n";
-+            *os << "  popq %rbx\n";
-+            *os << "  jmp " << doneLabel << "\n";
-+            *os << slowLabel << ":\n";
-+            *os << "  popq %rbx\n";
-+            // Dynamic allocation via mmap syscall (sys_mmap = 9) when heap fills up
-+            *os << "  pushq %rcx\n  pushq %r11\n  pushq %rdi\n  pushq %rsi\n  pushq %rdx\n  pushq %r10\n  pushq %r8\n  pushq %r9\n";
-+            *os << "  movq $9, %rax\n";          // sys_mmap
-+            *os << "  movq $0, %rdi\n";          // addr = NULL
-+            *os << "  movq $67108864, %rsi\n";   // len = 64MB
-+            *os << "  movq $3, %rdx\n";          // PROT_READ | PROT_WRITE
-+            *os << "  movq $34, %r10\n";         // MAP_PRIVATE | MAP_ANONYMOUS
-+            *os << "  movq $-1, %r8\n";          // fd = -1
-+            *os << "  movq $0, %r9\n";           // offset = 0
-+            *os << "  syscall\n";
-+            *os << "  popq %r9\n  popq %r8\n  popq %r10\n  popq %rdx\n  popq %rsi\n  popq %rdi\n  popq %r11\n  popq %rcx\n";
-+            *os << "  movq %rax, " << formatStackOperand(pointerOffset) << "\n";
-+            *os << "  movq %rax, %r11\n";
-+            *os << "  addq $" << alignedSize << ", %rax\n";
-+            *os << "  movq %rax, heap_ptr(%rip)\n";
-+            *os << "  addq $67108864, %r11\n";
-+            *os << "  movq %r11, heap_end(%rip)\n";
-+            *os << doneLabel << ":\n";
-         } else {
-             *os << "  mov rax, [rip + heap_ptr]\n";
-             *os << "  mov " << formatStackOperand(pointerOffset) << ", rax\n";
-diff --git a/src/target/os/linux/LinuxOS.cpp b/src/target/os/linux/LinuxOS.cpp
-index 8180d75..11219f4 100644
---- a/src/target/os/linux/LinuxOS.cpp
-+++ b/src/target/os/linux/LinuxOS.cpp
-@@ -394,7 +394,8 @@ void LinuxOS::emitHeader(CodeGen& cg) {
-         *os << ".section .rodata\n.Lproc_environ:\n  .string \"/proc/self/environ\"\n";
-         *os << ".Lproc_cmdline:\n  .string \"/proc/self/cmdline\"\n";
-         *os << ".section .data\n.align 8\nheap_ptr:\n  .quad __fyra_heap\n";
--        *os << ".section .bss\n.align 16\n__fyra_heap:\n  .zero 1048576\n";
-+        *os << ".align 8\nheap_end:\n  .quad __fyra_heap + 67108864\n";
-+        *os << ".section .bss\n.align 16\n__fyra_heap:\n  .zero 67108864\n";
-         *os << ".text\n";
+@@ -605,6 +605,15 @@ void X64Architecture::emitFAdd(CodeGen& cg, ir::Instruction& i) {
+             *os << "  addsd " << op1 << ", %xmm0\n";
+             *os << "  movsd %xmm0, " << dst << "\n";
+         }
++    } else {
++        auto& as = cg.getAssembler();
++        emitLoadValue(cg, as, i.getOperands()[0]->get(), 0); // RAX
++        emitLoadValue(cg, as, i.getOperands()[1]->get(), 1); // RCX
++        as.emitBytes({0x66, 0x48, 0x0F, 0x6E, 0xC0}); // movq xmm0, rax
++        as.emitBytes({0x66, 0x48, 0x0F, 0x6E, 0xC9}); // movq xmm1, rcx
++        as.emitBytes({0xF2, 0x0F, 0x58, 0xC1});       // addsd xmm0, xmm1
++        as.emitBytes({0x66, 0x48, 0x0F, 0x7E, 0xC0}); // movq rax, xmm0
++        emitStoreResult(cg, i, 0);
      }
  }
+
+@@ -622,6 +631,15 @@ void X64Architecture::emitFSub(CodeGen& cg, ir::Instruction& i) {
+             *os << "  subsd " << op1 << ", %xmm0\n";
+             *os << "  movsd %xmm0, " << dst << "\n";
+         }
++    } else {
++        auto& as = cg.getAssembler();
++        emitLoadValue(cg, as, i.getOperands()[0]->get(), 0);
++        emitLoadValue(cg, as, i.getOperands()[1]->get(), 1);
++        as.emitBytes({0x66, 0x48, 0x0F, 0x6E, 0xC0}); // movq xmm0, rax
++        as.emitBytes({0x66, 0x48, 0x0F, 0x6E, 0xC9}); // movq xmm1, rcx
++        as.emitBytes({0xF2, 0x0F, 0x5C, 0xC1});       // subsd xmm0, xmm1
++        as.emitBytes({0x66, 0x48, 0x0F, 0x7E, 0xC0}); // movq rax, xmm0
++        emitStoreResult(cg, i, 0);
+     }
+ }
+
+@@ -639,6 +657,15 @@ void X64Architecture::emitFMul(CodeGen& cg, ir::Instruction& i) {
+             *os << "  mulsd " << op1 << ", %xmm0\n";
+             *os << "  movsd %xmm0, " << dst << "\n";
+         }
++    } else {
++        auto& as = cg.getAssembler();
++        emitLoadValue(cg, as, i.getOperands()[0]->get(), 0);
++        emitLoadValue(cg, as, i.getOperands()[1]->get(), 1);
++        as.emitBytes({0x66, 0x48, 0x0F, 0x6E, 0xC0}); // movq xmm0, rax
++        as.emitBytes({0x66, 0x48, 0x0F, 0x6E, 0xC9}); // movq xmm1, rcx
++        as.emitBytes({0xF2, 0x0F, 0x59, 0xC1});       // mulsd xmm0, xmm1
++        as.emitBytes({0x66, 0x48, 0x0F, 0x7E, 0xC0}); // movq rax, xmm0
++        emitStoreResult(cg, i, 0);
+     }
+ }
+
+@@ -656,6 +683,15 @@ void X64Architecture::emitFDiv(CodeGen& cg, ir::Instruction& i) {
+             *os << "  divsd " << op1 << ", %xmm0\n";
+             *os << "  movsd %xmm0, " << dst << "\n";
+         }
++    } else {
++        auto& as = cg.getAssembler();
++        emitLoadValue(cg, as, i.getOperands()[0]->get(), 0);
++        emitLoadValue(cg, as, i.getOperands()[1]->get(), 1);
++        as.emitBytes({0x66, 0x48, 0x0F, 0x6E, 0xC0}); // movq xmm0, rax
++        as.emitBytes({0x66, 0x48, 0x0F, 0x6E, 0xC9}); // movq xmm1, rcx
++        as.emitBytes({0xF2, 0x0F, 0x5E, 0xC1});       // divsd xmm0, xmm1
++        as.emitBytes({0x66, 0x48, 0x0F, 0x7E, 0xC0}); // movq rax, xmm0
++        emitStoreResult(cg, i, 0);
+     }
+ }
+
+@@ -719,17 +755,24 @@ void X64Architecture::emitCmp(CodeGen& cg, ir::Instruction& i) {
+             }
+         }
+     } else {
+-        emitLoadValue(cg, cg.getAssembler(), i.getOperands()[0]->get(), 0);
+-        emitLoadValue(cg, cg.getAssembler(), i.getOperands()[1]->get(), 1);
+-        cg.getAssembler().emitBytes({0x48, 0x39, 0xC8});
++        auto& as = cg.getAssembler();
++        emitLoadValue(cg, as, i.getOperands()[0]->get(), 0);
++        emitLoadValue(cg, as, i.getOperands()[1]->get(), 1);
++        if (isFloatCmp) {
++            as.emitBytes({0x66, 0x48, 0x0F, 0x6E, 0xC0}); // movq xmm0, rax
++            as.emitBytes({0x66, 0x48, 0x0F, 0x6E, 0xC9}); // movq xmm1, rcx
++            as.emitBytes({0x66, 0x0F, 0x2E, 0xC1});       // ucomisd xmm0, xmm1
++        } else {
++            as.emitBytes({0x48, 0x39, 0xC8});            // cmp rax, rcx
++        }
+         uint8_t s = 0x94;
+         switch (i.getOpcode()) {
+             case ir::Instruction::Ceq:  case ir::Instruction::Ceqf: s = 0x94; break;
+             case ir::Instruction::Cne:  case ir::Instruction::Cnef: s = 0x95; break;
+-            case ir::Instruction::Cslt: case ir::Instruction::Clt:  s = 0x9C; break;
+-            case ir::Instruction::Csle: case ir::Instruction::Cle:  s = 0x9E; break;
+-            case ir::Instruction::Csgt: case ir::Instruction::Cgt:  s = 0x9F; break;
+-            case ir::Instruction::Csge: case ir::Instruction::Cge:  s = 0x9D; break;
++            case ir::Instruction::Cslt: case ir::Instruction::Clt:  s = (isFloatCmp ? 0x92 : 0x9C); break;
++            case ir::Instruction::Csle: case ir::Instruction::Cle:  s = (isFloatCmp ? 0x96 : 0x9E); break;
++            case ir::Instruction::Csgt: case ir::Instruction::Cgt:  s = (isFloatCmp ? 0x97 : 0x9F); break;
++            case ir::Instruction::Csge: case ir::Instruction::Cge:  s = (isFloatCmp ? 0x93 : 0x9D); break;
+             case ir::Instruction::Cult: s = 0x92; break;
+             case ir::Instruction::Cule: s = 0x96; break;
+             case ir::Instruction::Cugt: s = 0x97; break;
+diff --git a/src/target/artifact/executable/elf.cpp b/src/target/artifact/executable/elf.cpp
+index a92351a..0fe0527 100644
+--- a/src/target/artifact/executable/elf.cpp
++++ b/src/target/artifact/executable/elf.cpp
+@@ -133,6 +133,7 @@ public:
+     void setPageSize(uint64_t size) { pageSize_ = size; }
+     void setEntryPointName(const std::string& name) { entryPointName_ = name; }
+     void setMachine(uint16_t machine) { machine_ = machine; }
++    void setStrip(bool strip) { strip_ = strip; }
+     std::string getLastError() const { return lastError_; }
+
+ private:
+@@ -200,6 +201,7 @@ private:
+     std::string entryPointName_;
+     uint64_t entryPointAddr_ = 0;
+     uint16_t machine_ = 0;
++    bool strip_ = false;
+     std::string lastError_;
+
+     // Parsed data
+@@ -679,8 +681,10 @@ void ElfGenerator::Impl::createFinalElfStructure() {
+         finalSectionIndexMap_[name] = finalSectionHeaders_.size() - 1;
+     };
+     add_meta_section(".shstrtab", SHT_STRTAB, 0);
+-    add_meta_section(".symtab", SHT_SYMTAB, sizeof(Symbol64));
+-    add_meta_section(".strtab", SHT_STRTAB, 0);
++    if (!strip_) {
++        add_meta_section(".symtab", SHT_SYMTAB, sizeof(Symbol64));
++        add_meta_section(".strtab", SHT_STRTAB, 0);
++    }
+
+     // Create symbol table (values are section offsets at this point)
+     finalSymbols_.push_back({}); // NULL symbol
+@@ -714,10 +718,12 @@ void ElfGenerator::Impl::createFinalElfStructure() {
+
+     // Finalize meta section header SIZES
+     finalSectionHeaders_[findFinalSectionIndex(".shstrtab")].sh_size = shStringTable_.size();
+-    finalSectionHeaders_[findFinalSectionIndex(".strtab")].sh_size = stringTable_.size();
+-    finalSectionHeaders_[findFinalSectionIndex(".symtab")].sh_size = finalSymbols_.size() * sizeof(Symbol64);
+-    finalSectionHeaders_[findFinalSectionIndex(".symtab")].sh_link = findFinalSectionIndex(".strtab");
+-    finalSectionHeaders_[findFinalSectionIndex(".symtab")].sh_info = first_global_idx;
++    if (!strip_) {
++        finalSectionHeaders_[findFinalSectionIndex(".strtab")].sh_size = stringTable_.size();
++        finalSectionHeaders_[findFinalSectionIndex(".symtab")].sh_size = finalSymbols_.size() * sizeof(Symbol64);
++        finalSectionHeaders_[findFinalSectionIndex(".symtab")].sh_link = findFinalSectionIndex(".strtab");
++        finalSectionHeaders_[findFinalSectionIndex(".symtab")].sh_info = first_global_idx;
++    }
+ }
+
+ void ElfGenerator::Impl::updateSymbolValues() {
+@@ -837,13 +843,21 @@ void ElfGenerator::Impl::writeSectionData(std::ofstream& file) {
+     file.seekp(shstrtab.sh_offset);
+     file.write(shStringTable_.c_str(), shStringTable_.size());
+
+-    SectionHeader64& symtab = finalSectionHeaders_[findFinalSectionIndex(".symtab")];
+-    file.seekp(symtab.sh_offset);
+-    file.write(reinterpret_cast<const char*>(finalSymbols_.data()), finalSymbols_.size() * sizeof(Symbol64));
++    if (!strip_) {
++        uint16_t symtab_idx = findFinalSectionIndex(".symtab");
++        if (symtab_idx != SHN_UNDEF) {
++            SectionHeader64& symtab = finalSectionHeaders_[symtab_idx];
++            file.seekp(symtab.sh_offset);
++            file.write(reinterpret_cast<const char*>(finalSymbols_.data()), finalSymbols_.size() * sizeof(Symbol64));
++        }
+
+-    SectionHeader64& strtab = finalSectionHeaders_[findFinalSectionIndex(".strtab")];
+-    file.seekp(strtab.sh_offset);
+-    file.write(stringTable_.c_str(), stringTable_.size());
++        uint16_t strtab_idx = findFinalSectionIndex(".strtab");
++        if (strtab_idx != SHN_UNDEF) {
++            SectionHeader64& strtab = finalSectionHeaders_[strtab_idx];
++            file.seekp(strtab.sh_offset);
++            file.write(stringTable_.c_str(), stringTable_.size());
++        }
++    }
+ }
+
+ bool ElfGenerator::Impl::writeExecutable(const std::string& outputFile) {
+@@ -951,4 +965,5 @@ void ElfGenerator::setBaseAddress(uint64_t address) { pImpl->setBaseAddress(addr
+ void ElfGenerator::setPageSize(uint64_t size) { pImpl->setPageSize(size); }
+ void ElfGenerator::setEntryPointName(const std::string& name) { pImpl->setEntryPointName(name); }
+ void ElfGenerator::setMachine(uint16_t machine) { pImpl->setMachine(machine); }
++void ElfGenerator::setStrip(bool strip) { pImpl->setStrip(strip); }
+ std::string ElfGenerator::getLastError() const { return pImpl->getLastError(); }
+\ No newline at end of file
