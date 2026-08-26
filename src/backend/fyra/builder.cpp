@@ -229,6 +229,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
 
     auto is_float_op = [&](const LIR::LIR_Inst& inst) -> bool {
+        auto is_dec = [&](uint32_t r) {
+            return r != UINT32_MAX && reg_decimal_scales.count(r) && reg_decimal_scales[r] > 0;
+        };
+        if (is_dec(inst.a) || is_dec(inst.b) || is_dec(inst.dst)) return false;
+
         if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32) return true;
         if (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32) return true;
         if (inst.type_b == LIR::Type::F64 || inst.type_b == LIR::Type::F32) return true;
@@ -368,7 +373,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 else if (inst.type_name == "d6") reg_decimal_scales[inst.dst] = 6;
 
                 LmValue val = inst.const_val;
-                if (IS_NIL(val) || val == 0) {
+                if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32 || is_float_op(inst)) {
+                    double fval;
+                    memcpy(&fval, &val, sizeof(double));
+                    ir::Value* c = context_->getConstantFP(context_->getDoubleType(), fval);
+                    reg_types[inst.dst] = LIR::Type::F64;
+                    reg_float_values[inst.dst] = fval;
+                    store_reg(inst.dst, c, LIR::Type::F64);
+                } else if (IS_NIL(val) || val == 0) {
                     ir::Value* c = context_->getConstantInt(context_->getIntegerType(64), VAL_NIL);
                     reg_types[inst.dst] = LIR::Type::Ptr;
                     store_reg(inst.dst, c, LIR::Type::Ptr);
@@ -815,7 +827,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         std::string prid = std::to_string(ai) + "_" + std::to_string(label_counter_++);
                         ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
 
-                        if (arg_type == LIR::Type::Ptr || arg_type == LIR::Type::I64) {
+                        uint32_t arg_r = (ai < inst.call_args.size()) ? inst.call_args[ai] : UINT32_MAX;
+                        bool is_known_i64 = (arg_r != UINT32_MAX && (reg_int_values.count(arg_r) || (reg_types.count(arg_r) && reg_types[arg_r] == LIR::Type::I64)));
+
+                        if (arg_type == LIR::Type::I64 || is_known_i64) {
+                            FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), args[ai]);
+                        } else if (arg_type == LIR::Type::Ptr) {
                             ir::BasicBlock* b_pr_ptr = builder_->createBasicBlock("pr_ptr_" + prid, cur_fn);
                             ir::BasicBlock* b_pr_int = builder_->createBasicBlock("pr_int_" + prid, cur_fn);
                             ir::BasicBlock* b_pr_nil = builder_->createBasicBlock("pr_nil_" + prid, cur_fn);
@@ -836,26 +853,17 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             ir::BasicBlock* b_pr_int_real = builder_->createBasicBlock("pr_int_real_" + prid, cur_fn);
                             ir::Value* is_vnil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
                             ir::Value* is_znil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), 0));
-                            ir::Value* is_tnil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), 0x7FFFFFFFFFFFFFFF));
-                            ir::Value* is_nil_scalar = builder_->createOr(builder_->createOr(is_vnil, is_znil), is_tnil);
+                            ir::Value* is_nil_scalar = builder_->createOr(is_vnil, is_znil);
 
-                            uint32_t arg_r = (ai < inst.call_args.size()) ? inst.call_args[ai] : UINT32_MAX;
-                            bool is_known_i64 = (arg_r != UINT32_MAX && reg_types.count(arg_r) && reg_types[arg_r] == LIR::Type::I64);
+                            builder_->createBr(is_nil_scalar, b_pr_int_nil, b_pr_int_real);
 
-                            if (!is_known_i64) {
-                                builder_->createBr(is_nil_scalar, b_pr_int_nil, b_pr_int_real);
+                            builder_->setInsertPoint(b_pr_int_nil);
+                            FyraBuiltinFunctions::emit_print_nil_inline(current_module_.get(), builder_.get());
+                            builder_->createJmp(b_pr_next);
 
-                                builder_->setInsertPoint(b_pr_int_nil);
-                                FyraBuiltinFunctions::emit_print_nil_inline(current_module_.get(), builder_.get());
-                                builder_->createJmp(b_pr_next);
-
-                                builder_->setInsertPoint(b_pr_int_real);
-                                FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg_val);
-                                builder_->createJmp(b_pr_next);
-                            } else {
-                                FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg_val);
-                                builder_->createJmp(b_pr_next);
-                            }
+                            builder_->setInsertPoint(b_pr_int_real);
+                            FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg_val);
+                            builder_->createJmp(b_pr_next);
 
                             // Branch: pointer candidate
                             builder_->setInsertPoint(b_pr_ptr);
@@ -1163,7 +1171,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         std::string prid = std::to_string(ai) + "_" + std::to_string(label_counter_++);
                         ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
 
-                        if (arg_type == LIR::Type::Ptr || arg_type == LIR::Type::I64) {
+                        uint32_t arg_r = (ai < inst.call_args.size()) ? inst.call_args[ai] : UINT32_MAX;
+                        bool is_known_i64 = (arg_r != UINT32_MAX && (reg_int_values.count(arg_r) || (reg_types.count(arg_r) && reg_types[arg_r] == LIR::Type::I64)));
+
+                        if (arg_type == LIR::Type::I64 || is_known_i64) {
+                            FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), args[ai]);
+                        } else if (arg_type == LIR::Type::Ptr) {
                             ir::BasicBlock* b_pr_ptr = builder_->createBasicBlock("pr_ptr_" + prid, cur_fn);
                             ir::BasicBlock* b_pr_int = builder_->createBasicBlock("pr_int_" + prid, cur_fn);
                             ir::BasicBlock* b_pr_nil = builder_->createBasicBlock("pr_nil_" + prid, cur_fn);
@@ -1264,13 +1277,37 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                     builder_->setInsertPoint(b_fail);
                     if (args.size() > 1) {
-                        FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), args[1]);
+                        ir::Value* msg_ptr = args[1];
+                        ir::Value* is_valid_msg = builder_->createCuge(msg_ptr, context_->getConstantInt(context_->getIntegerType(64), 65536));
+                        ir::BasicBlock* b_msg_v = builder_->createBasicBlock("assert_msg_v_" + aid, cur_fn);
+                        ir::BasicBlock* b_msg_d = builder_->createBasicBlock("assert_msg_d_" + aid, cur_fn);
+                        builder_->createBr(is_valid_msg, b_msg_v, b_msg_d);
+
+                        builder_->setInsertPoint(b_msg_v);
+                        FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), msg_ptr);
+                        ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
+                        builder_->createExternCall("io.write", {
+                            context_->getConstantInt(context_->getIntegerType(64), 1),
+                            builder_->createAdd(gv_nl, context_->getConstantInt(context_->getIntegerType(64), 24)),
+                            context_->getConstantInt(context_->getIntegerType(64), 1)
+                        }, context_->getIntegerType(64));
+                        builder_->createExternCall("process.exit", {
+                            context_->getConstantInt(context_->getIntegerType(64), 1)
+                        }, context_->getIntegerType(64));
+
+                        builder_->setInsertPoint(b_msg_d);
+                        ir::GlobalVariable* gv_fail = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "assert_msg", "Assertion failed\n");
+                        builder_->createExternCall("io.write", {
+                            context_->getConstantInt(context_->getIntegerType(64), 1),
+                            builder_->createAdd(gv_fail, context_->getConstantInt(context_->getIntegerType(64), 24)),
+                            context_->getConstantInt(context_->getIntegerType(64), 17)
+                        }, context_->getIntegerType(64));
                     } else {
                         ir::GlobalVariable* gv_fail = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "assert_msg", "Assertion failed\n");
                         builder_->createExternCall("io.write", {
                             context_->getConstantInt(context_->getIntegerType(64), 1),
-                            gv_fail,
-                            context_->getConstantInt(context_->getIntegerType(64), 16)
+                            builder_->createAdd(gv_fail, context_->getConstantInt(context_->getIntegerType(64), 24)),
+                            context_->getConstantInt(context_->getIntegerType(64), 17)
                         }, context_->getIntegerType(64));
                     }
                     builder_->createExternCall("process.exit", {
