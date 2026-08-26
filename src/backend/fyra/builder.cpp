@@ -839,6 +839,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), arg_val);
                             builder_->createJmp(b_pr_next);
 
+                            ir::BasicBlock* b_pr_dict = builder_->createBasicBlock("pr_dict_" + prid, cur_fn);
+                            ir::BasicBlock* b_pr_fallback = builder_->createBasicBlock("pr_fb_" + prid, cur_fn);
+
                             builder_->setInsertPoint(b_pr_non_str);
                             ir::Value* is_enum = builder_->createCeq(magic, context_->getConstantInt(context_->getIntegerType(64), 0x454E554D));
                             builder_->createBr(is_enum, b_pr_enum, b_pr_list);
@@ -852,11 +855,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             builder_->createJmp(b_pr_next);
 
                             builder_->setInsertPoint(b_pr_list);
+                            ir::Value* is_list = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), 12));
+                            builder_->createBr(is_list, b_pr_dict, b_pr_fallback);
+
+                            builder_->setInsertPoint(b_pr_dict);
                             used_builtins_.insert("lm_list_new");
                             FyraBuiltinFunctions::emit_list_ir(current_module_.get(), builder_.get());
                             ir::Function* fn_list_str = current_module_->getFunction("lm_list_to_str");
                             ir::Value* list_s = builder_->createCall(fn_list_str, {arg_val});
                             FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), list_s);
+                            builder_->createJmp(b_pr_next);
+
+                            builder_->setInsertPoint(b_pr_fallback);
+                            FyraBuiltinFunctions::emit_print_int_inline(current_module_.get(), builder_.get(), arg_val);
                             builder_->createJmp(b_pr_next);
 
                             builder_->setInsertPoint(b_pr_next);

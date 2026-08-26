@@ -1243,14 +1243,14 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
 
         builder->setInsertPoint(b_ptrcmp);
         ir::Value* k1_ge = builder->createCuge(k1, ctx->getConstantInt(i64, 65536));
-        ir::Value* k1_hi = builder->createShr(k1, ctx->getConstantInt(i64, 48));
-        ir::Value* k1_hi_z = builder->createCeq(k1_hi, ctx->getConstantInt(i64, 0));
-        ir::Value* is_ptr1 = builder->createAnd(k1_ge, k1_hi_z);
+        ir::Value* k1_pos = builder->createCsgt(k1, ctx->getConstantInt(i64, 0));
+        ir::Value* k1_not_nil = builder->createCne(k1, ctx->getConstantInt(i64, 0x7FFFFFFFFFFFFFFF));
+        ir::Value* is_ptr1 = builder->createAnd(builder->createAnd(k1_ge, k1_pos), k1_not_nil);
 
         ir::Value* k2_ge = builder->createCuge(k2, ctx->getConstantInt(i64, 65536));
-        ir::Value* k2_hi = builder->createShr(k2, ctx->getConstantInt(i64, 48));
-        ir::Value* k2_hi_z = builder->createCeq(k2_hi, ctx->getConstantInt(i64, 0));
-        ir::Value* is_ptr2 = builder->createAnd(k2_ge, k2_hi_z);
+        ir::Value* k2_pos = builder->createCsgt(k2, ctx->getConstantInt(i64, 0));
+        ir::Value* k2_not_nil = builder->createCne(k2, ctx->getConstantInt(i64, 0x7FFFFFFFFFFFFFFF));
+        ir::Value* is_ptr2 = builder->createAnd(builder->createAnd(k2_ge, k2_pos), k2_not_nil);
 
         ir::Value* both_ptr = builder->createAnd(is_ptr1, is_ptr2);
         ir::BasicBlock* b_chk_enum = builder->createBasicBlock("chk_enum", fn_eq);
