@@ -1,0 +1,50 @@
+diff --git a/src/codegen/CodeGen.cpp b/src/codegen/CodeGen.cpp
+index ad0b474..ab339e9 100644
+--- a/src/codegen/CodeGen.cpp
++++ b/src/codegen/CodeGen.cpp
+@@ -382,18 +382,11 @@ void CodeGen::emitDataSection() {
+         }
+     } else if (rodataAssembler) {
+         if (usesHeap) {
+-            // Consistent naming: heap_ptr and __fyra_heap
+-            uint64_t heap_base_offset = rodataAssembler->getCodeSize();
+-            while (heap_base_offset % 16 != 0) {
+-                rodataAssembler->emitByte(0);
+-                heap_base_offset = rodataAssembler->getCodeSize();
+-            }
+-            for(int i=0; i<1048576; ++i) rodataAssembler->emitByte(0);
+-
++            // Place __fyra_heap in .bss (NOBITS) so zero bytes are allocated by loader, not written to ELF file
+             SymbolInfo hb_sym;
+             hb_sym.name = "__fyra_heap";
+-            hb_sym.sectionName = ".data";
+-            hb_sym.value = heap_base_offset;
++            hb_sym.sectionName = ".bss";
++            hb_sym.value = 0;
+             hb_sym.size = 1048576;
+             hb_sym.binding = 1;
+             addSymbol(hb_sym);
+diff --git a/src/target/artifact/executable/elf.cpp b/src/target/artifact/executable/elf.cpp
+index ced2d39..a92351a 100644
+--- a/src/target/artifact/executable/elf.cpp
++++ b/src/target/artifact/executable/elf.cpp
+@@ -288,6 +288,19 @@ bool ElfGenerator::Impl::generateFromCode(const std::map<std::string, std::vecto
+         s.sectionName = sym_in.sectionName;
+         s.isDefined = (s.sectionName != "*UND*");
+         symbols_[s.name] = s;
++
++        // If a symbol is defined in .bss, ensure the .bss section exists in sections_
++        if (s.isDefined && s.sectionName == ".bss" && sections_.find(".bss") == sections_.end()) {
++            Section bss;
++            bss.name = ".bss";
++            bss.size = s.value + s.size;
++            bss.addralign = 8;
++            std::memset(&bss.header, 0, sizeof(SectionHeader64));
++            sections_[".bss"] = bss;
++            sectionOrder_.push_back(".bss");
++        } else if (s.isDefined && s.sectionName == ".bss") {
++            sections_[".bss"].size = std::max(sections_[".bss"].size, s.value + s.size);
++        }
+     }
+
+     relocations_.clear();
