@@ -47,6 +47,9 @@ Floating point operations failed due to six distinct root causes across the Fyra
 6. **PE Section Alignment (`vendor/fyra/src/target/artifact/executable/pe.cpp`)**:
    - Fixed PE section header `virtualSize` calculation to guarantee alignment with `fileAlignment_` and ensure `virtualSize >= rawDataSize` for PE executable generation.
 
+7. **Dictionary Insertion-Order Key Preservation (`src/backend/fyra/fyra_builtin_functions.cpp`)**:
+   - Fixed `lm_dict_set` and `lm_dict_items` to insert new keys at contiguous `count` indices and iterate up to `count` rather than probing full capacity `cap`.
+
 ---
 
 ## 3. Affected Files

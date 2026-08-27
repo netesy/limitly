@@ -1691,8 +1691,9 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_set);
         ir::BasicBlock* b_loop = builder->createBasicBlock("loop", fn_set);
         ir::BasicBlock* b_check = builder->createBasicBlock("check", fn_set);
-        ir::BasicBlock* b_store = builder->createBasicBlock("store", fn_set);
+        ir::BasicBlock* b_update = builder->createBasicBlock("update", fn_set);
         ir::BasicBlock* b_next = builder->createBasicBlock("next", fn_set);
+        ir::BasicBlock* b_insert = builder->createBasicBlock("insert", fn_set);
         ir::BasicBlock* b_done = builder->createBasicBlock("done", fn_set);
 
         builder->setInsertPoint(b_entry);
@@ -1706,12 +1707,11 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         builder->createBr(dict_is_null, b_done, b_valid_dict);
 
         builder->setInsertPoint(b_valid_dict);
+        ir::Value* count = builder->createLoad(dict_ptr);
         ir::Value* keys_slot = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 16));
         ir::Value* keys = builder->createLoad(keys_slot);
         ir::Value* vals_slot = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 24));
         ir::Value* vals = builder->createLoad(vals_slot);
-        ir::Value* cap_ptr = builder->createAdd(dict_ptr, ctx->getConstantInt(i64, 8));
-        ir::Value* cap = builder->createLoad(cap_ptr);
 
         ir::Instruction* i_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
         builder->createStore(ctx->getConstantInt(i64, 0), i_slot);
@@ -1719,8 +1719,8 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
 
         builder->setInsertPoint(b_loop);
         ir::Value* i = builder->createLoad(i_slot);
-        ir::Value* cond = builder->createCslt(i, cap);
-        builder->createBr(cond, b_check, b_done);
+        ir::Value* cond = builder->createCslt(i, count);
+        builder->createBr(cond, b_check, b_insert);
 
         builder->setInsertPoint(b_check);
         ir::Value* k_off = builder->createMul(i, ctx->getConstantInt(i64, 8));
@@ -1728,32 +1728,29 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* curr_k = builder->createLoad(k_addr);
 
         ir::Value* is_match = builder->createCall(fn_eq, {curr_k, key});
-        ir::Value* is_empty = builder->createCeq(curr_k, ctx->getConstantInt(i64, 0));
-        ir::Value* should_store = builder->createOr(is_match, is_empty);
-        builder->createBr(should_store, b_store, b_next);
+        builder->createBr(is_match, b_update, b_next);
 
-        builder->setInsertPoint(b_store);
-        builder->createStore(key, k_addr);
-        ir::Value* v_addr = builder->createAdd(vals, k_off);
-        builder->createStore(val, v_addr);
-
-        ir::BasicBlock* b_inc = builder->createBasicBlock("inc_cnt", fn_set);
-        ir::BasicBlock* b_store_ret = builder->createBasicBlock("store_ret", fn_set);
-        builder->createBr(is_empty, b_inc, b_store_ret);
-
-        builder->setInsertPoint(b_inc);
-        ir::Value* cur_cnt = builder->createLoad(dict_ptr);
-        ir::Value* new_cnt = builder->createAdd(cur_cnt, ctx->getConstantInt(i64, 1));
-        builder->createStore(new_cnt, dict_ptr);
-        builder->createJmp(b_store_ret);
-
-        builder->setInsertPoint(b_store_ret);
+        builder->setInsertPoint(b_update);
+        ir::Value* v_addr_upd = builder->createAdd(vals, k_off);
+        builder->createStore(val, v_addr_upd);
         builder->createRet(nullptr);
 
         builder->setInsertPoint(b_next);
         ir::Value* next_i = builder->createAdd(i, ctx->getConstantInt(i64, 1));
         builder->createStore(next_i, i_slot);
         builder->createJmp(b_loop);
+
+        // Insertion at slot = count (insertion-order)
+        builder->setInsertPoint(b_insert);
+        ir::Value* ins_off = builder->createMul(count, ctx->getConstantInt(i64, 8));
+        ir::Value* ins_k_addr = builder->createAdd(keys, ins_off);
+        ir::Value* ins_v_addr = builder->createAdd(vals, ins_off);
+        builder->createStore(key, ins_k_addr);
+        builder->createStore(val, ins_v_addr);
+
+        ir::Value* new_cnt = builder->createAdd(count, ctx->getConstantInt(i64, 1));
+        builder->createStore(new_cnt, dict_ptr);
+        builder->createRet(nullptr);
 
         builder->setInsertPoint(b_done);
         builder->createRet(nullptr);
@@ -1920,7 +1917,7 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
 
         builder->setInsertPoint(b_loop);
         ir::Value* i = builder->createLoad(i_slot);
-        ir::Value* cond = builder->createCslt(i, cap);
+        ir::Value* cond = builder->createCslt(i, count);
         builder->createBr(cond, b_check, b_done);
 
         builder->setInsertPoint(b_check);
