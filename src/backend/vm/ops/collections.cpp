@@ -61,6 +61,7 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             }
             break;
         }
+        case LIR::LIR_Op::ListSet:
         case LIR::LIR_Op::DictSet:
             if (IS_PTR(registers[pc->dst])) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->dst]);
