@@ -227,14 +227,22 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     for (const auto& param : fn.params) {
         LIRParameter lir_param;
         lir_param.name = param.first;
-        lir_param.type = Type::I64;
+        TypePtr p_type = param.second ? convert_ast_type_to_lir_type(param.second) : nullptr;
+        lir_param.type = language_type_to_abi_type(p_type);
         params.push_back(lir_param);
     }
     for (const auto& optional_param : fn.optionalParams) {
         LIRParameter lir_param;
         lir_param.name = optional_param.first;
-        lir_param.type = Type::I64;
+        TypePtr p_type = optional_param.second.first ? convert_ast_type_to_lir_type(optional_param.second.first) : nullptr;
+        lir_param.type = language_type_to_abi_type(p_type);
         params.push_back(lir_param);
+    }
+    if (is_closure) {
+        LIRParameter env_param;
+        env_param.name = "__env";
+        env_param.type = Type::Ptr;
+        params.push_back(env_param);
     }
     
     Type return_abi_type = Type::I64;

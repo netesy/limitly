@@ -1,5 +1,6 @@
 #include "fyra_builtin_functions.hh"
 #include "backend/vm/vm_string.hh"
+#include "backend/vm/vm_value.hh"
 #include "backend/vm/vm_list.hh"
 #include "backend/utf8.hh"
 #include "ir/IRBuilder.h"
@@ -3533,29 +3534,7 @@ extern "C" {
 
 uint64_t lm_key_eq_ffi(uint64_t k1, uint64_t k2) {
     if (k1 == k2) return 1;
-    if (k1 < 65536 || k2 < 65536) return 0;
-#ifdef _WIN32
-    if (IsBadReadPtr((void*)k1, 8) || IsBadReadPtr((void*)k2, 8)) return 0;
-#endif
-
-    uint32_t t1 = *(uint32_t*)k1;
-    uint32_t t2 = *(uint32_t*)k2;
-    if (t1 == 11 && t2 == 11) { // TYPE_STRING
-        uint64_t len1 = *(uint64_t*)(k1 + 8);
-        uint64_t len2 = *(uint64_t*)(k2 + 8);
-        if (len1 != len2) return 0;
-#ifdef _WIN32
-        if (IsBadReadPtr((void*)(k1 + 24), len1) || IsBadReadPtr((void*)(k2 + 24), len2)) return 0;
-#endif
-        uint64_t res = memcmp((char*)(k1 + 24), (char*)(k2 + 24), len1) == 0 ? 1 : 0;
-        return res;
-    }
-    if (t1 == 0x454E554D && t2 == 0x454E554D) { // Enum tag
-        uint64_t tag1 = *(uint64_t*)(k1 + 8);
-        uint64_t tag2 = *(uint64_t*)(k2 + 8);
-        return tag1 == tag2 ? 1 : 0;
-    }
-    return 0;
+    return lm_value_eq((LmValue)k1, (LmValue)k2) ? 1 : 0;
 }
 
 uint64_t lm_string_byte_at_ffi(const char* str, uint64_t index) {
