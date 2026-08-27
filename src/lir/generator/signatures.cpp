@@ -151,10 +151,11 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         auto result = std::move(current_function_);
         current_function_ = nullptr;
 
-        // Register with LIRFunctionManager to ensure it's found during Call execution
+        // Register with LIRFunctionManager and FunctionRegistry
         std::vector<LIRParameter> params;
         auto lir_func = LIRFunctionManager::getInstance().createFunction(init_func_name, params, Type::Void, nullptr);
         lir_func->setInstructions(result->instructions);
+        LIR::FunctionRegistry::getInstance().registerFunction(init_func_name, std::move(result));
 
         current_module_ = prev_mod;
     }

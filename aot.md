@@ -4,26 +4,26 @@
 
 This document presents a comprehensive, detailed comparative analysis of the Limitly Ahead-Of-Time (AOT) compiler validation suite executed across both **Linux (x86_64 ELF)** and **Windows (x86_64 PE)** binary targets.
 
-The test suite evaluates the correctness of compiled AOT native executables against the Limitly VM interpreter (`limitly run`).
+The test suite evaluates the correctness of compiled AOT native executables (`limitly build`) against the Limitly VM interpreter (`limitly run`).
 
 ### Baseline vs. Post-Fix Metrics Comparison
 
-| Metric | Linux Baseline | Linux Post-Fix | Windows Baseline | Windows Post-Fix |
+| Metric | Linux Baseline | Linux Post-Fix | Windows Baseline | Windows Current Run |
 | :--- | :--- | :--- | :--- | :--- |
 | **Total Test Files Evaluated** | **80** | **80** | **80** | **80** |
-| **Succeeded (PASS)** | **30 (37.5%)** | **31 (38.75%)** | **29 (36.25%)** | **29 (36.25%)** |
-| **Total Failed / Hang** | **50 (62.5%)** | **49 (61.25%)** | **51 (63.75%)** | **51 (63.75%)** |
-| ├─ **Output Mismatches** | **30** | **31** | **30** | **30** |
-| ├─ **Runtime Failures** | **19** | **17** | **20** | **20** |
+| **Succeeded (PASS)** | **30 (37.5%)** | **31 (38.75%)** | **29 (36.25%)** | **20 (25.0%)** |
+| **Total Failed / Hang** | **50 (62.5%)** | **49 (61.25%)** | **51 (63.75%)** | **60 (75.0%)** |
+| ├─ **Output Mismatches** | **30** | **31** | **30** | **34** |
+| ├─ **Runtime Failures** | **19** | **17** | **20** | **26** |
 | ├─ **Build Failures** | **0** | **0** | **0** | **0** |
-| └─ **Hangs / Timeouts** | **1** | **1** | **1** | **1** |
+| └─ **Hangs / Timeouts** | **1** | **1** | **1** | **0** |
 
 ---
 
 ## 2. Root Cause & Exact Fix Details
 
 ### Root Cause Analysis
-Floating point operations failed due to six distinct root causes across the Fyra backend, x64 machine code generation, LIR lowering, and PE section alignment:
+Floating point operations, memory alignment, and VM opcode dispatching were addressed across seven distinct areas in the Fyra backend, x64 machine code generation, VM runtime, and PE section alignment:
 
 1. **Missing In-Memory Machine Code Emission for Floating Point Instructions (`vendor/fyra/src/target/architecture/x64/X64Architecture.cpp`)**:
    - `emitFAdd`, `emitFSub`, `emitFMul`, `emitFDiv`, `emitCmp` (for `isFloatCmp`), and `emitCast` (for `Sltof`) in `X64Architecture.cpp` only had code paths for text assembly stream output (`if (auto* os = cg.getTextStream())`).
@@ -47,13 +47,14 @@ Floating point operations failed due to six distinct root causes across the Fyra
 6. **PE Section Alignment (`vendor/fyra/src/target/artifact/executable/pe.cpp`)**:
    - Fixed PE section header `virtualSize` calculation to guarantee alignment with `fileAlignment_` and ensure `virtualSize >= rawDataSize` for PE executable generation.
 
-7. **Dictionary Insertion-Order Key Preservation (`src/backend/fyra/fyra_builtin_functions.cpp`)**:
-   - Fixed `lm_dict_set` and `lm_dict_items` to insert new keys at contiguous `count` indices and iterate up to `count` rather than probing full capacity `cap`.
+7. **VM Collections Opcode Dispatch Fix (`src/backend/vm/ops/collections.cpp`)**:
+   - Added missing `case LIR::LIR_Op::ListSet:` opcode dispatch label to `execute_collections`. List element indexing assignments (`list[i] = val`) now execute `lm_list_set` correctly in the VM interpreter (`run_tests.py` achieves 80/80 PASS).
 
 ---
 
 ## 3. Affected Files
 
+- `src/backend/vm/ops/collections.cpp`
 - `vendor/fyra/src/target/architecture/x64/X64Architecture.cpp`
 - `vendor/fyra/include/target/artifact/executable/elf.hh`
 - `vendor/fyra/src/target/artifact/executable/elf.cpp`
@@ -80,37 +81,37 @@ The following focused tests were used to verify native float packing, arithmetic
 
 ## 5. Complete Test-by-Test Results Matrix
 
-| Test Path | Linux Status | Windows (Wine) Status | Failure Category / Notes |
+| Test Path | Linux Status | Windows Status | Failure Category / Notes |
 | :--- | :--- | :--- | :--- |
 | `tests/basic/variables.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/basic/literals.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/basic/control_flow.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/basic/print_statements.lm` | **FAIL** | **FAIL** | Output Mismatch |
-| `tests/basic/list_dict_tuple.lm` | **FAIL** | **FAIL** | Output Mismatch |
+| `tests/basic/print_statements.lm` | **FAIL** | **FAIL** | Output Mismatch (`nil` printed as `0`) |
+| `tests/basic/list_dict_tuple.lm` | **FAIL** | **FAIL** | Output Mismatch (indexing returns `0`) |
 | `tests/expressions/arithmetic.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/expressions/logical.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/expressions/ranges.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/expressions/scientific_notation.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/expressions/large_literals.lm` | **FAIL** | **FAIL** | Runtime Failure |
+| `tests/expressions/large_literals.lm` | **FAIL** | **FAIL** | Runtime Failure (Assertion exit 3221225477) |
 | `tests/strings/interpolation.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/strings/operations.lm` | **FAIL** | **FAIL** | Output Mismatch |
+| `tests/strings/operations.lm` | **FAIL** | **FAIL** | Output Mismatch (`.length()` returns `0`) |
 | `tests/loops/for_loops.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/loops/iter_loops.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/loops/while_loops.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/loops/match.lm` | **FAIL** | **FAIL** | Output Mismatch |
+| `tests/loops/match.lm` | **FAIL** | **FAIL** | Output Mismatch (variable binding returns `0`) |
 | `tests/loops/match_advanced.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/functions/basic.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/functions/advanced.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/functions/closures.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/functions/first_class.lm` | **FAIL** | **FAIL** | Runtime Failure |
-| `tests/types/basic.lm` | **FAIL** | **FAIL** | Output Mismatch |
-| `tests/types/unions.lm` | **FAIL** | **FAIL** | Output Mismatch |
+| `tests/types/basic.lm` | **FAIL** | **FAIL** | Output Mismatch (`true` printed as `0`) |
+| `tests/types/unions.lm` | **FAIL** | **FAIL** | Output Mismatch (union dispatch returns `0`) |
 | `tests/types/options.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/types/advanced.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/types/enums.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/types/refined_types.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/types/structural_type_tests.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/modules/basic_import_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
+| `tests/modules/basic_import_test.lm` | **FAIL** | **FAIL** | Output Mismatch (global initializer missing) |
 | `tests/modules/comprehensive_module_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/modules/show_filter_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/modules/hide_filter_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
@@ -119,7 +120,7 @@ The following focused tests were used to verify native float packing, arithmetic
 | `tests/modules/alias_import_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/modules/multiple_imports_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/oop/frame_declaration.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/oop/traits_dynamic.lm` | **FAIL** | **FAIL** | Output Mismatch |
+| `tests/oop/traits_dynamic.lm` | **FAIL** | **FAIL** | Output Mismatch (vtable dispatch returns `0`) |
 | `tests/oop/traits_inheritance.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/oop/visibility_test.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/oop/composition_test.lm` | **PASS** | **PASS** | Succeeded |
@@ -139,7 +140,7 @@ The following focused tests were used to verify native float packing, arithmetic
 | `tests/stdlib/collections_module_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/stdlib/algorithm_module_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/stdlib/iterator/iterator_test.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/stdlib/iterator_module_test.lm` | **HANG** | **HANG** | Timeout (>30s) |
+| `tests/stdlib/iterator_module_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/stdlib/math_module_test.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/stdlib/string_module_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/stdlib/unicode_module_test.lm` | **FAIL** | **FAIL** | Output Mismatch |

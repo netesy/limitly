@@ -56,11 +56,11 @@ frame Random {
     pub fn range_float(min_val: float, max_val: float): float { return min_val + (max_val - min_val) * self.next_float(); }
 
     pub fn next_bytes(count: int): [int] {
-        var res_bytes: [int] = [];
+        var res_bytes: [int] = [] as [int];
         for (var i = 0; i < count; i = i + 1) {
             var b = self.next_int();
             if (b < 0) b = -b;
-            res_bytes = res_bytes + [b % 256];
+            res_bytes.append(b % 256);
         }
         return res_bytes;
     }
@@ -110,11 +110,11 @@ frame SecureRandom {
     }
 
     pub fn next_bytes(count: int): [int] {
-        var res_bytes: [int] = [];
+        var res_bytes: [int] = [] as [int];
         for (var i = 0; i < count; i = i + 1) {
             var b = self.next_int();
             if (b < 0) b = -b;
-            res_bytes = res_bytes + [b % 256];
+            res_bytes.append(b % 256);
         }
         return res_bytes;
     }
