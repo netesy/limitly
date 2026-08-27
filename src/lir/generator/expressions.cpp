@@ -754,12 +754,12 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
     for (size_t i = 0; i < arg_regs.size(); i++) {
         if (i == 0) {
             // First argument: format with first arg
-            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, result, format_reg, arg_regs[i]));
+            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, Type::Ptr, result, format_reg, arg_regs[i]));
             current_result = result;
         } else {
             // Subsequent arguments: format previous result with next arg
             Reg temp_result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, temp_result, current_result, arg_regs[i]));
+            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, Type::Ptr, temp_result, current_result, arg_regs[i]));
             current_result = temp_result;
             if (i == arg_regs.size() - 1) {
                 // Final result is in temp_result, move to result register

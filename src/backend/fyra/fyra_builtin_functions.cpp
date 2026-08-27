@@ -42,6 +42,7 @@ std::string FyraBuiltinFunctions::get_internal_name(const std::string& name) {
     if (name == "print")  return "lm_print";
     if (name == "assert") return "lm_assert";
     if (name == "len")    return "lm_list_len";
+    if (name == "length" || name == "_builtin_length") return "_builtin_string_byte_len";
     return name;
 }
 
@@ -419,30 +420,6 @@ ir::Value* FyraBuiltinFunctions::emit_decimal_to_str_inline(ir::Module* module,
     builder->createJmp(b_copy_loop_d);
 
     builder->setInsertPoint(b_copy_done_d);
-    ir::Value* dst_start = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
-    ir::Instruction* copy_idx = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
-    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx);
-    ir::Value* copy_len = builder->createAdd(str_len, ctx->getConstantInt(i64, 1));
-
-    ir::BasicBlock* b_copy_loop = builder->createBasicBlock("i2s_copy_loop_" + s_uid, cur_fn);
-    ir::BasicBlock* b_copy_body = builder->createBasicBlock("i2s_copy_body_" + s_uid, cur_fn);
-    ir::BasicBlock* b_copy_done = builder->createBasicBlock("i2s_copy_done_" + s_uid, cur_fn);
-
-    builder->createJmp(b_copy_loop);
-
-    builder->setInsertPoint(b_copy_loop);
-    ir::Value* c_i = builder->createLoad(copy_idx);
-    ir::Value* c_cond = builder->createCslt(c_i, copy_len);
-    builder->createBr(c_cond, b_copy_body, b_copy_done);
-
-    builder->setInsertPoint(b_copy_body);
-    ir::Value* ch_i = builder->createLoadub(builder->createAdd(str_start, c_i));
-    builder->createStoreb(ch_i, builder->createAdd(dst_start, c_i));
-    builder->createStore(builder->createAdd(c_i, ctx->getConstantInt(i64, 1)), copy_idx);
-    builder->createJmp(b_copy_loop);
-
-    builder->setInsertPoint(b_copy_done);
-
     return buf_ptr;
 }
 
@@ -550,31 +527,79 @@ ir::Value* FyraBuiltinFunctions::emit_int_to_str_inline(ir::Module* module,
     builder->createJmp(b_copy_loop_d);
 
     builder->setInsertPoint(b_copy_done_d);
-    ir::Value* dst_start = builder->createAdd(buf_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
-    ir::Instruction* copy_idx = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
-    builder->createStore(ctx->getConstantInt(i64, 0), copy_idx);
-    ir::Value* copy_len = builder->createAdd(str_len, ctx->getConstantInt(i64, 1));
-
-    ir::BasicBlock* b_copy_loop = builder->createBasicBlock("i2s_copy_loop_" + s_uid, cur_fn);
-    ir::BasicBlock* b_copy_body = builder->createBasicBlock("i2s_copy_body_" + s_uid, cur_fn);
-    ir::BasicBlock* b_copy_done = builder->createBasicBlock("i2s_copy_done_" + s_uid, cur_fn);
-
-    builder->createJmp(b_copy_loop);
-
-    builder->setInsertPoint(b_copy_loop);
-    ir::Value* c_i = builder->createLoad(copy_idx);
-    ir::Value* c_cond = builder->createCslt(c_i, copy_len);
-    builder->createBr(c_cond, b_copy_body, b_copy_done);
-
-    builder->setInsertPoint(b_copy_body);
-    ir::Value* ch_i = builder->createLoadub(builder->createAdd(str_start, c_i));
-    builder->createStoreb(ch_i, builder->createAdd(dst_start, c_i));
-    builder->createStore(builder->createAdd(c_i, ctx->getConstantInt(i64, 1)), copy_idx);
-    builder->createJmp(b_copy_loop);
-
-    builder->setInsertPoint(b_copy_done);
-
     return buf_ptr;
+}
+
+ir::Value* FyraBuiltinFunctions::emit_str_to_int_inline(ir::Module* module,
+                                                         ir::IRBuilder* builder,
+                                                         ir::Value* str_ptr) {
+    auto ctx = module->getContextShared();
+    auto i64 = ctx->getIntegerType(64);
+
+    ir::Function* cur_fn = builder->getInsertPoint()->getParent();
+    std::string s_uid = std::to_string(g_print_int_counter++);
+
+    ir::BasicBlock* b_loop       = builder->createBasicBlock("s2i_loop_" + s_uid, cur_fn);
+    ir::BasicBlock* b_body       = builder->createBasicBlock("s2i_body_" + s_uid, cur_fn);
+    ir::BasicBlock* b_chk_sign   = builder->createBasicBlock("s2i_chk_sign_" + s_uid, cur_fn);
+    ir::BasicBlock* b_chk_digit  = builder->createBasicBlock("s2i_chk_digit_" + s_uid, cur_fn);
+    ir::BasicBlock* b_add_digit  = builder->createBasicBlock("s2i_add_digit_" + s_uid, cur_fn);
+    ir::BasicBlock* b_next       = builder->createBasicBlock("s2i_next_" + s_uid, cur_fn);
+    ir::BasicBlock* b_done       = builder->createBasicBlock("s2i_done_" + s_uid, cur_fn);
+
+    ir::Instruction* val_slot  = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    ir::Instruction* sign_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+    ir::Instruction* idx_slot  = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+
+    builder->createStore(ctx->getConstantInt(i64, 0), val_slot);
+    builder->createStore(ctx->getConstantInt(i64, 1), sign_slot);
+    builder->createStore(ctx->getConstantInt(i64, 0), idx_slot);
+
+    ir::Value* len = builder->createLoad(builder->createAdd(str_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET)));
+    ir::Value* data_ptr = builder->createAdd(str_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
+
+    builder->createJmp(b_loop);
+
+    builder->setInsertPoint(b_loop);
+    ir::Value* idx = builder->createLoad(idx_slot);
+    ir::Value* loop_cond = builder->createCslt(idx, len);
+    builder->createBr(loop_cond, b_body, b_done);
+
+    builder->setInsertPoint(b_body);
+    ir::Value* ch = builder->createCast(builder->createLoadub(builder->createAdd(data_ptr, idx)), i64);
+
+    ir::Value* is_zero_idx = builder->createCeq(idx, ctx->getConstantInt(i64, 0));
+    ir::Value* is_minus    = builder->createCeq(ch, ctx->getConstantInt(i64, 45));
+    ir::Value* is_neg_sign = builder->createAnd(is_zero_idx, is_minus);
+
+    builder->createBr(is_neg_sign, b_chk_sign, b_chk_digit);
+
+    builder->setInsertPoint(b_chk_sign);
+    builder->createStore(ctx->getConstantInt(i64, -1), sign_slot);
+    builder->createJmp(b_next);
+
+    builder->setInsertPoint(b_chk_digit);
+    ir::Value* ge_0 = builder->createCsge(ch, ctx->getConstantInt(i64, 48));
+    ir::Value* le_9 = builder->createCsle(ch, ctx->getConstantInt(i64, 57));
+    ir::Value* is_digit = builder->createAnd(ge_0, le_9);
+    builder->createBr(is_digit, b_add_digit, b_next);
+
+    builder->setInsertPoint(b_add_digit);
+    ir::Value* cur_val = builder->createLoad(val_slot);
+    ir::Value* digit = builder->createSub(ch, ctx->getConstantInt(i64, 48));
+    ir::Value* new_val = builder->createAdd(builder->createMul(cur_val, ctx->getConstantInt(i64, 10)), digit);
+    builder->createStore(new_val, val_slot);
+    builder->createJmp(b_next);
+
+    builder->setInsertPoint(b_next);
+    builder->createStore(builder->createAdd(idx, ctx->getConstantInt(i64, 1)), idx_slot);
+    builder->createJmp(b_loop);
+
+    builder->setInsertPoint(b_done);
+    ir::Value* abs_val = builder->createLoad(val_slot);
+    ir::Value* sign = builder->createLoad(sign_slot);
+    ir::Value* final_val = builder->createMul(abs_val, sign);
+    return final_val;
 }
 
 extern "C" char* lm_float_to_str(uint64_t bits) {
@@ -1060,10 +1085,23 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
     if (!fn_len) fn_len = builder->createFunction("lm_list_len", i64, {i64});
     if (fn_len->getBasicBlocks().empty()) {
         ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_len);
+        ir::BasicBlock* b_str   = builder->createBasicBlock("len_str", fn_len);
+        ir::BasicBlock* b_obj   = builder->createBasicBlock("len_obj", fn_len);
+
         builder->setInsertPoint(b_entry);
         ir::Value* list_ptr = fn_len->getParameters().front().get();
-        ir::Value* len = builder->createLoad(list_ptr);
-        builder->createRet(len);
+        ir::Value* magic = builder->createLoad(list_ptr);
+        ir::Value* type_id = builder->createAnd(magic, ctx->getConstantInt(i64, 0xFFFFFFFF));
+        ir::Value* is_str = builder->createCeq(type_id, ctx->getConstantInt(i64, 11));
+        builder->createBr(is_str, b_str, b_obj);
+
+        builder->setInsertPoint(b_str);
+        ir::Value* str_len = builder->createLoad(builder->createAdd(list_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET)));
+        builder->createRet(str_len);
+
+        builder->setInsertPoint(b_obj);
+        ir::Value* obj_len = builder->createLoad(list_ptr);
+        builder->createRet(obj_len);
     }
 
     // 3. lm_list_get(list_ptr: i64, index: i64) -> i64
@@ -1521,16 +1559,9 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
 
         builder->setInsertPoint(b_ptrcmp);
         ir::Value* k1_ge = builder->createCuge(k1, ctx->getConstantInt(i64, 65536));
-        ir::Value* k1_pos = builder->createCsgt(k1, ctx->getConstantInt(i64, 0));
-        ir::Value* k1_not_nil = builder->createCne(k1, ctx->getConstantInt(i64, 0x7FFFFFFFFFFFFFFF));
-        ir::Value* is_ptr1 = builder->createAnd(builder->createAnd(k1_ge, k1_pos), k1_not_nil);
-
         ir::Value* k2_ge = builder->createCuge(k2, ctx->getConstantInt(i64, 65536));
-        ir::Value* k2_pos = builder->createCsgt(k2, ctx->getConstantInt(i64, 0));
-        ir::Value* k2_not_nil = builder->createCne(k2, ctx->getConstantInt(i64, 0x7FFFFFFFFFFFFFFF));
-        ir::Value* is_ptr2 = builder->createAnd(builder->createAnd(k2_ge, k2_pos), k2_not_nil);
+        ir::Value* both_ptr = builder->createAnd(k1_ge, k2_ge);
 
-        ir::Value* both_ptr = builder->createAnd(is_ptr1, is_ptr2);
         ir::BasicBlock* b_chk_enum = builder->createBasicBlock("chk_enum", fn_eq);
         builder->createBr(both_ptr, b_chk_enum, b_ret_false);
 
@@ -3449,6 +3480,32 @@ void FyraBuiltinFunctions::emit_error_new_ir(ir::Module* module, ir::IRBuilder* 
 } // namespace LM::Backend::Fyra
 
 extern "C" {
+#include <windows.h>
+
+uint64_t lm_key_eq_ffi(uint64_t k1, uint64_t k2) {
+    if (k1 == k2) return 1;
+    if (k1 < 65536 || k2 < 65536) return 0;
+    if (IsBadReadPtr((void*)k1, 8) || IsBadReadPtr((void*)k2, 8)) return 0;
+
+    uint32_t t1 = *(uint32_t*)k1;
+    uint32_t t2 = *(uint32_t*)k2;
+    if (t1 == 11 && t2 == 11) { // TYPE_STRING
+        uint64_t len1 = *(uint64_t*)(k1 + 8);
+        uint64_t len2 = *(uint64_t*)(k2 + 8);
+        if (len1 != len2) return 0;
+        if (IsBadReadPtr((void*)(k1 + 24), len1) || IsBadReadPtr((void*)(k2 + 24), len2)) return 0;
+        uint64_t res = memcmp((char*)(k1 + 24), (char*)(k2 + 24), len1) == 0 ? 1 : 0;
+        printf("lm_key_eq_ffi: k1_str='%.*s', k2_str='%.*s' -> %llu\n", (int)len1, (char*)(k1 + 24), (int)len2, (char*)(k2 + 24), (unsigned long long)res);
+        return res;
+    }
+    if (t1 == 0x454E554D && t2 == 0x454E554D) { // Enum tag
+        uint64_t tag1 = *(uint64_t*)(k1 + 8);
+        uint64_t tag2 = *(uint64_t*)(k2 + 8);
+        return tag1 == tag2 ? 1 : 0;
+    }
+    return 0;
+}
+
 uint64_t lm_string_byte_at_ffi(const char* str, uint64_t index) {
     if (!str) return 0;
     size_t len = strlen(str);

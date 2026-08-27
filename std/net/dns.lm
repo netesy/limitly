@@ -67,19 +67,19 @@ frame DNS {
 }
 
 fn split_string(s: str, delimiter: str): [str] {
-    var parts: [str] = [];
+    var parts: [str] = [] as [str];
     var current: str = "";
     var i: int = 0;
     while (i < len(s)) {
         if (_builtin_substring(s, i, i + 1) == delimiter) {
-            parts = parts + [current];
+            parts.append(current);
             current = "";
         } else {
             current = current + _builtin_substring(s, i, i + 1);
         }
         i = i + 1;
     }
-    parts = parts + [current];
+    parts.append(current);
     return parts;
 }
 

@@ -36,6 +36,7 @@ public:
     static void emit_print_decimal_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val, int scale);
     static ir::Value* emit_decimal_to_str_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val, int scale);
     static ir::Value* emit_int_to_str_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
+    static ir::Value* emit_str_to_int_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* str_ptr);
     static ir::Value* emit_float_to_str_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
     static ir::Value* emit_bool_to_str_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
     static void emit_str_alloc_ir(ir::Module* module, ir::IRBuilder* builder);
