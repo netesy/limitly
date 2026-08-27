@@ -23,31 +23,34 @@ The test suite evaluates the correctness of compiled AOT native executables agai
 ## 2. Root Cause & Exact Fix Details
 
 ### Root Cause Analysis
-Floating point operations failed due to two distinct bugs across the Fyra backend and Limitly LIR builder:
+Floating point operations failed due to five distinct root causes across the Fyra backend, x64 machine code generation, LIR lowering, and runtime print safeguards:
 
 1. **Missing In-Memory Machine Code Emission for Floating Point Instructions (`vendor/fyra/src/target/architecture/x64/X64Architecture.cpp`)**:
-   - `emitFAdd`, `emitFSub`, `emitFMul`, `emitFDiv`, and `emitCmp` (for `isFloatCmp`) in `X64Architecture.cpp` only had code paths for text assembly stream output (`if (auto* os = cg.getTextStream())`).
-   - When generating binary executables directly via in-memory machine code (`as`), the `else` branch was completely missing. Consequently, no machine code bytes were emitted for floating point math or float comparisons, leaving the destination stack slot at zero.
+   - `emitFAdd`, `emitFSub`, `emitFMul`, `emitFDiv`, `emitCmp` (for `isFloatCmp`), and `emitCast` (for `Sltof`) in `X64Architecture.cpp` only had code paths for text assembly stream output (`if (auto* os = cg.getTextStream())`).
+   - When generating binary executables directly via in-memory machine code (`as`), the `else` branch was completely missing. Consequently, no machine code bytes were emitted for floating point math or float comparisons, leaving the destination register/stack slot at zero.
 
-2. **Early String Conversion & Layout Mismatch (`src/backend/fyra/builder.cpp` & `fyra_builtin_functions.cpp`)**:
-   - In `builder.cpp`, float constants were being converted at compile time into string literals and wrapped using `create_string_header`, which allocated a 16-byte `FyraString` header.
-   - At print time, `emit_print_str_inline` expected an `LmStringHeader` layout with string bytes at offset 24 (`DATA_OFFSET`). Reading offset 24 of a 16-byte allocation read uninitialized memory (zeros), producing `\x00\x00\x00\x00` (4 null bytes).
-   - Furthermore, `emit_float_to_str_inline` relied on an unresolved external C library symbol (`lm_float_to_str`) that is not present in standalone AOT ELF executables.
+2. **Float Unpacking & Constant Type Tracking (`src/backend/fyra/builder.cpp`)**:
+   - Float constants stored in boxed structures (`LM_BOX_FLOAT`, `TYPE_FLOAT`) or converted from string literals were not being properly unpacked into `ConstantFP` double constants in `LoadConst`.
+   - Register type tracking in `LoadConst` was incorrectly overwriting destination register types with `I64` or `Ptr` instead of maintaining `LIR::Type::F64`.
 
-### Applied Fix
-1. **Added In-Memory X64 Codegen in `vendor/fyra/src/target/architecture/x64/X64Architecture.cpp`**:
-   - Implemented the in-memory binary assembler (`else`) branches for `emitFAdd` (`addsd`), `emitFSub` (`subsd`), `emitFMul` (`mulsd`), `emitFDiv` (`divsd`), `emitCmp` (`ucomisd`), and `emitCast` (`cvtsi2sd` for integer-to-float conversions).
-2. **Preserved Native Float Representation in `src/backend/fyra/builder.cpp`**:
-   - Stored float constants natively as `ConstantFP` in Fyra IR rather than converting them into string headers early.
-   - Updated register loading to automatically promote integer operands to double precision floats via `createSltof` during mixed-type float operations.
-3. **Pure Fyra IR Float-to-String Formatting (`src/backend/fyra/fyra_builtin_functions.cpp`)**:
-   - Implemented `emit_float_to_str_inline` in pure Fyra IR using IEEE-754 64-bit double bitfield decomposition and single-digit step division to prevent 64-bit integer multiplication overflow.
+3. **Global Variable Array Type Declarations (`src/backend/fyra/builder.cpp` & `fyra_builtin_functions.cpp`)**:
+   - String header array constants were being declared as `PointerType(i8)` instead of `ArrayType`.
+   - The Fyra validator marked these globals as `unsupported_global` and omitted `.data` section byte emission, resulting in null pointer dereference segfaults at runtime when accessing string constants.
+
+4. **Fyra IR Loop SSA Regalloc Fix (`src/backend/fyra/fyra_builtin_functions.cpp`)**:
+   - Inlined string formatting loops (`emit_decimal_to_str_inline`, `emit_int_to_str_inline`, `emit_float_to_str_inline`) were using local stack allocs (`createAlloc`/`createLoad`/`createStore`) for loop counters. Direct `createLoad` on stack slots emitted direct dereferences that clobbered loop registers across iterations.
+   - Replaced stack alloc counter loops with SSA `PhiNode` constructs to preserve register values across loop iterations.
+
+5. **Pure Fyra IR Float-to-String Formatting (`src/backend/fyra/fyra_builtin_functions.cpp`)**:
+   - Replaced unresolved external C library symbol `lm_float_to_str` with a pure Fyra IR routine that performs IEEE-754 64-bit double bitfield decomposition (sign, exponent, mantissa), %g-style 6-significant-digit conversion, and NaN/Inf detection.
 
 ---
 
 ## 3. Affected Files
 
 - `vendor/fyra/src/target/architecture/x64/X64Architecture.cpp`
+- `vendor/fyra/include/target/artifact/executable/elf.hh`
+- `vendor/fyra/src/target/artifact/executable/elf.cpp`
 - `src/backend/fyra/builder.cpp`
 - `src/backend/fyra/fyra_builtin_functions.cpp`
 - `fyra.patch`
@@ -63,7 +66,8 @@ The following focused tests were used to verify native float packing, arithmetic
 | `tests/basic/variables.lm` | **PASS** | `3.14`, `2.71` float variable assignment and printing |
 | `tests/expressions/arithmetic.lm` | **PASS** | `3.14 + 2.0 = 5.14`, `3.14 / 2.0 = 1.57` native float math |
 | `tests/strings/interpolation.lm` | **PASS** | `Pi: 3.14159`, `Area of circle: 12.56636` float expressions in interpolated strings |
-| `tests/expressions/scientific_notation.lm` | Verified | `1.23e-10`, `4.56e+15`, `1.5e3 + 2.5e2 = 1750.0` |
+| `tests/expressions/scientific_notation.lm` | **PASS** | `1.23e-10`, `4.56e+15`, `1.5e3 + 2.5e2 = 1750.0` scientific notation parsing & formatting |
+| `tests/basic/literals.lm` | **PASS** | Integers, Floats, Strings, Booleans, Nil, Decimals all pass cleanly |
 
 ---
 
@@ -72,21 +76,21 @@ The following focused tests were used to verify native float packing, arithmetic
 | Test Path | Linux Status | Windows (Wine) Status | Failure Category / Notes |
 | :--- | :--- | :--- | :--- |
 | `tests/basic/variables.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/basic/literals.lm` | **FAIL** | **FAIL** | Runtime Failure (Exit code -11) |
+| `tests/basic/literals.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/basic/control_flow.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/basic/print_statements.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/basic/list_dict_tuple.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/expressions/arithmetic.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/expressions/logical.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/expressions/ranges.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/expressions/scientific_notation.lm` | **FAIL** | **FAIL** | Output Mismatch |
+| `tests/expressions/scientific_notation.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/expressions/large_literals.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/strings/interpolation.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/strings/operations.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/loops/for_loops.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/loops/iter_loops.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/loops/while_loops.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/loops/match.lm` | **FAIL** | **FAIL** | Output Mismatch (Linux) / Runtime Failure (Win) |
+| `tests/loops/match.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/loops/match_advanced.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/functions/basic.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/functions/advanced.lm` | **FAIL** | **FAIL** | Runtime Failure |
@@ -126,7 +130,7 @@ The following focused tests were used to verify native float packing, arithmetic
 | `tests/stdlib/collections/arraylist_test.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/stdlib/collections/priority_queue_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/stdlib/collections_module_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
-| `tests/stdlib/algorithm_module_test.lm` | **FAIL** | **FAIL** | Output Mismatch (Linux) / Runtime Failure (Win) |
+| `tests/stdlib/algorithm_module_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/stdlib/iterator/iterator_test.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/stdlib/iterator_module_test.lm` | **HANG** | **HANG** | Timeout (>30s) |
 | `tests/stdlib/math_module_test.lm` | **FAIL** | **FAIL** | Runtime Failure |
@@ -135,13 +139,13 @@ The following focused tests were used to verify native float packing, arithmetic
 | `tests/stdlib/regex_module_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/stdlib/env_module_test.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/stdlib/process_module_test.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/stdlib/time_module_test.lm` | **FAIL** | **FAIL** | Runtime Failure (Linux) / Output Mismatch (Win) |
+| `tests/stdlib/time_module_test.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/stdlib/random_module_test.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/stdlib/parse_module_test.lm` | **FAIL** | **FAIL** | Runtime Failure |
-| `tests/stdlib/format_module_test.lm` | **FAIL** | **FAIL** | Runtime Failure (Linux) / Output Mismatch (Win) |
+| `tests/stdlib/format_module_test.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/stdlib/search/search_test.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/stdlib/range/range_test.lm` | **PASS** | **PASS** | Succeeded |
-| `tests/stdlib/sort/sort_test.lm` | **PASS** | **FAIL** | Succeeded (Linux) / Runtime Failure (Win) |
+| `tests/stdlib/sort/sort_test.lm` | **PASS** | **PASS** | Succeeded |
 | `tests/stdlib/path/path_test.lm` | **FAIL** | **FAIL** | Output Mismatch |
 | `tests/stdlib/semver_test.lm` | **FAIL** | **FAIL** | Runtime Failure |
 | `tests/stdlib/url_test.lm` | **FAIL** | **FAIL** | Output Mismatch |

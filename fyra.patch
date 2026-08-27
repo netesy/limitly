@@ -16,7 +16,7 @@ index 1b29a75..322cc6b 100644
       * @brief Retrieves the last error message.
       * @return A string containing the last error, or an empty string if no error occurred.
 diff --git a/src/target/architecture/x64/X64Architecture.cpp b/src/target/architecture/x64/X64Architecture.cpp
-index 1f6e711..f7bafb3 100644
+index 1f6e711..0245ea5 100644
 --- a/src/target/architecture/x64/X64Architecture.cpp
 +++ b/src/target/architecture/x64/X64Architecture.cpp
 @@ -605,6 +605,15 @@ void X64Architecture::emitFAdd(CodeGen& cg, ir::Instruction& i) {
@@ -115,6 +115,35 @@ index 1f6e711..f7bafb3 100644
              case ir::Instruction::Cult: s = 0x92; break;
              case ir::Instruction::Cule: s = 0x96; break;
              case ir::Instruction::Cugt: s = 0x97; break;
+@@ -749,7 +792,15 @@ void X64Architecture::emitCast(CodeGen& cg, ir::Instruction& i, const ir::Type*
+
+     if (auto* os = cg.getTextStream()) {
+         ir::Instruction::Opcode op = i.getOpcode();
+-        if (op == ir::Instruction::ExtUB) {
++        if (op == ir::Instruction::Sltof || op == ir::Instruction::SWtoF || op == ir::Instruction::UWtoF || op == ir::Instruction::Ultof) {
++            if (abi == X64ABI::Windows) {
++                *os << "  cvtsi2sd xmm0, " << srcOp << "\n";
++                *os << "  movsd " << destOp << ", xmm0\n";
++            } else {
++                *os << "  cvtsi2sd " << srcOp << ", %xmm0\n";
++                *os << "  movsd %xmm0, " << destOp << "\n";
++            }
++        } else if (op == ir::Instruction::ExtUB) {
+             *os << "  movzbq " << srcOp << ", " << rax << "\n";
+             *os << "  movq " << rax << ", " << destOp << "\n";
+         } else if (op == ir::Instruction::ExtUH) {
+@@ -777,7 +828,10 @@ void X64Architecture::emitCast(CodeGen& cg, ir::Instruction& i, const ir::Type*
+         auto& as = cg.getAssembler();
+         ir::Instruction::Opcode op = i.getOpcode();
+         emitLoadValue(cg, as, i.getOperands()[0]->get(), 0);
+-        if (op == ir::Instruction::ExtUB) {
++        if (op == ir::Instruction::Sltof || op == ir::Instruction::SWtoF || op == ir::Instruction::UWtoF || op == ir::Instruction::Ultof) {
++            as.emitBytes({0xF2, 0x48, 0x0F, 0x2A, 0xC0}); // cvtsi2sd xmm0, rax
++            as.emitBytes({0x66, 0x48, 0x0F, 0x7E, 0xC0}); // movq rax, xmm0
++        } else if (op == ir::Instruction::ExtUB) {
+             as.emitBytes({0x0F, 0xB6, 0xC0}); // movzbl eax, al
+         } else if (op == ir::Instruction::ExtUH) {
+             as.emitBytes({0x0F, 0xB7, 0xC0}); // movzwl eax, ax
 diff --git a/src/target/artifact/executable/elf.cpp b/src/target/artifact/executable/elf.cpp
 index a92351a..0fe0527 100644
 --- a/src/target/artifact/executable/elf.cpp
