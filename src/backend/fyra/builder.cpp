@@ -680,42 +680,46 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Xor: store_reg(inst.dst, builder_->createXor(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::CmpEQ: {
                 reg_types[inst.dst] = LIR::Type::Bool;
-                bool is_ptr = (inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr ||
-                               (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
-                               (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
-                               reg_string_literals.count(inst.a) || reg_string_literals.count(inst.b));
-                if (is_ptr) {
-                    used_builtins_.insert("lm_key_eq");
-                    ir::Function* fn = current_module_->getFunction("lm_key_eq");
-                    if (!fn) fn = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                    store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}), LIR::Type::Bool);
-                } else if (is_float_op(inst)) {
+                if (is_float_op(inst)) {
                     ir::Value* c = builder_->createCeqf(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else {
-                    ir::Value* c = builder_->createCeq(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
-                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                    bool is_ptr = (inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr ||
+                                   (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
+                                   (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
+                                   reg_string_literals.count(inst.a) || reg_string_literals.count(inst.b));
+                    if (is_ptr) {
+                        used_builtins_.insert("lm_key_eq");
+                        ir::Function* fn = current_module_->getFunction("lm_key_eq");
+                        if (!fn) fn = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
+                        store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}), LIR::Type::Bool);
+                    } else {
+                        ir::Value* c = builder_->createCeq(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
+                        store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                    }
                 }
                 break;
             }
             case LIR::LIR_Op::CmpNEQ: {
                 reg_types[inst.dst] = LIR::Type::Bool;
-                bool is_ptr = (inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr ||
-                               (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
-                               (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
-                               reg_string_literals.count(inst.a) || reg_string_literals.count(inst.b));
-                if (is_ptr) {
-                    used_builtins_.insert("lm_key_eq");
-                    ir::Function* fn = current_module_->getFunction("lm_key_eq");
-                    if (!fn) fn = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                    ir::Value* eq_res = builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)});
-                    store_reg(inst.dst, builder_->createCeq(eq_res, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
-                } else if (is_float_op(inst)) {
+                if (is_float_op(inst)) {
                     ir::Value* c = builder_->createCnef(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else {
-                    ir::Value* c = builder_->createCne(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
-                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                    bool is_ptr = (inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr ||
+                                   (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
+                                   (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
+                                   reg_string_literals.count(inst.a) || reg_string_literals.count(inst.b));
+                    if (is_ptr) {
+                        used_builtins_.insert("lm_key_eq");
+                        ir::Function* fn = current_module_->getFunction("lm_key_eq");
+                        if (!fn) fn = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
+                        ir::Value* eq_res = builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)});
+                        store_reg(inst.dst, builder_->createCeq(eq_res, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
+                    } else {
+                        ir::Value* c = builder_->createCne(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
+                        store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                    }
                 }
                 break;
             }
