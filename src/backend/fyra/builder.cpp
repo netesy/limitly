@@ -131,6 +131,8 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                 for (char& c : gname) { if (c == '.') c = '_'; }
                 if (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32) {
                     global_types_[gname] = LIR::Type::F64;
+                } else if (f->register_types.count(inst.a) && (f->register_types.at(inst.a) == LIR::Type::F64 || f->register_types.at(inst.a) == LIR::Type::F32)) {
+                    global_types_[gname] = LIR::Type::F64;
                 }
             }
         }
@@ -721,7 +723,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     ir::Value* c = builder_->createCeqf(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
-                } else if (reg_string_literals.count(inst.a) || reg_string_literals.count(inst.b)) {
+                } else if (reg_string_literals.count(inst.a) || reg_string_literals.count(inst.b) ||
+                           (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
+                           (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
+                           (inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr)) {
                     used_builtins_.insert("lm_key_eq");
                     ir::Function* fn = current_module_->getFunction("lm_key_eq");
                     if (!fn) fn = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
@@ -737,7 +742,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     ir::Value* c = builder_->createCnef(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
-                } else if (reg_string_literals.count(inst.a) || reg_string_literals.count(inst.b)) {
+                } else if (reg_string_literals.count(inst.a) || reg_string_literals.count(inst.b) ||
+                           (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
+                           (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
+                           (inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr)) {
                     used_builtins_.insert("lm_key_eq");
                     ir::Function* fn = current_module_->getFunction("lm_key_eq");
                     if (!fn) fn = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
@@ -1421,7 +1429,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Load: store_reg(inst.dst, builder_->createLoad(load_reg(inst.a, inst.type_a)), inst.result_type); break;
             case LIR::LIR_Op::Store: builder_->createStore(load_reg(inst.b, inst.type_b), load_reg(inst.a, inst.type_a)); break;
             case LIR::LIR_Op::Cast: {
-                if (reg_string_literals.count(inst.a)) {
+                if (reg_string_literals.count(inst.a) ||
+                    (reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
+                    inst.type_a == LIR::Type::Ptr) {
                     ir::Value* str_val = load_reg(inst.a, LIR::Type::Ptr);
                     ir::Value* int_val = FyraBuiltinFunctions::emit_str_to_int_inline(current_module_.get(), builder_.get(), str_val);
                     store_reg(inst.dst, int_val, inst.result_type);
@@ -1433,8 +1443,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::DecRescale: {
                 int src_scale = decimal_scale_for_reg(inst.a);
                 int dst_scale = decimal_scale_for_reg(inst.dst);
-                if (dst_scale > 0 && src_scale < 0) src_scale = (dst_scale == 6) ? 4 : 2;
-                if (src_scale > 0 && dst_scale < 0) dst_scale = (src_scale == 2) ? 4 : 6;
+                if (src_scale <= 0) {
+                    auto it = lir_func.register_language_types.find(inst.a);
+                    if (it != lir_func.register_language_types.end() && it->second) src_scale = it->second->getDecimalScale();
+                }
+                if (dst_scale <= 0) {
+                    auto it = lir_func.register_language_types.find(inst.dst);
+                    if (it != lir_func.register_language_types.end() && it->second) dst_scale = it->second->getDecimalScale();
+                }
+                if (dst_scale > 0 && src_scale <= 0) src_scale = (dst_scale == 6) ? 4 : 2;
+                if (src_scale > 0 && dst_scale <= 0) dst_scale = (src_scale == 2) ? 4 : 6;
+                if (src_scale <= 0) src_scale = 2;
+                if (dst_scale <= 0) dst_scale = 4;
 
                 ir::Value* value = load_reg(inst.a, inst.type_a);
                 if (src_scale > 0 && dst_scale > 0 && src_scale != dst_scale) {
