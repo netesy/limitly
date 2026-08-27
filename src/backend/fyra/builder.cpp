@@ -1051,10 +1051,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                     builder_->setInsertPoint(b_match);
                     std::vector<ir::Value*> call_args_matching;
-                    for (size_t k = 0; k < target_f->getParameters().size(); ++k) {
-                        if (k < args.size()) call_args_matching.push_back(args[k]);
-                        else if (k == args.size()) call_args_matching.push_back(callee);
-                        else call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
+                    size_t target_param_cnt = target_f->getParameters().size();
+                    if (target_param_cnt == args.size() + 1) {
+                        for (size_t k = 0; k < args.size(); ++k) call_args_matching.push_back(args[k]);
+                        call_args_matching.push_back(callee);
+                    } else if (target_param_cnt == args.size()) {
+                        for (size_t k = 0; k < args.size(); ++k) call_args_matching.push_back(args[k]);
+                    } else {
+                        for (size_t k = 0; k < target_param_cnt; ++k) {
+                            if (k < args.size()) call_args_matching.push_back(args[k]);
+                            else if (k == args.size()) call_args_matching.push_back(callee);
+                            else call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
+                        }
                     }
                     ir::Value* call_res = builder_->createCall(target_f, call_args_matching);
                     builder_->createStore(call_res, res_slot);

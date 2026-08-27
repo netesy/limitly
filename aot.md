@@ -23,7 +23,7 @@ The test suite evaluates the correctness of compiled AOT native executables agai
 ## 2. Root Cause & Exact Fix Details
 
 ### Root Cause Analysis
-Floating point operations failed due to five distinct root causes across the Fyra backend, x64 machine code generation, LIR lowering, and runtime print safeguards:
+Floating point operations failed due to six distinct root causes across the Fyra backend, x64 machine code generation, LIR lowering, and PE section alignment:
 
 1. **Missing In-Memory Machine Code Emission for Floating Point Instructions (`vendor/fyra/src/target/architecture/x64/X64Architecture.cpp`)**:
    - `emitFAdd`, `emitFSub`, `emitFMul`, `emitFDiv`, `emitCmp` (for `isFloatCmp`), and `emitCast` (for `Sltof`) in `X64Architecture.cpp` only had code paths for text assembly stream output (`if (auto* os = cg.getTextStream())`).
@@ -44,6 +44,9 @@ Floating point operations failed due to five distinct root causes across the Fyr
 5. **Pure Fyra IR Float-to-String Formatting (`src/backend/fyra/fyra_builtin_functions.cpp`)**:
    - Replaced unresolved external C library symbol `lm_float_to_str` with a pure Fyra IR routine that performs IEEE-754 64-bit double bitfield decomposition (sign, exponent, mantissa), %g-style 6-significant-digit conversion, and NaN/Inf detection.
 
+6. **PE Section Alignment (`vendor/fyra/src/target/artifact/executable/pe.cpp`)**:
+   - Fixed PE section header `virtualSize` calculation to guarantee alignment with `fileAlignment_` and ensure `virtualSize >= rawDataSize` for PE executable generation.
+
 ---
 
 ## 3. Affected Files
@@ -51,6 +54,7 @@ Floating point operations failed due to five distinct root causes across the Fyr
 - `vendor/fyra/src/target/architecture/x64/X64Architecture.cpp`
 - `vendor/fyra/include/target/artifact/executable/elf.hh`
 - `vendor/fyra/src/target/artifact/executable/elf.cpp`
+- `vendor/fyra/src/target/artifact/executable/pe.cpp`
 - `src/backend/fyra/builder.cpp`
 - `src/backend/fyra/fyra_builtin_functions.cpp`
 - `fyra.patch`
