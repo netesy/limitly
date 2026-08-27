@@ -229,3 +229,38 @@ index a92351a..0fe0527 100644
 +void ElfGenerator::setStrip(bool strip) { pImpl->setStrip(strip); }
  std::string ElfGenerator::getLastError() const { return pImpl->getLastError(); }
 \ No newline at end of file
+diff --git a/src/target/artifact/executable/pe.cpp b/src/target/artifact/executable/pe.cpp
+index e890ea1..4685cdf 100644
+--- a/src/target/artifact/executable/pe.cpp
++++ b/src/target/artifact/executable/pe.cpp
+@@ -139,7 +139,8 @@ public:
+             }
+             if (entry.second.empty()) continue;
+             Section s; s.name = entry.first; s.data = entry.second; s.virtualAddress = currentRva;
+-            s.virtualSize = s.data.size(); s.rawDataSize = align(s.data.size(), fileAlignment_);
++            s.rawDataSize = align(s.data.size(), fileAlignment_);
++            s.virtualSize = std::max((uint32_t)s.data.size(), s.rawDataSize);
+             if (s.name == ".text" || s.name == "CODE") s.characteristics = 0x60000020;
+             else if (s.name == ".data" || s.name == "DATA") s.characteristics = 0xC0000040;
+             else s.characteristics = 0x40000040;
+@@ -162,7 +163,8 @@ public:
+             Section idata; idata.name = ".idata"; idata.characteristics = 0xC0000040;
+             idata.virtualAddress = currentRva; importDirectoryRVA_ = idata.virtualAddress;
+             idata.data = generateImportSection(idata.virtualAddress);
+-            idata.virtualSize = idata.data.size(); idata.rawDataSize = align(idata.virtualSize, fileAlignment_);
++            idata.rawDataSize = align(idata.data.size(), fileAlignment_);
++            idata.virtualSize = std::max((uint32_t)idata.data.size(), idata.rawDataSize);
+             sections_.push_back(idata);
+             currentRva = align(currentRva + idata.virtualSize, sectionAlignment_);
+         }
+@@ -183,8 +185,8 @@ public:
+                     importedSymbols_.push_back(s);
+                 }
+             }
+-            textSec->virtualSize = textSec->data.size();
+-            textSec->rawDataSize = align(textSec->virtualSize, fileAlignment_);
++            textSec->rawDataSize = align(textSec->data.size(), fileAlignment_);
++            textSec->virtualSize = std::max((uint32_t)textSec->data.size(), textSec->rawDataSize);
+         }
+
+         // 5. Relocations
