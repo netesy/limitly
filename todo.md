@@ -1,68 +1,271 @@
-# Fyra Heap Allocation & Overflow Investigation Report
+# Limit Programming Language - TODO and Implementation Status
 
-## 1. Root Cause
-The Category 1 / Group A runtime failures (SIGSEGV -11 crashes) occurred because Fyra's AOT backend allocated heap memory using a fixed-capacity static BSS memory section (`__fyra_heap`). `emitAlloc` generated bump-allocation machine code (`heap_ptr += alignedSize`) without checking whether `heap_ptr` exceeded the allocated `__fyra_heap` buffer boundary. When non-trivial programs or stdlib modules executed extensive object/string allocations, `heap_ptr` overflowed past `__fyra_heap` into unmapped memory addresses, causing immediate SIGSEGV segmentation faults.
+## 🎯 Current Development Phase: **Backend Development (Phase 2)**
 
-## 2. Heap Architecture
-Fyra manages AOT heap memory via a static pointer symbol `heap_ptr` and a static backing storage array `__fyra_heap` in the `.bss` section.
-- **Allocation mechanism**: `ir::Instruction::Alloc` generates inline assembly in `X64Architecture::emitAlloc` that reads `heap_ptr(%rip)`, stores the current pointer to a stack slot as the allocated address, adds `alignedSize` to `heap_ptr`, and stores the updated address back to `heap_ptr(%rip)`.
-- **Growth & bounds**: Originally, no boundary check existed. `heap_ptr` grew monotonically in 8-byte aligned increments.
-- **Runtime calls**: High-level runtime functions (`lm_str_alloc`, `lm_dict_new`, `lm_list_new`, `lm_tuple_new`) allocate memory blocks via Fyra's `alloc` IR instruction or native `memory.alloc` extern calls.
+### ✅ **COMPLETED FEATURES**
 
-## 3. 1 MB → 64 MB Change
-- **What it controls**: The `.zero` directive size for `__fyra_heap` in `.bss` inside `CodeGen::emitDataSection()` and `LinuxOS::emitHeader()`.
-- **Effect**: Increasing 1MB to 64MB expanded the static BSS bump allocation window before overflow occurred. However, without bounds checking or dynamic expansion, any long-running or memory-heavy execution would still eventually overflow `__fyra_heap` and crash. Thus, changing the constant alone was a temporary capacity expansion rather than a complete architectural fix.
+#### Core Language Features
+- **✅ Control Flow**: if/else, while, for loops, nested structures - **FULLY WORKING**
+- **✅ Variables**: Declaration, assignment, scoping with type annotations - **FULLY WORKING**
+- **✅ Expressions**: Arithmetic, comparison, logical operations with proper precedence - **FULLY WORKING**
+- **✅ Iterators**: Range-based iteration (`iter (i in 1..10)`) with full nesting support - **FULLY WORKING**
+- **✅ String Features**: String interpolation with all patterns (`"text {expr} more"`) - **FULLY WORKING**
+- **✅ Print Statements**: Clean output without side effects - **FULLY WORKING**
+- **✅ Memory Management**: Region-based allocation with memory safety analysis - **FULLY WORKING**
+- **✅ Functions**: Complete function system with advanced features - **FULLY WORKING**
 
-## 4. Correct Fix
-The minimal, robust architectural fix for Fyra's AOT backend consists of two complementary components:
-1. **Capacity Expansion & Bounds Marker**: Define `heap_end` in `.data` pointing to the boundary of the primary static bump arena (`__fyra_heap + 67108864`).
-2. **Bounds Checking & Dynamic mmap Fallback**: In `X64Architecture::emitAlloc`, compare `heap_ptr + alignedSize` against `heap_end(%rip)`. If the allocation fits within `heap_end`, proceed with fast-path bump allocation. If `heap_ptr` exceeds `heap_end`, branch to a slow path that executes an OS `mmap` syscall (`sys_mmap = 9`) to dynamically allocate a new 64 MB anonymous memory segment (`PROT_READ | PROT_WRITE`, `MAP_PRIVATE | MAP_ANONYMOUS`), update `heap_ptr` to point into the newly mapped segment, and update `heap_end` to point to the end of the new segment.
+#### Advanced Function System ✅ **FULLY COMPLETE**
+- **✅ Function Declarations**: `fn name(params): returnType { ... }` - **COMPLETE**
+- **✅ Function Calls**: All call patterns working perfectly - **COMPLETE**
+- **✅ Optional Parameters**: `name: str?` with proper null handling - **COMPLETE**
+- **✅ Default Parameters**: `name: str = "World"` with runtime defaults - **COMPLETE**
+- **✅ Multiple Optional Parameters**: Mixed required/optional parameters - **COMPLETE**
+- **✅ Variable Argument Counts**: Functions accept 1-N arguments - **COMPLETE**
+- **✅ Nested Function Calls**: `double(addOne(5))` patterns - **COMPLETE**
+- **✅ Complex Signatures**: Functions with multiple types and defaults - **COMPLETE**
+- **✅ Type Safety**: Full type checking for all function features - **COMPLETE**
+- **✅ Memory Safety**: All function calls pass memory safety analysis - **COMPLETE**
+- **✅ Boolean Context**: Optional types work in `if (optional)` conditions - **COMPLETE**
+- **✅ Type Compatibility**: `String` → `String?` conversions working - **COMPLETE**
+- **✅ Function Variable Declaration**: Functions properly declared as callable variables - **COMPLETE**
 
-## 5. Implementation
-- **Files Modified in `vendor/fyra`**:
-  - `vendor/fyra/src/target/os/linux/LinuxOS.cpp`: Added `heap_end` symbol pointing to `__fyra_heap + 67108864`.
-  - `vendor/fyra/src/target/architecture/x64/X64Architecture.cpp`: Implemented bounds check (`cmpq heap_end(%rip), %rbx`, `ja .L_alloc_slow`) and dynamic `sys_mmap` allocation fallback in `X64Architecture::emitAlloc`.
-  - `vendor/fyra/src/codegen/CodeGen.cpp`: Updated `__fyra_heap` BSS reservation in data section emission.
-- **Exported Patch**: Saved all changes to `fyra.patch` via `cd vendor/fyra && git diff > ../../fyra.patch`.
+#### Unified Error/Optional Type System ✅ **FULLY COMPLETE**
+- **✅ Optional Types**: `str?`, `int?` with ErrorUnion backend - **COMPLETE**
+- **✅ Type Compatibility**: Automatic conversion from `T` to `T?` - **COMPLETE**
+- **✅ Boolean Context**: Optional types usable in `if` conditions - **COMPLETE**
+- **✅ Function Parameters**: Optional parameters fully working - **COMPLETE**
+- **✅ Type Checking**: Compile-time validation of optional types - **COMPLETE**
+- **✅ VM Support**: Runtime handling of optional values - **COMPLETE**
 
-## 6. Regression Results
+#### Type System ✅ **FULLY COMPLETE**
+- **✅ Basic Types**: `int`, `uint`, `str`, `bool`, `float`, `nil` - **FULLY WORKING**
+- **✅ Type Aliases**: `type UserId = int` - **FULLY WORKING**
+- **✅ Union Types**: `type NumberOrString = int | str` - **FULLY WORKING**
+- **✅ Option Types**: `type MaybeInt = int | nil` - **FULLY WORKING**
+- **✅ Optional Types**: `str?`, `int?` with ErrorUnion implementation - **FULLY WORKING**
+- **✅ Type Inference**: Automatic type inference from literals and expressions - **FULLY WORKING**
+- **✅ Type Compatibility**: Strict type checking with automatic conversions - **FULLY WORKING**
+- **✅ Boolean Context**: Optional and union types in conditional expressions - **FULLY WORKING**
+- **✅ Error Union Types**: Backend support for fallible types (`T?`) - **FULLY WORKING**
 
-```text
-Group A before: 22 failures (SIGSEGV -11)
-Group A after:  0 failures (all SIGSEGV crashes resolved)
+#### Memory Safety
+- **✅ Linear Types**: Single ownership with move semantics - **FULLY WORKING**
+- **✅ Memory Regions**: Hierarchical memory management - **FULLY WORKING**
+- **✅ Lifetime Analysis**: Compile-time tracking of variable lifetimes - **FULLY WORKING**
+- **✅ Error Detection**: Use-after-move, double-move, uninitialized use - **FULLY WORKING**
+- **✅ Reference Tracking**: Generation-based reference validation - **FULLY WORKING**
 
-Positive suite: 30 PASS
-Negative suite: All expected failure cases handled
-Fyra/vendor tests: All vendor unit tests build & pass cleanly
+#### Module System (Parser and AST Only)
+- **✅ Import/Export Parsing**: `import module as alias` syntax - **PARSER COMPLETE**
+- **✅ Module Filtering Parsing**: `show`, `hide` filters syntax - **PARSER COMPLETE**
+- **✅ AST Support**: Full AST representation for modules - **AST COMPLETE**
+- **❌ VM Implementation**: Module loading and caching - **MISSING**
+- **❌ Runtime Module System**: Module resolution and execution - **MISSING**
 
-New failures: 0
+### 🔄 **PARTIALLY IMPLEMENTED FEATURES**
+
+#### Classes (Basic Syntax, Partial VM)
+- **✅ Parsing**: Class declarations, methods, fields - **COMPLETE**
+- **✅ AST Support**: Full AST representation - **COMPLETE**
+- **🔄 Type Checking**: Basic class type checking - **PARTIAL**
+- **🔄 VM Implementation**: Basic class support - **PARTIAL**
+- **❌ Inheritance**: Class inheritance system - **MISSING**
+- **❌ Method Dispatch**: Virtual method calls - **MISSING**
+
+#### Error Handling ✅ **FULLY COMPLETE - MAJOR MILESTONE!** 🎉
+- **✅ Parsing**: `?` operator, error types, `?else{}` blocks - **COMPLETE**
+- **✅ Type Checking**: Compile-time error type validation - **COMPLETE**
+- **✅ Optional Types**: `T?` syntax and type compatibility - **COMPLETE**
+- **✅ Boolean Context**: Optional types in `if` conditions - **COMPLETE**
+- **✅ VM Support**: Primitive-based error handling with error IDs - **COMPLETE**
+- **✅ Auto-wrapping**: Return values automatically wrapped in `ok()` - **COMPLETE**
+- **✅ `? else {}` Blocks**: Error handling blocks execute correctly - **COMPLETE**
+- **✅ `?` Operator Runtime**: Error propagation works perfectly at runtime - **COMPLETE**
+- **✅ Error Values**: `err()` creates unique error IDs with proper error information - **COMPLETE**
+- **✅ Error Propagation**: Chained operations with `?` propagate errors correctly - **COMPLETE**
+- **✅ Error Display**: Rich error messages with type and context information - **COMPLETE**
+- **✅ Primitive Backend**: Compatible with register VM and JIT using int64_t error IDs - **COMPLETE**
+
+#### Concurrency ✅ **CHANNEL-BASED WORKERS COMPLETE!** 🎉
+- **✅ Parsing**: `parallel`/`concurrent` blocks - **COMPLETE**
+- **✅ AST Support**: Concurrency AST nodes - **COMPLETE**
+- **✅ Task-Based Concurrency**: `task(i in range)` execution - **FULLY WORKING**
+- **✅ Channel Operations**: Creation, polling, closing - **FULLY WORKING**
+- **✅ Worker Iteration**: `worker(item from channel)` - **FULLY WORKING**
+- **✅ Scheduler Loop**: Proper fiber lifecycle management - **FULLY WORKING**
+- **✅ Channel Polling**: Non-blocking data extraction - **FULLY WORKING**
+- **✅ Seeded Channels**: Pre-populated channel iteration - **FULLY WORKING**
+- **✅ Multiple Concurrent Blocks**: Sequential execution support - **FULLY WORKING**
+- **✅ Comprehensive Tests**: All concurrency patterns tested - **FULLY WORKING**
+- **❌ Parallel Blocks**: `parallel` block execution - **NOT STARTED**
+- **❌ Thread Pool**: Advanced scheduling - **NOT STARTED**
+- **❌ Atomic Operations**: Shared state synchronization - **NOT STARTED**
+
+#### **Structural Types (Parsing Complete, Type System Missing)**
+- **✅ Parsing**: `{ field: type, field: type }` syntax - **COMPLETE**
+- **✅ AST Support**: `StructuralTypeField`, `isStructural` flag - **COMPLETE**
+- **✅ Type Checker Detection**: Recognizes structural types - **COMPLETE**
+- **❌ Type System Backend**: `createStructuralType()` method - **MISSING**
+- **❌ Structural Literals**: `{ field: value }` instantiation - **MISSING**
+- **❌ Field Access**: `obj.field` operations - **MISSING**
+- **❌ Type Compatibility**: Structural type matching - **MISSING**
+
+**Structural Types Status:**
+```limit
+// ✅ This parses correctly:
+type Person = { name: str, age: int };
+
+// ❌ This is not yet supported:
+var person: Person = { name: "Alice", age: 30 };
+var name = person.name;
 ```
 
-## 7. Reclassified Category 1 Test Suite Results (`tests/build_tests.py`)
+### ❌ **MISSING FEATURES**
 
-### Group A: Bump-Allocation Heap Overflow (Fixed via Bounds Check & Dynamic `mmap` Fallback in `fyra.patch`)
-1. [x] `tests/basic/variables.lm` - PASS
-2. [x] `tests/basic/literals.lm` - PASS
-3. [x] `tests/expressions/arithmetic.lm` - PASS
-4. [x] `tests/expressions/large_literals.lm` - PASS
-5. [x] `tests/strings/interpolation.lm` - PASS
-6. [x] `tests/loops/match.lm` - PASS
-7. [x] `tests/loops/match_advanced.lm` - PASS
-8. [x] `tests/functions/closures.lm` - PASS
-9. [x] `tests/functions/first_class.lm` - PASS
-10. [x] `tests/types/basic.lm` - PASS
-11. [x] `tests/types/unions.lm` - PASS
-12. [x] `tests/types/advanced.lm` - PASS
-13. [x] `tests/types/refined_types.lm` - PASS
-14. [x] `tests/concurrency/parallel_blocks.lm` - PASS
-15. [x] `tests/concurrency/concurrent_blocks.lm` - PASS
-16. [x] `tests/stdlib/time_module_test.lm` - PASS
-17. [x] `tests/stdlib/random_module_test.lm` - PASS
-18. [x] `tests/stdlib/parse_module_test.lm` - PASS
-19. [x] `tests/stdlib/format_module_test.lm` - PASS
-20. [x] `tests/stdlib/semver_test.lm` - PASS
-21. [x] `tests/stdlib/net/net_test.lm` - PASS
-22. [x] `tests/stdlib/collections/queue_stack_bitset_test.lm` - PASS
+#### First-Class Functions (Next Major Feature)
+- **❌ Function Types**: `fn(int, int): int` type annotations - **NOT STARTED**
+- **❌ Function Variables**: `var addFunc = add` - **NOT STARTED**
+- **❌ Function Parameters**: `operation: fn(int, int): int` - **NOT STARTED**
+- **❌ Lambda Expressions**: `fn(x: int): int { return x + 1; }` - **NOT STARTED**
+- **❌ Function Returns**: Functions returning functions - **NOT STARTED**
+- **❌ Closures**: Capturing environment variables - **NOT STARTED**
+- **❌ Higher-Order Functions**: Functions operating on functions - **NOT STARTED**
+- **❌ Function Composition**: `compose(f, g)` patterns - **NOT STARTED**
 
-### Group B: AOT Iterator Module Test
-23. [ ] `tests/stdlib/iterator_module_test.lm` - Timeout (>30s) / AOT method dispatch loop.
+#### Advanced Type Features
+- **❌ Type Constraints**: `type List<T> = ...` - **NOT STARTED**
+- **❌ Constraints**: `type PositiveInt = int where value > 0;` - **NOT STARTED**
+- **❌ Structural Subtyping**: Duck typing support - **NOT STARTED**
+- **❌ Intersection Types**: `HasName and HasAge` - **NOT STARTED**
+
+#### Pattern Matching
+- **❌ Match Expressions**: `match value { ... }` - **NOT STARTED**
+- **❌ Pattern Guards**: `case x if x > 0` - **NOT STARTED**
+- **❌ Destructuring**: `case { name, age }` - **NOT STARTED**
+
+#### Advanced Functions
+- **❌ First-Class Functions**: Functions as values (see detailed section above) - **NOT STARTED**
+
+#### Async/Await
+- **❌ Async Functions**: `async fn` declarations - **NOT STARTED**
+- **❌ Await Expressions**: `await asyncCall()` - **NOT STARTED**
+- **❌ Future Types**: Promise-based concurrency - **NOT STARTED**
+
+#### Standard Library
+- **❌ Collections**: List, Dict, Set implementations - **NOT STARTED**
+- **❌ I/O Operations**: File, network operations - **NOT STARTED**
+- **❌ String Utilities**: Advanced string manipulation - **NOT STARTED**
+
+#### Tooling
+- **❌ IDE Integration**: Language server protocol - **NOT STARTED**
+- **❌ Debugger**: Step-through debugging - **NOT STARTED**
+- **❌ Package Manager**: Dependency management - **NOT STARTED**
+
+### 🚀 **NEXT PRIORITIES**
+
+### Immediate (Phase 2 Completion)
+1. **✅ Enhanced Error Handling**: Custom error types and messages - **COMPLETE!** 🎉
+   - ✅ Custom error types: `err("ValidationError", "Invalid input")` - **WORKING**
+   - ✅ Custom error messages: `err("Field cannot be empty")` - **WORKING**
+   - ✅ Integration with existing error handling infrastructure - **WORKING**
+   - ✅ Primitive-based backend compatibility - **WORKING**
+   - ✅ Rich error display with type and message information - **WORKING**
+2. **✅ Channel-Based Concurrency**: Complete worker iteration - **COMPLETE!** 🎉
+   - ✅ Task-based concurrent execution - **WORKING**
+   - ✅ Channel-based worker iteration - **WORKING**
+   - ✅ Seeded channel support - **WORKING**
+   - ✅ Comprehensive test coverage - **WORKING**
+3. **Parallel Blocks**: Implement `parallel` block execution
+4. **Complete Structural Types**: Implement type system backend for `{ field: type }` syntax
+5. **Complete Classes**: Inheritance and method dispatch
+
+### Short Term (Phase 3)
+1. **First-Class Functions**: Complete function-as-values system
+2. **Pattern Matching**: Implement match expressions
+3. **Type Constraints**: Basic Type Constraints type support
+4. **Standard Library**: Core collections and utilities
+
+### Long Term (Phase 4+)
+1. **Async/Await**: Asynchronous programming support
+2. **Advanced Type Constraints**: Constraints and advanced features
+3. **Tooling**: IDE integration and debugging
+4. **Optimization**: JIT compilation and performance
+
+## 📊 **IMPLEMENTATION QUALITY METRICS**
+
+### Excellent (Production Ready)
+- **✅ Advanced Function System**: Complete optional/default parameter support
+- **✅ Unified Type System**: ErrorUnion types, optional types, type compatibility
+- **✅ Type System Core**: Union types, type aliases, basic types
+- **✅ Memory Safety**: Linear types, lifetime analysis
+- **✅ Control Flow**: All control structures working perfectly
+- **✅ Enhanced Error Handling**: Complete custom error types and messages
+
+### Good (Mostly Working)
+- **String Features**: Interpolation and operations
+- **Variable System**: Declaration and scoping
+- **Error Detection**: Comprehensive error reporting
+
+### Needs Work (Partially Implemented)
+- **Module System**: Parser and AST complete, VM implementation needed
+- **Classes**: Basic support, needs inheritance
+- **Structural Types**: Parsing done, type system needed
+
+### Not Started (Future Work)
+- **Type constriants**: Complete type system extension needed
+- **Pattern Matching**: New language feature
+- **Async/Await**: Runtime and syntax support needed
+
+## 🎯 **SUCCESS METRICS**
+
+### Phase 2 Goals (Current)
+- [x] ~~Fix function system VM implementation~~ **COMPLETED ✅**
+- [x] ~~Implement optional/fallible type system~~ **COMPLETED ✅**
+- [x] ~~Fix type compatibility for ErrorUnion types~~ **COMPLETED ✅**
+- [x] ~~Enable optional types in boolean contexts~~ **COMPLETED ✅**
+- [ ] Complete error handling VM implementation (`?` operator, `err()`, error propagation)
+- [ ] Complete structural type support
+- [ ] Add basic class inheritance
+- [ ] Begin first-class function implementation
+
+### Phase 3 Goals (Next)
+- [ ] Complete first-class function system
+- [ ] Pattern matching implementation
+- [ ] Type Constraints
+- [ ] Standard library foundation
+
+## 📝 **NOTES**
+
+### Recent Achievements
+- **✅ Channel-Based Concurrency**: Complete worker iteration with channels! **MAJOR MILESTONE** 🎉
+  - ✅ Task-based concurrent execution with proper synchronization
+  - ✅ Channel-based worker iteration with non-blocking polling
+  - ✅ Seeded channel support for pre-populated data
+  - ✅ Scheduler loop with proper fiber lifecycle management
+  - ✅ Comprehensive test coverage with all patterns working
+- **✅ Enhanced Error Handling System**: Complete custom error types and messages! **MAJOR MILESTONE** 🎉
+- **✅ `? else {}` Error Handling**: Complete implementation of error handling blocks! **MAJOR MILESTONE** 🎉
+- **✅ Advanced Function System**: Complete implementation with optional/default parameters **FULLY WORKING**
+- **✅ Unified Error/Optional Type System**: Complete `T?` type support with ErrorUnion backend **FULLY WORKING**
+- **✅ Type Compatibility Fixes**: Fixed argument order in type compatibility checking **CRITICAL FIX**
+- **✅ Function Variable Declaration**: Functions properly declared as callable variables **CRITICAL FIX**
+- **✅ Boolean Context Support**: Optional types work in `if (optional)` conditions **NEW FEATURE**
+- **✅ Union Types**: Fully implemented with comprehensive testing **FULLY WORKING**
+- **✅ Memory Safety**: Advanced linear type system working **FULLY WORKING**
+- **✅ Type Checking**: Robust type system with excellent error detection **FULLY WORKING**
+- **✅ Module System**: Complete import/export functionality **FULLY WORKING**
+- **✅ Function Parameter Handling**: Optional parameters, default values, variable argument counts **FULLY WORKING**
+- **✅ Mixed-Type Comparisons**: Enhanced comparison operators for optional types **FULLY WORKING**
+- **✅ CFG Validation**: Fixed control flow graph validation for complex error handling patterns **CRITICAL FIX**
+
+### Key Architectural Decisions
+- **Separation of Concerns**: Clean separation between parsing, type checking, and VM
+- **Memory Safety First**: Compile-time memory safety without runtime overhead
+- **Type Safety**: Strong static typing with inference
+- **Incremental Development**: Each feature fully tested before moving to next
+
+### Development Philosophy
+- **Quality Over Speed**: Each feature is thoroughly tested and documented
+- **Test-Driven**: Comprehensive test suites for all features
+- **Clean Architecture**: Well-separated components with clear interfaces
+- **Memory Safety**: Zero-cost abstractions with compile-time guarantees
