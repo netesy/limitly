@@ -1549,6 +1549,14 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         ir::BasicBlock* b_ret_true = builder->createBasicBlock("ret_true", fn_eq);
         ir::BasicBlock* b_ret_false = builder->createBasicBlock("ret_false", fn_eq);
 
+        ir::BasicBlock* b_chk_enum = builder->createBasicBlock("chk_enum", fn_eq);
+        ir::BasicBlock* b_enum_cmp = builder->createBasicBlock("enum_cmp", fn_eq);
+        ir::BasicBlock* b_pay_cmp = builder->createBasicBlock("pay_cmp", fn_eq);
+        ir::BasicBlock* b_str_prep = builder->createBasicBlock("str_prep", fn_eq);
+        ir::BasicBlock* b_str_cmp_bytes = builder->createBasicBlock("str_cmp_bytes", fn_eq);
+        ir::BasicBlock* b_sloop = builder->createBasicBlock("str_loop", fn_eq);
+        ir::BasicBlock* b_sbody = builder->createBasicBlock("str_body", fn_eq);
+
         builder->setInsertPoint(b_entry);
         auto it = fn_eq->getParameters().begin();
         ir::Value* k1 = it->get(); it++;
@@ -1561,103 +1569,142 @@ void FyraBuiltinFunctions::emit_dict_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* k1_ge = builder->createCuge(k1, ctx->getConstantInt(i64, 65536));
         ir::Value* k2_ge = builder->createCuge(k2, ctx->getConstantInt(i64, 65536));
         ir::Value* both_ptr = builder->createAnd(k1_ge, k2_ge);
-
-        ir::BasicBlock* b_chk_enum = builder->createBasicBlock("chk_enum", fn_eq);
         builder->createBr(both_ptr, b_chk_enum, b_ret_false);
 
         builder->setInsertPoint(b_chk_enum);
         ir::Value* t1_raw = builder->createLoad(k1);
         ir::Value* t2_raw = builder->createLoad(k2);
-        ir::Value* type1  = builder->createAnd(t1_raw, ctx->getConstantInt(i64, 0xFFFFFFFF));
-        ir::Value* type2  = builder->createAnd(t2_raw, ctx->getConstantInt(i64, 0xFFFFFFFF));
-
-        ir::Value* is_str1 = builder->createCeq(type1, ctx->getConstantInt(i64, 11));
-        ir::Value* is_str2 = builder->createCeq(type2, ctx->getConstantInt(i64, 11));
-        ir::Value* both_str = builder->createAnd(is_str1, is_str2);
-
-        ir::BasicBlock* b_str_cmp = builder->createBasicBlock("str_hdr_cmp", fn_eq);
-        ir::BasicBlock* b_enum_chk = builder->createBasicBlock("enum_chk", fn_eq);
-        builder->createBr(both_str, b_str_cmp, b_enum_chk);
-
-        // String Header Comparison
-        builder->setInsertPoint(b_str_cmp);
-        ir::Value* slen1 = builder->createLoad(builder->createAdd(k1, ctx->getConstantInt(i64, 8)));
-        ir::Value* slen2 = builder->createLoad(builder->createAdd(k2, ctx->getConstantInt(i64, 8)));
-        ir::Value* lens_eq = builder->createCeq(slen1, slen2);
-        
-        ir::BasicBlock* b_str_bytes = builder->createBasicBlock("str_hdr_bytes", fn_eq);
-        builder->createBr(lens_eq, b_str_bytes, b_ret_false);
-
-        builder->setInsertPoint(b_str_bytes);
-        ir::Instruction* sidx_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
-        builder->createStore(ctx->getConstantInt(i64, 0), sidx_slot);
-        
-        ir::BasicBlock* b_sloop = builder->createBasicBlock("str_hdr_loop", fn_eq);
-        ir::BasicBlock* b_sbody = builder->createBasicBlock("str_hdr_body", fn_eq);
-        builder->createJmp(b_sloop);
-
-        builder->setInsertPoint(b_sloop);
-        ir::Value* si = builder->createLoad(sidx_slot);
-        ir::Value* sdone = builder->createCsge(si, slen1);
-        builder->createBr(sdone, b_ret_true, b_sbody);
-
-        builder->setInsertPoint(b_sbody);
-        ir::Value* sc1 = builder->createLoadub(builder->createAdd(builder->createAdd(k1, ctx->getConstantInt(i64, 24)), si));
-        ir::Value* sc2 = builder->createLoadub(builder->createAdd(builder->createAdd(k2, ctx->getConstantInt(i64, 24)), si));
-        ir::Value* sdiff = builder->createCne(sc1, sc2);
-        builder->createStore(builder->createAdd(si, ctx->getConstantInt(i64, 1)), sidx_slot);
-        builder->createBr(sdiff, b_ret_false, b_sloop);
-
-        // Enum / Fallback comparison
-        builder->setInsertPoint(b_enum_chk);
         ir::Value* is_enum1 = builder->createCeq(t1_raw, ctx->getConstantInt(i64, 0x454E554D));
         ir::Value* is_enum2 = builder->createCeq(t2_raw, ctx->getConstantInt(i64, 0x454E554D));
-        ir::Value* both_enum = builder->createAnd(is_enum1, is_enum2);
         ir::Value* either_enum = builder->createOr(is_enum1, is_enum2);
 
-        ir::BasicBlock* b_enum_only = builder->createBasicBlock("enum_only", fn_eq);
-        builder->createBr(either_enum, b_enum_only, b_loop_init);
+        builder->createBr(either_enum, b_enum_cmp, b_str_prep);
 
-        builder->setInsertPoint(b_enum_only);
-        ir::BasicBlock* b_enum_cmp = builder->createBasicBlock("enum_cmp", fn_eq);
-        builder->createBr(both_enum, b_enum_cmp, b_ret_false);
-
+        // Enum branch
         builder->setInsertPoint(b_enum_cmp);
+        ir::Value* both_enum = builder->createAnd(is_enum1, is_enum2);
+        ir::BasicBlock* b_enum_match = builder->createBasicBlock("enum_match", fn_eq);
+        builder->createBr(both_enum, b_enum_match, b_ret_false);
+
+        builder->setInsertPoint(b_enum_match);
         ir::Value* tag1 = builder->createLoad(builder->createAdd(k1, ctx->getConstantInt(i64, 8)));
         ir::Value* tag2 = builder->createLoad(builder->createAdd(k2, ctx->getConstantInt(i64, 8)));
         ir::Value* tags_eq = builder->createCeq(tag1, tag2);
-
-        ir::BasicBlock* b_pay_cmp = builder->createBasicBlock("pay_cmp", fn_eq);
         builder->createBr(tags_eq, b_pay_cmp, b_ret_false);
 
         builder->setInsertPoint(b_pay_cmp);
         ir::Value* pay1 = builder->createLoad(builder->createAdd(k1, ctx->getConstantInt(i64, 16)));
         ir::Value* pay2 = builder->createLoad(builder->createAdd(k2, ctx->getConstantInt(i64, 16)));
         ir::Value* pays_eq = builder->createCeq(pay1, pay2);
-        builder->createRet(pays_eq);
+        builder->createBr(pays_eq, b_ret_true, b_ret_false);
 
-        builder->setInsertPoint(b_loop_init);
-        ir::Instruction* idx_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
-        builder->createStore(ctx->getConstantInt(i64, 0), idx_slot);
-        builder->createJmp(b_loop_cond);
+        // String preparation branch (handles LmStringHeader type_id == 11 and raw C-strings)
+        builder->setInsertPoint(b_str_prep);
+        ir::Value* type1 = builder->createAnd(t1_raw, ctx->getConstantInt(i64, 0xFFFFFFFF));
+        ir::Value* type2 = builder->createAnd(t2_raw, ctx->getConstantInt(i64, 0xFFFFFFFF));
+        ir::Value* is_hdr1 = builder->createCeq(type1, ctx->getConstantInt(i64, 11));
+        ir::Value* is_hdr2 = builder->createCeq(type2, ctx->getConstantInt(i64, 11));
 
-        builder->setInsertPoint(b_loop_cond);
-        ir::Value* idx = builder->createLoad(idx_slot);
-        ir::Value* p1 = builder->createAdd(k1, idx);
-        ir::Value* p2 = builder->createAdd(k2, idx);
-        ir::Value* c1 = builder->createLoadub(p1);
-        ir::Value* c2 = builder->createLoadub(p2);
-        ir::Value* chars_diff = builder->createCne(c1, c2);
-        builder->createBr(chars_diff, b_ret_false, b_check_end);
+        ir::Instruction* d1_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        ir::Instruction* l1_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        ir::Instruction* d2_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        ir::Instruction* l2_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
 
-        builder->setInsertPoint(b_check_end);
-        ir::Value* is_end = builder->createCeq(c1, ctx->getConstantInt(ctx->getIntegerType(8), 0));
-        builder->createBr(is_end, b_ret_true, b_advance);
+        ir::BasicBlock* b_h1_true = builder->createBasicBlock("h1_true", fn_eq);
+        ir::BasicBlock* b_h1_false = builder->createBasicBlock("h1_false", fn_eq);
+        ir::BasicBlock* b_h1_done = builder->createBasicBlock("h1_done", fn_eq);
 
-        builder->setInsertPoint(b_advance);
-        ir::Value* next_idx = builder->createAdd(idx, ctx->getConstantInt(i64, 1));
-        builder->createStore(next_idx, idx_slot);
-        builder->createJmp(b_loop_cond);
+        builder->createBr(is_hdr1, b_h1_true, b_h1_false);
+
+        builder->setInsertPoint(b_h1_true);
+        builder->createStore(builder->createAdd(k1, ctx->getConstantInt(i64, 24)), d1_slot);
+        builder->createStore(builder->createLoad(builder->createAdd(k1, ctx->getConstantInt(i64, 8))), l1_slot);
+        builder->createJmp(b_h1_done);
+
+        builder->setInsertPoint(b_h1_false);
+        builder->createStore(k1, d1_slot);
+        ir::Instruction* len1_acc = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        builder->createStore(ctx->getConstantInt(i64, 0), len1_acc);
+        ir::BasicBlock* b_l1_loop = builder->createBasicBlock("l1_loop", fn_eq);
+        ir::BasicBlock* b_l1_body = builder->createBasicBlock("l1_body", fn_eq);
+        ir::BasicBlock* b_l1_done = builder->createBasicBlock("l1_done", fn_eq);
+        builder->createJmp(b_l1_loop);
+
+        builder->setInsertPoint(b_l1_loop);
+        ir::Value* cur_l1 = builder->createLoad(len1_acc);
+        ir::Value* ch1 = builder->createLoadub(builder->createAdd(k1, cur_l1));
+        ir::Value* is_z1 = builder->createCeq(ch1, ctx->getConstantInt(ctx->getIntegerType(8), 0));
+        builder->createBr(is_z1, b_l1_done, b_l1_body);
+
+        builder->setInsertPoint(b_l1_body);
+        builder->createStore(builder->createAdd(cur_l1, ctx->getConstantInt(i64, 1)), len1_acc);
+        builder->createJmp(b_l1_loop);
+
+        builder->setInsertPoint(b_l1_done);
+        builder->createStore(builder->createLoad(len1_acc), l1_slot);
+        builder->createJmp(b_h1_done);
+
+        builder->setInsertPoint(b_h1_done);
+
+        ir::BasicBlock* b_h2_true = builder->createBasicBlock("h2_true", fn_eq);
+        ir::BasicBlock* b_h2_false = builder->createBasicBlock("h2_false", fn_eq);
+        ir::BasicBlock* b_h2_done = builder->createBasicBlock("h2_done", fn_eq);
+
+        builder->createBr(is_hdr2, b_h2_true, b_h2_false);
+
+        builder->setInsertPoint(b_h2_true);
+        builder->createStore(builder->createAdd(k2, ctx->getConstantInt(i64, 24)), d2_slot);
+        builder->createStore(builder->createLoad(builder->createAdd(k2, ctx->getConstantInt(i64, 8))), l2_slot);
+        builder->createJmp(b_h2_done);
+
+        builder->setInsertPoint(b_h2_false);
+        builder->createStore(k2, d2_slot);
+        ir::Instruction* len2_acc = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        builder->createStore(ctx->getConstantInt(i64, 0), len2_acc);
+        ir::BasicBlock* b_l2_loop = builder->createBasicBlock("l2_loop", fn_eq);
+        ir::BasicBlock* b_l2_body = builder->createBasicBlock("l2_body", fn_eq);
+        ir::BasicBlock* b_l2_done = builder->createBasicBlock("l2_done", fn_eq);
+        builder->createJmp(b_l2_loop);
+
+        builder->setInsertPoint(b_l2_loop);
+        ir::Value* cur_l2 = builder->createLoad(len2_acc);
+        ir::Value* ch2 = builder->createLoadub(builder->createAdd(k2, cur_l2));
+        ir::Value* is_z2 = builder->createCeq(ch2, ctx->getConstantInt(ctx->getIntegerType(8), 0));
+        builder->createBr(is_z2, b_l2_done, b_l2_body);
+
+        builder->setInsertPoint(b_l2_body);
+        builder->createStore(builder->createAdd(cur_l2, ctx->getConstantInt(i64, 1)), len2_acc);
+        builder->createJmp(b_l2_loop);
+
+        builder->setInsertPoint(b_l2_done);
+        builder->createStore(builder->createLoad(len2_acc), l2_slot);
+        builder->createJmp(b_h2_done);
+
+        builder->setInsertPoint(b_h2_done);
+
+        ir::Value* len1_val = builder->createLoad(l1_slot);
+        ir::Value* len2_val = builder->createLoad(l2_slot);
+        ir::Value* lens_eq = builder->createCeq(len1_val, len2_val);
+        builder->createBr(lens_eq, b_str_cmp_bytes, b_ret_false);
+
+        builder->setInsertPoint(b_str_cmp_bytes);
+        ir::Value* data1_val = builder->createLoad(d1_slot);
+        ir::Value* data2_val = builder->createLoad(d2_slot);
+        ir::Instruction* sidx_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
+        builder->createStore(ctx->getConstantInt(i64, 0), sidx_slot);
+        builder->createJmp(b_sloop);
+
+        builder->setInsertPoint(b_sloop);
+        ir::Value* si = builder->createLoad(sidx_slot);
+        ir::Value* sdone = builder->createCsge(si, len1_val);
+        builder->createBr(sdone, b_ret_true, b_sbody);
+
+        builder->setInsertPoint(b_sbody);
+        ir::Value* sc1 = builder->createLoadub(builder->createAdd(data1_val, si));
+        ir::Value* sc2 = builder->createLoadub(builder->createAdd(data2_val, si));
+        ir::Value* sdiff = builder->createCne(sc1, sc2);
+        builder->createStore(builder->createAdd(si, ctx->getConstantInt(i64, 1)), sidx_slot);
+        builder->createBr(sdiff, b_ret_false, b_sloop);
 
         builder->setInsertPoint(b_ret_true);
         builder->createRet(ctx->getConstantInt(i64, 1));
@@ -3480,12 +3527,16 @@ void FyraBuiltinFunctions::emit_error_new_ir(ir::Module* module, ir::IRBuilder* 
 } // namespace LM::Backend::Fyra
 
 extern "C" {
+#ifdef _WIN32
 #include <windows.h>
+#endif
 
 uint64_t lm_key_eq_ffi(uint64_t k1, uint64_t k2) {
     if (k1 == k2) return 1;
     if (k1 < 65536 || k2 < 65536) return 0;
+#ifdef _WIN32
     if (IsBadReadPtr((void*)k1, 8) || IsBadReadPtr((void*)k2, 8)) return 0;
+#endif
 
     uint32_t t1 = *(uint32_t*)k1;
     uint32_t t2 = *(uint32_t*)k2;
@@ -3493,9 +3544,10 @@ uint64_t lm_key_eq_ffi(uint64_t k1, uint64_t k2) {
         uint64_t len1 = *(uint64_t*)(k1 + 8);
         uint64_t len2 = *(uint64_t*)(k2 + 8);
         if (len1 != len2) return 0;
+#ifdef _WIN32
         if (IsBadReadPtr((void*)(k1 + 24), len1) || IsBadReadPtr((void*)(k2 + 24), len2)) return 0;
+#endif
         uint64_t res = memcmp((char*)(k1 + 24), (char*)(k2 + 24), len1) == 0 ? 1 : 0;
-        printf("lm_key_eq_ffi: k1_str='%.*s', k2_str='%.*s' -> %llu\n", (int)len1, (char*)(k1 + 24), (int)len2, (char*)(k2 + 24), (unsigned long long)res);
         return res;
     }
     if (t1 == 0x454E554D && t2 == 0x454E554D) { // Enum tag

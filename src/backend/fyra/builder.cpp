@@ -986,7 +986,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::CallIndirect: {
                 std::vector<ir::Value*> args;
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
-                ir::Value* callee = load_reg(inst.a, inst.type_a);
+                ir::Value* raw_callee = load_reg(inst.a, inst.type_a);
 
                 std::string cid = std::to_string(label_counter_++);
                 ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
@@ -997,14 +997,34 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Instruction* res_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
                 builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), res_slot);
 
-                ir::Value* is_ge_ptr = builder_->createCuge(callee, context_->getConstantInt(context_->getIntegerType(64), 65536));
-                ir::Value* high_bits = builder_->createShr(callee, context_->getConstantInt(context_->getIntegerType(64), 48));
+                ir::Value* is_ge_ptr = builder_->createCuge(raw_callee, context_->getConstantInt(context_->getIntegerType(64), 65536));
+                ir::Value* high_bits = builder_->createShr(raw_callee, context_->getConstantInt(context_->getIntegerType(64), 48));
                 ir::Value* high_zero = builder_->createCeq(high_bits, context_->getConstantInt(context_->getIntegerType(64), 0));
                 ir::Value* is_valid_ptr = builder_->createAnd(is_ge_ptr, high_zero);
 
                 builder_->createBr(is_valid_ptr, b_dispatch, b_raw_call);
 
                 builder_->setInsertPoint(b_dispatch);
+                ir::Instruction* callee_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+                builder_->createStore(raw_callee, callee_slot);
+
+                ir::BasicBlock* b_is_box = builder_->createBasicBlock("ind_box_" + cid, cur_fn);
+                ir::BasicBlock* b_read_callee = builder_->createBasicBlock("ind_rd_callee_" + cid, cur_fn);
+
+                ir::Value* first_word = builder_->createLoad(raw_callee);
+                ir::Value* first_u32 = builder_->createAnd(first_word, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
+                ir::Value* is_box_type = builder_->createCeq(first_u32, context_->getConstantInt(context_->getIntegerType(64), 13)); // TYPE_BOX = 13
+
+                builder_->createBr(is_box_type, b_is_box, b_read_callee);
+
+                builder_->setInsertPoint(b_is_box);
+                ir::Value* unboxed_ptr = builder_->createLoad(builder_->createAdd(raw_callee, context_->getConstantInt(context_->getIntegerType(64), 8)));
+                builder_->createStore(unboxed_ptr, callee_slot);
+                builder_->createJmp(b_read_callee);
+
+                builder_->setInsertPoint(b_read_callee);
+                ir::Value* callee = builder_->createLoad(callee_slot);
+
                 ir::Value* magic = builder_->createLoad(callee);
                 ir::Value* type_id = builder_->createAnd(magic, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
                 ir::Value* is_str = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), 11));
@@ -1062,7 +1082,24 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     builder_->setInsertPoint(b_match);
                     std::vector<ir::Value*> call_args_matching;
                     size_t target_param_cnt = target_f->getParameters().size();
-                    if (target_param_cnt == args.size() + 1) {
+                    bool uses_r0_env = false;
+                    auto* registered_f = LIR::FunctionRegistry::getInstance().getFunction(f_name);
+                    if (registered_f) {
+                        for (const auto& inst : registered_f->instructions) {
+                            if ((inst.op == LIR::LIR_Op::TupleGet || inst.op == LIR::LIR_Op::TupleSet) && inst.a == 0) {
+                                uses_r0_env = true;
+                                break;
+                            }
+                        }
+                    }
+
+                    if (f_name.starts_with("__lambda") && uses_r0_env) {
+                        call_args_matching.push_back(callee);
+                        for (size_t k = 0; k < args.size(); ++k) call_args_matching.push_back(args[k]);
+                    } else if (f_name.starts_with("__lambda")) {
+                        for (size_t k = 0; k < args.size(); ++k) call_args_matching.push_back(args[k]);
+                        call_args_matching.push_back(callee);
+                    } else if (target_param_cnt == args.size() + 1) {
                         for (size_t k = 0; k < args.size(); ++k) call_args_matching.push_back(args[k]);
                         call_args_matching.push_back(callee);
                     } else if (target_param_cnt == args.size()) {
@@ -1073,6 +1110,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             else if (k == args.size()) call_args_matching.push_back(callee);
                             else call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
                         }
+                    }
+                    while (call_args_matching.size() < target_param_cnt) {
+                        call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
                     }
                     ir::Value* call_res = builder_->createCall(target_f, call_args_matching);
                     builder_->createStore(call_res, res_slot);
