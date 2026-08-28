@@ -113,12 +113,32 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
 
         std::vector<ir::Type*> param_types;
         for (size_t i = 0; i < f->param_count; ++i) {
-            param_types.push_back(context_->getIntegerType(64));
+            ir::Type* pty = context_->getIntegerType(64);
+            auto it = f->register_language_types.find(i);
+            if (it != f->register_language_types.end() && it->second) {
+                if (it->second->tag == ::TypeTag::Float64 || it->second->tag == ::TypeTag::Float32) pty = context_->getDoubleType();
+            } else {
+                auto it2 = f->register_types.find(i);
+                if (it2 != f->register_types.end() && (it2->second == LIR::Type::F64 || it2->second == LIR::Type::F32)) {
+                    pty = context_->getDoubleType();
+                }
+            }
+            param_types.push_back(pty);
         }
 
         ir::Type* ret_type = context_->getIntegerType(64);
         builder_->createFunction(ir_name, ret_type, param_types);
     }
+
+    auto is_instruction_float = [](const LIR::LIR_Function* f_func, uint32_t reg) -> bool {
+        for (const auto& in : f_func->instructions) {
+            if (in.dst == reg) {
+                if (in.result_type == LIR::Type::F64 || in.result_type == LIR::Type::F32) return true;
+                if (in.type_name == "float" || in.type_name == "f64" || in.type_name == "f32") return true;
+            }
+        }
+        return false;
+    };
 
     // 1b. Pre-scan global variable types across reachable functions
     for (const auto& func_name : registry.getFunctionNames()) {
@@ -129,9 +149,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             if (inst.op == LIR::LIR_Op::StoreGlobal) {
                 std::string gname = inst.func_name.empty() ? ("global_" + std::to_string(inst.dst)) : inst.func_name;
                 for (char& c : gname) { if (c == '.') c = '_'; }
-                if (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32) {
-                    global_types_[gname] = LIR::Type::F64;
-                } else if (f->register_types.count(inst.a) && (f->register_types.at(inst.a) == LIR::Type::F64 || f->register_types.at(inst.a) == LIR::Type::F32)) {
+                if (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32 || is_instruction_float(f, inst.a)) {
                     global_types_[gname] = LIR::Type::F64;
                 }
             }
@@ -295,9 +313,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     for (const auto& param : main_fn->getParameters()) {
         builder_->createStore(param.get(), reg_slots[param_idx]);
         regs[param_idx] = param.get();
-        auto it = lir_func.register_types.find(param_idx);
-        if (it != lir_func.register_types.end()) {
-            reg_types[param_idx] = it->second;
+        if (param->getType() && (param->getType()->isDoubleTy() || param->getType()->isFloatTy())) {
+            reg_types[param_idx] = LIR::Type::F64;
+        } else {
+            auto it = lir_func.register_types.find(param_idx);
+            if (it != lir_func.register_types.end()) {
+                reg_types[param_idx] = it->second;
+            }
         }
         param_idx++;
     }
@@ -340,11 +362,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 v->setName("r" + std::to_string(r));
             }
             if (reg_slots.count(r)) {
-                ir::Value* store_v = v;
-                if (v->getType()->isDoubleTy() || v->getType()->isFloatTy()) {
-                    store_v = builder_->createCast(v, context_->getIntegerType(64));
-                }
-                builder_->createStore(store_v, reg_slots[r]);
+                builder_->createStore(v, reg_slots[r]);
             }
         }
         regs[r] = v;
@@ -352,14 +370,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     };
 
     auto load_float_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
-        ir::Value* v = load_reg(r, t);
         LIR::Type actual_t = (reg_types.count(r) ? reg_types[r] : t);
+        if (actual_t == LIR::Type::F64 || actual_t == LIR::Type::F32) {
+            return load_reg(r, LIR::Type::F64);
+        }
+        ir::Value* v = load_reg(r, t);
         if (v && v->getType()->isIntegerTy()) {
-            if (actual_t == LIR::Type::F64 || actual_t == LIR::Type::F32) {
-                return builder_->createCast(v, context_->getDoubleType());
-            } else if (actual_t == LIR::Type::I64 || actual_t == LIR::Type::Bool) {
-                return builder_->createSltof(v, context_->getDoubleType());
-            }
+            return builder_->createSltof(v, context_->getDoubleType());
         }
         return v;
     };
