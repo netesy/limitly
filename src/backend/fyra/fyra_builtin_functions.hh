@@ -38,6 +38,7 @@ public:
     static ir::Value* emit_int_to_str_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
     static ir::Value* emit_str_to_int_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* str_ptr);
     static ir::Value* emit_float_to_str_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
+    static void emit_float_to_str_ir(ir::Module* module, ir::IRBuilder* builder);
     static ir::Value* emit_bool_to_str_inline(ir::Module* module, ir::IRBuilder* builder, ir::Value* val);
     static void emit_str_alloc_ir(ir::Module* module, ir::IRBuilder* builder);
     static void emit_str_concat_ir(ir::Module* module, ir::IRBuilder* builder);
