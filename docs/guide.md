@@ -245,12 +245,12 @@ Limit supports C-style `for` loops, which consist of an initializer, a condition
 
 ```
 // Loop from 0 to 4
-for (var i = 0; i < 5; i += 1) {
+for (var i = 0; i < 5; i = i + 1) {
     print("i = {i}");
 }
 
 // Countdown from 3 to 1
-for (var j = 3; j > 0; j -= 1) {
+for (var j = 3; j > 0; j = j - 1) {
     print("j = {j}");
 }
 ```
@@ -684,10 +684,10 @@ You can declare `static` fields and methods, which belong to the frame itself ra
 
 ```limit
 frame Counter {
-    static var count = 0;
+    static count: int = 0;
 
     static fn increment() {
-        Counter.count += 1;
+        Counter.count = Counter.count + 1;
     }
 }
 
@@ -701,17 +701,17 @@ An `abstract` frame cannot be instantiated directly and is meant to be subframed
 
 ```limit
 abstract frame Shape {
-    abstract fn area(): float;
+    abstract fn area(): float { return 0.0; }
 }
 
 frame Circle : Shape {
-    var radius: float;
+    pub radius: float;
 
-    fn init(r: float) {
+    pub init(r: float) {
         self.radius = r;
     }
 
-    fn area(): float {
+    pub fn area(): float {
         return 3.14 * self.radius * self.radius;
     }
 }
@@ -729,14 +729,19 @@ frame Parent {
 }
 ```
 
-#### Data Frames (Planned)
+#### Data Frames (Planned / Removed)
 
-A `data` frame is a special kind of frame that automatically generates useful methods, such as a constructor for all its fields. Data frames are implicitly `final`.
+> ⚠️ Note: The `data` keyword modifier has been removed from frame declarations in favor of traits and standard frames.
 
 ```limit
-data frame User {
-    name: str,
-    age: int
+frame User {
+    pub name: str;
+    pub age: int;
+
+    pub init(name: str, age: int) {
+        self.name = name;
+        self.age = age;
+    }
 }
 
 var user = User("Alice", 30);
@@ -796,7 +801,7 @@ frame Cat : Speaker {
 }
 
 var speakers: [Speaker] = [Dog(), Cat()];
-iter (s: Speaker in speakers) {
+iter (s in speakers) {
     s.speak();
 }
 // Output:
@@ -886,14 +891,10 @@ greet(); // greet is imported
 For more explicit control over what a module exposes, you can use a `module` block with `pub` and `prot` visibility keywords. By default, members are private.
 
 ```limit
-// in file my_app/utils.lm
-module my_app.utils {
-    pub fn format_user(user: User): str {
-        // ...
-    }
-
-    prot frame StringHelper {
-        // ...
+// in file my_app_utils.lm
+module my_app_utils {
+    pub fn format_user(name: str): str {
+        return "User: {name}";
     }
 
     var api_key = "secret"; // private by default
@@ -938,41 +939,37 @@ You can unpack values from tuples and lists into separate variables.
 // Destructuring a tuple
 var (name, age) = ("Alice", 30);
 print("{name} is {age} years old."); // Output: Alice is 30 years old.
-
-// Destructuring a list
-var [a, b, c] = [1, 2, 3];
-print(a); // Output: 1
 ```
 
-### Unsafe Blocks
+### Unsafe Blocks (Disabled / Planned)
 
-Limit is a memory-safe language, but sometimes you may need to interface with low-level code or perform operations that the compiler cannot guarantee are safe. For these cases, you can use an `unsafe` block.
+> ⚠️ Note: `unsafe` blocks are currently disabled by the compiler pending complete memory-model boundary validation.
 
 ```limit
-unsafe {
-    // Low-level operations
-}
+// unsafe {
+//     // Low-level operations
+// }
 ```
 
-### Contract Statements
+### Contract Statements (Planned)
 
-Contracts are used to enforce preconditions, postconditions, and invariants in your code. They are useful for debugging and ensuring correctness.
+> ⚠️ Note: `contract(...)` statements are parsed as reserved keywords but lowerings are currently unimplemented in LIR.
 
 ```limit
-fn divide(a: int, b: int): int {
-    contract(b != 0, "Cannot divide by zero");
-    return a / b;
-}
+// fn divide(a: int, b: int): int {
+//     contract(b != 0, "Cannot divide by zero");
+//     return a / b;
+// }
 ```
 
-### Compile-Time Execution
+### Compile-Time Execution (Disabled / Planned)
 
-The `comptime` keyword allows you to execute code at compile time. This is useful for metaprogramming, generating lookup tables, or performing other computations before the program runs.
+> ⚠️ Note: `comptime` blocks are currently disabled by the compiler.
 
 ```limit
-comptime {
-    var my_compile_time_var = 123;
-}
+// comptime {
+//     var my_compile_time_var = 123;
+// }
 ```
 
 ## The Type System
@@ -1017,7 +1014,7 @@ trait HasAge {
     fn get_age(): int;
 }
 
-type Person = HasName & HasAge;
+type Person = HasName and HasAge;
 
 fn print_person_details(p: Person) {
     print("{p.get_name()} is {p.get_age()} years old.");
@@ -1059,9 +1056,8 @@ print_point(my_point); // Output: (10.5, 20.0)
 A tuple is a fixed-size, ordered collection of elements of different types. Tuple types are defined using parentheses.
 
 ```limit
-type PersonInfo = (str, int, str);
-
-var person: PersonInfo = ("Alice", 30, "New York");
+// Tuple type aliases are planned. Currently tuples are typed as (str, int, str).
+var person: (str, int, str) = ("Alice", 30, "New York");
 ```
 
 ### Enum Declarations
@@ -1447,7 +1443,7 @@ A `task` statement is used inside a `parallel` or `concurrent` block to define a
 ```limit
 concurrent {
     // A simple task
-    task {
+    task() {
         print("Task 1");
     }
 

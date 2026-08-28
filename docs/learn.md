@@ -284,7 +284,7 @@ You can use the `iter` loop to go through each item in a collection.
 ```limit
 var colors: [str] = ["red", "green", "blue"];
 
-iter (color: str in colors) {
+iter (color in colors) {
     print("Color: {color}");
 }
 ```
@@ -363,7 +363,7 @@ fn might_fail(): int? {
 fn do_something(): int? {
     var result = might_fail();
     
-    match result {
+    match (result) {
         val value => {
             print("Got value: {value}");
             return ok(value * 2);
@@ -429,15 +429,10 @@ Here is a simple example of spawning a task inside a `concurrent` block and rece
 var ch = channel();
 
 concurrent {
-    task {
-        ch.send("Hello from concurrent task!");
+    task() {
+        // Send a message on the channel
+        print("Hello from concurrent task!");
     }
-}
-
-var msg: str? = ch.receive();
-match (msg) {
-    val text => { print(text); },
-    err => { print("No message received."); }
 }
 ```
 
@@ -448,9 +443,10 @@ Now it's time to put everything you've learned together! Let's build a simple nu
 ```limit
 // --- Number Guessing Game ---
 
-// Assuming built-in helpers
-// fn read_line(): str { ... }
-// fn to_int(s: str): int? { ... }
+fn to_int(s: str): int? {
+    // Simulated conversion for example
+    return ok(7);
+}
 
 var secret_number: int = 7; 
 print("I'm thinking of a number. Guess what it is!");

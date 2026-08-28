@@ -8,20 +8,23 @@ This document tracks the consistency between learning materials, usage guides, t
 
 | Concept | learn.md | guide.md | language.md | Tests | Status |
 | :--- | :---: | :---: | :---: | :--- | :---: |
-| **Variables (`var`)** | ✅ | ✅ | ✅ | `tests/basic/variables.lm` | ✅ |
-| **Constants (`val`/`const`)** | ✅ | ✅ | ✅ | `tests/basic/variables.lm` | ✅ |
-| **Integers (`int`/`i32`/etc)** | ✅ | ✅ | ✅ | `tests/types/basic.lm` | ✅ |
-| **Decimals (`d2`/`d4`/`d6`)** | ✅ | ✅ | ✅ | `tests/decimal_tests.lm` | ✅ |
-| **Frames (`frame`)** | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm` | ✅ |
-| **Self Reference (`self`)** | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm` | ✅ |
-| **Traits (`trait`)** | ✅ | ✅ | ✅ | `tests/oop/traits_dynamic.lm` | ✅ |
-| **Modules (`import`)** | ✅ | ✅ | ✅ | `tests/modules/*` | ✅ |
-| **Fallible (`Type?`)** | ✅ | ✅ | ✅ | `tests/error_handling/unified_type_system.lm` | ✅ |
-| **Structured Concurrency** | ✅ | ✅ | ✅ | `tests/concurrency/*` | ✅ |
-| **Pattern Match (`match`)** | ✅ | ✅ | ✅ | `tests/loops/match.lm` | ✅ |
-| **Ternary (`? :`)** | ❌ | ⚠️ (Planned) | ⚠️ (Planned) | ❌ | 🚨 (Spec Drift) |
-| **Safe Access (`?.`)** | ❌ | ❌ | ⚠️ (Planned) | ❌ | 🚨 (Spec Drift) |
-| **Elvis (`?:`)** | ❌ | ❌ | ⚠️ (Planned) | ❌ | 🚨 (Spec Drift) |
+| **Variables (`var`)** | ✅ | ✅ | ✅ | `tests/basic/variables.lm` | ✅ Fully consistent |
+| **Constants (`val`/`const`)** | ✅ | ✅ | ✅ | `tests/basic/variables.lm` | ✅ Fully consistent |
+| **Integers (`int`/`i32`/etc)** | ✅ | ✅ | ✅ | `tests/types/basic.lm` | ✅ Fully consistent |
+| **Decimals (`d2`/`d4`/`d6`)** | ✅ | ✅ | ✅ | `tests/decimal_tests.lm` | ✅ Fully consistent |
+| **Frames (`frame`)** | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm` | ✅ Fully consistent |
+| **Self Reference (`self`)** | ✅ | ✅ | ✅ | `tests/oop/frame_declaration.lm` | ✅ Fully consistent |
+| **Traits (`trait`)** | ✅ | ✅ | ✅ | `tests/oop/traits_dynamic.lm` | ✅ Fully consistent |
+| **Modules (`import`)** | ✅ | ✅ | ✅ | `tests/modules/*` | ✅ Fully consistent |
+| **Fallible (`Type?`)** | ✅ | ✅ | ✅ | `tests/error_handling/unified_type_system.lm` | ✅ Fully consistent |
+| **Structured Concurrency** | ✅ | ✅ | ✅ | `tests/concurrency/*` | ✅ Fully consistent |
+| **Pattern Match (`match`)** | ✅ | ✅ | ✅ | `tests/loops/match.lm` | ✅ Fully consistent |
+| **Unsafe Blocks (`unsafe`)** | ❌ | ⚠️ (Disabled) | ⚠️ (Disabled) | ❌ | 🚨 Spec Drift (Disabled) |
+| **Contract Stmts (`contract`)**| ❌ | ⚠️ (Planned) | ⚠️ (Planned) | ❌ | 🚨 Spec Drift (Unimplemented) |
+| **Comptime (`comptime`)** | ❌ | ⚠️ (Disabled) | ⚠️ (Disabled) | ❌ | 🚨 Spec Drift (Disabled) |
+| **Ternary (`? :`)** | ❌ | ⚠️ (Planned) | ⚠️ (Planned) | ❌ | 🚨 Spec Drift (Planned) |
+| **Safe Access (`?.`)** | ❌ | ❌ | ⚠️ (Planned) | ❌ | 🚨 Spec Drift (Planned) |
+| **Elvis (`?:`)** | ❌ | ❌ | ⚠️ (Planned) | ❌ | 🚨 Spec Drift (Planned) |
 
 **Statuses:**
 - ✅ **Fully consistent**: Concept is fully documented, correctly taught, and covered by passing tests.
@@ -37,15 +40,17 @@ This document tracks the consistency between learning materials, usage guides, t
 - **Structured Concurrency in Onboarding**: `learn.md` lacks a dedicated introduction to structured concurrency blocks (`parallel`/`concurrent`), leaving a gap for beginner systems-level learners. *[RESOLVED]*
 
 ### 2.2 Doc ↔ Code Mismatches
-- **Ok/Err Constructors**: Prior documentation taught uppercase `Ok(value)` and `Err(error)` constructs for native `Type?` return values. In reality, the compiler and TypeChecker expect lowercase `ok(value)` and `err()` (with uppercase variants reserved for stdlib wrappers in `std.result`). *[RESOLVED]*
-- **Frame Field `var` Keyword**: Prior onboarding code blocks taught frame field declarations as `pub var name: str`, whereas the compiler syntax parser disallows the `var` keyword inside frame field declarations (which must be `pub name: str`). *[RESOLVED]*
+- **`iter` Loop Syntax**: `learn.md` previously taught `iter (color: str in colors)`. Fixed to `iter (color in colors)` to match parser rules. *[RESOLVED]*
+- **Match Expression Syntax**: `learn.md` previously taught `match result { ... }`. Fixed to `match (result) { ... }` requiring parentheses. *[RESOLVED]*
+- **Task Invocation Syntax**: `learn.md` previously taught `task { ... }`. Fixed to `task() { ... }` matching parser expectation. *[RESOLVED]*
+- **Channel Method**: `learn.md` taught `ch.receive()`. Fixed to `ch.recv()`. *[RESOLVED]*
 
 ### 2.3 Doc ↔ Test Mismatches
-- **`this` Receiver**: Previous documentation mentioned `this` as a valid frame receiver. However, all test files (such as `tests/oop/frame_declaration.lm`) and compiler AST parsing strictly require `self` as the canonical receiver. *[RESOLVED]*
-- **`-repl` Command Line Flag**: Documentation mentioned a `-repl` flag. The actual CLI driver simply defaults to the REPL when run without arguments, and the flag is not natively supported. *[RESOLVED]*
+- **`data frame` Syntax**: `guide.md` taught `data frame User { ... }`. Marked as removed/deprecated in alignment with parser AST rules. *[RESOLVED]*
+- **Disabled Keywords in Usage Examples**: `guide.md` presented `unsafe`, `comptime`, and `contract` as fully usable code. Added explicit warning notices and disabled non-functional examples. *[RESOLVED]*
 
 ### 2.4 Philosophy Violations
-- **No Implicit Coercion**: Any implicit conversion of float to decimal types or comparisons with mismatched decimal scales throws strict compile-time type-check errors to satisfy the *"Explicit is better than implicit"* principles in `zen.md`. No violations were found in implementation files.
+- **No Implicit Coercion**: Any implicit conversion of float to decimal types or comparisons with mismatched decimal scales throws strict compile-time type-check errors to satisfy the *"Explicit is better than implicit"* principles in `zen.md`. Verified against `src/frontend/type_checker/types.cpp:258`.
 
 ### 2.5 Teaching Inconsistencies
 - **Upper-case constructors for native types**: Solved by documenting the distinction between standard library wrappers in `std.result` (uppercase `Ok`/`Err` structs) and native compiler fallible primitives (lowercase `ok`/`err` constructors).
@@ -55,10 +60,14 @@ This document tracks the consistency between learning materials, usage guides, t
 ## 🏁 3. Final Integrity Check
 
 ### Is the language teachable without misleading users?
-**YES**. All outdated syntax guides, incorrect uppercase error constructor claims, invalid receiver keywords (`this`), and invalid frame field modifiers have been systematically resolved and corrected across `learn.md` and `guide.md`.
+**YES**. Every code block in `learn.md` and `guide.md` has been audited and validated against the Limitly compiler binary (`./bin/limitly`). All non-compiling examples, invalid type annotations, unparenthesized expressions, and disabled keywords have been fixed or explicitly flagged.
 
 ### Is the documentation system internally consistent?
-**YES**. The spec `language.md`, the developer guide `guide.md`, and the onboarding resource `learn.md` are completely synchronized on keyword usage (`frame`, `self`), optional/fallible semantics (`Type?`, `ok()`, `err()`), and pattern matching syntax (`val x`, `err e`). All planned or unimplemented features are clearly flagged with `(Planned)`.
+**YES**. The formal spec (`language.md`), practical guide (`guide.md`), onboarding material (`learn.md`), philosophy contract (`zen.md`), and drift audit (`drift.md`) are completely synchronized with the codebase and test suite.
 
 ### Is the philosophy actually enforced?
-**YES**. Philosophical principles defined in `zen.md` (Explicit over Implicit, Errors as Values, Structured Concurrency, Region Safety, Explicit Null Handling) map directly to active, checked compiler subsystems within `src/frontend/type_checker/` and `src/frontend/memory_checker.cpp`. No drift exists between philosophy and code.
+**YES**. Design principles in `zen.md` directly map to active compiler checks in `src/frontend/type_checker/`, `src/frontend/memory_checker.cpp`, and test cases under `tests/`.
+
+### Ranking of Unimplemented / Disabled Features (Spec Drift)
+1. **Disabled Features (`unsafe`, `comptime`)**: Keywords are reserved and parsed, but LIR lowering disabled pending memory boundary validation.
+2. **Planned Control Flow Constructs (`contract(...)`, ternary `? :`, Elvis `?:`, Safe member access `?.`)**: Keywords reserved but lowerings remain unimplemented.

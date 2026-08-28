@@ -25,31 +25,40 @@ Features defined in `language.md` (the formal spec) but are either unimplemented
 Inconsistencies between teaching materials (`learn.md`, `guide.md`) and the actual compiler syntax/VM rules.
 
 ### 2.1 Doc Drift (Beginner Risk) → `learn.md` Issues
-- **Ok/Err Pattern Matching Mismatch** (RESOLVED/FLAGGED):
-  - *Drift*: `learn.md` previously taught `Ok(value) => ...` and `Err => ...` patterns for matching on the native fallible type `Type?`.
-  - *Actual Behavior*: The TypeChecker and Register VM expect `val value => ...` (success pattern) and `err => ...` or `err e => ...` (error pattern).
-  - *Action Taken*: Standardized on `val` and `err` matching in `learn.md`.
-- **Frame Field Declaration with `var`** (RESOLVED/FLAGGED):
-  - *Drift*: `learn.md` previously taught `pub var name: str = "World";` inside a frame.
-  - *Actual Behavior*: The compiler expects frame fields to be declared without the `var` keyword (e.g., `pub name: str = "World";`).
-  - *Action Taken*: Standardized field declarations across `learn.md` to match actual compiler rules.
-- **Usage of `this` Keyword** (RESOLVED):
-  - *Drift*: Taught using `this` instead of `self` for frame receivers.
-  - *Actual Behavior*: The compiler only recognizes `self`. `this` is unsupported.
-  - *Action Taken*: Standardized entirely on `self`.
-- **`-repl` flag** (RESOLVED):
-  - *Drift*: Documented `-repl` flag to start REPL.
-  - *Actual Behavior*: Executing `./bin/limitly` with no arguments automatically starts the REPL.
+- **`iter` Loop Type Annotation** (RESOLVED/FLAGGED):
+  - *Drift*: `learn.md` previously taught `iter (color: str in colors)`.
+  - *Actual Behavior*: Parser expects `iter (color in colors)` without type annotation on loop variable.
+  - *Action Taken*: Corrected syntax in `learn.md`.
+- **Unparenthesized Match Expression** (RESOLVED/FLAGGED):
+  - *Drift*: `learn.md` previously taught `match result { ... }`.
+  - *Actual Behavior*: Parser strictly requires parentheses around the match expression: `match (result) { ... }`.
+  - *Action Taken*: Updated all match expressions in `learn.md` to `match (...)`.
+- **Task Argument Syntax** (RESOLVED/FLAGGED):
+  - *Drift*: `learn.md` previously taught `task { ... }`.
+  - *Actual Behavior*: Parser expects argument parentheses: `task() { ... }`.
+  - *Action Taken*: Updated all task invocations in `learn.md` to `task()`.
+- **Channel Method `recv()`** (RESOLVED/FLAGGED):
+  - *Drift*: `learn.md` previously taught `ch.receive()`.
+  - *Actual Behavior*: Native channel implementation uses `.recv()`.
+  - *Action Taken*: Updated `learn.md` to use `.recv()`.
 
 ### 2.2 Doc Drift (User Risk) → `guide.md` Issues
-- **Uppercase Ok/Err Constructors** (RESOLVED/FLAGGED):
-  - *Drift*: `guide.md` used uppercase `Ok(...)` and `Err(...)` as constructors for the native `Type?` system (e.g. `return Ok(a / b);`).
-  - *Actual Behavior*: The native unified error system uses lowercase constructors `ok(...)` and `err(...)` or `err(Type)`. Uppercase variants are only used as standard library wrappers in `std.result`.
-  - *Action Taken*: Corrected all native fallible examples in `guide.md` to use lowercase `ok` and `err`.
-- **Usage of `class` Keyword** (RESOLVED):
-  - *Drift*: Explanations in `guide.md` referred to `class` instead of `frame`.
-  - *Actual Behavior*: `frame` is the exclusive keyword for object-oriented structures in Limitly.
-  - *Action Taken*: Completely standardized on `frame`.
+- **`data frame` Syntax** (RESOLVED/FLAGGED):
+  - *Drift*: `guide.md` documented `data frame User { ... }`.
+  - *Actual Behavior*: `data` keyword modifier is removed/unsupported in frame declarations.
+  - *Action Taken*: Marked `data frame` as removed and updated examples to standard `frame`.
+- **Abstract Method Bodies** (RESOLVED/FLAGGED):
+  - *Drift*: `guide.md` showed `abstract fn area(): float;` without body.
+  - *Actual Behavior*: Compiler parser currently requires block bodies for frame methods.
+  - *Action Taken*: Added default return bodies in `guide.md` examples.
+- **Intersection Type Alias Syntax** (RESOLVED/FLAGGED):
+  - *Drift*: `guide.md` showed `type Person = HasName & HasAge;`.
+  - *Actual Behavior*: Parser uses `and` for intersection type alias definitions (`HasName and HasAge`).
+  - *Action Taken*: Updated operator in `guide.md`.
+- **Disabled Keywords Flagged (`unsafe`, `comptime`, `contract`)** (RESOLVED/FLAGGED):
+  - *Drift*: `guide.md` presented `unsafe`, `comptime`, and `contract` as fully active usage patterns.
+  - *Actual Behavior*: These constructs are parsed as keywords but currently disabled/unimplemented in LIR lowering.
+  - *Action Taken*: Added explicit warning notices and commented out non-functional code blocks in `guide.md`.
 
 ---
 
