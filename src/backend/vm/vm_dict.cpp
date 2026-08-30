@@ -20,6 +20,8 @@ RUNTIME_API LmDict* lm_dict_new(uint64_t (*hash_fn)(LmValue),
     dict->size = 0;
     dict->hash_fn = hash_fn;
     dict->cmp_fn = cmp_fn;
+    dict->head = NULL;
+    dict->tail = NULL;
     
     dict->buckets = (LmDictEntry**)calloc(dict->bucket_count, 
                                            sizeof(LmDictEntry*));
@@ -55,7 +57,16 @@ RUNTIME_API void lm_dict_set(LmDict* dict, LmValue key, LmValue value) {
     new_entry->value = value;
     new_entry->hash = hash;
     new_entry->next = dict->buckets[bucket];
+    new_entry->order_next = NULL;
     dict->buckets[bucket] = new_entry;
+    
+    if (dict->tail) {
+        dict->tail->order_next = new_entry;
+        dict->tail = new_entry;
+    } else {
+        dict->head = new_entry;
+        dict->tail = new_entry;
+    }
     dict->size++;
 }
 
@@ -83,13 +94,11 @@ RUNTIME_API int lm_dict_contains(LmDict* dict, LmValue key) {
 RUNTIME_API void lm_dict_free(LmDict* dict) {
     if (!dict) return;
     
-    for (uint64_t i = 0; i < dict->bucket_count; i++) {
-        LmDictEntry* entry = dict->buckets[i];
-        while (entry) {
-            LmDictEntry* next = entry->next;
-            free(entry);
-            entry = next;
-        }
+    LmDictEntry* entry = dict->head;
+    while (entry) {
+        LmDictEntry* next = entry->order_next;
+        free(entry);
+        entry = next;
     }
     
     free(dict->buckets);
@@ -109,17 +118,15 @@ RUNTIME_API LmValue* lm_dict_items(LmDict* dict, uint64_t* out_count) {
     }
     
     uint64_t index = 0;
-    for (uint64_t i = 0; i < dict->bucket_count; i++) {
-        LmDictEntry* entry = dict->buckets[i];
-        while (entry) {
-            items[index * 2] = entry->key;
-            items[index * 2 + 1] = entry->value;
-            index++;
-            entry = entry->next;
-        }
+    LmDictEntry* entry = dict->head;
+    while (entry && index < dict->size) {
+        items[index * 2] = entry->key;
+        items[index * 2 + 1] = entry->value;
+        index++;
+        entry = entry->order_next;
     }
     
-    *out_count = dict->size;
+    *out_count = index;
     return items;
 }
 

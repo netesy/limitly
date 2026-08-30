@@ -56,7 +56,10 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     for (size_t i = 0; i < method.params.size(); ++i) {
         size_t reg_index = i + 1; // +1 for 'this'
         bind_variable(method.params[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr p_type = method.params[i].second ? convert_ast_type_to_lir_type(method.params[i].second) : nullptr;
+        set_register_language_type(static_cast<Reg>(reg_index), p_type);
+        set_register_abi_type(static_cast<Reg>(reg_index), language_type_to_abi_type(p_type));
+        set_register_type(static_cast<Reg>(reg_index), p_type);
     }
     
     // Emit method body
@@ -86,12 +89,21 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     for (const auto& param : method.params) {
         LIRParameter lir_param;
         lir_param.name = param.first;
-        lir_param.type = Type::I64;
+        TypePtr p_type = param.second ? convert_ast_type_to_lir_type(param.second) : nullptr;
+        lir_param.type = language_type_to_abi_type(p_type);
         params.push_back(lir_param);
     }
     
-    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
+    Type return_abi_type = Type::I64;
+    if (method.returnType.has_value()) {
+        auto lang_type = convert_ast_type_to_lir_type(method.returnType.value());
+        return_abi_type = language_type_to_abi_type(lang_type);
+    }
+    
+    auto lir_func = std::make_shared<LIRFunction>(full_method_name, params, return_abi_type, nullptr);
     lir_func->setInstructions(result->instructions);
+    lir_func->setRegisterLanguageTypes(result->register_language_types);
+    lir_func->setRegisterTypes(result->register_types);
     func_manager.registerFunction(lir_func);
 }
 
@@ -156,7 +168,10 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     for (size_t i = 0; i < method.parameters.size(); ++i) {
         size_t reg_index = i + 1; // +1 for 'this'
         bind_variable(method.parameters[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr p_type = method.parameters[i].second ? convert_ast_type_to_lir_type(method.parameters[i].second) : nullptr;
+        set_register_language_type(static_cast<Reg>(reg_index), p_type);
+        set_register_abi_type(static_cast<Reg>(reg_index), language_type_to_abi_type(p_type));
+        set_register_type(static_cast<Reg>(reg_index), p_type);
     }
     bind_variable("self", 0);
     
@@ -164,7 +179,10 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     for (size_t i = 0; i < method.optionalParams.size(); ++i) {
         size_t reg_index = method.parameters.size() + i + 1; // +1 for 'this'
         bind_variable(method.optionalParams[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr p_type = method.optionalParams[i].second.first ? convert_ast_type_to_lir_type(method.optionalParams[i].second.first) : nullptr;
+        set_register_language_type(static_cast<Reg>(reg_index), p_type);
+        set_register_abi_type(static_cast<Reg>(reg_index), language_type_to_abi_type(p_type));
+        set_register_type(static_cast<Reg>(reg_index), p_type);
     }
     
     // Emit method body
@@ -209,22 +227,28 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     for (const auto& param : method.parameters) {
         LIRParameter lir_param;
         lir_param.name = param.first;
-        // Convert type - for now use I64 as default
-        lir_param.type = Type::I64;
+        TypePtr p_type = param.second ? convert_ast_type_to_lir_type(param.second) : nullptr;
+        lir_param.type = language_type_to_abi_type(p_type);
         params.push_back(lir_param);
     }
     for (const auto& optional_param : method.optionalParams) {
         LIRParameter lir_param;
         lir_param.name = optional_param.first;
-        lir_param.type = Type::I64;
+        TypePtr p_type = optional_param.second.first ? convert_ast_type_to_lir_type(optional_param.second.first) : nullptr;
+        lir_param.type = language_type_to_abi_type(p_type);
         params.push_back(lir_param);
     }
     
-    // Create function with I64 return type for now
-    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
+    Type return_abi_type = Type::I64;
+    if (method.returnType) {
+        auto lang_type = convert_ast_type_to_lir_type(method.returnType);
+        return_abi_type = language_type_to_abi_type(lang_type);
+    }
     
-    // Copy the instructions from our LIR_Function
+    auto lir_func = std::make_shared<LIRFunction>(full_method_name, params, return_abi_type, nullptr);
     lir_func->setInstructions(result->instructions);
+    lir_func->setRegisterLanguageTypes(result->register_language_types);
+    lir_func->setRegisterTypes(result->register_types);
     func_manager.registerFunction(lir_func);
 
     // Update function table
@@ -273,7 +297,10 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     for (size_t i = 0; i < init_method.parameters.size(); ++i) {
         size_t reg_index = i + 1; // +1 for 'this'
         bind_variable(init_method.parameters[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr p_type = init_method.parameters[i].second ? convert_ast_type_to_lir_type(init_method.parameters[i].second) : nullptr;
+        set_register_language_type(static_cast<Reg>(reg_index), p_type);
+        set_register_abi_type(static_cast<Reg>(reg_index), language_type_to_abi_type(p_type));
+        set_register_type(static_cast<Reg>(reg_index), p_type);
     }
     bind_variable("self", 0);
     
@@ -281,7 +308,10 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     for (size_t i = 0; i < init_method.optionalParams.size(); ++i) {
         size_t reg_index = init_method.parameters.size() + i + 1; // +1 for 'this'
         bind_variable(init_method.optionalParams[i].first, static_cast<Reg>(reg_index));
-        set_register_type(static_cast<Reg>(reg_index), nullptr);
+        TypePtr p_type = init_method.optionalParams[i].second.first ? convert_ast_type_to_lir_type(init_method.optionalParams[i].second.first) : nullptr;
+        set_register_language_type(static_cast<Reg>(reg_index), p_type);
+        set_register_abi_type(static_cast<Reg>(reg_index), language_type_to_abi_type(p_type));
+        set_register_type(static_cast<Reg>(reg_index), p_type);
     }
     
     // Emit init method body
@@ -326,22 +356,22 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     for (const auto& param : init_method.parameters) {
         LIRParameter lir_param;
         lir_param.name = param.first;
-        // Convert type - for now use I64 as default
-        lir_param.type = Type::I64;
+        TypePtr p_type = param.second ? convert_ast_type_to_lir_type(param.second) : nullptr;
+        lir_param.type = language_type_to_abi_type(p_type);
         params.push_back(lir_param);
     }
     for (const auto& optional_param : init_method.optionalParams) {
         LIRParameter lir_param;
         lir_param.name = optional_param.first;
-        lir_param.type = Type::I64;
+        TypePtr p_type = optional_param.second.first ? convert_ast_type_to_lir_type(optional_param.second.first) : nullptr;
+        lir_param.type = language_type_to_abi_type(p_type);
         params.push_back(lir_param);
     }
     
-    // Create function with I64 return type for now
-    auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
-    
-    // Copy the instructions from our LIR_Function
+    auto lir_func = std::make_shared<LIRFunction>(full_method_name, params, Type::Void, nullptr);
     lir_func->setInstructions(result->instructions);
+    lir_func->setRegisterLanguageTypes(result->register_language_types);
+    lir_func->setRegisterTypes(result->register_types);
     func_manager.registerFunction(lir_func);
 
     // Update function table
