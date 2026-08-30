@@ -187,7 +187,7 @@ $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 # Exclude src/backend/fyra from general rule - they're handled separately
 $(OBJ_DIR)/src/backend/fyra/%.o: src/backend/fyra/%.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) --param ggc-min-expand=20 --param ggc-min-heapsize=32768 -c $< -o $@
 
 $(OBJ_DIR)/fyra/%.o: vendor/fyra/src/%.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)

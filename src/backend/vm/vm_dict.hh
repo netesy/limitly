@@ -18,6 +18,7 @@ typedef struct LmDictEntry {
     LmValue value;
     uint64_t hash;
     struct LmDictEntry* next;
+    struct LmDictEntry* order_next;
 } LmDictEntry;
 
 typedef struct {
@@ -27,6 +28,8 @@ typedef struct {
     uint64_t size;
     uint64_t (*hash_fn)(LmValue key);
     int (*cmp_fn)(LmValue k1, LmValue k2);
+    LmDictEntry* head;
+    LmDictEntry* tail;
 } LmDict;
 
 // Dict operations

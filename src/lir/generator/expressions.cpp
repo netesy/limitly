@@ -752,14 +752,21 @@ Reg Generator::emit_interpolated_string_expr(LM::Frontend::AST::InterpolatedStri
     // Handle multiple arguments by chaining STR_FORMAT calls
     Reg current_result = format_reg;
     for (size_t i = 0; i < arg_regs.size(); i++) {
+        Type arg_abi = get_register_abi_type(arg_regs[i]);
         if (i == 0) {
             // First argument: format with first arg
-            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, Type::Ptr, result, format_reg, arg_regs[i]));
+            LIR_Inst inst(LIR_Op::STR_FORMAT, Type::Ptr, result, format_reg, arg_regs[i]);
+            inst.type_a = Type::Ptr;
+            inst.type_b = arg_abi;
+            emit_instruction(inst);
             current_result = result;
         } else {
             // Subsequent arguments: format previous result with next arg
             Reg temp_result = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::STR_FORMAT, Type::Ptr, temp_result, current_result, arg_regs[i]));
+            LIR_Inst inst(LIR_Op::STR_FORMAT, Type::Ptr, temp_result, current_result, arg_regs[i]);
+            inst.type_a = Type::Ptr;
+            inst.type_b = arg_abi;
+            emit_instruction(inst);
             current_result = temp_result;
             if (i == arg_regs.size() - 1) {
                 // Final result is in temp_result, move to result register
@@ -1389,8 +1396,24 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 args.reserve(arg_regs.size() + 1);
                 args.push_back(result);
                 for (Reg r : arg_regs) args.push_back(r);
+
+                std::vector<Type> arg_types;
+                arg_types.reserve(args.size());
+                arg_types.push_back(Type::Ptr);
+                for (size_t i = 0; i < arg_regs.size(); ++i) {
+                    Type arg_abi = Type::I64;
+                    if (i < expr.arguments.size() && expr.arguments[i] && expr.arguments[i]->inferred_type) {
+                        arg_abi = language_type_to_abi_type(expr.arguments[i]->inferred_type);
+                    } else if (auto lang_type = get_register_language_type(arg_regs[i])) {
+                        arg_abi = language_type_to_abi_type(lang_type);
+                    } else {
+                        arg_abi = get_register_abi_type(arg_regs[i]);
+                    }
+                    arg_types.push_back(arg_abi);
+                }
+
                 Reg dummy = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::Call, dummy, func_name + ".init", args));
+                emit_instruction(LIR_Inst(LIR_Op::Call, dummy, func_name + ".init", args, arg_types));
             } else {
                 if (frame_decl) {
                     for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
@@ -1708,6 +1731,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
                 }
                 LIR_Inst inst(LIR_Op::TraitCallMethod, result, 0, 0);
+                inst.result_type = (expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::I64);
                 inst.func_name = method_name;
                 inst.type_name = trait_name;
                 inst.call_args = arg_regs;
@@ -2332,6 +2356,8 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
                     // Set field type
                     if (offset_it->second < it->second.fields.size()) {
                         set_register_language_type(dst, field_lang_type);
+                        set_register_abi_type(dst, field_abi_type);
+                        set_register_type(dst, field_lang_type);
                     }
 
                     return dst;
@@ -2345,11 +2371,15 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
             if (offset_it != frame_info.field_offsets.end()) {
                 // Found the field - emit FrameGetField
                 Reg dst = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::FrameGetField, Type::Ptr, dst, object_reg, static_cast<uint32_t>(offset_it->second)));
+                TypePtr field_lang_type = frame_info.fields[offset_it->second].second;
+                Type field_abi_type = language_type_to_abi_type(field_lang_type);
+                emit_instruction(LIR_Inst(LIR_Op::FrameGetField, field_abi_type, dst, object_reg, static_cast<uint32_t>(offset_it->second)));
 
                 // Set field type
                 if (offset_it->second < frame_info.fields.size()) {
-                    set_register_language_type(dst, frame_info.fields[offset_it->second].second);
+                    set_register_language_type(dst, field_lang_type);
+                    set_register_abi_type(dst, field_abi_type);
+                    set_register_type(dst, field_lang_type);
                 }
 
                 return dst;
