@@ -907,7 +907,17 @@ void Generator::emit_import_stmt(LM::Frontend::AST::ImportStatement& stmt) {
 
 
 void Generator::emit_contract_stmt(LM::Frontend::AST::ContractStatement& stmt) {
-    report_error("Contract statements not yet implemented");
+    if (!stmt.condition) return;
+    Reg cond_reg = emit_expr(*stmt.condition);
+    Reg msg_reg = stmt.message ? emit_expr(*stmt.message) : 0;
+
+    LIR_Inst inst(LIR_Op::CallBuiltin, Type::Void, 0, 0, 0);
+    inst.func_name = "assert";
+    inst.call_args.push_back(cond_reg);
+    if (msg_reg != 0) {
+        inst.call_args.push_back(msg_reg);
+    }
+    emit_instruction(inst);
 }
 
 
