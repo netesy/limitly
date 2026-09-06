@@ -127,6 +127,7 @@ private:
     std::shared_ptr<LM::Frontend::AST::FrameDeclaration> current_frame = nullptr;
     TypePtr current_return_type = nullptr;
     bool in_loop = false;
+    bool in_unsafe_block = false;
     
     // Source context for error reporting
     std::string current_source;

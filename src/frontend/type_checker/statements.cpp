@@ -57,9 +57,11 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
     } else if (auto staged_block = std::dynamic_pointer_cast<LM::Frontend::AST::StagedBlockStatement>(stmt)) {
         return check_staged_block_statement(staged_block);
     } else if (auto unsafe_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::UnsafeStatement>(stmt)) {
-        // Unsafe operations must always be explicitly scoped and validated; reject until
-        // full unsafe memory-model checks are implemented in frontend + lowering + runtime.
-        add_error("unsafe statements are currently disabled: explicit unsafe boundaries require full memory-model validation", unsafe_stmt->line);
+        bool prev = in_unsafe_block;
+        in_unsafe_block = true;
+        TypePtr body_res = check_statement(unsafe_stmt->body);
+        in_unsafe_block = prev;
+        unsafe_stmt->inferred_type = type_system.NIL_TYPE;
         return type_system.NIL_TYPE;
     } else if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
         return check_import_statement(import_stmt);
@@ -72,6 +74,16 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
 
 TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> func) {
     if (!func) return nullptr;
+
+    if (func->isStaged) {
+        add_error("staged functions ('staged fn') are not supported yet", func->line);
+    }
+    for (bool is_staged : func->stagedParams) {
+        if (is_staged) {
+            add_error("staged parameters ('staged param') are not supported yet", func->line);
+            break;
+        }
+    }
     
     // Enter new memory region for this function
     enter_memory_region();

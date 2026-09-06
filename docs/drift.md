@@ -16,8 +16,8 @@ Features defined in `language.md` (the formal spec) but are either unimplemented
 | **Async/Await** | `async fn` / `await` expressions | Reserved keywords; currently unimplemented at parser/LIR generator level. | **HIGH** |
 | **Contract Statements** | `contract(cond, msg)` | Compile-time enforcement for static conditions and runtime assertion lowering. | **DONE** |
 | **Compile-Time Execution (`staged`)** | `staged { block }` | Staged metaprogramming and stage 0 compile-time evaluation. | **DONE** |
-| **Unsafe Blocks** | `unsafe { block }` | Keyword is reserved but block semantics are parsed as normal block statements without isolation. | **MEDIUM** |
-| **Frame Modifiers (`abstract`, `final`, `data`)** | Restricting frame instantiation/extension | Keywords parsed, but restrictions are not enforced by the TypeChecker. | **MEDIUM** |
+| **Unsafe Blocks** | `unsafe { block }` | Nested scope tracking via in_unsafe_block with diagnostics for raw FFI/memory operations outside unsafe. | **DONE** |
+| **Frame Modifiers (`abstract`, `final`)** | Restricting frame instantiation/extension | Enforced at compile-time: abstract frame instantiation and abstract method bodies are rejected. | **DONE** |
 
 ---
 

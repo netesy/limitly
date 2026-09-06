@@ -729,22 +729,30 @@ frame Parent {
 }
 ```
 
-#### Data Frames (Planned / Removed)
+#### Frame Modifiers & Traits
 
-> ⚠️ Note: The `data` keyword modifier has been removed from frame declarations in favor of traits and standard frames.
+Frame modifiers in Limitly include `abstract` and `final`. `abstract` frames cannot be instantiated directly and can declare abstract methods that subframes must implement. `final` frames cannot be extended, and `final` methods cannot be overridden. Traits provide interface contracts and structural guarantees for frames.
 
 ```limit
-frame User {
-    pub name: str;
-    pub age: int;
+trait Identifiable {
+    fn id(): int;
+}
 
-    pub init(name: str, age: int) {
+frame User: Identifiable {
+    pub user_id: int;
+    pub name: str;
+
+    pub init(id: int, name: str) {
+        self.user_id = id;
         self.name = name;
-        self.age = age;
+    }
+
+    pub fn id(): int {
+        return self.user_id;
     }
 }
 
-var user = User("Alice", 30);
+var user = User(1, "Alice");
 print(user.name); // Output: Alice
 ```
 
@@ -941,25 +949,26 @@ var (name, age) = ("Alice", 30);
 print("{name} is {age} years old."); // Output: Alice is 30 years old.
 ```
 
-### Unsafe Blocks (Disabled / Planned)
+### Unsafe Blocks
 
-> ⚠️ Note: `unsafe` blocks are currently disabled by the compiler pending complete memory-model boundary validation.
+`unsafe` blocks create explicit scope boundaries for operations bypassing standard safety checks (such as raw memory allocations and FFI pointer operations). Raw FFI operations (`ffi_alloc`, `ffi_free`, `ffi_memset`, `ffi_memcpy`, `ffi_store_*`, `ffi_load_*`) outside an `unsafe` block raise a compile-time diagnostic.
 
 ```limit
-// unsafe {
-//     // Low-level operations
-// }
+unsafe {
+    var ptr = ffi_alloc(64);
+    ffi_free(ptr);
+}
 ```
 
-### Contract Statements (Planned)
+### Contract Statements
 
-> ⚠️ Note: `contract(...)` statements are parsed as reserved keywords but lowerings are currently unimplemented in LIR.
+`contract(condition, message)` statements provide static contract enforcement. Conditions composed of compile-time constants (including arithmetic, logical, and comparison operations) are evaluated at compile time. Dynamic contracts or unfulfilled static contracts fall back to runtime assertions.
 
 ```limit
-// fn divide(a: int, b: int): int {
-//     contract(b != 0, "Cannot divide by zero");
-//     return a / b;
-// }
+fn divide(a: int, b: int): int {
+    contract(BUFFER_SIZE > 0, "Buffer size must be positive");
+    return a / b;
+}
 ```
 
 ### Compile-Time Execution (`staged { ... }`)

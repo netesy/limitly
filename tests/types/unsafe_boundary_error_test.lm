@@ -1,0 +1,4 @@
+fn main(): int {
+    var ptr = resource_create(64);
+    return 0;
+}

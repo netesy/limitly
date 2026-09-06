@@ -1813,7 +1813,9 @@ void Generator::emit_continue_stmt(LM::Frontend::AST::ContinueStatement& stmt) {
 
 
 void Generator::emit_unsafe_stmt(LM::Frontend::AST::UnsafeStatement& stmt) {
-    report_error("Unsafe statements not yet implemented");
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
 }
 
 
