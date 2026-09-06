@@ -1,0 +1,7 @@
+fn main(): int {
+    var x = 10;
+    assert(x > 5);
+    assert(x == 10, "x should be 10");
+    print("Assert variadic test passed!");
+    return 0;
+}
