@@ -306,6 +306,12 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
 
 TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame) {
     if (!frame) return nullptr;
+
+    for (const auto& method : frame->methods) {
+        if (frame->isAbstract && method->isAbstract && method->body) {
+            add_error("Abstract method '" + method->name + "' in abstract frame '" + name + "' cannot have a body", method->line);
+        }
+    }
     
     size_t initial_error_count = errors.size();
 
@@ -331,7 +337,15 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
 
         auto it = trait_declarations.find(trait_name);
         if (it == trait_declarations.end()) {
-            add_error("Frame '" + frame->name + "' implements unknown trait: " + trait_name, frame->line);
+            auto parent_frame_it = frame_declarations.find(trait_name);
+            if (parent_frame_it != frame_declarations.end()) {
+                // Extended parent frame (e.g. abstract frame)
+                if (parent_frame_it->second.declaration && parent_frame_it->second.declaration->isFinal) {
+                    add_error("Cannot extend final frame '" + trait_name + "'", frame->line);
+                }
+                continue;
+            }
+            add_error("Frame '" + frame->name + "' implements unknown trait or parent frame: " + trait_name, frame->line);
             continue;
         }
 
@@ -521,6 +535,10 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
     
     const FrameInfo& frame_info = frame_it->second;
     
+    if (frame_info.declaration && frame_info.declaration->isAbstract) {
+        add_error("Cannot instantiate abstract frame '" + expr->frameName + "'", expr->line);
+    }
+
     // Use the qualified name from frame_declarations (which is the actual registered name)
     // This ensures module frames use their full qualified name (e.g., test_module_frame.Counter)
     std::string frame_qualified_name = frame_info.name;

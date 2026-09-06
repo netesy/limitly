@@ -1,0 +1,26 @@
+abstract frame BaseShape {
+    fn area(): float;
+}
+
+final frame Square: BaseShape {
+    pub side: float;
+    pub init(s: float) {
+        self.side = s;
+    }
+    pub fn area(): float {
+        return self.side * self.side;
+    }
+}
+
+// Invalid extension of final frame - should fail
+frame ChildSquare: Square {
+    pub fn area(): float {
+        return 0.0;
+    }
+}
+
+fn main(): int {
+    var sq = Square(4.0);
+    print(sq.area());
+    return 0;
+}

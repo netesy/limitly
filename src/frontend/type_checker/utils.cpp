@@ -233,10 +233,10 @@ std::string TypeChecker::get_code_context(int line) {
 }
 
 void TypeChecker::check_assert_call(const std::shared_ptr<LM::Frontend::AST::CallExpr>& expr) {
-    if (expr->arguments.size() != 2) {
-        add_error("assert() expects exactly 2 arguments: condition (bool) and message (string), got " + 
+    if (expr->arguments.empty() || expr->arguments.size() > 2) {
+        add_error("assert() expects 1 or 2 arguments: condition (bool) and optional message (string), got " +
                 std::to_string(expr->arguments.size()), expr->line, 0, 
-                get_code_context(expr->line), "assert(...)", "assert(condition, message)");
+                get_code_context(expr->line), "assert(...)", "assert(condition, [message])");
         return;
     }
     
@@ -247,11 +247,13 @@ void TypeChecker::check_assert_call(const std::shared_ptr<LM::Frontend::AST::Cal
                 expr->line, 0, get_code_context(expr->line), "condition", "boolean expression");
     }
     
-    // Check second argument (message) is string
-    TypePtr messageType = check_expression(expr->arguments[1]);
-    if (!is_string_type(messageType) && messageType->tag != TypeTag::Any) {
-        add_error("assert() second argument must be string, got " + messageType->toString(), 
-                expr->line, 0, get_code_context(expr->line), "message", "string literal or expression");
+    // Check optional second argument (message) is string
+    if (expr->arguments.size() == 2) {
+        TypePtr messageType = check_expression(expr->arguments[1]);
+        if (!is_string_type(messageType) && messageType->tag != TypeTag::Any) {
+            add_error("assert() second argument must be string, got " + messageType->toString(),
+                    expr->line, 0, get_code_context(expr->line), "message", "string literal or expression");
+        }
     }
 }
 

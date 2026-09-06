@@ -1,0 +1,26 @@
+fn main(): int {
+    const BUFFER_SIZE = 1024;
+    const PI = 3.14159265;
+    const IS_VALID = true;
+
+    // Integer comparisons
+    contract(BUFFER_SIZE > 0, "Buffer size must be positive");
+    contract(BUFFER_SIZE >= 1024, "Buffer size must be at least 1024");
+    contract(BUFFER_SIZE < 2048, "Buffer size must be less than 2048");
+    contract(BUFFER_SIZE <= 1024, "Buffer size must be <= 1024");
+    contract(BUFFER_SIZE == 1024, "Buffer size must equal 1024");
+    contract(BUFFER_SIZE != 512, "Buffer size must not equal 512");
+
+    // Float comparisons & precision
+    contract(PI == 3.14159265, "PI exact comparison");
+    contract(PI > 3.14, "PI greater than 3.14");
+    contract(PI < 3.15, "PI less than 3.15");
+
+    // Logical operations & boolean literals
+    contract(IS_VALID and BUFFER_SIZE > 0, "IS_VALID and positive buffer");
+    contract(not (BUFFER_SIZE == 0), "Not buffer size 0");
+    contract(BUFFER_SIZE == 0 or IS_VALID, "Logical OR test");
+
+    print("Contract edge cases test passed!");
+    return 0;
+}

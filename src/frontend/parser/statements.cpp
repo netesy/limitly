@@ -752,8 +752,13 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             }
             consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
             if (match({TokenType::COLON})) frameMethod->returnType = parseTypeAnnotation();
-            consume(TokenType::LEFT_BRACE, "Expected '{' before method body.");
-            frameMethod->body = block();
+            if (match({TokenType::SEMICOLON})) {
+                frameMethod->isAbstract = true;
+                frameMethod->body = nullptr;
+            } else {
+                consume(TokenType::LEFT_BRACE, "Expected '{' or ';' after method declaration.");
+                frameMethod->body = block();
+            }
             if (frameMethod->name == "init") { frameMethod->isInit = true; frameDecl->init = frameMethod; }
             else if (frameMethod->name == "deinit") { frameMethod->isDeinit = true; frameDecl->deinit = frameMethod; }
             else frameDecl->methods.push_back(frameMethod);
