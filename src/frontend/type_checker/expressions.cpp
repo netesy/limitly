@@ -389,7 +389,11 @@ bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, lo
             }
         }
     } else if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
-        if (literal->literalType == TokenType::INT_LITERAL || literal->literalType == TokenType::HEX_LITERAL) {
+        if (std::holds_alternative<bool>(literal->value)) {
+            out_int = std::get<bool>(literal->value) ? 1 : 0;
+            is_int = true;
+            return true;
+        } else if (literal->literalType == TokenType::INT_LITERAL || literal->literalType == TokenType::HEX_LITERAL) {
             try {
                 if (std::holds_alternative<std::string>(literal->value)) {
                     std::string s_val = std::get<std::string>(literal->value);
@@ -436,6 +440,11 @@ bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, lo
                     is_int = true;
                     return true;
                 }
+            } else if (unary->op == TokenType::BANG || unary->op == TokenType::NOT) {
+                bool val_truthy = right_is_int ? (right_int != 0) : (right_double != 0.0);
+                out_int = val_truthy ? 0 : 1;
+                is_int = true;
+                return true;
             }
         }
     } else if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
@@ -447,6 +456,91 @@ bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, lo
             evaluate_const_expr(binary->right, right_int, right_double, right_is_int, checker)) {
 
             bool both_int = left_is_int && right_is_int;
+            // Logical and Comparison operators
+            switch (binary->op) {
+                case TokenType::AND: {
+                    bool l = left_is_int ? (left_int != 0) : (left_double != 0.0);
+                    bool r = right_is_int ? (right_int != 0) : (right_double != 0.0);
+                    out_int = (l && r) ? 1 : 0;
+                    is_int = true;
+                    return true;
+                }
+                case TokenType::OR: {
+                    bool l = left_is_int ? (left_int != 0) : (left_double != 0.0);
+                    bool r = right_is_int ? (right_int != 0) : (right_double != 0.0);
+                    out_int = (l || r) ? 1 : 0;
+                    is_int = true;
+                    return true;
+                }
+                case TokenType::EQUAL_EQUAL: {
+                    if (both_int) {
+                        out_int = (left_int == right_int) ? 1 : 0;
+                    } else {
+                        double l = left_is_int ? (double)left_int : left_double;
+                        double r = right_is_int ? (double)right_int : right_double;
+                        out_int = (std::abs(l - r) < 1e-9) ? 1 : 0;
+                    }
+                    is_int = true;
+                    return true;
+                }
+                case TokenType::BANG_EQUAL: {
+                    if (both_int) {
+                        out_int = (left_int != right_int) ? 1 : 0;
+                    } else {
+                        double l = left_is_int ? (double)left_int : left_double;
+                        double r = right_is_int ? (double)right_int : right_double;
+                        out_int = (std::abs(l - r) >= 1e-9) ? 1 : 0;
+                    }
+                    is_int = true;
+                    return true;
+                }
+                case TokenType::LESS: {
+                    if (both_int) {
+                        out_int = (left_int < right_int) ? 1 : 0;
+                    } else {
+                        double l = left_is_int ? (double)left_int : left_double;
+                        double r = right_is_int ? (double)right_int : right_double;
+                        out_int = (l < r) ? 1 : 0;
+                    }
+                    is_int = true;
+                    return true;
+                }
+                case TokenType::LESS_EQUAL: {
+                    if (both_int) {
+                        out_int = (left_int <= right_int) ? 1 : 0;
+                    } else {
+                        double l = left_is_int ? (double)left_int : left_double;
+                        double r = right_is_int ? (double)right_int : right_double;
+                        out_int = (l <= r) ? 1 : 0;
+                    }
+                    is_int = true;
+                    return true;
+                }
+                case TokenType::GREATER: {
+                    if (both_int) {
+                        out_int = (left_int > right_int) ? 1 : 0;
+                    } else {
+                        double l = left_is_int ? (double)left_int : left_double;
+                        double r = right_is_int ? (double)right_int : right_double;
+                        out_int = (l > r) ? 1 : 0;
+                    }
+                    is_int = true;
+                    return true;
+                }
+                case TokenType::GREATER_EQUAL: {
+                    if (both_int) {
+                        out_int = (left_int >= right_int) ? 1 : 0;
+                    } else {
+                        double l = left_is_int ? (double)left_int : left_double;
+                        double r = right_is_int ? (double)right_int : right_double;
+                        out_int = (l >= r) ? 1 : 0;
+                    }
+                    is_int = true;
+                    return true;
+                }
+                default: break;
+            }
+
             if (!both_int) {
                 double l = left_is_int ? (double)left_int : left_double;
                 double r = right_is_int ? (double)right_int : right_double;
@@ -856,6 +950,15 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 
     if (!target_name.empty()) {
         resolve_call_arguments(expr, target_name);
+    }
+
+    if (!in_unsafe_block && !target_name.empty()) {
+        if (target_name == "ffi_alloc" || target_name == "ffi_free" || target_name == "ffi_realloc" ||
+            target_name == "ffi_memset" || target_name == "ffi_memcpy" ||
+            target_name.find("ffi_store_") == 0 || target_name.find("ffi_load_") == 0 ||
+            target_name.find("std.ffi.ffi_") != std::string::npos) {
+            add_error("raw memory / FFI operation '" + target_name + "' requires an 'unsafe' block context", expr->line);
+        }
     }
     
     // Handle built-in functions with special or variadic signatures
