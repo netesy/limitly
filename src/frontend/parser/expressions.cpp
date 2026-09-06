@@ -502,6 +502,17 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::finishCall(std::shared_pt
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
+    if (match({TokenType::STAGED})) {
+        auto stagedExpr = createNodeWithContext<LM::Frontend::AST::StagedExpr>();
+        stagedExpr->line = previous().line;
+        if (check(TokenType::LEFT_BRACE)) {
+            consume(TokenType::LEFT_BRACE, "Expected '{' after 'staged'.");
+            stagedExpr->block = block();
+        } else {
+            stagedExpr->expression = expression();
+        }
+        return stagedExpr;
+    }
     if (match({TokenType::FALSE})) {
         auto literalExpr = createNodeWithContext<LM::Frontend::AST::LiteralExpr>();
         literalExpr->line = previous().line; literalExpr->value = false;

@@ -48,6 +48,46 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
             }
             return decl;
         }
+        if (match({TokenType::STAGED})) {
+            if (match({TokenType::FN})) {
+                auto decl = function("function");
+                if (decl) {
+                    decl->annotations = annotations;
+                    decl->visibility = visibility;
+                    decl->isStatic = isStatic;
+                    decl->isAbstract = isAbstract;
+                    decl->isFinal = isFinal;
+                    decl->isStaged = true;
+                }
+                return decl;
+            }
+            if (match({TokenType::VAR}) || match({TokenType::CONST}) || match({TokenType::VAL})) {
+                bool isConst = (previous().type == TokenType::CONST || previous().type == TokenType::VAL);
+                auto decl = varDeclaration();
+                if (decl) {
+                    decl->annotations = annotations;
+                    if (auto varDecl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(decl)) {
+                        varDecl->visibility = visibility;
+                        varDecl->isStatic = isStatic;
+                        varDecl->isConst = isConst;
+                    }
+                    auto stagedStmt = std::make_shared<LM::Frontend::AST::StagedStatement>();
+                    stagedStmt->line = decl->line;
+                    stagedStmt->declaration = decl;
+                    return stagedStmt;
+                }
+                return decl;
+            }
+            if (check(TokenType::LEFT_BRACE)) {
+                consume(TokenType::LEFT_BRACE, "Expected '{' after 'staged'.");
+                auto blk = block();
+                auto stagedBlock = std::make_shared<LM::Frontend::AST::StagedBlockStatement>();
+                stagedBlock->line = previous().line;
+                stagedBlock->body = blk;
+                return stagedBlock;
+            }
+            return stagedStatement();
+        }
         if (match({TokenType::FN})) {
             auto decl = function("function");
             if (decl) {
@@ -200,7 +240,7 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::statement() {
     if (match({TokenType::MATCH})) return matchStatement();
     if (match({TokenType::UNSAFE})) return unsafeBlock();
     if (match({TokenType::CONTRACT})) return contractStatement();
-    if (match({TokenType::COMPTIME})) return comptimeStatement();
+    if (match({TokenType::STAGED})) return stagedStatement();
 
     return expressionStatement();
 }
@@ -517,6 +557,7 @@ std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> Parser::function(const s
 
     if (!check(TokenType::RIGHT_PAREN)) {
         do {
+            bool isStagedParam = match({TokenType::STAGED});
             auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
             std::shared_ptr<LM::Frontend::AST::TypeAnnotation> paramType = nullptr;
             if (match({TokenType::COLON})) paramType = parseTypeAnnotation();
@@ -528,6 +569,7 @@ std::shared_ptr<LM::Frontend::AST::FunctionDeclaration> Parser::function(const s
                 func->optionalParams.push_back({paramName, {paramType, nullptr}});
             } else {
                 func->params.push_back({paramName, paramType});
+                func->stagedParams.push_back(isStagedParam);
             }
         } while (match({TokenType::COMMA}));
     }
@@ -1178,11 +1220,25 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::contractStatement() {
     return stmt;
 }
 
-std::shared_ptr<LM::Frontend::AST::Statement> Parser::comptimeStatement() {
-    auto stmt = std::make_shared<LM::Frontend::AST::ComptimeStatement>();
+std::shared_ptr<LM::Frontend::AST::Statement> Parser::stagedStatement() {
+    auto stmt = std::make_shared<LM::Frontend::AST::StagedStatement>();
     stmt->line = previous().line;
-    stmt->declaration = declaration();
-    return stmt;
+    if (check(TokenType::LEFT_BRACE)) {
+        consume(TokenType::LEFT_BRACE, "Expected '{' after 'staged'.");
+        auto blockStmt = block();
+        stmt->block = blockStmt;
+        auto stagedBlock = std::make_shared<LM::Frontend::AST::StagedBlockStatement>();
+        stagedBlock->line = stmt->line;
+        stagedBlock->body = blockStmt;
+        return stagedBlock;
+    } else if (check(TokenType::FN) || check(TokenType::VAR) || check(TokenType::VAL) || check(TokenType::CONST)) {
+        stmt->declaration = declaration();
+        return stmt;
+    } else {
+        stmt->expression = expression();
+        match({TokenType::SEMICOLON});
+        return stmt;
+    }
 }
 
 void Parser::pushBlockContext(const std::string& blockType, const Token& startToken) {

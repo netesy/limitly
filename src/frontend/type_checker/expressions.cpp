@@ -58,6 +58,8 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
         type = check_cast_expr(cast);
     } else if (auto frame_inst = std::dynamic_pointer_cast<LM::Frontend::AST::FrameInstantiationExpr>(expr)) {
         type = check_frame_instantiation_expr(frame_inst);
+    } else if (auto staged_expr = std::dynamic_pointer_cast<LM::Frontend::AST::StagedExpr>(expr)) {
+        type = check_staged_expr(staged_expr);
     } else {
         add_error("Unknown expression type", expr->line);
         type = type_system.NIL_TYPE; // Default fallback
@@ -114,6 +116,8 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
         type = check_cast_expr(cast);
     } else if (auto frame_inst = std::dynamic_pointer_cast<LM::Frontend::AST::FrameInstantiationExpr>(expr)) {
         type = check_frame_instantiation_expr(frame_inst);
+    } else if (auto staged_expr = std::dynamic_pointer_cast<LM::Frontend::AST::StagedExpr>(expr)) {
+        type = check_staged_expr(staged_expr);
     } else {
         add_error("Unknown expression type", expr->line);
         type = type_system.NIL_TYPE; // Default fallback
@@ -2526,6 +2530,109 @@ void TypeChecker::resolve_call_arguments(std::shared_ptr<LM::Frontend::AST::Call
         expr->arguments = mapped_args;
         expr->namedArgs.clear();
     }
+}
+
+TypePtr TypeChecker::check_staged_expr(std::shared_ptr<LM::Frontend::AST::StagedExpr> staged_expr) {
+    if (!staged_expr) return type_system.NIL_TYPE;
+    if (staged_expr->expression) {
+        auto evaluated = evaluate_staged_expression(staged_expr->expression, 0);
+        if (evaluated) {
+            staged_expr->expression = evaluated;
+            TypePtr res = check_expression(evaluated);
+            staged_expr->inferred_type = res;
+            return res;
+        }
+    } else if (staged_expr->block) {
+        auto eval_node = evaluate_staged_statement_node(staged_expr->block, 0);
+        if (auto blk = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(eval_node)) {
+            staged_expr->block = blk;
+            TypePtr res = check_block_statement(blk);
+            if (blk->statements.size() == 1) {
+                if (auto expr_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(blk->statements[0])) {
+                    if (expr_stmt->expression) {
+                        staged_expr->expression = expr_stmt->expression;
+                    }
+                }
+            }
+            staged_expr->inferred_type = res;
+            return res;
+        }
+    }
+    staged_expr->inferred_type = type_system.NIL_TYPE;
+    return type_system.NIL_TYPE;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> TypeChecker::evaluate_staged_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr, size_t depth) {
+    static const size_t MAX_RECURSION_DEPTH = 1000;
+    if (depth > MAX_RECURSION_DEPTH) {
+        add_error("staged evaluation error: maximum recursion depth (1000) exceeded", expr ? expr->line : 0);
+        return expr;
+    }
+    if (!expr) return nullptr;
+
+    if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+        return lit;
+    }
+    if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
+        auto it_int = constant_ints.find(var->name);
+        if (it_int != constant_ints.end()) {
+            auto lit = std::make_shared<LM::Frontend::AST::LiteralExpr>();
+            lit->line = var->line;
+            lit->value = std::to_string(it_int->second);
+            lit->literalType = TokenType::INT_LITERAL;
+            lit->inferred_type = type_system.INT64_TYPE;
+            return lit;
+        }
+        auto it_dbl = constant_doubles.find(var->name);
+        if (it_dbl != constant_doubles.end()) {
+            auto lit = std::make_shared<LM::Frontend::AST::LiteralExpr>();
+            lit->line = var->line;
+            lit->value = std::to_string(it_dbl->second);
+            lit->literalType = TokenType::FLOAT_LITERAL;
+            lit->inferred_type = type_system.FLOAT64_TYPE;
+            return lit;
+        }
+        return var;
+    }
+    if (auto bin = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
+        auto left_eval = evaluate_staged_expression(bin->left, depth + 1);
+        auto right_eval = evaluate_staged_expression(bin->right, depth + 1);
+        long long val_int = 0;
+        double val_double = 0.0;
+        bool is_int = false;
+        if (evaluate_const_expr(bin, val_int, val_double, is_int, this)) {
+            auto lit = std::make_shared<LM::Frontend::AST::LiteralExpr>();
+            lit->line = bin->line;
+            if (is_int) {
+                lit->value = std::to_string(val_int);
+                lit->literalType = TokenType::INT_LITERAL;
+                lit->inferred_type = type_system.INT64_TYPE;
+            } else {
+                lit->value = std::to_string(val_double);
+                lit->literalType = TokenType::FLOAT_LITERAL;
+                lit->inferred_type = type_system.FLOAT64_TYPE;
+            }
+            return lit;
+        }
+        bin->left = left_eval;
+        bin->right = right_eval;
+        return bin;
+    }
+    if (auto ternary = std::dynamic_pointer_cast<LM::Frontend::AST::TernaryExpr>(expr)) {
+        auto cond_eval = evaluate_staged_expression(ternary->condition, depth + 1);
+        long long val_int = 0;
+        double val_double = 0.0;
+        bool is_int = false;
+        if (evaluate_const_expr(cond_eval, val_int, val_double, is_int, this)) {
+            bool cond_true = is_int ? (val_int != 0) : (val_double != 0.0);
+            if (cond_true) {
+                return evaluate_staged_expression(ternary->thenBranch, depth + 1);
+            } else {
+                return evaluate_staged_expression(ternary->elseBranch, depth + 1);
+            }
+        }
+    }
+    return expr;
 }
 
 } // namespace Frontend

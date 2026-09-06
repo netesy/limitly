@@ -49,6 +49,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                           << ": '" << token.lexeme << "' (line " << token.line << ")\n";
             }
             std::cout << "\n";
+            return 0;
         }
 
         LM::Frontend::Parser parser(scanner, options.print_cst);
@@ -91,6 +92,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             std::cout << "=== CST ===\n";
             const auto* cstRoot = parser.getCST();
             if (cstRoot) std::cout << Frontend::CST::Printer::printCST(cstRoot) << "\n";
+            return 0;
         }
 
         if (options.print_ast) {
@@ -98,6 +100,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             LM::Frontend::AST::ASTPrinter printer;
             printer.process(ast);
             std::cout << "\n";
+            return 0;
         }
 
         LIR::Generator lir_generator;
@@ -119,18 +122,11 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
 
         if (options.print_lir) {
              std::cout << "\n=== Final LIR ===\n";
-             for (size_t i = 0; i < lir_function->instructions.size(); ++i) {
-                 std::cout << i << ": " << lir_function->instructions[i].to_string() << "\n";
+             if (lir_function) {
+                 LIR::Disassembler disassembler(*lir_function);
+                 std::cout << disassembler.disassemble() << "\n";
              }
-             
-             auto& func_manager = LIR::LIRFunctionManager::getInstance();
-             for (const auto& func_name : func_manager.getFunctionNames()) {
-                 std::cout << "\n=== Function LIR: " << func_name << " ===\n";
-                 auto func = func_manager.getFunction(func_name);
-                 for (size_t i = 0; i < func->getInstructions().size(); ++i) {
-                     std::cout << i << ": " << func->getInstructions()[i].to_string() << "\n";
-                 }
-             }
+             return 0;
         }
 
         if (options.use_aot || options.use_wasm || options.use_wasi || options.print_fyra_ir) {

@@ -240,7 +240,8 @@ private:
     void emit_func_stmt(LM::Frontend::AST::FunctionDeclaration& stmt);
     void emit_import_stmt(LM::Frontend::AST::ImportStatement& stmt);
     void emit_contract_stmt(LM::Frontend::AST::ContractStatement& stmt);
-    void emit_comptime_stmt(LM::Frontend::AST::ComptimeStatement& stmt);
+    void emit_staged_stmt(LM::Frontend::AST::StagedStatement& stmt);
+    void emit_staged_block(LM::Frontend::AST::StagedBlockStatement& stmt);
     void emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt);
     void emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stmt);
     void emit_task_init_and_step(LM::Frontend::AST::TaskStatement& task, size_t task_id, Reg contexts_reg, Reg channel_reg, Reg counter_reg, int64_t loop_var_value = 0);

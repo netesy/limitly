@@ -151,7 +151,7 @@ enum class TokenType {
     MODULE,     // module
 
     CONTRACT,   // contract
-    COMPTIME,   // comptime
+    STAGED,     // staged
     UNSAFE,     // unsafe
     ITER,       // iter
     WHERE,      // where

@@ -52,11 +52,10 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_match_statement(match_stmt);
     } else if (auto contract_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContractStatement>(stmt)) {
         return check_contract_statement(contract_stmt);
-    } else if (auto comptime_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ComptimeStatement>(stmt)) {
-        // Strict phase separation: comptime evaluation is not allowed to consume runtime state
-        // until a dedicated deterministic comptime evaluator is implemented.
-        add_error("comptime statements are currently disabled: compile-time execution cannot depend on runtime values", comptime_stmt->line);
-        return type_system.NIL_TYPE;
+    } else if (auto staged_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::StagedStatement>(stmt)) {
+        return check_staged_statement(staged_stmt);
+    } else if (auto staged_block = std::dynamic_pointer_cast<LM::Frontend::AST::StagedBlockStatement>(stmt)) {
+        return check_staged_block_statement(staged_block);
     } else if (auto unsafe_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::UnsafeStatement>(stmt)) {
         // Unsafe operations must always be explicitly scoped and validated; reject until
         // full unsafe memory-model checks are implemented in frontend + lowering + runtime.
@@ -835,6 +834,90 @@ TypePtr TypeChecker::check_range_expr(std::shared_ptr<LM::Frontend::AST::RangeEx
     TypePtr rangeType = std::make_shared<::Type>(TypeTag::Range);
     expr->inferred_type = rangeType;
     return rangeType;
+}
+
+TypePtr TypeChecker::check_staged_statement(std::shared_ptr<LM::Frontend::AST::StagedStatement> staged_stmt) {
+    if (!staged_stmt) return type_system.NIL_TYPE;
+
+    if (staged_stmt->declaration) {
+        return check_statement(staged_stmt->declaration);
+    } else if (staged_stmt->block) {
+        auto eval_block = evaluate_staged_statement_node(staged_stmt->block, 0);
+        return check_statement(eval_block);
+    } else if (staged_stmt->expression) {
+        auto eval_expr = evaluate_staged_expression(staged_stmt->expression, 0);
+        return check_expression(eval_expr);
+    }
+    return type_system.NIL_TYPE;
+}
+
+TypePtr TypeChecker::check_staged_block_statement(std::shared_ptr<LM::Frontend::AST::StagedBlockStatement> staged_block) {
+    if (!staged_block || !staged_block->body) return type_system.NIL_TYPE;
+
+    auto eval_node = evaluate_staged_statement_node(staged_block->body, 0);
+    return check_statement(eval_node);
+}
+
+std::shared_ptr<LM::Frontend::AST::Statement> TypeChecker::evaluate_staged_statement_node(std::shared_ptr<LM::Frontend::AST::Statement> stmt, size_t depth) {
+    static const size_t MAX_RECURSION_DEPTH = 1000;
+    if (depth > MAX_RECURSION_DEPTH) {
+        add_error("staged evaluation error: maximum recursion depth (1000) exceeded", stmt ? stmt->line : 0);
+        return stmt;
+    }
+    if (!stmt) return nullptr;
+
+    if (auto block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(stmt)) {
+        std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> new_stmts;
+        for (auto& s : block->statements) {
+            auto eval_s = evaluate_staged_statement_node(s, depth + 1);
+            if (eval_s) new_stmts.push_back(eval_s);
+        }
+        block->statements = new_stmts;
+        return block;
+    }
+
+    if (auto if_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(stmt)) {
+        auto eval_cond = evaluate_staged_expression(if_stmt->condition, depth + 1);
+        long long val_int = 0;
+        double val_double = 0.0;
+        bool is_int = false;
+        if (evaluate_const_expr(eval_cond, val_int, val_double, is_int, this)) {
+            bool cond_true = is_int ? (val_int != 0) : (val_double != 0.0);
+            if (cond_true) {
+                return evaluate_staged_statement_node(if_stmt->thenBranch, depth + 1);
+            } else {
+                if (if_stmt->elseBranch) {
+                    return evaluate_staged_statement_node(if_stmt->elseBranch, depth + 1);
+                } else {
+                    auto empty = std::make_shared<LM::Frontend::AST::ExprStatement>();
+                    empty->line = if_stmt->line;
+                    return empty;
+                }
+            }
+        }
+        if_stmt->condition = eval_cond;
+        if_stmt->thenBranch = evaluate_staged_statement_node(if_stmt->thenBranch, depth + 1);
+        if (if_stmt->elseBranch) {
+            if_stmt->elseBranch = evaluate_staged_statement_node(if_stmt->elseBranch, depth + 1);
+        }
+        return if_stmt;
+    }
+
+    if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
+        if (var_decl->initializer) {
+            var_decl->initializer = evaluate_staged_expression(var_decl->initializer, depth + 1);
+        }
+        return var_decl;
+    }
+
+    if (auto expr_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(stmt)) {
+        if (expr_stmt->expression) {
+            expr_stmt->expression = evaluate_staged_expression(expr_stmt->expression, depth + 1);
+        }
+        return expr_stmt;
+    }
+
+    return stmt;
 }
 
 } // namespace Frontend

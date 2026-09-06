@@ -1,0 +1,29 @@
+// Contract and Staged Execution Test
+
+fn test_contract() {
+    const BUFFER_SIZE: int = 1024;
+    // Compile-time static contract checking
+    contract(BUFFER_SIZE > 0, "Buffer size must be positive");
+    print("Contract check passed!");
+}
+
+fn test_staged() {
+    const BUFFER_SIZE: int = 1024;
+    var branch_tag: int = 0;
+    staged {
+        if (BUFFER_SIZE == 1024) {
+            branch_tag = 1;
+        } else {
+            branch_tag = 2;
+        }
+    }
+    print("Staged branch tag: " + (branch_tag as str));
+
+    val expr_val = staged { 100 + 200 };
+    print("Staged expr val: " + (expr_val as str));
+}
+
+fn main() {
+    test_contract();
+    test_staged();
+}

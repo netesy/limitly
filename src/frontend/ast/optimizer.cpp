@@ -173,6 +173,10 @@ std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::optimizeExpression(
         return optimizeTernaryExpr(ternary);
     } else if (auto assign = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(expr)) {
         return optimizeAssignExpr(assign);
+    } else if (auto stagedExpr = std::dynamic_pointer_cast<LM::Frontend::AST::StagedExpr>(expr)) {
+        if (stagedExpr->expression) stagedExpr->expression = optimizeExpression(stagedExpr->expression);
+        if (stagedExpr->block) stagedExpr->block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(optimizeStatement(stagedExpr->block));
+        return stagedExpr;
     }
     
     return expr;
@@ -197,6 +201,14 @@ std::shared_ptr<LM::Frontend::AST::Statement> ASTOptimizer::optimizeStatement(st
         return optimizeForStatement(forStmt);
     } else if (auto returnStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         return optimizeReturnStatement(returnStmt);
+    } else if (auto stagedStmt = std::dynamic_pointer_cast<LM::Frontend::AST::StagedStatement>(stmt)) {
+        if (stagedStmt->declaration) stagedStmt->declaration = optimizeStatement(stagedStmt->declaration);
+        if (stagedStmt->block) stagedStmt->block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(optimizeStatement(stagedStmt->block));
+        if (stagedStmt->expression) stagedStmt->expression = optimizeExpression(stagedStmt->expression);
+        return stagedStmt;
+    } else if (auto stagedBlock = std::dynamic_pointer_cast<LM::Frontend::AST::StagedBlockStatement>(stmt)) {
+        if (stagedBlock->body) stagedBlock->body = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(optimizeStatement(stagedBlock->body));
+        return stagedBlock;
     }
     
     return stmt;

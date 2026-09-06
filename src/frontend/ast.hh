@@ -95,7 +95,10 @@ namespace AST {
     struct ModuleDeclaration;
     struct UnsafeStatement;
     struct ContractStatement;
-    struct ComptimeStatement;
+    struct StagedBlockStatement;
+    struct StagedExpr;
+    struct StagedParam;
+    struct StagedStatement;
     
     // Channel operation nodes
     struct ChannelOfferExpr;
@@ -473,6 +476,8 @@ namespace AST {
         bool isStatic = false;                                  // For static functions
         bool isAbstract = false;                                // For abstract functions
         bool isFinal = false;                                   // For final functions
+        bool isStaged = false;                                  // For staged functions
+        std::vector<bool> stagedParams;                         // For staged parameters
     };
 
     // Async function declaration
@@ -803,9 +808,26 @@ namespace AST {
         std::shared_ptr<Expression> message;
     };
     
-    // Compile-time statement
-    struct ComptimeStatement : public Statement {
+    // Staged AST nodes
+    struct StagedBlockStatement : public Statement {
+        std::shared_ptr<BlockStatement> body;
+    };
+
+    struct StagedExpr : public Expression {
+        std::shared_ptr<Expression> expression;
+        std::shared_ptr<BlockStatement> block;
+    };
+
+    struct StagedParam {
+        std::string name;
+        std::shared_ptr<TypeAnnotation> type;
+        bool isStaged = true;
+    };
+
+    struct StagedStatement : public Statement {
         std::shared_ptr<Statement> declaration;
+        std::shared_ptr<BlockStatement> block;
+        std::shared_ptr<Expression> expression;
     };
 
     // Error handling expressions

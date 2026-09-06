@@ -72,7 +72,12 @@ void ASTPrinter::process(const std::shared_ptr<LM::Frontend::AST::Program>& prog
     std::cout << "==========" << std::endl;
     
     for (const auto& stmt : program->statements) {
-              printNode(stmt);
+        if (!stmt) {
+            std::cout << "  (null stmt)\n";
+            continue;
+        }
+        std::cout << "  [DEBUG stmt ptr: " << stmt.get() << "]\n";
+        printNode(stmt);
     }
 }
 
@@ -558,10 +563,31 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
             printNode(contractStmt->message, indent + 2);
         }
     }
-    else if (auto comptimeStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ComptimeStatement>(node)) {
-        std::cout << indentation << "ComptimeStatement:" << std::endl;
-        if (comptimeStmt->declaration) {
-            printNode(comptimeStmt->declaration, indent + 1);
+    else if (auto stagedStmt = std::dynamic_pointer_cast<LM::Frontend::AST::StagedStatement>(node)) {
+        std::cout << indentation << "StagedStatement:" << std::endl;
+        if (stagedStmt->declaration) {
+            printNode(stagedStmt->declaration, indent + 1);
+        }
+        if (stagedStmt->block) {
+            printNode(stagedStmt->block, indent + 1);
+        }
+        if (stagedStmt->expression) {
+            printNode(stagedStmt->expression, indent + 1);
+        }
+    }
+    else if (auto stagedBlock = std::dynamic_pointer_cast<LM::Frontend::AST::StagedBlockStatement>(node)) {
+        std::cout << indentation << "StagedBlockStatement:" << std::endl;
+        if (stagedBlock->body) {
+            printNode(stagedBlock->body, indent + 1);
+        }
+    }
+    else if (auto stagedExpr = std::dynamic_pointer_cast<LM::Frontend::AST::StagedExpr>(node)) {
+        std::cout << indentation << "StagedExpr:" << std::endl;
+        if (stagedExpr->expression) {
+            printNode(stagedExpr->expression, indent + 1);
+        }
+        if (stagedExpr->block) {
+            printNode(stagedExpr->block, indent + 1);
         }
     }
     // Consolidated ReturnStatement case
