@@ -908,6 +908,16 @@ void Generator::emit_import_stmt(LM::Frontend::AST::ImportStatement& stmt) {
 
 void Generator::emit_contract_stmt(LM::Frontend::AST::ContractStatement& stmt) {
     if (!stmt.condition) return;
+    long long val_int = 0;
+    double val_double = 0.0;
+    bool is_int = false;
+    if (LM::Frontend::evaluate_const_expr(stmt.condition, val_int, val_double, is_int)) {
+        bool cond_true = is_int ? (val_int != 0) : (val_double != 0.0);
+        if (cond_true) {
+            // Statically verified contract — no runtime check needed!
+            return;
+        }
+    }
     Reg cond_reg = emit_expr(*stmt.condition);
     Reg msg_reg = stmt.message ? emit_expr(*stmt.message) : 0;
 

@@ -149,6 +149,15 @@ void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement
         }
         
         check_statement(iter_stmt->body);
+    } else if (auto staged_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::StagedStatement>(stmt)) {
+        if (staged_stmt->declaration) check_statement(staged_stmt->declaration);
+        if (staged_stmt->block) check_statement(staged_stmt->block);
+        if (staged_stmt->expression) check_expression(staged_stmt->expression);
+    } else if (auto staged_block = std::dynamic_pointer_cast<LM::Frontend::AST::StagedBlockStatement>(stmt)) {
+        if (staged_block->body) check_statement(staged_block->body);
+    } else if (auto contract_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContractStatement>(stmt)) {
+        if (contract_stmt->condition) check_expression(contract_stmt->condition);
+        if (contract_stmt->message) check_expression(contract_stmt->message);
     }
 }
 
@@ -229,6 +238,9 @@ void MemoryChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Expressi
         check_expression(unary_expr->right);
     } else if (auto group_expr = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
         check_expression(group_expr->expression);
+    } else if (auto staged_expr = std::dynamic_pointer_cast<LM::Frontend::AST::StagedExpr>(expr)) {
+        if (staged_expr->expression) check_expression(staged_expr->expression);
+        if (staged_expr->block) check_statement(staged_expr->block);
     }
 }
 

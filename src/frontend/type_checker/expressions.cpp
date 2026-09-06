@@ -116,6 +116,8 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
         type = check_cast_expr(cast);
     } else if (auto frame_inst = std::dynamic_pointer_cast<LM::Frontend::AST::FrameInstantiationExpr>(expr)) {
         type = check_frame_instantiation_expr(frame_inst);
+    } else if (auto staged_expr = std::dynamic_pointer_cast<LM::Frontend::AST::StagedExpr>(expr)) {
+        type = check_staged_expr(staged_expr);
     } else {
         add_error("Unknown expression type", expr->line);
         type = type_system.NIL_TYPE; // Default fallback
@@ -2545,6 +2547,13 @@ TypePtr TypeChecker::check_staged_expr(std::shared_ptr<LM::Frontend::AST::Staged
         if (auto blk = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(eval_node)) {
             staged_expr->block = blk;
             TypePtr res = check_block_statement(blk);
+            if (blk->statements.size() == 1) {
+                if (auto expr_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(blk->statements[0])) {
+                    if (expr_stmt->expression) {
+                        staged_expr->expression = expr_stmt->expression;
+                    }
+                }
+            }
             staged_expr->inferred_type = res;
             return res;
         }

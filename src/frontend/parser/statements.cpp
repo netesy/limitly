@@ -79,7 +79,7 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
                 return decl;
             }
             if (check(TokenType::LEFT_BRACE)) {
-                match({TokenType::LEFT_BRACE});
+                consume(TokenType::LEFT_BRACE, "Expected '{' after 'staged'.");
                 auto blk = block();
                 auto stagedBlock = std::make_shared<LM::Frontend::AST::StagedBlockStatement>();
                 stagedBlock->line = previous().line;
@@ -1224,7 +1224,7 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::stagedStatement() {
     auto stmt = std::make_shared<LM::Frontend::AST::StagedStatement>();
     stmt->line = previous().line;
     if (check(TokenType::LEFT_BRACE)) {
-        match({TokenType::LEFT_BRACE});
+        consume(TokenType::LEFT_BRACE, "Expected '{' after 'staged'.");
         auto blockStmt = block();
         stmt->block = blockStmt;
         auto stagedBlock = std::make_shared<LM::Frontend::AST::StagedBlockStatement>();

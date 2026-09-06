@@ -506,7 +506,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
         auto stagedExpr = createNodeWithContext<LM::Frontend::AST::StagedExpr>();
         stagedExpr->line = previous().line;
         if (check(TokenType::LEFT_BRACE)) {
-            match({TokenType::LEFT_BRACE});
+            consume(TokenType::LEFT_BRACE, "Expected '{' after 'staged'.");
             stagedExpr->block = block();
         } else {
             stagedExpr->expression = expression();

@@ -72,7 +72,12 @@ void ASTPrinter::process(const std::shared_ptr<LM::Frontend::AST::Program>& prog
     std::cout << "==========" << std::endl;
     
     for (const auto& stmt : program->statements) {
-              printNode(stmt);
+        if (!stmt) {
+            std::cout << "  (null stmt)\n";
+            continue;
+        }
+        std::cout << "  [DEBUG stmt ptr: " << stmt.get() << "]\n";
+        printNode(stmt);
     }
 }
 
@@ -580,6 +585,9 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
         std::cout << indentation << "StagedExpr:" << std::endl;
         if (stagedExpr->expression) {
             printNode(stagedExpr->expression, indent + 1);
+        }
+        if (stagedExpr->block) {
+            printNode(stagedExpr->block, indent + 1);
         }
     }
     // Consolidated ReturnStatement case

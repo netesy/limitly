@@ -1,4 +1,5 @@
 #include "lir.hh"
+#include "../backend/vm/vm_string.hh"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -25,6 +26,13 @@ std::string LIR_Inst::to_string() const {
                 oss << " r" << dst << ", nil";
             } else if (IS_BOOL(const_val)) {
                 oss << " r" << dst << ", " << (UNBOX_BOOL(const_val) ? "true" : "false");
+            } else if (IS_PTR(const_val)) {
+                auto* str_hdr = reinterpret_cast<LmStringHeader*>(UNBOX_PTR(const_val));
+                if (str_hdr) {
+                    oss << " r" << dst << ", \"" << str_hdr->data << "\"";
+                } else {
+                    oss << " r" << dst << ", ptr:" << std::hex << const_val << std::dec;
+                }
             } else {
                 oss << " r" << dst << ", [boxed:" << std::hex << const_val << std::dec << "]";
             }
