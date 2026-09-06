@@ -48,6 +48,7 @@ private:
         std::size_t region_id;
         std::size_t alloc_id;
         int reference_count = 0;  // Track number of references for ownership checking
+        bool is_const = false;    // True for const/val bindings (immutable)
     };
     std::unordered_map<std::string, VariableInfo> variable_memory_info;
     
