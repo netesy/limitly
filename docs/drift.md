@@ -17,7 +17,7 @@ Features defined in `language.md` (the formal spec) but are either unimplemented
 | **Contract Statements** | `contract(cond, msg)` | Compile-time enforcement for static conditions and runtime assertion lowering. | **DONE** |
 | **Compile-Time Execution (`staged`)** | `staged { block }` | Staged metaprogramming and stage 0 compile-time evaluation. | **DONE** |
 | **Unsafe Blocks** | `unsafe { block }` | Nested scope tracking via in_unsafe_block with diagnostics for raw FFI/memory operations outside unsafe. | **DONE** |
-| **Frame Modifiers (`abstract`, `final`, `data`)** | Restricting frame instantiation/extension | Keywords parsed, but restrictions are not enforced by the TypeChecker. | **MEDIUM** |
+| **Frame Modifiers (`abstract`, `final`)** | Restricting frame instantiation/extension | Keywords parsed, but restrictions are not enforced by the TypeChecker. `data frame` removed in favor of traits. | **MEDIUM** |
 
 ---
 

@@ -729,22 +729,30 @@ frame Parent {
 }
 ```
 
-#### Data Frames (Planned / Removed)
+#### Frame Modifiers & Traits over Data Frames
 
-> ⚠️ Note: The `data` keyword modifier has been removed from frame declarations in favor of traits and standard frames.
+Frame modifiers in Limitly include `abstract` and `final`. The `data frame` concept has been completely removed in favor of standard frames combined with traits. Traits provide the interface contracts and structural guarantees for data structures without needing specialized data frame keywords.
 
 ```limit
-frame User {
-    pub name: str;
-    pub age: int;
+trait Identifiable {
+    fn id(): int;
+}
 
-    pub init(name: str, age: int) {
+frame User: Identifiable {
+    pub user_id: int;
+    pub name: str;
+
+    pub init(id: int, name: str) {
+        self.user_id = id;
         self.name = name;
-        self.age = age;
+    }
+
+    pub fn id(): int {
+        return self.user_id;
     }
 }
 
-var user = User("Alice", 30);
+var user = User(1, "Alice");
 print(user.name); // Output: Alice
 ```
 
