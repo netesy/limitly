@@ -83,12 +83,14 @@ bool Optimizer::optimize() {
         bool ur = remove_unreachable_code();
         bool cf = constant_folding();
         bool po = peephole_optimize();
+        bool rm = redundant_memory_elimination();
         bool dce = dead_code_elimination();
         bool rc = remove_redundant_entry_calls();
 
         pass_changed |= ur;
         pass_changed |= cf;
         pass_changed |= po;
+        pass_changed |= rm;
         pass_changed |= dce;
         pass_changed |= rc;
 
@@ -166,16 +168,12 @@ bool Optimizer::remove_unreachable_code() {
 
         switch (inst.op) {
             case LIR_Op::Jump: {
-                if (inst.imm >= 0) {
-                    push_if_valid(static_cast<size_t>(inst.imm));
-                }
+                push_if_valid(static_cast<size_t>(inst.imm));
                 break;
             }
             case LIR_Op::JumpIf:
             case LIR_Op::JumpIfFalse: {
-                if (inst.imm >= 0) {
-                    push_if_valid(static_cast<size_t>(inst.imm));
-                }
+                push_if_valid(static_cast<size_t>(inst.imm));
                 if (i + 1 < n) push_if_valid(i + 1);  // fallthrough
                 break;
             }
@@ -211,8 +209,7 @@ bool Optimizer::remove_unreachable_code() {
         }
 
         for (auto& inst : compacted) {
-            if ((inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) &&
-                inst.imm >= 0) {
+            if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
                 size_t old_target = static_cast<size_t>(inst.imm);
                 if (old_target < n && remap[old_target] != static_cast<size_t>(-1)) {
                     inst.imm = static_cast<int64_t>(remap[old_target]);
@@ -273,6 +270,81 @@ bool Optimizer::dead_code_elimination_simple() {
         }
     }
     
+    return changed;
+}
+
+bool Optimizer::redundant_memory_elimination() {
+    if (func_.instructions.empty()) return false;
+    bool changed = false;
+
+    // Track memory state for pointers: address_reg -> stored_value_reg / loaded_dest_reg
+    // Invalidated on labels, calls, stores to unknown memory, etc.
+    std::unordered_map<Reg, Reg> active_memory_stores;
+
+    for (size_t i = 0; i < func_.instructions.size(); ++i) {
+        auto& inst = func_.instructions[i];
+
+        // Invalidate on control flow or calls
+        if (inst.op == LIR_Op::Label || inst.op == LIR_Op::Jump ||
+            inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse ||
+            inst.op == LIR_Op::Call || inst.op == LIR_Op::CallVoid ||
+            inst.op == LIR_Op::CallIndirect || inst.op == LIR_Op::CallBuiltin) {
+            active_memory_stores.clear();
+            continue;
+        }
+
+        // Redundant Store: Store ptr, val; Store ptr, val -> remove second store
+        if (inst.op == LIR_Op::MemoryStore || inst.op == LIR_Op::Store) {
+            Reg ptr_reg = inst.a;
+            Reg val_reg = inst.b;
+            auto it = active_memory_stores.find(ptr_reg);
+            if (it != active_memory_stores.end() && it->second == val_reg) {
+                // Redundant store of same value to same address
+                func_.instructions.erase(func_.instructions.begin() + i);
+                --i;
+                changed = true;
+                continue;
+            } else {
+                active_memory_stores[ptr_reg] = val_reg;
+            }
+        }
+
+        // Redundant Load: Store ptr, val; Load dst, ptr -> Mov dst, val
+        if (inst.op == LIR_Op::MemoryLoad || inst.op == LIR_Op::Load) {
+            Reg ptr_reg = inst.a;
+            auto it = active_memory_stores.find(ptr_reg);
+            if (it != active_memory_stores.end()) {
+                Reg stored_val = it->second;
+                inst.op = LIR_Op::Mov;
+                inst.a = stored_val;
+                inst.b = UINT32_MAX;
+                changed = true;
+                // Invalidate if destination register is modified by this load
+                if (inst.dst != UINT32_MAX) {
+                    for (auto store_it = active_memory_stores.begin(); store_it != active_memory_stores.end(); ) {
+                        if (store_it->first == inst.dst || store_it->second == inst.dst) {
+                            store_it = active_memory_stores.erase(store_it);
+                        } else {
+                            ++store_it;
+                        }
+                    }
+                }
+                continue;
+            }
+        }
+
+        // Invalidate any active store mappings if dst is overwritten
+        if (inst.dst != UINT32_MAX) {
+            for (auto store_it = active_memory_stores.begin(); store_it != active_memory_stores.end(); ) {
+                if (store_it->first == inst.dst || store_it->second == inst.dst) {
+                    store_it = active_memory_stores.erase(store_it);
+                } else {
+                    ++store_it;
+                }
+            }
+        }
+    }
+
     return changed;
 }
 

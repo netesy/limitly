@@ -649,7 +649,7 @@ public:
         if (op == ResourceOperation::WRITE) {
             if (args.empty()) return VAL_FALSE;
             LmStringHeader* s = lm_value_to_string(args[0]);
-            if (s && s->data) {
+            if (s) {
                 std::fwrite(s->data, 1, s->len, stdout);
                 std::fflush(stdout);
                 lm_str_free(s);
@@ -668,7 +668,7 @@ public:
         if (op == ResourceOperation::WRITE) {
             if (args.empty()) return VAL_FALSE;
             LmStringHeader* s = lm_value_to_string(args[0]);
-            if (s && s->data) {
+            if (s) {
                 std::fwrite(s->data, 1, s->len, stderr);
                 std::fflush(stderr);
                 lm_str_free(s);

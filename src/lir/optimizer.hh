@@ -53,6 +53,12 @@ public:
      */
     bool remove_redundant_entry_calls();
 
+    /**
+     * @brief Remove redundant consecutive memory loads and stores
+     * @return true if changes were made
+     */
+    bool redundant_memory_elimination();
+
 private:
     LIR_Function& func_;
 
