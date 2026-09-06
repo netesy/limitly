@@ -237,8 +237,10 @@ void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
         emit_match_stmt(*match_stmt);
     } else if (auto contract_stmt = dynamic_cast<LM::Frontend::AST::ContractStatement*>(&stmt)) {
         emit_contract_stmt(*contract_stmt);
-    } else if (auto comptime_stmt = dynamic_cast<LM::Frontend::AST::ComptimeStatement*>(&stmt)) {
-        emit_comptime_stmt(*comptime_stmt);
+    } else if (auto staged_stmt = dynamic_cast<LM::Frontend::AST::StagedStatement*>(&stmt)) {
+        emit_staged_stmt(*staged_stmt);
+    } else if (auto staged_block = dynamic_cast<LM::Frontend::AST::StagedBlockStatement*>(&stmt)) {
+        emit_staged_block(*staged_block);
     } else if (auto parallel_stmt = dynamic_cast<LM::Frontend::AST::ParallelStatement*>(&stmt)) {
         emit_parallel_stmt(*parallel_stmt);
     } else if (auto concurrent_stmt = dynamic_cast<LM::Frontend::AST::ConcurrentStatement*>(&stmt)) {
@@ -909,8 +911,20 @@ void Generator::emit_contract_stmt(LM::Frontend::AST::ContractStatement& stmt) {
 }
 
 
-void Generator::emit_comptime_stmt(LM::Frontend::AST::ComptimeStatement& stmt) {
-    report_error("Comptime statements not yet implemented");
+void Generator::emit_staged_stmt(LM::Frontend::AST::StagedStatement& stmt) {
+    if (stmt.declaration) {
+        emit_stmt(*stmt.declaration);
+    } else if (stmt.block) {
+        emit_stmt(*stmt.block);
+    } else if (stmt.expression) {
+        emit_expr(*stmt.expression);
+    }
+}
+
+void Generator::emit_staged_block(LM::Frontend::AST::StagedBlockStatement& stmt) {
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
+    }
 }
 
 

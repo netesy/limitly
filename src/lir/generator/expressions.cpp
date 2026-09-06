@@ -116,6 +116,23 @@ Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
         return emit_cast_expr(*cast);
     } else if (auto frame_inst = dynamic_cast<LM::Frontend::AST::FrameInstantiationExpr*>(&expr)) {
         return emit_frame_instantiation_expr(*frame_inst);
+    } else if (auto staged_expr = dynamic_cast<LM::Frontend::AST::StagedExpr*>(&expr)) {
+        if (staged_expr->expression) {
+            return emit_expr(*staged_expr->expression);
+        }
+        if (staged_expr->block) {
+            Reg last_reg = Reg();
+            for (auto& stmt : staged_expr->block->statements) {
+                if (auto expr_stmt = dynamic_cast<LM::Frontend::AST::ExprStatement*>(stmt.get())) {
+                    if (expr_stmt->expression) {
+                        last_reg = emit_expr(*expr_stmt->expression);
+                    }
+                } else {
+                    emit_stmt(*stmt);
+                }
+            }
+            return last_reg;
+        }
     } else if (auto this_expr = dynamic_cast<LM::Frontend::AST::ThisExpr*>(&expr)) {
         return emit_this_expr(*this_expr);
     } else if (auto channel_offer = dynamic_cast<LM::Frontend::AST::ChannelOfferExpr*>(&expr)) {

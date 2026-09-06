@@ -962,14 +962,14 @@ print("{name} is {age} years old."); // Output: Alice is 30 years old.
 // }
 ```
 
-### Compile-Time Execution (Disabled / Planned)
+### Compile-Time Execution (`staged { ... }`)
 
-> ⚠️ Note: `comptime` blocks are currently disabled by the compiler.
+Staged compile-time execution allows expressions and blocks to be evaluated during stage 0 semantic analysis.
 
 ```limit
-// comptime {
-//     var my_compile_time_var = 123;
-// }
+staged {
+    var my_compile_time_var = 123;
+}
 ```
 
 ## The Type System

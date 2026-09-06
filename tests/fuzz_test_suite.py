@@ -41,7 +41,7 @@ RESERVED_KEYWORDS = [
     "frame", "trait", "import", "match", "in", "type", "enum", "err", "ok",
     "and", "or", "not", "as", "where", "self", "super", "true", "false",
     "nil", "break", "continue", "parallel", "concurrent", "task", "worker",
-    "contract", "comptime", "unsafe", "module", "interface", "mixin",
+    "contract", "staged", "unsafe", "module", "interface", "mixin",
     "implements", "show", "hide", "from", "elif", "else", "static", "abstract",
     "final", "pub", "prot"
 ]

@@ -15,7 +15,7 @@ Features defined in `language.md` (the formal spec) but are either unimplemented
 | **Range Steps (`0..10..2`)** | `start..end..step` syntax | Unimplemented in the parser/generator. Range expressions only support `start..end`. | **LOW** |
 | **Async/Await** | `async fn` / `await` expressions | Reserved keywords; currently unimplemented at parser/LIR generator level. | **HIGH** |
 | **Contract Statements** | `contract(cond, msg)` | Keyword is reserved but unsupported as a language-level compiler check. | **MEDIUM** |
-| **Compile-Time Execution (`comptime`)** | `comptime { block }` | Keyword is reserved but actual compile-time macro execution is unimplemented. | **MEDIUM** |
+| **Compile-Time Execution (`staged`)** | `staged { block }` | Staged metaprogramming and stage 0 compile-time evaluation. | **DONE** |
 | **Unsafe Blocks** | `unsafe { block }` | Keyword is reserved but block semantics are parsed as normal block statements without isolation. | **MEDIUM** |
 | **Frame Modifiers (`abstract`, `final`, `data`)** | Restricting frame instantiation/extension | Keywords parsed, but restrictions are not enforced by the TypeChecker. | **MEDIUM** |
 

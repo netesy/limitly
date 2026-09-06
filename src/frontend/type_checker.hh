@@ -374,6 +374,11 @@ private:
     TypePtr check_return_statement(std::shared_ptr<LM::Frontend::AST::ReturnStatement> return_stmt);
     TypePtr check_match_statement(std::shared_ptr<LM::Frontend::AST::MatchStatement> match_stmt);
     TypePtr check_contract_statement(std::shared_ptr<LM::Frontend::AST::ContractStatement> contract_stmt);
+    TypePtr check_staged_statement(std::shared_ptr<LM::Frontend::AST::StagedStatement> staged_stmt);
+    TypePtr check_staged_block_statement(std::shared_ptr<LM::Frontend::AST::StagedBlockStatement> staged_block);
+    TypePtr check_staged_expr(std::shared_ptr<LM::Frontend::AST::StagedExpr> staged_expr);
+    std::shared_ptr<LM::Frontend::AST::Expression> evaluate_staged_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr, size_t depth = 0);
+    std::shared_ptr<LM::Frontend::AST::Statement> evaluate_staged_statement_node(std::shared_ptr<LM::Frontend::AST::Statement> stmt, size_t depth = 0);
     
     // Expression type checking
     TypePtr check_literal_expr(std::shared_ptr<LM::Frontend::AST::LiteralExpr> expr, TypePtr expected_type = nullptr);
