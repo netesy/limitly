@@ -1,0 +1,19 @@
+abstract frame Shape {
+    fn area(): float;
+}
+
+frame Circle: Shape {
+    pub radius: float;
+    pub init(r: float) {
+        self.radius = r;
+    }
+    pub fn area(): float {
+        return 3.14 * self.radius * self.radius;
+    }
+}
+
+fn main(): int {
+    var c = Circle(5.0);
+    print(c.area());
+    return 0;
+}

@@ -729,9 +729,9 @@ frame Parent {
 }
 ```
 
-#### Frame Modifiers & Traits over Data Frames
+#### Frame Modifiers & Traits
 
-Frame modifiers in Limitly include `abstract` and `final`. The `data frame` concept has been completely removed in favor of standard frames combined with traits. Traits provide the interface contracts and structural guarantees for data structures without needing specialized data frame keywords.
+Frame modifiers in Limitly include `abstract` and `final`. `abstract` frames cannot be instantiated directly and can declare abstract methods that subframes must implement. `final` frames cannot be extended, and `final` methods cannot be overridden. Traits provide interface contracts and structural guarantees for frames.
 
 ```limit
 trait Identifiable {

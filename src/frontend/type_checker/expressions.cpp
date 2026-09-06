@@ -1080,6 +1080,9 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 
         if (frame_it != frame_declarations.end()) {
             const FrameInfo& frame_info = frame_it->second;
+            if (frame_info.declaration && frame_info.declaration->isAbstract) {
+                add_error("Cannot instantiate abstract frame '" + var_expr->name + "'", expr->line);
+            }
             std::string init_name = var_expr->name + ".init";
             auto sig_it = function_signatures.find(init_name);
 
