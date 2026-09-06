@@ -1,0 +1,25 @@
+// Staged Metaprogramming and Compile-time Branch Stripping Test
+
+const FEATURE_ENABLED: int = 1;
+
+fn test_staged_block() {
+    var x: int = 0;
+    staged {
+        if (FEATURE_ENABLED == 1) {
+            x = 42;
+        } else {
+            x = 100;
+        }
+    }
+    print("Staged value: " + (x as str));
+}
+
+fn test_staged_expr() {
+    val result = staged { 10 + 20 };
+    print("Staged expr result: " + (result as str));
+}
+
+fn main() {
+    test_staged_block();
+    test_staged_expr();
+}

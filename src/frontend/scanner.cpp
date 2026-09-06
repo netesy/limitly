@@ -747,7 +747,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "implements") return TokenType::IMPLEMENTS;
     if (rest == "module") return TokenType::MODULE;
     if (rest == "contract") return TokenType::CONTRACT;
-    if (rest == "comptime") return TokenType::COMPTIME;
+    if (rest == "staged") return TokenType::STAGED;
     if (rest == "unsafe") return TokenType::UNSAFE;
     if (rest == "iter") return TokenType::ITER;
     if (rest == "where") return TokenType::WHERE;
@@ -1045,8 +1045,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "IMPLEMENTS";
     case TokenType::MODULE:
         return "MODULE";
-    case TokenType::COMPTIME:
-        return "COMPTIME";
+    case TokenType::STAGED:
+        return "STAGED";
     case TokenType::UNSAFE:
         return "UNSAFE";
     case TokenType::ITER:

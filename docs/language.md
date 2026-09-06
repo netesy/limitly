@@ -7,7 +7,7 @@ This document provides a formal specification of the Limit programming language 
 ### 1.1 Keywords
 
 ```
-and, as, break, concurrent, continue, comptime, contract, elif, else, enum,
+and, as, break, concurrent, continue, staged, contract, elif, else, enum,
 err, false, fn, for, frame, from, hide, if, import, in, interface, iter,
 match, module, nil, not, ok, or, parallel, prot, pub, return, self, show,
 static, super, task, trait, true, type, unsafe, val, var, const, where,

@@ -160,7 +160,7 @@ public:
     std::shared_ptr<LM::Frontend::AST::Statement> iterStatement();
     std::shared_ptr<LM::Frontend::AST::Statement> unsafeBlock();
     std::shared_ptr<LM::Frontend::AST::Statement> contractStatement();
-    std::shared_ptr<LM::Frontend::AST::Statement> comptimeStatement();
+    std::shared_ptr<LM::Frontend::AST::Statement> stagedStatement();
 
     // Concurrency parsing helper
     void parseConcurrencyParams(
