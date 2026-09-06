@@ -955,8 +955,10 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     if (!in_unsafe_block && !target_name.empty()) {
         if (target_name == "ffi_alloc" || target_name == "ffi_free" || target_name == "ffi_realloc" ||
             target_name == "ffi_memset" || target_name == "ffi_memcpy" ||
+            target_name == "resource_create" || target_name == "resource_destroy" || target_name == "resource_call" ||
+            target_name == "buffer_alloc" || target_name == "buffer_free" ||
             target_name.find("ffi_store_") == 0 || target_name.find("ffi_load_") == 0 ||
-            target_name.find("std.ffi.ffi_") != std::string::npos) {
+            target_name.find("std.ffi.") != std::string::npos || target_name.find("ffi_") == 0) {
             add_error("raw memory / FFI operation '" + target_name + "' requires an 'unsafe' block context", expr->line);
         }
     }
