@@ -18,6 +18,15 @@ namespace LM {
 namespace LIR {
 
 namespace {
+bool is_variable_alias_expr(LM::Frontend::AST::Expression* expr) {
+    if (!expr) return false;
+    if (dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr)) return true;
+    if (auto grouping = dynamic_cast<LM::Frontend::AST::GroupingExpr*>(expr)) {
+        return is_variable_alias_expr(grouping->expression.get());
+    }
+    return false;
+}
+
 bool resolve_match_variant_info(TypeSystem* type_system,
                                 TypePtr match_type,
                                 const std::string& pattern_type_name,
@@ -356,18 +365,21 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
 
     Reg value_reg;
     
-   // std::cout << "[DEBUG] Checking if variable has initializer" << std::endl;
     if (stmt.initializer) {
-       // std::cout << "[DEBUG] Variable has initializer, processing..." << std::endl;
-        // Check if the initializer is a literal - if so, optimize by directly using it
+        Reg value = 0;
         if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(stmt.initializer.get())) {
-            // For literal initializers, emit the literal with the expected type
-            value_reg = emit_literal_expr(*literal, declared_type);
+            value = emit_literal_expr(*literal, declared_type);
         } else {
-            // For non-literal initializers, evaluate and move
-           // std::cout << "[DEBUG] Processing non-literal initializer" << std::endl;
-            Reg value = emit_expr(*stmt.initializer);
-           // std::cout << "[DEBUG] emit_expr completed, value=" << value << std::endl;
+            value = emit_expr(*stmt.initializer);
+        }
+
+        bool is_literal = (dynamic_cast<LM::Frontend::AST::LiteralExpr*>(stmt.initializer.get()) != nullptr);
+        bool is_immutable = stmt.isConst;
+        bool is_var_alias = is_variable_alias_expr(stmt.initializer.get());
+
+        if (is_literal || (is_immutable && !is_var_alias)) {
+            value_reg = value;
+        } else {
             value_reg = allocate_register();
             Type abi_type = language_type_to_abi_type(stmt.inferred_type);
             emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, value_reg, value, 0));
