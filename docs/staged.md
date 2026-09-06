@@ -56,31 +56,37 @@ Compile-time staged evaluation occurs strictly **DURING Semantic Analysis / Type
 ### Pipeline Flowchart
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│ 1. AST Parser & Early Symbol Resolution                    │
-│    - Parses 'staged' tokens into StagedBlock/Expr AST nodes │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 2. Semantic Analysis & TypeChecker (Stage 0 Pass)           │
-│    ┌───────────────────────────────────────────────────┐    │
-│    │ Type-check staged blocks & parameters             │    │
-│    ├───────────────────────────────────────────────────┤    │
-│    │ StagedEvaluator Pass                             │    │
-│    │  - Evaluates compile-time expressions/functions   │    │
-│    │  - Performs enum/condition branch stripping      │    │
-│    │  - Enforces sandboxing execution limits          │    │
-│    ├───────────────────────────────────────────────────┤    │
-│    │ Re-validate folded AST nodes & layouts            │    │
-│    └───────────────────────────────────────────────────┘    │
-└──────────────────────────────┬──────────────────────────────┘
-                               │
-                               ▼
-┌─────────────────────────────────────────────────────────────┐
-│ 3. LIR Lowering & Bytecode Emission                         │
-│    - Emits LIR strictly from fully folded concrete AST     │
-└─────────────────────────────────────────────────────────────┘
+                  ┌───────────────────────────────┐
+                  │          Parse AST            │
+                  └───────────────┬───────────────┘
+                                  │
+                                  ▼
+ ┌─────────────────────────────────────────────────────────────────┐
+ │ PASS 1: Type Checking & Static Contract Checking                │
+ │ - Check static contracts: contract(sizeof(T) == 16)             │
+ │ - Verify staged function arguments and enum/union bounds        │
+ └───────────────────────────────┬─────────────────────────────────┘
+                                  │
+                                  ▼
+ ┌─────────────────────────────────────────────────────────────────┐
+ │ PASS 2: Staged Evaluator (Compile-time Interpreter)             │
+ │ - Execute staged { ... } blocks                                 │
+ │ - Evaluate staged functions that return types/unions/enums      │
+ │ - Replace staged AST nodes with concrete literal AST nodes       │
+ └───────────────────────────────┬─────────────────────────────────┘
+                                  │
+                                  ▼
+ ┌─────────────────────────────────────────────────────────────────┐
+ │ PASS 3: Behavioral Contract Lowering                            │
+ │ - Lower function preconditions: requires(x > 0)                 │
+ │ - Lower function postconditions: ensures(result != null)        │
+ │ - Inject explicit runtime guard/trap AST nodes into bodies      │
+ └───────────────────────────────┬─────────────────────────────────┘
+                                  │
+                                  ▼
+                  ┌───────────────────────────────┐
+                  │       LIR / Bytecode Gen      │
+                  └───────────────────────────────┘
 ```
 
 ### Pipeline Pseudocode
