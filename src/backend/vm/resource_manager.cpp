@@ -546,9 +546,26 @@ static std::string compute_hmac(const std::string& algo, const std::string& key,
 
 // ===================== Software Graphics Backend =====================
 
+struct GpuBuffer {
+    int id = 0;
+    std::vector<double> data; // vertex floats (x, y, r, g, b, a)
+};
+
+struct GpuPipeline {
+    int id = 0;
+    int shader_id = 0;
+    int primitive_type = 0; // 0 = rect, 1 = triangle, 2 = vertex_stream
+};
+
+struct GpuBindings {
+    int id = 0;
+    int vertex_buffer_id = 0;
+    int index_buffer_id = 0;
+};
+
 class SoftwareGraphicsResource : public Resource {
 public:
-    SoftwareGraphicsResource() : width_(800), height_(600) {
+    SoftwareGraphicsResource() : width_(800), height_(600), pass_active_(false) {
         pixels_.resize(width_ * height_ * 4, 0);
     }
 
@@ -557,8 +574,7 @@ public:
     RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
         switch (op) {
             case ResourceOperation::OPEN: {
-                int w = 800;
-                int h = 600;
+                int w = 800, h = 600;
                 if (!args.empty()) {
                     if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
                         if (lm_list_len(list) > 0) w = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
@@ -575,7 +591,44 @@ public:
                 }
                 return VAL_TRUE;
             }
+            case ResourceOperation::MAKE_BUFFER: {
+                if (args.empty()) return VAL_NIL;
+                int buf_id = static_cast<int>(register_value_to_i64(args[0]));
+                GpuBuffer buf;
+                buf.id = buf_id;
+                if (args.size() > 1) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[1], TYPE_LIST))) {
+                        size_t len = lm_list_len(list);
+                        for (size_t i = 0; i < len; ++i) {
+                            buf.data.push_back(register_value_to_double(lm_list_get(list, i)));
+                        }
+                    }
+                }
+                buffers_[buf_id] = buf;
+                return VAL_TRUE;
+            }
+            case ResourceOperation::MAKE_PIPELINE: {
+                if (args.empty()) return VAL_NIL;
+                int pip_id = static_cast<int>(register_value_to_i64(args[0]));
+                GpuPipeline pip;
+                pip.id = pip_id;
+                if (args.size() > 1) pip.shader_id = static_cast<int>(register_value_to_i64(args[1]));
+                if (args.size() > 2) pip.primitive_type = static_cast<int>(register_value_to_i64(args[2]));
+                pipelines_[pip_id] = pip;
+                return VAL_TRUE;
+            }
+            case ResourceOperation::MAKE_BINDINGS: {
+                if (args.empty()) return VAL_NIL;
+                int bind_id = static_cast<int>(register_value_to_i64(args[0]));
+                GpuBindings b;
+                b.id = bind_id;
+                if (args.size() > 1) b.vertex_buffer_id = static_cast<int>(register_value_to_i64(args[1]));
+                if (args.size() > 2) b.index_buffer_id = static_cast<int>(register_value_to_i64(args[2]));
+                bindings_[bind_id] = b;
+                return VAL_TRUE;
+            }
             case ResourceOperation::FILL: {
+                pass_active_ = true;
                 double r = 0.0, g = 0.0, b = 0.0, a = 1.0;
                 if (!args.empty()) {
                     if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
@@ -601,6 +654,106 @@ public:
                     pixels_[i + 1] = gu;
                     pixels_[i + 2] = bu;
                     pixels_[i + 3] = au;
+                }
+                return VAL_TRUE;
+            }
+            case ResourceOperation::END_PASS: {
+                if (!pass_active_) return VAL_FALSE;
+                pass_active_ = false;
+                return VAL_TRUE;
+            }
+            case ResourceOperation::APPLY_PIPELINE: {
+                if (!pass_active_) return VAL_FALSE;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) current_pipeline_ = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
+                    } else {
+                        current_pipeline_ = static_cast<int>(register_value_to_i64(args[0]));
+                    }
+                }
+                return VAL_TRUE;
+            }
+            case ResourceOperation::APPLY_BINDINGS: {
+                if (!pass_active_) return VAL_FALSE;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) current_vbuf_ = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
+                        if (lm_list_len(list) > 1) current_ibuf_ = static_cast<int>(register_value_to_i64(lm_list_get(list, 1)));
+                    } else {
+                        current_vbuf_ = static_cast<int>(register_value_to_i64(args[0]));
+                        if (args.size() > 1) current_ibuf_ = static_cast<int>(register_value_to_i64(args[1]));
+                    }
+                }
+                return VAL_TRUE;
+            }
+            case ResourceOperation::DRAW: {
+                if (!pass_active_) return VAL_FALSE;
+                auto vbuf_it = buffers_.find(current_vbuf_);
+                if (vbuf_it == buffers_.end() || vbuf_it->second.data.empty()) return VAL_FALSE;
+
+                auto pip_it = pipelines_.find(current_pipeline_);
+                int primitive_type = (pip_it != pipelines_.end()) ? pip_it->second.primitive_type : 0;
+
+                const auto& data = vbuf_it->second.data;
+
+                if (primitive_type == 1 && data.size() >= 10) { // Triangle Primitive (x1, y1, x2, y2, x3, y3, r, g, b, a)
+                    double x1 = data[0], y1 = data[1], x2 = data[2], y2 = data[3], x3 = data[4], y3 = data[5];
+                    double r = data[6], g = data[7], b = data[8], a = data[9];
+
+                    int min_x = std::clamp(static_cast<int>(std::floor(std::min({x1, x2, x3}))), 0, width_);
+                    int max_x = std::clamp(static_cast<int>(std::ceil(std::max({x1, x2, x3}))), 0, width_);
+                    int min_y = std::clamp(static_cast<int>(std::floor(std::min({y1, y2, y3}))), 0, height_);
+                    int max_y = std::clamp(static_cast<int>(std::ceil(std::max({y1, y2, y3}))), 0, height_);
+
+                    auto edge = [](double ax, double ay, double bx, double by, double cx, double cy) {
+                        return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
+                    };
+
+                    uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
+                    uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
+                    uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
+                    uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
+
+                    for (int py = min_y; py < max_y; ++py) {
+                        for (int px = min_x; px < max_x; ++px) {
+                            double pX = px + 0.5;
+                            double pY = py + 0.5;
+                            double w0 = edge(x2, y2, x3, y3, pX, pY);
+                            double w1 = edge(x3, y3, x1, y1, pX, pY);
+                            double w2 = edge(x1, y1, x2, y2, pX, pY);
+
+                            if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
+                                size_t idx = static_cast<size_t>(py * width_ + px) * 4;
+                                pixels_[idx]     = ru;
+                                pixels_[idx + 1] = gu;
+                                pixels_[idx + 2] = bu;
+                                pixels_[idx + 3] = au;
+                            }
+                        }
+                    }
+                } else if (data.size() >= 8) { // Rectangle Primitive (x, y, w, h, r, g, b, a)
+                    double x = data[0], y = data[1], w = data[2], h = data[3];
+                    double r = data[4], g = data[5], b = data[6], a = data[7];
+
+                    int x0 = std::clamp(static_cast<int>(x), 0, width_);
+                    int y0 = std::clamp(static_cast<int>(y), 0, height_);
+                    int x1 = std::clamp(static_cast<int>(x + w), 0, width_);
+                    int y1 = std::clamp(static_cast<int>(y + h), 0, height_);
+
+                    uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
+                    uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
+                    uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
+                    uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
+
+                    for (int py = y0; py < y1; ++py) {
+                        for (int px = x0; px < x1; ++px) {
+                            size_t idx = static_cast<size_t>(py * width_ + px) * 4;
+                            pixels_[idx]     = ru;
+                            pixels_[idx + 1] = gu;
+                            pixels_[idx + 2] = bu;
+                            pixels_[idx + 3] = au;
+                        }
+                    }
                 }
                 return VAL_TRUE;
             }
@@ -701,40 +854,6 @@ public:
                 }
                 return VAL_TRUE;
             }
-            case ResourceOperation::APPLY_PIPELINE: {
-                if (!args.empty()) {
-                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
-                        if (lm_list_len(list) > 0) current_pipeline_ = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
-                    } else {
-                        current_pipeline_ = static_cast<int>(register_value_to_i64(args[0]));
-                    }
-                }
-                return VAL_TRUE;
-            }
-            case ResourceOperation::APPLY_BINDINGS: {
-                if (!args.empty()) {
-                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
-                        if (lm_list_len(list) > 0) current_vbuf_ = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
-                        if (lm_list_len(list) > 1) current_ibuf_ = static_cast<int>(register_value_to_i64(lm_list_get(list, 1)));
-                    } else {
-                        current_vbuf_ = static_cast<int>(register_value_to_i64(args[0]));
-                        if (args.size() > 1) current_ibuf_ = static_cast<int>(register_value_to_i64(args[1]));
-                    }
-                }
-                return VAL_TRUE;
-            }
-            case ResourceOperation::DRAW: {
-                int count = 0;
-                if (!args.empty()) {
-                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
-                        if (lm_list_len(list) > 1) count = static_cast<int>(register_value_to_i64(lm_list_get(list, 1)));
-                    } else {
-                        if (args.size() > 1) count = static_cast<int>(register_value_to_i64(args[1]));
-                    }
-                }
-                last_draw_count_ = count;
-                return VAL_TRUE;
-            }
             case ResourceOperation::READ: {
                 int px = 0;
                 int py = 0;
@@ -766,10 +885,13 @@ public:
 private:
     int width_;
     int height_;
+    bool pass_active_ = false;
     int current_pipeline_ = 0;
     int current_vbuf_ = 0;
     int current_ibuf_ = 0;
-    int last_draw_count_ = 0;
+    std::map<int, GpuBuffer> buffers_;
+    std::map<int, GpuPipeline> pipelines_;
+    std::map<int, GpuBindings> bindings_;
     std::vector<uint8_t> pixels_;
 };
 

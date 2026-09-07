@@ -69,7 +69,12 @@ enum class ResourceOperation : uint32_t {
     DRAW_TRIANGLE = 36,
     APPLY_PIPELINE = 37,
     APPLY_BINDINGS = 38,
-    DRAW = 39
+    DRAW = 39,
+    MAKE_BUFFER = 40,
+    MAKE_IMAGE = 41,
+    MAKE_PIPELINE = 42,
+    MAKE_BINDINGS = 43,
+    END_PASS = 44
 };
 
 } // namespace VM

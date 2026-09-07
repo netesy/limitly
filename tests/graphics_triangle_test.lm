@@ -1,4 +1,7 @@
 import std.gg as gg;
+import std.graphics.canvas as canvas;
+import std.graphics.paint as paint;
+import std.graphics.color as color;
 
 fn main() {
     print("=== Software Graphics Pixel Verification ===");
@@ -7,8 +10,13 @@ fn main() {
     // Begin pass and clear to black background (0,0,0,1)
     gg.begin_pass(800, 600, 0.0, 0.0, 0.0, 1.0);
 
-    // Draw red triangle
-    gg.draw_triangle_primitive(100.0, 100.0, 200.0, 100.0, 150.0, 200.0, 1.0, 0.0, 0.0, 1.0);
+    // Draw red triangle using Canvas -> std.gg pipeline draw
+    var cvs = canvas.Canvas(w=800.0, h=600.0);
+    var p = paint.Paint();
+    p.color_val = color.rgb(255, 0, 0);
+
+    cvs.draw_triangle(100.0, 100.0, 200.0, 100.0, 150.0, 200.0, p);
+    gg.end_pass();
     gg.commit();
 
     // Verify pixel inside triangle (150, 120) is non-nil

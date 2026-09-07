@@ -98,12 +98,27 @@ pub fn make_pass_action(r: float, g: float, b: float, a: float, clear: bool): Pa
 pub fn make_buffer(size: int, is_index: bool): Buffer {
     var id = global_graphics_context.next_resource_id;
     global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_BUFFER, [id, []]);
+    }
+    return Buffer(id=id, size=size, is_index=is_index);
+}
+
+pub fn make_buffer_data(size: int, is_index: bool, data: any): Buffer {
+    var id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_BUFFER, [id, data]);
+    }
     return Buffer(id=id, size=size, is_index=is_index);
 }
 
 pub fn make_image(width: int, height: int): Image {
     var id = global_graphics_context.next_resource_id;
     global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_IMAGE, [id, width, height]);
+    }
     return Image(id=id, width=width, height=height);
 }
 
@@ -122,10 +137,18 @@ pub fn make_shader(vs: str, fs: str): Shader {
 pub fn make_pipeline(shader_id: int, primitive_type: int): Pipeline {
     var id = global_graphics_context.next_resource_id;
     global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_PIPELINE, [id, shader_id, primitive_type]);
+    }
     return Pipeline(id=id, shader_id=shader_id, primitive_type=primitive_type);
 }
 
 pub fn make_bindings(vbuf_id: int, ibuf_id: int, img_id: int, sampler_id: int): Bindings {
+    var id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_BINDINGS, [id, vbuf_id, ibuf_id]);
+    }
     return Bindings(
         vertex_buffer_id=vbuf_id,
         index_buffer_id=ibuf_id,
@@ -152,7 +175,11 @@ pub fn draw_triangle_primitive(x1: float, y1: float, x2: float, y2: float, x3: f
     }
 }
 
-pub fn end_pass(): nil {}
+pub fn end_pass(): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_END_PASS, []);
+    }
+}
 
 pub fn apply_pipeline(pip_id: int): nil {
     if (global_graphics_context.handle != -1) {

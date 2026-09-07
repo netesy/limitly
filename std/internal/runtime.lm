@@ -38,6 +38,11 @@ pub var OP_DRAW_TRIANGLE: int = 36;
 pub var OP_APPLY_PIPELINE: int = 37;
 pub var OP_APPLY_BINDINGS: int = 38;
 pub var OP_DRAW: int = 39;
+pub var OP_MAKE_BUFFER: int = 40;
+pub var OP_MAKE_IMAGE: int = 41;
+pub var OP_MAKE_PIPELINE: int = 42;
+pub var OP_MAKE_BINDINGS: int = 43;
+pub var OP_END_PASS: int = 44;
 
 pub fn create(type_id: int, args: any): int {
     unsafe {

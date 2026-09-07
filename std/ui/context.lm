@@ -1,5 +1,5 @@
 // UI Context Module
-// Retained UI Pipeline implementation
+// Retained UI Pipeline implementation with Dynamic Layout and Hit Testing
 
 import std.ui.types as ui_types;
 import std.gg as gg;
@@ -53,6 +53,60 @@ pub fn update_blueprint(bp: ui_types.Blueprint): nil {
     global_ui_context.dirty = 1;
 }
 
+pub fn hit_test_and_click_blueprint(bp: ui_types.Blueprint, px: float, py: float, x: float, y: float, available_w: float, available_h: float): ui_types.Blueprint {
+    if (bp.variant_type == 1) { // Container
+        var data = bp.container_data_val;
+        var curr_y = y + data.padding.y;
+        var curr_x = x + data.padding.x;
+        var new_children = ui_types.empty_blueprints();
+        var child_w = available_w - data.padding.x - data.padding.w;
+        var child_h = 36.0;
+
+        var i = 0;
+        while (i < len(bp.children)) {
+            var child_bp = bp.children[i];
+            var updated_child = hit_test_and_click_blueprint(child_bp, px, py, curr_x, curr_y, child_w, child_h);
+            new_children = new_children + [updated_child];
+            if (data.axis.is_vertical == 1) {
+                curr_y = curr_y + child_h + 8.0 + data.spacing;
+            } else {
+                curr_x = curr_x + 120.0 + data.spacing;
+            }
+            i = i + 1;
+        }
+        return ui_types.Blueprint(
+            variant_type=1,
+            container_data_val=data,
+            text_data_val=bp.text_data_val,
+            button_data_val=bp.button_data_val,
+            constraints=bp.constraints,
+            children=new_children
+        );
+    }
+    if (bp.variant_type == 3) { // Button
+        var bdata = bp.button_data_val;
+        if (px >= x and px <= x + available_w and py >= y and py <= y + 36.0) {
+            bdata.label = bdata.label + " [Clicked]";
+            bdata.background = ui_types.color_rgb8(220, 80, 50);
+            mark_element_dirty(1);
+        }
+        return ui_types.Blueprint(
+            variant_type=3,
+            container_data_val=bp.container_data_val,
+            text_data_val=bp.text_data_val,
+            button_data_val=bdata,
+            constraints=bp.constraints,
+            children=bp.children
+        );
+    }
+    return bp;
+}
+
+pub fn dispatch_pointer_click(px: float, py: float): nil {
+    var updated = hit_test_and_click_blueprint(global_ui_context.current_blueprint, px, py, 20.0, 20.0, 760.0, 560.0);
+    global_ui_context.current_blueprint = updated;
+}
+
 fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil {
     if (bp.variant_type == 1) { // Container
         var data = bp.container_data_val;
@@ -62,12 +116,15 @@ fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w
 
         var curr_y = y + data.padding.y;
         var curr_x = x + data.padding.x;
+        var child_w = available_w - data.padding.x - data.padding.w;
+        var child_h = 36.0;
+
         var i = 0;
         while (i < len(bp.children)) {
             var child_bp = bp.children[i];
-            render_blueprint_node(child_bp, curr_x, curr_y, available_w - data.padding.x - data.padding.w, 40.0, cvs);
+            render_blueprint_node(child_bp, curr_x, curr_y, child_w, child_h, cvs);
             if (data.axis.is_vertical == 1) {
-                curr_y = curr_y + 44.0 + data.spacing;
+                curr_y = curr_y + child_h + 8.0 + data.spacing;
             } else {
                 curr_x = curr_x + 120.0 + data.spacing;
             }

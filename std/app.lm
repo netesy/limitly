@@ -172,14 +172,20 @@ pub fn app_run(): nil {
     
     // Main event loop
     while (global_app_state.is_running != 0) {
+        if (has_pending_events() != 0) {
+            var ev = poll_event();
+            if (ev.event_type == EVENT_QUIT) {
+                global_app_state.is_running = 0;
+            }
+        } else {
+            // Headless execution: complete frame step and yield loop
+            if (global_app_state.frame_count >= 1) {
+                global_app_state.is_running = 0;
+            }
+        }
         process_events();
         present_frame();
         global_app_state.frame_count = global_app_state.frame_count + 1;
-
-        // Single tick exit for non-blocking headless execution
-        if (global_app_state.frame_count >= 1) {
-            global_app_state.is_running = 0;
-        }
     }
 }
 
