@@ -1,0 +1,36 @@
+import std.ffi as ffi;
+
+fn main() {
+    print("=== C++ extern 'C' Acceptance Test ===");
+
+    unsafe {
+        var lib = ffi.load("./tests/ffi/native/libtest_cpp.so");
+        assert(lib.is_loaded, "Failed to load libtest_cpp.so");
+
+        var add_func = lib.func("cpp_add", ffi.TYPE_I32, [ffi.TYPE_I32, ffi.TYPE_I32]);
+        assert(add_func.func_ptr != 0, "Failed to locate cpp_add symbol");
+        var res_add = add_func.call(100, 250);
+        print("cpp_add(100, 250) =");
+        print(res_add);
+        assert(res_add == 350, "cpp_add(100, 250) should be 350");
+
+        var scale_func = lib.func("cpp_scale", ffi.TYPE_F64, [ffi.TYPE_F64, ffi.TYPE_F64]);
+        assert(scale_func.func_ptr != 0, "Failed to locate cpp_scale symbol");
+        var res_scale = scale_func.call(2.5, 4.0);
+        print("cpp_scale(2.5, 4.0) =");
+        print(res_scale);
+        assert(res_scale == 10.0, "cpp_scale(2.5, 4.0) should be 10.0");
+
+        var strlen_func = lib.func("cpp_strlen", ffi.TYPE_I64, [ffi.TYPE_PTR]);
+        assert(strlen_func.func_ptr != 0, "Failed to locate cpp_strlen symbol");
+        var c_str = ffi.string_to_cstring("C++ extern C test");
+        var res_len = strlen_func.call(c_str.ptr);
+        print("cpp_strlen('C++ extern C test') =");
+        print(res_len);
+        assert(res_len == 17, "cpp_strlen should return 17");
+        ffi.cstring_free(c_str);
+
+        lib.close();
+    }
+    print("=== C++ extern 'C' Acceptance Test PASSED ===");
+}
