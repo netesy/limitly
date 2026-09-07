@@ -15,48 +15,64 @@ bool Optimizer::optimize() {
     bool pass_changed;
     int pass_count = 0;
 
+    report_ = OptimizationReport{};
+    report_.function_name = func_.name;
+    report_.initial_instructions = func_.instructions.size();
+    report_.memory_ops_before = MetricsCollector::count_memory_ops(func_);
+
     AnalysisManager am(func_);
+
+    auto run_pass = [&](const std::string& name, auto pass_fn) -> bool {
+        size_t before = func_.instructions.size();
+        bool res = pass_fn();
+        size_t after = func_.instructions.size();
+        int delta = static_cast<int>(after) - static_cast<int>(before);
+        if (delta != 0) {
+            report_.pass_deltas[name] += delta;
+        }
+        return res;
+    };
 
     do {
         pass_changed = false;
 
-        bool ur = remove_unreachable_code();
+        bool ur = run_pass("Unreachable code elimination", [&]() { return remove_unreachable_code(); });
         if (ur) am.invalidate_all();
 
-        bool cf = constant_folding();
+        bool cf = run_pass("Constant folding", [&]() { return constant_folding(); });
         if (cf) am.invalidate_all();
 
-        bool po = peephole_optimize();
+        bool po = run_pass("Peephole / Strength reduction", [&]() { return peephole_optimize(); });
         if (po) am.invalidate_all();
 
-        bool rm = redundant_memory_elimination();
+        bool rm = run_pass("Redundant memory elimination", [&]() { return redundant_memory_elimination(); });
         if (rm) am.invalidate_def_use();
 
-        bool cp = copy_propagation();
+        bool cp = run_pass("Copy propagation", [&]() { return copy_propagation(); });
         if (cp) am.invalidate_all();
 
-        bool dce = dead_code_elimination();
+        bool dce = run_pass("DCE", [&]() { return dead_code_elimination(); });
         if (dce) am.invalidate_all();
 
-        bool rc = remove_redundant_entry_calls();
+        bool rc = run_pass("Redundant entry calls", [&]() { return remove_redundant_entry_calls(); });
         if (rc) am.invalidate_all();
 
-        bool fi = function_inlining();
+        bool fi = run_pass("Inlining", [&]() { return function_inlining(); });
         if (fi) am.invalidate_all();
 
-        bool gvn = global_value_numbering();
+        bool gvn = run_pass("GVN", [&]() { return global_value_numbering(); });
         if (gvn) am.invalidate_all();
 
-        bool gch = generational_check_hoisting();
+        bool gch = run_pass("Generational check hoisting", [&]() { return generational_check_hoisting(); });
         if (gch) am.invalidate_all();
 
-        bool pol = prune_orphaned_labels();
+        bool pol = run_pass("Prune orphaned labels", [&]() { return prune_orphaned_labels(); });
         if (pol) am.invalidate_cfg();
 
-        bool tco = tail_call_optimization();
+        bool tco = run_pass("TCO", [&]() { return tail_call_optimization(); });
         if (tco) am.invalidate_all();
 
-        bool licm = loop_invariant_code_motion();
+        bool licm = run_pass("LICM", [&]() { return loop_invariant_code_motion(); });
         if (licm) am.invalidate_all();
 
         pass_changed |= ur;
@@ -76,6 +92,14 @@ bool Optimizer::optimize() {
         changed |= pass_changed;
         pass_count++;
     } while (pass_changed && pass_count < 10);
+
+    report_.final_instructions = func_.instructions.size();
+    report_.memory_ops_after = MetricsCollector::count_memory_ops(func_);
+
+    if (std::getenv("LIMITLY_PRINT_OPT_REPORT")) {
+        report_.print();
+    }
+
     return changed;
 }
 
@@ -117,33 +141,17 @@ bool Optimizer::dead_code_elimination() {
 bool Optimizer::remove_unreachable_code() {
     if (func_.instructions.empty()) return false;
 
-    AnalysisManager am(func_);
-    const auto& cfg = am.get_cfg();
+    bool changed = false;
+    for (size_t i = 0; i < func_.instructions.size(); ++i) {
+        const auto& inst = func_.instructions[i];
 
-    const size_t n = func_.instructions.size();
-    std::vector<bool> reachable_insts(n, false);
-
-    for (const auto& block : cfg.get_blocks()) {
-        if (block.reachable) {
-            for (size_t i = block.start_inst_idx; i < block.end_inst_idx; ++i) {
-                reachable_insts[i] = true;
+        if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::Return || inst.op == LIR_Op::Ret) {
+            size_t j = i + 1;
+            while (j < func_.instructions.size() && func_.instructions[j].op != LIR_Op::Label) {
+                func_.instructions.erase(func_.instructions.begin() + j);
+                changed = true;
             }
         }
-    }
-
-    bool changed = false;
-    std::vector<LIR_Inst> compacted;
-    compacted.reserve(n);
-    for (size_t i = 0; i < n; ++i) {
-        if (reachable_insts[i]) {
-            compacted.push_back(func_.instructions[i]);
-        } else {
-            changed = true;
-        }
-    }
-
-    if (changed) {
-        func_.instructions = std::move(compacted);
     }
 
     return changed;
@@ -892,7 +900,13 @@ bool Optimizer::loop_invariant_code_motion() {
                 if (a_invariant && b_invariant && dst_single_def) {
                     LIR_Inst hoisted = cand;
                     func_.instructions.erase(func_.instructions.begin() + k);
-                    func_.instructions.insert(func_.instructions.begin() + header_block->start_inst_idx, hoisted);
+
+                    size_t insert_pos = header_block->start_inst_idx;
+                    if (insert_pos < func_.instructions.size() &&
+                        func_.instructions[insert_pos].op == LIR_Op::Label) {
+                        insert_pos++;
+                    }
+                    func_.instructions.insert(func_.instructions.begin() + insert_pos, hoisted);
                     changed = true;
                     break;
                 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "lir.hh"
+#include "metrics.hh"
 #include <set>
 #include <vector>
 
@@ -16,6 +17,8 @@ public:
      * @return true if any change was made
      */
     bool optimize();
+
+    const OptimizationReport& get_report() const { return report_; }
 
     /**
      * @brief Perform Dead Code Elimination with CFG-based liveness analysis
@@ -103,6 +106,7 @@ public:
 
 private:
     LIR_Function& func_;
+    OptimizationReport report_;
 
     /**
      * @brief Check if an instruction has side effects
