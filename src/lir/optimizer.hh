@@ -66,6 +66,12 @@ public:
     bool function_inlining();
 
     /**
+     * @brief Perform Copy Propagation across basic blocks using def-use analysis
+     * @return true if copies were propagated
+     */
+    bool copy_propagation();
+
+    /**
      * @brief Perform Global Value Numbering across basic block sequences
      * @return true if changes were made
      */

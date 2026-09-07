@@ -1,5 +1,6 @@
 #include "optimizer.hh"
 #include "functions.hh"
+#include "analysis.hh"
 #include "backend/vm/vm_value.hh"
 #include <unordered_set>
 #include <unordered_map>
@@ -9,97 +10,60 @@
 namespace LM {
 namespace LIR {
 
-// ============================================================================
-// Liveness Analysis for Dead Code Elimination
-// ============================================================================
-
-class LivenessAnalyzer {
-public:
-    explicit LivenessAnalyzer(const std::vector<LIR_Inst>& instructions)
-        : instructions_(instructions) {}
-
-    // Compute which registers are live at each instruction
-    std::vector<std::unordered_set<Reg>> analyze() {
-        std::vector<std::unordered_set<Reg>> live_at(instructions_.size());
-        
-        if (instructions_.empty()) return live_at;
-
-        // Build a map of labels to instruction indices
-        std::unordered_map<uint32_t, size_t> label_to_idx;
-        for (size_t i = 0; i < instructions_.size(); ++i) {
-            if (instructions_[i].op == LIR_Op::Label) {
-                label_to_idx[instructions_[i].imm] = i;
-            }
-        }
-
-        // Backward pass: compute liveness from end to start
-        std::unordered_set<Reg> live_regs;
-        
-        for (int i = static_cast<int>(instructions_.size()) - 1; i >= 0; --i) {
-            const auto& inst = instructions_[i];
-            
-            // Add uses to live set (before this instruction)
-            if (inst.a != UINT32_MAX) live_regs.insert(inst.a);
-            if (inst.b != UINT32_MAX) live_regs.insert(inst.b);
-            for (Reg arg : inst.call_args) {
-                if (arg != UINT32_MAX) live_regs.insert(arg);
-            }
-            
-            // For return statements, the destination register is also live
-            if ((inst.op == LIR_Op::Return || inst.op == LIR_Op::Ret) && inst.dst != UINT32_MAX) {
-                live_regs.insert(inst.dst);
-            }
-            
-            // For conditional jumps, we need to consider both paths
-            if (inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
-                // The condition register is used
-                if (inst.dst != UINT32_MAX) live_regs.insert(inst.dst);
-            }
-            
-            // Store live set at this point
-            live_at[i] = live_regs;
-            
-            // Remove destination from live set (it's being defined here)
-            // EXCEPT for return statements where dst is the return value
-            // EXCEPT for jumps where dst is the condition
-            if (inst.dst != UINT32_MAX && 
-                inst.op != LIR_Op::Return && inst.op != LIR_Op::Ret &&
-                inst.op != LIR_Op::Jump && inst.op != LIR_Op::JumpIf && inst.op != LIR_Op::JumpIfFalse) {
-                live_regs.erase(inst.dst);
-            }
-        }
-        
-        return live_at;
-    }
-
-private:
-    const std::vector<LIR_Inst>& instructions_;
-};
-
 bool Optimizer::optimize() {
     bool changed = false;
     bool pass_changed;
     int pass_count = 0;
+
+    AnalysisManager am(func_);
+
     do {
         pass_changed = false;
+
         bool ur = remove_unreachable_code();
+        if (ur) am.invalidate_all();
+
         bool cf = constant_folding();
+        if (cf) am.invalidate_all();
+
         bool po = peephole_optimize();
+        if (po) am.invalidate_all();
+
         bool rm = redundant_memory_elimination();
+        if (rm) am.invalidate_def_use();
+
+        bool cp = copy_propagation();
+        if (cp) am.invalidate_all();
+
         bool dce = dead_code_elimination();
+        if (dce) am.invalidate_all();
+
         bool rc = remove_redundant_entry_calls();
+        if (rc) am.invalidate_all();
 
         bool fi = function_inlining();
+        if (fi) am.invalidate_all();
+
         bool gvn = global_value_numbering();
+        if (gvn) am.invalidate_all();
+
         bool gch = generational_check_hoisting();
+        if (gch) am.invalidate_all();
+
         bool pol = prune_orphaned_labels();
+        if (pol) am.invalidate_cfg();
+
         bool tco = tail_call_optimization();
+        if (tco) am.invalidate_all();
+
         bool licm = loop_invariant_code_motion();
+        if (licm) am.invalidate_all();
 
         pass_changed |= ur;
         pass_changed |= cf;
         pass_changed |= po;
         pass_changed |= rm;
+        pass_changed |= cp;
         pass_changed |= dce;
         pass_changed |= rc;
         pass_changed |= fi;
@@ -119,38 +83,31 @@ bool Optimizer::dead_code_elimination() {
     if (func_.instructions.empty()) return false;
 
     bool changed = false;
-    
-    // Perform liveness analysis
-    LivenessAnalyzer analyzer(func_.instructions);
-    auto live_at = analyzer.analyze();
+    AnalysisManager am(func_);
+    const auto& def_use = am.get_def_use();
 
-    // Mark instructions to remove (backward pass)
+    // Mark instructions to remove
     std::vector<bool> to_remove(func_.instructions.size(), false);
-    
+
     for (size_t i = 0; i < func_.instructions.size(); ++i) {
         const auto& inst = func_.instructions[i];
-        
-        // Check if instruction has side effects
-        bool has_side_effects = has_instruction_side_effects(inst);
-        
-        // Check if destination is live after this instruction
-        bool dst_is_live = false;
-        if (inst.dst != UINT32_MAX && i + 1 < live_at.size()) {
-            dst_is_live = live_at[i + 1].count(inst.dst) > 0;
-        }
-        
-        // Keep instruction if it has side effects or destination is live
-        if (!has_side_effects && !dst_is_live && inst.dst != UINT32_MAX) {
-            // Dead instruction - mark for removal
-            to_remove[i] = true;
-            changed = true;
+
+        if (DefUseAnalysis::has_side_effects(inst)) continue;
+
+        if (inst.dst != UINT32_MAX) {
+            size_t use_count = def_use.get_use_count(inst.dst);
+            if (use_count == 0) {
+                to_remove[i] = true;
+                changed = true;
+            }
         }
     }
 
-    // Remove marked instructions in reverse order
-    for (int i = static_cast<int>(func_.instructions.size()) - 1; i >= 0; --i) {
-        if (to_remove[i]) {
-            func_.instructions.erase(func_.instructions.begin() + i);
+    if (changed) {
+        for (int i = static_cast<int>(func_.instructions.size()) - 1; i >= 0; --i) {
+            if (to_remove[i]) {
+                func_.instructions.erase(func_.instructions.begin() + i);
+            }
         }
     }
 
@@ -160,46 +117,16 @@ bool Optimizer::dead_code_elimination() {
 bool Optimizer::remove_unreachable_code() {
     if (func_.instructions.empty()) return false;
 
+    AnalysisManager am(func_);
+    const auto& cfg = am.get_cfg();
+
     const size_t n = func_.instructions.size();
-    std::vector<bool> reachable(n, false);
-    std::queue<size_t> worklist;
+    std::vector<bool> reachable_insts(n, false);
 
-    auto push_if_valid = [&](size_t idx) {
-        if (idx < n && !reachable[idx]) {
-            reachable[idx] = true;
-            worklist.push(idx);
-        }
-    };
-
-    // Entry point
-    push_if_valid(0);
-
-    // Graph traversal over instruction indices (CFG-aware over jump targets,
-    // with linear fallthrough when control continues).
-    while (!worklist.empty()) {
-        size_t i = worklist.front();
-        worklist.pop();
-        const auto& inst = func_.instructions[i];
-
-        switch (inst.op) {
-            case LIR_Op::Jump: {
-                push_if_valid(static_cast<size_t>(inst.imm));
-                break;
-            }
-            case LIR_Op::JumpIf:
-            case LIR_Op::JumpIfFalse: {
-                push_if_valid(static_cast<size_t>(inst.imm));
-                if (i + 1 < n) push_if_valid(i + 1);  // fallthrough
-                break;
-            }
-            case LIR_Op::Return:
-            case LIR_Op::Ret: {
-                // terminal
-                break;
-            }
-            default: {
-                if (i + 1 < n) push_if_valid(i + 1);  // linear reachability
-                break;
+    for (const auto& block : cfg.get_blocks()) {
+        if (block.reachable) {
+            for (size_t i = block.start_inst_idx; i < block.end_inst_idx; ++i) {
+                reachable_insts[i] = true;
             }
         }
     }
@@ -208,7 +135,7 @@ bool Optimizer::remove_unreachable_code() {
     std::vector<LIR_Inst> compacted;
     compacted.reserve(n);
     for (size_t i = 0; i < n; ++i) {
-        if (reachable[i]) {
+        if (reachable_insts[i]) {
             compacted.push_back(func_.instructions[i]);
         } else {
             changed = true;
@@ -216,22 +143,6 @@ bool Optimizer::remove_unreachable_code() {
     }
 
     if (changed) {
-        // Build old->new index map so jump targets remain valid after compaction.
-        std::vector<size_t> remap(n, static_cast<size_t>(-1));
-        size_t next = 0;
-        for (size_t i = 0; i < n; ++i) {
-            if (reachable[i]) remap[i] = next++;
-        }
-
-        for (auto& inst : compacted) {
-            if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
-                size_t old_target = static_cast<size_t>(inst.imm);
-                if (old_target < n && remap[old_target] != static_cast<size_t>(-1)) {
-                    inst.imm = static_cast<int64_t>(remap[old_target]);
-                }
-            }
-        }
-
         func_.instructions = std::move(compacted);
     }
 
@@ -239,67 +150,18 @@ bool Optimizer::remove_unreachable_code() {
 }
 
 bool Optimizer::dead_code_elimination_simple() {
-    if (func_.instructions.empty()) return false;
-
-    bool changed = false;
-    bool pass_changed = true;
-    int iterations = 0;
-    
-    // Iteratively remove dead code until no more changes
-    while (pass_changed && iterations < 10) {
-        iterations++;
-        pass_changed = false;
-        
-        // Backward pass: compute which registers are live at each point
-        std::unordered_set<Reg> live_regs;
-        
-        // Start from the end and work backwards
-        for (int i = static_cast<int>(func_.instructions.size()) - 1; i >= 0; --i) {
-            const auto& inst = func_.instructions[i];
-            
-            // Check if this instruction has side effects
-            bool has_side_effects = has_instruction_side_effects(inst);
-            
-            // If destination is live or has side effects, keep it
-            if (has_side_effects || (inst.dst != UINT32_MAX && live_regs.count(inst.dst))) {
-                // Add operands to live set
-                if (inst.a != UINT32_MAX) live_regs.insert(inst.a);
-                if (inst.b != UINT32_MAX) live_regs.insert(inst.b);
-                
-                // Add call arguments
-                for (Reg arg : inst.call_args) {
-                    if (arg != UINT32_MAX) live_regs.insert(arg);
-                }
-            } else if (inst.dst != UINT32_MAX) {
-                // This instruction is dead - remove it
-                func_.instructions.erase(func_.instructions.begin() + i);
-                pass_changed = true;
-                changed = true;
-                continue;
-            }
-            
-            // Remove destination from live set (it's being defined here)
-            if (inst.dst != UINT32_MAX) {
-                live_regs.erase(inst.dst);
-            }
-        }
-    }
-    
-    return changed;
+    return dead_code_elimination();
 }
 
 bool Optimizer::redundant_memory_elimination() {
     if (func_.instructions.empty()) return false;
     bool changed = false;
 
-    // Track memory state for pointers: address_reg -> stored_value_reg / loaded_dest_reg
-    // Invalidated on labels, calls, stores to unknown memory, etc.
     std::unordered_map<Reg, Reg> active_memory_stores;
 
     for (size_t i = 0; i < func_.instructions.size(); ++i) {
         auto& inst = func_.instructions[i];
 
-        // Invalidate on control flow or calls
         if (inst.op == LIR_Op::Label || inst.op == LIR_Op::Jump ||
             inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse ||
             inst.op == LIR_Op::Call || inst.op == LIR_Op::CallVoid ||
@@ -308,13 +170,11 @@ bool Optimizer::redundant_memory_elimination() {
             continue;
         }
 
-        // Redundant Store: Store ptr, val; Store ptr, val -> remove second store
         if (inst.op == LIR_Op::MemoryStore || inst.op == LIR_Op::Store) {
             Reg ptr_reg = inst.a;
             Reg val_reg = inst.b;
             auto it = active_memory_stores.find(ptr_reg);
             if (it != active_memory_stores.end() && it->second == val_reg) {
-                // Redundant store of same value to same address
                 func_.instructions.erase(func_.instructions.begin() + i);
                 --i;
                 changed = true;
@@ -324,7 +184,6 @@ bool Optimizer::redundant_memory_elimination() {
             }
         }
 
-        // Redundant Load: Store ptr, val; Load dst, ptr -> Mov dst, val
         if (inst.op == LIR_Op::MemoryLoad || inst.op == LIR_Op::Load) {
             Reg ptr_reg = inst.a;
             auto it = active_memory_stores.find(ptr_reg);
@@ -334,7 +193,6 @@ bool Optimizer::redundant_memory_elimination() {
                 inst.a = stored_val;
                 inst.b = UINT32_MAX;
                 changed = true;
-                // Invalidate if destination register is modified by this load
                 if (inst.dst != UINT32_MAX) {
                     for (auto store_it = active_memory_stores.begin(); store_it != active_memory_stores.end(); ) {
                         if (store_it->first == inst.dst || store_it->second == inst.dst) {
@@ -348,7 +206,6 @@ bool Optimizer::redundant_memory_elimination() {
             }
         }
 
-        // Invalidate any active store mappings if dst is overwritten
         if (inst.dst != UINT32_MAX) {
             for (auto store_it = active_memory_stores.begin(); store_it != active_memory_stores.end(); ) {
                 if (store_it->first == inst.dst || store_it->second == inst.dst) {
@@ -364,27 +221,15 @@ bool Optimizer::redundant_memory_elimination() {
 }
 
 bool Optimizer::has_instruction_side_effects(const LIR_Inst& inst) const {
-    return (
-        inst.op == LIR_Op::Call || inst.op == LIR_Op::CallVoid ||
-        inst.op == LIR_Op::CallIndirect || inst.op == LIR_Op::CallBuiltin ||
-        inst.op == LIR_Op::CallVariadic ||
-        inst.op == LIR_Op::Return || inst.op == LIR_Op::Ret ||
-        inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || 
-        inst.op == LIR_Op::JumpIfFalse ||
-        inst.op == LIR_Op::Label || inst.op == LIR_Op::Store ||
-        inst.op == LIR_Op::ChannelSend || inst.op == LIR_Op::ChannelRecv ||
-        inst.op == LIR_Op::ChannelClose || inst.op == LIR_Op::Await ||
-        inst.op == LIR_Op::AsyncCall
-    );
+    return DefUseAnalysis::has_side_effects(inst);
 }
 
 bool Optimizer::peephole_optimize() {
     bool changed = false;
-    
+
     for (size_t i = 0; i < func_.instructions.size(); ++i) {
         auto& inst = func_.instructions[i];
 
-        // 1. Remove redundant moves: mov rX, rX
         if (inst.op == LIR_Op::Mov && inst.dst == inst.a) {
             func_.instructions.erase(func_.instructions.begin() + i);
             --i;
@@ -392,7 +237,6 @@ bool Optimizer::peephole_optimize() {
             continue;
         }
 
-        // 2. Eliminate double moves: mov rX, rY; mov rZ, rX -> mov rZ, rY
         if (inst.op == LIR_Op::Mov && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
             if (next.op == LIR_Op::Mov && next.a == inst.dst) {
@@ -404,10 +248,9 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 3. Eliminate redundant loads: load_const rX, C; load_const rX, C -> load_const rX, C
         if (inst.op == LIR_Op::LoadConst && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
-            if (next.op == LIR_Op::LoadConst && next.dst == inst.dst && 
+            if (next.op == LIR_Op::LoadConst && next.dst == inst.dst &&
                 next.const_val == inst.const_val) {
                 func_.instructions.erase(func_.instructions.begin() + i + 1);
                 changed = true;
@@ -415,7 +258,6 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 4. Strength reduction: add rX, rY, 0 -> mov rX, rY
         if (inst.op == LIR_Op::Add && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -429,7 +271,6 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 5. Strength reduction: mul rX, rY, 0 -> load_const rX, 0
         if (inst.op == LIR_Op::Mul && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -445,7 +286,6 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 6. Strength reduction: mul rX, rY, 1 -> mov rX, rY
         if (inst.op == LIR_Op::Mul && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -459,7 +299,6 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 7. Strength reduction: mul rX, rY, 2^n -> shl rX, rY, n
         if (inst.op == LIR_Op::Mul && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -472,7 +311,6 @@ bool Optimizer::peephole_optimize() {
                         changed = true;
                         continue;
                     } else if (val > 2 && (val & (val - 1)) == 0) {
-                        // Power of two > 2: rewrite mul rX, rY, 2^n -> shl rX, rY, n
                         int shift = 0;
                         while (val > 1) { val >>= 1; shift++; }
                         prev.const_val = make_i64(shift);
@@ -484,8 +322,7 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 8. Eliminate redundant comparisons: cmpeq rX, rY, rY -> load_const rX, true
-        if ((inst.op == LIR_Op::CmpEQ || inst.op == LIR_Op::CmpLE || inst.op == LIR_Op::CmpGE) && 
+        if ((inst.op == LIR_Op::CmpEQ || inst.op == LIR_Op::CmpLE || inst.op == LIR_Op::CmpGE) &&
             inst.a != UINT32_MAX && inst.a == inst.b) {
             inst.op = LIR_Op::LoadConst;
             inst.a = UINT32_MAX;
@@ -495,8 +332,7 @@ bool Optimizer::peephole_optimize() {
             continue;
         }
 
-        // 9. Eliminate redundant comparisons: cmpne rX, rY, rY -> load_const rX, false
-        if ((inst.op == LIR_Op::CmpNEQ || inst.op == LIR_Op::CmpLT || inst.op == LIR_Op::CmpGT) && 
+        if ((inst.op == LIR_Op::CmpNEQ || inst.op == LIR_Op::CmpLT || inst.op == LIR_Op::CmpGT) &&
             inst.a != UINT32_MAX && inst.a == inst.b) {
             inst.op = LIR_Op::LoadConst;
             inst.a = UINT32_MAX;
@@ -506,7 +342,6 @@ bool Optimizer::peephole_optimize() {
             continue;
         }
 
-        // 10. Eliminate redundant boolean operations: and rX, rY, rY -> mov rX, rY
         if (inst.op == LIR_Op::And && inst.a == inst.b) {
             inst.op = LIR_Op::Mov;
             inst.b = UINT32_MAX;
@@ -514,7 +349,6 @@ bool Optimizer::peephole_optimize() {
             continue;
         }
 
-        // 11. Eliminate redundant boolean operations: or rX, rY, rY -> mov rX, rY
         if (inst.op == LIR_Op::Or && inst.a == inst.b) {
             inst.op = LIR_Op::Mov;
             inst.b = UINT32_MAX;
@@ -522,7 +356,6 @@ bool Optimizer::peephole_optimize() {
             continue;
         }
 
-        // 12. Eliminate redundant boolean operations: xor rX, rY, rY -> load_const rX, false
         if (inst.op == LIR_Op::Xor && inst.a != UINT32_MAX && inst.a == inst.b) {
             inst.op = LIR_Op::LoadConst;
             inst.a = UINT32_MAX;
@@ -532,7 +365,6 @@ bool Optimizer::peephole_optimize() {
             continue;
         }
 
-        // 13. Eliminate redundant negation: neg rX, rY; neg rZ, rX -> mov rZ, rY
         if (inst.op == LIR_Op::Neg && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
             if (next.op == LIR_Op::Neg && next.a == inst.dst) {
@@ -545,7 +377,6 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 14. Eliminate unused jumps: jump L; L: -> remove jump
         if (inst.op == LIR_Op::Jump && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
             if (next.op == LIR_Op::Label && next.imm == inst.imm) {
@@ -556,7 +387,6 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 15. Combine consecutive loads into single load
         if (inst.op == LIR_Op::LoadConst && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
             if (next.op == LIR_Op::Mov && next.a == inst.dst) {
@@ -567,7 +397,6 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 16. Eliminate mov before return: mov rX, rY; return rX -> return rY
         if (inst.op == LIR_Op::Mov && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
             if ((next.op == LIR_Op::Return || next.op == LIR_Op::Ret) && next.dst == inst.dst) {
@@ -579,7 +408,6 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 17. Eliminate sub rX, rY, 0 -> mov rX, rY
         if (inst.op == LIR_Op::Sub && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -593,7 +421,6 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 18. Eliminate div rX, rY, 1 -> mov rX, rY
         if (inst.op == LIR_Op::Div && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -607,7 +434,6 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 19. Eliminate mod rX, rY, 1 -> load_const rX, 0
         if (inst.op == LIR_Op::Mod && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -623,7 +449,7 @@ bool Optimizer::peephole_optimize() {
             }
         }
     }
-    
+
     return changed;
 }
 
@@ -631,53 +457,70 @@ bool Optimizer::constant_folding() {
     if (func_.instructions.empty()) return false;
 
     bool changed = false;
-    std::unordered_map<Reg, Backend::Value> const_regs;
+    AnalysisManager am(func_);
+    const auto& cfg = am.get_cfg();
 
-    for (size_t i = 0; i < func_.instructions.size(); ++i) {
-        auto& inst = func_.instructions[i];
+    for (const auto& block : cfg.get_blocks()) {
+        if (!block.reachable) continue;
 
-        if (inst.op == LIR_Op::LoadConst) {
-            const_regs[inst.dst] = inst.const_val;
-            continue;
-        }
+        std::unordered_map<Reg, Backend::Value> block_consts;
 
-        if (inst.op == LIR_Op::Mov) {
-            if (const_regs.count(inst.a)) {
-                const_regs[inst.dst] = const_regs[inst.a];
-            } else {
-                const_regs.erase(inst.dst);
+        for (size_t i = block.start_inst_idx; i < block.end_inst_idx; ++i) {
+            auto& inst = func_.instructions[i];
+
+            if (inst.op == LIR_Op::LoadConst) {
+                block_consts[inst.dst] = inst.const_val;
+                continue;
             }
-            continue;
-        }
 
-        // Arithmetic folding
-        if (inst.op == LIR_Op::Add || inst.op == LIR_Op::Sub || inst.op == LIR_Op::Mul || inst.op == LIR_Op::Div) {
-            if (const_regs.count(inst.a) && const_regs.count(inst.b)) {
-                Backend::Value va = const_regs[inst.a];
-                Backend::Value vb = const_regs[inst.b];
-
-                if (IS_INT(va) && IS_INT(vb)) {
-                    int64_t a = UNBOX_INT(va);
-                    int64_t b = UNBOX_INT(vb);
-                    int64_t res = 0;
-
-                    if (inst.op == LIR_Op::Add) res = a + b;
-                    else if (inst.op == LIR_Op::Sub) res = a - b;
-                    else if (inst.op == LIR_Op::Mul) res = a * b;
-                    else if (inst.op == LIR_Op::Div && b != 0) res = a / b;
-                    else continue;
-
-                    Backend::Value res_val = make_i64(res);
-                    inst.op = LIR_Op::LoadConst;
-                    inst.const_val = res_val;
-                    const_regs[inst.dst] = res_val;
-                    changed = true;
+            if (inst.op == LIR_Op::Mov) {
+                if (block_consts.count(inst.a)) {
+                    block_consts[inst.dst] = block_consts[inst.a];
+                } else {
+                    block_consts.erase(inst.dst);
                 }
-            } else {
-                if (inst.dst != UINT32_MAX) const_regs.erase(inst.dst);
+                continue;
             }
-        } else if (inst.dst != UINT32_MAX) {
-            const_regs.erase(inst.dst);
+
+            if (inst.op == LIR_Op::Add || inst.op == LIR_Op::Sub ||
+                inst.op == LIR_Op::Mul || inst.op == LIR_Op::Div || inst.op == LIR_Op::Mod) {
+                if (block_consts.count(inst.a) && block_consts.count(inst.b)) {
+                    Backend::Value va = block_consts[inst.a];
+                    Backend::Value vb = block_consts[inst.b];
+
+                    if (IS_INT(va) && IS_INT(vb)) {
+                        int64_t a = UNBOX_INT(va);
+                        int64_t b = UNBOX_INT(vb);
+                        int64_t res = 0;
+                        bool valid = true;
+
+                        if (inst.op == LIR_Op::Add) res = a + b;
+                        else if (inst.op == LIR_Op::Sub) res = a - b;
+                        else if (inst.op == LIR_Op::Mul) res = a * b;
+                        else if (inst.op == LIR_Op::Div) {
+                            if (b == 0) valid = false;
+                            else res = a / b;
+                        } else if (inst.op == LIR_Op::Mod) {
+                            if (b == 0) valid = false;
+                            else res = a % b;
+                        }
+
+                        if (valid) {
+                            Backend::Value res_val = make_i64(res);
+                            inst.op = LIR_Op::LoadConst;
+                            inst.a = UINT32_MAX;
+                            inst.b = UINT32_MAX;
+                            inst.const_val = res_val;
+                            block_consts[inst.dst] = res_val;
+                            changed = true;
+                        }
+                    }
+                } else {
+                    if (inst.dst != UINT32_MAX) block_consts.erase(inst.dst);
+                }
+            } else if (inst.dst != UINT32_MAX) {
+                block_consts.erase(inst.dst);
+            }
         }
     }
 
@@ -701,7 +544,6 @@ bool Optimizer::function_inlining() {
             if (!target_func) continue;
 
             const auto& target_insts = target_func->getInstructions();
-            // Candidate check: small leaf function (under 12 instructions, no internal calls/jumps)
             if (target_insts.empty() || target_insts.size() > 12) continue;
 
             bool is_leaf = true;
@@ -715,7 +557,6 @@ bool Optimizer::function_inlining() {
             }
             if (!is_leaf) continue;
 
-            // Reserve registers in caller function for inlined frame
             size_t num_params = inst.call_args.size();
             size_t max_target_reg = num_params + 16;
             for (const auto& ti : target_insts) {
@@ -731,7 +572,6 @@ bool Optimizer::function_inlining() {
 
             std::vector<LIR_Inst> inlined_insts;
 
-            // Map parameters
             for (size_t param_idx = 0; param_idx < inst.call_args.size(); ++param_idx) {
                 Reg param_reg = static_cast<Reg>(param_idx) + base_reg;
                 Reg arg_reg = inst.call_args[param_idx];
@@ -753,7 +593,6 @@ bool Optimizer::function_inlining() {
                 }
             }
 
-            // Replace call instruction with inlined instructions
             func_.instructions.erase(func_.instructions.begin() + i);
             func_.instructions.insert(func_.instructions.begin() + i, inlined_insts.begin(), inlined_insts.end());
             changed = true;
@@ -764,9 +603,66 @@ bool Optimizer::function_inlining() {
     return changed;
 }
 
+bool Optimizer::copy_propagation() {
+    if (func_.instructions.empty()) return false;
+    bool changed = false;
+
+    AnalysisManager am(func_);
+    const auto& cfg = am.get_cfg();
+
+    for (const auto& block : cfg.get_blocks()) {
+        if (!block.reachable) continue;
+
+        std::unordered_map<Reg, Reg> copy_map;
+
+        for (size_t i = block.start_inst_idx; i < block.end_inst_idx; ++i) {
+            auto& inst = func_.instructions[i];
+
+            // Substitute operands if copy exists
+            if (inst.a != UINT32_MAX && copy_map.count(inst.a)) {
+                inst.a = copy_map[inst.a];
+                changed = true;
+            }
+            if (inst.b != UINT32_MAX && copy_map.count(inst.b)) {
+                inst.b = copy_map[inst.b];
+                changed = true;
+            }
+            for (size_t arg_idx = 0; arg_idx < inst.call_args.size(); ++arg_idx) {
+                if (inst.call_args[arg_idx] != UINT32_MAX && copy_map.count(inst.call_args[arg_idx])) {
+                    inst.call_args[arg_idx] = copy_map[inst.call_args[arg_idx]];
+                    changed = true;
+                }
+            }
+
+            // Invalidate copies if destination or source is overwritten
+            if (inst.dst != UINT32_MAX) {
+                copy_map.erase(inst.dst);
+                for (auto it = copy_map.begin(); it != copy_map.end(); ) {
+                    if (it->second == inst.dst) {
+                        it = copy_map.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
+            }
+
+            // Track new Mov copy
+            if (inst.op == LIR_Op::Mov && inst.dst != UINT32_MAX && inst.a != UINT32_MAX && inst.dst != inst.a) {
+                copy_map[inst.dst] = inst.a;
+            }
+        }
+    }
+
+    return changed;
+}
+
 bool Optimizer::global_value_numbering() {
     if (func_.instructions.empty()) return false;
     bool changed = false;
+
+    AnalysisManager am(func_);
+    const auto& dom = am.get_dom();
+    const auto& cfg = am.get_cfg();
 
     struct ExprKey {
         LIR_Op op;
@@ -781,54 +677,75 @@ bool Optimizer::global_value_numbering() {
         }
     };
 
-    std::unordered_map<ExprKey, Reg, ExprKeyHash> value_table;
+    struct AvailableExpr {
+        Reg dst_reg;
+        uint32_t block_id;
+    };
 
-    for (size_t i = 0; i < func_.instructions.size(); ++i) {
-        auto& inst = func_.instructions[i];
+    std::unordered_map<ExprKey, AvailableExpr, ExprKeyHash> avail_table;
 
-        // Invalidate table on labels and calls/jumps (basic block boundary)
-        if (inst.op == LIR_Op::Label || inst.op == LIR_Op::Call || inst.op == LIR_Op::CallVoid ||
-            inst.op == LIR_Op::CallIndirect || inst.op == LIR_Op::CallBuiltin ||
-            inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
-            value_table.clear();
-            continue;
-        }
+    for (const auto& block : cfg.get_blocks()) {
+        if (!block.reachable) continue;
 
-        // Invalidate any table entries where an operand or dst register is overwritten
-        auto invalidate_reg = [&](Reg r) {
-            if (r == UINT32_MAX) return;
-            for (auto it = value_table.begin(); it != value_table.end(); ) {
-                if (it->first.a == r || it->first.b == r || it->second == r) {
-                    it = value_table.erase(it);
-                } else {
-                    ++it;
+        for (size_t i = block.start_inst_idx; i < block.end_inst_idx; ++i) {
+            auto& inst = func_.instructions[i];
+
+            if (DefUseAnalysis::has_side_effects(inst) || inst.op == LIR_Op::Load || inst.op == LIR_Op::MemoryLoad) {
+                if (inst.dst != UINT32_MAX) {
+                    Reg r = inst.dst;
+                    for (auto it = avail_table.begin(); it != avail_table.end(); ) {
+                        if (it->first.a == r || it->first.b == r || it->second.dst_reg == r) {
+                            it = avail_table.erase(it);
+                        } else {
+                            ++it;
+                        }
+                    }
                 }
+                continue;
             }
-        };
 
-        // If this instruction modifies inst.dst or operands, invalidate past table entries using them
-        if (inst.dst != UINT32_MAX) {
-            invalidate_reg(inst.dst);
-        }
+            if (inst.op == LIR_Op::Add || inst.op == LIR_Op::Sub || inst.op == LIR_Op::Mul ||
+                inst.op == LIR_Op::Div || inst.op == LIR_Op::And || inst.op == LIR_Op::Or ||
+                inst.op == LIR_Op::Xor || inst.op == LIR_Op::Shl || inst.op == LIR_Op::Shr ||
+                inst.op == LIR_Op::CmpEQ || inst.op == LIR_Op::CmpNEQ || inst.op == LIR_Op::CmpLT ||
+                inst.op == LIR_Op::CmpLE || inst.op == LIR_Op::CmpGT || inst.op == LIR_Op::CmpGE) {
 
-        // Pure side-effect-free arithmetic/bitwise/comparison instructions
-        if (inst.op == LIR_Op::Add || inst.op == LIR_Op::Sub || inst.op == LIR_Op::Mul ||
-            inst.op == LIR_Op::Div || inst.op == LIR_Op::And || inst.op == LIR_Op::Or ||
-            inst.op == LIR_Op::Xor || inst.op == LIR_Op::Shl || inst.op == LIR_Op::Shr ||
-            inst.op == LIR_Op::CmpEQ || inst.op == LIR_Op::CmpNEQ || inst.op == LIR_Op::CmpLT ||
-            inst.op == LIR_Op::CmpLE || inst.op == LIR_Op::CmpGT || inst.op == LIR_Op::CmpGE) {
+                ExprKey key{inst.op, inst.a, inst.b};
+                auto it = avail_table.find(key);
+                if (it != avail_table.end()) {
+                    if (dom.dominates(it->second.block_id, block.id)) {
+                        Reg existing_dst = it->second.dst_reg;
+                        inst.op = LIR_Op::Mov;
+                        inst.a = existing_dst;
+                        inst.b = UINT32_MAX;
+                        changed = true;
+                        continue;
+                    }
+                }
 
-            ExprKey key{inst.op, inst.a, inst.b};
-            auto it = value_table.find(key);
-            if (it != value_table.end()) {
-                // Duplicate expression found! Replace instruction with Mov from existing result
-                Reg existing_dst = it->second;
-                inst.op = LIR_Op::Mov;
-                inst.a = existing_dst;
-                inst.b = UINT32_MAX;
-                changed = true;
-            } else if (inst.dst != UINT32_MAX && inst.dst != inst.a && inst.dst != inst.b) {
-                value_table[key] = inst.dst;
+                if (inst.dst != UINT32_MAX) {
+                    Reg r = inst.dst;
+                    for (auto it_a = avail_table.begin(); it_a != avail_table.end(); ) {
+                        if (it_a->first.a == r || it_a->first.b == r || it_a->second.dst_reg == r) {
+                            it_a = avail_table.erase(it_a);
+                        } else {
+                            ++it_a;
+                        }
+                    }
+                }
+
+                if (inst.dst != UINT32_MAX && inst.dst != inst.a && inst.dst != inst.b) {
+                    avail_table[key] = AvailableExpr{inst.dst, block.id};
+                }
+            } else if (inst.dst != UINT32_MAX) {
+                Reg r = inst.dst;
+                for (auto it = avail_table.begin(); it != avail_table.end(); ) {
+                    if (it->first.a == r || it->first.b == r || it->second.dst_reg == r) {
+                        it = avail_table.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
             }
         }
     }
@@ -840,7 +757,6 @@ bool Optimizer::generational_check_hoisting() {
     if (func_.instructions.empty()) return false;
     bool changed = false;
 
-    // Eliminate consecutive matching RegionEnter / RegionExit instruction pairs with no intervening side effects
     for (size_t i = 0; i + 1 < func_.instructions.size(); ) {
         auto& first = func_.instructions[i];
         auto& second = func_.instructions[i + 1];
@@ -869,7 +785,6 @@ bool Optimizer::prune_orphaned_labels() {
         }
     }
 
-    // Preserve the first label if it serves as the function entry label
     uint32_t first_label = UINT32_MAX;
     for (const auto& inst : func_.instructions) {
         if (inst.op == LIR_Op::Label) {
@@ -896,7 +811,6 @@ bool Optimizer::tail_call_optimization() {
     if (func_.instructions.empty() || func_.name.empty()) return false;
     bool changed = false;
 
-    // Entry label is the first label defined in the function
     uint32_t entry_label = UINT32_MAX;
     for (size_t i = 0; i < func_.instructions.size(); ++i) {
         if (func_.instructions[i].op == LIR_Op::Label) {
@@ -915,7 +829,6 @@ bool Optimizer::tail_call_optimization() {
             call_inst.func_name == func_.name &&
             (next_inst.op == LIR_Op::Return || next_inst.op == LIR_Op::Ret)) {
 
-            // Convert tail call into parameter moves via temporary registers to avoid clobbering
             std::vector<LIR_Inst> replacement;
             size_t num_args = call_inst.call_args.size();
             std::vector<Reg> temps(num_args);
@@ -945,49 +858,48 @@ bool Optimizer::loop_invariant_code_motion() {
     if (func_.instructions.empty()) return false;
     bool changed = false;
 
-    std::unordered_map<uint32_t, size_t> label_pos;
-    for (size_t i = 0; i < func_.instructions.size(); ++i) {
-        if (func_.instructions[i].op == LIR_Op::Label) {
-            label_pos[static_cast<uint32_t>(func_.instructions[i].imm)] = i;
-        }
-    }
+    AnalysisManager am(func_);
+    const auto& loops = am.get_loops().get_loops();
+    const auto& cfg = am.get_cfg();
 
-    for (size_t i = 0; i < func_.instructions.size(); ++i) {
-        const auto& inst = func_.instructions[i];
-        if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
-            uint32_t target_label = static_cast<uint32_t>(inst.imm);
-            auto it = label_pos.find(target_label);
-            if (it != label_pos.end() && it->second < i) {
-                size_t header_idx = it->second;
-                size_t backedge_idx = i;
-
-                // Track definitions count for registers modified within loop
-                std::unordered_map<Reg, size_t> loop_reg_defs;
-                for (size_t k = header_idx; k <= backedge_idx; ++k) {
-                    if (func_.instructions[k].dst != UINT32_MAX) {
-                        loop_reg_defs[func_.instructions[k].dst]++;
-                    }
+    for (const auto& loop : loops) {
+        std::unordered_map<Reg, size_t> loop_reg_defs;
+        for (uint32_t block_id : loop.body_blocks) {
+            const auto* block = cfg.get_block(block_id);
+            if (!block) continue;
+            for (size_t k = block->start_inst_idx; k < block->end_inst_idx; ++k) {
+                if (func_.instructions[k].dst != UINT32_MAX) {
+                    loop_reg_defs[func_.instructions[k].dst]++;
                 }
-
-                for (size_t k = header_idx + 1; k < backedge_idx; ++k) {
-                    const auto& cand = func_.instructions[k];
-                    if (has_instruction_side_effects(cand) || cand.dst == UINT32_MAX) continue;
-
-                    bool a_invariant = (cand.a == UINT32_MAX || loop_reg_defs.count(cand.a) == 0);
-                    bool b_invariant = (cand.b == UINT32_MAX || loop_reg_defs.count(cand.b) == 0);
-                    bool dst_single_def = (loop_reg_defs[cand.dst] == 1);
-
-                    if (a_invariant && b_invariant && dst_single_def) {
-                        LIR_Inst hoisted = cand;
-                        func_.instructions.erase(func_.instructions.begin() + k);
-                        func_.instructions.insert(func_.instructions.begin() + header_idx, hoisted);
-                        changed = true;
-                        break;
-                    }
-                }
-                if (changed) break;
             }
         }
+
+        const auto* header_block = cfg.get_block(loop.header_id);
+        if (!header_block) continue;
+
+        for (uint32_t block_id : loop.body_blocks) {
+            const auto* block = cfg.get_block(block_id);
+            if (!block) continue;
+
+            for (size_t k = block->start_inst_idx; k < block->end_inst_idx; ++k) {
+                const auto& cand = func_.instructions[k];
+                if (DefUseAnalysis::has_side_effects(cand) || cand.dst == UINT32_MAX) continue;
+
+                bool a_invariant = (cand.a == UINT32_MAX || loop_reg_defs.count(cand.a) == 0);
+                bool b_invariant = (cand.b == UINT32_MAX || loop_reg_defs.count(cand.b) == 0);
+                bool dst_single_def = (loop_reg_defs[cand.dst] == 1);
+
+                if (a_invariant && b_invariant && dst_single_def) {
+                    LIR_Inst hoisted = cand;
+                    func_.instructions.erase(func_.instructions.begin() + k);
+                    func_.instructions.insert(func_.instructions.begin() + header_block->start_inst_idx, hoisted);
+                    changed = true;
+                    break;
+                }
+            }
+            if (changed) break;
+        }
+        if (changed) break;
     }
 
     return changed;
@@ -995,18 +907,18 @@ bool Optimizer::loop_invariant_code_motion() {
 
 bool Optimizer::remove_redundant_entry_calls() {
     if (func_.instructions.empty()) return false;
-    
+
     if (func_.name != "__top_level_wrapper__") return false;
-    
+
     bool changed = false;
-    
+
     for (size_t i = 0; i + 1 < func_.instructions.size(); ++i) {
         const auto& first = func_.instructions[i];
         const auto& second = func_.instructions[i + 1];
-        
+
         if ((first.op == LIR_Op::Call || first.op == LIR_Op::CallVoid) &&
             (second.op == LIR_Op::Call || second.op == LIR_Op::CallVoid)) {
-            
+
             if (first.func_name == second.func_name && !first.func_name.empty()) {
                 func_.instructions.erase(func_.instructions.begin() + i + 1);
                 changed = true;
@@ -1014,7 +926,7 @@ bool Optimizer::remove_redundant_entry_calls() {
             }
         }
     }
-    
+
     return changed;
 }
 
