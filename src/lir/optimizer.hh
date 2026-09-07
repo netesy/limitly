@@ -77,6 +77,24 @@ public:
      */
     bool generational_check_hoisting();
 
+    /**
+     * @brief Remove unused/orphaned label instructions not targeted by any jump
+     * @return true if labels were removed
+     */
+    bool prune_orphaned_labels();
+
+    /**
+     * @brief Perform tail-call optimization converting tail recursive calls into jumps
+     * @return true if tail calls were optimized
+     */
+    bool tail_call_optimization();
+
+    /**
+     * @brief Hoist loop-invariant operations before loop entry labels
+     * @return true if instructions were hoisted
+     */
+    bool loop_invariant_code_motion();
+
 private:
     LIR_Function& func_;
 

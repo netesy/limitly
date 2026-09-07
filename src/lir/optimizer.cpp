@@ -92,6 +92,9 @@ bool Optimizer::optimize() {
         bool fi = function_inlining();
         bool gvn = global_value_numbering();
         bool gch = generational_check_hoisting();
+        bool pol = prune_orphaned_labels();
+        bool tco = tail_call_optimization();
+        bool licm = loop_invariant_code_motion();
 
         pass_changed |= ur;
         pass_changed |= cf;
@@ -102,6 +105,9 @@ bool Optimizer::optimize() {
         pass_changed |= fi;
         pass_changed |= gvn;
         pass_changed |= gch;
+        pass_changed |= pol;
+        pass_changed |= tco;
+        pass_changed |= licm;
 
         changed |= pass_changed;
         pass_count++;
@@ -453,16 +459,27 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 7. Strength reduction: mul rX, rY, 2 -> add rX, rY, rY
+        // 7. Strength reduction: mul rX, rY, 2^n -> shl rX, rY, n
         if (inst.op == LIR_Op::Mul && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
                 if (prev.op == LIR_Op::LoadConst && prev.dst == inst.b &&
-                    IS_INT(prev.const_val) && UNBOX_INT(prev.const_val) == 2) {
-                    inst.op = LIR_Op::Add;
-                    inst.b = inst.a;
-                    changed = true;
-                    continue;
+                    IS_INT(prev.const_val)) {
+                    int64_t val = UNBOX_INT(prev.const_val);
+                    if (val == 2) {
+                        inst.op = LIR_Op::Add;
+                        inst.b = inst.a;
+                        changed = true;
+                        continue;
+                    } else if (val > 2 && (val & (val - 1)) == 0) {
+                        // Power of two > 2: rewrite mul rX, rY, 2^n -> shl rX, rY, n
+                        int shift = 0;
+                        while (val > 1) { val >>= 1; shift++; }
+                        prev.const_val = make_i64(shift);
+                        inst.op = LIR_Op::Shl;
+                        changed = true;
+                        continue;
+                    }
                 }
             }
         }
@@ -810,7 +827,7 @@ bool Optimizer::global_value_numbering() {
                 inst.a = existing_dst;
                 inst.b = UINT32_MAX;
                 changed = true;
-            } else if (inst.dst != UINT32_MAX) {
+            } else if (inst.dst != UINT32_MAX && inst.dst != inst.a && inst.dst != inst.b) {
                 value_table[key] = inst.dst;
             }
         }
@@ -835,6 +852,141 @@ bool Optimizer::generational_check_hoisting() {
             if (i > 0) --i;
         } else {
             ++i;
+        }
+    }
+
+    return changed;
+}
+
+bool Optimizer::prune_orphaned_labels() {
+    if (func_.instructions.empty()) return false;
+    bool changed = false;
+
+    std::unordered_set<uint32_t> targeted_labels;
+    for (const auto& inst : func_.instructions) {
+        if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
+            targeted_labels.insert(static_cast<uint32_t>(inst.imm));
+        }
+    }
+
+    // Preserve the first label if it serves as the function entry label
+    uint32_t first_label = UINT32_MAX;
+    for (const auto& inst : func_.instructions) {
+        if (inst.op == LIR_Op::Label) {
+            first_label = static_cast<uint32_t>(inst.imm);
+            break;
+        }
+    }
+
+    for (size_t i = 0; i < func_.instructions.size(); ) {
+        const auto& inst = func_.instructions[i];
+        if (inst.op == LIR_Op::Label && inst.imm != first_label &&
+            targeted_labels.find(inst.imm) == targeted_labels.end()) {
+            func_.instructions.erase(func_.instructions.begin() + i);
+            changed = true;
+        } else {
+            ++i;
+        }
+    }
+
+    return changed;
+}
+
+bool Optimizer::tail_call_optimization() {
+    if (func_.instructions.empty() || func_.name.empty()) return false;
+    bool changed = false;
+
+    // Entry label is the first label defined in the function
+    uint32_t entry_label = UINT32_MAX;
+    for (size_t i = 0; i < func_.instructions.size(); ++i) {
+        if (func_.instructions[i].op == LIR_Op::Label) {
+            entry_label = static_cast<uint32_t>(func_.instructions[i].imm);
+            break;
+        }
+    }
+
+    if (entry_label == UINT32_MAX) return false;
+
+    for (size_t i = 0; i + 1 < func_.instructions.size(); ++i) {
+        auto& call_inst = func_.instructions[i];
+        const auto& next_inst = func_.instructions[i + 1];
+
+        if ((call_inst.op == LIR_Op::Call || call_inst.op == LIR_Op::CallVoid) &&
+            call_inst.func_name == func_.name &&
+            (next_inst.op == LIR_Op::Return || next_inst.op == LIR_Op::Ret)) {
+
+            // Convert tail call into parameter moves via temporary registers to avoid clobbering
+            std::vector<LIR_Inst> replacement;
+            size_t num_args = call_inst.call_args.size();
+            std::vector<Reg> temps(num_args);
+
+            for (size_t arg_idx = 0; arg_idx < num_args; ++arg_idx) {
+                temps[arg_idx] = func_.allocate_register();
+                replacement.push_back(LIR_Inst(LIR_Op::Mov, Type::I64, temps[arg_idx], call_inst.call_args[arg_idx], 0));
+            }
+            for (size_t arg_idx = 0; arg_idx < num_args; ++arg_idx) {
+                Reg param_reg = static_cast<Reg>(arg_idx);
+                replacement.push_back(LIR_Inst(LIR_Op::Mov, Type::I64, param_reg, temps[arg_idx], 0));
+            }
+
+            replacement.push_back(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, entry_label));
+
+            func_.instructions.erase(func_.instructions.begin() + i);
+            func_.instructions.insert(func_.instructions.begin() + i, replacement.begin(), replacement.end());
+            changed = true;
+            break;
+        }
+    }
+
+    return changed;
+}
+
+bool Optimizer::loop_invariant_code_motion() {
+    if (func_.instructions.empty()) return false;
+    bool changed = false;
+
+    std::unordered_map<uint32_t, size_t> label_pos;
+    for (size_t i = 0; i < func_.instructions.size(); ++i) {
+        if (func_.instructions[i].op == LIR_Op::Label) {
+            label_pos[static_cast<uint32_t>(func_.instructions[i].imm)] = i;
+        }
+    }
+
+    for (size_t i = 0; i < func_.instructions.size(); ++i) {
+        const auto& inst = func_.instructions[i];
+        if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
+            uint32_t target_label = static_cast<uint32_t>(inst.imm);
+            auto it = label_pos.find(target_label);
+            if (it != label_pos.end() && it->second < i) {
+                size_t header_idx = it->second;
+                size_t backedge_idx = i;
+
+                // Track definitions count for registers modified within loop
+                std::unordered_map<Reg, size_t> loop_reg_defs;
+                for (size_t k = header_idx; k <= backedge_idx; ++k) {
+                    if (func_.instructions[k].dst != UINT32_MAX) {
+                        loop_reg_defs[func_.instructions[k].dst]++;
+                    }
+                }
+
+                for (size_t k = header_idx + 1; k < backedge_idx; ++k) {
+                    const auto& cand = func_.instructions[k];
+                    if (has_instruction_side_effects(cand) || cand.dst == UINT32_MAX) continue;
+
+                    bool a_invariant = (cand.a == UINT32_MAX || loop_reg_defs.count(cand.a) == 0);
+                    bool b_invariant = (cand.b == UINT32_MAX || loop_reg_defs.count(cand.b) == 0);
+                    bool dst_single_def = (loop_reg_defs[cand.dst] == 1);
+
+                    if (a_invariant && b_invariant && dst_single_def) {
+                        LIR_Inst hoisted = cand;
+                        func_.instructions.erase(func_.instructions.begin() + k);
+                        func_.instructions.insert(func_.instructions.begin() + header_idx, hoisted);
+                        changed = true;
+                        break;
+                    }
+                }
+                if (changed) break;
+            }
         }
     }
 
