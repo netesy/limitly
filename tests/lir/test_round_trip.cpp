@@ -13,9 +13,10 @@
 //   make lir-test
 // =============================================================================
 #include "../../src/lir/lir.hh"
+#include "../../src/lir/optimizer.hh"
+#include "../../src/lir/metrics.hh"
 #include "../../src/lir/serializer.hh"
-#include "../../src/runtime/runtime.h"
-#include "../../src/runtime/runtime_value.h"
+#include "../../src/backend/vm/vm_value.hh"
 
 #include <cassert>
 #include <cstdint>
@@ -442,6 +443,39 @@ int main() {
             CHECK(back_inst.call_arg_types[2] == LM::LIR::Type::U8,
                   "call_arg_types[2] lost");
         }
+    }
+
+    // --- Test 9: metrics & OptimizationReport unit test ---------------------
+    {
+        LIR_Function f("opt_test", 0);
+        f.register_count = 5;
+
+        // Inst 0: LoadConst 10 -> r0
+        f.instructions.push_back(LIR_Inst(LIR_Op::LoadConst, LM::LIR::Type::I64, 0, BOX_INT(10)));
+        // Inst 1: LoadConst 20 -> r1
+        f.instructions.push_back(LIR_Inst(LIR_Op::LoadConst, LM::LIR::Type::I64, 1, BOX_INT(20)));
+        // Inst 2: Add r0, r1 -> r2
+        f.instructions.push_back(LIR_Inst(LIR_Op::Add, LM::LIR::Type::I64, 2, 0, 1));
+        // Inst 3: LoadConst 0 -> r3
+        f.instructions.push_back(LIR_Inst(LIR_Op::LoadConst, LM::LIR::Type::I64, 3, BOX_INT(0)));
+        // Inst 4: Add r2, r3 -> r4 (Strength reduction: x + 0 -> x)
+        f.instructions.push_back(LIR_Inst(LIR_Op::Add, LM::LIR::Type::I64, 4, 2, 3));
+        // Inst 5: Ret r4
+        f.instructions.push_back(LIR_Inst(LIR_Op::Ret, 4));
+
+        size_t initial_mem_ops = MetricsCollector::count_memory_ops(f);
+        size_t initial_inst_count = f.instructions.size();
+        CHECK(initial_inst_count == 6, "Initial instruction count should be 6");
+        CHECK(initial_mem_ops == 0, "Initial memory ops should be 0");
+
+        Optimizer opt(f);
+        bool opt_res = opt.optimize();
+        CHECK(opt_res, "Optimizer should optimize test function");
+
+        const auto& report = opt.get_report();
+        CHECK(report.initial_instructions == initial_inst_count, "Report initial instructions baseline must be immutable");
+        CHECK(report.final_instructions < report.initial_instructions, "Report final instructions should be less than initial");
+        CHECK(report.passes.size() > 0, "Report should contain recorded pass records");
     }
 
     if (g_failures == 0) {

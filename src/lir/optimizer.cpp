@@ -18,17 +18,38 @@ bool Optimizer::optimize() {
     report_ = OptimizationReport{};
     report_.function_name = func_.name;
     report_.initial_instructions = func_.instructions.size();
-    report_.memory_ops_before = MetricsCollector::count_memory_ops(func_);
+    report_.initial_blocks = MetricsCollector::count_blocks(func_);
+    report_.initial_memory_ops = MetricsCollector::count_memory_ops(func_);
+    report_.initial_loads = MetricsCollector::count_loads(func_);
+    report_.initial_stores = MetricsCollector::count_stores(func_);
 
     AnalysisManager am(func_);
 
     auto run_pass = [&](const std::string& name, auto pass_fn) -> bool {
-        size_t before = func_.instructions.size();
+        PassRecord rec;
+        rec.pass_name = name;
+        rec.instructions_before = func_.instructions.size();
+        rec.memory_ops_before = MetricsCollector::count_memory_ops(func_);
+        rec.loads_before = MetricsCollector::count_loads(func_);
+        rec.stores_before = MetricsCollector::count_stores(func_);
+        rec.blocks_before = MetricsCollector::count_blocks(func_);
+
         bool res = pass_fn();
-        size_t after = func_.instructions.size();
-        int delta = static_cast<int>(after) - static_cast<int>(before);
-        if (delta != 0) {
-            report_.pass_deltas[name] += delta;
+
+        rec.instructions_after = func_.instructions.size();
+        rec.memory_ops_after = MetricsCollector::count_memory_ops(func_);
+        rec.loads_after = MetricsCollector::count_loads(func_);
+        rec.stores_after = MetricsCollector::count_stores(func_);
+        rec.blocks_after = MetricsCollector::count_blocks(func_);
+
+        rec.instruction_delta = static_cast<int>(rec.instructions_after) - static_cast<int>(rec.instructions_before);
+        rec.memory_delta = static_cast<int>(rec.memory_ops_after) - static_cast<int>(rec.memory_ops_before);
+        rec.loads_delta = static_cast<int>(rec.loads_after) - static_cast<int>(rec.loads_before);
+        rec.stores_delta = static_cast<int>(rec.stores_after) - static_cast<int>(rec.stores_before);
+        rec.blocks_delta = static_cast<int>(rec.blocks_after) - static_cast<int>(rec.blocks_before);
+
+        if (res || rec.instruction_delta != 0 || rec.memory_delta != 0 || rec.blocks_delta != 0) {
+            report_.passes.push_back(rec);
         }
         return res;
     };
@@ -94,7 +115,10 @@ bool Optimizer::optimize() {
     } while (pass_changed && pass_count < 10);
 
     report_.final_instructions = func_.instructions.size();
-    report_.memory_ops_after = MetricsCollector::count_memory_ops(func_);
+    report_.final_blocks = MetricsCollector::count_blocks(func_);
+    report_.final_memory_ops = MetricsCollector::count_memory_ops(func_);
+    report_.final_loads = MetricsCollector::count_loads(func_);
+    report_.final_stores = MetricsCollector::count_stores(func_);
 
     if (std::getenv("LIMITLY_PRINT_OPT_REPORT")) {
         report_.print();
