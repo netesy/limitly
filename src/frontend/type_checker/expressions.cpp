@@ -1802,6 +1802,9 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
         TypePtr var_type = lookup_variable(expr->name);
         if (var_type) {
             auto it_mem = variable_memory_info.find(expr->name);
+            if (it_mem != variable_memory_info.end() && it_mem->second.is_const) {
+                add_error("Cannot reassign to immutable variable '" + expr->name + "' declared with 'val' or 'const'", expr->line);
+            }
             if (it_mem != variable_memory_info.end() && it_mem->second.memory_state == "moved") {
                 add_error("Use after move: Cannot assign to moved variable '" + expr->name + "'", expr->line);
             }

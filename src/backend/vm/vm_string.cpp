@@ -54,8 +54,8 @@ RUNTIME_API LmStringHeader* lm_str_concat(const LmStringHeader* a, const LmStrin
     LmStringHeader* res = lm_str_alloc(total_len);
     if (!res) return NULL;
 
-    if (len_a > 0 && a && a->data) memcpy(res->data, a->data, len_a);
-    if (len_b > 0 && b && b->data) memcpy(res->data + len_a, b->data, len_b);
+    if (len_a > 0 && a) memcpy(res->data, a->data, len_a);
+    if (len_b > 0 && b) memcpy(res->data + len_a, b->data, len_b);
 
     res->len = total_len;
     res->data[total_len] = '\0';
@@ -222,8 +222,8 @@ RUNTIME_API LmStringHeader* lm_bool_to_str(uint8_t value) {
 }
 
 RUNTIME_API LmStringHeader* lm_str_format(const LmStringHeader* format_str, const LmStringHeader* arg_str) {
-    if (!format_str || !format_str->data) return arg_str ? lm_str_from_bytes(arg_str->data, arg_str->len) : lm_str_from_bytes("", 0);
-    if (!arg_str || !arg_str->data) return lm_str_from_bytes(format_str->data, format_str->len);
+    if (!format_str) return arg_str ? lm_str_from_bytes(arg_str->data, arg_str->len) : lm_str_from_bytes("", 0);
+    if (!arg_str) return lm_str_from_bytes(format_str->data, format_str->len);
 
     const char* pos = strstr(format_str->data, "%s");
     if (pos) {

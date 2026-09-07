@@ -161,22 +161,22 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
         ffi_arg_types[i] = lir_type_to_ffi_type(type);
         RegisterValue val = registers[arg_regs[i + arg_start]];
         switch (type) {
-            case LIR::Type::I8:  *(int8_t*)&arg_storage[i] = (int8_t)to_int(val); break;
-            case LIR::Type::U8:  *(uint8_t*)&arg_storage[i] = (uint8_t)to_int(val); break;
-            case LIR::Type::I16: *(int16_t*)&arg_storage[i] = (int16_t)to_int(val); break;
-            case LIR::Type::U16: *(uint16_t*)&arg_storage[i] = (uint16_t)to_int(val); break;
-            case LIR::Type::I32: *(int32_t*)&arg_storage[i] = (int32_t)to_int(val); break;
-            case LIR::Type::U32: *(uint32_t*)&arg_storage[i] = (uint32_t)to_int(val); break;
-            case LIR::Type::I64: *(int64_t*)&arg_storage[i] = to_int(val); break;
-            case LIR::Type::U64: *(uint64_t*)&arg_storage[i] = (uint64_t)to_int(val); break;
-            case LIR::Type::F32: *(float*)&arg_storage[i] = (float)to_float(val); break;
-            case LIR::Type::F64: *(double*)&arg_storage[i] = to_float(val); break;
-            case LIR::Type::Bool: *(uint8_t*)&arg_storage[i] = (uint8_t)(to_int(val) != 0); break;
+            case LIR::Type::I8:  { int8_t v = (int8_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
+            case LIR::Type::U8:  { uint8_t v = (uint8_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
+            case LIR::Type::I16: { int16_t v = (int16_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
+            case LIR::Type::U16: { uint16_t v = (uint16_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
+            case LIR::Type::I32: { int32_t v = (int32_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
+            case LIR::Type::U32: { uint32_t v = (uint32_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
+            case LIR::Type::I64: { int64_t v = to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
+            case LIR::Type::U64: { uint64_t v = (uint64_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
+            case LIR::Type::F32: { float v = (float)to_float(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
+            case LIR::Type::F64: { double v = to_float(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
+            case LIR::Type::Bool: { uint8_t v = (uint8_t)(to_int(val) != 0); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
             case LIR::Type::Ptr: {
                 void* p = value_to_ptr(val);
                 const char* cstr = get_cstring_from_value(val);
                 if (cstr) p = (void*)cstr;
-                *(void**)&arg_storage[i] = p;
+                std::memcpy(&arg_storage[i], &p, sizeof(p));
                 break;
             }
             default: arg_storage[i] = 0; break;
@@ -190,19 +190,20 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
         uint64_t result_storage = 0;
         ffi_call(&cif, FFI_FN(func_ptr), &result_storage, ffi_arg_values.data());
         switch (ret_type) {
-            case LIR::Type::I8:  registers[pc->dst] = BOX_INT((int64_t)*(int8_t*)&result_storage); break;
-            case LIR::Type::U8:  registers[pc->dst] = BOX_INT((int64_t)*(uint8_t*)&result_storage); break;
-            case LIR::Type::I16: registers[pc->dst] = BOX_INT((int64_t)*(int16_t*)&result_storage); break;
-            case LIR::Type::U16: registers[pc->dst] = BOX_INT((int64_t)*(uint16_t*)&result_storage); break;
-            case LIR::Type::I32: registers[pc->dst] = BOX_INT((int64_t)*(int32_t*)&result_storage); break;
-            case LIR::Type::U32: registers[pc->dst] = BOX_INT((int64_t)*(uint32_t*)&result_storage); break;
-            case LIR::Type::I64: registers[pc->dst] = BOX_INT(*(int64_t*)&result_storage); break;
-            case LIR::Type::U64: registers[pc->dst] = BOX_INT((int64_t)*(uint64_t*)&result_storage); break;
-            case LIR::Type::F32: registers[pc->dst] = make_float((double)*(float*)&result_storage); break;
-            case LIR::Type::F64: registers[pc->dst] = make_float(*(double*)&result_storage); break;
-            case LIR::Type::Bool: registers[pc->dst] = (*(uint8_t*)&result_storage) ? VAL_TRUE : VAL_FALSE; break;
+            case LIR::Type::I8:  { int8_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
+            case LIR::Type::U8:  { uint8_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
+            case LIR::Type::I16: { int16_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
+            case LIR::Type::U16: { uint16_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
+            case LIR::Type::I32: { int32_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
+            case LIR::Type::U32: { uint32_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
+            case LIR::Type::I64: { int64_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT(v); break; }
+            case LIR::Type::U64: { uint64_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
+            case LIR::Type::F32: { float v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = make_float((double)v); break; }
+            case LIR::Type::F64: { double v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = make_float(v); break; }
+            case LIR::Type::Bool: { uint8_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = v ? VAL_TRUE : VAL_FALSE; break; }
             case LIR::Type::Ptr:  {
-                RegisterValue val = lm_alloc_foreign_ptr(*(void**)&result_storage);
+                void* p; std::memcpy(&p, &result_storage, sizeof(p));
+                RegisterValue val = lm_alloc_foreign_ptr(p);
                 registers[pc->dst] = val;
                 // Register allocation with current active region
                 if (IS_PTR(val) && !vm_region_stack.empty()) {

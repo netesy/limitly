@@ -278,7 +278,7 @@ static LmStringHeader* format_tuple(LmTuple* tuple) {
     for (uint64_t i = 0; i < tuple->size; i++) {
         if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
         LmStringHeader* s = format_value(tuple->elements[i]);
-        append_to_buffer(&buf, &pos, &capacity, s && s->data ? s->data : "nil");
+        append_to_buffer(&buf, &pos, &capacity, s ? s->data : "nil");
         lm_str_free(s);
     }
     append_to_buffer(&buf, &pos, &capacity, ")");
@@ -297,7 +297,7 @@ static LmStringHeader* format_list(LmList* list) {
     for (uint64_t i = 0; i < list->size; i++) {
         if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
         LmStringHeader* s = format_value(list->data[i]);
-        append_to_buffer(&buf, &pos, &capacity, s && s->data ? s->data : "nil");
+        append_to_buffer(&buf, &pos, &capacity, s ? s->data : "nil");
         lm_str_free(s);
     }
     append_to_buffer(&buf, &pos, &capacity, "]");
@@ -318,11 +318,11 @@ static LmStringHeader* format_dict(LmDict* dict) {
     for (uint64_t i = 0; i < count; i++) {
         if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
         LmStringHeader* k = format_value(items[i * 2]);
-        append_to_buffer(&buf, &pos, &capacity, k && k->data ? k->data : "nil");
+        append_to_buffer(&buf, &pos, &capacity, k ? k->data : "nil");
         lm_str_free(k);
         append_to_buffer(&buf, &pos, &capacity, ": ");
         LmStringHeader* v = format_value(items[i * 2 + 1]);
-        append_to_buffer(&buf, &pos, &capacity, v && v->data ? v->data : "nil");
+        append_to_buffer(&buf, &pos, &capacity, v ? v->data : "nil");
         lm_str_free(v);
     }
     if (items) free(items);
@@ -416,7 +416,7 @@ static LmStringHeader* format_value(LmValue value) {
                     append_to_buffer(&buf, &pos, &capacity, "ok(");
                     if (!IS_NIL(payload)) {
                         LmStringHeader* s = format_value(payload);
-                        append_to_buffer(&buf, &pos, &capacity, s && s->data ? s->data : "nil");
+                        append_to_buffer(&buf, &pos, &capacity, s ? s->data : "nil");
                         lm_str_free(s);
                     }
                     append_to_buffer(&buf, &pos, &capacity, ")");
@@ -434,7 +434,7 @@ static LmStringHeader* format_value(LmValue value) {
                     append_to_buffer(&buf, &pos, &capacity, "err(");
                     if (!IS_NIL(payload)) {
                         LmStringHeader* s = format_value(payload);
-                        append_to_buffer(&buf, &pos, &capacity, s && s->data ? s->data : "nil");
+                        append_to_buffer(&buf, &pos, &capacity, s ? s->data : "nil");
                         lm_str_free(s);
                     }
                     append_to_buffer(&buf, &pos, &capacity, ")");
@@ -452,7 +452,7 @@ static LmStringHeader* format_value(LmValue value) {
                 for (int i = 0; i < f->field_count; i++) {
                     if (i > 0) append_to_buffer(&buf, &pos, &capacity, ", ");
                     LmStringHeader* s = format_value(f->fields[i]);
-                    append_to_buffer(&buf, &pos, &capacity, s && s->data ? s->data : "nil");
+                    append_to_buffer(&buf, &pos, &capacity, s ? s->data : "nil");
                     lm_str_free(s);
                 }
                 append_to_buffer(&buf, &pos, &capacity, "}");

@@ -147,6 +147,7 @@ Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
         report_error("Unknown expression type");
         return 0;
     }
+    return 0;
 }
 
 
