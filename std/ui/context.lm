@@ -129,6 +129,105 @@ pub fn create_container(id: int, bg: Color): Node {
     );
 }
 
+pub fn layout_column_node(node: Node, x: int, y: int, w: int, padding: int, spacing: int): Node {
+    var cur_y = y + padding;
+    var inner_w = w - (padding * 2);
+    var new_children: [Node] = [];
+
+    var i = 0;
+    while (i < len(node.children)) {
+        var child = node.children[i];
+        var h = 32;
+        if (child.kind == WIDGET_LABEL) {
+            h = 24;
+        } elif (child.kind == WIDGET_SLIDER or child.kind == WIDGET_PROGRESS) {
+            h = 24;
+        } elif (child.kind == WIDGET_SWITCH) {
+            h = 28;
+        } elif (child.kind == WIDGET_CONTAINER) {
+            child = layout_column_node(child, x + padding, cur_y, inner_w, 10, 8);
+            h = child.bounds.h;
+        }
+
+        child.bounds = Rect(x=x + padding, y=cur_y, w=inner_w, h=h);
+        new_children.append(child);
+        cur_y = cur_y + h + spacing;
+        i = i + 1;
+    }
+    node.children = new_children;
+    node.bounds = Rect(x=x, y=y, w=w, h=cur_y - y + padding);
+    return node;
+}
+
+pub fn update_hover_node(node: Node, px: int, py: int): Node {
+    node.is_hovered = node.bounds.contains(px, py);
+    var new_children: [Node] = [];
+    var i = 0;
+    while (i < len(node.children)) {
+        new_children.append(update_hover_node(node.children[i], px, py));
+        i = i + 1;
+    }
+    node.children = new_children;
+    return node;
+}
+
+pub fn reset_pressed_node(node: Node): Node {
+    node.is_pressed = false;
+    var new_children: [Node] = [];
+    var i = 0;
+    while (i < len(node.children)) {
+        new_children.append(reset_pressed_node(node.children[i]));
+        i = i + 1;
+    }
+    node.children = new_children;
+    return node;
+}
+
+pub fn update_node_state(node: Node, target_id: int, mouse_x: int, mouse_y: int, is_down: bool, ev_key: str): Node {
+    if (node.id == target_id) {
+        if (is_down) {
+            node.is_pressed = true;
+            node.is_focused = true;
+            if (node.kind == WIDGET_SWITCH) {
+                node.checked = not node.checked;
+            } elif (node.kind == WIDGET_SLIDER) {
+                var rel_x = mouse_x - node.bounds.x;
+                if (node.bounds.w > 0) {
+                    node.value = (rel_x as float) / (node.bounds.w as float);
+                    if (node.value < 0.0) { node.value = 0.0; }
+                    if (node.value > 1.0) { node.value = 1.0; }
+                }
+            }
+        }
+        if (ev_key != "") {
+            if (node.kind == WIDGET_TEXTFIELD) {
+                var char_val = extract_key_char(ev_key);
+                if (char_val == "BACKSPACE") {
+                    var cur_l = string.length(node.text);
+                    if (cur_l > 0) {
+                        node.text = string.substring(node.text, 0, cur_l - 1);
+                    }
+                } elif (string.length(char_val) == 1) {
+                    node.text = node.text + char_val;
+                }
+            }
+        }
+    } else {
+        if (is_down) {
+            node.is_focused = false;
+        }
+    }
+
+    var new_children: [Node] = [];
+    var i = 0;
+    while (i < len(node.children)) {
+        new_children.append(update_node_state(node.children[i], target_id, mouse_x, mouse_y, is_down, ev_key));
+        i = i + 1;
+    }
+    node.children = new_children;
+    return node;
+}
+
 pub frame UIContext {
     pub var root: Node;
     pub var mouse_x: int;
@@ -145,30 +244,7 @@ pub frame UIContext {
     }
 
     pub fn layout_column(node: Node, x: int, y: int, w: int, padding: int, spacing: int) {
-        node.bounds = Rect(x=x, y=y, w=w, h=0);
-        var cur_y = y + padding;
-        var inner_w = w - (padding * 2);
-
-        var i = 0;
-        while (i < len(node.children)) {
-            var child = node.children[i];
-            var h = 32;
-            if (child.kind == WIDGET_LABEL) {
-                h = 24;
-            } elif (child.kind == WIDGET_SLIDER or child.kind == WIDGET_PROGRESS) {
-                h = 24;
-            } elif (child.kind == WIDGET_SWITCH) {
-                h = 28;
-            } elif (child.kind == WIDGET_CONTAINER) {
-                self.layout_column(child, x + padding, cur_y, inner_w, 10, 8);
-                h = child.bounds.h;
-            }
-
-            child.bounds = Rect(x=x + padding, y=cur_y, w=inner_w, h=h);
-            cur_y = cur_y + h + spacing;
-            i = i + 1;
-        }
-        node.bounds.h = cur_y - y + padding;
+        self.root = layout_column_node(self.root, x, y, w, padding, spacing);
     }
 
     pub fn handle_event(ev_str: str) {
@@ -181,7 +257,7 @@ pub frame UIContext {
             var parts = parse_coords(string.substring(ev_str, 10, string.length(ev_str)));
             self.mouse_x = parts[0];
             self.mouse_y = parts[1];
-            self.update_hover(self.root, self.mouse_x, self.mouse_y);
+            self.root = update_hover_node(self.root, self.mouse_x, self.mouse_y);
         } elif (string.starts_with(ev_str, "MouseDown:")) {
             var parts = parse_coords_3(string.substring(ev_str, 10, string.length(ev_str)));
             self.mouse_x = parts[1];
@@ -190,45 +266,16 @@ pub frame UIContext {
             if (hit_id != -1) {
                 self.focused_id = hit_id;
                 self.clicked_id = hit_id;
-                var target_opt = self.find_node(self.root, hit_id);
-                if (target_opt != nil) {
-                    var target = target_opt as Node;
-                    target.is_pressed = true;
-
-                    if (target.kind == WIDGET_SWITCH) {
-                        target.checked = not target.checked;
-                    } elif (target.kind == WIDGET_SLIDER) {
-                        var rel_x = self.mouse_x - target.bounds.x;
-                        if (target.bounds.w > 0) {
-                            target.value = (rel_x as float) / (target.bounds.w as float);
-                            if (target.value < 0.0) { target.value = 0.0; }
-                            if (target.value > 1.0) { target.value = 1.0; }
-                        }
-                    }
-                }
+                self.root = update_node_state(self.root, hit_id, self.mouse_x, self.mouse_y, true, "");
             } else {
                 self.focused_id = -1;
             }
         } elif (string.starts_with(ev_str, "MouseUp:")) {
-            self.reset_pressed(self.root);
+            self.root = reset_pressed_node(self.root);
         } elif (string.starts_with(ev_str, "KeyDown:")) {
             if (self.focused_id != -1) {
-                var target_node = self.find_node(self.root, self.focused_id);
-                if (target_node != nil) {
-                    var n = target_node as Node;
-                    if (n.kind == WIDGET_TEXTFIELD) {
-                        var rest = string.substring(ev_str, 8, string.length(ev_str));
-                        var char_val = extract_key_char(rest);
-                        if (char_val == "BACKSPACE") {
-                            var cur_l = string.length(n.text);
-                            if (cur_l > 0) {
-                                n.text = string.substring(n.text, 0, cur_l - 1);
-                            }
-                        } elif (string.length(char_val) == 1) {
-                            n.text = n.text + char_val;
-                        }
-                    }
-                }
+                var rest = string.substring(ev_str, 8, string.length(ev_str));
+                self.root = update_node_state(self.root, self.focused_id, 0, 0, false, rest);
             }
         }
     }
@@ -248,39 +295,6 @@ pub frame UIContext {
             }
         }
         return -1;
-    }
-
-    fn update_hover(node: Node, px: int, py: int) {
-        node.is_hovered = node.bounds.contains(px, py);
-        var i = 0;
-        while (i < len(node.children)) {
-            self.update_hover(node.children[i], px, py);
-            i = i + 1;
-        }
-    }
-
-    fn reset_pressed(node: Node) {
-        node.is_pressed = false;
-        var i = 0;
-        while (i < len(node.children)) {
-            self.reset_pressed(node.children[i]);
-            i = i + 1;
-        }
-    }
-
-    fn find_node(node: Node, id: int): Node? {
-        if (node.id == id) {
-            return ok(node);
-        }
-        var i = 0;
-        while (i < len(node.children)) {
-            var res = self.find_node(node.children[i], id);
-            if (res != nil) {
-                return res;
-            }
-            i = i + 1;
-        }
-        return err();
     }
 
     pub fn render(canvas: graphics.Canvas) {
@@ -390,7 +404,13 @@ fn extract_key_char(s: str): str {
 fn str_to_int(s: str): int {
     var res = 0;
     var trimmed = string.trim(s);
-    var i = 0;
+    var is_neg = false;
+    var start_idx = 0;
+    if (string.length(trimmed) > 0 and string.substring(trimmed, 0, 1) == "-") {
+        is_neg = true;
+        start_idx = 1;
+    }
+    var i = start_idx;
     var slen = string.length(trimmed);
     while (i < slen) {
         var c = string.substring(trimmed, i, i + 1);
@@ -405,6 +425,9 @@ fn str_to_int(s: str): int {
         elif (c == "8") { res = res * 10 + 8; }
         elif (c == "9") { res = res * 10 + 9; }
         i = i + 1;
+    }
+    if (is_neg) {
+        return 0 - res;
     }
     return res;
 }

@@ -57,6 +57,7 @@
     #include <netdb.h>
     #include <fcntl.h>
     #include <poll.h>
+    #include <dlfcn.h>
     #include <X11/Xlib.h>
     #include <X11/Xutil.h>
     #include <X11/Xatom.h>
@@ -1306,6 +1307,7 @@ public:
 
 private:
     bool is_open_ = false;
+    bool gl_accelerated_ = false;
     int width_ = 800;
     int height_ = 600;
 
@@ -1315,6 +1317,27 @@ private:
     Pixmap backbuffer_ = 0;
     GC gc_ = nullptr;
     Atom wm_delete_window_ = 0;
+
+    void* gl_lib_ = nullptr;
+    void* gl_context_ = nullptr;
+
+    typedef void* (*PFN_glXCreateContext)(Display*, void*, void*, int);
+    typedef int (*PFN_glXMakeCurrent)(Display*, ::Window, void*);
+    typedef void (*PFN_glXSwapBuffers)(Display*, ::Window);
+    typedef void (*PFN_glXDestroyContext)(Display*, void*);
+    typedef void* (*PFN_glXChooseVisual)(Display*, int, int*);
+    typedef void (*PFN_glClearColor)(float, float, float, float);
+    typedef void (*PFN_glClear)(unsigned int);
+    typedef void (*PFN_glViewport)(int, int, int, int);
+
+    PFN_glXCreateContext pfn_glXCreateContext = nullptr;
+    PFN_glXMakeCurrent pfn_glXMakeCurrent = nullptr;
+    PFN_glXSwapBuffers pfn_glXSwapBuffers = nullptr;
+    PFN_glXDestroyContext pfn_glXDestroyContext = nullptr;
+    PFN_glXChooseVisual pfn_glXChooseVisual = nullptr;
+    PFN_glClearColor pfn_glClearColor = nullptr;
+    PFN_glClear pfn_glClear = nullptr;
+    PFN_glViewport pfn_glViewport = nullptr;
 #endif
 
     bool create_window(int w, int h, const char* title) {
@@ -1330,12 +1353,48 @@ private:
         int screen = DefaultScreen(display_);
         ::Window root = RootWindow(display_, screen);
 
-        window_ = XCreateSimpleWindow(display_, root, 100, 100, width_, height_, 1,
-                                     BlackPixel(display_, screen), WhitePixel(display_, screen));
+        // Attempt OpenGL hardware acceleration via GLX first
+        gl_lib_ = dlopen("libGL.so.1", RTLD_LAZY);
+        if (gl_lib_) {
+            pfn_glXChooseVisual = (PFN_glXChooseVisual)dlsym(gl_lib_, "glXChooseVisual");
+            pfn_glXCreateContext = (PFN_glXCreateContext)dlsym(gl_lib_, "glXCreateContext");
+            pfn_glXMakeCurrent = (PFN_glXMakeCurrent)dlsym(gl_lib_, "glXMakeCurrent");
+            pfn_glXSwapBuffers = (PFN_glXSwapBuffers)dlsym(gl_lib_, "glXSwapBuffers");
+            pfn_glXDestroyContext = (PFN_glXDestroyContext)dlsym(gl_lib_, "glXDestroyContext");
+            pfn_glClearColor = (PFN_glClearColor)dlsym(gl_lib_, "glClearColor");
+            pfn_glClear = (PFN_glClear)dlsym(gl_lib_, "glClear");
+            pfn_glViewport = (PFN_glViewport)dlsym(gl_lib_, "glViewport");
 
-        XSelectInput(display_, window_, ExposureMask | KeyPressMask | KeyReleaseMask |
-                                        ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
-                                        StructureNotifyMask | FocusChangeMask);
+            if (pfn_glXChooseVisual && pfn_glXCreateContext && pfn_glXMakeCurrent && pfn_glXSwapBuffers) {
+                int attribs[] = { 4, 1, 8, 8, 9, 8, 10, 8, 5, 1, 0 }; // GLX_RGBA, etc.
+                XVisualInfo* vi = (XVisualInfo*)pfn_glXChooseVisual(display_, screen, attribs);
+                if (vi) {
+                    XSetWindowAttributes swa;
+                    swa.colormap = XCreateColormap(display_, root, vi->visual, AllocNone);
+                    swa.event_mask = ExposureMask | KeyPressMask | KeyReleaseMask |
+                                     ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
+                                     StructureNotifyMask | FocusChangeMask;
+                    window_ = XCreateWindow(display_, root, 100, 100, width_, height_, 1,
+                                            vi->depth, InputOutput, vi->visual,
+                                            CWColormap | CWEventMask, &swa);
+                    gl_context_ = pfn_glXCreateContext(display_, vi, nullptr, 1);
+                    if (gl_context_ && pfn_glXMakeCurrent(display_, window_, gl_context_)) {
+                        gl_accelerated_ = true;
+                        if (pfn_glViewport) pfn_glViewport(0, 0, width_, height_);
+                    }
+                    XFree(vi);
+                }
+            }
+        }
+
+        if (!window_) {
+            window_ = XCreateSimpleWindow(display_, root, 100, 100, width_, height_, 1,
+                                         BlackPixel(display_, screen), WhitePixel(display_, screen));
+
+            XSelectInput(display_, window_, ExposureMask | KeyPressMask | KeyReleaseMask |
+                                            ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
+                                            StructureNotifyMask | FocusChangeMask);
+        }
 
         wm_delete_window_ = XInternAtom(display_, "WM_DELETE_WINDOW", False);
         XSetWMProtocols(display_, window_, &wm_delete_window_, 1);
@@ -1364,6 +1423,14 @@ private:
         if (!is_open_) return;
 #if !defined(_WIN32)
         if (display_) {
+            if (gl_accelerated_ && gl_context_ && pfn_glXDestroyContext) {
+                pfn_glXDestroyContext(display_, gl_context_);
+                gl_context_ = nullptr;
+            }
+            if (gl_lib_) {
+                dlclose(gl_lib_);
+                gl_lib_ = nullptr;
+            }
             if (backbuffer_) XFreePixmap(display_, backbuffer_);
             if (gc_) XFreeGC(display_, gc_);
             if (window_) XDestroyWindow(display_, window_);
@@ -1373,6 +1440,7 @@ private:
         window_ = 0;
         backbuffer_ = 0;
         gc_ = nullptr;
+        gl_accelerated_ = false;
 #endif
         is_open_ = false;
     }
@@ -1388,6 +1456,10 @@ private:
 
     void clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 #if !defined(_WIN32)
+        if (gl_accelerated_ && pfn_glClearColor && pfn_glClear) {
+            pfn_glClearColor(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
+            pfn_glClear(0x00004000); // GL_COLOR_BUFFER_BIT
+        }
         if (display_ && backbuffer_ && gc_) {
             unsigned long color = (r << 16) | (g << 8) | b;
             XSetForeground(display_, gc_, color);
