@@ -1,0 +1,94 @@
+// Test native window creation, event polling, UI layout, and rendering pipeline
+
+import std.gg as gg;
+import std.ui.ui_retained as ui;
+
+fn test_window_creation(): bool {
+    print("Testing window creation...");
+    var win = gg.create_window(640, 480, "Test Window")? else {
+        print("FAIL: create_window returned nil");
+        return false;
+    };
+    if (not win.is_open()) {
+        print("FAIL: window is_open() returned false");
+        return false;
+    }
+    if (win.width() != 640 or win.height() != 480) {
+        print("FAIL: window dimensions mismatch");
+        return false;
+    }
+    win.close();
+    if (win.is_open()) {
+        print("FAIL: window is_open() returned true after close");
+        return false;
+    }
+    print("PASS: Window creation and dimensions test");
+    return true;
+}
+
+fn test_ui_tree_and_layout(): bool {
+    print("Testing UI tree and layout...");
+    var root = ui.create_container(1, ui.color_bg());
+    var btn = ui.create_button(2, "Click Me");
+    var slider = ui.create_slider(3, 0.5);
+
+    root.add_child(btn);
+    root.add_child(slider);
+
+    var ctx = ui.UIContext(root=root);
+    ctx.layout_column(root, 10, 10, 200, 5, 5);
+
+    if (btn.bounds.x != 15 or btn.bounds.y != 15 or btn.bounds.w != 190) {
+        print("FAIL: Button bounds incorrect after layout_column");
+        return false;
+    }
+
+    if (slider.bounds.x != 15 or slider.bounds.w != 190) {
+        print("FAIL: Slider bounds incorrect after layout_column");
+        return false;
+    }
+
+    print("PASS: UI tree and layout test");
+    return true;
+}
+
+fn test_event_dispatch(): bool {
+    print("Testing UI event dispatch and hit testing...");
+    var root = ui.create_container(1, ui.color_bg());
+    var btn = ui.create_button(10, "Target Button");
+    root.add_child(btn);
+
+    var ctx = ui.UIContext(root=root);
+    ctx.layout_column(root, 0, 0, 100, 0, 0);
+
+    // Simulate MouseDown inside button bounds (x=0, y=0, w=100, h=32)
+    ctx.handle_event("MouseDown:1,20,10");
+    if (ctx.clicked_id != 10 or ctx.focused_id != 10) {
+        print("FAIL: MouseDown event dispatch or hit test failed");
+        return false;
+    }
+
+    ctx.handle_event("MouseUp:1,20,10");
+    if (btn.is_pressed) {
+        print("FAIL: MouseUp did not reset pressed state");
+        return false;
+    }
+
+    print("PASS: Event dispatch and hit testing test");
+    return true;
+}
+
+fn main(): int {
+    print("========================================");
+    print("Running Native Desktop GUI Subsystem Tests");
+    print("========================================");
+
+    if (not test_window_creation()) return 1;
+    if (not test_ui_tree_and_layout()) return 1;
+    if (not test_event_dispatch()) return 1;
+
+    print("========================================");
+    print("All Native GUI Tests Passed Successfully!");
+    print("========================================");
+    return 0;
+}

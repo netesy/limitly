@@ -57,6 +57,9 @@
     #include <netdb.h>
     #include <fcntl.h>
     #include <poll.h>
+    #include <X11/Xlib.h>
+    #include <X11/Xutil.h>
+    #include <X11/Xatom.h>
     #if defined(__APPLE__)
         #include <sys/random.h>
     #elif defined(__linux__)
@@ -99,6 +102,12 @@ int64_t register_value_to_i64(RegisterValue val) {
         }
     }
     return 0;
+}
+
+double register_value_to_float(RegisterValue val) {
+    if (is_float(val)) return as_float(val);
+    if (is_integer(val)) return (double)as_i64(val);
+    return 0.0;
 }
 
 namespace {
@@ -1207,6 +1216,274 @@ public:
     }
 };
 
+class WindowResource : public Resource {
+public:
+    WindowResource() = default;
+    ~WindowResource() override {
+        destroy_window();
+    }
+
+    ResourceType getType() const override { return ResourceType::WINDOW; }
+
+    RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
+        switch (op) {
+            case ResourceOperation::CREATE_WINDOW:
+            case ResourceOperation::OPEN: {
+                int width = args.size() > 0 ? (int)register_value_to_i64(args[0]) : 800;
+                int height = args.size() > 1 ? (int)register_value_to_i64(args[1]) : 600;
+                const char* title = args.size() > 2 ? register_value_to_cstr(args[2]) : "Limit Window";
+                if (!title) title = "Limit Window";
+                return create_window(width, height, title) ? VAL_TRUE : VAL_FALSE;
+            }
+            case ResourceOperation::DESTROY_WINDOW:
+            case ResourceOperation::CLOSE: {
+                destroy_window();
+                return VAL_TRUE;
+            }
+            case ResourceOperation::POLL_EVENT:
+            case ResourceOperation::POLL: {
+                return poll_event();
+            }
+            case ResourceOperation::CLEAR: {
+                float r = args.size() > 0 ? (float)register_value_to_float(args[0]) : 0.0f;
+                float g = args.size() > 1 ? (float)register_value_to_float(args[1]) : 0.0f;
+                float b = args.size() > 2 ? (float)register_value_to_float(args[2]) : 0.0f;
+                float a = args.size() > 3 ? (float)register_value_to_float(args[3]) : 255.0f;
+                if (r <= 1.0f && g <= 1.0f && b <= 1.0f && a <= 1.0f && (r > 0 || g > 0 || b > 0 || a > 0)) {
+                    r *= 255.0f; g *= 255.0f; b *= 255.0f; a *= 255.0f;
+                }
+                clear((uint8_t)r, (uint8_t)g, (uint8_t)b, (uint8_t)a);
+                return VAL_TRUE;
+            }
+            case ResourceOperation::DRAW_RECT: {
+                int x = args.size() > 0 ? (int)register_value_to_i64(args[0]) : 0;
+                int y = args.size() > 1 ? (int)register_value_to_i64(args[1]) : 0;
+                int w = args.size() > 2 ? (int)register_value_to_i64(args[2]) : 0;
+                int h = args.size() > 3 ? (int)register_value_to_i64(args[3]) : 0;
+                float r = args.size() > 4 ? (float)register_value_to_float(args[4]) : 0.0f;
+                float g = args.size() > 5 ? (float)register_value_to_float(args[5]) : 0.0f;
+                float b_col = args.size() > 6 ? (float)register_value_to_float(args[6]) : 0.0f;
+                float a = args.size() > 7 ? (float)register_value_to_float(args[7]) : 255.0f;
+                bool filled = args.size() > 8 ? (register_value_to_i64(args[8]) != 0) : true;
+                if (r <= 1.0f && g <= 1.0f && b_col <= 1.0f && a <= 1.0f && (r > 0 || g > 0 || b_col > 0 || a > 0)) {
+                    r *= 255.0f; g *= 255.0f; b_col *= 255.0f; a *= 255.0f;
+                }
+                draw_rect(x, y, w, h, (uint8_t)r, (uint8_t)g, (uint8_t)b_col, (uint8_t)a, filled);
+                return VAL_TRUE;
+            }
+            case ResourceOperation::DRAW_TEXT: {
+                int x = args.size() > 0 ? (int)register_value_to_i64(args[0]) : 0;
+                int y = args.size() > 1 ? (int)register_value_to_i64(args[1]) : 0;
+                const char* text = args.size() > 2 ? register_value_to_cstr(args[2]) : "";
+                if (!text) text = "";
+                float r = args.size() > 3 ? (float)register_value_to_float(args[3]) : 255.0f;
+                float g = args.size() > 4 ? (float)register_value_to_float(args[4]) : 255.0f;
+                float b_col = args.size() > 5 ? (float)register_value_to_float(args[5]) : 255.0f;
+                float a = args.size() > 6 ? (float)register_value_to_float(args[6]) : 255.0f;
+                if (r <= 1.0f && g <= 1.0f && b_col <= 1.0f && a <= 1.0f && (r > 0 || g > 0 || b_col > 0 || a > 0)) {
+                    r *= 255.0f; g *= 255.0f; b_col *= 255.0f; a *= 255.0f;
+                }
+                draw_text(x, y, text, (uint8_t)r, (uint8_t)g, (uint8_t)b_col, (uint8_t)a);
+                return VAL_TRUE;
+            }
+            case ResourceOperation::PRESENT: {
+                present();
+                return VAL_TRUE;
+            }
+            case ResourceOperation::SET_TITLE: {
+                const char* title = args.size() > 0 ? register_value_to_cstr(args[0]) : "Limit Window";
+                if (title) set_title(title);
+                return VAL_TRUE;
+            }
+            case ResourceOperation::GET_SIZE: {
+                std::string res = std::to_string(width_) + "," + std::to_string(height_);
+                return make_string_value(res.c_str());
+            }
+            default:
+                return VAL_NIL;
+        }
+    }
+
+private:
+    bool is_open_ = false;
+    int width_ = 800;
+    int height_ = 600;
+
+#if !defined(_WIN32)
+    Display* display_ = nullptr;
+    ::Window window_ = 0;
+    Pixmap backbuffer_ = 0;
+    GC gc_ = nullptr;
+    Atom wm_delete_window_ = 0;
+#endif
+
+    bool create_window(int w, int h, const char* title) {
+        destroy_window();
+        width_ = w;
+        height_ = h;
+#if !defined(_WIN32)
+        display_ = XOpenDisplay(nullptr);
+        if (!display_) {
+            std::cerr << "[WindowResource] Failed to open X11 Display\n";
+            return false;
+        }
+        int screen = DefaultScreen(display_);
+        ::Window root = RootWindow(display_, screen);
+
+        window_ = XCreateSimpleWindow(display_, root, 100, 100, width_, height_, 1,
+                                     BlackPixel(display_, screen), WhitePixel(display_, screen));
+
+        XSelectInput(display_, window_, ExposureMask | KeyPressMask | KeyReleaseMask |
+                                        ButtonPressMask | ButtonReleaseMask | PointerMotionMask |
+                                        StructureNotifyMask | FocusChangeMask);
+
+        wm_delete_window_ = XInternAtom(display_, "WM_DELETE_WINDOW", False);
+        XSetWMProtocols(display_, window_, &wm_delete_window_, 1);
+
+        XStoreName(display_, window_, title);
+
+        gc_ = XCreateGC(display_, window_, 0, nullptr);
+        backbuffer_ = XCreatePixmap(display_, window_, width_, height_, DefaultDepth(display_, screen));
+
+        // Fill backbuffer initial background
+        XSetForeground(display_, gc_, WhitePixel(display_, screen));
+        XFillRectangle(display_, backbuffer_, gc_, 0, 0, width_, height_);
+
+        XMapWindow(display_, window_);
+        XFlush(display_);
+
+        is_open_ = true;
+        return true;
+#else
+        is_open_ = true;
+        return true;
+#endif
+    }
+
+    void destroy_window() {
+        if (!is_open_) return;
+#if !defined(_WIN32)
+        if (display_) {
+            if (backbuffer_) XFreePixmap(display_, backbuffer_);
+            if (gc_) XFreeGC(display_, gc_);
+            if (window_) XDestroyWindow(display_, window_);
+            XCloseDisplay(display_);
+        }
+        display_ = nullptr;
+        window_ = 0;
+        backbuffer_ = 0;
+        gc_ = nullptr;
+#endif
+        is_open_ = false;
+    }
+
+    void set_title(const char* title) {
+#if !defined(_WIN32)
+        if (display_ && window_) {
+            XStoreName(display_, window_, title);
+            XFlush(display_);
+        }
+#endif
+    }
+
+    void clear(uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+#if !defined(_WIN32)
+        if (display_ && backbuffer_ && gc_) {
+            unsigned long color = (r << 16) | (g << 8) | b;
+            XSetForeground(display_, gc_, color);
+            XFillRectangle(display_, backbuffer_, gc_, 0, 0, width_, height_);
+        }
+#endif
+    }
+
+    void draw_rect(int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a, bool filled) {
+#if !defined(_WIN32)
+        if (display_ && backbuffer_ && gc_) {
+            unsigned long color = (r << 16) | (g << 8) | b;
+            XSetForeground(display_, gc_, color);
+            if (filled) {
+                XFillRectangle(display_, backbuffer_, gc_, x, y, w, h);
+            } else {
+                XDrawRectangle(display_, backbuffer_, gc_, x, y, w, h);
+            }
+        }
+#endif
+    }
+
+    void draw_text(int x, int y, const char* text, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
+#if !defined(_WIN32)
+        if (display_ && backbuffer_ && gc_) {
+            unsigned long color = (r << 16) | (g << 8) | b;
+            XSetForeground(display_, gc_, color);
+            XDrawString(display_, backbuffer_, gc_, x, y + 12, text, (int)std::strlen(text));
+        }
+#endif
+    }
+
+    void present() {
+#if !defined(_WIN32)
+        if (display_ && window_ && backbuffer_ && gc_) {
+            XCopyArea(display_, backbuffer_, window_, gc_, 0, 0, width_, height_, 0, 0);
+            XFlush(display_);
+        }
+#endif
+    }
+
+    RegisterValue poll_event() {
+        if (!is_open_) return make_string_value("Close");
+#if !defined(_WIN32)
+        if (!display_) return VAL_NIL;
+
+        while (XPending(display_) > 0) {
+            XEvent ev;
+            XNextEvent(display_, &ev);
+
+            if (ev.type == ClientMessage) {
+                if ((Atom)ev.xclient.data.l[0] == wm_delete_window_) {
+                    is_open_ = false;
+                    return make_string_value("Close");
+                }
+            } else if (ev.type == ConfigureNotify) {
+                if (ev.xconfigure.width != width_ || ev.xconfigure.height != height_) {
+                    width_ = ev.xconfigure.width;
+                    height_ = ev.xconfigure.height;
+                    int screen = DefaultScreen(display_);
+                    if (backbuffer_) XFreePixmap(display_, backbuffer_);
+                    backbuffer_ = XCreatePixmap(display_, window_, width_, height_, DefaultDepth(display_, screen));
+                    std::string res = "Resize:" + std::to_string(width_) + "," + std::to_string(height_);
+                    return make_string_value(res.c_str());
+                }
+            } else if (ev.type == MotionNotify) {
+                std::string res = "MouseMove:" + std::to_string(ev.xmotion.x) + "," + std::to_string(ev.xmotion.y);
+                return make_string_value(res.c_str());
+            } else if (ev.type == ButtonPress) {
+                std::string res = "MouseDown:" + std::to_string(ev.xbutton.button) + "," + std::to_string(ev.xbutton.x) + "," + std::to_string(ev.xbutton.y);
+                return make_string_value(res.c_str());
+            } else if (ev.type == ButtonRelease) {
+                std::string res = "MouseUp:" + std::to_string(ev.xbutton.button) + "," + std::to_string(ev.xbutton.x) + "," + std::to_string(ev.xbutton.y);
+                return make_string_value(res.c_str());
+            } else if (ev.type == KeyPress) {
+                char buf[32] = {0};
+                KeySym keysym;
+                int len = XLookupString(&ev.xkey, buf, sizeof(buf) - 1, &keysym, nullptr);
+                std::string key_str = len > 0 ? std::string(buf, len) : std::to_string(keysym);
+                std::string res = "KeyDown:" + std::to_string((int)keysym) + ":" + key_str;
+                return make_string_value(res.c_str());
+            } else if (ev.type == KeyRelease) {
+                KeySym keysym = XLookupKeysym(&ev.xkey, 0);
+                std::string res = "KeyUp:" + std::to_string((int)keysym);
+                return make_string_value(res.c_str());
+            } else if (ev.type == FocusIn) {
+                return make_string_value("FocusGained");
+            } else if (ev.type == FocusOut) {
+                return make_string_value("FocusLost");
+            }
+        }
+#endif
+        return VAL_NIL;
+    }
+};
+
 // ===================== ResourceManager Core =====================
 
 ResourceManager& ResourceManager::getInstance() {
@@ -1244,6 +1521,7 @@ int64_t ResourceManager::create(ResourceType type, const std::vector<RegisterVal
         case ResourceType::UDP_SOCKET:    res = std::make_unique<UdpSocketResource>(); break;
         case ResourceType::WEBSOCKET:     res = std::make_unique<WebSocketResource>(); break;
         case ResourceType::HASH_ENGINE:   res = std::make_unique<HashEngineResource>(); break;
+        case ResourceType::WINDOW:        res = std::make_unique<WindowResource>(); break;
         default: return -1;
     }
     int64_t id = next_id_++;

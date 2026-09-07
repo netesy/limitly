@@ -1,0 +1,408 @@
+// Retained UI Toolkit for Limitly (std.ui.ui_retained)
+
+import std.gg as gg;
+import std.string as string;
+
+pub frame Color {
+    pub var r: float;
+    pub var g: float;
+    pub var b: float;
+    pub var a: float;
+}
+
+pub fn rgb(r: float, g: float, b: float): Color {
+    return Color(r=r, g=g, b=b, a=255.0);
+}
+
+pub fn rgba(r: float, g: float, b: float, a: float): Color {
+    return Color(r=r, g=g, b=b, a=a);
+}
+
+pub fn color_bg(): Color { return Color(r=30.0, g=34.0, b=42.0, a=255.0); }
+pub fn color_sidebar(): Color { return Color(r=40.0, g=44.0, b=52.0, a=255.0); }
+pub fn color_card(): Color { return Color(r=50.0, g=56.0, b=66.0, a=255.0); }
+pub fn color_primary(): Color { return Color(r=66.0, g=133.0, b=244.0, a=255.0); }
+pub fn color_primary_hover(): Color { return Color(r=82.0, g=145.0, b=250.0, a=255.0); }
+pub fn color_text(): Color { return Color(r=240.0, g=240.0, b=240.0, a=255.0); }
+pub fn color_muted(): Color { return Color(r=160.0, g=165.0, b=175.0, a=255.0); }
+pub fn color_accent(): Color { return Color(r=52.0, g=168.0, b=83.0, a=255.0); }
+
+pub frame Rect {
+    pub var x: int;
+    pub var y: int;
+    pub var w: int;
+    pub var h: int;
+
+    pub fn contains(px: int, py: int): bool {
+        return (px >= self.x and px <= (self.x + self.w) and py >= self.y and py <= (self.y + self.h));
+    }
+}
+
+pub var WIDGET_LABEL: int = 1;
+pub var WIDGET_BUTTON: int = 2;
+pub var WIDGET_SLIDER: int = 3;
+pub var WIDGET_SWITCH: int = 4;
+pub var WIDGET_TEXTFIELD: int = 5;
+pub var WIDGET_PROGRESS: int = 6;
+pub var WIDGET_CONTAINER: int = 7;
+
+pub frame Node {
+    pub var id: int;
+    pub var kind: int;
+    pub var bounds: Rect;
+    pub var text: str;
+    pub var value: float;
+    pub var checked: bool;
+    pub var is_focused: bool;
+    pub var is_hovered: bool;
+    pub var is_pressed: bool;
+    pub var children: [Node];
+    pub var bg_color: Color;
+    pub var fg_color: Color;
+
+    pub fn add_child(child: Node) {
+        self.children.append(child);
+    }
+}
+
+pub fn create_label(id: int, text: str): Node {
+    var empty_nodes: [Node] = [];
+    return Node(
+        id=id, kind=WIDGET_LABEL, bounds=Rect(x=0, y=0, w=0, h=0), text=text,
+        value=0.0, checked=false, is_focused=false, is_hovered=false, is_pressed=false,
+        children=empty_nodes, bg_color=Color(r=0.0, g=0.0, b=0.0, a=0.0), fg_color=color_text()
+    );
+}
+
+pub fn create_button(id: int, text: str): Node {
+    var empty_nodes: [Node] = [];
+    return Node(
+        id=id, kind=WIDGET_BUTTON, bounds=Rect(x=0, y=0, w=0, h=0), text=text,
+        value=0.0, checked=false, is_focused=false, is_hovered=false, is_pressed=false,
+        children=empty_nodes, bg_color=color_primary(), fg_color=color_text()
+    );
+}
+
+pub fn create_slider(id: int, value: float): Node {
+    var empty_nodes: [Node] = [];
+    return Node(
+        id=id, kind=WIDGET_SLIDER, bounds=Rect(x=0, y=0, w=0, h=0), text="",
+        value=value, checked=false, is_focused=false, is_hovered=false, is_pressed=false,
+        children=empty_nodes, bg_color=color_card(), fg_color=color_primary()
+    );
+}
+
+pub fn create_switch(id: int, checked: bool): Node {
+    var empty_nodes: [Node] = [];
+    return Node(
+        id=id, kind=WIDGET_SWITCH, bounds=Rect(x=0, y=0, w=0, h=0), text="",
+        value=0.0, checked=checked, is_focused=false, is_hovered=false, is_pressed=false,
+        children=empty_nodes, bg_color=color_card(), fg_color=color_accent()
+    );
+}
+
+pub fn create_textfield(id: int, text: str): Node {
+    var empty_nodes: [Node] = [];
+    return Node(
+        id=id, kind=WIDGET_TEXTFIELD, bounds=Rect(x=0, y=0, w=0, h=0), text=text,
+        value=0.0, checked=false, is_focused=false, is_hovered=false, is_pressed=false,
+        children=empty_nodes, bg_color=color_card(), fg_color=color_text()
+    );
+}
+
+pub fn create_progress(id: int, value: float): Node {
+    var empty_nodes: [Node] = [];
+    return Node(
+        id=id, kind=WIDGET_PROGRESS, bounds=Rect(x=0, y=0, w=0, h=0), text="",
+        value=value, checked=false, is_focused=false, is_hovered=false, is_pressed=false,
+        children=empty_nodes, bg_color=color_card(), fg_color=color_accent()
+    );
+}
+
+pub fn create_container(id: int, bg: Color): Node {
+    var empty_nodes: [Node] = [];
+    return Node(
+        id=id, kind=WIDGET_CONTAINER, bounds=Rect(x=0, y=0, w=0, h=0), text="",
+        value=0.0, checked=false, is_focused=false, is_hovered=false, is_pressed=false,
+        children=empty_nodes, bg_color=bg, fg_color=color_text()
+    );
+}
+
+pub frame UIContext {
+    pub var root: Node;
+    pub var mouse_x: int;
+    pub var mouse_y: int;
+    pub var focused_id: int;
+    pub var clicked_id: int;
+
+    pub init(root: Node) {
+        self.root = root;
+        self.mouse_x = 0;
+        self.mouse_y = 0;
+        self.focused_id = -1;
+        self.clicked_id = -1;
+    }
+
+    pub fn layout_column(node: Node, x: int, y: int, w: int, padding: int, spacing: int) {
+        node.bounds = Rect(x=x, y=y, w=w, h=0);
+        var cur_y = y + padding;
+        var inner_w = w - (padding * 2);
+
+        var i = 0;
+        while (i < len(node.children)) {
+            var child = node.children[i];
+            var h = 32;
+            if (child.kind == WIDGET_LABEL) {
+                h = 24;
+            } elif (child.kind == WIDGET_SLIDER or child.kind == WIDGET_PROGRESS) {
+                h = 24;
+            } elif (child.kind == WIDGET_SWITCH) {
+                h = 28;
+            } elif (child.kind == WIDGET_CONTAINER) {
+                self.layout_column(child, x + padding, cur_y, inner_w, 10, 8);
+                h = child.bounds.h;
+            }
+
+            child.bounds = Rect(x=x + padding, y=cur_y, w=inner_w, h=h);
+            cur_y = cur_y + h + spacing;
+            i = i + 1;
+        }
+        node.bounds.h = cur_y - y + padding;
+    }
+
+    pub fn handle_event(ev_str: str) {
+        self.clicked_id = -1;
+        if (ev_str == "FocusLost") {
+            return;
+        }
+
+        if (string.starts_with(ev_str, "MouseMove:")) {
+            var parts = parse_coords(string.substring(ev_str, 10, string.length(ev_str)));
+            self.mouse_x = parts[0];
+            self.mouse_y = parts[1];
+            self.update_hover(self.root, self.mouse_x, self.mouse_y);
+        } elif (string.starts_with(ev_str, "MouseDown:")) {
+            var parts = parse_coords_3(string.substring(ev_str, 10, string.length(ev_str)));
+            self.mouse_x = parts[1];
+            self.mouse_y = parts[2];
+            var hit_id = self.hit_test_id(self.root, self.mouse_x, self.mouse_y);
+            if (hit_id != -1) {
+                self.focused_id = hit_id;
+                self.clicked_id = hit_id;
+                var target_opt = self.find_node(self.root, hit_id);
+                if (target_opt != nil) {
+                    var target = target_opt as Node;
+                    target.is_pressed = true;
+
+                    if (target.kind == WIDGET_SWITCH) {
+                        target.checked = not target.checked;
+                    } elif (target.kind == WIDGET_SLIDER) {
+                        var rel_x = self.mouse_x - target.bounds.x;
+                        if (target.bounds.w > 0) {
+                            target.value = (rel_x as float) / (target.bounds.w as float);
+                            if (target.value < 0.0) { target.value = 0.0; }
+                            if (target.value > 1.0) { target.value = 1.0; }
+                        }
+                    }
+                }
+            } else {
+                self.focused_id = -1;
+            }
+        } elif (string.starts_with(ev_str, "MouseUp:")) {
+            self.reset_pressed(self.root);
+        } elif (string.starts_with(ev_str, "KeyDown:")) {
+            if (self.focused_id != -1) {
+                var target_node = self.find_node(self.root, self.focused_id);
+                if (target_node != nil) {
+                    var n = target_node as Node;
+                    if (n.kind == WIDGET_TEXTFIELD) {
+                        var rest = string.substring(ev_str, 8, string.length(ev_str));
+                        var char_val = extract_key_char(rest);
+                        if (char_val == "BACKSPACE") {
+                            var cur_l = string.length(n.text);
+                            if (cur_l > 0) {
+                                n.text = string.substring(n.text, 0, cur_l - 1);
+                            }
+                        } elif (string.length(char_val) == 1) {
+                            n.text = n.text + char_val;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn hit_test_id(node: Node, px: int, py: int): int {
+        if (node.bounds.contains(px, py)) {
+            var i = len(node.children) - 1;
+            while (i >= 0) {
+                var child_hit = self.hit_test_id(node.children[i], px, py);
+                if (child_hit != -1) {
+                    return child_hit;
+                }
+                i = i - 1;
+            }
+            if (node.kind != WIDGET_CONTAINER) {
+                return node.id;
+            }
+        }
+        return -1;
+    }
+
+    fn update_hover(node: Node, px: int, py: int) {
+        node.is_hovered = node.bounds.contains(px, py);
+        var i = 0;
+        while (i < len(node.children)) {
+            self.update_hover(node.children[i], px, py);
+            i = i + 1;
+        }
+    }
+
+    fn reset_pressed(node: Node) {
+        node.is_pressed = false;
+        var i = 0;
+        while (i < len(node.children)) {
+            self.reset_pressed(node.children[i]);
+            i = i + 1;
+        }
+    }
+
+    fn find_node(node: Node, id: int): Node? {
+        if (node.id == id) {
+            return ok(node);
+        }
+        var i = 0;
+        while (i < len(node.children)) {
+            var res = self.find_node(node.children[i], id);
+            if (res != nil) {
+                return res;
+            }
+            i = i + 1;
+        }
+        return err();
+    }
+
+    pub fn render(win: gg.Window) {
+        self.render_node(win, self.root);
+    }
+
+    fn render_node(win: gg.Window, node: Node) {
+        if (node.kind == WIDGET_CONTAINER) {
+            win.draw_rect(node.bounds.x, node.bounds.y, node.bounds.w, node.bounds.h,
+                          node.bg_color.r, node.bg_color.g, node.bg_color.b, node.bg_color.a, true);
+        } elif (node.kind == WIDGET_LABEL) {
+            win.draw_text(node.bounds.x, node.bounds.y, node.text,
+                          node.fg_color.r, node.fg_color.g, node.fg_color.b, node.fg_color.a);
+        } elif (node.kind == WIDGET_BUTTON) {
+            var bg = node.bg_color;
+            if (node.is_pressed) {
+                bg = color_accent();
+            } elif (node.is_hovered) {
+                bg = color_primary_hover();
+            }
+            win.draw_rect(node.bounds.x, node.bounds.y, node.bounds.w, node.bounds.h,
+                          bg.r, bg.g, bg.b, bg.a, true);
+            win.draw_text(node.bounds.x + 12, node.bounds.y + 6, node.text,
+                          node.fg_color.r, node.fg_color.g, node.fg_color.b, node.fg_color.a);
+        } elif (node.kind == WIDGET_SLIDER) {
+            var card_c = color_card();
+            win.draw_rect(node.bounds.x, node.bounds.y + 8, node.bounds.w, 8,
+                          card_c.r, card_c.g, card_c.b, card_c.a, true);
+            var fill_w = ((node.bounds.w as float) * node.value) as int;
+            var primary_c = color_primary();
+            win.draw_rect(node.bounds.x, node.bounds.y + 8, fill_w, 8,
+                          primary_c.r, primary_c.g, primary_c.b, primary_c.a, true);
+            var txt_c = color_text();
+            win.draw_rect(node.bounds.x + fill_w - 4, node.bounds.y, 8, 24,
+                          txt_c.r, txt_c.g, txt_c.b, txt_c.a, true);
+        } elif (node.kind == WIDGET_SWITCH) {
+            var bg = color_card();
+            if (node.checked) { bg = color_accent(); }
+            win.draw_rect(node.bounds.x, node.bounds.y, 48, 24, bg.r, bg.g, bg.b, bg.a, true);
+            var thumb_x = node.bounds.x + 2;
+            if (node.checked) { thumb_x = node.bounds.x + 26; }
+            var txt_c = color_text();
+            win.draw_rect(thumb_x, node.bounds.y + 2, 20, 20,
+                          txt_c.r, txt_c.g, txt_c.b, txt_c.a, true);
+        } elif (node.kind == WIDGET_PROGRESS) {
+            var card_c = color_card();
+            win.draw_rect(node.bounds.x, node.bounds.y, node.bounds.w, node.bounds.h,
+                          card_c.r, card_c.g, card_c.b, card_c.a, true);
+            var fill_w = ((node.bounds.w as float) * node.value) as int;
+            var accent_c = color_accent();
+            win.draw_rect(node.bounds.x, node.bounds.y, fill_w, node.bounds.h,
+                          accent_c.r, accent_c.g, accent_c.b, accent_c.a, true);
+        } elif (node.kind == WIDGET_TEXTFIELD) {
+            var border = color_muted();
+            if (self.focused_id == node.id) { border = color_primary(); }
+            var card_c = color_card();
+            win.draw_rect(node.bounds.x, node.bounds.y, node.bounds.w, node.bounds.h,
+                          card_c.r, card_c.g, card_c.b, card_c.a, true);
+            win.draw_rect(node.bounds.x, node.bounds.y, node.bounds.w, node.bounds.h,
+                          border.r, border.g, border.b, border.a, false);
+            var display_txt = node.text;
+            if (self.focused_id == node.id) {
+                display_txt = display_txt + "|";
+            }
+            var txt_c = color_text();
+            win.draw_text(node.bounds.x + 8, node.bounds.y + 6, display_txt,
+                          txt_c.r, txt_c.g, txt_c.b, txt_c.a);
+        }
+
+        var i = 0;
+        while (i < len(node.children)) {
+            self.render_node(win, node.children[i]);
+            i = i + 1;
+        }
+    }
+}
+
+fn parse_coords(s: str): [int] {
+    var parts = string.split(s, ",");
+    if (len(parts) >= 2) {
+        return [str_to_int(parts[0]), str_to_int(parts[1])];
+    }
+    return [0, 0];
+}
+
+fn parse_coords_3(s: str): [int] {
+    var parts = string.split(s, ",");
+    if (len(parts) >= 3) {
+        return [str_to_int(parts[0]), str_to_int(parts[1]), str_to_int(parts[2])];
+    }
+    return [0, 0, 0];
+}
+
+fn extract_key_char(s: str): str {
+    var parts = string.split(s, ":");
+    if (len(parts) >= 2) {
+        var key_code = str_to_int(parts[0]);
+        if (key_code == 65288 or key_code == 8) {
+            return "BACKSPACE";
+        }
+        return parts[1];
+    }
+    return "";
+}
+
+fn str_to_int(s: str): int {
+    var res = 0;
+    var trimmed = string.trim(s);
+    var i = 0;
+    var slen = string.length(trimmed);
+    while (i < slen) {
+        var c = string.substring(trimmed, i, i + 1);
+        if (c == "0") { res = res * 10 + 0; }
+        elif (c == "1") { res = res * 10 + 1; }
+        elif (c == "2") { res = res * 10 + 2; }
+        elif (c == "3") { res = res * 10 + 3; }
+        elif (c == "4") { res = res * 10 + 4; }
+        elif (c == "5") { res = res * 10 + 5; }
+        elif (c == "6") { res = res * 10 + 6; }
+        elif (c == "7") { res = res * 10 + 7; }
+        elif (c == "8") { res = res * 10 + 8; }
+        elif (c == "9") { res = res * 10 + 9; }
+        i = i + 1;
+    }
+    return res;
+}

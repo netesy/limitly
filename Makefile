@@ -17,7 +17,7 @@ else
 	CXX := g++
 	CC := gcc
 	AR := ar
-	LIBS := -lffi -ldl
+	LIBS := -lffi -ldl -lX11
 endif
 
 # =============================

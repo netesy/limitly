@@ -173,6 +173,12 @@ pub fn create_entropy(): Resource? {
     return ok(Resource(h=h, k=rt.RT_ENTROPY));
 }
 
+pub fn create_window(width: int, height: int, title: str): Resource? {
+    var h = rt.create(rt.RT_WINDOW, [width, height, title]);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=rt.RT_WINDOW));
+}
+
 pub fn create(type_id: int, args: [any]): Resource? {
     var h = rt.create(type_id, args);
     if (h == -1) return err();
@@ -209,6 +215,7 @@ pub var OP_DELETE: int = rt.OP_DELETE;
 
 pub var KIND_FILE: int = rt.RT_FILE;
 pub var KIND_SOCKET: int = rt.RT_SOCKET;
+pub var KIND_WINDOW: int = rt.RT_WINDOW;
 pub var KIND_STDOUT: int = rt.RT_STDOUT;
 pub var KIND_STDERR: int = rt.RT_STDERR;
 pub var KIND_ENTROPY: int = rt.RT_ENTROPY;

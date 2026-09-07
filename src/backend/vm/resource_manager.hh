@@ -28,6 +28,7 @@ const char* register_value_to_cstr(RegisterValue val);
 
 // Helper to extract an int64 from a RegisterValue.
 int64_t register_value_to_i64(RegisterValue val);
+double register_value_to_float(RegisterValue val);
 
 // Helper to extract a raw pointer from a RegisterValue (foreign ptr or int).
 void* register_value_to_ptr(RegisterValue val);

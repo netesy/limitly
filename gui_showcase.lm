@@ -1,0 +1,102 @@
+// Native Desktop GUI Showcase for Limitly
+// Created using std.ui, std.gg, std.graphics
+// Contains NO std.ffi imports or raw pointer operations
+
+import std.gg as gg;
+import std.ui.ui_retained as ui;
+import std.ui.window as ui_win;
+
+fn main(): int {
+    print("Launching Native Desktop Limitly GUI Showcase...");
+
+    var win = gg.create_window(800, 600, "Limit Native Desktop GUI Showcase")? else {
+        print("Failed to create native desktop window.");
+        return 1;
+    };
+
+    // Root UI tree construction
+    var root = ui.create_container(100, ui.color_bg());
+
+    // Header section
+    var header = ui.create_container(200, ui.color_card());
+    var title_label = ui.create_label(201, "Limit Native GUI Stack Showcase (X11 Native Window)");
+    title_label.fg_color = ui.color_primary();
+    var subtitle_label = ui.create_label(202, "Zero std.ffi, Zero Framebuffer Hacks, Native OS Windowing");
+    subtitle_label.fg_color = ui.color_muted();
+    header.add_child(title_label);
+    header.add_child(subtitle_label);
+
+    // Sidebar section
+    var sidebar = ui.create_container(300, ui.color_sidebar());
+    var btn1 = ui.create_button(301, "Action 1: Increment Counter");
+    var btn2 = ui.create_button(302, "Action 2: Toggle Dark Mode");
+    var switch1 = ui.create_switch(303, true);
+    var switch_label = ui.create_label(304, "Enable Realtime Rendering");
+    sidebar.add_child(btn1);
+    sidebar.add_child(btn2);
+    sidebar.add_child(switch_label);
+    sidebar.add_child(switch1);
+
+    // Content section
+    var content = ui.create_container(400, ui.color_bg());
+    var counter_label = ui.create_label(401, "Button Click Count: 0");
+    var input_label = ui.create_label(402, "Type in TextField below:");
+    var textfield = ui.create_textfield(403, "Hello Limit Desktop GUI!");
+    var slider_label = ui.create_label(404, "Interactive Slider Value:");
+    var slider = ui.create_slider(405, 0.45);
+    var progress_label = ui.create_label(406, "Progress Bar:");
+    var progress = ui.create_progress(407, 0.45);
+
+    content.add_child(counter_label);
+    content.add_child(input_label);
+    content.add_child(textfield);
+    content.add_child(slider_label);
+    content.add_child(slider);
+    content.add_child(progress_label);
+    content.add_child(progress);
+
+    root.add_child(header);
+    root.add_child(sidebar);
+    root.add_child(content);
+
+    var ui_ctx = ui.UIContext(root=root);
+
+    // Initial Layout calculation
+    ui_ctx.layout_column(header, 20, 20, 760, 10, 6);
+    ui_ctx.layout_column(sidebar, 20, 110, 240, 10, 8);
+    ui_ctx.layout_column(content, 280, 110, 500, 10, 8);
+
+    var click_count = 0;
+
+    print("Native Window created successfully. Starting main event loop...");
+
+    while (win.is_open()) {
+        // Poll native OS events
+        var events = win.poll_events();
+        var i = 0;
+        while (i < len(events)) {
+            var ev = events[i];
+            ui_ctx.handle_event(ev);
+
+            if (ui_ctx.clicked_id == 301) {
+                click_count = click_count + 1;
+                counter_label.text = "Button Click Count: " + (click_count as str);
+            }
+
+            i = i + 1;
+        }
+
+        // Sync slider value with progress bar
+        progress.value = slider.value;
+        slider_label.text = "Interactive Slider Value: " + (((slider.value * 100.0) as int) as str) + "%";
+
+        // Render frame
+        win.clear(30.0, 34.0, 42.0, 255.0);
+        ui_ctx.render(win);
+        win.present();
+    }
+
+    win.close();
+    print("Native GUI Showcase exited cleanly.");
+    return 0;
+}

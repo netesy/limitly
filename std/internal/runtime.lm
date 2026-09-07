@@ -3,6 +3,7 @@
 
 pub var RT_FILE: int = 0;
 pub var RT_SOCKET: int = 1;
+pub var RT_WINDOW: int = 2;
 pub var RT_STDOUT: int = 9;
 pub var RT_STDERR: int = 10;
 pub var RT_ENTROPY: int = 12;
@@ -16,6 +17,8 @@ pub var OP_CLOSE: int = 1;
 pub var OP_READ: int = 2;
 pub var OP_WRITE: int = 3;
 pub var OP_CONNECT: int = 6;
+pub var OP_DRAW_RECT: int = 7;
+pub var OP_DRAW_TEXT: int = 8;
 pub var OP_POLL: int = 10;
 pub var OP_BIND: int = 23;
 pub var OP_LISTEN: int = 24;
@@ -30,6 +33,14 @@ pub var OP_RENAME: int = 32;
 pub var OP_EXISTS: int = 33;
 pub var OP_DELETE: int = 34;
 pub var OP_HMAC: int = 35;
+pub var OP_CREATE_WINDOW: int = 36;
+pub var OP_DESTROY_WINDOW: int = 37;
+pub var OP_POLL_EVENT: int = 38;
+pub var OP_PRESENT: int = 39;
+pub var OP_CLEAR: int = 40;
+pub var OP_SET_TITLE: int = 41;
+pub var OP_GET_SIZE: int = 42;
+pub var OP_RESIZE: int = 43;
 
 pub fn create(type_id: int, args: any): int {
     unsafe {

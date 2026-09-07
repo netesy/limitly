@@ -13,7 +13,7 @@ if(WIN32)
     set(PLATFORM_EXE_EXT .exe)
     add_definitions(-DWIN32)
 else()
-    set(PLATFORM_LIBS -lpthread)
+    set(PLATFORM_LIBS -lpthread -lX11)
     set(PLATFORM_EXE_EXT "")
 endif()
 

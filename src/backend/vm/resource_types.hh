@@ -64,7 +64,15 @@ enum class ResourceOperation : uint32_t {
     RENAME = 32,
     EXISTS = 33,
     DELETE = 34,
-    HMAC = 35
+    HMAC = 35,
+    CREATE_WINDOW = 36,
+    DESTROY_WINDOW = 37,
+    POLL_EVENT = 38,
+    PRESENT = 39,
+    CLEAR = 40,
+    SET_TITLE = 41,
+    GET_SIZE = 42,
+    RESIZE = 43
 };
 
 } // namespace VM

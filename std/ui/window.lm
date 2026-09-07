@@ -1,15 +1,59 @@
-import std.ui.widget as widget;
+// Standard Library UI Window (std.ui.window)
+// High-level window representation integrating std.gg graphics and std.ui retained toolkit
 
-frame Window {
+import std.gg as gg;
+import std.ui.ui_retained as ui;
+
+pub frame Window {
+    pub var native_win: gg.Window;
+    pub var ui_ctx: ui.UIContext;
     pub var title: str;
-    pub var width: float;
-    pub var height: float;
-    pub var root_widget: widget.Widget;
+    pub var width: int;
+    pub var height: int;
 
-    pub init(t: str = "Window", w: float = 800.0, h: float = 600.0, root: widget.Widget = widget.Widget()) {
+    pub init(t: str, w: int, h: int, root: ui.Node) {
         self.title = t;
         self.width = w;
         self.height = h;
-        self.root_widget = root;
+        self.native_win = gg.create_window(w, h, t)? else {
+            // fallback
+        };
+        self.ui_ctx = ui.UIContext(root=root);
     }
+
+    pub fn is_open(): bool {
+        return self.native_win.is_open();
+    }
+
+    pub fn poll_events(): [str] {
+        var events = self.native_win.poll_events();
+        var i = 0;
+        while (i < len(events)) {
+            self.ui_ctx.handle_event(events[i]);
+            i = i + 1;
+        }
+        return events;
+    }
+
+    pub fn render() {
+        self.native_win.clear(30.0, 34.0, 42.0, 255.0);
+        self.ui_ctx.render(self.native_win);
+        self.native_win.present();
+    }
+
+    pub fn close() {
+        self.native_win.close();
+    }
+
+    pub fn clicked_id(): int {
+        return self.ui_ctx.clicked_id;
+    }
+}
+
+pub fn create_window(title: str, width: int, height: int, root: ui.Node): Window? {
+    var win = Window(t=title, w=width, h=height, root=root);
+    if (not win.is_open()) {
+        return err();
+    }
+    return ok(win);
 }
