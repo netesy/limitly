@@ -1,104 +1,10 @@
-// Standard Library Graphics Layer (std.gg)
-// Native window-backed 2D/3D graphics module
+// Standard Library Low-Level Graphics Abstraction (std.gg)
+// Inspired by Sokol GFX: backend-independent, low-level graphics commands.
+// Contains NO window management, OS event handling, or UI logic.
 
 import std.resource as res;
 import std.internal.runtime as rt;
 
-pub frame Window {
-    pub var resource: res.Resource;
-    pub var width_val: int;
-    pub var height_val: int;
-    pub var is_open_val: bool;
-
-    pub init(r: res.Resource, w: int, h: int) {
-        self.resource = r;
-        self.width_val = w;
-        self.height_val = h;
-        self.is_open_val = r.is_open();
-    }
-
-    pub fn width(): int {
-        return self.width_val;
-    }
-
-    pub fn height(): int {
-        return self.height_val;
-    }
-
-    pub fn is_open(): bool {
-        return self.is_open_val;
-    }
-
-    pub fn close(): nil {
-        if (self.is_open_val) {
-            rt.call(self.resource.handle, rt.OP_DESTROY_WINDOW, []);
-            self.resource.close();
-            self.is_open_val = false;
-        }
-    }
-
-    pub fn poll_events(): [str] {
-        var events: [str] = [];
-        if (not self.is_open_val) {
-            return events;
-        }
-        var keep_polling = true;
-        while (keep_polling) {
-            var ev = rt.call(self.resource.handle, rt.OP_POLL_EVENT, []);
-            if (ev == nil) {
-                keep_polling = false;
-            } else {
-                var ev_str = ev as str;
-                if (ev_str == "Close") {
-                    self.is_open_val = false;
-                }
-                events.append(ev_str);
-            }
-        }
-        return events;
-    }
-
-    pub fn clear(r: float, g: float, b: float, a: float) {
-        if (self.is_open_val) {
-            rt.call(self.resource.handle, rt.OP_CLEAR, [r, g, b, a]);
-        }
-    }
-
-    pub fn draw_rect(x: int, y: int, w: int, h: int, r: float, g: float, b: float, a: float, filled: bool) {
-        if (self.is_open_val) {
-            var f_val = 0;
-            if (filled) { f_val = 1; }
-            rt.call(self.resource.handle, rt.OP_DRAW_RECT, [x, y, w, h, r, g, b, a, f_val]);
-        }
-    }
-
-    pub fn draw_text(x: int, y: int, text: str, r: float, g: float, b: float, a: float) {
-        if (self.is_open_val) {
-            rt.call(self.resource.handle, rt.OP_DRAW_TEXT, [x, y, text, r, g, b, a]);
-        }
-    }
-
-    pub fn present() {
-        if (self.is_open_val) {
-            rt.call(self.resource.handle, rt.OP_PRESENT, []);
-        }
-    }
-
-    pub fn set_title(title: str) {
-        if (self.is_open_val) {
-            rt.call(self.resource.handle, rt.OP_SET_TITLE, [title]);
-        }
-    }
-}
-
-pub fn create_window(width: int, height: int, title: str): Window? {
-    var r = res.create_window(width, height, title)? else {
-        return err();
-    };
-    return ok(Window(r=r, w=width, h=height));
-}
-
-// Low-level pipeline structures
 pub frame Buffer {
     pub var id: int;
     pub var size: int;
@@ -119,40 +25,34 @@ pub frame PassAction {
     pub var a: float;
 }
 
-pub var current_window: Window? = nil;
-
-pub fn setup(window: Window) {
-    current_window = ok(window);
+// Low-Level Pass & Drawing API
+pub fn begin_pass(win_handle: int, r: float, g: float, b: float, a: float) {
+    rt.call(win_handle, rt.OP_CLEAR, [r, g, b, a]);
 }
 
-pub fn shutdown() {
-    match (current_window) {
-        val win => {
-            win.close();
-            current_window = nil;
-        },
-        _ => {}
-    }
+pub fn draw_rect(win_handle: int, x: int, y: int, w: int, h: int, r: float, g: float, b: float, a: float, filled: bool) {
+    var f_val = 0;
+    if (filled) { f_val = 1; }
+    rt.call(win_handle, rt.OP_DRAW_RECT, [x, y, w, h, r, g, b, a, f_val]);
 }
 
-pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float) {
-    match (current_window) {
-        val win => {
-            win.clear(r, g, b, a);
-        },
-        _ => {}
-    }
+pub fn draw_text(win_handle: int, x: int, y: int, text: str, r: float, g: float, b: float, a: float) {
+    rt.call(win_handle, rt.OP_DRAW_TEXT, [x, y, text, r, g, b, a]);
 }
 
-pub fn end_pass() {
-    // Pass completion hook
+pub fn end_pass(win_handle: int) {
+    // End pass hook
 }
 
-pub fn commit() {
-    match (current_window) {
-        val win => {
-            win.present();
-        },
-        _ => {}
-    }
+pub fn commit(win_handle: int) {
+    rt.call(win_handle, rt.OP_PRESENT, []);
 }
+
+pub fn setup() {}
+pub fn shutdown() {}
+pub fn apply_bindings(v_id: int, i_id: int) {}
+pub fn apply_pipeline(pip_id: int) {}
+pub fn draw(base: int, count: int, instances: int) {}
+pub fn make_buffer(data_ptr: int, data_size: int, index: bool): int { return 0; }
+pub fn make_shader(vs: str, fs: str): int { return 0; }
+pub fn make_pipeline(shd_id: int, primitive_type: int): int { return 0; }

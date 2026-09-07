@@ -1,59 +1,80 @@
-// Standard Library UI Window (std.ui.window)
-// High-level window representation integrating std.gg graphics and std.ui retained toolkit
+// Standard Library Window & Application Abstraction (std.ui.window)
+// High-level native OS window owner and event pump
 
-import std.gg as gg;
-import std.ui.ui_retained as ui;
+import std.resource as res;
+import std.internal.runtime as rt;
 
 pub frame Window {
-    pub var native_win: gg.Window;
-    pub var ui_ctx: ui.UIContext;
-    pub var title: str;
-    pub var width: int;
-    pub var height: int;
+    pub var resource: res.Resource;
+    pub var width_val: int;
+    pub var height_val: int;
+    pub var title_val: str;
+    pub var is_open_val: bool;
 
-    pub init(t: str, w: int, h: int, root: ui.Node) {
-        self.title = t;
-        self.width = w;
-        self.height = h;
-        self.native_win = gg.create_window(w, h, t)? else {
-            // fallback
-        };
-        self.ui_ctx = ui.UIContext(root=root);
+    pub init(r: res.Resource, w: int, h: int, t: str) {
+        self.resource = r;
+        self.width_val = w;
+        self.height_val = h;
+        self.title_val = t;
+        self.is_open_val = r.is_open();
+    }
+
+    pub fn width(): int {
+        return self.width_val;
+    }
+
+    pub fn height(): int {
+        return self.height_val;
     }
 
     pub fn is_open(): bool {
-        return self.native_win.is_open();
+        return self.is_open_val;
+    }
+
+    pub fn handle(): int {
+        return self.resource.handle;
+    }
+
+    pub fn close(): nil {
+        if (self.is_open_val) {
+            rt.call(self.resource.handle, rt.OP_DESTROY_WINDOW, []);
+            self.resource.close();
+            self.is_open_val = false;
+        }
     }
 
     pub fn poll_events(): [str] {
-        var events = self.native_win.poll_events();
-        var i = 0;
-        while (i < len(events)) {
-            self.ui_ctx.handle_event(events[i]);
-            i = i + 1;
+        var events: [str] = [];
+        if (not self.is_open_val) {
+            return events;
+        }
+        var keep_polling = true;
+        while (keep_polling) {
+            var ev = rt.call(self.resource.handle, rt.OP_POLL_EVENT, []);
+            if (ev == nil) {
+                keep_polling = false;
+            } else {
+                var ev_str = ev as str;
+                if (ev_str == "Close") {
+                    self.is_open_val = false;
+                }
+                events.append(ev_str);
+            }
         }
         return events;
     }
 
-    pub fn render() {
-        self.native_win.clear(30.0, 34.0, 42.0, 255.0);
-        self.ui_ctx.render(self.native_win);
-        self.native_win.present();
-    }
-
-    pub fn close() {
-        self.native_win.close();
-    }
-
-    pub fn clicked_id(): int {
-        return self.ui_ctx.clicked_id;
+    pub fn set_title(title: str) {
+        if (self.is_open_val) {
+            self.title_val = title;
+            rt.call(self.resource.handle, rt.OP_SET_TITLE, [title]);
+        }
     }
 }
 
-pub fn create_window(title: str, width: int, height: int, root: ui.Node): Window? {
-    var win = Window(t=title, w=width, h=height, root=root);
-    if (not win.is_open()) {
+pub fn create_window(width: int, height: int, title: str): Window? {
+    var r = res.create_window(width, height, title)? else {
         return err();
-    }
-    return ok(win);
+    };
+    return ok(Window(r=r, w=width, h=height, t=title));
 }

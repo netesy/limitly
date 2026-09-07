@@ -1,11 +1,11 @@
-// Test native window creation, event polling, UI layout, and rendering pipeline
+// Test native window creation via std.ui.window, event polling, UI layout, and rendering pipeline
 
-import std.gg as gg;
-import std.ui.ui_retained as ui;
+import std.ui.window as window;
+import std.ui.context as ui;
 
 fn test_window_creation(): bool {
     print("Testing window creation...");
-    var win = gg.create_window(640, 480, "Test Window")? else {
+    var win = window.create_window(640, 480, "Test Window")? else {
         print("FAIL: create_window returned nil");
         return false;
     };

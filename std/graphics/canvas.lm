@@ -1,20 +1,43 @@
-import std.graphics.rect as rect;
-import std.graphics.paint as paint;
-import std.graphics.color as color;
-import std.graphics.path as path;
-import std.graphics.image as image;
+// Standard Library Graphics Canvas (std.graphics.canvas)
+// Higher-level 2D/3D graphics drawing abstraction calling into std.gg
 
-frame Canvas {
-    pub var width: float;
-    pub var height: float;
+import std.gg as gg;
 
-    pub init(w: float = 800.0, h: float = 600.0) {
-        self.width = w;
-        self.height = h;
+pub frame Color {
+    pub var r: float;
+    pub var g: float;
+    pub var b: float;
+    pub var a: float;
+}
+
+pub fn rgb(r: float, g: float, b: float): Color {
+    return Color(r=r, g=g, b=b, a=255.0);
+}
+
+pub fn rgba(r: float, g: float, b: float, a: float): Color {
+    return Color(r=r, g=g, b=b, a=a);
+}
+
+pub frame Canvas {
+    pub var win_handle: int;
+
+    pub init(h: int) {
+        self.win_handle = h;
     }
 
-    pub fn draw_rect(r: rect.Rect, p: paint.Paint): nil {}
-    pub fn draw_color(c: color.Color): nil {}
-    pub fn draw_image(img: image.Image, x: float, y: float): nil {}
-    pub fn draw_path(p: path.Path, paint_obj: paint.Paint): nil {}
+    pub fn clear(c: Color) {
+        gg.begin_pass(self.win_handle, c.r, c.g, c.b, c.a);
+    }
+
+    pub fn draw_rect(x: int, y: int, w: int, h: int, c: Color, filled: bool) {
+        gg.draw_rect(self.win_handle, x, y, w, h, c.r, c.g, c.b, c.a, filled);
+    }
+
+    pub fn draw_text(x: int, y: int, text: str, c: Color) {
+        gg.draw_text(self.win_handle, x, y, text, c.r, c.g, c.b, c.a);
+    }
+
+    pub fn present() {
+        gg.commit(self.win_handle);
+    }
 }

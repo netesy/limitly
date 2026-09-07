@@ -1,15 +1,15 @@
 // Native Desktop GUI Showcase for Limitly
-// Created using std.ui, std.gg, std.graphics
+// Created using std.ui, std.graphics, std.gg
 // Contains NO std.ffi imports or raw pointer operations
 
-import std.gg as gg;
-import std.ui.ui_retained as ui;
-import std.ui.window as ui_win;
+import std.ui.window as window;
+import std.ui.context as ui;
+import std.graphics.canvas as graphics;
 
 fn main(): int {
     print("Launching Native Desktop Limitly GUI Showcase...");
 
-    var win = gg.create_window(800, 600, "Limit Native Desktop GUI Showcase")? else {
+    var win = window.create_window(800, 600, "Limit Native Desktop GUI Showcase")? else {
         print("Failed to create native desktop window.");
         return 1;
     };
@@ -66,12 +66,13 @@ fn main(): int {
     ui_ctx.layout_column(sidebar, 20, 110, 240, 10, 8);
     ui_ctx.layout_column(content, 280, 110, 500, 10, 8);
 
+    var canvas = graphics.Canvas(h=win.handle());
     var click_count = 0;
 
     print("Native Window created successfully. Starting main event loop...");
 
     while (win.is_open()) {
-        // Poll native OS events
+        // Poll native OS events from window layer
         var events = win.poll_events();
         var i = 0;
         while (i < len(events)) {
@@ -90,10 +91,11 @@ fn main(): int {
         progress.value = slider.value;
         slider_label.text = "Interactive Slider Value: " + (((slider.value * 100.0) as int) as str) + "%";
 
-        // Render frame
-        win.clear(30.0, 34.0, 42.0, 255.0);
-        ui_ctx.render(win);
-        win.present();
+        // Render frame via Canvas / std.graphics -> std.gg
+        var bg_color = graphics.rgba(30.0, 34.0, 42.0, 255.0);
+        canvas.clear(bg_color);
+        ui_ctx.render(canvas);
+        canvas.present();
     }
 
     win.close();
