@@ -59,6 +59,24 @@ public:
      */
     bool redundant_memory_elimination();
 
+    /**
+     * @brief Perform small leaf function inlining
+     * @return true if changes were made
+     */
+    bool function_inlining();
+
+    /**
+     * @brief Perform Global Value Numbering across basic block sequences
+     * @return true if changes were made
+     */
+    bool global_value_numbering();
+
+    /**
+     * @brief Eliminate empty generational check region enter/exit pairs
+     * @return true if changes were made
+     */
+    bool generational_check_hoisting();
+
 private:
     LIR_Function& func_;
 

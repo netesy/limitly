@@ -1,6 +1,8 @@
 #include "optimizer.hh"
+#include "functions.hh"
 #include "backend/vm/vm_value.hh"
 #include <unordered_set>
+#include <unordered_map>
 #include <algorithm>
 #include <queue>
 
@@ -87,12 +89,19 @@ bool Optimizer::optimize() {
         bool dce = dead_code_elimination();
         bool rc = remove_redundant_entry_calls();
 
+        bool fi = function_inlining();
+        bool gvn = global_value_numbering();
+        bool gch = generational_check_hoisting();
+
         pass_changed |= ur;
         pass_changed |= cf;
         pass_changed |= po;
         pass_changed |= rm;
         pass_changed |= dce;
         pass_changed |= rc;
+        pass_changed |= fi;
+        pass_changed |= gvn;
+        pass_changed |= gch;
 
         changed |= pass_changed;
         pass_count++;
@@ -402,7 +411,6 @@ bool Optimizer::peephole_optimize() {
 
         // 4. Strength reduction: add rX, rY, 0 -> mov rX, rY
         if (inst.op == LIR_Op::Add && inst.b != UINT32_MAX) {
-            // Check if b is a constant 0
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
                 if (prev.op == LIR_Op::LoadConst && prev.dst == inst.b &&
@@ -415,7 +423,23 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 5. Strength reduction: mul rX, rY, 1 -> mov rX, rY
+        // 5. Strength reduction: mul rX, rY, 0 -> load_const rX, 0
+        if (inst.op == LIR_Op::Mul && inst.b != UINT32_MAX) {
+            if (i > 0) {
+                auto& prev = func_.instructions[i - 1];
+                if (prev.op == LIR_Op::LoadConst && prev.dst == inst.b &&
+                    IS_INT(prev.const_val) && UNBOX_INT(prev.const_val) == 0) {
+                    inst.op = LIR_Op::LoadConst;
+                    inst.a = UINT32_MAX;
+                    inst.b = UINT32_MAX;
+                    inst.const_val = make_i64(0);
+                    changed = true;
+                    continue;
+                }
+            }
+        }
+
+        // 6. Strength reduction: mul rX, rY, 1 -> mov rX, rY
         if (inst.op == LIR_Op::Mul && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -429,7 +453,7 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 6. Strength reduction: mul rX, rY, 2 -> add rX, rY, rY
+        // 7. Strength reduction: mul rX, rY, 2 -> add rX, rY, rY
         if (inst.op == LIR_Op::Mul && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -443,31 +467,29 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 7. Eliminate redundant comparisons: cmpeq rX, rY, rY -> load_const rX, true
+        // 8. Eliminate redundant comparisons: cmpeq rX, rY, rY -> load_const rX, true
         if ((inst.op == LIR_Op::CmpEQ || inst.op == LIR_Op::CmpLE || inst.op == LIR_Op::CmpGE) && 
             inst.a != UINT32_MAX && inst.a == inst.b) {
             inst.op = LIR_Op::LoadConst;
             inst.a = UINT32_MAX;
             inst.b = UINT32_MAX;
-            // Create a true constant
             inst.const_val = VAL_TRUE;
             changed = true;
             continue;
         }
 
-        // 8. Eliminate redundant comparisons: cmpne rX, rY, rY -> load_const rX, false
+        // 9. Eliminate redundant comparisons: cmpne rX, rY, rY -> load_const rX, false
         if ((inst.op == LIR_Op::CmpNEQ || inst.op == LIR_Op::CmpLT || inst.op == LIR_Op::CmpGT) && 
             inst.a != UINT32_MAX && inst.a == inst.b) {
             inst.op = LIR_Op::LoadConst;
             inst.a = UINT32_MAX;
             inst.b = UINT32_MAX;
-            // Create a false constant
             inst.const_val = VAL_FALSE;
             changed = true;
             continue;
         }
 
-        // 9. Eliminate redundant boolean operations: and rX, rY, rY -> mov rX, rY
+        // 10. Eliminate redundant boolean operations: and rX, rY, rY -> mov rX, rY
         if (inst.op == LIR_Op::And && inst.a == inst.b) {
             inst.op = LIR_Op::Mov;
             inst.b = UINT32_MAX;
@@ -475,7 +497,7 @@ bool Optimizer::peephole_optimize() {
             continue;
         }
 
-        // 10. Eliminate redundant boolean operations: or rX, rY, rY -> mov rX, rY
+        // 11. Eliminate redundant boolean operations: or rX, rY, rY -> mov rX, rY
         if (inst.op == LIR_Op::Or && inst.a == inst.b) {
             inst.op = LIR_Op::Mov;
             inst.b = UINT32_MAX;
@@ -483,7 +505,7 @@ bool Optimizer::peephole_optimize() {
             continue;
         }
 
-        // 11. Eliminate redundant boolean operations: xor rX, rY, rY -> load_const rX, false
+        // 12. Eliminate redundant boolean operations: xor rX, rY, rY -> load_const rX, false
         if (inst.op == LIR_Op::Xor && inst.a != UINT32_MAX && inst.a == inst.b) {
             inst.op = LIR_Op::LoadConst;
             inst.a = UINT32_MAX;
@@ -493,7 +515,7 @@ bool Optimizer::peephole_optimize() {
             continue;
         }
 
-        // 12. Eliminate redundant negation: neg rX, rY; neg rZ, rX -> mov rZ, rY
+        // 13. Eliminate redundant negation: neg rX, rY; neg rZ, rX -> mov rZ, rY
         if (inst.op == LIR_Op::Neg && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
             if (next.op == LIR_Op::Neg && next.a == inst.dst) {
@@ -506,7 +528,7 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 13. Eliminate unused jumps: jump L; L: -> remove jump
+        // 14. Eliminate unused jumps: jump L; L: -> remove jump
         if (inst.op == LIR_Op::Jump && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
             if (next.op == LIR_Op::Label && next.imm == inst.imm) {
@@ -517,11 +539,10 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 14. Combine consecutive loads into single load
+        // 15. Combine consecutive loads into single load
         if (inst.op == LIR_Op::LoadConst && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
             if (next.op == LIR_Op::Mov && next.a == inst.dst) {
-                // Replace next mov with direct load to its destination
                 inst.dst = next.dst;
                 func_.instructions.erase(func_.instructions.begin() + i + 1);
                 changed = true;
@@ -529,7 +550,7 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 15. Eliminate mov before return: mov rX, rY; return rX -> return rY
+        // 16. Eliminate mov before return: mov rX, rY; return rX -> return rY
         if (inst.op == LIR_Op::Mov && i + 1 < func_.instructions.size()) {
             auto& next = func_.instructions[i + 1];
             if ((next.op == LIR_Op::Return || next.op == LIR_Op::Ret) && next.dst == inst.dst) {
@@ -541,7 +562,7 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 16. Eliminate sub rX, rY, 0 -> mov rX, rY
+        // 17. Eliminate sub rX, rY, 0 -> mov rX, rY
         if (inst.op == LIR_Op::Sub && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -555,7 +576,7 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 17. Eliminate div rX, rY, 1 -> mov rX, rY
+        // 18. Eliminate div rX, rY, 1 -> mov rX, rY
         if (inst.op == LIR_Op::Div && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -569,7 +590,7 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // 18. Eliminate mod rX, rY, 1 -> load_const rX, 0
+        // 19. Eliminate mod rX, rY, 1 -> load_const rX, 0
         if (inst.op == LIR_Op::Mod && inst.b != UINT32_MAX) {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
@@ -618,7 +639,6 @@ bool Optimizer::constant_folding() {
                 Backend::Value va = const_regs[inst.a];
                 Backend::Value vb = const_regs[inst.b];
 
-                // Only fold integers for now
                 if (IS_INT(va) && IS_INT(vb)) {
                     int64_t a = UNBOX_INT(va);
                     int64_t b = UNBOX_INT(vb);
@@ -647,34 +667,197 @@ bool Optimizer::constant_folding() {
     return changed;
 }
 
+bool Optimizer::function_inlining() {
+    if (func_.instructions.empty()) return false;
+    bool changed = false;
+
+    auto& func_mgr = LIRFunctionManager::getInstance();
+
+    for (size_t i = 0; i < func_.instructions.size(); ++i) {
+        auto& inst = func_.instructions[i];
+
+        if ((inst.op == LIR_Op::Call || inst.op == LIR_Op::CallVoid) &&
+            !inst.func_name.empty() && inst.func_name != func_.name &&
+            func_mgr.hasFunction(inst.func_name)) {
+
+            auto target_func = func_mgr.getFunction(inst.func_name);
+            if (!target_func) continue;
+
+            const auto& target_insts = target_func->getInstructions();
+            // Candidate check: small leaf function (under 12 instructions, no internal calls/jumps)
+            if (target_insts.empty() || target_insts.size() > 12) continue;
+
+            bool is_leaf = true;
+            for (const auto& ti : target_insts) {
+                if (ti.op == LIR_Op::Call || ti.op == LIR_Op::CallVoid ||
+                    ti.op == LIR_Op::CallIndirect || ti.op == LIR_Op::CallBuiltin ||
+                    ti.op == LIR_Op::Jump || ti.op == LIR_Op::JumpIf || ti.op == LIR_Op::JumpIfFalse) {
+                    is_leaf = false;
+                    break;
+                }
+            }
+            if (!is_leaf) continue;
+
+            // Reserve registers in caller function for inlined frame
+            size_t num_params = inst.call_args.size();
+            size_t max_target_reg = num_params + 16;
+            for (const auto& ti : target_insts) {
+                if (ti.dst != UINT32_MAX && ti.dst > max_target_reg) max_target_reg = ti.dst;
+                if (ti.a != UINT32_MAX && ti.a > max_target_reg) max_target_reg = ti.a;
+                if (ti.b != UINT32_MAX && ti.b > max_target_reg) max_target_reg = ti.b;
+            }
+
+            Reg base_reg = func_.allocate_register();
+            for (size_t r = 1; r <= max_target_reg; ++r) {
+                func_.allocate_register();
+            }
+
+            std::vector<LIR_Inst> inlined_insts;
+
+            // Map parameters
+            for (size_t param_idx = 0; param_idx < inst.call_args.size(); ++param_idx) {
+                Reg param_reg = static_cast<Reg>(param_idx) + base_reg;
+                Reg arg_reg = inst.call_args[param_idx];
+                inlined_insts.push_back(LIR_Inst(LIR_Op::Mov, Type::I64, param_reg, arg_reg, 0));
+            }
+
+            for (const auto& ti : target_insts) {
+                if (ti.op == LIR_Op::Return || ti.op == LIR_Op::Ret) {
+                    if (inst.dst != UINT32_MAX && ti.dst != UINT32_MAX) {
+                        Reg ret_val = ti.dst + base_reg;
+                        inlined_insts.push_back(LIR_Inst(LIR_Op::Mov, Type::I64, inst.dst, ret_val, 0));
+                    }
+                } else {
+                    LIR_Inst mapped = ti;
+                    if (mapped.dst != UINT32_MAX) mapped.dst += base_reg;
+                    if (mapped.a != UINT32_MAX) mapped.a += base_reg;
+                    if (mapped.b != UINT32_MAX) mapped.b += base_reg;
+                    inlined_insts.push_back(mapped);
+                }
+            }
+
+            // Replace call instruction with inlined instructions
+            func_.instructions.erase(func_.instructions.begin() + i);
+            func_.instructions.insert(func_.instructions.begin() + i, inlined_insts.begin(), inlined_insts.end());
+            changed = true;
+            break;
+        }
+    }
+
+    return changed;
+}
+
+bool Optimizer::global_value_numbering() {
+    if (func_.instructions.empty()) return false;
+    bool changed = false;
+
+    struct ExprKey {
+        LIR_Op op;
+        Reg a;
+        Reg b;
+        bool operator==(const ExprKey& o) const { return op == o.op && a == o.a && b == o.b; }
+    };
+
+    struct ExprKeyHash {
+        size_t operator()(const ExprKey& k) const {
+            return (static_cast<size_t>(k.op) << 16) ^ (k.a << 8) ^ k.b;
+        }
+    };
+
+    std::unordered_map<ExprKey, Reg, ExprKeyHash> value_table;
+
+    for (size_t i = 0; i < func_.instructions.size(); ++i) {
+        auto& inst = func_.instructions[i];
+
+        // Invalidate table on labels and calls/jumps (basic block boundary)
+        if (inst.op == LIR_Op::Label || inst.op == LIR_Op::Call || inst.op == LIR_Op::CallVoid ||
+            inst.op == LIR_Op::CallIndirect || inst.op == LIR_Op::CallBuiltin ||
+            inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
+            value_table.clear();
+            continue;
+        }
+
+        // Invalidate any table entries where an operand or dst register is overwritten
+        auto invalidate_reg = [&](Reg r) {
+            if (r == UINT32_MAX) return;
+            for (auto it = value_table.begin(); it != value_table.end(); ) {
+                if (it->first.a == r || it->first.b == r || it->second == r) {
+                    it = value_table.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        };
+
+        // If this instruction modifies inst.dst or operands, invalidate past table entries using them
+        if (inst.dst != UINT32_MAX) {
+            invalidate_reg(inst.dst);
+        }
+
+        // Pure side-effect-free arithmetic/bitwise/comparison instructions
+        if (inst.op == LIR_Op::Add || inst.op == LIR_Op::Sub || inst.op == LIR_Op::Mul ||
+            inst.op == LIR_Op::Div || inst.op == LIR_Op::And || inst.op == LIR_Op::Or ||
+            inst.op == LIR_Op::Xor || inst.op == LIR_Op::Shl || inst.op == LIR_Op::Shr ||
+            inst.op == LIR_Op::CmpEQ || inst.op == LIR_Op::CmpNEQ || inst.op == LIR_Op::CmpLT ||
+            inst.op == LIR_Op::CmpLE || inst.op == LIR_Op::CmpGT || inst.op == LIR_Op::CmpGE) {
+
+            ExprKey key{inst.op, inst.a, inst.b};
+            auto it = value_table.find(key);
+            if (it != value_table.end()) {
+                // Duplicate expression found! Replace instruction with Mov from existing result
+                Reg existing_dst = it->second;
+                inst.op = LIR_Op::Mov;
+                inst.a = existing_dst;
+                inst.b = UINT32_MAX;
+                changed = true;
+            } else if (inst.dst != UINT32_MAX) {
+                value_table[key] = inst.dst;
+            }
+        }
+    }
+
+    return changed;
+}
+
+bool Optimizer::generational_check_hoisting() {
+    if (func_.instructions.empty()) return false;
+    bool changed = false;
+
+    // Eliminate consecutive matching RegionEnter / RegionExit instruction pairs with no intervening side effects
+    for (size_t i = 0; i + 1 < func_.instructions.size(); ) {
+        auto& first = func_.instructions[i];
+        auto& second = func_.instructions[i + 1];
+
+        if (first.op == LIR_Op::RegionEnter && second.op == LIR_Op::RegionExit &&
+            first.imm == second.imm) {
+            func_.instructions.erase(func_.instructions.begin() + i, func_.instructions.begin() + i + 2);
+            changed = true;
+            if (i > 0) --i;
+        } else {
+            ++i;
+        }
+    }
+
+    return changed;
+}
+
 bool Optimizer::remove_redundant_entry_calls() {
     if (func_.instructions.empty()) return false;
     
-    // Only apply this optimization to the top-level wrapper function
     if (func_.name != "__top_level_wrapper__") return false;
     
     bool changed = false;
     
-    // Look for pattern: call <func>; call <same_func>; with no intervening side effects
     for (size_t i = 0; i + 1 < func_.instructions.size(); ++i) {
         const auto& first = func_.instructions[i];
         const auto& second = func_.instructions[i + 1];
         
-        // Check if both are calls to the same function
         if ((first.op == LIR_Op::Call || first.op == LIR_Op::CallVoid) &&
             (second.op == LIR_Op::Call || second.op == LIR_Op::CallVoid)) {
             
-            // Check if they call the same function
             if (first.func_name == second.func_name && !first.func_name.empty()) {
-                // Check if there are no intervening instructions with side effects
-                // (Since we're checking consecutive instructions, there are none)
-                
-                // Remove the second call (it's redundant)
                 func_.instructions.erase(func_.instructions.begin() + i + 1);
                 changed = true;
-                
-                // After removal, we need to re-check from this position
-                // since the next instruction might now be another redundant call
                 --i;
             }
         }
