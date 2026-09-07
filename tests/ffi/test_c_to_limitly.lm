@@ -1,0 +1,60 @@
+import std.ffi as ffi;
+
+fn main() {
+    print("=== C -> Limitly Acceptance Test ===");
+
+    unsafe {
+        var lib = ffi.load("./tests/ffi/native/libffi_test.so");
+        assert(lib.is_loaded, "Failed to load libffi_test.so");
+
+        // 1. Integer addition
+        var add_func = lib.func("add_i32", ffi.TYPE_I32, [ffi.TYPE_I32, ffi.TYPE_I32]);
+        assert(add_func.func_ptr != 0, "Failed to locate add_i32 symbol");
+        var res_add = add_func.call(15, 27);
+        print("add_i32(15, 27) =");
+        print(res_add);
+        assert(res_add == 42, "add_i32(15, 27) should be 42");
+
+        // 2. Factorial
+        var fact_func = lib.func("factorial", ffi.TYPE_I64, [ffi.TYPE_I64]);
+        assert(fact_func.func_ptr != 0, "Failed to locate factorial symbol");
+        var res_fact = fact_func.call(5);
+        print("factorial(5) =");
+        print(res_fact);
+        assert(res_fact == 120, "factorial(5) should be 120");
+
+        // 3. Float multiplication
+        var mult_func = lib.func("multiply_f64", ffi.TYPE_F64, [ffi.TYPE_F64, ffi.TYPE_F64]);
+        assert(mult_func.func_ptr != 0, "Failed to locate multiply_f64 symbol");
+        var res_mult = mult_func.call(3.5, 2.0);
+        print("multiply_f64(3.5, 2.0) =");
+        print(res_mult);
+        assert(res_mult == 7.0, "multiply_f64(3.5, 2.0) should be 7.0");
+
+        // 4. String length (String / Pointer passing)
+        var len_func = lib.func("string_length", ffi.TYPE_I64, [ffi.TYPE_PTR]);
+        assert(len_func.func_ptr != 0, "Failed to locate string_length symbol");
+        var c_str = ffi.string_to_cstring("hello Limitly ffi");
+        var res_len = len_func.call(c_str.ptr);
+        print("string_length('hello Limitly ffi') =");
+        print(res_len);
+        assert(res_len == 17, "string_length should return 17");
+        ffi.cstring_free(c_str);
+
+        // 5. Pointer mutation
+        var mem = ffi.alloc(4);
+        ffi.store_i32(mem, 21);
+        var mutate_func = lib.func("mutate_value", ffi.TYPE_I32, [ffi.TYPE_PTR]);
+        assert(mutate_func.func_ptr != 0, "Failed to locate mutate_value symbol");
+        var mutate_ret = mutate_func.call(mem);
+        assert(mutate_ret == 1, "mutate_value should return status 1");
+        var val_after = ffi.load_i32(mem);
+        print("value after mutate_value =");
+        print(val_after);
+        assert(val_after == 42, "memory content should be mutated to 42");
+        ffi.free(mem);
+
+        lib.close();
+    }
+    print("=== C -> Limitly Acceptance Test PASSED ===");
+}
