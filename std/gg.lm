@@ -154,11 +154,23 @@ pub fn draw_triangle_primitive(x1: float, y1: float, x2: float, y2: float, x3: f
 
 pub fn end_pass(): nil {}
 
-pub fn apply_pipeline(pip_id: int): nil {}
+pub fn apply_pipeline(pip_id: int): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_APPLY_PIPELINE, [pip_id]);
+    }
+}
 
-pub fn apply_bindings(v_id: int, i_id: int): nil {}
+pub fn apply_bindings(v_id: int, i_id: int): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_APPLY_BINDINGS, [v_id, i_id]);
+    }
+}
 
-pub fn draw(base: int, count: int, instances: int): nil {}
+pub fn draw(base: int, count: int, instances: int): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_DRAW, [base, count, instances]);
+    }
+}
 
 pub fn commit(): nil {
     if (global_graphics_context.handle != -1) {

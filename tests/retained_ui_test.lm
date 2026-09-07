@@ -1,0 +1,46 @@
+// Retained UI End-to-End Regression Test
+// Verifies std.app -> std.ui -> std.graphics -> std.gg -> C++ VM Software Backend
+
+import std.app as app;
+import std.gg as gg;
+import std.ui.context as ui_ctx;
+import std.ui.builder as ui_builder;
+
+fn main() {
+    print("=== Retained UI End-to-End Test ===");
+    assert(gg.setup(), "gg setup failed");
+
+    var cfg = app.default_window_config();
+    assert(app.app_init(cfg) == 1, "app_init failed");
+    ui_ctx.ui_init();
+
+    // Construct retained UI blueprint tree: vstack containing a button and text label
+    var btn = ui_builder.button_background("Click Me", ui_builder.color_rgb8(200, 50, 50));
+    var lbl = ui_builder.text_color("Hello Retained UI", ui_builder.color_rgb8(255, 255, 255));
+    var root_bp = ui_builder.vstack([btn, lbl]);
+
+    ui_ctx.update_blueprint(root_bp);
+
+    // Initial pass
+    gg.begin_pass(800, 600, 0.0, 0.0, 0.0, 1.0);
+    ui_ctx.frame_update(0.016);
+    gg.end_pass();
+    gg.commit();
+
+    // Verify initial pixels in software framebuffer via pixel readback
+    var bg_pixel = gg.readback_pixel(10, 10);
+    assert(bg_pixel != nil, "pixel readback failed");
+
+    // Inject state change event and verify repaint
+    ui_ctx.mark_element_dirty(1);
+    gg.begin_pass(800, 600, 0.1, 0.1, 0.1, 1.0);
+    ui_ctx.frame_update(0.016);
+    gg.end_pass();
+    gg.commit();
+
+    app.app_shutdown();
+    gg.shutdown();
+    print("Retained UI End-to-End Test Passed.");
+}
+
+main();

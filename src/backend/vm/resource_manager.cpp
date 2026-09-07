@@ -701,6 +701,40 @@ public:
                 }
                 return VAL_TRUE;
             }
+            case ResourceOperation::APPLY_PIPELINE: {
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) current_pipeline_ = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
+                    } else {
+                        current_pipeline_ = static_cast<int>(register_value_to_i64(args[0]));
+                    }
+                }
+                return VAL_TRUE;
+            }
+            case ResourceOperation::APPLY_BINDINGS: {
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) current_vbuf_ = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
+                        if (lm_list_len(list) > 1) current_ibuf_ = static_cast<int>(register_value_to_i64(lm_list_get(list, 1)));
+                    } else {
+                        current_vbuf_ = static_cast<int>(register_value_to_i64(args[0]));
+                        if (args.size() > 1) current_ibuf_ = static_cast<int>(register_value_to_i64(args[1]));
+                    }
+                }
+                return VAL_TRUE;
+            }
+            case ResourceOperation::DRAW: {
+                int count = 0;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 1) count = static_cast<int>(register_value_to_i64(lm_list_get(list, 1)));
+                    } else {
+                        if (args.size() > 1) count = static_cast<int>(register_value_to_i64(args[1]));
+                    }
+                }
+                last_draw_count_ = count;
+                return VAL_TRUE;
+            }
             case ResourceOperation::READ: {
                 int px = 0;
                 int py = 0;
@@ -732,6 +766,10 @@ public:
 private:
     int width_;
     int height_;
+    int current_pipeline_ = 0;
+    int current_vbuf_ = 0;
+    int current_ibuf_ = 0;
+    int last_draw_count_ = 0;
     std::vector<uint8_t> pixels_;
 };
 

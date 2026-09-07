@@ -66,7 +66,10 @@ enum class ResourceOperation : uint32_t {
     EXISTS = 33,
     DELETE = 34,
     HMAC = 35,
-    DRAW_TRIANGLE = 36
+    DRAW_TRIANGLE = 36,
+    APPLY_PIPELINE = 37,
+    APPLY_BINDINGS = 38,
+    DRAW = 39
 };
 
 } // namespace VM

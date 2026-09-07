@@ -1,5 +1,7 @@
 import std.ui.window as window;
 import std.app as app;
+import std.gg as gg;
+import std.ui.context as ui_context;
 
 frame Application {
     pub var name: str;
@@ -11,9 +13,21 @@ frame Application {
     }
 
     pub fn run(): nil {
+        gg.setup();
         var cfg = app.default_window_config();
         cfg.title = self.name;
         app.app_init(cfg);
+
+        ui_context.ui_init();
+        if (len(self.windows) > 0) {
+            ui_context.update_blueprint(self.windows[0].root_blueprint);
+        }
+
+        gg.begin_pass(cfg.width, cfg.height, 0.1, 0.1, 0.15, 1.0);
+        ui_context.frame_update(0.016);
+        gg.end_pass();
+        gg.commit();
+
         app.app_run();
     }
 }

@@ -1,9 +1,193 @@
+// std.ui.types - Type definitions for Retained UI System
+
 frame Color {
-    pub r: float;
+    pub var r: float;
+    pub var g: float;
+    pub var b: float;
+    pub var a: float;
 }
 
-fn create_color(r: float): Color {
-    var c = Color(r=r);
-    c.r = r;
-    return c;
+pub fn color_rgb(r: float, g: float, b: float): Color {
+    return Color(r=r, g=g, b=b, a=1.0);
+}
+
+pub fn color_rgba(r: float, g: float, b: float, a: float): Color {
+    return Color(r=r, g=g, b=b, a=a);
+}
+
+pub fn color_rgb8(r: int, g: int, b: int): Color {
+    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=1.0);
+}
+
+frame Point {
+    pub var x: float;
+    pub var y: float;
+}
+
+pub fn point(x: float, y: float): Point {
+    return Point(x=x, y=y);
+}
+
+frame Size {
+    pub var width: float;
+    pub var height: float;
+}
+
+pub fn size(w: float, h: float): Size {
+    return Size(width=w, height=h);
+}
+
+frame Rect {
+    pub var x: float;
+    pub var y: float;
+    pub var w: float;
+    pub var h: float;
+}
+
+pub fn rect(x: float, y: float, w: float, h: float): Rect {
+    return Rect(x=x, y=y, w=w, h=h);
+}
+
+frame Axis {
+    pub var is_vertical: int;
+}
+
+pub var AXIS_HORIZONTAL: Axis = Axis(is_vertical=0);
+pub var AXIS_VERTICAL: Axis = Axis(is_vertical=1);
+
+frame Alignment {
+    pub var align_type: int;
+}
+
+pub var ALIGN_START: Alignment = Alignment(align_type=0);
+pub var ALIGN_CENTER: Alignment = Alignment(align_type=1);
+pub var ALIGN_END: Alignment = Alignment(align_type=2);
+
+frame ContainerData {
+    pub var axis: Axis;
+    pub var spacing: float;
+    pub var padding: Rect;
+    pub var background: Color;
+}
+
+pub fn container_data(axis: Axis): ContainerData {
+    return ContainerData(
+        axis=axis,
+        spacing=0.0,
+        padding=rect(0.0, 0.0, 0.0, 0.0),
+        background=color_rgba(0.0, 0.0, 0.0, 0.0)
+    );
+}
+
+frame TextData {
+    pub var content: str;
+    pub var font_size: float;
+    pub var color: Color;
+    pub var font_weight: int;
+}
+
+pub fn text_data(content: str): TextData {
+    return TextData(content=content, font_size=14.0, color=color_rgb(1.0, 1.0, 1.0), font_weight=400);
+}
+
+frame ButtonData {
+    pub var label: str;
+    pub var background: Color;
+    pub var text_color: Color;
+    pub var corner_radius: float;
+    pub var padding: Rect;
+    pub var enabled: int;
+}
+
+pub fn button_data(label: str): ButtonData {
+    return ButtonData(
+        label=label,
+        background=color_rgb8(60, 120, 210),
+        text_color=color_rgb8(255, 255, 255),
+        corner_radius=4.0,
+        padding=rect(8.0, 4.0, 8.0, 4.0),
+        enabled=1
+    );
+}
+
+frame ImageData {
+    pub var texture_id: int;
+    pub var tint: Color;
+    pub var fit_mode: int;
+}
+
+pub fn image_data(tex_id: int): ImageData {
+    return ImageData(texture_id=tex_id, tint=color_rgb(1.0, 1.0, 1.0), fit_mode=0);
+}
+
+frame TextFieldData {
+    pub var prompt_text: str;
+    pub var text: str;
+    pub var font_size: float;
+    pub var background: Color;
+    pub var corner_radius: float;
+    pub var editable: int;
+}
+
+pub fn text_field_data(prompt_text: str): TextFieldData {
+    return TextFieldData(
+        prompt_text=prompt_text,
+        text="",
+        font_size=14.0,
+        background=color_rgb8(40, 40, 40),
+        corner_radius=4.0,
+        editable=1
+    );
+}
+
+frame ScrollData {
+    pub var axis: Axis;
+    pub var scrollbar_width: float;
+    pub var scrollbar_color: Color;
+}
+
+pub fn scroll_data(axis: Axis): ScrollData {
+    return ScrollData(axis=axis, scrollbar_width=8.0, scrollbar_color=color_rgb8(100, 100, 100));
+}
+
+frame CustomData {
+    pub var type_id: int;
+    pub var state_size: int;
+    pub var render_callback: int;
+}
+
+pub fn custom_data(type_id: int, state_size: int): CustomData {
+    return CustomData(type_id=type_id, state_size=state_size, render_callback=0);
+}
+
+frame LayoutConstraint {
+    pub var mode: int;
+    pub var value_num: int;
+}
+
+frame Blueprint {
+    pub var variant_type: int; // 1 = Container, 2 = Text, 3 = Button
+    pub var container_data_val: ContainerData;
+    pub var text_data_val: TextData;
+    pub var button_data_val: ButtonData;
+    pub var constraints: [LayoutConstraint];
+    pub var children: [Blueprint];
+}
+
+pub fn empty_constraints(): [LayoutConstraint] {
+    var res: [LayoutConstraint] = [];
+    return res;
+}
+
+pub fn empty_blueprints(): [Blueprint] {
+    var res: [Blueprint] = [];
+    return res;
+}
+
+pub fn blueprint_add_constraint(bp: Blueprint, c: LayoutConstraint): Blueprint {
+    return Blueprint(variant_type=bp.variant_type, container_data_val=bp.container_data_val, text_data_val=bp.text_data_val, button_data_val=bp.button_data_val, constraints=bp.constraints + [c], children=bp.children);
+}
+
+pub fn blueprint_add_child(bp: Blueprint, child: Blueprint): Blueprint {
+    return Blueprint(variant_type=bp.variant_type, container_data_val=bp.container_data_val, text_data_val=bp.text_data_val, button_data_val=bp.button_data_val, constraints=bp.constraints, children=bp.children + [child]);
 }

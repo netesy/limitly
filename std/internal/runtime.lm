@@ -35,6 +35,9 @@ pub var OP_EXISTS: int = 33;
 pub var OP_DELETE: int = 34;
 pub var OP_HMAC: int = 35;
 pub var OP_DRAW_TRIANGLE: int = 36;
+pub var OP_APPLY_PIPELINE: int = 37;
+pub var OP_APPLY_BINDINGS: int = 38;
+pub var OP_DRAW: int = 39;
 
 pub fn create(type_id: int, args: any): int {
     unsafe {
