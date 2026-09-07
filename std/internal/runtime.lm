@@ -10,13 +10,17 @@ pub var RT_DNS_RESOLVER: int = 13;
 pub var RT_UDP_SOCKET: int = 14;
 pub var RT_WEBSOCKET: int = 15;
 pub var RT_HASH_ENGINE: int = 16;
+pub var RT_GRAPHICS: int = 17;
 
 pub var OP_OPEN: int = 0;
 pub var OP_CLOSE: int = 1;
 pub var OP_READ: int = 2;
 pub var OP_WRITE: int = 3;
 pub var OP_CONNECT: int = 6;
+pub var OP_DRAW_RECT: int = 7;
+pub var OP_DRAW_TEXT: int = 8;
 pub var OP_POLL: int = 10;
+pub var OP_FILL: int = 16;
 pub var OP_BIND: int = 23;
 pub var OP_LISTEN: int = 24;
 pub var OP_ACCEPT: int = 25;
@@ -30,6 +34,7 @@ pub var OP_RENAME: int = 32;
 pub var OP_EXISTS: int = 33;
 pub var OP_DELETE: int = 34;
 pub var OP_HMAC: int = 35;
+pub var OP_DRAW_TRIANGLE: int = 36;
 
 pub fn create(type_id: int, args: any): int {
     unsafe {

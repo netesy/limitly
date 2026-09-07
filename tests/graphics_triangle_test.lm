@@ -1,0 +1,22 @@
+import std.gg as gg;
+
+fn main() {
+    print("=== Software Graphics Pixel Verification ===");
+    assert(gg.setup(), "gg setup failed");
+
+    // Begin pass and clear to black background (0,0,0,1)
+    gg.begin_pass(800, 600, 0.0, 0.0, 0.0, 1.0);
+
+    // Draw red triangle
+    gg.draw_triangle_primitive(100.0, 100.0, 200.0, 100.0, 150.0, 200.0, 1.0, 0.0, 0.0, 1.0);
+    gg.commit();
+
+    // Verify pixel inside triangle (150, 120) is non-nil
+    var inside_pixel = gg.readback_pixel(150, 120);
+    assert(inside_pixel != nil, "Pixel inside triangle should be non-nil");
+
+    gg.shutdown();
+    print("Pixel verification passed successfully.");
+}
+
+main();

@@ -51,7 +51,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
         }
         case LIR::LIR_Op::ResourceCall: {
             int64_t id = to_int(registers[pc->a]);
-            // Operation can be in pc->b (from call) or pc->imm (from literal optimization)
             ResourceOperation op;
             if (pc->b != UINT32_MAX) {
                 op = static_cast<ResourceOperation>(to_int(registers[pc->b]));
@@ -60,17 +59,19 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             }
             
             std::vector<RegisterValue> args;
-            // Arguments list is in call_args[2] if called via resource_call intrinsic
-            size_t args_idx = (pc->call_args.size() > 2) ? 2 : 0;
-            if (!pc->call_args.empty() && pc->call_args[args_idx] != UINT32_MAX) {
-                RegisterValue list_val = registers[pc->call_args[args_idx]];
-                if (auto* list = reinterpret_cast<LmList*>(header_if_type(list_val, TYPE_LIST))) {
-                    size_t len = lm_list_len(list);
-                    for (size_t i = 0; i < len; ++i) {
-                        args.push_back(lm_list_get(list, i));
+            // Unpack arguments from call_args registers
+            for (size_t i = 2; i < pc->call_args.size(); ++i) {
+                size_t reg_idx = pc->call_args[i];
+                if (reg_idx < registers.size()) {
+                    RegisterValue val = registers[reg_idx];
+                    if (auto* list = reinterpret_cast<LmList*>(header_if_type(val, TYPE_LIST))) {
+                        size_t len = lm_list_len(list);
+                        for (size_t k = 0; k < len; ++k) {
+                            args.push_back(lm_list_get(list, k));
+                        }
+                    } else if (val != VAL_NIL) {
+                        args.push_back(val);
                     }
-                } else {
-                    args.push_back(list_val);
                 }
             }
 
@@ -84,7 +85,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
         }
         case LIR::LIR_Op::ChannelSend:
         case LIR::LIR_Op::ChannelPush: {
-            // ChannelPush is an alias for ChannelSend.
             if (IS_PTR(registers[pc->a])) {
                 auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
                 RegisterValue value = (pc->b != UINT32_MAX) ? registers[pc->b] : VAL_NIL;
@@ -104,7 +104,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
         }
         case LIR::LIR_Op::ChannelRecv:
         case LIR::LIR_Op::ChannelPop: {
-            // ChannelPop is an alias for ChannelRecv.
             if (IS_PTR(registers[pc->a])) {
                 auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
                 registers[pc->dst] = channel->recv(get_current_fiber());
@@ -189,13 +188,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             if (IS_PTR(registers[pc->a])) ((TaskContext*)UNBOX_PTR(registers[pc->a]))->state = TaskState::RUNNING;
             break;
         case LIR::LIR_Op::TaskSetField: {
-            // H35: the value to write was being read from pc->dst (the
-            // result register), which is wrong. The value lives in pc->b
-            // for the modern generator pattern (e.g. when emitted as
-            // `TaskSetField(0, ctx, value, imm)`); for the legacy pattern
-            // `TaskSetField(value, ctx, 0, imm)` it lives in pc->dst. We
-            // prefer pc->b when it is a valid non-zero register, else fall
-            // back to pc->dst, so both generator call-sites work.
             if (IS_PTR(registers[pc->a])) {
                 RegisterValue value;
                 if (pc->b != 0 && pc->b != UINT32_MAX) {
@@ -220,8 +212,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             }
             break;
         case LIR::LIR_Op::TaskGetState: {
-            // Read a task context's state into pc->dst as an int.
-            // State encoding: 0=INIT, 1=RUNNING, 2=SLEEPING, 3=COMPLETED.
             if (IS_PTR(registers[pc->a])) {
                 auto* context = (TaskContext*)UNBOX_PTR(registers[pc->a]);
                 int64_t s = 0;
@@ -238,8 +228,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::TaskSetState: {
-            // Write the task context's state from pc->b (or pc->imm if
-            // pc->b is unset).
             if (IS_PTR(registers[pc->a])) {
                 auto* context = (TaskContext*)UNBOX_PTR(registers[pc->a]);
                 int64_t s = (pc->b != UINT32_MAX) ? as_i64(registers[pc->b])
@@ -262,30 +250,18 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = make_i64(1);
             break;
         case LIR::LIR_Op::SchedulerAddTask:
-            // No-op stub: tasks are added implicitly via TaskContextAlloc.
-            // Touched here so the dispatcher does not silently drop it.
             break;
         case LIR::LIR_Op::SchedulerTick:
-            // Advance the scheduler by one tick, waking up sleeping tasks
-            // whose sleep_until has been reached.
             if (scheduler) scheduler->tick();
             current_time++;
             break;
         case LIR::LIR_Op::GetTickCount:
-            // Return the current tick count. Prefer the scheduler's clock
-            // when one exists, otherwise fall back to the VM's own counter.
             registers[pc->dst] = make_i64(
                 static_cast<int64_t>(scheduler ? scheduler->current_time : current_time));
             break;
         case LIR::LIR_Op::DelayUntil: {
-            // Mark the current task as sleeping until the given tick.
-            // Arg layout: pc->a = target tick (int). For now this is a
-            // best-effort cooperative stub: it records the wake-up time
-            // but does not actually yield (the VM is single-threaded).
             int64_t target = (pc->a != UINT32_MAX) ? as_i64(registers[pc->a])
                                                    : static_cast<int64_t>(pc->imm);
-            // Advance current_time so subsequent GetTickCount calls are
-            // consistent.
             if (scheduler && (int64_t)scheduler->current_time < target) {
                 while ((int64_t)scheduler->current_time < target) scheduler->tick();
             } else if ((int64_t)current_time < target) {
@@ -303,7 +279,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 auto name_it = context->fields.find(4);
                 if (name_it == context->fields.end()) continue;
 
-                // Extract function name from register value
                 std::string func_name = "";
                 if (IS_PTR(name_it->second)) {
                     ObjHeader* h = (ObjHeader*)UNBOX_PTR(name_it->second);

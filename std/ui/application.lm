@@ -1,15 +1,19 @@
 import std.ui.window as window;
+import std.app as app;
 
 frame Application {
     pub var name: str;
     pub var windows: [window.Window];
 
-    pub init(n: str = "LimitApp", wins: [window.Window] = []) {
+    pub init(n: str = "LimitApp") {
         self.name = n;
-        self.windows = wins;
+        self.windows = [window.Window()];
     }
 
     pub fn run(): nil {
-        print("Application is running.");
+        var cfg = app.default_window_config();
+        cfg.title = self.name;
+        app.app_init(cfg);
+        app.app_run();
     }
 }

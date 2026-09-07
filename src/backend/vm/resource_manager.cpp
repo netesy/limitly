@@ -1,10 +1,11 @@
 #include "resource_manager.hh"
 #include "register.hh"
+#include "vm_list.hh"
+#include "vm_runtime.hh"
+#include "vm_value.hh"
 #include <iostream>
 #include "../channel.hh"
 #include "../fiber.hh"
-#include "vm_runtime.hh"
-#include "vm_value.hh"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -73,6 +74,13 @@ namespace LM {
 namespace Backend {
 namespace VM {
 
+// Helper to inspect header type
+static ObjHeader* check_header_type(RegisterValue value, uint32_t type_id) {
+    if (!IS_PTR(value)) return nullptr;
+    ObjHeader* header = reinterpret_cast<ObjHeader*>(UNBOX_PTR(value));
+    return (header && header->type_id == type_id) ? header : nullptr;
+}
+
 // ===================== Value extraction helpers =====================
 
 const char* register_value_to_cstr(RegisterValue val) {
@@ -99,6 +107,10 @@ int64_t register_value_to_i64(RegisterValue val) {
         }
     }
     return 0;
+}
+
+static double register_value_to_double(RegisterValue val) {
+    return as_float(val);
 }
 
 namespace {
@@ -531,6 +543,197 @@ static std::string compute_hmac(const std::string& algo, const std::string& key,
 }
 
 } // anonymous namespace
+
+// ===================== Software Graphics Backend =====================
+
+class SoftwareGraphicsResource : public Resource {
+public:
+    SoftwareGraphicsResource() : width_(800), height_(600) {
+        pixels_.resize(width_ * height_ * 4, 0);
+    }
+
+    ResourceType getType() const override { return ResourceType::GRAPHICS; }
+
+    RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
+        switch (op) {
+            case ResourceOperation::OPEN: {
+                int w = 800;
+                int h = 600;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) w = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
+                        if (lm_list_len(list) > 1) h = static_cast<int>(register_value_to_i64(lm_list_get(list, 1)));
+                    } else {
+                        w = static_cast<int>(register_value_to_i64(args[0]));
+                        if (args.size() > 1) h = static_cast<int>(register_value_to_i64(args[1]));
+                    }
+                }
+                if (w > 0 && h > 0) {
+                    width_ = w;
+                    height_ = h;
+                    pixels_.assign(width_ * height_ * 4, 0);
+                }
+                return VAL_TRUE;
+            }
+            case ResourceOperation::FILL: {
+                double r = 0.0, g = 0.0, b = 0.0, a = 1.0;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) r = register_value_to_double(lm_list_get(list, 0));
+                        if (lm_list_len(list) > 1) g = register_value_to_double(lm_list_get(list, 1));
+                        if (lm_list_len(list) > 2) b = register_value_to_double(lm_list_get(list, 2));
+                        if (lm_list_len(list) > 3) a = register_value_to_double(lm_list_get(list, 3));
+                    } else {
+                        r = register_value_to_double(args[0]);
+                        if (args.size() > 1) g = register_value_to_double(args[1]);
+                        if (args.size() > 2) b = register_value_to_double(args[2]);
+                        if (args.size() > 3) a = register_value_to_double(args[3]);
+                    }
+                }
+
+                uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
+                uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
+                uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
+                uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
+
+                for (size_t i = 0; i < pixels_.size(); i += 4) {
+                    pixels_[i]     = ru;
+                    pixels_[i + 1] = gu;
+                    pixels_[i + 2] = bu;
+                    pixels_[i + 3] = au;
+                }
+                return VAL_TRUE;
+            }
+            case ResourceOperation::DRAW_RECT: {
+                double x = 0.0, y = 0.0, w = 0.0, h = 0.0;
+                double r = 1.0, g = 1.0, b = 1.0, a = 1.0;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) x = register_value_to_double(lm_list_get(list, 0));
+                        if (lm_list_len(list) > 1) y = register_value_to_double(lm_list_get(list, 1));
+                        if (lm_list_len(list) > 2) w = register_value_to_double(lm_list_get(list, 2));
+                        if (lm_list_len(list) > 3) h = register_value_to_double(lm_list_get(list, 3));
+                        if (lm_list_len(list) > 4) r = register_value_to_double(lm_list_get(list, 4));
+                        if (lm_list_len(list) > 5) g = register_value_to_double(lm_list_get(list, 5));
+                        if (lm_list_len(list) > 6) b = register_value_to_double(lm_list_get(list, 6));
+                        if (lm_list_len(list) > 7) a = register_value_to_double(lm_list_get(list, 7));
+                    } else {
+                        x = register_value_to_double(args[0]);
+                        if (args.size() > 1) y = register_value_to_double(args[1]);
+                        if (args.size() > 2) w = register_value_to_double(args[2]);
+                        if (args.size() > 3) h = register_value_to_double(args[3]);
+                        if (args.size() > 4) r = register_value_to_double(args[4]);
+                        if (args.size() > 5) g = register_value_to_double(args[5]);
+                        if (args.size() > 6) b = register_value_to_double(args[6]);
+                        if (args.size() > 7) a = register_value_to_double(args[7]);
+                    }
+                }
+
+                int x0 = std::clamp(static_cast<int>(x), 0, width_);
+                int y0 = std::clamp(static_cast<int>(y), 0, height_);
+                int x1 = std::clamp(static_cast<int>(x + w), 0, width_);
+                int y1 = std::clamp(static_cast<int>(y + h), 0, height_);
+
+                uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
+                uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
+                uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
+                uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
+
+                for (int py = y0; py < y1; ++py) {
+                    for (int px = x0; px < x1; ++px) {
+                        size_t idx = static_cast<size_t>(py * width_ + px) * 4;
+                        pixels_[idx]     = ru;
+                        pixels_[idx + 1] = gu;
+                        pixels_[idx + 2] = bu;
+                        pixels_[idx + 3] = au;
+                    }
+                }
+                return VAL_TRUE;
+            }
+            case ResourceOperation::DRAW_TRIANGLE: {
+                double x1 = 0.0, y1 = 0.0, x2 = 0.0, y2 = 0.0, x3 = 0.0, y3 = 0.0;
+                double r = 1.0, g = 1.0, b = 1.0, a = 1.0;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) x1 = register_value_to_double(lm_list_get(list, 0));
+                        if (lm_list_len(list) > 1) y1 = register_value_to_double(lm_list_get(list, 1));
+                        if (lm_list_len(list) > 2) x2 = register_value_to_double(lm_list_get(list, 2));
+                        if (lm_list_len(list) > 3) y2 = register_value_to_double(lm_list_get(list, 3));
+                        if (lm_list_len(list) > 4) x3 = register_value_to_double(lm_list_get(list, 4));
+                        if (lm_list_len(list) > 5) y3 = register_value_to_double(lm_list_get(list, 5));
+                        if (lm_list_len(list) > 6) r  = register_value_to_double(lm_list_get(list, 6));
+                        if (lm_list_len(list) > 7) g  = register_value_to_double(lm_list_get(list, 7));
+                        if (lm_list_len(list) > 8) b  = register_value_to_double(lm_list_get(list, 8));
+                        if (lm_list_len(list) > 9) a  = register_value_to_double(lm_list_get(list, 9));
+                    }
+                }
+
+                int min_x = std::clamp(static_cast<int>(std::floor(std::min({x1, x2, x3}))), 0, width_);
+                int max_x = std::clamp(static_cast<int>(std::ceil(std::max({x1, x2, x3}))), 0, width_);
+                int min_y = std::clamp(static_cast<int>(std::floor(std::min({y1, y2, y3}))), 0, height_);
+                int max_y = std::clamp(static_cast<int>(std::ceil(std::max({y1, y2, y3}))), 0, height_);
+
+                auto edge = [](double ax, double ay, double bx, double by, double cx, double cy) {
+                    return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
+                };
+
+                uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
+                uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
+                uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
+                uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
+
+                for (int py = min_y; py < max_y; ++py) {
+                    for (int px = min_x; px < max_x; ++px) {
+                        double pX = px + 0.5;
+                        double pY = py + 0.5;
+                        double w0 = edge(x2, y2, x3, y3, pX, pY);
+                        double w1 = edge(x3, y3, x1, y1, pX, pY);
+                        double w2 = edge(x1, y1, x2, y2, pX, pY);
+
+                        if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
+                            size_t idx = static_cast<size_t>(py * width_ + px) * 4;
+                            pixels_[idx]     = ru;
+                            pixels_[idx + 1] = gu;
+                            pixels_[idx + 2] = bu;
+                            pixels_[idx + 3] = au;
+                        }
+                    }
+                }
+                return VAL_TRUE;
+            }
+            case ResourceOperation::READ: {
+                int px = 0;
+                int py = 0;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) px = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
+                        if (lm_list_len(list) > 1) py = static_cast<int>(register_value_to_i64(lm_list_get(list, 1)));
+                    } else {
+                        px = static_cast<int>(register_value_to_i64(args[0]));
+                        if (args.size() > 1) py = static_cast<int>(register_value_to_i64(args[1]));
+                    }
+                }
+                if (px < 0 || px >= width_ || py < 0 || py >= height_) return make_i64(0);
+                size_t idx = static_cast<size_t>(py * width_ + px) * 4;
+                uint32_t val = (static_cast<uint32_t>(pixels_[idx]) << 24) |
+                               (static_cast<uint32_t>(pixels_[idx + 1]) << 16) |
+                               (static_cast<uint32_t>(pixels_[idx + 2]) << 8) |
+                               (static_cast<uint32_t>(pixels_[idx + 3]));
+                return make_i64(static_cast<int64_t>(val));
+            }
+            case ResourceOperation::FLUSH:
+            case ResourceOperation::CLOSE:
+                return VAL_TRUE;
+            default:
+                return VAL_NIL;
+        }
+    }
+
+private:
+    int width_;
+    int height_;
+    std::vector<uint8_t> pixels_;
+};
 
 // ===================== Concrete Resource Implementations =====================
 
@@ -1244,6 +1447,7 @@ int64_t ResourceManager::create(ResourceType type, const std::vector<RegisterVal
         case ResourceType::UDP_SOCKET:    res = std::make_unique<UdpSocketResource>(); break;
         case ResourceType::WEBSOCKET:     res = std::make_unique<WebSocketResource>(); break;
         case ResourceType::HASH_ENGINE:   res = std::make_unique<HashEngineResource>(); break;
+        case ResourceType::GRAPHICS:      res = std::make_unique<SoftwareGraphicsResource>(); break;
         default: return -1;
     }
     int64_t id = next_id_++;

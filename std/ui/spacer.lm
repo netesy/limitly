@@ -1,13 +1,13 @@
 import std.ui.widget as widget;
 
 frame Spacer {
-    pub var flex: int;
+    pub var flex: float;
 
-    pub init(f: int = 1) {
+    pub init(f: float = 1.0) {
         self.flex = f;
     }
 
     pub fn build(): widget.Widget {
-        return self;
+        return widget.Widget();
     }
 }
