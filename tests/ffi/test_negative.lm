@@ -1,0 +1,34 @@
+import std.ffi as ffi;
+
+fn main() {
+    print("=== Negative & Error FFI Test Suite ===");
+
+    unsafe {
+        // 1. Missing library loading
+        var missing_lib = ffi.load("non_existent_library_xyz.so");
+        assert(missing_lib.is_loaded == false, "Missing library should report is_loaded == false");
+
+        // 2. Missing symbol resolution
+        var libc = ffi.load("libc.so.6");
+        assert(libc.is_loaded, "libc.so.6 should be loadable");
+
+        var missing_sym = libc.symbol("invalid_non_existent_symbol_12345");
+        assert(missing_sym == 0 or missing_sym == nil, "Missing symbol lookup should return 0 or nil");
+
+        // 3. Null pointer safety in load/store
+        var null_ptr: int = 0;
+        var loaded_val = ffi.load_i32(null_ptr);
+        assert(loaded_val == 0 or loaded_val == nil, "load_i32 on null pointer should safely return 0/nil");
+
+        // 4. Pointer alignment check
+        var unaligned_ptr: int = 1001;
+        assert(ffi.ptr_is_aligned(unaligned_ptr, 4) == false, "1001 should not be 4-byte aligned");
+        var aligned_ptr = ffi.ptr_align(unaligned_ptr, 4);
+        assert(ffi.ptr_is_aligned(aligned_ptr, 4) == true, "ptr_align(1001, 4) should be 4-byte aligned");
+        assert(aligned_ptr == 1004, "ptr_align(1001, 4) should equal 1004");
+
+        libc.close();
+    }
+
+    print("=== Negative & Error FFI Test Suite PASSED ===");
+}
