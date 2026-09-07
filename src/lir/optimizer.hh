@@ -59,42 +59,6 @@ public:
      */
     bool redundant_memory_elimination();
 
-    /**
-     * @brief Perform small leaf function inlining
-     * @return true if changes were made
-     */
-    bool function_inlining();
-
-    /**
-     * @brief Perform Global Value Numbering across basic block sequences
-     * @return true if changes were made
-     */
-    bool global_value_numbering();
-
-    /**
-     * @brief Eliminate empty generational check region enter/exit pairs
-     * @return true if changes were made
-     */
-    bool generational_check_hoisting();
-
-    /**
-     * @brief Remove unused/orphaned label instructions not targeted by any jump
-     * @return true if labels were removed
-     */
-    bool prune_orphaned_labels();
-
-    /**
-     * @brief Perform tail-call optimization converting tail recursive calls into jumps
-     * @return true if tail calls were optimized
-     */
-    bool tail_call_optimization();
-
-    /**
-     * @brief Hoist loop-invariant operations before loop entry labels
-     * @return true if instructions were hoisted
-     */
-    bool loop_invariant_code_motion();
-
 private:
     LIR_Function& func_;
 
