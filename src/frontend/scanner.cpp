@@ -651,10 +651,8 @@ void Scanner::number() {
         advance(); // consume 'e' or 'E'
         
         // Handle optional + or - after e/E
-        bool hasSign = false;
         if (peek() == '+' || peek() == '-') {
             advance();
-            hasSign = true;
         }
         
         // Must have at least one digit after e/E (and optional +/-)

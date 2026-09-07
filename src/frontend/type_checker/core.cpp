@@ -184,7 +184,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
         if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
             type_system.addUserDefinedType(name, type_system.createFrameType(name));
         } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
-            TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait, TraitType{name});
+            TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait, TraitType{name, {}, {}});
             type_system.addUserDefinedType(name, trait_type);
         }
     };

@@ -31,15 +31,13 @@ void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
     }
     
     // Parse timeout parameter
-    uint64_t timeout_ms = 20000;  // 20 second default
     if (!stmt.timeout.empty()) {
-        timeout_ms = parse_timeout(stmt.timeout);
+        (void)parse_timeout(stmt.timeout);
     }
     
     // Parse grace period
-    uint64_t grace_ms = 1000;  // 1 second default
     if (!stmt.grace.empty()) {
-        grace_ms = parse_grace_period(stmt.grace);
+        (void)parse_grace_period(stmt.grace);
     }
     
     // Parse error handling

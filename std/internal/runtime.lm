@@ -32,13 +32,19 @@ pub var OP_DELETE: int = 34;
 pub var OP_HMAC: int = 35;
 
 pub fn create(type_id: int, args: any): int {
-    return resource_create(type_id, args);
+    unsafe {
+        return resource_create(type_id, args);
+    }
 }
 
 pub fn call(handle: int, op_id: int, args: any): any {
-    return resource_call(handle, op_id, args);
+    unsafe {
+        return resource_call(handle, op_id, args);
+    }
 }
 
 pub fn destroy(handle: int): nil {
-    resource_destroy(handle);
+    unsafe {
+        resource_destroy(handle);
+    }
 }

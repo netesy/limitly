@@ -55,7 +55,6 @@ std::string Disassembler::disassemble() const {
     
     // Get all registered function names
     auto all_function_names = function_registry.getFunctionNames();
-    bool has_user_functions = false;
     
     // First show called functions (original behavior)
     if (!called_functions.empty()) {
@@ -75,7 +74,6 @@ std::string Disassembler::disassemble() const {
                 
                 // Show functions that either have real instructions or more than just call+return
                 if (has_real_instructions || lir_func->instructions.size() > 2) {
-                    has_user_functions = true;
                     // Create a temporary disassembler for this function
                     Disassembler func_disassemble(*lir_func, show_debug_info);
                     

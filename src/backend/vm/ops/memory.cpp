@@ -180,10 +180,13 @@ void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
     if (!ptr) { execute_memory_alloc(pc); return; }
     int64_t size = to_int(registers[pc->b]);
     if (size < 0) { registers[pc->dst] = VAL_NIL; return; }
+    {
+        std::lock_guard<std::mutex> lock(g_memory_mutex);
+        g_memory_allocations.erase(reinterpret_cast<uintptr_t>(ptr));
+    }
     void* new_ptr = std::realloc(ptr, size);
     if (new_ptr) {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
-        g_memory_allocations.erase(reinterpret_cast<uintptr_t>(ptr));
         g_memory_allocations[reinterpret_cast<uintptr_t>(new_ptr)] = size;
         RegisterValue val = lm_alloc_foreign_ptr(new_ptr);
         registers[pc->dst] = val;

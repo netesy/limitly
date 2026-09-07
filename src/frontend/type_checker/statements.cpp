@@ -297,6 +297,12 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
     
     declare_variable(var_decl->name, final_type);
     declare_variable_memory(var_decl->name, final_type);  // Track memory safety
+    if (var_decl->isConst) {
+        auto it = variable_memory_info.find(var_decl->name);
+        if (it != variable_memory_info.end()) {
+            it->second.is_const = true;
+        }
+    }
     
     // New variables are linear types by default if they are complex/linear types
     bool is_linear_type = (final_type &&
