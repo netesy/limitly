@@ -82,6 +82,7 @@ set(LIR_SOURCES
     src/lir/generator/concurrency.cpp
     src/lir/generator/modules.cpp
     src/lir/function_registry.cpp
+    src/lir/analysis.cpp
     src/lir/optimizer.cpp
     src/lir/metrics.cpp
     src/lir/serializer.cpp

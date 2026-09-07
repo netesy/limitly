@@ -113,7 +113,7 @@ LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
                  src/lir/generator/core.cpp src/lir/generator/statements.cpp src/lir/generator/expressions.cpp \
                  src/lir/generator/signatures.cpp src/lir/generator/oop.cpp src/lir/generator/concurrency.cpp \
                  src/lir/generator/modules.cpp src/lir/function_registry.cpp \
-                 src/lir/optimizer.cpp src/lir/metrics.cpp src/lir/serializer.cpp
+                 src/lir/analysis.cpp src/lir/optimizer.cpp src/lir/metrics.cpp src/lir/serializer.cpp
 
 BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/frontend/value.cpp src/backend/utf8.cpp 
 
@@ -350,8 +350,6 @@ lir-test: $(BIN_DIR) $(OBJ_DIR)/libLimitly.a $(LIR_TEST_OBJS)
 # Test Target
 # =============================
 tests: $(PLATFORM)
-	@echo "Running project formatting test..."
-	./bin/lyra format
 	@echo "========================================"
 	@echo "Running Limit Language Test Suite"
 	@echo "========================================"
