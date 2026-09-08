@@ -1,0 +1,44 @@
+// Retained UI Interactive End-to-End Regression Test
+// Verifies std.app -> std.ui -> std.graphics -> std.gg -> C++ VM Software Backend
+
+import std.app as app;
+import std.gg as gg;
+import std.ui.index as ui;
+
+fn main() {
+    print("=== Retained UI Interactive End-to-End Test ===");
+
+    var cfg = app.default_window_config();
+    assert(app.app_init(cfg) == 1, "app_init failed");
+
+    // Construct retained UI tree using public std.ui facade
+    var btn = ui.button_background("Click Me", ui.color_rgb8(60, 120, 210));
+    var lbl = ui.text_color("Hello Retained UI", ui.color_rgb8(255, 255, 255));
+    var root = ui.column([btn, lbl]);
+
+    app.set_ui(root);
+
+    // Frame 1: Render initial retained UI
+    app.run_frame_step();
+    var pixel_frame1 = gg.readback_pixel(50, 25);
+    assert(pixel_frame1 != nil, "pixel readback frame 1 failed");
+
+    // Frame 2: Queue mouse click event targeting button at (x=50, y=25)
+    app.push_mouse_click(50, 25);
+    app.run_frame_step();
+    var pixel_frame2 = gg.readback_pixel(50, 25);
+    assert(pixel_frame2 != nil, "pixel readback frame 2 failed");
+    assert(pixel_frame1 != pixel_frame2, "pixel state did not change after mouse click event");
+
+    // Frame 3: Step another frame without interaction and verify state persistence
+    app.run_frame_step();
+    var pixel_frame3 = gg.readback_pixel(50, 25);
+    assert(pixel_frame3 == pixel_frame2, "retained UI state failed to persist across subsequent frames");
+
+    // Clean shutdown
+    app.app_shutdown();
+    gg.shutdown();
+    print("Retained UI Interactive Test Passed.");
+}
+
+main();

@@ -1,0 +1,31 @@
+// GUI Showcase Application
+// Demonstrates target architecture: Limit App -> std.app -> std.ui -> std.graphics -> std.gg -> VM Backend
+
+import std.app as app;
+import std.ui.index as ui;
+
+fn main() {
+    print("=== Limit Portable GUI Showcase ===");
+
+    var config = app.default_window_config();
+    config.title = "Limit GUI & Graphics Showcase";
+    config.width = 800;
+    config.height = 600;
+
+    assert(app.app_init(config) == 1, "app init failed");
+
+    // Construct retained UI widget tree using public std.ui facade
+    var btn = ui.button_background("Interactive Button", ui.color_rgb8(50, 150, 240));
+    var lbl = ui.text_color("Retained Mode UI Active", ui.color_rgb8(240, 240, 240));
+    var root = ui.column([btn, lbl]);
+
+    app.set_ui(root);
+
+    app.push_quit_event();
+    app.app_run();
+
+    app.app_shutdown();
+    print("GUI Showcase completed successfully.");
+}
+
+main();

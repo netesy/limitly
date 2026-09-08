@@ -1,15 +1,13 @@
 import std.ui.widget as widget;
 
 frame Gesture {
-    pub var child: widget.Widget;
-    pub var on_tap_token: int;
+    pub var gesture_type: int;
 
-    pub init(ch: widget.Widget = widget.Widget(), token: int = 0) {
-        self.child = ch;
-        self.on_tap_token = token;
+    pub init(gt: int = 0) {
+        self.gesture_type = gt;
     }
 
     pub fn build(): widget.Widget {
-        return self;
+        return widget.Widget();
     }
 }

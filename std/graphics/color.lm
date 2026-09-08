@@ -27,7 +27,7 @@ frame Color {
     }
 }
 
-fn hex_digit(v: int): str {
+pub fn hex_digit(v: int): str {
     if (v < 10) return v as str;
     if (v == 10) return "a";
     if (v == 11) return "b";
@@ -37,25 +37,31 @@ fn hex_digit(v: int): str {
     return "f";
 }
 
-fn hex_byte(v: int): str {
+pub fn hex_byte(v: int): str {
     var hi = v / 16;
     var lo = v % 16;
     return hex_digit(hi) + hex_digit(lo);
 }
 
-fn rgb(r: int, g: int, b: int): Color {
-    return Color(r as float / 255.0, g as float / 255.0, b as float / 255.0, 1.0);
+pub fn rgb(r: int, g: int, b: int): Color {
+    var rf = r / 255.0;
+    var gf = g / 255.0;
+    var bf = b / 255.0;
+    return Color(r=rf, g=gf, b=bf, a=1.0);
 }
 
-fn rgba(r: int, g: int, b: int, a: float): Color {
-    return Color(r as float / 255.0, g as float / 255.0, b as float / 255.0, a);
+pub fn rgba(r: int, g: int, b: int, a: float): Color {
+    var rf = r / 255.0;
+    var gf = g / 255.0;
+    var bf = b / 255.0;
+    return Color(r=rf, g=gf, b=bf, a=a);
 }
 
-fn lerp(c1: Color, c2: Color, t: float): Color {
+pub fn lerp(c1: Color, c2: Color, t: float): Color {
     return Color(
-        c1.r + (c2.r - c1.r) * t,
-        c1.g + (c2.g - c1.g) * t,
-        c1.b + (c2.b - c1.b) * t,
-        c1.a + (c2.a - c1.a) * t
+        r=c1.r + (c2.r - c1.r) * t,
+        g=c1.g + (c2.g - c1.g) * t,
+        b=c1.b + (c2.b - c1.b) * t,
+        a=c1.a + (c2.a - c1.a) * t
     );
 }

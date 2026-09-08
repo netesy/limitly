@@ -1,15 +1,13 @@
 import std.ui.widget as widget;
 
 frame Align {
-    pub var child: widget.Widget;
-    pub var alignment: int; // 0 = Center, 1 = TopLeft, etc.
+    pub var alignment: int;
 
-    pub init(ch: widget.Widget = widget.Widget(), align: int = 0) {
-        self.child = ch;
-        self.alignment = align;
+    pub init(a: int = 0) {
+        self.alignment = a;
     }
 
     pub fn build(): widget.Widget {
-        return self;
+        return widget.Widget();
     }
 }

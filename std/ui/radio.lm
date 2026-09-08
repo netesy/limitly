@@ -4,9 +4,9 @@ frame Radio {
     pub var selected: bool;
     pub var value: int;
 
-    pub init(sel: bool = false, val: int = 0) {
+    pub init(sel: bool = false, val_num: int = 0) {
         self.selected = sel;
-        self.value = val;
+        self.value = val_num;
     }
 
     pub fn build(): widget.Widget {

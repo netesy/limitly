@@ -1,11 +1,7 @@
 frame Polygon {
-    pub var points: [float]; // interleaved x, y
+    pub var points: [float];
 
-    pub init(pts: [float] = []) {
+    pub init(pts: [float] = [0.0]) {
         self.points = pts;
-    }
-
-    pub fn vertex_count(): int {
-        return len(self.points) / 2;
     }
 }

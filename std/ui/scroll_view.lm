@@ -3,11 +3,11 @@ import std.ui.widget as widget;
 frame ScrollView {
     pub var child: widget.Widget;
 
-    pub init(ch: widget.Widget = widget.Widget()) {
-        self.child = ch;
+    pub init() {
+        self.child = widget.Widget();
     }
 
     pub fn build(): widget.Widget {
-        return self;
+        return widget.Widget();
     }
 }

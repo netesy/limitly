@@ -142,6 +142,10 @@ tests = [
     "tests/regression/ownership_refactor_test.lm",
     # Regression - Trait Dispatch
     "tests/regression/trait_dispatch_test.lm",
+    # Graphics & Retained UI
+    "tests/std_gg_smoke.lm",
+    "tests/graphics_triangle_test.lm",
+    "tests/retained_ui_test.lm",
 ]
 
 # Tests that need extra time (resource creation, crypto, network)

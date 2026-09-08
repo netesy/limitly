@@ -7,7 +7,7 @@ namespace LM {
 namespace Backend {
 namespace VM {
 
-// NOTE: This enum must stay in sync with the mirror in src/lir/lir.hh
+// NOTE: This enum matches the legacy LIR values and adds GRAPHICS = 17 for VM runtime graphics
 enum class ResourceType : uint32_t {
     FILE = 0,
     SOCKET = 1,
@@ -25,7 +25,8 @@ enum class ResourceType : uint32_t {
     DNS_RESOLVER = 13,
     UDP_SOCKET = 14,
     WEBSOCKET = 15,
-    HASH_ENGINE = 16
+    HASH_ENGINE = 16,
+    GRAPHICS = 17
 };
 
 enum class ResourceOperation : uint32_t {
@@ -64,7 +65,16 @@ enum class ResourceOperation : uint32_t {
     RENAME = 32,
     EXISTS = 33,
     DELETE = 34,
-    HMAC = 35
+    HMAC = 35,
+    DRAW_TRIANGLE = 36,
+    APPLY_PIPELINE = 37,
+    APPLY_BINDINGS = 38,
+    DRAW = 39,
+    MAKE_BUFFER = 40,
+    MAKE_IMAGE = 41,
+    MAKE_PIPELINE = 42,
+    MAKE_BINDINGS = 43,
+    END_PASS = 44
 };
 
 } // namespace VM
