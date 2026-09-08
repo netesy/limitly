@@ -59,6 +59,9 @@ tests = [
     # Concurrency
     "tests/concurrency/parallel_blocks.lm",
     "tests/concurrency/concurrent_blocks.lm",
+    # FFI ABI and callback ownership
+    "tests/ffi/test_trampoline.lm",
+    "tests/ffi/test_hardening.lm",
     # Stdlib - Core
     "tests/stdlib/core/string_test.lm",
     "tests/stdlib/core/math_test.lm",

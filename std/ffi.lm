@@ -64,9 +64,15 @@ pub enum CallingConvention {
 }
 
 // Memory Allocation Intrinsics
-pub fn alloc(size: int): pubptr { return 0; }
+pub fn alloc(size: int): pubptr {
+    if (size < 0) { return 0; }
+    return 0;
+}
 pub fn free(ptr: pubptr): nil {}
-pub fn realloc(ptr: pubptr, new_size: int): pubptr { return 0; }
+pub fn realloc(ptr: pubptr, new_size: int): pubptr {
+    if (new_size < 0) { return 0; }
+    return 0;
+}
 
 // Memory Manipulation
 pub fn memcpy(dest: pubptr, src: pubptr, size: int): nil {}
@@ -75,16 +81,24 @@ pub fn memcmp(ptr1: pubptr, ptr2: pubptr, size: int): int { return 0; }
 
 // Pointer Arithmetic
 pub fn ptr_add(ptr: pubptr, offset: int): pubptr { return ptr + offset; }
+fn _ffi_alloc(size: int): pubptr { return 0; }
+fn _ffi_free(ptr: pubptr): nil {}
+fn _ffi_load_i8(ptr: pubptr): int { return 0; }
+fn _ffi_load_u8(ptr: pubptr): int { return 0; }
+fn _ffi_store_i8(ptr: pubptr, value: int): nil {}
+fn _ffi_ptr_add(ptr: pubptr, offset: int): pubptr { return ptr + offset; }
 pub fn ptr_sub(ptr: pubptr, offset: int): pubptr { return ptr - offset; }
 pub fn ptr_diff(ptr1: pubptr, ptr2: pubptr): int { return ptr1 - ptr2; }
 
 pub fn ptr_align(ptr: pubptr, alignment: int): pubptr {
+    if (alignment <= 0 or (alignment & (alignment - 1)) != 0) { return 0; }
     var remainder: int = ptr % alignment;
     if (remainder == 0) { return ptr; }
     return ptr + (alignment - remainder);
 }
 
 pub fn ptr_is_aligned(ptr: pubptr, alignment: int): bool {
+    if (alignment <= 0 or (alignment & (alignment - 1)) != 0) { return false; }
     return (ptr % alignment) == 0;
 }
 
@@ -122,6 +136,15 @@ pub fn library_get_symbol(handle: pubptr, symbol: str): fnptr { return 0; }
 // Foreign Calls
 pub fn foreign_call(func_ptr: fnptr, args: [any], return_type: int = 6, param_types: [any] = []): any { return 0; }
 
+// Typed calls are the supported safe-wrapper building blocks. Unlike
+// `foreign_call`, their complete ABI signature is visible in LIR and can be
+// implemented identically by every backend.
+pub fn call_i64_0(func_ptr: fnptr): int { return 0; }
+pub fn call_i64_1(func_ptr: fnptr, arg1: int): int { return 0; }
+pub fn call_i64_2(func_ptr: fnptr, arg1: int, arg2: int): int { return 0; }
+pub fn call_f64_2(func_ptr: fnptr, arg1: f64, arg2: f64): f64 { return 0.0; }
+pub fn call_void_1(func_ptr: fnptr, arg1: pubptr): nil {}
+
 // CString wrapper
 pub frame CString {
     pub var ptr: pubptr;
@@ -133,16 +156,16 @@ pub fn string_to_cstring(s: str): CString {
     var len_val: int = len(s);
     var p: pubptr = 0;
     unsafe {
-        p = alloc(len_val + 1);
+        p = _ffi_alloc(len_val + 1);
         if (p != 0 and len_val > 0) {
             var i: int = 0;
             while (i < len_val) {
-                store_i8(p + i, s[i]);
+                _ffi_store_i8(_ffi_ptr_add(p, i), s[i]);
                 i = i + 1;
             }
         }
         if (p != 0) {
-            store_i8(p + len_val, 0);
+            _ffi_store_i8(_ffi_ptr_add(p, len_val), 0);
         }
     }
     return CString(ptr=p, length=len_val, is_owned=1);
@@ -154,14 +177,14 @@ pub fn cstring_to_string(p: pubptr): str {
     var bytes: [int] = [];
     unsafe {
         var current: pubptr = p;
-        while (load_i8(current) != 0) {
+        while (_ffi_load_i8(current) != 0) {
             len_val = len_val + 1;
-            current = current + 1;
+            current = _ffi_ptr_add(current, 1);
         }
         if (len_val > 0) {
             var i: int = 0;
             while (i < len_val) {
-                var b: int = load_i8(p + i);
+                var b: int = _ffi_load_i8(_ffi_ptr_add(p, i));
                 bytes.append(b);
                 i = i + 1;
             }
@@ -170,10 +193,27 @@ pub fn cstring_to_string(p: pubptr): str {
     return _builtin_string_from_bytes(bytes);
 }
 
+// Convert a foreign C string without scanning beyond caller-owned memory.
+// Returns nil when no terminator occurs within max_length bytes.
+pub fn cstring_to_string_bounded(p: pubptr, max_length: int): str? {
+    if (p == 0 or max_length < 0) { return err(); }
+    var bytes: [int] = [];
+    unsafe {
+        var i: int = 0;
+        while (i < max_length) {
+            var b: int = _ffi_load_u8(_ffi_ptr_add(p, i));
+            if (b == 0) { return ok(_builtin_string_from_bytes(bytes)); }
+            bytes.append(b);
+            i = i + 1;
+        }
+    }
+    return err();
+}
+
 pub fn cstring_free(cs: CString): nil {
     if (cs.is_owned != 0 and cs.ptr != 0) {
         unsafe {
-            free(cs.ptr);
+            _ffi_free(cs.ptr);
         }
     }
 }
@@ -187,9 +227,9 @@ pub fn cstring_from_ptr(p: pubptr, take_ownership: int): CString {
     if (p != 0) {
         unsafe {
             var current: pubptr = p;
-            while (load_i8(current) != 0) {
+            while (_ffi_load_i8(current) != 0) {
                 len_val = len_val + 1;
-                current = current + 1;
+                current = _ffi_ptr_add(current, 1);
             }
         }
     }
@@ -315,3 +355,45 @@ pub fn callback_ptr(handle: int): fnptr {
 // callback_destroy: release the trampoline and free the libffi closure page.
 // After calling this, the code pointer returned by callback_ptr is invalid.
 pub fn callback_destroy(handle: int): nil {}
+fn _ffi_callback_create(func_name: str, arg_types: [any], ret_type: int): int { return 0; }
+fn _ffi_callback_ptr(handle: int): fnptr { return 0; }
+fn _ffi_callback_destroy(handle: int): nil {}
+
+// Owning callback wrapper. Prefer this over passing a bare callback handle
+// through safe standard-library APIs.
+pub frame Callback {
+    pub var handle: int;
+    pub var pointer: fnptr;
+    pub var is_open: bool;
+
+    pub fn close(): nil {
+        if (self.is_open and self.handle > 0) {
+            unsafe { _ffi_callback_destroy(self.handle); }
+            self.handle = 0;
+            self.pointer = 0;
+            self.is_open = false;
+        }
+    }
+}
+
+pub fn create_callback(func_name: str, arg_types: [any], ret_type: int): Callback? {
+    if (func_name == "" or ret_type < TYPE_I8 or ret_type > TYPE_VOID or ret_type == TYPE_CSTRING) {
+        return err();
+    }
+    var i: int = 0;
+    while (i < len(arg_types)) {
+        var type_id: int = arg_types[i] as int;
+        if (type_id < TYPE_I8 or type_id > TYPE_CSTRING) { return err(); }
+        i = i + 1;
+    }
+    unsafe {
+        var h: int = _ffi_callback_create(func_name, arg_types, ret_type);
+        if (h == nil or h <= 0) { return err(); }
+        var p: fnptr = _ffi_callback_ptr(h);
+        if (p == nil or p == 0) {
+            _ffi_callback_destroy(h);
+            return err();
+        }
+        return ok(Callback(handle=h, pointer=p, is_open=true));
+    }
+}

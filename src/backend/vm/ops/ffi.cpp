@@ -29,7 +29,8 @@ namespace {
     std::mutex g_library_mutex;
     std::unordered_map<uintptr_t, std::string> g_libraries;
     std::mutex g_callback_mutex;
-    int64_t g_next_callback_id = 0;
+    // Zero is reserved as the invalid native handle throughout std.ffi.
+    int64_t g_next_callback_id = 1;
     std::mutex g_callframe_mutex;
     std::unordered_map<uint64_t, std::vector<RegisterValue>> g_callframe_registers;
     std::unordered_map<uint64_t, std::vector<uint8_t>> g_callframe_stack;
@@ -85,6 +86,27 @@ namespace {
             case LIR::Type::Ptr:  return &ffi_type_pointer;
             case LIR::Type::Void: return &ffi_type_void;
             default:              return &ffi_type_void;
+        }
+    }
+
+    bool ffi_type_id_to_lir(int64_t id, bool allow_void, LIR::Type& out) {
+        switch (id) {
+            case 0:  out = LIR::Type::I8;  return true;
+            case 1:  out = LIR::Type::U8;  return true;
+            case 2:  out = LIR::Type::I16; return true;
+            case 3:  out = LIR::Type::U16; return true;
+            case 4:  out = LIR::Type::I32; return true;
+            case 5:  out = LIR::Type::U32; return true;
+            case 6:  out = LIR::Type::I64; return true;
+            case 7:  out = LIR::Type::U64; return true;
+            case 8:  out = LIR::Type::F32; return true;
+            case 9:  out = LIR::Type::F64; return true;
+            case 10: // pointer
+            case 11: out = LIR::Type::Ptr; return true; // C string
+            case 12:
+                if (allow_void) { out = LIR::Type::Void; return true; }
+                return false;
+            default: return false;
         }
     }
 
@@ -262,13 +284,18 @@ void RegisterVM::execute_extern_library_load(const LIR::LIR_Inst* pc) {
 void RegisterVM::execute_extern_library_unload(const LIR::LIR_Inst* pc) {
     void* handle = value_to_ptr(registers[pc->a]);
     if (handle) {
+        {
+            std::lock_guard<std::mutex> lock(g_library_mutex);
+            auto it = g_libraries.find(reinterpret_cast<uintptr_t>(handle));
+            if (it == g_libraries.end()) return;
+            // Remove before unloading so concurrent resolve/unload attempts fail.
+            g_libraries.erase(it);
+        }
         #ifdef _WIN32
         FreeLibrary(static_cast<HMODULE>(handle));
         #else
         dlclose(handle);
         #endif
-        std::lock_guard<std::mutex> lock(g_library_mutex);
-        g_libraries.erase(reinterpret_cast<uintptr_t>(handle));
     }
 }
 
@@ -279,6 +306,12 @@ void RegisterVM::execute_extern_library_get_symbol(const LIR::LIR_Inst* pc) {
     if (!handle) { registers[pc->dst] = VAL_NIL; return; }
     const char* symbol = get_cstring_from_value(registers[symbol_reg]);
     if (!symbol) { registers[pc->dst] = VAL_NIL; return; }
+    // Keep the handle alive across symbol lookup; unload uses the same mutex.
+    std::lock_guard<std::mutex> lock(g_library_mutex);
+    if (g_libraries.find(reinterpret_cast<uintptr_t>(handle)) == g_libraries.end()) {
+        registers[pc->dst] = VAL_NIL;
+        return;
+    }
     #ifdef _WIN32
     void* ptr = reinterpret_cast<void*>(GetProcAddress(static_cast<HMODULE>(handle), symbol));
     #else
@@ -366,7 +399,7 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
             case LIR::Type::Bool: { uint8_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = v ? VAL_TRUE : VAL_FALSE; break; }
             case LIR::Type::Ptr:  {
                 void* p; std::memcpy(&p, &result_storage, sizeof(p));
-                RegisterValue val = lm_alloc_foreign_ptr(p);
+                RegisterValue val = p ? lm_alloc_foreign_ptr(p) : VAL_NIL;
                 registers[pc->dst] = val;
                 // Register allocation with current active region
                 if (IS_PTR(val) && !vm_region_stack.empty()) {
@@ -395,6 +428,11 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
 // Returns an integer handle (callback ID) that identifies the trampoline.
 // ---------------------------------------------------------------------------
 void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
+    if (pc->call_args.size() != 3) {
+        std::cerr << "[ffi] callback_create: expected name, argument types, and return type\n";
+        registers[pc->dst] = VAL_NIL;
+        return;
+    }
     // ── Step 1: Read the Limitly function name from call_args[0] ──────────
     std::string limitly_func_name;
     if (!pc->call_args.empty()) {
@@ -416,62 +454,67 @@ void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
         registers[pc->dst] = VAL_NIL;
         return;
     }
+    auto& functions = LIR::LIRFunctionManager::getInstance();
+    if (!functions.hasFunction(limitly_func_name)) {
+        std::cerr << "[ffi] callback_create: function '" << limitly_func_name
+                  << "' is not registered\n";
+        registers[pc->dst] = VAL_NIL;
+        return;
+    }
 
     // ── Step 2: Read the arg-type list from call_args[1] ─────────────────
     // Each element is a TYPE_* integer constant (e.g., TYPE_I64 == 6).
     std::vector<LIR::Type> arg_types;
+    bool valid_arg_list = false;
     if (pc->call_args.size() >= 2) {
         RegisterValue list_val = registers[pc->call_args[1]];
         if (IS_PTR(list_val)) {
             auto* h = static_cast<ObjHeader*>(UNBOX_PTR(list_val));
             if (h && h->type_id == TYPE_LIST) {
+                valid_arg_list = true;
                 LmList* lst = (LmList*)h;
                 uint64_t count = lm_list_len(lst);
+                if (count > 64) {
+                    std::cerr << "[ffi] callback_create: at most 64 arguments are supported\n";
+                    registers[pc->dst] = VAL_NIL;
+                    return;
+                }
                 arg_types.reserve(count);
                 for (uint64_t i = 0; i < count; ++i) {
                     int64_t type_id = as_i64(lm_list_get(lst, i));
-                    // Map std.ffi TYPE_* constants to LIR::Type
-                    // TYPE_I8=0,U8=1,I16=2,U16=3,I32=4,U32=5,I64=6,U64=7,
-                    // F32=8,F64=9,PTR=10,CSTRING=11,VOID=12
-                    switch (type_id) {
-                        case 0:  arg_types.push_back(LIR::Type::I8);   break;
-                        case 1:  arg_types.push_back(LIR::Type::U8);   break;
-                        case 2:  arg_types.push_back(LIR::Type::I16);  break;
-                        case 3:  arg_types.push_back(LIR::Type::U16);  break;
-                        case 4:  arg_types.push_back(LIR::Type::I32);  break;
-                        case 5:  arg_types.push_back(LIR::Type::U32);  break;
-                        case 6:  arg_types.push_back(LIR::Type::I64);  break;
-                        case 7:  arg_types.push_back(LIR::Type::U64);  break;
-                        case 8:  arg_types.push_back(LIR::Type::F32);  break;
-                        case 9:  arg_types.push_back(LIR::Type::F64);  break;
-                        case 10: arg_types.push_back(LIR::Type::Ptr);  break;
-                        case 11: arg_types.push_back(LIR::Type::Ptr);  break; // c_string -> ptr
-                        default: arg_types.push_back(LIR::Type::I64);  break;
+                    LIR::Type type;
+                    if (!ffi_type_id_to_lir(type_id, false, type)) {
+                        std::cerr << "[ffi] callback_create: invalid argument type id "
+                                  << type_id << " at index " << i << '\n';
+                        registers[pc->dst] = VAL_NIL;
+                        return;
                     }
+                    arg_types.push_back(type);
                 }
             }
         }
     }
+    if (!valid_arg_list) {
+        std::cerr << "[ffi] callback_create: argument types must be a list\n";
+        registers[pc->dst] = VAL_NIL;
+        return;
+    }
+    const size_t expected_args = functions.getFunction(limitly_func_name)->getParameters().size();
+    if (arg_types.size() != expected_args) {
+        std::cerr << "[ffi] callback_create: signature for '" << limitly_func_name
+                  << "' declares " << arg_types.size() << " native arguments but function expects "
+                  << expected_args << '\n';
+        registers[pc->dst] = VAL_NIL;
+        return;
+    }
 
     // ── Step 3: Read the return-type integer from call_args[2] ───────────
-    LIR::Type ret_type = LIR::Type::I64; // default
-    if (pc->call_args.size() >= 3) {
-        int64_t rid = as_i64(registers[pc->call_args[2]]);
-        switch (rid) {
-            case 0:  ret_type = LIR::Type::I8;   break;
-            case 1:  ret_type = LIR::Type::U8;   break;
-            case 2:  ret_type = LIR::Type::I16;  break;
-            case 3:  ret_type = LIR::Type::U16;  break;
-            case 4:  ret_type = LIR::Type::I32;  break;
-            case 5:  ret_type = LIR::Type::U32;  break;
-            case 6:  ret_type = LIR::Type::I64;  break;
-            case 7:  ret_type = LIR::Type::U64;  break;
-            case 8:  ret_type = LIR::Type::F32;  break;
-            case 9:  ret_type = LIR::Type::F64;  break;
-            case 10: ret_type = LIR::Type::Ptr;  break;
-            case 12: ret_type = LIR::Type::Void; break;
-            default: ret_type = LIR::Type::I64;  break;
-        }
+    LIR::Type ret_type;
+    int64_t rid = as_i64(registers[pc->call_args[2]]);
+    if (!ffi_type_id_to_lir(rid, true, ret_type)) {
+        std::cerr << "[ffi] callback_create: invalid return type id " << rid << '\n';
+        registers[pc->dst] = VAL_NIL;
+        return;
     }
     // ── Step 4: Assign a stable callback ID ──────────────────────────────
     int64_t id;
@@ -590,32 +633,32 @@ void RegisterVM::execute_extern_ccall_frame_create(const LIR::LIR_Inst* pc) {
 }
 void RegisterVM::execute_extern_ccall_frame_destroy(const LIR::LIR_Inst* pc) {
     int64_t id = to_int(registers[pc->a]);
-    std::lock_guard<std::mutex> lock(g_callback_mutex);
+    std::lock_guard<std::mutex> lock(g_callframe_mutex);
     g_callframe_registers.erase(id); g_callframe_stack.erase(id);
 }
 void RegisterVM::execute_extern_ccall_frame_set_reg(const LIR::LIR_Inst* pc) {
     int64_t id = to_int(registers[pc->dst]); int64_t idx = to_int(registers[pc->a]);
     RegisterValue val = registers[pc->b];
-    std::lock_guard<std::mutex> lock(g_callback_mutex);
+    std::lock_guard<std::mutex> lock(g_callframe_mutex);
     auto it = g_callframe_registers.find(id);
     if (it != g_callframe_registers.end() && idx >= 0 && idx < (int64_t)it->second.size()) it->second[idx] = val;
 }
 void RegisterVM::execute_extern_ccall_frame_get_reg(const LIR::LIR_Inst* pc) {
     int64_t id = to_int(registers[pc->a]); int64_t idx = to_int(registers[pc->b]);
-    std::lock_guard<std::mutex> lock(g_callback_mutex);
+    std::lock_guard<std::mutex> lock(g_callframe_mutex);
     auto it = g_callframe_registers.find(id);
     if (it != g_callframe_registers.end() && idx >= 0 && idx < (int64_t)it->second.size()) registers[pc->dst] = it->second[idx];
     else registers[pc->dst] = VAL_NIL;
 }
 void RegisterVM::execute_extern_ccall_frame_set_stack_arg(const LIR::LIR_Inst* pc) {
     int64_t id = to_int(registers[pc->dst]); int64_t off = to_int(registers[pc->a]); int64_t val = to_int(registers[pc->b]);
-    std::lock_guard<std::mutex> lock(g_callback_mutex);
+    std::lock_guard<std::mutex> lock(g_callframe_mutex);
     auto it = g_callframe_stack.find(id);
     if (it != g_callframe_stack.end() && off >= 0 && off + 8 <= (int64_t)it->second.size()) std::memcpy(&it->second[off], &val, 8);
 }
 void RegisterVM::execute_extern_ccall_frame_get_stack_arg(const LIR::LIR_Inst* pc) {
     int64_t id = to_int(registers[pc->a]); int64_t off = to_int(registers[pc->b]);
-    std::lock_guard<std::mutex> lock(g_callback_mutex);
+    std::lock_guard<std::mutex> lock(g_callframe_mutex);
     auto it = g_callframe_stack.find(id);
     if (it != g_callframe_stack.end() && off >= 0 && off + 8 <= (int64_t)it->second.size()) {
         int64_t val; std::memcpy(&val, &it->second[off], 8); registers[pc->dst] = BOX_INT(val);
