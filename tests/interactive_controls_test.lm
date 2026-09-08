@@ -1,5 +1,5 @@
 // Interactive Controls Test
-// Verifies single click, checkbox toggle, slider adjustment, text input, tabs, and scroll_view
+// Verifies single click, checkbox toggle, slider adjustment, text input, tabs, and scroll
 
 import std.app as app;
 import std.ui as ui;
@@ -19,8 +19,8 @@ fn run_tests() {
     var chk = ui.checkbox(false);
     var sld = ui.slider(20.0, 0.0, 100.0);
     var inp = ui.input("test", "Placeholder");
-    var tab_bar = ui.tabs(["Tab1", "Tab2", "Tab3"], 0);
-    var scr = ui.scroll([
+    var tab_bar = ui.tabs(["Tab1", "Tab2", "Tab3"], [ui.empty(), ui.empty(), ui.empty()], 0).height(36.0);
+    var scr = ui.scroll(ui.column([
         ui.text("Line 1"),
         ui.text("Line 2"),
         ui.text("Line 3"),
@@ -31,7 +31,7 @@ fn run_tests() {
         ui.text("Line 8"),
         ui.text("Line 9"),
         ui.text("Line 10")
-    ], 60.0);
+    ])).height(60.0);
 
     var root = ui.column([
         tab_bar,
@@ -163,7 +163,7 @@ fn run_tests() {
     print("Pass: Slider drag semantics verified");
 
     // 9. Verify Badge Widget
-    var bdg = ui.badge("ACTIVE", ui.green, ui.white);
+    var bdg = ui.badge("ACTIVE").background(ui.green).foreground(ui.white);
     assert(bdg.kind == ui.KIND_BADGE, "Badge kind must be KIND_BADGE");
     assert(bdg.text_val == "ACTIVE", "Badge text should match label");
     print("Pass: Badge widget verified");
@@ -197,7 +197,7 @@ fn run_tests() {
     // 11. Verify Tab View Page Switching
     var page_a = ui.text("Content Alpha");
     var page_b = ui.text("Content Beta");
-    var tv = ui.tab_view(["Page A", "Page B"], [page_a, page_b], 0);
+    var tv = ui.tabs(["Page A", "Page B"], [page_a, page_b], 0);
     assert(tv.kind == ui.KIND_TABS, "Tab view kind must be KIND_TABS");
     assert(tv.active_tab == 0, "Initial tab view page should be 0");
 

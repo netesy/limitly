@@ -500,10 +500,6 @@ pub fn input(value: str = "", placeholder: str = "Type here...", on_change: any 
     return w;
 }
 
-pub fn text_field(value: str = "", placeholder: str = "Type here...", on_change: any = nil): Widget {
-    return input(value, placeholder, on_change);
-}
-
 pub fn checkbox(checked: bool = false, on_change: any = nil): Widget {
     var w = Widget(KIND_CHECKBOX);
     if (checked) {
@@ -535,17 +531,7 @@ pub fn slider(value: float = 50.0, min_val: float = 0.0, max_val: float = 100.0,
     return w;
 }
 
-pub fn tabs(titles: [str], active: int = 0, on_change: any = nil): Widget {
-    var w = Widget(KIND_TABS);
-    w.tab_titles = titles;
-    w.active_tab = active;
-    w.on_change_action = on_change;
-    w.height_val = 36.0;
-    w.spacing_val = 6.0;
-    return w;
-}
-
-pub fn tab_view(titles: [str], pages: [Widget], active: int = 0, on_change: any = nil): Widget {
+pub fn tabs(titles: [str], pages: [Widget], active: int = 0, on_change: any = nil): Widget {
     var w = Widget(KIND_TABS);
     w.tab_titles = titles;
     w.children = pages;
@@ -556,11 +542,11 @@ pub fn tab_view(titles: [str], pages: [Widget], active: int = 0, on_change: any 
     return w;
 }
 
-pub fn badge(label: str, bg: Color = blue, fg: Color = white): Widget {
+pub fn badge(label: str): Widget {
     var w = Widget(KIND_BADGE);
     w.text_val = label;
-    w.background_color = bg;
-    w.foreground_color = fg;
+    w.background_color = blue;
+    w.foreground_color = white;
     w.height_val = 20.0;
     w.corner_radius_val = 4.0;
     w.padding_left = 6.0;
@@ -589,26 +575,11 @@ pub fn select(options: [str], selected_idx: int = 0, on_change: any = nil): Widg
     return w;
 }
 
-pub fn scroll_view(content: Widget, height: float = 140.0): Widget {
+pub fn scroll(content: Widget): Widget {
     var w = Widget(KIND_SCROLL);
     w.children = [content];
-    w.height_val = height;
+    w.height_val = 140.0;
     w.scroll_y = 0.0;
     w.background_color = rgb(20, 22, 28);
     return w;
 }
-
-pub fn scroll(children: [Widget], height: float = 140.0): Widget {
-    var col = column(children).spacing(6.0);
-    return scroll_view(col, height);
-}
-
-// Backward Compatibility Aliases (Deprecated)
-pub fn vstack(children: [Widget]): Widget {
-    return column(children);
-}
-
-pub fn hstack(children: [Widget]): Widget {
-    return row(children);
-}
-

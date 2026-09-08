@@ -66,7 +66,7 @@ fn build_header(): ui.Widget {
             .font_size(12.0)
             .color(ui.green),
 
-        ui.badge("HEALTHY", ui.rgb(30, 80, 50), ui.rgb(100, 240, 150)),
+        ui.badge("HEALTHY").background(ui.rgb(30, 80, 50)).foreground(ui.rgb(100, 240, 150)),
 
         ui.spacer(),
 
@@ -99,7 +99,7 @@ fn stat_card(title: str, metric: str, subtitle: str, metric_color: ui.Color, bad
             .font_size(11.0)
             .color(ui.gray),
         ui.spacer(),
-        ui.badge(badge_label, ui.rgb(35, 45, 60), ui.rgb(140, 190, 255))
+        ui.badge(badge_label).background(ui.rgb(35, 45, 60)).foreground(ui.rgb(140, 190, 255))
     ]);
 
     return ui.column([
@@ -138,7 +138,7 @@ fn build_overview_page(): ui.Widget {
             .bold()
             .color(ui.white),
         ui.spacer(),
-        ui.badge("MULTI-REGION", ui.indigo, ui.white)
+        ui.badge("MULTI-REGION").background(ui.indigo).foreground(ui.white)
     ]);
 
     var summary_desc = ui.text("Autonomous edge cluster running across 34 PoPs. Self-healing mesh routing enabled.")
@@ -192,11 +192,11 @@ fn service_row(name: str, status: str, version: str, region: str, is_healthy: in
             .bold()
             .color(ui.white)
             .width(180.0),
-        ui.badge(status, status_bg, status_fg),
+        ui.badge(status).background(status_bg).foreground(status_fg),
         ui.spacer(),
-        ui.badge(version, ui.rgb(35, 45, 65), ui.rgb(130, 180, 255)),
+        ui.badge(version).background(ui.rgb(35, 45, 65)).foreground(ui.rgb(130, 180, 255)),
         ui.spacer(),
-        ui.badge(region, ui.rgb(35, 38, 48), ui.gray),
+        ui.badge(region).background(ui.rgb(35, 38, 48)).foreground(ui.gray),
         ui.spacer(),
         ui.button("Restart", on_sync)
             .background(ui.rgb(45, 48, 60))
@@ -218,7 +218,7 @@ fn build_microservices_page(): ui.Widget {
         ui.text("Filter:").color(ui.light_gray),
         ui.input("payments", "Search microservice...", on_search_changed).width(200.0),
         ui.spacer(),
-        ui.badge("4 SERVICES MONITORED", ui.rgb(35, 50, 70), ui.rgb(140, 200, 255))
+        ui.badge("4 SERVICES MONITORED").background(ui.rgb(35, 50, 70)).foreground(ui.rgb(140, 200, 255))
     ]).spacing(8.0);
 
     var list = ui.column([
@@ -248,8 +248,8 @@ fn build_telemetry_page(): ui.Widget {
             .bold()
             .color(ui.light_gray),
         ui.spacer(),
-        ui.badge("SCISSOR CLIPPED", ui.rgb(30, 60, 90), ui.rgb(120, 200, 255)),
-        ui.badge("LIVE STREAM", ui.rgb(25, 75, 45), ui.rgb(90, 240, 140))
+        ui.badge("SCISSOR CLIPPED").background(ui.rgb(30, 60, 90)).foreground(ui.rgb(120, 200, 255)),
+        ui.badge("LIVE STREAM").background(ui.rgb(25, 75, 45)).foreground(ui.rgb(90, 240, 140))
     ]).spacing(8.0);
 
     var logs = [
@@ -271,11 +271,11 @@ fn build_telemetry_page(): ui.Widget {
     ];
 
     // Scissor clipped scroll container (190px high)
-    var scroll_view = ui.scroll(logs, 190.0);
+    var log_scroll = ui.scroll(ui.column(logs).spacing(6.0)).height(190.0);
 
     return ui.column([
         top_bar,
-        scroll_view
+        log_scroll
     ]).style(card_style);
 }
 
@@ -296,7 +296,7 @@ fn build_settings_page(): ui.Widget {
             "Global Multi-Cloud"
         ], 0, on_region_changed).width(220.0),
         ui.spacer(),
-        ui.badge("ACTIVE ENV", ui.indigo, ui.white)
+        ui.badge("ACTIVE ENV").background(ui.indigo).foreground(ui.white)
     ]).spacing(10.0);
 
     var toggle_row = ui.row([
@@ -338,7 +338,7 @@ fn build_settings_page(): ui.Widget {
 // Footer Component
 fn build_footer(): ui.Widget {
     return ui.row([
-        ui.text("Limit Engine v1.0 - Native Sokol App Window (60 FPS) - Scissor Clipped Retained Canvas")
+        ui.text("Limit Engine v1.0 - Software Framebuffer - Scissor Clipped Retained Canvas")
             .font_size(11.0)
             .color(ui.gray),
         ui.spacer(),
@@ -358,15 +358,18 @@ fn build_app_view(): ui.Widget {
         build_settings_page()
     ];
 
-    var tab_container = ui.tab_view(titles, pages, 0, on_tab_switch);
+    var tab_container = ui.tabs(titles, pages, 0, on_tab_switch);
 
-    return ui.column([
+    var page = ui.column([
         build_header(),
         tab_container,
         build_footer()
     ])
     .spacing(12.0)
     .padding(14.0);
+    // Root overflow is explicit in v1: applications wrap oversized content in
+    // Scroll rather than relying on an implicit root scrolling policy.
+    return ui.scroll(page).height(592.0);
 }
 
 fn main() {
