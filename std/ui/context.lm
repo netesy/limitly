@@ -150,9 +150,7 @@ fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w
 }
 
 pub fn frame_update(delta_time: float): nil {
-    if (global_ui_context.dirty != 0) {
-        var cvs = canvas.Canvas(w=800.0, h=600.0);
-        render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, 760.0, 560.0, cvs);
-        global_ui_context.dirty = 0;
-    }
+    var cvs = canvas.Canvas(w=800.0, h=600.0);
+    render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, 760.0, 560.0, cvs);
+    global_ui_context.dirty = 0;
 }

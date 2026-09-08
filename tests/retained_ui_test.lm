@@ -3,47 +3,37 @@
 
 import std.app as app;
 import std.gg as gg;
-import std.ui.context as ui_ctx;
-import std.ui.builder as ui_builder;
+import std.ui.index as ui;
 
 fn main() {
     print("=== Retained UI Interactive End-to-End Test ===");
-    assert(gg.setup(), "gg setup failed");
 
     var cfg = app.default_window_config();
     assert(app.app_init(cfg) == 1, "app_init failed");
-    ui_ctx.ui_init();
 
-    // Construct retained UI blueprint tree
-    var btn = ui_builder.button_background("Click Me", ui_builder.color_rgb8(60, 120, 210));
-    var lbl = ui_builder.text_color("Hello Retained UI", ui_builder.color_rgb8(255, 255, 255));
-    var root_bp = ui_builder.vstack([btn, lbl]);
+    // Construct retained UI tree using public std.ui facade
+    var btn = ui.button_background("Click Me", ui.color_rgb8(60, 120, 210));
+    var lbl = ui.text_color("Hello Retained UI", ui.color_rgb8(255, 255, 255));
+    var root = ui.column([btn, lbl]);
 
-    ui_ctx.update_blueprint(root_bp);
+    app.set_ui(root);
 
     // Frame 1: Render initial retained UI
-    gg.begin_pass(800, 600, 0.1, 0.1, 0.15, 1.0);
-    ui_ctx.frame_update(0.016);
-    gg.end_pass();
-    gg.commit();
+    app.run_frame_step();
+    var pixel_frame1 = gg.readback_pixel(50, 25);
+    assert(pixel_frame1 != nil, "pixel readback frame 1 failed");
 
-    // Read pixel before interaction (button background pixel at x=50, y=25)
-    var pixel_before = gg.readback_pixel(50, 25);
-    assert(pixel_before != nil, "pixel readback before interaction failed");
+    // Frame 2: Queue mouse click event targeting button at (x=50, y=25)
+    app.push_mouse_click(50, 25);
+    app.run_frame_step();
+    var pixel_frame2 = gg.readback_pixel(50, 25);
+    assert(pixel_frame2 != nil, "pixel readback frame 2 failed");
+    assert(pixel_frame1 != pixel_frame2, "pixel state did not change after mouse click event");
 
-    // Inject pointer click event at (x=50, y=25) targeting the button
-    ui_ctx.dispatch_pointer_click(50.0, 25.0);
-
-    // Frame 2: Render updated retained UI after interaction
-    gg.begin_pass(800, 600, 0.1, 0.1, 0.15, 1.0);
-    ui_ctx.frame_update(0.016);
-    gg.end_pass();
-    gg.commit();
-
-    // Read pixel after interaction
-    var pixel_after = gg.readback_pixel(50, 25);
-    assert(pixel_after != nil, "pixel readback after interaction failed");
-    assert(pixel_before != pixel_after, "pixel state did not change after interactive button click");
+    // Frame 3: Step another frame without interaction and verify state persistence
+    app.run_frame_step();
+    var pixel_frame3 = gg.readback_pixel(50, 25);
+    assert(pixel_frame3 == pixel_frame2, "retained UI state failed to persist across subsequent frames");
 
     // Clean shutdown
     app.app_shutdown();

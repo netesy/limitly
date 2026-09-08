@@ -1,6 +1,10 @@
 // Application Module
 // Portable window application lifecycle, event loop, and timing driver
 
+import std.ui.context as ui_context;
+import std.ui.types as ui_types;
+import std.gg as gg;
+
 // Event type constants
 pub var EVENT_QUIT: int = 0;
 pub var EVENT_RESIZE: int = 1;
@@ -21,6 +25,8 @@ frame Event {
     pub var event_type: int;
     pub var timestamp: int;
     pub var window_id: int;
+    pub var x: int;
+    pub var y: int;
 }
 
 // Key event frame
@@ -93,7 +99,7 @@ frame AppState {
 }
 
 fn make_default_event(): Event {
-    return Event(event_type=0, timestamp=0, window_id=0);
+    return Event(event_type=0, timestamp=0, window_id=0, x=0, y=0);
 }
 
 // Global application state
@@ -119,6 +125,7 @@ pub fn app_init(config: WindowConfig): int {
         return 0;
     }
     
+    gg.setup();
     global_app_state.window_config = config;
     global_app_state.width = config.width;
     global_app_state.height = config.height;
@@ -132,6 +139,7 @@ pub fn app_init(config: WindowConfig): int {
     global_app_state.last_frame_time = 0;
     global_app_state.delta_time = 0.0;
     global_app_state.event_queue = [] as [Event];
+    ui_context.ui_init();
     
     return 1;
 }
@@ -159,6 +167,17 @@ pub fn app_is_running(): int {
     return global_app_state.is_running;
 }
 
+pub fn set_ui(root_blueprint: ui_types.Blueprint): nil {
+    ui_context.ui_init();
+    ui_context.update_blueprint(root_blueprint);
+}
+
+pub fn run_frame_step(): nil {
+    process_events();
+    present_frame();
+    global_app_state.frame_count = global_app_state.frame_count + 1;
+}
+
 pub fn app_run(): nil {
     if (global_app_state.is_initialized == 0) {
         return;
@@ -172,20 +191,7 @@ pub fn app_run(): nil {
     
     // Main event loop
     while (global_app_state.is_running != 0) {
-        if (has_pending_events() != 0) {
-            var ev = poll_event();
-            if (ev.event_type == EVENT_QUIT) {
-                global_app_state.is_running = 0;
-            }
-        } else {
-            // Headless execution: complete frame step and yield loop
-            if (global_app_state.frame_count >= 1) {
-                global_app_state.is_running = 0;
-            }
-        }
-        process_events();
-        present_frame();
-        global_app_state.frame_count = global_app_state.frame_count + 1;
+        run_frame_step();
     }
 }
 
@@ -197,6 +203,23 @@ pub fn process_events(): nil {
     if (global_app_state.is_initialized == 0) {
         return;
     }
+    while (has_pending_events() != 0) {
+        var ev = poll_event();
+        if (ev.event_type == EVENT_QUIT) {
+            global_app_state.is_running = 0;
+        }
+        if (ev.event_type == EVENT_MOUSE_DOWN or ev.event_type == EVENT_MOUSE_UP) {
+            ui_context.dispatch_pointer_click(ev.x as float, ev.y as float);
+        }
+    }
+}
+
+pub fn push_mouse_click(x: int, y: int): nil {
+    push_event(Event(event_type=EVENT_MOUSE_DOWN, timestamp=0, window_id=1, x=x, y=y));
+}
+
+pub fn push_quit_event(): nil {
+    push_event(Event(event_type=EVENT_QUIT, timestamp=0, window_id=1, x=0, y=0));
 }
 
 pub fn push_event(event: Event): nil {
@@ -234,6 +257,10 @@ pub fn present_frame(): nil {
     if (global_app_state.is_initialized == 0) {
         return;
     }
+    gg.begin_pass(global_app_state.width, global_app_state.height, 0.1, 0.1, 0.15, 1.0);
+    ui_context.frame_update(0.016);
+    gg.end_pass();
+    gg.commit();
 }
 
 pub fn get_window_width(): int {

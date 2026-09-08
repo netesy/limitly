@@ -1,70 +1,52 @@
 // UI Module Index
 // Main entry point for the UI framework and widget toolkit
 
-import std.ui.application as application;
+import std.ui.builder as builder;
 import std.ui.window as window;
-import std.ui.widget as widget;
-import std.ui.build_context as build_context;
-import std.ui.theme as theme;
-import std.ui.layout as layout;
-import std.ui.navigation as navigation;
-import std.ui.dialog as dialog;
-import std.ui.menu as menu;
-import std.ui.button as button;
-import std.ui.label as label;
-import std.ui.text as text;
-import std.ui.text_field as text_field;
-import std.ui.image as image;
-import std.ui.icon as icon;
-import std.ui.checkbox as checkbox;
-import std.ui.radio as radio;
-import std.ui.switch as switch_widget;
-import std.ui.slider as slider;
-import std.ui.progress_bar as progress_bar;
-import std.ui.scroll_view as scroll_view;
-import std.ui.list_view as list_view;
-import std.ui.grid_view as grid_view;
-import std.ui.tree_view as tree_view;
-import std.ui.table_view as table_view;
-import std.ui.column as column;
-import std.ui.row as row;
-import std.ui.stack as stack;
-import std.ui.grid as grid;
-import std.ui.padding as padding;
-import std.ui.align as align;
-import std.ui.spacer as spacer;
-import std.ui.gesture as gesture;
+import std.ui.types as ui_types;
 
-var Application = application.Application;
 var Window = window.Window;
-var Widget = widget.Widget;
-var BuildContext = build_context.BuildContext;
-var Theme = theme.Theme;
-var Layout = layout.Layout;
-var Navigation = navigation.Navigation;
-var Dialog = dialog.Dialog;
-var Menu = menu.Menu;
-var Button = button.Button;
-var Label = label.Label;
-var Text = text.Text;
-var TextField = text_field.TextField;
-var Image = image.Image;
-var Icon = icon.Icon;
-var Checkbox = checkbox.Checkbox;
-var Radio = radio.Radio;
-var Switch = switch_widget.Switch;
-var Slider = slider.Slider;
-var ProgressBar = progress_bar.ProgressBar;
-var ScrollView = scroll_view.ScrollView;
-var ListView = list_view.ListView;
-var GridView = grid_view.GridView;
-var TreeView = tree_view.TreeView;
-var TableView = table_view.TableView;
-var Column = column.Column;
-var Row = row.Row;
-var Stack = stack.Stack;
-var Grid = grid.Grid;
-var Padding = padding.Padding;
-var Align = align.Align;
-var Spacer = spacer.Spacer;
-var Gesture = gesture.Gesture;
+
+fn vstack(children: [ui_types.Blueprint]): ui_types.Blueprint {
+    return builder.vstack(children);
+}
+
+fn hstack(children: [ui_types.Blueprint]): ui_types.Blueprint {
+    return builder.hstack(children);
+}
+
+fn column(children: [ui_types.Blueprint]): ui_types.Blueprint {
+    return builder.vstack(children);
+}
+
+fn row(children: [ui_types.Blueprint]): ui_types.Blueprint {
+    return builder.hstack(children);
+}
+
+fn text(content: str): ui_types.Blueprint {
+    return builder.text(content);
+}
+
+fn text_color(content: str, c: ui_types.Color): ui_types.Blueprint {
+    return builder.text_color(content, c);
+}
+
+fn label(content: str): ui_types.Blueprint {
+    return builder.text(content);
+}
+
+fn button(lbl: str): ui_types.Blueprint {
+    return builder.button(lbl);
+}
+
+fn button_background(lbl: str, bg: ui_types.Color): ui_types.Blueprint {
+    return builder.button_background(lbl, bg);
+}
+
+fn empty(): ui_types.Blueprint {
+    return builder.empty();
+}
+
+fn color_rgb8(r: int, g: int, b: int): ui_types.Color {
+    return builder.color_rgb8(r, g, b);
+}

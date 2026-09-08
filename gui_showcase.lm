@@ -1,29 +1,30 @@
 // GUI Showcase Application
-// Demonstrates pure end-to-end std.app -> std.ui -> std.graphics -> std.gg -> VM Software Backend
+// Demonstrates target architecture: Limit App -> std.app -> std.ui -> std.graphics -> std.gg -> VM Backend
 
 import std.app as app;
-import std.ui.application as ui_app;
-import std.ui.window as window;
-import std.ui.builder as builder;
-import std.gg as gg;
+import std.ui.index as ui;
 
 fn main() {
     print("=== Limit Portable GUI Showcase ===");
-    assert(gg.setup(), "gg setup failed");
 
-    // Construct retained UI widget tree using std.ui builder
-    var btn = builder.button_background("Interactive Button", builder.color_rgb8(50, 150, 240));
-    var lbl = builder.text_color("Retained Mode UI Active", builder.color_rgb8(240, 240, 240));
-    var root_bp = builder.vstack([btn, lbl]);
+    var config = app.default_window_config();
+    config.title = "Limit GUI & Graphics Showcase";
+    config.width = 800;
+    config.height = 600;
 
-    var win = window.Window(t="Limit Showcase Window", w=800.0, h=600.0, bp=root_bp);
+    assert(app.app_init(config) == 1, "app init failed");
 
-    var my_app = ui_app.Application(n="ShowcaseApp");
-    my_app.windows = [win];
-    my_app.run();
+    // Construct retained UI widget tree using public std.ui facade
+    var btn = ui.button_background("Interactive Button", ui.color_rgb8(50, 150, 240));
+    var lbl = ui.text_color("Retained Mode UI Active", ui.color_rgb8(240, 240, 240));
+    var root = ui.column([btn, lbl]);
+
+    app.set_ui(root);
+
+    app.push_quit_event();
+    app.app_run();
 
     app.app_shutdown();
-    gg.shutdown();
     print("GUI Showcase completed successfully.");
 }
 
