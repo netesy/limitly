@@ -57,6 +57,17 @@ IntrinsicRegistry::IntrinsicRegistry() {
     registerIntrinsic("std.ffi.ffi_memset", {LIR_Op::MemoryFill, 0, 0, 3, 0});
     registerIntrinsic("std.ffi.ffi_memcpy", {LIR_Op::MemoryCopy, 0, 0, 3, 0});
 
+    // Callback trampoline intrinsics
+    // type_id == 0 : create a native trampoline  (returns integer handle)
+    // type_id == 1 : retrieve the code pointer   (returns fnptr)
+    registerIntrinsic("std.ffi.callback_create",  {LIR_Op::CallbackCreate,  0, 0, 3, 0});
+    registerIntrinsic("std.ffi.callback_ptr",     {LIR_Op::CallbackCreate,  0, 0, 1, 1});
+    registerIntrinsic("std.ffi.callback_destroy", {LIR_Op::CallbackDestroy, 0, 0, 1, 0});
+    // Also register under the alias form (import std.ffi as ffi)
+    registerIntrinsic("ffi.callback_create",      {LIR_Op::CallbackCreate,  0, 0, 3, 0});
+    registerIntrinsic("ffi.callback_ptr",         {LIR_Op::CallbackCreate,  0, 0, 1, 1});
+    registerIntrinsic("ffi.callback_destroy",     {LIR_Op::CallbackDestroy, 0, 0, 1, 0});
+
     // Unified Resource Intrinsics
     registerIntrinsic("resource_create", {LIR_Op::ResourceCreate, 0, 0, 1, 0});
     registerIntrinsic("resource_call", {LIR_Op::ResourceCall, 0, 0, 0, 0});

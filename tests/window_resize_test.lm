@@ -1,0 +1,54 @@
+// Window Resize Test
+// Verifies EVENT_RESIZE updates global_app_state and ui_context viewport
+
+import std.app as app;
+import std.ui as ui;
+import std.ui.context as ui_context;
+
+fn test_resize() {
+    print("=== Testing Window Resize Handling ===");
+
+    var cfg = app.default_window_config();
+    cfg.width = 800;
+    cfg.height = 600;
+    cfg.resizable = 1;
+
+    assert(app.init(cfg) == 1, "app.init failed");
+    assert(app.get_window_width() == 800, "initial width should be 800");
+    assert(app.get_window_height() == 600, "initial height should be 600");
+    assert(ui_context.get_viewport_width() == 800.0, "initial viewport_w should be 800");
+    assert(ui_context.get_viewport_height() == 600.0, "initial viewport_h should be 600");
+
+    var root = ui.column([
+        ui.row([
+            ui.text("Title").bold(),
+            ui.spacer(),
+            ui.button("Action", nil)
+        ]),
+        ui.spacer()
+    ]);
+    app.ui(root);
+
+    // Simulate EVENT_RESIZE from native window manager (e.g., resized to 1280x720)
+    app.push_event(app.Event(
+        event_type=app.EVENT_RESIZE,
+        timestamp=0,
+        window_id=1,
+        x=1280,
+        y=720
+    ));
+
+    app.process_events();
+
+    assert(app.get_window_width() == 1280, "width should be updated to 1280");
+    assert(app.get_window_height() == 720, "height should be updated to 720");
+    assert(ui_context.get_viewport_width() == 1280.0, "viewport_w should be 1280.0");
+    assert(ui_context.get_viewport_height() == 720.0, "viewport_h should be 720.0");
+
+    // Render frame at resized dimensions
+    app.present_frame();
+
+    print("=== Window Resize Test Passed ===");
+}
+
+test_resize();

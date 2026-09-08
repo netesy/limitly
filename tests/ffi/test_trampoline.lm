@@ -1,0 +1,107 @@
+// test_trampoline.lm
+//
+// End-to-end test for OS-native FFI callback trampolines.
+//
+// Strategy:
+//   1. Define a pure Limitly function (the "handler") to be exposed as a
+//      C-ABI callback.
+//   2. Create a native trampoline via the CallbackCreate opcode, obtaining a
+//      Limitly-side handle (an integer ID).
+//   3. Retrieve the executable native code pointer via CallbackGet.
+//   4. Call that pointer back through the standard ForeignCall path, passing
+//      known arguments.
+//   5. Assert the return value matches what the Limitly function computes.
+//
+// This test does NOT require any external shared library.
+
+import std.ffi as ffi;
+
+// ── Limitly functions that will be exposed as C callbacks ──────────────────
+
+// Simple: add two 64-bit integers and return their sum.
+pub fn cb_add(a: int, b: int): int {
+    return a + b;
+}
+
+// Multiply two floats.
+pub fn cb_multiply(x: float, y: float): float {
+    return x * y;
+}
+
+// Returns a fixed sentinel integer (tests zero-arg callbacks).
+pub fn cb_sentinel(): int {
+    return 99;
+}
+
+// ── Test driver ────────────────────────────────────────────────────────────
+
+fn main() {
+    print("=== FFI Trampoline Round-Trip Test ===");
+
+    unsafe {
+        // ── Test 1: cb_add(i64, i64) -> i64 ─────────────────────────────
+        print("--- Test 1: cb_add ---");
+
+        var handle_add: int = ffi.callback_create("cb_add",
+                                                    [ffi.TYPE_I64, ffi.TYPE_I64],
+                                                    ffi.TYPE_I64);
+        assert(handle_add >= 0, "callback_create should return non-negative handle");
+
+        // Obtain the native code pointer (returned as int/ptr).
+        var fn_add: int = ffi.callback_ptr(handle_add);
+        assert(fn_add != 0, "callback_ptr should return non-null address");
+
+        // Call it back as a regular C function.
+        var add_ff = ffi.declare("cb_add_trampoline", fn_add,
+                                  [ffi.TYPE_I64, ffi.TYPE_I64], ffi.TYPE_I64);
+        var result_add: int = add_ff.call(10, 32);
+        print("cb_add(10, 32) =");
+        print(result_add);
+        assert(result_add == 42, "cb_add round-trip must return 42");
+
+        // Cleanup.
+        ffi.callback_destroy(handle_add);
+        print("Test 1 PASSED");
+
+        // ── Test 2: cb_multiply(f64, f64) -> f64 ────────────────────────
+        print("--- Test 2: cb_multiply ---");
+
+        var handle_mul: int = ffi.callback_create("cb_multiply",
+                                                    [ffi.TYPE_F64, ffi.TYPE_F64],
+                                                    ffi.TYPE_F64);
+        assert(handle_mul >= 0, "callback_create should return non-negative handle");
+
+        var fn_mul: int = ffi.callback_ptr(handle_mul);
+        assert(fn_mul != 0, "callback_ptr should return non-null address");
+
+        var mul_ff = ffi.declare("cb_multiply_trampoline", fn_mul,
+                                  [ffi.TYPE_F64, ffi.TYPE_F64], ffi.TYPE_F64);
+        var result_mul: float = mul_ff.call(3.5, 2.0);
+        print("cb_multiply(3.5, 2.0) =");
+        print(result_mul);
+        assert(result_mul == 7.0, "cb_multiply round-trip must return 7.0");
+
+        ffi.callback_destroy(handle_mul);
+        print("Test 2 PASSED");
+
+        // ── Test 3: cb_sentinel() -> i64  (zero arguments) ───────────────
+        print("--- Test 3: cb_sentinel (zero args) ---");
+
+        var handle_sen: int = ffi.callback_create("cb_sentinel", [], ffi.TYPE_I64);
+        assert(handle_sen >= 0, "callback_create should return non-negative handle");
+
+        var fn_sen: int = ffi.callback_ptr(handle_sen);
+        assert(fn_sen != 0, "callback_ptr should return non-null address");
+
+        var sen_ff = ffi.declare("cb_sentinel_trampoline", fn_sen, [], ffi.TYPE_I64);
+        var result_sen: int = sen_ff.call();
+        print("cb_sentinel() =");
+        print(result_sen);
+        assert(result_sen == 99, "cb_sentinel round-trip must return 99");
+
+        ffi.callback_destroy(handle_sen);
+        print("Test 3 PASSED");
+    }
+
+    print("=== FFI Trampoline Round-Trip Test PASSED ===");
+}

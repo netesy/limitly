@@ -1,76 +1,245 @@
-pub frame Buffer {
+// std.gg - Portable Sokol-GFX Style Low-Level Graphics Abstraction Module
+
+import std.internal.runtime as rt;
+
+frame Buffer {
     pub var id: int;
     pub var size: int;
+    pub var is_index: bool;
 }
 
-pub frame Shader {
+frame Image {
+    pub var id: int;
+    pub var width: int;
+    pub var height: int;
+}
+
+frame Sampler {
     pub var id: int;
 }
 
-pub frame Pipeline {
+frame Shader {
     pub var id: int;
+    pub var vs_src: str;
+    pub var fs_src: str;
 }
 
-pub frame PassAction {
+frame Pipeline {
+    pub var id: int;
+    pub var shader_id: int;
+    pub var primitive_type: int;
+}
+
+frame Bindings {
+    pub var vertex_buffer_id: int;
+    pub var index_buffer_id: int;
+    pub var image_id: int;
+    pub var sampler_id: int;
+}
+
+frame PassAction {
     pub var r: float;
     pub var g: float;
     pub var b: float;
     pub var a: float;
+    pub var clear: bool;
 }
 
-pub fn setup() {
-    _setup();
+frame Pass {
+    pub var width: int;
+    pub var height: int;
+    pub var action: PassAction;
 }
 
-pub fn shutdown() {
-    _shutdown();
+frame GraphicsContext {
+    pub var handle: int;
+    pub var next_resource_id: int;
+
+    pub init() {
+        self.handle = -1;
+        self.next_resource_id = 1;
+    }
 }
 
-pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float) {
-    _begin_pass(w, h, r, g, b, a);
+pub var global_graphics_context: GraphicsContext = GraphicsContext();
+
+pub fn setup(): bool {
+    if (global_graphics_context.handle != -1) {
+        return true;
+    }
+    global_graphics_context.handle = rt.create(17, []);
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_OPEN, [800, 600]);
+        return true;
+    }
+    return false;
 }
 
-pub fn end_pass() {
-    _end_pass();
+pub fn shutdown(): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_CLOSE, []);
+        rt.destroy(global_graphics_context.handle);
+        global_graphics_context.handle = -1;
+    }
 }
 
-pub fn commit() {
-    _commit();
+pub fn is_valid(): bool {
+    return global_graphics_context.handle != -1;
 }
 
-pub fn apply_bindings(v_id: int, i_id: int) {
-    _apply_bindings(v_id, i_id);
+pub fn spawn_window(width: int, height: int, title: str, resizable: int = 1): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_SPAWN, [width, height, title, resizable]);
+    }
 }
 
-pub fn apply_pipeline(pip_id: int) {
-    _apply_pipeline(pip_id);
+pub fn push_clip(x: float, y: float, w: float, h: float): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_PUSH_CLIP, [x, y, w, h]);
+    }
 }
 
-pub fn draw(base: int, count: int, instances: int) {
-    _draw(base, count, instances);
+pub fn pop_clip(): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_POP_CLIP, []);
+    }
 }
 
-pub fn make_buffer(data_ptr: int, data_size: int, index: bool): int {
-    return _make_buffer(data_ptr, data_size, index);
+pub fn poll_events(): any {
+    if (global_graphics_context.handle != -1) {
+        return rt.call(global_graphics_context.handle, rt.OP_POLL, []);
+    }
+    return nil;
 }
 
-pub fn make_shader(vs: str, fs: str): int {
-    return _make_shader(vs, fs);
+pub fn rgba(r: int, g: int, b: int): int {
+    return (r << 16) | (g << 8) | b;
 }
 
-pub fn make_pipeline(shd_id: int, primitive_type: int): int {
-    return _make_pipeline(shd_id, primitive_type);
+pub fn make_pass_action(r: float, g: float, b: float, a: float, clear: bool): PassAction {
+    return PassAction(r=r, g=g, b=b, a=a, clear=clear);
 }
 
-// Private built-in hooks
-fn _setup() {}
-fn _shutdown() {}
-fn _begin_pass(w: int, h: int, r: float, g: float, b: float, a: float) {}
-fn _end_pass() {}
-fn _commit() {}
-fn _apply_bindings(vbuf: int, ibuf: int) {}
-fn _apply_pipeline(pip: int) {}
-fn _draw(base: int, count: int, instances: int) {}
-fn _make_buffer(data_val: int, size_val: int, index_val: bool): int { return 0; }
-fn _make_shader(vs_val: str, fs_val: str): int { return 0; }
-fn _make_pipeline(shd_val: int, prim_val: int): int { return 0; }
+pub fn make_buffer(size: int, is_index: bool): Buffer {
+    var id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_BUFFER, [id, []]);
+    }
+    return Buffer(id=id, size=size, is_index=is_index);
+}
+
+pub fn make_buffer_data(size: int, is_index: bool, data: any): Buffer {
+    var id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_BUFFER, [id, data]);
+    }
+    return Buffer(id=id, size=size, is_index=is_index);
+}
+
+pub fn make_image(width: int, height: int): Image {
+    var id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_IMAGE, [id, width, height]);
+    }
+    return Image(id=id, width=width, height=height);
+}
+
+pub fn make_sampler(): Sampler {
+    var id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    return Sampler(id=id);
+}
+
+pub fn make_shader(vs: str, fs: str): Shader {
+    var id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    return Shader(id=id, vs_src=vs, fs_src=fs);
+}
+
+pub fn make_pipeline(shader_id: int, primitive_type: int): Pipeline {
+    var id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_PIPELINE, [id, shader_id, primitive_type]);
+    }
+    return Pipeline(id=id, shader_id=shader_id, primitive_type=primitive_type);
+}
+
+pub fn make_bindings(vbuf_id: int, ibuf_id: int, img_id: int, sampler_id: int): Bindings {
+    var id = global_graphics_context.next_resource_id;
+    global_graphics_context.next_resource_id = global_graphics_context.next_resource_id + 1;
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_MAKE_BINDINGS, [id, vbuf_id, ibuf_id]);
+    }
+    return Bindings(
+        vertex_buffer_id=vbuf_id,
+        index_buffer_id=ibuf_id,
+        image_id=img_id,
+        sampler_id=sampler_id
+    );
+}
+
+pub fn begin_pass(w: int, h: int, r: float, g: float, b: float, a: float): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_FILL, [r, g, b, a]);
+    }
+}
+
+pub fn draw_rect_primitive(x: float, y: float, w: float, h: float, r: float, g: float, b: float, a: float): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_RECT, [x, y, w, h, r, g, b, a]);
+    }
+}
+
+pub fn draw_triangle_primitive(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, r: float, g: float, b: float, a: float): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_TRIANGLE, [x1, y1, x2, y2, x3, y3, r, g, b, a]);
+    }
+}
+
+pub fn draw_text(text_str: str, x: float, y: float, r: float, g: float, b: float, a: float, scale: int = 1): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_DRAW_TEXT, [text_str, x, y, r, g, b, a, scale]);
+    }
+}
+
+pub fn end_pass(): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_END_PASS, []);
+    }
+}
+
+pub fn apply_pipeline(pip_id: int): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_APPLY_PIPELINE, [pip_id]);
+    }
+}
+
+pub fn apply_bindings(v_id: int, i_id: int): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_APPLY_BINDINGS, [v_id, i_id]);
+    }
+}
+
+pub fn draw(base: int, count: int, instances: int): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_DRAW, [base, count, instances]);
+    }
+}
+
+pub fn commit(): nil {
+    if (global_graphics_context.handle != -1) {
+        rt.call(global_graphics_context.handle, rt.OP_FLUSH, []);
+    }
+}
+
+pub fn readback_pixel(x: int, y: int): any {
+    if (global_graphics_context.handle != -1) {
+        var res = rt.call(global_graphics_context.handle, rt.OP_READ, [x, y]);
+        return res;
+    }
+    return nil;
+}

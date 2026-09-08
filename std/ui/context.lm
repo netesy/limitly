@@ -1,692 +1,1486 @@
 // UI Context Module
-// Multi-Tree Pipeline implementation with RAII cleanup and reactive state management
+// Retained UI Pipeline implementation with Dynamic Layout, Flexbox Spacers, Hit Testing, and Callback Dispatch
 
-import std.ffi as ffi;
-import std.gfx.types as gfx_types;
-import std.gfx.context as gfx_context;
 import std.ui.types as ui_types;
+import std.ui as ui;
+import std.gg as gg;
+import std.graphics.canvas as canvas;
+import std.graphics.paint as paint;
+import std.graphics.color as color;
+import std.graphics.rect as rect;
 
-// Initialize UI context
-fn ui_init(): int {
+frame UIContextState {
+    pub var is_initialized: int;
+    pub var next_element_id: int;
+    pub var root_element: int;
+    pub var dirty: int;
+    pub var current_blueprint: ui_types.Blueprint;
+    pub var current_widget: ui.Widget;
+    pub var has_widget: int;
+    pub var viewport_w: float;
+    pub var viewport_h: float;
+    pub var captured_widget: ui.Widget;
+    pub var has_captured: int;
+    pub var captured_bounds_x: float;
+    pub var captured_bounds_y: float;
+    pub var captured_bounds_w: float;
+    pub var captured_bounds_h: float;
+    pub var last_pointer_x: float;
+    pub var last_pointer_y: float;
+    pub var is_pointer_down: int;
+}
+
+pub var global_ui_context: UIContextState = UIContextState(
+    is_initialized=0,
+    next_element_id=1,
+    root_element=0,
+    dirty=1,
+    current_blueprint=ui_types.Blueprint(
+        variant_type=1,
+        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
+        text_data_val=ui_types.text_data(""),
+        button_data_val=ui_types.button_data(""),
+        constraints=ui_types.empty_constraints(),
+        children=ui_types.empty_blueprints()
+    ),
+    current_widget=ui.empty(),
+    has_widget=0,
+    viewport_w=800.0,
+    viewport_h=600.0,
+    captured_widget=ui.empty(),
+    has_captured=0,
+    captured_bounds_x=0.0,
+    captured_bounds_y=0.0,
+    captured_bounds_w=0.0,
+    captured_bounds_h=0.0,
+    last_pointer_x=0.0,
+    last_pointer_y=0.0,
+    is_pointer_down=0
+);
+
+pub fn ui_init(): int {
     if (global_ui_context.is_initialized != 0) {
         return 0;
     }
     
     global_ui_context.is_initialized = 1;
     global_ui_context.next_element_id = 1;
-    global_ui_context.next_event_token = 1;
-    global_ui_context.next_state_id = 1;
-    global_ui_context.root_element = ui_types.INVALID_ELEMENT_ID;
-    global_ui_context.elements = {};
-    global_ui_context.state_containers = {};
-    global_ui_context.dependencies = [];
-    global_ui_context.event_handlers = [];
-    global_ui_context.event_queue = [];
-    global_ui_context.render_commands = [];
+    global_ui_context.root_element = 1;
     global_ui_context.dirty = 1;
     
     return 1;
 }
 
-// Shutdown UI context with RAII cleanup
-fn ui_shutdown(): void {
-    if (global_ui_context.is_initialized == 0) {
+pub fn mark_element_dirty(element_id: int): nil {
+    global_ui_context.dirty = 1;
+}
+
+pub fn set_viewport_size(w: float, h: float): nil {
+    if (w > 0.0 and h > 0.0) {
+        if (global_ui_context.viewport_w != w or global_ui_context.viewport_h != h) {
+            global_ui_context.viewport_w = w;
+            global_ui_context.viewport_h = h;
+            global_ui_context.dirty = 1;
+        }
+    }
+}
+
+pub fn get_viewport_width(): float {
+    return global_ui_context.viewport_w;
+}
+
+pub fn get_viewport_height(): float {
+    return global_ui_context.viewport_h;
+}
+
+pub fn set_root(w: ui.Widget): nil {
+    global_ui_context.current_widget = w;
+    global_ui_context.has_widget = 1;
+    global_ui_context.dirty = 1;
+}
+
+pub fn update_blueprint(bp: ui_types.Blueprint): nil {
+    global_ui_context.current_blueprint = bp;
+    global_ui_context.has_widget = 0;
+    global_ui_context.dirty = 1;
+}
+
+pub fn set_root_any(root: any): nil {
+    if (root == nil) {
         return;
     }
-    
-    // RAII cleanup: Release all native resources from elements
-    pub var element_ids: [ui_types.ElementId] = [];
-    var iter: int = 0;
-    
-    // Collect all element IDs
-    for (id, element) in global_ui_context.elements {
-        element_ids = element_ids + [id];
-        iter = iter + 1;
+    var w = root as ui.Widget;
+    if (w != nil) {
+        set_root(w);
+    } else {
+        var bp = root as ui_types.Blueprint;
+        if (bp != nil) {
+            update_blueprint(bp);
+        }
     }
-    
-    // Clean up each element's native resources
-    var i: int = 0;
-    while (i < len(element_ids)) {
-        var element_id: ui_types.ElementId = element_ids[i];
-        cleanup_element_resources(element_id);
-        i = i + 1;
+}
+
+// Unicode & Text Editing Helpers
+
+pub fn codepoint_to_utf8(cp: int): str {
+    // Invalid Unicode scalar values are rejected instead of producing malformed
+    // UTF-8. U+0000 is valid, but Limit strings are currently NUL terminated and
+    // cannot represent it, so it follows the same explicit rejection policy.
+    if (cp <= 0 or cp > 1114111 or (cp >= 55296 and cp <= 57343)) {
+        return "";
     }
-    
-    // Clean up state containers with custom state pointers
-    for (state_id, container) in global_ui_context.state_containers {
-        match (container.value) {
-            ui_types.CustomState(ptr, size) => {
-                if (ptr != 0) {
-                    ffi.ffi_free(ptr);
+    if (cp < 128) {
+        return _builtin_string_from_bytes([cp]);
+    }
+    if (cp <= 2047) {
+        var b1 = 192 | ((cp >> 6) & 31);
+        var b2 = 128 | (cp & 63);
+        return _builtin_string_from_bytes([b1, b2]);
+    }
+    if (cp <= 65535) {
+        var b1 = 224 | ((cp >> 12) & 15);
+        var b2 = 128 | ((cp >> 6) & 63);
+        var b3 = 128 | (cp & 63);
+        return _builtin_string_from_bytes([b1, b2, b3]);
+    }
+    if (cp <= 1114111) {
+        var b1 = 240 | ((cp >> 18) & 7);
+        var b2 = 128 | ((cp >> 12) & 63);
+        var b3 = 128 | ((cp >> 6) & 63);
+        var b4 = 128 | (cp & 63);
+        return _builtin_string_from_bytes([b1, b2, b3, b4]);
+    }
+    return "";
+}
+
+pub fn utf8_pop_back(s: str): str {
+    var l = len(s);
+    if (l <= 0) {
+        return "";
+    }
+    var cut = l - 1;
+    while (cut > 0 and (_builtin_string_byte_at(s, cut) & 192) == 128) {
+        cut = cut - 1;
+    }
+    if (cut <= 0) {
+        return "";
+    }
+    return _builtin_substring(s, 0, cut);
+}
+
+// Layout Measurement Helpers
+
+fn get_char_width(font_size: float): float {
+    if (font_size >= 20.0) {
+        return 16.0;
+    }
+    return 8.0;
+}
+
+fn measure_widget_height(w: ui.Widget): float {
+    if (w.height_val > 0.0) {
+        return w.height_val;
+    }
+    if (w.kind == ui.KIND_TEXT) {
+        if (w.font_size_val >= 20.0) {
+            return 20.0 + w.padding_top + w.padding_bottom;
+        }
+        return 12.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_BUTTON) {
+        return 28.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_INPUT) {
+        return 28.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_CHECKBOX) {
+        return 26.0;
+    }
+    if (w.kind == ui.KIND_SLIDER) {
+        return 24.0;
+    }
+    if (w.kind == ui.KIND_TABS) {
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            return 36.0 + 8.0 + measure_widget_height(w.children[w.active_tab]);
+        }
+        return 36.0;
+    }
+    if (w.kind == ui.KIND_SCROLL) {
+        if (w.height_val > 0.0) return w.height_val;
+        return 140.0;
+    }
+    if (w.kind == ui.KIND_BADGE) {
+        return 20.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_SELECT) {
+        return 28.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_SPACER) {
+        return 10.0;
+    }
+    if (w.kind == ui.KIND_CONTAINER) {
+        if (len(w.children) == 0) {
+            return w.padding_top + w.padding_bottom;
+        }
+        if (w.is_vertical == 1) { // Column
+            var total_h = w.padding_top + w.padding_bottom;
+            var i = 0;
+            while (i < len(w.children)) {
+                var ch_h = measure_widget_height(w.children[i]);
+                total_h = total_h + ch_h;
+                if (i > 0) {
+                    total_h = total_h + w.spacing_val;
                 }
+                i = i + 1;
             }
-            _ => { }
+            return total_h;
+        } elif (w.is_vertical == 0) { // Row
+            var max_h = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var ch_h = measure_widget_height(w.children[i]);
+                if (ch_h > max_h) {
+                    max_h = ch_h;
+                }
+                i = i + 1;
+            }
+            return max_h + w.padding_top + w.padding_bottom;
+        } else { // Stack
+            var max_h = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var ch_h = measure_widget_height(w.children[i]);
+                if (ch_h > max_h) {
+                    max_h = ch_h;
+                }
+                i = i + 1;
+            }
+            return max_h;
         }
     }
-    
-    // Clear all collections
-    global_ui_context.elements = {};
-    global_ui_context.state_containers = {};
-    global_ui_context.dependencies = [];
-    global_ui_context.event_handlers = [];
-    global_ui_context.event_queue = [];
-    global_ui_context.render_commands = [];
-    
-    global_ui_context.is_initialized = 0;
+    return 24.0;
 }
 
-// Cleanup element resources (RAII destructor)
-fn cleanup_element_resources(element_id: ui_types.ElementId): void {
-    if (element_id == ui_types.INVALID_ELEMENT_ID) {
-        return;
+fn measure_widget_width(w: ui.Widget, available_w: float): float {
+    if (w.width_val > 0.0) {
+        return w.width_val;
     }
-    
-    var element: ui_types.Element = global_ui_context.elements[element_id];
-    
-    // Release native graphics resources
-    var i: int = 0;
-    while (i < len(element.native_resources)) {
-        var resource_id: gfx_types.ResourceId = element.native_resources[i];
-        if (resource_id != ui_types.INVALID_ELEMENT_ID) {
-            gfx_context.destroy_image(resource_id);
+    if (w.kind == ui.KIND_TEXT) {
+        var cw = get_char_width(w.font_size_val);
+        return (len(w.text_val) as float) * cw + w.padding_left + w.padding_right;
+    }
+    if (w.kind == ui.KIND_BUTTON) {
+        var cw = 8.0;
+        var tw = (len(w.text_val) as float) * cw + w.padding_left + w.padding_right + 16.0;
+        if (tw < 60.0) {
+            tw = 60.0;
         }
-        i = i + 1;
+        return tw;
     }
-    
-    // Clean up custom element state
-    match (element.variant) {
-        ui_types.Custom(data) => {
-            if (data.state_ptr != 0) {
-                ffi.ffi_free(data.state_ptr);
+    if (w.kind == ui.KIND_INPUT) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 220.0;
+    }
+    if (w.kind == ui.KIND_CHECKBOX) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 42.0;
+    }
+    if (w.kind == ui.KIND_SLIDER) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 140.0;
+    }
+    if (w.kind == ui.KIND_BADGE) {
+        if (w.width_val > 0.0) return w.width_val;
+        return (len(w.text_val) as float) * 8.0 + w.padding_left + w.padding_right + 12.0;
+    }
+    if (w.kind == ui.KIND_SELECT) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 180.0;
+    }
+    if (w.kind == ui.KIND_TABS or w.kind == ui.KIND_SCROLL) {
+        if (w.width_val > 0.0) return w.width_val;
+        return available_w;
+    }
+    if (w.kind == ui.KIND_SPACER) {
+        return 0.0;
+    }
+    if (w.kind == ui.KIND_CONTAINER) {
+        if (w.is_vertical == 0) { // Row
+            var total_w = w.padding_left + w.padding_right;
+            var i = 0;
+            while (i < len(w.children)) {
+                var ch_w = measure_widget_width(w.children[i], available_w);
+                total_w = total_w + ch_w;
+                if (i > 0) {
+                    total_w = total_w + w.spacing_val;
+                }
+                i = i + 1;
             }
+            return total_w;
         }
-        _ => { }
     }
-    
-    // Unregister from state dependencies
-    unregister_element_dependencies(element_id);
+    return available_w;
 }
 
-// Unregister element from state dependencies (RAII cleanup)
-fn unregister_element_dependencies(element_id: ui_types.ElementId): void {
-    pub var new_dependencies: [ui_types.StateDependency] = [];
-    var i: int = 0;
-    
-    while (i < len(global_ui_context.dependencies)) {
-        var dep: ui_types.StateDependency = global_ui_context.dependencies[i];
-        if (dep.element_id == element_id) {
-            // Remove self dependency
+pub fn hit_test_and_click_blueprint(bp: ui_types.Blueprint, px: float, py: float, x: float, y: float, available_w: float, available_h: float): ui_types.Blueprint {
+    if (bp.variant_type == 1) { // Container
+        var data = bp.container_data_val;
+        var curr_y = y + data.padding.y;
+        var curr_x = x + data.padding.x;
+        var new_children = ui_types.empty_blueprints();
+        var child_w = available_w - data.padding.x - data.padding.w;
+        var child_h = 36.0;
+
+        var i = 0;
+        while (i < len(bp.children)) {
+            var child_bp = bp.children[i];
+            var updated_child = hit_test_and_click_blueprint(child_bp, px, py, curr_x, curr_y, child_w, child_h);
+            new_children = new_children + [updated_child];
+            if (data.axis.is_vertical == 1) {
+                curr_y = curr_y + child_h + 8.0 + data.spacing;
+            } else {
+                curr_x = curr_x + 120.0 + data.spacing;
+            }
+            i = i + 1;
+        }
+        return ui_types.Blueprint(
+            variant_type=1,
+            container_data_val=data,
+            text_data_val=bp.text_data_val,
+            button_data_val=bp.button_data_val,
+            constraints=bp.constraints,
+            children=new_children
+        );
+    }
+    if (bp.variant_type == 3) { // Button
+        var bdata = bp.button_data_val;
+        if (px >= x and px <= x + available_w and py >= y and py <= y + 36.0) {
+            bdata.label = bdata.label + " [Clicked]";
+            bdata.background = ui_types.color_rgb8(220, 80, 50);
+            mark_element_dirty(1);
+        }
+        return ui_types.Blueprint(
+            variant_type=3,
+            container_data_val=bp.container_data_val,
+            text_data_val=bp.text_data_val,
+            button_data_val=bdata,
+            constraints=bp.constraints,
+            children=bp.children
+        );
+    }
+    return bp;
+}
+
+pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y: float, available_w: float, available_h: float): nil {
+    if (w.kind == ui.KIND_CONTAINER) {
+        var curr_x = x + w.padding_left;
+        var curr_y = y + w.padding_top;
+        var inner_w = available_w - w.padding_left - w.padding_right;
+        var inner_h = available_h - w.padding_top - w.padding_bottom;
+
+        if (w.is_vertical == 1) { // Column
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = inner_w;
+                if (child.width_val > 0.0) {
+                    child_w = child.width_val;
+                }
+                hit_test_and_click_widget(child, px, py, curr_x, curr_y, child_w, child_h);
+                curr_y = curr_y + child_h + w.spacing_val;
+                i = i + 1;
+            }
+        } elif (w.is_vertical == 0) { // Row with Flexbox Spacers
+            var fixed_w = 0.0;
+            var num_spacers = 0;
+            var total_flex = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                if (child.kind == ui.KIND_SPACER) {
+                    num_spacers = num_spacers + 1;
+                    total_flex = total_flex + child.flex_val;
+                } else {
+                    var cw = measure_widget_width(child, inner_w);
+                    fixed_w = fixed_w + cw;
+                }
+                i = i + 1;
+            }
+            var spacing_total = 0.0;
+            if (len(w.children) > 1) {
+                var num_gaps: float = (len(w.children) - 1) as float;
+                spacing_total = num_gaps * w.spacing_val;
+            }
+            var remaining_w = inner_w - fixed_w - spacing_total;
+            var spacer_unit = 0.0;
+            if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
+                spacer_unit = remaining_w / total_flex;
+            }
+
+            i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = 0.0;
+                if (child.kind == ui.KIND_SPACER) {
+                    child_w = spacer_unit * child.flex_val;
+                } else {
+                    child_w = measure_widget_width(child, inner_w);
+                    hit_test_and_click_widget(child, px, py, curr_x, curr_y, child_w, child_h);
+                }
+                curr_x = curr_x + child_w + w.spacing_val;
+                i = i + 1;
+            }
+        } else { // Stack
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                hit_test_and_click_widget(child, px, py, curr_x, curr_y, inner_w, child_h);
+                i = i + 1;
+            }
+        }
+    }
+    if (w.kind == ui.KIND_BUTTON) {
+        var btn_h = measure_widget_height(w);
+        var btn_w = available_w;
+        if (w.width_val > 0.0) {
+            btn_w = w.width_val;
+        }
+        if (px >= x and px <= x + btn_w and py >= y and py <= y + btn_h) {
+            w.is_pressed = 1;
+            global_ui_context.has_captured = 1;
+            global_ui_context.captured_widget = w;
+            global_ui_context.captured_bounds_x = x;
+            global_ui_context.captured_bounds_y = y;
+            global_ui_context.captured_bounds_w = btn_w;
+            global_ui_context.captured_bounds_h = btn_h;
+            mark_element_dirty(1);
+        }
+    }
+    if (w.kind == ui.KIND_INPUT) {
+        var inp_w = available_w;
+        if (w.width_val > 0.0) inp_w = w.width_val;
+        var inp_h = 28.0;
+        if (w.height_val > 0.0) inp_h = w.height_val;
+        if (px >= x and px <= x + inp_w and py >= y and py <= y + inp_h) {
+            w.is_focused = 1;
+            mark_element_dirty(1);
         } else {
-            // Remove element_id from dependents list
-            pub var new_dependents: [ui_types.ElementId] = [];
-            var j: int = 0;
-            while (j < len(dep.dependents)) {
-                if (dep.dependents[j] != element_id) {
-                    new_dependents = new_dependents + [dep.dependents[j]];
-                }
-                j = j + 1;
+            if (w.is_focused != 0) {
+                w.is_focused = 0;
+                mark_element_dirty(1);
             }
-            new_dependencies = new_dependencies + [ui_types.StateDependency(
-                element_id=dep.element_id,
-                state_key=dep.state_key,
-                dependents=new_dependents
-            )];
         }
-        i = i + 1;
     }
-    
-    global_ui_context.dependencies = new_dependencies;
-}
-
-// Layer 1: Blueprint to Retained Element Tree conversion
-fn blueprint_to_tree(bp: ui_types.Blueprint, parent_id: ui_types.ElementId): ui_types.ElementId {
-    var element: ui_types.Element = create_element(bp.variant, parent_id);
-    
-    // Apply constraints
-    var i: int = 0;
-    while (i < len(bp.constraints)) {
-        element.constraints = element.constraints + [bp.constraints[i]];
-        i = i + 1;
+    if (w.kind == ui.KIND_CHECKBOX) {
+        var chk_w = 42.0;
+        if (w.width_val > 0.0) chk_w = w.width_val;
+        var chk_h = 26.0;
+        if (w.height_val > 0.0) chk_h = w.height_val;
+        if (px >= x and px <= x + chk_w and py >= y and py <= y + chk_h) {
+            w.is_pressed = 1;
+            global_ui_context.has_captured = 1;
+            global_ui_context.captured_widget = w;
+            global_ui_context.captured_bounds_x = x;
+            global_ui_context.captured_bounds_y = y;
+            global_ui_context.captured_bounds_w = chk_w;
+            global_ui_context.captured_bounds_h = chk_h;
+            mark_element_dirty(1);
+        }
     }
-    
-    // Register element in global context
-    global_ui_context.elements[element.id] = element;
-    
-    // Process children recursively
-    pub var child_ids: [ui_types.ElementId] = [];
-    var j: int = 0;
-    while (j < len(bp.children)) {
-        var child_id: ui_types.ElementId = blueprint_to_tree(bp.children[j], element.id);
-        child_ids = child_ids + [child_id];
-        j = j + 1;
+    if (w.kind == ui.KIND_SLIDER) {
+        var s_w = 140.0;
+        if (w.width_val > 0.0) s_w = w.width_val;
+        var s_h = 24.0;
+        if (w.height_val > 0.0) s_h = w.height_val;
+        if (px >= x and px <= x + s_w and py >= y and py <= y + s_h) {
+            w.is_pressed = 1;
+            global_ui_context.has_captured = 1;
+            global_ui_context.captured_widget = w;
+            global_ui_context.captured_bounds_x = x;
+            global_ui_context.captured_bounds_y = y;
+            global_ui_context.captured_bounds_w = s_w;
+            global_ui_context.captured_bounds_h = s_h;
+            var ratio = (px - x) / s_w;
+            if (ratio < 0.0) ratio = 0.0;
+            if (ratio > 1.0) ratio = 1.0;
+            w.slider_val = w.slider_min + ratio * (w.slider_max - w.slider_min);
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+        }
     }
-    
-    // Update element with children
-    element.children = child_ids;
-    global_ui_context.elements[element.id] = element;
-    
-    // If self is a root element, set it as root
-    if (parent_id == ui_types.INVALID_ELEMENT_ID) {
-        global_ui_context.root_element = element.id;
-    }
-    
-    return element.id;
-}
-
-// Layer 2: Layout pass (compute metrics for element tree)
-fn layout_pass(width: float, height: float): ui_types.LayoutResult {
-    if (global_ui_context.root_element == ui_types.INVALID_ELEMENT_ID) {
-        return ui_types.LayoutResult(
-            root_metrics=ui_types.layout_metrics(ui_types.POINT_ZERO, ui_types.SIZE_ZERO, 0.0),
-            element_metrics={},
-            dirty_regions=[]
-        );
-    }
-    
-    var element_metrics: {ui_types.ElementId: ui_types.LayoutMetrics} = {};
-    pub var dirty_regions: [ui_types.Rect] = [];
-    
-    // Compute layout starting from root
-    var root_metrics: ui_types.LayoutMetrics = compute_element_layout(
-        global_ui_context.root_element,
-        ui_types.POINT_ZERO,
-        ui_types.size(width, height),
-        element_metrics
-    );
-    
-    return ui_types.LayoutResult(
-        root_metrics=root_metrics,
-        element_metrics=element_metrics,
-        dirty_regions=dirty_regions
-    );
-}
-
-// Compute layout for a single element
-fn compute_element_layout(
-    element_id: ui_types.ElementId,
-    position: ui_types.Point,
-    available_size: ui_types.Size,
-    metrics: {ui_types.ElementId: ui_types.LayoutMetrics}
-): ui_types.LayoutMetrics {
-    var element: ui_types.Element = global_ui_context.elements[element_id];
-    
-    // Compute size based on constraints
-    var computed_size: ui_types.Size = compute_size(element.constraints, available_size);
-    
-    // Compute child layouts based on variant
-    match (element.variant) {
-        ui_types.Container(data) => {
-            var child_offset: ui_types.Point = ui_types.point(
-                position.x + data.padding.x,
-                position.y + data.padding.y
-            );
-            var child_available_size: ui_types.Size = ui_types.size(
-                computed_size.width - data.padding.x - data.padding.width,
-                computed_size.height - data.padding.y - data.padding.height
-            );
-            
-            var i: int = 0;
-            var current_pos: float = 0.0;
-            
-            while (i < len(element.children)) {
-                var child_id: ui_types.ElementId = element.children[i];
-                var child_metrics: ui_types.LayoutMetrics = compute_element_layout(
-                    child_id,
-                    child_offset,
-                    child_available_size,
-                    metrics
-                );
-                
-                match (data.axis) {
-                    ui_types.Axis.Horizontal => {
-                        child_offset.x = child_offset.x + child_metrics.size.width + data.spacing;
-                    }
-                    ui_types.Axis.Vertical => {
-                        child_offset.y = child_offset.y + child_metrics.size.height + data.spacing;
-                    }
+    if (w.kind == ui.KIND_TABS) {
+        var tab_x = x;
+        var tab_h = 32.0;
+        var i = 0;
+        while (i < len(w.tab_titles)) {
+            var title = w.tab_titles[i];
+            var item_w = (len(title) as float) * 8.0 + 24.0;
+            if (px >= tab_x and px <= tab_x + item_w and py >= y and py <= y + tab_h) {
+                w.active_tab = i;
+                if (w.on_change_action != nil) {
+                    var act: fn(): nil = w.on_change_action as fn(): nil;
+                    act();
                 }
-                
+                mark_element_dirty(1);
+            }
+            tab_x = tab_x + item_w + w.spacing_val;
+            i = i + 1;
+        }
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            hit_test_and_click_widget(w.children[w.active_tab], px, py, x, y + 40.0, available_w, available_h - 40.0);
+        }
+    }
+    if (w.kind == ui.KIND_SCROLL) {
+        var v_w = available_w;
+        var v_h = 140.0;
+        if (w.height_val > 0.0) v_h = w.height_val;
+        if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
+            if (px >= x + v_w - 12.0) {
+                var click_y_ratio = (py - y) / v_h;
+                if (click_y_ratio < 0.0) click_y_ratio = 0.0;
+                if (click_y_ratio > 1.0) click_y_ratio = 1.0;
+                w.scroll_y = click_y_ratio * w.max_scroll_y;
+                mark_element_dirty(1);
+            } else if (len(w.children) > 0) {
+                var child = w.children[0];
+                var total_child_h = measure_widget_height(child);
+                hit_test_and_click_widget(child, px, py + w.scroll_y, x + 6.0, y + 6.0, v_w - 12.0, total_child_h);
+            }
+        }
+    }
+    if (w.kind == ui.KIND_SELECT) {
+        var sel_w = 180.0;
+        if (w.width_val > 0.0) sel_w = w.width_val;
+        var sel_h = 28.0;
+        if (w.height_val > 0.0) sel_h = w.height_val;
+        if (w.is_open == 1) {
+            var menu_y = y + sel_h + 2.0;
+            var item_h = 26.0;
+            var num_opts = len(w.select_options);
+            var menu_h = (num_opts as float) * item_h + 4.0;
+            if (px >= x and px <= x + sel_w and py >= menu_y and py <= menu_y + menu_h) {
+                var opt_idx: int = ((py - (menu_y + 2.0)) / item_h) as int;
+                if (opt_idx >= 0 and opt_idx < num_opts) {
+                    w.selected_idx = opt_idx;
+                    w.text_val = w.select_options[opt_idx];
+                    w.is_open = 0;
+                    if (w.on_change_action != nil) {
+                        var act: fn(): nil = w.on_change_action as fn(): nil;
+                        act();
+                    }
+                    mark_element_dirty(1);
+                    return;
+                }
+            } elif (px >= x and px <= x + sel_w and py >= y and py <= y + sel_h) {
+                w.is_open = 0;
+                mark_element_dirty(1);
+                return;
+            } else {
+                w.is_open = 0;
+                mark_element_dirty(1);
+            }
+        } else {
+            if (px >= x and px <= x + sel_w and py >= y and py <= y + sel_h) {
+                w.is_open = 1;
+                mark_element_dirty(1);
+                return;
+            }
+        }
+    }
+}
+
+pub fn dispatch_pointer_down(px: float, py: float): nil {
+    global_ui_context.is_pointer_down = 1;
+    global_ui_context.last_pointer_x = px;
+    global_ui_context.last_pointer_y = py;
+    var content_w = global_ui_context.viewport_w - 40.0;
+    var content_h = global_ui_context.viewport_h - 40.0;
+    if (content_w < 100.0) {
+        content_w = 100.0;
+    }
+    if (content_h < 100.0) {
+        content_h = 100.0;
+    }
+    if (global_ui_context.has_widget == 1) {
+        hit_test_and_click_widget(global_ui_context.current_widget, px, py, 20.0, 20.0, content_w, content_h);
+    } else {
+        var updated = hit_test_and_click_blueprint(global_ui_context.current_blueprint, px, py, 20.0, 20.0, content_w, content_h);
+        global_ui_context.current_blueprint = updated;
+    }
+}
+
+pub fn dispatch_pointer_click(px: float, py: float): nil {
+    dispatch_pointer_down(px, py);
+    dispatch_pointer_up(px, py);
+}
+
+pub fn hit_test_hover_widget(w: ui.Widget, px: float, py: float, x: float, y: float, available_w: float, available_h: float): nil {
+    var inside = 0;
+    var w_w = available_w;
+    if (w.width_val > 0.0) w_w = w.width_val;
+    var w_h = measure_widget_height(w);
+
+    if (px >= x and px <= x + w_w and py >= y and py <= y + w_h) {
+        inside = 1;
+    }
+
+    if (inside == 1) {
+        if (w.is_hovered == 0) {
+            w.is_hovered = 1;
+            mark_element_dirty(1);
+        }
+    } else {
+        if (w.is_hovered == 1) {
+            w.is_hovered = 0;
+            mark_element_dirty(1);
+        }
+    }
+
+    if (w.kind == ui.KIND_CONTAINER) {
+        var curr_x = x + w.padding_left;
+        var curr_y = y + w.padding_top;
+        var inner_w = available_w - w.padding_left - w.padding_right;
+        var inner_h = available_h - w.padding_top - w.padding_bottom;
+
+        if (w.is_vertical == 1) { // Column
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = inner_w;
+                if (child.width_val > 0.0) child_w = child.width_val;
+                hit_test_hover_widget(child, px, py, curr_x, curr_y, child_w, child_h);
+                curr_y = curr_y + child_h + w.spacing_val;
+                i = i + 1;
+            }
+        } elif (w.is_vertical == 0) { // Row
+            var fixed_w = 0.0;
+            var num_spacers = 0;
+            var total_flex = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                if (child.kind == ui.KIND_SPACER) {
+                    num_spacers = num_spacers + 1;
+                    total_flex = total_flex + child.flex_val;
+                } else {
+                    var cw = measure_widget_width(child, inner_w);
+                    fixed_w = fixed_w + cw;
+                }
+                i = i + 1;
+            }
+            var spacing_total = 0.0;
+            if (len(w.children) > 1) {
+                var num_gaps: float = (len(w.children) - 1) as float;
+                spacing_total = num_gaps * w.spacing_val;
+            }
+            var remaining_w = inner_w - fixed_w - spacing_total;
+            var spacer_unit = 0.0;
+            if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
+                spacer_unit = remaining_w / total_flex;
+            }
+
+            i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = 0.0;
+                if (child.kind == ui.KIND_SPACER) {
+                    child_w = spacer_unit * child.flex_val;
+                } else {
+                    child_w = measure_widget_width(child, inner_w);
+                    hit_test_hover_widget(child, px, py, curr_x, curr_y, child_w, child_h);
+                }
+                curr_x = curr_x + child_w + w.spacing_val;
+                i = i + 1;
+            }
+        } else { // Stack
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                hit_test_hover_widget(child, px, py, curr_x, curr_y, inner_w, child_h);
                 i = i + 1;
             }
         }
-        _ => { }
     }
-    
-    var result_metrics: ui_types.LayoutMetrics = ui_types.layout_metrics(position, computed_size, 0.0);
-    metrics[element_id] = result_metrics;
-    
-    // Update element with computed metrics
-    element.metrics = result_metrics;
-    global_ui_context.elements[element_id] = element;
-    
-    return result_metrics;
-}
 
-// Compute size from constraints
-fn compute_size(constraints: [ui_types.LayoutConstraint], available: ui_types.Size): ui_types.Size {
-    var width: float = available.width;
-    var height: float = available.height;
-    
-    var i: int = 0;
-    while (i < len(constraints)) {
-        match (constraints[i]) {
-            ui_types.Fixed(value) => {
-                width = value as float;
-                height = value as float;
+    if (w.kind == ui.KIND_TABS) {
+        var tab_x = x;
+        var tab_h = 32.0;
+        var i = 0;
+        var found_hover = 0 - 1;
+        while (i < len(w.tab_titles)) {
+            var title = w.tab_titles[i];
+            var item_w = (len(title) as float) * 8.0 + 24.0;
+            if (px >= tab_x and px <= tab_x + item_w and py >= y and py <= y + tab_h) {
+                found_hover = i;
             }
-            ui_types.Min(value) => {
-                if (width < value as float) {
-                    width = value as float;
-                }
-                if (height < value as float) {
-                    height = value as float;
-                }
-            }
-            ui_types.Max(value) => {
-                if (width > value as float) {
-                    width = value as float;
-                }
-                if (height > value as float) {
-                    height = value as float;
-                }
-            }
-            ui_types.Fill => {
-                // Use available size
-            }
-            ui_types.Auto => {
-                // Compute from content
-                width = -1.0;
-                height = -1.0;
+            tab_x = tab_x + item_w + w.spacing_val;
+            i = i + 1;
+        }
+        if (w.hovered_tab != found_hover) {
+            w.hovered_tab = found_hover;
+            mark_element_dirty(1);
+        }
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            hit_test_hover_widget(w.children[w.active_tab], px, py, x, y + 40.0, available_w, available_h - 40.0);
+        }
+    }
+
+    if (w.kind == ui.KIND_SCROLL) {
+        var v_w = available_w;
+        var v_h = 140.0;
+        if (w.height_val > 0.0) v_h = w.height_val;
+        if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
+            if (len(w.children) > 0) {
+                var child = w.children[0];
+                var total_child_h = measure_widget_height(child);
+                hit_test_hover_widget(child, px, py + w.scroll_y, x + 6.0, y + 6.0, v_w - 12.0, total_child_h);
             }
         }
-        i = i + 1;
     }
-    
-    return ui_types.size(width, height);
 }
 
-// Layer 3: Render pass (flatten element tree to command stream)
-fn render_pass(): ui_types.RenderResult {
-    global_ui_context.render_commands = [];
-    
-    if (global_ui_context.root_element == ui_types.INVALID_ELEMENT_ID) {
-        return ui_types.RenderResult(commands=[], resource_updates=[]);
+pub fn dispatch_pointer_move(px: float, py: float): nil {
+    global_ui_context.last_pointer_x = px;
+    global_ui_context.last_pointer_y = py;
+
+    if (global_ui_context.has_captured == 1) {
+        var cap = global_ui_context.captured_widget;
+        if (cap.kind == ui.KIND_BUTTON) {
+            var inside = 0;
+            if (px >= global_ui_context.captured_bounds_x and
+                px <= global_ui_context.captured_bounds_x + global_ui_context.captured_bounds_w and
+                py >= global_ui_context.captured_bounds_y and
+                py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
+                inside = 1;
+            }
+            if (inside == 1 and cap.is_pressed == 0) {
+                cap.is_pressed = 1;
+                mark_element_dirty(1);
+            } elif (inside == 0 and cap.is_pressed == 1) {
+                cap.is_pressed = 0;
+                mark_element_dirty(1);
+            }
+        } elif (cap.kind == ui.KIND_SLIDER) {
+            var ratio = (px - global_ui_context.captured_bounds_x) / global_ui_context.captured_bounds_w;
+            if (ratio < 0.0) ratio = 0.0;
+            if (ratio > 1.0) ratio = 1.0;
+            cap.slider_val = cap.slider_min + ratio * (cap.slider_max - cap.slider_min);
+            if (cap.on_change_action != nil) {
+                var act: fn(): nil = cap.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+        }
     }
-    
-    pub var resource_updates: [gfx_types.ResourceId] = [];
-    
-    // Render element tree
-    render_element(global_ui_context.root_element, ui_types.POINT_ZERO, resource_updates);
-    
-    return ui_types.RenderResult(
-        commands=global_ui_context.render_commands,
-        resource_updates=resource_updates
-    );
+
+    var content_w = global_ui_context.viewport_w - 40.0;
+    var content_h = global_ui_context.viewport_h - 40.0;
+    if (content_w < 100.0) {
+        content_w = 100.0;
+    }
+    if (content_h < 100.0) {
+        content_h = 100.0;
+    }
+    if (global_ui_context.has_widget == 1) {
+        hit_test_hover_widget(global_ui_context.current_widget, px, py, 20.0, 20.0, content_w, content_h);
+    }
 }
 
-// Render single element to command stream
-fn render_element(
-    element_id: ui_types.ElementId,
-    offset: ui_types.Point,
-    resource_updates: [gfx_types.ResourceId]
-): void {
-    var element: ui_types.Element = global_ui_context.elements[element_id];
-    
-    if (element.visible == 0) {
-        return;
+fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil {
+    if (bp.variant_type == 1) { // Container
+        var data = bp.container_data_val;
+        var p = paint.Paint();
+        p.color_val = color.rgb((data.background.r * 255.0) as int, (data.background.g * 255.0) as int, (data.background.b * 255.0) as int);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=available_w, h=available_h), p);
+
+        var curr_y = y + data.padding.y;
+        var curr_x = x + data.padding.x;
+        var child_w = available_w - data.padding.x - data.padding.w;
+        var child_h = 36.0;
+
+        var i = 0;
+        while (i < len(bp.children)) {
+            var child_bp = bp.children[i];
+            render_blueprint_node(child_bp, curr_x, curr_y, child_w, child_h, cvs);
+            if (data.axis.is_vertical == 1) {
+                curr_y = curr_y + child_h + 8.0 + data.spacing;
+            } else {
+                curr_x = curr_x + 120.0 + data.spacing;
+            }
+            i = i + 1;
+        }
     }
-    
-    var position: ui_types.Point = ui_types.point(
-        offset.x + element.metrics.position.x,
-        offset.y + element.metrics.position.y
-    );
-    
-    var rect: ui_types.Rect = ui_types.rect(
-        position.x,
-        position.y,
-        element.metrics.size.width,
-        element.metrics.size.height
-    );
-    
-    // Emit render commands based on variant
-    match (element.variant) {
-        ui_types.Container(data) => {
-            // Draw background
-            if (data.background.a > 0.0) {
-                global_ui_context.render_commands = global_ui_context.render_commands + [
-                    ui_types.RenderCommand.DrawRect(ui_types.DrawRectCommand(
-                        rect=rect,
-                        color=data.background,
-                        corner_radius=data.corner_radius
-                    ))
-                ];
-            }
-            
-            // Draw border
-            if (data.border.a > 0.0 && data.border_width > 0.0) {
-                global_ui_context.render_commands = global_ui_context.render_commands + [
-                    ui_types.RenderCommand.DrawRect(ui_types.DrawRectCommand(
-                        rect=rect,
-                        color=data.border,
-                        corner_radius=data.corner_radius
-                    ))
-                ];
-            }
-            
-            // Clip if needed
-            if (data.clip_content != 0) {
-                global_ui_context.render_commands = global_ui_context.render_commands + [
-                    ui_types.RenderCommand.ClipRect(ui_types.ClipRectCommand(rect=rect))
-                ];
-            }
-            
-            // Render children
-            var i: int = 0;
-            while (i < len(element.children)) {
-                render_element(element.children[i], position, resource_updates);
+    if (bp.variant_type == 2) { // Text
+        var tdata = bp.text_data_val;
+        var p = paint.Paint();
+        p.color_val = color.rgb((tdata.color.r * 255.0) as int, (tdata.color.g * 255.0) as int, (tdata.color.b * 255.0) as int);
+        cvs.draw_text(tdata.content, x, y, p, 1);
+    }
+    if (bp.variant_type == 3) { // Button
+        var bdata = bp.button_data_val;
+        var p = paint.Paint();
+        p.color_val = color.rgb((bdata.background.r * 255.0) as int, (bdata.background.g * 255.0) as int, (bdata.background.b * 255.0) as int);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=available_w, h=36.0), p);
+
+        var text_p = paint.Paint();
+        text_p.color_val = color.rgb((bdata.text_color.r * 255.0) as int, (bdata.text_color.g * 255.0) as int, (bdata.text_color.b * 255.0) as int);
+        cvs.draw_text(bdata.label, x + 10.0, y + 8.0, text_p, 1);
+    }
+}
+
+fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil {
+    if (w.kind == ui.KIND_CONTAINER) {
+        if (w.background_color.a > 0.0) {
+            var p = paint.Paint();
+            p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+            cvs.draw_rect(rect.Rect(x=x, y=y, w=available_w, h=available_h), p);
+        }
+        var curr_x = x + w.padding_left;
+        var curr_y = y + w.padding_top;
+        var inner_w = available_w - w.padding_left - w.padding_right;
+        var inner_h = available_h - w.padding_top - w.padding_bottom;
+
+        if (w.is_vertical == 1) { // Column
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = inner_w;
+                if (child.width_val > 0.0) {
+                    child_w = child.width_val;
+                }
+                render_widget_node(child, curr_x, curr_y, child_w, child_h, cvs);
+                curr_y = curr_y + child_h + w.spacing_val;
                 i = i + 1;
             }
-            
-            // Restore clip
-            if (data.clip_content != 0) {
-                global_ui_context.render_commands = global_ui_context.render_commands + [
-                    ui_types.RenderCommand.ClipRect(ui_types.ClipRectCommand(rect=ui_types.RECT_ZERO))
-                ];
+        } elif (w.is_vertical == 0) { // Row with Flexbox Spacers
+            var fixed_w = 0.0;
+            var num_spacers = 0;
+            var total_flex = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                if (child.kind == ui.KIND_SPACER) {
+                    num_spacers = num_spacers + 1;
+                    total_flex = total_flex + child.flex_val;
+                } else {
+                    var cw = measure_widget_width(child, inner_w);
+                    fixed_w = fixed_w + cw;
+                }
+                i = i + 1;
+            }
+            var spacing_total = 0.0;
+            if (len(w.children) > 1) {
+                var num_gaps: float = (len(w.children) - 1) as float;
+                spacing_total = num_gaps * w.spacing_val;
+            }
+            var remaining_w = inner_w - fixed_w - spacing_total;
+            var spacer_unit = 0.0;
+            if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
+                spacer_unit = remaining_w / total_flex;
+            }
+
+            i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = 0.0;
+                if (child.kind == ui.KIND_SPACER) {
+                    child_w = spacer_unit * child.flex_val;
+                } else {
+                    child_w = measure_widget_width(child, inner_w);
+                    render_widget_node(child, curr_x, curr_y, child_w, child_h, cvs);
+                }
+                curr_x = curr_x + child_w + w.spacing_val;
+                i = i + 1;
+            }
+        } else { // Stack
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                render_widget_node(child, curr_x, curr_y, inner_w, child_h, cvs);
+                i = i + 1;
             }
         }
-        
-        ui_types.Text(data) => {
-            global_ui_context.render_commands = global_ui_context.render_commands + [
-                ui_types.RenderCommand.DrawText(ui_types.DrawTextCommand(
-                    text=data.content,
-                    position=position,
-                    font_size=data.font_size,
-                    color=data.color,
-                    max_width=element.metrics.size.width
-                ))
-            ];
+    }
+    if (w.kind == ui.KIND_TEXT) {
+        var p = paint.Paint();
+        p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        var scale = 1;
+        if (w.font_size_val >= 20.0) {
+            scale = 2;
         }
-        
-        ui_types.Button(data) => {
-            var bg_color: ui_types.Color = data.background;
-            match (element.state) {
-                ui_types.Hovered => { bg_color = data.hover_background; }
-                ui_types.Pressed => { bg_color = data.pressed_background; }
-                _ => { }
+        cvs.draw_text(w.text_val, x + w.padding_left, y + w.padding_top, p, scale);
+    }
+    if (w.kind == ui.KIND_BUTTON) {
+        var bg = w.background_color;
+        if (w.is_pressed == 1) {
+            if (w.pressed_style_val.has_bg) {
+                bg = w.pressed_style_val.bg;
+            } else {
+                bg = ui.rgb(220, 80, 50);
             }
-            
-            // Draw button background
-            global_ui_context.render_commands = global_ui_context.render_commands + [
-                ui_types.RenderCommand.DrawRect(ui_types.DrawRectCommand(
-                    rect=rect,
-                    color=bg_color,
-                    corner_radius=data.corner_radius
-                ))
-            ];
-            
-            // Draw button text
-            var text_pos: ui_types.Point = ui_types.point(
-                position.x + data.padding.x,
-                position.y + data.padding.y
-            );
-            global_ui_context.render_commands = global_ui_context.render_commands + [
-                ui_types.RenderCommand.DrawText(ui_types.DrawTextCommand(
-                    text=data.label,
-                    position=text_pos,
-                    font_size=data.font_size,
-                    color=data.text_color,
-                    max_width=element.metrics.size.width - data.padding.x - data.padding.width
-                ))
-            ];
+        } elif (w.is_hovered == 1) {
+            if (w.hover_style_val.has_bg) {
+                bg = w.hover_style_val.bg;
+            } else {
+                var r_val = ((bg.r * 255.0) as int) + 25;
+                if (r_val > 255) r_val = 255;
+                var g_val = ((bg.g * 255.0) as int) + 25;
+                if (g_val > 255) g_val = 255;
+                var b_val = ((bg.b * 255.0) as int) + 30;
+                if (b_val > 255) b_val = 255;
+                bg = ui.rgb(r_val, g_val, b_val);
+            }
         }
-        
-        ui_types.Image(data) => {
-            global_ui_context.render_commands = global_ui_context.render_commands + [
-                ui_types.RenderCommand.DrawImage(ui_types.DrawImageCommand(
-                    texture_id=data.texture_id,
-                    rect=rect,
-                    tint=data.tint
-                ))
-            ];
+        var p = paint.Paint();
+        p.color_val = color.rgba((bg.r * 255.0) as int, (bg.g * 255.0) as int, (bg.b * 255.0) as int, bg.a);
+        var btn_h = measure_widget_height(w);
+        var btn_w = available_w;
+        if (w.width_val > 0.0) {
+            btn_w = w.width_val;
         }
-        
-        ui_types.Custom(data) => {
-            global_ui_context.render_commands = global_ui_context.render_commands + [
-                ui_types.RenderCommand.DrawCustom(ui_types.DrawCustomCommand(
-                    type_id=data.type_id,
-                    state_ptr=data.state_ptr,
-                    rect=rect
-                ))
-            ];
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=btn_w, h=btn_h), p);
+
+        var fg = w.foreground_color;
+        if (w.is_pressed == 1 and w.pressed_style_val.has_fg) {
+            fg = w.pressed_style_val.fg;
+        } elif (w.is_hovered == 1 and w.hover_style_val.has_fg) {
+            fg = w.hover_style_val.fg;
         }
+        var text_p = paint.Paint();
+        text_p.color_val = color.rgba((fg.r * 255.0) as int, (fg.g * 255.0) as int, (fg.b * 255.0) as int, fg.a);
         
-        _ => { }
+        // Vertically and horizontally align text inside button
+        var ty = y + (btn_h - 8.0) / 2.0;
+        var tx = x + (btn_w - ((len(w.text_val) as float) * 8.0)) / 2.0;
+        if (tx < x + w.padding_left) {
+            tx = x + w.padding_left;
+        }
+        cvs.draw_text(w.text_val, tx, ty, text_p, 1);
+    }
+    if (w.kind == ui.KIND_INPUT) {
+        var inp_w = available_w;
+        if (w.width_val > 0.0) inp_w = w.width_val;
+        var inp_h = 28.0;
+        if (w.height_val > 0.0) inp_h = w.height_val;
+
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgb(20, 22, 28);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=inp_w, h=inp_h), bg_p);
+
+        var border_p = paint.Paint();
+        if (w.is_focused == 1) {
+            border_p.color_val = color.rgb(90, 130, 240);
+        } elif (w.is_hovered == 1) {
+            border_p.color_val = color.rgb(75, 85, 110);
+        } else {
+            border_p.color_val = color.rgb(55, 60, 75);
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=inp_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y + inp_h - 1.0, w=inp_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=1.0, h=inp_h), border_p);
+        cvs.draw_rect(rect.Rect(x=x + inp_w - 1.0, y=y, w=1.0, h=inp_h), border_p);
+
+        var ty = y + (inp_h - 8.0) / 2.0;
+        var tx = x + 8.0;
+        if (len(w.text_val) > 0) {
+            var text_p = paint.Paint();
+            text_p.color_val = color.rgb(255, 255, 255);
+            cvs.draw_text(w.text_val, tx, ty, text_p, 1);
+            if (w.is_focused == 1) {
+                var caret_x = tx + (len(w.text_val) as float) * 8.0;
+                var caret_p = paint.Paint();
+                caret_p.color_val = color.rgb(100, 180, 255);
+                cvs.draw_text("|", caret_x, ty, caret_p, 1);
+            }
+        } else {
+            if (w.is_focused == 1) {
+                var caret_p = paint.Paint();
+                caret_p.color_val = color.rgb(100, 180, 255);
+                cvs.draw_text("|", tx, ty, caret_p, 1);
+            } else {
+                var ph_p = paint.Paint();
+                ph_p.color_val = color.rgb(110, 115, 130);
+                cvs.draw_text(w.placeholder_val, tx, ty, ph_p, 1);
+            }
+        }
+    }
+    if (w.kind == ui.KIND_CHECKBOX) {
+        var chk_w = 42.0;
+        if (w.width_val > 0.0) chk_w = w.width_val;
+        var chk_h = 26.0;
+        if (w.height_val > 0.0) chk_h = w.height_val;
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgb(32, 35, 46);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=chk_w, h=chk_h), bg_p);
+
+        var border_p = paint.Paint();
+        if (w.is_checked == 1) {
+            border_p.color_val = color.rgb(70, 180, 120);
+        } else {
+            border_p.color_val = color.rgb(60, 65, 80);
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=chk_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y + chk_h - 1.0, w=chk_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=1.0, h=chk_h), border_p);
+        cvs.draw_rect(rect.Rect(x=x + chk_w - 1.0, y=y, w=1.0, h=chk_h), border_p);
+
+        var text_p = paint.Paint();
+        if (w.is_checked == 1) {
+            text_p.color_val = color.rgb(80, 220, 130);
+        } else {
+            text_p.color_val = color.rgb(130, 135, 150);
+        }
+        var tx = x + (chk_w - ((len(w.text_val) as float) * 8.0)) / 2.0;
+        var ty = y + (chk_h - 8.0) / 2.0;
+        cvs.draw_text(w.text_val, tx, ty, text_p, 1);
+    }
+    if (w.kind == ui.KIND_SLIDER) {
+        var s_w = 140.0;
+        if (w.width_val > 0.0) s_w = w.width_val;
+        var s_h = 24.0;
+        var track_y = y + (s_h - 4.0) / 2.0;
+
+        var span = w.slider_max - w.slider_min;
+        if (span <= 0.0) span = 1.0;
+        var progress = (w.slider_val - w.slider_min) / span;
+        if (progress < 0.0) progress = 0.0;
+        if (progress > 1.0) progress = 1.0;
+
+        var fill_w = progress * s_w;
+
+        // Inactive right track
+        var right_p = paint.Paint();
+        right_p.color_val = color.rgb(45, 50, 62);
+        cvs.draw_rect(rect.Rect(x=x, y=track_y, w=s_w, h=4.0), right_p);
+
+        // Active left track
+        var left_p = paint.Paint();
+        left_p.color_val = color.rgb(80, 150, 255);
+        cvs.draw_rect(rect.Rect(x=x, y=track_y, w=fill_w, h=4.0), left_p);
+
+        // Thumb handle
+        var thumb_w = 12.0;
+        var thumb_h = 16.0;
+        var thumb_x = x + fill_w - (thumb_w / 2.0);
+        if (thumb_x < x) thumb_x = x;
+        if (thumb_x + thumb_w > x + s_w) thumb_x = x + s_w - thumb_w;
+        var thumb_y = y + (s_h - thumb_h) / 2.0;
+
+        var thumb_p = paint.Paint();
+        thumb_p.color_val = color.rgb(240, 245, 255);
+        cvs.draw_rect(rect.Rect(x=thumb_x, y=thumb_y, w=thumb_w, h=thumb_h), thumb_p);
+    }
+    if (w.kind == ui.KIND_BADGE) {
+        var bdg_h = 20.0;
+        if (w.height_val > 0.0) bdg_h = w.height_val;
+        var bdg_w = (len(w.text_val) as float) * 8.0 + 14.0;
+        if (w.width_val > 0.0) bdg_w = w.width_val;
+
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=bdg_w, h=bdg_h), bg_p);
+
+        var text_p = paint.Paint();
+        text_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        var tx = x + (bdg_w - ((len(w.text_val) as float) * 8.0)) / 2.0;
+        var ty = y + (bdg_h - 8.0) / 2.0;
+        cvs.draw_text(w.text_val, tx, ty, text_p, 1);
+    }
+    if (w.kind == ui.KIND_SELECT) {
+        var sel_w = 180.0;
+        if (w.width_val > 0.0) sel_w = w.width_val;
+        var sel_h = 28.0;
+        if (w.height_val > 0.0) sel_h = w.height_val;
+
+        var bg_p = paint.Paint();
+        if (w.is_hovered == 1 or w.is_open == 1) {
+            bg_p.color_val = color.rgb(38, 42, 54);
+        } else {
+            bg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=sel_w, h=sel_h), bg_p);
+
+        var border_p = paint.Paint();
+        if (w.is_hovered == 1 or w.is_open == 1) {
+            border_p.color_val = color.rgb(80, 150, 255);
+        } else {
+            border_p.color_val = color.rgb(55, 60, 75);
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=sel_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y + sel_h - 1.0, w=sel_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=1.0, h=sel_h), border_p);
+        cvs.draw_rect(rect.Rect(x=x + sel_w - 1.0, y=y, w=1.0, h=sel_h), border_p);
+
+        var text_p = paint.Paint();
+        text_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        var ty = y + (sel_h - 8.0) / 2.0;
+        cvs.draw_text(w.text_val, x + 10.0, ty, text_p, 1);
+
+        var chev_p = paint.Paint();
+        chev_p.color_val = color.rgb(130, 140, 160);
+        if (w.is_open == 1) {
+            cvs.draw_text("^", x + sel_w - 18.0, ty, chev_p, 1);
+        } else {
+            cvs.draw_text("v", x + sel_w - 18.0, ty, chev_p, 1);
+        }
+
+        // Render Open Dropdown Menu
+        if (w.is_open == 1 and len(w.select_options) > 0) {
+            var menu_x = x;
+            var menu_y = y + sel_h + 2.0;
+            var item_h = 26.0;
+            var num_opts = len(w.select_options);
+            var menu_h = (num_opts as float) * item_h + 4.0;
+
+            var menu_bg = paint.Paint();
+            menu_bg.color_val = color.rgb(24, 26, 34);
+            cvs.draw_rect(rect.Rect(x=menu_x, y=menu_y, w=sel_w, h=menu_h), menu_bg);
+
+            var menu_border = paint.Paint();
+            menu_border.color_val = color.rgb(80, 140, 230);
+            cvs.draw_rect(rect.Rect(x=menu_x, y=menu_y, w=sel_w, h=1.0), menu_border);
+            cvs.draw_rect(rect.Rect(x=menu_x, y=menu_y + menu_h - 1.0, w=sel_w, h=1.0), menu_border);
+            cvs.draw_rect(rect.Rect(x=menu_x, y=menu_y, w=1.0, h=menu_h), menu_border);
+            cvs.draw_rect(rect.Rect(x=menu_x + sel_w - 1.0, y=menu_y, w=1.0, h=menu_h), menu_border);
+
+            var opt_idx = 0;
+            while (opt_idx < num_opts) {
+                var opt_item_y = menu_y + 2.0 + (opt_idx as float) * item_h;
+                if (opt_idx == w.selected_idx) {
+                    var item_sel_bg = paint.Paint();
+                    item_sel_bg.color_val = color.rgb(45, 65, 105);
+                    cvs.draw_rect(rect.Rect(x=menu_x + 2.0, y=opt_item_y, w=sel_w - 4.0, h=item_h), item_sel_bg);
+                }
+
+                var opt_text_p = paint.Paint();
+                if (opt_idx == w.selected_idx) {
+                    opt_text_p.color_val = color.rgb(255, 255, 255);
+                } else {
+                    opt_text_p.color_val = color.rgb(180, 185, 200);
+                }
+                var opt_ty = opt_item_y + (item_h - 8.0) / 2.0;
+                cvs.draw_text(w.select_options[opt_idx], menu_x + 10.0, opt_ty, opt_text_p, 1);
+                opt_idx = opt_idx + 1;
+            }
+        }
+    }
+    if (w.kind == ui.KIND_TABS) {
+        var tab_x = x;
+        var tab_h = 32.0;
+        var i = 0;
+        while (i < len(w.tab_titles)) {
+            var title = w.tab_titles[i];
+            var item_w = (len(title) as float) * 8.0 + 24.0;
+            var is_sel = 0;
+            if (i == w.active_tab) is_sel = 1;
+            var is_hov = 0;
+            if (i == w.hovered_tab) is_hov = 1;
+
+            var bg_p = paint.Paint();
+            if (is_sel == 1) {
+                bg_p.color_val = color.rgb(40, 50, 72);
+            } elif (is_hov == 1) {
+                bg_p.color_val = color.rgb(32, 36, 48);
+            } else {
+                bg_p.color_val = color.rgb(24, 26, 34);
+            }
+            cvs.draw_rect(rect.Rect(x=tab_x, y=y, w=item_w, h=tab_h), bg_p);
+
+            if (is_sel == 1) {
+                var line_p = paint.Paint();
+                line_p.color_val = color.rgb(80, 160, 255);
+                cvs.draw_rect(rect.Rect(x=tab_x, y=y + tab_h - 2.0, w=item_w, h=2.0), line_p);
+            }
+
+            var text_p = paint.Paint();
+            if (is_sel == 1) {
+                text_p.color_val = color.rgb(255, 255, 255);
+            } else {
+                text_p.color_val = color.rgb(140, 145, 160);
+            }
+            var tx = tab_x + 12.0;
+            var ty = y + (tab_h - 8.0) / 2.0;
+            cvs.draw_text(title, tx, ty, text_p, 1);
+
+            tab_x = tab_x + item_w + w.spacing_val;
+            i = i + 1;
+        }
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            render_widget_node(w.children[w.active_tab], x, y + 40.0, available_w, available_h - 40.0, cvs);
+        }
+    }
+    if (w.kind == ui.KIND_SCROLL) {
+        var v_w = available_w;
+        var v_h = 140.0;
+        if (w.height_val > 0.0) v_h = w.height_val;
+
+        // Background
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=v_w, h=v_h), bg_p);
+
+        // Render content with scroll offset AND scissor clipping!
+        var total_child_h = 0.0;
+        if (len(w.children) > 0) {
+            var child = w.children[0];
+            total_child_h = measure_widget_height(child);
+            var max_s = total_child_h - v_h;
+            if (max_s < 0.0) max_s = 0.0;
+            w.max_scroll_y = max_s;
+            if (w.scroll_y > max_s) w.scroll_y = max_s;
+            if (w.scroll_y < 0.0) w.scroll_y = 0.0;
+
+            var content_w = v_w - 12.0;
+            cvs.push_clip(rect.Rect(x=x, y=y, w=v_w, h=v_h));
+            render_widget_node(child, x + 6.0, y + 6.0 - w.scroll_y, content_w, total_child_h, cvs);
+            cvs.pop_clip();
+        }
+
+        // Draw Scrollbar Track & Thumb if scrollable
+        if (total_child_h > v_h) {
+            var bar_x = x + v_w - 8.0;
+            var track_p = paint.Paint();
+            track_p.color_val = color.rgb(28, 30, 38);
+            cvs.draw_rect(rect.Rect(x=bar_x, y=y + 2.0, w=6.0, h=v_h - 4.0), track_p);
+
+            var thumb_ratio = v_h / total_child_h;
+            var thumb_h = thumb_ratio * (v_h - 4.0);
+            if (thumb_h < 16.0) thumb_h = 16.0;
+
+            var max_scroll = total_child_h - v_h;
+            var scroll_ratio = 0.0;
+            if (max_scroll > 0.0) scroll_ratio = w.scroll_y / max_scroll;
+            if (scroll_ratio > 1.0) scroll_ratio = 1.0;
+
+            var thumb_y = y + 2.0 + scroll_ratio * ((v_h - 4.0) - thumb_h);
+            var thumb_p = paint.Paint();
+            thumb_p.color_val = color.rgb(90, 100, 125);
+            cvs.draw_rect(rect.Rect(x=bar_x, y=thumb_y, w=6.0, h=thumb_h), thumb_p);
+        }
     }
 }
 
-// Reactive state management: Create state container
-fn create_state(value: ui_types.StateValue): int {
-    var container: ui_types.StateContainer = create_state_container(value);
-    global_ui_context.state_containers[container.id] = container;
-    return container.id;
+pub fn frame_update(delta_time: float): nil {
+    var vw = global_ui_context.viewport_w;
+    var vh = global_ui_context.viewport_h;
+    var cvs = canvas.Canvas(w=vw, h=vh);
+    var content_w = vw - 40.0;
+    var content_h = vh - 40.0;
+    if (content_w < 100.0) {
+        content_w = 100.0;
+    }
+    if (content_h < 100.0) {
+        content_h = 100.0;
+    }
+    if (global_ui_context.has_widget == 1) {
+        render_widget_node(global_ui_context.current_widget, 20.0, 20.0, content_w, content_h, cvs);
+    } else {
+        render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, content_w, content_h, cvs);
+    }
+    global_ui_context.dirty = 0;
 }
 
-// Reactive state management: Get state value
-fn get_state(state_id: int): ui_types.StateValue {
-    var container: ui_types.StateContainer = global_ui_context.state_containers[state_id];
-    return container.value;
-}
-
-// Reactive state management: Set state value and notify subscribers
-fn set_state(state_id: int, new_value: ui_types.StateValue): void {
-    var container: ui_types.StateContainer = global_ui_context.state_containers[state_id];
-    var old_value: ui_types.StateValue = container.value;
-    
-    container.value = new_value;
-    container.version = container.version + 1;
-    global_ui_context.state_containers[state_id] = container;
-    
-    // Notify subscribers
-    var i: int = 0;
-    while (i < len(container.subscribers)) {
-        var element_id: ui_types.ElementId = container.subscribers[i];
-        mark_element_dirty(element_id);
+fn reset_pressed_recursive(w: ui.Widget): nil {
+    if (w.is_pressed != 0) {
+        w.is_pressed = 0;
+        mark_element_dirty(1);
+    }
+    var i = 0;
+    while (i < len(w.children)) {
+        reset_pressed_recursive(w.children[i]);
         i = i + 1;
     }
-    
-    // Queue change events
-    var j: int = 0;
-    while (j < len(container.subscribers)) {
-        var element_id: ui_types.ElementId = container.subscribers[j];
-        global_ui_context.event_queue = global_ui_context.event_queue + [
-            ui_types.UIEvent.Change(ui_types.ChangeEvent(
-                element_id=element_id,
-                old_value=old_value,
-                new_value=new_value
-            ))
-        ];
-        j = j + 1;
-    }
 }
 
-// Subscribe element to state changes
-fn subscribe_state(state_id: int, element_id: ui_types.ElementId): void {
-    var container: ui_types.StateContainer = global_ui_context.state_containers[state_id];
-    container.subscribers = container.subscribers + [element_id];
-    global_ui_context.state_containers[state_id] = container;
-}
+pub fn dispatch_pointer_up(px: float, py: float): nil {
+    global_ui_context.is_pointer_down = 0;
+    global_ui_context.last_pointer_x = px;
+    global_ui_context.last_pointer_y = py;
 
-// Mark element as dirty (needs re-layout)
-fn mark_element_dirty(element_id: ui_types.ElementId): void {
-    var element: ui_types.Element = global_ui_context.elements[element_id];
-    // Mark as needing layout update
-    global_ui_context.dirty = 1;
-}
+    if (global_ui_context.has_captured == 1) {
+        var cap = global_ui_context.captured_widget;
+        cap.is_pressed = 0;
 
-// Event handling: Register event handler
-fn register_event_handler(
-    element_id: ui_types.ElementId,
-    event_type: ui_types.UIEvent,
-    callback: ui_types.EventToken
-): ui_types.EventToken {
-    var handler: ui_types.EventHandler = create_event_handler(element_id, event_type, callback);
-    global_ui_context.event_handlers = global_ui_context.event_handlers + [handler];
-    
-    // Add event token to element
-    var element: ui_types.Element = global_ui_context.elements[element_id];
-    element.event_tokens = element.event_tokens + [handler.token];
-    global_ui_context.elements[element_id] = element;
-    
-    return handler.token;
-}
-
-// Event handling: Process event queue
-fn process_events(): void {
-    var i: int = 0;
-    while (i < len(global_ui_context.event_queue)) {
-        var event: ui_types.UIEvent = global_ui_context.event_queue[i];
-        dispatch_event(event);
-        i = i + 1;
-    }
-    
-    global_ui_context.event_queue = [];
-}
-
-// Dispatch event to handlers
-fn dispatch_event(event: ui_types.UIEvent): void {
-    var i: int = 0;
-    while (i < len(global_ui_context.event_handlers)) {
-        var handler: ui_types.EventHandler = global_ui_context.event_handlers[i];
-        
-        // Check if handler matches event type and element
-        var matches: int = 0;
-        match (event) {
-            ui_types.Click(e) => {
-                match (handler.event_type) {
-                    ui_types.Click(_) => { matches = 1; }
-                    _ => { }
+        if (cap.kind == ui.KIND_BUTTON) {
+            if (px >= global_ui_context.captured_bounds_x and
+                px <= global_ui_context.captured_bounds_x + global_ui_context.captured_bounds_w and
+                py >= global_ui_context.captured_bounds_y and
+                py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
+                cap.click_count = cap.click_count + 1;
+                if (cap.on_click_action != nil) {
+                    var act: fn(): nil = cap.on_click_action as fn(): nil;
+                    act();
                 }
+                mark_element_dirty(1);
             }
-            ui_types.Hover(e) => {
-                match (handler.event_type) {
-                    ui_types.Hover(_) => { matches = 1; }
-                    _ => { }
+        } elif (cap.kind == ui.KIND_CHECKBOX) {
+            if (px >= global_ui_context.captured_bounds_x and
+                px <= global_ui_context.captured_bounds_x + global_ui_context.captured_bounds_w and
+                py >= global_ui_context.captured_bounds_y and
+                py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
+                if (cap.is_checked == 1) {
+                    cap.is_checked = 0;
+                    cap.text_val = "[ ]";
+                } else {
+                    cap.is_checked = 1;
+                    cap.text_val = "[X]";
                 }
-            }
-            ui_types.Focus(e) => {
-                match (handler.event_type) {
-                    ui_types.Focus(_) => { matches = 1; }
-                    _ => { }
+                if (cap.on_change_action != nil) {
+                    var act: fn(): nil = cap.on_change_action as fn(): nil;
+                    act();
                 }
+                mark_element_dirty(1);
             }
-            ui_types.Change(e) => {
-                match (handler.event_type) {
-                    ui_types.Change(_) => { matches = 1; }
-                    _ => { }
-                }
-            }
-            _ => { }
         }
-        
-        if (matches != 0) {
-            // Invoke callback via event token
-            // This would use the VM's callback mechanism
-            invoke_callback(handler.callback, event);
+
+        global_ui_context.has_captured = 0;
+        global_ui_context.captured_widget = ui.empty();
+    }
+
+    if (global_ui_context.has_widget == 1) {
+        reset_pressed_recursive(global_ui_context.current_widget);
+    }
+}
+
+fn send_char_to_widget(w: ui.Widget, cp: int): int {
+    if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
+        if (cp >= 32 and cp != 127) {
+            var ch = codepoint_to_utf8(cp);
+            if (len(ch) > 0) {
+                w.text_val = w.text_val + ch;
+                if (w.on_change_action != nil) {
+                    var act: fn(): nil = w.on_change_action as fn(): nil;
+                    act();
+                }
+                mark_element_dirty(1);
+            }
+            return 1;
         }
-        
-        i = i + 1;
     }
-}
-
-// Invoke callback by event token
-fn invoke_callback(token: ui_types.EventToken, event: ui_types.UIEvent): void {
-    // This would use the VM's callback registration system
-    // Callback invocation hook
-}
-
-// Main frame update (called from std::app event loop)
-fn frame_update(delta_time: float): void {
-    // Process events
-    process_events();
-    
-    // Run layout pass if dirty
-    if (global_ui_context.dirty != 0) {
-        var layout_result: ui_types.LayoutResult = layout_pass(
-            get_window_width() as float,
-            get_window_height() as float
-        );
-        global_ui_context.dirty = 0;
-    }
-    
-    // Run render pass
-    var render_result: ui_types.RenderResult = render_pass();
-    
-    // Submit render commands to graphics context
-    submit_render_commands(render_result.commands);
-}
-
-// Submit render commands to graphics context
-fn submit_render_commands(commands: [ui_types.RenderCommand]): void {
-    var i: int = 0;
-    while (i < len(commands)) {
-        match (commands[i]) {
-            ui_types.RenderCommand.DrawRect(cmd) => {
-                // Convert to graphics context draw call
-                // This would use gfx_context.begin_pass, apply_pipeline, draw, etc.
-            }
-            ui_types.RenderCommand.DrawText(cmd) => {
-                // Convert to text rendering
-            }
-            ui_types.RenderCommand.DrawImage(cmd) => {
-                // Convert to image rendering
-            }
-            ui_types.RenderCommand.ClipRect(cmd) => {
-                // Apply scissor rect
-            }
-            ui_types.RenderCommand.PushTransform(cmd) => {
-                // Push transform matrix
-            }
-            ui_types.RenderCommand.PopTransform(cmd) => {
-                // Pop transform matrix
-            }
-            ui_types.RenderCommand.DrawCustom(cmd) => {
-                // Invoke custom render callback
-            }
+    var i = 0;
+    while (i < len(w.children)) {
+        if (send_char_to_widget(w.children[i], cp) == 1) {
+            return 1;
         }
         i = i + 1;
     }
+    return 0;
 }
 
-// Get window width from std::app
-fn get_window_width(): int {
-    // This would call into std::app
-    return 800;
-}
-
-// Get window height from std::app
-fn get_window_height(): int {
-    // This would call into std::app
-    return 600;
-}
-
-// Update blueprint (rebuild retained tree)
-fn update_blueprint(bp: ui_types.Blueprint): void {
-    // RAII cleanup: Remove old elements that are no longer in new blueprint
-    var old_root: ui_types.ElementId = global_ui_context.root_element;
-    
-    // Convert new blueprint to tree
-    var new_root: ui_types.ElementId = blueprint_to_tree(bp, ui_types.INVALID_ELEMENT_ID);
-    
-    // Cleanup old tree
-    if (old_root != ui_types.INVALID_ELEMENT_ID) {
-        cleanup_element_resources(old_root);
-        delete global_ui_context.elements[old_root];
+pub fn dispatch_char_input(cp: int): nil {
+    if (global_ui_context.has_widget == 1) {
+        send_char_to_widget(global_ui_context.current_widget, cp);
     }
-    
-    global_ui_context.dirty = 1;
 }
 
-// Delete helper (simulated)
-fn delete(key: int, map: {int: ui_types.Element}): void {
-    // This would be a built-in operation
+fn send_key_down_to_widget(w: ui.Widget, key_code: int): int {
+    if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
+        if (key_code == 8) { // Backspace
+            if (len(w.text_val) > 0) {
+                w.text_val = utf8_pop_back(w.text_val);
+                if (w.on_change_action != nil) {
+                    var act: fn(): nil = w.on_change_action as fn(): nil;
+                    act();
+                }
+                mark_element_dirty(1);
+            }
+            return 1;
+        }
+    }
+    var i = 0;
+    while (i < len(w.children)) {
+        if (send_key_down_to_widget(w.children[i], key_code) == 1) {
+            return 1;
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
+pub fn dispatch_key_down(key_code: int): nil {
+    if (global_ui_context.has_widget == 1) {
+        send_key_down_to_widget(global_ui_context.current_widget, key_code);
+    }
+}
+
+fn send_wheel_to_widget(w: ui.Widget, px: float, py: float, delta: float, x: float, y: float, available_w: float, available_h: float): int {
+    if (w.kind == ui.KIND_CONTAINER) {
+        var curr_x = x + w.padding_left;
+        var curr_y = y + w.padding_top;
+        var inner_w = available_w - w.padding_left - w.padding_right;
+        var inner_h = available_h - w.padding_top - w.padding_bottom;
+
+        if (w.is_vertical == 1) { // Column
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var ch_h = measure_widget_height(child);
+                var ch_w = inner_w;
+                if (child.width_val > 0.0) ch_w = child.width_val;
+                if (send_wheel_to_widget(child, px, py, delta, curr_x, curr_y, ch_w, ch_h) == 1) {
+                    return 1;
+                }
+                curr_y = curr_y + ch_h + w.spacing_val;
+                i = i + 1;
+            }
+        } elif (w.is_vertical == 0) { // Row
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var ch_h = measure_widget_height(child);
+                var ch_w = measure_widget_width(child, inner_w);
+                if (send_wheel_to_widget(child, px, py, delta, curr_x, curr_y, ch_w, ch_h) == 1) {
+                    return 1;
+                }
+                curr_x = curr_x + ch_w + w.spacing_val;
+                i = i + 1;
+            }
+        }
+    }
+    if (w.kind == ui.KIND_TABS) {
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            if (send_wheel_to_widget(w.children[w.active_tab], px, py, delta, x, y + 40.0, available_w, available_h - 40.0) == 1) {
+                return 1;
+            }
+        }
+    }
+    if (w.kind == ui.KIND_SCROLL) {
+        var v_w = available_w;
+        var v_h = 140.0;
+        if (w.height_val > 0.0) v_h = w.height_val;
+        if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
+            w.scroll_y = w.scroll_y - (delta * 0.25);
+            if (w.scroll_y < 0.0) w.scroll_y = 0.0;
+            if (w.scroll_y > w.max_scroll_y) w.scroll_y = w.max_scroll_y;
+            mark_element_dirty(1);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+pub fn dispatch_mouse_wheel(delta: float): nil {
+    if (global_ui_context.has_widget == 1) {
+        var content_w = global_ui_context.viewport_w - 40.0;
+        var content_h = global_ui_context.viewport_h - 40.0;
+        if (content_w < 100.0) {
+            content_w = 100.0;
+        }
+        if (content_h < 100.0) {
+            content_h = 100.0;
+        }
+        send_wheel_to_widget(global_ui_context.current_widget, global_ui_context.last_pointer_x, global_ui_context.last_pointer_y, delta, 20.0, 20.0, content_w, content_h);
+    }
 }

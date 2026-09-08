@@ -1,15 +1,13 @@
 import std.ui.widget as widget;
 
 frame Padding {
-    pub var child: widget.Widget;
-    pub var value: float;
+    pub var padding: float;
 
-    pub init(ch: widget.Widget = widget.Widget(), v: float = 0.0) {
-        self.child = ch;
-        self.value = v;
+    pub init(p: float = 0.0) {
+        self.padding = p;
     }
 
     pub fn build(): widget.Widget {
-        return self;
+        return widget.Widget();
     }
 }

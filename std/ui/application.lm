@@ -1,15 +1,37 @@
 import std.ui.window as window;
+import std.app as app;
+import std.gg as gg;
+import std.ui.context as ui_context;
 
 frame Application {
     pub var name: str;
     pub var windows: [window.Window];
 
-    pub init(n: str = "LimitApp", wins: [window.Window] = []) {
+    pub init(n: str = "LimitApp") {
         self.name = n;
-        self.windows = wins;
+        self.windows = [window.Window()];
+    }
+
+    pub fn render_frame(): nil {
+        gg.begin_pass(800, 600, 0.1, 0.1, 0.15, 1.0);
+        ui_context.frame_update(0.016);
+        gg.end_pass();
+        gg.commit();
     }
 
     pub fn run(): nil {
-        print("Application is running.");
+        gg.setup();
+        var cfg = app.default_window_config();
+        cfg.title = self.name;
+        app.app_init(cfg);
+
+        ui_context.ui_init();
+        if (len(self.windows) > 0) {
+            ui_context.update_blueprint(self.windows[0].root_blueprint);
+        }
+
+        self.render_frame();
+        app.push_quit_event();
+        app.app_run();
     }
 }

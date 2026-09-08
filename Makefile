@@ -10,7 +10,7 @@ ifeq ($(OS),Windows_NT)
 	CXX := $(MSYS2_PATH)/mingw64/bin/g++.exe
 	CC := $(MSYS2_PATH)/mingw64/bin/gcc.exe
 	AR := $(MSYS2_PATH)/mingw64/bin/ar.exe
-	LIBS := -lws2_32 -lffi
+	LIBS := -lws2_32 -lffi -lgdi32 -luser32 -lshell32
 else
 	PLATFORM := linux
 	EXE_EXT :=
@@ -26,11 +26,11 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
-	CFLAGS := -std=c99 -g -fPIC -I. -Isrc
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CFLAGS := -std=c99 -g -fPIC -I. -Isrc -Ivendor/sokol
 else
-	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
-	CFLAGS := -std=c99 -O2 -fPIC -I. -Isrc
+	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CFLAGS := -std=c99 -O2 -fPIC -I. -Isrc -Ivendor/sokol
 endif
 
 ifeq ($(PLATFORM),windows)
@@ -106,7 +106,7 @@ LYRA_SRCS := $(wildcard $(LYRA_DIR)/src/*.cpp)
 LYRA_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_SRCS))
 LYRA_BIN := $(BIN_DIR)/lyra$(EXE_EXT)
 
-REGISTER_SRCS := src/backend/vm/resource_manager.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp src/backend/vm/vm_dict.cpp src/backend/vm/vm_image.cpp src/backend/vm/vm_list.cpp src/backend/vm/vm_runtime.cpp src/backend/vm/vm_string.cpp src/backend/vm/vm_tuple.cpp src/backend/vm/vm_value.cpp
+REGISTER_SRCS := src/backend/vm/resource_manager.cpp src/backend/vm/sokol_app_runtime.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp src/backend/vm/vm_dict.cpp src/backend/vm/vm_image.cpp src/backend/vm/vm_list.cpp src/backend/vm/vm_runtime.cpp src/backend/vm/vm_string.cpp src/backend/vm/vm_tuple.cpp src/backend/vm/vm_value.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
                  src/lir/builtin_functions.cpp src/lir/intrinsic_registry.cpp src/lir/verifier.cpp src/lir/lir_types.cpp src/lir/generator.cpp \
@@ -350,130 +350,7 @@ lir-test: $(BIN_DIR) $(OBJ_DIR)/libLimitly.a $(LIR_TEST_OBJS)
 # Test Target
 # =============================
 tests: $(PLATFORM)
-	@echo "========================================"
-	@echo "Running Limit Language Test Suite"
-	@echo "========================================"
-	@echo
-	@FAILED=0; \
-	PASSED=0; \
-	TOTAL=0; \
-	run_test() { \
-		TOTAL=$$((TOTAL + 1)); \
-		echo "Running $$1..."; \
-		if [ "$(PLATFORM)" = "windows" ]; then \
-			TEMP_FILE=$$(powershell -Command "Get-Content -Path 'env:TEMP'")/limitly_test_output_$$(powershell -Command "Get-Random").txt; \
-			./bin/limitly.exe "$$1" > "$$TEMP_FILE" 2>&1; \
-			if grep -q -i -E "segmentation fault|segfault" "$$TEMP_FILE"; then \
-				echo "  FAIL: $$1 (segmentation fault detected in output)"; \
-				echo "  Output:"; \
-				cat "$$TEMP_FILE"; \
-				FAILED=$$((FAILED + 1)); \
-			elif grep -q -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$$TEMP_FILE"; then \
-				echo "  FAIL: $$1 (contains errors)"; \
-				echo "  Error output:"; \
-				grep -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$$TEMP_FILE"; \
-				FAILED=$$((FAILED + 1)); \
-			else \
-				echo "  PASS: $$1"; \
-				PASSED=$$((PASSED + 1)); \
-			fi; \
-			rm "$$TEMP_FILE"; \
-		else \
-			TEMP_FILE=$$(mktemp); \
-			./bin/limitly "$$1" > "$$TEMP_FILE" 2>&1; \
-			if grep -q -E "segmentation fault|segfault" "$$TEMP_FILE"; then \
-				echo "  FAIL: $$1 (segmentation fault detected in output)"; \
-				echo "  Output:"; \
-				cat "$$TEMP_FILE"; \
-				FAILED=$$((FAILED + 1)); \
-			elif grep -q -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$$TEMP_FILE"; then \
-				echo "  FAIL: $$1 (contains errors)"; \
-				echo "  Error output:"; \
-				grep -E "error\\[E|Error:|RuntimeError|SemanticError|BytecodeError" "$$TEMP_FILE"; \
-				FAILED=$$((FAILED + 1)); \
-			else \
-				echo "  PASS: $$1"; \
-				PASSED=$$((PASSED + 1)); \
-			fi; \
-			rm "$$TEMP_FILE"; \
-		fi; \
-	}; \
-	run_test_allow_semantic() { \
-		run_test "$$1"; \
-	}; \
-	echo "=== BASIC TESTS ==="; \
-	run_test "tests/basic/variables.lm"; \
-	run_test "tests/basic/literals.lm"; \
-	run_test "tests/basic/control_flow.lm"; \
-	run_test "tests/basic/print_statements.lm"; \
-	if [ "$(PLATFORM)" = "windows" ]; then run_test "tests/basic/list_dict_tuple.lm"; fi; \
-	echo; \
-	echo "=== EXPRESSION TESTS ==="; \
-	run_test "tests/expressions/arithmetic.lm"; \
-	run_test "tests/expressions/logical.lm"; \
-	run_test "tests/expressions/ranges.lm"; \
-	if [ "$(PLATFORM)" = "windows" ]; then \
-		run_test "tests/expressions/scientific_notation.lm"; \
-		run_test "tests/expressions/large_literals.lm"; \
-	fi; \
-	echo; \
-	echo "=== STRING TESTS ==="; \
-	run_test "tests/strings/interpolation.lm"; \
-	run_test "tests/strings/operations.lm"; \
-	echo; \
-	echo "=== LOOP TESTS ==="; \
-	run_test "tests/loops/for_loops.lm"; \
-	run_test "tests/loops/iter_loops.lm"; \
-	run_test "tests/loops/while_loops.lm"; \
-	echo; \
-	echo "=== FUNCTION TESTS ==="; \
-	run_test "tests/functions/basic.lm"; \
-	run_test "tests/functions/advanced.lm"; \
-	run_test "tests/functions/closures.lm"; \
-	run_test_allow_semantic "tests/functions/first_class.lm"; \
-	echo; \
-	echo "=== TYPE TESTS ==="; \
-	run_test "tests/types/basic.lm"; \
-	run_test "tests/types/unions.lm"; \
-	run_test "tests/types/options.lm"; \
-	run_test "tests/types/advanced.lm"; \
-	run_test "tests/types/enums.lm"; \
-	run_test "tests/types/refined_types.lm"; \
-	echo; \
-	echo "=== MODULE TESTS ==="; \
-	run_test "tests/modules/basic_import_test.lm"; \
-	if [ "$(PLATFORM)" = "linux" ]; then run_test "tests/modules/comprehensive_module_test.lm"; fi; \
-	run_test "tests/modules/show_filter_test.lm"; \
-	run_test "tests/modules/hide_filter_test.lm"; \
-	run_test "tests/modules/module_caching_test.lm"; \
-	run_test "tests/modules/function_params_test.lm"; \
-	run_test "tests/modules/alias_import_test.lm"; \
-	run_test "tests/modules/multiple_imports_test.lm"; \
-	echo; \
-	echo "=== OOP TESTS ==="; \
-	run_test "tests/oop/frame_declaration.lm"; \
-	run_test "tests/oop/traits_dynamic.lm"; \
-	run_test "tests/oop/traits_inheritance.lm"; \
-	run_test "tests/oop/visibility_test.lm"; \
-	if [ "$(PLATFORM)" = "windows" ]; then run_test_allow_semantic "tests/oop/composition_test.lm"; else run_test_allow_semantic "tests/oop/composition_test.lm"; fi; \
-	echo; \
-	echo "=== CONCURRENCY TESTS ==="; \
-	run_test "tests/concurrency/parallel_blocks.lm"; \
-	run_test "tests/concurrency/concurrent_blocks.lm"; \
-	echo; \
-	echo "========================================"; \
-	echo "Test Results:"; \
-	echo "  PASSED: $$PASSED"; \
-	echo "  FAILED: $$FAILED"; \
-	echo "  TOTAL:  $$TOTAL"; \
-	echo "========================================"; \
-	if [ $$FAILED -gt 0 ]; then \
-		echo "Some tests failed!"; \
-		exit 1; \
-	else \
-		echo "All tests passed!"; \
-		exit 0; \
-	fi
+	@python3 tests/run_tests.py || python tests/run_tests.py
 
 # =============================
 # AOT Test Target

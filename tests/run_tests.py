@@ -142,6 +142,18 @@ tests = [
     "tests/regression/ownership_refactor_test.lm",
     # Regression - Trait Dispatch
     "tests/regression/trait_dispatch_test.lm",
+    # Graphics & Retained UI
+    "tests/std_gg_smoke.lm",
+    "tests/graphics_triangle_test.lm",
+    "tests/text_render_test.lm",
+    "tests/retained_ui_test.lm",
+    "tests/ui_fluent_test.lm",
+    "tests/ui_ergonomics_test.lm",
+    "tests/window_resize_test.lm",
+    "tests/interactive_controls_test.lm",
+    "tests/showcase_verify_test.lm",
+    "tests/scroll_clipping_pixel_test.lm",
+    "tests/scroll_tab_interaction_test.lm",
 ]
 
 # Tests that need extra time (resource creation, crypto, network)

@@ -14,7 +14,7 @@ frame Matrix {
         return self.data[row * 4 + col];
     }
 
-    pub fn set(row: int, col: int, val: float): nil {
-        self.data[row * 4 + col] = val;
+    pub fn set(row: int, col: int, value: float): nil {
+        self.data[row * 4 + col] = value;
     }
 }

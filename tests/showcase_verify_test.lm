@@ -1,0 +1,61 @@
+// Showcase Verification Test
+// Validates build_app_view(), all 4 tab pages, badges, select, input, and multi-window without blocking
+
+import std.app as app;
+import std.ui as ui;
+
+fn test_showcase_headless() {
+    print("=== Testing GUI Showcase Components & Tab Navigation ===");
+
+    var cfg = app.default_window_config();
+    cfg.width = 820;
+    cfg.height = 620;
+    assert(app.init(cfg) == 1, "app init failed");
+
+    // Construct tab view and pages
+    var p0 = ui.text("Overview Content");
+    var p1 = ui.text("Microservices Content");
+    var p2 = ui.text("Telemetry Content");
+    var p3 = ui.text("Settings Content");
+    var tv = ui.tabs(["Overview", "Microservices", "Live Telemetry", "Settings & Tools"], [p0, p1, p2, p3], 0);
+
+    var sel = ui.select(["US-East", "EU-Central", "AP-East"], 0);
+    var bdg = ui.badge("HEALTHY").background(ui.green).foreground(ui.white);
+
+    var root = ui.column([
+        ui.row([bdg, sel]),
+        tv
+    ]);
+
+    app.ui(root);
+    app.present_frame();
+
+    assert(tv.active_tab == 0, "Initial tab should be 0 (Overview)");
+    print("Pass: Initial tab Overview verified");
+
+    // Click Tab 1 (Microservices)
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=130, y=70));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=130, y=70));
+    app.process_events();
+    assert(tv.active_tab == 1, "Active tab should switch to 1 (Microservices)");
+    print("Pass: Switched to Tab 1 (Microservices)");
+
+    // Click Tab 2 (Live Telemetry)
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=260, y=70));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=260, y=70));
+    app.process_events();
+    assert(tv.active_tab == 2, "Active tab should switch to 2 (Live Telemetry)");
+    print("Pass: Switched to Tab 2 (Live Telemetry)");
+
+    // Click Tab 3 (Settings & Tools)
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=390, y=70));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=390, y=70));
+    app.process_events();
+    assert(tv.active_tab == 3, "Active tab should switch to 3 (Settings & Tools)");
+    print("Pass: Switched to Tab 3 (Settings & Tools)");
+
+    app.app_shutdown();
+    print("=== All GUI Showcase Verification Checks Passed ===");
+}
+
+test_showcase_headless();

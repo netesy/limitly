@@ -1,28 +1,19 @@
-import std.math as math;
+var PI: float = 3.141592653589793;
 
 frame Ellipse {
-    pub var x: float;
-    pub var y: float;
+    pub var cx: float;
+    pub var cy: float;
     pub var rx: float;
     pub var ry: float;
 
-    pub init(x: float = 0.0, y: float = 0.0, rx: float = 0.0, ry: float = 0.0) {
-        self.x = x;
-        self.y = y;
-        self.rx = rx;
-        self.ry = ry;
-    }
-
-    pub fn contains(px: float, py: float): bool {
-        var dx = px - self.x;
-        var dy = py - self.y;
-        if (self.rx == 0.0 or self.ry == 0.0) {
-            return false;
-        }
-        return (dx * dx) / (self.rx * self.rx) + (dy * dy) / (self.ry * self.ry) <= 1.0;
+    pub init(x: float = 0.0, y: float = 0.0, r1: float = 0.0, r2: float = 0.0) {
+        self.cx = x;
+        self.cy = y;
+        self.rx = r1;
+        self.ry = r2;
     }
 
     pub fn area(): float {
-        return math.PI * self.rx * self.ry;
+        return PI * self.rx * self.ry;
     }
 }

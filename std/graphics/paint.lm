@@ -7,10 +7,10 @@ frame Paint {
     pub var stroke_width: float;
     pub var is_stroke: bool;
 
-    pub init(c: color.Color = color.Color(), b: brush.Brush = brush.Brush(), sw: float = 1.0, stroke: bool = false) {
-        self.color_val = c;
-        self.brush_val = b;
-        self.stroke_width = sw;
-        self.is_stroke = stroke;
+    pub init() {
+        self.color_val = color.rgb(0, 0, 0);
+        self.brush_val = brush.Brush();
+        self.stroke_width = 1.0;
+        self.is_stroke = false;
     }
 }

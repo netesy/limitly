@@ -1,15 +1,23 @@
 import std.ui.widget as widget;
+import std.ui.types as ui_types;
 
 frame Window {
     pub var title: str;
     pub var width: float;
     pub var height: float;
-    pub var root_widget: widget.Widget;
+    pub var root_blueprint: ui_types.Blueprint;
 
-    pub init(t: str = "Window", w: float = 800.0, h: float = 600.0, root: widget.Widget = widget.Widget()) {
+    pub init(t: str = "Window", w: float = 800.0, h: float = 600.0) {
         self.title = t;
         self.width = w;
         self.height = h;
-        self.root_widget = root;
+        self.root_blueprint = ui_types.Blueprint(
+            variant_type=1,
+            container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
+            text_data_val=ui_types.text_data(""),
+            button_data_val=ui_types.button_data(""),
+            constraints=ui_types.empty_constraints(),
+            children=ui_types.empty_blueprints()
+        );
     }
 }
