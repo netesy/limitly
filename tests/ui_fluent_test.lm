@@ -1,0 +1,172 @@
+// Comprehensive Fluent UI Public API Test Suite
+// Verifies:
+// 1. Fluent text styling
+// 2. Fluent button styling
+// 3. Layout modifiers (column, row, spacing, padding)
+// 4. Reusable Style value
+// 5. Modifier precedence and override ordering
+// 6. Button action callback execution
+// 7. Multi-frame retained state persistence
+// 8. std.app -> Sokol lifecycle integration
+
+import std.app as app;
+import std.ui as ui;
+import std.gg as gg;
+
+fn test_button_callback() {
+    print("Action callback executed successfully!");
+}
+
+fn test_fluent_text_styling(): int {
+    var t = ui.text("Hello Limit")
+        .color(ui.red)
+        .font_size(24.0)
+        .bold();
+
+    assert(t.kind == ui.KIND_TEXT, "text kind mismatch");
+    assert(t.text_val == "Hello Limit", "text content mismatch");
+    assert(t.foreground_color.r > 0.8, "text color R mismatch");
+    assert(t.font_size_val == 24.0, "text font size mismatch");
+    assert(t.font_weight_val == 700, "text weight mismatch");
+    print("[PASS] 1. Fluent text styling");
+    return 1;
+}
+
+fn test_fluent_button_styling(): int {
+    var btn = ui.button("Save", test_button_callback)
+        .background(ui.indigo)
+        .foreground(ui.white)
+        .padding(14.0)
+        .corner_radius(8.0)
+        .size(160.0, 44.0);
+
+    assert(btn.kind == ui.KIND_BUTTON, "button kind mismatch");
+    assert(btn.text_val == "Save", "button label mismatch");
+    assert(btn.padding_left == 14.0, "button padding mismatch");
+    assert(btn.corner_radius_val == 8.0, "button corner radius mismatch");
+    assert(btn.width_val == 160.0, "button width mismatch");
+    assert(btn.height_val == 44.0, "button height mismatch");
+    assert(btn.on_click_action != nil, "button callback missing");
+    print("[PASS] 2. Fluent button styling");
+    return 1;
+}
+
+fn test_layout_modifiers(): int {
+    var item1 = ui.text("Item 1");
+    var item2 = ui.text("Item 2");
+    var col = ui.column([item1, item2])
+        .spacing(12.0)
+        .padding_xy(16.0, 20.0);
+
+    assert(col.kind == ui.KIND_CONTAINER, "column kind mismatch");
+    assert(col.is_vertical == 1, "column vertical axis mismatch");
+    assert(len(col.children) == 2, "column child count mismatch");
+    assert(col.spacing_val == 12.0, "column spacing mismatch");
+    assert(col.padding_left == 16.0, "column padding_x mismatch");
+    assert(col.padding_top == 20.0, "column padding_y mismatch");
+
+    var r = ui.row([item1, item2]).spacing(8.0);
+    assert(r.is_vertical == 0, "row axis mismatch");
+    assert(r.spacing_val == 8.0, "row spacing mismatch");
+
+    print("[PASS] 3. Layout modifiers (column, row, spacing, padding)");
+    return 1;
+}
+
+fn test_style_reuse_and_precedence(): int {
+    // Define a reusable style
+    var base_style = ui.style()
+        .background(ui.blue)
+        .foreground(ui.white)
+        .padding(10.0)
+        .corner_radius(6.0)
+        .font_size(16.0);
+
+    // Apply reusable style to two different widgets
+    var btn1 = ui.button("B1").style(base_style);
+    var btn2 = ui.button("B2").style(base_style);
+
+    assert(btn1.background_color.b > 0.9, "btn1 base background mismatch");
+    assert(btn2.background_color.b > 0.9, "btn2 base background mismatch");
+    assert(btn1.padding_left == 10.0, "btn1 base padding mismatch");
+    assert(btn2.padding_left == 10.0, "btn2 base padding mismatch");
+
+    // Test modifier override ordering: local modifier overrides style property (later wins)
+    btn2.background(ui.red).padding(18.0);
+    assert(btn2.background_color.r > 0.8, "btn2 overridden background mismatch");
+    assert(btn2.padding_left == 18.0, "btn2 overridden padding mismatch");
+
+    // Test direct modifier override ordering: later direct modifier overrides earlier direct modifier
+    var t = ui.text("Test").color(ui.red).color(ui.green);
+    assert(t.foreground_color.g > 0.7, "later modifier precedence failed");
+
+    print("[PASS] 4. Reusable Style value and modifier precedence");
+    return 1;
+}
+
+fn test_state_styling(): int {
+    var pressed_style = ui.style().background(ui.dark_gray).foreground(ui.yellow);
+    var btn = ui.button("Stateful")
+        .background(ui.blue)
+        .pressed(pressed_style);
+
+    assert(btn.pressed_style_val.has_bg == true, "pressed style missing bg");
+    assert(btn.pressed_style_val.has_fg == true, "pressed style missing fg");
+    print("[PASS] 5. State-specific styling (LVGL-inspired)");
+    return 1;
+}
+
+fn test_retained_lifecycle_and_callback(): int {
+    var cfg = app.default_window_config();
+    assert(app.init(cfg) == 1, "app init failed");
+
+    var btn = ui.button("Click Counter", test_button_callback)
+        .background(ui.rgb(40, 100, 200))
+        .size(200.0, 40.0);
+
+    var root = ui.column([btn]).padding(20.0);
+    app.ui(root);
+
+    // Frame 1: Initial rendering
+    app.run_frame_step();
+    var p1 = gg.readback_pixel(50, 50);
+    assert(p1 != nil, "frame 1 readback failed");
+    assert(btn.click_count == 0, "initial click count must be 0");
+    assert(btn.is_pressed == 0, "initial is_pressed must be 0");
+
+    // Frame 2: Mouse down on button at (x=50, y=50) -> pressed visual
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=50, y=50));
+    app.run_frame_step();
+    var p2 = gg.readback_pixel(50, 50);
+    assert(p2 != nil, "frame 2 readback failed");
+    assert(p1 != p2, "pixel should change to pressed color on mouse down");
+    assert(btn.is_pressed == 1, "button is_pressed must be 1 on mouse down");
+
+    // Frame 3: Mouse up on button -> fires callback and resets pressed state
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=50, y=50));
+    app.run_frame_step();
+    assert(btn.click_count == 1, "button click_count was not incremented");
+    assert(btn.is_pressed == 0, "button is_pressed must be 0 after mouse up");
+
+    // Frame 4: Verify retained state persistence across frames
+    app.run_frame_step();
+    assert(btn.click_count == 1, "click count must persist");
+
+    app.shutdown();
+    gg.shutdown();
+    print("[PASS] 6. Retained multi-frame state and callback invocation");
+    return 1;
+}
+
+fn main() {
+    print("=== Limit Fluent UI Comprehensive Test Suite ===");
+    test_fluent_text_styling();
+    test_fluent_button_styling();
+    test_layout_modifiers();
+    test_style_reuse_and_precedence();
+    test_state_styling();
+    test_retained_lifecycle_and_callback();
+    print("=== All Fluent UI Tests Passed Successfully ===");
+}
+
+main();

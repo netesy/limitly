@@ -1,7 +1,8 @@
 // UI Context Module
-// Retained UI Pipeline implementation with Dynamic Layout and Hit Testing
+// Retained UI Pipeline implementation with Dynamic Layout, Flexbox Spacers, Hit Testing, and Callback Dispatch
 
 import std.ui.types as ui_types;
+import std.ui as ui;
 import std.gg as gg;
 import std.graphics.canvas as canvas;
 import std.graphics.paint as paint;
@@ -14,6 +15,19 @@ frame UIContextState {
     pub var root_element: int;
     pub var dirty: int;
     pub var current_blueprint: ui_types.Blueprint;
+    pub var current_widget: ui.Widget;
+    pub var has_widget: int;
+    pub var viewport_w: float;
+    pub var viewport_h: float;
+    pub var captured_widget: ui.Widget;
+    pub var has_captured: int;
+    pub var captured_bounds_x: float;
+    pub var captured_bounds_y: float;
+    pub var captured_bounds_w: float;
+    pub var captured_bounds_h: float;
+    pub var last_pointer_x: float;
+    pub var last_pointer_y: float;
+    pub var is_pointer_down: int;
 }
 
 pub var global_ui_context: UIContextState = UIContextState(
@@ -28,7 +42,20 @@ pub var global_ui_context: UIContextState = UIContextState(
         button_data_val=ui_types.button_data(""),
         constraints=ui_types.empty_constraints(),
         children=ui_types.empty_blueprints()
-    )
+    ),
+    current_widget=ui.empty(),
+    has_widget=0,
+    viewport_w=800.0,
+    viewport_h=600.0,
+    captured_widget=ui.empty(),
+    has_captured=0,
+    captured_bounds_x=0.0,
+    captured_bounds_y=0.0,
+    captured_bounds_w=0.0,
+    captured_bounds_h=0.0,
+    last_pointer_x=0.0,
+    last_pointer_y=0.0,
+    is_pointer_down=0
 );
 
 pub fn ui_init(): int {
@@ -48,9 +75,248 @@ pub fn mark_element_dirty(element_id: int): nil {
     global_ui_context.dirty = 1;
 }
 
+pub fn set_viewport_size(w: float, h: float): nil {
+    if (w > 0.0 and h > 0.0) {
+        if (global_ui_context.viewport_w != w or global_ui_context.viewport_h != h) {
+            global_ui_context.viewport_w = w;
+            global_ui_context.viewport_h = h;
+            global_ui_context.dirty = 1;
+        }
+    }
+}
+
+pub fn get_viewport_width(): float {
+    return global_ui_context.viewport_w;
+}
+
+pub fn get_viewport_height(): float {
+    return global_ui_context.viewport_h;
+}
+
+pub fn set_root(w: ui.Widget): nil {
+    global_ui_context.current_widget = w;
+    global_ui_context.has_widget = 1;
+    global_ui_context.dirty = 1;
+}
+
 pub fn update_blueprint(bp: ui_types.Blueprint): nil {
     global_ui_context.current_blueprint = bp;
+    global_ui_context.has_widget = 0;
     global_ui_context.dirty = 1;
+}
+
+pub fn set_root_any(root: any): nil {
+    if (root == nil) {
+        return;
+    }
+    var w = root as ui.Widget;
+    if (w != nil) {
+        set_root(w);
+    } else {
+        var bp = root as ui_types.Blueprint;
+        if (bp != nil) {
+            update_blueprint(bp);
+        }
+    }
+}
+
+// Unicode & Text Editing Helpers
+
+pub fn codepoint_to_utf8(cp: int): str {
+    if (cp <= 0) {
+        return "";
+    }
+    if (cp < 128) {
+        return _builtin_string_from_bytes([cp]);
+    }
+    if (cp <= 2047) {
+        var b1 = 192 | ((cp >> 6) & 31);
+        var b2 = 128 | (cp & 63);
+        return _builtin_string_from_bytes([b1, b2]);
+    }
+    if (cp <= 65535) {
+        var b1 = 224 | ((cp >> 12) & 15);
+        var b2 = 128 | ((cp >> 6) & 63);
+        var b3 = 128 | (cp & 63);
+        return _builtin_string_from_bytes([b1, b2, b3]);
+    }
+    if (cp <= 1114111) {
+        var b1 = 240 | ((cp >> 18) & 7);
+        var b2 = 128 | ((cp >> 12) & 63);
+        var b3 = 128 | ((cp >> 6) & 63);
+        var b4 = 128 | (cp & 63);
+        return _builtin_string_from_bytes([b1, b2, b3, b4]);
+    }
+    return "";
+}
+
+pub fn utf8_pop_back(s: str): str {
+    var l = len(s);
+    if (l <= 0) {
+        return "";
+    }
+    var cut = l - 1;
+    while (cut > 0 and (_builtin_string_byte_at(s, cut) & 192) == 128) {
+        cut = cut - 1;
+    }
+    if (cut <= 0) {
+        return "";
+    }
+    return _builtin_substring(s, 0, cut);
+}
+
+// Layout Measurement Helpers
+
+fn get_char_width(font_size: float): float {
+    if (font_size >= 20.0) {
+        return 16.0;
+    }
+    return 8.0;
+}
+
+fn measure_widget_height(w: ui.Widget): float {
+    if (w.height_val > 0.0) {
+        return w.height_val;
+    }
+    if (w.kind == ui.KIND_TEXT) {
+        if (w.font_size_val >= 20.0) {
+            return 20.0 + w.padding_top + w.padding_bottom;
+        }
+        return 12.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_BUTTON) {
+        return 28.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_INPUT) {
+        return 28.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_CHECKBOX) {
+        return 26.0;
+    }
+    if (w.kind == ui.KIND_SLIDER) {
+        return 24.0;
+    }
+    if (w.kind == ui.KIND_TABS) {
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            return 36.0 + 8.0 + measure_widget_height(w.children[w.active_tab]);
+        }
+        return 36.0;
+    }
+    if (w.kind == ui.KIND_SCROLL) {
+        if (w.height_val > 0.0) return w.height_val;
+        return 140.0;
+    }
+    if (w.kind == ui.KIND_BADGE) {
+        return 20.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_SELECT) {
+        return 28.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_SPACER) {
+        return 10.0;
+    }
+    if (w.kind == ui.KIND_CONTAINER) {
+        if (len(w.children) == 0) {
+            return w.padding_top + w.padding_bottom;
+        }
+        if (w.is_vertical == 1) { // Column
+            var total_h = w.padding_top + w.padding_bottom;
+            var i = 0;
+            while (i < len(w.children)) {
+                var ch_h = measure_widget_height(w.children[i]);
+                total_h = total_h + ch_h;
+                if (i > 0) {
+                    total_h = total_h + w.spacing_val;
+                }
+                i = i + 1;
+            }
+            return total_h;
+        } elif (w.is_vertical == 0) { // Row
+            var max_h = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var ch_h = measure_widget_height(w.children[i]);
+                if (ch_h > max_h) {
+                    max_h = ch_h;
+                }
+                i = i + 1;
+            }
+            return max_h + w.padding_top + w.padding_bottom;
+        } else { // Stack
+            var max_h = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var ch_h = measure_widget_height(w.children[i]);
+                if (ch_h > max_h) {
+                    max_h = ch_h;
+                }
+                i = i + 1;
+            }
+            return max_h;
+        }
+    }
+    return 24.0;
+}
+
+fn measure_widget_width(w: ui.Widget, available_w: float): float {
+    if (w.width_val > 0.0) {
+        return w.width_val;
+    }
+    if (w.kind == ui.KIND_TEXT) {
+        var cw = get_char_width(w.font_size_val);
+        return (len(w.text_val) as float) * cw + w.padding_left + w.padding_right;
+    }
+    if (w.kind == ui.KIND_BUTTON) {
+        var cw = 8.0;
+        var tw = (len(w.text_val) as float) * cw + w.padding_left + w.padding_right + 16.0;
+        if (tw < 60.0) {
+            tw = 60.0;
+        }
+        return tw;
+    }
+    if (w.kind == ui.KIND_INPUT) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 220.0;
+    }
+    if (w.kind == ui.KIND_CHECKBOX) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 42.0;
+    }
+    if (w.kind == ui.KIND_SLIDER) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 140.0;
+    }
+    if (w.kind == ui.KIND_BADGE) {
+        if (w.width_val > 0.0) return w.width_val;
+        return (len(w.text_val) as float) * 8.0 + w.padding_left + w.padding_right + 12.0;
+    }
+    if (w.kind == ui.KIND_SELECT) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 180.0;
+    }
+    if (w.kind == ui.KIND_TABS or w.kind == ui.KIND_SCROLL) {
+        if (w.width_val > 0.0) return w.width_val;
+        return available_w;
+    }
+    if (w.kind == ui.KIND_SPACER) {
+        return 0.0;
+    }
+    if (w.kind == ui.KIND_CONTAINER) {
+        if (w.is_vertical == 0) { // Row
+            var total_w = w.padding_left + w.padding_right;
+            var i = 0;
+            while (i < len(w.children)) {
+                var ch_w = measure_widget_width(w.children[i], available_w);
+                total_w = total_w + ch_w;
+                if (i > 0) {
+                    total_w = total_w + w.spacing_val;
+                }
+                i = i + 1;
+            }
+            return total_w;
+        }
+    }
+    return available_w;
 }
 
 pub fn hit_test_and_click_blueprint(bp: ui_types.Blueprint, px: float, py: float, x: float, y: float, available_w: float, available_h: float): ui_types.Blueprint {
@@ -102,9 +368,428 @@ pub fn hit_test_and_click_blueprint(bp: ui_types.Blueprint, px: float, py: float
     return bp;
 }
 
+pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y: float, available_w: float, available_h: float): nil {
+    if (w.kind == ui.KIND_CONTAINER) {
+        var curr_x = x + w.padding_left;
+        var curr_y = y + w.padding_top;
+        var inner_w = available_w - w.padding_left - w.padding_right;
+        var inner_h = available_h - w.padding_top - w.padding_bottom;
+
+        if (w.is_vertical == 1) { // Column
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = inner_w;
+                if (child.width_val > 0.0) {
+                    child_w = child.width_val;
+                }
+                hit_test_and_click_widget(child, px, py, curr_x, curr_y, child_w, child_h);
+                curr_y = curr_y + child_h + w.spacing_val;
+                i = i + 1;
+            }
+        } elif (w.is_vertical == 0) { // Row with Flexbox Spacers
+            var fixed_w = 0.0;
+            var num_spacers = 0;
+            var total_flex = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                if (child.kind == ui.KIND_SPACER) {
+                    num_spacers = num_spacers + 1;
+                    total_flex = total_flex + child.flex_val;
+                } else {
+                    var cw = measure_widget_width(child, inner_w);
+                    fixed_w = fixed_w + cw;
+                }
+                i = i + 1;
+            }
+            var spacing_total = 0.0;
+            if (len(w.children) > 1) {
+                var num_gaps: float = (len(w.children) - 1) as float;
+                spacing_total = num_gaps * w.spacing_val;
+            }
+            var remaining_w = inner_w - fixed_w - spacing_total;
+            var spacer_unit = 0.0;
+            if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
+                spacer_unit = remaining_w / total_flex;
+            }
+
+            i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = 0.0;
+                if (child.kind == ui.KIND_SPACER) {
+                    child_w = spacer_unit * child.flex_val;
+                } else {
+                    child_w = measure_widget_width(child, inner_w);
+                    hit_test_and_click_widget(child, px, py, curr_x, curr_y, child_w, child_h);
+                }
+                curr_x = curr_x + child_w + w.spacing_val;
+                i = i + 1;
+            }
+        } else { // Stack
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                hit_test_and_click_widget(child, px, py, curr_x, curr_y, inner_w, child_h);
+                i = i + 1;
+            }
+        }
+    }
+    if (w.kind == ui.KIND_BUTTON) {
+        var btn_h = measure_widget_height(w);
+        var btn_w = available_w;
+        if (w.width_val > 0.0) {
+            btn_w = w.width_val;
+        }
+        if (px >= x and px <= x + btn_w and py >= y and py <= y + btn_h) {
+            w.is_pressed = 1;
+            global_ui_context.has_captured = 1;
+            global_ui_context.captured_widget = w;
+            global_ui_context.captured_bounds_x = x;
+            global_ui_context.captured_bounds_y = y;
+            global_ui_context.captured_bounds_w = btn_w;
+            global_ui_context.captured_bounds_h = btn_h;
+            mark_element_dirty(1);
+        }
+    }
+    if (w.kind == ui.KIND_INPUT) {
+        var inp_w = available_w;
+        if (w.width_val > 0.0) inp_w = w.width_val;
+        var inp_h = 28.0;
+        if (w.height_val > 0.0) inp_h = w.height_val;
+        if (px >= x and px <= x + inp_w and py >= y and py <= y + inp_h) {
+            w.is_focused = 1;
+            mark_element_dirty(1);
+        } else {
+            if (w.is_focused != 0) {
+                w.is_focused = 0;
+                mark_element_dirty(1);
+            }
+        }
+    }
+    if (w.kind == ui.KIND_CHECKBOX) {
+        var chk_w = 42.0;
+        if (w.width_val > 0.0) chk_w = w.width_val;
+        var chk_h = 26.0;
+        if (w.height_val > 0.0) chk_h = w.height_val;
+        if (px >= x and px <= x + chk_w and py >= y and py <= y + chk_h) {
+            w.is_pressed = 1;
+            global_ui_context.has_captured = 1;
+            global_ui_context.captured_widget = w;
+            global_ui_context.captured_bounds_x = x;
+            global_ui_context.captured_bounds_y = y;
+            global_ui_context.captured_bounds_w = chk_w;
+            global_ui_context.captured_bounds_h = chk_h;
+            mark_element_dirty(1);
+        }
+    }
+    if (w.kind == ui.KIND_SLIDER) {
+        var s_w = 140.0;
+        if (w.width_val > 0.0) s_w = w.width_val;
+        var s_h = 24.0;
+        if (w.height_val > 0.0) s_h = w.height_val;
+        if (px >= x and px <= x + s_w and py >= y and py <= y + s_h) {
+            w.is_pressed = 1;
+            global_ui_context.has_captured = 1;
+            global_ui_context.captured_widget = w;
+            global_ui_context.captured_bounds_x = x;
+            global_ui_context.captured_bounds_y = y;
+            global_ui_context.captured_bounds_w = s_w;
+            global_ui_context.captured_bounds_h = s_h;
+            var ratio = (px - x) / s_w;
+            if (ratio < 0.0) ratio = 0.0;
+            if (ratio > 1.0) ratio = 1.0;
+            w.slider_val = w.slider_min + ratio * (w.slider_max - w.slider_min);
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+        }
+    }
+    if (w.kind == ui.KIND_TABS) {
+        var tab_x = x;
+        var tab_h = 32.0;
+        var i = 0;
+        while (i < len(w.tab_titles)) {
+            var title = w.tab_titles[i];
+            var item_w = (len(title) as float) * 8.0 + 24.0;
+            if (px >= tab_x and px <= tab_x + item_w and py >= y and py <= y + tab_h) {
+                w.active_tab = i;
+                if (w.on_change_action != nil) {
+                    var act: fn(): nil = w.on_change_action as fn(): nil;
+                    act();
+                }
+                mark_element_dirty(1);
+            }
+            tab_x = tab_x + item_w + w.spacing_val;
+            i = i + 1;
+        }
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            hit_test_and_click_widget(w.children[w.active_tab], px, py, x, y + 40.0, available_w, available_h - 40.0);
+        }
+    }
+    if (w.kind == ui.KIND_SCROLL) {
+        var v_w = available_w;
+        var v_h = 140.0;
+        if (w.height_val > 0.0) v_h = w.height_val;
+        if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
+            if (px >= x + v_w - 12.0) {
+                var click_y_ratio = (py - y) / v_h;
+                if (click_y_ratio < 0.0) click_y_ratio = 0.0;
+                if (click_y_ratio > 1.0) click_y_ratio = 1.0;
+                w.scroll_y = click_y_ratio * w.max_scroll_y;
+                mark_element_dirty(1);
+            } else if (len(w.children) > 0) {
+                var child = w.children[0];
+                var total_child_h = measure_widget_height(child);
+                hit_test_and_click_widget(child, px, py + w.scroll_y, x + 6.0, y + 6.0, v_w - 12.0, total_child_h);
+            }
+        }
+    }
+    if (w.kind == ui.KIND_SELECT) {
+        var sel_w = 180.0;
+        if (w.width_val > 0.0) sel_w = w.width_val;
+        var sel_h = 28.0;
+        if (w.height_val > 0.0) sel_h = w.height_val;
+        if (w.is_open == 1) {
+            var menu_y = y + sel_h + 2.0;
+            var item_h = 26.0;
+            var num_opts = len(w.select_options);
+            var menu_h = (num_opts as float) * item_h + 4.0;
+            if (px >= x and px <= x + sel_w and py >= menu_y and py <= menu_y + menu_h) {
+                var opt_idx: int = ((py - (menu_y + 2.0)) / item_h) as int;
+                if (opt_idx >= 0 and opt_idx < num_opts) {
+                    w.selected_idx = opt_idx;
+                    w.text_val = w.select_options[opt_idx];
+                    w.is_open = 0;
+                    if (w.on_change_action != nil) {
+                        var act: fn(): nil = w.on_change_action as fn(): nil;
+                        act();
+                    }
+                    mark_element_dirty(1);
+                    return;
+                }
+            } elif (px >= x and px <= x + sel_w and py >= y and py <= y + sel_h) {
+                w.is_open = 0;
+                mark_element_dirty(1);
+                return;
+            } else {
+                w.is_open = 0;
+                mark_element_dirty(1);
+            }
+        } else {
+            if (px >= x and px <= x + sel_w and py >= y and py <= y + sel_h) {
+                w.is_open = 1;
+                mark_element_dirty(1);
+                return;
+            }
+        }
+    }
+}
+
+pub fn dispatch_pointer_down(px: float, py: float): nil {
+    global_ui_context.is_pointer_down = 1;
+    global_ui_context.last_pointer_x = px;
+    global_ui_context.last_pointer_y = py;
+    var content_w = global_ui_context.viewport_w - 40.0;
+    var content_h = global_ui_context.viewport_h - 40.0;
+    if (content_w < 100.0) {
+        content_w = 100.0;
+    }
+    if (content_h < 100.0) {
+        content_h = 100.0;
+    }
+    if (global_ui_context.has_widget == 1) {
+        hit_test_and_click_widget(global_ui_context.current_widget, px, py, 20.0, 20.0, content_w, content_h);
+    } else {
+        var updated = hit_test_and_click_blueprint(global_ui_context.current_blueprint, px, py, 20.0, 20.0, content_w, content_h);
+        global_ui_context.current_blueprint = updated;
+    }
+}
+
 pub fn dispatch_pointer_click(px: float, py: float): nil {
-    var updated = hit_test_and_click_blueprint(global_ui_context.current_blueprint, px, py, 20.0, 20.0, 760.0, 560.0);
-    global_ui_context.current_blueprint = updated;
+    dispatch_pointer_down(px, py);
+    dispatch_pointer_up(px, py);
+}
+
+pub fn hit_test_hover_widget(w: ui.Widget, px: float, py: float, x: float, y: float, available_w: float, available_h: float): nil {
+    var inside = 0;
+    var w_w = available_w;
+    if (w.width_val > 0.0) w_w = w.width_val;
+    var w_h = measure_widget_height(w);
+
+    if (px >= x and px <= x + w_w and py >= y and py <= y + w_h) {
+        inside = 1;
+    }
+
+    if (inside == 1) {
+        if (w.is_hovered == 0) {
+            w.is_hovered = 1;
+            mark_element_dirty(1);
+        }
+    } else {
+        if (w.is_hovered == 1) {
+            w.is_hovered = 0;
+            mark_element_dirty(1);
+        }
+    }
+
+    if (w.kind == ui.KIND_CONTAINER) {
+        var curr_x = x + w.padding_left;
+        var curr_y = y + w.padding_top;
+        var inner_w = available_w - w.padding_left - w.padding_right;
+        var inner_h = available_h - w.padding_top - w.padding_bottom;
+
+        if (w.is_vertical == 1) { // Column
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = inner_w;
+                if (child.width_val > 0.0) child_w = child.width_val;
+                hit_test_hover_widget(child, px, py, curr_x, curr_y, child_w, child_h);
+                curr_y = curr_y + child_h + w.spacing_val;
+                i = i + 1;
+            }
+        } elif (w.is_vertical == 0) { // Row
+            var fixed_w = 0.0;
+            var num_spacers = 0;
+            var total_flex = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                if (child.kind == ui.KIND_SPACER) {
+                    num_spacers = num_spacers + 1;
+                    total_flex = total_flex + child.flex_val;
+                } else {
+                    var cw = measure_widget_width(child, inner_w);
+                    fixed_w = fixed_w + cw;
+                }
+                i = i + 1;
+            }
+            var spacing_total = 0.0;
+            if (len(w.children) > 1) {
+                var num_gaps: float = (len(w.children) - 1) as float;
+                spacing_total = num_gaps * w.spacing_val;
+            }
+            var remaining_w = inner_w - fixed_w - spacing_total;
+            var spacer_unit = 0.0;
+            if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
+                spacer_unit = remaining_w / total_flex;
+            }
+
+            i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = 0.0;
+                if (child.kind == ui.KIND_SPACER) {
+                    child_w = spacer_unit * child.flex_val;
+                } else {
+                    child_w = measure_widget_width(child, inner_w);
+                    hit_test_hover_widget(child, px, py, curr_x, curr_y, child_w, child_h);
+                }
+                curr_x = curr_x + child_w + w.spacing_val;
+                i = i + 1;
+            }
+        } else { // Stack
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                hit_test_hover_widget(child, px, py, curr_x, curr_y, inner_w, child_h);
+                i = i + 1;
+            }
+        }
+    }
+
+    if (w.kind == ui.KIND_TABS) {
+        var tab_x = x;
+        var tab_h = 32.0;
+        var i = 0;
+        var found_hover = 0 - 1;
+        while (i < len(w.tab_titles)) {
+            var title = w.tab_titles[i];
+            var item_w = (len(title) as float) * 8.0 + 24.0;
+            if (px >= tab_x and px <= tab_x + item_w and py >= y and py <= y + tab_h) {
+                found_hover = i;
+            }
+            tab_x = tab_x + item_w + w.spacing_val;
+            i = i + 1;
+        }
+        if (w.hovered_tab != found_hover) {
+            w.hovered_tab = found_hover;
+            mark_element_dirty(1);
+        }
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            hit_test_hover_widget(w.children[w.active_tab], px, py, x, y + 40.0, available_w, available_h - 40.0);
+        }
+    }
+
+    if (w.kind == ui.KIND_SCROLL) {
+        var v_w = available_w;
+        var v_h = 140.0;
+        if (w.height_val > 0.0) v_h = w.height_val;
+        if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
+            if (len(w.children) > 0) {
+                var child = w.children[0];
+                var total_child_h = measure_widget_height(child);
+                hit_test_hover_widget(child, px, py + w.scroll_y, x + 6.0, y + 6.0, v_w - 12.0, total_child_h);
+            }
+        }
+    }
+}
+
+pub fn dispatch_pointer_move(px: float, py: float): nil {
+    global_ui_context.last_pointer_x = px;
+    global_ui_context.last_pointer_y = py;
+
+    if (global_ui_context.has_captured == 1) {
+        var cap = global_ui_context.captured_widget;
+        if (cap.kind == ui.KIND_BUTTON) {
+            var inside = 0;
+            if (px >= global_ui_context.captured_bounds_x and
+                px <= global_ui_context.captured_bounds_x + global_ui_context.captured_bounds_w and
+                py >= global_ui_context.captured_bounds_y and
+                py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
+                inside = 1;
+            }
+            if (inside == 1 and cap.is_pressed == 0) {
+                cap.is_pressed = 1;
+                mark_element_dirty(1);
+            } elif (inside == 0 and cap.is_pressed == 1) {
+                cap.is_pressed = 0;
+                mark_element_dirty(1);
+            }
+        } elif (cap.kind == ui.KIND_SLIDER) {
+            var ratio = (px - global_ui_context.captured_bounds_x) / global_ui_context.captured_bounds_w;
+            if (ratio < 0.0) ratio = 0.0;
+            if (ratio > 1.0) ratio = 1.0;
+            cap.slider_val = cap.slider_min + ratio * (cap.slider_max - cap.slider_min);
+            if (cap.on_change_action != nil) {
+                var act: fn(): nil = cap.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+        }
+    }
+
+    var content_w = global_ui_context.viewport_w - 40.0;
+    var content_h = global_ui_context.viewport_h - 40.0;
+    if (content_w < 100.0) {
+        content_w = 100.0;
+    }
+    if (content_h < 100.0) {
+        content_h = 100.0;
+    }
+    if (global_ui_context.has_widget == 1) {
+        hit_test_hover_widget(global_ui_context.current_widget, px, py, 20.0, 20.0, content_w, content_h);
+    }
 }
 
 fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil {
@@ -135,7 +820,7 @@ fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w
         var tdata = bp.text_data_val;
         var p = paint.Paint();
         p.color_val = color.rgb((tdata.color.r * 255.0) as int, (tdata.color.g * 255.0) as int, (tdata.color.b * 255.0) as int);
-        cvs.draw_text(tdata.content, x, y, p);
+        cvs.draw_text(tdata.content, x, y, p, 1);
     }
     if (bp.variant_type == 3) { // Button
         var bdata = bp.button_data_val;
@@ -145,12 +830,654 @@ fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w
 
         var text_p = paint.Paint();
         text_p.color_val = color.rgb((bdata.text_color.r * 255.0) as int, (bdata.text_color.g * 255.0) as int, (bdata.text_color.b * 255.0) as int);
-        cvs.draw_text(bdata.label, x + 10.0, y + 8.0, text_p);
+        cvs.draw_text(bdata.label, x + 10.0, y + 8.0, text_p, 1);
+    }
+}
+
+fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil {
+    if (w.kind == ui.KIND_CONTAINER) {
+        if (w.background_color.a > 0.0) {
+            var p = paint.Paint();
+            p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+            cvs.draw_rect(rect.Rect(x=x, y=y, w=available_w, h=available_h), p);
+        }
+        var curr_x = x + w.padding_left;
+        var curr_y = y + w.padding_top;
+        var inner_w = available_w - w.padding_left - w.padding_right;
+        var inner_h = available_h - w.padding_top - w.padding_bottom;
+
+        if (w.is_vertical == 1) { // Column
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = inner_w;
+                if (child.width_val > 0.0) {
+                    child_w = child.width_val;
+                }
+                render_widget_node(child, curr_x, curr_y, child_w, child_h, cvs);
+                curr_y = curr_y + child_h + w.spacing_val;
+                i = i + 1;
+            }
+        } elif (w.is_vertical == 0) { // Row with Flexbox Spacers
+            var fixed_w = 0.0;
+            var num_spacers = 0;
+            var total_flex = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                if (child.kind == ui.KIND_SPACER) {
+                    num_spacers = num_spacers + 1;
+                    total_flex = total_flex + child.flex_val;
+                } else {
+                    var cw = measure_widget_width(child, inner_w);
+                    fixed_w = fixed_w + cw;
+                }
+                i = i + 1;
+            }
+            var spacing_total = 0.0;
+            if (len(w.children) > 1) {
+                var num_gaps: float = (len(w.children) - 1) as float;
+                spacing_total = num_gaps * w.spacing_val;
+            }
+            var remaining_w = inner_w - fixed_w - spacing_total;
+            var spacer_unit = 0.0;
+            if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
+                spacer_unit = remaining_w / total_flex;
+            }
+
+            i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = 0.0;
+                if (child.kind == ui.KIND_SPACER) {
+                    child_w = spacer_unit * child.flex_val;
+                } else {
+                    child_w = measure_widget_width(child, inner_w);
+                    render_widget_node(child, curr_x, curr_y, child_w, child_h, cvs);
+                }
+                curr_x = curr_x + child_w + w.spacing_val;
+                i = i + 1;
+            }
+        } else { // Stack
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                render_widget_node(child, curr_x, curr_y, inner_w, child_h, cvs);
+                i = i + 1;
+            }
+        }
+    }
+    if (w.kind == ui.KIND_TEXT) {
+        var p = paint.Paint();
+        p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        var scale = 1;
+        if (w.font_size_val >= 20.0) {
+            scale = 2;
+        }
+        cvs.draw_text(w.text_val, x + w.padding_left, y + w.padding_top, p, scale);
+    }
+    if (w.kind == ui.KIND_BUTTON) {
+        var bg = w.background_color;
+        if (w.is_pressed == 1) {
+            if (w.pressed_style_val.has_bg) {
+                bg = w.pressed_style_val.bg;
+            } else {
+                bg = ui.rgb(220, 80, 50);
+            }
+        } elif (w.is_hovered == 1) {
+            if (w.hover_style_val.has_bg) {
+                bg = w.hover_style_val.bg;
+            } else {
+                var r_val = ((bg.r * 255.0) as int) + 25;
+                if (r_val > 255) r_val = 255;
+                var g_val = ((bg.g * 255.0) as int) + 25;
+                if (g_val > 255) g_val = 255;
+                var b_val = ((bg.b * 255.0) as int) + 30;
+                if (b_val > 255) b_val = 255;
+                bg = ui.rgb(r_val, g_val, b_val);
+            }
+        }
+        var p = paint.Paint();
+        p.color_val = color.rgba((bg.r * 255.0) as int, (bg.g * 255.0) as int, (bg.b * 255.0) as int, bg.a);
+        var btn_h = measure_widget_height(w);
+        var btn_w = available_w;
+        if (w.width_val > 0.0) {
+            btn_w = w.width_val;
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=btn_w, h=btn_h), p);
+
+        var fg = w.foreground_color;
+        if (w.is_pressed == 1 and w.pressed_style_val.has_fg) {
+            fg = w.pressed_style_val.fg;
+        } elif (w.is_hovered == 1 and w.hover_style_val.has_fg) {
+            fg = w.hover_style_val.fg;
+        }
+        var text_p = paint.Paint();
+        text_p.color_val = color.rgba((fg.r * 255.0) as int, (fg.g * 255.0) as int, (fg.b * 255.0) as int, fg.a);
+        
+        // Vertically and horizontally align text inside button
+        var ty = y + (btn_h - 8.0) / 2.0;
+        var tx = x + (btn_w - ((len(w.text_val) as float) * 8.0)) / 2.0;
+        if (tx < x + w.padding_left) {
+            tx = x + w.padding_left;
+        }
+        cvs.draw_text(w.text_val, tx, ty, text_p, 1);
+    }
+    if (w.kind == ui.KIND_INPUT) {
+        var inp_w = available_w;
+        if (w.width_val > 0.0) inp_w = w.width_val;
+        var inp_h = 28.0;
+        if (w.height_val > 0.0) inp_h = w.height_val;
+
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgb(20, 22, 28);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=inp_w, h=inp_h), bg_p);
+
+        var border_p = paint.Paint();
+        if (w.is_focused == 1) {
+            border_p.color_val = color.rgb(90, 130, 240);
+        } elif (w.is_hovered == 1) {
+            border_p.color_val = color.rgb(75, 85, 110);
+        } else {
+            border_p.color_val = color.rgb(55, 60, 75);
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=inp_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y + inp_h - 1.0, w=inp_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=1.0, h=inp_h), border_p);
+        cvs.draw_rect(rect.Rect(x=x + inp_w - 1.0, y=y, w=1.0, h=inp_h), border_p);
+
+        var ty = y + (inp_h - 8.0) / 2.0;
+        var tx = x + 8.0;
+        if (len(w.text_val) > 0) {
+            var text_p = paint.Paint();
+            text_p.color_val = color.rgb(255, 255, 255);
+            cvs.draw_text(w.text_val, tx, ty, text_p, 1);
+            if (w.is_focused == 1) {
+                var caret_x = tx + (len(w.text_val) as float) * 8.0;
+                var caret_p = paint.Paint();
+                caret_p.color_val = color.rgb(100, 180, 255);
+                cvs.draw_text("|", caret_x, ty, caret_p, 1);
+            }
+        } else {
+            if (w.is_focused == 1) {
+                var caret_p = paint.Paint();
+                caret_p.color_val = color.rgb(100, 180, 255);
+                cvs.draw_text("|", tx, ty, caret_p, 1);
+            } else {
+                var ph_p = paint.Paint();
+                ph_p.color_val = color.rgb(110, 115, 130);
+                cvs.draw_text(w.placeholder_val, tx, ty, ph_p, 1);
+            }
+        }
+    }
+    if (w.kind == ui.KIND_CHECKBOX) {
+        var chk_w = 42.0;
+        if (w.width_val > 0.0) chk_w = w.width_val;
+        var chk_h = 26.0;
+        if (w.height_val > 0.0) chk_h = w.height_val;
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgb(32, 35, 46);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=chk_w, h=chk_h), bg_p);
+
+        var border_p = paint.Paint();
+        if (w.is_checked == 1) {
+            border_p.color_val = color.rgb(70, 180, 120);
+        } else {
+            border_p.color_val = color.rgb(60, 65, 80);
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=chk_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y + chk_h - 1.0, w=chk_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=1.0, h=chk_h), border_p);
+        cvs.draw_rect(rect.Rect(x=x + chk_w - 1.0, y=y, w=1.0, h=chk_h), border_p);
+
+        var text_p = paint.Paint();
+        if (w.is_checked == 1) {
+            text_p.color_val = color.rgb(80, 220, 130);
+        } else {
+            text_p.color_val = color.rgb(130, 135, 150);
+        }
+        var tx = x + (chk_w - ((len(w.text_val) as float) * 8.0)) / 2.0;
+        var ty = y + (chk_h - 8.0) / 2.0;
+        cvs.draw_text(w.text_val, tx, ty, text_p, 1);
+    }
+    if (w.kind == ui.KIND_SLIDER) {
+        var s_w = 140.0;
+        if (w.width_val > 0.0) s_w = w.width_val;
+        var s_h = 24.0;
+        var track_y = y + (s_h - 4.0) / 2.0;
+
+        var span = w.slider_max - w.slider_min;
+        if (span <= 0.0) span = 1.0;
+        var progress = (w.slider_val - w.slider_min) / span;
+        if (progress < 0.0) progress = 0.0;
+        if (progress > 1.0) progress = 1.0;
+
+        var fill_w = progress * s_w;
+
+        // Inactive right track
+        var right_p = paint.Paint();
+        right_p.color_val = color.rgb(45, 50, 62);
+        cvs.draw_rect(rect.Rect(x=x, y=track_y, w=s_w, h=4.0), right_p);
+
+        // Active left track
+        var left_p = paint.Paint();
+        left_p.color_val = color.rgb(80, 150, 255);
+        cvs.draw_rect(rect.Rect(x=x, y=track_y, w=fill_w, h=4.0), left_p);
+
+        // Thumb handle
+        var thumb_w = 12.0;
+        var thumb_h = 16.0;
+        var thumb_x = x + fill_w - (thumb_w / 2.0);
+        if (thumb_x < x) thumb_x = x;
+        if (thumb_x + thumb_w > x + s_w) thumb_x = x + s_w - thumb_w;
+        var thumb_y = y + (s_h - thumb_h) / 2.0;
+
+        var thumb_p = paint.Paint();
+        thumb_p.color_val = color.rgb(240, 245, 255);
+        cvs.draw_rect(rect.Rect(x=thumb_x, y=thumb_y, w=thumb_w, h=thumb_h), thumb_p);
+    }
+    if (w.kind == ui.KIND_BADGE) {
+        var bdg_h = 20.0;
+        if (w.height_val > 0.0) bdg_h = w.height_val;
+        var bdg_w = (len(w.text_val) as float) * 8.0 + 14.0;
+        if (w.width_val > 0.0) bdg_w = w.width_val;
+
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=bdg_w, h=bdg_h), bg_p);
+
+        var text_p = paint.Paint();
+        text_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        var tx = x + (bdg_w - ((len(w.text_val) as float) * 8.0)) / 2.0;
+        var ty = y + (bdg_h - 8.0) / 2.0;
+        cvs.draw_text(w.text_val, tx, ty, text_p, 1);
+    }
+    if (w.kind == ui.KIND_SELECT) {
+        var sel_w = 180.0;
+        if (w.width_val > 0.0) sel_w = w.width_val;
+        var sel_h = 28.0;
+        if (w.height_val > 0.0) sel_h = w.height_val;
+
+        var bg_p = paint.Paint();
+        if (w.is_hovered == 1 or w.is_open == 1) {
+            bg_p.color_val = color.rgb(38, 42, 54);
+        } else {
+            bg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=sel_w, h=sel_h), bg_p);
+
+        var border_p = paint.Paint();
+        if (w.is_hovered == 1 or w.is_open == 1) {
+            border_p.color_val = color.rgb(80, 150, 255);
+        } else {
+            border_p.color_val = color.rgb(55, 60, 75);
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=sel_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y + sel_h - 1.0, w=sel_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=1.0, h=sel_h), border_p);
+        cvs.draw_rect(rect.Rect(x=x + sel_w - 1.0, y=y, w=1.0, h=sel_h), border_p);
+
+        var text_p = paint.Paint();
+        text_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        var ty = y + (sel_h - 8.0) / 2.0;
+        cvs.draw_text(w.text_val, x + 10.0, ty, text_p, 1);
+
+        var chev_p = paint.Paint();
+        chev_p.color_val = color.rgb(130, 140, 160);
+        if (w.is_open == 1) {
+            cvs.draw_text("^", x + sel_w - 18.0, ty, chev_p, 1);
+        } else {
+            cvs.draw_text("v", x + sel_w - 18.0, ty, chev_p, 1);
+        }
+
+        // Render Open Dropdown Menu
+        if (w.is_open == 1 and len(w.select_options) > 0) {
+            var menu_x = x;
+            var menu_y = y + sel_h + 2.0;
+            var item_h = 26.0;
+            var num_opts = len(w.select_options);
+            var menu_h = (num_opts as float) * item_h + 4.0;
+
+            var menu_bg = paint.Paint();
+            menu_bg.color_val = color.rgb(24, 26, 34);
+            cvs.draw_rect(rect.Rect(x=menu_x, y=menu_y, w=sel_w, h=menu_h), menu_bg);
+
+            var menu_border = paint.Paint();
+            menu_border.color_val = color.rgb(80, 140, 230);
+            cvs.draw_rect(rect.Rect(x=menu_x, y=menu_y, w=sel_w, h=1.0), menu_border);
+            cvs.draw_rect(rect.Rect(x=menu_x, y=menu_y + menu_h - 1.0, w=sel_w, h=1.0), menu_border);
+            cvs.draw_rect(rect.Rect(x=menu_x, y=menu_y, w=1.0, h=menu_h), menu_border);
+            cvs.draw_rect(rect.Rect(x=menu_x + sel_w - 1.0, y=menu_y, w=1.0, h=menu_h), menu_border);
+
+            var opt_idx = 0;
+            while (opt_idx < num_opts) {
+                var opt_item_y = menu_y + 2.0 + (opt_idx as float) * item_h;
+                if (opt_idx == w.selected_idx) {
+                    var item_sel_bg = paint.Paint();
+                    item_sel_bg.color_val = color.rgb(45, 65, 105);
+                    cvs.draw_rect(rect.Rect(x=menu_x + 2.0, y=opt_item_y, w=sel_w - 4.0, h=item_h), item_sel_bg);
+                }
+
+                var opt_text_p = paint.Paint();
+                if (opt_idx == w.selected_idx) {
+                    opt_text_p.color_val = color.rgb(255, 255, 255);
+                } else {
+                    opt_text_p.color_val = color.rgb(180, 185, 200);
+                }
+                var opt_ty = opt_item_y + (item_h - 8.0) / 2.0;
+                cvs.draw_text(w.select_options[opt_idx], menu_x + 10.0, opt_ty, opt_text_p, 1);
+                opt_idx = opt_idx + 1;
+            }
+        }
+    }
+    if (w.kind == ui.KIND_TABS) {
+        var tab_x = x;
+        var tab_h = 32.0;
+        var i = 0;
+        while (i < len(w.tab_titles)) {
+            var title = w.tab_titles[i];
+            var item_w = (len(title) as float) * 8.0 + 24.0;
+            var is_sel = 0;
+            if (i == w.active_tab) is_sel = 1;
+            var is_hov = 0;
+            if (i == w.hovered_tab) is_hov = 1;
+
+            var bg_p = paint.Paint();
+            if (is_sel == 1) {
+                bg_p.color_val = color.rgb(40, 50, 72);
+            } elif (is_hov == 1) {
+                bg_p.color_val = color.rgb(32, 36, 48);
+            } else {
+                bg_p.color_val = color.rgb(24, 26, 34);
+            }
+            cvs.draw_rect(rect.Rect(x=tab_x, y=y, w=item_w, h=tab_h), bg_p);
+
+            if (is_sel == 1) {
+                var line_p = paint.Paint();
+                line_p.color_val = color.rgb(80, 160, 255);
+                cvs.draw_rect(rect.Rect(x=tab_x, y=y + tab_h - 2.0, w=item_w, h=2.0), line_p);
+            }
+
+            var text_p = paint.Paint();
+            if (is_sel == 1) {
+                text_p.color_val = color.rgb(255, 255, 255);
+            } else {
+                text_p.color_val = color.rgb(140, 145, 160);
+            }
+            var tx = tab_x + 12.0;
+            var ty = y + (tab_h - 8.0) / 2.0;
+            cvs.draw_text(title, tx, ty, text_p, 1);
+
+            tab_x = tab_x + item_w + w.spacing_val;
+            i = i + 1;
+        }
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            render_widget_node(w.children[w.active_tab], x, y + 40.0, available_w, available_h - 40.0, cvs);
+        }
+    }
+    if (w.kind == ui.KIND_SCROLL) {
+        var v_w = available_w;
+        var v_h = 140.0;
+        if (w.height_val > 0.0) v_h = w.height_val;
+
+        // Background
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=v_w, h=v_h), bg_p);
+
+        // Render content with scroll offset AND scissor clipping!
+        var total_child_h = 0.0;
+        if (len(w.children) > 0) {
+            var child = w.children[0];
+            total_child_h = measure_widget_height(child);
+            var max_s = total_child_h - v_h;
+            if (max_s < 0.0) max_s = 0.0;
+            w.max_scroll_y = max_s;
+            if (w.scroll_y > max_s) w.scroll_y = max_s;
+            if (w.scroll_y < 0.0) w.scroll_y = 0.0;
+
+            var content_w = v_w - 12.0;
+            cvs.push_clip(rect.Rect(x=x, y=y, w=v_w, h=v_h));
+            render_widget_node(child, x + 6.0, y + 6.0 - w.scroll_y, content_w, total_child_h, cvs);
+            cvs.pop_clip();
+        }
+
+        // Draw Scrollbar Track & Thumb if scrollable
+        if (total_child_h > v_h) {
+            var bar_x = x + v_w - 8.0;
+            var track_p = paint.Paint();
+            track_p.color_val = color.rgb(28, 30, 38);
+            cvs.draw_rect(rect.Rect(x=bar_x, y=y + 2.0, w=6.0, h=v_h - 4.0), track_p);
+
+            var thumb_ratio = v_h / total_child_h;
+            var thumb_h = thumb_ratio * (v_h - 4.0);
+            if (thumb_h < 16.0) thumb_h = 16.0;
+
+            var max_scroll = total_child_h - v_h;
+            var scroll_ratio = 0.0;
+            if (max_scroll > 0.0) scroll_ratio = w.scroll_y / max_scroll;
+            if (scroll_ratio > 1.0) scroll_ratio = 1.0;
+
+            var thumb_y = y + 2.0 + scroll_ratio * ((v_h - 4.0) - thumb_h);
+            var thumb_p = paint.Paint();
+            thumb_p.color_val = color.rgb(90, 100, 125);
+            cvs.draw_rect(rect.Rect(x=bar_x, y=thumb_y, w=6.0, h=thumb_h), thumb_p);
+        }
     }
 }
 
 pub fn frame_update(delta_time: float): nil {
-    var cvs = canvas.Canvas(w=800.0, h=600.0);
-    render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, 760.0, 560.0, cvs);
+    var vw = global_ui_context.viewport_w;
+    var vh = global_ui_context.viewport_h;
+    var cvs = canvas.Canvas(w=vw, h=vh);
+    var content_w = vw - 40.0;
+    var content_h = vh - 40.0;
+    if (content_w < 100.0) {
+        content_w = 100.0;
+    }
+    if (content_h < 100.0) {
+        content_h = 100.0;
+    }
+    if (global_ui_context.has_widget == 1) {
+        render_widget_node(global_ui_context.current_widget, 20.0, 20.0, content_w, content_h, cvs);
+    } else {
+        render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, content_w, content_h, cvs);
+    }
     global_ui_context.dirty = 0;
+}
+
+fn reset_pressed_recursive(w: ui.Widget): nil {
+    if (w.is_pressed != 0) {
+        w.is_pressed = 0;
+        mark_element_dirty(1);
+    }
+    var i = 0;
+    while (i < len(w.children)) {
+        reset_pressed_recursive(w.children[i]);
+        i = i + 1;
+    }
+}
+
+pub fn dispatch_pointer_up(px: float, py: float): nil {
+    global_ui_context.is_pointer_down = 0;
+    global_ui_context.last_pointer_x = px;
+    global_ui_context.last_pointer_y = py;
+
+    if (global_ui_context.has_captured == 1) {
+        var cap = global_ui_context.captured_widget;
+        cap.is_pressed = 0;
+
+        if (cap.kind == ui.KIND_BUTTON) {
+            if (px >= global_ui_context.captured_bounds_x and
+                px <= global_ui_context.captured_bounds_x + global_ui_context.captured_bounds_w and
+                py >= global_ui_context.captured_bounds_y and
+                py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
+                cap.click_count = cap.click_count + 1;
+                if (cap.on_click_action != nil) {
+                    var act: fn(): nil = cap.on_click_action as fn(): nil;
+                    act();
+                }
+                mark_element_dirty(1);
+            }
+        } elif (cap.kind == ui.KIND_CHECKBOX) {
+            if (px >= global_ui_context.captured_bounds_x and
+                px <= global_ui_context.captured_bounds_x + global_ui_context.captured_bounds_w and
+                py >= global_ui_context.captured_bounds_y and
+                py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
+                if (cap.is_checked == 1) {
+                    cap.is_checked = 0;
+                    cap.text_val = "[ ]";
+                } else {
+                    cap.is_checked = 1;
+                    cap.text_val = "[X]";
+                }
+                if (cap.on_change_action != nil) {
+                    var act: fn(): nil = cap.on_change_action as fn(): nil;
+                    act();
+                }
+                mark_element_dirty(1);
+            }
+        }
+
+        global_ui_context.has_captured = 0;
+        global_ui_context.captured_widget = ui.empty();
+    }
+
+    if (global_ui_context.has_widget == 1) {
+        reset_pressed_recursive(global_ui_context.current_widget);
+    }
+}
+
+fn send_char_to_widget(w: ui.Widget, cp: int): int {
+    if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
+        if (cp >= 32 and cp != 127) {
+            var ch = codepoint_to_utf8(cp);
+            if (len(ch) > 0) {
+                w.text_val = w.text_val + ch;
+                if (w.on_change_action != nil) {
+                    var act: fn(): nil = w.on_change_action as fn(): nil;
+                    act();
+                }
+                mark_element_dirty(1);
+            }
+            return 1;
+        }
+    }
+    var i = 0;
+    while (i < len(w.children)) {
+        if (send_char_to_widget(w.children[i], cp) == 1) {
+            return 1;
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
+pub fn dispatch_char_input(cp: int): nil {
+    if (global_ui_context.has_widget == 1) {
+        send_char_to_widget(global_ui_context.current_widget, cp);
+    }
+}
+
+fn send_key_down_to_widget(w: ui.Widget, key_code: int): int {
+    if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
+        if (key_code == 8) { // Backspace
+            if (len(w.text_val) > 0) {
+                w.text_val = utf8_pop_back(w.text_val);
+                if (w.on_change_action != nil) {
+                    var act: fn(): nil = w.on_change_action as fn(): nil;
+                    act();
+                }
+                mark_element_dirty(1);
+            }
+            return 1;
+        }
+    }
+    var i = 0;
+    while (i < len(w.children)) {
+        if (send_key_down_to_widget(w.children[i], key_code) == 1) {
+            return 1;
+        }
+        i = i + 1;
+    }
+    return 0;
+}
+
+pub fn dispatch_key_down(key_code: int): nil {
+    if (global_ui_context.has_widget == 1) {
+        send_key_down_to_widget(global_ui_context.current_widget, key_code);
+    }
+}
+
+fn send_wheel_to_widget(w: ui.Widget, px: float, py: float, delta: float, x: float, y: float, available_w: float, available_h: float): int {
+    if (w.kind == ui.KIND_CONTAINER) {
+        var curr_x = x + w.padding_left;
+        var curr_y = y + w.padding_top;
+        var inner_w = available_w - w.padding_left - w.padding_right;
+        var inner_h = available_h - w.padding_top - w.padding_bottom;
+
+        if (w.is_vertical == 1) { // Column
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var ch_h = measure_widget_height(child);
+                var ch_w = inner_w;
+                if (child.width_val > 0.0) ch_w = child.width_val;
+                if (send_wheel_to_widget(child, px, py, delta, curr_x, curr_y, ch_w, ch_h) == 1) {
+                    return 1;
+                }
+                curr_y = curr_y + ch_h + w.spacing_val;
+                i = i + 1;
+            }
+        } elif (w.is_vertical == 0) { // Row
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var ch_h = measure_widget_height(child);
+                var ch_w = measure_widget_width(child, inner_w);
+                if (send_wheel_to_widget(child, px, py, delta, curr_x, curr_y, ch_w, ch_h) == 1) {
+                    return 1;
+                }
+                curr_x = curr_x + ch_w + w.spacing_val;
+                i = i + 1;
+            }
+        }
+    }
+    if (w.kind == ui.KIND_TABS) {
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            if (send_wheel_to_widget(w.children[w.active_tab], px, py, delta, x, y + 40.0, available_w, available_h - 40.0) == 1) {
+                return 1;
+            }
+        }
+    }
+    if (w.kind == ui.KIND_SCROLL) {
+        var v_w = available_w;
+        var v_h = 140.0;
+        if (w.height_val > 0.0) v_h = w.height_val;
+        if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
+            w.scroll_y = w.scroll_y - (delta * 0.25);
+            if (w.scroll_y < 0.0) w.scroll_y = 0.0;
+            if (w.scroll_y > w.max_scroll_y) w.scroll_y = w.max_scroll_y;
+            mark_element_dirty(1);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+pub fn dispatch_mouse_wheel(delta: float): nil {
+    if (global_ui_context.has_widget == 1) {
+        var content_w = global_ui_context.viewport_w - 40.0;
+        var content_h = global_ui_context.viewport_h - 40.0;
+        if (content_w < 100.0) {
+            content_w = 100.0;
+        }
+        if (content_h < 100.0) {
+            content_h = 100.0;
+        }
+        send_wheel_to_widget(global_ui_context.current_widget, global_ui_context.last_pointer_x, global_ui_context.last_pointer_y, delta, 20.0, 20.0, content_w, content_h);
+    }
 }

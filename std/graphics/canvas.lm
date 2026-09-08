@@ -59,8 +59,15 @@ frame Canvas {
         }
     }
 
-    pub fn draw_text(text_str: str, x: float, y: float, p: paint.Paint): nil {
-        var w = (len(text_str) * 8) as float;
-        self.draw_rect(rect.Rect(x=x, y=y, w=w, h=16.0), p);
+    pub fn draw_text(text_str: str, x: float, y: float, p: paint.Paint, scale: int = 1): nil {
+        gg.draw_text(text_str, x, y, p.color_val.r, p.color_val.g, p.color_val.b, p.color_val.a, scale);
+    }
+
+    pub fn push_clip(r: rect.Rect): nil {
+        gg.push_clip(r.x, r.y, r.w, r.h);
+    }
+
+    pub fn pop_clip(): nil {
+        gg.pop_clip();
     }
 }

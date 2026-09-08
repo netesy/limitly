@@ -3,6 +3,7 @@
 #include "vm_list.hh"
 #include "vm_runtime.hh"
 #include "vm_value.hh"
+#include "vm_string.hh"
 #include <iostream>
 #include "../channel.hh"
 #include "../fiber.hh"
@@ -21,6 +22,7 @@
 #include <filesystem>
 #include <random>
 #include <stdexcept>
+#include "font8x8_basic.h"
 
 // Platform-specific headers and macros
 #if defined(_WIN32)
@@ -87,6 +89,9 @@ const char* register_value_to_cstr(RegisterValue val) {
     if (!IS_PTR(val)) return nullptr;
     ObjHeader* h = (ObjHeader*)UNBOX_PTR(val);
     if (!h) return nullptr;
+    if (h->type_id == TYPE_STRING) {
+        return ((LmStringHeader*)h)->data;
+    }
     if (h->type_id == TYPE_BOX) {
         LmBox* box = (LmBox*)h;
         if (box->type == LM_BOX_STRING) return (const char*)box->value.as_ptr;
@@ -563,10 +568,172 @@ struct GpuBindings {
     int index_buffer_id = 0;
 };
 
+#if defined(_WIN32)
+static LRESULT CALLBACK LimitWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+#endif
+
 class SoftwareGraphicsResource : public Resource {
 public:
+    struct WindowEvent {
+        int type;
+        int x;
+        int y;
+        int key;
+    };
+
     SoftwareGraphicsResource() : width_(800), height_(600), pass_active_(false) {
         pixels_.resize(width_ * height_ * 4, 0);
+    }
+
+    struct ClipRect {
+        int x0 = 0;
+        int y0 = 0;
+        int x1 = 100000;
+        int y1 = 100000;
+    };
+    std::vector<ClipRect> clip_stack_;
+
+    ClipRect get_current_clip() const {
+        if (clip_stack_.empty()) {
+            return ClipRect{0, 0, width_, height_};
+        }
+        return clip_stack_.back();
+    }
+
+    void push_clip(int x, int y, int w, int h) {
+        ClipRect current = get_current_clip();
+        int new_x0 = std::clamp(x, 0, width_);
+        int new_y0 = std::clamp(y, 0, height_);
+        int new_x1 = std::clamp(x + w, 0, width_);
+        int new_y1 = std::clamp(y + h, 0, height_);
+
+        ClipRect intersected;
+        intersected.x0 = std::max(current.x0, new_x0);
+        intersected.y0 = std::max(current.y0, new_y0);
+        intersected.x1 = std::min(current.x1, new_x1);
+        intersected.y1 = std::min(current.y1, new_y1);
+        if (intersected.x1 < intersected.x0) intersected.x1 = intersected.x0;
+        if (intersected.y1 < intersected.y0) intersected.y1 = intersected.y0;
+
+        clip_stack_.push_back(intersected);
+    }
+
+    void pop_clip() {
+        if (!clip_stack_.empty()) {
+            clip_stack_.pop_back();
+        }
+    }
+
+#if defined(_WIN32)
+    HWND get_hwnd() const { return hwnd_; }
+#endif
+
+    ~SoftwareGraphicsResource() override {
+        destroy_window();
+    }
+
+    void destroy_window() {
+#if defined(_WIN32)
+        if (hwnd_) {
+            if (hdc_) {
+                ReleaseDC(hwnd_, hdc_);
+                hdc_ = nullptr;
+            }
+            DestroyWindow(hwnd_);
+            hwnd_ = nullptr;
+            UnregisterClassW(L"LIMIT_SOKOL_APP", GetModuleHandleW(NULL));
+        }
+#endif
+    }
+
+    int get_width() const { return width_; }
+    int get_height() const { return height_; }
+
+    void resize_framebuffer(int w, int h) {
+        if (w <= 0 || h <= 0) return;
+        if (width_ == w && height_ == h) return;
+        width_ = w;
+        height_ = h;
+        pixels_.assign(static_cast<size_t>(width_) * static_cast<size_t>(height_) * 4, 0);
+        bgra_pixels_.assign(pixels_.size(), 0);
+    }
+
+    bool has_frame() const {
+#if defined(_WIN32)
+        return !bgra_pixels_.empty() && hdc_ != nullptr;
+#else
+        return false;
+#endif
+    }
+
+#if defined(_WIN32)
+    void present_to_hdc(HDC hdc) {
+        if (bgra_pixels_.empty() || width_ <= 0 || height_ <= 0) return;
+        if (bgra_pixels_.size() != static_cast<size_t>(width_) * static_cast<size_t>(height_) * 4) return;
+        BITMAPINFO bmi = {};
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = width_;
+        bmi.bmiHeader.biHeight = -height_; // Top-down
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
+
+        StretchDIBits(hdc, 0, 0, width_, height_,
+                      0, 0, width_, height_,
+                      bgra_pixels_.data(), &bmi, DIB_RGB_COLORS, SRCCOPY);
+    }
+#endif
+
+    void create_window(int w, int h, const std::string& title, bool resizable = true) {
+#if defined(_WIN32)
+        if (hwnd_) return;
+        const char* headless = std::getenv("LIMITLY_HEADLESS");
+        if (headless && std::string(headless) != "0") {
+            return;
+        }
+
+        HINSTANCE hinst = GetModuleHandleW(NULL);
+        WNDCLASSEXW wc = {};
+        wc.cbSize = sizeof(WNDCLASSEXW);
+        wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
+        wc.lpfnWndProc = LimitWindowProc;
+        wc.hInstance = hinst;
+        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+        wc.lpszClassName = L"LIMIT_SOKOL_APP";
+        RegisterClassExW(&wc);
+
+        int title_len = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, NULL, 0);
+        std::vector<wchar_t> wtitle(title_len > 0 ? title_len : 1, 0);
+        if (title_len > 0) {
+            MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wtitle.data(), title_len);
+        }
+
+        RECT rc = { 0, 0, w, h };
+        DWORD style = resizable ? WS_OVERLAPPEDWINDOW : (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX);
+        AdjustWindowRect(&rc, style, FALSE);
+
+        hwnd_ = CreateWindowExW(
+            0,
+            L"LIMIT_SOKOL_APP",
+            wtitle.data(),
+            style,
+            CW_USEDEFAULT, CW_USEDEFAULT,
+            rc.right - rc.left, rc.bottom - rc.top,
+            NULL, NULL, hinst, NULL
+        );
+
+        if (hwnd_) {
+            SetWindowLongPtr(hwnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
+            hdc_ = GetDC(hwnd_);
+            ShowWindow(hwnd_, SW_SHOWNORMAL);
+            UpdateWindow(hwnd_);
+        }
+#endif
+    }
+
+    void push_native_event(int type, int x, int y, int key) {
+        std::lock_guard<std::mutex> lock(event_mutex_);
+        native_events_.push_back({type, x, y, key});
     }
 
     ResourceType getType() const override { return ResourceType::GRAPHICS; }
@@ -627,7 +794,30 @@ public:
                 bindings_[bind_id] = b;
                 return VAL_TRUE;
             }
+            case ResourceOperation::PUSH: {
+                double x = 0.0, y = 0.0, w = width_, h = height_;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) x = register_value_to_double(lm_list_get(list, 0));
+                        if (lm_list_len(list) > 1) y = register_value_to_double(lm_list_get(list, 1));
+                        if (lm_list_len(list) > 2) w = register_value_to_double(lm_list_get(list, 2));
+                        if (lm_list_len(list) > 3) h = register_value_to_double(lm_list_get(list, 3));
+                    } else {
+                        x = register_value_to_double(args[0]);
+                        if (args.size() > 1) y = register_value_to_double(args[1]);
+                        if (args.size() > 2) w = register_value_to_double(args[2]);
+                        if (args.size() > 3) h = register_value_to_double(args[3]);
+                    }
+                }
+                push_clip(static_cast<int>(x), static_cast<int>(y), static_cast<int>(w), static_cast<int>(h));
+                return VAL_TRUE;
+            }
+            case ResourceOperation::POP: {
+                pop_clip();
+                return VAL_TRUE;
+            }
             case ResourceOperation::FILL: {
+                clip_stack_.clear();
                 pass_active_ = true;
                 double r = 0.0, g = 0.0, b = 0.0, a = 1.0;
                 if (!args.empty()) {
@@ -700,10 +890,11 @@ public:
                     double x1 = data[0], y1 = data[1], x2 = data[2], y2 = data[3], x3 = data[4], y3 = data[5];
                     double r = data[6], g = data[7], b = data[8], a = data[9];
 
-                    int min_x = std::clamp(static_cast<int>(std::floor(std::min({x1, x2, x3}))), 0, width_);
-                    int max_x = std::clamp(static_cast<int>(std::ceil(std::max({x1, x2, x3}))), 0, width_);
-                    int min_y = std::clamp(static_cast<int>(std::floor(std::min({y1, y2, y3}))), 0, height_);
-                    int max_y = std::clamp(static_cast<int>(std::ceil(std::max({y1, y2, y3}))), 0, height_);
+                    ClipRect clip = get_current_clip();
+                    int min_x = std::clamp(static_cast<int>(std::floor(std::min({x1, x2, x3}))), clip.x0, clip.x1);
+                    int max_x = std::clamp(static_cast<int>(std::ceil(std::max({x1, x2, x3}))), clip.x0, clip.x1);
+                    int min_y = std::clamp(static_cast<int>(std::floor(std::min({y1, y2, y3}))), clip.y0, clip.y1);
+                    int max_y = std::clamp(static_cast<int>(std::ceil(std::max({y1, y2, y3}))), clip.y0, clip.y1);
 
                     auto edge = [](double ax, double ay, double bx, double by, double cx, double cy) {
                         return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
@@ -735,10 +926,11 @@ public:
                     double x = data[0], y = data[1], w = data[2], h = data[3];
                     double r = data[4], g = data[5], b = data[6], a = data[7];
 
-                    int x0 = std::clamp(static_cast<int>(x), 0, width_);
-                    int y0 = std::clamp(static_cast<int>(y), 0, height_);
-                    int x1 = std::clamp(static_cast<int>(x + w), 0, width_);
-                    int y1 = std::clamp(static_cast<int>(y + h), 0, height_);
+                    ClipRect clip = get_current_clip();
+                    int x0 = std::clamp(static_cast<int>(x), clip.x0, clip.x1);
+                    int y0 = std::clamp(static_cast<int>(y), clip.y0, clip.y1);
+                    int x1 = std::clamp(static_cast<int>(x + w), clip.x0, clip.x1);
+                    int y1 = std::clamp(static_cast<int>(y + h), clip.y0, clip.y1);
 
                     uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
                     uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
@@ -782,10 +974,11 @@ public:
                     }
                 }
 
-                int x0 = std::clamp(static_cast<int>(x), 0, width_);
-                int y0 = std::clamp(static_cast<int>(y), 0, height_);
-                int x1 = std::clamp(static_cast<int>(x + w), 0, width_);
-                int y1 = std::clamp(static_cast<int>(y + h), 0, height_);
+                ClipRect clip = get_current_clip();
+                int x0 = std::clamp(static_cast<int>(x), clip.x0, clip.x1);
+                int y0 = std::clamp(static_cast<int>(y), clip.y0, clip.y1);
+                int x1 = std::clamp(static_cast<int>(x + w), clip.x0, clip.x1);
+                int y1 = std::clamp(static_cast<int>(y + h), clip.y0, clip.y1);
 
                 uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
                 uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
@@ -821,10 +1014,11 @@ public:
                     }
                 }
 
-                int min_x = std::clamp(static_cast<int>(std::floor(std::min({x1, x2, x3}))), 0, width_);
-                int max_x = std::clamp(static_cast<int>(std::ceil(std::max({x1, x2, x3}))), 0, width_);
-                int min_y = std::clamp(static_cast<int>(std::floor(std::min({y1, y2, y3}))), 0, height_);
-                int max_y = std::clamp(static_cast<int>(std::ceil(std::max({y1, y2, y3}))), 0, height_);
+                ClipRect clip = get_current_clip();
+                int min_x = std::clamp(static_cast<int>(std::floor(std::min({x1, x2, x3}))), clip.x0, clip.x1);
+                int max_x = std::clamp(static_cast<int>(std::ceil(std::max({x1, x2, x3}))), clip.x0, clip.x1);
+                int min_y = std::clamp(static_cast<int>(std::floor(std::min({y1, y2, y3}))), clip.y0, clip.y1);
+                int max_y = std::clamp(static_cast<int>(std::ceil(std::max({y1, y2, y3}))), clip.y0, clip.y1);
 
                 auto edge = [](double ax, double ay, double bx, double by, double cx, double cy) {
                     return (cx - ax) * (by - ay) - (cy - ay) * (bx - ax);
@@ -854,6 +1048,92 @@ public:
                 }
                 return VAL_TRUE;
             }
+            case ResourceOperation::DRAW_TEXT: {
+                std::string text = "";
+                double x = 0.0, y = 0.0;
+                double r = 1.0, g = 1.0, b = 1.0, a = 1.0;
+                int scale = 2;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) {
+                            const char* s = register_value_to_cstr(lm_list_get(list, 0));
+                            if (s) text = s;
+                        }
+                        if (lm_list_len(list) > 1) x = register_value_to_double(lm_list_get(list, 1));
+                        if (lm_list_len(list) > 2) y = register_value_to_double(lm_list_get(list, 2));
+                        if (lm_list_len(list) > 3) r = register_value_to_double(lm_list_get(list, 3));
+                        if (lm_list_len(list) > 4) g = register_value_to_double(lm_list_get(list, 4));
+                        if (lm_list_len(list) > 5) b = register_value_to_double(lm_list_get(list, 5));
+                        if (lm_list_len(list) > 6) a = register_value_to_double(lm_list_get(list, 6));
+                        if (lm_list_len(list) > 7) {
+                            int s = static_cast<int>(register_value_to_i64(lm_list_get(list, 7)));
+                            if (s > 0) scale = s;
+                        }
+                    } else {
+                        const char* s = register_value_to_cstr(args[0]);
+                        if (s) text = s;
+                        if (args.size() > 1) x = register_value_to_double(args[1]);
+                        if (args.size() > 2) y = register_value_to_double(args[2]);
+                        if (args.size() > 3) r = register_value_to_double(args[3]);
+                        if (args.size() > 4) g = register_value_to_double(args[4]);
+                        if (args.size() > 5) b = register_value_to_double(args[5]);
+                        if (args.size() > 6) a = register_value_to_double(args[6]);
+                        if (args.size() > 7) {
+                            int s = static_cast<int>(register_value_to_i64(args[7]));
+                            if (s > 0) scale = s;
+                        }
+                    }
+                }
+
+                uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
+                uint8_t gu = static_cast<uint8_t>(std::clamp(g * 255.0, 0.0, 255.0));
+                uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
+                uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
+
+                ClipRect clip = get_current_clip();
+                int cursor_x = static_cast<int>(x);
+                int start_y = static_cast<int>(y);
+
+                for (unsigned char ch : text) {
+                    if (ch == '\n') {
+                        start_y += 8 * scale;
+                        cursor_x = static_cast<int>(x);
+                        continue;
+                    }
+                    if (ch < 128) {
+                        for (int row = 0; row < 8; ++row) {
+                            uint8_t row_bits = font8x8_basic[ch][row];
+                            for (int col = 0; col < 8; ++col) {
+                                if (row_bits & (1 << col)) {
+                                    for (int dy = 0; dy < scale; ++dy) {
+                                        for (int dx = 0; dx < scale; ++dx) {
+                                            int px = cursor_x + col * scale + dx;
+                                            int py = start_y + row * scale + dy;
+                                            if (px >= clip.x0 && px < clip.x1 && py >= clip.y0 && py < clip.y1) {
+                                                size_t idx = static_cast<size_t>(py * width_ + px) * 4;
+                                                if (au == 255) {
+                                                    pixels_[idx]     = ru;
+                                                    pixels_[idx + 1] = gu;
+                                                    pixels_[idx + 2] = bu;
+                                                    pixels_[idx + 3] = 255;
+                                                } else {
+                                                    float alpha = au / 255.0f;
+                                                    pixels_[idx]     = static_cast<uint8_t>(ru * alpha + pixels_[idx] * (1.0f - alpha));
+                                                    pixels_[idx + 1] = static_cast<uint8_t>(gu * alpha + pixels_[idx + 1] * (1.0f - alpha));
+                                                    pixels_[idx + 2] = static_cast<uint8_t>(bu * alpha + pixels_[idx + 2] * (1.0f - alpha));
+                                                    pixels_[idx + 3] = std::max(pixels_[idx + 3], au);
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    cursor_x += 8 * scale;
+                }
+                return VAL_TRUE;
+            }
             case ResourceOperation::READ: {
                 int px = 0;
                 int py = 0;
@@ -874,9 +1154,90 @@ public:
                                (static_cast<uint32_t>(pixels_[idx + 3]));
                 return make_i64(static_cast<int64_t>(val));
             }
-            case ResourceOperation::FLUSH:
-            case ResourceOperation::CLOSE:
+            case ResourceOperation::SPAWN: {
+                int w = width_, h = height_;
+                std::string title = "Limit Application";
+                bool resizable = true;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) w = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
+                        if (lm_list_len(list) > 1) h = static_cast<int>(register_value_to_i64(lm_list_get(list, 1)));
+                        if (lm_list_len(list) > 2) {
+                            const char* s = register_value_to_cstr(lm_list_get(list, 2));
+                            if (s) title = s;
+                        }
+                        if (lm_list_len(list) > 3) {
+                            resizable = register_value_to_i64(lm_list_get(list, 3)) != 0;
+                        }
+                    } else {
+                        w = static_cast<int>(register_value_to_i64(args[0]));
+                        if (args.size() > 1) h = static_cast<int>(register_value_to_i64(args[1]));
+                        if (args.size() > 2) {
+                            const char* s = register_value_to_cstr(args[2]);
+                            if (s) title = s;
+                        }
+                        if (args.size() > 3) {
+                            resizable = register_value_to_i64(args[3]) != 0;
+                        }
+                    }
+                }
+#if defined(_WIN32)
+                if (hwnd_) {
+                    return VAL_TRUE;
+                }
+#endif
+                if (w > 0 && h > 0) {
+                    width_ = w;
+                    height_ = h;
+                    pixels_.assign(width_ * height_ * 4, 0);
+                }
+                create_window(width_, height_, title, resizable);
                 return VAL_TRUE;
+            }
+            case ResourceOperation::POLL: {
+#if defined(_WIN32)
+                if (hwnd_) {
+                    MSG msg;
+                    while (PeekMessageW(&msg, hwnd_, 0, 0, PM_REMOVE)) {
+                        TranslateMessage(&msg);
+                        DispatchMessageW(&msg);
+                    }
+                }
+#endif
+                LmList* list = lm_list_new();
+                std::lock_guard<std::mutex> lock(event_mutex_);
+                for (const auto& ev : native_events_) {
+                    lm_list_append(list, BOX_INT(ev.type));
+                    lm_list_append(list, BOX_INT(ev.x));
+                    lm_list_append(list, BOX_INT(ev.y));
+                    lm_list_append(list, BOX_INT(ev.key));
+                }
+                native_events_.clear();
+                return BOX_PTR(list);
+            }
+            case ResourceOperation::FLUSH: {
+#if defined(_WIN32)
+                if (hwnd_ && hdc_) {
+                    if (bgra_pixels_.size() != pixels_.size()) {
+                        bgra_pixels_.resize(pixels_.size());
+                    }
+                    for (size_t i = 0; i < pixels_.size(); i += 4) {
+                        bgra_pixels_[i]     = pixels_[i + 2]; // B
+                        bgra_pixels_[i + 1] = pixels_[i + 1]; // G
+                        bgra_pixels_[i + 2] = pixels_[i];     // R
+                        bgra_pixels_[i + 3] = pixels_[i + 3]; // A
+                    }
+
+                    present_to_hdc(hdc_);
+                    Sleep(16);
+                }
+#endif
+                return VAL_TRUE;
+            }
+            case ResourceOperation::CLOSE: {
+                destroy_window();
+                return VAL_TRUE;
+            }
             default:
                 return VAL_NIL;
         }
@@ -893,7 +1254,79 @@ private:
     std::map<int, GpuPipeline> pipelines_;
     std::map<int, GpuBindings> bindings_;
     std::vector<uint8_t> pixels_;
+#if defined(_WIN32)
+    HWND hwnd_ = nullptr;
+    HDC hdc_ = nullptr;
+#endif
+    std::mutex event_mutex_;
+    std::vector<WindowEvent> native_events_;
+    std::vector<uint8_t> bgra_pixels_;
 };
+
+#if defined(_WIN32)
+static LRESULT CALLBACK LimitWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    auto* res = reinterpret_cast<SoftwareGraphicsResource*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
+    if (res) {
+        switch (msg) {
+            case WM_CLOSE:
+                res->push_native_event(0, 0, 0, 0); // EVENT_QUIT
+                return 0;
+            case WM_SIZE: {
+                if (hwnd == res->get_hwnd() && wParam != SIZE_MINIMIZED) {
+                    int new_w = LOWORD(lParam);
+                    int new_h = HIWORD(lParam);
+                    if (new_w > 0 && new_h > 0 && (new_w != res->get_width() || new_h != res->get_height())) {
+                        res->resize_framebuffer(new_w, new_h);
+                        res->push_native_event(1, new_w, new_h, 0); // EVENT_RESIZE
+                    }
+                }
+                return 0;
+            }
+            case WM_GETMINMAXINFO: {
+                auto* mmi = reinterpret_cast<MINMAXINFO*>(lParam);
+                mmi->ptMinTrackSize.x = 400;
+                mmi->ptMinTrackSize.y = 300;
+                return 0;
+            }
+            case WM_LBUTTONDOWN:
+                res->push_native_event(4, LOWORD(lParam), HIWORD(lParam), 0); // EVENT_MOUSE_DOWN
+                return 0;
+            case WM_LBUTTONUP:
+                res->push_native_event(5, LOWORD(lParam), HIWORD(lParam), 0); // EVENT_MOUSE_UP
+                return 0;
+            case WM_MOUSEMOVE:
+                res->push_native_event(6, LOWORD(lParam), HIWORD(lParam), 0); // EVENT_MOUSE_MOVE
+                return 0;
+            case WM_KEYDOWN:
+                res->push_native_event(2, 0, 0, static_cast<int>(wParam)); // EVENT_KEY_DOWN
+                return 0;
+            case WM_KEYUP:
+                res->push_native_event(3, 0, 0, static_cast<int>(wParam)); // EVENT_KEY_UP
+                return 0;
+            case WM_CHAR:
+                res->push_native_event(7, 0, 0, static_cast<int>(wParam)); // EVENT_CHAR
+                return 0;
+            case WM_MOUSEWHEEL: {
+                int delta = static_cast<short>(HIWORD(wParam));
+                res->push_native_event(8, 0, delta, 0); // EVENT_MOUSE_WHEEL
+                return 0;
+            }
+            case WM_ERASEBKGND:
+                return 1;
+            case WM_PAINT: {
+                PAINTSTRUCT ps;
+                HDC hdc = BeginPaint(hwnd, &ps);
+                if (hwnd == res->get_hwnd() && res->has_frame()) {
+                    res->present_to_hdc(hdc);
+                }
+                EndPaint(hwnd, &ps);
+                return 0;
+            }
+        }
+    }
+    return DefWindowProcW(hwnd, msg, wParam, lParam);
+}
+#endif
 
 // ===================== Concrete Resource Implementations =====================
 

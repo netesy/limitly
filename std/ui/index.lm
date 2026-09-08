@@ -1,52 +1,90 @@
 // UI Module Index
-// Main entry point for the UI framework and widget toolkit
+// Re-exports the modern fluent std.ui API and retains legacy structures for compatibility
 
-import std.ui.builder as builder;
+import std.ui as ui;
+import std.ui.application as application;
 import std.ui.window as window;
 import std.ui.types as ui_types;
+import std.ui.builder as builder;
 
-var Window = window.Window;
+pub var Application = application.Application;
+pub var Window = window.Window;
 
-fn vstack(children: [ui_types.Blueprint]): ui_types.Blueprint {
-    return builder.vstack(children);
+// Re-export fluent widget constructors
+pub fn text(content: str): ui.Widget {
+    return ui.text(content);
 }
 
-fn hstack(children: [ui_types.Blueprint]): ui_types.Blueprint {
-    return builder.hstack(children);
+pub fn button(lbl: str, on_click: any = nil): ui.Widget {
+    return ui.button(lbl, on_click);
 }
 
-fn column(children: [ui_types.Blueprint]): ui_types.Blueprint {
-    return builder.vstack(children);
+pub fn column(children: [ui.Widget]): ui.Widget {
+    return ui.column(children);
 }
 
-fn row(children: [ui_types.Blueprint]): ui_types.Blueprint {
-    return builder.hstack(children);
+pub fn row(children: [ui.Widget]): ui.Widget {
+    return ui.row(children);
 }
 
-fn text(content: str): ui_types.Blueprint {
-    return builder.text(content);
+pub fn stack(children: [ui.Widget]): ui.Widget {
+    return ui.stack(children);
 }
 
-fn text_color(content: str, c: ui_types.Color): ui_types.Blueprint {
-    return builder.text_color(content, c);
+pub fn spacer(flex: float = 1.0): ui.Widget {
+    return ui.spacer(flex);
 }
 
-fn label(content: str): ui_types.Blueprint {
-    return builder.text(content);
+pub fn empty(): ui.Widget {
+    return ui.empty();
 }
 
-fn button(lbl: str): ui_types.Blueprint {
-    return builder.button(lbl);
+pub fn style(): ui.Style {
+    return ui.style();
 }
 
-fn button_background(lbl: str, bg: ui_types.Color): ui_types.Blueprint {
-    return builder.button_background(lbl, bg);
+// Colors
+pub fn rgb(r: int, g: int, b: int): ui.Color {
+    return ui.rgb(r, g, b);
 }
 
-fn empty(): ui_types.Blueprint {
-    return builder.empty();
+pub fn rgba(r: int, g: int, b: int, a: float): ui.Color {
+    return ui.rgba(r, g, b, a);
 }
 
-fn color_rgb8(r: int, g: int, b: int): ui_types.Color {
-    return builder.color_rgb8(r, g, b);
+pub var white: ui.Color = ui.white;
+pub var black: ui.Color = ui.black;
+pub var red: ui.Color = ui.red;
+pub var green: ui.Color = ui.green;
+pub var blue: ui.Color = ui.blue;
+pub var indigo: ui.Color = ui.indigo;
+pub var yellow: ui.Color = ui.yellow;
+pub var gray: ui.Color = ui.gray;
+pub var dark_gray: ui.Color = ui.dark_gray;
+pub var light_gray: ui.Color = ui.light_gray;
+pub var transparent: ui.Color = ui.transparent;
+
+// Backward Compatibility Aliases (Deprecated)
+pub fn color_rgb8(r: int, g: int, b: int): ui.Color {
+    return ui.rgb(r, g, b);
+}
+
+pub fn text_color(content: str, c: ui.Color): ui.Widget {
+    return ui.text(content).color(c);
+}
+
+pub fn button_background(lbl: str, bg: ui.Color): ui.Widget {
+    return ui.button(lbl).background(bg);
+}
+
+pub fn label(content: str): ui.Widget {
+    return ui.text(content);
+}
+
+pub fn vstack(children: [ui.Widget]): ui.Widget {
+    return ui.column(children);
+}
+
+pub fn hstack(children: [ui.Widget]): ui.Widget {
+    return ui.row(children);
 }

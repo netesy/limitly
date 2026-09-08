@@ -1,31 +1,392 @@
-// GUI Showcase Application
-// Demonstrates target architecture: Limit App -> std.app -> std.ui -> std.graphics -> std.gg -> VM Backend
+// Limit Studio — Modern Cloud Console Showcase
+// Demonstrates a complete, beautifully-themed, real-world application built with std.ui & std.app.
+// Features:
+// - Composable widgets (tabs, inputs, badges, select, checkboxes, sliders, scrollviews)
+// - Hover styling, pressed styling, and unhover click reset
+// - Scissor-clipped scroll view (content clipped cleanly to container)
+// - Dynamic tab view page switching
+// - True dropdown select menu
+// - Adaptive responsive layout
 
 import std.app as app;
-import std.ui.index as ui;
+import std.ui as ui;
+
+// Action Callbacks
+fn on_deploy() {
+    print("[Action] Deploying microservice release v2.4.0 to edge clusters...");
+}
+
+fn on_sync() {
+    print("[Action] Cluster state synchronized with central registry.");
+}
+
+fn on_drain() {
+    print("[Action] Draining worker node pool (zero-downtime cordon active).");
+}
+
+fn on_purge() {
+    print("[Action] Edge CDN cache purged globally across 34 points of presence.");
+}
+
+fn on_tab_switch() {
+    print("[Navigation] Active tab switched.");
+}
+
+fn on_search_changed() {
+    print("[Search] Filter query updated.");
+}
+
+fn on_autoscale_toggled() {
+    print("[Config] Auto-Scale toggled.");
+}
+
+fn on_rolling_toggled() {
+    print("[Config] Rolling Restarts toggled.");
+}
+
+fn on_replica_slider() {
+    print("[Config] Replica scale slider adjusted.");
+}
+
+fn on_region_changed() {
+    print("[Config] Deployment region changed via select dropdown.");
+}
+
+// UI Header Component
+fn build_header(): ui.Widget {
+    var header_bar = ui.row([
+        ui.text("LIMIT STUDIO")
+            .font_size(20.0)
+            .bold()
+            .color(ui.indigo),
+
+        ui.spacer(),
+
+        ui.text("Cluster: us-east-prod-1  |  Latency: 12ms")
+            .font_size(12.0)
+            .color(ui.green),
+
+        ui.badge("HEALTHY", ui.rgb(30, 80, 50), ui.rgb(100, 240, 150)),
+
+        ui.spacer(),
+
+        ui.button("Deploy v2.4", on_deploy)
+            .background(ui.indigo)
+            .foreground(ui.white)
+            .padding_xy(14.0, 7.0)
+            .corner_radius(6.0),
+
+        ui.button("Sync State", on_sync)
+            .background(ui.rgb(45, 50, 68))
+            .foreground(ui.rgb(160, 200, 255))
+            .padding_xy(14.0, 7.0)
+            .corner_radius(6.0)
+    ]).spacing(10.0);
+
+    return header_bar;
+}
+
+// Reusable Metric Stat Card
+fn stat_card(title: str, metric: str, subtitle: str, metric_color: ui.Color, badge_label: str): ui.Widget {
+    var card_style = ui.style()
+        .background(ui.rgb(26, 28, 36))
+        .padding(12.0)
+        .corner_radius(8.0)
+        .spacing(4.0);
+
+    var top_row = ui.row([
+        ui.text(title)
+            .font_size(11.0)
+            .color(ui.gray),
+        ui.spacer(),
+        ui.badge(badge_label, ui.rgb(35, 45, 60), ui.rgb(140, 190, 255))
+    ]);
+
+    return ui.column([
+        top_row,
+        ui.text(metric)
+            .font_size(20.0)
+            .bold()
+            .color(metric_color),
+        ui.text(subtitle)
+            .font_size(11.0)
+            .color(ui.light_gray)
+    ])
+    .style(card_style)
+    .width(220.0);
+}
+
+// TAB 0: Overview Page
+fn build_overview_page(): ui.Widget {
+    var metrics_row = ui.row([
+        stat_card("COMPUTE UTILIZATION", "42.8%", "16 vCPUs active - 4 nodes", ui.rgb(80, 220, 130), "STABLE"),
+        ui.spacer(),
+        stat_card("INGRESS BANDWIDTH", "1.84 GB/s", "+14.2% vs prior hour", ui.rgb(100, 180, 255), "PEAK"),
+        ui.spacer(),
+        stat_card("EDGE AVAILABILITY", "99.995%", "0 dropouts detected", ui.rgb(80, 220, 130), "SLO MET")
+    ]).spacing(8.0);
+
+    var summary_card_style = ui.style()
+        .background(ui.rgb(24, 26, 34))
+        .padding(14.0)
+        .corner_radius(8.0)
+        .spacing(8.0);
+
+    var summary_title = ui.row([
+        ui.text("Infrastructure Orchestration Summary")
+            .font_size(14.0)
+            .bold()
+            .color(ui.white),
+        ui.spacer(),
+        ui.badge("MULTI-REGION", ui.indigo, ui.white)
+    ]);
+
+    var summary_desc = ui.text("Autonomous edge cluster running across 34 PoPs. Self-healing mesh routing enabled.")
+        .font_size(12.0)
+        .color(ui.light_gray);
+
+    var quick_actions = ui.row([
+        ui.button("Sync Cluster State", on_sync)
+            .background(ui.blue)
+            .foreground(ui.white)
+            .padding_xy(12.0, 6.0)
+            .corner_radius(4.0),
+
+        ui.button("Drain Worker Nodes", on_drain)
+            .background(ui.rgb(65, 40, 40))
+            .foreground(ui.rgb(255, 140, 120))
+            .padding_xy(12.0, 6.0)
+            .corner_radius(4.0),
+
+        ui.button("Purge Edge Cache", on_purge)
+            .background(ui.rgb(40, 45, 55))
+            .foreground(ui.light_gray)
+            .padding_xy(12.0, 6.0)
+            .corner_radius(4.0)
+    ]).spacing(10.0);
+
+    var summary_card = ui.column([
+        summary_title,
+        summary_desc,
+        quick_actions
+    ]).style(summary_card_style);
+
+    return ui.column([
+        metrics_row,
+        summary_card
+    ]).spacing(10.0);
+}
+
+// Service Row in Catalog
+fn service_row(name: str, status: str, version: str, region: str, is_healthy: int): ui.Widget {
+    var status_bg = ui.rgb(25, 75, 45);
+    var status_fg = ui.rgb(90, 240, 140);
+    if (is_healthy == 0) {
+        status_bg = ui.rgb(75, 55, 20);
+        status_fg = ui.rgb(255, 210, 80);
+    }
+
+    return ui.row([
+        ui.text(name)
+            .font_size(13.0)
+            .bold()
+            .color(ui.white)
+            .width(180.0),
+        ui.badge(status, status_bg, status_fg),
+        ui.spacer(),
+        ui.badge(version, ui.rgb(35, 45, 65), ui.rgb(130, 180, 255)),
+        ui.spacer(),
+        ui.badge(region, ui.rgb(35, 38, 48), ui.gray),
+        ui.spacer(),
+        ui.button("Restart", on_sync)
+            .background(ui.rgb(45, 48, 60))
+            .foreground(ui.light_gray)
+            .padding_xy(10.0, 4.0)
+            .corner_radius(4.0)
+    ]).spacing(8.0);
+}
+
+// TAB 1: Microservices Catalog Page
+fn build_microservices_page(): ui.Widget {
+    var card_style = ui.style()
+        .background(ui.rgb(24, 26, 34))
+        .padding(14.0)
+        .corner_radius(8.0)
+        .spacing(10.0);
+
+    var filter_bar = ui.row([
+        ui.text("Filter:").color(ui.light_gray),
+        ui.input("payments", "Search microservice...", on_search_changed).width(200.0),
+        ui.spacer(),
+        ui.badge("4 SERVICES MONITORED", ui.rgb(35, 50, 70), ui.rgb(140, 200, 255))
+    ]).spacing(8.0);
+
+    var list = ui.column([
+        service_row("payments-api-v2", "ONLINE", "v2.4.0", "us-east-1", 1),
+        service_row("auth0-gateway", "ONLINE", "v1.9.3", "eu-west-1", 1),
+        service_row("kafka-event-mesh", "DEGRADED", "v3.1.0", "ap-northeast", 0),
+        service_row("prom-telemetry", "ONLINE", "v2.8.2", "global", 1)
+    ]).spacing(10.0);
+
+    return ui.column([
+        filter_bar,
+        list
+    ]).style(card_style);
+}
+
+// TAB 2: Live Telemetry Page (Scissor Clipped Scroll View)
+fn build_telemetry_page(): ui.Widget {
+    var card_style = ui.style()
+        .background(ui.rgb(22, 24, 30))
+        .padding(12.0)
+        .corner_radius(8.0)
+        .spacing(6.0);
+
+    var top_bar = ui.row([
+        ui.text("Real-Time Cluster Telemetry Feed")
+            .font_size(13.0)
+            .bold()
+            .color(ui.light_gray),
+        ui.spacer(),
+        ui.badge("SCISSOR CLIPPED", ui.rgb(30, 60, 90), ui.rgb(120, 200, 255)),
+        ui.badge("LIVE STREAM", ui.rgb(25, 75, 45), ui.rgb(90, 240, 140))
+    ]).spacing(8.0);
+
+    var logs = [
+        ui.text("[13:50:02] [INFO] Deployment b72ef1 verified on 12 edge nodes - HTTP/3 enabled").color(ui.rgb(140, 210, 160)),
+        ui.text("[13:50:18] [SEC]  Autonomous TLS certificate renewal confirmed (0 ms downtime)").color(ui.rgb(160, 190, 240)),
+        ui.text("[13:50:31] [METR] Prometheus metrics exporter heartbeat ACK received on :9090").color(ui.gray),
+        ui.text("[13:50:44] [POD]  Pod worker-node-us-east-8 auto-healed after healthcheck timeout").color(ui.rgb(255, 200, 100)),
+        ui.text("[13:51:02] [NET]  BGP anycast route converged across 34 points of presence").color(ui.rgb(140, 210, 160)),
+        ui.text("[13:51:15] [AUTH] mTLS mutual authentication handshake success (auth0-gateway)").color(ui.rgb(160, 190, 240)),
+        ui.text("[13:51:28] [DB]   Read replica replication lag < 4ms across cross-region VPC").color(ui.gray),
+        ui.text("[13:51:40] [CDN]  Edge cache hit ratio reached 98.6% on static assets bucket").color(ui.rgb(140, 210, 160)),
+        ui.text("[13:51:55] [SYS]  Kernel eBPF packet filter rules updated without packet drop").color(ui.rgb(160, 190, 240)),
+        ui.text("[13:52:10] [ALERT] Spike in queries absorbed by horizontal autoscale pool").color(ui.rgb(255, 140, 120)),
+        ui.text("[13:52:25] [SYNC] Distributed consensus quorum acknowledged in epoch #4912").color(ui.rgb(160, 190, 240)),
+        ui.text("[13:52:40] [MESH] Envoy proxy sidecar memory stabilized at 18.4 MB").color(ui.gray),
+        ui.text("[13:52:55] [HEAL] Node pool cordon lifted automatically on us-east-prod-1").color(ui.rgb(140, 210, 160)),
+        ui.text("[13:53:10] [RATE] Token bucket rate limiter allowed 42,900 req/sec sustained").color(ui.rgb(160, 190, 240)),
+        ui.text("[13:53:25] [DONE] Telemetry buffer flushed cleanly to persistent storage").color(ui.rgb(140, 210, 160))
+    ];
+
+    // Scissor clipped scroll container (190px high)
+    var scroll_view = ui.scroll(logs, 190.0);
+
+    return ui.column([
+        top_bar,
+        scroll_view
+    ]).style(card_style);
+}
+
+// TAB 3: Settings & Tools Page (Select, Checkboxes, Slider, Open Window)
+fn build_settings_page(): ui.Widget {
+    var card_style = ui.style()
+        .background(ui.rgb(24, 26, 34))
+        .padding(14.0)
+        .corner_radius(8.0)
+        .spacing(12.0);
+
+    var region_row = ui.row([
+        ui.text("Target Region / Environment:").color(ui.white).width(200.0),
+        ui.select([
+            "US-East (N. Virginia)",
+            "EU-Central (Frankfurt)",
+            "AP-East (Tokyo)",
+            "Global Multi-Cloud"
+        ], 0, on_region_changed).width(220.0),
+        ui.spacer(),
+        ui.badge("ACTIVE ENV", ui.indigo, ui.white)
+    ]).spacing(10.0);
+
+    var toggle_row = ui.row([
+        ui.text("Autonomous Scale:").color(ui.light_gray),
+        ui.checkbox(true, on_autoscale_toggled),
+        ui.spacer(),
+        ui.text("Zero-Downtime Rolling:").color(ui.light_gray),
+        ui.checkbox(true, on_rolling_toggled),
+        ui.spacer(),
+        ui.text("Replicas (1..20):").color(ui.light_gray),
+        ui.slider(8.0, 1.0, 20.0, on_replica_slider).width(120.0)
+    ]).spacing(8.0);
+
+    var diagnostics_row = ui.row([
+        ui.column([
+            ui.text("System Diagnostics & Telemetry")
+                .font_size(13.0)
+                .bold()
+                .color(ui.white),
+            ui.text("Collects real-time engine telemetry, scissor clipping state, and event loop metrics.")
+                .font_size(11.0)
+                .color(ui.gray)
+        ]),
+        ui.spacer(),
+        ui.button("Run Diagnostics", on_sync)
+            .background(ui.indigo)
+            .foreground(ui.white)
+            .padding_xy(16.0, 8.0)
+            .corner_radius(6.0)
+    ]).spacing(12.0);
+
+    return ui.column([
+        region_row,
+        toggle_row,
+        diagnostics_row
+    ]).style(card_style);
+}
+
+// Footer Component
+fn build_footer(): ui.Widget {
+    return ui.row([
+        ui.text("Limit Engine v1.0 - Native Sokol App Window (60 FPS) - Scissor Clipped Retained Canvas")
+            .font_size(11.0)
+            .color(ui.gray),
+        ui.spacer(),
+        ui.text("Memory: 14.2 MB  |  Ready")
+            .font_size(11.0)
+            .color(ui.gray)
+    ]);
+}
+
+// App Root View
+fn build_app_view(): ui.Widget {
+    var titles = ["Overview", "Microservices", "Live Telemetry", "Settings & Tools"];
+    var pages = [
+        build_overview_page(),
+        build_microservices_page(),
+        build_telemetry_page(),
+        build_settings_page()
+    ];
+
+    var tab_container = ui.tab_view(titles, pages, 0, on_tab_switch);
+
+    return ui.column([
+        build_header(),
+        tab_container,
+        build_footer()
+    ])
+    .spacing(12.0)
+    .padding(14.0);
+}
 
 fn main() {
-    print("=== Limit Portable GUI Showcase ===");
+    print("=== Launching Limit Studio - Modern Cloud Console Showcase ===");
 
-    var config = app.default_window_config();
-    config.title = "Limit GUI & Graphics Showcase";
-    config.width = 800;
-    config.height = 600;
+    var cfg = app.default_window_config();
+    cfg.title = "Limit Studio - Cloud Infrastructure Console";
+    cfg.width = 820;
+    cfg.height = 620;
 
-    assert(app.app_init(config) == 1, "app init failed");
+    assert(app.init(cfg) == 1, "app init failed");
 
-    // Construct retained UI widget tree using public std.ui facade
-    var btn = ui.button_background("Interactive Button", ui.color_rgb8(50, 150, 240));
-    var lbl = ui.text_color("Retained Mode UI Active", ui.color_rgb8(240, 240, 240));
-    var root = ui.column([btn, lbl]);
+    var root = build_app_view();
+    app.ui(root);
 
-    app.set_ui(root);
+    print("Running application main loop...");
+    app.run();
 
-    app.push_quit_event();
-    app.app_run();
-
-    app.app_shutdown();
-    print("GUI Showcase completed successfully.");
+    app.shutdown();
+    print("Limit Studio shutdown successfully.");
 }
 
 main();
