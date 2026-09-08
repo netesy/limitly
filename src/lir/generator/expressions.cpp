@@ -1649,6 +1649,20 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
                 Reg result = allocate_register();
 
+                // ── Intrinsic check (mirrors the VariableExpr path at line 1323) ──
+                if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(qualified_name)) {
+                    Type abi_res_type = (expr.inferred_type) ? language_type_to_abi_type(expr.inferred_type) : Type::Void;
+                    if (expr.inferred_type) set_register_language_type(result, expr.inferred_type);
+                    LIR_Inst inst(intrinsic->opcode, abi_res_type, result, 0, 0, 0);
+                    inst.imm = intrinsic->type_id;
+                    inst.func_name = qualified_name;
+                    if (arg_regs.size() > 0) inst.a = arg_regs[0];
+                    if (arg_regs.size() > 1) inst.b = arg_regs[1];
+                    for (size_t k = 0; k < arg_regs.size(); ++k) inst.call_args.push_back(arg_regs[k]);
+                    emit_instruction(inst);
+                    return result;
+                }
+
                 std::string vm_name = qualified_name;
                 LIR_Op op = LIR_Op::Call;
                 if (qualified_name == "len" || qualified_name == "length" || qualified_name == "_builtin_len" ||

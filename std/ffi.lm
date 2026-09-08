@@ -268,3 +268,50 @@ pub fn load(path: str): Library {
     var loaded: bool = (h != 0 and h != nil);
     return Library(handle=h, path=path, is_loaded=loaded);
 }
+
+// ── Native Callback / Trampoline API ──────────────────────────────────────
+//
+// These three functions allow a pure Limitly function to be exposed as a
+// genuine C-ABI callable address (e.g. for use with Win32 RegisterClassEx,
+// SetWindowsHookEx, qsort, or any other OS/library that requires a real
+// function pointer).
+//
+// Usage:
+//   // 1. Define the Limitly function to expose:
+//   pub fn my_handler(a: int, b: int): int { return a + b; }
+//
+//   // 2. Create the native trampoline:
+//   var handle = ffi.callback_create("my_handler",
+//                                     [ffi.TYPE_I64, ffi.TYPE_I64],
+//                                     ffi.TYPE_I64);
+//
+//   // 3. Get the C-callable address:
+//   var fn_ptr = ffi.callback_ptr(handle);
+//
+//   // 4. Pass fn_ptr to OS / C library as a CALLBACK or WNDPROC etc.
+//
+//   // 5. Release when done:
+//   ffi.callback_destroy(handle);
+//
+// Notes:
+//   - The Limitly function must be declared `pub` in the same module.
+//   - arg_types is a list of TYPE_* constants (TYPE_I64, TYPE_F64, etc.).
+//   - ret_type is a single TYPE_* constant.
+//   - The handle is an opaque integer — treat it as an ownership token.
+//   - callback_ptr returns 0 (nil) if the handle is invalid.
+
+// callback_create: wrap a Limitly function as a C-ABI native callable.
+// Returns an integer handle that can be passed to callback_ptr/callback_destroy.
+pub fn callback_create(func_name: str, arg_types: [any], ret_type: int): int {
+    return 0; // implemented by the CallbackCreate LIR intrinsic via intrinsic_registry
+}
+
+// callback_ptr: retrieve the executable machine-code address for the trampoline.
+// This address is safe to cast to any C function-pointer type and pass to OS APIs.
+pub fn callback_ptr(handle: int): fnptr {
+    return 0; // implemented by the CallbackCreate/type_id=1 LIR intrinsic
+}
+
+// callback_destroy: release the trampoline and free the libffi closure page.
+// After calling this, the code pointer returned by callback_ptr is invalid.
+pub fn callback_destroy(handle: int): nil {}
