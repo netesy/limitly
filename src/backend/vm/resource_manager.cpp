@@ -23,6 +23,7 @@
 #include <random>
 #include <stdexcept>
 #include "font8x8_basic.h"
+#include "sokol_app_runtime.hh"
 
 // Platform-specific headers and macros
 #if defined(_WIN32)
@@ -568,9 +569,7 @@ struct GpuBindings {
     int index_buffer_id = 0;
 };
 
-#if defined(_WIN32)
-static LRESULT CALLBACK LimitWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-#endif
+
 
 class SoftwareGraphicsResource : public Resource {
 public:
@@ -624,111 +623,12 @@ public:
         }
     }
 
-#if defined(_WIN32)
-    HWND get_hwnd() const { return hwnd_; }
-#endif
-
-    ~SoftwareGraphicsResource() override {
-        destroy_window();
-    }
-
-    void destroy_window() {
-#if defined(_WIN32)
-        if (hwnd_) {
-            if (hdc_) {
-                ReleaseDC(hwnd_, hdc_);
-                hdc_ = nullptr;
-            }
-            DestroyWindow(hwnd_);
-            hwnd_ = nullptr;
-            UnregisterClassW(L"LIMIT_SOKOL_APP", GetModuleHandleW(NULL));
-        }
-#endif
-    }
-
-    int get_width() const { return width_; }
-    int get_height() const { return height_; }
-
-    void resize_framebuffer(int w, int h) {
-        if (w <= 0 || h <= 0) return;
-        if (width_ == w && height_ == h) return;
-        width_ = w;
-        height_ = h;
-        pixels_.assign(static_cast<size_t>(width_) * static_cast<size_t>(height_) * 4, 0);
-        bgra_pixels_.assign(pixels_.size(), 0);
-    }
-
-    bool has_frame() const {
-#if defined(_WIN32)
-        return !bgra_pixels_.empty() && hdc_ != nullptr;
-#else
-        return false;
-#endif
-    }
-
-#if defined(_WIN32)
-    void present_to_hdc(HDC hdc) {
-        if (bgra_pixels_.empty() || width_ <= 0 || height_ <= 0) return;
-        if (bgra_pixels_.size() != static_cast<size_t>(width_) * static_cast<size_t>(height_) * 4) return;
-        BITMAPINFO bmi = {};
-        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        bmi.bmiHeader.biWidth = width_;
-        bmi.bmiHeader.biHeight = -height_; // Top-down
-        bmi.bmiHeader.biPlanes = 1;
-        bmi.bmiHeader.biBitCount = 32;
-        bmi.bmiHeader.biCompression = BI_RGB;
-
-        StretchDIBits(hdc, 0, 0, width_, height_,
-                      0, 0, width_, height_,
-                      bgra_pixels_.data(), &bmi, DIB_RGB_COLORS, SRCCOPY);
-    }
-#endif
-
-    void create_window(int w, int h, const std::string& title, bool resizable = true) {
-#if defined(_WIN32)
-        if (hwnd_) return;
-        const char* headless = std::getenv("LIMITLY_HEADLESS");
-        if (headless && std::string(headless) != "0") {
-            return;
-        }
-
-        HINSTANCE hinst = GetModuleHandleW(NULL);
-        WNDCLASSEXW wc = {};
-        wc.cbSize = sizeof(WNDCLASSEXW);
-        wc.style = CS_HREDRAW | CS_VREDRAW | CS_OWNDC;
-        wc.lpfnWndProc = LimitWindowProc;
-        wc.hInstance = hinst;
-        wc.hCursor = LoadCursor(NULL, IDC_ARROW);
-        wc.lpszClassName = L"LIMIT_SOKOL_APP";
-        RegisterClassExW(&wc);
-
-        int title_len = MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, NULL, 0);
-        std::vector<wchar_t> wtitle(title_len > 0 ? title_len : 1, 0);
-        if (title_len > 0) {
-            MultiByteToWideChar(CP_UTF8, 0, title.c_str(), -1, wtitle.data(), title_len);
-        }
-
-        RECT rc = { 0, 0, w, h };
-        DWORD style = resizable ? WS_OVERLAPPEDWINDOW : (WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_MINIMIZEBOX);
-        AdjustWindowRect(&rc, style, FALSE);
-
-        hwnd_ = CreateWindowExW(
-            0,
-            L"LIMIT_SOKOL_APP",
-            wtitle.data(),
-            style,
-            CW_USEDEFAULT, CW_USEDEFAULT,
-            rc.right - rc.left, rc.bottom - rc.top,
-            NULL, NULL, hinst, NULL
-        );
-
-        if (hwnd_) {
-            SetWindowLongPtr(hwnd_, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
-            hdc_ = GetDC(hwnd_);
-            ShowWindow(hwnd_, SW_SHOWNORMAL);
-            UpdateWindow(hwnd_);
-        }
-#endif
+    void resize_framebuffer(int width, int height) {
+        if (width <= 0 || height <= 0 || (width == width_ && height == height_)) return;
+        width_ = width;
+        height_ = height;
+        pixels_.assign(static_cast<std::size_t>(width_) * height_ * 4, 0);
+        clip_stack_.clear();
     }
 
     void push_native_event(int type, int x, int y, int key) {
@@ -1181,29 +1081,28 @@ public:
                         }
                     }
                 }
-#if defined(_WIN32)
-                if (hwnd_) {
-                    return VAL_TRUE;
-                }
-#endif
                 if (w > 0 && h > 0) {
                     width_ = w;
                     height_ = h;
                     pixels_.assign(width_ * height_ * 4, 0);
                 }
-                create_window(width_, height_, title, resizable);
+                const char* headless = std::getenv("LIMITLY_HEADLESS");
+                if (!(headless && std::string(headless) != "0")) {
+                    sokol_app_runtime().start(SokolAppConfig{width_, height_, title, resizable, true});
+                }
                 return VAL_TRUE;
             }
             case ResourceOperation::POLL: {
-#if defined(_WIN32)
-                if (hwnd_) {
-                    MSG msg;
-                    while (PeekMessageW(&msg, hwnd_, 0, 0, PM_REMOVE)) {
-                        TranslateMessage(&msg);
-                        DispatchMessageW(&msg);
-                    }
+                // In native mode this is the synchronization boundary from the
+                // Sokol frame callback into the VM's existing one-frame step.
+                // Headless mode returns immediately.
+                sokol_app_runtime().wait_for_frame();
+                std::vector<RuntimeAppEvent> app_events;
+                sokol_app_runtime().poll_events(app_events);
+                for (const auto& ev : app_events) {
+                    if (ev.type == 1) resize_framebuffer(ev.x, ev.y);
+                    push_native_event(ev.type, ev.x, ev.y, ev.key);
                 }
-#endif
                 LmList* list = lm_list_new();
                 std::lock_guard<std::mutex> lock(event_mutex_);
                 for (const auto& ev : native_events_) {
@@ -1216,26 +1115,11 @@ public:
                 return BOX_PTR(list);
             }
             case ResourceOperation::FLUSH: {
-#if defined(_WIN32)
-                if (hwnd_ && hdc_) {
-                    if (bgra_pixels_.size() != pixels_.size()) {
-                        bgra_pixels_.resize(pixels_.size());
-                    }
-                    for (size_t i = 0; i < pixels_.size(); i += 4) {
-                        bgra_pixels_[i]     = pixels_[i + 2]; // B
-                        bgra_pixels_[i + 1] = pixels_[i + 1]; // G
-                        bgra_pixels_[i + 2] = pixels_[i];     // R
-                        bgra_pixels_[i + 3] = pixels_[i + 3]; // A
-                    }
-
-                    present_to_hdc(hdc_);
-                    Sleep(16);
-                }
-#endif
+                sokol_app_runtime().submit_frame(pixels_.data(), width_, height_);
                 return VAL_TRUE;
             }
             case ResourceOperation::CLOSE: {
-                destroy_window();
+                sokol_app_runtime().stop();
                 return VAL_TRUE;
             }
             default:
@@ -1254,79 +1138,11 @@ private:
     std::map<int, GpuPipeline> pipelines_;
     std::map<int, GpuBindings> bindings_;
     std::vector<uint8_t> pixels_;
-#if defined(_WIN32)
-    HWND hwnd_ = nullptr;
-    HDC hdc_ = nullptr;
-#endif
     std::mutex event_mutex_;
     std::vector<WindowEvent> native_events_;
-    std::vector<uint8_t> bgra_pixels_;
 };
 
-#if defined(_WIN32)
-static LRESULT CALLBACK LimitWindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    auto* res = reinterpret_cast<SoftwareGraphicsResource*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
-    if (res) {
-        switch (msg) {
-            case WM_CLOSE:
-                res->push_native_event(0, 0, 0, 0); // EVENT_QUIT
-                return 0;
-            case WM_SIZE: {
-                if (hwnd == res->get_hwnd() && wParam != SIZE_MINIMIZED) {
-                    int new_w = LOWORD(lParam);
-                    int new_h = HIWORD(lParam);
-                    if (new_w > 0 && new_h > 0 && (new_w != res->get_width() || new_h != res->get_height())) {
-                        res->resize_framebuffer(new_w, new_h);
-                        res->push_native_event(1, new_w, new_h, 0); // EVENT_RESIZE
-                    }
-                }
-                return 0;
-            }
-            case WM_GETMINMAXINFO: {
-                auto* mmi = reinterpret_cast<MINMAXINFO*>(lParam);
-                mmi->ptMinTrackSize.x = 400;
-                mmi->ptMinTrackSize.y = 300;
-                return 0;
-            }
-            case WM_LBUTTONDOWN:
-                res->push_native_event(4, LOWORD(lParam), HIWORD(lParam), 0); // EVENT_MOUSE_DOWN
-                return 0;
-            case WM_LBUTTONUP:
-                res->push_native_event(5, LOWORD(lParam), HIWORD(lParam), 0); // EVENT_MOUSE_UP
-                return 0;
-            case WM_MOUSEMOVE:
-                res->push_native_event(6, LOWORD(lParam), HIWORD(lParam), 0); // EVENT_MOUSE_MOVE
-                return 0;
-            case WM_KEYDOWN:
-                res->push_native_event(2, 0, 0, static_cast<int>(wParam)); // EVENT_KEY_DOWN
-                return 0;
-            case WM_KEYUP:
-                res->push_native_event(3, 0, 0, static_cast<int>(wParam)); // EVENT_KEY_UP
-                return 0;
-            case WM_CHAR:
-                res->push_native_event(7, 0, 0, static_cast<int>(wParam)); // EVENT_CHAR
-                return 0;
-            case WM_MOUSEWHEEL: {
-                int delta = static_cast<short>(HIWORD(wParam));
-                res->push_native_event(8, 0, delta, 0); // EVENT_MOUSE_WHEEL
-                return 0;
-            }
-            case WM_ERASEBKGND:
-                return 1;
-            case WM_PAINT: {
-                PAINTSTRUCT ps;
-                HDC hdc = BeginPaint(hwnd, &ps);
-                if (hwnd == res->get_hwnd() && res->has_frame()) {
-                    res->present_to_hdc(hdc);
-                }
-                EndPaint(hwnd, &ps);
-                return 0;
-            }
-        }
-    }
-    return DefWindowProcW(hwnd, msg, wParam, lParam);
-}
-#endif
+
 
 // ===================== Concrete Resource Implementations =====================
 

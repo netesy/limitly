@@ -17,10 +17,10 @@ fn test_showcase_headless() {
     var p1 = ui.text("Microservices Content");
     var p2 = ui.text("Telemetry Content");
     var p3 = ui.text("Settings Content");
-    var tv = ui.tab_view(["Overview", "Microservices", "Live Telemetry", "Settings & Tools"], [p0, p1, p2, p3], 0);
+    var tv = ui.tabs(["Overview", "Microservices", "Live Telemetry", "Settings & Tools"], [p0, p1, p2, p3], 0);
 
     var sel = ui.select(["US-East", "EU-Central", "AP-East"], 0);
-    var bdg = ui.badge("HEALTHY", ui.green, ui.white);
+    var bdg = ui.badge("HEALTHY").background(ui.green).foreground(ui.white);
 
     var root = ui.column([
         ui.row([bdg, sel]),

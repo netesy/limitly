@@ -1,0 +1,17 @@
+// Unicode scalar conversion is the boundary used by normalized character events.
+import std.ui.context as context;
+
+fn test_unicode_scalars(): nil {
+    assert(context.codepoint_to_utf8(65) == "A");
+    assert(context.codepoint_to_utf8(233) == "é");
+    assert(context.codepoint_to_utf8(20013) == "中");
+    assert(context.codepoint_to_utf8(128512) == "😀");
+
+    assert(context.codepoint_to_utf8(-1) == "");
+    assert(context.codepoint_to_utf8(55296) == "");
+    assert(context.codepoint_to_utf8(57343) == "");
+    assert(context.codepoint_to_utf8(1114112) == "");
+}
+
+test_unicode_scalars();
+print("UI_UNICODE_SCALAR_TEST_PASSED");

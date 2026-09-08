@@ -123,7 +123,10 @@ pub fn set_root_any(root: any): nil {
 // Unicode & Text Editing Helpers
 
 pub fn codepoint_to_utf8(cp: int): str {
-    if (cp <= 0) {
+    // Invalid Unicode scalar values are rejected instead of producing malformed
+    // UTF-8. U+0000 is valid, but Limit strings are currently NUL terminated and
+    // cannot represent it, so it follows the same explicit rejection policy.
+    if (cp <= 0 or cp > 1114111 or (cp >= 55296 and cp <= 57343)) {
         return "";
     }
     if (cp < 128) {
