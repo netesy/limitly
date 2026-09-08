@@ -59,6 +59,9 @@ tests = [
     # Concurrency
     "tests/concurrency/parallel_blocks.lm",
     "tests/concurrency/concurrent_blocks.lm",
+    # FFI ABI and callback ownership
+    "tests/ffi/test_trampoline.lm",
+    "tests/ffi/test_hardening.lm",
     # Stdlib - Core
     "tests/stdlib/core/string_test.lm",
     "tests/stdlib/core/math_test.lm",
@@ -145,7 +148,15 @@ tests = [
     # Graphics & Retained UI
     "tests/std_gg_smoke.lm",
     "tests/graphics_triangle_test.lm",
+    "tests/text_render_test.lm",
     "tests/retained_ui_test.lm",
+    "tests/ui_fluent_test.lm",
+    "tests/ui_ergonomics_test.lm",
+    "tests/window_resize_test.lm",
+    "tests/interactive_controls_test.lm",
+    "tests/showcase_verify_test.lm",
+    "tests/scroll_clipping_pixel_test.lm",
+    "tests/scroll_tab_interaction_test.lm",
 ]
 
 # Tests that need extra time (resource creation, crypto, network)

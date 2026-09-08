@@ -1,0 +1,93 @@
+// ScrollView Clipping and Nested Scissor Pixel Proof Test
+// Proves deterministically that:
+// 1. Content above clip top is invisible in framebuffer
+// 2. Content inside viewport is visible in framebuffer
+// 3. Content below clip bottom is invisible in framebuffer
+// 4. Clip popping restores parent clip without leaking
+// 5. Nested clips correctly compute geometric intersection
+
+import std.gg as gg;
+
+fn run_clipping_pixel_test() {
+    print("=== Testing ScrollView Scissor Clipping with Pixel Readback ===");
+
+    gg.setup();
+    // Begin pass clearing to black
+    gg.begin_pass(800, 600, 0.0, 0.0, 0.0, 1.0);
+
+    // 1. Push outer clip: (50, 50, 300, 300)
+    gg.push_clip(50.0, 50.0, 300.0, 300.0);
+
+    // 2. Push inner scrollview viewport clip: (100, 100, 100, 100) -> viewport from [100, 100] to [200, 200]
+    gg.push_clip(100.0, 100.0, 100.0, 100.0);
+
+    // Draw a tall red child rectangle spanning y=50 to y=250 (extends 50px above and 50px below viewport)
+    gg.draw_rect_primitive(100.0, 50.0, 100.0, 200.0, 1.0, 0.0, 0.0, 1.0);
+
+    // Pixel checks:
+    // (150, 75): Above clip top (y=100) -> MUST be invisible (not red)
+    var pixel_above_any = gg.readback_pixel(150, 75);
+    var pixel_above = pixel_above_any as int;
+    var red_above = (pixel_above >> 24) & 255;
+    assert(red_above == 0, "Pixel above clip top must be invisible (red == 0)");
+    print("Pass: Pixel above clip top is invisible");
+
+    // (150, 150): Inside viewport [100..200, 100..200] -> MUST be visible (red)
+    var pixel_inside_any = gg.readback_pixel(150, 150);
+    var pixel_inside = pixel_inside_any as int;
+    var red_inside = (pixel_inside >> 24) & 255;
+    assert(red_inside == 255, "Pixel inside viewport must be visible (red == 255)");
+    print("Pass: Pixel inside viewport is visible");
+
+    // (150, 225): Below clip bottom (y=200) -> MUST be invisible (not red)
+    var pixel_below_any = gg.readback_pixel(150, 225);
+    var pixel_below = pixel_below_any as int;
+    var red_below = (pixel_below >> 24) & 255;
+    assert(red_below == 0, "Pixel below clip bottom must be invisible (red == 0)");
+    print("Pass: Pixel below clip bottom is invisible");
+
+    // 3. Pop scrollview viewport clip -> restores outer clip [50..350, 50..350]
+    gg.pop_clip();
+
+    // Draw sibling green rectangle at (220, 220, 50, 50) inside outer clip but outside popped viewport
+    gg.draw_rect_primitive(220.0, 220.0, 50.0, 50.0, 0.0, 1.0, 0.0, 1.0);
+
+    var pixel_sibling_any = gg.readback_pixel(240, 240);
+    var pixel_sibling = pixel_sibling_any as int;
+    var green_sibling = (pixel_sibling >> 16) & 255;
+    assert(green_sibling == 255, "Sibling outside popped clip must render normally (green == 255)");
+    print("Pass: Clip pop restored parent clip without leaking");
+
+    // Pop outer clip
+    gg.pop_clip();
+
+    // 4. Verify Nested Clip Intersection: Clip A [100..200, 100..200] and Clip B [150..250, 150..250]
+    // Effective intersection MUST be [150..200, 150..200]
+    gg.push_clip(100.0, 100.0, 100.0, 100.0);
+    gg.push_clip(150.0, 150.0, 100.0, 100.0);
+
+    // Draw blue across [100..250, 100..250]
+    gg.draw_rect_primitive(100.0, 100.0, 150.0, 150.0, 0.0, 0.0, 1.0, 1.0);
+
+    // (125, 125): Inside A only -> must be invisible
+    var p_a_only = (gg.readback_pixel(125, 125) as int >> 8) & 255;
+    assert(p_a_only == 0, "Pixel in Clip A only must be clipped by intersection");
+
+    // (175, 175): Inside both A and B -> must be visible (blue)
+    var p_intersect = (gg.readback_pixel(175, 175) as int >> 8) & 255;
+    assert(p_intersect == 255, "Pixel in intersection of A and B must be visible");
+
+    // (225, 225): Inside B only -> must be invisible
+    var p_b_only = (gg.readback_pixel(225, 225) as int >> 8) & 255;
+    assert(p_b_only == 0, "Pixel in Clip B only must be clipped by intersection");
+
+    gg.pop_clip();
+    gg.pop_clip();
+    print("Pass: Nested clip intersection verified");
+
+    gg.end_pass();
+    gg.shutdown();
+    print("=== All ScrollView Clipping Pixel Proof Tests Passed ===");
+}
+
+run_clipping_pixel_test();

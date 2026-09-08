@@ -72,6 +72,11 @@ Available low-level intrinsics in `std.ffi`:
 - `memcpy`, `memset`, `memcmp`
 - `ptr_add`, `ptr_sub`, `ptr_diff`, `ptr_align`, `ptr_is_aligned`
 
+Raw allocations are ownership-tracked. `free` and `realloc` accept only pointers
+returned by `ffi.alloc`/`ffi.realloc`; use a library-specific destructor for
+memory returned by a foreign library. Negative buffer sizes and invalid
+alignments are rejected.
+
 ---
 
 ## 4. CString Helpers and Lifetime Rules
@@ -81,6 +86,11 @@ var c_str = ffi.string_to_cstring("Hello C");
 var ret_len = strlen_func.call(c_str.ptr);
 ffi.cstring_free(c_str);
 ```
+
+For foreign strings whose allocation is not controlled by Limitly, prefer
+`cstring_to_string_bounded(ptr, capacity)`. It fails when a NUL terminator is not
+found within `capacity`; the unbounded helper is retained for compatibility and
+must only be used with a trusted, known-terminated pointer.
 
 ### Memory Ownership Summary
 | Value / Boundary | Allocator | Owner | Freeing Rule |

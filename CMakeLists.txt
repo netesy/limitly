@@ -9,7 +9,7 @@ include_directories(vendor/fyra/include)
 include_directories(vendor/fyra/src)
 
 if(WIN32)
-    set(PLATFORM_LIBS -lws2_32)
+    set(PLATFORM_LIBS -lws2_32 -lgdi32 -luser32 -lshell32)
     set(PLATFORM_EXE_EXT .exe)
     add_definitions(-DWIN32)
 else()
@@ -50,6 +50,8 @@ set(BACKEND_COMMON_SOURCES
     src/backend/utf8.cpp
     src/backend/symbol_table.cpp
     src/backend/value.cpp
+    src/backend/vm/resource_manager.cpp
+    src/backend/vm/sokol_app_runtime.cpp
     src/backend/vm/register.cpp
     src/backend/vm/register_helpers.cpp
     src/backend/vm/ops/arithmetic.cpp

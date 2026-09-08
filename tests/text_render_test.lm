@@ -1,0 +1,33 @@
+import std.gg as gg;
+import std.graphics.canvas as canvas;
+import std.graphics.paint as paint;
+import std.graphics.color as color;
+
+fn main() {
+    print("=== Text Glyph Rendering Verification ===");
+    assert(gg.setup(), "gg setup failed");
+
+    // Begin pass and clear to black background (0,0,0,1)
+    gg.begin_pass(800, 600, 0.0, 0.0, 0.0, 1.0);
+
+    var cvs = canvas.Canvas(w=800.0, h=600.0);
+    var p = paint.Paint();
+    p.color_val = color.rgb(255, 255, 255);
+
+    // Draw text "A" at (100.0, 100.0) with scale = 1
+    // 'A' bitmap row 0 is 0x0C (bits 2 and 3 set -> pixels at x=102, 103, y=100)
+    cvs.draw_text("A", 100.0, 100.0, p, 1);
+
+    gg.end_pass();
+    gg.commit();
+
+    var bg_pixel = gg.readback_pixel(100, 100);
+    var glyph_pixel = gg.readback_pixel(102, 100);
+    assert(bg_pixel == 255, "Background pixel should be pure alpha/black");
+    assert(glyph_pixel != bg_pixel, "Glyph pixel at (102, 100) should be foreground text color");
+
+    gg.shutdown();
+    print("Text Glyph Rendering Verification Passed.");
+}
+
+main();

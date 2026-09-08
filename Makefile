@@ -10,7 +10,7 @@ ifeq ($(OS),Windows_NT)
 	CXX := $(MSYS2_PATH)/mingw64/bin/g++.exe
 	CC := $(MSYS2_PATH)/mingw64/bin/gcc.exe
 	AR := $(MSYS2_PATH)/mingw64/bin/ar.exe
-	LIBS := -lws2_32 -lffi
+	LIBS := -lws2_32 -lffi -lgdi32 -luser32 -lshell32
 else
 	PLATFORM := linux
 	EXE_EXT :=
@@ -26,11 +26,11 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
-	CFLAGS := -std=c99 -g -fPIC -I. -Isrc
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CFLAGS := -std=c99 -g -fPIC -I. -Isrc -Ivendor/sokol
 else
-	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
-	CFLAGS := -std=c99 -O2 -fPIC -I. -Isrc
+	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CFLAGS := -std=c99 -O2 -fPIC -I. -Isrc -Ivendor/sokol
 endif
 
 ifeq ($(PLATFORM),windows)
@@ -106,7 +106,7 @@ LYRA_SRCS := $(wildcard $(LYRA_DIR)/src/*.cpp)
 LYRA_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_SRCS))
 LYRA_BIN := $(BIN_DIR)/lyra$(EXE_EXT)
 
-REGISTER_SRCS := src/backend/vm/resource_manager.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp src/backend/vm/vm_dict.cpp src/backend/vm/vm_image.cpp src/backend/vm/vm_list.cpp src/backend/vm/vm_runtime.cpp src/backend/vm/vm_string.cpp src/backend/vm/vm_tuple.cpp src/backend/vm/vm_value.cpp
+REGISTER_SRCS := src/backend/vm/resource_manager.cpp src/backend/vm/sokol_app_runtime.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp src/backend/vm/vm_dict.cpp src/backend/vm/vm_image.cpp src/backend/vm/vm_list.cpp src/backend/vm/vm_runtime.cpp src/backend/vm/vm_string.cpp src/backend/vm/vm_tuple.cpp src/backend/vm/vm_value.cpp
 
 LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
                  src/lir/builtin_functions.cpp src/lir/intrinsic_registry.cpp src/lir/verifier.cpp src/lir/lir_types.cpp src/lir/generator.cpp \

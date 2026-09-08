@@ -2318,7 +2318,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::MemoryCopy: {
                 auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryCopy);
                 if (cap) {
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm)};
+                    ir::Value* size = inst.call_args.empty()
+                        ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0))
+                        : load_reg(inst.call_args[0], LIR::Type::I64);
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), size};
                     builder_->createExternCall(cap->name, args, nullptr);
                 }
                 break;
@@ -2326,7 +2329,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::MemoryFill: {
                 auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryFill);
                 if (cap) {
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm)};
+                    ir::Value* size = inst.call_args.empty()
+                        ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0))
+                        : load_reg(inst.call_args[0], LIR::Type::I64);
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), size};
                     builder_->createExternCall(cap->name, args, nullptr);
                 }
                 break;
@@ -2334,7 +2340,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::MemoryCompare: {
                 auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryCompare);
                 if (cap) {
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), context_->getConstantInt(context_->getIntegerType(64), (long long)inst.imm)};
+                    ir::Value* size = inst.call_args.empty()
+                        ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0))
+                        : load_reg(inst.call_args[0], LIR::Type::I64);
+                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), size};
                     ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
                     store_reg(inst.dst, res, inst.result_type);
                 }

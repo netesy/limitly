@@ -3,6 +3,7 @@
 
 import std.ui.context as ui_context;
 import std.ui.types as ui_types;
+import std.ui as std_ui;
 import std.gg as gg;
 
 // Event type constants
@@ -13,6 +14,8 @@ pub var EVENT_KEY_UP: int = 3;
 pub var EVENT_MOUSE_DOWN: int = 4;
 pub var EVENT_MOUSE_UP: int = 5;
 pub var EVENT_MOUSE_MOVE: int = 6;
+pub var EVENT_CHAR: int = 7;
+pub var EVENT_MOUSE_WHEEL: int = 8;
 
 // Modifier key flags
 pub var MOD_SHIFT: int = 1;
@@ -27,6 +30,16 @@ frame Event {
     pub var window_id: int;
     pub var x: int;
     pub var y: int;
+    pub var key_code: int;
+
+    pub init(event_type: int = 0, timestamp: int = 0, window_id: int = 0, x: int = 0, y: int = 0, key_code: int = 0) {
+        self.event_type = event_type;
+        self.timestamp = timestamp;
+        self.window_id = window_id;
+        self.x = x;
+        self.y = y;
+        self.key_code = key_code;
+    }
 }
 
 // Key event frame
@@ -99,7 +112,7 @@ frame AppState {
 }
 
 fn make_default_event(): Event {
-    return Event(event_type=0, timestamp=0, window_id=0, x=0, y=0);
+    return Event(event_type=0, timestamp=0, window_id=0, x=0, y=0, key_code=0);
 }
 
 // Global application state
@@ -140,8 +153,19 @@ pub fn app_init(config: WindowConfig): int {
     global_app_state.delta_time = 0.0;
     global_app_state.event_queue = [] as [Event];
     ui_context.ui_init();
+    ui_context.set_viewport_size(config.width as float, config.height as float);
     
     return 1;
+}
+
+pub fn init(config: any = nil): int {
+    if (config != nil) {
+        var wc = config as WindowConfig;
+        if (wc != nil) {
+            return app_init(wc);
+        }
+    }
+    return app_init(default_window_config());
 }
 
 // Shutdown application and release resources
@@ -157,6 +181,11 @@ pub fn app_shutdown(): nil {
     global_app_state.event_queue = [] as [Event];
     global_app_state.is_initialized = 0;
     global_app_state.window_id = 0;
+    gg.shutdown();
+}
+
+pub fn shutdown(): nil {
+    app_shutdown();
 }
 
 pub fn app_is_valid(): int {
@@ -167,9 +196,14 @@ pub fn app_is_running(): int {
     return global_app_state.is_running;
 }
 
-pub fn set_ui(root_blueprint: ui_types.Blueprint): nil {
+pub fn ui(root: std_ui.Widget): nil {
     ui_context.ui_init();
-    ui_context.update_blueprint(root_blueprint);
+    ui_context.set_root(root);
+}
+
+pub fn set_ui(root: any): nil {
+    ui_context.ui_init();
+    ui_context.set_root_any(root);
 }
 
 pub fn run_frame_step(): nil {
@@ -187,6 +221,7 @@ pub fn app_run(): nil {
         return;
     }
     
+    show_window();
     global_app_state.is_running = 1;
     
     // Main event loop
@@ -195,27 +230,75 @@ pub fn app_run(): nil {
     }
 }
 
+pub fn run(root: any = nil): nil {
+    if (root != nil) {
+        set_ui(root);
+    }
+    app_run();
+}
+
 pub fn app_quit(): nil {
     global_app_state.is_running = 0;
+}
+
+pub fn quit(): nil {
+    app_quit();
 }
 
 pub fn process_events(): nil {
     if (global_app_state.is_initialized == 0) {
         return;
     }
+    var raw_events = gg.poll_events();
+    if (raw_events != nil) {
+        var native_events: [int] = raw_events as [int];
+        var i: int = 0;
+        var num_events = len(native_events);
+        while (i + 3 < num_events) {
+            var ev_type: int = native_events[i];
+            var ev_x: int = native_events[i + 1];
+            var ev_y: int = native_events[i + 2];
+            var ev_k: int = native_events[i + 3];
+            push_event(Event(event_type=ev_type, timestamp=0, window_id=1, x=ev_x, y=ev_y, key_code=ev_k));
+            i = i + 4;
+        }
+    }
     while (has_pending_events() != 0) {
         var ev = poll_event();
         if (ev.event_type == EVENT_QUIT) {
             global_app_state.is_running = 0;
         }
-        if (ev.event_type == EVENT_MOUSE_DOWN or ev.event_type == EVENT_MOUSE_UP) {
-            ui_context.dispatch_pointer_click(ev.x as float, ev.y as float);
+        if (ev.event_type == EVENT_RESIZE) {
+            global_app_state.width = ev.x;
+            global_app_state.height = ev.y;
+            global_app_state.framebuffer_width = ev.x;
+            global_app_state.framebuffer_height = ev.y;
+            ui_context.set_viewport_size(ev.x as float, ev.y as float);
+        }
+        if (ev.event_type == EVENT_MOUSE_DOWN) {
+            ui_context.dispatch_pointer_down(ev.x as float, ev.y as float);
+        }
+        if (ev.event_type == EVENT_MOUSE_UP) {
+            ui_context.dispatch_pointer_up(ev.x as float, ev.y as float);
+        }
+        if (ev.event_type == EVENT_MOUSE_MOVE) {
+            ui_context.dispatch_pointer_move(ev.x as float, ev.y as float);
+        }
+        if (ev.event_type == EVENT_KEY_DOWN) {
+            ui_context.dispatch_key_down(ev.key_code);
+        }
+        if (ev.event_type == EVENT_CHAR) {
+            ui_context.dispatch_char_input(ev.key_code);
+        }
+        if (ev.event_type == EVENT_MOUSE_WHEEL) {
+            ui_context.dispatch_mouse_wheel(ev.y as float);
         }
     }
 }
 
 pub fn push_mouse_click(x: int, y: int): nil {
-    push_event(Event(event_type=EVENT_MOUSE_DOWN, timestamp=0, window_id=1, x=x, y=y));
+    push_event(Event(event_type=EVENT_MOUSE_DOWN, timestamp=0, window_id=1, x=x, y=y, key_code=0));
+    push_event(Event(event_type=EVENT_MOUSE_UP, timestamp=0, window_id=1, x=x, y=y, key_code=0));
 }
 
 pub fn push_quit_event(): nil {
@@ -257,6 +340,7 @@ pub fn present_frame(): nil {
     if (global_app_state.is_initialized == 0) {
         return;
     }
+    ui_context.set_viewport_size(global_app_state.width as float, global_app_state.height as float);
     gg.begin_pass(global_app_state.width, global_app_state.height, 0.1, 0.1, 0.15, 1.0);
     ui_context.frame_update(0.016);
     gg.end_pass();
@@ -322,7 +406,12 @@ pub fn set_swap_interval(interval: int): nil {
     global_app_state.window_config.swap_interval = interval;
 }
 
-pub fn show_window(): nil {}
+pub fn show_window(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    gg.spawn_window(global_app_state.width, global_app_state.height, global_app_state.window_config.title, global_app_state.window_config.resizable);
+}
 pub fn hide_window(): nil {}
 pub fn focus_window(): nil {}
 pub fn request_attention(): nil {}

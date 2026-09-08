@@ -55,6 +55,12 @@ public:
     ValuePtr createErrorValue(const std::string& errorType, const std::string& message);
     ValuePtr createSuccessValue(const RegisterValue& value);
 
+    // Called by native FFI trampolines to re-enter the VM synchronously.
+    // Saves full VM state, executes `func_name` with `args`, restores state,
+    // and returns whatever the Limitly function left in registers[0].
+    RegisterValue invoke_for_callback(const std::string& func_name,
+                                      const std::vector<RegisterValue>& args);
+
 private:
     // Opcode execution modules
     void execute_arithmetic(const LIR::LIR_Inst* pc);
