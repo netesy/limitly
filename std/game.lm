@@ -1,0 +1,23 @@
+// std/game.lm
+// Unified std.game module entrypoint
+
+import std.game.types as types;
+import std.game.gui as gui_mod;
+import std.game.app as app_mod;
+
+// Re-export core types
+pub fn Vec2(x: float = 0.0, y: float = 0.0): types.Vec2 { return types.Vec2(x=x, y=y); }
+pub fn Rect(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0): types.Rect { return types.Rect(x=x, y=y, w=w, h=h); }
+pub fn Color(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0): types.Color { return types.Color(r=r, g=g, b=b, a=a); }
+pub fn rgb(r: int, g: int, b: int): types.Color { return types.rgb(r, g, b); }
+pub fn rgba(r: int, g: int, b: int, a: float): types.Color { return types.rgba(r, g, b, a); }
+pub fn hex(c: int, a: float = 1.0): types.Color { return types.hex(c, a); }
+
+pub fn GUITheme(): types.GUITheme { return types.GUITheme(); }
+pub fn GUI(theme: any = nil): gui_mod.GUI { return gui_mod.GUI(theme); }
+pub var gui: gui_mod.GUI = gui_mod.default_gui;
+
+pub fn GameConfig(title: str = "Limit Game", width: int = 800, height: int = 600, resizable: bool = true): app_mod.GameConfig {
+    return app_mod.GameConfig(title=title, width=width, height=height, resizable=resizable);
+}
+pub fn Game(cfg: any = nil): app_mod.Game { return app_mod.Game(cfg); }

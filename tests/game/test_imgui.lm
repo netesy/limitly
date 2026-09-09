@@ -1,0 +1,143 @@
+// tests/game/test_imgui.lm
+// Comprehensive test suite for std.game Immediate-Mode GUI library
+
+import std.game as game;
+import std.gg as gg;
+
+fn test_primitives() {
+    print("=== Testing std.game Types & Primitives ===");
+    var v = game.Vec2(10.0, 20.0);
+    assert(v.x == 10.0 and v.y == 20.0, "Vec2 init mismatch");
+
+    var r = game.Rect(100.0, 100.0, 200.0, 50.0);
+    assert(r.contains(150.0, 120.0) == true, "Rect should contain point inside");
+    assert(r.contains(50.0, 50.0) == false, "Rect should not contain point outside");
+
+    var c = game.hex(0xff0000, 1.0);
+    assert(c.r > 0.99, "Hex red extraction failed");
+    print("✓ Primitives passed");
+}
+
+fn test_button_interaction() {
+    print("=== Testing IMGUI Button Click Cycle ===");
+    var gui = game.GUI();
+
+    // Frame 1: Mouse not hovering button
+    gui.begin(0.0, 0.0, false);
+    gui.set_cursor(50.0, 50.0);
+    var clicked1 = gui.button("Click Me", 100.0, 30.0);
+    gui.end();
+    assert(clicked1 == false, "Button should not click when unhovered");
+
+    // Frame 2: Mouse presses down on button (x=60, y=60)
+    gui.begin(60.0, 60.0, true);
+    gui.set_cursor(50.0, 50.0);
+    var clicked2 = gui.button("Click Me", 100.0, 30.0);
+    gui.end();
+    assert(clicked2 == false, "Button should not register click until release");
+
+    // Frame 3: Mouse released over button
+    gui.begin(60.0, 60.0, false);
+    gui.set_cursor(50.0, 50.0);
+    var clicked3 = gui.button("Click Me", 100.0, 30.0);
+    gui.end();
+    assert(clicked3 == true, "Button should register click upon release while hovered");
+    print("✓ Button interaction passed");
+}
+
+fn test_checkbox_toggle() {
+    print("=== Testing IMGUI Checkbox & Toggle ===");
+    var gui = game.GUI();
+    var is_sound_on = false;
+
+    // Frame 1: Press checkbox
+    gui.begin(15.0, 15.0, true);
+    gui.set_cursor(10.0, 10.0);
+    is_sound_on = gui.checkbox("Sound FX", is_sound_on);
+    gui.end();
+
+    // Frame 2: Release over checkbox -> state should toggle to true
+    gui.begin(15.0, 15.0, false);
+    gui.set_cursor(10.0, 10.0);
+    is_sound_on = gui.checkbox("Sound FX", is_sound_on);
+    gui.end();
+    assert(is_sound_on == true, "Checkbox should toggle to true on click");
+    print("✓ Checkbox passed");
+}
+
+fn test_slider_drag() {
+    print("=== Testing IMGUI Slider Value Drag ===");
+    var gui = game.GUI();
+    var volume = 0.0;
+
+    // Press down at 50% along the 200px track (track starts at x=10, width=200 -> middle is x=110)
+    gui.begin(110.0, 15.0, true);
+    gui.set_cursor(10.0, 10.0);
+    volume = gui.slider("Volume", volume, 0.0, 100.0, 200.0);
+    gui.end();
+
+    assert(volume >= 48.0 and volume <= 52.0, "Slider value should be approximately 50.0 after midpoint click");
+    print("✓ Slider drag passed");
+}
+
+fn test_collapsible_header() {
+    print("=== Testing IMGUI Collapsible Header ===");
+    var gui = game.GUI();
+
+    // Initially open
+    gui.begin(0.0, 0.0, false);
+    gui.set_cursor(10.0, 10.0);
+    var open1 = gui.header("Inventory", true);
+    gui.end();
+    assert(open1 == true, "Header should be open initially");
+
+    // Click header bar
+    gui.begin(50.0, 15.0, true);
+    gui.set_cursor(10.0, 10.0);
+    var open2 = gui.header("Inventory", true);
+    gui.end();
+    assert(open2 == false, "Header should collapse upon click");
+    print("✓ Collapsible header passed");
+}
+
+fn test_window_and_rasterization() {
+    print("=== Testing IMGUI Window & Pixel Rasterization ===");
+    assert(gg.setup(), "gg.setup failed");
+
+    gg.begin_pass(800, 600, 0.1, 0.1, 0.1, 1.0);
+
+    var gui = game.GUI();
+    gui.begin(0.0, 0.0, false);
+
+    if (gui.begin_window("Character Sheet", 50.0, 50.0, 300.0, 250.0)) {
+        gui.label("Warrior - Level 42");
+        gui.separator();
+        gui.progress_bar(0.75, 200.0, 18.0, "HP: 75/100");
+        gui.spacing(10.0);
+        gui.button("Equip Shield");
+        gui.end_window();
+    }
+
+    gui.end();
+
+    gg.end_pass();
+    gg.commit();
+
+    // Verify pixel inside the window titlebar is rendered (e.g. at 60, 60)
+    var pixel = gg.readback_pixel(60, 60);
+    assert(pixel != nil, "Rendered window titlebar pixel should be non-nil");
+
+    gg.shutdown();
+    print("✓ Window and pixel rasterization passed");
+}
+
+test_primitives();
+test_button_interaction();
+test_checkbox_toggle();
+test_slider_drag();
+test_collapsible_header();
+test_window_and_rasterization();
+
+print("========================================");
+print("All std.game IMGUI tests passed successfully!");
+print("========================================");

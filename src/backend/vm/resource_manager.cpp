@@ -23,6 +23,86 @@
 #include <random>
 #include <stdexcept>
 #include "font8x8_basic.h"
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "stb_truetype.h"
+
+struct SystemFontEngine {
+    std::vector<uint8_t> font_bytes;
+    stbtt_fontinfo info;
+    bool is_ready = false;
+    bool attempted = false;
+
+    void init() {
+        if (attempted) return;
+        attempted = true;
+
+        static const char* search_dirs[] = {
+#if defined(_WIN32)
+            "C:\\Windows\\Fonts\\",
+            "C:\\WINNT\\Fonts\\",
+#elif defined(__APPLE__)
+            "/System/Library/Fonts/",
+            "/Library/Fonts/",
+            "/System/Library/Fonts/Supplemental/",
+#else
+            "/usr/share/fonts/truetype/dejavu/",
+            "/usr/share/fonts/TTF/",
+            "/usr/share/fonts/truetype/liberation/",
+            "/usr/share/fonts/truetype/freefont/",
+            "/usr/share/fonts/truetype/ubuntu/",
+            "/usr/share/fonts/",
+#endif
+            nullptr
+        };
+
+        static const char* preferred_fonts[] = {
+#if defined(_WIN32)
+            "segoeui.ttf",
+            "arial.ttf",
+            "tahoma.ttf",
+            "calibri.ttf",
+            "consola.ttf",
+#elif defined(__APPLE__)
+            "SFNS.ttf",
+            "Helvetica.ttc",
+            "Arial.ttf",
+#else
+            "DejaVuSans.ttf",
+            "LiberationSans-Regular.ttf",
+            "FreeSans.ttf",
+            "Ubuntu-R.ttf",
+#endif
+            nullptr
+        };
+
+        for (int i = 0; preferred_fonts[i] != nullptr && !is_ready; ++i) {
+            for (int d = 0; search_dirs[d] != nullptr && !is_ready; ++d) {
+                std::string path = std::string(search_dirs[d]) + preferred_fonts[i];
+                FILE* f = fopen(path.c_str(), "rb");
+                if (f) {
+                    fseek(f, 0, SEEK_END);
+                    long sz = ftell(f);
+                    fseek(f, 0, SEEK_SET);
+                    if (sz > 0) {
+                        font_bytes.resize(sz);
+                        if (fread(font_bytes.data(), 1, sz, f) == (size_t)sz) {
+                            int offset = stbtt_GetFontOffsetForIndex(font_bytes.data(), 0);
+                            if (offset < 0) offset = 0;
+                            if (stbtt_InitFont(&info, font_bytes.data(), offset)) {
+                                is_ready = true;
+                            }
+                        }
+                    }
+                    fclose(f);
+                }
+            }
+        }
+    }
+};
+
+static SystemFontEngine s_system_font_engine;
+
 #include "sokol_app_runtime.hh"
 
 // Platform-specific headers and macros
@@ -720,18 +800,42 @@ public:
                 clip_stack_.clear();
                 pass_active_ = true;
                 double r = 0.0, g = 0.0, b = 0.0, a = 1.0;
+                int req_w = 0, req_h = 0;
                 if (!args.empty()) {
                     if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
-                        if (lm_list_len(list) > 0) r = register_value_to_double(lm_list_get(list, 0));
-                        if (lm_list_len(list) > 1) g = register_value_to_double(lm_list_get(list, 1));
-                        if (lm_list_len(list) > 2) b = register_value_to_double(lm_list_get(list, 2));
-                        if (lm_list_len(list) > 3) a = register_value_to_double(lm_list_get(list, 3));
+                        size_t llen = lm_list_len(list);
+                        if (llen >= 6) {
+                            req_w = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
+                            req_h = static_cast<int>(register_value_to_i64(lm_list_get(list, 1)));
+                            r = register_value_to_double(lm_list_get(list, 2));
+                            g = register_value_to_double(lm_list_get(list, 3));
+                            b = register_value_to_double(lm_list_get(list, 4));
+                            a = register_value_to_double(lm_list_get(list, 5));
+                        } else {
+                            if (llen > 0) r = register_value_to_double(lm_list_get(list, 0));
+                            if (llen > 1) g = register_value_to_double(lm_list_get(list, 1));
+                            if (llen > 2) b = register_value_to_double(lm_list_get(list, 2));
+                            if (llen > 3) a = register_value_to_double(lm_list_get(list, 3));
+                        }
                     } else {
-                        r = register_value_to_double(args[0]);
-                        if (args.size() > 1) g = register_value_to_double(args[1]);
-                        if (args.size() > 2) b = register_value_to_double(args[2]);
-                        if (args.size() > 3) a = register_value_to_double(args[3]);
+                        if (args.size() >= 6) {
+                            req_w = static_cast<int>(register_value_to_i64(args[0]));
+                            req_h = static_cast<int>(register_value_to_i64(args[1]));
+                            r = register_value_to_double(args[2]);
+                            g = register_value_to_double(args[3]);
+                            b = register_value_to_double(args[4]);
+                            a = register_value_to_double(args[5]);
+                        } else {
+                            r = register_value_to_double(args[0]);
+                            if (args.size() > 1) g = register_value_to_double(args[1]);
+                            if (args.size() > 2) b = register_value_to_double(args[2]);
+                            if (args.size() > 3) a = register_value_to_double(args[3]);
+                        }
                     }
+                }
+
+                if (req_w > 0 && req_h > 0 && (req_w != width_ || req_h != height_)) {
+                    resize_framebuffer(req_w, req_h);
                 }
 
                 uint8_t ru = static_cast<uint8_t>(std::clamp(r * 255.0, 0.0, 255.0));
@@ -991,6 +1095,81 @@ public:
                 uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
 
                 ClipRect clip = get_current_clip();
+
+                if (!s_system_font_engine.attempted) {
+                    s_system_font_engine.init();
+                }
+
+                if (s_system_font_engine.is_ready) {
+                    float font_size = 13.0f;
+                    if (scale == 2) font_size = 20.0f;
+                    else if (scale == 3) font_size = 26.0f;
+                    else if (scale > 3 && scale <= 7) font_size = static_cast<float>(scale * 9);
+                    else if (scale > 7) font_size = static_cast<float>(scale);
+
+                    float fscale = stbtt_ScaleForPixelHeight(&s_system_font_engine.info, font_size);
+                    int ascent = 0, descent = 0, line_gap = 0;
+                    stbtt_GetFontVMetrics(&s_system_font_engine.info, &ascent, &descent, &line_gap);
+
+                    int c_x1 = 0, c_y1 = 0, c_x2 = 0, c_y2 = 0;
+                    stbtt_GetCodepointBitmapBox(&s_system_font_engine.info, 'A', fscale, fscale, &c_x1, &c_y1, &c_x2, &c_y2);
+
+                    int cursor_x = static_cast<int>(x);
+                    int start_y = static_cast<int>(y);
+                    int baseline_y = start_y - c_y1;
+                    int line_height = static_cast<int>((ascent - descent + line_gap) * fscale + 0.5f);
+                    if (line_height < static_cast<int>(font_size)) line_height = static_cast<int>(font_size);
+
+                    for (size_t i = 0; i < text.size(); ++i) {
+                        char ch = text[i];
+                        if (ch == '\r') continue;
+                        if (ch == '\n') {
+                            start_y += line_height;
+                            baseline_y = start_y - c_y1;
+                            cursor_x = static_cast<int>(x);
+                            continue;
+                        }
+
+                        int advance = 0, lsb = 0;
+                        stbtt_GetCodepointHMetrics(&s_system_font_engine.info, static_cast<unsigned char>(ch), &advance, &lsb);
+
+                        int b_w = 0, b_h = 0, b_xoff = 0, b_yoff = 0;
+                        unsigned char* bmp = stbtt_GetCodepointBitmap(&s_system_font_engine.info, 0, fscale, static_cast<unsigned char>(ch), &b_w, &b_h, &b_xoff, &b_yoff);
+                        if (bmp) {
+                            int glyph_ox = cursor_x + b_xoff;
+                            int glyph_oy = baseline_y + b_yoff;
+
+                            for (int gy = 0; gy < b_h; ++gy) {
+                                int py = glyph_oy + gy;
+                                if (py < clip.y0 || py >= clip.y1) continue;
+                                for (int gx = 0; gx < b_w; ++gx) {
+                                    int px = glyph_ox + gx;
+                                    if (px < clip.x0 || px >= clip.x1) continue;
+
+                                    unsigned char cov = bmp[gy * b_w + gx];
+                                    if (cov == 0) continue;
+
+                                    size_t idx = static_cast<size_t>(py * width_ + px) * 4;
+                                    float alpha_cov = (au / 255.0f) * (cov / 255.0f);
+                                    pixels_[idx]     = static_cast<uint8_t>(ru * alpha_cov + pixels_[idx] * (1.0f - alpha_cov));
+                                    pixels_[idx + 1] = static_cast<uint8_t>(gu * alpha_cov + pixels_[idx + 1] * (1.0f - alpha_cov));
+                                    pixels_[idx + 2] = static_cast<uint8_t>(bu * alpha_cov + pixels_[idx + 2] * (1.0f - alpha_cov));
+                                    pixels_[idx + 3] = std::max(pixels_[idx + 3], static_cast<uint8_t>(au * (cov / 255.0f)));
+                                }
+                            }
+                            stbtt_FreeBitmap(bmp, nullptr);
+                        }
+
+                        cursor_x += static_cast<int>(advance * fscale + 0.5f);
+                        if (i + 1 < text.size() && text[i + 1] != '\n') {
+                            int kern = stbtt_GetCodepointKernAdvance(&s_system_font_engine.info, static_cast<unsigned char>(ch), static_cast<unsigned char>(text[i + 1]));
+                            cursor_x += static_cast<int>(kern * fscale + 0.5f);
+                        }
+                    }
+                    return VAL_TRUE;
+                }
+
+                // Fallback to basic 8x8 font if no system font could be loaded
                 int cursor_x = static_cast<int>(x);
                 int start_y = static_cast<int>(y);
 
@@ -1120,6 +1299,23 @@ public:
             }
             case ResourceOperation::CLOSE: {
                 sokol_app_runtime().stop();
+                return VAL_TRUE;
+            }
+            case ResourceOperation::SET_STATE: {
+                int w = 0, h = 0;
+                if (!args.empty()) {
+                    if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {
+                        if (lm_list_len(list) > 0) w = static_cast<int>(register_value_to_i64(lm_list_get(list, 0)));
+                        if (lm_list_len(list) > 1) h = static_cast<int>(register_value_to_i64(lm_list_get(list, 1)));
+                    } else {
+                        w = static_cast<int>(register_value_to_i64(args[0]));
+                        if (args.size() > 1) h = static_cast<int>(register_value_to_i64(args[1]));
+                    }
+                }
+                if (w > 0 && h > 0) {
+                    resize_framebuffer(w, h);
+                    sokol_app_runtime().set_window_size(w, h);
+                }
                 return VAL_TRUE;
             }
             default:

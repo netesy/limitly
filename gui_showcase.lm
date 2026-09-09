@@ -369,7 +369,7 @@ fn build_app_view(): ui.Widget {
     .padding(14.0);
     // Root overflow is explicit in v1: applications wrap oversized content in
     // Scroll rather than relying on an implicit root scrolling policy.
-    return ui.scroll(page).height(592.0);
+    return ui.scroll(page);
 }
 
 fn main() {

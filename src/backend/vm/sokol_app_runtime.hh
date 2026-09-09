@@ -38,6 +38,7 @@ public:
     void poll_events(std::vector<RuntimeAppEvent>& events);
     void submit_frame(const std::uint8_t* rgba, int width, int height);
     void wait_for_frame();
+    void set_window_size(int width, int height);
 
 private:
     Impl* impl_;
