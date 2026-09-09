@@ -1,6 +1,6 @@
 // Standard Library Range Module
 
-pub frame Range {
+frame Range {
     var start: int;
     var stop: int;
     var step: int;
@@ -20,7 +20,7 @@ pub frame Range {
     }
 }
 
-pub frame RangeIterator {
+frame RangeIterator {
     var current: int;
     var stop: int;
     var step: int;

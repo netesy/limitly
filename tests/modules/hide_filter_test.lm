@@ -4,7 +4,7 @@ print("=== Hide Filter Test ===");
 print("Test 1: Hide single identifier");
 import tests.modules.math_module as math1 hide E;
 print("✓ Imported with hide filter");
-print("✓ Non-hidden variable accessible: PI = " + math1.pi);
+print("✓ Non-hidden variable accessible: PI = {math1.pi}");
 assert(math1.pi == 3.14159, "Hide filter should allow access to non-hidden variables");
 
 print("Test 2: Hide multiple identifiers");

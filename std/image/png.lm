@@ -1,0 +1,43 @@
+// std/image/png.lm
+// PNG-specific load/save API.
+
+import std.ffi as ffi;
+import std.image.index as image;
+
+pub var CHANNELS_RGB:  int = 3;
+pub var CHANNELS_RGBA: int = 4;
+
+pub fn load(path: str): image.Image? {
+    return image.load(path);
+}
+
+pub fn load_as(path: str, channels: int): image.Image? {
+    return image.load_forced(path, channels);
+}
+
+pub fn save(img: image.Image, path: str): bool? {
+    return image.save_png(img, path);
+}
+
+pub fn save_with_stride(img: image.Image, path: str, stride: int): bool? {
+    if (not img.is_valid() or stride < img.width * img.channels) { return err(); }
+    unsafe {
+        var lib: int = image._open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_save: int = ffi.library_get_symbol(lib, "save_image_png_stride");
+        if (fn_save == nil) { ffi.library_unload(lib); return err(); }
+
+        var cs: ffi.CString = ffi.string_to_cstring(path);
+        var res: int = ffi.foreign_call(
+            fn_save,
+            [ffi.cstring_as_ptr(cs), img.width, img.height, img.channels, img.pixels, stride],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_I32]
+        ) as int;
+        ffi.cstring_free(cs);
+        ffi.library_unload(lib);
+        if (res == 0) { return err(); }
+        return ok(true);
+    }
+}

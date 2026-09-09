@@ -1,11 +1,11 @@
 // Standard Library Core Module
 
-pub frame Error {
+frame Error {
     pub var code: str;
     pub var message: str;
 }
 
-pub frame OptionInt {
+frame OptionInt {
     pub var has_value: bool;
     pub var value: int;
 
@@ -15,7 +15,7 @@ pub frame OptionInt {
     pub fn unwrap_or(default_value: int): int { if (self.has_value) return self.value; return default_value; }
 }
 
-pub frame OptionStr {
+frame OptionStr {
     pub var has_value: bool;
     pub var value: str;
 
@@ -25,7 +25,7 @@ pub frame OptionStr {
     pub fn unwrap_or(default_value: str): str { if (self.has_value) return self.value; return default_value; }
 }
 
-pub frame ResultInt {
+frame ResultInt {
     pub var success: bool;
     pub var value: int;
     pub var error_info: Error;
@@ -55,7 +55,7 @@ pub frame ResultInt {
     }
 }
 
-pub frame ResultStr {
+frame ResultStr {
     pub var success: bool;
     pub var value: str;
     pub var error_info: Error;

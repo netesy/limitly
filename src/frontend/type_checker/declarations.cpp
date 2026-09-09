@@ -254,6 +254,10 @@ void TypeChecker::register_builtin_function(const std::string& name,
 TypePtr TypeChecker::check_trait_declaration(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait) {
     if (!trait) return nullptr;
 
+    if (trait->hasExplicitVisibility) {
+        add_error("`trait` declarations cannot have a visibility modifier (`trait` is already public by default)", trait->line);
+    }
+
     TraitInfo trait_info;
     trait_info.name = trait->name;
     trait_info.extends = trait->extends;
@@ -306,6 +310,10 @@ TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::
 
 TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame) {
     if (!frame) return nullptr;
+
+    if (frame->hasExplicitVisibility) {
+        add_error("`frame` declarations cannot have a visibility modifier (`frame` is already public by default)", frame->line);
+    }
 
     for (const auto& method : frame->methods) {
         if (frame->isAbstract && method->isAbstract && method->body) {
@@ -865,7 +873,9 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
                     current_program_->imported_symbols[qname] = f;
                 } else if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
                     TypePtr var_type = type_system.ANY_TYPE;
-                    if (variable_types.count(full_path_base)) {
+                    if (v->type.has_value()) {
+                        var_type = resolve_type_annotation(v->type.value());
+                    } else if (variable_types.count(full_path_base)) {
                         var_type = variable_types[full_path_base];
                     }
                     declare_variable(qname, var_type);

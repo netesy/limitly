@@ -17,8 +17,9 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
         // Visibility: pub / prot only. Vars/fns are private by default when
         // neither is specified (no explicit 'private' keyword).
         // Method/frame modifiers (parallel to visibility, not interchangeable):
-        //   static, abstract, final. ('data' was removed — traits cover it.)
+        //   static, abstract, final. 
         LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private;
+        bool hasExplicitVisibility = false;
         bool isStatic = false;
         bool isAbstract = false;
         bool isFinal = false;
@@ -28,8 +29,10 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
                check(TokenType::ABSTRACT) || check(TokenType::FINAL)) {
             if (match({TokenType::PUB})) {
                 visibility = LM::Frontend::AST::VisibilityLevel::Public;
+                hasExplicitVisibility = true;
             } else if (match({TokenType::PROT})) {
                 visibility = LM::Frontend::AST::VisibilityLevel::Protected;
+                hasExplicitVisibility = true;
             } else if (match({TokenType::STATIC})) {
                 isStatic = true;
             } else if (match({TokenType::ABSTRACT})) {
@@ -43,6 +46,8 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
             auto decl = frameDeclaration();
             if (decl) {
                 decl->annotations = annotations;
+                decl->visibility = visibility;
+                decl->hasExplicitVisibility = hasExplicitVisibility;
                 decl->isAbstract = isAbstract;
                 decl->isFinal = isFinal;
             }
@@ -118,7 +123,11 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
         }
         if (match({TokenType::ENUM})) {
             auto decl = enumDeclaration();
-            if (decl) decl->annotations = annotations;
+            if (decl) {
+                decl->annotations = annotations;
+                decl->visibility = visibility;
+                decl->hasExplicitVisibility = hasExplicitVisibility;
+            }
             return decl;
         }
         if (match({TokenType::IMPORT})) {
@@ -133,7 +142,11 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
         }
         if (match({TokenType::TRAIT})) {
             auto decl = traitDeclaration();
-            if (decl) decl->annotations = annotations;
+            if (decl) {
+                decl->annotations = annotations;
+                decl->visibility = visibility;
+                decl->hasExplicitVisibility = hasExplicitVisibility;
+            }
             return decl;
         }
         if (match({TokenType::INTERFACE})) {

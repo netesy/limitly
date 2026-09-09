@@ -2,7 +2,7 @@
 
 import std.internal.runtime as rt;
 
-pub frame Resource {
+frame Resource {
     pub var handle: int;
     pub var kind: int;
     pub var is_open_val: bool;
@@ -30,7 +30,7 @@ pub frame Resource {
     }
 }
 
-pub frame ResourceReader {
+frame ResourceReader {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -40,7 +40,7 @@ pub frame ResourceReader {
     }
 }
 
-pub frame ResourceWriter {
+frame ResourceWriter {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -94,7 +94,7 @@ frame Binder {
     }
 }
 
-pub frame Listener {
+frame Listener {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;
@@ -105,7 +105,7 @@ pub frame Listener {
     }
 }
 
-pub frame Accepter {
+frame Accepter {
     pub var resource: Resource;
     pub init(r: Resource) {
         self.resource = r;

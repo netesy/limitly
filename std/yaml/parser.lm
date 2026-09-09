@@ -2,7 +2,7 @@
 
 import std.yaml.value as val_mod;
 
-pub frame YAMLParser {
+frame YAMLParser {
     pub idx: int;
     pub text: str;
 

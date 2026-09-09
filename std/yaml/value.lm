@@ -1,6 +1,6 @@
 // YAML Value representation
 
-pub frame YAMLValue {
+frame YAMLValue {
     pub type_tag: str; // "object", "string", "number", "bool"
     pub str_val: str;
     pub num_val: int;

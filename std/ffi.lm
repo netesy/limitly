@@ -55,7 +55,7 @@ pub var TYPE_CSTRING: int = 11;
 pub var TYPE_VOID: int = 12;
 
 // C ABI calling conventions
-pub enum CallingConvention {
+enum CallingConvention {
     CDecl,
     StdCall,
     FastCall,
@@ -146,7 +146,7 @@ pub fn call_f64_2(func_ptr: fnptr, arg1: f64, arg2: f64): f64 { return 0.0; }
 pub fn call_void_1(func_ptr: fnptr, arg1: pubptr): nil {}
 
 // CString wrapper
-pub frame CString {
+frame CString {
     pub var ptr: pubptr;
     pub var length: int;
     pub var is_owned: int;
@@ -237,7 +237,7 @@ pub fn cstring_from_ptr(p: pubptr, take_ownership: int): CString {
 }
 
 // High-Level Foreign Function Descriptor & Call Wrapper
-pub frame ForeignFunction {
+frame ForeignFunction {
     pub var name: str;
     pub var func_ptr: fnptr;
     pub var param_types: [any];
@@ -273,7 +273,7 @@ pub fn declare(name: str, func_ptr: fnptr, param_types: [any], return_type: int)
 }
 
 // High-level Library Abstraction
-pub frame Library {
+frame Library {
     pub var handle: pubptr;
     pub var path: str;
     pub var is_loaded: bool;
@@ -305,8 +305,41 @@ pub fn load(path: str): Library {
     unsafe {
         h = library_load(path);
     }
-    var loaded: bool = (h != 0 and h != nil);
-    return Library(handle=h, path=path, is_loaded=loaded);
+    if (h != 0 and h != nil) {
+        return Library(handle=h, path=path, is_loaded=true);
+    }
+
+    // Try cross-platform shared library extensions across Windows (.dll),
+    // Linux / Android (.so), and macOS (.dylib).
+    var exts: [str] = [".dll", ".so", ".dylib"];
+    var i: int = 0;
+    while (i < len(exts)) {
+        var ext: str = exts[i];
+        var candidate_path: str = path + ext;
+        unsafe {
+            h = library_load(candidate_path);
+        }
+        if (h != 0 and h != nil) {
+            return Library(handle=h, path=candidate_path, is_loaded=true);
+        }
+        i = i + 1;
+    }
+
+    return Library(handle=0, path=path, is_loaded=false);
+}
+
+// Load the first available library from a list of candidate paths.
+pub fn load_first(candidates: [str]): Library {
+    var i: int = 0;
+    var count: int = len(candidates);
+    while (i < count) {
+        var lib: Library = load(candidates[i]);
+        if (lib.is_loaded) {
+            return lib;
+        }
+        i = i + 1;
+    }
+    return Library(handle=0, path="", is_loaded=false);
 }
 
 // ── Native Callback / Trampoline API ──────────────────────────────────────
@@ -361,7 +394,7 @@ fn _ffi_callback_destroy(handle: int): nil {}
 
 // Owning callback wrapper. Prefer this over passing a bare callback handle
 // through safe standard-library APIs.
-pub frame Callback {
+frame Callback {
     pub var handle: int;
     pub var pointer: fnptr;
     pub var is_open: bool;

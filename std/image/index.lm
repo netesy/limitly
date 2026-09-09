@@ -1,26 +1,7 @@
-// std/image.lm
+// std/image/index.lm
 //
-// Unified Public Fluent Image API and Facades for Limitly.
-// Implements semantic constructors, composable chaining, and format facades.
-//
-// Usage:
-//   import std.image as image;
-//
-//   // Fluent creation & drawing:
-//   var img = image.create(200, 200)?
-//       .fill(image.black)
-//       .fill_rect(20, 20, 60, 60, image.red)
-//       .line(0, 0, 200, 200, image.white)
-//       .flip_h()
-//       .resize(100, 100)?;
-//
-//   img.save("output.png");
-//
-//   // Format facades:
-//   image.png.save(img, "output.png");
-//   image.jpg.save(img, "output.jpg", 85);
-//   image.bmp.save(img, "output.bmp");
-//   image.tga.save(img, "output.tga");
+// Core image types, fluent manipulation, shared lifecycle, and pixel access.
+// Sub-modules (png, jpg, bmp, tga, hdr) import this module.
 
 import std.ffi as ffi;
 
@@ -496,10 +477,6 @@ pub fn free(img: Image): nil {
     free_image(img);
 }
 
-pub fn destroy(img: Image): nil {
-    free_image(img);
-}
-
 // ── Clone / Duplicate ─────────────────────────────────────────────────────
 
 pub fn clone(img: Image): Image? {
@@ -871,65 +848,3 @@ pub fn save(img: Image, path: str, quality: int = 90): bool? {
     }
     return save_png(img, path);
 }
-
-// ── Format Facades (Allows image.png.save, image.jpg.save, etc.) ──────────
-
-frame PngFacade {
-    pub init() {}
-    pub fn save(img: Image, path: str): bool? {
-        return save_png(img, path);
-    }
-    pub fn load(path: str): Image? {
-        return load(path);
-    }
-    pub fn load_as(path: str, channels: int): Image? {
-        return load_forced(path, channels);
-    }
-}
-
-frame JpgFacade {
-    pub init() {}
-    pub fn save(img: Image, path: str, quality: int = 90): bool? {
-        return save_jpg(img, path, quality);
-    }
-    pub fn load(path: str): Image? {
-        return load(path);
-    }
-    pub fn load_as(path: str, channels: int): Image? {
-        return load_forced(path, channels);
-    }
-}
-
-frame BmpFacade {
-    pub init() {}
-    pub fn save(img: Image, path: str): bool? {
-        return save_bmp(img, path);
-    }
-    pub fn load(path: str): Image? {
-        return load(path);
-    }
-    pub fn load_as(path: str, channels: int): Image? {
-        return load_forced(path, channels);
-    }
-}
-
-frame TgaFacade {
-    pub init() {}
-    pub fn save(img: Image, path: str): bool? {
-        return save_tga(img, path, false);
-    }
-    pub fn save_rle(img: Image, path: str): bool? {
-        return save_tga(img, path, true);
-    }
-    pub fn load(path: str): Image? {
-        return load(path);
-    }
-    pub fn load_as(path: str, channels: int): Image? {
-        return load_forced(path, channels);
-    }
-}
-
-pub var png: PngFacade = PngFacade();
-pub var jpg: JpgFacade = JpgFacade();
-pub var bmp: BmpFacade = BmpFacade();
-pub var tga: TgaFacade = TgaFacade();

@@ -1,6 +1,6 @@
 // JSON Value representation
 
-pub frame JSONValue {
+frame JSONValue {
     pub type_tag: str; // "object", "array", "string", "number", "bool", "null"
     pub str_val: str;
     pub num_val: int;
