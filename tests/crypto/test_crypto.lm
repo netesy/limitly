@@ -1,0 +1,116 @@
+// tests/crypto/test_crypto.lm
+// Comprehensive test suite for Limitly std.crypto standard library powered by OpenSSL
+
+import std.crypto.index as crypto;
+
+fn test_hashing() {
+    print("=== Testing Cryptographic Hashing ===");
+    var h1 = crypto.sha256("hello world");
+    print("SHA-256: {h1}");
+    assert(h1 == "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9", "sha256 mismatch");
+
+    var h_512 = crypto.sha512("hello world");
+    assert(len(h_512) == 128, "sha512 length should be 128 hex chars");
+
+    var h_md5 = crypto.md5("hello world");
+    assert(h_md5 == "5eb63bbbe01eeed093cb22bb8f5acdc3", "md5 mismatch");
+
+    // Streaming Hasher
+    var hasher = crypto.Hasher("sha256");
+    hasher.update("hello ");
+    hasher.update("world");
+    var h2 = hasher.digest();
+    assert(h1 == h2, "streaming hash should match one-shot hash");
+    print("✓ Hashing & Streaming Hasher passed");
+}
+
+fn test_hmac() {
+    print("=== Testing HMAC ===");
+    var sig = crypto.hmac_sha256("secret_key", "data to authenticate");
+    print("HMAC-SHA256: {sig}");
+    assert(len(sig) == 64, "hmac sha256 should be 64 hex characters");
+    print("✓ HMAC passed");
+}
+
+fn test_secure_random() {
+    print("=== Testing Secure Random ===");
+    var hex1 = crypto.random_hex(16);
+    var hex2 = crypto.random_hex(16);
+    assert(len(hex1) == 32, "16 bytes should be 32 hex chars");
+    assert(hex1 != hex2, "consecutive random hex must be distinct");
+
+    var u = crypto.uuid();
+    assert(len(u) == 36, "uuid length should be 36");
+    print("Generated UUID v4: {u}");
+
+    var num = crypto.random_int(10, 50);
+    assert(num >= 10 and num < 50, "random_int should be in [10, 50)");
+    print("✓ Secure Random passed");
+}
+
+fn test_aes_gcm() {
+    print("=== Testing AES-256-GCM (Authenticated Encryption) ===");
+    var key = crypto.random_hex(32); // 64 hex chars = 32-byte AES key
+    var iv = crypto.random_hex(12);  // 24 hex chars = 12-byte GCM IV
+    var plaintext = "Confidential customer payload 123456789";
+    var aad = "user-id-42";
+
+    var enc_opt = crypto.encrypt_gcm(key, iv, plaintext, aad);
+    var enc = enc_opt? else {
+        assert(false, "AES-GCM encryption failed");
+        return;
+    };
+    assert(len(enc.ciphertext) > 0, "Ciphertext should not be empty");
+    assert(len(enc.tag) == 32, "Tag should be 16 bytes = 32 hex chars");
+
+    var dec_opt = crypto.decrypt_gcm(key, iv, enc.ciphertext, enc.tag, aad);
+    var dec = dec_opt? else {
+        assert(false, "AES-GCM decryption failed");
+        return;
+    };
+    assert(dec == plaintext, "Decrypted text should match original plaintext");
+
+    // Tag tampering test
+    var tampered_opt = crypto.decrypt_gcm(key, iv, enc.ciphertext, "00000000000000000000000000000000", aad);
+    var tampering_caught = false;
+    var bad = tampered_opt? else {
+        tampering_caught = true;
+        "";
+    };
+    assert(tampering_caught == true, "Tampered tag must fail authentication");
+    print("✓ AES-256-GCM & Tag Tampering verification passed");
+}
+
+fn test_aes_cbc() {
+    print("=== Testing AES-256-CBC ===");
+    var key = crypto.random_hex(32);
+    var iv = crypto.random_hex(16);
+    var plaintext = "Plaintext block payload for CBC mode!";
+
+    var enc_opt = crypto.encrypt_cbc(key, iv, plaintext);
+    var enc = enc_opt? else {
+        assert(false, "AES-CBC encryption failed");
+        return;
+    };
+
+    var dec_opt = crypto.decrypt_cbc(key, iv, enc);
+    var dec = dec_opt? else {
+        assert(false, "AES-CBC decryption failed");
+        return;
+    };
+    assert(dec == plaintext, "CBC decrypted should match original");
+    print("✓ AES-256-CBC passed");
+}
+
+fn main() {
+    test_hashing();
+    test_hmac();
+    test_secure_random();
+    test_aes_gcm();
+    test_aes_cbc();
+    print("========================================");
+    print("All std.crypto tests passed successfully!");
+    print("========================================");
+}
+
+main();

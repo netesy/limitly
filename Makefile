@@ -13,6 +13,9 @@ ifeq ($(OS),Windows_NT)
 	LIBS := -lws2_32 -lffi -lgdi32 -luser32 -lshell32
 	STB_IMAGE_LIB := bin/libstb_image.dll
 	STB_SHARED_FLAGS := -shared -static -static-libgcc
+	LIMITLY_SSL_LIB := bin/liblimitly_ssl.dll
+	SSL_SHARED_FLAGS := -shared -O2 -I $(MSYS2_PATH)/mingw64/include -L $(MSYS2_PATH)/mingw64/lib
+	SSL_LIBS := -lssl -lcrypto -lz -lregex -lcrypt32 -lws2_32
 else ifeq ($(shell uname),Darwin)
 	PLATFORM := linux
 	EXE_EXT :=
@@ -22,6 +25,9 @@ else ifeq ($(shell uname),Darwin)
 	LIBS := -lffi -ldl
 	STB_IMAGE_LIB := bin/libstb_image.dylib
 	STB_SHARED_FLAGS := -shared -fPIC
+	LIMITLY_SSL_LIB := bin/liblimitly_ssl.dylib
+	SSL_SHARED_FLAGS := -shared -fPIC -O2
+	SSL_LIBS := -lssl -lcrypto -lz
 else
 	PLATFORM := linux
 	EXE_EXT :=
@@ -31,6 +37,9 @@ else
 	LIBS := -lffi -ldl
 	STB_IMAGE_LIB := bin/libstb_image.so
 	STB_SHARED_FLAGS := -shared -fPIC
+	LIMITLY_SSL_LIB := bin/liblimitly_ssl.so
+	SSL_SHARED_FLAGS := -shared -fPIC -O2
+	SSL_LIBS := -lssl -lcrypto -lz
 endif
 
 # =============================
@@ -417,6 +426,32 @@ else
 	./bin/limitly run tests/ffi/test_image_fluent.lm
 endif
 	@echo "✅ std.image integration test finished."
+
+# =============================
+# OpenSSL TLS & Crypto shared library (compiled beside limitly in bin/)
+# =============================
+ssl-lib: $(LIMITLY_SSL_LIB)
+
+$(LIMITLY_SSL_LIB): src/native/openssl_wrapper.c
+	@echo "🔨 Building OpenSSL native bridge beside limitly in bin/ → $@"
+	$(CC) $(SSL_SHARED_FLAGS) -o $@ src/native/openssl_wrapper.c $(SSL_LIBS)
+	@echo "✅ $@ built."
+
+ssl-lib-android: src/native/openssl_wrapper.c
+	@echo "🔨 Building OpenSSL native bridge for Android in bin/ → bin/liblimitly_ssl.so"
+	$(ANDROID_CC) -shared -fPIC -O2 -o bin/liblimitly_ssl.so src/native/openssl_wrapper.c -lssl -lcrypto
+	@echo "✅ bin/liblimitly_ssl.so built for Android."
+
+ssl-test: $(PLATFORM) ssl-lib
+	@echo "🧪 Running OpenSSL TLS & Crypto tests ..."
+ifeq ($(PLATFORM),windows)
+	./bin/limitly.exe run tests/crypto/test_crypto.lm
+	./bin/limitly.exe run tests/net/test_tls.lm
+else
+	./bin/limitly run tests/crypto/test_crypto.lm
+	./bin/limitly run tests/net/test_tls.lm
+endif
+	@echo "✅ OpenSSL TLS & Crypto tests passed."
 
 # =============================
 # AOT Test Target

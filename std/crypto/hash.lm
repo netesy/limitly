@@ -1,151 +1,175 @@
-// Cryptographic Hash Functions Module
+// std/crypto/hash.lm
+// Clean cryptographic hashing using OpenSSL EVP
 
-import std.resource as res;
-import std.core as core;
-import std.core show Error;
+import std.ffi as ffi;
 
+// ── Shared OpenSSL library loader ──────────────────────────────────────────
+pub var _LIB_PATH: str = "";
+pub var _LIB_HANDLE: any = nil;
+
+pub fn _open_lib(): any {
+    unsafe {
+        if (_LIB_HANDLE != nil and _LIB_HANDLE != 0) {
+            return _LIB_HANDLE;
+        }
+
+        if (_LIB_PATH != "") {
+            var h = ffi.library_load(_LIB_PATH);
+            if (h != 0 and h != nil) {
+                _LIB_HANDLE = h;
+                return h;
+            }
+        }
+
+        var candidates: [str] = [
+            "bin/liblimitly_ssl.dll",
+            "bin/liblimitly_ssl.so",
+            "bin/liblimitly_ssl.dylib",
+            "./bin/liblimitly_ssl.dll",
+            "./bin/liblimitly_ssl.so",
+            "./bin/liblimitly_ssl.dylib",
+            "liblimitly_ssl.dll",
+            "liblimitly_ssl.so",
+            "liblimitly_ssl.dylib"
+        ];
+
+        var i: int = 0;
+        var count: int = len(candidates);
+        while (i < count) {
+            var c: str = candidates[i];
+            var h2 = ffi.library_load(c);
+            if (h2 != 0 and h2 != nil) {
+                _LIB_PATH = c;
+                _LIB_HANDLE = h2;
+                return h2;
+            }
+            i = i + 1;
+        }
+
+        return nil;
+    }
+}
+
+// ── Streaming Hasher frame ─────────────────────────────────────────────────
 frame Hasher {
-    var resource: res.Resource;
-    pub init(r: res.Resource) { self.resource = r; }
-    pub fn open_algo(algo: str): bool {
-        var result = res._call(h=self.resource.handle, op=res.OP_OPEN, args=[algo]);
-        return (result == true);
-    }
-    pub fn update(data: str): bool {
-        var result = res._call(h=self.resource.handle, op=res.OP_WRITE, args=[data]);
-        return (result == true);
-    }
-    pub fn finalize(): any {
-        return res._call(h=self.resource.handle, op=res.OP_READ, args=[]);
-    }
-}
+    pub var algorithm: str;
+    pub var ctx: any;
+    pub var is_open: bool;
 
-frame HashEngine {
-    pub var resource: res.Resource;
-    pub var hasher: Hasher;
-    pub init(h: int) {
-        self.resource = res.Resource(h=h, k=res.KIND_HASH_ENGINE);
-        self.hasher = Hasher(r=self.resource);
-    }
-}
-
-frame Hash {
-    pub fn hash(data: str, algorithm: str): str?Error {
-        match (res.create_hash_engine()) {
-            val engine_res => {
-                var engine = HashEngine(h=engine_res.handle);
-                if (not engine.hasher.open_algo(algo=algorithm)) {
-                    engine.resource.close();
-                    return err(Error(code="ERR", message="fail"));
+    pub init(algo: str = "sha256") {
+        self.algorithm = algo;
+        self.ctx = nil;
+        self.is_open = false;
+        unsafe {
+            var lib = _open_lib();
+            if (lib != nil and lib != 0) {
+                var fn_create = ffi.library_get_symbol(lib, "crypto_hasher_create");
+                if (fn_create != nil and fn_create != 0) {
+                    var cs_algo: ffi.CString = ffi.string_to_cstring(algo);
+                    var raw_ctx = ffi.foreign_call(
+                        fn_create,
+                        [ffi.cstring_as_ptr(cs_algo)],
+                        ffi.TYPE_PTR,
+                        [ffi.TYPE_PTR]
+                    );
+                    ffi.cstring_free(cs_algo);
+                    if (raw_ctx != nil and raw_ctx != 0) {
+                        self.ctx = raw_ctx;
+                        self.is_open = true;
+                    }
                 }
-                if (not engine.hasher.update(data=data)) {
-                    engine.resource.close();
-                    return err(Error(code="ERR", message="fail"));
+            }
+        }
+    }
+
+    pub fn update(data: str): Hasher {
+        if (not self.is_open or self.ctx == nil or self.ctx == 0) { return self; }
+        unsafe {
+            var lib = _open_lib();
+            if (lib != nil and lib != 0) {
+                var fn_upd = ffi.library_get_symbol(lib, "crypto_hasher_update");
+                if (fn_upd != nil and fn_upd != 0) {
+                    var cs: ffi.CString = ffi.string_to_cstring(data);
+                    ffi.foreign_call(
+                        fn_upd,
+                        [self.ctx, ffi.cstring_as_ptr(cs), len(data)],
+                        ffi.TYPE_I32,
+                        [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32]
+                    );
+                    ffi.cstring_free(cs);
                 }
-                var result = engine.hasher.finalize();
-                engine.resource.close();
-                if (result == nil) return err(Error(code="ERR", message="fail"));
-                return ok(result as str);
-            },
-            err e => return err(Error(code="ERR", message="fail"))
+            }
         }
+        return self;
     }
 
-    pub fn sha256(data: str): str?Error {
-        match (self.hash(data=data, algorithm="sha256")) {
-            val s => return ok(s),
-            err e => return err(Error(code="ERR", message="fail"))
-        }
-    }
-    pub fn sha512(data: str): str?Error {
-        match (self.hash(data=data, algorithm="sha512")) {
-            val s => return ok(s),
-            err e => return err(Error(code="ERR", message="fail"))
-        }
-    }
-    pub fn md5(data: str): str?Error {
-        match (self.hash(data=data, algorithm="md5")) {
-            val s => return ok(s),
-            err e => return err(Error(code="ERR", message="fail"))
-        }
-    }
-    pub fn sha1(data: str): str?Error {
-        match (self.hash(data=data, algorithm="sha1")) {
-            val s => return ok(s),
-            err e => return err(Error(code="ERR", message="fail"))
-        }
-    }
-
-    pub fn create(algorithm: str): int?Error {
-        match (res.create_hash_engine()) {
-            val engine_res => {
-                var engine = HashEngine(h=engine_res.handle);
-                if (not engine.hasher.open_algo(algo=algorithm)) {
-                    engine.resource.close();
-                    return err(Error(code="ERR", message="fail"));
+    pub fn hex(): str {
+        if (not self.is_open or self.ctx == nil or self.ctx == 0) { return ""; }
+        var result_str: str = "";
+        unsafe {
+            var lib = _open_lib();
+            if (lib != nil and lib != 0) {
+                var fn_final = ffi.library_get_symbol(lib, "crypto_hasher_final_hex");
+                if (fn_final != nil and fn_final != 0) {
+                    var out_buf: int = ffi.alloc(130);
+                    var ok_code = ffi.foreign_call(
+                        fn_final,
+                        [self.ctx, out_buf],
+                        ffi.TYPE_I32,
+                        [ffi.TYPE_PTR, ffi.TYPE_PTR]
+                    );
+                    if (ok_code == 1) {
+                        result_str = ffi.cstring_to_string(out_buf);
+                    }
+                    ffi.free(out_buf);
                 }
-                return ok(engine_res.handle);
-            },
-            err e => return err(Error(code="ERR", message="fail"))
+            }
+        }
+        self.is_open = false;
+        self.ctx = nil;
+        return result_str;
+    }
+
+    pub fn digest(): str {
+        return self.hex();
+    }
+}
+
+// ── One-shot Hash Functions ────────────────────────────────────────────────
+
+pub fn hash(algo: str, data: str): str {
+    var out_str: str = "";
+    unsafe {
+        var lib = _open_lib();
+        if (lib != nil and lib != 0) {
+            var fn_hash = ffi.library_get_symbol(lib, "crypto_hash");
+            if (fn_hash != nil and fn_hash != 0) {
+                var cs_algo: ffi.CString = ffi.string_to_cstring(algo);
+                var cs_data: ffi.CString = ffi.string_to_cstring(data);
+                var out_buf: int = ffi.alloc(130);
+
+                var ok_code = ffi.foreign_call(
+                    fn_hash,
+                    [ffi.cstring_as_ptr(cs_algo), ffi.cstring_as_ptr(cs_data), len(data), out_buf],
+                    ffi.TYPE_I32,
+                    [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_PTR]
+                );
+
+                if (ok_code == 1) {
+                    out_str = ffi.cstring_to_string(out_buf);
+                }
+
+                ffi.cstring_free(cs_algo);
+                ffi.cstring_free(cs_data);
+                ffi.free(out_buf);
+            }
         }
     }
-
-    pub fn update(handle: int, data: str): nil?Error {
-        var engine = HashEngine(h=handle);
-        if (not engine.hasher.update(data=data)) return err(Error(code="ERR", message="fail"));
-        return ok(nil);
-    }
-
-    pub fn finalize(handle: int): str?Error {
-        var engine = HashEngine(h=handle);
-        var result = engine.hasher.finalize();
-        engine.resource.close();
-        if (result == nil) return err(Error(code="ERR", message="fail"));
-        return ok(result as str);
-    }
+    return out_str;
 }
 
-pub fn sha256(data: str): str?Error {
-    match (Hash.sha256(data=data)) {
-        val s => return ok(s),
-        err e => return err(Error(code="ERR", message="fail"))
-    }
-}
-pub fn sha512(data: str): str?Error {
-    match (Hash.sha512(data=data)) {
-        val s => return ok(s),
-        err e => return err(Error(code="ERR", message="fail"))
-    }
-}
-pub fn md5(data: str): str?Error {
-    match (Hash.md5(data=data)) {
-        val s => return ok(s),
-        err e => return err(Error(code="ERR", message="fail"))
-    }
-}
-pub fn sha1(data: str): str?Error {
-    match (Hash.sha1(data=data)) {
-        val s => return ok(s),
-        err e => return err(Error(code="ERR", message="fail"))
-    }
-}
-
-fn byte_ord(ch: str): int {
-    var alphabet = "abcdefghijklmnopqrstuvwxyz";
-    for (var i = 0; i < len(alphabet); i = i + 1) {
-        if (substring(alphabet, i, i + 1) == ch) return 97 + i;
-    }
-    var u_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    for (var i = 0; i < len(u_alphabet); i = i + 1) {
-        if (substring(u_alphabet, i, i + 1) == ch) return 65 + i;
-    }
-    var digits = "0123456789";
-    for (var i = 0; i < len(digits); i = i + 1) {
-        if (substring(digits, i, i + 1) == ch) return 48 + i;
-    }
-    if (ch == " ") return 32;
-    if (ch == "\n") return 10;
-    if (ch == "\r") return 13;
-    if (ch == "\t") return 9;
-    return 0;
-}
+pub fn sha256(data: str): str { return hash("sha256", data); }
+pub fn sha512(data: str): str { return hash("sha512", data); }
+pub fn sha384(data: str): str { return hash("sha384", data); }
+pub fn sha1(data: str): str   { return hash("sha1", data); }
+pub fn md5(data: str): str    { return hash("md5", data); }

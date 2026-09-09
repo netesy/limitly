@@ -1,21 +1,46 @@
-// Standard Library Regex Entrypoint Module
+// std/regex/index.lm
+// Clean Standard Library Regex Entrypoint Module
 
 import std.regex.regex as regex_mod;
 
-pub fn Regex(pattern: str, flags: int): any {
+pub fn Match(is_matched: bool = false, value: str = "", start: int = -1, end: int = -1, index: int = -1): regex_mod.Match {
+    return regex_mod.Match(is_matched, value, start, end, index);
+}
+
+pub fn Regex(pattern: str, flags: int = 0): regex_mod.Regex {
     return regex_mod.Regex(pattern, flags);
 }
 
-pub fn RegexPatterns(): any {
+pub fn RegexPatterns(): regex_mod.RegexPatterns {
     return regex_mod.RegexPatterns();
 }
 
+pub fn first_match(pattern: str, text: str): regex_mod.Match {
+    var r = regex_mod.Regex(pattern, 0);
+    return r.find_match(text, 0);
+}
+
+pub fn all_matches(pattern: str, text: str): [regex_mod.Match] {
+    var r = regex_mod.Regex(pattern, 0);
+    return r.find_matches(text);
+}
+
 pub fn is_match(pattern: str, text: str): bool {
-    var regex = regex_mod.Regex(pattern, 0);
-    return regex.matches(text);
+    var r = regex_mod.Regex(pattern, 0);
+    return r.is_match(text);
 }
 
 pub fn replace(pattern: str, text: str, replacement: str): str {
-    var regex = regex_mod.Regex(pattern, 0);
-    return regex.replace(text, replacement);
+    var r = regex_mod.Regex(pattern, 0);
+    return r.replace(text, replacement);
+}
+
+pub fn replace_all(pattern: str, text: str, replacement: str): str {
+    var r = regex_mod.Regex(pattern, 0);
+    return r.replace_all(text, replacement);
+}
+
+pub fn split(pattern: str, text: str): [str] {
+    var r = regex_mod.Regex(pattern, 0);
+    return r.split(text);
 }

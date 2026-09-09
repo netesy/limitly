@@ -1,85 +1,80 @@
-// HMAC Module
+// std/crypto/hmac.lm
+// Clean HMAC implementation using OpenSSL EVP HMAC
 
-import std.core as core;
-import std.resource as res;
+import std.ffi as ffi;
 import std.crypto.hash as hash;
 
 frame HMAC {
-    pub fn sign(key: str, data: str, algorithm: str): core.ResultStr {
-        if (algorithm == "sha256") return self.sign_with_block(key=key, data=data, algorithm="sha256", block_size=64);
-        if (algorithm == "sha512") return self.sign_with_block(key=key, data=data, algorithm="sha512", block_size=128);
-        if (algorithm == "md5") return self.sign_with_block(key=key, data=data, algorithm="md5", block_size=64);
-        if (algorithm == "sha1") return self.sign_with_block(key=key, data=data, algorithm="sha1", block_size=64);
-        return core.err_str(e="fail");
+    pub fn compute(key: str, data: str, algo: str = "sha256"): str {
+        return hmac(algo, key, data);
     }
 
-    pub fn sha256(key: str, data: str): core.ResultStr { return self.sign_with_block(key=key, data=data, algorithm="sha256", block_size=64); }
-    pub fn sha512(key: str, data: str): core.ResultStr { return self.sign_with_block(key=key, data=data, algorithm="sha512", block_size=128); }
-    pub fn md5(key: str, data: str): core.ResultStr { return self.sign_with_block(key=key, data=data, algorithm="md5", block_size=64); }
-    pub fn sha1(key: str, data: str): core.ResultStr { return self.sign_with_block(key=key, data=data, algorithm="sha1", block_size=64); }
-
-    fn sign_with_block(key: str, data: str, algorithm: str, block_size: int): core.ResultStr {
-        var k = key;
-        if (len(key) > block_size) {
-            var key_hash = self.raw_hash(data=key, algorithm=algorithm);
-            if (key_hash.is_err()) return key_hash;
-            k = key_hash.unwrap();
-        }
-        while (len(k) < block_size) { k = k + "\x00"; }
-        var ipad = "";
-        var opad = "";
-        var i = 0;
-        while (i < block_size) {
-            var b = byte_ord(substring(k, i, i + 1));
-            ipad = ipad + char_from(b=b ^ 0x36);
-            opad = opad + char_from(b=b ^ 0x5C);
-            i = i + 1;
-        }
-        var inner = self.raw_hash(data=ipad + data, algorithm=algorithm);
-        if (inner.is_err()) return inner;
-        return self.raw_hash(data=opad + inner.unwrap(), algorithm=algorithm);
+    pub fn sha256(key: str, data: str): str {
+        return hmac("sha256", key, data);
     }
 
-    fn raw_hash(data: str, algorithm: str): core.ResultStr {
-        match (res.create_hash_engine()) {
-            val engine_res => {
-                var engine = hash.HashEngine(h=engine_res.handle);
-                if (not engine.hasher.open_algo(algo=algorithm)) {
-                    engine.resource.close();
-                    return core.err_str(e="fail");
+    pub fn sha512(key: str, data: str): str {
+        return hmac("sha512", key, data);
+    }
+
+    pub fn sha384(key: str, data: str): str {
+        return hmac("sha384", key, data);
+    }
+
+    pub fn md5(key: str, data: str): str {
+        return hmac("md5", key, data);
+    }
+
+    pub fn sha1(key: str, data: str): str {
+        return hmac("sha1", key, data);
+    }
+}
+
+pub fn hmac(algo: str, key: str, data: str): str {
+    var out_str: str = "";
+    unsafe {
+        var lib = hash._open_lib();
+        if (lib != nil and lib != 0) {
+            var fn_hmac = ffi.library_get_symbol(lib, "crypto_hmac");
+            if (fn_hmac != nil and fn_hmac != 0) {
+                var cs_algo: ffi.CString = ffi.string_to_cstring(algo);
+                var cs_key: ffi.CString  = ffi.string_to_cstring(key);
+                var cs_data: ffi.CString = ffi.string_to_cstring(data);
+                var out_buf: int = ffi.alloc(130);
+
+                var ok_code = ffi.foreign_call(
+                    fn_hmac,
+                    [
+                        ffi.cstring_as_ptr(cs_algo),
+                        ffi.cstring_as_ptr(cs_key), len(key),
+                        ffi.cstring_as_ptr(cs_data), len(data),
+                        out_buf
+                    ],
+                    ffi.TYPE_I32,
+                    [
+                        ffi.TYPE_PTR,
+                        ffi.TYPE_PTR, ffi.TYPE_I32,
+                        ffi.TYPE_PTR, ffi.TYPE_I32,
+                        ffi.TYPE_PTR
+                    ]
+                );
+
+                if (ok_code == 1) {
+                    out_str = ffi.cstring_to_string(out_buf);
                 }
-                if (not engine.hasher.update(data=data)) {
-                    engine.resource.close();
-                    return core.err_str(e="fail");
-                }
-                var result = engine.hasher.finalize();
-                engine.resource.close();
-                if (result == nil) return core.err_str(e="fail");
-                return core.ok_str(v=result as str);
-            },
-            err e => return core.err_str(e="fail")
+
+                ffi.cstring_free(cs_algo);
+                ffi.cstring_free(cs_key);
+                ffi.cstring_free(cs_data);
+                ffi.free(out_buf);
+            }
         }
     }
+    return out_str;
 }
 
-fn byte_ord(ch: str): int {
-    if (ch >= "a" and ch <= "z") return 97 + (len(ch) == 1 ? (ch - "a") : 0);
-    if (ch >= "A" and ch <= "Z") return 65 + (len(ch) == 1 ? (ch - "A") : 0);
-    if (ch >= "0" and ch <= "9") return 48 + (len(ch) == 1 ? (ch - "0") : 0);
-    if (ch == " ") return 32;
-    if (ch == "\n") return 10;
-    if (ch == "\r") return 13;
-    if (ch == "\t") return 9;
-    return 0;
-}
-
-fn char_from(b: int): str {
-    if (b >= 97 and b <= 122) return substring("abcdefghijklmnopqrstuvwxyz", b - 97, b - 96);
-    if (b >= 65 and b <= 90) return substring("ABCDEFGHIJKLMNOPQRSTUVWXYZ", b - 65, b - 64);
-    if (b >= 48 and b <= 57) return substring("0123456789", b - 48, b - 47);
-    if (b == 32) return " ";
-    if (b == 10) return "\n";
-    if (b == 13) return "\r";
-    if (b == 9) return "\t";
-    return "\x00";
-}
+pub fn sha256(key: str, data: str): str { return hmac("sha256", key, data); }
+pub fn sha512(key: str, data: str): str { return hmac("sha512", key, data); }
+pub fn sha384(key: str, data: str): str { return hmac("sha384", key, data); }
+pub fn sha1(key: str, data: str): str   { return hmac("sha1", key, data); }
+pub fn md5(key: str, data: str): str    { return hmac("md5", key, data); }

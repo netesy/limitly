@@ -1,0 +1,235 @@
+// std/crypto/cipher.lm
+// Clean authenticated & symmetric encryption using OpenSSL (AES-256-GCM and AES-256-CBC)
+
+import std.ffi as ffi;
+import std.crypto.hash as hash;
+
+frame GcmCipher {
+    pub var ciphertext: str;
+    pub var tag: str;
+
+    pub init(ciphertext: str = "", tag: str = "") {
+        self.ciphertext = ciphertext;
+        self.tag = tag;
+    }
+}
+
+frame AES {
+    pub fn encrypt_gcm(key: str, iv: str, plaintext: str, aad: str = ""): GcmCipher? {
+        return encrypt_gcm(key, iv, plaintext, aad);
+    }
+
+    pub fn decrypt_gcm(key: str, iv: str, ciphertext: str, tag: str, aad: str = ""): str? {
+        return decrypt_gcm(key, iv, ciphertext, tag, aad);
+    }
+
+    pub fn encrypt_cbc(key: str, iv: str, plaintext: str): str? {
+        return encrypt_cbc(key, iv, plaintext);
+    }
+
+    pub fn decrypt_cbc(key: str, iv: str, ciphertext: str): str? {
+        return decrypt_cbc(key, iv, ciphertext);
+    }
+}
+
+pub fn encrypt_gcm(key: str, iv: str, plaintext: str, aad: str = ""): GcmCipher? {
+    unsafe {
+        var lib = hash._open_lib();
+        if (lib != nil and lib != 0) {
+            var fn_enc = ffi.library_get_symbol(lib, "crypto_aes_gcm_encrypt_hex");
+            if (fn_enc != nil and fn_enc != 0) {
+                var cs_key = ffi.string_to_cstring(key);
+                var cs_iv  = ffi.string_to_cstring(iv);
+                var cs_pt  = ffi.string_to_cstring(plaintext);
+                var cs_aad = ffi.string_to_cstring(aad);
+
+                var ct_buf  = ffi.alloc(len(plaintext) * 2 + 32);
+                var tag_buf = ffi.alloc(64);
+
+                var res = ffi.foreign_call(
+                    fn_enc,
+                    [
+                        ffi.cstring_as_ptr(cs_key),
+                        ffi.cstring_as_ptr(cs_iv),
+                        ffi.cstring_as_ptr(cs_pt), len(plaintext),
+                        ffi.cstring_as_ptr(cs_aad), len(aad),
+                        ct_buf,
+                        tag_buf
+                    ],
+                    ffi.TYPE_I32,
+                    [
+                        ffi.TYPE_PTR, ffi.TYPE_PTR,
+                        ffi.TYPE_PTR, ffi.TYPE_I32,
+                        ffi.TYPE_PTR, ffi.TYPE_I32,
+                        ffi.TYPE_PTR, ffi.TYPE_PTR
+                    ]
+                );
+
+                var ok_result: GcmCipher? = nil;
+                if (res >= 0) {
+                    var ct_str  = ffi.cstring_to_string(ct_buf);
+                    var tag_str = ffi.cstring_to_string(tag_buf);
+                    ok_result = ok(GcmCipher(ciphertext=ct_str, tag=tag_str));
+                }
+
+                ffi.cstring_free(cs_key);
+                ffi.cstring_free(cs_iv);
+                ffi.cstring_free(cs_pt);
+                ffi.cstring_free(cs_aad);
+                ffi.free(ct_buf);
+                ffi.free(tag_buf);
+
+                if (ok_result != nil) {
+                    return ok_result;
+                }
+            }
+        }
+    }
+    return err();
+}
+
+pub fn decrypt_gcm(key: str, iv: str, ciphertext: str, tag: str, aad: str = ""): str? {
+    unsafe {
+        var lib = hash._open_lib();
+        if (lib != nil and lib != 0) {
+            var fn_dec = ffi.library_get_symbol(lib, "crypto_aes_gcm_decrypt_hex");
+            if (fn_dec != nil and fn_dec != 0) {
+                var cs_key = ffi.string_to_cstring(key);
+                var cs_iv  = ffi.string_to_cstring(iv);
+                var cs_ct  = ffi.string_to_cstring(ciphertext);
+                var cs_aad = ffi.string_to_cstring(aad);
+                var cs_tag = ffi.string_to_cstring(tag);
+
+                var pt_buf = ffi.alloc(len(ciphertext) + 32);
+
+                var dec_len = ffi.foreign_call(
+                    fn_dec,
+                    [
+                        ffi.cstring_as_ptr(cs_key),
+                        ffi.cstring_as_ptr(cs_iv),
+                        ffi.cstring_as_ptr(cs_ct),
+                        ffi.cstring_as_ptr(cs_aad), len(aad),
+                        ffi.cstring_as_ptr(cs_tag),
+                        pt_buf
+                    ],
+                    ffi.TYPE_I32,
+                    [
+                        ffi.TYPE_PTR, ffi.TYPE_PTR,
+                        ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32,
+                        ffi.TYPE_PTR, ffi.TYPE_PTR
+                    ]
+                );
+
+                var pt_res: str? = nil;
+                if (dec_len >= 0) {
+                    pt_res = ok(ffi.cstring_to_string(pt_buf));
+                }
+
+                ffi.cstring_free(cs_key);
+                ffi.cstring_free(cs_iv);
+                ffi.cstring_free(cs_ct);
+                ffi.cstring_free(cs_aad);
+                ffi.cstring_free(cs_tag);
+                ffi.free(pt_buf);
+
+                if (pt_res != nil) {
+                    return pt_res;
+                }
+            }
+        }
+    }
+    return err();
+}
+
+pub fn encrypt_cbc(key: str, iv: str, plaintext: str): str? {
+    unsafe {
+        var lib = hash._open_lib();
+        if (lib != nil and lib != 0) {
+            var fn_enc = ffi.library_get_symbol(lib, "crypto_aes_cbc_encrypt_hex");
+            if (fn_enc != nil and fn_enc != 0) {
+                var cs_key = ffi.string_to_cstring(key);
+                var cs_iv  = ffi.string_to_cstring(iv);
+                var cs_pt  = ffi.string_to_cstring(plaintext);
+
+                var ct_buf = ffi.alloc(len(plaintext) * 2 + 64);
+
+                var res = ffi.foreign_call(
+                    fn_enc,
+                    [
+                        ffi.cstring_as_ptr(cs_key),
+                        ffi.cstring_as_ptr(cs_iv),
+                        ffi.cstring_as_ptr(cs_pt), len(plaintext),
+                        ct_buf
+                    ],
+                    ffi.TYPE_I32,
+                    [
+                        ffi.TYPE_PTR, ffi.TYPE_PTR,
+                        ffi.TYPE_PTR, ffi.TYPE_I32,
+                        ffi.TYPE_PTR
+                    ]
+                );
+
+                var ok_res: str? = nil;
+                if (res >= 0) {
+                    ok_res = ok(ffi.cstring_to_string(ct_buf));
+                }
+
+                ffi.cstring_free(cs_key);
+                ffi.cstring_free(cs_iv);
+                ffi.cstring_free(cs_pt);
+                ffi.free(ct_buf);
+
+                if (ok_res != nil) {
+                    return ok_res;
+                }
+            }
+        }
+    }
+    return err();
+}
+
+pub fn decrypt_cbc(key: str, iv: str, ciphertext: str): str? {
+    unsafe {
+        var lib = hash._open_lib();
+        if (lib != nil and lib != 0) {
+            var fn_dec = ffi.library_get_symbol(lib, "crypto_aes_cbc_decrypt_hex");
+            if (fn_dec != nil and fn_dec != 0) {
+                var cs_key = ffi.string_to_cstring(key);
+                var cs_iv  = ffi.string_to_cstring(iv);
+                var cs_ct  = ffi.string_to_cstring(ciphertext);
+
+                var pt_buf = ffi.alloc(len(ciphertext) + 64);
+
+                var res = ffi.foreign_call(
+                    fn_dec,
+                    [
+                        ffi.cstring_as_ptr(cs_key),
+                        ffi.cstring_as_ptr(cs_iv),
+                        ffi.cstring_as_ptr(cs_ct),
+                        pt_buf
+                    ],
+                    ffi.TYPE_I32,
+                    [
+                        ffi.TYPE_PTR, ffi.TYPE_PTR,
+                        ffi.TYPE_PTR, ffi.TYPE_PTR
+                    ]
+                );
+
+                var ok_res: str? = nil;
+                if (res >= 0) {
+                    ok_res = ok(ffi.cstring_to_string(pt_buf));
+                }
+
+                ffi.cstring_free(cs_key);
+                ffi.cstring_free(cs_iv);
+                ffi.cstring_free(cs_ct);
+                ffi.free(pt_buf);
+
+                if (ok_res != nil) {
+                    return ok_res;
+                }
+            }
+        }
+    }
+    return err();
+}
