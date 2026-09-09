@@ -51,7 +51,8 @@ set(BACKEND_COMMON_SOURCES
     src/backend/symbol_table.cpp
     src/backend/value.cpp
     src/backend/vm/resource_manager.cpp
-    src/backend/vm/sokol_app_runtime.cpp
+    src/runtime/sokol/sokol_app_runtime.cpp
+    src/runtime/limitrt/limitrt.cpp
     src/backend/vm/register.cpp
     src/backend/vm/register_helpers.cpp
     src/backend/vm/ops/arithmetic.cpp

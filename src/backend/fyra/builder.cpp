@@ -2410,6 +2410,25 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (inst.dst != UINT32_MAX) store_reg(inst.dst, res, inst.result_type);
                 break;
             }
+            case LIR::LIR_Op::CallbackCreate: {
+                if (inst.imm == 1) {
+                    ir::Value* handle = load_reg(inst.a, LIR::Type::I64);
+                    ir::Value* res = builder_->createExternCall("limitrt_callback_get_ptr", {handle}, lir_type_to_fyra_type(inst.result_type));
+                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, res, inst.result_type);
+                } else {
+                    ir::Value* name_str = (!inst.call_args.empty()) ? load_reg(inst.call_args[0], LIR::Type::Ptr) : context_->getConstantInt(context_->getIntegerType(64), 0);
+                    ir::Value* arg_types = (inst.call_args.size() >= 2) ? load_reg(inst.call_args[1], LIR::Type::Ptr) : context_->getConstantInt(context_->getIntegerType(64), 0);
+                    ir::Value* ret_type = (inst.call_args.size() >= 3) ? load_reg(inst.call_args[2], LIR::Type::I64) : context_->getConstantInt(context_->getIntegerType(64), 0);
+                    ir::Value* res = builder_->createExternCall("limitrt_callback_create", {name_str, arg_types, ret_type}, lir_type_to_fyra_type(inst.result_type));
+                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, res, inst.result_type);
+                }
+                break;
+            }
+            case LIR::LIR_Op::CallbackDestroy: {
+                ir::Value* handle = load_reg(inst.a, LIR::Type::I64);
+                builder_->createExternCall("limitrt_callback_destroy", {handle}, nullptr);
+                break;
+            }
             case LIR::LIR_Op::ForeignCallDirect: {
                 std::vector<ir::Value*> args;
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));

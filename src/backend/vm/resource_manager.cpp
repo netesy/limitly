@@ -103,7 +103,7 @@ struct SystemFontEngine {
 
 static SystemFontEngine s_system_font_engine;
 
-#include "sokol_app_runtime.hh"
+#include "../../runtime/sokol/sokol_app_runtime.hh"
 
 // Platform-specific headers and macros
 #if defined(_WIN32)
