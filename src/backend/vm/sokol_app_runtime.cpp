@@ -68,19 +68,25 @@ static void sokol_frame(void* user_data) {
     std::lock_guard<std::mutex> lock(state->mutex);
     if (!state->bgra.empty() && state->frame_width > 0 && state->frame_height > 0) {
         HWND hwnd = static_cast<HWND>(const_cast<void*>(sapp_win32_get_hwnd()));
-        HDC hdc = GetDC(hwnd);
-        if (hdc) {
-            BITMAPINFO bmi{};
-            bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-            bmi.bmiHeader.biWidth = state->frame_width;
-            bmi.bmiHeader.biHeight = -state->frame_height;
-            bmi.bmiHeader.biPlanes = 1;
-            bmi.bmiHeader.biBitCount = 32;
-            bmi.bmiHeader.biCompression = BI_RGB;
-            StretchDIBits(hdc, 0, 0, sapp_width(), sapp_height(), 0, 0,
-                          state->frame_width, state->frame_height, state->bgra.data(),
-                          &bmi, DIB_RGB_COLORS, SRCCOPY);
-            ReleaseDC(hwnd, hdc);
+        if (hwnd) {
+            HDC hdc = GetDC(hwnd);
+            if (hdc) {
+                RECT rc{};
+                GetClientRect(hwnd, &rc);
+                int dst_w = rc.right - rc.left;
+                int dst_h = rc.bottom - rc.top;
+                BITMAPINFO bmi{};
+                bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+                bmi.bmiHeader.biWidth = state->frame_width;
+                bmi.bmiHeader.biHeight = -state->frame_height;
+                bmi.bmiHeader.biPlanes = 1;
+                bmi.bmiHeader.biBitCount = 32;
+                bmi.bmiHeader.biCompression = BI_RGB;
+                StretchDIBits(hdc, 0, 0, dst_w, dst_h, 0, 0,
+                              state->frame_width, state->frame_height, state->bgra.data(),
+                              &bmi, DIB_RGB_COLORS, SRCCOPY);
+                ReleaseDC(hwnd, hdc);
+            }
         }
     }
     ++state->frame_generation;
@@ -96,6 +102,11 @@ static void sokol_cleanup(void* user_data) {
 
 static void sokol_event(const sapp_event* event, void* user_data) {
     auto* state = static_cast<SokolAppRuntime::Impl*>(user_data);
+    float scale_x = (event->window_width > 0) ? (static_cast<float>(event->framebuffer_width) / static_cast<float>(event->window_width)) : 1.0f;
+    float scale_y = (event->window_height > 0) ? (static_cast<float>(event->framebuffer_height) / static_cast<float>(event->window_height)) : 1.0f;
+    int mx = static_cast<int>(event->mouse_x * scale_x);
+    int my = static_cast<int>(event->mouse_y * scale_y);
+
     switch (event->type) {
         case SAPP_EVENTTYPE_QUIT_REQUESTED:
             state->push(0);
@@ -113,16 +124,16 @@ static void sokol_event(const sapp_event* event, void* user_data) {
             break;
         case SAPP_EVENTTYPE_MOUSE_DOWN:
             if (event->mouse_button == SAPP_MOUSEBUTTON_LEFT) {
-                state->push(4, static_cast<int>(event->mouse_x), static_cast<int>(event->mouse_y));
+                state->push(4, mx, my);
             }
             break;
         case SAPP_EVENTTYPE_MOUSE_UP:
             if (event->mouse_button == SAPP_MOUSEBUTTON_LEFT) {
-                state->push(5, static_cast<int>(event->mouse_x), static_cast<int>(event->mouse_y));
+                state->push(5, mx, my);
             }
             break;
         case SAPP_EVENTTYPE_MOUSE_MOVE:
-            state->push(6, static_cast<int>(event->mouse_x), static_cast<int>(event->mouse_y));
+            state->push(6, mx, my);
             break;
         case SAPP_EVENTTYPE_CHAR:
             state->push(7, 0, 0, static_cast<int>(event->char_code));
@@ -217,6 +228,21 @@ void SokolAppRuntime::wait_for_frame() {
         return impl_->frame_generation != observed || !impl_->alive.load();
     });
     impl_->consumed_generation = impl_->frame_generation;
+}
+
+void SokolAppRuntime::set_window_size(int width, int height) {
+#if defined(_WIN32)
+    HWND hwnd = static_cast<HWND>(const_cast<void*>(sapp_win32_get_hwnd()));
+    if (hwnd && width > 0 && height > 0) {
+        RECT rc = {0, 0, width, height};
+        DWORD style = static_cast<DWORD>(GetWindowLong(hwnd, GWL_STYLE));
+        DWORD ex_style = static_cast<DWORD>(GetWindowLong(hwnd, GWL_EXSTYLE));
+        AdjustWindowRectEx(&rc, style, FALSE, ex_style);
+        int w = rc.right - rc.left;
+        int h = rc.bottom - rc.top;
+        SetWindowPos(hwnd, nullptr, 0, 0, w, h, SWP_NOMOVE | SWP_NOZORDER | SWP_NOACTIVATE);
+    }
+#endif
 }
 
 SokolAppRuntime& sokol_app_runtime() {

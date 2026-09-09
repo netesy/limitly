@@ -157,6 +157,14 @@ tests = [
     "tests/showcase_verify_test.lm",
     "tests/scroll_clipping_pixel_test.lm",
     "tests/scroll_tab_interaction_test.lm",
+    # New Stdlib Enhancements: Crypto, Compression, Regex, TLS, Game IMGUI
+    "tests/crypto/test_crypto.lm",
+    "tests/compress/test_compress.lm",
+    "tests/regex/test_regex_matches.lm",
+    "tests/net/test_tls.lm",
+    "tests/ffi/test_font_lib.lm",
+    "tests/game/test_imgui.lm",
+    "tests/game/test_imgui_expanded.lm",
 ]
 
 # Tests that need extra time (resource creation, crypto, network)

@@ -1,0 +1,1424 @@
+// std/game/gui.lm
+// High-performance, zero-DOM Immediate-Mode GUI (IMGUI) engine for game developers.
+// Features comprehensive widget library, moddable style stack, and customizable themes.
+
+import std.gg as gg;
+import std.game.types as types;
+
+frame WindowState {
+    pub var x: float;
+    pub var y: float;
+    pub var w: float;
+    pub var h: float;
+    pub var collapsed: bool;
+    pub var is_dragging: bool;
+    pub var drag_off_x: float;
+    pub var drag_off_y: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, w: float = 200.0, h: float = 200.0) {
+        self.x = x;
+        self.y = y;
+        self.w = w;
+        self.h = h;
+        self.collapsed = false;
+        self.is_dragging = false;
+        self.drag_off_x = 0.0;
+        self.drag_off_y = 0.0;
+    }
+}
+
+frame GUI {
+    pub var theme: types.GUITheme;
+
+    // Input snapshot for current frame
+    pub var mouse_x: float;
+    pub var mouse_y: float;
+    pub var mouse_down: bool;
+    pub var mouse_pressed: bool;
+    pub var mouse_released: bool;
+    pub var mouse_wheel: float;
+    pub var prev_mouse_down: bool;
+    pub var dt: float;
+
+    // Interaction tracking
+    pub var hot_id: str;
+    pub var active_id: str;
+    pub var id_prefix: str;
+    pub var prev_item_hovered: bool;
+    pub var prev_item_rect: types.Rect;
+
+    // Layout & Flow cursor
+    pub var cursor_x: float;
+    pub var cursor_y: float;
+    pub var start_x: float;
+    pub var start_y: float;
+    pub var line_h: float;
+    pub var same_line_flag: bool;
+    pub var prev_item_w: float;
+    pub var indent_x: float;
+
+    // Multi-column layout
+    pub var columns_count: int;
+    pub var columns_idx: int;
+    pub var columns_start_x: float;
+    pub var columns_width: float;
+
+    // Scrolling & Popups
+    pub var scroll_y: float;
+    pub var active_popup_id: str;
+    pub var cur_tab_bar_id: str;
+    pub var combo_open_id: str;
+
+    // Window management
+    pub var in_window: bool;
+    pub var cur_window_title: str;
+    pub var cur_window_x: float;
+    pub var cur_window_y: float;
+    pub var cur_window_w: float;
+    pub var cur_window_h: float;
+
+    // Persistent storage for windows & collapsing headers
+    pub var windows: {str: WindowState};
+    pub var headers: {str: bool};
+
+    // Moddable Style Stack
+    pub var style_color_indices: [int];
+    pub var style_color_stack: [types.Color];
+    pub var style_var_indices: [int];
+    pub var style_var_stack: [float];
+
+    pub init(theme: any = nil) {
+        if (theme == nil) {
+            self.theme = types.default_theme();
+        } else {
+            self.theme = theme as types.GUITheme;
+        }
+
+        self.mouse_x = 0.0;
+        self.mouse_y = 0.0;
+        self.mouse_down = false;
+        self.mouse_pressed = false;
+        self.mouse_released = false;
+        self.mouse_wheel = 0.0;
+        self.prev_mouse_down = false;
+        self.dt = 0.016;
+
+        self.hot_id = "";
+        self.active_id = "";
+        self.id_prefix = "";
+        self.prev_item_hovered = false;
+        self.prev_item_rect = types.rect(0.0, 0.0, 0.0, 0.0);
+
+        self.cursor_x = 10.0;
+        self.cursor_y = 10.0;
+        self.start_x = 10.0;
+        self.start_y = 10.0;
+        self.line_h = 0.0;
+        self.same_line_flag = false;
+        self.prev_item_w = 0.0;
+        self.indent_x = 0.0;
+
+        self.columns_count = 1;
+        self.columns_idx = 0;
+        self.columns_start_x = 10.0;
+        self.columns_width = 400.0;
+
+        self.scroll_y = 0.0;
+        self.active_popup_id = "";
+        self.cur_tab_bar_id = "";
+        self.combo_open_id = "";
+
+        self.in_window = false;
+        self.cur_window_title = "";
+        self.cur_window_x = 0.0;
+        self.cur_window_y = 0.0;
+        self.cur_window_w = 0.0;
+        self.cur_window_h = 0.0;
+
+        self.windows = {} as {str: WindowState};
+        self.headers = {} as {str: bool};
+
+        self.style_color_indices = [];
+        self.style_color_stack = [];
+        self.style_var_indices = [];
+        self.style_var_stack = [];
+    }
+
+    // ── Frame Lifecycle ────────────────────────────────────────────────────────
+
+    pub fn begin(mx: float, my: float, is_down: bool, wheel: float = 0.0, dt: float = 0.016): nil {
+        self.mouse_x = mx;
+        self.mouse_y = my;
+        self.mouse_pressed = (is_down and not self.prev_mouse_down);
+        self.mouse_released = (not is_down and self.prev_mouse_down);
+        self.mouse_down = is_down;
+        self.prev_mouse_down = is_down;
+        self.mouse_wheel = wheel;
+        self.dt = dt;
+
+        self.hot_id = "";
+
+        self.cursor_x = 10.0;
+        self.cursor_y = 10.0;
+        self.start_x = 10.0;
+        self.start_y = 10.0;
+        self.line_h = 0.0;
+        self.same_line_flag = false;
+        self.prev_item_w = 0.0;
+        self.indent_x = 0.0;
+        self.id_prefix = "";
+        self.in_window = false;
+        self.prev_item_hovered = false;
+        self.columns_count = 1;
+        self.columns_idx = 0;
+    }
+
+    pub fn end(): nil {
+        if (self.in_window) {
+            self.end_window();
+        }
+        if (self.mouse_released) {
+            self.active_id = "";
+        }
+    }
+
+    pub fn set_theme(new_theme: types.GUITheme): nil {
+        self.theme = new_theme;
+    }
+
+    // ── Moddability: Style Stack ───────────────────────────────────────────────
+
+    pub fn push_style_color(idx: int, color: types.Color): nil {
+        self.style_color_indices.append(idx);
+        self.style_color_stack.append(color);
+    }
+
+    pub fn pop_style_color(count: int = 1): nil {
+        var c = count;
+        while (c > 0 and len(self.style_color_indices) > 0) {
+            var n = len(self.style_color_indices);
+            var new_indices: [int] = [];
+            var new_stack: [types.Color] = [];
+            var i = 0;
+            while (i < n - 1) {
+                new_indices.append(self.style_color_indices[i]);
+                new_stack.append(self.style_color_stack[i]);
+                i = i + 1;
+            }
+            self.style_color_indices = new_indices;
+            self.style_color_stack = new_stack;
+            c = c - 1;
+        }
+    }
+
+    pub fn push_style_var(idx: int, value: float): nil {
+        self.style_var_indices.append(idx);
+        self.style_var_stack.append(value);
+    }
+
+    pub fn pop_style_var(count: int = 1): nil {
+        var c = count;
+        while (c > 0 and len(self.style_var_indices) > 0) {
+            var n = len(self.style_var_indices);
+            var new_indices: [int] = [];
+            var new_stack: [float] = [];
+            var i = 0;
+            while (i < n - 1) {
+                new_indices.append(self.style_var_indices[i]);
+                new_stack.append(self.style_var_stack[i]);
+                i = i + 1;
+            }
+            self.style_var_indices = new_indices;
+            self.style_var_stack = new_stack;
+            c = c - 1;
+        }
+    }
+
+    pub fn get_style_color(idx: int): types.Color {
+        var n = len(self.style_color_indices);
+        var i = n - 1;
+        while (i >= 0) {
+            if (self.style_color_indices[i] == idx) {
+                return self.style_color_stack[i];
+            }
+            i = i - 1;
+        }
+        if (idx == types.COLOR_WINDOW_BG) { return self.theme.bg_window; }
+        elif (idx == types.COLOR_WINDOW_TITLE) { return self.theme.bg_window_title; }
+        elif (idx == types.COLOR_PANEL_BG) { return self.theme.bg_panel; }
+        elif (idx == types.COLOR_TEXT) { return self.theme.text; }
+        elif (idx == types.COLOR_TEXT_MUTED) { return self.theme.text_muted; }
+        elif (idx == types.COLOR_ACCENT) { return self.theme.accent; }
+        elif (idx == types.COLOR_BUTTON) { return self.theme.btn_normal; }
+        elif (idx == types.COLOR_BUTTON_HOVER) { return self.theme.btn_hover; }
+        elif (idx == types.COLOR_BUTTON_ACTIVE) { return self.theme.btn_active; }
+        elif (idx == types.COLOR_SLIDER_TRACK) { return self.theme.slider_track; }
+        elif (idx == types.COLOR_SLIDER_THUMB) { return self.theme.slider_thumb; }
+        elif (idx == types.COLOR_CHECKBOX_BORDER) { return self.theme.checkbox_border; }
+        elif (idx == types.COLOR_CHECKBOX_CHECK) { return self.theme.checkbox_check; }
+        elif (idx == types.COLOR_SEPARATOR) { return self.theme.separator; }
+        elif (idx == types.COLOR_FRAME_BG) { return self.theme.frame_bg; }
+        elif (idx == types.COLOR_FRAME_BG_HOVER) { return self.theme.frame_bg_hover; }
+        elif (idx == types.COLOR_FRAME_BG_ACTIVE) { return self.theme.frame_bg_active; }
+        elif (idx == types.COLOR_TAB) { return self.theme.tab_normal; }
+        elif (idx == types.COLOR_TAB_ACTIVE) { return self.theme.tab_active; }
+        elif (idx == types.COLOR_PLOT_LINES) { return self.theme.plot_lines; }
+        elif (idx == types.COLOR_PLOT_HISTOGRAM) { return self.theme.plot_histogram; }
+        return self.theme.text;
+    }
+
+    pub fn get_style_var(idx: int, default_value: float): float {
+        var n = len(self.style_var_indices);
+        var i = n - 1;
+        while (i >= 0) {
+            if (self.style_var_indices[i] == idx) {
+                return self.style_var_stack[i];
+            }
+            i = i - 1;
+        }
+        if (idx == types.VAR_PADDING) { return self.theme.padding; }
+        elif (idx == types.VAR_SPACING) { return self.theme.spacing; }
+        elif (idx == types.VAR_ITEM_HEIGHT) { return self.theme.item_height; }
+        elif (idx == types.VAR_ROUNDING) { return self.theme.rounding; }
+        return default_value;
+    }
+
+
+    // ── ID & Scoping ───────────────────────────────────────────────────────────
+
+    pub fn make_id(label: str): str {
+        if (self.id_prefix == "") {
+            return label;
+        }
+        return self.id_prefix + "/" + label;
+    }
+
+    pub fn push_id(prefix: str): nil {
+        if (self.id_prefix == "") {
+            self.id_prefix = prefix;
+        } else {
+            self.id_prefix = self.id_prefix + "/" + prefix;
+        }
+    }
+
+    pub fn pop_id(): nil {
+        var n = len(self.id_prefix);
+        var last_slash = -1;
+        var i = 0;
+        while (i < n) {
+            if (_builtin_substring(self.id_prefix, i, i + 1) == "/") {
+                last_slash = i;
+            }
+            i = i + 1;
+        }
+        if (last_slash != -1) {
+            self.id_prefix = _builtin_substring(self.id_prefix, 0, last_slash);
+        } else {
+            self.id_prefix = "";
+        }
+    }
+
+    // ── Layout Cursor ──────────────────────────────────────────────────────────
+
+    pub fn set_cursor(x: float, y: float): nil {
+        self.cursor_x = x;
+        self.cursor_y = y;
+    }
+
+    pub fn same_line(spacing: float = -1.0): nil {
+        var sp = spacing;
+        if (sp < 0.0) {
+            sp = self.get_style_var(types.VAR_SPACING, self.theme.spacing);
+        }
+        self.same_line_flag = true;
+        self.cursor_x = self.cursor_x + self.prev_item_w + sp;
+    }
+
+    pub fn spacing(amount: float = -1.0): nil {
+        var sp = amount;
+        if (sp < 0.0) {
+            sp = self.get_style_var(types.VAR_SPACING, self.theme.spacing);
+        }
+        self.cursor_y = self.cursor_y + sp;
+    }
+
+    pub fn indent(amount: float = 16.0): nil {
+        self.indent_x = self.indent_x + amount;
+        self.cursor_x = self.cursor_x + amount;
+    }
+
+    pub fn unindent(amount: float = 16.0): nil {
+        self.indent_x = self.indent_x - amount;
+        if (self.indent_x < 0.0) {
+            self.indent_x = 0.0;
+        }
+        self.cursor_x = self.start_x + self.indent_x;
+    }
+
+    fn advance(item_w: float, item_h: float): nil {
+        self.prev_item_w = item_w;
+        if (self.same_line_flag) {
+            self.same_line_flag = false;
+            if (item_h > self.line_h) {
+                self.line_h = item_h;
+            }
+        } else {
+            self.cursor_x = self.start_x + self.indent_x;
+            var sp = self.get_style_var(types.VAR_SPACING, self.theme.spacing);
+            self.cursor_y = self.cursor_y + item_h + sp;
+            self.line_h = item_h;
+        }
+    }
+
+    // ── Multi-column Layout ────────────────────────────────────────────────────
+
+    pub fn columns(count: int, width: float = -1.0): nil {
+        self.columns_count = count;
+        self.columns_idx = 0;
+        self.columns_start_x = self.cursor_x;
+        var total_w = width;
+        if (total_w <= 0.0) {
+            if (self.in_window) {
+                var pad = self.get_style_var(types.VAR_PADDING, self.theme.padding);
+                total_w = self.cur_window_w - 2.0 * pad;
+            } else {
+                total_w = 400.0;
+            }
+        }
+        self.columns_width = total_w / (count as float);
+    }
+
+    pub fn next_column(): nil {
+        if (self.columns_count <= 1) { return; }
+        self.columns_idx = self.columns_idx + 1;
+        if (self.columns_idx >= self.columns_count) {
+            self.columns_idx = 0;
+            self.cursor_x = self.columns_start_x;
+            var sp = self.get_style_var(types.VAR_SPACING, self.theme.spacing);
+            self.cursor_y = self.cursor_y + self.line_h + sp;
+        } else {
+            self.cursor_x = self.columns_start_x + (self.columns_idx as float) * self.columns_width;
+        }
+    }
+
+    // ── Basic IMGUI Controls ───────────────────────────────────────────────────
+
+    pub fn label(text: str, custom_color: any = nil): nil {
+        var c = self.get_style_color(types.COLOR_TEXT);
+        if (custom_color != nil) {
+            c = custom_color as types.Color;
+        }
+        var w = (len(text) * 8 * self.theme.font_scale) as float;
+        var h = (8 * self.theme.font_scale + 4) as float;
+
+        gg.draw_text(text, self.cursor_x, self.cursor_y + 2.0, c.r, c.g, c.b, c.a, self.theme.font_scale);
+        self.prev_item_hovered = (self.mouse_x >= self.cursor_x and self.mouse_x <= (self.cursor_x + w) and
+                                  self.mouse_y >= self.cursor_y and self.mouse_y <= (self.cursor_y + h));
+        self.prev_item_rect = types.rect(self.cursor_x, self.cursor_y, w, h);
+        self.advance(w, h);
+    }
+
+    pub fn button(text: str, width: float = 0.0, height: float = 0.0): bool {
+        var w = width;
+        if (w <= 0.0) {
+            w = (len(text) * 8 * self.theme.font_scale + 24) as float;
+        }
+        var h = height;
+        if (h <= 0.0) {
+            h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
+        }
+
+        var id = self.make_id(text);
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+
+        if (hovered) {
+            self.hot_id = id;
+        }
+
+        var clicked = false;
+        if (self.active_id == id) {
+            if (self.mouse_released) {
+                self.active_id = "";
+                if (hovered) {
+                    clicked = true;
+                }
+            }
+        } elif (hovered and self.mouse_pressed) {
+            self.active_id = id;
+        }
+
+        var bg = self.get_style_color(types.COLOR_BUTTON);
+        if (self.active_id == id) {
+            bg = self.get_style_color(types.COLOR_BUTTON_ACTIVE);
+        } elif (self.hot_id == id) {
+            bg = self.get_style_color(types.COLOR_BUTTON_HOVER);
+        }
+
+        gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+
+        var text_w = (len(text) * 8 * self.theme.font_scale) as float;
+        var text_x = bx + (w - text_w) / 2.0;
+        var text_y = by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0;
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        gg.draw_text(text, text_x, text_y, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w, h);
+        return clicked;
+    }
+
+    pub fn button_colored(text: str, bg_color: types.Color, width: float = 0.0, height: float = 0.0): bool {
+        self.push_style_color(types.COLOR_BUTTON, bg_color);
+        var res = self.button(text, width, height);
+        self.pop_style_color(1);
+        return res;
+    }
+
+    pub fn checkbox(label: str, checked: bool): bool {
+        var box_size = 18.0;
+        var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
+        var id = self.make_id(label);
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+        var total_w = box_size + 8.0 + (len(label) * 8 * self.theme.font_scale) as float;
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + total_w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+
+        if (hovered) {
+            self.hot_id = id;
+        }
+
+        var new_checked = checked;
+        if (hovered and self.mouse_pressed) {
+            new_checked = not checked;
+        }
+
+        var border = self.get_style_color(types.COLOR_CHECKBOX_BORDER);
+        if (hovered) {
+            border = self.get_style_color(types.COLOR_ACCENT);
+        }
+        var box_y = by + (h - box_size) / 2.0;
+        gg.draw_rect_primitive(bx, box_y, box_size, box_size, border.r, border.g, border.b, border.a);
+
+        var bg = self.get_style_color(types.COLOR_FRAME_BG);
+        gg.draw_rect_primitive(bx + 2.0, box_y + 2.0, box_size - 4.0, box_size - 4.0, bg.r, bg.g, bg.b, bg.a);
+
+        if (new_checked) {
+            var check_col = self.get_style_color(types.COLOR_CHECKBOX_CHECK);
+            gg.draw_rect_primitive(bx + 4.0, box_y + 4.0, box_size - 8.0, box_size - 8.0, check_col.r, check_col.g, check_col.b, check_col.a);
+        }
+
+        var text_x = bx + box_size + 8.0;
+        var text_y = by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0;
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        gg.draw_text(label, text_x, text_y, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, total_w, h);
+        self.advance(total_w, h);
+        return new_checked;
+    }
+
+    pub fn radio_button(label: str, active: bool): bool {
+        var size = 16.0;
+        var id = self.make_id(label);
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+        var total_w = size + 8.0 + (len(label) * 8 * self.theme.font_scale) as float;
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + total_w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + size));
+        if (hovered) { self.hot_id = id; }
+
+        var clicked = false;
+        if (hovered and self.mouse_pressed) {
+            clicked = true;
+        }
+
+        var border = self.get_style_color(types.COLOR_CHECKBOX_BORDER);
+        if (hovered) { border = self.get_style_color(types.COLOR_ACCENT); }
+        gg.draw_rect_primitive(bx, by, size, size, border.r, border.g, border.b, border.a);
+        var bg = self.get_style_color(types.COLOR_FRAME_BG);
+        gg.draw_rect_primitive(bx + 1.0, by + 1.0, size - 2.0, size - 2.0, bg.r, bg.g, bg.b, bg.a);
+
+        if (active) {
+            var check_col = self.get_style_color(types.COLOR_ACCENT);
+            gg.draw_rect_primitive(bx + 4.0, by + 4.0, size - 8.0, size - 8.0, check_col.r, check_col.g, check_col.b, check_col.a);
+        }
+
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        gg.draw_text(label, bx + size + 8.0, by + 1.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, total_w, size);
+        self.advance(total_w, size);
+        return clicked;
+    }
+
+    pub fn toggle(label: str, enabled: bool): bool {
+        var pill_w = 34.0;
+        var pill_h = 18.0;
+        var id = self.make_id(label);
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+        var total_w = pill_w + 8.0 + (len(label) * 8 * self.theme.font_scale) as float;
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + total_w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + pill_h));
+
+        if (hovered) {
+            self.hot_id = id;
+        }
+
+        var new_enabled = enabled;
+        if (hovered and self.mouse_pressed) {
+            new_enabled = not enabled;
+        }
+
+        var bg = self.get_style_color(types.COLOR_BUTTON);
+        if (new_enabled) {
+            bg = self.get_style_color(types.COLOR_ACCENT);
+        }
+        gg.draw_rect_primitive(bx, by, pill_w, pill_h, bg.r, bg.g, bg.b, bg.a);
+
+        var thumb_size = pill_h - 4.0;
+        var thumb_x = bx + 2.0;
+        if (new_enabled) {
+            thumb_x = bx + pill_w - thumb_size - 2.0;
+        }
+        gg.draw_rect_primitive(thumb_x, by + 2.0, thumb_size, thumb_size, 1.0, 1.0, 1.0, 1.0);
+
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        gg.draw_text(label, bx + pill_w + 8.0, by + 1.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, total_w, pill_h);
+        self.advance(total_w, pill_h);
+        return new_enabled;
+    }
+
+    pub fn slider(label: str, value: float, min_val: float, max_val: float, width: float = 160.0): float {
+        var w = width;
+        var track_h = 6.0;
+        var thumb_size = 14.0;
+        var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
+        var id = self.make_id(label);
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+
+        if (hovered) {
+            self.hot_id = id;
+        }
+
+        var current_val = value;
+        if (self.active_id == id) {
+            if (self.mouse_down) {
+                var norm = (self.mouse_x - bx) / w;
+                if (norm < 0.0) { norm = 0.0; }
+                if (norm > 1.0) { norm = 1.0; }
+                current_val = min_val + norm * (max_val - min_val);
+            } else {
+                self.active_id = "";
+            }
+        } elif (hovered and self.mouse_pressed) {
+            self.active_id = id;
+            var norm2 = (self.mouse_x - bx) / w;
+            if (norm2 < 0.0) { norm2 = 0.0; }
+            if (norm2 > 1.0) { norm2 = 1.0; }
+            current_val = min_val + norm2 * (max_val - min_val);
+        }
+
+        var track_y = by + (h - track_h) / 2.0;
+        var track_color = self.get_style_color(types.COLOR_SLIDER_TRACK);
+        gg.draw_rect_primitive(bx, track_y, w, track_h, track_color.r, track_color.g, track_color.b, track_color.a);
+
+        var range = max_val - min_val;
+        if (range <= 0.0) { range = 1.0; }
+        var t = (current_val - min_val) / range;
+        if (t < 0.0) { t = 0.0; }
+        if (t > 1.0) { t = 1.0; }
+
+        var thumb_x = bx + t * (w - thumb_size);
+        var thumb_y = by + (h - thumb_size) / 2.0;
+
+        var thumb_color = self.get_style_color(types.COLOR_SLIDER_THUMB);
+        if (self.active_id == id or self.hot_id == id) {
+            thumb_color = self.theme.slider_thumb_hover;
+        }
+        gg.draw_rect_primitive(thumb_x, thumb_y, thumb_size, thumb_size, thumb_color.r, thumb_color.g, thumb_color.b, thumb_color.a);
+
+        if (label != "") {
+            var ltc = self.get_style_color(types.COLOR_TEXT_MUTED);
+            var label_x = bx + w + 8.0;
+            var label_y = by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0;
+            gg.draw_text(label, label_x, label_y, ltc.r, ltc.g, ltc.b, ltc.a, self.theme.font_scale);
+        }
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w + 80.0, h);
+        return current_val;
+    }
+
+    pub fn slider_int(label: str, value: int, min_val: int = 0, max_val: int = 100, w: float = 140.0): int {
+        var diff_range: int = max_val - min_val;
+        if (diff_range <= 0) { diff_range = 1; }
+        var range: float = diff_range * 1.0;
+
+        var val_diff: int = value - min_val;
+        var norm_val: float = (val_diff * 1.0) / range;
+
+        var new_norm = self.slider(label, norm_val, 0.0, 1.0, w);
+        var scaled_f: float = new_norm * range;
+        var min_f: float = min_val * 1.0;
+        var final_f: float = min_f + scaled_f + 0.5;
+        var result: int = final_f as int;
+
+        if (result < min_val) { result = min_val; }
+        if (result > max_val) { result = max_val; }
+        return result;
+    }
+
+
+    pub fn stepper_int(label: str, value: int, step: int = 1, min_val: int = 0, max_val: int = 100): int {
+        var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
+        var btn_w = 24.0;
+        var box_w = 60.0;
+        var by = self.cursor_y;
+
+        var new_val = value;
+        if (self.button(" - ", btn_w, h)) {
+            new_val = new_val - step;
+            if (new_val < min_val) { new_val = min_val; }
+        }
+        self.same_line();
+
+        var val_str = "{new_val}";
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        var fbg = self.get_style_color(types.COLOR_FRAME_BG);
+        var vx = self.cursor_x;
+        gg.draw_rect_primitive(vx, by, box_w, h, fbg.r, fbg.g, fbg.b, fbg.a);
+        var text_w = (len(val_str) * 8 * self.theme.font_scale) as float;
+        gg.draw_text(val_str, vx + (box_w - text_w) / 2.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+        self.advance(box_w, h);
+        self.same_line();
+
+        if (self.button(" + ", btn_w, h)) {
+            new_val = new_val + step;
+            if (new_val > max_val) { new_val = max_val; }
+        }
+
+        if (label != "") {
+            self.same_line();
+            var ltc = self.get_style_color(types.COLOR_TEXT_MUTED);
+            gg.draw_text(label, self.cursor_x + 4.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, ltc.r, ltc.g, ltc.b, ltc.a, self.theme.font_scale);
+            var lw = (len(label) * 8 * self.theme.font_scale) as float;
+            self.advance(lw + 4.0, h);
+        }
+
+        return new_val;
+    }
+
+    pub fn stepper_float(label: str, value: float, step: float = 0.1, min_val: float = 0.0, max_val: float = 1.0): float {
+        var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
+        var btn_w = 24.0;
+        var box_w = 60.0;
+        var by = self.cursor_y;
+
+        var new_val = value;
+        if (self.button(" - ", btn_w, h)) {
+            new_val = new_val - step;
+            if (new_val < min_val) { new_val = min_val; }
+        }
+        self.same_line();
+
+        var val_str = "{new_val}";
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        var fbg = self.get_style_color(types.COLOR_FRAME_BG);
+        var vx = self.cursor_x;
+        gg.draw_rect_primitive(vx, by, box_w, h, fbg.r, fbg.g, fbg.b, fbg.a);
+        var text_w = (len(val_str) * 8 * self.theme.font_scale) as float;
+        gg.draw_text(val_str, vx + (box_w - text_w) / 2.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+        self.advance(box_w, h);
+        self.same_line();
+
+
+        if (self.button(" + ", btn_w, h)) {
+            new_val = new_val + step;
+            if (new_val > max_val) { new_val = max_val; }
+        }
+
+        if (label != "") {
+            self.same_line();
+            var ltc = self.get_style_color(types.COLOR_TEXT_MUTED);
+            gg.draw_text(label, self.cursor_x + 4.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, ltc.r, ltc.g, ltc.b, ltc.a, self.theme.font_scale);
+            var lw = (len(label) * 8 * self.theme.font_scale) as float;
+            self.advance(lw + 4.0, h);
+        }
+
+        return new_val;
+    }
+
+    pub fn input_text(label: str, text: str, max_len: int = 256): str {
+        var w = 160.0;
+        var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
+        var id = self.make_id(label);
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        if (hovered) { self.hot_id = id; }
+        if (hovered and self.mouse_pressed) {
+            self.active_id = id;
+        }
+
+        var is_focused = (self.active_id == id);
+        var bg = self.get_style_color(types.COLOR_FRAME_BG);
+        if (is_focused) {
+            bg = self.get_style_color(types.COLOR_FRAME_BG_ACTIVE);
+        } elif (hovered) {
+            bg = self.get_style_color(types.COLOR_FRAME_BG_HOVER);
+        }
+
+        gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+
+        var border = self.theme.checkbox_border;
+        if (is_focused) {
+            border = self.get_style_color(types.COLOR_ACCENT);
+        }
+        gg.draw_rect_primitive(bx, by, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by + h - 1.0, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by, 1.0, h, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx + w - 1.0, by, 1.0, h, border.r, border.g, border.b, border.a);
+
+        var display_text = text;
+        if (is_focused) {
+            display_text = display_text + "|";
+        }
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        gg.draw_text(display_text, bx + 6.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+
+        if (label != "") {
+            var ltc = self.get_style_color(types.COLOR_TEXT_MUTED);
+            gg.draw_text(label, bx + w + 8.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, ltc.r, ltc.g, ltc.b, ltc.a, self.theme.font_scale);
+        }
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w + 80.0, h);
+        return text;
+    }
+
+    pub fn combo_box(label: str, items: [str], selected_idx: int): int {
+        var w = 150.0;
+        var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
+        var id = self.make_id(label);
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        if (hovered) { self.hot_id = id; }
+
+        var is_open = (self.combo_open_id == id);
+        if (hovered and self.mouse_pressed) {
+            if (is_open) {
+                self.combo_open_id = "";
+            } else {
+                self.combo_open_id = id;
+            }
+        }
+
+        var bg = self.get_style_color(types.COLOR_FRAME_BG);
+        if (hovered or is_open) { bg = self.get_style_color(types.COLOR_FRAME_BG_HOVER); }
+        gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+
+        var border = self.theme.checkbox_border;
+        if (is_open) { border = self.get_style_color(types.COLOR_ACCENT); }
+        gg.draw_rect_primitive(bx, by, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by + h - 1.0, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by, 1.0, h, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx + w - 1.0, by, 1.0, h, border.r, border.g, border.b, border.a);
+
+        var current_text = "";
+        if (selected_idx >= 0 and selected_idx < len(items)) {
+            current_text = items[selected_idx];
+        }
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        gg.draw_text(current_text, bx + 6.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+
+        var arrow_char = "v";
+        if (is_open) { arrow_char = "^"; }
+        var ac = self.theme.text_muted;
+        gg.draw_text(arrow_char, bx + w - 16.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, ac.r, ac.g, ac.b, ac.a, self.theme.font_scale);
+
+        if (label != "") {
+            var ltc = self.get_style_color(types.COLOR_TEXT_MUTED);
+            gg.draw_text(label, bx + w + 8.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, ltc.r, ltc.g, ltc.b, ltc.a, self.theme.font_scale);
+        }
+
+        var new_idx = selected_idx;
+        if (is_open) {
+            var item_count = len(items);
+            var popup_h = (item_count as float) * h;
+            var popup_y = by + h + 2.0;
+            var pbg = self.get_style_color(types.COLOR_PANEL_BG);
+            gg.draw_rect_primitive(bx, popup_y, w, popup_h, pbg.r, pbg.g, pbg.b, pbg.a);
+
+            var k = 0;
+            while (k < item_count) {
+                var iy = popup_y + (k as float) * h;
+                var item_hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                                    self.mouse_y >= iy and self.mouse_y <= (iy + h));
+                if (item_hovered) {
+                    var hbg = self.get_style_color(types.COLOR_FRAME_BG_HOVER);
+                    gg.draw_rect_primitive(bx, iy, w, h, hbg.r, hbg.g, hbg.b, hbg.a);
+                    if (self.mouse_pressed) {
+                        new_idx = k;
+                        self.combo_open_id = "";
+                    }
+                }
+                var itc = self.get_style_color(types.COLOR_TEXT);
+                if (k == selected_idx) { itc = self.get_style_color(types.COLOR_ACCENT); }
+                gg.draw_text(items[k], bx + 6.0, iy + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, itc.r, itc.g, itc.b, itc.a, self.theme.font_scale);
+                k = k + 1;
+            }
+        }
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w + 80.0, h);
+        return new_idx;
+    }
+
+    pub fn color_button(id: str, color: types.Color, w: float = 24.0, h: float = 24.0): bool {
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+        var full_id = self.make_id(id);
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        if (hovered) { self.hot_id = full_id; }
+
+        var clicked = false;
+        if (hovered and self.mouse_pressed) {
+            clicked = true;
+        }
+
+        var border = self.theme.checkbox_border;
+        if (hovered) { border = self.get_style_color(types.COLOR_ACCENT); }
+        gg.draw_rect_primitive(bx, by, w, h, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx + 2.0, by + 2.0, w - 4.0, h - 4.0, color.r, color.g, color.b, color.a);
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w, h);
+        return clicked;
+    }
+
+    pub fn color_picker(label: str, color: types.Color): types.Color {
+        self.push_id(label);
+        self.color_button("##swatch", color, 28.0, 28.0);
+        self.same_line();
+        self.label(label);
+
+        self.indent(12.0);
+        var nr = self.slider("R", color.r, 0.0, 1.0, 120.0);
+        var ng = self.slider("G", color.g, 0.0, 1.0, 120.0);
+        var nb = self.slider("B", color.b, 0.0, 1.0, 120.0);
+        self.unindent(12.0);
+        self.pop_id();
+
+        return types.Color(r=nr, g=ng, b=nb, a=color.a);
+    }
+
+    pub fn plot_lines(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0, w: float = 180.0, h: float = 50.0): nil {
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+        var count = len(values);
+
+        var bg = self.get_style_color(types.COLOR_FRAME_BG);
+        gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+        var border = self.theme.checkbox_border;
+        gg.draw_rect_primitive(bx, by, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by + h - 1.0, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by, 1.0, h, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx + w - 1.0, by, 1.0, h, border.r, border.g, border.b, border.a);
+
+        var val_range = max_val - min_val;
+        if (val_range <= 0.0) { val_range = 1.0; }
+
+        if (count > 1) {
+            var step_x = w / ((count - 1) as float);
+            var lc = self.get_style_color(types.COLOR_PLOT_LINES);
+            var i = 0;
+            while (i < count) {
+                var cur_px = bx + (i as float) * step_x;
+                var norm = (values[i] - min_val) / val_range;
+                if (norm < 0.0) { norm = 0.0; }
+                if (norm > 1.0) { norm = 1.0; }
+                var cur_py = by + h - norm * (h - 4.0) - 2.0;
+
+                gg.draw_rect_primitive(cur_px - 1.0, cur_py - 1.0, 2.0, 2.0, lc.r, lc.g, lc.b, lc.a);
+                i = i + 1;
+            }
+        }
+
+        if (label != "") {
+            var ltc = self.get_style_color(types.COLOR_TEXT_MUTED);
+            gg.draw_text(label, bx + 4.0, by + 4.0, ltc.r, ltc.g, ltc.b, ltc.a, self.theme.font_scale);
+        }
+
+        self.prev_item_hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w, h);
+    }
+
+    pub fn plot_histogram(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0, w: float = 180.0, h: float = 50.0): nil {
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+        var count = len(values);
+
+        var bg = self.get_style_color(types.COLOR_FRAME_BG);
+        gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+        var border = self.theme.checkbox_border;
+        gg.draw_rect_primitive(bx, by, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by + h - 1.0, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by, 1.0, h, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx + w - 1.0, by, 1.0, h, border.r, border.g, border.b, border.a);
+
+        var val_range = max_val - min_val;
+        if (val_range <= 0.0) { val_range = 1.0; }
+
+        if (count > 0) {
+            var bar_w = (w - (count as float) * 2.0) / (count as float);
+            if (bar_w < 1.0) { bar_w = 1.0; }
+            var hc = self.get_style_color(types.COLOR_PLOT_HISTOGRAM);
+
+            var i = 0;
+            while (i < count) {
+                var bar_x = bx + 2.0 + (i as float) * (bar_w + 2.0);
+                var norm = (values[i] - min_val) / val_range;
+                if (norm < 0.0) { norm = 0.0; }
+                if (norm > 1.0) { norm = 1.0; }
+                var bar_h = norm * (h - 4.0);
+                var bar_y = by + h - bar_h - 2.0;
+
+                gg.draw_rect_primitive(bar_x, bar_y, bar_w, bar_h, hc.r, hc.g, hc.b, hc.a);
+                i = i + 1;
+            }
+        }
+
+        if (label != "") {
+            var ltc = self.get_style_color(types.COLOR_TEXT_MUTED);
+            gg.draw_text(label, bx + 4.0, by + 4.0, ltc.r, ltc.g, ltc.b, ltc.a, self.theme.font_scale);
+        }
+
+        self.prev_item_hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w, h);
+    }
+
+    pub fn progress_bar(fraction: float, width: float = 160.0, height: float = 16.0): nil {
+        var w = width;
+        var h = height;
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+
+        var f = fraction;
+        if (f < 0.0) { f = 0.0; }
+        if (f > 1.0) { f = 1.0; }
+
+        var track = self.get_style_color(types.COLOR_SLIDER_TRACK);
+        gg.draw_rect_primitive(bx, by, w, h, track.r, track.g, track.b, track.a);
+
+        if (f > 0.0) {
+            var fill_w = w * f;
+            var fill_color = self.get_style_color(types.COLOR_ACCENT);
+            gg.draw_rect_primitive(bx, by, fill_w, h, fill_color.r, fill_color.g, fill_color.b, fill_color.a);
+        }
+
+        self.prev_item_hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and self.mouse_y >= by and self.mouse_y <= (by + h));
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w, h);
+    }
+
+    pub fn separator(): nil {
+        var w = 200.0;
+        if (self.in_window) {
+            var pad = self.get_style_var(types.VAR_PADDING, self.theme.padding);
+            w = self.cur_window_w - (pad * 2.0);
+        }
+        var c = self.get_style_color(types.COLOR_SEPARATOR);
+        gg.draw_rect_primitive(self.cursor_x, self.cursor_y + 2.0, w, 1.0, c.r, c.g, c.b, c.a);
+        self.cursor_y = self.cursor_y + 5.0;
+    }
+
+    pub fn header(title: str, default_open: bool = true): bool {
+        var id = self.make_id(title);
+        var is_open = default_open;
+        if (self.headers[id] != nil) {
+            is_open = self.headers[id];
+        } else {
+            self.headers[id] = default_open;
+        }
+
+
+        var w = 200.0;
+        if (self.in_window) {
+            var pad = self.get_style_var(types.VAR_PADDING, self.theme.padding);
+            w = self.cur_window_w - (pad * 2.0);
+        }
+        var h = 22.0;
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+
+        if (hovered) {
+            self.hot_id = id;
+            if (self.mouse_pressed) {
+                is_open = not is_open;
+                self.headers[id] = is_open;
+            }
+        }
+
+        var bg = self.get_style_color(types.COLOR_PANEL_BG);
+        if (hovered) {
+            bg = self.get_style_color(types.COLOR_BUTTON_HOVER);
+        }
+        gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+
+        var prefix = "[+] ";
+        if (is_open) {
+            prefix = "[-] ";
+        }
+        var full_title = prefix + title;
+        var ty = by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0;
+        var ac = self.get_style_color(types.COLOR_ACCENT);
+        gg.draw_text(full_title, bx + 6.0, ty, ac.r, ac.g, ac.b, 1.0, self.theme.font_scale);
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w, h);
+        return is_open;
+    }
+
+    // ── Tab Bar ────────────────────────────────────────────────────────────────
+
+    pub fn begin_tab_bar(id: str): bool {
+        self.cur_tab_bar_id = id;
+        return true;
+    }
+
+    pub fn tab_item(label: str, is_active: bool): bool {
+        var w = (len(label) * 8 * self.theme.font_scale + 20) as float;
+        var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+        var id = self.make_id(self.cur_tab_bar_id + "/" + label);
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        if (hovered) { self.hot_id = id; }
+
+        var clicked = false;
+        if (hovered and self.mouse_pressed) {
+            clicked = true;
+        }
+
+        var bg = self.get_style_color(types.COLOR_TAB);
+        if (is_active) {
+            bg = self.get_style_color(types.COLOR_TAB_ACTIVE);
+        } elif (hovered) {
+            bg = self.get_style_color(types.COLOR_BUTTON_HOVER);
+        }
+        gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        if (is_active) { tc = types.white; }
+        var tw = (len(label) * 8 * self.theme.font_scale) as float;
+        gg.draw_text(label, bx + (w - tw) / 2.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w, h);
+        self.same_line();
+        return clicked;
+    }
+
+    pub fn end_tab_bar(): nil {
+        self.cur_tab_bar_id = "";
+        self.cursor_x = self.start_x + self.indent_x;
+        var sp = self.get_style_var(types.VAR_SPACING, self.theme.spacing);
+        self.cursor_y = self.cursor_y + sp;
+    }
+
+    // ── Tree Node ──────────────────────────────────────────────────────────────
+
+    pub fn tree_node(label: str): bool {
+        var id = self.make_id(label);
+        var open = false;
+        if (self.headers[id] != nil) {
+            open = self.headers[id];
+        }
+
+
+        var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+        var w = 160.0;
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        if (hovered) { self.hot_id = id; }
+
+        if (hovered and self.mouse_pressed) {
+            open = not open;
+            self.headers[id] = open;
+        }
+
+        var icon = ">";
+        if (open) { icon = "v"; }
+        var ac = self.get_style_color(types.COLOR_ACCENT);
+        gg.draw_text(icon, bx, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, ac.r, ac.g, ac.b, ac.a, self.theme.font_scale);
+
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        gg.draw_text(label, bx + 16.0, by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w, h);
+
+        if (open) {
+            self.indent(16.0);
+        }
+        return open;
+    }
+
+    pub fn tree_pop(): nil {
+        self.unindent(16.0);
+    }
+
+    // ── Tooltip ────────────────────────────────────────────────────────────────
+
+    pub fn tooltip(text: str): nil {
+        if (self.prev_item_hovered and text != "") {
+            var tw = (len(text) * 8 * self.theme.font_scale + 16) as float;
+            var th = 22.0;
+            var tx = self.mouse_x + 12.0;
+            var ty = self.mouse_y + 12.0;
+
+            var bg = self.get_style_color(types.COLOR_PANEL_BG);
+            gg.draw_rect_primitive(tx, ty, tw, th, bg.r, bg.g, bg.b, bg.a);
+            var border = self.get_style_color(types.COLOR_SEPARATOR);
+            gg.draw_rect_primitive(tx, ty, tw, 1.0, border.r, border.g, border.b, border.a);
+            gg.draw_rect_primitive(tx, ty + th - 1.0, tw, 1.0, border.r, border.g, border.b, border.a);
+            gg.draw_rect_primitive(tx, ty, 1.0, th, border.r, border.g, border.b, border.a);
+            gg.draw_rect_primitive(tx + tw - 1.0, ty, 1.0, th, border.r, border.g, border.b, border.a);
+
+            var tc = self.get_style_color(types.COLOR_TEXT);
+            gg.draw_text(text, tx + 8.0, ty + (th - 8.0 * (self.theme.font_scale as float)) / 2.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+        }
+    }
+
+    // ── Popups ─────────────────────────────────────────────────────────────────
+
+    pub fn open_popup(id: str): nil {
+        self.active_popup_id = id;
+    }
+
+    pub fn close_popup(id: str): nil {
+        if (self.active_popup_id == id) {
+            self.active_popup_id = "";
+        }
+    }
+
+    pub fn is_popup_open(id: str): bool {
+        return self.active_popup_id == id;
+    }
+
+    pub fn begin_popup(id: str, x: float, y: float, w: float, h: float): bool {
+        if (self.active_popup_id != id) {
+            return false;
+        }
+        var bg = self.get_style_color(types.COLOR_PANEL_BG);
+        gg.draw_rect_primitive(x, y, w, h, bg.r, bg.g, bg.b, bg.a);
+        var border = self.get_style_color(types.COLOR_ACCENT);
+        gg.draw_rect_primitive(x, y, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(x, y + h - 1.0, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(x, y, 1.0, h, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(x + w - 1.0, y, 1.0, h, border.r, border.g, border.b, border.a);
+
+        var pad = self.get_style_var(types.VAR_PADDING, self.theme.padding);
+        self.cursor_x = x + pad;
+        self.cursor_y = y + pad;
+        self.start_x = self.cursor_x;
+        self.start_y = self.cursor_y;
+        return true;
+    }
+
+    pub fn end_popup(): nil {
+        // End popup
+    }
+
+    // ── Scroll Area ────────────────────────────────────────────────────────────
+
+    pub fn begin_scroll_area(w: float, h: float, content_h: float): bool {
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+        gg.push_clip(bx, by, w, h);
+
+        var bg = self.get_style_color(types.COLOR_FRAME_BG);
+        gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        if (hovered and self.mouse_wheel != 0.0) {
+            self.scroll_y = self.scroll_y - self.mouse_wheel * 20.0;
+            var max_scroll = content_h - h;
+            if (max_scroll < 0.0) { max_scroll = 0.0; }
+            if (self.scroll_y < 0.0) { self.scroll_y = 0.0; }
+            if (self.scroll_y > max_scroll) { self.scroll_y = max_scroll; }
+        }
+
+        if (content_h > h) {
+            var sb_w = 6.0;
+            var sb_x = bx + w - sb_w - 2.0;
+            var track_c = self.get_style_color(types.COLOR_SLIDER_TRACK);
+            gg.draw_rect_primitive(sb_x, by, sb_w, h, track_c.r, track_c.g, track_c.b, track_c.a);
+
+            var thumb_h = (h / content_h) * h;
+            if (thumb_h < 15.0) { thumb_h = 15.0; }
+            var max_scroll = content_h - h;
+            var norm = 0.0;
+            if (max_scroll > 0.0) { norm = self.scroll_y / max_scroll; }
+            var thumb_y = by + norm * (h - thumb_h);
+            var thumb_c = self.get_style_color(types.COLOR_SLIDER_THUMB);
+            gg.draw_rect_primitive(sb_x, thumb_y, sb_w, thumb_h, thumb_c.r, thumb_c.g, thumb_c.b, thumb_c.a);
+        }
+
+        self.cursor_x = bx + 4.0;
+        self.cursor_y = by + 4.0 - self.scroll_y;
+        self.start_x = self.cursor_x;
+        self.start_y = self.cursor_y;
+        return true;
+    }
+
+    pub fn end_scroll_area(): nil {
+        gg.pop_clip();
+    }
+
+    // ── Floating Window Management ─────────────────────────────────────────────
+
+    pub fn set_window_rect(title: str, x: float, y: float, w: float, h: float): nil {
+        var win = self.windows[title];
+        if (win != nil) {
+            win.x = x;
+            win.y = y;
+            win.w = w;
+            win.h = h;
+        } else {
+            self.windows[title] = WindowState(x, y, w, h);
+        }
+    }
+
+    pub fn begin_window(title: str, default_x: float, default_y: float, default_w: float, default_h: float): bool {
+        var win = self.windows[title];
+        if (win == nil) {
+            win = WindowState(default_x, default_y, default_w, default_h);
+            self.windows[title] = win;
+        }
+
+        var titlebar_h = 24.0;
+        var wx = win.x;
+        var wy = win.y;
+        var ww = win.w;
+        var wh = win.h;
+
+        var title_hovered = (self.mouse_x >= wx and self.mouse_x <= (wx + ww) and
+                             self.mouse_y >= wy and self.mouse_y <= (wy + titlebar_h));
+
+        var id = self.make_id(title);
+        if (title_hovered and self.mouse_pressed) {
+            win.is_dragging = true;
+            win.drag_off_x = self.mouse_x - wx;
+            win.drag_off_y = self.mouse_y - wy;
+            self.active_id = id;
+        }
+
+        if (win.is_dragging) {
+            if (self.mouse_down) {
+                win.x = self.mouse_x - win.drag_off_x;
+                win.y = self.mouse_y - win.drag_off_y;
+                wx = win.x;
+                wy = win.y;
+            } else {
+                win.is_dragging = false;
+                if (self.active_id == id) {
+                    self.active_id = "";
+                }
+            }
+        }
+
+        var bg = self.get_style_color(types.COLOR_WINDOW_BG);
+        var panel_h = wh;
+        if (win.collapsed) {
+            panel_h = titlebar_h;
+        }
+        gg.draw_rect_primitive(wx, wy, ww, panel_h, bg.r, bg.g, bg.b, bg.a);
+
+        var tb = self.get_style_color(types.COLOR_WINDOW_TITLE);
+        gg.draw_rect_primitive(wx, wy, ww, titlebar_h, tb.r, tb.g, tb.b, tb.a);
+
+        var text_y = wy + (titlebar_h - 8.0 * (self.theme.font_scale as float)) / 2.0;
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        var pad = self.get_style_var(types.VAR_PADDING, self.theme.padding);
+        gg.draw_text(title, wx + pad, text_y, tc.r, tc.g, tc.b, 1.0, self.theme.font_scale);
+
+        self.in_window = true;
+        self.cur_window_title = title;
+        self.cur_window_x = wx;
+        self.cur_window_y = wy;
+        self.cur_window_w = ww;
+        self.cur_window_h = wh;
+
+        if (win.collapsed) {
+            return false;
+        }
+
+        gg.push_clip(wx, wy + titlebar_h, ww, wh - titlebar_h);
+
+        self.cursor_x = wx + pad;
+        self.cursor_y = wy + titlebar_h + pad;
+        self.start_x = self.cursor_x;
+        self.start_y = self.cursor_y;
+
+        return true;
+    }
+
+    pub fn end_window(): nil {
+        if (not self.in_window) {
+            return;
+        }
+        var win = self.windows[self.cur_window_title];
+        if (win != nil and not win.collapsed) {
+            gg.pop_clip();
+        }
+        self.in_window = false;
+        self.cur_window_title = "";
+    }
+}
+
+pub var default_gui: GUI = GUI();

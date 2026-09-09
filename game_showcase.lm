@@ -1,0 +1,310 @@
+// game_showcase.lm
+// Interactive Showcase for std.game - Zero-DOM Immediate-Mode GUI Engine for Game Developers
+// Demonstrates:
+// - Real-time procedural IMGUI overlaid on a live 2D canvas game scene
+// - Draggable floating windows (HUD, Telemetry, Theme Modder, System Logs)
+// - Moddable style stack and instant theme switching (Cyberpunk, Dark, Light, Retro)
+// - Complete widget suite:
+//   * Push buttons, colored accent buttons
+//   * Sliders (float & integer), numeric steppers
+//   * Checkboxes, toggles, radio groups
+//   * Dropdown combobox, color picker
+//   * Live telemetry graphs (FPS line plot, Frame time histogram)
+//   * Tab bars, collapsible tree nodes, scroll areas
+//   * Modal popups and tooltips
+
+import std.game as game;
+import std.game.types as types;
+import std.gg as gg;
+
+fn main(): int {
+    print("=== Launching Limitly Game IMGUI & Typography Showcase ===");
+
+    // Default screen size is 800x600, fully configurable via GameConfig or set_resolution
+    var cfg = game.GameConfig(
+        title="Limitly Game Engine - IMGUI & Typography Showcase",
+        width=800,
+        height=600,
+        resizable=true
+    );
+    // Dark deep-space background
+    cfg.bg_color = types.hex(0x0b0d19, 1.0);
+
+    var app = game.Game(cfg);
+    if (not app.setup()) {
+        print("Error: Failed to initialize graphics context & game runner.");
+        return 1;
+    }
+
+    // Set Cyberpunk theme as starting theme
+    app.gui.set_theme(types.cyberpunk_theme());
+
+    // ── Game State ─────────────────────────────────────────────────────────────
+    var ship_angle = 0.0;
+    var ship_speed = 3.5;
+    var ship_color = types.hex(0x00f0ff, 1.0);
+
+    var health = 85.0;
+    var shield = 65.0;
+    var energy = 92.0;
+    var score = 1420;
+    var level = 4;
+
+    var god_mode = false;
+    var warp_drive = true;
+    var difficulty_mode = 1; // 0=Easy, 1=Normal, 2=Hardcore
+
+    var weapons = ["Plasma Cannon", "Gauss Railgun", "Photon Torpedo", "Disruptor Beam"];
+    var selected_weapon = 0;
+
+    var fps_data = [60.0, 59.5, 60.2, 58.8, 61.1, 60.0, 59.9, 60.5, 60.1, 60.0];
+    var frame_times = [16.6, 16.8, 16.4, 17.0, 16.3, 16.6, 16.7, 16.5, 16.6, 16.6];
+
+    var active_theme_idx = 0; // 0=Cyberpunk, 1=Dark, 2=Light, 3=Retro
+    var log_messages = [
+        "[00:00.01] Engine core initialized (Sokol GLES / Metal / D3D11)",
+        "[00:00.04] TrueType font rasterizer loaded via stb_truetype",
+        "[00:00.07] Audio mixer initialized (44.1kHz, 32 channels)",
+        "[00:00.12] Starship entity spawned in central orbit",
+        "[00:00.18] Sector radar operational: 12 stellar bodies detected",
+        "[00:00.25] Ready for pilot input"
+    ];
+
+    var sim_tick = 0;
+
+    print("Running game showcase loop...");
+
+    while (app.is_running) {
+        app.begin_frame();
+        sim_tick = sim_tick + 1;
+
+        var sw = app.width as float;
+        var sh = app.height as float;
+
+        // ── Background Space Scene ─────────────────────────────────────────────
+        // Draw responsive grid lines
+        var gx = 0.0;
+        while (gx < sw) {
+            gg.draw_rect_primitive(gx, 0.0, 1.0, sh, 0.12, 0.15, 0.25, 0.35);
+            gx = gx + 64.0;
+        }
+        var gy = 0.0;
+        while (gy < sh) {
+            gg.draw_rect_primitive(0.0, gy, sw, 1.0, 0.12, 0.15, 0.25, 0.35);
+            gy = gy + 64.0;
+        }
+
+        // Animated player spaceship in center of viewport
+        var ship_x = sw * 0.5;
+        var ship_y = sh * 0.38;
+        ship_angle = ship_angle + 0.015;
+        var p1x = ship_x;
+        var p1y = ship_y - 24.0;
+        var p2x = ship_x - 18.0;
+        var p2y = ship_y + 20.0;
+        var p3x = ship_x + 18.0;
+        var p3y = ship_y + 20.0;
+
+        // Engine glow
+        if (warp_drive) {
+            gg.draw_triangle_primitive(
+                ship_x - 10.0, ship_y + 20.0,
+                ship_x + 10.0, ship_y + 20.0,
+                ship_x, ship_y + 36.0 + (sim_tick % 8) as float,
+                1.0, 0.3, 0.1, 0.8
+            );
+        }
+
+        // Ship hull
+        gg.draw_triangle_primitive(
+            p1x, p1y, p2x, p2y, p3x, p3y,
+            ship_color.r, ship_color.g, ship_color.b, ship_color.a
+        );
+        // Cockpit
+        gg.draw_rect_primitive(ship_x - 4.0, ship_y - 8.0, 8.0, 12.0, 1.0, 1.0, 1.0, 0.9);
+
+        // ── Dynamic Responsive Layout Coordinates ──────────────────────────────
+        var hud_w = 250.0;
+        var hud_h = sh - 32.0;
+        if (hud_h < 400.0) { hud_h = 400.0; }
+
+        var tele_w = 260.0;
+        var tele_h = (sh - 44.0) * 0.52;
+        if (tele_h < 240.0) { tele_h = 240.0; }
+        var tele_x = sw - tele_w - 16.0;
+        if (tele_x < hud_w + 24.0) { tele_x = hud_w + 24.0; }
+
+        var log_y = 24.0 + tele_h;
+        var log_h = sh - log_y - 16.0;
+        if (log_h < 150.0) { log_h = 150.0; }
+
+        var center_w = 240.0;
+        var center_h = 260.0;
+        var center_x = (sw - center_w) * 0.5;
+        var center_y = sh - center_h - 16.0;
+        if (center_y < 16.0) { center_y = 16.0; }
+
+        // ── Window 1: Starship Command HUD ─────────────────────────────────────
+        if (app.gui.begin_window("Starship Command HUD", 16.0, 16.0, hud_w, hud_h)) {
+            app.gui.label("VESSEL STATUS");
+
+            var bar_w = hud_w - 24.0;
+
+            app.gui.label("Hull Integrity");
+            app.gui.progress_bar(health / 100.0, bar_w, 14.0, "{health as int}%");
+
+            app.gui.label("Energy Shields");
+            app.gui.progress_bar(shield / 100.0, bar_w, 14.0, "{shield as int}%");
+
+            app.gui.label("Reactor Output");
+            app.gui.progress_bar(energy / 100.0, bar_w, 14.0, "{energy as int}%");
+
+            app.gui.separator();
+            app.gui.label("ARMAMENT & PROPULSION");
+
+            selected_weapon = app.gui.combo_box("Active Weapon", weapons, selected_weapon);
+
+            ship_speed = app.gui.slider("Sublight Speed", ship_speed, 0.0, 10.0);
+            level = app.gui.stepper_int("Pilot Rank", level, 1, 1, 50);
+
+            app.gui.separator();
+            app.gui.label("SYSTEM OVERRIDES");
+
+            god_mode = app.gui.checkbox("Invulnerability Field", god_mode);
+            warp_drive = app.gui.toggle("Warp Drive", warp_drive);
+
+            app.gui.separator();
+            if (app.gui.button_colored("ENGAGE HYPERDRIVE", types.hex(0xff0055, 1.0), bar_w, 28.0)) {
+                log_messages.append("[Hyperdrive] Micro-jump sequence initiated!");
+            }
+
+            app.gui.end_window();
+        }
+
+        // ── Window 2: Engine Telemetry & Diagnostics ───────────────────────────
+        if (app.gui.begin_window("Engine Telemetry", tele_x, 16.0, tele_w, tele_h)) {
+            app.gui.label("REAL-TIME METRICS");
+
+            var plot_w = tele_w - 24.0;
+            app.gui.plot_lines("FPS", fps_data, 45.0, 75.0, plot_w, 40.0);
+            app.gui.plot_histogram("Frame Latency (ms)", frame_times, 0.0, 30.0, plot_w, 35.0);
+
+            app.gui.separator();
+            app.gui.label("SCENE HIERARCHY");
+
+            if (app.gui.tree_node("Sector Entities (12)")) {
+                app.gui.label("├─ PlayerCruiser [Active]");
+                app.gui.label("├─ Waypoint Alpha");
+                app.gui.label("├─ Asteroid Belt (240 bodies)");
+                app.gui.label("└─ Space Station Outpost 7");
+                app.gui.tree_pop();
+            }
+
+            if (app.gui.tree_node("Lighting & Shaders")) {
+                app.gui.label("├─ Ambient Pass: D3D11 / Metal");
+                app.gui.label("├─ Subpixel TrueType Renderer");
+                app.gui.label("└─ HDR Bloom: Active");
+                app.gui.tree_pop();
+            }
+
+            app.gui.separator();
+            if (app.gui.button("Trigger Emergency Alert", plot_w, 26.0)) {
+                app.gui.open_popup("AlertModal");
+            }
+
+            app.gui.end_window();
+        }
+
+        // ── Window 3: Theme & Display Studio ──────────────────────────────────
+        if (app.gui.begin_window("Theme & Display Studio", center_x, center_y, center_w, center_h)) {
+            app.gui.label("PRESET UI THEMES");
+
+            if (app.gui.radio_button("Cyberpunk Neon", active_theme_idx == 0)) {
+                active_theme_idx = 0;
+                app.gui.set_theme(types.cyberpunk_theme());
+            }
+            if (app.gui.radio_button("Dark Obsidian", active_theme_idx == 1)) {
+                active_theme_idx = 1;
+                app.gui.set_theme(types.dark_theme());
+            }
+            if (app.gui.radio_button("Clean Studio (Light)", active_theme_idx == 2)) {
+                active_theme_idx = 2;
+                app.gui.set_theme(types.light_theme());
+            }
+            if (app.gui.radio_button("Classic 90s Retro", active_theme_idx == 3)) {
+                active_theme_idx = 3;
+                app.gui.set_theme(types.retro_theme());
+            }
+
+            app.gui.separator();
+            ship_color = app.gui.color_picker("Hull Paint", ship_color);
+
+            app.gui.separator();
+            app.gui.label("DISPLAY RESOLUTION");
+
+            var btn_w = (center_w - 32.0) / 2.0;
+            if (app.gui.button("800 x 600", btn_w, 22.0)) {
+                app.set_resolution(800, 600);
+            }
+            app.gui.same_line();
+            if (app.gui.button("1024 x 720", btn_w, 22.0)) {
+                app.set_resolution(1024, 720);
+            }
+            if (app.gui.button("1280 x 720", btn_w, 22.0)) {
+                app.set_resolution(1280, 720);
+            }
+            app.gui.same_line();
+            if (app.gui.button("1920 x 1080", btn_w, 22.0)) {
+                app.set_resolution(1920, 1080);
+            }
+
+            app.gui.end_window();
+        }
+
+        // ── Modal Popup: Emergency Alert ───────────────────────────────────────
+        var popup_w = 280.0;
+        var popup_h = 150.0;
+        var popup_x = (sw - popup_w) * 0.5;
+        var popup_y = (sh - popup_h) * 0.5;
+        if (app.gui.begin_popup("AlertModal", popup_x, popup_y, popup_w, popup_h)) {
+            app.gui.label("⚠️ SYSTEM ANOMALY DETECTED");
+            app.gui.label("Core temperature rising rapidly.");
+            app.gui.label("Initiate thermal purge?");
+            app.gui.spacing(8.0);
+
+            if (app.gui.button_colored("PURGE CORE", types.hex(0xee2222, 1.0), 120.0, 26.0)) {
+                log_messages.append("[Purge] Core flushed! Temp stabilized.");
+                app.gui.close_popup("AlertModal");
+            }
+            app.gui.same_line();
+            if (app.gui.button("Cancel", 120.0, 26.0)) {
+                app.gui.close_popup("AlertModal");
+            }
+            app.gui.end_popup();
+        }
+
+        // ── Bottom Telemetry Console ───────────────────────────────────────────
+        if (app.gui.begin_window("Flight Log Console", tele_x, log_y, tele_w, log_h)) {
+            var log_count = len(log_messages);
+            var content_h = (log_count as float) * 18.0;
+            var scroll_h = log_h - 40.0;
+            if (scroll_h < 80.0) { scroll_h = 80.0; }
+            app.gui.begin_scroll_area(tele_w - 24.0, scroll_h, content_h);
+            var l_idx = 0;
+            while (l_idx < log_count) {
+                app.gui.label(log_messages[l_idx]);
+                l_idx = l_idx + 1;
+            }
+            app.gui.end_scroll_area();
+            app.gui.end_window();
+        }
+
+        app.end_frame();
+    }
+
+    app.shutdown();
+    print("Limitly Game Showcase closed successfully.");
+    return 0;
+}
+
+main();

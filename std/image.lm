@@ -23,6 +23,7 @@
 //   image.tga.save(img, "output.tga");
 
 import std.ffi as ffi;
+import std.image.font as font;
 
 // ── Channel count constants ───────────────────────────────────────────────
 pub var CHANNELS_GREY:       int = 1;
@@ -233,6 +234,11 @@ frame Image {
 
     pub fn blit(src: Image, dst_x: int, dst_y: int): Image {
         blit(self, src, dst_x, dst_y);
+        return self;
+    }
+
+    pub fn blend_blit(src: Image, dst_x: int, dst_y: int): Image {
+        blend_blit(self, src, dst_x, dst_y);
         return self;
     }
 
@@ -747,6 +753,42 @@ pub fn blit(dst: Image, src: Image, dst_x: int, dst_y: int): nil {
     }
 }
 
+pub fn blend_blit(dst: Image, src: Image, dst_x: int, dst_y: int): nil {
+    if (not dst.is_valid() or not src.is_valid()) { return; }
+    var sy: int = 0;
+    while (sy < src.height) {
+        var dy: int = dst_y + sy;
+        if (dy >= 0 and dy < dst.height) {
+            var sx: int = 0;
+            while (sx < src.width) {
+                var dx: int = dst_x + sx;
+                if (dx >= 0 and dx < dst.width) {
+                    var spx: Pixel = get_pixel(src, sx, sy);
+                    if (spx.a > 0) {
+                        if (spx.a == 255) {
+                            set_pixel(dst, dx, dy, spx.r, spx.g, spx.b, 255);
+                        } else {
+                            var dpx: Pixel = get_pixel(dst, dx, dy);
+                            var a_src: float = (spx.a as float) / 255.0;
+                            var a_dst: float = (dpx.a as float) / 255.0;
+                            var out_a: float = a_src + a_dst * (1.0 - a_src);
+                            if (out_a > 0.0) {
+                                var out_r: float = ((spx.r as float) * a_src + (dpx.r as float) * a_dst * (1.0 - a_src)) / out_a;
+                                var out_g: float = ((spx.g as float) * a_src + (dpx.g as float) * a_dst * (1.0 - a_src)) / out_a;
+                                var out_b: float = ((spx.b as float) * a_src + (dpx.b as float) * a_dst * (1.0 - a_src)) / out_a;
+                                set_pixel(dst, dx, dy, out_r as int, out_g as int, out_b as int, (out_a * 255.0) as int);
+                            }
+                        }
+                    }
+                }
+                sx = sx + 1;
+            }
+        }
+        sy = sy + 1;
+    }
+}
+
+
 // ── Unified Save & Format Exporters ───────────────────────────────────────
 
 pub fn save_png(img: Image, path: str): bool? {
@@ -933,3 +975,31 @@ pub var png: PngFacade = PngFacade();
 pub var jpg: JpgFacade = JpgFacade();
 pub var bmp: BmpFacade = BmpFacade();
 pub var tga: TgaFacade = TgaFacade();
+
+frame FontFacade {
+    pub init() {}
+    pub fn load(path: str): font.Font? {
+        return font.load_font(path);
+    }
+    pub fn load_system(name: str = ""): font.Font? {
+        return font.load_system_font(name);
+    }
+    pub fn detect_system(name: str = ""): str {
+        return font.detect_system_font(name);
+    }
+}
+
+pub var font: FontFacade = FontFacade();
+
+pub fn load_font(path: str): font.Font? {
+    return font.load_font(path);
+}
+
+pub fn load_system_font(name: str = ""): font.Font? {
+    return font.load_system_font(name);
+}
+
+pub fn detect_system_font(name: str = ""): str {
+    return font.detect_system_font(name);
+}
+

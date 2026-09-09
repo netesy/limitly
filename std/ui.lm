@@ -578,7 +578,7 @@ pub fn select(options: [str], selected_idx: int = 0, on_change: any = nil): Widg
 pub fn scroll(content: Widget): Widget {
     var w = Widget(KIND_SCROLL);
     w.children = [content];
-    w.height_val = 140.0;
+    w.height_val = 0.0;
     w.scroll_y = 0.0;
     w.background_color = rgb(20, 22, 28);
     return w;

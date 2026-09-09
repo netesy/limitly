@@ -185,3 +185,342 @@ EXPORT int rotate_image_90_cw(const unsigned char* src, int src_w, int src_h, in
     }
     return 1;
 }
+
+// ============================================================================
+// TrueType Font Rendering & Metrics (stb_truetype)
+// ============================================================================
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "../../vendor/stb/stb_truetype.h"
+#include <stdio.h>
+
+typedef struct {
+    unsigned char* file_data;
+    size_t file_size;
+    stbtt_fontinfo info;
+    int is_owned;
+} FontHandle;
+
+EXPORT void* load_font_file(const char* filepath) {
+    if (!filepath) return NULL;
+    FILE* f = fopen(filepath, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (size <= 0) { fclose(f); return NULL; }
+    unsigned char* buffer = (unsigned char*)malloc(size);
+    if (!buffer) { fclose(f); return NULL; }
+    if (fread(buffer, 1, size, f) != (size_t)size) {
+        free(buffer);
+        fclose(f);
+        return NULL;
+    }
+    fclose(f);
+
+    FontHandle* handle = (FontHandle*)malloc(sizeof(FontHandle));
+    if (!handle) {
+        free(buffer);
+        return NULL;
+    }
+    handle->file_data = buffer;
+    handle->file_size = (size_t)size;
+    handle->is_owned = 1;
+
+    int offset = stbtt_GetFontOffsetForIndex(buffer, 0);
+    if (offset < 0) offset = 0;
+    if (!stbtt_InitFont(&handle->info, buffer, offset)) {
+        free(buffer);
+        free(handle);
+        return NULL;
+    }
+    return handle;
+}
+
+
+
+
+EXPORT void* load_font_memory(const unsigned char* data, int data_len) {
+    if (!data || data_len <= 0) return NULL;
+    unsigned char* buffer = (unsigned char*)malloc(data_len);
+    if (!buffer) return NULL;
+    memcpy(buffer, data, data_len);
+
+    FontHandle* handle = (FontHandle*)malloc(sizeof(FontHandle));
+    if (!handle) {
+        free(buffer);
+        return NULL;
+    }
+    handle->file_data = buffer;
+    handle->file_size = (size_t)data_len;
+    handle->is_owned = 1;
+
+    int offset = stbtt_GetFontOffsetForIndex(buffer, 0);
+    if (offset < 0) offset = 0;
+    if (!stbtt_InitFont(&handle->info, buffer, offset)) {
+        free(buffer);
+        free(handle);
+        return NULL;
+    }
+    return handle;
+}
+
+EXPORT void free_font(void* font_handle) {
+    if (!font_handle) return;
+    FontHandle* handle = (FontHandle*)font_handle;
+    if (handle->file_data && handle->is_owned) {
+        free(handle->file_data);
+    }
+    free(handle);
+}
+
+EXPORT int get_font_vmetrics(void* font_handle, float font_size, float* ascent, float* descent, float* line_gap) {
+    if (!font_handle) return 0;
+    FontHandle* handle = (FontHandle*)font_handle;
+    int a, d, g;
+    stbtt_GetFontVMetrics(&handle->info, &a, &d, &g);
+    float scale = stbtt_ScaleForPixelHeight(&handle->info, font_size);
+    if (ascent) *ascent = a * scale;
+    if (descent) *descent = d * scale;
+    if (line_gap) *line_gap = g * scale;
+    return 1;
+}
+
+EXPORT float measure_text_width(void* font_handle, float font_size, const char* text) {
+    if (!font_handle || !text) return 0.0f;
+    FontHandle* handle = (FontHandle*)font_handle;
+    float scale = stbtt_ScaleForPixelHeight(&handle->info, font_size);
+    float max_width = 0.0f;
+    float cur_width = 0.0f;
+    int len = (int)strlen(text);
+    for (int i = 0; i < len; i++) {
+        if (text[i] == '\n') {
+            if (cur_width > max_width) max_width = cur_width;
+            cur_width = 0.0f;
+            continue;
+        }
+        int advance, lsb;
+        stbtt_GetCodepointHMetrics(&handle->info, (int)(unsigned char)text[i], &advance, &lsb);
+        cur_width += advance * scale;
+        if (i + 1 < len && text[i+1] != '\n') {
+            int kern = stbtt_GetCodepointKernAdvance(&handle->info, (int)(unsigned char)text[i], (int)(unsigned char)text[i+1]);
+            cur_width += kern * scale;
+        }
+    }
+    if (cur_width > max_width) max_width = cur_width;
+    return max_width;
+}
+
+EXPORT int measure_text_width_int(void* font_handle, int font_size, const char* text) {
+    return (int)(measure_text_width(font_handle, (float)font_size, text) + 0.999f);
+}
+
+EXPORT int measure_text_height_int(void* font_handle, int font_size, const char* text) {
+    if (!font_handle || !text) return 0;
+    FontHandle* handle = (FontHandle*)font_handle;
+    int a, d, g;
+    stbtt_GetFontVMetrics(&handle->info, &a, &d, &g);
+    float scale = stbtt_ScaleForPixelHeight(&handle->info, (float)font_size);
+    float line_h = (float)(a - d + g) * scale;
+    if (line_h < (float)font_size) line_h = (float)font_size;
+    int lines = 1;
+    for (int i = 0; text[i]; i++) {
+        if (text[i] == '\n') lines++;
+    }
+    return (int)(lines * line_h + 0.5f);
+}
+
+EXPORT unsigned char* render_text_rgba(void* font_handle, float font_size, const char* text,
+                                       int r, int g, int b, int a,
+                                       int* out_w, int* out_h) {
+    if (!font_handle || !text) return NULL;
+    FontHandle* handle = (FontHandle*)font_handle;
+
+    int num_lines = 1;
+    for (int i = 0; text[i]; i++) {
+        if (text[i] == '\n') num_lines++;
+    }
+
+    int va, vd, vg;
+    stbtt_GetFontVMetrics(&handle->info, &va, &vd, &vg);
+    float scale = stbtt_ScaleForPixelHeight(&handle->info, font_size);
+    float ascent = (float)va * scale;
+    float descent = (float)vd * scale;
+    float line_gap = (float)vg * scale;
+    float line_height = (float)(va - vd + vg) * scale;
+    if (line_height < font_size) line_height = font_size;
+
+    float max_w = measure_text_width(font_handle, font_size, text);
+    int total_w = (int)(max_w + 1.5f);
+    if (total_w < 1) total_w = 1;
+    int total_h = (int)((float)num_lines * line_height + 1.5f);
+    if (total_h < 1) total_h = 1;
+
+    // Extra padding around bounding box
+    total_w += 4;
+    total_h += 4;
+
+    unsigned char* out_buf = (unsigned char*)calloc(total_w * total_h * 4, 1);
+    if (!out_buf) return NULL;
+
+    int line_idx = 0;
+    float x_pos = 2.0f;
+    float y_base = 2.0f + ascent;
+
+    int len = (int)strlen(text);
+    for (int i = 0; i < len; i++) {
+        char ch = text[i];
+        if (ch == '\n') {
+            line_idx++;
+            x_pos = 2.0f;
+            y_base = 2.0f + (float)line_idx * line_height + ascent;
+            continue;
+        }
+
+        int advance, lsb;
+        stbtt_GetCodepointHMetrics(&handle->info, (int)(unsigned char)ch, &advance, &lsb);
+
+        int c_x1, c_y1, c_x2, c_y2;
+        stbtt_GetCodepointBitmapBox(&handle->info, (int)(unsigned char)ch, scale, scale, &c_x1, &c_y1, &c_x2, &c_y2);
+        int gw = c_x2 - c_x1;
+        int gh = c_y2 - c_y1;
+
+        if (gw > 0 && gh > 0) {
+            unsigned char* glyph_bmp = (unsigned char*)malloc(gw * gh);
+            if (glyph_bmp) {
+                stbtt_MakeCodepointBitmap(&handle->info, glyph_bmp, gw, gh, gw, scale, scale, (int)(unsigned char)ch);
+
+                int dst_x0 = (int)(x_pos + (float)c_x1);
+                int dst_y0 = (int)(y_base + (float)c_y1);
+
+                for (int gy = 0; gy < gh; gy++) {
+                    int dy = dst_y0 + gy;
+                    if (dy < 0 || dy >= total_h) continue;
+                    for (int gx = 0; gx < gw; gx++) {
+                        int dx = dst_x0 + gx;
+                        if (dx < 0 || dx >= total_w) continue;
+                        unsigned char cov = glyph_bmp[gy * gw + gx];
+                        if (cov == 0) continue;
+
+                        int idx = (dy * total_w + dx) * 4;
+                        float cov_f = (float)cov / 255.0f;
+                        float alpha_f = ((float)a / 255.0f) * cov_f;
+
+                        // Alpha composite
+                        float cur_a = (float)out_buf[idx + 3] / 255.0f;
+                        float new_a = alpha_f + cur_a * (1.0f - alpha_f);
+                        if (new_a > 0.0f) {
+                            float nr = ((float)r * alpha_f + (float)out_buf[idx] * cur_a * (1.0f - alpha_f)) / new_a;
+                            float ng = ((float)g * alpha_f + (float)out_buf[idx + 1] * cur_a * (1.0f - alpha_f)) / new_a;
+                            float nb = ((float)b * alpha_f + (float)out_buf[idx + 2] * cur_a * (1.0f - alpha_f)) / new_a;
+                            out_buf[idx] = (unsigned char)(nr + 0.5f);
+                            out_buf[idx + 1] = (unsigned char)(ng + 0.5f);
+                            out_buf[idx + 2] = (unsigned char)(nb + 0.5f);
+                            out_buf[idx + 3] = (unsigned char)(new_a * 255.0f + 0.5f);
+                        }
+                    }
+                }
+                free(glyph_bmp);
+            }
+        }
+
+        x_pos += (float)advance * scale;
+        if (i + 1 < len && text[i+1] != '\n') {
+            int kern = stbtt_GetCodepointKernAdvance(&handle->info, (int)(unsigned char)ch, (int)(unsigned char)text[i+1]);
+            x_pos += (float)kern * scale;
+        }
+    }
+
+    if (out_w) *out_w = total_w;
+    if (out_h) *out_h = total_h;
+    return out_buf;
+}
+
+EXPORT void free_text_rgba(unsigned char* buf) {
+    if (buf) free(buf);
+}
+
+EXPORT int detect_system_font_path(const char* preferred_name, char* out_path, int max_path_len) {
+    if (!out_path || max_path_len <= 0) return 0;
+    out_path[0] = '\0';
+
+    static const char* search_dirs[] = {
+#ifdef _WIN32
+        "C:\\Windows\\Fonts\\",
+        "C:\\WinNT\\Fonts\\",
+#elif __APPLE__
+        "/System/Library/Fonts/",
+        "/Library/Fonts/",
+        "/System/Library/Fonts/Supplemental/",
+#else
+        "/usr/share/fonts/truetype/dejavu/",
+        "/usr/share/fonts/TTF/",
+        "/usr/share/fonts/truetype/liberation/",
+        "/usr/share/fonts/truetype/freefont/",
+        "/usr/share/fonts/truetype/ubuntu/",
+        "/usr/share/fonts/",
+        "/usr/local/share/fonts/",
+#endif
+        NULL
+    };
+
+    if (preferred_name && preferred_name[0] != '\0') {
+        char temp[512];
+        for (int i = 0; search_dirs[i] != NULL; i++) {
+            snprintf(temp, sizeof(temp), "%s%s", search_dirs[i], preferred_name);
+            FILE* f = fopen(temp, "rb");
+            if (f) {
+                fclose(f);
+                strncpy(out_path, temp, max_path_len - 1);
+                out_path[max_path_len - 1] = '\0';
+                return 1;
+            }
+            if (!strstr(preferred_name, ".ttf") && !strstr(preferred_name, ".TTF") &&
+                !strstr(preferred_name, ".ttc") && !strstr(preferred_name, ".otf")) {
+                snprintf(temp, sizeof(temp), "%s%s.ttf", search_dirs[i], preferred_name);
+                f = fopen(temp, "rb");
+                if (f) {
+                    fclose(f);
+                    strncpy(out_path, temp, max_path_len - 1);
+                    out_path[max_path_len - 1] = '\0';
+                    return 1;
+                }
+            }
+        }
+    }
+
+    static const char* fallbacks[] = {
+#ifdef _WIN32
+        "C:\\Windows\\Fonts\\segoeui.ttf",
+        "C:\\Windows\\Fonts\\arial.ttf",
+        "C:\\Windows\\Fonts\\tahoma.ttf",
+        "C:\\Windows\\Fonts\\calibri.ttf",
+        "C:\\Windows\\Fonts\\consola.ttf",
+#elif __APPLE__
+        "/System/Library/Fonts/SFNS.ttf",
+        "/System/Library/Fonts/Helvetica.ttc",
+        "/Library/Fonts/Arial.ttf",
+        "/System/Library/Fonts/Supplemental/Arial.ttf",
+#else
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+        "/usr/share/fonts/truetype/freefont/FreeSans.ttf",
+        "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+#endif
+        NULL
+    };
+
+    for (int i = 0; fallbacks[i] != NULL; i++) {
+        FILE* f = fopen(fallbacks[i], "rb");
+        if (f) {
+            fclose(f);
+            strncpy(out_path, fallbacks[i], max_path_len - 1);
+            out_path[max_path_len - 1] = '\0';
+            return 1;
+        }
+    }
+
+    return 0;
+}
+

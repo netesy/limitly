@@ -538,7 +538,7 @@ pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y
     }
     if (w.kind == ui.KIND_SCROLL) {
         var v_w = available_w;
-        var v_h = 140.0;
+        var v_h = available_h;
         if (w.height_val > 0.0) v_h = w.height_val;
         if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
             if (px >= x + v_w - 12.0) {
@@ -736,7 +736,7 @@ pub fn hit_test_hover_widget(w: ui.Widget, px: float, py: float, x: float, y: fl
 
     if (w.kind == ui.KIND_SCROLL) {
         var v_w = available_w;
-        var v_h = 140.0;
+        var v_h = available_h;
         if (w.height_val > 0.0) v_h = w.height_val;
         if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
             if (len(w.children) > 0) {
@@ -1223,7 +1223,7 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
     }
     if (w.kind == ui.KIND_SCROLL) {
         var v_w = available_w;
-        var v_h = 140.0;
+        var v_h = available_h;
         if (w.height_val > 0.0) v_h = w.height_val;
 
         // Background
@@ -1458,7 +1458,7 @@ fn send_wheel_to_widget(w: ui.Widget, px: float, py: float, delta: float, x: flo
     }
     if (w.kind == ui.KIND_SCROLL) {
         var v_w = available_w;
-        var v_h = 140.0;
+        var v_h = available_h;
         if (w.height_val > 0.0) v_h = w.height_val;
         if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
             w.scroll_y = w.scroll_y - (delta * 0.25);
