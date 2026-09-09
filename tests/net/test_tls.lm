@@ -1,0 +1,42 @@
+// tests/net/test_tls.lm
+// Test TLS configuration and client connection
+
+import std.net.tls as tls;
+
+print("=== TLS Standard Library Tests ===");
+
+fn test_tls_config() {
+    // 1. Test TLSConfig builder pattern
+    var cfg = tls.TLSConfig()
+        .with_verify(false)
+        .with_sni("example.com")
+        .with_timeout(2000);
+
+    assert(cfg.verify_peer == false, "verify_peer should be false");
+    assert(cfg.sni == "example.com", "sni should be example.com");
+    assert(cfg.timeout_ms == 2000, "timeout should be 2000");
+
+    // 2. Test default config
+    var default_cfg = tls.TLSConfig();
+    assert(default_cfg.verify_peer == true, "default verify_peer should be true");
+    assert(default_cfg.timeout_ms == 5000, "default timeout should be 5000");
+    print("✓ TLSConfig builder tests passed");
+}
+
+fn test_tls_connect_unreachable() {
+    var cfg = tls.TLSConfig().with_timeout(500);
+    var res = tls.connect("127.0.0.1", 1, cfg);
+    match (res) {
+        val sock => {
+            print("Connected to port 1 unexpectedly");
+            sock.close();
+        },
+        err e => {
+            print("✓ TLS connect gracefully handles unreachable port");
+        }
+    }
+}
+
+test_tls_config();
+test_tls_connect_unreachable();
+print("All TLS tests passed successfully!");
