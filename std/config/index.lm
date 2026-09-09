@@ -2,7 +2,7 @@
 
 import std.env as env;
 
-pub frame Config {
+frame Config {
     pub keys: [str];
     pub vals: [str];
 

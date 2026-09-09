@@ -1,4 +1,4 @@
-pub frame ExportedFrame {
+frame ExportedFrame {
     pub var x: int;
     pub init(v: int) {
         self.x = v;

@@ -1,6 +1,6 @@
 // XML Document and Node representation
 
-pub frame XMLNode {
+frame XMLNode {
     pub name: str;
     pub text: str;
     pub attrs_keys: [str];
@@ -8,7 +8,7 @@ pub frame XMLNode {
     pub children: [any];
 }
 
-pub frame XMLDocument {
+frame XMLDocument {
     pub root: any; // XMLNode as any
 }
 

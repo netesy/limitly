@@ -16,7 +16,7 @@ fn is_digit_char(ch: str): bool {
     return false;
 }
 
-pub frame JSONParser {
+frame JSONParser {
     pub idx: int;
     pub text: str;
 

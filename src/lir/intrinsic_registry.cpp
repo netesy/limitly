@@ -59,6 +59,7 @@ IntrinsicRegistry::IntrinsicRegistry() {
     registerIntrinsic("std.ffi.ccall_execute3_piif", {LIR_Op::ForeignCall, 0, 0, 0, 0});
     registerIntrinsic("std.ffi.ccall_execute4_sppp_ptr", {LIR_Op::ForeignCall, 0, 0, 0, 0});
     registerIntrinsic("std.ffi.ccall_execute5_siiip_int", {LIR_Op::ForeignCall, 0, 0, 0, 0});
+    registerIntrinsic("std.ffi.foreign_call", {LIR_Op::ForeignCall, 0, 0, 0, 0});
     registerIntrinsic("std.ffi.call_i64_0", {LIR_Op::ForeignCall, 0, 0, 1, 0});
     registerIntrinsic("std.ffi.call_i64_1", {LIR_Op::ForeignCall, 0, 0, 2, 0});
     registerIntrinsic("std.ffi.call_i64_2", {LIR_Op::ForeignCall, 0, 0, 3, 0});

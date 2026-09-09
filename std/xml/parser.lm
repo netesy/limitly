@@ -2,7 +2,7 @@
 
 import std.xml.document as doc;
 
-pub frame XMLParser {
+frame XMLParser {
     pub idx: int;
     pub text: str;
 

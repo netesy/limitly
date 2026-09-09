@@ -3,7 +3,7 @@
 import std.iterator as iterator;
 import std.iterator show Iterator;
 
-pub frame Vector {
+frame Vector {
     pub var data: [any];
     var size: int;
     var capacity: int;
@@ -146,7 +146,7 @@ pub frame Vector {
     }
 }
 
-pub frame VectorIterator: Iterator {
+frame VectorIterator: Iterator {
     var data: [any];
     var size: int;
     var index: int;
@@ -167,7 +167,7 @@ pub frame VectorIterator: Iterator {
     }
 }
 
-pub frame Deque {
+frame Deque {
     pub var data: [any];
 
     pub init() {
@@ -264,7 +264,7 @@ pub frame Deque {
     }
 }
 
-pub frame ArrayList {
+frame ArrayList {
     var data: Vector;
 
     pub init() {
@@ -312,7 +312,7 @@ pub frame ArrayList {
     }
 }
 
-pub frame RingBuffer {
+frame RingBuffer {
     var data: [any];
     var capacity: int;
     var start: int;

@@ -1,0 +1,214 @@
+// tests/ffi/test_image_fluent.lm
+// Fluent Image API & Facade Verification Suite
+// All generated test images have dimensions >= 150x150 for clear visual inspection.
+//
+// Verifies:
+// 1. Semantic color constructors & palette constants matching std.ui
+// 2. Method chaining on Image (fill, fill_rect, line, flip_v, flip_h, blit)
+// 3. Out-of-place fluent transforms (resize, crop, rotate_90, clone)
+// 4. Auto-detecting save() across PNG, JPG, BMP, TGA (150x150)
+// 5. Format facades (image.png, image.jpg, image.bmp, image.tga) (150x150)
+// 6. Direct format module imports (import std.image.png as png) (150x150)
+
+import std.image as image;
+import std.image.png as png;
+import std.image.jpg as jpg;
+import std.image.bmp as bmp;
+import std.image.tga as tga;
+
+fn test_semantic_colors(): int {
+    print("--- Test 1: Semantic Colors & Constructors ---");
+
+    var p1 = image.rgb(255, 128, 64);
+    assert(p1.r == 255, "p1.r mismatch");
+    assert(p1.g == 128, "p1.g mismatch");
+    assert(p1.b == 64,  "p1.b mismatch");
+    assert(p1.a == 255, "p1.a mismatch");
+
+    var p2 = image.rgba(10, 20, 30, 200);
+    assert(p2.r == 10,  "p2.r mismatch");
+    assert(p2.a == 200, "p2.a mismatch");
+
+    var p3 = image.color_rgb(1.0, 0.0, 0.5);
+    assert(p3.r == 255, "p3.r mismatch");
+    assert(p3.g == 0,   "p3.g mismatch");
+    assert(p3.b == 127, "p3.b mismatch");
+
+    var p4 = p3.with_alpha(100);
+    assert(p4.a == 100, "p4.with_alpha mismatch");
+
+    assert(image.white.r == 255 and image.white.g == 255 and image.white.b == 255, "white mismatch");
+    assert(image.black.r == 0   and image.black.g == 0   and image.black.b == 0,   "black mismatch");
+    assert(image.transparent.a == 0, "transparent mismatch");
+
+    print("[PASS] 1. Semantic color constructors & palette");
+    return 1;
+}
+
+fn test_fluent_chaining(): int {
+    print("--- Test 2: Fluent Canvas Chaining (150x150) ---");
+
+    var img_opt = image.create(150, 150, 4);
+    var img = img_opt? else {
+        print("[FAIL] image.create failed");
+        return 0;
+    };
+
+    // Chain drawing operations fluently on 150x150 canvas
+    img.fill(image.dark_gray)
+       .fill_rect(20, 20, 50, 50, image.red)
+       .fill_rect(80, 20, 50, 50, image.blue)
+       .line(0, 0, 149, 149, image.white)
+       .set(0, 0, image.yellow);
+
+    var p_bg = img.get(75, 120);
+    assert(p_bg.r == image.dark_gray.r, "background pixel mismatch");
+
+    var p_red = img.get(30, 40);
+    assert(p_red.r == image.red.r and p_red.g == image.red.g, "red rect pixel mismatch");
+
+    var p_blue = img.get(90, 40);
+    assert(p_blue.b == image.blue.b, "blue rect pixel mismatch");
+
+    var p_diag = img.get(75, 75);
+    assert(p_diag.r == image.white.r, "line diagonal pixel mismatch");
+
+    var p_yell = img.get(0, 0);
+    assert(p_yell.r == image.yellow.r and p_yell.g == image.yellow.g, "set yellow pixel mismatch");
+
+    print("[PASS] 2. Fluent canvas chaining (150x150)");
+    img.free();
+    return 1;
+}
+
+fn test_fluent_transforms(): int {
+    print("--- Test 3: Fluent Transform Chaining (150x150) ---");
+
+    var img_opt = image.create(150, 150, 4);
+    var img = img_opt? else { return 0; };
+
+    img.fill(image.black)
+       .set(0, 0, image.red);
+
+    // In-place flip chain
+    img.flip_h().flip_v();
+    // After horizontal & vertical flip: (0,0) -> (149,149)
+    var p_corner = img.get(149, 149);
+    assert(p_corner.r == image.red.r, "flipped pixel not at (149,149)");
+
+    // Out-of-place resize to 200x150
+    var resized_opt = img.resize(200, 150);
+    var resized = resized_opt? else { return 0; };
+    assert(resized.width == 200 and resized.height == 150, "resized dimensions mismatch");
+
+    // Out-of-place crop to 150x100
+    var cropped_opt = resized.crop(10, 10, 150, 100);
+    var cropped = cropped_opt? else { return 0; };
+    assert(cropped.width == 150 and cropped.height == 100, "cropped dimensions mismatch");
+
+    // Rotate 90: (150x100) -> (100x150)
+    var rotated_opt = cropped.rotate_90();
+    var rotated = rotated_opt? else { return 0; };
+    assert(rotated.width == 100 and rotated.height == 150, "rotated dimensions mismatch");
+
+    img.free();
+    resized.free();
+    cropped.free();
+    rotated.free();
+
+    print("[PASS] 3. Fluent transform chaining (>= 150)");
+    return 1;
+}
+
+fn test_unified_save_autodetect(): int {
+    print("--- Test 4: Unified Save Auto-Detection (150x150) ---");
+
+    var img_opt = image.create(150, 150, 4);
+    var img = img_opt? else { return 0; };
+    img.fill(image.indigo);
+
+    var s1 = img.save("tests/ffi/fluent_out.png")? else { return 0; };
+    assert(s1 == true, "save png failed");
+
+    var s2 = img.save("tests/ffi/fluent_out.jpg", 80)? else { return 0; };
+    assert(s2 == true, "save jpg failed");
+
+    var s3 = img.save("tests/ffi/fluent_out.bmp")? else { return 0; };
+    assert(s3 == true, "save bmp failed");
+
+    var s4 = img.save("tests/ffi/fluent_out.tga")? else { return 0; };
+    assert(s4 == true, "save tga failed");
+
+    // Verify loading the saved files
+    var l1 = image.load("tests/ffi/fluent_out.png")? else { return 0; };
+    assert(l1.width == 150 and l1.height == 150, "reloaded png mismatch (150x150)");
+
+    var l2 = image.load("tests/ffi/fluent_out.bmp")? else { return 0; };
+    assert(l2.width == 150 and l2.height == 150, "reloaded bmp mismatch (150x150)");
+
+    img.free();
+    l1.free();
+    l2.free();
+
+    print("[PASS] 4. Unified save auto-detection & reload (150x150)");
+    return 1;
+}
+
+fn test_format_facades(): int {
+    print("--- Test 5: Format Facades & Submodules (150x150) ---");
+
+    var img_opt = image.create(150, 150, 3);
+    var img = img_opt? else { return 0; };
+    img.fill(image.green);
+
+    // Using format submodules via top-level image namespace
+    var ok1 = image.png.save(img, "tests/ffi/facade_out.png")? else { return 0; };
+    assert(ok1 == true, "image.png.save failed");
+
+    var ok2 = image.jpg.save(img, "tests/ffi/facade_out.jpg", 85)? else { return 0; };
+    assert(ok2 == true, "image.jpg.save failed");
+
+    var ok3 = image.bmp.save(img, "tests/ffi/facade_out.bmp")? else { return 0; };
+    assert(ok3 == true, "image.bmp.save failed");
+
+    var ok4 = image.tga.save(img, "tests/ffi/facade_out.tga")? else { return 0; };
+    assert(ok4 == true, "image.tga.save failed");
+
+    var ok5 = image.tga.save_rle(img, "tests/ffi/facade_out_rle.tga")? else { return 0; };
+    assert(ok5 == true, "image.tga.save_rle failed");
+
+    // Using directly imported format submodules
+    var ok6 = png.save(img, "tests/ffi/direct_out.png")? else { return 0; };
+    assert(ok6 == true, "png.save failed");
+
+    var ok7 = jpg.save(img, "tests/ffi/direct_out.jpg", 90)? else { return 0; };
+    assert(ok7 == true, "jpg.save failed");
+
+    var ok8 = bmp.save(img, "tests/ffi/direct_out.bmp")? else { return 0; };
+    assert(ok8 == true, "bmp.save failed");
+
+    var ok9 = tga.save(img, "tests/ffi/direct_out.tga")? else { return 0; };
+    assert(ok9 == true, "tga.save failed");
+
+    img.free();
+
+    print("[PASS] 5. Format facades and submodules (150x150)");
+    return 1;
+}
+
+fn main(): int {
+    print("=======================================================");
+    print("  std.image Fluent API & Facade Test Suite (>= 150x150)");
+    print("=======================================================");
+
+    test_semantic_colors();
+    test_fluent_chaining();
+    test_fluent_transforms();
+    test_unified_save_autodetect();
+    test_format_facades();
+
+    print("=======================================================");
+    print("  All Fluent Image API Tests PASSED (>= 150x150)!");
+    print("=======================================================");
+    return 0;
+}

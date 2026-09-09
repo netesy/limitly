@@ -1,6 +1,6 @@
 // Standard Library LinkedList Collection
 
-pub frame Node {
+frame Node {
     pub var value: any;
     pub var next: any; // Node?
 
@@ -10,7 +10,7 @@ pub frame Node {
     }
 }
 
-pub frame Iterator {
+frame Iterator {
     var current: any; // Node?
 
     pub init(head: any) {
@@ -28,7 +28,7 @@ pub frame Iterator {
     }
 }
 
-pub frame LinkedList {
+frame LinkedList {
     pub var head: any; // Node?
     pub var tail: any; // Node?
     pub var size: int;

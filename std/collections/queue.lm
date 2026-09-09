@@ -1,7 +1,7 @@
 // Standard Library Queue, PriorityQueue, Stack, and BitSet Collections
 import std.collections.vector as vector;
 
-pub frame Queue {
+frame Queue {
     var data: Deque;
 
     pub init() {
@@ -29,7 +29,7 @@ pub frame Queue {
     }
 }
 
-pub frame PriorityQueue {
+frame PriorityQueue {
     pub var heap: vector.Vector;
     var comparator: any;
 
@@ -133,7 +133,7 @@ pub frame PriorityQueue {
     }
 }
 
-pub frame Stack {
+frame Stack {
     var data: Vector;
 
     pub init() {
@@ -161,7 +161,7 @@ pub frame Stack {
     }
 }
 
-pub frame BitSet {
+frame BitSet {
     var w0: int;
     var w1: int;
     var w2: int;
@@ -223,7 +223,7 @@ pub frame BitSet {
 
     pub fn iterator(): BitSetIterator { return BitSetIterator(bitset=self, current=0, yielded=0); }
 }
-pub frame BitSetIterator {
+frame BitSetIterator {
     var bitset: BitSet;
     var current: int;
     var yielded: int;

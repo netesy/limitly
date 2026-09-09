@@ -1,0 +1,162 @@
+// std/image/hdr.lm
+// HDR (Radiance RGBE) image API — float pixel buffers.
+
+import std.ffi as ffi;
+import std.image.index as image;
+
+frame HdrImage {
+    pub var width:    int;
+    pub var height:   int;
+    pub var channels: int;
+    pub var pixels:   int;   // float* buffer (pubptr = int)
+    pub var _lib:     int;
+
+    pub init(w: int = 0, h: int = 0, c: int = 3,
+             p: int = 0, lib: int = 0) {
+        self.width    = w;
+        self.height   = h;
+        self.channels = c;
+        self.pixels   = p;
+        self._lib     = lib;
+    }
+
+    pub fn float_count(): int {
+        return self.width * self.height * self.channels;
+    }
+
+    pub fn pixel_byte_offset(x: int, y: int): int {
+        return (y * self.width + x) * self.channels * 4;
+    }
+
+    pub fn is_valid(): bool {
+        return self.pixels != 0 and self.width > 0 and self.height > 0;
+    }
+}
+
+pub fn load(path: str): HdrImage? {
+    unsafe {
+        var lib: int = image._open_lib();
+        if (lib == 0) { return err(); }
+
+        var fn_load: int = ffi.library_get_symbol(lib, "load_image_hdr");
+        if (fn_load == 0) { ffi.library_unload(lib); return err(); }
+
+        var w_p: int = ffi.alloc(4);
+        var h_p: int = ffi.alloc(4);
+        var c_p: int = ffi.alloc(4);
+        var cs:  ffi.CString = ffi.string_to_cstring(path);
+
+        var data_ptr: int = ffi.foreign_call(
+            fn_load,
+            [ffi.cstring_as_ptr(cs), w_p, h_p, c_p],
+            ffi.TYPE_PTR,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]
+        ) as int;
+        ffi.cstring_free(cs);
+
+        var w: int = ffi.load_i32(w_p);
+        var h: int = ffi.load_i32(h_p);
+        var c: int = ffi.load_i32(c_p);
+        ffi.free(w_p); ffi.free(h_p); ffi.free(c_p);
+
+        if (data_ptr == 0) { ffi.library_unload(lib); return err(); }
+        return ok(HdrImage(w=w, h=h, c=c, p=data_ptr, lib=lib));
+    }
+}
+
+pub fn save(img: HdrImage, path: str): bool? {
+    if (not img.is_valid()) { return err(); }
+    unsafe {
+        var fn_save: int = ffi.library_get_symbol(img._lib, "save_image_hdr");
+        if (fn_save == 0) { return err(); }
+        var cs: ffi.CString = ffi.string_to_cstring(path);
+        var res: int = ffi.foreign_call(
+            fn_save,
+            [ffi.cstring_as_ptr(cs), img.width, img.height, img.channels, img.pixels],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR]
+        ) as int;
+        ffi.cstring_free(cs);
+        if (res == 0) { return err(); }
+        return ok(true);
+    }
+}
+
+pub fn free(img: HdrImage): nil {
+    if (img.pixels == 0) { return; }
+    unsafe {
+        var fn_free: int = ffi.library_get_symbol(img._lib, "free_image_hdr");
+        if (fn_free != 0) {
+            ffi.call_void_1(fn_free, img.pixels);
+        }
+        if (img._lib != 0) {
+            ffi.library_unload(img._lib);
+        }
+    }
+}
+
+// Reinhard tone-map + sRGB gamma encode → standard u8 Image.
+pub fn to_ldr(img: HdrImage, exposure: float = 1.0): image.Image? {
+    if (not img.is_valid()) { return err(); }
+    var out_ch: int = 3;
+    if (img.channels == 4) { out_ch = 4; }
+
+    var ldr_opt: image.Image? = image.create(img.width, img.height, out_ch);
+    var ldr: image.Image = ldr_opt? else { return err(); };
+
+    unsafe {
+        var px_count: int = img.width * img.height;
+        var i: int = 0;
+        while (i < px_count) {
+            var base_f: int = ffi.ptr_add(img.pixels, i * img.channels * 4);
+
+            var fr: float = ffi.load_f32(base_f) * exposure;
+            var fg: float = 0.0;
+            var fb: float = 0.0;
+            var fa: float = 1.0;
+
+            if (img.channels >= 2) { fg = ffi.load_f32(ffi.ptr_add(base_f, 4)) * exposure; }
+            if (img.channels >= 3) { fb = ffi.load_f32(ffi.ptr_add(base_f, 8)) * exposure; }
+            if (img.channels >= 4) { fa = ffi.load_f32(ffi.ptr_add(base_f, 12)); }
+
+            // Reinhard: x / (1 + x)
+            fr = fr / (1.0 + fr);
+            fg = fg / (1.0 + fg);
+            fb = fb / (1.0 + fb);
+
+            // Approximate sRGB gamma (1/2.2)
+            fr = fr ** (1.0 / 2.2);
+            fg = fg ** (1.0 / 2.2);
+            fb = fb ** (1.0 / 2.2);
+
+            var ri: int = (fr * 255.0) as int; if (ri < 0) ri = 0; if (ri > 255) ri = 255;
+            var gi: int = (fg * 255.0) as int; if (gi < 0) gi = 0; if (gi > 255) gi = 255;
+            var bi: int = (fb * 255.0) as int; if (bi < 0) bi = 0; if (bi > 255) bi = 255;
+            var ai: int = (fa * 255.0) as int; if (ai < 0) ai = 0; if (ai > 255) ai = 255;
+
+            var x: int = i % img.width;
+            var y: int = i / img.width;
+            image.set_pixel(ldr, x, y, ri, gi, bi, ai);
+            i = i + 1;
+        }
+    }
+    return ok(ldr);
+}
+
+pub fn get_pixel_hdr(img: HdrImage, x: int, y: int): (float, float, float, float) {
+    if (not img.is_valid() or x < 0 or y < 0 or x >= img.width or y >= img.height) {
+        return (0.0, 0.0, 0.0, 1.0);
+    }
+    unsafe {
+        var off:  int = img.pixel_byte_offset(x, y);
+        var base: int = ffi.ptr_add(img.pixels, off);
+        var r: float = ffi.load_f32(base);
+        var g: float = 0.0;
+        var b: float = 0.0;
+        var a: float = 1.0;
+        if (img.channels >= 2) { g = ffi.load_f32(ffi.ptr_add(base, 4)); }
+        if (img.channels >= 3) { b = ffi.load_f32(ffi.ptr_add(base, 8)); }
+        if (img.channels >= 4) { a = ffi.load_f32(ffi.ptr_add(base, 12)); }
+        return (r, g, b, a);
+    }
+}

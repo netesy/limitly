@@ -3,6 +3,7 @@
 #include "../vm_value.hh"
 #include "../vm_list.hh"
 #include "../../../lir/functions.hh"
+#include "../vm_string.hh"
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -64,6 +65,9 @@ namespace {
     const char* get_cstring_from_value(RegisterValue value) {
         if (!IS_PTR(value)) return nullptr;
         auto* header = static_cast<ObjHeader*>(UNBOX_PTR(value));
+        if (header->type_id == TYPE_STRING) {
+            return static_cast<const char*>(reinterpret_cast<LmStringHeader*>(header)->data);
+        }
         if (header->type_id == TYPE_BOX && static_cast<LmBox*>(static_cast<void*>(header))->type == LM_BOX_STRING) {
             return static_cast<const char*>(static_cast<LmBox*>(static_cast<void*>(header))->value.as_ptr);
         }
@@ -114,6 +118,10 @@ namespace {
         if (IS_PTR(val)) {
             auto* header = static_cast<ObjHeader*>(UNBOX_PTR(val));
             if (header->type_id == TYPE_FOREIGN_PTR) return ((ObjForeignPtr*)header)->ptr;
+            if (header->type_id == TYPE_FRAME) {
+                LmFrame* frame = reinterpret_cast<LmFrame*>(header);
+                if (frame->field_count > 0) return value_to_ptr(frame->fields[0]);
+            }
             return UNBOX_PTR(val);
         }
         if (is_integer(val)) return (void*)(uintptr_t)as_i64(val);
@@ -335,19 +343,62 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
     std::vector<LIR::Reg> arg_regs = pc->call_args;
     size_t arg_start = 0;
     if (pc->op == LIR::LIR_Op::ForeignCall) arg_start = 1;
-    size_t num_args = (arg_regs.size() > arg_start) ? (arg_regs.size() - arg_start) : 0;
-    
+    std::vector<RegisterValue> call_arg_values;
     std::vector<LIR::Type> resolved_arg_types;
-    for (size_t i = arg_start; i < arg_regs.size(); ++i) {
-        if (i < pc->call_arg_types.size() && pc->call_arg_types[i] != LIR::Type::Void) resolved_arg_types.push_back(pc->call_arg_types[i]);
-        else {
-            RegisterValue val = registers[arg_regs[i]];
-            if (is_float(val)) resolved_arg_types.push_back(LIR::Type::F64);
-            else if (IS_PTR(val)) resolved_arg_types.push_back(LIR::Type::Ptr);
-            else resolved_arg_types.push_back(LIR::Type::I64);
+
+    if (pc->func_name == "std.ffi.foreign_call" || pc->func_name == "ffi.foreign_call") {
+        if (pc->call_args.size() > 2) {
+            int64_t ret_id = to_int(registers[pc->call_args[2]]);
+            ffi_type_id_to_lir(ret_id, true, ret_type);
+        }
+
+        LmList* pt_list = nullptr;
+        if (pc->call_args.size() > 3) {
+            RegisterValue pt_val = registers[pc->call_args[3]];
+            if (IS_PTR(pt_val) && ((ObjHeader*)UNBOX_PTR(pt_val))->type_id == TYPE_LIST) {
+                pt_list = (LmList*)UNBOX_PTR(pt_val);
+            }
+        }
+
+        if (pc->call_args.size() > 1) {
+            RegisterValue args_val = registers[pc->call_args[1]];
+            if (IS_PTR(args_val) && ((ObjHeader*)UNBOX_PTR(args_val))->type_id == TYPE_LIST) {
+                LmList* args_list = (LmList*)UNBOX_PTR(args_val);
+                for (uint64_t i = 0; i < args_list->size; ++i) {
+                    RegisterValue val = args_list->data[i];
+                    call_arg_values.push_back(val);
+                    LIR::Type arg_t = LIR::Type::I64;
+                    bool got_type = false;
+                    if (pt_list && i < pt_list->size) {
+                        int64_t tid = to_int(pt_list->data[i]);
+                        got_type = ffi_type_id_to_lir(tid, false, arg_t);
+                    }
+                    if (!got_type) {
+                        if (is_float(val)) arg_t = LIR::Type::F64;
+                        else if (IS_PTR(val)) arg_t = LIR::Type::Ptr;
+                        else arg_t = LIR::Type::I64;
+                    }
+                    resolved_arg_types.push_back(arg_t);
+                }
+            }
+        }
+    } else {
+        size_t arg_start = 0;
+        if (pc->op == LIR::LIR_Op::ForeignCall) arg_start = 1;
+        for (size_t i = arg_start; i < arg_regs.size(); ++i) {
+            call_arg_values.push_back(registers[arg_regs[i]]);
+            if (i < pc->call_arg_types.size() && pc->call_arg_types[i] != LIR::Type::Void) {
+                resolved_arg_types.push_back(pc->call_arg_types[i]);
+            } else {
+                RegisterValue val = registers[arg_regs[i]];
+                if (is_float(val)) resolved_arg_types.push_back(LIR::Type::F64);
+                else if (IS_PTR(val)) resolved_arg_types.push_back(LIR::Type::Ptr);
+                else resolved_arg_types.push_back(LIR::Type::I64);
+            }
         }
     }
 
+    size_t num_args = call_arg_values.size();
     std::vector<ffi_type*> ffi_arg_types(num_args);
     std::vector<void*> ffi_arg_values(num_args);
     std::vector<uint64_t> arg_storage(num_args);
@@ -355,7 +406,7 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
     for (size_t i = 0; i < num_args; ++i) {
         LIR::Type type = resolved_arg_types[i];
         ffi_arg_types[i] = lir_type_to_ffi_type(type);
-        RegisterValue val = registers[arg_regs[i + arg_start]];
+        RegisterValue val = call_arg_values[i];
         switch (type) {
             case LIR::Type::I8:  { int8_t v = (int8_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
             case LIR::Type::U8:  { uint8_t v = (uint8_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
