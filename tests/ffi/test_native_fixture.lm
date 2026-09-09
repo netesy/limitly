@@ -12,7 +12,7 @@ pub fn main(): int {
     print("=== Native C Integration Test ===");
 
     unsafe {
-        var lib: ffi.Library = ffi.load("tests/ffi/libnative_fixture");
+        var lib: ffi.Library = ffi.load("tests/ffi/libnative_fixture.so");
         if (not lib.is_loaded) {
             print("ERROR: Failed to load libnative_fixture");
             return 1;
