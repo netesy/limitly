@@ -1,0 +1,65 @@
+// Real Native C Integration Test
+// Exercises scalar C calls, float calls, pointer mutation, string passing,
+// and callbacks through libnative_fixture.so
+
+import std.ffi;
+
+pub fn my_add(a: int, b: int): int {
+    return a + b;
+}
+
+pub fn main(): int {
+    print("=== Native C Integration Test ===");
+
+    unsafe {
+        var lib: ffi.Library = ffi.load("tests/ffi/libnative_fixture");
+        if (not lib.is_loaded) {
+            print("ERROR: Failed to load libnative_fixture");
+            return 1;
+        }
+        print("✓ Library loaded successfully");
+
+        // 1. Scalar C call (int32_t add_i32(int32_t, int32_t))
+        var sym_add: int = lib.symbol("add_i32");
+        var res_add: int = ffi.call_i64_2(sym_add, 15, 27);
+        print("add_i32(15, 27) = " + (res_add as str));
+        assert(res_add == 42, "add_i32 failed");
+
+        // 2. Float C call (double multiply_double(double, double))
+        var sym_mul: int = lib.symbol("multiply_double");
+        var res_mul: float = ffi.call_f64_2(sym_mul, 3.5, 2.0);
+        print("multiply_double(3.5, 2.0) = " + (res_mul as str));
+        assert(res_mul == 7.0, "multiply_double failed");
+
+        // 3. String passing (int32_t string_len(const char*))
+        var sym_slen: int = lib.symbol("string_len");
+        var cs: ffi.CString = ffi.string_to_cstring("Hello Limit FFI!");
+        var len_val: int = ffi.call_i64_1(sym_slen, ffi.cstring_as_ptr(cs));
+        print("string_len('Hello Limit FFI!') = " + (len_val as str));
+        assert(len_val == 16, "string_len failed");
+        ffi.cstring_free(cs);
+
+        // 4. Pointer mutation (void increment_i32(int32_t*))
+        var sym_inc: int = lib.symbol("increment_i32");
+        var ptr: int = ffi.alloc(8);
+        ffi.store_i32(ptr, 100);
+        ffi.call_void_1(sym_inc, ptr);
+        var mutated_val: int = ffi.load_i32(ptr);
+        print("increment_i32(100) = " + (mutated_val as str));
+        assert(mutated_val == 101, "increment_i32 failed");
+        ffi.free(ptr);
+
+        // 5. Native callback (int32_t invoke_callback(binary_op_fn, int32_t, int32_t))
+        var handle: int = ffi.callback_create("my_add", [ffi.TYPE_I64, ffi.TYPE_I64], ffi.TYPE_I64);
+        var cb_ptr: int = ffi.callback_ptr(handle);
+        var sym_inv: int = lib.symbol("invoke_callback");
+        var cb_res: int = ffi.call_i64_2(sym_inv, cb_ptr, 18, 24);
+        print("invoke_callback(my_add, 18, 24) = " + (cb_res as str));
+        assert(cb_res == 42, "invoke_callback failed");
+        ffi.callback_destroy(handle);
+
+        lib.close();
+    }
+    print("=== Native C Integration Test PASSED ===");
+    return 0;
+}

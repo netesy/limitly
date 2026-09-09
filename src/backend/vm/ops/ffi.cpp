@@ -4,6 +4,7 @@
 #include "../vm_list.hh"
 #include "../../../lir/functions.hh"
 #include "../vm_string.hh"
+#include "../../../runtime/limitrt/limitrt.h"
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -12,14 +13,7 @@
 #include <functional>
 #include <vector>
 #include <string>
-#include <ffi.h>
 #include <iostream>
-
-#ifdef _WIN32
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
 
 namespace LM {
 namespace Backend {
@@ -27,37 +21,16 @@ namespace VM {
 namespace Register {
 
 namespace {
-    std::mutex g_library_mutex;
-    std::unordered_map<uintptr_t, std::string> g_libraries;
-    std::mutex g_callback_mutex;
-    // Zero is reserved as the invalid native handle throughout std.ffi.
-    int64_t g_next_callback_id = 1;
     std::mutex g_callframe_mutex;
     std::unordered_map<uint64_t, std::vector<RegisterValue>> g_callframe_registers;
     std::unordered_map<uint64_t, std::vector<uint8_t>> g_callframe_stack;
     uint64_t g_next_callframe_id = 0;
 
-    // -----------------------------------------------------------------------
-    // Native trampoline infrastructure
-    // -----------------------------------------------------------------------
-
-    // Per-trampoline context: everything the dispatcher needs to re-enter the VM.
-    struct TrampolineContext {
-        RegisterVM*            vm;          // The VM that owns this callback
-        std::string            func_name;   // Limitly function name to invoke
-        std::vector<LIR::Type> arg_types;   // Native parameter types (from LIR)
-        LIR::Type              ret_type;    // Native return type  (from LIR)
-        ffi_cif                cif;         // Prepared call-interface (owned)
-        std::vector<ffi_type*> ffi_arg_ptrs;// Pointers into ffi_arg_types storage
-        ffi_closure*           closure;     // The executable closure page
-        void*                  code_ptr;    // Executable address inside the page
-        int64_t                id;          // Our callback ID
+    struct VmCallbackUserData {
+        RegisterVM* vm;
+        std::string func_name;
     };
 
-    // id -> TrampolineContext*   (heap-allocated, freed on CallbackDestroy)
-    std::unordered_map<int64_t, TrampolineContext*> g_callbacks;
-
-    // -----------------------------------------------------------------------
     LIR::Reg arg_reg(const LIR::LIR_Inst* pc, size_t index, LIR::Reg fallback) {
         return index < pc->call_args.size() ? pc->call_args[index] : fallback;
     }
@@ -74,41 +47,41 @@ namespace {
         return nullptr;
     }
 
-    ffi_type* lir_type_to_ffi_type(LIR::Type type) {
+    limitrt_type lir_type_to_limitrt_type(LIR::Type type) {
         switch (type) {
-            case LIR::Type::I8:   return &ffi_type_sint8;
-            case LIR::Type::U8:   return &ffi_type_uint8;
-            case LIR::Type::I16:  return &ffi_type_sint16;
-            case LIR::Type::U16:  return &ffi_type_uint16;
-            case LIR::Type::I32:  return &ffi_type_sint32;
-            case LIR::Type::U32:  return &ffi_type_uint32;
-            case LIR::Type::I64:  return &ffi_type_sint64;
-            case LIR::Type::U64:  return &ffi_type_uint64;
-            case LIR::Type::F32:  return &ffi_type_float;
-            case LIR::Type::F64:  return &ffi_type_double;
-            case LIR::Type::Bool: return &ffi_type_uint8;
-            case LIR::Type::Ptr:  return &ffi_type_pointer;
-            case LIR::Type::Void: return &ffi_type_void;
-            default:              return &ffi_type_void;
+            case LIR::Type::I8:   return LIMITRT_TYPE_I8;
+            case LIR::Type::U8:   return LIMITRT_TYPE_U8;
+            case LIR::Type::I16:  return LIMITRT_TYPE_I16;
+            case LIR::Type::U16:  return LIMITRT_TYPE_U16;
+            case LIR::Type::I32:  return LIMITRT_TYPE_I32;
+            case LIR::Type::U32:  return LIMITRT_TYPE_U32;
+            case LIR::Type::I64:  return LIMITRT_TYPE_I64;
+            case LIR::Type::U64:  return LIMITRT_TYPE_U64;
+            case LIR::Type::F32:  return LIMITRT_TYPE_F32;
+            case LIR::Type::F64:  return LIMITRT_TYPE_F64;
+            case LIR::Type::Bool: return LIMITRT_TYPE_U8;
+            case LIR::Type::Ptr:  return LIMITRT_TYPE_PTR;
+            case LIR::Type::Void: return LIMITRT_TYPE_VOID;
+            default:              return LIMITRT_TYPE_VOID;
         }
     }
 
-    bool ffi_type_id_to_lir(int64_t id, bool allow_void, LIR::Type& out) {
+    bool ffi_type_id_to_limitrt(int64_t id, bool allow_void, limitrt_type& out) {
         switch (id) {
-            case 0:  out = LIR::Type::I8;  return true;
-            case 1:  out = LIR::Type::U8;  return true;
-            case 2:  out = LIR::Type::I16; return true;
-            case 3:  out = LIR::Type::U16; return true;
-            case 4:  out = LIR::Type::I32; return true;
-            case 5:  out = LIR::Type::U32; return true;
-            case 6:  out = LIR::Type::I64; return true;
-            case 7:  out = LIR::Type::U64; return true;
-            case 8:  out = LIR::Type::F32; return true;
-            case 9:  out = LIR::Type::F64; return true;
-            case 10: // pointer
-            case 11: out = LIR::Type::Ptr; return true; // C string
+            case 0:  out = LIMITRT_TYPE_I8;  return true;
+            case 1:  out = LIMITRT_TYPE_U8;  return true;
+            case 2:  out = LIMITRT_TYPE_I16; return true;
+            case 3:  out = LIMITRT_TYPE_U16; return true;
+            case 4:  out = LIMITRT_TYPE_I32; return true;
+            case 5:  out = LIMITRT_TYPE_U32; return true;
+            case 6:  out = LIMITRT_TYPE_I64; return true;
+            case 7:  out = LIMITRT_TYPE_U64; return true;
+            case 8:  out = LIMITRT_TYPE_F32; return true;
+            case 9:  out = LIMITRT_TYPE_F64; return true;
+            case 10: out = LIMITRT_TYPE_PTR; return true;
+            case 11: out = LIMITRT_TYPE_CSTRING; return true;
             case 12:
-                if (allow_void) { out = LIR::Type::Void; return true; }
+                if (allow_void) { out = LIMITRT_TYPE_VOID; return true; }
                 return false;
             default: return false;
         }
@@ -128,94 +101,77 @@ namespace {
         return nullptr;
     }
 
-    // -----------------------------------------------------------------------
-    // Convert a raw C argument slot (void*) to a Limitly RegisterValue.
-    // `args[i]` from libffi is a pointer TO the argument, not the argument.
-    // -----------------------------------------------------------------------
-    RegisterValue ffi_arg_to_register(void* arg_slot, LIR::Type type) {
+    limitrt_value vm_val_to_limitrt_val(RegisterValue val, limitrt_type type) {
+        limitrt_value v;
+        std::memset(&v, 0, sizeof(v));
+        v.type = type;
         switch (type) {
-            case LIR::Type::I8:  { int8_t   v; std::memcpy(&v, arg_slot, sizeof(v)); return make_i64((int64_t)v); }
-            case LIR::Type::U8:  { uint8_t  v; std::memcpy(&v, arg_slot, sizeof(v)); return make_i64((int64_t)v); }
-            case LIR::Type::I16: { int16_t  v; std::memcpy(&v, arg_slot, sizeof(v)); return make_i64((int64_t)v); }
-            case LIR::Type::U16: { uint16_t v; std::memcpy(&v, arg_slot, sizeof(v)); return make_i64((int64_t)v); }
-            case LIR::Type::I32: { int32_t  v; std::memcpy(&v, arg_slot, sizeof(v)); return make_i64((int64_t)v); }
-            case LIR::Type::U32: { uint32_t v; std::memcpy(&v, arg_slot, sizeof(v)); return make_i64((int64_t)v); }
-            case LIR::Type::I64: { int64_t  v; std::memcpy(&v, arg_slot, sizeof(v)); return make_i64(v);           }
-            case LIR::Type::U64: { uint64_t v; std::memcpy(&v, arg_slot, sizeof(v)); return make_i64((int64_t)v); }
-            case LIR::Type::F32: { float    v; std::memcpy(&v, arg_slot, sizeof(v)); return make_float((double)v); }
-            case LIR::Type::F64: { double   v; std::memcpy(&v, arg_slot, sizeof(v)); return make_float(v);          }
-            case LIR::Type::Bool:{ uint8_t  v; std::memcpy(&v, arg_slot, sizeof(v)); return v ? VAL_TRUE : VAL_FALSE; }
-            case LIR::Type::Ptr: {
-                void* p; std::memcpy(&p, arg_slot, sizeof(p));
-                return lm_alloc_foreign_ptr(p);
-            }
-            default: return VAL_NIL;
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // Convert a Limitly RegisterValue to the native return slot expected by
-    // libffi.  `ret` points to the caller-allocated return buffer.
-    // -----------------------------------------------------------------------
-    void register_to_ffi_ret(RegisterValue rv, LIR::Type type, void* ret) {
-        switch (type) {
-            case LIR::Type::I8:  { int8_t   v = (int8_t)as_i64(rv);   std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::U8:  { uint8_t  v = (uint8_t)as_i64(rv);  std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::I16: { int16_t  v = (int16_t)as_i64(rv);  std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::U16: { uint16_t v = (uint16_t)as_i64(rv); std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::I32: { int32_t  v = (int32_t)as_i64(rv);  std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::U32: { uint32_t v = (uint32_t)as_i64(rv); std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::I64: { int64_t  v = as_i64(rv);           std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::U64: { uint64_t v = (uint64_t)as_i64(rv); std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::F32: { float    v = (float)as_float(rv);  std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::F64: { double   v = as_float(rv);         std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::Bool:{ uint8_t  v = IS_BOOL(rv) ? (UNBOX_BOOL(rv) ? 1 : 0) : (uint8_t)(as_i64(rv) != 0); std::memcpy(ret, &v, sizeof(v)); break; }
-            case LIR::Type::Ptr: {
-                void* p = value_to_ptr(rv);
-                std::memcpy(ret, &p, sizeof(p));
+            case LIMITRT_TYPE_I8:  v.val.i8 = (int8_t)as_i64(val); break;
+            case LIMITRT_TYPE_U8:  v.val.u8 = (uint8_t)as_i64(val); break;
+            case LIMITRT_TYPE_I16: v.val.i16 = (int16_t)as_i64(val); break;
+            case LIMITRT_TYPE_U16: v.val.u16 = (uint16_t)as_i64(val); break;
+            case LIMITRT_TYPE_I32: v.val.i32 = (int32_t)as_i64(val); break;
+            case LIMITRT_TYPE_U32: v.val.u32 = (uint32_t)as_i64(val); break;
+            case LIMITRT_TYPE_I64: v.val.i64 = as_i64(val); break;
+            case LIMITRT_TYPE_U64: v.val.u64 = (uint64_t)as_i64(val); break;
+            case LIMITRT_TYPE_F32: v.val.f32 = (float)as_float(val); break;
+            case LIMITRT_TYPE_F64: v.val.f64 = as_float(val); break;
+            case LIMITRT_TYPE_PTR:
+            case LIMITRT_TYPE_CSTRING: {
+                void* p = value_to_ptr(val);
+                const char* cstr = get_cstring_from_value(val);
+                if (cstr) p = (void*)cstr;
+                v.val.ptr = p;
                 break;
             }
-            case LIR::Type::Void:
-            default: break;  // nothing to write for void return
+            default: break;
+        }
+        return v;
+    }
+
+    RegisterValue limitrt_val_to_vm_val(const limitrt_value& v, limitrt_type type) {
+        switch (type) {
+            case LIMITRT_TYPE_I8:  return BOX_INT((int64_t)v.val.i8);
+            case LIMITRT_TYPE_U8:  return BOX_INT((int64_t)v.val.u8);
+            case LIMITRT_TYPE_I16: return BOX_INT((int64_t)v.val.i16);
+            case LIMITRT_TYPE_U16: return BOX_INT((int64_t)v.val.u16);
+            case LIMITRT_TYPE_I32: return BOX_INT((int64_t)v.val.i32);
+            case LIMITRT_TYPE_U32: return BOX_INT((int64_t)v.val.u32);
+            case LIMITRT_TYPE_I64: return BOX_INT(v.val.i64);
+            case LIMITRT_TYPE_U64: return BOX_INT((int64_t)v.val.u64);
+            case LIMITRT_TYPE_F32: return make_float((double)v.val.f32);
+            case LIMITRT_TYPE_F64: return make_float(v.val.f64);
+            case LIMITRT_TYPE_PTR:
+            case LIMITRT_TYPE_CSTRING:
+                return v.val.ptr ? lm_alloc_foreign_ptr(v.val.ptr) : VAL_NIL;
+            default:
+                return VAL_NIL;
         }
     }
 
-    // -----------------------------------------------------------------------
-    // Generic trampoline dispatcher — called by every ffi_closure.
-    // Signature matches what ffi_prep_closure_loc expects.
-    // -----------------------------------------------------------------------
-    static void trampoline_dispatcher(
-        ffi_cif*  /*cif*/,
-        void*      ret,
-        void**     args,
-        void*      user_data)
+    void vm_callback_trampoline_handler(
+        void* userdata,
+        const limitrt_value* args,
+        size_t num_args,
+        limitrt_value* out_result)
     {
-        TrampolineContext* ctx = static_cast<TrampolineContext*>(user_data);
-        RegisterVM* vm = ctx->vm;
+        auto* data = static_cast<VmCallbackUserData*>(userdata);
+        RegisterVM* vm = data->vm;
 
-        // Marshal raw C arguments to Limitly RegisterValues
-        std::vector<RegisterValue> arg_vals;
-        arg_vals.reserve(ctx->arg_types.size());
-        for (size_t i = 0; i < ctx->arg_types.size(); ++i)
-            arg_vals.push_back(ffi_arg_to_register(args[i], ctx->arg_types[i]));
+        std::vector<RegisterValue> vm_args;
+        vm_args.reserve(num_args);
+        for (size_t i = 0; i < num_args; ++i) {
+            vm_args.push_back(limitrt_val_to_vm_val(args[i], (limitrt_type)args[i].type));
+        }
 
-        // Re-enter VM through the public bridge (handles save/restore)
-        RegisterValue rv = vm->invoke_for_callback(ctx->func_name, arg_vals);
-
-        // Marshal return value back to native ABI
-        if (ret) register_to_ffi_ret(rv, ctx->ret_type, ret);
+        RegisterValue rv = vm->invoke_for_callback(data->func_name, vm_args);
+        if (out_result) {
+            *out_result = vm_val_to_limitrt_val(rv, (limitrt_type)out_result->type);
+        }
     }
 
 } // namespace (anonymous)
 
-// ---------------------------------------------------------------------------
-// RegisterVM::invoke_for_callback
-//
-// Public bridge called by the trampoline dispatcher.  Mirrors the save/restore
-// pattern used by the Call handler in vm_calls.cpp so the two paths remain
-// consistent.  On entry, `args` are already Limitly RegisterValues.
-// Returns whatever registers[0] held after the Limitly function returns.
-// ---------------------------------------------------------------------------
 RegisterValue RegisterVM::invoke_for_callback(
     const std::string& func_name,
     const std::vector<RegisterValue>& args)
@@ -227,21 +183,17 @@ RegisterValue RegisterVM::invoke_for_callback(
     }
     auto func = func_manager.getFunction(func_name);
 
-    // Pad arg list to expected parameter count
     std::vector<RegisterValue> arg_vals = args;
     size_t expected = func->getParameters().size();
     while (arg_vals.size() < expected) arg_vals.push_back(VAL_NIL);
 
-    // Save current VM execution state
     auto saved_registers              = registers;
     const LIR::LIR_Function* saved_func = current_function_;
 
-    // Set up fresh register file with arguments
     registers.assign(registers.size(), VAL_NIL);
     for (size_t i = 0; i < arg_vals.size() && i < registers.size(); ++i)
         registers[i] = arg_vals[i];
 
-    // Build a temporary LIR_Function wrapper (same pattern as vm_calls.cpp)
     LIR::LIR_Function temp_wrapper(func->getName(),
                                     static_cast<uint32_t>(arg_vals.size()));
     temp_wrapper.instructions            = func->getInstructions();
@@ -261,7 +213,6 @@ RegisterValue RegisterVM::invoke_for_callback(
 
     RegisterValue return_value = registers[0];
 
-    // Restore caller's VM state
     registers        = saved_registers;
     current_function_ = saved_func;
 
@@ -272,17 +223,10 @@ void RegisterVM::execute_extern_library_load(const LIR::LIR_Inst* pc) {
     LIR::Reg path_reg = arg_reg(pc, 0, pc->a);
     const char* path = get_cstring_from_value(registers[path_reg]);
     if (!path) { registers[pc->dst] = VAL_NIL; return; }
-    #ifdef _WIN32
-    void* handle = static_cast<void*>(LoadLibraryA(path));
-    #else
-    void* handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL);
-    #endif
+    void* handle = limitrt_library_open(path);
     if (!handle) { registers[pc->dst] = VAL_NIL; return; }
-    std::lock_guard<std::mutex> lock(g_library_mutex);
-    g_libraries[reinterpret_cast<uintptr_t>(handle)] = path;
     RegisterValue val = lm_alloc_foreign_ptr(handle);
     registers[pc->dst] = val;
-    // Register allocation with current active region
     if (IS_PTR(val) && !vm_region_stack.empty()) {
         uintptr_t ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
         vm_allocation_regions[ptr] = active_region_id;
@@ -292,18 +236,7 @@ void RegisterVM::execute_extern_library_load(const LIR::LIR_Inst* pc) {
 void RegisterVM::execute_extern_library_unload(const LIR::LIR_Inst* pc) {
     void* handle = value_to_ptr(registers[pc->a]);
     if (handle) {
-        {
-            std::lock_guard<std::mutex> lock(g_library_mutex);
-            auto it = g_libraries.find(reinterpret_cast<uintptr_t>(handle));
-            if (it == g_libraries.end()) return;
-            // Remove before unloading so concurrent resolve/unload attempts fail.
-            g_libraries.erase(it);
-        }
-        #ifdef _WIN32
-        FreeLibrary(static_cast<HMODULE>(handle));
-        #else
-        dlclose(handle);
-        #endif
+        limitrt_library_close(handle);
     }
 }
 
@@ -314,20 +247,9 @@ void RegisterVM::execute_extern_library_get_symbol(const LIR::LIR_Inst* pc) {
     if (!handle) { registers[pc->dst] = VAL_NIL; return; }
     const char* symbol = get_cstring_from_value(registers[symbol_reg]);
     if (!symbol) { registers[pc->dst] = VAL_NIL; return; }
-    // Keep the handle alive across symbol lookup; unload uses the same mutex.
-    std::lock_guard<std::mutex> lock(g_library_mutex);
-    if (g_libraries.find(reinterpret_cast<uintptr_t>(handle)) == g_libraries.end()) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    #ifdef _WIN32
-    void* ptr = reinterpret_cast<void*>(GetProcAddress(static_cast<HMODULE>(handle), symbol));
-    #else
-    void* ptr = dlsym(handle, symbol);
-    #endif
+    void* ptr = limitrt_symbol_lookup(handle, symbol);
     RegisterValue val = ptr ? lm_alloc_foreign_ptr(ptr) : VAL_NIL;
     registers[pc->dst] = val;
-    // Register allocation with current active region
     if (IS_PTR(val) && !vm_region_stack.empty()) {
         uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
         vm_allocation_regions[ptr_val] = active_region_id;
@@ -338,18 +260,16 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
     RegisterValue func_ptr_val = registers[arg_reg(pc, 0, pc->a)];
     void* func_ptr = value_to_ptr(func_ptr_val);
     if (!func_ptr) { registers[pc->dst] = VAL_NIL; return; }
-    
-    LIR::Type ret_type = pc->result_type;
+
+    limitrt_type ret_type = lir_type_to_limitrt_type(pc->result_type);
     std::vector<LIR::Reg> arg_regs = pc->call_args;
-    size_t arg_start = 0;
-    if (pc->op == LIR::LIR_Op::ForeignCall) arg_start = 1;
     std::vector<RegisterValue> call_arg_values;
-    std::vector<LIR::Type> resolved_arg_types;
+    std::vector<limitrt_type> resolved_arg_types;
 
     if (pc->func_name == "std.ffi.foreign_call" || pc->func_name == "ffi.foreign_call") {
         if (pc->call_args.size() > 2) {
-            int64_t ret_id = to_int(registers[pc->call_args[2]]);
-            ffi_type_id_to_lir(ret_id, true, ret_type);
+            int64_t ret_id = as_i64(registers[pc->call_args[2]]);
+            ffi_type_id_to_limitrt(ret_id, true, ret_type);
         }
 
         LmList* pt_list = nullptr;
@@ -367,16 +287,16 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
                 for (uint64_t i = 0; i < args_list->size; ++i) {
                     RegisterValue val = args_list->data[i];
                     call_arg_values.push_back(val);
-                    LIR::Type arg_t = LIR::Type::I64;
+                    limitrt_type arg_t = LIMITRT_TYPE_I64;
                     bool got_type = false;
                     if (pt_list && i < pt_list->size) {
-                        int64_t tid = to_int(pt_list->data[i]);
-                        got_type = ffi_type_id_to_lir(tid, false, arg_t);
+                        int64_t tid = as_i64(pt_list->data[i]);
+                        got_type = ffi_type_id_to_limitrt(tid, false, arg_t);
                     }
                     if (!got_type) {
-                        if (is_float(val)) arg_t = LIR::Type::F64;
-                        else if (IS_PTR(val)) arg_t = LIR::Type::Ptr;
-                        else arg_t = LIR::Type::I64;
+                        if (is_float(val)) arg_t = LIMITRT_TYPE_F64;
+                        else if (IS_PTR(val)) arg_t = LIMITRT_TYPE_PTR;
+                        else arg_t = LIMITRT_TYPE_I64;
                     }
                     resolved_arg_types.push_back(arg_t);
                 }
@@ -388,110 +308,48 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
         for (size_t i = arg_start; i < arg_regs.size(); ++i) {
             call_arg_values.push_back(registers[arg_regs[i]]);
             if (i < pc->call_arg_types.size() && pc->call_arg_types[i] != LIR::Type::Void) {
-                resolved_arg_types.push_back(pc->call_arg_types[i]);
+                resolved_arg_types.push_back(lir_type_to_limitrt_type(pc->call_arg_types[i]));
             } else {
                 RegisterValue val = registers[arg_regs[i]];
-                if (is_float(val)) resolved_arg_types.push_back(LIR::Type::F64);
-                else if (IS_PTR(val)) resolved_arg_types.push_back(LIR::Type::Ptr);
-                else resolved_arg_types.push_back(LIR::Type::I64);
+                if (is_float(val)) resolved_arg_types.push_back(LIMITRT_TYPE_F64);
+                else if (IS_PTR(val)) resolved_arg_types.push_back(LIMITRT_TYPE_PTR);
+                else resolved_arg_types.push_back(LIMITRT_TYPE_I64);
             }
         }
     }
 
     size_t num_args = call_arg_values.size();
-    std::vector<ffi_type*> ffi_arg_types(num_args);
-    std::vector<void*> ffi_arg_values(num_args);
-    std::vector<uint64_t> arg_storage(num_args);
-
+    std::vector<limitrt_value> limitrt_args(num_args);
     for (size_t i = 0; i < num_args; ++i) {
-        LIR::Type type = resolved_arg_types[i];
-        ffi_arg_types[i] = lir_type_to_ffi_type(type);
-        RegisterValue val = call_arg_values[i];
-        switch (type) {
-            case LIR::Type::I8:  { int8_t v = (int8_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::U8:  { uint8_t v = (uint8_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::I16: { int16_t v = (int16_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::U16: { uint16_t v = (uint16_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::I32: { int32_t v = (int32_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::U32: { uint32_t v = (uint32_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::I64: { int64_t v = to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::U64: { uint64_t v = (uint64_t)to_int(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::F32: { float v = (float)to_float(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::F64: { double v = to_float(val); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::Bool: { uint8_t v = (uint8_t)(to_int(val) != 0); std::memcpy(&arg_storage[i], &v, sizeof(v)); break; }
-            case LIR::Type::Ptr: {
-                void* p = value_to_ptr(val);
-                const char* cstr = get_cstring_from_value(val);
-                if (cstr) p = (void*)cstr;
-                std::memcpy(&arg_storage[i], &p, sizeof(p));
-                break;
-            }
-            default: arg_storage[i] = 0; break;
-        }
-        ffi_arg_values[i] = &arg_storage[i];
+        limitrt_args[i] = vm_val_to_limitrt_val(call_arg_values[i], resolved_arg_types[i]);
     }
-    
-    ffi_cif cif;
-    ffi_type* ffi_ret_type = lir_type_to_ffi_type(ret_type);
-    if (ffi_prep_cif(&cif, FFI_DEFAULT_ABI, num_args, ffi_ret_type, ffi_arg_types.data()) == FFI_OK) {
-        uint64_t result_storage = 0;
-        ffi_call(&cif, FFI_FN(func_ptr), &result_storage, ffi_arg_values.data());
-        switch (ret_type) {
-            case LIR::Type::I8:  { int8_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
-            case LIR::Type::U8:  { uint8_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
-            case LIR::Type::I16: { int16_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
-            case LIR::Type::U16: { uint16_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
-            case LIR::Type::I32: { int32_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
-            case LIR::Type::U32: { uint32_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
-            case LIR::Type::I64: { int64_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT(v); break; }
-            case LIR::Type::U64: { uint64_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = BOX_INT((int64_t)v); break; }
-            case LIR::Type::F32: { float v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = make_float((double)v); break; }
-            case LIR::Type::F64: { double v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = make_float(v); break; }
-            case LIR::Type::Bool: { uint8_t v; std::memcpy(&v, &result_storage, sizeof(v)); registers[pc->dst] = v ? VAL_TRUE : VAL_FALSE; break; }
-            case LIR::Type::Ptr:  {
-                void* p; std::memcpy(&p, &result_storage, sizeof(p));
-                RegisterValue val = p ? lm_alloc_foreign_ptr(p) : VAL_NIL;
-                registers[pc->dst] = val;
-                // Register allocation with current active region
-                if (IS_PTR(val) && !vm_region_stack.empty()) {
-                    uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-                    vm_allocation_regions[ptr_val] = active_region_id;
-                }
-                break;
-            }
-            default: registers[pc->dst] = VAL_NIL; break;
+
+    limitrt_value out_res;
+    std::memset(&out_res, 0, sizeof(out_res));
+    if (limitrt_ffi_call(func_ptr, ret_type, resolved_arg_types.data(), limitrt_args.data(), num_args, &out_res)) {
+        RegisterValue val = limitrt_val_to_vm_val(out_res, ret_type);
+        registers[pc->dst] = val;
+        if (IS_PTR(val) && !vm_region_stack.empty()) {
+            uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+            vm_allocation_regions[ptr_val] = active_region_id;
         }
-    } else registers[pc->dst] = VAL_NIL;
+    } else {
+        registers[pc->dst] = VAL_NIL;
+    }
 }
 
-// ---------------------------------------------------------------------------
-// CallbackCreate -- allocate a genuine native trampoline via libffi closures.
-//
-// Called as:  ffi.callback_create(func_name: str,
-//                                  arg_types: [int],
-//                                  ret_type:  int): int
-//
-// The LIR instruction's call_args hold the three argument registers:
-//   call_args[0] : register containing the Limitly function name (str)
-//   call_args[1] : register containing the arg-type list ([int])
-//   call_args[2] : register containing the return-type integer (int)
-//
-// Returns an integer handle (callback ID) that identifies the trampoline.
-// ---------------------------------------------------------------------------
 void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
     if (pc->call_args.size() != 3) {
         std::cerr << "[ffi] callback_create: expected name, argument types, and return type\n";
         registers[pc->dst] = VAL_NIL;
         return;
     }
-    // ── Step 1: Read the Limitly function name from call_args[0] ──────────
     std::string limitly_func_name;
     if (!pc->call_args.empty()) {
         const char* cstr = get_cstring_from_value(registers[pc->call_args[0]]);
         if (cstr) {
             limitly_func_name = cstr;
         } else {
-            // Try plain string value
             RegisterValue nv = registers[pc->call_args[0]];
             if (IS_PTR(nv)) {
                 auto* h = static_cast<ObjHeader*>(UNBOX_PTR(nv));
@@ -513,9 +371,7 @@ void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
         return;
     }
 
-    // ── Step 2: Read the arg-type list from call_args[1] ─────────────────
-    // Each element is a TYPE_* integer constant (e.g., TYPE_I64 == 6).
-    std::vector<LIR::Type> arg_types;
+    std::vector<limitrt_type> arg_types;
     bool valid_arg_list = false;
     if (pc->call_args.size() >= 2) {
         RegisterValue list_val = registers[pc->call_args[1]];
@@ -533,8 +389,8 @@ void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
                 arg_types.reserve(count);
                 for (uint64_t i = 0; i < count; ++i) {
                     int64_t type_id = as_i64(lm_list_get(lst, i));
-                    LIR::Type type;
-                    if (!ffi_type_id_to_lir(type_id, false, type)) {
+                    limitrt_type type;
+                    if (!ffi_type_id_to_limitrt(type_id, false, type)) {
                         std::cerr << "[ffi] callback_create: invalid argument type id "
                                   << type_id << " at index " << i << '\n';
                         registers[pc->dst] = VAL_NIL;
@@ -559,110 +415,45 @@ void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
         return;
     }
 
-    // ── Step 3: Read the return-type integer from call_args[2] ───────────
-    LIR::Type ret_type;
+    limitrt_type ret_type;
     int64_t rid = as_i64(registers[pc->call_args[2]]);
-    if (!ffi_type_id_to_lir(rid, true, ret_type)) {
+    if (!ffi_type_id_to_limitrt(rid, true, ret_type)) {
         std::cerr << "[ffi] callback_create: invalid return type id " << rid << '\n';
         registers[pc->dst] = VAL_NIL;
         return;
     }
-    // ── Step 4: Assign a stable callback ID ──────────────────────────────
-    int64_t id;
-    {
-        std::lock_guard<std::mutex> lock(g_callback_mutex);
-        id = g_next_callback_id++;
-    }
 
-    // Build the ffi_type* vectors (must outlive ffi_prep_cif — stored in ctx)
-    auto* ctx = new TrampolineContext();
-    ctx->vm        = this;
-    ctx->func_name = limitly_func_name;  // runtime function name from call arg
-    ctx->arg_types = arg_types;
-    ctx->ret_type  = ret_type;
-    ctx->id        = id;
+    VmCallbackUserData* udata = new VmCallbackUserData{this, limitly_func_name};
+    int64_t id = limitrt_callback_create(
+        vm_callback_trampoline_handler,
+        udata,
+        arg_types.data(),
+        arg_types.size(),
+        ret_type
+    );
 
-    ctx->ffi_arg_ptrs.reserve(arg_types.size());
-    for (auto t : arg_types)
-        ctx->ffi_arg_ptrs.push_back(lir_type_to_ffi_type(t));
-
-    ffi_type* ffi_ret = lir_type_to_ffi_type(ret_type);
-    ffi_status status = ffi_prep_cif(
-        &ctx->cif,
-        FFI_DEFAULT_ABI,
-        static_cast<unsigned>(ctx->ffi_arg_ptrs.size()),
-        ffi_ret,
-        ctx->ffi_arg_ptrs.empty() ? nullptr : ctx->ffi_arg_ptrs.data());
-
-    if (status != FFI_OK) {
-        std::cerr << "[ffi] ffi_prep_cif failed (status=" << status
-                  << ") for callback '" << limitly_func_name << "'\n";
-        delete ctx;
+    if (id <= 0) {
+        delete udata;
         registers[pc->dst] = VAL_NIL;
         return;
-    }
-
-    // Allocate an executable closure page
-    ctx->closure  = static_cast<ffi_closure*>(ffi_closure_alloc(sizeof(ffi_closure), &ctx->code_ptr));
-    if (!ctx->closure) {
-        std::cerr << "[ffi] ffi_closure_alloc failed for callback '" << limitly_func_name << "'\n";
-        delete ctx;
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-
-    status = ffi_prep_closure_loc(
-        ctx->closure,
-        &ctx->cif,
-        trampoline_dispatcher,
-        ctx,
-        ctx->code_ptr);
-
-    if (status != FFI_OK) {
-        std::cerr << "[ffi] ffi_prep_closure_loc failed (status=" << status
-                  << ") for callback '" << limitly_func_name << "'\n";
-        ffi_closure_free(ctx->closure);
-        delete ctx;
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-
-    // Register the context
-    {
-        std::lock_guard<std::mutex> lock(g_callback_mutex);
-        g_callbacks[id] = ctx;
     }
     registers[pc->dst] = BOX_INT(id);
 }
 
-// ---------------------------------------------------------------------------
-// CallbackDestroy — release the libffi closure and its context.
-// ---------------------------------------------------------------------------
 void RegisterVM::execute_extern_unregister_callback(const LIR::LIR_Inst* pc) {
-    int64_t id = to_int(registers[pc->a]);
-    std::lock_guard<std::mutex> lock(g_callback_mutex);
-    auto it = g_callbacks.find(id);
-    if (it != g_callbacks.end()) {
-        TrampolineContext* ctx = it->second;
-        ffi_closure_free(ctx->closure); // releases the executable page
-        delete ctx;
-        g_callbacks.erase(it);
+    int64_t id = as_i64(registers[pc->a]);
+    void* udata = limitrt_callback_get_userdata(id);
+    if (udata) {
+        delete static_cast<VmCallbackUserData*>(udata);
     }
+    limitrt_callback_destroy(id);
 }
 
-// ---------------------------------------------------------------------------
-// execute_extern_get_callback_ptr — return the executable code pointer
-// (i.e. the real C-callable address) for a previously created trampoline.
-// This is the address you pass to RegisterClassEx, SetWindowsHookEx, etc.
-// ---------------------------------------------------------------------------
 void RegisterVM::execute_extern_get_callback_ptr(const LIR::LIR_Inst* pc) {
-    int64_t id = to_int(registers[pc->a]);
-    std::lock_guard<std::mutex> lock(g_callback_mutex);
-    auto it = g_callbacks.find(id);
-    if (it != g_callbacks.end()) {
-        TrampolineContext* ctx = it->second;
-        // code_ptr is the executable entry point — box it as a foreign pointer
-        RegisterValue val = lm_alloc_foreign_ptr(ctx->code_ptr);
+    int64_t id = as_i64(registers[pc->a]);
+    void* code_ptr = limitrt_callback_get_ptr(id);
+    if (code_ptr) {
+        RegisterValue val = lm_alloc_foreign_ptr(code_ptr);
         registers[pc->dst] = val;
         if (IS_PTR(val) && !vm_region_stack.empty()) {
             uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
@@ -674,7 +465,7 @@ void RegisterVM::execute_extern_get_callback_ptr(const LIR::LIR_Inst* pc) {
 }
 
 void RegisterVM::execute_extern_ccall_frame_create(const LIR::LIR_Inst* pc) {
-    int64_t rc = to_int(registers[pc->a]); int64_t ss = to_int(registers[pc->b]);
+    int64_t rc = as_i64(registers[pc->a]); int64_t ss = as_i64(registers[pc->b]);
     if (rc < 0 || ss < 0) { registers[pc->dst] = VAL_NIL; return; }
     std::lock_guard<std::mutex> lock(g_callframe_mutex);
     uint64_t id = g_next_callframe_id++;
@@ -683,32 +474,32 @@ void RegisterVM::execute_extern_ccall_frame_create(const LIR::LIR_Inst* pc) {
     registers[pc->dst] = BOX_INT(static_cast<int64_t>(id));
 }
 void RegisterVM::execute_extern_ccall_frame_destroy(const LIR::LIR_Inst* pc) {
-    int64_t id = to_int(registers[pc->a]);
+    int64_t id = as_i64(registers[pc->a]);
     std::lock_guard<std::mutex> lock(g_callframe_mutex);
     g_callframe_registers.erase(id); g_callframe_stack.erase(id);
 }
 void RegisterVM::execute_extern_ccall_frame_set_reg(const LIR::LIR_Inst* pc) {
-    int64_t id = to_int(registers[pc->dst]); int64_t idx = to_int(registers[pc->a]);
+    int64_t id = as_i64(registers[pc->dst]); int64_t idx = as_i64(registers[pc->a]);
     RegisterValue val = registers[pc->b];
     std::lock_guard<std::mutex> lock(g_callframe_mutex);
     auto it = g_callframe_registers.find(id);
     if (it != g_callframe_registers.end() && idx >= 0 && idx < (int64_t)it->second.size()) it->second[idx] = val;
 }
 void RegisterVM::execute_extern_ccall_frame_get_reg(const LIR::LIR_Inst* pc) {
-    int64_t id = to_int(registers[pc->a]); int64_t idx = to_int(registers[pc->b]);
+    int64_t id = as_i64(registers[pc->a]); int64_t idx = as_i64(registers[pc->b]);
     std::lock_guard<std::mutex> lock(g_callframe_mutex);
     auto it = g_callframe_registers.find(id);
     if (it != g_callframe_registers.end() && idx >= 0 && idx < (int64_t)it->second.size()) registers[pc->dst] = it->second[idx];
     else registers[pc->dst] = VAL_NIL;
 }
 void RegisterVM::execute_extern_ccall_frame_set_stack_arg(const LIR::LIR_Inst* pc) {
-    int64_t id = to_int(registers[pc->dst]); int64_t off = to_int(registers[pc->a]); int64_t val = to_int(registers[pc->b]);
+    int64_t id = as_i64(registers[pc->dst]); int64_t off = as_i64(registers[pc->a]); int64_t val = as_i64(registers[pc->b]);
     std::lock_guard<std::mutex> lock(g_callframe_mutex);
     auto it = g_callframe_stack.find(id);
     if (it != g_callframe_stack.end() && off >= 0 && off + 8 <= (int64_t)it->second.size()) std::memcpy(&it->second[off], &val, 8);
 }
 void RegisterVM::execute_extern_ccall_frame_get_stack_arg(const LIR::LIR_Inst* pc) {
-    int64_t id = to_int(registers[pc->a]); int64_t off = to_int(registers[pc->b]);
+    int64_t id = as_i64(registers[pc->a]); int64_t off = as_i64(registers[pc->b]);
     std::lock_guard<std::mutex> lock(g_callframe_mutex);
     auto it = g_callframe_stack.find(id);
     if (it != g_callframe_stack.end() && off >= 0 && off + 8 <= (int64_t)it->second.size()) {
@@ -728,8 +519,6 @@ void RegisterVM::execute_ffi(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::ForeignCall:
         case LIR::LIR_Op::ForeignCallDirect: execute_extern_call_function(pc); break;
         case LIR::LIR_Op::CallbackCreate:
-            // imm == 0: create trampoline (returns int handle)
-            // imm == 1: get executable code pointer (returns fnptr)
             if (pc->imm == 1) execute_extern_get_callback_ptr(pc);
             else              execute_extern_register_callback(pc);
             break;
