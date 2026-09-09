@@ -1,0 +1,23 @@
+// std/image/jpg.lm
+// JPEG-specific load/save API.
+
+import std.ffi as ffi;
+import std.image.index as image;
+
+pub var DEFAULT_QUALITY: int = 90;
+
+pub fn load(path: str): image.Image? {
+    return image.load(path);
+}
+
+pub fn load_as(path: str, channels: int): image.Image? {
+    return image.load_forced(path, channels);
+}
+
+pub fn save(img: image.Image, path: str, quality: int = 90): bool? {
+    return image.save_jpg(img, path, quality);
+}
+
+pub fn save_default(img: image.Image, path: str): bool? {
+    return save(img, path, DEFAULT_QUALITY);
+}

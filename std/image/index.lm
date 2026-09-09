@@ -1,0 +1,891 @@
+// std/image/index.lm
+//
+// Core image types, fluent manipulation, shared lifecycle, and pixel access.
+// Sub-modules (png, jpg, bmp, tga, hdr) import this module.
+
+import std.ffi as ffi;
+
+// ── Channel count constants ───────────────────────────────────────────────
+pub var CHANNELS_GREY:       int = 1;
+pub var CHANNELS_GREY_ALPHA: int = 2;
+pub var CHANNELS_RGB:        int = 3;
+pub var CHANNELS_RGBA:       int = 4;
+
+// ── Pixel value frame ─────────────────────────────────────────────────────
+frame Pixel {
+    pub var r: int;
+    pub var g: int;
+    pub var b: int;
+    pub var a: int;
+
+    pub init(r: int = 0, g: int = 0, b: int = 0, a: int = 255) {
+        self.r = r; self.g = g; self.b = b; self.a = a;
+    }
+
+    pub fn with_alpha(new_a: int): Pixel {
+        return Pixel(r=self.r, g=self.g, b=self.b, a=new_a);
+    }
+}
+
+// ── Semantic Color Constructors & Palettes (Fluent style matching std.ui) ──
+pub fn rgb(r: int, g: int, b: int): Pixel {
+    return Pixel(r=r, g=g, b=b, a=255);
+}
+
+pub fn rgba(r: int, g: int, b: int, a: int): Pixel {
+    return Pixel(r=r, g=g, b=b, a=a);
+}
+
+pub fn color_rgb(r: float, g: float, b: float): Pixel {
+    var ri: int = (r * 255.0) as int; if (ri < 0) ri = 0; if (ri > 255) ri = 255;
+    var gi: int = (g * 255.0) as int; if (gi < 0) gi = 0; if (gi > 255) gi = 255;
+    var bi: int = (b * 255.0) as int; if (bi < 0) bi = 0; if (bi > 255) bi = 255;
+    return Pixel(r=ri, g=gi, b=bi, a=255);
+}
+
+pub fn color_rgba(r: float, g: float, b: float, a: float): Pixel {
+    var ri: int = (r * 255.0) as int; if (ri < 0) ri = 0; if (ri > 255) ri = 255;
+    var gi: int = (g * 255.0) as int; if (gi < 0) gi = 0; if (gi > 255) gi = 255;
+    var bi: int = (b * 255.0) as int; if (bi < 0) bi = 0; if (bi > 255) bi = 255;
+    var ai: int = (a * 255.0) as int; if (ai < 0) ai = 0; if (ai > 255) ai = 255;
+    return Pixel(r=ri, g=gi, b=bi, a=ai);
+}
+
+pub fn color_rgb8(r: int, g: int, b: int): Pixel {
+    return rgb(r, g, b);
+}
+
+pub var white:       Pixel = Pixel(r=255, g=255, b=255, a=255);
+pub var black:       Pixel = Pixel(r=0,   g=0,   b=0,   a=255);
+pub var red:         Pixel = Pixel(r=230, g=50,  b=50,  a=255);
+pub var green:       Pixel = Pixel(r=50,  g=200, b=75,  a=255);
+pub var blue:        Pixel = Pixel(r=50,  g=150, b=240, a=255);
+pub var indigo:      Pixel = Pixel(r=90,  g=90,  b=230, a=255);
+pub var yellow:      Pixel = Pixel(r=240, g=205, b=40,  a=255);
+pub var cyan:        Pixel = Pixel(r=40,  g=210, b=240, a=255);
+pub var magenta:     Pixel = Pixel(r=220, g=50,  b=220, a=255);
+pub var gray:        Pixel = Pixel(r=140, g=140, b=140, a=255);
+pub var dark_gray:   Pixel = Pixel(r=40,  g=40,  b=45,  a=255);
+pub var light_gray:  Pixel = Pixel(r=215, g=215, b=220, a=255);
+pub var transparent: Pixel = Pixel(r=0,   g=0,   b=0,   a=0);
+
+// ── Image metadata frame ──────────────────────────────────────────────────
+frame ImageInfo {
+    pub var width:    int;
+    pub var height:   int;
+    pub var channels: int;
+
+    pub init(w: int = 0, h: int = 0, c: int = 0) {
+        self.width = w; self.height = h; self.channels = c;
+    }
+}
+
+// ── Internal: shared library path & cross-platform loader ───────────────────
+pub var _LIB_PATH: str = "";
+
+pub fn _open_lib(): int {
+    unsafe {
+        // 1. If explicit user path was configured, try it first
+        if (_LIB_PATH != "") {
+            var h: int = ffi.library_load(_LIB_PATH);
+            if (h != 0 and h != nil) {
+                return h;
+            }
+        }
+
+        // 2. Candidate paths beside the limitly executable in bin/ and standard paths
+        //    across all OS targets (Windows: .dll, Linux / Android: .so, macOS: .dylib)
+        var candidates: [str] = [
+            "bin/libstb_image.dll",
+            "bin/libstb_image.so",
+            "bin/libstb_image.dylib",
+            "./bin/libstb_image.dll",
+            "./bin/libstb_image.so",
+            "./bin/libstb_image.dylib",
+            "libstb_image.dll",
+            "libstb_image.so",
+            "libstb_image.dylib",
+            "std/image/libstb_image.dll",
+            "std/image/libstb_image.so",
+            "std/image/libstb_image.dylib",
+            "tests/ffi/libstb_image.dll",
+            "tests/ffi/libstb_image.so",
+            "tests/ffi/libstb_image.dylib"
+        ];
+
+        var i: int = 0;
+        var count: int = len(candidates);
+        while (i < count) {
+            var c: str = candidates[i];
+            var h2: int = ffi.library_load(c);
+            if (h2 != 0 and h2 != nil) {
+                _LIB_PATH = c;
+                return h2;
+            }
+            i = i + 1;
+        }
+
+        return 0;
+    }
+}
+
+// ── Image frame (with Fluent chaining modifiers) ──────────────────────────
+
+frame Image {
+    pub var width:    int;
+    pub var height:   int;
+    pub var channels: int;
+    pub var pixels:   int;   // raw u8 pixel buffer pointer (pubptr = int)
+    pub var is_hdr:   bool;
+    pub var _lib:     int;   // library handle
+
+    pub init(w: int = 0, h: int = 0, c: int = 4,
+             p: int = 0, lib: int = 0) {
+        self.width    = w;
+        self.height   = h;
+        self.channels = c;
+        self.pixels   = p;
+        self.is_hdr   = false;
+        self._lib     = lib;
+    }
+
+    pub fn pixel_offset(x: int, y: int): int {
+        return (y * self.width + x) * self.channels;
+    }
+
+    pub fn byte_size(): int {
+        return self.width * self.height * self.channels;
+    }
+
+    pub fn is_valid(): bool {
+        return self.pixels != nil and self.width > 0 and self.height > 0;
+    }
+
+    // ── Fluent Pixel Access ───────────────────────────────────────────────
+
+    pub fn get(x: int, y: int): Pixel {
+        return get_pixel(self, x, y);
+    }
+
+    pub fn set(x: int, y: int, px: Pixel): Image {
+        set_pixel(self, x, y, px.r, px.g, px.b, px.a);
+        return self;
+    }
+
+    pub fn set_rgba(x: int, y: int, r: int, g: int, b: int, a: int = 255): Image {
+        set_pixel(self, x, y, r, g, b, a);
+        return self;
+    }
+
+    // ── Fluent Canvas & Drawing Modifiers ─────────────────────────────────
+
+    pub fn fill(color: Pixel): Image {
+        fill(self, color.r, color.g, color.b, color.a);
+        return self;
+    }
+
+    pub fn fill_rgb(r: int, g: int, b: int): Image {
+        fill(self, r, g, b, 255);
+        return self;
+    }
+
+    pub fn fill_rgba(r: int, g: int, b: int, a: int): Image {
+        fill(self, r, g, b, a);
+        return self;
+    }
+
+    pub fn clear(color: Pixel): Image {
+        return self.fill(color);
+    }
+
+    pub fn fill_rect(x: int, y: int, w: int, h: int, color: Pixel): Image {
+        fill_rect(self, x, y, w, h, color);
+        return self;
+    }
+
+    pub fn rect(x: int, y: int, w: int, h: int, color: Pixel): Image {
+        return self.fill_rect(x, y, w, h, color);
+    }
+
+    pub fn line(x0: int, y0: int, x1: int, y1: int, color: Pixel): Image {
+        draw_line(self, x0, y0, x1, y1, color);
+        return self;
+    }
+
+    pub fn blit(src: Image, dst_x: int, dst_y: int): Image {
+        blit(self, src, dst_x, dst_y);
+        return self;
+    }
+
+    pub fn blend_blit(src: Image, dst_x: int, dst_y: int): Image {
+        blend_blit(self, src, dst_x, dst_y);
+        return self;
+    }
+
+    // ── Fluent In-place Transforms ────────────────────────────────────────
+
+    pub fn flip_v(): Image {
+        flip_vertical(self);
+        return self;
+    }
+
+    pub fn flip_h(): Image {
+        flip_horizontal(self);
+        return self;
+    }
+
+    pub fn flip_vertical(): Image {
+        flip_vertical(self);
+        return self;
+    }
+
+    pub fn flip_horizontal(): Image {
+        flip_horizontal(self);
+        return self;
+    }
+
+    // ── Fluent Out-of-place Transforms ────────────────────────────────────
+
+    pub fn clone(): Image? {
+        return clone(self);
+    }
+
+    pub fn resize(new_w: int, new_h: int): Image? {
+        return resize(self, new_w, new_h);
+    }
+
+    pub fn crop(x: int, y: int, w: int, h: int): Image? {
+        return crop(self, x, y, w, h);
+    }
+
+    pub fn rotate_90(): Image? {
+        return rotate_90(self);
+    }
+
+    // ── Fluent Save & Lifecycle ───────────────────────────────────────────
+
+    pub fn save(path: str, quality: int = 90): bool? {
+        return save(self, path, quality);
+    }
+
+    pub fn save_png(path: str): bool? {
+        return save_png(self, path);
+    }
+
+    pub fn save_jpg(path: str, quality: int = 90): bool? {
+        return save_jpg(self, path, quality);
+    }
+
+    pub fn save_bmp(path: str): bool? {
+        return save_bmp(self, path);
+    }
+
+    pub fn save_tga(path: str, rle: bool = false): bool? {
+        return save_tga(self, path, rle);
+    }
+
+    pub fn release(): nil {
+        free_image(self);
+    }
+
+    pub fn free(): nil {
+        free_image(self);
+    }
+}
+
+// ── Generic Load ──────────────────────────────────────────────────────────
+
+pub fn load(path: str): Image? {
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_load: int = ffi.library_get_symbol(lib, "load_image");
+        if (fn_load == nil) { return err(); }
+
+        var w_p: int = ffi.alloc(4);
+        var h_p: int = ffi.alloc(4);
+        var c_p: int = ffi.alloc(4);
+        if (w_p == nil or h_p == nil or c_p == nil) {
+            ffi.free(w_p); ffi.free(h_p); ffi.free(c_p);
+            ffi.library_unload(lib);
+            return err();
+        }
+
+        var cs: ffi.CString = ffi.string_to_cstring(path);
+        var data_ptr: int = ffi.foreign_call(
+            fn_load,
+            [ffi.cstring_as_ptr(cs), w_p, h_p, c_p],
+            ffi.TYPE_PTR,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]
+        ) as int;
+        ffi.cstring_free(cs);
+
+        var w: int = ffi.load_i32(w_p);
+        var h: int = ffi.load_i32(h_p);
+        var c: int = ffi.load_i32(c_p);
+        ffi.free(w_p); ffi.free(h_p); ffi.free(c_p);
+
+        if (data_ptr == nil) { ffi.library_unload(lib); return err(); }
+        return ok(Image(w=w, h=h, c=c, p=data_ptr, lib=lib));
+    }
+}
+
+// ── Forced-channel Load ───────────────────────────────────────────────────
+
+pub fn load_forced(path: str, channels: int): Image? {
+    if (channels < 1 or channels > 4) { return err(); }
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_load: int = ffi.library_get_symbol(lib, "load_image_forced");
+        if (fn_load == nil) { ffi.library_unload(lib); return err(); }
+
+        var w_p: int = ffi.alloc(4);
+        var h_p: int = ffi.alloc(4);
+        var c_p: int = ffi.alloc(4);
+        var cs:  ffi.CString = ffi.string_to_cstring(path);
+
+        var data_ptr: int = ffi.foreign_call(
+            fn_load,
+            [ffi.cstring_as_ptr(cs), w_p, h_p, c_p, channels],
+            ffi.TYPE_PTR,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32]
+        ) as int;
+        ffi.cstring_free(cs);
+
+        var w: int = ffi.load_i32(w_p);
+        var h: int = ffi.load_i32(h_p);
+        var c: int = ffi.load_i32(c_p);
+        ffi.free(w_p); ffi.free(h_p); ffi.free(c_p);
+
+        if (data_ptr == nil) { ffi.library_unload(lib); return err(); }
+        return ok(Image(w=w, h=h, c=channels, p=data_ptr, lib=lib));
+    }
+}
+
+// ── Metadata Query (no pixel allocation) ──────────────────────────────────
+
+pub fn query(path: str): ImageInfo? {
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_q: int = ffi.library_get_symbol(lib, "query_image_info");
+        if (fn_q == nil) { ffi.library_unload(lib); return err(); }
+
+        var w_p: int = ffi.alloc(4);
+        var h_p: int = ffi.alloc(4);
+        var c_p: int = ffi.alloc(4);
+        var cs:  ffi.CString = ffi.string_to_cstring(path);
+
+        var ok_flag: int = ffi.foreign_call(
+            fn_q,
+            [ffi.cstring_as_ptr(cs), w_p, h_p, c_p],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_PTR]
+        ) as int;
+        ffi.cstring_free(cs);
+
+        var w: int = ffi.load_i32(w_p);
+        var h: int = ffi.load_i32(h_p);
+        var c: int = ffi.load_i32(c_p);
+        ffi.free(w_p); ffi.free(h_p); ffi.free(c_p);
+        ffi.library_unload(lib);
+
+        if (ok_flag == 0) { return err(); }
+        return ok(ImageInfo(w=w, h=h, c=c));
+    }
+}
+
+// ── Create a blank (zero-filled) image ────────────────────────────────────
+
+pub fn create(w: int, h: int, channels: int = 4): Image? {
+    if (w <= 0 or h <= 0 or channels < 1 or channels > 4) { return err(); }
+    unsafe {
+        var byte_count: int = w * h * channels;
+        var p: int = ffi.alloc(byte_count);
+        if (p == nil) { return err(); }
+        ffi.memset(p, 0, byte_count);
+        var lib: int = _open_lib();
+        return ok(Image(w=w, h=h, c=channels, p=p, lib=lib));
+    }
+}
+
+// ── Pixel Access Functions ────────────────────────────────────────────────
+
+pub fn get_pixel(img: Image, x: int, y: int): Pixel {
+    if (not img.is_valid() or x < 0 or y < 0 or x >= img.width or y >= img.height) {
+        return Pixel(r=0, g=0, b=0, a=255);
+    }
+    unsafe {
+        var off:  int = img.pixel_offset(x, y);
+        var base: int = ffi.ptr_add(img.pixels, off);
+        var r: int = 0; var g: int = 0; var b: int = 0; var a: int = 255;
+        if (img.channels >= 1) { r = ffi.load_u8(base); }
+        if (img.channels == 2) {
+            a = ffi.load_u8(ffi.ptr_add(base, 1));
+        } elif (img.channels >= 2) {
+            g = ffi.load_u8(ffi.ptr_add(base, 1));
+        }
+        if (img.channels >= 3) { b = ffi.load_u8(ffi.ptr_add(base, 2)); }
+        if (img.channels >= 4) { a = ffi.load_u8(ffi.ptr_add(base, 3)); }
+        return Pixel(r=r, g=g, b=b, a=a);
+    }
+}
+
+pub fn set_pixel(img: Image, x: int, y: int,
+                  r: int, g: int, b: int, a: int = 255): nil {
+    if (not img.is_valid() or x < 0 or y < 0 or x >= img.width or y >= img.height) {
+        return;
+    }
+    var rc: int = r; if (rc < 0) rc = 0; if (rc > 255) rc = 255;
+    var gc: int = g; if (gc < 0) gc = 0; if (gc > 255) gc = 255;
+    var bc: int = b; if (bc < 0) bc = 0; if (bc > 255) bc = 255;
+    var ac: int = a; if (ac < 0) ac = 0; if (ac > 255) ac = 255;
+    unsafe {
+        var off:  int = img.pixel_offset(x, y);
+        var base: int = ffi.ptr_add(img.pixels, off);
+        if (img.channels >= 1) { ffi.store_u8(base, rc); }
+        if (img.channels == 2) {
+            ffi.store_u8(ffi.ptr_add(base, 1), ac);
+        } elif (img.channels >= 2) {
+            ffi.store_u8(ffi.ptr_add(base, 1), gc);
+        }
+        if (img.channels >= 3) { ffi.store_u8(ffi.ptr_add(base, 2), bc); }
+        if (img.channels >= 4) { ffi.store_u8(ffi.ptr_add(base, 3), ac); }
+    }
+}
+
+// ── Free / Lifecycle ──────────────────────────────────────────────────────
+
+pub fn free_image(img: Image): nil {
+    if (img.pixels == nil) { return; }
+    unsafe {
+        var freed: bool = false;
+        if (img._lib != nil) {
+            var fn_free: int = ffi.library_get_symbol(img._lib, "free_image");
+            if (fn_free != nil) {
+                ffi.call_void_1(fn_free, img.pixels);
+                freed = true;
+            }
+            ffi.library_unload(img._lib);
+        }
+        if (not freed) {
+            ffi.free(img.pixels);
+        }
+    }
+}
+
+pub fn free(img: Image): nil {
+    free_image(img);
+}
+
+// ── Clone / Duplicate ─────────────────────────────────────────────────────
+
+pub fn clone(img: Image): Image? {
+    if (not img.is_valid()) { return err(); }
+    unsafe {
+        var bs: int = img.byte_size();
+        var p: int = ffi.alloc(bs);
+        if (p == nil) { return err(); }
+        ffi.memcpy(p, img.pixels, bs);
+        var lib: int = _open_lib();
+        return ok(Image(w=img.width, h=img.height, c=img.channels, p=p, lib=lib));
+    }
+}
+
+// ── Resize (Bilinear Resampling) ──────────────────────────────────────────
+
+pub fn resize(img: Image, new_width: int, new_height: int): Image? {
+    if (not img.is_valid() or new_width <= 0 or new_height <= 0) { return err(); }
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_resize: int = ffi.library_get_symbol(lib, "resize_image");
+        if (fn_resize == nil) { ffi.library_unload(lib); return err(); }
+
+        var out_bytes: int = new_width * new_height * img.channels;
+        var out_p: int = ffi.alloc(out_bytes);
+        if (out_p == nil) { ffi.library_unload(lib); return err(); }
+
+        var res: int = ffi.foreign_call(
+            fn_resize,
+            [img.pixels, img.width, img.height, img.channels, out_p, new_width, new_height],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32]
+        ) as int;
+
+        if (res == 0) {
+            ffi.free(out_p);
+            ffi.library_unload(lib);
+            return err();
+        }
+
+        return ok(Image(w=new_width, h=new_height, c=img.channels, p=out_p, lib=lib));
+    }
+}
+
+// ── Crop ──────────────────────────────────────────────────────────────────
+
+pub fn crop(img: Image, x: int, y: int, width: int, height: int): Image? {
+    if (not img.is_valid() or width <= 0 or height <= 0) { return err(); }
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_crop: int = ffi.library_get_symbol(lib, "crop_image");
+        if (fn_crop == nil) { ffi.library_unload(lib); return err(); }
+
+        var out_bytes: int = width * height * img.channels;
+        var out_p: int = ffi.alloc(out_bytes);
+        if (out_p == nil) { ffi.library_unload(lib); return err(); }
+
+        var res: int = ffi.foreign_call(
+            fn_crop,
+            [img.pixels, img.width, img.height, img.channels, out_p, x, y, width, height],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32]
+        ) as int;
+
+        if (res == 0) {
+            ffi.free(out_p);
+            ffi.library_unload(lib);
+            return err();
+        }
+
+        return ok(Image(w=width, h=height, c=img.channels, p=out_p, lib=lib));
+    }
+}
+
+// ── In-place Vertical Flip ────────────────────────────────────────────────
+
+pub fn flip_vertical(img: Image): nil {
+    if (not img.is_valid()) { return; }
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return; }
+        var fn_flip: int = ffi.library_get_symbol(lib, "flip_image_v");
+        if (fn_flip != nil) {
+            ffi.foreign_call(
+                fn_flip,
+                [img.pixels, img.width, img.height, img.channels],
+                ffi.TYPE_I32,
+                [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32]
+            );
+        }
+        ffi.library_unload(lib);
+    }
+}
+
+// ── In-place Horizontal Flip ──────────────────────────────────────────────
+
+pub fn flip_horizontal(img: Image): nil {
+    if (not img.is_valid()) { return; }
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return; }
+        var fn_flip: int = ffi.library_get_symbol(lib, "flip_image_h");
+        if (fn_flip != nil) {
+            ffi.foreign_call(
+                fn_flip,
+                [img.pixels, img.width, img.height, img.channels],
+                ffi.TYPE_I32,
+                [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32]
+            );
+        }
+        ffi.library_unload(lib);
+    }
+}
+
+// ── Rotate 90 Degrees Clockwise ───────────────────────────────────────────
+
+pub fn rotate_90(img: Image): Image? {
+    if (not img.is_valid()) { return err(); }
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_rot: int = ffi.library_get_symbol(lib, "rotate_image_90_cw");
+        if (fn_rot == nil) { ffi.library_unload(lib); return err(); }
+
+        var new_w: int = img.height;
+        var new_h: int = img.width;
+        var out_bytes: int = new_w * new_h * img.channels;
+        var out_p: int = ffi.alloc(out_bytes);
+        if (out_p == nil) { ffi.library_unload(lib); return err(); }
+
+        var res: int = ffi.foreign_call(
+            fn_rot,
+            [img.pixels, img.width, img.height, img.channels, out_p],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR]
+        ) as int;
+
+        if (res == 0) {
+            ffi.free(out_p);
+            ffi.library_unload(lib);
+            return err();
+        }
+
+        return ok(Image(w=new_w, h=new_h, c=img.channels, p=out_p, lib=lib));
+    }
+}
+
+// ── Fill Color ────────────────────────────────────────────────────────────
+
+pub fn fill(img: Image, r: int, g: int, b: int, a: int = 255): nil {
+    if (not img.is_valid()) { return; }
+    var y: int = 0;
+    while (y < img.height) {
+        var x: int = 0;
+        while (x < img.width) {
+            set_pixel(img, x, y, r, g, b, a);
+            x = x + 1;
+        }
+        y = y + 1;
+    }
+}
+
+// ── Fill Rectangle ────────────────────────────────────────────────────────
+
+pub fn fill_rect(img: Image, x: int, y: int, w: int, h: int, color: Pixel): nil {
+    if (not img.is_valid()) { return; }
+    var ry: int = 0;
+    while (ry < h) {
+        var rx: int = 0;
+        while (rx < w) {
+            set_pixel(img, x + rx, y + ry, color.r, color.g, color.b, color.a);
+            rx = rx + 1;
+        }
+        ry = ry + 1;
+    }
+}
+
+// ── Bresenham Line Drawing ────────────────────────────────────────────────
+
+pub fn draw_line(img: Image, x0: int, y0: int, x1: int, y1: int, color: Pixel): nil {
+    if (not img.is_valid()) { return; }
+    var dx: int = x1 - x0;
+    if (dx < 0) { dx = 0 - dx; }
+    var dy: int = y1 - y0;
+    if (dy < 0) { dy = 0 - dy; }
+    var sx: int = 1;
+    if (x0 > x1) { sx = 0 - 1; }
+    var sy: int = 1;
+    if (y0 > y1) { sy = 0 - 1; }
+    var err_val: int = dx - dy;
+
+    var cur_x: int = x0;
+    var cur_y: int = y0;
+    var running: bool = true;
+    while (running) {
+        set_pixel(img, cur_x, cur_y, color.r, color.g, color.b, color.a);
+        if (cur_x == x1 and cur_y == y1) {
+            running = false;
+        } else {
+            var e2: int = 2 * err_val;
+            if (e2 > (0 - dy)) {
+                err_val = err_val - dy;
+                cur_x = cur_x + sx;
+            }
+            if (e2 < dx) {
+                err_val = err_val + dx;
+                cur_y = cur_y + sy;
+            }
+        }
+    }
+}
+
+pub fn flip_v(img: Image): nil {
+    flip_vertical(img);
+}
+
+pub fn flip_h(img: Image): nil {
+    flip_horizontal(img);
+}
+
+// ── Blit (Copy Sub-image into Target Image) ────────────────────────────────
+
+pub fn blit(dst: Image, src: Image, dst_x: int, dst_y: int): nil {
+    if (not dst.is_valid() or not src.is_valid()) { return; }
+    var sy: int = 0;
+    while (sy < src.height) {
+        var dy: int = dst_y + sy;
+        if (dy >= 0 and dy < dst.height) {
+            var sx: int = 0;
+            while (sx < src.width) {
+                var dx: int = dst_x + sx;
+                if (dx >= 0 and dx < dst.width) {
+                    var px: Pixel = get_pixel(src, sx, sy);
+                    set_pixel(dst, dx, dy, px.r, px.g, px.b, px.a);
+                }
+                sx = sx + 1;
+            }
+        }
+        sy = sy + 1;
+    }
+}
+
+pub fn blend_blit(dst: Image, src: Image, dst_x: int, dst_y: int): nil {
+    if (not dst.is_valid() or not src.is_valid()) { return; }
+    var sy: int = 0;
+    while (sy < src.height) {
+        var dy: int = dst_y + sy;
+        if (dy >= 0 and dy < dst.height) {
+            var sx: int = 0;
+            while (sx < src.width) {
+                var dx: int = dst_x + sx;
+                if (dx >= 0 and dx < dst.width) {
+                    var spx: Pixel = get_pixel(src, sx, sy);
+                    if (spx.a > 0) {
+                        if (spx.a == 255) {
+                            set_pixel(dst, dx, dy, spx.r, spx.g, spx.b, 255);
+                        } else {
+                            var dpx: Pixel = get_pixel(dst, dx, dy);
+                            var a_src: float = (spx.a as float) / 255.0;
+                            var a_dst: float = (dpx.a as float) / 255.0;
+                            var out_a: float = a_src + a_dst * (1.0 - a_src);
+                            if (out_a > 0.0) {
+                                var out_r: float = ((spx.r as float) * a_src + (dpx.r as float) * a_dst * (1.0 - a_src)) / out_a;
+                                var out_g: float = ((spx.g as float) * a_src + (dpx.g as float) * a_dst * (1.0 - a_src)) / out_a;
+                                var out_b: float = ((spx.b as float) * a_src + (dpx.b as float) * a_dst * (1.0 - a_src)) / out_a;
+                                set_pixel(dst, dx, dy, out_r as int, out_g as int, out_b as int, (out_a * 255.0) as int);
+                            }
+                        }
+                    }
+                }
+                sx = sx + 1;
+            }
+        }
+        sy = sy + 1;
+    }
+}
+
+
+// ── Unified Save & Format Exporters ───────────────────────────────────────
+
+pub fn save_png(img: Image, path: str): bool? {
+    if (not img.is_valid()) { return err(); }
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_save: int = ffi.library_get_symbol(lib, "save_image_png");
+        if (fn_save == nil) { ffi.library_unload(lib); return err(); }
+
+        var cs: ffi.CString = ffi.string_to_cstring(path);
+        var res: int = ffi.foreign_call(
+            fn_save,
+            [ffi.cstring_as_ptr(cs), img.width, img.height, img.channels, img.pixels],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR]
+        ) as int;
+        ffi.cstring_free(cs);
+        ffi.library_unload(lib);
+        if (res == 0) { return err(); }
+        return ok(true);
+    }
+}
+
+pub fn save_jpg(img: Image, path: str, quality: int = 90): bool? {
+    if (not img.is_valid()) { return err(); }
+    var q: int = quality;
+    if (q < 1)   q = 1;
+    if (q > 100) q = 100;
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_save: int = ffi.library_get_symbol(lib, "save_image_jpg");
+        if (fn_save == nil) { ffi.library_unload(lib); return err(); }
+
+        var cs: ffi.CString = ffi.string_to_cstring(path);
+        var res: int = ffi.foreign_call(
+            fn_save,
+            [ffi.cstring_as_ptr(cs), img.width, img.height, img.channels, img.pixels, q],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_I32]
+        ) as int;
+        ffi.cstring_free(cs);
+        ffi.library_unload(lib);
+        if (res == 0) { return err(); }
+        return ok(true);
+    }
+}
+
+pub fn save_bmp(img: Image, path: str): bool? {
+    if (not img.is_valid()) { return err(); }
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_save: int = ffi.library_get_symbol(lib, "save_image_bmp");
+        if (fn_save == nil) { ffi.library_unload(lib); return err(); }
+
+        var cs: ffi.CString = ffi.string_to_cstring(path);
+        var res: int = ffi.foreign_call(
+            fn_save,
+            [ffi.cstring_as_ptr(cs), img.width, img.height, img.channels, img.pixels],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR]
+        ) as int;
+        ffi.cstring_free(cs);
+        ffi.library_unload(lib);
+        if (res == 0) { return err(); }
+        return ok(true);
+    }
+}
+
+pub fn save_tga(img: Image, path: str, rle: bool = false): bool? {
+    if (not img.is_valid()) { return err(); }
+    unsafe {
+        var lib: int = _open_lib();
+        if (lib == nil) { return err(); }
+
+        var fn_name: str = "save_image_tga";
+        if (rle) { fn_name = "save_image_tga_rle"; }
+
+        var fn_save: int = ffi.library_get_symbol(lib, fn_name);
+        if (fn_save == nil) { ffi.library_unload(lib); return err(); }
+
+        var cs: ffi.CString = ffi.string_to_cstring(path);
+        var res: int = ffi.foreign_call(
+            fn_save,
+            [ffi.cstring_as_ptr(cs), img.width, img.height, img.channels, img.pixels],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR]
+        ) as int;
+        ffi.cstring_free(cs);
+        ffi.library_unload(lib);
+        if (res == 0) { return err(); }
+        return ok(true);
+    }
+}
+
+// Unified save with format auto-detection by file extension
+pub fn save(img: Image, path: str, quality: int = 90): bool? {
+    if (not img.is_valid()) { return err(); }
+    var l: int = len(path);
+    if (l >= 4) {
+        var ext4: str = _builtin_substring(path, l - 4, l);
+        if (ext4 == ".png") {
+            return save_png(img, path);
+        } elif (ext4 == ".jpg") {
+            return save_jpg(img, path, quality);
+        } elif (ext4 == ".bmp") {
+            return save_bmp(img, path);
+        } elif (ext4 == ".tga") {
+            return save_tga(img, path, false);
+        }
+    }
+    if (l >= 5) {
+        var ext5: str = _builtin_substring(path, l - 5, l);
+        if (ext5 == ".jpeg") {
+            return save_jpg(img, path, quality);
+        }
+    }
+    return save_png(img, path);
+}

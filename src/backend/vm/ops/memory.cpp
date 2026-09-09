@@ -25,6 +25,10 @@ namespace {
         if (is_integer(val)) return (void*)(uintptr_t)as_i64(val);
         return nullptr;
     }
+
+    size_t checked_size(int64_t size) {
+        return size > 0 ? static_cast<size_t>(size) : 0;
+    }
 }
 
 void RegisterVM::execute_memory_load(const LIR::LIR_Inst* pc) {
@@ -102,47 +106,38 @@ void RegisterVM::execute_memory_store(const LIR::LIR_Inst* pc) {
 }
 
 void RegisterVM::execute_memory_copy(const LIR::LIR_Inst* pc) {
-    // Arg layout (set by the LIR generator for 3-arg intrinsics):
-    //   pc->a            = destination pointer
-    //   pc->b            = source pointer
-    //   pc->call_args[0] = byte count
-    // The previous implementation read dest from pc->dst (the result
-    // register), which silently turned every copy into a no-op when dst
-    // was unused. Read dest from pc->a instead.
     void* dest = value_to_ptr(registers[pc->a]);
     void* src = (pc->b != UINT32_MAX) ? value_to_ptr(registers[pc->b]) : nullptr;
-    size_t n = (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX)
-                   ? static_cast<size_t>(to_int(registers[pc->call_args[0]]))
-                   : 0;
+    size_t n = 0;
+    if (pc->call_args.size() >= 3) {
+        n = checked_size(to_int(registers[pc->call_args[2]]));
+    } else if (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX) {
+        n = checked_size(to_int(registers[pc->call_args[0]]));
+    }
     if (dest && src && n > 0) std::memcpy(dest, src, n);
 }
 
 void RegisterVM::execute_memory_fill(const LIR::LIR_Inst* pc) {
-    // Arg layout:
-    //   pc->a            = destination pointer
-    //   pc->b            = fill byte (int)
-    //   pc->call_args[0] = byte count
     void* dest = value_to_ptr(registers[pc->a]);
     int value = (pc->b != UINT32_MAX) ? static_cast<int>(to_int(registers[pc->b])) : 0;
-    size_t n = (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX)
-                   ? static_cast<size_t>(to_int(registers[pc->call_args[0]]))
-                   : 0;
+    size_t n = 0;
+    if (pc->call_args.size() >= 3) {
+        n = checked_size(to_int(registers[pc->call_args[2]]));
+    } else if (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX) {
+        n = checked_size(to_int(registers[pc->call_args[0]]));
+    }
     if (dest && n > 0) std::memset(dest, value, n);
 }
 
 void RegisterVM::execute_memory_compare(const LIR::LIR_Inst* pc) {
-    // Arg layout:
-    //   pc->a            = lhs pointer
-    //   pc->b            = rhs pointer
-    //   pc->call_args[0] = byte count
-    //   pc->dst          = result register
-    // The previous implementation read size from pc->imm (always a tiny
-    // constant); read from the third argument register instead.
     void* s1 = value_to_ptr(registers[pc->a]);
     void* s2 = (pc->b != UINT32_MAX) ? value_to_ptr(registers[pc->b]) : nullptr;
-    size_t n = (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX)
-                   ? static_cast<size_t>(to_int(registers[pc->call_args[0]]))
-                   : 0;
+    size_t n = 0;
+    if (pc->call_args.size() >= 3) {
+        n = checked_size(to_int(registers[pc->call_args[2]]));
+    } else if (!pc->call_args.empty() && pc->call_args[0] != UINT32_MAX) {
+        n = checked_size(to_int(registers[pc->call_args[0]]));
+    }
     if (s1 && s2 && n > 0) {
         int result = std::memcmp(s1, s2, n);
         registers[pc->dst] = BOX_INT(static_cast<int64_t>(result));
@@ -170,7 +165,9 @@ void RegisterVM::execute_memory_free(const LIR::LIR_Inst* pc) {
     void* ptr = value_to_ptr(registers[pc->a]);
     if (ptr) {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
-        g_memory_allocations.erase(reinterpret_cast<uintptr_t>(ptr));
+        auto it = g_memory_allocations.find(reinterpret_cast<uintptr_t>(ptr));
+        if (it == g_memory_allocations.end()) return;
+        g_memory_allocations.erase(it);
         std::free(ptr);
     }
 }
@@ -178,15 +175,21 @@ void RegisterVM::execute_memory_free(const LIR::LIR_Inst* pc) {
 void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
     void* ptr = value_to_ptr(registers[pc->a]);
     if (!ptr) { execute_memory_alloc(pc); return; }
+    const uintptr_t old_address = reinterpret_cast<uintptr_t>(ptr);
     int64_t size = to_int(registers[pc->b]);
     if (size < 0) { registers[pc->dst] = VAL_NIL; return; }
     {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
-        g_memory_allocations.erase(reinterpret_cast<uintptr_t>(ptr));
+        auto it = g_memory_allocations.find(old_address);
+        if (it == g_memory_allocations.end()) {
+            registers[pc->dst] = VAL_NIL;
+            return;
+        }
     }
     void* new_ptr = std::realloc(ptr, size);
     if (new_ptr) {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
+        g_memory_allocations.erase(old_address);
         g_memory_allocations[reinterpret_cast<uintptr_t>(new_ptr)] = size;
         RegisterValue val = lm_alloc_foreign_ptr(new_ptr);
         registers[pc->dst] = val;
@@ -238,7 +241,10 @@ void RegisterVM::execute_ptr_align(const LIR::LIR_Inst* pc) {
     if (!ptr) { registers[pc->dst] = VAL_NIL; return; }
     uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
     int64_t alignment = to_int(registers[pc->b]);
-    if (alignment <= 0) { registers[pc->dst] = registers[pc->a]; return; }
+    if (alignment <= 0 || (alignment & (alignment - 1)) != 0) {
+        registers[pc->dst] = VAL_NIL;
+        return;
+    }
     uintptr_t aligned = (addr + (alignment - 1)) & ~(alignment - 1);
     RegisterValue val = lm_alloc_foreign_ptr(reinterpret_cast<void*>(aligned));
     registers[pc->dst] = val;
@@ -254,7 +260,10 @@ void RegisterVM::execute_ptr_is_aligned(const LIR::LIR_Inst* pc) {
     if (!ptr) { registers[pc->dst] = VAL_FALSE; return; }
     uintptr_t addr = reinterpret_cast<uintptr_t>(ptr);
     int64_t alignment = to_int(registers[pc->b]);
-    if (alignment <= 0) { registers[pc->dst] = VAL_FALSE; return; }
+    if (alignment <= 0 || (alignment & (alignment - 1)) != 0) {
+        registers[pc->dst] = VAL_FALSE;
+        return;
+    }
     bool aligned = (addr % static_cast<uintptr_t>(alignment)) == 0;
     registers[pc->dst] = aligned ? VAL_TRUE : VAL_FALSE;
 }

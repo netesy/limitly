@@ -1,0 +1,187 @@
+// tests/game/test_imgui_expanded.lm
+// Comprehensive verification suite for expanded std.game GUI engine widgets,
+// moddable style stack, and preset themes.
+
+import std.gg as gg;
+import std.game.types as types;
+import std.game.gui as gui;
+
+fn test_style_stack(): int {
+    print("=== Test 1: Style Stack & Moddability ===");
+    var ui = gui.GUI();
+
+    // Default button color
+    var def_btn_c = ui.get_style_color(types.COLOR_BUTTON);
+    assert(def_btn_c.r == ui.theme.btn_normal.r, "Default button color should match theme");
+
+    // Push custom button color
+    var custom_pink = types.hex(0xff007f, 1.0);
+    ui.push_style_color(types.COLOR_BUTTON, custom_pink);
+    var pushed_c = ui.get_style_color(types.COLOR_BUTTON);
+    assert(pushed_c.r == custom_pink.r and pushed_c.g == custom_pink.g, "Pushed color should be returned");
+
+    // Pop style color
+    ui.pop_style_color(1);
+    var popped_c = ui.get_style_color(types.COLOR_BUTTON);
+    assert(popped_c.r == def_btn_c.r, "Popped color should restore default theme color");
+
+    // Push/pop style vars
+    ui.push_style_var(types.VAR_PADDING, 25.0);
+    assert(ui.get_style_var(types.VAR_PADDING, 0.0) == 25.0, "Pushed padding should be 25.0");
+    ui.pop_style_var(1);
+    assert(ui.get_style_var(types.VAR_PADDING, 0.0) == ui.theme.padding, "Popped padding should restore theme padding");
+
+    print("✓ Style stack passed");
+    return 1;
+}
+
+fn test_preset_themes(): int {
+    print("=== Test 2: Preset Themes ===");
+    var dark = types.dark_theme();
+    var light = types.light_theme();
+    var cyber = types.cyberpunk_theme();
+    var retro = types.retro_theme();
+
+    assert(dark.bg_window.r < 0.2, "Dark theme window should be dark");
+    assert(light.bg_window.r > 0.8, "Light theme window should be bright");
+    assert(cyber.accent.r > 0.8, "Cyberpunk theme should have high-saturation accent");
+    assert(retro.rounding == 0.0, "Retro theme should have 0.0 rounding");
+
+    var ui = gui.GUI(cyber);
+    assert(ui.get_style_color(types.COLOR_WINDOW_BG).r == cyber.bg_window.r, "GUI initialized with cyberpunk theme");
+
+    print("✓ Preset themes passed");
+    return 1;
+}
+
+fn test_extended_controls(): int {
+    print("=== Test 3: Extended Controls & Widgets ===");
+    var setup_ok = gg.setup();
+    assert(setup_ok, "gg.setup failed");
+
+
+    var ui = gui.GUI();
+
+    // 1. Text input
+    ui.begin(15.0, 15.0, false);
+    var entered = ui.input_text("Player Name", "Knight");
+    assert(entered == "Knight", "Input text should retain entered text");
+    ui.end();
+
+    // 2. Combo box
+    var weapons = ["Sword", "Bow", "Magic Staff"];
+    ui.begin(0.0, 0.0, false);
+    var selected = ui.combo_box("Weapon", weapons, 0);
+    assert(selected == 0, "Initial combo selection should be 0");
+    ui.end();
+
+    // 3. Radio button
+    ui.begin(15.0, 15.0, true);
+    var clicked_radio = ui.radio_button("Difficulty: Normal", false);
+    assert(clicked_radio == true, "Radio button should be clicked on hit");
+    ui.end();
+
+    // 4. Steppers
+    ui.begin(0.0, 0.0, false);
+    var stepped_int = ui.stepper_int("Level", 5, 1, 1, 100);
+    assert(stepped_int == 5, "Stepper int should start at initial value");
+    var stepped_flt = ui.stepper_float("Speed", 1.5, 0.1, 0.0, 10.0);
+    assert(stepped_flt == 1.5, "Stepper float should start at initial value");
+    ui.end();
+
+    // 5. Slider int
+    ui.begin(0.0, 0.0, false);
+    var s_int = ui.slider_int("Volume", 75, 0, 100);
+    assert(s_int == 75, "Slider int should retain value when no interaction");
+    ui.end();
+
+
+    // 6. Color Picker & Swatch
+    ui.begin(0.0, 0.0, false);
+    var base_col = types.hex(0x336699, 1.0);
+    var picked_col = ui.color_picker("Player Color", base_col);
+    assert(picked_col.r == base_col.r, "Color picker should return current color");
+    ui.end();
+
+    // 7. Data Plots
+    ui.begin(0.0, 0.0, false);
+    var fps_samples = [60.0, 58.0, 59.0, 61.0, 60.5];
+    ui.plot_lines("FPS", fps_samples, 0.0, 100.0);
+    ui.plot_histogram("Frame Times", fps_samples, 0.0, 100.0);
+    ui.end();
+
+    // 8. Tab bar
+    ui.begin(15.0, 15.0, true);
+    ui.begin_tab_bar("MainTabs");
+    var tab1 = ui.tab_item("General", true);
+    var tab2 = ui.tab_item("Audio", false);
+    ui.end_tab_bar();
+    ui.end();
+
+    // 9. Tree node
+    ui.begin(0.0, 0.0, false);
+    var is_node_open = ui.tree_node("Advanced Settings");
+    if (is_node_open) {
+        ui.label("Sub-setting 1");
+        ui.tree_pop();
+    }
+    ui.end();
+
+    // 10. Popups
+    ui.open_popup("WarningModal");
+    assert(ui.is_popup_open("WarningModal") == true, "Popup should be open");
+    ui.begin(0.0, 0.0, false);
+    if (ui.begin_popup("WarningModal", 50.0, 50.0, 200.0, 100.0)) {
+        ui.label("Are you sure?");
+        ui.end_popup();
+    }
+    ui.close_popup("WarningModal");
+    assert(ui.is_popup_open("WarningModal") == false, "Popup should be closed");
+    ui.end();
+
+    // 11. Multi-column layout
+    ui.begin(0.0, 0.0, false);
+    ui.columns(3);
+    ui.label("Col 1");
+    ui.next_column();
+    ui.label("Col 2");
+    ui.next_column();
+    ui.label("Col 3");
+    ui.next_column();
+    ui.end();
+
+    // 12. Scroll area
+    ui.begin(0.0, 0.0, false, 2.0); // Mouse wheel = 2.0
+    if (ui.begin_scroll_area(200.0, 150.0, 400.0)) {
+        var i = 0;
+        while (i < 10) {
+            ui.label("Scrollable row " + (i as str));
+            i = i + 1;
+        }
+        ui.end_scroll_area();
+    }
+    ui.end();
+
+    // 13. Tooltip
+    ui.begin(15.0, 15.0, false);
+    ui.button("HoverMe", 60.0, 20.0);
+    ui.tooltip("This is a helpful hint!");
+    ui.end();
+
+    gg.shutdown();
+    print("✓ Extended controls passed");
+    return 1;
+}
+
+fn main(): int {
+    print("========================================");
+    print("Running Expanded IMGUI Test Suite");
+    print("========================================");
+    test_style_stack();
+    test_preset_themes();
+    test_extended_controls();
+    print("========================================");
+    print("All expanded IMGUI tests passed 100%!");
+    print("========================================");
+    return 0;
+}

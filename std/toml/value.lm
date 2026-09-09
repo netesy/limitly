@@ -1,6 +1,6 @@
 // TOML Value representation
 
-pub frame TOMLValue {
+frame TOMLValue {
     pub type_tag: str; // "object", "string", "number", "bool"
     pub str_val: str;
     pub num_val: int;

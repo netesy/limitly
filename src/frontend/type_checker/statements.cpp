@@ -386,6 +386,10 @@ TypePtr TypeChecker::check_module_declaration(std::shared_ptr<LM::Frontend::AST:
 TypePtr TypeChecker::check_enum_declaration(std::shared_ptr<LM::Frontend::AST::EnumDeclaration> enum_decl) {
     if (!enum_decl) return nullptr;
 
+    if (enum_decl->hasExplicitVisibility) {
+        add_error("`enum` declarations cannot have a visibility modifier (`enum` is already public by default)", enum_decl->line);
+    }
+
     // Create or get the base enum type
     TypePtr enumType = type_system.getType(enum_decl->name);
     if (!enumType || enumType->tag == TypeTag::Nil) {

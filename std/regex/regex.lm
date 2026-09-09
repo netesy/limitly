@@ -1,112 +1,222 @@
-// Standard Library Regex Module
+// std/regex/regex.lm
+// Clean Standard Library Regex Module with rich Match objects and POSIX regular expressions
 
-import std.core as core;
+import std.ffi as ffi;
+import std.crypto.hash as hash;
+
+frame Match {
+    pub var is_matched: bool;
+    pub var value: str;
+    pub var start: int;
+    pub var end: int;
+    pub var index: int;
+
+    pub init(is_matched: bool = false, value: str = "", start: int = -1, end: int = -1, index: int = -1) {
+        self.is_matched = is_matched;
+        self.value = value;
+        self.start = start;
+        self.end = end;
+        self.index = index;
+    }
+
+    pub fn to_string(): str {
+        return self.value;
+    }
+
+    pub fn length(): int {
+        return len(self.value);
+    }
+
+    pub fn is_valid(): bool {
+        return self.is_matched;
+    }
+}
 
 frame Regex {
-    pub flags: int;  // Simple flag system: 1=case_insensitive, 2=multiline, 4=global
-    pub pattern: str;
+    pub var flags: int;  // 1=case_insensitive, 2=multiline, 4=global
+    pub var pattern: str;
+    pub var preg: any;
 
-    pub init(pattern: str, flags: int) {
+    pub init(pattern: str, flags: int = 0) {
         self.pattern = pattern;
         self.flags = flags;
-    }
+        self.preg = nil;
 
-    // Basic pattern matching
-    pub fn matches(text: str): bool {
-        return self.find_first_match(text) != nil;
-    }
-
-    pub fn find_first_match(text: str): any {
-        // Simple regex engine implementation for basic patterns
-        if (self.pattern == "" or text == "") {
-            return nil;
-        }
-
-        var m = self.simple_match(text, 0);
-        if (m == nil) {
-            return nil;
-        }
-
-        return m;
-    }
-
-    pub fn find_all_matches(text: str): [str] {
-        var results: [str] = [];
-        var start_pos = 0;
-        var keep_going = true;
-        while (start_pos < len(text) and keep_going == true) {
-            var match_start = self.find_match_start(text, start_pos);
-            if (match_start == -1) {
-                keep_going = false;
-            } else {
-                var m = self.simple_match(text, start_pos);
-                var match_str = m as str;
-                results.append(match_str);
-                start_pos = match_start + len(match_str);
+        unsafe {
+            var lib = hash._open_lib();
+            if (lib != nil and lib != 0) {
+                var fn_comp = ffi.library_get_symbol(lib, "limitly_regex_compile");
+                if (fn_comp != nil and fn_comp != 0) {
+                    var cs = ffi.string_to_cstring(pattern);
+                    var p = ffi.foreign_call(
+                        fn_comp,
+                        [ffi.cstring_as_ptr(cs), flags],
+                        ffi.TYPE_PTR,
+                        [ffi.TYPE_PTR, ffi.TYPE_I32]
+                    );
+                    ffi.cstring_free(cs);
+                    if (p != nil and p != 0) {
+                        self.preg = p;
+                    }
+                }
             }
+        }
+    }
+
+    // Pattern matching test
+    pub fn is_match(text: str): bool {
+        var m = self.find_match(text, 0);
+        return m.is_matched;
+    }
+
+    pub fn matches(text: str): bool {
+        return self.is_match(text);
+    }
+
+    // Return a rich Match object
+    pub fn find_match(text: str, start_pos: int = 0): Match {
+        if (self.pattern == "" or len(text) == 0 or start_pos > len(text)) {
+            return Match(is_matched=false);
+        }
+
+        // 1. Try native POSIX regex
+        if (self.preg != nil and self.preg != 0) {
+            unsafe {
+                var lib = hash._open_lib();
+                if (lib != nil and lib != 0) {
+                    var fn_match = ffi.library_get_symbol(lib, "limitly_regex_match");
+                    if (fn_match != nil and fn_match != 0) {
+                        var cs = ffi.string_to_cstring(text);
+                        var s_buf = ffi.alloc(4);
+                        var e_buf = ffi.alloc(4);
+
+                        var res = ffi.foreign_call(
+                            fn_match,
+                            [self.preg, ffi.cstring_as_ptr(cs), start_pos, s_buf, e_buf],
+                            ffi.TYPE_I32,
+                            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_PTR]
+                        ) as int;
+
+                        var s = ffi.load_i32(s_buf);
+                        var e = ffi.load_i32(e_buf);
+
+                        ffi.cstring_free(cs);
+                        ffi.free(s_buf);
+                        ffi.free(e_buf);
+
+                        if (res == 1) {
+                            var matched_val = _builtin_substring(text, s, e);
+                            return Match(is_matched=true, value=matched_val, start=s, end=e, index=0);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Fallback to substring matching
+        var m_start = self.find_match_start(text, start_pos);
+        if (m_start != -1) {
+            var pat_len = len(self.pattern);
+            var m_val = _builtin_substring(text, m_start, m_start + pat_len);
+            return Match(is_matched=true, value=m_val, start=m_start, end=m_start + pat_len, index=0);
+        }
+
+        return Match(is_matched=false);
+    }
+
+    // Return all matches as a list of Match objects
+    pub fn find_matches(text: str): [Match] {
+        var results: [Match] = [];
+        var start_pos = 0;
+        var idx = 0;
+        var text_len = len(text);
+
+        while (start_pos <= text_len) {
+            var m = self.find_match(text, start_pos);
+            if (not m.is_matched) {
+                return results;
+            }
+
+            m.index = idx;
+            results.append(m);
+            idx = idx + 1;
+
+            if (m.end <= start_pos) {
+                start_pos = start_pos + 1;
+            } else {
+                start_pos = m.end;
+            }
+        }
+        return results;
+    }
+
+    // Legacy find_first_match returning str or nil
+    pub fn find_first_match(text: str): any {
+        var m = self.find_match(text, 0);
+        if (m.is_matched) {
+            return m.value;
+        }
+        return nil;
+    }
+
+    // Legacy find_all_matches returning [str]
+    pub fn find_all_matches(text: str): [str] {
+        var ms = self.find_matches(text);
+        var results: [str] = [];
+        var i = 0;
+        var count = len(ms);
+        while (i < count) {
+            results.append(ms[i].value);
+            i = i + 1;
         }
         return results;
     }
 
     // Replacement operations
     pub fn replace(text: str, replacement: str): str {
-        var result = "";
-        var start_pos = 0;
-        var keep_going = true;
-
-        while (start_pos < len(text) and keep_going == true) {
-            var m = self.simple_match(text, start_pos);
-            if (m == nil) {
-                result = result + _builtin_substring(text, start_pos, len(text));
-                keep_going = false;
-            } else {
-                var match_str = m as str;
-                var match_start = self.find_match_start(text, start_pos);
-                if (match_start == -1) {
-                    keep_going = false;
-                } else {
-                    result = result + _builtin_substring(text, start_pos, match_start);
-                    result = result + replacement;
-                    start_pos = match_start + len(match_str);
-                    if ((self.flags & 4) == 0) {
-                        result = result + _builtin_substring(text, start_pos, len(text));
-                        keep_going = false;
-                    }
-                }
-            }
+        var m = self.find_match(text, 0);
+        if (not m.is_matched) {
+            return text;
         }
-
-        return result;
+        var before = _builtin_substring(text, 0, m.start);
+        var after = _builtin_substring(text, m.end, len(text));
+        return before + replacement + after;
     }
 
     pub fn replace_all(text: str, replacement: str): str {
-        var regex_with_global = Regex(self.pattern, self.flags | 4);
-        return regex_with_global.replace(text, replacement);
+        var ms = self.find_matches(text);
+        if (len(ms) == 0) {
+            return text;
+        }
+        var result = "";
+        var last_idx = 0;
+        var i = 0;
+        var count = len(ms);
+        while (i < count) {
+            var m = ms[i];
+            result = result + _builtin_substring(text, last_idx, m.start);
+            result = result + replacement;
+            last_idx = m.end;
+            i = i + 1;
+        }
+        result = result + _builtin_substring(text, last_idx, len(text));
+        return result;
     }
 
     // Splitting operations
     pub fn split(text: str): [str] {
+        var ms = self.find_matches(text);
         var parts: [str] = [];
-        var start_pos = 0;
-        var keep_going = true;
-
-        while (start_pos <= len(text) and keep_going == true) {
-            var m = self.simple_match(text, start_pos);
-            if (m == nil) {
-                parts.append(_builtin_substring(text, start_pos, len(text)));
-                keep_going = false;
-            } else {
-                var match_str = m as str;
-                var match_start = self.find_match_start(text, start_pos);
-                if (match_start == -1) {
-                    keep_going = false;
-                } else {
-                    parts.append(_builtin_substring(text, start_pos, match_start));
-                    start_pos = match_start + len(match_str);
-                }
-            }
+        var last_idx = 0;
+        var i = 0;
+        var count = len(ms);
+        while (i < count) {
+            var m = ms[i];
+            parts.append(_builtin_substring(text, last_idx, m.start));
+            last_idx = m.end;
+            i = i + 1;
         }
-
+        parts.append(_builtin_substring(text, last_idx, len(text)));
         return parts;
     }
 
@@ -124,33 +234,7 @@ frame Regex {
         return "/" + self.pattern + "/" + flag_str;
     }
 
-    // Private helper methods
-    pub fn simple_match(text: str, start_pos: int): any {
-        if (self.pattern == "*") {
-            if (start_pos < len(text)) {
-                return _builtin_substring(text, start_pos, start_pos + 1);
-            } else {
-                return nil;
-            }
-        }
-
-        if (self.pattern == ".*") {
-            if (start_pos < len(text)) {
-                return _builtin_substring(text, start_pos, len(text));
-            } else {
-                return nil;
-            }
-        }
-
-        var pattern_to_use = self.pattern;
-        var pos = self.find_match_start(text, start_pos);
-        if (pos != -1 and pos >= start_pos) {
-            return _builtin_substring(text, pos, pos + len(pattern_to_use));
-        }
-
-        return nil;
-    }
-
+    // Fallback helper
     pub fn find_match_start(text: str, start_pos: int): int {
         var pattern_to_use = self.pattern;
         var sub_len = len(pattern_to_use);

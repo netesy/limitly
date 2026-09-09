@@ -183,6 +183,7 @@ namespace AST {
         // (no explicit 'private' keyword — vars/fns are private when neither
         // pub nor prot is specified).
         VisibilityLevel visibility = VisibilityLevel::Private;
+        bool hasExplicitVisibility = false;
 
         // inferred_type is inherited from Node
         // For statements, this typically represents the type of value produced by the statement

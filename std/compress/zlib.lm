@@ -1,0 +1,108 @@
+// std/compress/zlib.lm
+// Clean zlib compression with decompression limits
+
+import std.ffi as ffi;
+import std.crypto.hash as hash;
+
+frame Zlib {
+    pub fn compress(data: str, level: int = 6): str? {
+        return compress(data, level);
+    }
+
+    pub fn decompress(compressed_hex: str, max_limit: int = 10485760): str? {
+        return decompress(compressed_hex, max_limit);
+    }
+
+    pub fn compress_hex(data: str, level: int = 6): str? {
+        return compress_hex(data, level);
+    }
+
+    pub fn decompress_hex(compressed_hex: str, max_limit: int = 10485760): str? {
+        return decompress_hex(compressed_hex, max_limit);
+    }
+}
+
+pub fn compress_hex(data: str, level: int = 6): str? {
+    if (len(data) == 0) {
+        return ok("");
+    }
+    unsafe {
+        var lib = hash._open_lib();
+        if (lib != nil and lib != 0) {
+            var fn_comp = ffi.library_get_symbol(lib, "limitly_zlib_compress_hex");
+            if (fn_comp != nil and fn_comp != 0) {
+                var cs_data = ffi.string_to_cstring(data);
+                // Allocate buffer for hex output (compressedBound * 2 + 64)
+                var out_buf = ffi.alloc(len(data) * 2 + 256);
+
+                var out_len = ffi.foreign_call(
+                    fn_comp,
+                    [ffi.cstring_as_ptr(cs_data), len(data), level, out_buf],
+                    ffi.TYPE_I32,
+                    [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR]
+                ) as int;
+
+                var res: str? = nil;
+                if (out_len >= 0) {
+                    res = ok(ffi.cstring_to_string(out_buf));
+                }
+
+                ffi.cstring_free(cs_data);
+                ffi.free(out_buf);
+
+                if (res != nil) {
+                    return res;
+                }
+            }
+        }
+    }
+    return err();
+}
+
+pub fn decompress_hex(compressed_hex: str, max_limit: int = 10485760): str? {
+    if (len(compressed_hex) == 0) {
+        return ok("");
+    }
+    unsafe {
+        var lib = hash._open_lib();
+        if (lib != nil and lib != 0) {
+            var fn_decomp = ffi.library_get_symbol(lib, "limitly_zlib_decompress_hex");
+            if (fn_decomp != nil and fn_decomp != 0) {
+                var cs_hex = ffi.string_to_cstring(compressed_hex);
+                var out_buf = ffi.alloc(max_limit + 4);
+                var out_len_p = ffi.alloc(4);
+                ffi.store_i32(out_len_p, max_limit);
+
+                var code = ffi.foreign_call(
+                    fn_decomp,
+                    [ffi.cstring_as_ptr(cs_hex), max_limit, out_buf, out_len_p],
+                    ffi.TYPE_I32,
+                    [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_PTR]
+                ) as int;
+
+                var res: str? = nil;
+                if (code >= 0) {
+                    res = ok(ffi.cstring_to_string(out_buf));
+                }
+
+                ffi.cstring_free(cs_hex);
+                ffi.free(out_buf);
+                ffi.free(out_len_p);
+
+                if (res != nil) {
+                    return res;
+                }
+            }
+        }
+    }
+    return err();
+}
+
+// Convenient aliases for standard string compression round trips
+pub fn compress(data: str, level: int = 6): str? {
+    return compress_hex(data, level);
+}
+
+pub fn decompress(compressed: str, max_limit: int = 10485760): str? {
+    return decompress_hex(compressed, max_limit);
+}

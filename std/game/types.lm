@@ -1,0 +1,258 @@
+// std/game/types.lm
+// Fundamental math primitives, color definitions, and themes for std.game IMGUI
+
+frame Vec2 {
+    pub var x: float;
+    pub var y: float;
+
+    pub init(x: float = 0.0, y: float = 0.0) {
+        self.x = x;
+        self.y = y;
+    }
+}
+
+pub fn vec2(x: float, y: float): Vec2 {
+    return Vec2(x=x, y=y);
+}
+
+frame Rect {
+    pub var x: float;
+    pub var y: float;
+    pub var w: float;
+    pub var h: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0) {
+        self.x = x;
+        self.y = y;
+        self.w = w;
+        self.h = h;
+    }
+
+    pub fn contains(px: float, py: float): bool {
+        return px >= self.x and px <= (self.x + self.w) and py >= self.y and py <= (self.y + self.h);
+    }
+}
+
+pub fn rect(x: float, y: float, w: float, h: float): Rect {
+    return Rect(x=x, y=y, w=w, h=h);
+}
+
+frame Color {
+    pub var r: float;
+    pub var g: float;
+    pub var b: float;
+    pub var a: float;
+
+    pub init(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0) {
+        self.r = r;
+        self.g = g;
+        self.b = b;
+        self.a = a;
+    }
+}
+
+pub fn rgb(r: int, g: int, b: int): Color {
+    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=1.0);
+}
+
+pub fn rgba(r: int, g: int, b: int, a: float): Color {
+    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=a);
+}
+
+pub fn hex(c: int, a: float = 1.0): Color {
+    var r = (c >> 16) & 255;
+    var g = (c >> 8) & 255;
+    var b = c & 255;
+    return rgba(r, g, b, a);
+}
+
+// Built-in standard game palette
+pub var white: Color       = Color(r=1.0, g=1.0, b=1.0, a=1.0);
+pub var black: Color       = Color(r=0.0, g=0.0, b=0.0, a=1.0);
+pub var transparent: Color = Color(r=0.0, g=0.0, b=0.0, a=0.0);
+pub var red: Color         = Color(r=0.92, g=0.25, b=0.25, a=1.0);
+pub var green: Color       = Color(r=0.25, g=0.85, b=0.35, a=1.0);
+pub var blue: Color        = Color(r=0.25, g=0.55, b=0.95, a=1.0);
+pub var yellow: Color      = Color(r=0.95, g=0.85, b=0.20, a=1.0);
+pub var cyan: Color        = Color(r=0.20, g=0.85, b=0.90, a=1.0);
+
+// Style Color Indices for Moddable Stack
+pub var COLOR_WINDOW_BG: int = 0;
+pub var COLOR_WINDOW_TITLE: int = 1;
+pub var COLOR_PANEL_BG: int = 2;
+pub var COLOR_TEXT: int = 3;
+pub var COLOR_TEXT_MUTED: int = 4;
+pub var COLOR_ACCENT: int = 5;
+pub var COLOR_BUTTON: int = 6;
+pub var COLOR_BUTTON_HOVER: int = 7;
+pub var COLOR_BUTTON_ACTIVE: int = 8;
+pub var COLOR_SLIDER_TRACK: int = 9;
+pub var COLOR_SLIDER_THUMB: int = 10;
+pub var COLOR_CHECKBOX_BORDER: int = 11;
+pub var COLOR_CHECKBOX_CHECK: int = 12;
+pub var COLOR_SEPARATOR: int = 13;
+pub var COLOR_FRAME_BG: int = 14;
+pub var COLOR_FRAME_BG_HOVER: int = 15;
+pub var COLOR_FRAME_BG_ACTIVE: int = 16;
+pub var COLOR_TAB: int = 17;
+pub var COLOR_TAB_ACTIVE: int = 18;
+pub var COLOR_PLOT_LINES: int = 19;
+pub var COLOR_PLOT_HISTOGRAM: int = 20;
+
+// Style Var Indices
+pub var VAR_PADDING: int = 0;
+pub var VAR_SPACING: int = 1;
+pub var VAR_ITEM_HEIGHT: int = 2;
+pub var VAR_ROUNDING: int = 3;
+
+frame GUITheme {
+    pub var bg_window: Color;
+    pub var bg_window_title: Color;
+    pub var bg_panel: Color;
+    pub var text: Color;
+    pub var text_muted: Color;
+    pub var accent: Color;
+    pub var btn_normal: Color;
+    pub var btn_hover: Color;
+    pub var btn_active: Color;
+    pub var slider_track: Color;
+    pub var slider_thumb: Color;
+    pub var slider_thumb_hover: Color;
+    pub var checkbox_border: Color;
+    pub var checkbox_check: Color;
+    pub var separator: Color;
+    pub var frame_bg: Color;
+    pub var frame_bg_hover: Color;
+    pub var frame_bg_active: Color;
+    pub var tab_normal: Color;
+    pub var tab_active: Color;
+    pub var plot_lines: Color;
+    pub var plot_histogram: Color;
+    pub var padding: float;
+    pub var spacing: float;
+    pub var item_height: float;
+    pub var rounding: float;
+    pub var font_scale: int;
+
+    pub init() {
+        // Modern game engine slate/dark palette
+        self.bg_window          = hex(0x181a1f, 0.95);
+        self.bg_window_title    = hex(0x21252b, 1.0);
+        self.bg_panel           = hex(0x282c34, 0.90);
+        self.text               = hex(0xabb2bf, 1.0);
+        self.text_muted         = hex(0x5c6370, 1.0);
+        self.accent             = hex(0x61afef, 1.0);
+        self.btn_normal         = hex(0x2c313a, 1.0);
+        self.btn_hover          = hex(0x3e4451, 1.0);
+        self.btn_active         = hex(0x4b5263, 1.0);
+        self.slider_track       = hex(0x1e2227, 1.0);
+        self.slider_thumb       = hex(0x61afef, 1.0);
+        self.slider_thumb_hover = hex(0x98c379, 1.0);
+        self.checkbox_border    = hex(0x4b5263, 1.0);
+        self.checkbox_check     = hex(0x98c379, 1.0);
+        self.separator          = hex(0x3e4451, 0.6);
+        self.frame_bg           = hex(0x21252b, 1.0);
+        self.frame_bg_hover     = hex(0x2c313a, 1.0);
+        self.frame_bg_active    = hex(0x3e4451, 1.0);
+        self.tab_normal         = hex(0x21252b, 1.0);
+        self.tab_active         = hex(0x61afef, 1.0);
+        self.plot_lines         = hex(0x98c379, 1.0);
+        self.plot_histogram     = hex(0xe5c07b, 1.0);
+        self.padding            = 10.0;
+        self.spacing            = 6.0;
+        self.item_height        = 24.0;
+        self.rounding           = 4.0;
+        self.font_scale         = 1;
+    }
+}
+
+pub fn default_theme(): GUITheme {
+    return GUITheme();
+}
+
+pub fn dark_theme(): GUITheme {
+    return GUITheme();
+}
+
+pub fn light_theme(): GUITheme {
+    var t = GUITheme();
+    t.bg_window          = hex(0xf0f2f5, 0.98);
+    t.bg_window_title    = hex(0xdde1e6, 1.0);
+    t.bg_panel           = hex(0xffffff, 1.0);
+    t.text               = hex(0x161616, 1.0);
+    t.text_muted         = hex(0x6f6f6f, 1.0);
+    t.accent             = hex(0x0f62fe, 1.0);
+    t.btn_normal         = hex(0xe0e0e0, 1.0);
+    t.btn_hover          = hex(0xd1d1d1, 1.0);
+    t.btn_active         = hex(0x0f62fe, 1.0);
+    t.slider_track       = hex(0xd0d0d0, 1.0);
+    t.slider_thumb       = hex(0x0f62fe, 1.0);
+    t.slider_thumb_hover = hex(0x0043ce, 1.0);
+    t.checkbox_border    = hex(0x8d8d8d, 1.0);
+    t.checkbox_check     = hex(0x0f62fe, 1.0);
+    t.separator          = hex(0xc6c6c6, 0.8);
+    t.frame_bg           = hex(0xffffff, 1.0);
+    t.frame_bg_hover     = hex(0xebebeb, 1.0);
+    t.frame_bg_active    = hex(0xdddddd, 1.0);
+    t.tab_normal         = hex(0xe0e0e0, 1.0);
+    t.tab_active         = hex(0x0f62fe, 1.0);
+    t.plot_lines         = hex(0x198038, 1.0);
+    t.plot_histogram     = hex(0x0f62fe, 1.0);
+    return t;
+}
+
+pub fn cyberpunk_theme(): GUITheme {
+    var t = GUITheme();
+    t.bg_window          = hex(0x0d0d1a, 0.95);
+    t.bg_window_title    = hex(0x160033, 1.0);
+    t.bg_panel           = hex(0x180040, 0.90);
+    t.text               = hex(0x00f0ff, 1.0);
+    t.text_muted         = hex(0x7928ca, 1.0);
+    t.accent             = hex(0xff0055, 1.0);
+    t.btn_normal         = hex(0x220055, 1.0);
+    t.btn_hover          = hex(0xff007f, 1.0);
+    t.btn_active         = hex(0x00f0ff, 1.0);
+    t.slider_track       = hex(0x1a0033, 1.0);
+    t.slider_thumb       = hex(0xff0055, 1.0);
+    t.slider_thumb_hover = hex(0x00f0ff, 1.0);
+    t.checkbox_border    = hex(0xff0055, 1.0);
+    t.checkbox_check     = hex(0x00f0ff, 1.0);
+    t.separator          = hex(0xff007f, 0.6);
+    t.frame_bg           = hex(0x160033, 1.0);
+    t.frame_bg_hover     = hex(0x2a0066, 1.0);
+    t.frame_bg_active    = hex(0x3a0088, 1.0);
+    t.tab_normal         = hex(0x220055, 1.0);
+    t.tab_active         = hex(0xff0055, 1.0);
+    t.plot_lines         = hex(0x00f0ff, 1.0);
+    t.plot_histogram     = hex(0xff0055, 1.0);
+    return t;
+}
+
+pub fn retro_theme(): GUITheme {
+    var t = GUITheme();
+    t.bg_window          = hex(0xc0c0c0, 1.0);
+    t.bg_window_title    = hex(0x000080, 1.0);
+    t.bg_panel           = hex(0xd4d0c8, 1.0);
+    t.text               = hex(0x000000, 1.0);
+    t.text_muted         = hex(0x808080, 1.0);
+    t.accent             = hex(0x000080, 1.0);
+    t.btn_normal         = hex(0xc0c0c0, 1.0);
+    t.btn_hover          = hex(0xd4d0c8, 1.0);
+    t.btn_active         = hex(0x808080, 1.0);
+    t.slider_track       = hex(0x808080, 1.0);
+    t.slider_thumb       = hex(0xc0c0c0, 1.0);
+    t.slider_thumb_hover = hex(0xffffff, 1.0);
+    t.checkbox_border    = hex(0x808080, 1.0);
+    t.checkbox_check     = hex(0x000000, 1.0);
+    t.separator          = hex(0x808080, 1.0);
+    t.frame_bg           = hex(0xffffff, 1.0);
+    t.frame_bg_hover     = hex(0xffffff, 1.0);
+    t.frame_bg_active    = hex(0xe0e0e0, 1.0);
+    t.tab_normal         = hex(0xc0c0c0, 1.0);
+    t.tab_active         = hex(0xffffff, 1.0);
+    t.plot_lines         = hex(0x008000, 1.0);
+    t.plot_histogram     = hex(0x000080, 1.0);
+    t.rounding           = 0.0;
+    return t;
+}
+

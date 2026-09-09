@@ -1,6 +1,6 @@
 // Standard Library Iterator Module
 
-pub trait Iterator {
+trait Iterator {
     fn next(): any;
 }
 

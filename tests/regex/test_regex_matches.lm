@@ -1,0 +1,58 @@
+// tests/regex/test_regex_matches.lm
+// Test suite for rich regex Match objects, spans, and POSIX regex patterns in std.regex
+
+import std.regex.index as r;
+import std.regex.regex as regex_mod;
+
+fn test_match_spans() {
+    print("=== Testing Regex Match Spans & Attributes ===");
+    var re = r.Regex("[0-9]+", 0);
+    var m = re.find_match("Order #4289 processed in 15 seconds", 0);
+    assert(m.is_matched == true, "Should have found match");
+    assert(m.value == "4289", "Matched value should be 4289");
+    assert(m.start == 7, "Start offset should be 7");
+    assert(m.end == 11, "End offset should be 11");
+    assert(m.length() == 4, "Length should be 4");
+    print("Match: '{m.value}' from {m.start} to {m.end}");
+    print("✓ Match spans passed");
+}
+
+fn test_all_matches() {
+    print("=== Testing all_matches ===");
+    var text = "Price: $12, Tax: $3, Total: $15";
+    var matches = r.all_matches("[0-9]+", text);
+    assert(len(matches) == 3, "Expected 3 matches");
+    assert(matches[0].value == "12", "First match should be 12");
+    assert(matches[1].value == "3", "Second match should be 3");
+    assert(matches[2].value == "15", "Third match should be 15");
+    print("Found {len(matches)} matches: {matches[0].value}, {matches[1].value}, {matches[2].value}");
+    print("✓ all_matches passed");
+}
+
+fn test_patterns_and_replace() {
+    print("=== Testing Replacement & Splitting ===");
+    var re = r.Regex("[0-9]+", 0);
+    var replaced = re.replace("Score: 100 points", "999");
+    assert(replaced == "Score: 999 points", "replace failed");
+
+    var replaced_all = re.replace_all("Item 1, Item 2, Item 3", "#");
+    assert(replaced_all == "Item #, Item #, Item #", "replace_all failed");
+
+    var parts = re.split("apple1banana2cherry");
+    assert(len(parts) == 3, "split count should be 3");
+    assert(parts[0] == "apple", "split part 0 should be apple");
+    assert(parts[1] == "banana", "split part 1 should be banana");
+    assert(parts[2] == "cherry", "split part 2 should be cherry");
+    print("✓ Replacement and splitting passed");
+}
+
+fn main() {
+    test_match_spans();
+    test_all_matches();
+    test_patterns_and_replace();
+    print("========================================");
+    print("All regex match tests passed successfully!");
+    print("========================================");
+}
+
+main();

@@ -11,6 +11,23 @@ ifeq ($(OS),Windows_NT)
 	CC := $(MSYS2_PATH)/mingw64/bin/gcc.exe
 	AR := $(MSYS2_PATH)/mingw64/bin/ar.exe
 	LIBS := -lws2_32 -lffi -lgdi32 -luser32 -lshell32
+	STB_IMAGE_LIB := bin/libstb_image.dll
+	STB_SHARED_FLAGS := -shared -static -static-libgcc
+	LIMITLY_SSL_LIB := bin/liblimitly_ssl.dll
+	SSL_SHARED_FLAGS := -shared -O2 -I $(MSYS2_PATH)/mingw64/include -L $(MSYS2_PATH)/mingw64/lib
+	SSL_LIBS := -lssl -lcrypto -lz -lregex -lcrypt32 -lws2_32
+else ifeq ($(shell uname),Darwin)
+	PLATFORM := linux
+	EXE_EXT :=
+	CXX := g++
+	CC := gcc
+	AR := ar
+	LIBS := -lffi -ldl
+	STB_IMAGE_LIB := bin/libstb_image.dylib
+	STB_SHARED_FLAGS := -shared -fPIC
+	LIMITLY_SSL_LIB := bin/liblimitly_ssl.dylib
+	SSL_SHARED_FLAGS := -shared -fPIC -O2
+	SSL_LIBS := -lssl -lcrypto -lz
 else
 	PLATFORM := linux
 	EXE_EXT :=
@@ -18,6 +35,11 @@ else
 	CC := gcc
 	AR := ar
 	LIBS := -lffi -ldl
+	STB_IMAGE_LIB := bin/libstb_image.so
+	STB_SHARED_FLAGS := -shared -fPIC
+	LIMITLY_SSL_LIB := bin/liblimitly_ssl.so
+	SSL_SHARED_FLAGS := -shared -fPIC -O2
+	SSL_LIBS := -lssl -lcrypto -lz
 endif
 
 # =============================
@@ -26,11 +48,11 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
-	CFLAGS := -std=c99 -g -fPIC -I. -Isrc -Ivendor/sokol
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol -Ivendor/stb $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CFLAGS := -std=c99 -g -fPIC -I. -Isrc -Ivendor/sokol -Ivendor/stb
 else
-	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
-	CFLAGS := -std=c99 -O2 -fPIC -I. -Isrc -Ivendor/sokol
+	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol -Ivendor/stb $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CFLAGS := -std=c99 -O2 -fPIC -I. -Isrc -Ivendor/sokol -Ivendor/stb
 endif
 
 ifeq ($(PLATFORM),windows)
@@ -145,7 +167,7 @@ TEST_RSP := $(RSP_DIR)/build_test.rsp
 # =============================
 # Phony targets
 # =============================
-.PHONY: all clean clear clean-lm check-deps windows linux release debug runtime tests aot-tests
+.PHONY: all clean clear clean-lm check-deps windows linux release debug runtime tests aot-tests stb-image stb-image-test
 
 # =============================
 # Default target
@@ -349,8 +371,87 @@ lir-test: $(BIN_DIR) $(OBJ_DIR)/libLimitly.a $(LIR_TEST_OBJS)
 # =============================
 # Test Target
 # =============================
-tests: $(PLATFORM)
+tests: $(PLATFORM) stb-image
 	@python3 tests/run_tests.py || python tests/run_tests.py
+
+# =============================
+# STB Image shared library (compiled beside limitly executable in bin/)
+# =============================
+# Compiles tests/ffi/stb_wrapper.c (which includes stb_image + stb_image_write)
+# into a platform-native shared library stored beside limitly in bin/.
+#
+#   Linux       : bin/libstb_image.so
+#   Android     : bin/libstb_image.so
+#   macOS       : bin/libstb_image.dylib
+#   Windows     : bin/libstb_image.dll
+#
+stb-image: $(STB_IMAGE_LIB)
+
+$(STB_IMAGE_LIB): tests/ffi/stb_wrapper.c vendor/stb/stb_image.h vendor/stb/stb_image_write.h
+	@echo "🔨 Building STB image shared library beside limitly in bin/ → $@"
+	$(CC) $(STB_SHARED_FLAGS) \
+		-Ivendor/stb \
+		-o $@ \
+		tests/ffi/stb_wrapper.c \
+		-lm
+	@echo "✅ $@ built."
+
+# Android target (using NDK clang or CC)
+ANDROID_API ?= 24
+ANDROID_TARGET ?= aarch64-linux-android
+ifeq ($(strip $(ANDROID_NDK)),)
+	ANDROID_CC := $(CC)
+else
+	ANDROID_CC := $(ANDROID_NDK)/toolchains/llvm/prebuilt/windows-x86_64/bin/$(ANDROID_TARGET)$(ANDROID_API)-clang
+endif
+
+stb-image-android: tests/ffi/stb_wrapper.c vendor/stb/stb_image.h vendor/stb/stb_image_write.h
+	@echo "🔨 Building STB image shared library for Android in bin/ → bin/libstb_image.so"
+	$(ANDROID_CC) -shared -fPIC \
+		-Ivendor/stb \
+		-o bin/libstb_image.so \
+		tests/ffi/stb_wrapper.c \
+		-lm
+	@echo "✅ bin/libstb_image.so built for Android."
+
+# Build the STB lib and run the image integration test.
+# Requires limitly to be built first (depends on $(PLATFORM)).
+stb-image-test: $(PLATFORM) stb-image
+	@echo "🧪 Running std.image integration test ..."
+ifeq ($(PLATFORM),windows)
+	./bin/limitly.exe run tests/ffi/test_image_lib.lm
+	./bin/limitly.exe run tests/ffi/test_image_fluent.lm
+else
+	./bin/limitly run tests/ffi/test_image_lib.lm
+	./bin/limitly run tests/ffi/test_image_fluent.lm
+endif
+	@echo "✅ std.image integration test finished."
+
+# =============================
+# OpenSSL TLS & Crypto shared library (compiled beside limitly in bin/)
+# =============================
+ssl-lib: $(LIMITLY_SSL_LIB)
+
+$(LIMITLY_SSL_LIB): src/native/openssl_wrapper.c
+	@echo "🔨 Building OpenSSL native bridge beside limitly in bin/ → $@"
+	$(CC) $(SSL_SHARED_FLAGS) -o $@ src/native/openssl_wrapper.c $(SSL_LIBS)
+	@echo "✅ $@ built."
+
+ssl-lib-android: src/native/openssl_wrapper.c
+	@echo "🔨 Building OpenSSL native bridge for Android in bin/ → bin/liblimitly_ssl.so"
+	$(ANDROID_CC) -shared -fPIC -O2 -o bin/liblimitly_ssl.so src/native/openssl_wrapper.c -lssl -lcrypto
+	@echo "✅ bin/liblimitly_ssl.so built for Android."
+
+ssl-test: $(PLATFORM) ssl-lib
+	@echo "🧪 Running OpenSSL TLS & Crypto tests ..."
+ifeq ($(PLATFORM),windows)
+	./bin/limitly.exe run tests/crypto/test_crypto.lm
+	./bin/limitly.exe run tests/net/test_tls.lm
+else
+	./bin/limitly run tests/crypto/test_crypto.lm
+	./bin/limitly run tests/net/test_tls.lm
+endif
+	@echo "✅ OpenSSL TLS & Crypto tests passed."
 
 # =============================
 # AOT Test Target

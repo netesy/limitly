@@ -1,0 +1,53 @@
+import std.ffi as ffi;
+
+pub fn increment(value: int): int {
+    return value + 1;
+}
+
+fn main() {
+    print("=== FFI hardening test ===");
+
+    unsafe {
+        var ptr = ffi.alloc(8);
+        assert(ptr != 0, "allocation must succeed");
+
+        ffi.store_u8(ptr, 65);
+        ffi.store_u8(ffi.ptr_add(ptr, 1), 0);
+        match (ffi.cstring_to_string_bounded(ptr, 2)) {
+            val text => { assert(text == "A", "bounded C string conversion must preserve bytes"); },
+            err e => { assert(false, "bounded C string conversion unexpectedly failed"); }
+        }
+        match (ffi.cstring_to_string_bounded(ptr, 1)) {
+            val text => { assert(false, "unterminated bounded C string must fail"); },
+            err e => { assert(true, "unterminated input rejected"); }
+        }
+
+        assert(ffi.ptr_is_aligned(ptr, 0) == false, "zero alignment must be rejected");
+        assert(ffi.ptr_is_aligned(ptr, 3) == false, "non-power-of-two alignment must be rejected");
+
+        ffi.free(ptr);
+        ffi.free(ptr); // Ownership tracking makes duplicate release a no-op.
+
+        match (ffi.create_callback("increment", [ffi.TYPE_I64], ffi.TYPE_I64)) {
+            val callback => {
+                assert(callback.handle > 0, "callback handles reserve zero as invalid");
+                assert(callback.pointer != 0, "callback pointer must be non-null");
+                callback.close();
+                callback.close();
+                assert(callback.is_open == false, "callback close must be idempotent");
+            },
+            err e => { assert(false, "valid callback creation unexpectedly failed"); }
+        }
+
+        match (ffi.create_callback("missing_callback", [ffi.TYPE_I64], ffi.TYPE_I64)) {
+            val callback => { assert(false, "unknown callback function must be rejected"); },
+            err e => { assert(true, "unknown callback rejected"); }
+        }
+        match (ffi.create_callback("increment", [ffi.TYPE_VOID], ffi.TYPE_I64)) {
+            val callback => { assert(false, "void callback argument must be rejected"); },
+            err e => { assert(true, "invalid callback signature rejected"); }
+        }
+    }
+
+    print("=== FFI hardening test PASSED ===");
+}

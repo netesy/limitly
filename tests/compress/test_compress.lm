@@ -1,0 +1,81 @@
+// tests/compress/test_compress.lm
+// Test suite for Limitly std.compress (zlib compression round-trips & decompression limits)
+
+import std.compress.index as compress;
+
+fn test_round_trip() {
+    print("=== Testing Compression Round Trip ===");
+    var text = "Limitly is a modern, fast, and concurrent systems programming language. " +
+               "Repeating sentences compress exceptionally well under deflate. " +
+               "Limitly is a modern, fast, and concurrent systems programming language.";
+
+    var comp_opt = compress.compress(text, 6);
+    var comp = comp_opt? else {
+        assert(false, "Compression failed");
+        return;
+    };
+
+    print("Uncompressed len: {len(text)}, Compressed hex len: {len(comp)}");
+    assert(len(comp) > 0, "Compressed output should not be empty");
+
+    var decomp_opt = compress.decompress(comp);
+    var decomp = decomp_opt? else {
+        assert(false, "Decompression failed");
+        return;
+    };
+
+    assert(decomp == text, "Decompressed text must match original exactly");
+    print("✓ Round trip compression/decompression passed");
+}
+
+fn test_decompression_limits() {
+    print("=== Testing Decompression Limits (Zip-bomb / Exhaustion protection) ===");
+    var text = "Data payload that expands significantly when unpacked! " +
+               "Repeat block 1234567890. Repeat block 1234567890. Repeat block 1234567890.";
+
+    var comp_opt = compress.compress(text, 9);
+    var comp = comp_opt? else {
+        assert(false, "Compression failed");
+        return;
+    };
+
+    // Attempt decompression with a limit smaller than the actual uncompressed payload (e.g. 15 bytes)
+    var limited_opt = compress.decompress(comp, 15);
+    var limit_triggered = false;
+    var bad = limited_opt? else {
+        limit_triggered = true;
+        "";
+    };
+
+    assert(limit_triggered == true, "Decompression limit must abort decompression when limit exceeded");
+    print("✓ Decompression limit enforcement passed (aborted cleanly)");
+}
+
+fn test_empty_string() {
+    print("=== Testing Empty String Round Trip ===");
+    var comp_opt = compress.compress("");
+    var comp = comp_opt? else {
+        assert(false, "Empty string compression failed");
+        return;
+    };
+
+    var decomp_opt = compress.decompress(comp);
+    var decomp = decomp_opt? else {
+        assert(false, "Empty string decompression failed");
+        return;
+    };
+
+    assert(decomp == "", "Empty string round trip should be empty");
+    print("✓ Empty string round trip passed");
+}
+
+fn main() {
+    test_round_trip();
+    test_decompression_limits();
+    test_empty_string();
+    print("========================================");
+    print("All std.compress tests passed successfully!");
+    print("========================================");
+}
+
+main();

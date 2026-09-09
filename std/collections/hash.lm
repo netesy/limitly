@@ -1,7 +1,7 @@
 // Standard Library HashMap Collection
 // This implementation uses the native dict type for efficiency.
 
-pub frame NativeHashMap {
+frame NativeHashMap {
     pub data: {any: any};
     
     pub init() {
@@ -42,7 +42,7 @@ pub frame NativeHashMap {
     }
 }
 
-pub frame NativeHashSet {
+frame NativeHashSet {
     pub data: {any: any};
     
     pub init() {

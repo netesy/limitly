@@ -1,0 +1,48 @@
+// tests/game/test_responsive_resize.lm
+import std.game as game;
+import std.game.types as types;
+import std.gg as gg;
+import std.ui as ui;
+import std.app as app;
+
+fn test_game_resize() {
+    var cfg = game.GameConfig(
+        title="Resize Test",
+        width=800,
+        height=600,
+        resizable=true
+    );
+    var g = game.Game(cfg);
+    assert(g.width == 800, "Initial width should be 800");
+    assert(g.height == 600, "Initial height should be 600");
+
+    // Test programmatically changing resolution
+    g.set_resolution(1024, 720);
+    assert(g.width == 1024, "Resized width should be 1024");
+    assert(g.height == 720, "Resized height should be 720");
+
+    g.set_resolution(1280, 720);
+    assert(g.width == 1280, "Resized width should be 1280");
+    assert(g.height == 720, "Resized height should be 720");
+
+    print("PASS: Game resolution configuration & resizing verified.");
+}
+
+fn test_scroll_flex_height() {
+    var item1 = ui.button("Item 1", nil);
+    var item2 = ui.button("Item 2", nil);
+    var col = ui.column([item1, item2]);
+    var scroll_view = ui.scroll(col);
+
+    // Height was not explicitly constrained, should allow flex
+    assert(scroll_view.height_val <= 0.0, "Scroll view height should be unconstrained by default");
+    print("PASS: Scroll view flexible height verified.");
+}
+
+fn main() {
+    test_game_resize();
+    test_scroll_flex_height();
+    print("All responsive resize tests passed!");
+}
+
+main();

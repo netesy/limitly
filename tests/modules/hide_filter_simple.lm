@@ -8,6 +8,6 @@ print(math1.pi);
 
 print("Test 2: Call factorial");
 var result = math1.factorial(5);
-print("5! = " + result);
+print("5! = {result}");
 
 print("=== Test Complete ===");

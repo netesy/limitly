@@ -1,0 +1,11 @@
+import std.app as app;
+
+fn main(): int {
+    var ev1 = app.Event(event_type=app.EVENT_RESIZE, timestamp=0, window_id=1, x=1200, y=900, key_code=0);
+    app.push_event(ev1);
+    print("Pending events count: {app.has_pending_events()}");
+    var polled = app.poll_event();
+    print("Polled event type: {polled.event_type}, x={polled.x}, y={polled.y}");
+    return 0;
+}
+main();
