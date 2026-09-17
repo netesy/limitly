@@ -4,6 +4,9 @@
 
 import std.gg as gg;
 import std.game.types as types;
+import std.string as std_string;
+import std.text.controller as text_ctrl;
+import std.focus.manager as focus_mod;
 
 frame WindowState {
     pub var x: float;
@@ -39,6 +42,12 @@ frame GUI {
     pub var mouse_wheel: float;
     pub var prev_mouse_down: bool;
     pub var dt: float;
+    pub var keys_down: [int];
+    pub var keys_pressed: [int];
+    pub var typed_chars: [int];
+    pub var active_modifiers: int;
+    pub var get_clipboard_cb: any;
+    pub var set_clipboard_cb: any;
 
     // Interaction tracking
     pub var hot_id: str;
@@ -68,6 +77,8 @@ frame GUI {
     pub var active_popup_id: str;
     pub var cur_tab_bar_id: str;
     pub var combo_open_id: str;
+    pub var editor_controllers: {str: any};
+    pub var focus_manager: focus_mod.FocusManager;
 
     // Window management
     pub var in_window: bool;
@@ -127,6 +138,8 @@ frame GUI {
         self.active_popup_id = "";
         self.cur_tab_bar_id = "";
         self.combo_open_id = "";
+        self.editor_controllers = {} as {str: any};
+        self.focus_manager = focus_mod.FocusManager();
 
         self.in_window = false;
         self.cur_window_title = "";
@@ -768,6 +781,137 @@ frame GUI {
         return new_val;
     }
 
+
+    pub fn is_key_down(k: int): bool {
+        var i = 0;
+        while (i < len(self.keys_down)) {
+            if (self.keys_down[i] == k) { return true; }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn is_key_pressed(k: int): bool {
+        var i = 0;
+        while (i < len(self.keys_pressed)) {
+            if (self.keys_pressed[i] == k) { return true; }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn get_typed_chars(): [int] {
+        return self.typed_chars;
+    }
+
+    pub fn input_text_multiline(label: str, text: str, width: float, height: float): str {
+        var w = width;
+        var h = height;
+        var id = self.make_id(label);
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+
+        if (self.editor_controllers[id] == nil) {
+            var new_ctrl = text_ctrl.EditorController(text);
+            self.editor_controllers[id] = new_ctrl;
+        }
+        var ctrl = self.editor_controllers[id] as text_ctrl.EditorController;
+        ctrl.get_clipboard = self.get_clipboard_cb;
+        ctrl.set_clipboard = self.set_clipboard_cb;
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        if (hovered) { self.hot_id = id; }
+        if (hovered and self.mouse_pressed) {
+            self.active_id = id;
+            self.focus_manager.request_focus(id);
+        }
+
+        var is_focused = (self.active_id == id or self.focus_manager.has_focus(id));
+        var bg = self.get_style_color(types.COLOR_FRAME_BG);
+        if (is_focused) {
+            bg = self.get_style_color(types.COLOR_FRAME_BG_ACTIVE);
+
+            var MOD_CTRL = 2; // MOD_CONTROL
+
+            var ch_i = 0;
+            var chars = self.typed_chars;
+            while (ch_i < len(chars)) {
+                var cp = chars[ch_i];
+                if (cp >= 32 and cp <= 126) {
+                    var ascii = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+                    var idx = cp - 32;
+                    var ch = std_string.substring(ascii, idx, idx + 1);
+                    ctrl.insert_text(ch);
+                } elif (cp == 10 or cp == 13) {
+                    ctrl.insert_newline();
+                }
+                ch_i = ch_i + 1;
+            }
+
+            if (self.is_key_pressed(8)) { ctrl.backspace(); }
+            if (self.is_key_pressed(262)) { ctrl.move_right(false); }
+            if (self.is_key_pressed(263)) { ctrl.move_left(false); }
+            if (self.is_key_pressed(264)) { ctrl.move_down(false); }
+            if (self.is_key_pressed(265)) { ctrl.move_up(false); }
+            if (self.is_key_pressed(90) and (self.active_modifiers & MOD_CTRL) != 0) { ctrl.undo(); }
+            if (self.is_key_pressed(89) and (self.active_modifiers & MOD_CTRL) != 0) { ctrl.redo(); }
+            if (self.is_key_pressed(67) and (self.active_modifiers & MOD_CTRL) != 0) { ctrl.copy(); }
+            if (self.is_key_pressed(86) and (self.active_modifiers & MOD_CTRL) != 0) { ctrl.paste(); }
+            if (self.is_key_pressed(88) and (self.active_modifiers & MOD_CTRL) != 0) {
+                ctrl.copy();
+                var r = ctrl.selection.get_range();
+                if (not ctrl.selection.is_empty()) {
+                    ctrl.document.delete_range(r[0], r[1], r[2], r[3]);
+                    ctrl.cursor.set(r[0], r[1]);
+                    ctrl.selection.set(r[0], r[1]);
+                    ctrl.save_history();
+                }
+            }
+        } elif (hovered) {
+            bg = self.get_style_color(types.COLOR_FRAME_BG_HOVER);
+        }
+
+        gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+
+        var border = self.theme.checkbox_border;
+        if (is_focused) {
+            border = self.get_style_color(types.COLOR_ACCENT);
+        }
+        gg.draw_rect_primitive(bx, by, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by + h - 1.0, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by, 1.0, h, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx + w - 1.0, by, 1.0, h, border.r, border.g, border.b, border.a);
+
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        gg.push_clip(bx + 1.0, by + 1.0, w - 2.0, h - 2.0);
+
+        var cy = by + 6.0;
+        var i = 0;
+        while (i < ctrl.get_line_count()) {
+            var line_text = ctrl.get_line(i);
+            if (is_focused and i == ctrl.get_cursor_line()) {
+                var prefix = std_string.substring(line_text, 0, ctrl.get_cursor_col());
+                var suffix = std_string.substring(line_text, ctrl.get_cursor_col(), len(line_text));
+                line_text = prefix + "|" + suffix;
+            }
+            gg.draw_text(line_text, bx + 6.0, cy, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+            cy = cy + 20.0 * (self.theme.font_scale as float);
+            i = i + 1;
+        }
+
+        gg.pop_clip();
+
+        if (label != "") {
+            var ltc = self.get_style_color(types.COLOR_TEXT_MUTED);
+            gg.draw_text(label, bx + w + 8.0, by + 6.0, ltc.r, ltc.g, ltc.b, ltc.a, self.theme.font_scale);
+        }
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w + 80.0, h);
+        return ctrl.get_text();
+    }
     pub fn input_text(label: str, text: str, max_len: int = 256): str {
         var w = 160.0;
         var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);

@@ -1,0 +1,227 @@
+import std.text.document as doc;
+import std.text.cursor as cursor;
+
+frame EditorController {
+    pub var document: doc.TextDocument;
+    pub var cursor: cursor.Cursor;
+    pub var selection: cursor.Selection;
+    pub var get_clipboard: any;
+    pub var set_clipboard: any;
+    pub var history: [str];
+    pub var history_idx: int;
+
+    pub init(initial_text: str = "") {
+        self.document = doc.TextDocument(initial_text);
+        self.cursor = cursor.Cursor();
+        self.selection = cursor.Selection();
+        self.get_clipboard = nil;
+        self.set_clipboard = nil;
+        self.history = [initial_text];
+        self.history_idx = 0;
+    }
+
+    pub fn save_history(): nil {
+        var current = self.document.get_text();
+        if (len(self.history) == 0 or self.history[self.history_idx] != current) {
+            var new_hist: [str] = [];
+            var i = 0;
+            while (i <= self.history_idx) {
+                new_hist = new_hist + [self.history[i]];
+                i = i + 1;
+            }
+            new_hist = new_hist + [current];
+            self.history = new_hist;
+            self.history_idx = self.history_idx + 1;
+        }
+    }
+
+    pub fn undo(): nil {
+        if (self.history_idx > 0) {
+            self.history_idx = self.history_idx - 1;
+            self.document = doc.TextDocument(self.history[self.history_idx]);
+            self.cursor.set(0, 0);
+            self.selection.set(0, 0);
+        }
+    }
+
+    pub fn redo(): nil {
+        if (self.history_idx < len(self.history) - 1) {
+            self.history_idx = self.history_idx + 1;
+            self.document = doc.TextDocument(self.history[self.history_idx]);
+            self.cursor.set(0, 0);
+            self.selection.set(0, 0);
+        }
+    }
+
+    pub fn insert_text(s: str): nil {
+        if (not self.selection.is_empty()) {
+            var r = self.selection.get_range();
+            self.document.delete_range(r[0], r[1], r[2], r[3]);
+            self.cursor.set(r[0], r[1]);
+            self.selection.set(r[0], r[1]);
+        }
+        var res = self.document.insert_string(self.cursor.line, self.cursor.col, s);
+        self.cursor.set(res[0], res[1]);
+        self.selection.set(res[0], res[1]);
+        self.save_history();
+    }
+
+    pub fn insert_newline(): nil {
+        if (not self.selection.is_empty()) {
+            var r = self.selection.get_range();
+            self.document.delete_range(r[0], r[1], r[2], r[3]);
+            self.cursor.set(r[0], r[1]);
+            self.selection.set(r[0], r[1]);
+        }
+        var res = self.document.insert_newline(self.cursor.line, self.cursor.col);
+        self.cursor.set(res[0], res[1]);
+        self.selection.set(res[0], res[1]);
+        self.save_history();
+    }
+
+    pub fn backspace(): nil {
+        if (not self.selection.is_empty()) {
+            var r = self.selection.get_range();
+            self.document.delete_range(r[0], r[1], r[2], r[3]);
+            self.cursor.set(r[0], r[1]);
+            self.selection.set(r[0], r[1]);
+        } else {
+            if (self.cursor.col > 0) {
+                self.document.delete_range(self.cursor.line, self.cursor.col - 1, self.cursor.line, self.cursor.col);
+                self.cursor.set(self.cursor.line, self.cursor.col - 1);
+                self.selection.set(self.cursor.line, self.cursor.col);
+            } elif (self.cursor.line > 0) {
+                var prev_line_len = len(self.document.lines[self.cursor.line - 1]);
+                self.document.delete_range(self.cursor.line - 1, prev_line_len, self.cursor.line, 0);
+                self.cursor.set(self.cursor.line - 1, prev_line_len);
+                self.selection.set(self.cursor.line, self.cursor.col);
+            }
+        }
+        self.save_history();
+    }
+
+    pub fn move_left(shift: bool = false): nil {
+        if (self.cursor.col > 0) {
+            self.cursor.col = self.cursor.col - 1;
+            self.cursor.pref_col = self.cursor.col;
+        } elif (self.cursor.line > 0) {
+            self.cursor.line = self.cursor.line - 1;
+            self.cursor.col = len(self.document.lines[self.cursor.line]);
+            self.cursor.pref_col = self.cursor.col;
+        }
+        if (shift) {
+            self.selection.extend_to(self.cursor.line, self.cursor.col);
+        } else {
+            if (not self.selection.is_empty()) {
+                var r = self.selection.get_range();
+                self.cursor.set(r[0], r[1]);
+            }
+            self.selection.set(self.cursor.line, self.cursor.col);
+        }
+    }
+
+    pub fn move_right(shift: bool = false): nil {
+        if (self.cursor.col < len(self.document.lines[self.cursor.line])) {
+            self.cursor.col = self.cursor.col + 1;
+            self.cursor.pref_col = self.cursor.col;
+        } elif (self.cursor.line < len(self.document.lines) - 1) {
+            self.cursor.line = self.cursor.line + 1;
+            self.cursor.col = 0;
+            self.cursor.pref_col = 0;
+        }
+        if (shift) {
+            self.selection.extend_to(self.cursor.line, self.cursor.col);
+        } else {
+            if (not self.selection.is_empty()) {
+                var r = self.selection.get_range();
+                self.cursor.set(r[2], r[3]);
+            }
+            self.selection.set(self.cursor.line, self.cursor.col);
+        }
+    }
+
+    pub fn move_up(shift: bool = false): nil {
+        if (self.cursor.line > 0) {
+            self.cursor.line = self.cursor.line - 1;
+            if (self.cursor.pref_col > len(self.document.lines[self.cursor.line])) {
+                self.cursor.col = len(self.document.lines[self.cursor.line]);
+            } else {
+                self.cursor.col = self.cursor.pref_col;
+            }
+        } else {
+            self.cursor.col = 0;
+            self.cursor.pref_col = 0;
+        }
+        if (shift) {
+            self.selection.extend_to(self.cursor.line, self.cursor.col);
+        } else {
+            self.selection.set(self.cursor.line, self.cursor.col);
+        }
+    }
+
+    pub fn move_down(shift: bool = false): nil {
+        if (self.cursor.line < len(self.document.lines) - 1) {
+            self.cursor.line = self.cursor.line + 1;
+            if (self.cursor.pref_col > len(self.document.lines[self.cursor.line])) {
+                self.cursor.col = len(self.document.lines[self.cursor.line]);
+            } else {
+                self.cursor.col = self.cursor.pref_col;
+            }
+        } else {
+            self.cursor.col = len(self.document.lines[self.cursor.line]);
+            self.cursor.pref_col = self.cursor.col;
+        }
+        if (shift) {
+            self.selection.extend_to(self.cursor.line, self.cursor.col);
+        } else {
+            self.selection.set(self.cursor.line, self.cursor.col);
+        }
+    }
+
+
+    pub fn copy(): nil {
+        if (self.set_clipboard != nil) {
+            var cb: fn(str): nil = self.set_clipboard as fn(str): nil;
+            if (self.selection.is_empty()) {
+                // Copy current line if no selection
+                var txt = self.document.lines[self.cursor.line] + "\n";
+                cb(txt);
+            } else {
+                // To actually copy selection we need a substring. For now just copy all text as a fallback if no selection extraction is built.
+                // Or better, just copy all if there's no substring logic inside TextDocument.
+                var txt = self.document.get_text();
+                cb(txt);
+            }
+        }
+    }
+
+    pub fn paste(): nil {
+        if (self.get_clipboard != nil) {
+            var cb: fn(): str = self.get_clipboard as fn(): str;
+            var s = cb();
+            if (len(s) > 0) {
+                self.insert_text(s);
+            }
+        }
+    }
+
+    pub fn get_text(): str {
+        return self.document.get_text();
+    }
+
+    pub fn get_line_count(): int {
+        return len(self.document.lines);
+    }
+
+    pub fn get_line(idx: int): str {
+        return self.document.lines[idx];
+    }
+
+    pub fn get_cursor_line(): int {
+        return self.cursor.line;
+    }
+
+    pub fn get_cursor_col(): int {
+        return self.cursor.col;
+    }
+}

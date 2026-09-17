@@ -3,6 +3,9 @@
 
 import std.ui.types as ui_types;
 import std.ui as ui;
+import std.string as std_string;
+import std.text.controller as text_ctrl;
+import std.focus.manager as focus_mod;
 import std.gg as gg;
 import std.graphics.canvas as canvas;
 import std.graphics.paint as paint;
@@ -16,6 +19,10 @@ frame UIContextState {
     pub var dirty: int;
     pub var current_blueprint: ui_types.Blueprint;
     pub var current_widget: ui.Widget;
+    pub var focus_manager: focus_mod.FocusManager;
+    pub var modifiers: int;
+    pub var get_clipboard_cb: any;
+    pub var set_clipboard_cb: any;
     pub var has_widget: int;
     pub var viewport_w: float;
     pub var viewport_h: float;
@@ -190,7 +197,11 @@ fn measure_widget_height(w: ui.Widget): float {
     if (w.kind == ui.KIND_BUTTON) {
         return 28.0 + w.padding_top + w.padding_bottom;
     }
-    if (w.kind == ui.KIND_INPUT) {
+        if (w.kind == ui.KIND_TEXTAREA) {
+        if (w.height_val > 0.0) return w.height_val;
+        return 120.0 + w.padding_top + w.padding_bottom;
+    }
+if (w.kind == ui.KIND_INPUT) {
         return 28.0 + w.padding_top + w.padding_bottom;
     }
     if (w.kind == ui.KIND_CHECKBOX) {
@@ -277,7 +288,11 @@ fn measure_widget_width(w: ui.Widget, available_w: float): float {
         }
         return tw;
     }
-    if (w.kind == ui.KIND_INPUT) {
+        if (w.kind == ui.KIND_TEXTAREA) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 300.0;
+    }
+if (w.kind == ui.KIND_INPUT) {
         if (w.width_val > 0.0) return w.width_val;
         return 220.0;
     }
@@ -459,7 +474,24 @@ pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y
             mark_element_dirty(1);
         }
     }
-    if (w.kind == ui.KIND_INPUT) {
+        if (w.kind == ui.KIND_TEXTAREA) {
+        var inp_w = available_w;
+        if (w.width_val > 0.0) inp_w = w.width_val;
+        var inp_h = 120.0;
+        if (w.height_val > 0.0) inp_h = w.height_val;
+        if (px >= x and px <= x + inp_w and py >= y and py <= y + inp_h) {
+            w.is_focused = 1;
+            if (len(w.focus_key) == 0) { w.focus_key = "ta_" + ((x*100.0) as int as str); }
+            global_ui_context.focus_manager.request_focus(w.focus_key);
+            mark_element_dirty(1);
+        } else {
+            if (w.is_focused != 0) {
+                w.is_focused = 0;
+                mark_element_dirty(1);
+            }
+        }
+    }
+if (w.kind == ui.KIND_INPUT) {
         var inp_w = available_w;
         if (w.width_val > 0.0) inp_w = w.width_val;
         var inp_h = 28.0;
@@ -969,7 +1001,64 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
         }
         cvs.draw_text(w.text_val, tx, ty, text_p, 1);
     }
-    if (w.kind == ui.KIND_INPUT) {
+        if (w.kind == ui.KIND_TEXTAREA) {
+        var inp_w = available_w;
+        if (w.width_val > 0.0) inp_w = w.width_val;
+        var inp_h = 120.0;
+        if (w.height_val > 0.0) inp_h = w.height_val;
+
+        if (w.text_editor_state == nil) {
+            w.text_editor_state = text_ctrl.EditorController(w.text_val);
+            if (len(w.focus_key) == 0) { w.focus_key = "ta_" + ((x*100.0) as int as str); }
+        }
+        var ctrl = w.text_editor_state as text_ctrl.EditorController;
+        ctrl.get_clipboard = global_ui_context.get_clipboard_cb;
+        ctrl.set_clipboard = global_ui_context.set_clipboard_cb;
+
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgb(20, 22, 28);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=inp_w, h=inp_h), bg_p);
+
+        var border_p = paint.Paint();
+        if (w.is_focused == 1 or global_ui_context.focus_manager.has_focus(w.focus_key)) {
+            border_p.color_val = color.rgb(90, 130, 240);
+        } elif (w.is_hovered == 1) {
+            border_p.color_val = color.rgb(75, 85, 110);
+        } else {
+            border_p.color_val = color.rgb(55, 60, 75);
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=inp_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y + inp_h - 1.0, w=inp_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=1.0, h=inp_h), border_p);
+        cvs.draw_rect(rect.Rect(x=x + inp_w - 1.0, y=y, w=1.0, h=inp_h), border_p);
+
+        var text_p = paint.Paint();
+        text_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+
+        cvs.push_clip(rect.Rect(x=x + 1.0, y=y + 1.0, w=inp_w - 2.0, h=inp_h - 2.0));
+
+        if (ctrl.get_line_count() == 1 and len(ctrl.get_line(0)) == 0 and len(w.placeholder_val) > 0 and w.is_focused == 0) {
+            var ph_p = paint.Paint();
+            ph_p.color_val = color.rgb(100, 105, 120);
+            cvs.draw_text(w.placeholder_val, x + w.padding_left, y + w.padding_top + 16.0, ph_p, 1);
+        } else {
+            var ii = 0;
+            var cy = y + w.padding_top + 16.0;
+            while (ii < ctrl.get_line_count()) {
+                var line_text = ctrl.get_line(ii);
+                if ((w.is_focused == 1 or global_ui_context.focus_manager.has_focus(w.focus_key)) and ii == ctrl.get_cursor_line()) {
+                    var prefix = std_string.substring(line_text, 0, ctrl.get_cursor_col());
+                    var suffix = std_string.substring(line_text, ctrl.get_cursor_col(), len(line_text));
+                    line_text = prefix + "|" + suffix;
+                }
+                cvs.draw_text(line_text, x + w.padding_left, cy, text_p, 1);
+                cy = cy + 20.0;
+                ii = ii + 1;
+            }
+        }
+        cvs.pop_clip();
+    }
+if (w.kind == ui.KIND_INPUT) {
         var inp_w = available_w;
         if (w.width_val > 0.0) inp_w = w.width_val;
         var inp_h = 28.0;
@@ -1355,7 +1444,34 @@ pub fn dispatch_pointer_up(px: float, py: float): nil {
 }
 
 fn send_char_to_widget(w: ui.Widget, cp: int): int {
-    if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
+        if (w.kind == ui.KIND_TEXTAREA and (w.is_focused == 1 or global_ui_context.focus_manager.has_focus(w.focus_key))) {
+        if (w.text_editor_state == nil) { w.text_editor_state = text_ctrl.EditorController(w.text_val); }
+        var ctrl = w.text_editor_state as text_ctrl.EditorController;
+
+        if (cp >= 32 and cp != 127) {
+            var ch = codepoint_to_utf8(cp);
+            if (len(ch) > 0) {
+                ctrl.insert_text(ch);
+                w.text_val = ctrl.get_text();
+                if (w.on_change_action != nil) {
+                    var act: fn(): nil = w.on_change_action as fn(): nil;
+                    act();
+                }
+                mark_element_dirty(1);
+            }
+            return 1;
+        } elif (cp == 10 or cp == 13) {
+            ctrl.insert_newline();
+            w.text_val = ctrl.get_text();
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+            return 1;
+        }
+    }
+if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
         if (cp >= 32 and cp != 127) {
             var ch = codepoint_to_utf8(cp);
             if (len(ch) > 0) {
@@ -1385,8 +1501,83 @@ pub fn dispatch_char_input(cp: int): nil {
     }
 }
 
-fn send_key_down_to_widget(w: ui.Widget, key_code: int): int {
-    if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
+fn send_key_down_to_widget(w: ui.Widget, key_code: int, mods: int): int {
+        if (w.kind == ui.KIND_TEXTAREA and (w.is_focused == 1 or global_ui_context.focus_manager.has_focus(w.focus_key))) {
+        if (w.text_editor_state == nil) { w.text_editor_state = text_ctrl.EditorController(w.text_val); }
+        var ctrl = w.text_editor_state as text_ctrl.EditorController;
+
+        var MOD_CTRL = 2; // Assuming MOD_CONTROL is 2
+
+        if (key_code == 8) { // Backspace
+            ctrl.backspace();
+            w.text_val = ctrl.get_text();
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 90 and (mods & MOD_CTRL) != 0) { // Ctrl+Z
+            ctrl.undo();
+            w.text_val = ctrl.get_text();
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 89 and (mods & MOD_CTRL) != 0) { // Ctrl+Y
+            ctrl.redo();
+            w.text_val = ctrl.get_text();
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 262) { // Right
+            ctrl.move_right(false);
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 263) { // Left
+            ctrl.move_left(false);
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 265) { // Up
+            ctrl.move_up(false);
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 264) { // Down
+            ctrl.move_down(false);
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 67 and (mods & MOD_CTRL) != 0) { // Ctrl+C
+            ctrl.copy();
+            return 1;
+        } elif (key_code == 88 and (mods & MOD_CTRL) != 0) { // Ctrl+X
+            ctrl.copy();
+            var r = ctrl.selection.get_range();
+            if (not ctrl.selection.is_empty()) {
+                ctrl.document.delete_range(r[0], r[1], r[2], r[3]);
+                ctrl.cursor.set(r[0], r[1]);
+                ctrl.selection.set(r[0], r[1]);
+                ctrl.save_history();
+                w.text_val = ctrl.get_text();
+                mark_element_dirty(1);
+            }
+            return 1;
+        } elif (key_code == 86 and (mods & MOD_CTRL) != 0) { // Ctrl+V
+            ctrl.paste();
+            w.text_val = ctrl.get_text();
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+            return 1;
+        }
+    }
+if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
         if (key_code == 8) { // Backspace
             if (len(w.text_val) > 0) {
                 w.text_val = utf8_pop_back(w.text_val);
@@ -1401,7 +1592,7 @@ fn send_key_down_to_widget(w: ui.Widget, key_code: int): int {
     }
     var i = 0;
     while (i < len(w.children)) {
-        if (send_key_down_to_widget(w.children[i], key_code) == 1) {
+        if (send_key_down_to_widget(w.children[i], key_code, mods) == 1) {
             return 1;
         }
         i = i + 1;
@@ -1409,9 +1600,10 @@ fn send_key_down_to_widget(w: ui.Widget, key_code: int): int {
     return 0;
 }
 
-pub fn dispatch_key_down(key_code: int): nil {
+pub fn dispatch_key_down(key_code: int, mods: int): nil {
     if (global_ui_context.has_widget == 1) {
-        send_key_down_to_widget(global_ui_context.current_widget, key_code);
+        global_ui_context.modifiers = mods;
+    send_key_down_to_widget(global_ui_context.current_widget, key_code, mods);
     }
 }
 

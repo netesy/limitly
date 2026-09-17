@@ -285,7 +285,7 @@ pub fn process_events(): nil {
             ui_context.dispatch_pointer_move(ev.x as float, ev.y as float);
         }
         if (ev.event_type == EVENT_KEY_DOWN) {
-            ui_context.dispatch_key_down(ev.key_code);
+            ui_context.dispatch_key_down(ev.key_code, get_modifier_state());
         }
         if (ev.event_type == EVENT_CHAR) {
             ui_context.dispatch_char_input(ev.key_code);
