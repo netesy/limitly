@@ -6,6 +6,18 @@ import std.ui.application as application;
 import std.ui.window as window;
 import std.ui.types as ui_types;
 import std.ui.builder as builder;
+import std.ui.charts as charts;
+
+pub var plot_lines = charts.plot_lines;
+pub var plot_histogram = charts.plot_histogram;
+pub var bar_chart = charts.bar_chart;
+pub var line_chart = charts.line_chart;
+pub var pie_chart = charts.pie_chart;
+pub var doughnut_chart = charts.doughnut_chart;
+pub var bubble_chart = charts.bubble_chart;
+pub var scatter_chart = charts.scatter_chart;
+pub var polar_area_chart = charts.polar_area_chart;
+pub var radar_chart = charts.radar_chart;
 
 pub var Application = application.Application;
 pub var Window = window.Window;
@@ -88,3 +100,49 @@ pub fn vstack(children: [ui.Widget]): ui.Widget {
 pub fn hstack(children: [ui.Widget]): ui.Widget {
     return ui.row(children);
 }
+
+pub fn toggle(enabled: bool = false, on_change: any = nil): ui.Widget {
+    return ui.toggle(enabled, on_change);
+}
+
+pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 100, on_change: any = nil): ui.Widget {
+    return ui.stepper(value, step, min_val, max_val, on_change);
+}
+
+
+pub fn tree_node(label: str, children: [ui.Widget], default_open: bool = false): ui.Widget {
+    return ui.tree_node(label, children, default_open);
+}
+
+pub fn color_picker(label: str, color: ui.Color, on_change: any = nil): ui.Widget {
+    return ui.color_picker(label, color, on_change);
+}
+
+pub fn table(headers: [str], rows: [[ui.Widget]]): ui.Widget {
+    return ui.table(headers, rows);
+}
+
+pub fn grid(columns_count: int, children: [ui.Widget]): ui.Widget {
+    return ui.grid(columns_count, children);
+}
+
+pub fn accordion(title: str, content: ui.Widget, default_open: bool = false): ui.Widget { return ui.accordion(title, content, default_open); }
+pub fn alert(message: str, type_val: str = "info"): ui.Widget { return ui.alert(message, type_val); }
+pub fn calendar(selected_date: str = "2025-01-01"): ui.Widget { return ui.calendar(selected_date); }
+pub fn card(title: str, content: ui.Widget): ui.Widget { return ui.card(title, content); }
+pub fn diff(old_text: str, new_text: str): ui.Widget { return ui.diff(old_text, new_text); }
+pub fn dock(items: [ui.Widget]): ui.Widget { return ui.dock(items); }
+pub fn file_input(label: str = "Choose File...", on_select: any = nil): ui.Widget { return ui.file_input(label, on_select); }
+pub fn filter(query: str = "", placeholder: str = "Filter...", on_change: any = nil): ui.Widget { return ui.filter(query, placeholder, on_change); }
+pub fn indicator(status: str = "online", label: str = ""): ui.Widget { return ui.indicator(status, label); }
+pub fn join(items: [ui.Widget]): ui.Widget { return ui.join(items); }
+pub fn link(text_val: str, url: str): ui.Widget { return ui.link(text_val, url); }
+pub fn list(items: [ui.Widget]): ui.Widget { return ui.list(items); }
+pub fn progress(fraction: float = 0.0, width_val: float = 160.0): ui.Widget { return ui.progress(fraction, width_val); }
+pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0, max_val: float = 100.0): ui.Widget { return ui.range_slider(low, high, min_val, max_val); }
+pub fn stat(title: str, value: str, desc: str = ""): ui.Widget { return ui.stat(title, value, desc); }
+pub fn timeline(events: [ui.Widget]): ui.Widget { return ui.timeline(events); }
+pub fn tooltip(label: str, content: ui.Widget): ui.Widget { return ui.tooltip(label, content); }
+pub fn toast(message: str, type_val: str = "info"): ui.Widget { return ui.toast(message, type_val); }
+pub fn steps(step_titles: [str], active_step: int = 0): ui.Widget { return ui.steps(step_titles, active_step); }
+pub fn mask(shape: str = "circle", child: ui.Widget = empty()): ui.Widget { return ui.mask(shape, child); }

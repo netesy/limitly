@@ -1492,6 +1492,37 @@ frame GUI {
         // End popup
     }
 
+    // ── Table / Grid Layout ───────────────────────────────────────────────────
+
+    pub fn table(headers: [str], rows_count: int, row_height: float = 24.0): bool {
+        var col_count = len(headers);
+        if (col_count == 0) { return false; }
+
+        var pad = self.get_style_var(types.VAR_PADDING, self.theme.padding);
+        var total_w = 400.0;
+        if (self.in_window) {
+            total_w = self.cur_window_w - (pad * 2.0);
+        }
+        var col_w = total_w / (col_count as float);
+
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+        var hbg = self.get_style_color(types.COLOR_PANEL_BG);
+        gg.draw_rect_primitive(bx, by, total_w, row_height, hbg.r, hbg.g, hbg.b, hbg.a);
+
+        var c_idx = 0;
+        while (c_idx < col_count) {
+            var cx = bx + (c_idx as float) * col_w;
+            var tc = self.get_style_color(types.COLOR_ACCENT);
+            gg.draw_text(headers[c_idx], cx + 6.0, by + (row_height - 8.0 * (self.theme.font_scale as float)) / 2.0, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+            c_idx = c_idx + 1;
+        }
+
+        self.columns(col_count, total_w);
+        self.cursor_y = by + row_height + 2.0;
+        return true;
+    }
+
     // ── Scroll Area ────────────────────────────────────────────────────────────
 
     pub fn begin_scroll_area(w: float, h: float, content_h: float): bool {
