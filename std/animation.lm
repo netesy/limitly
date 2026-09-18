@@ -1,0 +1,312 @@
+// std/animation.lm
+// Shared Generic Animation Core Engine for Limit
+// Time-based, interruptible, easing curves, spring physics, transitions, and ID-keyed state store
+
+// Easing Curve Type Identifiers
+pub var EASE_LINEAR: int = 0;
+pub var EASE_IN: int = 1;
+pub var EASE_OUT: int = 2;
+pub var EASE_IN_OUT: int = 3;
+pub var EASE_BOUNCE: int = 4;
+pub var EASE_ELASTIC: int = 5;
+pub var EASE_CUBIC: int = 6;
+pub var EASE_BACK: int = 7;
+
+// Animation Lifecycle States
+pub var STATE_IDLE: int = 0;
+pub var STATE_RUNNING: int = 1;
+pub var STATE_PAUSED: int = 2;
+pub var STATE_COMPLETED: int = 3;
+pub var STATE_CANCELLED: int = 4;
+
+// ── Easing Resolver ─────────────────────────────────────────────────────────
+
+pub fn apply_easing(t: float, type_val: int): float {
+    var progress = t;
+    if (progress < 0.0) progress = 0.0;
+    if (progress > 1.0) progress = 1.0;
+
+    if (type_val == EASE_LINEAR) {
+        return progress;
+    } elif (type_val == EASE_IN) {
+        return progress * progress;
+    } elif (type_val == EASE_OUT) {
+        return progress * (2.0 - progress);
+    } elif (type_val == EASE_IN_OUT) {
+        if (progress < 0.5) {
+            return 2.0 * progress * progress;
+        }
+        return -1.0 + (4.0 - 2.0 * progress) * progress;
+    } elif (type_val == EASE_CUBIC) {
+        return progress * progress * progress;
+    } elif (type_val == EASE_BOUNCE) {
+        if (progress < 0.363) {
+            return 7.5625 * progress * progress;
+        } elif (progress < 0.727) {
+            var p2 = progress - 0.545;
+            return 7.5625 * p2 * p2 + 0.75;
+        } elif (progress < 0.909) {
+            var p3 = progress - 0.818;
+            return 7.5625 * p3 * p3 + 0.9375;
+        }
+        var p4 = progress - 0.954;
+        return 7.5625 * p4 * p4 + 0.984375;
+    } elif (type_val == EASE_BACK) {
+        var s = 1.70158;
+        return progress * progress * ((s + 1.0) * progress - s);
+    }
+    return progress;
+}
+
+// ── Spring Physics Model ───────────────────────────────────────────────────
+
+frame Spring {
+    pub var stiffness: float;
+    pub var damping: float;
+    pub var mass: float;
+    pub var velocity: float;
+
+    pub init(stiffness: float = 180.0, damping: float = 12.0, mass: float = 1.0) {
+        self.stiffness = stiffness;
+        self.damping = damping;
+        self.mass = mass;
+        self.velocity = 0.0;
+    }
+
+    pub fn update(current: float, target: float, dt: float): float {
+        var force = -self.stiffness * (current - target);
+        var damping_force = -self.damping * self.velocity;
+        var accel = (force + damping_force) / self.mass;
+
+        self.velocity = self.velocity + accel * dt;
+        var next_val = current + self.velocity * dt;
+        return next_val;
+    }
+
+    pub fn is_at_rest(current: float, target: float, eps: float = 0.001): bool {
+        var diff = current - target;
+        if (diff < 0.0) diff = -diff;
+        var vel = self.velocity;
+        if (vel < 0.0) vel = -vel;
+        return (diff < eps and vel < eps);
+    }
+}
+
+// ── Interpolation Helpers ──────────────────────────────────────────────────
+
+pub fn lerp_float(a: float, b: float, t: float): float {
+    return a + (b - a) * t;
+}
+
+pub fn lerp_rgba(r1: float, g1: float, b1: float, a1: float, r2: float, g2: float, b2: float, a2: float, t: float): [float] {
+    return [
+        lerp_float(r1, r2, t),
+        lerp_float(g1, g2, t),
+        lerp_float(b1, b2, t),
+        lerp_float(a1, a2, t)
+    ];
+}
+
+// ── Generic Animation Instance ─────────────────────────────────────────────
+
+frame PropertyAnimation {
+    pub var start_val: float;
+    pub var target_val: float;
+    pub var current_val: float;
+    pub var duration: float;
+    pub var elapsed: float;
+    pub var delay: float;
+    pub var easing_type: int;
+    pub var state: int;
+    pub var is_spring: bool;
+    pub var spring_model: Spring;
+
+    pub init(start_v: float = 0.0, target_v: float = 1.0, dur: float = 0.25, easing: int = 0) {
+        self.start_val = start_v;
+        self.target_val = target_v;
+        self.current_val = start_v;
+        self.duration = dur;
+        self.elapsed = 0.0;
+        self.delay = 0.0;
+        self.easing_type = easing;
+        self.state = STATE_IDLE;
+        self.is_spring = false;
+        self.spring_model = Spring();
+    }
+
+    pub fn play(): nil {
+        self.state = STATE_RUNNING;
+    }
+
+    pub fn pause(): nil {
+        self.state = STATE_PAUSED;
+    }
+
+    pub fn stop(): nil {
+        self.state = STATE_COMPLETED;
+        self.current_val = self.target_val;
+    }
+
+    pub fn set_target(new_target: float): nil {
+        if (self.target_val != new_target) {
+            self.start_val = self.current_val; // Interruptible: continue from current visual position!
+            self.target_val = new_target;
+            self.elapsed = 0.0;
+            self.state = STATE_RUNNING;
+        }
+    }
+
+    pub fn update(dt: float): float {
+        if (self.state != STATE_RUNNING) {
+            return self.current_val;
+        }
+
+        if (self.delay > 0.0) {
+            self.delay = self.delay - dt;
+            if (self.delay > 0.0) {
+                return self.current_val;
+            }
+        }
+
+        if (self.is_spring) {
+            self.current_val = self.spring_model.update(self.current_val, self.target_val, dt);
+            if (self.spring_model.is_at_rest(self.current_val, self.target_val)) {
+                self.current_val = self.target_val;
+                self.state = STATE_COMPLETED;
+            }
+        } else {
+            self.elapsed = self.elapsed + dt;
+            if (self.duration <= 0.0) {
+                self.current_val = self.target_val;
+                self.state = STATE_COMPLETED;
+            } else {
+                var progress = self.elapsed / self.duration;
+                if (progress >= 1.0) {
+                    progress = 1.0;
+                    self.current_val = self.target_val;
+                    self.state = STATE_COMPLETED;
+                } else {
+                    var eased_t = apply_easing(progress, self.easing_type);
+                    self.current_val = lerp_float(self.start_val, self.target_val, eased_t);
+                }
+            }
+        }
+        return self.current_val;
+    }
+}
+
+// ── Transition Abstraction ─────────────────────────────────────────────────
+
+frame Transition {
+    pub var opacity_anim: PropertyAnimation;
+    pub var scale_anim: PropertyAnimation;
+    pub var slide_x_anim: PropertyAnimation;
+    pub var slide_y_anim: PropertyAnimation;
+    pub var active: bool;
+
+    pub init() {
+        self.opacity_anim = PropertyAnimation(0.0, 1.0, 0.25, EASE_OUT);
+        self.scale_anim = PropertyAnimation(0.9, 1.0, 0.25, EASE_OUT);
+        self.slide_x_anim = PropertyAnimation(0.0, 0.0, 0.25, EASE_OUT);
+        self.slide_y_anim = PropertyAnimation(20.0, 0.0, 0.25, EASE_OUT);
+        self.active = true;
+    }
+
+    pub fn fade(start_a: float = 0.0, end_a: float = 1.0, dur: float = 0.25): Transition {
+        self.opacity_anim = PropertyAnimation(start_a, end_a, dur, EASE_OUT);
+        return self;
+    }
+
+    pub fn scale(start_s: float = 0.9, end_s: float = 1.0, dur: float = 0.25): Transition {
+        self.scale_anim = PropertyAnimation(start_s, end_s, dur, EASE_OUT);
+        return self;
+    }
+
+    pub fn slide(start_y: float = 20.0, end_y: float = 0.0, dur: float = 0.25): Transition {
+        self.slide_y_anim = PropertyAnimation(start_y, end_y, dur, EASE_OUT);
+        return self;
+    }
+
+    pub fn update(dt: float): nil {
+        if (self.active) {
+            self.opacity_anim.update(dt);
+            self.scale_anim.update(dt);
+            self.slide_x_anim.update(dt);
+            self.slide_y_anim.update(dt);
+        }
+    }
+}
+
+// ── Shared Animation Manager ───────────────────────────────────────────────
+
+frame AnimationManager {
+    pub var active_animations: [PropertyAnimation];
+
+    pub init() {
+        self.active_animations = [] as [PropertyAnimation];
+    }
+
+    pub fn add(anim: PropertyAnimation): PropertyAnimation {
+        anim.play();
+        self.active_animations.append(anim);
+        return anim;
+    }
+
+    pub fn update_all(dt: float): nil {
+        var remaining: [PropertyAnimation] = [];
+        var i = 0;
+        while (i < len(self.active_animations)) {
+            var anim = self.active_animations[i];
+            anim.update(dt);
+            if (anim.state == STATE_RUNNING or anim.state == STATE_PAUSED) {
+                remaining.append(anim);
+            }
+            i = i + 1;
+        }
+        self.active_animations = remaining;
+    }
+}
+
+// ── Immediate Mode Transient Animation State Store (Keyed by Stable ID) ────
+
+frame IMGUIAnimationState {
+    pub var id: str;
+    pub var float_anims: {str: PropertyAnimation};
+
+    pub init(id: str = "") {
+        self.id = id;
+        self.float_anims = {} as {str: PropertyAnimation};
+    }
+
+    pub fn animate_property(prop_name: str, target: float, dur: float = 0.15, easing: int = 2, dt: float = 0.016): float {
+        var anim = self.float_anims[prop_name] as PropertyAnimation;
+        if (anim == nil) {
+            anim = PropertyAnimation(target, target, dur, easing);
+            anim.play();
+            self.float_anims[prop_name] = anim;
+            return target;
+        }
+        anim.set_target(target);
+        return anim.update(dt);
+    }
+}
+
+frame IMGUIAnimationStore {
+    pub var states: {str: IMGUIAnimationState};
+
+    pub init() {
+        self.states = {} as {str: IMGUIAnimationState};
+    }
+
+    pub fn get_or_create(id: str): IMGUIAnimationState {
+        var st = self.states[id] as IMGUIAnimationState;
+        if (st == nil) {
+            st = IMGUIAnimationState(id);
+            self.states[id] = st;
+        }
+        return st;
+    }
+}
+
+pub var global_animation_manager: AnimationManager = AnimationManager();
+pub var global_imgui_anim_store: IMGUIAnimationStore = IMGUIAnimationStore();

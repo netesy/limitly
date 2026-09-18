@@ -3,8 +3,10 @@
 
 import std.text.controller as text_ctrl;
 import std.ui.charts as charts_mod;
+import std.animation as anim_mod;
 
 pub var charts = charts_mod;
+pub var animation = anim_mod;
 
 frame Color {
     pub var r: float; // 0.0 to 1.0
@@ -267,6 +269,11 @@ frame Widget {
     pub var text_editor_state: any;
     pub var focus_key: str;
 
+    pub var opacity_val: float;
+    pub var scale_val: float;
+    pub var anim_property: anim_mod.PropertyAnimation;
+    pub var active_transition: anim_mod.Transition;
+
     pub init(k: int) {
         self.kind = k;
         self.text_val = "";
@@ -311,6 +318,47 @@ frame Widget {
         self.is_open = 0;
         self.text_editor_state = nil;
         self.focus_key = "";
+
+        self.opacity_val = 1.0;
+        self.scale_val = 1.0;
+        self.anim_property = nil;
+        self.active_transition = nil;
+    }
+
+    pub fn opacity(o: float): Widget {
+        self.opacity_val = o;
+        return self;
+    }
+
+    pub fn scale(s: float): Widget {
+        self.scale_val = s;
+        return self;
+    }
+
+    pub fn animate(duration: float = 0.25, easing: int = 0): Widget {
+        if (self.anim_property == nil) {
+            self.anim_property = anim_mod.PropertyAnimation(0.0, 1.0, duration, easing);
+            self.anim_property.play();
+        } else {
+            self.anim_property.duration = duration;
+            self.anim_property.easing_type = easing;
+        }
+        return self;
+    }
+
+    pub fn spring(stiffness: float = 180.0, damping: float = 12.0): Widget {
+        if (self.anim_property == nil) {
+            self.anim_property = anim_mod.PropertyAnimation(0.0, 1.0, 0.25, 0);
+        }
+        self.anim_property.is_spring = true;
+        self.anim_property.spring_model = anim_mod.Spring(stiffness, damping);
+        self.anim_property.play();
+        return self;
+    }
+
+    pub fn transition(trans: anim_mod.Transition): Widget {
+        self.active_transition = trans;
+        return self;
     }
 
     pub fn checked(c: bool): Widget {

@@ -1953,6 +1953,22 @@ if (w.kind == ui.KIND_INPUT) {
     }
 }
 
+pub fn update_animations_recursive(w: ui.Widget, dt: float): nil {
+    if (w.anim_property != nil) {
+        w.anim_property.update(dt);
+        mark_element_dirty(1);
+    }
+    if (w.active_transition != nil) {
+        w.active_transition.update(dt);
+        mark_element_dirty(1);
+    }
+    var i = 0;
+    while (i < len(w.children)) {
+        update_animations_recursive(w.children[i], dt);
+        i = i + 1;
+    }
+}
+
 pub fn frame_update(delta_time: float): nil {
     var vw = global_ui_context.viewport_w;
     var vh = global_ui_context.viewport_h;
@@ -1966,6 +1982,7 @@ pub fn frame_update(delta_time: float): nil {
         content_h = 100.0;
     }
     if (global_ui_context.has_widget == 1) {
+        update_animations_recursive(global_ui_context.current_widget, delta_time);
         render_widget_node(global_ui_context.current_widget, 20.0, 20.0, content_w, content_h, cvs);
     } else {
         render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, content_w, content_h, cvs);

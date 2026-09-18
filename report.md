@@ -1,5 +1,5 @@
-# Comprehensive Architectural Analysis & Framework Parity Report
-**Limit UI Framework (`std.ui`) & Immediate-Mode Game GUI (`std.game.gui`)**
+# Comprehensive Architectural Analysis & Unified Subsystems Report
+**Limit UI Framework (`std.ui`), Immediate-Mode Game GUI (`std.game.gui`), & Unified Animation System (`std.animation`)**
 
 ---
 
@@ -9,7 +9,7 @@ Limit features a dual-paradigm GUI architecture:
 1. **`std.ui`**: A retained-mode, fluent, declarative UI framework designed for applications, desktop tools, and cloud consoles (`gui_showcase.lm`).
 2. **`std.game.gui`**: An immediate-mode (IMGUI), zero-DOM procedural engine optimized for games, HUD overlays, tools, and real-time interactive scenes (`game_showcase.lm`).
 
-By examining world-class retained-mode frameworks (**Qt**, **SwiftUI**, **Flutter**) and immediate-mode frameworks (**Dear ImGui**), this report evaluates how Limit leverages their proven strengths, avoids historical architectural pitfalls, achieves complete end-to-end widget parity across both paradigms, and establishes single shared core abstractions (following the precedent set by `std.text.controller.EditorController` and `std.graphics.text_layout`) so zero implementation logic is ever duplicated.
+By examining world-class retained-mode frameworks (**Qt/QML**, **SwiftUI**, **Flutter**, **Jetpack Compose**, **UIKit**) and immediate-mode frameworks (**Dear ImGui**), this report documents Limit's shared core architecture, widget parity, complete 10-chart data visualization suite (`std/ui/charts.lm`), and the newly implemented **Unified Animation Subsystem (`std.animation`)**.
 
 ---
 
@@ -54,7 +54,7 @@ By examining world-class retained-mode frameworks (**Qt**, **SwiftUI**, **Flutte
 
 ---
 
-## Part 3: Complete Widget Audit & 35+ Component Parity Matrix (Fully Updated)
+## Part 3: Complete Widget Audit & 35+ Component Parity Matrix
 
 The table below details all 35+ widgets available across `std.ui` (Retained) and `std.game.gui` (Immediate) against world-class standards:
 
@@ -83,79 +83,49 @@ The table below details all 35+ widgets available across `std.ui` (Retained) and
 
 ---
 
-## Part 4: Single Abstraction Architecture Strategy ("Write Once, Run in Both")
+## Part 4: Unified Animation Subsystem (`std.animation`)
 
-To prevent repeating code logic between `std.ui` and `std.game.gui`, we apply the **Single Core Abstraction Model**. Just as text editing was bridged via `std.text.controller.EditorController` and `std.graphics.text_layout`, four key foundational abstractions bridge the entire UI ecosystem:
+The **Unified Animation Subsystem (`std.animation`)** is built as a single shared core that drives both `std.ui` (Retained) and `std.game.gui` (Immediate) without duplicating implementation logic.
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                          APPLICATIONS & GAMES                           │
-│     (Desktop Apps, Cloud Consoles)           (2D/3D Game Engines, HUD)   │
-└────────────────────┬────────────────────────────────────┬───────────────┘
-                     │                                    │
-          ┌──────────▼──────────┐              ┌──────────▼──────────┐
-          │   RETAINED MODE     │              │   IMMEDIATE MODE    │
-          │     `std.ui`        │              │   `std.game.gui`    │
-          └──────────┬──────────┘              └──────────┬──────────┘
-                     │                                    │
-─────────────────────┴────────────────────────────────────┴─────────────────────
-                        SHARED CORE ABSTRACTION LAYER
-────────────────────────────────────────────────────────────────────────────────
- ┌─────────────────────────┐  ┌─────────────────────────┐  ┌──────────────────┐
- │  1. Text & Layout Core  │  │  2. Theme & Style Token │  │  3. Focus & Nav  │
- │  - EditorController     │  │  - Palette Tokens       │  │  - FocusManager  │
- │  - TextLayout / HitTest │  │  - Metrics & Spacing    │  │  - Tab Navigation│
- └────────────┬────────────┘  └────────────┬────────────┘  └────────┬─────────┘
-              │                            │                       │
-              └────────────────────────────┼───────────────────────┘
-                                           │
-                              ┌────────────▼───────────┐
-                              │  4. Vector Canvas Core │
-                              │  - `std.gg` Primitives │
-                              │  - Scissor Clip Stack  │
-                              └────────────────────────┘
+                         APPLICATION
+                              │
+                 ┌────────────┴────────────┐
+                 │                         │
+             std.ui                 std.game.gui
+          Retained Mode             Immediate Mode
+                 │                         │
+                 └────────────┬────────────┘
+                              │
+                   SHARED UI CORE
+                              │
+          ┌───────────────────┼──────────────────┐
+          │                   │                  │
+        State             Animation            Input
+          │                   │                  │
+          └───────────────────┼──────────────────┘
+                              │
+                           std.gg
 ```
 
-### The 4 Unified Core Abstractions
-
-1. **Text & Input Abstraction Engine (`std.text.controller` & `std.graphics.text_layout`)**:
-   * *Status*: Active & Integrated across both frameworks.
-   * *Role*: Manages multiline cursor navigation, selection highlights, character mutation, undo/redo buffers, line wrapping, font scale measurement, and coordinate hit testing.
-   * *Usage*: Drives both `ui.textarea()` / `ui.input()` (retained) and `gui.input_text_multiline()` / `gui.input_text()` (immediate).
-
-2. **Unified Theme & Token System (`std.ui.theme` / `std.game.types`)**:
-   * *Architecture*: Unifies `GUITheme` (used by game GUI) and `Style` (used by retained UI) into a shared semantic token palette:
-     * Surface colors (`bg_window`, `bg_panel`, `frame_bg`, `frame_hover`, `frame_active`).
-     * Accent colors (`accent`, `accent_hover`, `text_primary`, `text_muted`).
-     * Metrics (`padding`, `spacing`, `item_height`, `corner_radius`, `font_scale`).
-   * *Benefit*: Changing a theme token instantly updates both retained UI panels and immediate game HUDs.
-
-3. **Unified Focus & Event Navigation Manager (`std.focus.manager`)**:
-   * *Architecture*: Global input router that handles:
-     * Focus registration (`request_focus(id)`).
-     * Keyboard tab traversal (Tab / Shift+Tab cycling).
-     * Shortcut routing (Ctrl+C, Ctrl+V, Esc, Enter).
-   * *Benefit*: Ensures consistent accessibility and keyboard navigation across both retained views and game dialogs.
-
-4. **Unified Vector & Scissor Rendering Pipeline (`std.gg`)**:
-   * *Architecture*: Both frameworks issue primitive calls to `std.gg`:
-     * Filled & stroked rectangles (`draw_rect_primitive`).
-     * Text rendering with font scale (`draw_text`).
-     * Clip stack manipulation (`push_clip` / `pop_clip`).
-   * *Benefit*: Ensures identical anti-aliasing, scissor clipping correctness, and hardware acceleration regardless of UI paradigm.
+### Key Subsystem Components (`std/animation.lm`):
+1. **Generic Time-Based Animation (`PropertyAnimation`)**: Time/dt-driven animation engine supporting interruptible target shifts. If target changes mid-flight, animation seamlessly continues from current visual value rather than resetting.
+2. **Easing Functions (`apply_easing`)**: Linear, ease_in, ease_out, ease_in_out, cubic, bounce, and back curves.
+3. **Spring Physics (`Spring`)**: Damped harmonic oscillator model (`stiffness`, `damping`, `mass`, `velocity`) for natural physics-driven transitions.
+4. **First-Class Transitions (`Transition`)**: Composable enter/exit transitions combining `.fade()`, `.scale()`, and `.slide()`.
+5. **Immediate-Mode State Store (`IMGUIAnimationStore`)**: Keyed by stable widget IDs (`id_prefix` / control IDs) so IMGUI controls (`gui.button`, `gui.toggle`) maintain transient visual interpolation states without turning into retained trees.
+6. **Retained Fluent Modifiers**: Fluent methods `.animate()`, `.spring()`, `.opacity()`, `.scale()`, `.transition()` added to `ui.Widget`.
 
 ---
 
 ## Part 5: Integration Testing & Verification Results
 
-The complete widget suite and expanded chart engine were verified using `tests/ui_widgets_test.lm`:
-- **Widget Constructors & Properties**: 100% passing across all 35+ components.
-- **Chart Suite Constructors**: 100% passing for `plot_lines`, `plot_histogram`, `bar_chart`, `line_chart`, `pie_chart`, `doughnut_chart`, `bubble_chart`, `scatter_chart`, `polar_area_chart`, and `radar_chart`.
-- **Measurement & Render Passes**: Verified through `ctx.frame_update(0.016)` canvas passes.
-- **Interaction Dispatching**: Verified through `ctx.dispatch_pointer_click` and `ctx.dispatch_pointer_move`.
+All components and subsystems were verified using dedicated integration test suites:
+- `tests/ui_widgets_test.lm`: 100% passing across 35+ components and full 10-chart suite.
+- `tests/animation_test.lm`: 100% passing across time-based easing, interruptible target shifts, spring physics convergence, IMGUI stable ID store, and retained UI modifiers.
 
 ---
 
 ## Conclusion
 
-By introducing shared core abstractions (`EditorController`, `FocusManager`, `GUITheme`/`Style`, and `std.gg`), expanding `std/ui/charts.lm` with a complete 10-chart data visualization suite (`plot_lines`, `plot_histogram`, `bar_chart`, `line_chart`, `pie_chart`, `doughnut_chart`, `bubble_chart`, `scatter_chart`, `polar_area_chart`, `radar_chart`), and implementing end-to-end rendering and interaction dispatch in `std/ui/context.lm` for all 35+ widgets, Limit achieves full end-to-end feature parity across Retained and Immediate mode frameworks with zero code duplication.
+By introducing shared core abstractions (`EditorController`, `FocusManager`, `GUITheme`/`Style`, `std.animation`, and `std.gg`), expanding `std/ui/charts.lm` with a complete 10-chart data visualization suite, and implementing the Unified Animation System across both paradigms, Limit achieves full end-to-end feature parity with zero code duplication.

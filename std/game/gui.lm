@@ -9,6 +9,7 @@ import std.text.controller as text_ctrl;
 import std.focus.manager as focus_mod;
 import std.graphics.text_layout as layout_mod;
 import std.ui.viewport as viewport_mod;
+import std.animation as anim;
 
 frame WindowState {
     pub var x: float;
@@ -94,6 +95,7 @@ frame GUI {
     // Persistent storage for windows & collapsing headers
     pub var windows: {str: WindowState};
     pub var headers: {str: bool};
+    pub var anim_store: anim.IMGUIAnimationStore;
 
     // Moddable Style Stack
     pub var style_color_indices: [int];
@@ -154,6 +156,7 @@ frame GUI {
 
         self.windows = {} as {str: WindowState};
         self.headers = {} as {str: bool};
+        self.anim_store = anim.global_imgui_anim_store;
 
         self.style_color_indices = [];
         self.style_color_stack = [];
@@ -468,11 +471,22 @@ frame GUI {
             self.active_id = id;
         }
 
+        var hover_target = 0.0;
+        if (hovered) { hover_target = 1.0; }
+        var ast = self.anim_store.get_or_create(id);
+        var hover_t = ast.animate_property("hover_t", hover_target, 0.15, anim.EASE_OUT, self.dt);
+
         var bg = self.get_style_color(types.COLOR_BUTTON);
         if (self.active_id == id) {
             bg = self.get_style_color(types.COLOR_BUTTON_ACTIVE);
-        } elif (self.hot_id == id) {
-            bg = self.get_style_color(types.COLOR_BUTTON_HOVER);
+        } else if (hover_t > 0.0) {
+            var hbg = self.get_style_color(types.COLOR_BUTTON_HOVER);
+            bg = types.Color(
+                r=anim.lerp_float(bg.r, hbg.r, hover_t),
+                g=anim.lerp_float(bg.g, hbg.g, hover_t),
+                b=anim.lerp_float(bg.b, hbg.b, hover_t),
+                a=anim.lerp_float(bg.a, hbg.a, hover_t)
+            );
         }
 
         gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);

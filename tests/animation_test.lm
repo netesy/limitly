@@ -1,0 +1,112 @@
+// Comprehensive Integration Tests for Limit Unified Animation System
+import std.animation as anim;
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.game.gui as gui_mod;
+
+fn test_time_based_property_animation(): nil {
+    print("Testing PropertyAnimation easing and time-based progression...");
+
+    var p_anim = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.EASE_OUT);
+    p_anim.play();
+
+    assert(p_anim.state == anim.STATE_RUNNING, "state running");
+
+    // Advance 0.5s
+    var v1 = p_anim.update(0.5);
+    assert(v1 > 0.0 and v1 < 100.0, "mid progress");
+
+    // Advance to 1.0s (completion)
+    var v2 = p_anim.update(0.5);
+    assert(v2 == 100.0, "completed value");
+    assert(p_anim.state == anim.STATE_COMPLETED, "state completed");
+
+    print("PropertyAnimation test passed.");
+}
+
+fn test_interruptible_target_changes(): nil {
+    print("Testing interruptible target changes...");
+
+    var anim_inst = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.EASE_LINEAR);
+    anim_inst.play();
+
+    // Advance 0.5s -> value is 50
+    var mid_val = anim_inst.update(0.5);
+    assert(mid_val == 50.0, "halfway value");
+
+    // Change target mid-animation to 0.0
+    anim_inst.set_target(0.0);
+    assert(anim_inst.start_val == 50.0, "interrupted start val preserved");
+    assert(anim_inst.target_val == 0.0, "new target val set");
+
+    // Advance 0.5s -> should move from 50.0 towards 0.0
+    var v_next = anim_inst.update(0.5);
+    assert(v_next < 50.0, "moving smoothly towards new target from current visual state");
+
+    print("Interruptible animation test passed.");
+}
+
+fn test_spring_physics(): nil {
+    print("Testing Spring physics convergence...");
+
+    var spr = anim.Spring(180.0, 12.0, 1.0);
+    var current = 0.0;
+    var target = 100.0;
+
+    var steps = 0;
+    while (not spr.is_at_rest(current, target) and steps < 200) {
+        current = spr.update(current, target, 0.016);
+        steps = steps + 1;
+    }
+
+    assert(spr.is_at_rest(current, target), "spring reached rest state");
+    print("Spring physics test passed.");
+}
+
+fn test_imgui_animation_store(): nil {
+    print("Testing IMGUI Animation Store with stable IDs...");
+
+    var store = anim.IMGUIAnimationStore();
+    var btn_id = "main_menu/start_btn";
+
+    var st = store.get_or_create(btn_id);
+    var t1 = st.animate_property("hover_t", 1.0, 0.1, anim.EASE_OUT, 0.05);
+    assert(t1 > 0.0 and t1 < 1.0, "imgui animated transition in progress");
+
+    var t2 = st.animate_property("hover_t", 1.0, 0.1, anim.EASE_OUT, 0.1);
+    assert(t2 == 1.0, "imgui animated transition completed");
+
+    print("IMGUI Animation Store test passed.");
+}
+
+fn test_retained_ui_animation_modifiers(): nil {
+    print("Testing std.ui retained animation modifiers...");
+
+    var btn = ui.button("Animated Btn")
+        .opacity(0.8)
+        .scale(1.1)
+        .animate(0.2, anim.EASE_OUT)
+        .spring(200.0, 15.0)
+        .transition(anim.Transition().fade(0.0, 1.0, 0.2));
+
+    assert(btn.opacity_val == 0.8, "opacity modifier");
+    assert(btn.scale_val == 1.1, "scale modifier");
+    assert(btn.anim_property != nil, "animate property created");
+    assert(btn.anim_property.is_spring, "spring model enabled");
+    assert(btn.active_transition != nil, "active transition attached");
+
+    print("Retained UI animation modifiers test passed.");
+}
+
+fn main(): int {
+    print("=== Running Unified Animation System Integration Test Suite ===");
+    test_time_based_property_animation();
+    test_interruptible_target_changes();
+    test_spring_physics();
+    test_imgui_animation_store();
+    test_retained_ui_animation_modifiers();
+    print("=== All Unified Animation System Tests Passed Successfully ===");
+    return 0;
+}
+
+main();
