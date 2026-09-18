@@ -1,0 +1,126 @@
+import std.string as string_mod;
+
+frame TextDocument {
+    pub var lines: [str];
+
+    pub init(initial_text: str = "") {
+        self.lines = string_mod.split(initial_text, "\n");
+        if (self.lines == nil or len(self.lines) == 0) {
+            self.lines = [""];
+        }
+        var i = 0;
+        while (i < len(self.lines)) {
+            if (self.lines[i] == nil) {
+                self.lines[i] = "";
+            }
+            i = i + 1;
+        }
+    }
+
+    pub fn get_text(): str {
+        if (len(self.lines) == 0) { return ""; }
+        var result = self.lines[0];
+        var i = 1;
+        while (i < len(self.lines)) {
+            result = result + "\n" + self.lines[i];
+            i = i + 1;
+        }
+        return result;
+    }
+
+    pub fn insert_string(line: int, col: int, s: str): (int, int) {
+        if (line < 0 or line >= len(self.lines)) { return (line, col); }
+        var current_line = self.lines[line];
+        if (col < 0) { col = 0; }
+        if (col > len(current_line)) { col = len(current_line); }
+
+        var s_lines = string_mod.split(s, "\n");
+        if (len(s_lines) == 1) {
+            var prefix = string_mod.substring(current_line, 0, col);
+            var suffix = string_mod.substring(current_line, col, len(current_line));
+            self.lines[line] = prefix + s + suffix;
+            return (line, col + len(s));
+        } else {
+            var prefix = string_mod.substring(current_line, 0, col);
+            var suffix = string_mod.substring(current_line, col, len(current_line));
+            self.lines[line] = prefix + s_lines[0];
+
+            var new_lines: [str] = [];
+            var i = 0;
+            while (i <= line) {
+                new_lines = new_lines + [self.lines[i]];
+                i = i + 1;
+            }
+
+            var j = 1;
+            while (j < len(s_lines) - 1) {
+                new_lines = new_lines + [s_lines[j]];
+                j = j + 1;
+            }
+
+            var last_line = s_lines[len(s_lines) - 1];
+            new_lines = new_lines + [last_line + suffix];
+
+            while (i < len(self.lines)) {
+                new_lines = new_lines + [self.lines[i]];
+                i = i + 1;
+            }
+            self.lines = new_lines;
+            return (line + len(s_lines) - 1, len(last_line));
+        }
+    }
+
+    pub fn delete_range(start_line: int, start_col: int, end_line: int, end_col: int): nil {
+        if (start_line == end_line) {
+            if (start_line >= 0 and start_line < len(self.lines)) {
+                var l = self.lines[start_line];
+                var prefix = string_mod.substring(l, 0, start_col);
+                var suffix = string_mod.substring(l, end_col, len(l));
+                self.lines[start_line] = prefix + suffix;
+            }
+        } else {
+            if (start_line >= 0 and end_line < len(self.lines)) {
+                var first = self.lines[start_line];
+                var last = self.lines[end_line];
+                var prefix = string_mod.substring(first, 0, start_col);
+                var suffix = string_mod.substring(last, end_col, len(last));
+                self.lines[start_line] = prefix + suffix;
+
+                var new_lines: [str] = [];
+                var i = 0;
+                while (i < len(self.lines)) {
+                    if (i <= start_line or i > end_line) {
+                        new_lines = new_lines + [self.lines[i]];
+                    }
+                    i = i + 1;
+                }
+                self.lines = new_lines;
+            }
+        }
+    }
+
+    pub fn insert_newline(line: int, col: int): (int, int) {
+        if (line < 0 or line >= len(self.lines)) { return (line, col); }
+        var current_line = self.lines[line];
+        if (col < 0) { col = 0; }
+        if (col > len(current_line)) { col = len(current_line); }
+
+        var prefix = string_mod.substring(current_line, 0, col);
+        var suffix = string_mod.substring(current_line, col, len(current_line));
+        self.lines[line] = prefix;
+
+        var new_lines: [str] = [];
+        var i = 0;
+        while (i <= line) {
+            new_lines = new_lines + [self.lines[i]];
+            i = i + 1;
+        }
+        new_lines = new_lines + [suffix];
+        while (i < len(self.lines)) {
+            new_lines = new_lines + [self.lines[i]];
+            i = i + 1;
+        }
+        self.lines = new_lines;
+        return (line + 1, 0);
+    }
+}

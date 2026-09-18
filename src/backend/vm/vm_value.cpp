@@ -476,6 +476,7 @@ RUNTIME_API LmValue lm_add(LmValue a, LmValue b) {
     if (IS_PTR(a) && IS_PTR(b)) {
         ObjHeader* h1 = (ObjHeader*)UNBOX_PTR(a);
         ObjHeader* h2 = (ObjHeader*)UNBOX_PTR(b);
+        if (h1 && h2) {
         if (h1->type_id == TYPE_LIST && h2->type_id == TYPE_LIST) {
             LmList* l1 = (LmList*)h1;
             LmList* l2 = (LmList*)h2;
@@ -507,6 +508,7 @@ RUNTIME_API LmValue lm_add(LmValue a, LmValue b) {
                 lm_str_free(s2);
                 return BOX_PTR(combined);
             }
+        }
         }
     }
     if (is_integer(a) && is_integer(b)) {

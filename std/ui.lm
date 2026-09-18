@@ -1,6 +1,8 @@
 // std.ui - Public Fluent & Composable UI Framework for Limit
 // Implements semantic widget constructors, composable modifiers, and reusable styles.
 
+import std.text.controller as text_ctrl;
+
 frame Color {
     pub var r: float; // 0.0 to 1.0
     pub var g: float;
@@ -178,6 +180,7 @@ pub var KIND_TABS: int = 9;
 pub var KIND_SCROLL: int = 10;
 pub var KIND_BADGE: int = 11;
 pub var KIND_SELECT: int = 12;
+pub var KIND_TEXTAREA: int = 13;
 
 // Unified Retained UI Node with Fluent Modifiers
 frame Widget {
@@ -223,6 +226,8 @@ frame Widget {
     pub var select_options: [str];
     pub var selected_idx: int;
     pub var is_open: int;
+    pub var text_editor_state: any;
+    pub var focus_key: str;
 
     pub init(k: int) {
         self.kind = k;
@@ -266,6 +271,8 @@ frame Widget {
         self.select_options = [] as [str];
         self.selected_idx = 0;
         self.is_open = 0;
+        self.text_editor_state = nil;
+        self.focus_key = "";
     }
 
     pub fn checked(c: bool): Widget {
@@ -446,6 +453,21 @@ pub fn button(label: str, on_click: any = nil): Widget {
     return w;
 }
 
+pub fn textarea(content: str): Widget {
+    var w = Widget(KIND_TEXTAREA);
+    w.text_val = content;
+    w.text_editor_state = text_ctrl.EditorController(content);
+    w.focus_key = "ta_default";
+    w.foreground_color = white;
+    w.padding_left = 8.0;
+    w.padding_top = 8.0;
+    w.padding_right = 8.0;
+    w.padding_bottom = 8.0;
+    w.width_val = 300.0;
+    w.height_val = 120.0;
+    return w;
+}
+
 pub fn column(children: [Widget]): Widget {
     var w = Widget(KIND_CONTAINER);
     w.is_vertical = 1;
@@ -581,5 +603,21 @@ pub fn scroll(content: Widget): Widget {
     w.height_val = 0.0;
     w.scroll_y = 0.0;
     w.background_color = rgb(20, 22, 28);
+    return w;
+}
+
+pub fn text_area(value: str = "", placeholder: str = "Type here...", on_change: any = nil): Widget {
+    var w = Widget(KIND_TEXTAREA);
+    w.text_val = value;
+    w.placeholder_val = placeholder;
+    w.on_change_action = on_change;
+    w.background_color = rgb(20, 22, 28);
+    w.foreground_color = white;
+    w.height_val = 120.0;
+    w.width_val = 300.0;
+    w.padding_left = 8.0;
+    w.padding_right = 8.0;
+    w.padding_top = 6.0;
+    w.padding_bottom = 6.0;
     return w;
 }

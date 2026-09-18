@@ -1,22 +1,33 @@
 // Standard Library String Replace Module
 
 pub fn replace(value: str, old: str, replacement: str): str {
+    if (value == nil) return "";
+    if (old == nil) return value;
+    var rep = replacement;
+    if (rep == nil) rep = "";
     var olen = len(old);
     var vlen = len(value);
     if (olen == 0) return value;
     var result = "";
     var i = 0;
     while (i <= vlen - olen) {
-        if (_builtin_substring(value, i, i + olen) == old) {
-            result = result + replacement;
+        var sub = _builtin_substring(value, i, i + olen);
+        if (sub != nil and sub == old) {
+            result = result + rep;
             i = i + olen;
         } else {
-            result = result + _builtin_substring(value, i, i + 1);
+            var ch = _builtin_substring(value, i, i + 1);
+            if (ch != nil) {
+                result = result + ch;
+            }
             i = i + 1;
         }
     }
     while (i < vlen) {
-        result = result + _builtin_substring(value, i, i + 1);
+        var ch = _builtin_substring(value, i, i + 1);
+        if (ch != nil) {
+            result = result + ch;
+        }
         i = i + 1;
     }
     return result;

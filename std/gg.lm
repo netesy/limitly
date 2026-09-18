@@ -212,6 +212,26 @@ pub fn draw_text(text_str: str, x: float, y: float, r: float, g: float, b: float
     }
 }
 
+pub fn measure_text(text_str: str, scale: int = 1): float {
+    if (global_graphics_context.handle != -1) {
+        var res = rt.call(global_graphics_context.handle, rt.OP_MEASURE_TEXT, [text_str, scale]);
+        if (res != nil) {
+            return res as float;
+        }
+    }
+    return (len(text_str) * 8 * scale) as float;
+}
+
+pub fn get_line_height(scale: int = 1): float {
+    if (global_graphics_context.handle != -1) {
+        var res = rt.call(global_graphics_context.handle, rt.OP_GET_FONT_METRICS, [scale]);
+        if (res != nil) {
+            return res as float;
+        }
+    }
+    return (16 * scale) as float;
+}
+
 pub fn end_pass(): nil {
     if (global_graphics_context.handle != -1) {
         rt.call(global_graphics_context.handle, rt.OP_END_PASS, []);

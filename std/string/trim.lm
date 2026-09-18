@@ -1,6 +1,7 @@
 // Standard Library String Trim Module
 
 pub fn trim(value: str): str {
+    if (value == nil) return "";
     var vlen = len(value);
     var start = 0;
     while (start < vlen) {

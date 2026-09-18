@@ -49,6 +49,8 @@ pub var OP_MAKE_IMAGE: int = 41;
 pub var OP_MAKE_PIPELINE: int = 42;
 pub var OP_MAKE_BINDINGS: int = 43;
 pub var OP_END_PASS: int = 44;
+pub var OP_MEASURE_TEXT: int = 45;
+pub var OP_GET_FONT_METRICS: int = 46;
 
 pub fn create(type_id: int, args: any): int {
     unsafe {

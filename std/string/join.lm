@@ -1,12 +1,18 @@
 // Standard Library String Join Module
 
 pub fn join(values: [str], delimiter: str): str {
+    if (values == nil) return "";
     var n = len(values);
     if (n == 0) return "";
     var result = values[0];
+    if (result == nil) result = "";
+    var del = delimiter;
+    if (del == nil) del = "";
     var i = 1;
     while (i < n) {
-        result = result + delimiter + values[i];
+        var val_i = values[i];
+        if (val_i == nil) val_i = "";
+        result = result + del + val_i;
         i = i + 1;
     }
     return result;

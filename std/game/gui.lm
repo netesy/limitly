@@ -4,6 +4,11 @@
 
 import std.gg as gg;
 import std.game.types as types;
+import std.string as std_string;
+import std.text.controller as text_ctrl;
+import std.focus.manager as focus_mod;
+import std.graphics.text_layout as layout_mod;
+import std.ui.viewport as viewport_mod;
 
 frame WindowState {
     pub var x: float;
@@ -39,6 +44,12 @@ frame GUI {
     pub var mouse_wheel: float;
     pub var prev_mouse_down: bool;
     pub var dt: float;
+    pub var keys_down: [int];
+    pub var keys_pressed: [int];
+    pub var typed_chars: [int];
+    pub var active_modifiers: int;
+    pub var get_clipboard_cb: any;
+    pub var set_clipboard_cb: any;
 
     // Interaction tracking
     pub var hot_id: str;
@@ -68,6 +79,9 @@ frame GUI {
     pub var active_popup_id: str;
     pub var cur_tab_bar_id: str;
     pub var combo_open_id: str;
+    pub var editor_controllers: {str: any};
+    pub var scroll_offsets: {str: float};
+    pub var focus_manager: focus_mod.FocusManager;
 
     // Window management
     pub var in_window: bool;
@@ -127,6 +141,9 @@ frame GUI {
         self.active_popup_id = "";
         self.cur_tab_bar_id = "";
         self.combo_open_id = "";
+        self.editor_controllers = {} as {str: any};
+        self.scroll_offsets = {} as {str: float};
+        self.focus_manager = focus_mod.FocusManager();
 
         self.in_window = false;
         self.cur_window_title = "";
@@ -768,6 +785,208 @@ frame GUI {
         return new_val;
     }
 
+
+    pub fn is_key_down(k: int): bool {
+        var i = 0;
+        while (i < len(self.keys_down)) {
+            if (self.keys_down[i] == k) { return true; }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn is_key_pressed(k: int): bool {
+        var i = 0;
+        while (i < len(self.keys_pressed)) {
+            if (self.keys_pressed[i] == k) { return true; }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn get_typed_chars(): [int] {
+        return self.typed_chars;
+    }
+
+    pub fn input_text_multiline(label: str, text: str, width: float, height: float): str {
+        print("M1");
+        var w = width;
+        var h = height;
+        var id = self.make_id(label);
+        print("M2");
+        var bx = self.cursor_x;
+        var by = self.cursor_y;
+
+        print("M3");
+        if (self.editor_controllers[id] == nil) {
+            print("M3.1");
+            var new_ctrl = text_ctrl.EditorController(text);
+            self.editor_controllers[id] = new_ctrl;
+        }
+        print("M4");
+        var ctrl = self.editor_controllers[id] as text_ctrl.EditorController;
+        ctrl.get_clipboard = self.get_clipboard_cb;
+        ctrl.set_clipboard = self.set_clipboard_cb;
+
+        print("M5");
+        var lh = gg.get_line_height(self.theme.font_scale);
+        print("M5.1");
+        var cur_scroll = 0.0;
+        print("M5.2");
+        if (self.scroll_offsets != nil) {
+            print("M5.3");
+            var scroll_val = self.scroll_offsets[id];
+            print("M5.4");
+            if (scroll_val != nil) {
+                cur_scroll = scroll_val as float;
+            }
+        }
+        print("M5.5");
+
+        var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
+                       self.mouse_y >= by and self.mouse_y <= (by + h));
+        if (hovered) { self.hot_id = id; }
+        if (hovered and self.mouse_pressed) {
+            self.active_id = id;
+            self.focus_manager.request_focus(id);
+
+            var rel_x = self.mouse_x - (bx + 6.0);
+            var rel_y = self.mouse_y - (by + 6.0) + cur_scroll;
+            var hit = layout_mod.hit_test_multiline(ctrl.get_lines(), rel_x, rel_y, lh, self.theme.font_scale);
+            ctrl.set_cursor(hit[0], hit[1]);
+        } elif (self.active_id == id and self.mouse_down) {
+            var rel_x = self.mouse_x - (bx + 6.0);
+            var rel_y = self.mouse_y - (by + 6.0) + cur_scroll;
+            var hit = layout_mod.hit_test_multiline(ctrl.get_lines(), rel_x, rel_y, lh, self.theme.font_scale);
+            ctrl.set_selection(hit[0], hit[1]);
+        }
+
+        var is_focused = (self.active_id == id or self.focus_manager.has_focus(id));
+        var bg = self.get_style_color(types.COLOR_FRAME_BG);
+        if (is_focused) {
+            bg = self.get_style_color(types.COLOR_FRAME_BG_ACTIVE);
+
+            var MOD_CTRL = 2; // MOD_CONTROL
+
+            if (self.typed_chars != nil) {
+                var ch_i = 0;
+                var chars = self.typed_chars;
+                while (ch_i < len(chars)) {
+                    var cp = chars[ch_i];
+                    if (cp >= 32 and cp <= 126) {
+                        var ch = _builtin_string_from_bytes([cp]);
+                        ctrl.insert_text(ch);
+                    } elif (cp == 10 or cp == 13) {
+                        ctrl.insert_newline();
+                    }
+                    ch_i = ch_i + 1;
+                }
+            }
+
+            if (self.is_key_pressed(8)) { ctrl.backspace(); }
+            if (self.is_key_pressed(262)) { ctrl.move_right(false); }
+            if (self.is_key_pressed(263)) { ctrl.move_left(false); }
+            if (self.is_key_pressed(264)) { ctrl.move_down(false); }
+            if (self.is_key_pressed(265)) { ctrl.move_up(false); }
+            if (self.is_key_pressed(90) and (self.active_modifiers & MOD_CTRL) != 0) { ctrl.undo(); }
+            if (self.is_key_pressed(89) and (self.active_modifiers & MOD_CTRL) != 0) { ctrl.redo(); }
+            if (self.is_key_pressed(67) and (self.active_modifiers & MOD_CTRL) != 0) { ctrl.copy(); }
+            if (self.is_key_pressed(86) and (self.active_modifiers & MOD_CTRL) != 0) { ctrl.paste(); }
+            if (self.is_key_pressed(88) and (self.active_modifiers & MOD_CTRL) != 0) {
+                ctrl.cut();
+            }
+        } elif (hovered) {
+            bg = self.get_style_color(types.COLOR_FRAME_BG_HOVER);
+        }
+
+        if (hovered and self.mouse_wheel != 0.0) {
+            cur_scroll = cur_scroll - self.mouse_wheel * 20.0;
+        }
+
+        var total_content_h = (ctrl.get_line_count() as float) * lh + 12.0;
+        var vp = viewport_mod.Viewport(w - 2.0, h - 2.0, w, total_content_h);
+        vp.scroll_y = cur_scroll;
+
+        if (is_focused) {
+            var cur_line = ctrl.get_cursor_line();
+            var line_text = ctrl.get_line(cur_line);
+            if (line_text == nil) { line_text = ""; }
+            var cur_col = ctrl.get_cursor_col();
+            var prefix = "";
+            if (cur_col > 0) {
+                prefix = std_string.substring(line_text, 0, cur_col);
+            }
+            if (prefix == nil) { prefix = ""; }
+            var cur_x = gg.measure_text(prefix, self.theme.font_scale);
+            var cur_y = (cur_line as float) * lh;
+            vp.ensure_visible(cur_x, cur_y, 2.0, lh);
+        } else {
+            vp.clamp_scroll();
+        }
+        if (self.scroll_offsets != nil) {
+            self.scroll_offsets[id] = vp.scroll_y;
+        }
+
+        gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+
+        var border = self.theme.checkbox_border;
+        if (is_focused) {
+            border = self.get_style_color(types.COLOR_ACCENT);
+        }
+        gg.draw_rect_primitive(bx, by, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by + h - 1.0, w, 1.0, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx, by, 1.0, h, border.r, border.g, border.b, border.a);
+        gg.draw_rect_primitive(bx + w - 1.0, by, 1.0, h, border.r, border.g, border.b, border.a);
+
+        print("N1");
+        var tc = self.get_style_color(types.COLOR_TEXT);
+        gg.push_clip(bx + 1.0, by + 1.0, w - 2.0, h - 2.0);
+
+        print("N2");
+        var start_line = (vp.scroll_y / lh) as int;
+        if (start_line < 0) start_line = 0;
+        var visible_lines = ((h / lh) as int) + 2;
+        var end_line = start_line + visible_lines;
+        if (end_line > ctrl.get_line_count()) end_line = ctrl.get_line_count();
+
+        print("N3 end_line=" + (end_line as str));
+        var ii = start_line;
+        while (ii < end_line) {
+            print("N4 ii=" + (ii as str));
+            var cy = by + 6.0 - vp.scroll_y + (ii as float) * lh;
+            var line_text = ctrl.get_line(ii);
+            print("N5 line_text got");
+            if (line_text == nil) { line_text = ""; }
+            if (is_focused and ii == ctrl.get_cursor_line()) {
+                print("N6 cursor line");
+                var cur_col = ctrl.get_cursor_col();
+                var line_len = len(line_text);
+                var prefix = "";
+                if (cur_col > 0) { prefix = std_string.substring(line_text, 0, cur_col); }
+                if (prefix == nil) { prefix = ""; }
+                var suffix = "";
+                if (cur_col < line_len) { suffix = std_string.substring(line_text, cur_col, line_len); }
+                if (suffix == nil) { suffix = ""; }
+                line_text = prefix + "|" + suffix;
+            }
+            print("N7 drawing text");
+            gg.draw_text(line_text, bx + 6.0, cy, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+            ii = ii + 1;
+        }
+
+        print("N8 clip pop");
+        gg.pop_clip();
+
+        if (label != nil and len(label) > 0) {
+            var ltc = self.get_style_color(types.COLOR_TEXT_MUTED);
+            gg.draw_text(label, bx + w + 8.0, by + 6.0, ltc.r, ltc.g, ltc.b, ltc.a, self.theme.font_scale);
+        }
+
+        self.prev_item_hovered = hovered;
+        self.prev_item_rect = types.rect(bx, by, w, h);
+        self.advance(w + 80.0, h);
+        return ctrl.get_text();
+    }
     pub fn input_text(label: str, text: str, max_len: int = 256): str {
         var w = 160.0;
         var h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
