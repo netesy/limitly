@@ -1,0 +1,70 @@
+// std/graphics/shadow.lm
+// Shared First-Class Shadow Abstraction for Limit Graphics, UI, and Game GUI
+
+frame Shadow {
+    pub var r: float;
+    pub var g: float;
+    pub var b: float;
+    pub var a: float;
+    pub var offset_x: float;
+    pub var offset_y: float;
+    pub var blur_radius: float;
+    pub var spread_radius: float;
+
+    pub init(
+        r: float = 0.0,
+        g: float = 0.0,
+        b: float = 0.0,
+        a: float = 0.25,
+        off_x: float = 0.0,
+        off_y: float = 4.0,
+        blur: float = 8.0,
+        spread: float = 0.0
+    ) {
+        self.r = r;
+        self.g = g;
+        self.b = b;
+        self.a = a;
+        self.offset_x = off_x;
+        self.offset_y = off_y;
+        self.blur_radius = blur;
+        self.spread_radius = spread;
+    }
+}
+
+pub fn shadow(
+    r: float = 0.0,
+    g: float = 0.0,
+    b: float = 0.0,
+    a: float = 0.25,
+    off_x: float = 0.0,
+    off_y: float = 4.0,
+    blur: float = 8.0,
+    spread: float = 0.0
+): Shadow {
+    return Shadow(r=r, g=g, b=b, a=a, off_x=off_x, off_y=off_y, blur=blur, spread=spread);
+}
+
+pub fn lerp_float(a: float, b: float, t: float): float {
+    return a + (b - a) * t;
+}
+
+pub fn lerp_shadow(s1: Shadow, s2: Shadow, t: float): Shadow {
+    var r = lerp_float(s1.r, s2.r, t);
+    var g = lerp_float(s1.g, s2.g, t);
+    var b = lerp_float(s1.b, s2.b, t);
+    var a = lerp_float(s1.a, s2.a, t);
+
+    var ox = lerp_float(s1.offset_x, s2.offset_x, t);
+    var oy = lerp_float(s1.offset_y, s2.offset_y, t);
+    var blur = lerp_float(s1.blur_radius, s2.blur_radius, t);
+    var spread = lerp_float(s1.spread_radius, s2.spread_radius, t);
+
+    return Shadow(
+        r=r, g=g, b=b, a=a,
+        off_x=ox,
+        off_y=oy,
+        blur=blur,
+        spread=spread
+    );
+}

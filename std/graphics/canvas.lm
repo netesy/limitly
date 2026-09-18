@@ -3,6 +3,7 @@ import std.graphics.paint as paint;
 import std.graphics.color as color;
 import std.graphics.path as path;
 import std.graphics.image as image;
+import std.graphics.shadow as shadow_mod;
 import std.gg as gg;
 
 frame Canvas {
@@ -12,6 +13,10 @@ frame Canvas {
     pub init(w: float = 800.0, h: float = 600.0) {
         self.width = w;
         self.height = h;
+    }
+
+    pub fn draw_shadow(r: rect.Rect, s: shadow_mod.Shadow): nil {
+        gg.draw_shadow_primitive(r.x, r.y, r.w, r.h, s.r, s.g, s.b, s.a, s.offset_x, s.offset_y, s.blur_radius, s.spread_radius);
     }
 
     pub fn draw_rect(r: rect.Rect, p: paint.Paint): nil {

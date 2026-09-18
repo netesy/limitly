@@ -1,6 +1,11 @@
 // std/animation.lm
 // Shared Generic Animation Core Engine for Limit
-// Time-based, interruptible, easing curves, spring physics, transitions, and ID-keyed state store
+// Time-based, interruptible, easing curves, spring physics, transitions, keyframes, composition, and ID-keyed state store
+
+import std.graphics.shadow as shadow_mod;
+
+pub var Shadow = shadow_mod.Shadow;
+pub var shadow = shadow_mod.shadow;
 
 // Easing Curve Type Identifiers
 pub var EASE_LINEAR: int = 0;
@@ -18,6 +23,22 @@ pub var STATE_RUNNING: int = 1;
 pub var STATE_PAUSED: int = 2;
 pub var STATE_COMPLETED: int = 3;
 pub var STATE_CANCELLED: int = 4;
+
+// ── Global Preferences & Accessibility ────────────────────────────────────
+
+frame AnimationPreferences {
+    pub var enabled: bool;
+    pub var reduce_motion: bool;
+    pub var duration_scale: float;
+
+    pub init(enabled: bool = true, reduce_motion: bool = false, duration_scale: float = 1.0) {
+        self.enabled = enabled;
+        self.reduce_motion = reduce_motion;
+        self.duration_scale = duration_scale;
+    }
+}
+
+pub var global_animation_preferences: AnimationPreferences = AnimationPreferences(true, false, 1.0);
 
 // ── Easing Resolver ─────────────────────────────────────────────────────────
 
@@ -74,6 +95,7 @@ frame Spring {
     }
 
     pub fn update(current: float, target: float, dt: float): float {
+        if (dt <= 0.0) return current;
         var force = -self.stiffness * (current - target);
         var damping_force = -self.damping * self.velocity;
         var accel = (force + damping_force) / self.mass;
@@ -107,7 +129,61 @@ pub fn lerp_rgba(r1: float, g1: float, b1: float, a1: float, r2: float, g2: floa
     ];
 }
 
-// ── Generic Animation Instance ─────────────────────────────────────────────
+pub fn lerp_shadow(s1: shadow_mod.Shadow, s2: shadow_mod.Shadow, t: float): shadow_mod.Shadow {
+    return shadow_mod.lerp_shadow(s1, s2, t);
+}
+
+// ── Multi-Stage Keyframe Animation ─────────────────────────────────────────
+
+frame Keyframe {
+    pub var progress: float; // 0.0 to 1.0
+    pub var value: float;
+
+    pub init(progress: float = 0.0, value: float = 0.0) {
+        self.progress = progress;
+        self.value = value;
+    }
+}
+
+frame Keyframes {
+    pub var frames: [Keyframe];
+
+    pub init() {
+        self.frames = [] as [Keyframe];
+    }
+
+    pub fn add(progress: float, value: float): Keyframes {
+        self.frames.append(Keyframe(progress, value));
+        return self;
+    }
+
+    pub fn evaluate(t: float): float {
+        var p = t;
+        if (p < 0.0) p = 0.0;
+        if (p > 1.0) p = 1.0;
+
+        var n = len(self.frames);
+        if (n == 0) return 0.0;
+        if (n == 1 or p <= self.frames[0].progress) return self.frames[0].value;
+        if (p >= self.frames[n - 1].progress) return self.frames[n - 1].value;
+
+        var i = 0;
+        while (i < n - 1) {
+            var k1 = self.frames[i];
+            var k2 = self.frames[i + 1];
+            if (p >= k1.progress and p <= k2.progress) {
+                var range = k2.progress - k1.progress;
+                if (range <= 0.0) return k1.value;
+                var local_t = (p - k1.progress) / range;
+                return lerp_float(k1.value, k2.value, local_t);
+            }
+            i = i + 1;
+        }
+        return self.frames[n - 1].value;
+    }
+}
+
+// ── Generic Property Animation Instance ────────────────────────────────────
 
 frame PropertyAnimation {
     pub var start_val: float;
@@ -120,6 +196,7 @@ frame PropertyAnimation {
     pub var state: int;
     pub var is_spring: bool;
     pub var spring_model: Spring;
+    pub var keyframes_model: Keyframes;
 
     pub init(start_v: float = 0.0, target_v: float = 1.0, dur: float = 0.25, easing: int = 0) {
         self.start_val = start_v;
@@ -132,9 +209,15 @@ frame PropertyAnimation {
         self.state = STATE_IDLE;
         self.is_spring = false;
         self.spring_model = Spring();
+        self.keyframes_model = Keyframes();
     }
 
     pub fn play(): nil {
+        if (not global_animation_preferences.enabled or global_animation_preferences.reduce_motion) {
+            self.current_val = self.target_val;
+            self.state = STATE_COMPLETED;
+            return;
+        }
         self.state = STATE_RUNNING;
     }
 
@@ -142,9 +225,31 @@ frame PropertyAnimation {
         self.state = STATE_PAUSED;
     }
 
+    pub fn resume(): nil {
+        if (self.state == STATE_PAUSED) {
+            self.state = STATE_RUNNING;
+        }
+    }
+
     pub fn stop(): nil {
         self.state = STATE_COMPLETED;
         self.current_val = self.target_val;
+    }
+
+    pub fn reset(): nil {
+        self.elapsed = 0.0;
+        self.current_val = self.start_val;
+        self.state = STATE_IDLE;
+    }
+
+    pub fn seek(progress: float): float {
+        var p = progress;
+        if (p < 0.0) p = 0.0;
+        if (p > 1.0) p = 1.0;
+        self.elapsed = p * self.duration;
+        var eased_t = apply_easing(p, self.easing_type);
+        self.current_val = lerp_float(self.start_val, self.target_val, eased_t);
+        return self.current_val;
     }
 
     pub fn set_target(new_target: float): nil {
@@ -157,6 +262,12 @@ frame PropertyAnimation {
     }
 
     pub fn update(dt: float): float {
+        if (not global_animation_preferences.enabled or global_animation_preferences.reduce_motion) {
+            self.current_val = self.target_val;
+            self.state = STATE_COMPLETED;
+            return self.current_val;
+        }
+
         if (self.state != STATE_RUNNING) {
             return self.current_val;
         }
@@ -168,6 +279,8 @@ frame PropertyAnimation {
             }
         }
 
+        var effective_dur = self.duration * global_animation_preferences.duration_scale;
+
         if (self.is_spring) {
             self.current_val = self.spring_model.update(self.current_val, self.target_val, dt);
             if (self.spring_model.is_at_rest(self.current_val, self.target_val)) {
@@ -176,23 +289,67 @@ frame PropertyAnimation {
             }
         } else {
             self.elapsed = self.elapsed + dt;
-            if (self.duration <= 0.0) {
+            if (effective_dur <= 0.0) {
                 self.current_val = self.target_val;
                 self.state = STATE_COMPLETED;
             } else {
-                var progress = self.elapsed / self.duration;
+                var progress = self.elapsed / effective_dur;
                 if (progress >= 1.0) {
                     progress = 1.0;
                     self.current_val = self.target_val;
                     self.state = STATE_COMPLETED;
                 } else {
-                    var eased_t = apply_easing(progress, self.easing_type);
-                    self.current_val = lerp_float(self.start_val, self.target_val, eased_t);
+                    if (len(self.keyframes_model.frames) > 0) {
+                        self.current_val = self.keyframes_model.evaluate(progress);
+                    } else {
+                        var eased_t = apply_easing(progress, self.easing_type);
+                        self.current_val = lerp_float(self.start_val, self.target_val, eased_t);
+                    }
                 }
             }
         }
         return self.current_val;
     }
+}
+
+// ── Animation Composition Helpers ──────────────────────────────────────────
+
+frame AnimationSequence {
+    pub var anims: [PropertyAnimation];
+    pub var current_idx: int;
+
+    pub init() {
+        self.anims = [] as [PropertyAnimation];
+        self.current_idx = 0;
+    }
+
+    pub fn add(anim: PropertyAnimation): AnimationSequence {
+        self.anims.append(anim);
+        return self;
+    }
+
+    pub fn update(dt: float): float {
+        if (self.current_idx >= len(self.anims)) {
+            if (len(self.anims) > 0) return self.anims[len(self.anims) - 1].current_val;
+            return 0.0;
+        }
+        var cur = self.anims[self.current_idx];
+        if (cur.state == STATE_IDLE) {
+            cur.play();
+        }
+        var v_out = cur.update(dt);
+        if (cur.state == STATE_COMPLETED) {
+            self.current_idx = self.current_idx + 1;
+        }
+        return v_out;
+    }
+}
+
+pub fn sequence(a1: PropertyAnimation, a2: PropertyAnimation): AnimationSequence {
+    var seq = AnimationSequence();
+    seq.add(a1);
+    seq.add(a2);
+    return seq;
 }
 
 // ── Transition Abstraction ─────────────────────────────────────────────────
@@ -272,19 +429,23 @@ frame AnimationManager {
 frame IMGUIAnimationState {
     pub var id: str;
     pub var float_anims: {str: PropertyAnimation};
+    pub var last_used_frame: int;
 
     pub init(id: str = "") {
         self.id = id;
         self.float_anims = {} as {str: PropertyAnimation};
+        self.last_used_frame = 0;
     }
 
     pub fn animate_property(prop_name: str, target: float, dur: float = 0.15, easing: int = 2, dt: float = 0.016): float {
         var anim = self.float_anims[prop_name] as PropertyAnimation;
         if (anim == nil) {
-            anim = PropertyAnimation(target, target, dur, easing);
+            var start_v = 0.0;
+            if (target == 0.0) { start_v = 1.0; }
+            anim = PropertyAnimation(start_v, target, dur, easing);
             anim.play();
             self.float_anims[prop_name] = anim;
-            return target;
+            return anim.update(dt);
         }
         anim.set_target(target);
         return anim.update(dt);
@@ -293,9 +454,11 @@ frame IMGUIAnimationState {
 
 frame IMGUIAnimationStore {
     pub var states: {str: IMGUIAnimationState};
+    pub var frame_counter: int;
 
     pub init() {
         self.states = {} as {str: IMGUIAnimationState};
+        self.frame_counter = 0;
     }
 
     pub fn get_or_create(id: str): IMGUIAnimationState {
@@ -304,7 +467,12 @@ frame IMGUIAnimationStore {
             st = IMGUIAnimationState(id);
             self.states[id] = st;
         }
+        st.last_used_frame = self.frame_counter;
         return st;
+    }
+
+    pub fn step_frame(): nil {
+        self.frame_counter = self.frame_counter + 1;
     }
 }
 

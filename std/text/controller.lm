@@ -1,10 +1,64 @@
 import std.text.document as doc;
-import std.text.cursor as cursor;
+
+frame Cursor {
+    pub var line: int;
+    pub var col: int;
+    pub var pref_col: int;
+
+    pub init(line: int = 0, col: int = 0) {
+        self.line = line;
+        self.col = col;
+        self.pref_col = col;
+    }
+
+    pub fn set(line: int, col: int): nil {
+        self.line = line;
+        self.col = col;
+        self.pref_col = col;
+    }
+}
+
+frame Selection {
+    pub var anchor_line: int;
+    pub var anchor_col: int;
+    pub var active_line: int;
+    pub var active_col: int;
+
+    pub init() {
+        self.anchor_line = 0;
+        self.anchor_col = 0;
+        self.active_line = 0;
+        self.active_col = 0;
+    }
+
+    pub fn set(line: int, col: int): nil {
+        self.anchor_line = line;
+        self.anchor_col = col;
+        self.active_line = line;
+        self.active_col = col;
+    }
+
+    pub fn extend_to(line: int, col: int): nil {
+        self.active_line = line;
+        self.active_col = col;
+    }
+
+    pub fn is_empty(): bool {
+        return (self.anchor_line == self.active_line and self.anchor_col == self.active_col);
+    }
+
+    pub fn get_range(): [int] {
+        if (self.anchor_line < self.active_line or (self.anchor_line == self.active_line and self.anchor_col <= self.active_col)) {
+            return [self.anchor_line, self.anchor_col, self.active_line, self.active_col];
+        }
+        return [self.active_line, self.active_col, self.anchor_line, self.anchor_col];
+    }
+}
 
 frame EditorController {
     pub var document: doc.TextDocument;
-    pub var cursor: cursor.Cursor;
-    pub var selection: cursor.Selection;
+    pub var cursor: Cursor;
+    pub var selection: Selection;
     pub var get_clipboard: any;
     pub var set_clipboard: any;
     pub var history: [str];
@@ -12,8 +66,8 @@ frame EditorController {
 
     pub init(initial_text: str = "") {
         self.document = doc.TextDocument(initial_text);
-        self.cursor = cursor.Cursor();
-        self.selection = cursor.Selection();
+        self.cursor = Cursor();
+        self.selection = Selection();
         self.get_clipboard = nil;
         self.set_clipboard = nil;
         self.history = [initial_text];

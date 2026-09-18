@@ -3,6 +3,7 @@
 
 import std.ui.types as ui_types;
 import std.ui as ui;
+import std.animation as anim;
 import std.string as std_string;
 import std.text.controller as text_ctrl;
 import std.focus.manager as focus_mod;
@@ -11,6 +12,7 @@ import std.graphics.canvas as canvas;
 import std.graphics.paint as paint;
 import std.graphics.color as color;
 import std.graphics.rect as rect;
+import std.graphics.shadow as shadow_mod;
 
 frame UIContextState {
     pub var is_initialized: int;
@@ -570,115 +572,17 @@ pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y
         }
     }
     if (w.kind == ui.KIND_ACCORDION) {
-        var acc_bg = paint.Paint();
-        acc_bg.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
-        cvs.draw_rect(rect.Rect(x=x, y=y, w=available_w, h=28.0), acc_bg);
-
-        var arrow_str = "[+] ";
-        if (w.is_open == 1) arrow_str = "[-] ";
-        var txt_p = paint.Paint();
-        txt_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
-        cvs.draw_text(arrow_str + w.text_val, x + 8.0, y + 8.0, txt_p, 1);
-
-        if (w.is_open == 1 and len(w.children) > 0) {
-            render_widget_node(w.children[0], x + 8.0, y + 32.0, available_w - 16.0, measure_widget_height(w.children[0]), cvs);
+        if (px >= x and px <= x + available_w and py >= y and py <= y + 28.0) {
+            if (w.is_open == 1) {
+                w.is_open = 0;
+            } else {
+                w.is_open = 1;
+            }
+            mark_element_dirty(1);
         }
     }
-    if (w.kind == ui.KIND_ALERT or w.kind == ui.KIND_TOAST) {
-        var abg_p = paint.Paint();
-        abg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
-        var aw = available_w;
-        if (w.width_val > 0.0) aw = w.width_val;
-        cvs.draw_rect(rect.Rect(x=x, y=y, w=aw, h=36.0), abg_p);
-
-        var atxt_p = paint.Paint();
-        atxt_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
-        cvs.draw_text(w.text_val, x + 10.0, y + 12.0, atxt_p, 1);
-    }
-    if (w.kind == ui.KIND_CARD) {
-        var cbg_p = paint.Paint();
-        cbg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
-        var card_h = measure_widget_height(w);
-        cvs.draw_rect(rect.Rect(x=x, y=y, w=available_w, h=card_h), cbg_p);
-
-        var ctitle_p = paint.Paint();
-        ctitle_p.color_val = color.rgb(255, 255, 255);
-        cvs.draw_text(w.text_val, x + 12.0, y + 12.0, ctitle_p, 1);
-
-        if (len(w.children) > 0) {
-            render_widget_node(w.children[0], x + 12.0, y + 32.0, available_w - 24.0, measure_widget_height(w.children[0]), cvs);
-        }
-    }
-    if (w.kind == ui.KIND_PROGRESS) {
-        var pw = 160.0;
-        if (w.width_val > 0.0) pw = w.width_val;
-        var pbg_p = paint.Paint();
-        pbg_p.color_val = color.rgb(35, 38, 48);
-        cvs.draw_rect(rect.Rect(x=x, y=y, w=pw, h=16.0), pbg_p);
-
-        var frac = w.slider_val;
-        if (frac < 0.0) frac = 0.0;
-        if (frac > 1.0) frac = 1.0;
-        if (frac > 0.0) {
-            var fill_p = paint.Paint();
-            fill_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
-            cvs.draw_rect(rect.Rect(x=x, y=y, w=pw * frac, h=16.0), fill_p);
-        }
-    }
-    if (w.kind == ui.KIND_STAT) {
-        var sbg_p = paint.Paint();
-        sbg_p.color_val = color.rgb(24, 26, 34);
-        var sw = 160.0;
-        if (w.width_val > 0.0) sw = w.width_val;
-        cvs.draw_rect(rect.Rect(x=x, y=y, w=sw, h=70.0), sbg_p);
-
-        var lbl_p = paint.Paint();
-        lbl_p.color_val = color.rgb(140, 145, 160);
-        cvs.draw_text(w.text_val, x + 10.0, y + 10.0, lbl_p, 1);
-
-        var val_p = paint.Paint();
-        val_p.color_val = color.rgb(80, 220, 130);
-        cvs.draw_text(w.placeholder_val, x + 10.0, y + 28.0, val_p, 2);
-
-        if (len(w.focus_key) > 0) {
-            var desc_p = paint.Paint();
-            desc_p.color_val = color.rgb(160, 165, 180);
-            cvs.draw_text(w.focus_key, x + 10.0, y + 52.0, desc_p, 1);
-        }
-    }
-    if (w.kind == ui.KIND_LINK) {
-        var ltxt_p = paint.Paint();
-        ltxt_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
-        cvs.draw_text(w.text_val, x, y + 6.0, ltxt_p, 1);
-        var underline_p = paint.Paint();
-        underline_p.color_val = ltxt_p.color_val;
-        cvs.draw_rect(rect.Rect(x=x, y=y + 16.0, w=(len(w.text_val) as float) * 8.0, h=1.0), underline_p);
-    }
-    if (w.kind == ui.KIND_FILE_INPUT) {
-        var fbg_p = paint.Paint();
-        fbg_p.color_val = color.rgb(35, 40, 52);
-        var fw = 220.0;
-        if (w.width_val > 0.0) fw = w.width_val;
-        cvs.draw_rect(rect.Rect(x=x, y=y, w=fw, h=32.0), fbg_p);
-
-        var icon_p = paint.Paint();
-        icon_p.color_val = color.rgb(100, 180, 255);
-        cvs.draw_text("[FILE]", x + 8.0, y + 10.0, icon_p, 1);
-
-        var ftxt_p = paint.Paint();
-        ftxt_p.color_val = color.rgb(220, 225, 240);
-        cvs.draw_text(w.text_val, x + 60.0, y + 10.0, ftxt_p, 1);
-    }
-    if (w.kind == ui.KIND_INDICATOR) {
-        var dot_p = paint.Paint();
-        dot_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
-        cvs.draw_rect(rect.Rect(x=x, y=y + 4.0, w=10.0, h=10.0), dot_p);
-
-        if (len(w.text_val) > 0) {
-            var itxt_p = paint.Paint();
-            itxt_p.color_val = color.rgb(200, 205, 220);
-            cvs.draw_text(w.text_val, x + 16.0, y + 4.0, itxt_p, 1);
-        }
+    if (w.kind == ui.KIND_CARD and len(w.children) > 0) {
+        hit_test_and_click_widget(w.children[0], px, py, x + 12.0, y + 32.0, available_w - 24.0, measure_widget_height(w.children[0]));
     }
     if (w.kind == ui.KIND_JOIN or w.kind == ui.KIND_LIST or w.kind == ui.KIND_TIMELINE or w.kind == ui.KIND_DOCK) {
         var cy = y;
@@ -686,7 +590,7 @@ pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y
         while (i < len(w.children)) {
             var child = w.children[i];
             var ch_h = measure_widget_height(child);
-            render_widget_node(child, x, cy, available_w, ch_h, cvs);
+            hit_test_and_click_widget(child, px, py, x, cy, available_w, ch_h);
             cy = cy + ch_h + 4.0;
             i = i + 1;
         }
@@ -1153,6 +1057,12 @@ fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w
 
 fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil {
     print("RWN kind=" + (w.kind as str));
+    if (w.shadow_val != nil and w.shadow_val.a > 0.0) {
+        var sw = available_w;
+        if (w.width_val > 0.0) sw = w.width_val;
+        var sh = measure_widget_height(w);
+        cvs.draw_shadow(rect.Rect(x=x, y=y, w=sw, h=sh), w.shadow_val);
+    }
     if (w.kind == ui.KIND_CONTAINER) {
         if (w.background_color.a > 0.0) {
             var p = paint.Paint();
@@ -1959,14 +1869,29 @@ pub fn update_animations_recursive(w: ui.Widget, dt: float): nil {
         mark_element_dirty(1);
     }
     if (w.active_transition != nil) {
-        w.active_transition.update(dt);
-        mark_element_dirty(1);
+        if (w.active_transition.active) {
+            w.active_transition.update(dt);
+            mark_element_dirty(1);
+            if (w.active_transition.opacity_anim.state == 3) { // STATE_COMPLETED
+                if (w.lifecycle_state == ui.LIFECYCLE_ENTERING) {
+                    w.lifecycle_state = ui.LIFECYCLE_ACTIVE;
+                } elif (w.lifecycle_state == ui.LIFECYCLE_EXITING) {
+                    w.lifecycle_state = ui.LIFECYCLE_REMOVED;
+                }
+            }
+        }
     }
+    var remaining: [ui.Widget] = [];
     var i = 0;
     while (i < len(w.children)) {
-        update_animations_recursive(w.children[i], dt);
+        var child = w.children[i];
+        update_animations_recursive(child, dt);
+        if (child.lifecycle_state != ui.LIFECYCLE_REMOVED) {
+            remaining.append(child);
+        }
         i = i + 1;
     }
+    w.children = remaining;
 }
 
 pub fn frame_update(delta_time: float): nil {
@@ -2202,7 +2127,7 @@ if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
     return 0;
 }
 
-pub fn dispatch_key_down(key_code: int, mods: int): nil {
+pub fn dispatch_key_down(key_code: int, mods: int = 0): nil {
     if (global_ui_context.has_widget == 1) {
         global_ui_context.modifiers = mods;
     send_key_down_to_widget(global_ui_context.current_widget, key_code, mods);

@@ -2,11 +2,12 @@
 // Implements semantic widget constructors, composable modifiers, and reusable styles.
 
 import std.text.controller as text_ctrl;
-import std.ui.charts as charts_mod;
 import std.animation as anim_mod;
+import std.graphics.shadow as shadow_mod;
 
-pub var charts = charts_mod;
 pub var animation = anim_mod;
+pub var Shadow = shadow_mod.Shadow;
+pub var shadow = shadow_mod.shadow;
 
 frame Color {
     pub var r: float; // 0.0 to 1.0
@@ -85,6 +86,8 @@ frame Style {
     pub var weight_val: int;
     pub var has_spacing: bool;
     pub var spacing_val: float;
+    pub var has_shadow: bool;
+    pub var shadow_val: shadow_mod.Shadow;
 
     pub init() {
         self.has_bg = false;
@@ -104,6 +107,14 @@ frame Style {
         self.weight_val = 400;
         self.has_spacing = false;
         self.spacing_val = 0.0;
+        self.has_shadow = false;
+        self.shadow_val = shadow_mod.Shadow();
+    }
+
+    pub fn shadow(s: shadow_mod.Shadow): Style {
+        self.has_shadow = true;
+        self.shadow_val = s;
+        return self;
     }
 
     pub fn background(c: Color): Style {
@@ -222,6 +233,11 @@ pub var KIND_RADAR_CHART: int = 46;
 pub var KIND_SCATTER_CHART: int = 47;
 pub var KIND_PIE_CHART: int = 48;
 
+pub var LIFECYCLE_ENTERING: int = 0;
+pub var LIFECYCLE_ACTIVE: int = 1;
+pub var LIFECYCLE_EXITING: int = 2;
+pub var LIFECYCLE_REMOVED: int = 3;
+
 // Unified Retained UI Node with Fluent Modifiers
 frame Widget {
     pub var kind: int;
@@ -271,6 +287,10 @@ frame Widget {
 
     pub var opacity_val: float;
     pub var scale_val: float;
+    pub var shadow_val: shadow_mod.Shadow;
+    pub var lifecycle_state: int;
+    pub var enter_transition: anim_mod.Transition;
+    pub var exit_transition: anim_mod.Transition;
     pub var anim_property: anim_mod.PropertyAnimation;
     pub var active_transition: anim_mod.Transition;
 
@@ -321,8 +341,16 @@ frame Widget {
 
         self.opacity_val = 1.0;
         self.scale_val = 1.0;
-        self.anim_property = nil;
-        self.active_transition = nil;
+        self.shadow_val = shadow_mod.Shadow();
+        self.lifecycle_state = LIFECYCLE_ACTIVE;
+        self.enter_transition = anim_mod.Transition();
+        self.exit_transition = anim_mod.Transition();
+        self.enter_transition.active = false;
+        self.exit_transition.active = false;
+        self.anim_property = anim_mod.PropertyAnimation(0.0, 0.0, 0.0, 0);
+        self.active_transition = anim_mod.Transition();
+        self.anim_property.state = anim_mod.STATE_IDLE;
+        self.active_transition.active = false;
     }
 
     pub fn opacity(o: float): Widget {
@@ -332,6 +360,11 @@ frame Widget {
 
     pub fn scale(s: float): Widget {
         self.scale_val = s;
+        return self;
+    }
+
+    pub fn shadow(s: shadow_mod.Shadow): Widget {
+        self.shadow_val = s;
         return self;
     }
 
@@ -359,6 +392,28 @@ frame Widget {
     pub fn transition(trans: anim_mod.Transition): Widget {
         self.active_transition = trans;
         return self;
+    }
+
+    pub fn enter(trans: anim_mod.Transition): Widget {
+        self.enter_transition = trans;
+        self.active_transition = trans;
+        self.lifecycle_state = LIFECYCLE_ENTERING;
+        return self;
+    }
+
+    pub fn exit(trans: anim_mod.Transition): Widget {
+        self.exit_transition = trans;
+        return self;
+    }
+
+    pub fn mark_for_removal(): nil {
+        if (self.exit_transition != nil) {
+            self.lifecycle_state = LIFECYCLE_EXITING;
+            self.active_transition = self.exit_transition;
+            self.active_transition.active = true;
+        } else {
+            self.lifecycle_state = LIFECYCLE_REMOVED;
+        }
     }
 
     pub fn checked(c: bool): Widget {
@@ -511,6 +566,9 @@ frame Widget {
         }
         if (s.has_spacing) {
             self.spacing_val = s.spacing_val;
+        }
+        if (s.has_shadow) {
+            self.shadow_val = s.shadow_val;
         }
         return self;
     }
