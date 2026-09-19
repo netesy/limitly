@@ -1,6 +1,13 @@
 // std.ui - Public Fluent & Composable UI Framework for Limit
 // Implements semantic widget constructors, composable modifiers, and reusable styles.
 
+import std.text.controller as text_ctrl;
+import std.animation as anim_mod;
+import std.graphics.shadow as shadow_mod;
+pub var animation = anim_mod;
+pub var Shadow = shadow_mod.Shadow;
+pub var shadow = shadow_mod.shadow;
+
 frame Color {
     pub var r: float; // 0.0 to 1.0
     pub var g: float;
@@ -78,6 +85,8 @@ frame Style {
     pub var weight_val: int;
     pub var has_spacing: bool;
     pub var spacing_val: float;
+    pub var has_shadow: bool;
+    pub var shadow_val: shadow_mod.Shadow;
 
     pub init() {
         self.has_bg = false;
@@ -97,6 +106,14 @@ frame Style {
         self.weight_val = 400;
         self.has_spacing = false;
         self.spacing_val = 0.0;
+        self.has_shadow = false;
+        self.shadow_val = shadow_mod.Shadow();
+    }
+
+    pub fn shadow(s: shadow_mod.Shadow): Style {
+        self.has_shadow = true;
+        self.shadow_val = s;
+        return self;
     }
 
     pub fn background(c: Color): Style {
@@ -160,6 +177,66 @@ frame Style {
         self.spacing_val = s;
         return self;
     }
+
+    pub fn merge(override_style: Style): Style {
+        var merged = Style();
+        merged.has_bg = self.has_bg;
+        merged.bg = self.bg;
+        merged.has_fg = self.has_fg;
+        merged.fg = self.fg;
+        merged.has_padding = self.has_padding;
+        merged.pad_l = self.pad_l;
+        merged.pad_t = self.pad_t;
+        merged.pad_r = self.pad_r;
+        merged.pad_b = self.pad_b;
+        merged.has_radius = self.has_radius;
+        merged.radius = self.radius;
+        merged.has_font_size = self.has_font_size;
+        merged.font_size_val = self.font_size_val;
+        merged.has_weight = self.has_weight;
+        merged.weight_val = self.weight_val;
+        merged.has_spacing = self.has_spacing;
+        merged.spacing_val = self.spacing_val;
+        merged.has_shadow = self.has_shadow;
+        merged.shadow_val = self.shadow_val;
+
+        if (override_style.has_bg) {
+            merged.has_bg = true;
+            merged.bg = override_style.bg;
+        }
+        if (override_style.has_fg) {
+            merged.has_fg = true;
+            merged.fg = override_style.fg;
+        }
+        if (override_style.has_padding) {
+            merged.has_padding = true;
+            merged.pad_l = override_style.pad_l;
+            merged.pad_t = override_style.pad_t;
+            merged.pad_r = override_style.pad_r;
+            merged.pad_b = override_style.pad_b;
+        }
+        if (override_style.has_radius) {
+            merged.has_radius = true;
+            merged.radius = override_style.radius;
+        }
+        if (override_style.has_font_size) {
+            merged.has_font_size = true;
+            merged.font_size_val = override_style.font_size_val;
+        }
+        if (override_style.has_weight) {
+            merged.has_weight = true;
+            merged.weight_val = override_style.weight_val;
+        }
+        if (override_style.has_spacing) {
+            merged.has_spacing = true;
+            merged.spacing_val = override_style.spacing_val;
+        }
+        if (override_style.has_shadow) {
+            merged.has_shadow = true;
+            merged.shadow_val = override_style.shadow_val;
+        }
+        return merged;
+    }
 }
 
 pub fn style(): Style {
@@ -178,6 +255,49 @@ pub var KIND_TABS: int = 9;
 pub var KIND_SCROLL: int = 10;
 pub var KIND_BADGE: int = 11;
 pub var KIND_SELECT: int = 12;
+pub var KIND_TEXTAREA: int = 13;
+pub var KIND_TOGGLE: int = 14;
+pub var KIND_STEPPER: int = 15;
+pub var KIND_PLOT_LINES: int = 16;
+pub var KIND_PLOT_HISTOGRAM: int = 17;
+pub var KIND_TREE_NODE: int = 18;
+pub var KIND_COLOR_PICKER: int = 19;
+pub var KIND_TABLE: int = 20;
+pub var KIND_ACCORDION: int = 21;
+pub var KIND_ALERT: int = 22;
+pub var KIND_CALENDAR: int = 23;
+pub var KIND_CARD: int = 24;
+pub var KIND_DIFF: int = 25;
+pub var KIND_DOCK: int = 26;
+pub var KIND_FILE_INPUT: int = 27;
+pub var KIND_FILTER: int = 28;
+pub var KIND_INDICATOR: int = 29;
+pub var KIND_JOIN: int = 30;
+pub var KIND_LINK: int = 31;
+pub var KIND_LIST: int = 32;
+pub var KIND_PROGRESS: int = 33;
+pub var KIND_RANGE_SLIDER: int = 34;
+pub var KIND_STAT: int = 35;
+pub var KIND_TIMELINE: int = 36;
+pub var KIND_TOOLTIP: int = 37;
+pub var KIND_TOAST: int = 38;
+pub var KIND_STEPS: int = 39;
+pub var KIND_MASK: int = 40;
+pub var KIND_BAR_CHART: int = 41;
+pub var KIND_BUBBLE_CHART: int = 42;
+pub var KIND_DOUGHNUT_CHART: int = 43;
+pub var KIND_LINE_CHART: int = 44;
+pub var KIND_POLAR_AREA_CHART: int = 45;
+pub var KIND_RADAR_CHART: int = 46;
+pub var KIND_SCATTER_CHART: int = 47;
+pub var KIND_PIE_CHART: int = 48;
+pub var KIND_OVERLAY: int = 49;
+pub var KIND_FORM_FIELD: int = 50;
+
+pub var LIFECYCLE_ENTERING: int = 0;
+pub var LIFECYCLE_ACTIVE: int = 1;
+pub var LIFECYCLE_EXITING: int = 2;
+pub var LIFECYCLE_REMOVED: int = 3;
 
 // Unified Retained UI Node with Fluent Modifiers
 frame Widget {
@@ -223,6 +343,17 @@ frame Widget {
     pub var select_options: [str];
     pub var selected_idx: int;
     pub var is_open: int;
+    pub var text_editor_state: any;
+    pub var focus_key: str;
+
+    pub var opacity_val: float;
+    pub var scale_val: float;
+    pub var shadow_val: shadow_mod.Shadow;
+    pub var lifecycle_state: int;
+    pub var enter_transition: anim_mod.Transition;
+    pub var exit_transition: anim_mod.Transition;
+    pub var anim_property: anim_mod.PropertyAnimation;
+    pub var active_transition: anim_mod.Transition;
 
     pub init(k: int) {
         self.kind = k;
@@ -266,6 +397,86 @@ frame Widget {
         self.select_options = [] as [str];
         self.selected_idx = 0;
         self.is_open = 0;
+        self.text_editor_state = nil;
+        self.focus_key = "";
+
+        self.opacity_val = 1.0;
+        self.scale_val = 1.0;
+        self.shadow_val = shadow_mod.Shadow();
+        self.lifecycle_state = LIFECYCLE_ACTIVE;
+        self.enter_transition = anim_mod.Transition();
+        self.exit_transition = anim_mod.Transition();
+        self.enter_transition.active = false;
+        self.exit_transition.active = false;
+        self.anim_property = anim_mod.PropertyAnimation(0.0, 0.0, 0.0, 0);
+        self.active_transition = anim_mod.Transition();
+        self.anim_property.state = anim_mod.STATE_IDLE;
+        self.active_transition.active = false;
+    }
+
+    pub fn opacity(o: float): Widget {
+        self.opacity_val = o;
+        return self;
+    }
+
+    pub fn scale(s: float): Widget {
+        self.scale_val = s;
+        return self;
+    }
+
+    pub fn shadow(s: shadow_mod.Shadow): Widget {
+        self.shadow_val = s;
+        return self;
+    }
+
+    pub fn animate(duration: float = 0.25, easing: int = 0): Widget {
+        if (self.anim_property.state == anim_mod.STATE_IDLE or self.anim_property.duration == 0.0) {
+            self.anim_property = anim_mod.PropertyAnimation(0.0, 1.0, duration, easing);
+        } else {
+            self.anim_property.duration = duration;
+            self.anim_property.easing_type = easing;
+        }
+        self.anim_property.play();
+        return self;
+    }
+
+    pub fn spring(stiffness: float = 180.0, damping: float = 12.0): Widget {
+        if (self.anim_property.state == anim_mod.STATE_IDLE or self.anim_property.duration == 0.0) {
+            self.anim_property = anim_mod.PropertyAnimation(0.0, 1.0, 0.25, 0);
+        }
+        self.anim_property.is_spring = true;
+        self.anim_property.spring_model = anim_mod.Spring(stiffness, damping);
+        self.anim_property.play();
+        return self;
+    }
+
+    pub fn transition(trans: anim_mod.Transition): Widget {
+        self.active_transition = trans;
+        self.active_transition.play();
+        return self;
+    }
+
+    pub fn enter(trans: anim_mod.Transition): Widget {
+        self.enter_transition = trans;
+        self.active_transition = trans;
+        self.active_transition.play();
+        self.lifecycle_state = LIFECYCLE_ENTERING;
+        return self;
+    }
+
+    pub fn exit(trans: anim_mod.Transition): Widget {
+        self.exit_transition = trans;
+        return self;
+    }
+
+    pub fn mark_for_removal(): nil {
+        if (self.exit_transition != nil) {
+            self.lifecycle_state = LIFECYCLE_EXITING;
+            self.active_transition = self.exit_transition;
+            self.active_transition.play();
+        } else {
+            self.lifecycle_state = LIFECYCLE_REMOVED;
+        }
     }
 
     pub fn checked(c: bool): Widget {
@@ -419,6 +630,9 @@ frame Widget {
         if (s.has_spacing) {
             self.spacing_val = s.spacing_val;
         }
+        if (s.has_shadow) {
+            self.shadow_val = s.shadow_val;
+        }
         return self;
     }
 }
@@ -446,10 +660,230 @@ pub fn button(label: str, on_click: any = nil): Widget {
     return w;
 }
 
+pub fn textarea(content: str): Widget {
+    var w = Widget(KIND_TEXTAREA);
+    w.text_val = content;
+    w.text_editor_state = text_ctrl.EditorController(content);
+    w.focus_key = "ta_default";
+    w.foreground_color = white;
+    w.padding_left = 8.0;
+    w.padding_top = 8.0;
+    w.padding_right = 8.0;
+    w.padding_bottom = 8.0;
+    w.width_val = 300.0;
+    w.height_val = 120.0;
+    return w;
+}
+
 pub fn column(children: [Widget]): Widget {
     var w = Widget(KIND_CONTAINER);
     w.is_vertical = 1;
     w.children = children;
+    return w;
+}
+
+pub fn accordion(title: str, content: Widget, default_open: bool = false): Widget {
+    var w = Widget(KIND_ACCORDION);
+    w.text_val = title;
+    w.children = [content];
+    if (default_open) w.is_open = 1; else w.is_open = 0;
+    w.background_color = rgb(28, 30, 40);
+    w.foreground_color = white;
+    return w;
+}
+
+pub fn alert(message: str, type_val: str = "info"): Widget {
+    var w = Widget(KIND_ALERT);
+    w.text_val = message;
+    w.placeholder_val = type_val;
+    if (type_val == "error" or type_val == "danger") {
+        w.background_color = rgb(80, 25, 30);
+        w.foreground_color = rgb(255, 120, 130);
+    } elif (type_val == "warning") {
+        w.background_color = rgb(70, 55, 20);
+        w.foreground_color = rgb(255, 210, 90);
+    } elif (type_val == "success") {
+        w.background_color = rgb(25, 65, 35);
+        w.foreground_color = rgb(100, 230, 140);
+    } else {
+        w.background_color = rgb(30, 45, 70);
+        w.foreground_color = rgb(120, 180, 255);
+    }
+    w.height_val = 36.0;
+    return w;
+}
+
+pub fn calendar(selected_date: str = "2025-01-01"): Widget {
+    var w = Widget(KIND_CALENDAR);
+    w.text_val = selected_date;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = white;
+    w.height_val = 180.0;
+    w.width_val = 220.0;
+    return w;
+}
+
+pub fn card(title: str, content: Widget): Widget {
+    var w = Widget(KIND_CARD);
+    w.text_val = title;
+    w.children = [content];
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = white;
+    w.padding_left = 12.0;
+    w.padding_top = 12.0;
+    w.padding_right = 12.0;
+    w.padding_bottom = 12.0;
+    return w;
+}
+
+pub fn diff(old_text: str, new_text: str): Widget {
+    var w = Widget(KIND_DIFF);
+    w.text_val = old_text;
+    w.placeholder_val = new_text;
+    w.background_color = rgb(20, 22, 28);
+    return w;
+}
+
+pub fn dock(items: [Widget]): Widget {
+    var w = Widget(KIND_DOCK);
+    w.children = items;
+    w.background_color = rgb(28, 30, 40);
+    w.height_val = 48.0;
+    return w;
+}
+
+pub fn file_input(label: str = "Choose File...", on_select: any = nil): Widget {
+    var w = Widget(KIND_FILE_INPUT);
+    w.text_val = label;
+    w.on_change_action = on_select;
+    w.background_color = rgb(35, 40, 52);
+    w.foreground_color = white;
+    w.height_val = 32.0;
+    w.width_val = 220.0;
+    return w;
+}
+
+pub fn filter(query: str = "", placeholder: str = "Filter...", on_change: any = nil): Widget {
+    var w = Widget(KIND_FILTER);
+    w.text_val = query;
+    w.placeholder_val = placeholder;
+    w.on_change_action = on_change;
+    w.background_color = rgb(20, 22, 28);
+    w.foreground_color = white;
+    w.height_val = 28.0;
+    w.width_val = 180.0;
+    return w;
+}
+
+pub fn indicator(status: str = "online", label: str = ""): Widget {
+    var w = Widget(KIND_INDICATOR);
+    w.placeholder_val = status;
+    w.text_val = label;
+    if (status == "online" or status == "active") {
+        w.foreground_color = rgb(80, 220, 130);
+    } elif (status == "busy" or status == "warning") {
+        w.foreground_color = rgb(255, 200, 80);
+    } else {
+        w.foreground_color = rgb(150, 155, 170);
+    }
+    w.height_val = 20.0;
+    return w;
+}
+
+pub fn join(items: [Widget]): Widget {
+    var w = Widget(KIND_JOIN);
+    w.children = items;
+    w.is_vertical = 0;
+    return w;
+}
+
+pub fn link(text_val: str, url: str): Widget {
+    var w = Widget(KIND_LINK);
+    w.text_val = text_val;
+    w.placeholder_val = url;
+    w.foreground_color = rgb(100, 180, 255);
+    w.height_val = 20.0;
+    return w;
+}
+
+pub fn list(items: [Widget]): Widget {
+    var w = Widget(KIND_LIST);
+    w.children = items;
+    w.is_vertical = 1;
+    return w;
+}
+
+pub fn progress(fraction: float = 0.0, width_val: float = 160.0): Widget {
+    var w = Widget(KIND_PROGRESS);
+    w.slider_val = fraction;
+    w.width_val = width_val;
+    w.height_val = 16.0;
+    w.background_color = rgb(35, 38, 48);
+    w.foreground_color = rgb(80, 180, 255);
+    return w;
+}
+
+pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0, max_val: float = 100.0): Widget {
+    var w = Widget(KIND_RANGE_SLIDER);
+    w.slider_min = min_val;
+    w.slider_max = max_val;
+    w.slider_val = low;
+    w.padding_left = high; // store high value in padding_left
+    w.height_val = 24.0;
+    w.width_val = 160.0;
+    w.background_color = rgb(35, 38, 48);
+    w.foreground_color = rgb(100, 180, 255);
+    return w;
+}
+
+pub fn stat(title: str, value: str, desc: str = ""): Widget {
+    var w = Widget(KIND_STAT);
+    w.text_val = title;
+    w.placeholder_val = value;
+    w.focus_key = desc;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = white;
+    w.height_val = 70.0;
+    w.width_val = 160.0;
+    return w;
+}
+
+pub fn timeline(events: [Widget]): Widget {
+    var w = Widget(KIND_TIMELINE);
+    w.children = events;
+    return w;
+}
+
+pub fn tooltip(label: str, content: Widget): Widget {
+    var w = Widget(KIND_TOOLTIP);
+    w.text_val = label;
+    w.children = [content];
+    return w;
+}
+
+pub fn toast(message: str, type_val: str = "info"): Widget {
+    var w = Widget(KIND_TOAST);
+    w.text_val = message;
+    w.placeholder_val = type_val;
+    w.background_color = rgb(28, 30, 42);
+    w.foreground_color = white;
+    w.height_val = 36.0;
+    w.width_val = 240.0;
+    return w;
+}
+
+pub fn steps(step_titles: [str], active_step: int = 0): Widget {
+    var w = Widget(KIND_STEPS);
+    w.tab_titles = step_titles;
+    w.active_tab = active_step;
+    w.height_val = 32.0;
+    return w;
+}
+
+pub fn mask(shape: str = "circle", child: Widget = empty()): Widget {
+    var w = Widget(KIND_MASK);
+    w.text_val = shape;
+    w.children = [child];
     return w;
 }
 
@@ -477,6 +911,25 @@ pub fn empty(): Widget {
     return Widget(KIND_CONTAINER);
 }
 
+pub fn overlay(content: Widget, x: float = 0.0, y: float = 0.0, width_val: float = 0.0, height_val: float = 0.0): Widget {
+    var w = Widget(KIND_OVERLAY);
+    w.children = [content];
+    w.padding_left = x;
+    w.padding_top = y;
+    w.width_val = width_val;
+    w.height_val = height_val;
+    return w;
+}
+
+pub fn form_field(label_text: str, control: Widget, help_text: str = "", error_text: str = ""): Widget {
+    var w = Widget(KIND_FORM_FIELD);
+    w.text_val = label_text;
+    w.placeholder_val = help_text;
+    w.focus_key = error_text;
+    w.children = [control];
+    return w;
+}
+
 // Input & Media Semantic Constructors (Experimental)
 pub fn image(source: str = ""): Widget {
     var w = Widget(KIND_IMAGE);
@@ -497,6 +950,192 @@ pub fn input(value: str = "", placeholder: str = "Type here...", on_change: any 
     w.padding_right = 8.0;
     w.padding_top = 6.0;
     w.padding_bottom = 6.0;
+    return w;
+}
+
+pub fn toggle(enabled: bool = false, on_change: any = nil): Widget {
+    var w = Widget(KIND_TOGGLE);
+    if (enabled) {
+        w.is_checked = 1;
+        w.foreground_color = rgb(80, 220, 130);
+    } else {
+        w.is_checked = 0;
+        w.foreground_color = gray;
+    }
+    w.background_color = rgb(35, 38, 48);
+    w.height_val = 22.0;
+    w.width_val = 44.0;
+    w.on_change_action = on_change;
+    return w;
+}
+
+pub fn stepper(value: int = 0, step: int = 1, min_val: int = 0, max_val: int = 100, on_change: any = nil): Widget {
+    var w = Widget(KIND_STEPPER);
+    w.slider_val = value as float;
+    w.slider_min = min_val as float;
+    w.slider_max = max_val as float;
+    w.spacing_val = step as float;
+    w.on_change_action = on_change;
+    w.height_val = 28.0;
+    w.width_val = 120.0;
+    w.background_color = rgb(28, 30, 38);
+    w.foreground_color = white;
+    return w;
+}
+
+pub fn plot_lines(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0): Widget {
+    var w = Widget(KIND_PLOT_LINES);
+    w.text_val = label;
+    w.slider_min = min_val;
+    w.slider_max = max_val;
+    w.height_val = 50.0;
+    w.width_val = 180.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(100, 180, 255);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn bar_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
+    var w = Widget(KIND_BAR_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 100.0;
+    w.width_val = 200.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(80, 180, 255);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn line_chart(label: str, values: [float]): Widget {
+    var w = Widget(KIND_LINE_CHART);
+    w.text_val = label;
+    w.height_val = 100.0;
+    w.width_val = 200.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(100, 220, 160);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn pie_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
+    var w = Widget(KIND_PIE_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = rgb(24, 26, 34);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn doughnut_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
+    var w = Widget(KIND_DOUGHNUT_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = rgb(24, 26, 34);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn bubble_chart(label: str, values: [float]): Widget {
+    var w = Widget(KIND_BUBBLE_CHART);
+    w.text_val = label;
+    w.height_val = 100.0;
+    w.width_val = 180.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(255, 180, 90);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn scatter_chart(label: str, values: [float]): Widget {
+    var w = Widget(KIND_SCATTER_CHART);
+    w.text_val = label;
+    w.height_val = 100.0;
+    w.width_val = 180.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(220, 120, 255);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn polar_area_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
+    var w = Widget(KIND_POLAR_AREA_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = rgb(24, 26, 34);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn radar_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
+    var w = Widget(KIND_RADAR_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(100, 200, 255);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn plot_histogram(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0): Widget {
+    var w = Widget(KIND_PLOT_HISTOGRAM);
+    w.text_val = label;
+    w.slider_min = min_val;
+    w.slider_max = max_val;
+    w.height_val = 50.0;
+    w.width_val = 180.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(80, 220, 130);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn tree_node(label: str, children: [Widget], default_open: bool = false): Widget {
+    var w = Widget(KIND_TREE_NODE);
+    w.text_val = label;
+    w.children = children;
+    if (default_open) {
+        w.is_open = 1;
+    } else {
+        w.is_open = 0;
+    }
+    w.foreground_color = white;
+    return w;
+}
+
+pub fn color_picker(label: str, color: Color, on_change: any = nil): Widget {
+    var w = Widget(KIND_COLOR_PICKER);
+    w.text_val = label;
+    w.foreground_color = color;
+    w.on_change_action = on_change;
+    w.height_val = 32.0;
+    w.width_val = 200.0;
+    return w;
+}
+
+pub fn table(headers: [str], rows: [[Widget]]): Widget {
+    var w = Widget(KIND_TABLE);
+    w.tab_titles = headers;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = white;
+    w.text_editor_state = rows;
+    return w;
+}
+
+pub fn grid(columns_count: int, children: [Widget]): Widget {
+    var w = Widget(KIND_CONTAINER);
+    w.is_vertical = 0;
+    w.active_tab = columns_count;
+    w.children = children;
     return w;
 }
 
@@ -581,5 +1220,21 @@ pub fn scroll(content: Widget): Widget {
     w.height_val = 0.0;
     w.scroll_y = 0.0;
     w.background_color = rgb(20, 22, 28);
+    return w;
+}
+
+pub fn text_area(value: str = "", placeholder: str = "Type here...", on_change: any = nil): Widget {
+    var w = Widget(KIND_TEXTAREA);
+    w.text_val = value;
+    w.placeholder_val = placeholder;
+    w.on_change_action = on_change;
+    w.background_color = rgb(20, 22, 28);
+    w.foreground_color = white;
+    w.height_val = 120.0;
+    w.width_val = 300.0;
+    w.padding_left = 8.0;
+    w.padding_right = 8.0;
+    w.padding_top = 6.0;
+    w.padding_bottom = 6.0;
     return w;
 }

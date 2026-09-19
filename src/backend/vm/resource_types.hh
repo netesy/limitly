@@ -74,7 +74,9 @@ enum class ResourceOperation : uint32_t {
     MAKE_IMAGE = 41,
     MAKE_PIPELINE = 42,
     MAKE_BINDINGS = 43,
-    END_PASS = 44
+    END_PASS = 44,
+    MEASURE_TEXT = 45,
+    GET_FONT_METRICS = 46
 };
 
 } // namespace VM

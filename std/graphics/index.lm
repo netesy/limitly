@@ -25,6 +25,7 @@ import std.graphics.vector3 as vector3;
 import std.graphics.animation as animation;
 import std.graphics.shader as shader;
 import std.graphics.backend as backend;
+import std.graphics.shadow as shadow_mod;
 
 // Re-export common types and helper constructors
 var Canvas = canvas.Canvas;
@@ -51,6 +52,7 @@ var Vector3 = vector3.Vector3;
 var Animation = animation.Animation;
 var Shader = shader.Shader;
 var Backend = backend.Backend;
+var Shadow = shadow_mod.Shadow;
 
 fn rgb(r: int, g: int, b: int): Color {
     return color.rgb(r, g, b);

@@ -1,13 +1,20 @@
 // Standard Library String Split Module
 
 pub fn split(value: str, delimiter: str): [str] {
-    var dlen = len(delimiter);
+    if (value == nil) return [""];
+    var del = delimiter;
+    if (del == nil) del = "";
+
+    var dlen = len(del);
     var vlen = len(value);
     var parts: [str] = [];
     if (dlen == 0) {
         var i = 0;
         while (i < vlen) {
-            parts.append(_builtin_substring(value, i, i + 1));
+            var sub = _builtin_substring(value, i, i + 1);
+            if (sub != nil) {
+                parts = parts + [sub];
+            }
             i = i + 1;
         }
         return parts;
@@ -15,14 +22,21 @@ pub fn split(value: str, delimiter: str): [str] {
     var start = 0;
     var i = 0;
     while (i <= vlen - dlen) {
-        if (_builtin_substring(value, i, i + dlen) == delimiter) {
-            parts.append(_builtin_substring(value, start, i));
+        var sub_delim = _builtin_substring(value, i, i + dlen);
+        if (sub_delim != nil and sub_delim == del) {
+            var sub = _builtin_substring(value, start, i);
+            if (sub != nil) {
+                parts = parts + [sub];
+            }
             start = i + dlen;
             i = start;
         } else {
             i = i + 1;
         }
     }
-    parts.append(_builtin_substring(value, start, vlen));
+    var last_sub = _builtin_substring(value, start, vlen);
+    if (last_sub != nil) {
+        parts = parts + [last_sub];
+    }
     return parts;
 }

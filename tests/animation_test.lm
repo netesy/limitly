@@ -1,0 +1,223 @@
+// Comprehensive Integration Tests for Limit Unified Animation System
+import std.animation as anim;
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.game.gui as gui_mod;
+import std.graphics.shadow as shadow_mod;
+
+fn test_time_based_property_animation(): nil {
+    print("Testing PropertyAnimation easing and time-based progression...");
+
+    var p_anim = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.EASE_OUT);
+    p_anim.play();
+
+    assert(p_anim.state == anim.STATE_RUNNING, "state running");
+
+    // Advance 0.5s
+    var v1 = p_anim.update(0.5);
+    assert(v1 > 0.0 and v1 < 100.0, "mid progress");
+
+    // Advance to 1.0s (completion)
+    var v2 = p_anim.update(0.5);
+    assert(v2 == 100.0, "completed value");
+    assert(p_anim.state == anim.STATE_COMPLETED, "state completed");
+
+    print("PropertyAnimation test passed.");
+}
+
+fn test_interruptible_target_changes(): nil {
+    print("Testing interruptible target changes...");
+
+    var anim_inst = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.EASE_LINEAR);
+    anim_inst.play();
+
+    // Advance 0.5s -> value is 50
+    var mid_val = anim_inst.update(0.5);
+    assert(mid_val == 50.0, "halfway value");
+
+    // Change target mid-animation to 0.0
+    anim_inst.set_target(0.0);
+    assert(anim_inst.start_val == 50.0, "interrupted start val preserved");
+    assert(anim_inst.target_val == 0.0, "new target val set");
+
+    // Advance 0.5s -> should move from 50.0 towards 0.0
+    var v_next = anim_inst.update(0.5);
+    assert(v_next < 50.0, "moving smoothly towards new target from current visual state");
+
+    print("Interruptible animation test passed.");
+}
+
+fn test_spring_physics(): nil {
+    print("Testing Spring physics convergence...");
+
+    var spr = anim.Spring(180.0, 12.0, 1.0);
+    var current = 0.0;
+    var target = 100.0;
+
+    var steps = 0;
+    while (not spr.is_at_rest(current, target) and steps < 200) {
+        current = spr.update(current, target, 0.016);
+        steps = steps + 1;
+    }
+
+    assert(spr.is_at_rest(current, target), "spring reached rest state");
+    print("Spring physics test passed.");
+}
+
+fn test_imgui_animation_store(): nil {
+    print("Testing IMGUI Animation Store with stable IDs...");
+
+    var store = anim.IMGUIAnimationStore();
+    var btn_id = "main_menu/start_btn";
+
+    var st = store.get_or_create(btn_id);
+    var initial_val = st.animate_property("hover_t", 0.0, 0.1, anim.EASE_OUT, 0.05);
+    assert(initial_val == 0.0, "initial unhovered value is 0.0 without flashing");
+
+    var t1 = st.animate_property("hover_t", 1.0, 0.1, anim.EASE_OUT, 0.05);
+    assert(t1 > 0.0 and t1 < 1.0, "imgui animated transition in progress");
+
+    var t2 = st.animate_property("hover_t", 1.0, 0.1, anim.EASE_OUT, 0.1);
+    assert(t2 == 1.0, "imgui animated transition completed");
+
+    print("IMGUI Animation Store test passed.");
+}
+
+fn test_retained_ui_animation_modifiers(): nil {
+    print("Testing std.ui retained animation modifiers...");
+
+    var sh_inst = shadow_mod.Shadow(r=0.0, g=0.0, b=0.0, a=0.3, off_x=2.0, off_y=4.0, blur=8.0);
+    var btn = ui.button("Animated Btn")
+        .opacity(0.8)
+        .scale(1.1)
+        .shadow(sh_inst)
+        .animate(0.2, anim.EASE_OUT)
+        .spring(200.0, 15.0)
+        .transition(anim.Transition().fade(0.0, 1.0, 0.2));
+
+    assert(btn.opacity_val == 0.8, "opacity modifier");
+    assert(btn.scale_val == 1.1, "scale modifier");
+    assert(btn.shadow_val.blur_radius == 8.0, "shadow modifier");
+    assert(btn.anim_property != nil, "animate property created");
+    assert(btn.anim_property.is_spring, "spring model enabled");
+    assert(btn.active_transition != nil, "active transition attached");
+
+    print("Retained UI animation modifiers test passed.");
+}
+
+fn test_shadow_interpolation(): nil {
+    print("Testing Shadow property interpolation...");
+
+    var s1 = shadow_mod.Shadow(r=0.0, g=0.0, b=0.0, a=0.0, off_x=0.0, off_y=0.0, blur=0.0, spread=0.0);
+    var s2 = shadow_mod.Shadow(r=1.0, g=1.0, b=1.0, a=1.0, off_x=10.0, off_y=20.0, blur=16.0, spread=4.0);
+
+    var s_mid = anim.lerp_shadow(s1, s2, 0.5);
+    assert(s_mid.offset_x == 5.0, "shadow offset_x lerp");
+    assert(s_mid.offset_y == 10.0, "shadow offset_y lerp");
+    assert(s_mid.blur_radius == 8.0, "shadow blur lerp");
+    assert(s_mid.spread_radius == 2.0, "shadow spread lerp");
+
+    print("Shadow interpolation test passed.");
+}
+
+fn test_keyframes_and_controls(): nil {
+    print("Testing Keyframes and seeking/reset controls...");
+
+    var kf = anim.Keyframes()
+        .add(0.0, 0.0)
+        .add(0.5, 100.0)
+        .add(1.0, 50.0);
+
+    assert(kf.evaluate(0.0) == 0.0, "kf start");
+    assert(kf.evaluate(0.5) == 100.0, "kf mid");
+    assert(kf.evaluate(0.25) == 50.0, "kf quarter lerp");
+    assert(kf.evaluate(1.0) == 50.0, "kf end");
+
+    var p_anim = anim.PropertyAnimation(0.0, 100.0, 2.0, anim.EASE_LINEAR);
+    p_anim.play();
+    p_anim.seek(0.5);
+    assert(p_anim.current_val == 50.0, "seek 50%");
+
+    p_anim.reset();
+    assert(p_anim.current_val == 0.0 and p_anim.state == anim.STATE_IDLE, "reset");
+
+    print("Keyframes and controls test passed.");
+}
+
+fn test_reduced_motion(): nil {
+    print("Testing reduced motion preferences...");
+
+    anim.global_animation_preferences.reduce_motion = true;
+
+    var p_anim = anim.PropertyAnimation(0.0, 100.0, 1.0, anim.EASE_OUT);
+    p_anim.play();
+
+    assert(p_anim.current_val == 100.0, "reduced motion instant jump");
+    assert(p_anim.state == anim.STATE_COMPLETED, "reduced motion immediate completion");
+
+    // Restore default
+    anim.global_animation_preferences.reduce_motion = false;
+
+    print("Reduced motion test passed.");
+}
+
+fn test_widget_lifecycle_transitions(): nil {
+    print("Testing Widget lifecycle transitions...");
+
+    var dialog = ui.card("Dialog", ui.text("Content"))
+        .enter(anim.Transition().fade(0.0, 1.0, 0.1))
+        .exit(anim.Transition().fade(1.0, 0.0, 0.1));
+
+    assert(dialog.lifecycle_state == ui.LIFECYCLE_ENTERING, "dialog entering state");
+
+    dialog.mark_for_removal();
+    assert(dialog.lifecycle_state == ui.LIFECYCLE_EXITING, "dialog exiting state");
+
+    print("Widget lifecycle transitions test passed.");
+}
+
+fn test_imgui_ttl_cleanup(): nil {
+    print("Testing IMGUI Animation Store TTL cleanup...");
+
+    var store = anim.IMGUIAnimationStore();
+    store.get_or_create("active_btn");
+    store.get_or_create("stale_btn");
+
+    assert(len(store.active_ids) == 2, "2 active ids initially");
+
+    // Advance frame counter past TTL
+    var i = 0;
+    while (i < 200) {
+        store.step_frame();
+        i = i + 1;
+    }
+
+    // Keep active_btn touched on current frame
+    store.get_or_create("active_btn");
+
+    // Prune stale entries older than 100 frames
+    store.prune_stale(100);
+
+    assert(len(store.active_ids) == 1, "stale_btn pruned");
+    assert(store.active_ids[0] == "active_btn", "active_btn retained");
+
+    print("IMGUI Animation Store TTL cleanup test passed.");
+}
+
+fn main(): int {
+    print("=== Running Unified Animation System Integration Test Suite ===");
+    test_time_based_property_animation();
+    test_interruptible_target_changes();
+    test_spring_physics();
+    test_imgui_animation_store();
+    test_retained_ui_animation_modifiers();
+    test_shadow_interpolation();
+    test_keyframes_and_controls();
+    test_reduced_motion();
+    test_widget_lifecycle_transitions();
+    test_imgui_ttl_cleanup();
+    print("=== All Unified Animation System Tests Passed Successfully ===");
+    return 0;
+}
+
+main();

@@ -158,6 +158,26 @@ fn test_retained_lifecycle_and_callback(): int {
     return 1;
 }
 
+fn test_style_merge(): int {
+    var s1 = ui.style()
+        .background(ui.red)
+        .padding(10.0);
+
+    var s2 = ui.style()
+        .foreground(ui.blue)
+        .corner_radius(6.0);
+
+    var merged = s1.merge(s2);
+
+    assert(merged.has_bg and merged.bg.r > 0.8, "base bg retained");
+    assert(merged.has_padding and merged.pad_l == 10.0, "base padding retained");
+    assert(merged.has_fg and merged.fg.b > 0.9, "merged fg added");
+    assert(merged.has_radius and merged.radius == 6.0, "merged radius added");
+
+    print("[PASS] 7. Style.merge partial style overrides");
+    return 1;
+}
+
 fn main() {
     print("=== Limit Fluent UI Comprehensive Test Suite ===");
     test_fluent_text_styling();
@@ -165,6 +185,7 @@ fn main() {
     test_layout_modifiers();
     test_style_reuse_and_precedence();
     test_state_styling();
+    test_style_merge();
     test_retained_lifecycle_and_callback();
     print("=== All Fluent UI Tests Passed Successfully ===");
 }

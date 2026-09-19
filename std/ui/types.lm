@@ -1,5 +1,7 @@
 // std.ui.types - Type definitions for Fluent, Retained UI System
 
+import std.text.controller as text_ctrl;
+
 frame Color {
     pub var r: float; // 0.0 to 1.0
     pub var g: float;
@@ -206,6 +208,7 @@ pub var KIND_TEXT: int = 2;
 pub var KIND_BUTTON: int = 3;
 pub var KIND_SPACER: int = 4;
 pub var KIND_IMAGE: int = 5;
+pub var KIND_TEXTAREA: int = 13;
 
 // Unified Retained UI Node with Fluent Modifiers
 frame Widget {
@@ -233,6 +236,14 @@ frame Widget {
     pub var height_val: float;
     pub var pressed_style_val: Style;
 
+    pub var text_editor_state: any;
+    pub var scroll_x: float;
+    pub var scroll_y: float;
+    pub var max_scroll_x: float;
+    pub var max_scroll_y: float;
+    pub var placeholder_val: str;
+    pub var focus_key: str;
+
     pub init(k: int) {
         self.kind = k;
         self.text_val = "";
@@ -256,6 +267,14 @@ frame Widget {
         self.width_val = 0.0;
         self.height_val = 0.0;
         self.pressed_style_val = Style();
+
+        self.text_editor_state = nil;
+        self.scroll_x = 0.0;
+        self.scroll_y = 0.0;
+        self.max_scroll_x = 0.0;
+        self.max_scroll_y = 0.0;
+        self.placeholder_val = "";
+        self.focus_key = "";
     }
 
     pub fn color(c: Color): Widget {
@@ -402,6 +421,21 @@ pub fn button(label: str, on_click: fn(): nil = nil): Widget {
     w.padding_bottom = 8.0;
     w.corner_radius_val = 4.0;
     w.height_val = 36.0;
+    return w;
+}
+
+pub fn textarea(content: str): Widget {
+    var w = Widget(KIND_TEXTAREA);
+    w.text_val = content;
+    w.text_editor_state = text_ctrl.EditorController(content);
+    w.focus_key = "ta_default";
+    w.foreground_color = white;
+    w.padding_left = 8.0;
+    w.padding_top = 8.0;
+    w.padding_right = 8.0;
+    w.padding_bottom = 8.0;
+    w.width_val = 300.0;
+    w.height_val = 120.0;
     return w;
 }
 

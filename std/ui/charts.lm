@@ -1,0 +1,120 @@
+// std/ui/charts.lm
+// Comprehensive Charts & Data Visualization Module for std.ui
+
+import std.ui as ui;
+
+pub fn plot_lines(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0): ui.Widget {
+    var w = ui.Widget(ui.KIND_PLOT_LINES);
+    w.text_val = label;
+    w.slider_min = min_val;
+    w.slider_max = max_val;
+    w.height_val = 60.0;
+    w.width_val = 180.0;
+    w.background_color = ui.rgb(24, 26, 34);
+    w.foreground_color = ui.rgb(100, 180, 255);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn plot_histogram(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0): ui.Widget {
+    var w = ui.Widget(ui.KIND_PLOT_HISTOGRAM);
+    w.text_val = label;
+    w.slider_min = min_val;
+    w.slider_max = max_val;
+    w.height_val = 60.0;
+    w.width_val = 180.0;
+    w.background_color = ui.rgb(24, 26, 34);
+    w.foreground_color = ui.rgb(80, 220, 130);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn bar_chart(label: str, values: [float], labels: [str] = [] as [str]): ui.Widget {
+    var w = ui.Widget(ui.KIND_BAR_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 100.0;
+    w.width_val = 200.0;
+    w.background_color = ui.rgb(24, 26, 34);
+    w.foreground_color = ui.rgb(80, 180, 255);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn line_chart(label: str, values: [float]): ui.Widget {
+    var w = ui.Widget(ui.KIND_LINE_CHART);
+    w.text_val = label;
+    w.height_val = 100.0;
+    w.width_val = 200.0;
+    w.background_color = ui.rgb(24, 26, 34);
+    w.foreground_color = ui.rgb(100, 220, 160);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn pie_chart(label: str, values: [float], labels: [str] = [] as [str]): ui.Widget {
+    var w = ui.Widget(ui.KIND_PIE_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = ui.rgb(24, 26, 34);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn doughnut_chart(label: str, values: [float], labels: [str] = [] as [str]): ui.Widget {
+    var w = ui.Widget(ui.KIND_DOUGHNUT_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = ui.rgb(24, 26, 34);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn bubble_chart(label: str, values: [float]): ui.Widget {
+    var w = ui.Widget(ui.KIND_BUBBLE_CHART);
+    w.text_val = label;
+    w.height_val = 100.0;
+    w.width_val = 180.0;
+    w.background_color = ui.rgb(24, 26, 34);
+    w.foreground_color = ui.rgb(255, 180, 90);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn scatter_chart(label: str, values: [float]): ui.Widget {
+    var w = ui.Widget(ui.KIND_SCATTER_CHART);
+    w.text_val = label;
+    w.height_val = 100.0;
+    w.width_val = 180.0;
+    w.background_color = ui.rgb(24, 26, 34);
+    w.foreground_color = ui.rgb(220, 120, 255);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn polar_area_chart(label: str, values: [float], labels: [str] = [] as [str]): ui.Widget {
+    var w = ui.Widget(ui.KIND_POLAR_AREA_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = ui.rgb(24, 26, 34);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn radar_chart(label: str, values: [float], labels: [str] = [] as [str]): ui.Widget {
+    var w = ui.Widget(ui.KIND_RADAR_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = ui.rgb(24, 26, 34);
+    w.foreground_color = ui.rgb(100, 200, 255);
+    w.text_editor_state = values;
+    return w;
+}

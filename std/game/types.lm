@@ -1,6 +1,11 @@
 // std/game/types.lm
 // Fundamental math primitives, color definitions, and themes for std.game IMGUI
 
+import std.graphics.shadow as shadow_mod;
+
+pub var Shadow = shadow_mod.Shadow;
+pub var shadow = shadow_mod.shadow;
+
 frame Vec2 {
     pub var x: float;
     pub var y: float;
@@ -133,6 +138,10 @@ frame GUITheme {
     pub var item_height: float;
     pub var rounding: float;
     pub var font_scale: int;
+    pub var hover_duration: float;
+    pub var press_duration: float;
+    pub var enter_duration: float;
+    pub var exit_duration: float;
 
     pub init() {
         // Modern game engine slate/dark palette
@@ -163,6 +172,10 @@ frame GUITheme {
         self.item_height        = 24.0;
         self.rounding           = 4.0;
         self.font_scale         = 1;
+        self.hover_duration     = 0.15;
+        self.press_duration     = 0.08;
+        self.enter_duration     = 0.25;
+        self.exit_duration      = 0.20;
     }
 }
 

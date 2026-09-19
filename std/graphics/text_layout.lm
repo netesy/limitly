@@ -1,4 +1,6 @@
 import std.graphics.font as font;
+import std.gg as gg;
+import std.string as std_string;
 
 frame TextLayout {
     pub var text: str;
@@ -10,4 +12,62 @@ frame TextLayout {
         self.font_val = f;
         self.max_width = max_w;
     }
+}
+
+pub fn hit_test_line(line_text: str, click_x: float, scale: int = 1): int {
+    if (line_text == nil or click_x <= 0.0) {
+        return 0;
+    }
+    var line_len = len(line_text);
+    if (line_len == 0) {
+        return 0;
+    }
+
+    var best_col = 0;
+    var min_dist = click_x;
+
+    var i = 0;
+    while (i <= line_len) {
+        var prefix = "";
+        if (i > 0) {
+            prefix = std_string.substring(line_text, 0, i);
+        }
+        if (prefix == nil) {
+            prefix = "";
+        }
+        var w = gg.measure_text(prefix, scale);
+        var dist = click_x - w;
+        if (dist < 0.0) {
+            dist = -dist;
+        }
+
+        if (dist < min_dist) {
+            min_dist = dist;
+            best_col = i;
+        }
+        i = i + 1;
+    }
+
+    return best_col;
+}
+
+pub fn hit_test_multiline(lines: [str], click_x: float, click_y: float, line_height: float, scale: int = 1): [int] {
+    if (lines == nil) {
+        return [0, 0];
+    }
+    var total_lines = len(lines);
+    if (total_lines == 0) {
+        return [0, 0];
+    }
+
+    var target_line = (click_y / line_height) as int;
+    if (target_line < 0) {
+        target_line = 0;
+    }
+    if (target_line >= total_lines) {
+        target_line = total_lines - 1;
+    }
+
+    var target_col = hit_test_line(lines[target_line], click_x, scale);
+    return [target_line, target_col];
 }

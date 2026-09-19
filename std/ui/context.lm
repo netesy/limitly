@@ -3,11 +3,16 @@
 
 import std.ui.types as ui_types;
 import std.ui as ui;
+import std.animation as anim;
+import std.string as std_string;
+import std.text.controller as text_ctrl;
+import std.focus.manager as focus_mod;
 import std.gg as gg;
 import std.graphics.canvas as canvas;
 import std.graphics.paint as paint;
 import std.graphics.color as color;
 import std.graphics.rect as rect;
+import std.graphics.shadow as shadow_mod;
 
 frame UIContextState {
     pub var is_initialized: int;
@@ -16,6 +21,10 @@ frame UIContextState {
     pub var dirty: int;
     pub var current_blueprint: ui_types.Blueprint;
     pub var current_widget: ui.Widget;
+    pub var focus_manager: focus_mod.FocusManager;
+    pub var modifiers: int;
+    pub var get_clipboard_cb: any;
+    pub var set_clipboard_cb: any;
     pub var has_widget: int;
     pub var viewport_w: float;
     pub var viewport_h: float;
@@ -28,6 +37,7 @@ frame UIContextState {
     pub var last_pointer_x: float;
     pub var last_pointer_y: float;
     pub var is_pointer_down: int;
+    pub var active_overlays: [ui.Widget];
 }
 
 pub var global_ui_context: UIContextState = UIContextState(
@@ -55,8 +65,19 @@ pub var global_ui_context: UIContextState = UIContextState(
     captured_bounds_h=0.0,
     last_pointer_x=0.0,
     last_pointer_y=0.0,
-    is_pointer_down=0
+    is_pointer_down=0,
+    active_overlays=[] as [ui.Widget]
 );
+
+pub fn push_overlay(w: ui.Widget): nil {
+    global_ui_context.active_overlays.append(w);
+    mark_element_dirty(1);
+}
+
+pub fn clear_overlays(): nil {
+    global_ui_context.active_overlays = [] as [ui.Widget];
+    mark_element_dirty(1);
+}
 
 pub fn ui_init(): int {
     if (global_ui_context.is_initialized != 0) {
@@ -190,7 +211,21 @@ fn measure_widget_height(w: ui.Widget): float {
     if (w.kind == ui.KIND_BUTTON) {
         return 28.0 + w.padding_top + w.padding_bottom;
     }
-    if (w.kind == ui.KIND_INPUT) {
+        if (w.kind == ui.KIND_TEXTAREA) {
+        if (w.height_val > 0.0) return w.height_val;
+        return 120.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_FORM_FIELD) {
+        var total_h = 18.0;
+        if (len(w.children) > 0) {
+            total_h = total_h + measure_widget_height(w.children[0]);
+        }
+        if (len(w.placeholder_val) > 0 or len(w.focus_key) > 0) {
+            total_h = total_h + 16.0;
+        }
+        return total_h;
+    }
+if (w.kind == ui.KIND_INPUT) {
         return 28.0 + w.padding_top + w.padding_bottom;
     }
     if (w.kind == ui.KIND_CHECKBOX) {
@@ -214,6 +249,83 @@ fn measure_widget_height(w: ui.Widget): float {
     }
     if (w.kind == ui.KIND_SELECT) {
         return 28.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_TOGGLE) {
+        return 22.0;
+    }
+    if (w.kind == ui.KIND_STEPPER) {
+        return 28.0;
+    }
+    if (w.kind == ui.KIND_PLOT_LINES or w.kind == ui.KIND_PLOT_HISTOGRAM) {
+        if (w.height_val > 0.0) return w.height_val;
+        return 60.0;
+    }
+    if (w.kind == ui.KIND_BAR_CHART or w.kind == ui.KIND_LINE_CHART or w.kind == ui.KIND_BUBBLE_CHART or w.kind == ui.KIND_SCATTER_CHART) {
+        if (w.height_val > 0.0) return w.height_val;
+        return 100.0;
+    }
+    if (w.kind == ui.KIND_PIE_CHART or w.kind == ui.KIND_DOUGHNUT_CHART or w.kind == ui.KIND_POLAR_AREA_CHART or w.kind == ui.KIND_RADAR_CHART) {
+        if (w.height_val > 0.0) return w.height_val;
+        return 120.0;
+    }
+    if (w.kind == ui.KIND_COLOR_PICKER) {
+        return 32.0;
+    }
+    if (w.kind == ui.KIND_TREE_NODE) {
+        var h = 24.0;
+        if (w.is_open == 1) {
+            var i = 0;
+            while (i < len(w.children)) {
+                h = h + measure_widget_height(w.children[i]);
+                i = i + 1;
+            }
+        }
+        return h;
+    }
+    if (w.kind == ui.KIND_TABLE) {
+        var rows_h = 28.0;
+        var r_list = w.text_editor_state as [[ui.Widget]];
+        if (r_list != nil) {
+            rows_h = rows_h + (len(r_list) as float) * 24.0;
+        }
+        return rows_h;
+    }
+    if (w.kind == ui.KIND_ALERT or w.kind == ui.KIND_FILE_INPUT or w.kind == ui.KIND_TOAST) {
+        return 36.0;
+    }
+    if (w.kind == ui.KIND_CALENDAR) {
+        return 180.0;
+    }
+    if (w.kind == ui.KIND_DOCK) {
+        return 48.0;
+    }
+    if (w.kind == ui.KIND_INDICATOR or w.kind == ui.KIND_LINK) {
+        return 20.0;
+    }
+    if (w.kind == ui.KIND_PROGRESS or w.kind == ui.KIND_STEPS) {
+        return 24.0;
+    }
+    if (w.kind == ui.KIND_STAT) {
+        return 70.0;
+    }
+    if (w.kind == ui.KIND_ACCORDION or w.kind == ui.KIND_CARD or w.kind == ui.KIND_TOOLTIP or w.kind == ui.KIND_MASK) {
+        var inner_h = 28.0;
+        if (len(w.children) > 0) {
+            inner_h = inner_h + measure_widget_height(w.children[0]);
+        }
+        return inner_h;
+    }
+    if (w.kind == ui.KIND_DIFF) {
+        return 80.0;
+    }
+    if (w.kind == ui.KIND_JOIN or w.kind == ui.KIND_LIST or w.kind == ui.KIND_TIMELINE) {
+        var total_list_h = 0.0;
+        var i = 0;
+        while (i < len(w.children)) {
+            total_list_h = total_list_h + measure_widget_height(w.children[i]);
+            i = i + 1;
+        }
+        return total_list_h;
     }
     if (w.kind == ui.KIND_SPACER) {
         return 10.0;
@@ -277,6 +389,13 @@ fn measure_widget_width(w: ui.Widget, available_w: float): float {
         }
         return tw;
     }
+        if (w.kind == ui.KIND_TEXTAREA) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 300.0;
+    }
+    if (w.kind == ui.KIND_FORM_FIELD and len(w.children) > 0) {
+        return measure_widget_width(w.children[0], available_w);
+    }
     if (w.kind == ui.KIND_INPUT) {
         if (w.width_val > 0.0) return w.width_val;
         return 220.0;
@@ -292,6 +411,41 @@ fn measure_widget_width(w: ui.Widget, available_w: float): float {
     if (w.kind == ui.KIND_BADGE) {
         if (w.width_val > 0.0) return w.width_val;
         return (len(w.text_val) as float) * 8.0 + w.padding_left + w.padding_right + 12.0;
+    }
+    if (w.kind == ui.KIND_TOGGLE) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 44.0;
+    }
+    if (w.kind == ui.KIND_STEPPER) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 120.0;
+    }
+    if (w.kind == ui.KIND_PLOT_LINES or w.kind == ui.KIND_PLOT_HISTOGRAM or w.kind == ui.KIND_BUBBLE_CHART or w.kind == ui.KIND_SCATTER_CHART) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 180.0;
+    }
+    if (w.kind == ui.KIND_BAR_CHART or w.kind == ui.KIND_LINE_CHART) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 200.0;
+    }
+    if (w.kind == ui.KIND_PIE_CHART or w.kind == ui.KIND_DOUGHNUT_CHART or w.kind == ui.KIND_POLAR_AREA_CHART or w.kind == ui.KIND_RADAR_CHART) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 120.0;
+    }
+    if (w.kind == ui.KIND_COLOR_PICKER) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 200.0;
+    }
+    if (w.kind == ui.KIND_CALENDAR) {
+        return 220.0;
+    }
+    if (w.kind == ui.KIND_FILE_INPUT or w.kind == ui.KIND_ALERT or w.kind == ui.KIND_TOAST) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 220.0;
+    }
+    if (w.kind == ui.KIND_PROGRESS or w.kind == ui.KIND_RANGE_SLIDER or w.kind == ui.KIND_STAT) {
+        if (w.width_val > 0.0) return w.width_val;
+        return 160.0;
     }
     if (w.kind == ui.KIND_SELECT) {
         if (w.width_val > 0.0) return w.width_val;
@@ -442,6 +596,37 @@ pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y
             }
         }
     }
+    if (w.kind == ui.KIND_ACCORDION) {
+        if (px >= x and px <= x + available_w and py >= y and py <= y + 28.0) {
+            if (w.is_open == 1) {
+                w.is_open = 0;
+            } else {
+                w.is_open = 1;
+            }
+            mark_element_dirty(1);
+        }
+    }
+    if (w.kind == ui.KIND_FORM_FIELD and len(w.children) > 0) {
+        var cy = y + 18.0;
+        var ctrl = w.children[0];
+        var ch_h = measure_widget_height(ctrl);
+        var ch_w = measure_widget_width(ctrl, available_w);
+        hit_test_and_click_widget(ctrl, px, py, x, cy, ch_w, ch_h);
+    }
+    if (w.kind == ui.KIND_CARD and len(w.children) > 0) {
+        hit_test_and_click_widget(w.children[0], px, py, x + 12.0, y + 32.0, available_w - 24.0, measure_widget_height(w.children[0]));
+    }
+    if (w.kind == ui.KIND_JOIN or w.kind == ui.KIND_LIST or w.kind == ui.KIND_TIMELINE or w.kind == ui.KIND_DOCK) {
+        var cy = y;
+        var i = 0;
+        while (i < len(w.children)) {
+            var child = w.children[i];
+            var ch_h = measure_widget_height(child);
+            hit_test_and_click_widget(child, px, py, x, cy, available_w, ch_h);
+            cy = cy + ch_h + 4.0;
+            i = i + 1;
+        }
+    }
     if (w.kind == ui.KIND_BUTTON) {
         var btn_h = measure_widget_height(w);
         var btn_w = available_w;
@@ -459,7 +644,32 @@ pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y
             mark_element_dirty(1);
         }
     }
-    if (w.kind == ui.KIND_INPUT) {
+        if (w.kind == ui.KIND_TEXTAREA) {
+        var inp_w = available_w;
+        if (w.width_val > 0.0) inp_w = w.width_val;
+        var inp_h = 120.0;
+        if (w.height_val > 0.0) inp_h = w.height_val;
+        if (px >= x and px <= x + inp_w and py >= y and py <= y + inp_h) {
+            w.is_focused = 1;
+            var fk_empty1 = true;
+            if (w.focus_key != nil) {
+                if (len(w.focus_key) > 0) {
+                    fk_empty1 = false;
+                }
+            }
+            if (fk_empty1) {
+                w.focus_key = "ta_" + ((x*100.0) as int as str);
+            }
+            global_ui_context.focus_manager.request_focus(w.focus_key);
+            mark_element_dirty(1);
+        } else {
+            if (w.is_focused != 0) {
+                w.is_focused = 0;
+                mark_element_dirty(1);
+            }
+        }
+    }
+if (w.kind == ui.KIND_INPUT) {
         var inp_w = available_w;
         if (w.width_val > 0.0) inp_w = w.width_val;
         var inp_h = 28.0;
@@ -474,7 +684,7 @@ pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y
             }
         }
     }
-    if (w.kind == ui.KIND_CHECKBOX) {
+    if (w.kind == ui.KIND_CHECKBOX or w.kind == ui.KIND_TOGGLE) {
         var chk_w = 42.0;
         if (w.width_val > 0.0) chk_w = w.width_val;
         var chk_h = 26.0;
@@ -487,6 +697,46 @@ pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y
             global_ui_context.captured_bounds_y = y;
             global_ui_context.captured_bounds_w = chk_w;
             global_ui_context.captured_bounds_h = chk_h;
+            mark_element_dirty(1);
+        }
+    }
+    if (w.kind == ui.KIND_STEPPER) {
+        var stp_w = 120.0;
+        if (w.width_val > 0.0) stp_w = w.width_val;
+        var stp_h = 28.0;
+        if (px >= x and px <= x + stp_w and py >= y and py <= y + stp_h) {
+            var step_val = w.spacing_val;
+            if (step_val <= 0.0) step_val = 1.0;
+            if (px <= x + 28.0) { // minus button
+                w.slider_val = w.slider_val - step_val;
+                if (w.slider_val < w.slider_min) w.slider_val = w.slider_min;
+            } elif (px >= x + stp_w - 28.0) { // plus button
+                w.slider_val = w.slider_val + step_val;
+                if (w.slider_val > w.slider_max) w.slider_val = w.slider_max;
+            }
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+        }
+    }
+    if (w.kind == ui.KIND_TREE_NODE or w.kind == ui.KIND_ACCORDION) {
+        if (px >= x and px <= x + available_w and py >= y and py <= y + 24.0) {
+            if (w.is_open == 1) {
+                w.is_open = 0;
+            } else {
+                w.is_open = 1;
+            }
+            mark_element_dirty(1);
+        }
+    }
+    if (w.kind == ui.KIND_FILE_INPUT or w.kind == ui.KIND_LINK or w.kind == ui.KIND_ALERT or w.kind == ui.KIND_TOAST) {
+        if (px >= x and px <= x + available_w and py >= y and py <= y + 32.0) {
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
             mark_element_dirty(1);
         }
     }
@@ -838,6 +1088,37 @@ fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w
 }
 
 fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil {
+    if (w.kind == ui.KIND_FORM_FIELD) {
+        var lbl_p = paint.Paint();
+        lbl_p.color_val = color.rgb(200, 205, 220);
+        cvs.draw_text(w.text_val, x, y + 2.0, lbl_p, 1);
+
+        var cy = y + 18.0;
+        if (len(w.children) > 0) {
+            var ctrl = w.children[0];
+            var ch_h = measure_widget_height(ctrl);
+            var ch_w = measure_widget_width(ctrl, available_w);
+            render_widget_node(ctrl, x, cy, ch_w, ch_h, cvs);
+            cy = cy + ch_h + 4.0;
+        }
+
+        if (len(w.focus_key) > 0) {
+            var err_p = paint.Paint();
+            err_p.color_val = color.rgb(255, 100, 100);
+            cvs.draw_text(w.focus_key, x, cy + 2.0, err_p, 1);
+        } elif (len(w.placeholder_val) > 0) {
+            var help_p = paint.Paint();
+            help_p.color_val = color.rgb(140, 145, 160);
+            cvs.draw_text(w.placeholder_val, x, cy + 2.0, help_p, 1);
+        }
+        return;
+    }
+    if (w.shadow_val != nil and w.shadow_val.a > 0.0) {
+        var sw = available_w;
+        if (w.width_val > 0.0) sw = w.width_val;
+        var sh = measure_widget_height(w);
+        cvs.draw_shadow(rect.Rect(x=x, y=y, w=sw, h=sh), w.shadow_val);
+    }
     if (w.kind == ui.KIND_CONTAINER) {
         if (w.background_color.a > 0.0) {
             var p = paint.Paint();
@@ -913,6 +1194,128 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
             }
         }
     }
+    if (w.kind == ui.KIND_ACCORDION) {
+        var acc_bg = paint.Paint();
+        acc_bg.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=available_w, h=28.0), acc_bg);
+
+        var arrow_str = "[+] ";
+        if (w.is_open == 1) arrow_str = "[-] ";
+        var txt_p = paint.Paint();
+        txt_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        cvs.draw_text(arrow_str + w.text_val, x + 8.0, y + 8.0, txt_p, 1);
+
+        if (w.is_open == 1 and len(w.children) > 0) {
+            render_widget_node(w.children[0], x + 8.0, y + 32.0, available_w - 16.0, measure_widget_height(w.children[0]), cvs);
+        }
+    }
+    if (w.kind == ui.KIND_ALERT or w.kind == ui.KIND_TOAST) {
+        var abg_p = paint.Paint();
+        abg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        var aw = available_w;
+        if (w.width_val > 0.0) aw = w.width_val;
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=aw, h=36.0), abg_p);
+
+        var atxt_p = paint.Paint();
+        atxt_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        cvs.draw_text(w.text_val, x + 10.0, y + 12.0, atxt_p, 1);
+    }
+    if (w.kind == ui.KIND_CARD) {
+        var cbg_p = paint.Paint();
+        cbg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        var card_h = measure_widget_height(w);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=available_w, h=card_h), cbg_p);
+
+        var ctitle_p = paint.Paint();
+        ctitle_p.color_val = color.rgb(255, 255, 255);
+        cvs.draw_text(w.text_val, x + 12.0, y + 12.0, ctitle_p, 1);
+
+        if (len(w.children) > 0) {
+            render_widget_node(w.children[0], x + 12.0, y + 32.0, available_w - 24.0, measure_widget_height(w.children[0]), cvs);
+        }
+    }
+    if (w.kind == ui.KIND_PROGRESS) {
+        var pw = 160.0;
+        if (w.width_val > 0.0) pw = w.width_val;
+        var pbg_p = paint.Paint();
+        pbg_p.color_val = color.rgb(35, 38, 48);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=pw, h=16.0), pbg_p);
+
+        var frac = w.slider_val;
+        if (frac < 0.0) frac = 0.0;
+        if (frac > 1.0) frac = 1.0;
+        if (frac > 0.0) {
+            var fill_p = paint.Paint();
+            fill_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+            cvs.draw_rect(rect.Rect(x=x, y=y, w=pw * frac, h=16.0), fill_p);
+        }
+    }
+    if (w.kind == ui.KIND_STAT) {
+        var sbg_p = paint.Paint();
+        sbg_p.color_val = color.rgb(24, 26, 34);
+        var sw = 160.0;
+        if (w.width_val > 0.0) sw = w.width_val;
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=sw, h=70.0), sbg_p);
+
+        var lbl_p = paint.Paint();
+        lbl_p.color_val = color.rgb(140, 145, 160);
+        cvs.draw_text(w.text_val, x + 10.0, y + 10.0, lbl_p, 1);
+
+        var val_p = paint.Paint();
+        val_p.color_val = color.rgb(80, 220, 130);
+        cvs.draw_text(w.placeholder_val, x + 10.0, y + 28.0, val_p, 2);
+
+        if (len(w.focus_key) > 0) {
+            var desc_p = paint.Paint();
+            desc_p.color_val = color.rgb(160, 165, 180);
+            cvs.draw_text(w.focus_key, x + 10.0, y + 52.0, desc_p, 1);
+        }
+    }
+    if (w.kind == ui.KIND_LINK) {
+        var ltxt_p = paint.Paint();
+        ltxt_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        cvs.draw_text(w.text_val, x, y + 6.0, ltxt_p, 1);
+        var underline_p = paint.Paint();
+        underline_p.color_val = ltxt_p.color_val;
+        cvs.draw_rect(rect.Rect(x=x, y=y + 16.0, w=(len(w.text_val) as float) * 8.0, h=1.0), underline_p);
+    }
+    if (w.kind == ui.KIND_FILE_INPUT) {
+        var fbg_p = paint.Paint();
+        fbg_p.color_val = color.rgb(35, 40, 52);
+        var fw = 220.0;
+        if (w.width_val > 0.0) fw = w.width_val;
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=fw, h=32.0), fbg_p);
+
+        var icon_p = paint.Paint();
+        icon_p.color_val = color.rgb(100, 180, 255);
+        cvs.draw_text("[FILE]", x + 8.0, y + 10.0, icon_p, 1);
+
+        var ftxt_p = paint.Paint();
+        ftxt_p.color_val = color.rgb(220, 225, 240);
+        cvs.draw_text(w.text_val, x + 60.0, y + 10.0, ftxt_p, 1);
+    }
+    if (w.kind == ui.KIND_INDICATOR) {
+        var dot_p = paint.Paint();
+        dot_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        cvs.draw_rect(rect.Rect(x=x, y=y + 4.0, w=10.0, h=10.0), dot_p);
+
+        if (len(w.text_val) > 0) {
+            var itxt_p = paint.Paint();
+            itxt_p.color_val = color.rgb(200, 205, 220);
+            cvs.draw_text(w.text_val, x + 16.0, y + 4.0, itxt_p, 1);
+        }
+    }
+    if (w.kind == ui.KIND_JOIN or w.kind == ui.KIND_LIST or w.kind == ui.KIND_TIMELINE or w.kind == ui.KIND_DOCK) {
+        var cy = y;
+        var i = 0;
+        while (i < len(w.children)) {
+            var child = w.children[i];
+            var ch_h = measure_widget_height(child);
+            render_widget_node(child, x, cy, available_w, ch_h, cvs);
+            cy = cy + ch_h + 4.0;
+            i = i + 1;
+        }
+    }
     if (w.kind == ui.KIND_TEXT) {
         var p = paint.Paint();
         p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
@@ -969,7 +1372,118 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
         }
         cvs.draw_text(w.text_val, tx, ty, text_p, 1);
     }
-    if (w.kind == ui.KIND_INPUT) {
+        if (w.kind == ui.KIND_TEXTAREA) {
+        print("T1");
+        var inp_w = available_w;
+        if (w.width_val > 0.0) inp_w = w.width_val;
+        var inp_h = 120.0;
+        if (w.height_val > 0.0) inp_h = w.height_val;
+
+        print("T2");
+        if (w.text_editor_state == nil) {
+            w.text_editor_state = text_ctrl.EditorController(w.text_val);
+            var fk_empty2 = true;
+            if (w.focus_key != nil) {
+                if (len(w.focus_key) > 0) {
+                    fk_empty2 = false;
+                }
+            }
+            if (fk_empty2) {
+                w.focus_key = "ta_" + ((x*100.0) as int as str);
+            }
+        }
+        print("T3");
+        var ctrl = w.text_editor_state as text_ctrl.EditorController;
+        ctrl.get_clipboard = global_ui_context.get_clipboard_cb;
+        ctrl.set_clipboard = global_ui_context.set_clipboard_cb;
+
+        print("T4");
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgb(20, 22, 28);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=inp_w, h=inp_h), bg_p);
+
+        print("T5");
+        var fk_has_focus = global_ui_context.focus_manager.has_focus(w.focus_key);
+        print("T5.1");
+        var border_p = paint.Paint();
+        if (w.is_focused == 1 or fk_has_focus) {
+            border_p.color_val = color.rgb(90, 130, 240);
+        } elif (w.is_hovered == 1) {
+            border_p.color_val = color.rgb(75, 85, 110);
+        } else {
+            border_p.color_val = color.rgb(55, 60, 75);
+        }
+        print("T5.2");
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=inp_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y + inp_h - 1.0, w=inp_w, h=1.0), border_p);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=1.0, h=inp_h), border_p);
+        cvs.draw_rect(rect.Rect(x=x + inp_w - 1.0, y=y, w=1.0, h=inp_h), border_p);
+
+        print("T5.3");
+        var text_p = paint.Paint();
+        text_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+
+        print("T5.4");
+        cvs.push_clip(rect.Rect(x=x + 1.0, y=y + 1.0, w=inp_w - 2.0, h=inp_h - 2.0));
+
+        print("T5.5");
+        var is_empty_doc = (ctrl.get_line_count() == 1);
+        print("T5.6");
+        if (is_empty_doc) {
+            var line0 = ctrl.get_line(0);
+            if (len(line0) > 0) {
+                is_empty_doc = false;
+            }
+        }
+        print("T5.7");
+        var has_ph = false;
+        if (len(w.placeholder_val) > 0) {
+            has_ph = true;
+        }
+        print("T5.8");
+        if (is_empty_doc and has_ph and w.is_focused == 0) {
+            var ph_p = paint.Paint();
+            ph_p.color_val = color.rgb(100, 105, 120);
+            cvs.draw_text(w.placeholder_val, x + w.padding_left, y + w.padding_top + 16.0, ph_p, 1);
+        } else {
+            print("T5.9");
+            print("L1 line_count=" + (ctrl.get_line_count() as str));
+            var ii = 0;
+            var cy = y + w.padding_top + 16.0;
+            while (ii < ctrl.get_line_count()) {
+                print("L2 ii=" + (ii as str));
+                var line_text = ctrl.get_line(ii);
+                print("L3 line_text got");
+                if (line_text == nil) { line_text = ""; }
+                print("L4 focus check");
+                var focus_chk = false;
+                if (w.is_focused == 1) { focus_chk = true; }
+                elif (w.focus_key != nil) {
+                    if (len(w.focus_key) > 0) {
+                        focus_chk = global_ui_context.focus_manager.has_focus(w.focus_key);
+                    }
+                }
+                if (focus_chk and ii == ctrl.get_cursor_line()) {
+                    print("L5 cursor line");
+                    var cur_col = ctrl.get_cursor_col();
+                    var line_len = len(line_text);
+                    var prefix = "";
+                    if (cur_col > 0) { prefix = std_string.substring(line_text, 0, cur_col); }
+                    if (prefix == nil) { prefix = ""; }
+                    var suffix = "";
+                    if (cur_col < line_len) { suffix = std_string.substring(line_text, cur_col, line_len); }
+                    if (suffix == nil) { suffix = ""; }
+                    line_text = prefix + "|" + suffix;
+                }
+                print("L6 drawing text");
+                cvs.draw_text(line_text, x + w.padding_left, cy, text_p, 1);
+                cy = cy + 20.0;
+                ii = ii + 1;
+            }
+        }
+        cvs.pop_clip();
+    }
+if (w.kind == ui.KIND_INPUT) {
         var inp_w = available_w;
         if (w.width_val > 0.0) inp_w = w.width_val;
         var inp_h = 28.0;
@@ -1045,6 +1559,261 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
         var tx = x + (chk_w - ((len(w.text_val) as float) * 8.0)) / 2.0;
         var ty = y + (chk_h - 8.0) / 2.0;
         cvs.draw_text(w.text_val, tx, ty, text_p, 1);
+    }
+    if (w.kind == ui.KIND_TOGGLE) {
+        var t_w = 44.0;
+        if (w.width_val > 0.0) t_w = w.width_val;
+        var t_h = 22.0;
+
+        var pill_p = paint.Paint();
+        if (w.is_checked == 1) {
+            pill_p.color_val = color.rgb(80, 200, 130);
+        } else {
+            pill_p.color_val = color.rgb(50, 55, 70);
+        }
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=t_w, h=t_h), pill_p);
+
+        var thumb_x = x + 3.0;
+        if (w.is_checked == 1) {
+            thumb_x = x + t_w - 19.0;
+        }
+        var thumb_p = paint.Paint();
+        thumb_p.color_val = color.rgb(255, 255, 255);
+        cvs.draw_rect(rect.Rect(x=thumb_x, y=y + 3.0, w=16.0, h=16.0), thumb_p);
+    }
+    if (w.kind == ui.KIND_STEPPER) {
+        var stp_w = 120.0;
+        if (w.width_val > 0.0) stp_w = w.width_val;
+        var stp_h = 28.0;
+
+        var btn_bg = paint.Paint();
+        btn_bg.color_val = color.rgb(38, 42, 56);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=28.0, h=stp_h), btn_bg);
+        cvs.draw_rect(rect.Rect(x=x + stp_w - 28.0, y=y, w=28.0, h=stp_h), btn_bg);
+
+        var box_bg = paint.Paint();
+        box_bg.color_val = color.rgb(24, 26, 34);
+        cvs.draw_rect(rect.Rect(x=x + 30.0, y=y, w=stp_w - 60.0, h=stp_h), box_bg);
+
+        var txt_p = paint.Paint();
+        txt_p.color_val = color.rgb(220, 225, 240);
+        cvs.draw_text("-", x + 10.0, y + 10.0, txt_p, 1);
+        cvs.draw_text("+", x + stp_w - 18.0, y + 10.0, txt_p, 1);
+
+        var val_str = (w.slider_val as int) as str;
+        var val_x = x + 30.0 + ((stp_w - 60.0) - ((len(val_str) as float) * 8.0)) / 2.0;
+        cvs.draw_text(val_str, val_x, y + 10.0, txt_p, 1);
+    }
+    if (w.kind == ui.KIND_PLOT_LINES) {
+        var pw = 180.0;
+        if (w.width_val > 0.0) pw = w.width_val;
+        var ph = 50.0;
+        if (w.height_val > 0.0) ph = w.height_val;
+
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=pw, h=ph), bg_p);
+
+        var val_list = w.text_editor_state as [float];
+        if (val_list != nil and len(val_list) > 1) {
+            var n = len(val_list);
+            var step_x = pw / ((n - 1) as float);
+            var v_range = w.slider_max - w.slider_min;
+            if (v_range <= 0.0) v_range = 1.0;
+
+            var line_p = paint.Paint();
+            line_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+
+            var i = 0;
+            while (i < n) {
+                var norm = (val_list[i] - w.slider_min) / v_range;
+                if (norm < 0.0) norm = 0.0;
+                if (norm > 1.0) norm = 1.0;
+                var py_val = y + ph - (norm * (ph - 4.0)) - 2.0;
+                var px_val = x + (i as float) * step_x;
+                cvs.draw_rect(rect.Rect(x=px_val - 1.0, y=py_val - 1.0, w=2.0, h=2.0), line_p);
+                i = i + 1;
+            }
+        }
+        var lbl_p = paint.Paint();
+        lbl_p.color_val = color.rgb(150, 160, 180);
+        cvs.draw_text(w.text_val, x + 4.0, y + 4.0, lbl_p, 1);
+    }
+    if (w.kind == ui.KIND_PLOT_HISTOGRAM or w.kind == ui.KIND_BAR_CHART) {
+        var pw = 180.0;
+        if (w.width_val > 0.0) pw = w.width_val;
+        var ph = 60.0;
+        if (w.height_val > 0.0) ph = w.height_val;
+
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=pw, h=ph), bg_p);
+
+        var val_list = w.text_editor_state as [float];
+        if (val_list != nil and len(val_list) > 0) {
+            var n = len(val_list);
+            var bar_w = (pw - (n as float) * 2.0) / (n as float);
+            if (bar_w < 1.0) bar_w = 1.0;
+
+            var bar_p = paint.Paint();
+            bar_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+
+            var i = 0;
+            while (i < n) {
+                var norm = val_list[i] / 100.0;
+                if (norm < 0.0) norm = 0.0;
+                if (norm > 1.0) norm = 1.0;
+                var bar_h = norm * (ph - 16.0);
+                var bar_x = x + 2.0 + (i as float) * (bar_w + 2.0);
+                var bar_y = y + ph - bar_h - 2.0;
+                cvs.draw_rect(rect.Rect(x=bar_x, y=bar_y, w=bar_w, h=bar_h), bar_p);
+                i = i + 1;
+            }
+        }
+        var lbl_p = paint.Paint();
+        lbl_p.color_val = color.rgb(150, 160, 180);
+        cvs.draw_text(w.text_val, x + 4.0, y + 4.0, lbl_p, 1);
+    }
+    if (w.kind == ui.KIND_LINE_CHART or w.kind == ui.KIND_SCATTER_CHART or w.kind == ui.KIND_BUBBLE_CHART) {
+        var pw = 180.0;
+        if (w.width_val > 0.0) pw = w.width_val;
+        var ph = 60.0;
+        if (w.height_val > 0.0) ph = w.height_val;
+
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=pw, h=ph), bg_p);
+
+        var val_list = w.text_editor_state as [float];
+        if (val_list != nil and len(val_list) > 0) {
+            var n = len(val_list);
+            var step_x = pw / ((n) as float);
+            var dot_p = paint.Paint();
+            dot_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+
+            var i = 0;
+            while (i < n) {
+                var norm = val_list[i] / 100.0;
+                if (norm < 0.0) norm = 0.0;
+                if (norm > 1.0) norm = 1.0;
+                var dot_y = y + ph - (norm * (ph - 16.0)) - 4.0;
+                var dot_x = x + (i as float) * step_x + 4.0;
+                var size = 4.0;
+                if (w.kind == ui.KIND_BUBBLE_CHART) size = 8.0;
+                cvs.draw_rect(rect.Rect(x=dot_x, y=dot_y, w=size, h=size), dot_p);
+                i = i + 1;
+            }
+        }
+        var lbl_p = paint.Paint();
+        lbl_p.color_val = color.rgb(150, 160, 180);
+        cvs.draw_text(w.text_val, x + 4.0, y + 4.0, lbl_p, 1);
+    }
+    if (w.kind == ui.KIND_PIE_CHART or w.kind == ui.KIND_DOUGHNUT_CHART or w.kind == ui.KIND_POLAR_AREA_CHART or w.kind == ui.KIND_RADAR_CHART) {
+        var pw = 120.0;
+        if (w.width_val > 0.0) pw = w.width_val;
+        var ph = 120.0;
+        if (w.height_val > 0.0) ph = w.height_val;
+
+        var bg_p = paint.Paint();
+        bg_p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=pw, h=ph), bg_p);
+
+        var val_list = w.text_editor_state as [float];
+        if (val_list != nil and len(val_list) > 0) {
+            var n = len(val_list);
+            var slice_h = (ph - 20.0) / (n as float);
+
+            var i = 0;
+            while (i < n) {
+                var slice_p = paint.Paint();
+                if (i % 3 == 0) slice_p.color_val = color.rgb(80, 180, 255);
+                elif (i % 3 == 1) slice_p.color_val = color.rgb(80, 220, 130);
+                else slice_p.color_val = color.rgb(255, 180, 90);
+
+                var norm = val_list[i] / 100.0;
+                if (norm < 0.0) norm = 0.0;
+                if (norm > 1.0) norm = 1.0;
+                var slice_w = norm * (pw - 20.0);
+                cvs.draw_rect(rect.Rect(x=x + 10.0, y=y + 16.0 + (i as float) * slice_h, w=slice_w, h=slice_h - 2.0), slice_p);
+                i = i + 1;
+            }
+        }
+        var lbl_p = paint.Paint();
+        lbl_p.color_val = color.rgb(150, 160, 180);
+        cvs.draw_text(w.text_val, x + 4.0, y + 2.0, lbl_p, 1);
+    }
+    if (w.kind == ui.KIND_TREE_NODE) {
+        var icon_str = ">";
+        if (w.is_open == 1) icon_str = "v";
+
+        var txt_p = paint.Paint();
+        txt_p.color_val = color.rgb(100, 180, 255);
+        cvs.draw_text(icon_str, x, y + 8.0, txt_p, 1);
+
+        var lbl_p = paint.Paint();
+        lbl_p.color_val = color.rgb(240, 245, 255);
+        cvs.draw_text(w.text_val, x + 16.0, y + 8.0, lbl_p, 1);
+
+        if (w.is_open == 1) {
+            var cy = y + 24.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var ch_h = measure_widget_height(child);
+                render_widget_node(child, x + 16.0, cy, available_w - 16.0, ch_h, cvs);
+                cy = cy + ch_h;
+                i = i + 1;
+            }
+        }
+    }
+    if (w.kind == ui.KIND_COLOR_PICKER) {
+        var border_p = paint.Paint();
+        border_p.color_val = color.rgb(60, 70, 90);
+        cvs.draw_rect(rect.Rect(x=x, y=y, w=28.0, h=28.0), border_p);
+
+        var swatch_p = paint.Paint();
+        swatch_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
+        cvs.draw_rect(rect.Rect(x=x + 2.0, y=y + 2.0, w=24.0, h=24.0), swatch_p);
+
+        var lbl_p = paint.Paint();
+        lbl_p.color_val = color.rgb(220, 225, 240);
+        cvs.draw_text(w.text_val, x + 36.0, y + 10.0, lbl_p, 1);
+    }
+    if (w.kind == ui.KIND_TABLE) {
+        var headers = w.tab_titles;
+        var num_cols = len(headers);
+        if (num_cols > 0) {
+            var col_w = available_w / (num_cols as float);
+            var hbg_p = paint.Paint();
+            hbg_p.color_val = color.rgb(32, 36, 48);
+            cvs.draw_rect(rect.Rect(x=x, y=y, w=available_w, h=24.0), hbg_p);
+
+            var c_idx = 0;
+            while (c_idx < num_cols) {
+                var cx = x + (c_idx as float) * col_w;
+                var htxt_p = paint.Paint();
+                htxt_p.color_val = color.rgb(100, 180, 255);
+                cvs.draw_text(headers[c_idx], cx + 6.0, y + 8.0, htxt_p, 1);
+                c_idx = c_idx + 1;
+            }
+
+            var rows = w.text_editor_state as [[ui.Widget]];
+            if (rows != nil) {
+                var r_idx = 0;
+                var cy = y + 26.0;
+                while (r_idx < len(rows)) {
+                    var row_widgets = rows[r_idx];
+                    var rcol = 0;
+                    while (rcol < len(row_widgets) and rcol < num_cols) {
+                        var cell_x = x + (rcol as float) * col_w;
+                        render_widget_node(row_widgets[rcol], cell_x + 4.0, cy + 2.0, col_w - 8.0, 20.0, cvs);
+                        rcol = rcol + 1;
+                    }
+                    cy = cy + 24.0;
+                    r_idx = r_idx + 1;
+                }
+            }
+        }
     }
     if (w.kind == ui.KIND_SLIDER) {
         var s_w = 140.0;
@@ -1272,6 +2041,37 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
     }
 }
 
+pub fn update_animations_recursive(w: ui.Widget, dt: float): nil {
+    if (w.anim_property != nil) {
+        w.anim_property.update(dt);
+        mark_element_dirty(1);
+    }
+    if (w.active_transition != nil) {
+        if (w.active_transition.active) {
+            w.active_transition.update(dt);
+            mark_element_dirty(1);
+            if (w.active_transition.opacity_anim.state == 3) { // STATE_COMPLETED
+                if (w.lifecycle_state == ui.LIFECYCLE_ENTERING) {
+                    w.lifecycle_state = ui.LIFECYCLE_ACTIVE;
+                } elif (w.lifecycle_state == ui.LIFECYCLE_EXITING) {
+                    w.lifecycle_state = ui.LIFECYCLE_REMOVED;
+                }
+            }
+        }
+    }
+    var remaining: [ui.Widget] = [];
+    var i = 0;
+    while (i < len(w.children)) {
+        var child = w.children[i];
+        update_animations_recursive(child, dt);
+        if (child.lifecycle_state != ui.LIFECYCLE_REMOVED) {
+            remaining.append(child);
+        }
+        i = i + 1;
+    }
+    w.children = remaining;
+}
+
 pub fn frame_update(delta_time: float): nil {
     var vw = global_ui_context.viewport_w;
     var vh = global_ui_context.viewport_h;
@@ -1285,10 +2085,29 @@ pub fn frame_update(delta_time: float): nil {
         content_h = 100.0;
     }
     if (global_ui_context.has_widget == 1) {
+        update_animations_recursive(global_ui_context.current_widget, delta_time);
         render_widget_node(global_ui_context.current_widget, 20.0, 20.0, content_w, content_h, cvs);
     } else {
         render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, content_w, content_h, cvs);
     }
+
+    // Top-Level Overlay / Portal Pass
+    var o_idx = 0;
+    while (o_idx < len(global_ui_context.active_overlays)) {
+        var ov = global_ui_context.active_overlays[o_idx];
+        if (len(ov.children) > 0) {
+            var child = ov.children[0];
+            var ox = ov.padding_left;
+            var oy = ov.padding_top;
+            var ow = ov.width_val;
+            if (ow <= 0.0) ow = measure_widget_width(child, content_w);
+            var oh = ov.height_val;
+            if (oh <= 0.0) oh = measure_widget_height(child);
+            render_widget_node(child, ox, oy, ow, oh, cvs);
+        }
+        o_idx = o_idx + 1;
+    }
+
     global_ui_context.dirty = 0;
 }
 
@@ -1355,7 +2174,34 @@ pub fn dispatch_pointer_up(px: float, py: float): nil {
 }
 
 fn send_char_to_widget(w: ui.Widget, cp: int): int {
-    if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
+        if (w.kind == ui.KIND_TEXTAREA and (w.is_focused == 1 or global_ui_context.focus_manager.has_focus(w.focus_key))) {
+        if (w.text_editor_state == nil) { w.text_editor_state = text_ctrl.EditorController(w.text_val); }
+        var ctrl = w.text_editor_state as text_ctrl.EditorController;
+
+        if (cp >= 32 and cp != 127) {
+            var ch = codepoint_to_utf8(cp);
+            if (len(ch) > 0) {
+                ctrl.insert_text(ch);
+                w.text_val = ctrl.get_text();
+                if (w.on_change_action != nil) {
+                    var act: fn(): nil = w.on_change_action as fn(): nil;
+                    act();
+                }
+                mark_element_dirty(1);
+            }
+            return 1;
+        } elif (cp == 10 or cp == 13) {
+            ctrl.insert_newline();
+            w.text_val = ctrl.get_text();
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+            return 1;
+        }
+    }
+if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
         if (cp >= 32 and cp != 127) {
             var ch = codepoint_to_utf8(cp);
             if (len(ch) > 0) {
@@ -1385,8 +2231,76 @@ pub fn dispatch_char_input(cp: int): nil {
     }
 }
 
-fn send_key_down_to_widget(w: ui.Widget, key_code: int): int {
-    if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
+fn send_key_down_to_widget(w: ui.Widget, key_code: int, mods: int): int {
+        if (w.kind == ui.KIND_TEXTAREA and (w.is_focused == 1 or global_ui_context.focus_manager.has_focus(w.focus_key))) {
+        if (w.text_editor_state == nil) { w.text_editor_state = text_ctrl.EditorController(w.text_val); }
+        var ctrl = w.text_editor_state as text_ctrl.EditorController;
+
+        var MOD_CTRL = 2; // Assuming MOD_CONTROL is 2
+
+        if (key_code == 8) { // Backspace
+            ctrl.backspace();
+            w.text_val = ctrl.get_text();
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 90 and (mods & MOD_CTRL) != 0) { // Ctrl+Z
+            ctrl.undo();
+            w.text_val = ctrl.get_text();
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 89 and (mods & MOD_CTRL) != 0) { // Ctrl+Y
+            ctrl.redo();
+            w.text_val = ctrl.get_text();
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 262) { // Right
+            ctrl.move_right(false);
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 263) { // Left
+            ctrl.move_left(false);
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 265) { // Up
+            ctrl.move_up(false);
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 264) { // Down
+            ctrl.move_down(false);
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 67 and (mods & MOD_CTRL) != 0) { // Ctrl+C
+            ctrl.copy();
+            return 1;
+        } elif (key_code == 88 and (mods & MOD_CTRL) != 0) { // Ctrl+X
+            ctrl.cut();
+            w.text_val = ctrl.get_text();
+            mark_element_dirty(1);
+            return 1;
+        } elif (key_code == 86 and (mods & MOD_CTRL) != 0) { // Ctrl+V
+            ctrl.paste();
+            w.text_val = ctrl.get_text();
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
+            return 1;
+        }
+    }
+if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
         if (key_code == 8) { // Backspace
             if (len(w.text_val) > 0) {
                 w.text_val = utf8_pop_back(w.text_val);
@@ -1401,7 +2315,7 @@ fn send_key_down_to_widget(w: ui.Widget, key_code: int): int {
     }
     var i = 0;
     while (i < len(w.children)) {
-        if (send_key_down_to_widget(w.children[i], key_code) == 1) {
+        if (send_key_down_to_widget(w.children[i], key_code, mods) == 1) {
             return 1;
         }
         i = i + 1;
@@ -1409,9 +2323,10 @@ fn send_key_down_to_widget(w: ui.Widget, key_code: int): int {
     return 0;
 }
 
-pub fn dispatch_key_down(key_code: int): nil {
+pub fn dispatch_key_down(key_code: int, mods: int = 0): nil {
     if (global_ui_context.has_widget == 1) {
-        send_key_down_to_widget(global_ui_context.current_widget, key_code);
+        global_ui_context.modifiers = mods;
+    send_key_down_to_widget(global_ui_context.current_widget, key_code, mods);
     }
 }
 
