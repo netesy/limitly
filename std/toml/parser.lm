@@ -1,6 +1,7 @@
 // TOML Parser Module
 
 import std.toml.value as val_mod;
+import std.string as std_string;
 
 fn is_digit_char(ch: str): bool {
     if (ch == "0") return true;
@@ -45,16 +46,7 @@ frame TOMLParser {
                 var key_raw = _builtin_substring(self.text, key_start, self.idx);
                 self.idx = self.idx + 1; // skip '='
 
-                var key = "";
-                var k_len = len(key_raw);
-                var k_idx = 0;
-                while (k_idx < k_len) {
-                    var k_ch = _builtin_substring(key_raw, k_idx, k_idx + 1);
-                    if (k_ch != " " and k_ch != "\t") {
-                        key = key + k_ch;
-                    }
-                    k_idx = k_idx + 1;
-                }
+                var key = std_string.trim(key_raw);
 
                 var skip_val_spaces = true;
                 while (self.idx < length and skip_val_spaces == true) {

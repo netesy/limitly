@@ -9,12 +9,14 @@ frame DoubleEndedQueue {
         self.impl = vector.Deque();
     }
 
-    pub fn push_back(item: any) {
+    pub fn push_back(item: any): DoubleEndedQueue {
         self.impl.push_back(item);
+        return self;
     }
 
-    pub fn push_front(item: any) {
+    pub fn push_front(item: any): DoubleEndedQueue {
         self.impl.push_front(item);
+        return self;
     }
 
     pub fn pop_back(): any {
@@ -36,4 +38,16 @@ frame DoubleEndedQueue {
     pub fn length(): int {
         return self.impl.length();
     }
+
+    pub fn is_empty(): bool {
+        return (self.length() == 0);
+    }
+
+    pub fn clear(): nil {
+        self.impl = vector.Deque();
+    }
+}
+
+pub fn Deque(): DoubleEndedQueue {
+    return DoubleEndedQueue();
 }

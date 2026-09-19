@@ -1,13 +1,64 @@
-// Standard Library Process Pipe Submodule
+// Standard Library Inter-Process Pipe Stream Module
 
-frame Pipe {
-    pub init() {}
+import std.resource as res;
 
-    pub fn write(data: str) {
-        return;
+frame PipeReader {
+    pub var resource: res.Resource;
+
+    pub init(r: res.Resource) {
+        self.resource = r;
     }
 
-    pub fn read(): str {
-        return "";
+    pub fn read(buffer_size: int = 1024): str {
+        if (!self.resource.is_open()) return "";
+        var result = res._call(self.resource.handle, res.OP_READ, [buffer_size]);
+        if (result == nil) return "";
+        return result as str;
     }
+
+    pub fn close(): nil {
+        if (self.resource.is_open()) {
+            self.resource.close();
+        }
+    }
+}
+
+frame PipeWriter {
+    pub var resource: res.Resource;
+
+    pub init(r: res.Resource) {
+        self.resource = r;
+    }
+
+    pub fn write(content: str): bool {
+        if (!self.resource.is_open()) return false;
+        var result = res._call(self.resource.handle, res.OP_WRITE, [content]);
+        return (result == true);
+    }
+
+    pub fn close(): nil {
+        if (self.resource.is_open()) {
+            self.resource.close();
+        }
+    }
+}
+
+frame PipePair {
+    pub var reader: PipeReader;
+    pub var writer: PipeWriter;
+
+    pub init(r: PipeReader, w: PipeWriter) {
+        self.reader = r;
+        self.writer = w;
+    }
+}
+
+pub fn create_pipe(): PipePair {
+    var r_res = res.create(res.KIND_FILE, ["pipe_read"])? else {
+        return PipePair(PipeReader(res.Resource(-1, res.KIND_FILE)), PipeWriter(res.Resource(-1, res.KIND_FILE)));
+    };
+    var w_res = res.create(res.KIND_FILE, ["pipe_write"])? else {
+        return PipePair(PipeReader(r_res), PipeWriter(res.Resource(-1, res.KIND_FILE)));
+    };
+    return PipePair(PipeReader(r_res), PipeWriter(w_res));
 }

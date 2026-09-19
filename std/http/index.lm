@@ -1,13 +1,9 @@
 // Standard Library HTTP Module (Index)
-// Re-exports client and server submodules.
-//
-// Usage:
-//   import std.http as http;
-//   var client = http.HTTPClient();
-//   var response = client.get("http://example.com");
+// Re-exports client, server, and router submodules.
 
 pub import std.http.client as client;
 pub import std.http.server as server;
+pub import std.http.router as router_mod;
 
 pub type HTTPClient = client.HTTPClient;
 pub type HTTPRequest = client.HTTPRequest;
@@ -15,5 +11,12 @@ pub type HTTPResponse = client.HTTPResponse;
 pub type HTTPServer = server.HTTPServer;
 pub type ServerRequest = server.ServerRequest;
 pub type ServerResponse = server.ServerResponse;
-pub type Route = server.Route;
-pub type Middleware = server.Middleware;
+
+pub type Request = router_mod.Request;
+pub type Response = router_mod.Response;
+pub type Route = router_mod.Route;
+pub type Router = router_mod.Router;
+
+pub fn router(): router_mod.Router {
+    return router_mod.Router();
+}

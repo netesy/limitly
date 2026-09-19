@@ -52,6 +52,11 @@ frame File {
 pub fn open(path: str, mode: str): File?IOError {
     match (res.open_file(path=path, mode=mode)) {
         val r => return ok(File(path, r)),
-        err e => return err(FileNotFound(path=path))
+        err e => {
+            if (mode == "w" or mode == "a") {
+                return err(PermissionDenied(path=path, operation=mode));
+            }
+            return err(FileNotFound(path=path));
+        }
     }
 }

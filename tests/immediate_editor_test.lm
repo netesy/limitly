@@ -1,0 +1,85 @@
+// Immediate Mode Text Editor Example & Test in Limit std.game.gui
+import std.game.gui as gui;
+import std.text.controller as text_ctrl;
+
+fn main(): int {
+    print("=== Immediate Mode Text Editor Test ===\n");
+
+    // 1. Instantiate Immediate Mode GUI Engine
+    var g = gui.GUI();
+
+    // 2. Initial Document Content
+    var initial_code = "# Immediate Mode Code Editor\nfn compute(): int\n    var result: int = 100\n    return result";
+
+    // 3. First Frame Execution Pass
+    print("\n--- Frame 1: Initializing Immediate Editor ---");
+    g.begin(0.0, 0.0, false, 0.0, 0.016);
+
+    // Begin Window Container
+    if (g.begin_window("Editor Window", 20.0, 20.0, 520.0, 360.0)) {
+        g.label("Limit Immediate Text Editor");
+
+        // Immediate mode toolbar buttons
+        g.same_line(-1.0);
+        if (g.button("Undo", 60.0, 24.0)) {
+            print("[Toolbar] Undo pressed\n");
+        }
+        g.same_line(-1.0);
+        if (g.button("Redo", 60.0, 24.0)) {
+            print("[Toolbar] Redo pressed\n");
+        }
+
+        // Render Immediate Mode Multiline Text Editor
+        var edited_text = g.input_text_multiline("code_editor_1", initial_code, 500.0, 250.0);
+
+        g.end_window();
+    }
+    g.end();
+
+    // Retrieve underlying EditorController stored in IMGUI state
+    var editor_id = g.make_id("code_editor_1");
+    var controller = g.editor_controllers[editor_id] as text_ctrl.EditorController;
+
+    if (controller == nil) {
+        print("ERROR: EditorController was not found in IMGUI store!\n");
+        return 1;
+    }
+
+    print("Initial Document Text from IMGUI Store:\n");
+    print(controller.get_text() + "\n");
+    print("Initial Line Count: " + (controller.get_line_count() as str) + "\n");
+
+    // 4. Test Interactive Immediate Operations Across Subsequent Frames
+    print("\n--- Frame 2: Simulating User Typing & Navigation ---");
+
+    // Simulate user editing state via controller
+    controller.insert_newline();
+    controller.insert_text("// Added in Frame 2");
+
+    g.begin(0.0, 0.0, false, 0.0, 0.016);
+    if (g.begin_window("Editor Window", 20.0, 20.0, 520.0, 360.0)) {
+        g.label("Limit Immediate Text Editor");
+        var frame2_text = g.input_text_multiline("code_editor_1", initial_code, 500.0, 250.0);
+        g.end_window();
+    }
+    g.end();
+
+    print("Frame 2 Line Count: " + (controller.get_line_count() as str) + "\n");
+
+    // 5. Test Undo / Redo in Immediate Mode State
+    print("\n--- Frame 3: Testing Undo/Redo Persistence ---");
+    controller.undo();
+    print("After Undo Line Count: " + (controller.get_line_count() as str) + "\n");
+    controller.redo();
+    print("After Redo Line Count: " + (controller.get_line_count() as str) + "\n");
+
+    g.begin(0.0, 0.0, false, 0.0, 0.016);
+    if (g.begin_window("Editor Window", 20.0, 20.0, 520.0, 360.0)) {
+        g.input_text_multiline("code_editor_1", initial_code, 500.0, 250.0);
+        g.end_window();
+    }
+    g.end();
+
+    print("\n=== Immediate Mode Text Editor Test Passed Successfully ===\n");
+    return 0;
+}

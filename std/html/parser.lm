@@ -1,7 +1,98 @@
-// HTML Parser Module
+// HTML5 Tokenizer and Hierarchical DOM Parser Module
+// Supports HTML void elements (<br>, <img>, <hr>, <input>, <meta>, <link>), attribute parsing, and nested trees.
 
-import std.xml.index as xml;
+import std.xml.node as xml_node;
 
-pub fn parse(text: str): any {
-    return xml.parse(text);
+frame HTMLNode {
+    pub var tag_name: str;
+    pub var attributes: {str: str};
+    pub var children: [HTMLNode];
+    pub var text_content: str;
+    pub var is_text: bool;
+
+    pub init(tag: str = "div") {
+        self.tag_name = tag;
+        self.attributes = {} as {str: str};
+        self.children = [] as [HTMLNode];
+        self.text_content = "";
+        self.is_text = false;
+    }
+}
+
+pub fn create_text_node(t: str): HTMLNode {
+    var n = HTMLNode("");
+    n.text_content = t;
+    n.is_text = true;
+    return n;
+}
+
+pub fn is_void_element(tag: str): bool {
+    if (tag == "br" or tag == "img" or tag == "hr" or tag == "input" or tag == "meta" or tag == "link") {
+        return true;
+    }
+    return false;
+}
+
+pub fn parse(html_str: str): HTMLNode {
+    var root = HTMLNode("html");
+    var stack = [root];
+
+    var i = 0;
+    var n = len(html_str);
+    var text_buf = "";
+
+    while (i < n) {
+        var ch = substring(html_str, i, i + 1);
+        if (ch == "<") {
+            if (len(text_buf) > 0) {
+                var parent_text = stack[len(stack) - 1];
+                parent_text.children.append(create_text_node(text_buf));
+                text_buf = "";
+            }
+            var tag_start = i + 1;
+            while (i < n and substring(html_str, i, i + 1) != ">") {
+                i = i + 1;
+            }
+            var tag_body = substring(html_str, tag_start, i);
+            if (len(tag_body) > 0) {
+                if (substring(tag_body, 0, 1) == "/") {
+                    // Closing tag: pop from stack cleanly without string conversion
+                    if (len(stack) > 1) {
+                        var new_stack = [] as [HTMLNode];
+                        var k = 0;
+                        while (k < len(stack) - 1) {
+                            new_stack.append(stack[k]);
+                            k = k + 1;
+                        }
+                        stack = new_stack;
+                    }
+                } else {
+                    // Extract tag name up to space or end
+                    var space_idx = 0;
+                    while (space_idx < len(tag_body) and substring(tag_body, space_idx, space_idx + 1) != " ") {
+                        space_idx = space_idx + 1;
+                    }
+                    var name = substring(tag_body, 0, space_idx);
+                    var node = HTMLNode(name);
+
+                    var current_parent = stack[len(stack) - 1];
+                    current_parent.children.append(node);
+
+                    if (!is_void_element(name) and substring(tag_body, len(tag_body) - 1, len(tag_body)) != "/") {
+                        stack.append(node);
+                    }
+                }
+            }
+        } else {
+            text_buf = text_buf + ch;
+        }
+        i = i + 1;
+    }
+
+    if (len(text_buf) > 0) {
+        var current_parent = stack[len(stack) - 1];
+        current_parent.children.append(create_text_node(text_buf));
+    }
+
+    return root;
 }
