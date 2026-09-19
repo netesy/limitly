@@ -173,6 +173,34 @@ fn test_widget_lifecycle_transitions(): nil {
     print("Widget lifecycle transitions test passed.");
 }
 
+fn test_imgui_ttl_cleanup(): nil {
+    print("Testing IMGUI Animation Store TTL cleanup...");
+
+    var store = anim.IMGUIAnimationStore();
+    store.get_or_create("active_btn");
+    store.get_or_create("stale_btn");
+
+    assert(len(store.active_ids) == 2, "2 active ids initially");
+
+    // Advance frame counter past TTL
+    var i = 0;
+    while (i < 200) {
+        store.step_frame();
+        i = i + 1;
+    }
+
+    // Keep active_btn touched on current frame
+    store.get_or_create("active_btn");
+
+    // Prune stale entries older than 100 frames
+    store.prune_stale(100);
+
+    assert(len(store.active_ids) == 1, "stale_btn pruned");
+    assert(store.active_ids[0] == "active_btn", "active_btn retained");
+
+    print("IMGUI Animation Store TTL cleanup test passed.");
+}
+
 fn main(): int {
     print("=== Running Unified Animation System Integration Test Suite ===");
     test_time_based_property_animation();
@@ -184,6 +212,7 @@ fn main(): int {
     test_keyframes_and_controls();
     test_reduced_motion();
     test_widget_lifecycle_transitions();
+    test_imgui_ttl_cleanup();
     print("=== All Unified Animation System Tests Passed Successfully ===");
     return 0;
 }

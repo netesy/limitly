@@ -195,6 +195,8 @@ frame PropertyAnimation {
     pub var easing_type: int;
     pub var state: int;
     pub var is_spring: bool;
+    pub var is_repeat: bool;
+    pub var is_reverse: bool;
     pub var spring_model: Spring;
     pub var keyframes_model: Keyframes;
 
@@ -208,6 +210,8 @@ frame PropertyAnimation {
         self.easing_type = easing;
         self.state = STATE_IDLE;
         self.is_spring = false;
+        self.is_repeat = false;
+        self.is_reverse = false;
         self.spring_model = Spring();
         self.keyframes_model = Keyframes();
     }
@@ -240,6 +244,25 @@ frame PropertyAnimation {
         self.elapsed = 0.0;
         self.current_val = self.start_val;
         self.state = STATE_IDLE;
+    }
+
+    pub fn set_delay(d: float): PropertyAnimation {
+        self.delay = d;
+        return self;
+    }
+
+    pub fn reverse(): PropertyAnimation {
+        var tmp = self.start_val;
+        self.start_val = self.target_val;
+        self.target_val = tmp;
+        self.elapsed = 0.0;
+        return self;
+    }
+
+    pub fn repeat_mode(rep: bool = true, rev: bool = false): PropertyAnimation {
+        self.is_repeat = rep;
+        self.is_reverse = rev;
+        return self;
     }
 
     pub fn seek(progress: float): float {
@@ -295,9 +318,18 @@ frame PropertyAnimation {
             } else {
                 var progress = self.elapsed / effective_dur;
                 if (progress >= 1.0) {
-                    progress = 1.0;
-                    self.current_val = self.target_val;
-                    self.state = STATE_COMPLETED;
+                    if (self.is_repeat) {
+                        self.elapsed = 0.0;
+                        if (self.is_reverse) {
+                            var tmp = self.start_val;
+                            self.start_val = self.target_val;
+                            self.target_val = tmp;
+                        }
+                    } else {
+                        progress = 1.0;
+                        self.current_val = self.target_val;
+                        self.state = STATE_COMPLETED;
+                    }
                 } else {
                     if (len(self.keyframes_model.frames) > 0) {
                         self.current_val = self.keyframes_model.evaluate(progress);
@@ -350,6 +382,49 @@ pub fn sequence(a1: PropertyAnimation, a2: PropertyAnimation): AnimationSequence
     seq.add(a1);
     seq.add(a2);
     return seq;
+}
+
+frame AnimationParallel {
+    pub var anims: [PropertyAnimation];
+
+    pub init() {
+        self.anims = [] as [PropertyAnimation];
+    }
+
+    pub fn add(anim: PropertyAnimation): AnimationParallel {
+        self.anims.append(anim);
+        return self;
+    }
+
+    pub fn update(dt: float): nil {
+        var i = 0;
+        while (i < len(self.anims)) {
+            var a = self.anims[i];
+            if (a.state == STATE_IDLE) {
+                a.play();
+            }
+            a.update(dt);
+            i = i + 1;
+        }
+    }
+
+    pub fn is_completed(): bool {
+        var i = 0;
+        while (i < len(self.anims)) {
+            if (self.anims[i].state != STATE_COMPLETED) {
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
+}
+
+pub fn parallel_group(a1: PropertyAnimation, a2: PropertyAnimation): AnimationParallel {
+    var p = AnimationParallel();
+    p.add(a1);
+    p.add(a2);
+    return p;
 }
 
 // ── Transition Abstraction ─────────────────────────────────────────────────
@@ -454,10 +529,12 @@ frame IMGUIAnimationState {
 
 frame IMGUIAnimationStore {
     pub var states: {str: IMGUIAnimationState};
+    pub var active_ids: [str];
     pub var frame_counter: int;
 
     pub init() {
         self.states = {} as {str: IMGUIAnimationState};
+        self.active_ids = [] as [str];
         self.frame_counter = 0;
     }
 
@@ -466,6 +543,7 @@ frame IMGUIAnimationStore {
         if (st == nil) {
             st = IMGUIAnimationState(id);
             self.states[id] = st;
+            self.active_ids.append(id);
         }
         st.last_used_frame = self.frame_counter;
         return st;
@@ -473,6 +551,26 @@ frame IMGUIAnimationStore {
 
     pub fn step_frame(): nil {
         self.frame_counter = self.frame_counter + 1;
+    }
+
+    pub fn prune_stale(max_age_frames: int = 120): nil {
+        var threshold = self.frame_counter - max_age_frames;
+        if (threshold < 0) threshold = 0;
+
+        var remaining_ids: [str] = [];
+        var remaining_states = {} as {str: IMGUIAnimationState};
+        var i = 0;
+        while (i < len(self.active_ids)) {
+            var k = self.active_ids[i];
+            var st = self.states[k] as IMGUIAnimationState;
+            if (st != nil and st.last_used_frame >= threshold) {
+                remaining_ids.append(k);
+                remaining_states[k] = st;
+            }
+            i = i + 1;
+        }
+        self.active_ids = remaining_ids;
+        self.states = remaining_states;
     }
 }
 
