@@ -177,6 +177,66 @@ frame Style {
         self.spacing_val = s;
         return self;
     }
+
+    pub fn merge(override_style: Style): Style {
+        var merged = Style();
+        merged.has_bg = self.has_bg;
+        merged.bg = self.bg;
+        merged.has_fg = self.has_fg;
+        merged.fg = self.fg;
+        merged.has_padding = self.has_padding;
+        merged.pad_l = self.pad_l;
+        merged.pad_t = self.pad_t;
+        merged.pad_r = self.pad_r;
+        merged.pad_b = self.pad_b;
+        merged.has_radius = self.has_radius;
+        merged.radius = self.radius;
+        merged.has_font_size = self.has_font_size;
+        merged.font_size_val = self.font_size_val;
+        merged.has_weight = self.has_weight;
+        merged.weight_val = self.weight_val;
+        merged.has_spacing = self.has_spacing;
+        merged.spacing_val = self.spacing_val;
+        merged.has_shadow = self.has_shadow;
+        merged.shadow_val = self.shadow_val;
+
+        if (override_style.has_bg) {
+            merged.has_bg = true;
+            merged.bg = override_style.bg;
+        }
+        if (override_style.has_fg) {
+            merged.has_fg = true;
+            merged.fg = override_style.fg;
+        }
+        if (override_style.has_padding) {
+            merged.has_padding = true;
+            merged.pad_l = override_style.pad_l;
+            merged.pad_t = override_style.pad_t;
+            merged.pad_r = override_style.pad_r;
+            merged.pad_b = override_style.pad_b;
+        }
+        if (override_style.has_radius) {
+            merged.has_radius = true;
+            merged.radius = override_style.radius;
+        }
+        if (override_style.has_font_size) {
+            merged.has_font_size = true;
+            merged.font_size_val = override_style.font_size_val;
+        }
+        if (override_style.has_weight) {
+            merged.has_weight = true;
+            merged.weight_val = override_style.weight_val;
+        }
+        if (override_style.has_spacing) {
+            merged.has_spacing = true;
+            merged.spacing_val = override_style.spacing_val;
+        }
+        if (override_style.has_shadow) {
+            merged.has_shadow = true;
+            merged.shadow_val = override_style.shadow_val;
+        }
+        return merged;
+    }
 }
 
 pub fn style(): Style {
