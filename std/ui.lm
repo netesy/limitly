@@ -1228,6 +1228,8 @@ pub fn text_area(value: str = "", placeholder: str = "Type here...", on_change: 
     w.text_val = value;
     w.placeholder_val = placeholder;
     w.on_change_action = on_change;
+    w.text_editor_state = text_ctrl.EditorController(value);
+    w.focus_key = "ta_default";
     w.background_color = rgb(20, 22, 28);
     w.foreground_color = white;
     w.height_val = 120.0;

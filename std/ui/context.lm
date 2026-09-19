@@ -1373,13 +1373,11 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
         cvs.draw_text(w.text_val, tx, ty, text_p, 1);
     }
         if (w.kind == ui.KIND_TEXTAREA) {
-        print("T1");
         var inp_w = available_w;
         if (w.width_val > 0.0) inp_w = w.width_val;
         var inp_h = 120.0;
         if (w.height_val > 0.0) inp_h = w.height_val;
 
-        print("T2");
         if (w.text_editor_state == nil) {
             w.text_editor_state = text_ctrl.EditorController(w.text_val);
             var fk_empty2 = true;
@@ -1392,19 +1390,15 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
                 w.focus_key = "ta_" + ((x*100.0) as int as str);
             }
         }
-        print("T3");
         var ctrl = w.text_editor_state as text_ctrl.EditorController;
         ctrl.get_clipboard = global_ui_context.get_clipboard_cb;
         ctrl.set_clipboard = global_ui_context.set_clipboard_cb;
 
-        print("T4");
         var bg_p = paint.Paint();
         bg_p.color_val = color.rgb(20, 22, 28);
         cvs.draw_rect(rect.Rect(x=x, y=y, w=inp_w, h=inp_h), bg_p);
 
-        print("T5");
         var fk_has_focus = global_ui_context.focus_manager.has_focus(w.focus_key);
-        print("T5.1");
         var border_p = paint.Paint();
         if (w.is_focused == 1 or fk_has_focus) {
             border_p.color_val = color.rgb(90, 130, 240);
@@ -1413,49 +1407,37 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
         } else {
             border_p.color_val = color.rgb(55, 60, 75);
         }
-        print("T5.2");
         cvs.draw_rect(rect.Rect(x=x, y=y, w=inp_w, h=1.0), border_p);
         cvs.draw_rect(rect.Rect(x=x, y=y + inp_h - 1.0, w=inp_w, h=1.0), border_p);
         cvs.draw_rect(rect.Rect(x=x, y=y, w=1.0, h=inp_h), border_p);
         cvs.draw_rect(rect.Rect(x=x + inp_w - 1.0, y=y, w=1.0, h=inp_h), border_p);
 
-        print("T5.3");
         var text_p = paint.Paint();
         text_p.color_val = color.rgba((w.foreground_color.r * 255.0) as int, (w.foreground_color.g * 255.0) as int, (w.foreground_color.b * 255.0) as int, w.foreground_color.a);
 
-        print("T5.4");
         cvs.push_clip(rect.Rect(x=x + 1.0, y=y + 1.0, w=inp_w - 2.0, h=inp_h - 2.0));
 
-        print("T5.5");
         var is_empty_doc = (ctrl.get_line_count() == 1);
-        print("T5.6");
         if (is_empty_doc) {
             var line0 = ctrl.get_line(0);
             if (len(line0) > 0) {
                 is_empty_doc = false;
             }
         }
-        print("T5.7");
         var has_ph = false;
         if (len(w.placeholder_val) > 0) {
             has_ph = true;
         }
-        print("T5.8");
         if (is_empty_doc and has_ph and w.is_focused == 0) {
             var ph_p = paint.Paint();
             ph_p.color_val = color.rgb(100, 105, 120);
             cvs.draw_text(w.placeholder_val, x + w.padding_left, y + w.padding_top + 16.0, ph_p, 1);
         } else {
-            print("T5.9");
-            print("L1 line_count=" + (ctrl.get_line_count() as str));
             var ii = 0;
             var cy = y + w.padding_top + 16.0;
             while (ii < ctrl.get_line_count()) {
-                print("L2 ii=" + (ii as str));
                 var line_text = ctrl.get_line(ii);
-                print("L3 line_text got");
                 if (line_text == nil) { line_text = ""; }
-                print("L4 focus check");
                 var focus_chk = false;
                 if (w.is_focused == 1) { focus_chk = true; }
                 elif (w.focus_key != nil) {
@@ -1464,7 +1446,6 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
                     }
                 }
                 if (focus_chk and ii == ctrl.get_cursor_line()) {
-                    print("L5 cursor line");
                     var cur_col = ctrl.get_cursor_col();
                     var line_len = len(line_text);
                     var prefix = "";
@@ -1475,7 +1456,6 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
                     if (suffix == nil) { suffix = ""; }
                     line_text = prefix + "|" + suffix;
                 }
-                print("L6 drawing text");
                 cvs.draw_text(line_text, x + w.padding_left, cy, text_p, 1);
                 cy = cy + 20.0;
                 ii = ii + 1;

@@ -823,39 +823,28 @@ frame GUI {
     }
 
     pub fn input_text_multiline(label: str, text: str, width: float, height: float): str {
-        print("M1");
         var w = width;
         var h = height;
         var id = self.make_id(label);
-        print("M2");
         var bx = self.cursor_x;
         var by = self.cursor_y;
 
-        print("M3");
         if (self.editor_controllers[id] == nil) {
-            print("M3.1");
             var new_ctrl = text_ctrl.EditorController(text);
             self.editor_controllers[id] = new_ctrl;
         }
-        print("M4");
         var ctrl = self.editor_controllers[id] as text_ctrl.EditorController;
         ctrl.get_clipboard = self.get_clipboard_cb;
         ctrl.set_clipboard = self.set_clipboard_cb;
 
-        print("M5");
         var lh = gg.get_line_height(self.theme.font_scale);
-        print("M5.1");
         var cur_scroll = 0.0;
-        print("M5.2");
         if (self.scroll_offsets != nil) {
-            print("M5.3");
             var scroll_val = self.scroll_offsets[id];
-            print("M5.4");
             if (scroll_val != nil) {
                 cur_scroll = scroll_val as float;
             }
         }
-        print("M5.5");
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
                        self.mouse_y >= by and self.mouse_y <= (by + h));
@@ -952,27 +941,21 @@ frame GUI {
         gg.draw_rect_primitive(bx, by, 1.0, h, border.r, border.g, border.b, border.a);
         gg.draw_rect_primitive(bx + w - 1.0, by, 1.0, h, border.r, border.g, border.b, border.a);
 
-        print("N1");
         var tc = self.get_style_color(types.COLOR_TEXT);
         gg.push_clip(bx + 1.0, by + 1.0, w - 2.0, h - 2.0);
 
-        print("N2");
         var start_line = (vp.scroll_y / lh) as int;
         if (start_line < 0) start_line = 0;
         var visible_lines = ((h / lh) as int) + 2;
         var end_line = start_line + visible_lines;
         if (end_line > ctrl.get_line_count()) end_line = ctrl.get_line_count();
 
-        print("N3 end_line=" + (end_line as str));
         var ii = start_line;
         while (ii < end_line) {
-            print("N4 ii=" + (ii as str));
             var cy = by + 6.0 - vp.scroll_y + (ii as float) * lh;
             var line_text = ctrl.get_line(ii);
-            print("N5 line_text got");
             if (line_text == nil) { line_text = ""; }
             if (is_focused and ii == ctrl.get_cursor_line()) {
-                print("N6 cursor line");
                 var cur_col = ctrl.get_cursor_col();
                 var line_len = len(line_text);
                 var prefix = "";
@@ -983,12 +966,10 @@ frame GUI {
                 if (suffix == nil) { suffix = ""; }
                 line_text = prefix + "|" + suffix;
             }
-            print("N7 drawing text");
             gg.draw_text(line_text, bx + 6.0, cy, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
             ii = ii + 1;
         }
 
-        print("N8 clip pop");
         gg.pop_clip();
 
         if (label != nil and len(label) > 0) {
