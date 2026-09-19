@@ -369,18 +369,18 @@ frame Widget {
     }
 
     pub fn animate(duration: float = 0.25, easing: int = 0): Widget {
-        if (self.anim_property == nil) {
+        if (self.anim_property.state == anim_mod.STATE_IDLE or self.anim_property.duration == 0.0) {
             self.anim_property = anim_mod.PropertyAnimation(0.0, 1.0, duration, easing);
-            self.anim_property.play();
         } else {
             self.anim_property.duration = duration;
             self.anim_property.easing_type = easing;
         }
+        self.anim_property.play();
         return self;
     }
 
     pub fn spring(stiffness: float = 180.0, damping: float = 12.0): Widget {
-        if (self.anim_property == nil) {
+        if (self.anim_property.state == anim_mod.STATE_IDLE or self.anim_property.duration == 0.0) {
             self.anim_property = anim_mod.PropertyAnimation(0.0, 1.0, 0.25, 0);
         }
         self.anim_property.is_spring = true;
@@ -391,12 +391,14 @@ frame Widget {
 
     pub fn transition(trans: anim_mod.Transition): Widget {
         self.active_transition = trans;
+        self.active_transition.play();
         return self;
     }
 
     pub fn enter(trans: anim_mod.Transition): Widget {
         self.enter_transition = trans;
         self.active_transition = trans;
+        self.active_transition.play();
         self.lifecycle_state = LIFECYCLE_ENTERING;
         return self;
     }
@@ -410,7 +412,7 @@ frame Widget {
         if (self.exit_transition != nil) {
             self.lifecycle_state = LIFECYCLE_EXITING;
             self.active_transition = self.exit_transition;
-            self.active_transition.active = true;
+            self.active_transition.play();
         } else {
             self.lifecycle_state = LIFECYCLE_REMOVED;
         }

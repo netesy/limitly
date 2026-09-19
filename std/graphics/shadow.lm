@@ -15,7 +15,7 @@ frame Shadow {
         r: float = 0.0,
         g: float = 0.0,
         b: float = 0.0,
-        a: float = 0.25,
+        a: float = 0.0,
         off_x: float = 0.0,
         off_y: float = 4.0,
         blur: float = 8.0,

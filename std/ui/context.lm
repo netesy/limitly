@@ -1056,7 +1056,6 @@ fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w
 }
 
 fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil {
-    print("RWN kind=" + (w.kind as str));
     if (w.shadow_val != nil and w.shadow_val.a > 0.0) {
         var sw = available_w;
         if (w.width_val > 0.0) sw = w.width_val;

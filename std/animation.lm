@@ -313,7 +313,11 @@ frame PropertyAnimation {
         } else {
             self.elapsed = self.elapsed + dt;
             if (effective_dur <= 0.0) {
-                self.current_val = self.target_val;
+                if (len(self.keyframes_model.frames) > 0) {
+                    self.current_val = self.keyframes_model.evaluate(1.0);
+                } else {
+                    self.current_val = self.target_val;
+                }
                 self.state = STATE_COMPLETED;
             } else {
                 var progress = self.elapsed / effective_dur;
@@ -327,7 +331,11 @@ frame PropertyAnimation {
                         }
                     } else {
                         progress = 1.0;
-                        self.current_val = self.target_val;
+                        if (len(self.keyframes_model.frames) > 0) {
+                            self.current_val = self.keyframes_model.evaluate(1.0);
+                        } else {
+                            self.current_val = self.target_val;
+                        }
                         self.state = STATE_COMPLETED;
                     }
                 } else {
@@ -444,6 +452,15 @@ frame Transition {
         self.active = true;
     }
 
+    pub fn play(): Transition {
+        self.active = true;
+        self.opacity_anim.play();
+        self.scale_anim.play();
+        self.slide_x_anim.play();
+        self.slide_y_anim.play();
+        return self;
+    }
+
     pub fn fade(start_a: float = 0.0, end_a: float = 1.0, dur: float = 0.25): Transition {
         self.opacity_anim = PropertyAnimation(start_a, end_a, dur, EASE_OUT);
         return self;
@@ -515,12 +532,11 @@ frame IMGUIAnimationState {
     pub fn animate_property(prop_name: str, target: float, dur: float = 0.15, easing: int = 2, dt: float = 0.016): float {
         var anim = self.float_anims[prop_name] as PropertyAnimation;
         if (anim == nil) {
-            var start_v = 0.0;
-            if (target == 0.0) { start_v = 1.0; }
-            anim = PropertyAnimation(start_v, target, dur, easing);
-            anim.play();
+            anim = PropertyAnimation(target, target, dur, easing);
+            anim.current_val = target;
+            anim.state = STATE_COMPLETED;
             self.float_anims[prop_name] = anim;
-            return anim.update(dt);
+            return target;
         }
         anim.set_target(target);
         return anim.update(dt);

@@ -71,6 +71,9 @@ fn test_imgui_animation_store(): nil {
     var btn_id = "main_menu/start_btn";
 
     var st = store.get_or_create(btn_id);
+    var initial_val = st.animate_property("hover_t", 0.0, 0.1, anim.EASE_OUT, 0.05);
+    assert(initial_val == 0.0, "initial unhovered value is 0.0 without flashing");
+
     var t1 = st.animate_property("hover_t", 1.0, 0.1, anim.EASE_OUT, 0.05);
     assert(t1 > 0.0 and t1 < 1.0, "imgui animated transition in progress");
 
