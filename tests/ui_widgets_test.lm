@@ -57,34 +57,34 @@ fn test_chart_constructors(): nil {
 
     var values = [10.0, 25.0, 50.0, 80.0, 60.0];
 
-    var pl = ui.charts.plot_lines("Lines", values);
+    var pl = ui.plot_lines("Lines", values);
     assert(pl.kind == ui.KIND_PLOT_LINES, "plot_lines kind");
 
-    var ph = ui.charts.plot_histogram("Hist", values);
+    var ph = ui.plot_histogram("Hist", values);
     assert(ph.kind == ui.KIND_PLOT_HISTOGRAM, "plot_histogram kind");
 
-    var bc = ui.charts.bar_chart("Bar", values);
+    var bc = ui.bar_chart("Bar", values);
     assert(bc.kind == ui.KIND_BAR_CHART, "bar_chart kind");
 
-    var lc = ui.charts.line_chart("Line", values);
+    var lc = ui.line_chart("Line", values);
     assert(lc.kind == ui.KIND_LINE_CHART, "line_chart kind");
 
-    var pie = ui.charts.pie_chart("Pie", values);
+    var pie = ui.pie_chart("Pie", values);
     assert(pie.kind == ui.KIND_PIE_CHART, "pie_chart kind");
 
-    var dn = ui.charts.doughnut_chart("Doughnut", values);
+    var dn = ui.doughnut_chart("Doughnut", values);
     assert(dn.kind == ui.KIND_DOUGHNUT_CHART, "doughnut_chart kind");
 
-    var bub = ui.charts.bubble_chart("Bubble", values);
+    var bub = ui.bubble_chart("Bubble", values);
     assert(bub.kind == ui.KIND_BUBBLE_CHART, "bubble_chart kind");
 
-    var sc = ui.charts.scatter_chart("Scatter", values);
+    var sc = ui.scatter_chart("Scatter", values);
     assert(sc.kind == ui.KIND_SCATTER_CHART, "scatter_chart kind");
 
-    var pa = ui.charts.polar_area_chart("Polar", values);
+    var pa = ui.polar_area_chart("Polar", values);
     assert(pa.kind == ui.KIND_POLAR_AREA_CHART, "polar_area_chart kind");
 
-    var rad = ui.charts.radar_chart("Radar", values);
+    var rad = ui.radar_chart("Radar", values);
     assert(rad.kind == ui.KIND_RADAR_CHART, "radar_chart kind");
 
     print("Chart constructors test passed.");
@@ -107,8 +107,8 @@ fn test_ui_context_rendering_and_dispatch(): nil {
             ui.color_picker("Theme", ui.blue),
             ui.file_input("Config File")
         ]), true),
-        ui.charts.bar_chart("Revenue", [30.0, 60.0, 90.0]),
-        ui.charts.pie_chart("Share", [40.0, 60.0]),
+        ui.bar_chart("Revenue", [30.0, 60.0, 90.0]),
+        ui.pie_chart("Share", [40.0, 60.0]),
         ui.table(["Service", "Status"], [
             [ui.text("Auth"), ui.indicator("online", "OK")],
             [ui.text("DB"), ui.indicator("online", "OK")]
@@ -127,11 +127,34 @@ fn test_ui_context_rendering_and_dispatch(): nil {
     print("UI Context rendering and dispatch pipeline test passed.");
 }
 
+fn test_overlay_and_form_field(): nil {
+    print("Testing Overlay and FormField primitives...");
+
+    var ff = ui.form_field("Username", ui.input("jules"), "Enter username", "Username is required");
+    assert(ff.kind == ui.KIND_FORM_FIELD, "form_field kind");
+    assert(ff.text_val == "Username", "form_field label");
+    assert(ff.placeholder_val == "Enter username", "form_field help_text");
+    assert(ff.focus_key == "Username is required", "form_field error_text");
+
+    var ov = ui.overlay(ui.card("Modal", ui.text("Top Level Layer")), 100.0, 100.0, 300.0, 200.0);
+    assert(ov.kind == ui.KIND_OVERLAY, "overlay kind");
+    assert(ov.padding_left == 100.0 and ov.padding_top == 100.0, "overlay coordinates");
+
+    ctx.push_overlay(ov);
+    assert(len(ctx.global_ui_context.active_overlays) == 1, "overlay pushed to context");
+
+    ctx.clear_overlays();
+    assert(len(ctx.global_ui_context.active_overlays) == 0, "overlays cleared");
+
+    print("Overlay and FormField test passed.");
+}
+
 fn main(): int {
     print("=== Running Comprehensive std.ui Widget & Chart Test Suite ===");
     test_widget_constructors();
     test_chart_constructors();
     test_ui_context_rendering_and_dispatch();
+    test_overlay_and_form_field();
     print("=== All Widget & Chart Tests Passed Successfully ===");
     return 0;
 }

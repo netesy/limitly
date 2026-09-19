@@ -37,6 +37,7 @@ frame UIContextState {
     pub var last_pointer_x: float;
     pub var last_pointer_y: float;
     pub var is_pointer_down: int;
+    pub var active_overlays: [ui.Widget];
 }
 
 pub var global_ui_context: UIContextState = UIContextState(
@@ -64,8 +65,19 @@ pub var global_ui_context: UIContextState = UIContextState(
     captured_bounds_h=0.0,
     last_pointer_x=0.0,
     last_pointer_y=0.0,
-    is_pointer_down=0
+    is_pointer_down=0,
+    active_overlays=[] as [ui.Widget]
 );
+
+pub fn push_overlay(w: ui.Widget): nil {
+    global_ui_context.active_overlays.append(w);
+    mark_element_dirty(1);
+}
+
+pub fn clear_overlays(): nil {
+    global_ui_context.active_overlays = [] as [ui.Widget];
+    mark_element_dirty(1);
+}
 
 pub fn ui_init(): int {
     if (global_ui_context.is_initialized != 0) {
@@ -202,6 +214,16 @@ fn measure_widget_height(w: ui.Widget): float {
         if (w.kind == ui.KIND_TEXTAREA) {
         if (w.height_val > 0.0) return w.height_val;
         return 120.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui.KIND_FORM_FIELD) {
+        var total_h = 18.0;
+        if (len(w.children) > 0) {
+            total_h = total_h + measure_widget_height(w.children[0]);
+        }
+        if (len(w.placeholder_val) > 0 or len(w.focus_key) > 0) {
+            total_h = total_h + 16.0;
+        }
+        return total_h;
     }
 if (w.kind == ui.KIND_INPUT) {
         return 28.0 + w.padding_top + w.padding_bottom;
@@ -371,7 +393,10 @@ fn measure_widget_width(w: ui.Widget, available_w: float): float {
         if (w.width_val > 0.0) return w.width_val;
         return 300.0;
     }
-if (w.kind == ui.KIND_INPUT) {
+    if (w.kind == ui.KIND_FORM_FIELD and len(w.children) > 0) {
+        return measure_widget_width(w.children[0], available_w);
+    }
+    if (w.kind == ui.KIND_INPUT) {
         if (w.width_val > 0.0) return w.width_val;
         return 220.0;
     }
@@ -580,6 +605,13 @@ pub fn hit_test_and_click_widget(w: ui.Widget, px: float, py: float, x: float, y
             }
             mark_element_dirty(1);
         }
+    }
+    if (w.kind == ui.KIND_FORM_FIELD and len(w.children) > 0) {
+        var cy = y + 18.0;
+        var ctrl = w.children[0];
+        var ch_h = measure_widget_height(ctrl);
+        var ch_w = measure_widget_width(ctrl, available_w);
+        hit_test_and_click_widget(ctrl, px, py, x, cy, ch_w, ch_h);
     }
     if (w.kind == ui.KIND_CARD and len(w.children) > 0) {
         hit_test_and_click_widget(w.children[0], px, py, x + 12.0, y + 32.0, available_w - 24.0, measure_widget_height(w.children[0]));
@@ -1056,6 +1088,31 @@ fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w
 }
 
 fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil {
+    if (w.kind == ui.KIND_FORM_FIELD) {
+        var lbl_p = paint.Paint();
+        lbl_p.color_val = color.rgb(200, 205, 220);
+        cvs.draw_text(w.text_val, x, y + 2.0, lbl_p, 1);
+
+        var cy = y + 18.0;
+        if (len(w.children) > 0) {
+            var ctrl = w.children[0];
+            var ch_h = measure_widget_height(ctrl);
+            var ch_w = measure_widget_width(ctrl, available_w);
+            render_widget_node(ctrl, x, cy, ch_w, ch_h, cvs);
+            cy = cy + ch_h + 4.0;
+        }
+
+        if (len(w.focus_key) > 0) {
+            var err_p = paint.Paint();
+            err_p.color_val = color.rgb(255, 100, 100);
+            cvs.draw_text(w.focus_key, x, cy + 2.0, err_p, 1);
+        } elif (len(w.placeholder_val) > 0) {
+            var help_p = paint.Paint();
+            help_p.color_val = color.rgb(140, 145, 160);
+            cvs.draw_text(w.placeholder_val, x, cy + 2.0, help_p, 1);
+        }
+        return;
+    }
     if (w.shadow_val != nil and w.shadow_val.a > 0.0) {
         var sw = available_w;
         if (w.width_val > 0.0) sw = w.width_val;
@@ -1911,6 +1968,24 @@ pub fn frame_update(delta_time: float): nil {
     } else {
         render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, content_w, content_h, cvs);
     }
+
+    // Top-Level Overlay / Portal Pass
+    var o_idx = 0;
+    while (o_idx < len(global_ui_context.active_overlays)) {
+        var ov = global_ui_context.active_overlays[o_idx];
+        if (len(ov.children) > 0) {
+            var child = ov.children[0];
+            var ox = ov.padding_left;
+            var oy = ov.padding_top;
+            var ow = ov.width_val;
+            if (ow <= 0.0) ow = measure_widget_width(child, content_w);
+            var oh = ov.height_val;
+            if (oh <= 0.0) oh = measure_widget_height(child);
+            render_widget_node(child, ox, oy, ow, oh, cvs);
+        }
+        o_idx = o_idx + 1;
+    }
+
     global_ui_context.dirty = 0;
 }
 

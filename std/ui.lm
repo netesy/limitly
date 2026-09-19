@@ -4,7 +4,6 @@
 import std.text.controller as text_ctrl;
 import std.animation as anim_mod;
 import std.graphics.shadow as shadow_mod;
-
 pub var animation = anim_mod;
 pub var Shadow = shadow_mod.Shadow;
 pub var shadow = shadow_mod.shadow;
@@ -232,6 +231,8 @@ pub var KIND_POLAR_AREA_CHART: int = 45;
 pub var KIND_RADAR_CHART: int = 46;
 pub var KIND_SCATTER_CHART: int = 47;
 pub var KIND_PIE_CHART: int = 48;
+pub var KIND_OVERLAY: int = 49;
+pub var KIND_FORM_FIELD: int = 50;
 
 pub var LIFECYCLE_ENTERING: int = 0;
 pub var LIFECYCLE_ACTIVE: int = 1;
@@ -850,6 +851,25 @@ pub fn empty(): Widget {
     return Widget(KIND_CONTAINER);
 }
 
+pub fn overlay(content: Widget, x: float = 0.0, y: float = 0.0, width_val: float = 0.0, height_val: float = 0.0): Widget {
+    var w = Widget(KIND_OVERLAY);
+    w.children = [content];
+    w.padding_left = x;
+    w.padding_top = y;
+    w.width_val = width_val;
+    w.height_val = height_val;
+    return w;
+}
+
+pub fn form_field(label_text: str, control: Widget, help_text: str = "", error_text: str = ""): Widget {
+    var w = Widget(KIND_FORM_FIELD);
+    w.text_val = label_text;
+    w.placeholder_val = help_text;
+    w.focus_key = error_text;
+    w.children = [control];
+    return w;
+}
+
 // Input & Media Semantic Constructors (Experimental)
 pub fn image(source: str = ""): Widget {
     var w = Widget(KIND_IMAGE);
@@ -912,6 +932,96 @@ pub fn plot_lines(label: str, values: [float], min_val: float = 0.0, max_val: fl
     w.width_val = 180.0;
     w.background_color = rgb(24, 26, 34);
     w.foreground_color = rgb(100, 180, 255);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn bar_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
+    var w = Widget(KIND_BAR_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 100.0;
+    w.width_val = 200.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(80, 180, 255);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn line_chart(label: str, values: [float]): Widget {
+    var w = Widget(KIND_LINE_CHART);
+    w.text_val = label;
+    w.height_val = 100.0;
+    w.width_val = 200.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(100, 220, 160);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn pie_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
+    var w = Widget(KIND_PIE_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = rgb(24, 26, 34);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn doughnut_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
+    var w = Widget(KIND_DOUGHNUT_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = rgb(24, 26, 34);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn bubble_chart(label: str, values: [float]): Widget {
+    var w = Widget(KIND_BUBBLE_CHART);
+    w.text_val = label;
+    w.height_val = 100.0;
+    w.width_val = 180.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(255, 180, 90);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn scatter_chart(label: str, values: [float]): Widget {
+    var w = Widget(KIND_SCATTER_CHART);
+    w.text_val = label;
+    w.height_val = 100.0;
+    w.width_val = 180.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(220, 120, 255);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn polar_area_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
+    var w = Widget(KIND_POLAR_AREA_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = rgb(24, 26, 34);
+    w.text_editor_state = values;
+    return w;
+}
+
+pub fn radar_chart(label: str, values: [float], labels: [str] = [] as [str]): Widget {
+    var w = Widget(KIND_RADAR_CHART);
+    w.text_val = label;
+    w.tab_titles = labels;
+    w.height_val = 120.0;
+    w.width_val = 120.0;
+    w.background_color = rgb(24, 26, 34);
+    w.foreground_color = rgb(100, 200, 255);
     w.text_editor_state = values;
     return w;
 }
