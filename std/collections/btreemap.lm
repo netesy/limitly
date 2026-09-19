@@ -1,4 +1,4 @@
-// Standard Library BTreeMap Collection
+// Standard Library BTreeMap & SortedMap Collections
 
 import std.collections.tree as tree;
 
@@ -9,15 +9,36 @@ frame BTreeMapWrapper {
         self.impl = tree.TreeMap();
     }
 
-    pub fn put(key: any, value: any) {
+    pub fn put(key: any, value: any): BTreeMapWrapper {
         self.impl.put(key, value);
+        return self;
     }
 
     pub fn get(key: any): any {
         return self.impl.get(key);
     }
 
+    pub fn contains(key: any): bool {
+        return (self.get(key) != nil);
+    }
+
     pub fn length(): int {
         return self.impl.length();
     }
+
+    pub fn is_empty(): bool {
+        return (self.length() == 0);
+    }
+
+    pub fn clear(): nil {
+        self.impl = tree.TreeMap();
+    }
+}
+
+pub fn BTreeMap(): BTreeMapWrapper {
+    return BTreeMapWrapper();
+}
+
+pub fn SortedMap(): BTreeMapWrapper {
+    return BTreeMapWrapper();
 }

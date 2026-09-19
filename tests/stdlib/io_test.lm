@@ -1,7 +1,7 @@
 import std.io as io;
 
 fn main(): int {
-    // Basic print test (we can't easily capture output here, but we can verify it doesn't crash)
+    // Basic print test
     io.print("Testing IO print...");
     
     // File exists test
@@ -13,32 +13,38 @@ fn main(): int {
     
     // File open/read/write/close test
     var f_res = io.open("test_io_temp.txt", "w");
-    match f_res {
+    match (f_res) {
         val f => {
             f.write("Hello Luminar");
             f.close();
-        }
+            nil;
+        },
         err e => {
             assert(false, "Failed to open file for writing");
+            nil;
         }
     }
     
     var f_read_res = io.open("test_io_temp.txt", "r");
-    match f_read_res {
+    match (f_read_res) {
         val f => {
             var content_res = f.read();
-            match content_res {
+            match (content_res) {
                 val content => {
                     assert(content == "Hello Luminar", "File content mismatch");
-                }
+                    nil;
+                },
                 err e => {
                     assert(false, "Failed to read file");
+                    nil;
                 }
             }
             f.close();
-        }
+            nil;
+        },
         err e => {
             assert(false, "Failed to open file for reading");
+            nil;
         }
     }
     

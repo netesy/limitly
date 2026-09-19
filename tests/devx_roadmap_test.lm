@@ -1,0 +1,91 @@
+// DevX Roadmap Unit Test Suite
+import std.string.builder as sb;
+import std.http.router as http_router;
+import std.json.index as json;
+import std.collections.deque as deque;
+import std.collections.btreemap as btreemap;
+
+fn test_string_builder(): nil {
+    print("Testing StringBuilder...");
+    var b = sb.builder();
+    b.append("Hello");
+    b.append_line(" World");
+    b.append_char(33); // '!'
+
+    var result = b.to_string();
+    assert(b.length() > 0, "length positive");
+    print("StringBuilder test passed.\n");
+    b.clear();
+    assert(b.length() == 0, "clear resets length");
+}
+
+fn handle_get_users(req: http_router.Request): http_router.Response {
+    return http_router.Response(200, "OK").json("users_ok");
+}
+
+fn test_http_router(): nil {
+    print("\nTesting Fluent HTTP Router...");
+    var r = http_router.router();
+    r.get("/api/v1/users", handle_get_users);
+
+    var req = http_router.Request("GET", "/api/v1/users");
+    var res = r.handle(req);
+    assert(res.status_code == 200, "status code 200");
+    assert(res.body == "users_ok", "response body match");
+    print("HTTP Router test passed.\n");
+
+    var missing_req = http_router.Request("GET", "/missing");
+    var missing_res = r.handle(missing_req);
+    assert(missing_res.status_code == 404, "404 for missing route");
+}
+
+fn test_json_helpers(): nil {
+    print("\nTesting JSON Serialization Helpers...");
+    var keys = ["name", "status", "role"];
+    var vals = ["Limit", "Active", "Compiler"];
+
+    var json_str = json.encode_object(keys, vals);
+    print("Encoded JSON successfully.\n");
+    assert(len(json_str) > 0, "json string non empty");
+    print("JSON Helpers test passed.\n");
+}
+
+fn test_deque_and_sorted_map(): nil {
+    print("\nTesting Deque ($O(1)$ DoubleEndedQueue)...");
+    var dq = deque.Deque();
+    dq.push_back("item2");
+    dq.push_front("item1");
+    dq.push_back("item3");
+
+    assert(dq.length() == 3, "deque length 3");
+    assert((dq.peek_front() as str) == "item1", "peek_front item1");
+    assert((dq.peek_back() as str) == "item3", "peek_back item3");
+
+    var pop1 = dq.pop_front() as str;
+    assert(pop1 == "item1", "pop_front item1");
+    var pop3 = dq.pop_back() as str;
+    assert(pop3 == "item3", "pop_back item3");
+    print("Deque test passed.\n");
+
+    print("\nTesting SortedMap ($O(log N)$ AVL BTreeMap)...");
+    var sm = btreemap.SortedMap();
+    sm.put(10, "Ten");
+    sm.put(5, "Five");
+    sm.put(20, "Twenty");
+
+    assert((sm.get(10) as str) == "Ten", "sm.get(10) Ten");
+    assert((sm.get(5) as str) == "Five", "sm.get(5) Five");
+    assert(sm.contains(20) == true, "sm.contains(20) true");
+    assert(sm.contains(99) == false, "sm.contains(99) false");
+    print("SortedMap test passed.\n");
+}
+
+fn main(): int {
+    print("=== Running DevX Roadmap Unit Test Suite ===\n");
+    test_string_builder();
+    test_http_router();
+    test_json_helpers();
+    test_deque_and_sorted_map();
+    print("\n=== All DevX Roadmap Tests Passed Successfully ===\n");
+    return 0;
+}

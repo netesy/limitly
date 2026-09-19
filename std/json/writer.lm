@@ -49,3 +49,22 @@ pub fn stringify(val_any: any): str {
     }
     return "null";
 }
+
+pub fn encode_pair(key: str, val_str: str): str {
+    return "\"" + key + "\":\"" + val_str + "\"";
+}
+
+pub fn encode_object(keys: [str], vals: [str]): str {
+    var res = "{";
+    var i = 0;
+    var n = len(keys);
+    while (i < n) {
+        res = res + "\"" + keys[i] + "\":\"" + vals[i] + "\"";
+        if (i < n - 1) {
+            res = res + ",";
+        }
+        i = i + 1;
+    }
+    res = res + "}";
+    return res;
+}

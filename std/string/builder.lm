@@ -7,13 +7,39 @@ frame StringBuilder {
         self.parts = [] as [str];
     }
 
-    pub fn append(s: str) {
+    pub fn append(s: str): StringBuilder {
         self.parts.append(s);
+        return self;
     }
 
-    pub fn append_line(s: str) {
+    pub fn append_str(s: str): StringBuilder {
+        return self.append(s);
+    }
+
+    pub fn append_line(s: str): StringBuilder {
         self.parts.append(s);
         self.parts.append("\n");
+        return self;
+    }
+
+    pub fn append_char(cp: int): StringBuilder {
+        var ch = _builtin_string_from_bytes([cp]);
+        self.parts.append(ch);
+        return self;
+    }
+
+    pub fn clear(): nil {
+        self.parts = [] as [str];
+    }
+
+    pub fn length(): int {
+        var total = 0;
+        var i = 0;
+        while (i < len(self.parts)) {
+            total = total + len(self.parts[i]);
+            i = i + 1;
+        }
+        return total;
     }
 
     pub fn to_string(): str {
@@ -25,4 +51,8 @@ frame StringBuilder {
         }
         return res;
     }
+}
+
+pub fn builder(): StringBuilder {
+    return StringBuilder();
 }

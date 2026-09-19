@@ -25,6 +25,7 @@ pub fn LinkedList(): any { return linked_list.DLL(); }
 pub fn Map(): any { return map.HashMapWrapper(); }
 pub fn HashMap(): any { return hashmap.HashMap(_keys=[] as [str], _values=[] as [int]); }
 pub fn BTreeMap(): any { return btreemap.BTreeMapWrapper(); }
+pub fn SortedMap(): any { return btreemap.BTreeMapWrapper(); }
 pub fn Set(): any { return set.Set(elements=[] as [int]); }
 pub fn HashSet(): any { return hashset.HashSetWrapper(); }
 pub fn BTreeSet(): any { return btreeset.BTreeSetWrapper(); }

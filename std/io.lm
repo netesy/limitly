@@ -1,0 +1,18 @@
+// Standard Library std/io.lm entry point
+import std.io.console as console_mod;
+import std.io.file as file_mod;
+import std.io.reader as reader_mod;
+import std.io.writer as writer_mod;
+import std.io.index as io_index;
+
+pub fn Console(): any { return console_mod.Console(); }
+pub fn Reader(r: any): any { return reader_mod.Reader(r); }
+pub fn Writer(r: any): any { return writer_mod.Writer(r); }
+
+pub fn open(path: str, mode: str): any { return file_mod.open(path, mode); }
+pub fn print(msg: any): nil { io_index.print(msg); }
+pub fn exists(path: str): bool { return io_index.exists(path); }
+pub fn delete(path: str): bool { return io_index.delete(path); }
+pub fn rename(old_path: str, new_path: str): bool { return io_index.rename(old_path, new_path); }
+pub fn create_directory(path: str): any { return io_index.create_directory(path); }
+pub fn list_directory(path: str): any { return io_index.list_directory(path); }

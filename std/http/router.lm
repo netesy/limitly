@@ -1,0 +1,108 @@
+// Standard Library Fluent HTTP Router Module
+
+frame Request {
+    pub var method: str;
+    pub var path: str;
+    pub var headers: [str];
+    pub var body: str;
+
+    pub init(method: str = "GET", path: str = "/", headers: [str] = [] as [str], body: str = "") {
+        self.method = method;
+        self.path = path;
+        self.headers = headers;
+        self.body = body;
+    }
+}
+
+frame Response {
+    pub var status_code: int;
+    pub var headers: [str];
+    pub var body: str;
+
+    pub init(code: int = 200, body: str = "") {
+        self.status_code = code;
+        self.headers = ["Content-Type: text/plain"];
+        self.body = body;
+    }
+
+    pub fn json(data: str): Response {
+        self.headers = ["Content-Type: application/json"];
+        self.body = data;
+        return self;
+    }
+
+    pub fn html(data: str): Response {
+        self.headers = ["Content-Type: text/html"];
+        self.body = data;
+        return self;
+    }
+
+    pub fn status(code: int): Response {
+        self.status_code = code;
+        return self;
+    }
+}
+
+frame Route {
+    pub var method: str;
+    pub var path: str;
+    pub var handler: any; // fn(Request): Response
+
+    pub init(m: str, p: str, h: any) {
+        self.method = m;
+        self.path = p;
+        self.handler = h;
+    }
+}
+
+frame Router {
+    pub var routes: [Route];
+
+    pub init() {
+        self.routes = [] as [Route];
+    }
+
+    pub fn get(path: str, handler: any): Router {
+        self.routes.append(Route("GET", path, handler));
+        return self;
+    }
+
+    pub fn post(path: str, handler: any): Router {
+        self.routes.append(Route("POST", path, handler));
+        return self;
+    }
+
+    pub fn put(path: str, handler: any): Router {
+        self.routes.append(Route("PUT", path, handler));
+        return self;
+    }
+
+    pub fn delete(path: str, handler: any): Router {
+        self.routes.append(Route("DELETE", path, handler));
+        return self;
+    }
+
+    pub fn route(method: str, path: str, handler: any): Router {
+        self.routes.append(Route(method, path, handler));
+        return self;
+    }
+
+    pub fn handle(req: Request): Response {
+        var i = 0;
+        while (i < len(self.routes)) {
+            var r = self.routes[i];
+            if (r.method == req.method and r.path == req.path) {
+                var handler_fn = r.handler as fn(Request): Response;
+                if (handler_fn != nil) {
+                    return handler_fn(req);
+                }
+            }
+            i = i + 1;
+        }
+        return Response(404, "404 Not Found");
+    }
+}
+
+pub fn router(): Router {
+    return Router();
+}

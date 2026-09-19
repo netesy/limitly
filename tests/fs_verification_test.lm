@@ -1,0 +1,63 @@
+// Filesystem System Real Verification Test using std.fs and std.path
+import std.fs.index as fs;
+import std.path.index as path;
+
+fn main(): int {
+    print("=== Filesystem System Real Verification Test ===\n");
+
+    var dir_path = path.Path("tests/fs_verify_dir") as path.Path;
+    var renamed_dir = path.Path("tests/fs_verify_dir_renamed") as path.Path;
+
+    var fs_sys = fs.FS() as fs.FS;
+
+    // 1. Initial cleanup
+    if (fs_sys.exists(dir_path)) {
+        fs_sys.remove(dir_path);
+    }
+    if (fs_sys.exists(renamed_dir)) {
+        fs_sys.remove(renamed_dir);
+    }
+
+    // 2. Directory Creation
+    print("Creating directory: tests/fs_verify_dir...\n");
+    fs_sys.create_dir(dir_path);
+    if (!fs_sys.exists(dir_path)) {
+        print("ERROR: Directory creation failed!\n");
+        return 1;
+    }
+    print("Directory creation verified.\n");
+
+    // 3. Directory Rename
+    print("Renaming directory...\n");
+    fs_sys.rename(dir_path, renamed_dir);
+    if (fs_sys.exists(dir_path)) {
+        print("ERROR: Old directory path still exists!\n");
+        return 1;
+    }
+    if (!fs_sys.exists(renamed_dir)) {
+        print("ERROR: Renamed directory does not exist!\n");
+        return 1;
+    }
+    print("Directory rename verified.\n");
+
+    // 4. Directory Removal
+    print("Removing renamed directory...\n");
+    fs_sys.remove(renamed_dir);
+    if (fs_sys.exists(renamed_dir)) {
+        print("ERROR: Directory still exists after removal!\n");
+        return 1;
+    }
+    print("Directory removal verified.\n");
+
+    // 5. Permissions
+    print("Verifying Permissions frame...\n");
+    var readonly_perm = fs.Permissions(true) as fs.Permissions;
+    if (!readonly_perm.is_readonly()) {
+        print("ERROR: Permissions.is_readonly failed!\n");
+        return 1;
+    }
+    print("Permissions frame verified.\n");
+
+    print("\n=== Filesystem System Verification Test Passed Successfully ===\n");
+    return 0;
+}

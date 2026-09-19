@@ -10,3 +10,11 @@ pub fn parse(text: str): any {
 pub fn stringify(val_any: any): str {
     return writer_mod.stringify(val_any);
 }
+
+pub fn encode_pair(key: str, val_str: str): str {
+    return writer_mod.encode_pair(key, val_str);
+}
+
+pub fn encode_object(keys: [str], vals: [str]): str {
+    return writer_mod.encode_object(keys, vals);
+}
