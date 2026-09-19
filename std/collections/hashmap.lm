@@ -1,192 +1,98 @@
-// HashMap Frame - Key-value storage implementation
+// HashMap Frame - $O(1)$ amortized bucket hash table
 
 import std.core as core;
 
-frame HashMap {
-    pub _keys: [str];
-    pub _values: [int];
+frame HashEntry {
+    pub key: str;
+    pub value: any;
 
-    pub fn from_pairs(pairs: [(str, int)]): HashMap {
-        var keys = [] as [str];
-        var values = [] as [int];
-        var i: int = 0;
-        
-        while (i < len(pairs)) {
-            var pair = pairs[i];
-            keys[i] = pair[0];
-            values[i] = pair[1];
+    pub init(k: str, v: any) {
+        self.key = k;
+        self.value = v;
+    }
+}
+
+frame HashMap {
+    pub buckets: [[HashEntry]];
+    pub capacity: int;
+    pub count: int;
+
+    pub init(initial_cap: int = 16) {
+        self.capacity = initial_cap;
+        self.count = 0;
+        self.buckets = [] as [[HashEntry]];
+        var i = 0;
+        while (i < self.capacity) {
+            self.buckets.append([] as [HashEntry]);
             i = i + 1;
         }
-        
-        return HashMap(_keys=keys, _values=values);
     }
 
-    // Basic operations
-    pub fn put(key: str, value: int): HashMap {
-        var index = self.find_key_index(key);
-        
-        if (index != nil) {
-            // Update existing key
-            var idx = index as int;
-            var new_values = [] as [int];
-            var i: int = 0;
-            while (i < len(self._values)) {
-                if (i == idx) {
-                    new_values[i] = value;
-                } else {
-                    new_values[i] = self._values[i];
-                }
-                i = i + 1;
-            }
-            return HashMap(_keys=self._keys, _values=new_values);
-        } else {
-            // Add new key-value pair
-            var new_keys = [] as [str];
-            var new_values = [] as [int];
-            var i: int = 0;
-            
-            while (i < len(self._keys)) {
-                new_keys[i] = self._keys[i];
-                new_values[i] = self._values[i];
-                i = i + 1;
-            }
-            
-            new_keys[len(self._keys)] = key;
-            new_values[len(self._values)] = value;
-            
-            return HashMap(_keys=new_keys, _values=new_values);
+    fn _hash(key: str): int {
+        var h = 5381;
+        var i = 0;
+        while (i < len(key)) {
+            var ch = substring(key, i, i + 1);
+            h = ((h * 33) + (ch as int)) % 2147483647;
+            i = i + 1;
         }
+        if (h < 0) h = 0 - h;
+        return h % self.capacity;
     }
 
-    pub fn get(key: str): int? {
-        var index = self.find_key_index(key);
-        if (index != nil) {
-            var idx = index as int;
-            return self._values[idx];
+    pub fn put(key: str, value: any): HashMap {
+        var idx = self._hash(key);
+        var bucket = self.buckets[idx];
+        var i = 0;
+        while (i < len(bucket)) {
+            if (bucket[i].key == key) {
+                bucket[i].value = value;
+                return self;
+            }
+            i = i + 1;
+        }
+        bucket.append(HashEntry(key, value));
+        self.count = self.count + 1;
+        return self;
+    }
+
+    pub fn get(key: str): any {
+        var idx = self._hash(key);
+        var bucket = self.buckets[idx];
+        var i = 0;
+        while (i < len(bucket)) {
+            if (bucket[i].key == key) {
+                return bucket[i].value;
+            }
+            i = i + 1;
         }
         return nil;
-    }
-
-    pub fn remove(key: str): HashMap {
-        var index = self.find_key_index(key);
-        if (index == nil) return self;
-        
-        var idx = index as int;
-        var new_keys = [] as [str];
-        var new_values = [] as [int];
-        var i: int = 0;
-        var j: int = 0;
-        
-        while (i < len(self._keys)) {
-            if (i != idx) {
-                new_keys[j] = self._keys[i];
-                new_values[j] = self._values[i];
-                j = j + 1;
-            }
-            i = i + 1;
-        }
-        
-        return HashMap(_keys=new_keys, _values=new_values);
     }
 
     pub fn contains_key(key: str): bool {
-        return self.find_key_index(key) != nil;
-    }
-
-    pub fn contains_value(value: int): bool {
-        var i: int = 0;
-        while (i < len(self._values)) {
-            if (self._values[i] == value) return true;
-            i = i + 1;
-        }
-        return false;
+        return (self.get(key) != nil);
     }
 
     pub fn size(): int {
-        return len(self._keys);
+        return self.count;
     }
 
     pub fn is_empty(): bool {
-        return len(self._keys) == 0;
+        return (self.count == 0);
     }
 
     pub fn clear(): HashMap {
-        return HashMap(_keys=[] as [str], _values=[] as [int]);
-    }
-
-    // Collection operations
-    pub fn keys(): [str] {
-        return self._keys;
-    }
-
-    pub fn values(): [int] {
-        return self._values;
-    }
-
-    pub fn entries(): [(str, int)] {
-        var result_entries = [] as [(str, int)];
-        var i: int = 0;
-        
-        while (i < len(self._keys)) {
-            result_entries[i] = (self._keys[i], self._values[i]);
+        self.count = 0;
+        self.buckets = [] as [[HashEntry]];
+        var i = 0;
+        while (i < self.capacity) {
+            self.buckets.append([] as [HashEntry]);
             i = i + 1;
         }
-        
-        return result_entries;
+        return self;
     }
+}
 
-    // Functional operations
-    pub fn map_values(f: fn(int): int): HashMap {
-        var new_values = [] as [int];
-        var i: int = 0;
-        
-        while (i < len(self._values)) {
-            new_values[i] = f(self._values[i]);
-            i = i + 1;
-        }
-        
-        return HashMap(_keys=self._keys, _values=new_values);
-    }
-
-    pub fn filter(predicate: fn(str, int): bool): HashMap {
-        var new_keys = [] as [str];
-        var new_values = [] as [int];
-        var i: int = 0;
-        var j: int = 0;
-        
-        while (i < len(self._keys)) {
-            if (predicate(self._keys[i], self._values[i])) {
-                new_keys[j] = self._keys[i];
-                new_values[j] = self._values[i];
-                j = j + 1;
-            }
-            i = i + 1;
-        }
-        
-        return HashMap(_keys=new_keys, _values=new_values);
-    }
-
-    // Utility methods
-    fn find_key_index(key: str): int? {
-        var i: int = 0;
-        while (i < len(self._keys)) {
-            if (self._keys[i] == key) return i;
-            i = i + 1;
-        }
-        return nil;
-    }
-
-    pub fn to_string(): str {
-        var result = "{";
-        var i: int = 0;
-        
-        while (i < len(self._keys)) {
-            if (i > 0) result = result + ", ";
-            result = result + "{self._keys[i]}: {self._values[i]}";
-            i = i + 1;
-        }
-        
-        result = result + "}";
-        return result;
-    }
+pub fn hashmap(): HashMap {
+    return HashMap();
 }

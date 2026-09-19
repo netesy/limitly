@@ -23,7 +23,7 @@ pub fn ArrayList(): any { return vector.ArrayList(); }
 pub fn Deque(): any { return deque.DoubleEndedQueue(); }
 pub fn LinkedList(): any { return linked_list.DLL(); }
 pub fn Map(): any { return map.HashMapWrapper(); }
-pub fn HashMap(): any { return hashmap.HashMap(_keys=[] as [str], _values=[] as [int]); }
+pub fn HashMap(): any { return hashmap.HashMap(); }
 pub fn BTreeMap(): any { return btreemap.BTreeMapWrapper(); }
 pub fn SortedMap(): any { return btreemap.BTreeMapWrapper(); }
 pub fn Set(): any { return set.Set(elements=[] as [int]); }
