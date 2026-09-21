@@ -4,9 +4,59 @@
 #include <queue>
 #include <algorithm>
 #include <iostream>
+#include <limits>
 
 namespace LM {
 namespace Frontend {
+
+static bool safe_add(int64_t a, int64_t b, int64_t& res) {
+#if defined(__GNUC__) || defined(__clang__)
+    return !__builtin_add_overflow(a, b, &res);
+#else
+    res = a + b;
+    return true;
+#endif
+}
+
+static bool safe_sub(int64_t a, int64_t b, int64_t& res) {
+#if defined(__GNUC__) || defined(__clang__)
+    return !__builtin_sub_overflow(a, b, &res);
+#else
+    res = a - b;
+    return true;
+#endif
+}
+
+static bool safe_mul(int64_t a, int64_t b, int64_t& res) {
+#if defined(__GNUC__) || defined(__clang__)
+    return !__builtin_mul_overflow(a, b, &res);
+#else
+    res = a * b;
+    return true;
+#endif
+}
+
+static int64_t floor_div(int64_t a, int64_t b) {
+    if (b < 0) {
+        if (b == std::numeric_limits<int64_t>::min()) return 0;
+        a = -a;
+        b = -b;
+    }
+    if (b == 0) return 0;
+    if (a >= 0) return a / b;
+    return (a - b + 1) / b;
+}
+
+static int64_t ceil_div(int64_t a, int64_t b) {
+    if (b < 0) {
+        if (b == std::numeric_limits<int64_t>::min()) return 0;
+        a = -a;
+        b = -b;
+    }
+    if (b == 0) return 0;
+    if (a >= 0) return (a + b - 1) / b;
+    return a / b;
+}
 
 bool ConstraintEngine::add_constraint(const NormalizedConstraint& constraint) {
     constraints_.push_back(constraint);
@@ -19,18 +69,6 @@ bool ConstraintEngine::add_constraint(const NormalizedConstraint& constraint) {
     }
 
     return update_intervals();
-}
-
-static int64_t floor_div(int64_t a, int64_t b) {
-    if (b < 0) { a = -a; b = -b; }
-    if (a >= 0) return a / b;
-    return (a - b + 1) / b;
-}
-
-static int64_t ceil_div(int64_t a, int64_t b) {
-    if (b < 0) { a = -a; b = -b; }
-    if (a >= 0) return (a + b - 1) / b;
-    return a / b;
 }
 
 bool ConstraintEngine::update_intervals() {
@@ -229,15 +267,18 @@ bool ConstraintEngine::check_difference_graph() const {
             if (edge.u == u) {
                 size_t v = edge.v;
                 int64_t w = edge.weight;
-                if (dist[u] + w < dist[v]) {
-                    dist[v] = dist[u] + w;
-                    count[v]++;
-                    if (count[v] >= n) {
-                        return false; // Negative cycle detected -> contradiction
-                    }
-                    if (!in_queue[v]) {
-                        q.push(v);
-                        in_queue[v] = true;
+                int64_t new_dist = 0;
+                if (safe_add(dist[u], w, new_dist)) {
+                    if (new_dist < dist[v]) {
+                        dist[v] = new_dist;
+                        count[v]++;
+                        if (count[v] >= n) {
+                            return false; // Negative cycle detected -> contradiction
+                        }
+                        if (!in_queue[v]) {
+                            q.push(v);
+                            in_queue[v] = true;
+                        }
                     }
                 }
             }
@@ -272,7 +313,6 @@ NativeProofResult ConstraintEngine::verify_obligation(
 
     NativeProofResult result;
 
-    // 1. Check if assumptions + (not target) is inconsistent -> Proven!
     ConstraintEngine proven_engine;
     for (const auto& asm_c : assumptions) {
         proven_engine.add_constraint(asm_c);
@@ -301,7 +341,6 @@ NativeProofResult ConstraintEngine::verify_obligation(
         return result;
     }
 
-    // 2. Check if assumptions + target is inconsistent -> Definite Counterexample!
     ConstraintEngine counter_engine;
     for (const auto& asm_c : assumptions) {
         counter_engine.add_constraint(asm_c);
@@ -313,7 +352,6 @@ NativeProofResult ConstraintEngine::verify_obligation(
         return result;
     }
 
-    // 3. Otherwise -> Unknown
     result.status = NativeProofStatus::Unknown;
     result.message = "Native constraint engine could not prove or disprove obligation";
     return result;
@@ -356,22 +394,34 @@ bool ConstraintBuilder::extract_linear_term(
         if (bin->op == TokenType::PLUS) {
             if (!extract_linear_term(bin->left, left_term)) return false;
             if (!extract_linear_term(bin->right, right_term)) return false;
+            int64_t new_offset = 0;
+            if (!safe_add(left_term.constant_offset, right_term.constant_offset, new_offset)) return false;
             out_term = left_term + right_term;
+            out_term.constant_offset = new_offset;
             return true;
         } else if (bin->op == TokenType::MINUS) {
             if (!extract_linear_term(bin->left, left_term)) return false;
             if (!extract_linear_term(bin->right, right_term)) return false;
+            int64_t new_offset = 0;
+            if (!safe_sub(left_term.constant_offset, right_term.constant_offset, new_offset)) return false;
             out_term = left_term - right_term;
+            out_term.constant_offset = new_offset;
             return true;
         } else if (bin->op == TokenType::STAR) {
             if (extract_linear_term(bin->left, left_term) && left_term.is_constant()) {
                 if (!extract_linear_term(bin->right, right_term)) return false;
+                int64_t new_offset = 0;
+                if (!safe_mul(right_term.constant_offset, left_term.constant_offset, new_offset)) return false;
                 out_term = right_term.scale(left_term.constant_offset);
+                out_term.constant_offset = new_offset;
                 return true;
             }
             if (extract_linear_term(bin->right, right_term) && right_term.is_constant()) {
                 if (!extract_linear_term(bin->left, left_term)) return false;
+                int64_t new_offset = 0;
+                if (!safe_mul(left_term.constant_offset, right_term.constant_offset, new_offset)) return false;
                 out_term = left_term.scale(right_term.constant_offset);
+                out_term.constant_offset = new_offset;
                 return true;
             }
             return false;
