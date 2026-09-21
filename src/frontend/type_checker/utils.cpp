@@ -1,4 +1,5 @@
 #include "../type_checker.hh"
+#include "../constraint_engine.hh"
 #include "../../error/debugger.hh"
 #include <filesystem>
 #include <algorithm>
@@ -290,83 +291,50 @@ SMTProofResult SMTVerifier::verify_obligation(
     const std::vector<std::shared_ptr<LM::Frontend::AST::Expression>>& assumption_asts) {
 
     SMTProofResult res;
-    std::string cond_smt = ast_to_smtlib(condition_ast);
-    if (cond_smt.empty()) {
+
+    NormalizedConstraint target_constraint;
+    if (!ConstraintBuilder::build_constraint(condition_ast, target_constraint)) {
         res.status = SMTProofStatus::Unsupported;
-        res.message = "AST condition contains unsupported expression for SMT solver";
+        res.message = "AST condition contains unsupported expression for native constraint engine";
         return res;
     }
 
-    std::string smt_declarations;
-    std::set<std::string> declared_vars;
-    if (!declare_smt_vars(condition_ast, smt_declarations, declared_vars)) {
-        res.status = SMTProofStatus::Unsupported;
-        res.message = "Condition contains unsupported variable type for SMT solver";
-        return res;
-    }
+    std::vector<NormalizedConstraint> assumptions;
     for (const auto& asm_ast : assumption_asts) {
-        if (!declare_smt_vars(asm_ast, smt_declarations, declared_vars)) {
+        NormalizedConstraint asm_c;
+        if (!ConstraintBuilder::build_constraint(asm_ast, asm_c)) {
             res.status = SMTProofStatus::Unsupported;
-            res.message = "Assumptions contain unsupported variable type for SMT solver";
+            res.message = "Assumptions contain unsupported expression for native constraint engine";
             return res;
         }
+        assumptions.push_back(asm_c);
     }
 
-    std::string smt_script = "(set-logic QF_LIA)\n" + smt_declarations;
-    for (const auto& asm_ast : assumption_asts) {
-        std::string asm_smt = ast_to_smtlib(asm_ast);
-        if (asm_smt.empty()) {
+    NativeProofResult native_res = ConstraintEngine::verify_obligation(target_constraint, assumptions);
+    switch (native_res.status) {
+        case NativeProofStatus::Proven:
+            res.status = SMTProofStatus::Proven;
+            res.message = native_res.message;
+            break;
+        case NativeProofStatus::Counterexample:
+            res.status = SMTProofStatus::Counterexample;
+            res.message = native_res.message;
+            break;
+        case NativeProofStatus::Unsupported:
             res.status = SMTProofStatus::Unsupported;
-            res.message = "Assumptions contain unsupported expression for SMT solver";
-            return res;
-        }
-        smt_script += "(assert " + asm_smt + ")\n";
+            res.message = native_res.message;
+            break;
+        case NativeProofStatus::SolverError:
+            res.status = SMTProofStatus::SolverError;
+            res.message = native_res.message;
+            break;
+        case NativeProofStatus::Unknown:
+        default:
+            res.status = SMTProofStatus::Unknown;
+            res.message = native_res.message;
+            break;
     }
-    smt_script += "(assert (not " + cond_smt + "))\n(check-sat)\n(get-model)\n";
 
-#ifndef _WIN32
-    // Secure temporary file creation using POSIX mkstemp
-    char tmp_template[] = "/tmp/limitly_smt_XXXXXX";
-    int fd = mkstemp(tmp_template);
-    if (fd != -1) {
-        ssize_t written = write(fd, smt_script.c_str(), smt_script.length());
-        (void)written;
-        close(fd);
-        std::string tmp_file = tmp_template;
-
-        FILE* pipe = popen(("z3 " + tmp_file + " 2>/dev/null").c_str(), "r");
-        if (pipe) {
-            char buffer[256];
-            std::string z3_output;
-            while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-                z3_output += buffer;
-            }
-            int status = pclose(pipe);
-            unlink(tmp_template);
-
-            if (status == 0) {
-                if (z3_output.find("unsat") != std::string::npos) {
-                    res.status = SMTProofStatus::Proven;
-                    res.message = "Z3 SMT solver proved obligation (UNSAT for negated condition)";
-                    return res;
-                } else if (z3_output.find("sat") != std::string::npos) {
-                    res.status = SMTProofStatus::Counterexample;
-                    res.message = "Z3 SMT solver found counterexample (SAT for negated condition)";
-                    res.model = z3_output;
-                    return res;
-                }
-            } else {
-                res.status = SMTProofStatus::SolverError;
-                res.message = "Z3 solver process exited with error status";
-                return res;
-            }
-        }
-        unlink(tmp_template);
-    }
-#endif
-
-    res.status = SMTProofStatus::Unknown;
-    res.message = "Z3 solver unavailable or return code unknown; falling back to dynamic assertion";
     return res;
 }
 
