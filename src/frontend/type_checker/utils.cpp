@@ -1,7 +1,11 @@
 #include "../type_checker.hh"
+#include "../constraint_engine.hh"
 #include "../../error/debugger.hh"
 #include <filesystem>
 #include <algorithm>
+#include <fstream>
+#include <unistd.h>
+#include <random>
 
 namespace fs = std::filesystem;
 
@@ -198,6 +202,140 @@ bool TypeChecker::is_failed_type(const std::string& name) const {
         }
     }
     return false;
+}
+
+std::string SMTVerifier::ast_to_smtlib(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
+    if (!expr) return "";
+    if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+        if (lit->literalType == TokenType::STRING) return ""; // Unsupported string literal in QF_LIA
+        if (std::holds_alternative<std::string>(lit->value)) return std::get<std::string>(lit->value);
+        if (std::holds_alternative<bool>(lit->value)) return std::get<bool>(lit->value) ? "true" : "false";
+    } else if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
+        return var->name;
+    } else if (auto grp = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
+        return ast_to_smtlib(grp->expression);
+    } else if (auto un = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
+        std::string right = ast_to_smtlib(un->right);
+        if (right.empty()) return "";
+        if (un->op == TokenType::BANG) return "(not " + right + ")";
+        if (un->op == TokenType::MINUS) return "(- " + right + ")";
+        return "";
+    } else if (auto bin = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
+        std::string op_str;
+        switch (bin->op) {
+            case TokenType::PLUS: op_str = "+"; break;
+            case TokenType::MINUS: op_str = "-"; break;
+            case TokenType::STAR: op_str = "*"; break;
+            case TokenType::EQUAL_EQUAL: op_str = "="; break;
+            case TokenType::BANG_EQUAL: op_str = "distinct"; break;
+            case TokenType::LESS: op_str = "<"; break;
+            case TokenType::LESS_EQUAL: op_str = "<="; break;
+            case TokenType::GREATER: op_str = ">"; break;
+            case TokenType::GREATER_EQUAL: op_str = ">="; break;
+            case TokenType::AMPERSAND_AMPERSAND:
+            case TokenType::AND: op_str = "and"; break;
+            case TokenType::PIPE_PIPE:
+            case TokenType::OR: op_str = "or"; break;
+            default: return "";
+        }
+        std::string left = ast_to_smtlib(bin->left);
+        std::string right = ast_to_smtlib(bin->right);
+        if (left.empty() || right.empty()) return "";
+        return "(" + op_str + " " + left + " " + right + ")";
+    }
+    return ""; // Any unsupported expression kind fails closed with empty string
+}
+
+static bool declare_smt_vars(std::shared_ptr<LM::Frontend::AST::Expression> expr, std::string& smt_declarations, std::set<std::string>& declared) {
+    if (!expr) return true;
+    if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
+        if (declared.find(var->name) == declared.end()) {
+            declared.insert(var->name);
+            if (var->inferred_type) {
+                if (var->inferred_type->tag == TypeTag::Bool) {
+                    smt_declarations += "(declare-const " + var->name + " Bool)\n";
+                } else if (var->inferred_type->tag == TypeTag::Int ||
+                           var->inferred_type->tag == TypeTag::Int64 ||
+                           var->inferred_type->tag == TypeTag::Int32 ||
+                           var->inferred_type->tag == TypeTag::Int16 ||
+                           var->inferred_type->tag == TypeTag::Int8 ||
+                           var->inferred_type->tag == TypeTag::UInt64 ||
+                           var->inferred_type->tag == TypeTag::UInt32 ||
+                           var->inferred_type->tag == TypeTag::UInt16 ||
+                           var->inferred_type->tag == TypeTag::UInt8) {
+                    smt_declarations += "(declare-const " + var->name + " Int)\n";
+                } else {
+                    return false; // Complex/unsupported variable type -> fail closed
+                }
+            } else {
+                return false; // Missing inferred type -> fail closed
+            }
+        }
+        return true;
+    } else if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+        if (lit->literalType == TokenType::STRING) return false;
+        return true;
+    } else if (auto bin = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
+        return declare_smt_vars(bin->left, smt_declarations, declared) &&
+               declare_smt_vars(bin->right, smt_declarations, declared);
+    } else if (auto un = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
+        return declare_smt_vars(un->right, smt_declarations, declared);
+    } else if (auto grp = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
+        return declare_smt_vars(grp->expression, smt_declarations, declared);
+    }
+    return false; // Fail closed for IndexExpr, MemberExpr, CallExpr, ListExpr, ResourceExpr, etc.
+}
+
+SMTProofResult SMTVerifier::verify_obligation(
+    std::shared_ptr<LM::Frontend::AST::Expression> condition_ast,
+    const std::vector<std::shared_ptr<LM::Frontend::AST::Expression>>& assumption_asts) {
+
+    SMTProofResult res;
+
+    NormalizedConstraint target_constraint;
+    if (!ConstraintBuilder::build_constraint(condition_ast, target_constraint)) {
+        res.status = SMTProofStatus::Unsupported;
+        res.message = "AST condition contains unsupported expression for native constraint engine";
+        return res;
+    }
+
+    std::vector<NormalizedConstraint> assumptions;
+    for (const auto& asm_ast : assumption_asts) {
+        NormalizedConstraint asm_c;
+        if (!ConstraintBuilder::build_constraint(asm_ast, asm_c)) {
+            res.status = SMTProofStatus::Unsupported;
+            res.message = "Assumptions contain unsupported expression for native constraint engine";
+            return res;
+        }
+        assumptions.push_back(asm_c);
+    }
+
+    NativeProofResult native_res = ConstraintEngine::verify_obligation(target_constraint, assumptions);
+    switch (native_res.status) {
+        case NativeProofStatus::Proven:
+            res.status = SMTProofStatus::Proven;
+            res.message = native_res.message;
+            break;
+        case NativeProofStatus::Counterexample:
+            res.status = SMTProofStatus::Counterexample;
+            res.message = native_res.message;
+            break;
+        case NativeProofStatus::Unsupported:
+            res.status = SMTProofStatus::Unsupported;
+            res.message = native_res.message;
+            break;
+        case NativeProofStatus::SolverError:
+            res.status = SMTProofStatus::SolverError;
+            res.message = native_res.message;
+            break;
+        case NativeProofStatus::Unknown:
+        default:
+            res.status = SMTProofStatus::Unknown;
+            res.message = native_res.message;
+            break;
+    }
+
+    return res;
 }
 
 } // namespace Frontend

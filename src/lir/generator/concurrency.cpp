@@ -403,6 +403,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
     emit_instruction(LIR_Inst(LIR_Op::SchedulerRun, scheduler_reg, 0, 0));
     
     exit_concurrency_context();
+    current_concurrent_block_id_.clear();
    // std::cout << "[DEBUG] Concurrent statement processing completed" << std::endl;
 }
 

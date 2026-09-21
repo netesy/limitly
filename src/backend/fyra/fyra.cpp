@@ -7,8 +7,8 @@
 #include "target/core/TargetResolver.h"
 #include "target/core/TargetInfo.h"
 #include "target/core/TargetDescriptor.h"
-#include "target/artifact/executable/elf.hh"
-#include "target/artifact/executable/pe.hh"
+#include "target/artifact/executable/ElfImage.h"
+#include "target/artifact/executable/PeImage.h"
 #include "ir/IRContext.h"
 #include "ir/Module.h"
 #include <iostream>
@@ -139,41 +139,40 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
             syms.push_back(start_sym);
         }
 
+        target::artifact::linker::LinkedImage linked_image;
+        linked_image.entrySymbolName = "_start";
+        for (const auto& [name, sec] : sections) {
+            target::artifact::linker::LinkedSection lsec;
+            lsec.name = name;
+            lsec.data = sec;
+            lsec.isExecutable = (name == ".text");
+            lsec.isWritable = (name == ".data" || name == ".bss");
+            lsec.isReadable = true;
+            linked_image.sections[name] = lsec;
+        }
+        for (const auto& sym : syms) {
+            target::artifact::linker::LinkedSymbol lsym;
+            lsym.name = sym.name;
+            lsym.virtualAddress = sym.value;
+            lsym.size = sym.size;
+            lsym.isFunction = (sym.type == 2);
+            lsym.isGlobal = (sym.binding == 1);
+            lsym.sectionName = sym.sectionName;
+            linked_image.symbols[sym.name] = lsym;
+        }
+
         if (options.platform == Platform::Windows) {
-            PEGenerator pe_gen(true, 0x140000000); // 64-bit, base address
-            std::vector<PEGenerator::Symbol> symbols;
-            for (const auto& sym : syms) {
-                symbols.push_back({sym.name, sym.value, sym.size, static_cast<uint8_t>(sym.type), static_cast<uint8_t>(sym.binding), sym.sectionName});
-            }
-            std::vector<PEGenerator::Relocation> relocs;
-            for (const auto& reloc : generator.getRelocations()) {
-                relocs.push_back({reloc.offset, reloc.type, reloc.addend, reloc.symbolName, reloc.sectionName});
-            }
-            if (!pe_gen.generateFromCode(sections, symbols, relocs, options.output_file)) {
+            target::artifact::executable::PeExecutableImageBuilder pe_builder;
+            if (!pe_builder.build(linked_image, options.output_file)) {
                 result.success = false;
-                result.error_message = "PE generation failed: " + pe_gen.getLastError();
+                result.error_message = "PE generation failed: " + pe_builder.getLastError();
                 return result;
             }
         } else if (options.platform == Platform::Linux) {
-            ElfGenerator elf_gen(options.output_file);
-            elf_gen.setMachine(62); // EM_X86_64
-            elf_gen.setBaseAddress(0x400000);
-            elf_gen.setEntryPointName("_start");
-            elf_gen.setStrip(options.strip);
-
-            std::vector<ElfGenerator::Symbol> symbols;
-            for (const auto& sym : syms) {
-                symbols.push_back({sym.name, sym.value, sym.size, static_cast<uint8_t>(sym.type), static_cast<uint8_t>(sym.binding), sym.sectionName});
-            }
-
-            std::vector<ElfGenerator::Relocation> relocs;
-            for (const auto& reloc : generator.getRelocations()) {
-                relocs.push_back({reloc.offset, reloc.type, reloc.addend, reloc.symbolName, reloc.sectionName});
-            }
-
-            if (!elf_gen.generateFromCode(sections, symbols, relocs, options.output_file)) {
+            target::artifact::linker::ElfExecutableImageBuilder elf_builder;
+            if (!elf_builder.build(linked_image, options.output_file)) {
                 result.success = false;
-                result.error_message = "ELF generation failed: " + elf_gen.getLastError();
+                result.error_message = "ELF generation failed: " + elf_builder.getLastError();
                 return result;
             }
         } else {

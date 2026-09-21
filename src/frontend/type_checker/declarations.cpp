@@ -39,13 +39,16 @@ TypePtr TypeChecker::check_contract_statement(std::shared_ptr<LM::Frontend::AST:
                 contract_stmt->line, 0, get_code_context(contract_stmt->line), "message", "string literal or expression");
     }
     
-    // Evaluate static contract condition at stage 0 compile-time if constant
+    // Evaluate static contract condition at stage 0 compile-time using constant evaluation or SMT solver
     long long val_int = 0;
     double val_double = 0.0;
     bool is_int = false;
     if (evaluate_const_expr(contract_stmt->condition, val_int, val_double, is_int, this)) {
         bool cond_true = is_int ? (val_int != 0) : (val_double != 0.0);
-        if (!cond_true) {
+        if (cond_true) {
+            contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::StaticallyProven;
+        } else {
+            contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::Counterexample;
             std::string msg = "Contract assertion failed";
             if (auto lit_msg = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(contract_stmt->message)) {
                 if (std::holds_alternative<std::string>(lit_msg->value)) {
@@ -53,6 +56,23 @@ TypePtr TypeChecker::check_contract_statement(std::shared_ptr<LM::Frontend::AST:
                 }
             }
             add_error("compile-time contract violation: " + msg, contract_stmt->line);
+        }
+    } else {
+        // Evaluate via SMT Solver Helper
+        SMTProofResult smt_res = SMTVerifier::verify_obligation(contract_stmt->condition);
+        if (smt_res.status == SMTProofStatus::Proven) {
+            contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::StaticallyProven;
+        } else if (smt_res.status == SMTProofStatus::Counterexample) {
+            contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::Counterexample;
+            std::string msg = "Contract assertion failed (SMT Counterexample)";
+            if (auto lit_msg = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(contract_stmt->message)) {
+                if (std::holds_alternative<std::string>(lit_msg->value)) {
+                    msg = std::get<std::string>(lit_msg->value);
+                }
+            }
+            add_error("compile-time contract violation: " + msg, contract_stmt->line);
+        } else {
+            contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::UnsupportedOrUnknown;
         }
     }
 

@@ -1,4 +1,5 @@
 #include "optimizer.hh"
+#include "algebraic_simplifier.hh"
 #include "functions.hh"
 #include "analysis.hh"
 #include "backend/vm/vm_value.hh"
@@ -96,6 +97,9 @@ bool Optimizer::optimize() {
         bool licm = run_pass("LICM", [&]() { return loop_invariant_code_motion(); });
         if (licm) am.invalidate_all();
 
+        bool alg_simp = run_pass("Algebraic simplification", [&]() { return algebraic_simplification(); });
+        if (alg_simp) am.invalidate_all();
+
         pass_changed |= ur;
         pass_changed |= cf;
         pass_changed |= po;
@@ -109,6 +113,7 @@ bool Optimizer::optimize() {
         pass_changed |= pol;
         pass_changed |= tco;
         pass_changed |= licm;
+        pass_changed |= alg_simp;
 
         changed |= pass_changed;
         pass_count++;
@@ -941,6 +946,12 @@ bool Optimizer::loop_invariant_code_motion() {
     }
 
     return changed;
+}
+
+bool Optimizer::algebraic_simplification() {
+    if (func_.instructions.empty()) return false;
+    AlgebraicSimplifier simplifier;
+    return simplifier.optimize_function(func_);
 }
 
 bool Optimizer::remove_redundant_entry_calls() {

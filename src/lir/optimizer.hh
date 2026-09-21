@@ -104,6 +104,12 @@ public:
      */
     bool loop_invariant_code_motion();
 
+    /**
+     * @brief Local algebraic expression simplification pass
+     * @return true if instructions were simplified
+     */
+    bool algebraic_simplification();
+
 private:
     LIR_Function& func_;
     OptimizationReport report_;

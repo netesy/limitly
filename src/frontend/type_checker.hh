@@ -605,6 +605,29 @@ bool evaluate_const_expr(std::shared_ptr<LM::Frontend::AST::Expression> expr, lo
 // TYPE CHECKER RESULT - Passed to LIR Generator
 // =============================================================================
 
+enum class SMTProofStatus {
+    Proven,
+    Counterexample,
+    Unknown,
+    Unsupported,
+    SolverError
+};
+
+struct SMTProofResult {
+    SMTProofStatus status = SMTProofStatus::Unknown;
+    std::string message;
+    std::string model;
+};
+
+class SMTVerifier {
+public:
+    static SMTProofResult verify_obligation(
+        std::shared_ptr<LM::Frontend::AST::Expression> condition_ast,
+        const std::vector<std::shared_ptr<LM::Frontend::AST::Expression>>& assumption_asts = {}
+    );
+    static std::string ast_to_smtlib(std::shared_ptr<LM::Frontend::AST::Expression> expr);
+};
+
 struct TypeCheckResult {
     std::shared_ptr<LM::Frontend::AST::Program> program;  // AST with inferred_type set
     std::shared_ptr<TypeSystem> type_system;

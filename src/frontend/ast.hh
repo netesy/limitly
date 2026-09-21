@@ -803,10 +803,18 @@ namespace AST {
         std::shared_ptr<BlockStatement> body;
     };
     
+    enum class ContractVerificationState {
+        RuntimeRequired,
+        StaticallyProven,
+        Counterexample,
+        UnsupportedOrUnknown
+    };
+
     // Contract statement
     struct ContractStatement : public Statement {
         std::shared_ptr<Expression> condition;
         std::shared_ptr<Expression> message;
+        ContractVerificationState verification_state = ContractVerificationState::RuntimeRequired;
     };
     
     // Staged AST nodes

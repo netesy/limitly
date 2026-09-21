@@ -81,7 +81,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/parser/statements.cpp src/frontend/parser/expressions.cpp \
               src/frontend/parser/types.cpp src/frontend/parser/patterns.cpp \
               src/frontend/cst.cpp src/frontend/cst/printer.cpp src/frontend/cst/utils.cpp \
-              src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp src/frontend/module_graph.cpp src/frontend/declaration_resolver.cpp \
+              src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp src/frontend/constraint_engine.cpp src/frontend/module_graph.cpp src/frontend/declaration_resolver.cpp \
               src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp
 
 BACK_SRCS := $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp src/backend/fyra/capability_mapper.cpp,)
@@ -107,7 +107,10 @@ FYRA_SRCS := $(if $(shell [ -f "$(FYRA_DIR)/include/ir/Module.h" ] && echo yes),
              $(wildcard $(FYRA_DIR)/src/target/architecture/x64/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/target/artifact/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/target/artifact/apk/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/artifact/archive/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/target/artifact/executable/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/artifact/linker/*.cpp) \
+             $(wildcard $(FYRA_DIR)/src/target/artifact/object/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/target/capabilities/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/target/core/*.cpp) \
              $(wildcard $(FYRA_DIR)/src/target/os/linux/*.cpp) \
@@ -135,7 +138,7 @@ LIR_CORE_SRCS := src/lir/lir.cpp src/lir/lir_utils.cpp src/lir/functions.cpp \
                  src/lir/generator/core.cpp src/lir/generator/statements.cpp src/lir/generator/expressions.cpp \
                  src/lir/generator/signatures.cpp src/lir/generator/oop.cpp src/lir/generator/concurrency.cpp \
                  src/lir/generator/modules.cpp src/lir/function_registry.cpp \
-                 src/lir/analysis.cpp src/lir/optimizer.cpp src/lir/metrics.cpp src/lir/serializer.cpp
+                 src/lir/analysis.cpp src/lir/optimizer.cpp src/lir/algebraic_simplifier.cpp src/lir/metrics.cpp src/lir/serializer.cpp
 
 BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/frontend/value.cpp src/backend/utf8.cpp 
 
