@@ -920,6 +920,10 @@ void Generator::emit_import_stmt(LM::Frontend::AST::ImportStatement& stmt) {
 
 void Generator::emit_contract_stmt(LM::Frontend::AST::ContractStatement& stmt) {
     if (!stmt.condition) return;
+    if (stmt.verification_state == LM::Frontend::AST::ContractVerificationState::StaticallyProven) {
+        // Statically proven contract — elide runtime check instruction entirely
+        return;
+    }
     long long val_int = 0;
     double val_double = 0.0;
     bool is_int = false;

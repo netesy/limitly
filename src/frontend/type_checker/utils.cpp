@@ -211,6 +211,14 @@ std::string SMTVerifier::ast_to_smtlib(std::shared_ptr<LM::Frontend::AST::Expres
         if (std::holds_alternative<bool>(lit->value)) return std::get<bool>(lit->value) ? "true" : "false";
     } else if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
         return var->name;
+    } else if (auto grp = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
+        return ast_to_smtlib(grp->expression);
+    } else if (auto un = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
+        std::string right = ast_to_smtlib(un->right);
+        if (right.empty()) return "";
+        if (un->op == TokenType::BANG) return "(not " + right + ")";
+        if (un->op == TokenType::MINUS) return "(- " + right + ")";
+        return "";
     } else if (auto bin = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         std::string op_str;
         switch (bin->op) {
@@ -223,6 +231,10 @@ std::string SMTVerifier::ast_to_smtlib(std::shared_ptr<LM::Frontend::AST::Expres
             case TokenType::LESS_EQUAL: op_str = "<="; break;
             case TokenType::GREATER: op_str = ">"; break;
             case TokenType::GREATER_EQUAL: op_str = ">="; break;
+            case TokenType::AMPERSAND_AMPERSAND:
+            case TokenType::AND: op_str = "and"; break;
+            case TokenType::PIPE_PIPE:
+            case TokenType::OR: op_str = "or"; break;
             default: return "";
         }
         std::string left = ast_to_smtlib(bin->left);
@@ -230,7 +242,7 @@ std::string SMTVerifier::ast_to_smtlib(std::shared_ptr<LM::Frontend::AST::Expres
         if (left.empty() || right.empty()) return "";
         return "(" + op_str + " " + left + " " + right + ")";
     }
-    return "";
+    return ""; // Any unsupported expression kind fails closed with empty string
 }
 
 static bool declare_smt_vars(std::shared_ptr<LM::Frontend::AST::Expression> expr, std::string& smt_declarations, std::set<std::string>& declared) {
@@ -241,24 +253,36 @@ static bool declare_smt_vars(std::shared_ptr<LM::Frontend::AST::Expression> expr
             if (var->inferred_type) {
                 if (var->inferred_type->tag == TypeTag::Bool) {
                     smt_declarations += "(declare-const " + var->name + " Bool)\n";
-                } else if (var->inferred_type->tag == TypeTag::Int || var->inferred_type->tag == TypeTag::Int64 || var->inferred_type->tag == TypeTag::Int32) {
+                } else if (var->inferred_type->tag == TypeTag::Int ||
+                           var->inferred_type->tag == TypeTag::Int64 ||
+                           var->inferred_type->tag == TypeTag::Int32 ||
+                           var->inferred_type->tag == TypeTag::Int16 ||
+                           var->inferred_type->tag == TypeTag::Int8 ||
+                           var->inferred_type->tag == TypeTag::UInt64 ||
+                           var->inferred_type->tag == TypeTag::UInt32 ||
+                           var->inferred_type->tag == TypeTag::UInt16 ||
+                           var->inferred_type->tag == TypeTag::UInt8) {
                     smt_declarations += "(declare-const " + var->name + " Int)\n";
                 } else {
-                    return false; // Complex/unsupported variable type
+                    return false; // Complex/unsupported variable type -> fail closed
                 }
             } else {
-                return false; // Missing inferred type -> Unsupported
+                return false; // Missing inferred type -> fail closed
             }
         }
+        return true;
+    } else if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+        if (lit->literalType == TokenType::STRING) return false;
+        return true;
     } else if (auto bin = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
-        if (!declare_smt_vars(bin->left, smt_declarations, declared)) return false;
-        if (!declare_smt_vars(bin->right, smt_declarations, declared)) return false;
+        return declare_smt_vars(bin->left, smt_declarations, declared) &&
+               declare_smt_vars(bin->right, smt_declarations, declared);
     } else if (auto un = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(expr)) {
-        if (!declare_smt_vars(un->right, smt_declarations, declared)) return false;
+        return declare_smt_vars(un->right, smt_declarations, declared);
     } else if (auto grp = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(expr)) {
-        if (!declare_smt_vars(grp->expression, smt_declarations, declared)) return false;
+        return declare_smt_vars(grp->expression, smt_declarations, declared);
     }
-    return true;
+    return false; // Fail closed for IndexExpr, MemberExpr, CallExpr, ListExpr, ResourceExpr, etc.
 }
 
 SMTProofResult SMTVerifier::verify_obligation(
@@ -291,9 +315,12 @@ SMTProofResult SMTVerifier::verify_obligation(
     std::string smt_script = "(set-logic QF_LIA)\n" + smt_declarations;
     for (const auto& asm_ast : assumption_asts) {
         std::string asm_smt = ast_to_smtlib(asm_ast);
-        if (!asm_smt.empty()) {
-            smt_script += "(assert " + asm_smt + ")\n";
+        if (asm_smt.empty()) {
+            res.status = SMTProofStatus::Unsupported;
+            res.message = "Assumptions contain unsupported expression for SMT solver";
+            return res;
         }
+        smt_script += "(assert " + asm_smt + ")\n";
     }
     smt_script += "(assert (not " + cond_smt + "))\n(check-sat)\n(get-model)\n";
 
