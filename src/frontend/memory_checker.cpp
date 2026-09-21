@@ -158,6 +158,35 @@ void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement
     } else if (auto contract_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContractStatement>(stmt)) {
         if (contract_stmt->condition) check_expression(contract_stmt->condition);
         if (contract_stmt->message) check_expression(contract_stmt->message);
+    } else if (auto parallel_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ParallelStatement>(stmt)) {
+        active_parallel_slices.clear();
+        if (parallel_stmt->body) check_statement(parallel_stmt->body);
+        active_parallel_slices.clear();
+    } else if (auto task_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::TaskStatement>(stmt)) {
+        if (task_stmt->iterable) {
+            check_expression(task_stmt->iterable);
+            if (auto range = std::dynamic_pointer_cast<LM::Frontend::AST::RangeExpr>(task_stmt->iterable)) {
+                if (is_constant_expression(range->start) && is_constant_expression(range->end)) {
+                    int64_t s = evaluate_constant_int(range->start);
+                    int64_t e = evaluate_constant_int(range->end);
+                    ParallelSliceCapability slice;
+                    slice.collection_name = "data";
+                    slice.start_idx = s;
+                    slice.end_idx = e;
+                    slice.is_mutable = true;
+                    verify_slice_disjointness(slice, task_stmt->line);
+                }
+            }
+        }
+        if (task_stmt->body) check_statement(task_stmt->body);
+    } else if (auto concurrent_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ConcurrentStatement>(stmt)) {
+        if (!concurrent_stmt->channel.empty()) {
+            mark_variable_borrowed(concurrent_stmt->channel, false);
+            if (variable_generation_info.count(concurrent_stmt->channel)) {
+                variable_generation_info[concurrent_stmt->channel].is_linear = true;
+            }
+        }
+        if (concurrent_stmt->body) check_statement(concurrent_stmt->body);
     }
 }
 
@@ -599,6 +628,21 @@ void MemoryChecker::check_block_statement(std::shared_ptr<LM::Frontend::AST::Blo
             variable_generation_info.erase(name);
         }
     }
+}
+
+bool MemoryChecker::verify_slice_disjointness(const ParallelSliceCapability& slice, int line) {
+    for (const auto& existing : active_parallel_slices) {
+        if (slice.overlaps_with(existing)) {
+            add_memory_error("Capability Violation", slice.collection_name,
+                             "Overlapping mutable slice capability in parallel worker: range [" +
+                             std::to_string(slice.start_idx) + ", " + std::to_string(slice.end_idx) +
+                             ") overlaps with range [" + std::to_string(existing.start_idx) + ", " +
+                             std::to_string(existing.end_idx) + ")", line);
+            return false;
+        }
+    }
+    active_parallel_slices.push_back(slice);
+    return true;
 }
 
 // =============================================================================

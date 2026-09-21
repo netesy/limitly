@@ -42,6 +42,28 @@ enum class OwnershipState {
     Invalid            // Variable is in invalid state
 };
 
+enum class CapabilityKind {
+    Unique,
+    ReadBorrow,
+    WriteBorrow,
+    SharedAtomic,
+    DisjointSlice
+};
+
+struct ParallelSliceCapability {
+    std::string collection_name;
+    int64_t start_idx = 0;
+    int64_t end_idx = 0;
+    bool is_mutable = false;
+    int worker_id = 0;
+
+    bool overlaps_with(const ParallelSliceCapability& other) const {
+        if (collection_name != other.collection_name) return false;
+        if (!is_mutable && !other.is_mutable) return false; // Concurrent reads are safe
+        return (start_idx < other.end_idx && other.start_idx < end_idx);
+    }
+};
+
 // Information tracked for each variable's generation
 struct GenerationInfo {
     int region_id;
@@ -89,6 +111,12 @@ private:
     std::unordered_map<std::string, std::vector<std::shared_ptr<GenerationalRef>>> reference_chain;
     std::unordered_map<std::string, std::vector<int>> generation_history;
     
+    // Capability tracking
+    std::vector<ParallelSliceCapability> active_parallel_slices;
+
+    // Check parallel slice capability disjointness
+    bool verify_slice_disjointness(const ParallelSliceCapability& slice, int line);
+
     // Current context
     std::string current_source;
     std::string current_file_path;
