@@ -57,7 +57,6 @@ void RegisterVM::reset() {
     current_time = 0;
     current_function_ = nullptr;
     shared_variables.clear();
-    shared_cells.clear();
     default_atomic.store(0);
     work_queues.clear();
     work_queue_counter.store(0);
@@ -194,8 +193,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::ParallelInit: case LIR::LIR_Op::ParallelSync:
             case LIR::LIR_Op::TaskContextAlloc: case LIR::LIR_Op::TaskContextInit: case LIR::LIR_Op::TaskSetField:
             case LIR::LIR_Op::TaskGetField: case LIR::LIR_Op::TaskGetState: case LIR::LIR_Op::TaskSetState:
-            case LIR::LIR_Op::SharedCellAlloc: case LIR::LIR_Op::SharedCellLoad:
-            case LIR::LIR_Op::SharedCellStore: case LIR::LIR_Op::SharedCellAdd: case LIR::LIR_Op::SharedCellSub:
             case LIR::LIR_Op::ResourceCreate: case LIR::LIR_Op::ResourceDestroy: case LIR::LIR_Op::ResourceCall:
                 execute_concurrency(pc); break;
             case LIR::LIR_Op::LoadGlobal: case LIR::LIR_Op::StoreGlobal: execute_modules(pc); break;

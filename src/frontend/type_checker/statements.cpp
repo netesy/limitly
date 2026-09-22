@@ -283,6 +283,23 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
             add_type_error(declared_type->toString(), init_type->toString(), var_decl->line);
             final_type = declared_type; // Use declared type anyway
         }
+
+        // Refinements are semantic types, not just aliases over their base type.
+        // Discharge the assignment obligation immediately when the native SMT
+        // fragment can decide it.  Unknown/unsupported expressions remain
+        // eligible for the existing runtime path, but definite violations are
+        // rejected at compile time.
+        if (declared_type->tag == TypeTag::Refined && var_decl->initializer) {
+            if (const auto* refined = std::get_if<RefinedType>(&declared_type->extra)) {
+                SMTProofResult proof = SMTVerifier::verify_refinement(
+                    refined->condition, var_decl->initializer);
+                if (proof.status == SMTProofStatus::Counterexample) {
+                    add_error("type mismatch: refinement type violation for variable '" + var_decl->name +
+                              "': initializer does not satisfy " + declared_type->toString(),
+                              var_decl->line);
+                }
+            }
+        }
     } else if (declared_type) {
         // Only declared
         final_type = declared_type;
@@ -695,7 +712,8 @@ TypePtr TypeChecker::check_parallel_statement(std::shared_ptr<LM::Frontend::AST:
     if (!parallel_stmt) return nullptr;
     
     enter_scope();
-    // Parallel blocks have direct access to outer scope variables, but with SharedCell semantics
+    // Parallel blocks have direct access to outer values subject to the
+    // capability analysis performed by the memory checker.
     // For type checking, we check the body normally
     if (parallel_stmt->body) {
         check_statement(parallel_stmt->body);
@@ -733,14 +751,18 @@ TypePtr TypeChecker::check_task_statement(std::shared_ptr<LM::Frontend::AST::Tas
     enter_scope();
     
     // Check iterable
+    TypePtr element_type = type_system.ANY_TYPE;
     if (task_stmt->iterable) {
         TypePtr iterable_type = check_expression(task_stmt->iterable);
-        // For now, allow any iterable, but could be restricted to ranges/collections
+        if (iterable_type && iterable_type->tag == TypeTag::List)
+            element_type = type_system.getContainerElementType(iterable_type);
+        else if (iterable_type && iterable_type->tag == TypeTag::Range)
+            element_type = type_system.INT64_TYPE;
     }
     
     // Bind loop variable
     if (!task_stmt->loopVar.empty()) {
-        declare_variable(task_stmt->loopVar, type_system.INT64_TYPE);
+        declare_variable(task_stmt->loopVar, element_type);
     }
     
     // Check body
@@ -760,13 +782,18 @@ TypePtr TypeChecker::check_worker_statement(std::shared_ptr<LM::Frontend::AST::W
     enter_scope();
     
     // Check iterable
+    TypePtr element_type = type_system.ANY_TYPE;
     if (worker_stmt->iterable) {
         TypePtr iterable_type = check_expression(worker_stmt->iterable);
+        if (iterable_type && iterable_type->tag == TypeTag::List)
+            element_type = type_system.getContainerElementType(iterable_type);
+        else if (iterable_type && iterable_type->tag == TypeTag::Range)
+            element_type = type_system.INT64_TYPE;
     }
     
     // Bind parameter
     if (!worker_stmt->paramName.empty()) {
-        declare_variable(worker_stmt->paramName, type_system.ANY_TYPE);
+        declare_variable(worker_stmt->paramName, element_type);
     }
     
     // Check body
@@ -944,4 +971,3 @@ std::shared_ptr<LM::Frontend::AST::Statement> TypeChecker::evaluate_staged_state
 
 } // namespace Frontend
 } // namespace LM
-

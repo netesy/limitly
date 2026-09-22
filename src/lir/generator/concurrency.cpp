@@ -9,11 +9,41 @@
 #include <algorithm>
 #include <map>
 #include <limits>
+#include <thread>
+#include <cctype>
 
 using namespace LM::LIR;
 
 namespace LM {
 namespace LIR {
+
+static std::string normalized_option(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return value;
+}
+
+static uint64_t parse_duration_ms(const std::string& text) {
+    if (text.empty()) return 0;
+    std::string value = normalized_option(text);
+    double multiplier = 1000.0; // bare durations retain the documented seconds convention
+    size_t suffix = value.size();
+    if (value.ends_with("ms")) { multiplier = 1.0; suffix -= 2; }
+    else if (value.ends_with("us")) { multiplier = 0.001; suffix -= 2; }
+    else if (value.ends_with("ns")) { multiplier = 0.000001; suffix -= 2; }
+    else if (value.ends_with("s")) { multiplier = 1000.0; suffix -= 1; }
+    const double amount = std::stod(value.substr(0, suffix));
+    if (amount < 0.0) throw std::invalid_argument("negative duration");
+    if (amount == 0.0) return 0;
+    return std::max<uint64_t>(1, static_cast<uint64_t>(amount * multiplier));
+}
+
+static Metadata::ErrorPolicy parse_error_policy(const std::string& value) {
+    const std::string normalized = normalized_option(value);
+    if (normalized == "continue") return Metadata::ErrorPolicy::Continue;
+    if (normalized == "partial") return Metadata::ErrorPolicy::Partial;
+    return Metadata::ErrorPolicy::Stop;
+}
 
 void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
    // std::cout << "[DEBUG] Emitting ParallelStatement" << std::endl;
@@ -21,75 +51,84 @@ void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     
     // Parse cores parameter
-    int num_cores = 3;  // default
-    if (!stmt.cores.empty() && stmt.cores != "auto") {
+    int num_cores = static_cast<int>(std::thread::hardware_concurrency());
+    if (num_cores <= 0) num_cores = 1;
+    if (!stmt.cores.empty() && normalized_option(stmt.cores) != "auto") {
         try {
             num_cores = std::stoi(stmt.cores);
         } catch (...) {
-            num_cores = 3;  // fallback
+            report_error("Invalid parallel core count '" + stmt.cores + "'.");
+            return;
+        }
+        if (num_cores <= 0 || num_cores > 256) {
+            report_error("Parallel core count must be between 1 and 256.");
+            return;
         }
     }
     
-    // Parse timeout parameter
-    if (!stmt.timeout.empty()) {
-        (void)parse_timeout(stmt.timeout);
+    uint64_t timeout_ms = 0;
+    uint64_t grace_ms = 0;
+    try {
+        timeout_ms = parse_timeout(stmt.timeout);
+        grace_ms = parse_grace_period(stmt.grace);
+    } catch (const std::exception&) {
+        report_error("Invalid parallel timeout or grace duration.");
+        return;
     }
-    
-    // Parse grace period
-    if (!stmt.grace.empty()) {
-        (void)parse_grace_period(stmt.grace);
-    }
-    
-    // Parse error handling
-    std::string error_strategy = "Stop";  // default
-    if (!stmt.on_error.empty()) {
-        error_strategy = stmt.on_error;
+
+    const std::string error_strategy = normalized_option(stmt.on_error);
+    if (error_strategy != "stop" && error_strategy != "continue" &&
+        error_strategy != "partial") {
+        report_error("parallel on_error must be Stop, Continue, or Partial.");
+        return;
     }
     
   
-    // According to spec: Parallel blocks should NOT use task statements
-    // They should use direct code with SharedCell operations and work queue system
-    
-    // 1. Find variables accessed in the parallel block body that need to be shared
-    std::set<std::string> accessed_variables;
-    collect_variables_from_statement(*stmt.body, accessed_variables);
-    
-   // std::cout << "[DEBUG] Found " << accessed_variables.size() << " variables to share via SharedCell" << std::endl;
-    
-    // 2. Allocate and initialize SharedCell IDs for each accessed variable
-    parallel_block_cell_ids_.clear();
-    for (const auto& var_name : accessed_variables) {
-        Reg cell_id_reg = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::SharedCellAlloc, Type::I64, cell_id_reg, 0, 0));
-        parallel_block_cell_ids_[var_name] = cell_id_reg;
-        
-        // Initialize the SharedCell with the variable's current value from the main thread
-        Reg var_reg = resolve_variable(var_name);
-        if (var_reg != UINT32_MAX) {
-            emit_instruction(LIR_Inst(LIR_Op::SharedCellStore, var_reg, cell_id_reg, var_reg, 0));
+    // Linear slice capabilities are proven by the memory checker and attached
+    // to this node.  Do not box arbitrary captured values in integer-only
+    // scalar atomic cells: doing that loses collection/channel identity and
+    // corrupt pointers.  Disjoint collections remain zero-copy values.
+    std::set<std::string> capability_collections;
+    for (const auto& capability : stmt.slice_capabilities) {
+        if (!capability.mutable_access || capability.begin < 0 ||
+            capability.end <= capability.begin ||
+            !capability_collections.insert(capability.collection).second) {
+            report_error("Invalid or overlapping parallel slice capability for '" +
+                         capability.collection + "'.");
+            return;
+        }
+        if (resolve_variable(capability.collection) == UINT32_MAX) {
+            report_error("Parallel slice capability refers to undefined collection '" +
+                         capability.collection + "'.");
+            return;
         }
     }
     
     // 3. Initialize parallel execution system (using available operations)
     Reg parallel_context_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::ParallelInit, parallel_context_reg, num_cores, 0));
+    emit_instruction(LIR_Inst(
+        LIR_Op::ParallelInit, parallel_context_reg, static_cast<Reg>(num_cores),
+        static_cast<Reg>(std::min<uint64_t>(timeout_ms, UINT32_MAX)),
+        Metadata::make_concurrency_imm(
+            static_cast<uint32_t>(std::min<uint64_t>(grace_ms, 0x00FFFFFFu)),
+            parse_error_policy(error_strategy))));
     
    // std::cout << "[DEBUG] Initialized parallel execution for " << num_cores << " cores" << std::endl;
     
-    // 4. Set up SharedCell context for the parallel block body
-    auto saved_parallel_block_cell_ids = parallel_block_cell_ids_;
+    // 4. Enter the structured parallel context.
     enter_concurrency_context();
     
-    // 5. Process parallel block body - execute directly with SharedCell context
+    // 5. Process the capability-checked parallel body.
     if (auto block_stmt = dynamic_cast<LM::Frontend::AST::BlockStatement*>(stmt.body.get())) {
         for (auto& body_stmt : block_stmt->statements) {
             // According to spec: NO task statements in parallel blocks
             if (auto task_stmt = dynamic_cast<LM::Frontend::AST::TaskStatement*>(body_stmt.get())) {
                 report_error("Task statements are not allowed in parallel blocks. Use concurrent blocks for task-based parallelism.");
+                exit_concurrency_context();
                 return;
             }
             
-            // For parallel blocks, execute statements directly with SharedCell context
+            // Emit the body without changing collection identity.
            // std::cout << "[DEBUG] Executing parallel statement directly" << std::endl;
             emit_stmt(*body_stmt);
         }
@@ -98,60 +137,20 @@ void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
     // 6. Synchronize and complete parallel execution (using available operations)
     emit_instruction(LIR_Inst(LIR_Op::ParallelSync, parallel_context_reg, 0, 0));
     
-    // 7. Synchronize SharedCell values back to main thread registers
-    for (const auto& var_mapping : parallel_block_cell_ids_) {
-        const std::string& var_name = var_mapping.first;
-        Reg cell_id_reg = var_mapping.second;
-        
-        // Load the final value from SharedCell
-        Reg current_value_reg = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::SharedCellLoad, current_value_reg, cell_id_reg, 0));
-        
-        // Store it back to the original variable
-        Reg var_reg = resolve_variable(var_name);
-        if (var_reg != UINT32_MAX) {
-            emit_instruction(LIR_Inst(LIR_Op::Mov, var_reg, current_value_reg, 0));
-
-        }
-    }
-    
-    // Restore SharedCell context
-    parallel_block_cell_ids_ = saved_parallel_block_cell_ids;
-    
-   // std::cout << "[DEBUG] Parallel block completed using SharedCell + direct execution" << std::endl;
+    // Restore the surrounding concurrency context. Collection ownership is
+    // rejoined structurally at ParallelSync; no copy-back is necessary.
+    exit_concurrency_context();
 }
 
 // Helper functions for parsing timeout and grace period strings
 
 uint64_t Generator::parse_timeout(const std::string& timeout_str) {
-    // Simple implementation - assume timeout is in seconds
-    if (timeout_str.empty()) return 20000; // 20 seconds default
-    
-    try {
-        if (timeout_str.back() == 's') {
-            return static_cast<uint64_t>(std::stod(timeout_str.substr(0, timeout_str.length() - 1)) * 1000);
-        } else {
-            return static_cast<uint64_t>(std::stod(timeout_str) * 1000);
-        }
-    } catch (...) {
-        return 20000; // fallback
-    }
+    return parse_duration_ms(timeout_str);
 }
 
 
 uint64_t Generator::parse_grace_period(const std::string& grace_str) {
-    // Simple implementation - assume grace period is in milliseconds
-    if (grace_str.empty()) return 1000; // 1 second default
-    
-    try {
-        if (grace_str.back() == 's') {
-            return static_cast<uint64_t>(std::stod(grace_str.substr(0, grace_str.length() - 1)) * 1000);
-        } else {
-            return static_cast<uint64_t>(std::stod(grace_str) * 1000);
-        }
-    } catch (...) {
-        return 1000; // fallback
-    }
+    return parse_duration_ms(grace_str);
 }
 
 std::optional<ValuePtr> Generator::evaluate_constant_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
@@ -186,6 +185,43 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
    // std::cout << "[DEBUG] Processing concurrent statement" << std::endl;
     auto int_type = std::make_shared<::Type>(::TypeTag::Int64);
     scheduler_initialized_ = true;
+    int num_cores = static_cast<int>(std::thread::hardware_concurrency());
+    if (num_cores <= 0) num_cores = 1;
+    if (!stmt.cores.empty() && normalized_option(stmt.cores) != "auto") {
+        try { num_cores = std::stoi(stmt.cores); }
+        catch (...) {
+            report_error("Invalid concurrent core count '" + stmt.cores + "'.");
+            return;
+        }
+        if (num_cores <= 0 || num_cores > 256) {
+            report_error("Concurrent core count must be between 1 and 256.");
+            return;
+        }
+    }
+    const std::string mode = normalized_option(stmt.mode);
+    const std::string on_error = normalized_option(stmt.onError);
+    const std::string on_timeout = normalized_option(stmt.onTimeout);
+    if (mode != "batch" && mode != "stream" && mode != "async") {
+        report_error("concurrent mode must be Batch, Stream, or Async.");
+        return;
+    }
+    if (on_error != "stop" && on_error != "continue" && on_error != "partial") {
+        report_error("concurrent on_error must be Stop, Continue, or Partial.");
+        return;
+    }
+    if (on_timeout != "stop" && on_timeout != "continue" && on_timeout != "partial") {
+        report_error("concurrent on_timeout must be Stop, Continue, or Partial.");
+        return;
+    }
+    uint64_t timeout_ms = 0;
+    uint64_t grace_ms = 0;
+    try {
+        timeout_ms = parse_timeout(stmt.timeout);
+        grace_ms = parse_grace_period(stmt.grace);
+    } catch (const std::exception&) {
+        report_error("Invalid concurrent timeout or grace duration.");
+        return;
+    }
    // std::cout << "[DEBUG] About to handle channel parameter assignment" << std::endl;
     // Handle channel parameter assignment (e.g., "ch=counts")
    // std::cout << "[DEBUG] Handling channel parameter assignment" << std::endl;
@@ -226,7 +262,12 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
     // Initialize scheduler for concurrent execution
    // std::cout << "[DEBUG] Initializing scheduler for concurrent block: " << current_concurrent_block_id_ << std::endl;
     Reg scheduler_reg = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::SchedulerInit, scheduler_reg, 0, 0));
+    emit_instruction(LIR_Inst(
+        LIR_Op::SchedulerInit, scheduler_reg, static_cast<Reg>(num_cores),
+        static_cast<Reg>(std::min<uint64_t>(timeout_ms, UINT32_MAX)),
+        Metadata::make_concurrency_imm(
+            static_cast<uint32_t>(std::min<uint64_t>(grace_ms, 0x00FFFFFFu)),
+            parse_error_policy(on_error), parse_error_policy(on_timeout))));
     scheduler_initialized_ = true;
     if (stmt.body) {
         // Look for TaskStatement in the body
@@ -626,22 +667,9 @@ void Generator::emit_task_stmt(LM::Frontend::AST::TaskStatement& stmt) {
         return;
     }
 
-    // Check if we're in a parallel block (SharedCell context) or concurrent block
-    if (!parallel_block_cell_ids_.empty()) {
-       // std::cout << "[DEBUG] TaskStatement within parallel block - using SharedCell approach" << std::endl;
-        
-        // For task statements within parallel blocks, emit the body directly
-        // SharedCell operations will handle variable access automatically
-        if (stmt.body) {
-            emit_stmt(*stmt.body);
-        }
-    } else {
-       // std::cout << "[DEBUG] TaskStatement within concurrent block - using task function approach" << std::endl;
-        
-        // For task statements within concurrent blocks, create separate task functions
-        if (stmt.body) {
-            emit_stmt(*stmt.body);
-        }
+    // Standalone task emission is only used by the concurrent lowering path.
+    if (stmt.body) {
+        emit_stmt(*stmt.body);
     }
 }
 
@@ -722,8 +750,8 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
     // Create separate LIR function for this task body
     std::string task_func_name = "_task_" + std::to_string(reinterpret_cast<uintptr_t>(&stmt));
     
-    // Task functions use fixed parameter layout: task_id, loop_var, channel, shared_cell_id
-    uint32_t param_count = 4;
+    // Task functions use the canonical task_id, loop_var, channel layout.
+    uint32_t param_count = 3;
     
     auto func = std::make_unique<LIR_Function>(task_func_name, param_count);
     
@@ -752,7 +780,6 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
     bind_variable("_task_id", static_cast<Reg>(0));
     bind_variable("_loop_var", static_cast<Reg>(1));
     bind_variable("_channel", static_cast<Reg>(2));
-    bind_variable("_shared_cell_id", static_cast<Reg>(3));  // Contains SharedCell ID
     
     // Bind loop variable name if specified
     if (!stmt.loopVar.empty()) {
@@ -767,14 +794,10 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
         set_register_type(channel_reg, channel_type);
     }
     
-    auto saved_parallel_block_cell_ids = parallel_block_cell_ids_;
     // Emit task body from AST
     if (stmt.body) {
         emit_stmt(*stmt.body);
     }
-    
-    // Restore SharedCell context
-    parallel_block_cell_ids_ = saved_parallel_block_cell_ids;
     
     // Ensure function has a return instruction
     if (current_function_->instructions.empty() || 

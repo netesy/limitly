@@ -338,6 +338,44 @@ SMTProofResult SMTVerifier::verify_obligation(
     return res;
 }
 
+SMTProofResult SMTVerifier::verify_refinement(
+    std::shared_ptr<LM::Frontend::AST::Expression> predicate,
+    std::shared_ptr<LM::Frontend::AST::Expression> value) {
+    SMTProofResult res;
+    NormalizedConstraint target;
+    LinearTerm replacement;
+    if (!ConstraintBuilder::build_constraint(predicate, target) ||
+        !ConstraintBuilder::extract_linear_term(value, replacement)) {
+        res.status = SMTProofStatus::Unsupported;
+        res.message = "Refinement predicate or assigned value is outside linear integer arithmetic";
+        return res;
+    }
+
+    auto substitute = [&replacement](LinearTerm& term) {
+        auto it = term.coeffs.find("value");
+        if (it == term.coeffs.end()) return;
+        const int64_t coefficient = it->second;
+        term.coeffs.erase(it);
+        term.constant_offset += replacement.constant_offset * coefficient;
+        for (const auto& [name, value_coefficient] : replacement.coeffs) {
+            term.add_term(name, value_coefficient * coefficient);
+        }
+    };
+    substitute(target.lhs);
+    substitute(target.rhs);
+
+    NativeProofResult native = ConstraintEngine::verify_obligation(target);
+    switch (native.status) {
+        case NativeProofStatus::Proven: res.status = SMTProofStatus::Proven; break;
+        case NativeProofStatus::Counterexample: res.status = SMTProofStatus::Counterexample; break;
+        case NativeProofStatus::Unsupported: res.status = SMTProofStatus::Unsupported; break;
+        case NativeProofStatus::SolverError: res.status = SMTProofStatus::SolverError; break;
+        default: res.status = SMTProofStatus::Unknown; break;
+    }
+    res.message = native.message;
+    return res;
+}
+
 } // namespace Frontend
 } // namespace LM
 

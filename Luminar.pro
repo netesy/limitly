@@ -17,7 +17,6 @@ HEADERS = \
    $$PWD/src/backend/fiber.hh \
    $$PWD/src/backend/register_value.hh \
    $$PWD/src/backend/scheduler.hh \
-   $$PWD/src/backend/shared_cell.hh \
    $$PWD/src/backend/symbol_table.hh \
    $$PWD/src/backend/task.hh \
    $$PWD/src/backend/types.hh \
@@ -348,4 +347,3 @@ INCLUDEPATH = \
     $$PWD/vendor/fyra/include/transforms
 
 #DEFINES = 
-

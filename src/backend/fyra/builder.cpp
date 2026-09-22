@@ -2013,24 +2013,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 terminated = true;
                 break;
             case LIR::LIR_Op::Nop: break;
-            // Shared Memory & Concurrency Operations
-            case LIR::LIR_Op::SharedCellAlloc: {
-                ir::Value* cell_ptr = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), 8)}, lir_type_to_fyra_type(inst.result_type));
-                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), cell_ptr);
-                store_reg(inst.dst, cell_ptr, inst.result_type);
-                break;
-            }
-            case LIR::LIR_Op::SharedCellStore: {
-                ir::Value* cell_ptr = load_reg((inst.a != UINT32_MAX && inst.a != 0) ? inst.a : inst.dst, LIR::Type::Ptr);
-                ir::Value* val = load_reg(inst.b, inst.type_b);
-                builder_->createStore(val, cell_ptr);
-                break;
-            }
-            case LIR::LIR_Op::SharedCellLoad: {
-                ir::Value* cell_ptr = load_reg(inst.a, LIR::Type::Ptr);
-                store_reg(inst.dst, builder_->createLoad(cell_ptr), inst.result_type);
-                break;
-            }
+            // Structured concurrency operations
             case LIR::LIR_Op::TaskContextAlloc: {
                 ir::Value* ctx_ptr = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), 64)}, lir_type_to_fyra_type(inst.result_type));
                 for (uint32_t f_idx = 0; f_idx < 8; ++f_idx) {

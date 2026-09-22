@@ -33,10 +33,10 @@ frame <FrameName> {
     pub init(<args>) { ... }
     pub deinit() { ... }
 
-    // Optional parallel block (direct SharedCell operations)
+    // Optional parallel block (linear slice capability access)
     parallel(<options>) {
         iter(<iterator>) {
-            // Direct code - SharedCell access
+            // Direct code - disjoint slice access
         }
     }
 
@@ -96,7 +96,7 @@ frame Service {
 
 ## **3. Concurrency Models**
 
-### **Parallel Block — Direct SharedCell Access (CPU-Bound)**
+### **Parallel Block — Linear Slice Access (CPU-Bound)**
 
 ```limit
 parallel(
@@ -107,7 +107,7 @@ parallel(
 ) {
     // Direct code only - NO "task" or "worker" keyword
     iter(i in 0..999) {
-        results[i] = compute(data[i])  // SharedCell operations
+        results[i] = compute(data[i])  // capability-checked slice operations
     }
 }
 ```
@@ -115,7 +115,7 @@ parallel(
 **Characteristics**:
 - ✅ Fork-join parallelism (CPU-bound)
 - ✅ Direct code execution with `iter()`
-- ✅ SharedCell for atomic access
+- ✅ exclusive slice capabilities for mutable access
 - ✅ Synchronous parallel execution
 - ✅ No channels required
 
@@ -378,7 +378,7 @@ frame MatrixMultiplier {
                 iter(k in 0..matrix_a[0].len-1) {
                     sum += self.matrix_a[i][k] * self.matrix_b[k][j]
                 }
-                self.result[i][j] = sum  // SharedCell atomic write
+                self.result[i][j] = sum  // exclusive slice write
             }
         }
     }
@@ -805,7 +805,7 @@ frame Service : Configurable {
 
 | Model | Syntax | Memory Model | Use Case | Bounded? | Input |
 |-------|--------|--------------|----------|----------|-------|
-| **Parallel** | `iter(i in range)` | SharedCell (atomic) | CPU-bound computation | ✅ Yes | Range/array |
+| **Parallel** | `iter(i in range)` | linear slices | CPU-bound computation | ✅ Yes | Range/array |
 | **Concurrent (batch)** | `task(i in range)` | Channels + atomic | I/O-bound batch work | ✅ Yes | Range/array |
 | **Concurrent (stream)** | `worker(event)` | Channels + atomic | Continuous I/O streams | ❌ No | Event stream |
 
@@ -835,7 +835,7 @@ frame Service : Configurable {
 2. **Traits for polymorphism** (flexible contracts)
 3. **Default private visibility** (no need for `private` keyword)
 4. **Three concurrency models:**
-   - **Parallel**: Direct `iter()` with SharedCell (CPU-bound)
+   - **Parallel**: Direct `iter()` with linear slices (CPU-bound)
    - **Concurrent (batch)**: `task()` with channels (bounded I/O)
    - **Concurrent (stream)**: `worker()` with channels (unbounded I/O)
 5. **Guaranteed cleanup** (deterministic destruction)

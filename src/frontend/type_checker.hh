@@ -625,6 +625,12 @@ public:
         std::shared_ptr<LM::Frontend::AST::Expression> condition_ast,
         const std::vector<std::shared_ptr<LM::Frontend::AST::Expression>>& assumption_asts = {}
     );
+    // Prove a refinement predicate after replacing its canonical `value`
+    // variable with the expression being assigned to the refined type.
+    static SMTProofResult verify_refinement(
+        std::shared_ptr<LM::Frontend::AST::Expression> predicate,
+        std::shared_ptr<LM::Frontend::AST::Expression> value
+    );
     static std::string ast_to_smtlib(std::shared_ptr<LM::Frontend::AST::Expression> expr);
 };
 

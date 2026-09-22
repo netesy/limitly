@@ -670,32 +670,6 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
     report_error("Undefined variable: " + expr.name);
     return 0;
     
-    // === SHARED CELL TASK BODY HANDLING ===
-    // Check if we're in a task body and this variable is a shared variable
-    if (!parallel_block_cell_ids_.empty() && parallel_block_cell_ids_.find(expr.name) != parallel_block_cell_ids_.end()) {
-        // This is a shared variable in a task body - use SharedCell operations
-       // std::cout << "[DEBUG] Task body accessing shared variable '" << expr.name << "' via SharedCell" << std::endl;
-        
-        // Get the SharedCell ID register for this variable
-        Reg cell_id_reg = parallel_block_cell_ids_[expr.name];
-        
-        // Load the current value from SharedCell
-        Reg value_reg = allocate_register();
-        emit_instruction(LIR_Inst(LIR_Op::SharedCellLoad, value_reg, cell_id_reg, 0));
-        
-        // Set type information
-        if (expr.inferred_type) {
-            set_register_type(value_reg, expr.inferred_type);
-            set_register_language_type(value_reg, expr.inferred_type);
-            set_register_abi_type(value_reg, language_type_to_abi_type(expr.inferred_type));
-        } else {
-            auto any_type = std::make_shared<::Type>(::TypeTag::Any);
-            set_register_type(value_reg, any_type);
-        }
-        
-        return value_reg;
-    }
-    
     // Set the type information for the register if available
     if (expr.inferred_type) {
         set_register_type(reg, expr.inferred_type);
@@ -1884,59 +1858,6 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                     break;
                 }
             }
-        }
-    }
-    
-    // === SHARED CELL TASK BODY ASSIGNMENT HANDLING ===
-    // Check if we're in a task body and this variable is a shared variable
-    if (!expr.name.empty() && !parallel_block_cell_ids_.empty() && parallel_block_cell_ids_.find(expr.name) != parallel_block_cell_ids_.end()) {
-        // This is a shared variable assignment in a task body - use SharedCell operations
-       // std::cout << "[DEBUG] Task body assigning to shared variable '" << expr.name << "' via SharedCell" << std::endl;
-        
-        // Get the SharedCell ID register for this variable
-        Reg cell_id_reg = parallel_block_cell_ids_[expr.name];
-        
-        // Handle compound assignment operators
-        if (expr.op != LM::Frontend::TokenType::EQUAL) {
-            // For compound assignment (+=, -=, *=, /=, %=), we need to:
-            // 1. Load current value from SharedCell
-            // 2. Perform operation with new value
-            // 3. Store result back to SharedCell
-            
-            Reg current_value_reg = allocate_register();
-            emit_instruction(LIR_Inst(LIR_Op::SharedCellLoad, current_value_reg, cell_id_reg, 0));
-            
-            // Perform the operation
-            Reg result_reg = allocate_register();
-            switch (expr.op) {
-                case LM::Frontend::TokenType::PLUS_EQUAL:
-                    emit_instruction(LIR_Inst(LIR_Op::Add, Type::I64, result_reg, current_value_reg, value));
-                    break;
-                case LM::Frontend::TokenType::MINUS_EQUAL:
-                    emit_instruction(LIR_Inst(LIR_Op::Sub, Type::I64, result_reg, current_value_reg, value));
-                    break;
-                case LM::Frontend::TokenType::STAR_EQUAL:
-                    emit_instruction(LIR_Inst(LIR_Op::Mul, Type::I64, result_reg, current_value_reg, value));
-                    break;
-                case LM::Frontend::TokenType::SLASH_EQUAL:
-                    emit_instruction(LIR_Inst(LIR_Op::Div, Type::I64, result_reg, current_value_reg, value));
-                    break;
-                case LM::Frontend::TokenType::MODULUS_EQUAL:
-                    emit_instruction(LIR_Inst(LIR_Op::Mod, Type::I64, result_reg, current_value_reg, value));
-                    break;
-                default:
-                    report_error("Unsupported compound assignment operator for SharedCell");
-                    return 0;
-            }
-            
-            // Store result back to SharedCell
-            emit_instruction(LIR_Inst(LIR_Op::SharedCellStore, result_reg, cell_id_reg, result_reg, 0));
-            
-            return result_reg;
-        } else {
-            // Simple assignment - store value directly to SharedCell
-            emit_instruction(LIR_Inst(LIR_Op::SharedCellStore, value, cell_id_reg, value, 0));
-            return value;
         }
     }
     
