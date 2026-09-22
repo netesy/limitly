@@ -41,9 +41,7 @@ frame HashMap {
     }
 
     pub fn put(key: str, value: any): HashMap {
-        print("put called for key: {key}");
         var idx = self._hash(key);
-        print("hash computed idx: {idx}");
         var i = 0;
         while (i < len(self.buckets[idx])) {
             if (self.buckets[idx][i].key == key) {

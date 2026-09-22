@@ -97,6 +97,9 @@ bool ConstraintEngine::update_intervals() {
 
         if (diff.is_single_variable(var, coeff)) {
             int64_t offset = diff.constant_offset;
+            if (offset == std::numeric_limits<int64_t>::min()) {
+                return false; // Overflow protection for INT64_MIN
+            }
             variables_.insert(var);
             Interval& iv = intervals_[var];
 

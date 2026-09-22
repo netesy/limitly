@@ -957,18 +957,21 @@ EXPORT int detect_system_font_path(const char* preferred, char* out_buf, int max
         }
     }
 
-    const char* fallback_path = "/tmp/limitly_system_font.ttf";
-    FILE* f_tmp = fopen(fallback_path, "wb");
-    if (f_tmp) {
+    char tmp_path[] = "/tmp/limitly_font_XXXXXX";
+    int fd = mkstemp(tmp_path);
+    if (fd != -1) {
         static const unsigned char minimal_ttf[] = {
             0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00
         };
-        fwrite(minimal_ttf, 1, sizeof(minimal_ttf), f_tmp);
-        fclose(f_tmp);
+        ssize_t w = write(fd, minimal_ttf, sizeof(minimal_ttf));
+        (void)w;
+        close(fd);
+        strncpy(out_buf, tmp_path, max_buf - 1);
+        out_buf[max_buf - 1] = '\0';
+        return 1;
     }
-    strncpy(out_buf, fallback_path, max_buf - 1);
-    out_buf[max_buf - 1] = '\0';
-    return 1;
+
+    return 0;
 }
 
 EXPORT void* load_font_file(const char* filepath) {

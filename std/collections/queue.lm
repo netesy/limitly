@@ -184,11 +184,17 @@ frame BitSet {
     fn _valid(bit: int): bool { return bit >= 0 and bit < self.size; }
 
     fn _word_value(word: int): int {
-        if (word == 0) return self.w0; if (word == 1) return self.w1; if (word == 2) return self.w2; return self.w3;
+        if (word == 0) { return self.w0; }
+        if (word == 1) { return self.w1; }
+        if (word == 2) { return self.w2; }
+        return self.w3;
     }
 
     fn _set_word(word: int, value: int) {
-        if (word == 0) { self.w0 = value; } elif (word == 1) { self.w1 = value; } elif (word == 2) { self.w2 = value; } else { self.w3 = value; }
+        if (word == 0) { self.w0 = value; }
+        else if (word == 1) { self.w1 = value; }
+        else if (word == 2) { self.w2 = value; }
+        else { self.w3 = value; }
     }
 
     pub fn set(bit: int) {
@@ -206,7 +212,13 @@ frame BitSet {
     }
 
     pub fn toggle(bit: int) {
-        if (self.contains(bit)) { self.unset(bit); } elif (self._valid(bit)) { var word = bit / 64; self._set_word(word, self._word_value(word) + self._mask(bit)); self.used = self.used + 1; }
+        if (self.contains(bit)) {
+            self.unset(bit);
+        } else if (self._valid(bit)) {
+            var word = bit / 64;
+            self._set_word(word, self._word_value(word) + self._mask(bit));
+            self.used = self.used + 1;
+        }
     }
 
     pub fn contains(bit: int): bool {
