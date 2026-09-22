@@ -14,6 +14,32 @@ using namespace LM::Frontend;
 namespace LM {
 namespace Frontend {
 
+TypePtr TypeChecker::record_typed_hole(
+    const std::shared_ptr<LM::Frontend::AST::HoleExpr>& hole,
+    TypePtr expected_type) {
+    TypePtr type = expected_type ? expected_type : type_system.ANY_TYPE;
+    hole->expected_type = type;
+    TypedHoleInfo info;
+    info.line = hole->line;
+    info.expected_type = type;
+    for (const auto& [name, candidate] : variable_types) {
+        if (!candidate) continue;
+        // A binding already carrying the same refined type is an inhabitant.
+        // Base-typed bindings are not guessed into a refinement here; literal
+        // candidates are discharged separately by completion through the
+        // verifier.
+        if (type->tag == TypeTag::Refined) {
+            if (candidate->tag != TypeTag::Refined ||
+                candidate->toString() != type->toString()) continue;
+        } else if (!is_type_compatible(type, candidate)) continue;
+        info.compatible_bindings.push_back(name);
+    }
+    std::sort(info.compatible_bindings.begin(), info.compatible_bindings.end());
+    typed_holes_.push_back(std::move(info));
+    add_error("typed hole: expected " + type->toString(), hole->line);
+    return type;
+}
+
 // Initialize static members
 std::unordered_set<std::string> TypeChecker::failed_modules;
 std::unordered_set<std::string> TypeChecker::failed_frames;
@@ -292,6 +318,51 @@ SMTProofResult SMTVerifier::verify_obligation(
 
     SMTProofResult res;
 
+    // Preserve boolean structure instead of forcing an entire verification
+    // condition into one arithmetic comparison. This gives contracts useful
+    // push-button behavior for conjunction, disjunction, and negation while
+    // each arithmetic leaf remains in the decidable native fragment.
+    if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(condition_ast)) {
+        if (std::holds_alternative<bool>(literal->value)) {
+            res.status = std::get<bool>(literal->value)
+                ? SMTProofStatus::Proven : SMTProofStatus::Counterexample;
+            res.message = std::get<bool>(literal->value)
+                ? "Boolean obligation is true" : "Boolean obligation is false";
+            return res;
+        }
+    }
+    if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(condition_ast)) {
+        if (unary->op == TokenType::BANG || unary->op == TokenType::NOT) {
+            SMTProofResult inner = verify_obligation(unary->right, assumption_asts);
+            if (inner.status == SMTProofStatus::Proven) inner.status = SMTProofStatus::Counterexample;
+            else if (inner.status == SMTProofStatus::Counterexample) inner.status = SMTProofStatus::Proven;
+            inner.message = "Negated obligation: " + inner.message;
+            return inner;
+        }
+    }
+    if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(condition_ast)) {
+        const bool is_and = binary->op == TokenType::AND || binary->op == TokenType::AMPERSAND_AMPERSAND;
+        const bool is_or = binary->op == TokenType::OR || binary->op == TokenType::PIPE_PIPE;
+        if (is_and || is_or) {
+            SMTProofResult left = verify_obligation(binary->left, assumption_asts);
+            SMTProofResult right = verify_obligation(binary->right, assumption_asts);
+            if (is_and) {
+                if (left.status == SMTProofStatus::Counterexample || right.status == SMTProofStatus::Counterexample)
+                    return {SMTProofStatus::Counterexample, "A conjunction member is false", ""};
+                if (left.status == SMTProofStatus::Proven && right.status == SMTProofStatus::Proven)
+                    return {SMTProofStatus::Proven, "All conjunction members are proven", ""};
+            } else {
+                if (left.status == SMTProofStatus::Proven || right.status == SMTProofStatus::Proven)
+                    return {SMTProofStatus::Proven, "A disjunction member is proven", ""};
+                if (left.status == SMTProofStatus::Counterexample && right.status == SMTProofStatus::Counterexample)
+                    return {SMTProofStatus::Counterexample, "All disjunction members are false", ""};
+            }
+            res.status = SMTProofStatus::Unknown;
+            res.message = "Boolean verification condition contains an unknown member";
+            return res;
+        }
+    }
+
     NormalizedConstraint target_constraint;
     if (!ConstraintBuilder::build_constraint(condition_ast, target_constraint)) {
         res.status = SMTProofStatus::Unsupported;
@@ -299,8 +370,22 @@ SMTProofResult SMTVerifier::verify_obligation(
         return res;
     }
 
+    std::vector<std::shared_ptr<LM::Frontend::AST::Expression>> flattened_assumptions;
+    std::function<void(const std::shared_ptr<LM::Frontend::AST::Expression>&)> flatten;
+    flatten = [&](const auto& assumption) {
+        auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(assumption);
+        if (binary && (binary->op == TokenType::AND ||
+                       binary->op == TokenType::AMPERSAND_AMPERSAND)) {
+            flatten(binary->left);
+            flatten(binary->right);
+        } else {
+            flattened_assumptions.push_back(assumption);
+        }
+    };
+    for (const auto& assumption : assumption_asts) flatten(assumption);
+
     std::vector<NormalizedConstraint> assumptions;
-    for (const auto& asm_ast : assumption_asts) {
+    for (const auto& asm_ast : flattened_assumptions) {
         NormalizedConstraint asm_c;
         if (!ConstraintBuilder::build_constraint(asm_ast, asm_c)) {
             res.status = SMTProofStatus::Unsupported;
@@ -335,6 +420,79 @@ SMTProofResult SMTVerifier::verify_obligation(
             break;
     }
 
+    return res;
+}
+
+SMTProofResult SMTVerifier::verify_refinement(
+    std::shared_ptr<LM::Frontend::AST::Expression> predicate,
+    std::shared_ptr<LM::Frontend::AST::Expression> value,
+    const std::vector<std::shared_ptr<LM::Frontend::AST::Expression>>& assumption_asts) {
+    SMTProofResult res;
+    if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(predicate)) {
+        if (unary->op == TokenType::BANG || unary->op == TokenType::NOT) {
+            res = verify_refinement(unary->right, value, assumption_asts);
+            if (res.status == SMTProofStatus::Proven) res.status = SMTProofStatus::Counterexample;
+            else if (res.status == SMTProofStatus::Counterexample) res.status = SMTProofStatus::Proven;
+            return res;
+        }
+    }
+    if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(predicate)) {
+        const bool is_and = binary->op == TokenType::AND || binary->op == TokenType::AMPERSAND_AMPERSAND;
+        const bool is_or = binary->op == TokenType::OR || binary->op == TokenType::PIPE_PIPE;
+        if (is_and || is_or) {
+            auto left = verify_refinement(binary->left, value, assumption_asts);
+            auto right = verify_refinement(binary->right, value, assumption_asts);
+            if (is_and) {
+                if (left.status == SMTProofStatus::Counterexample || right.status == SMTProofStatus::Counterexample)
+                    return {SMTProofStatus::Counterexample, "Refinement conjunction is false", ""};
+                if (left.status == SMTProofStatus::Proven && right.status == SMTProofStatus::Proven)
+                    return {SMTProofStatus::Proven, "Refinement conjunction proven", ""};
+            } else {
+                if (left.status == SMTProofStatus::Proven || right.status == SMTProofStatus::Proven)
+                    return {SMTProofStatus::Proven, "Refinement disjunction proven", ""};
+                if (left.status == SMTProofStatus::Counterexample && right.status == SMTProofStatus::Counterexample)
+                    return {SMTProofStatus::Counterexample, "Refinement disjunction is false", ""};
+            }
+            return {SMTProofStatus::Unknown, "Composite refinement contains an unknown member", ""};
+        }
+    }
+    NormalizedConstraint target;
+    LinearTerm replacement;
+    if (!ConstraintBuilder::build_constraint(predicate, target) ||
+        !ConstraintBuilder::extract_linear_term(value, replacement)) {
+        res.status = SMTProofStatus::Unsupported;
+        res.message = "Refinement predicate or assigned value is outside linear integer arithmetic";
+        return res;
+    }
+
+    auto substitute = [&replacement](LinearTerm& term) {
+        auto it = term.coeffs.find("value");
+        if (it == term.coeffs.end()) return;
+        const int64_t coefficient = it->second;
+        term.coeffs.erase(it);
+        term.constant_offset += replacement.constant_offset * coefficient;
+        for (const auto& [name, value_coefficient] : replacement.coeffs) {
+            term.add_term(name, value_coefficient * coefficient);
+        }
+    };
+    substitute(target.lhs);
+    substitute(target.rhs);
+
+    std::vector<NormalizedConstraint> assumptions;
+    for (const auto& assumption : assumption_asts) {
+        NormalizedConstraint normalized;
+        if (!ConstraintBuilder::build_constraint(assumption, normalized)) continue;
+        assumptions.push_back(std::move(normalized));
+    }
+    NativeProofResult native = ConstraintEngine::verify_obligation(target, assumptions);
+    switch (native.status) {
+        case NativeProofStatus::Proven: res.status = SMTProofStatus::Proven; break;
+        case NativeProofStatus::Counterexample: res.status = SMTProofStatus::Counterexample; break;
+        case NativeProofStatus::Unsupported: res.status = SMTProofStatus::Unsupported; break;
+        case NativeProofStatus::SolverError: res.status = SMTProofStatus::SolverError; break;
+        default: res.status = SMTProofStatus::Unknown; break;
+    }
+    res.message = native.message;
     return res;
 }
 

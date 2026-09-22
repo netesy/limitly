@@ -124,6 +124,7 @@ private:
     std::vector<NormalizedConstraint> constraints_;
     std::unordered_map<VarId, Interval> intervals_;
     std::set<VarId> variables_;
+    bool contradiction_ = false;
 
     bool update_intervals();
     bool check_difference_graph() const;

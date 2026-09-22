@@ -47,6 +47,7 @@ TypePtr TypeChecker::check_contract_statement(std::shared_ptr<LM::Frontend::AST:
         bool cond_true = is_int ? (val_int != 0) : (val_double != 0.0);
         if (cond_true) {
             contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::StaticallyProven;
+            verification_assumptions_.push_back(contract_stmt->condition);
         } else {
             contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::Counterexample;
             std::string msg = "Contract assertion failed";
@@ -59,9 +60,11 @@ TypePtr TypeChecker::check_contract_statement(std::shared_ptr<LM::Frontend::AST:
         }
     } else {
         // Evaluate via SMT Solver Helper
-        SMTProofResult smt_res = SMTVerifier::verify_obligation(contract_stmt->condition);
+        SMTProofResult smt_res = SMTVerifier::verify_obligation(
+            contract_stmt->condition, verification_assumptions_);
         if (smt_res.status == SMTProofStatus::Proven) {
             contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::StaticallyProven;
+            verification_assumptions_.push_back(contract_stmt->condition);
         } else if (smt_res.status == SMTProofStatus::Counterexample) {
             contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::Counterexample;
             std::string msg = "Contract assertion failed (SMT Counterexample)";
@@ -73,6 +76,14 @@ TypePtr TypeChecker::check_contract_statement(std::shared_ptr<LM::Frontend::AST:
             add_error("compile-time contract violation: " + msg, contract_stmt->line);
         } else {
             contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::UnsupportedOrUnknown;
+            if (verification_policy_ == VerificationPolicy::Strict) {
+                add_error("strict verification could not prove contract: " + smt_res.message,
+                          contract_stmt->line);
+            } else {
+                // The hybrid runtime assertion dominates subsequent statements
+                // in this lexical block, so its condition is a sound VC fact.
+                verification_assumptions_.push_back(contract_stmt->condition);
+            }
         }
     }
 

@@ -1,0 +1,4 @@
+// @error:type_error
+// Boolean refinement members are all enforced by the native verifier.
+type SmallPositive = int where value > 0 and value < 10;
+var too_large: SmallPositive = 11;

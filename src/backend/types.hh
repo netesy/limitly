@@ -1611,6 +1611,7 @@ public:
         case TypeTag::Decimal2:
         case TypeTag::Decimal4:
         case TypeTag::Decimal6:
+        case TypeTag::Capability:
             return true; // Simple types match by tag alone
 
         case TypeTag::List: {

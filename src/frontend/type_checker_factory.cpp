@@ -19,7 +19,8 @@ namespace TypeCheckerFactory {
 // Declaration
 TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program,
                                const std::string& source,
-                               const std::string& file_path);
+                               const std::string& file_path,
+                               VerificationPolicy policy);
 
 std::unique_ptr<TypeChecker> create(TypeSystem& type_system, SymbolDatabase& symbol_db);
 
@@ -42,7 +43,8 @@ std::unique_ptr<TypeChecker> create(TypeSystem& type_system, SymbolDatabase& sym
 
 TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program,
                               const std::string& source,
-                              const std::string& file_path) {
+                              const std::string& file_path,
+                              VerificationPolicy policy) {
     TypeChecker::failed_modules.clear();
     TypeChecker::failed_frames.clear();
 
@@ -152,9 +154,11 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     // Create type system and checker
     auto type_system = std::make_shared<TypeSystem>();
     auto checker = create(*type_system, symbol_db);
+    checker->set_verification_policy(policy);
     checker->set_source_context(source, file_path);
     bool success = checker->check_program(program);
     TypeCheckResult result(program, type_system, success, checker->get_errors());
+    result.typed_holes = checker->get_typed_holes();
     result.import_aliases = checker->get_import_aliases();
     result.registered_modules = checker->get_registered_modules();
     return result;

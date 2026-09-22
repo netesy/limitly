@@ -1,0 +1,9 @@
+// @error:race_condition
+// An empty range cannot confer an exclusive mutable capability.
+var values = [1, 2, 3];
+
+parallel(cores=2) {
+    iter(i in 2..2) {
+        values[i] = 9;
+    }
+}

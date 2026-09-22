@@ -323,8 +323,6 @@ private:
     std::map<std::string, int64_t> constant_values_;
     std::map<std::string, Reg> variable_registers_;
     std::map<std::string, Reg> channel_registers_;
-    std::map<std::string, uint32_t> parallel_block_cell_ids_;
-    std::map<std::string, Reg> shared_cell_registers_;
     std::string current_concurrent_block_id_;
     std::string current_concurrent_channel_ = "";
     std::map<std::string, uint64_t> task_counters_;

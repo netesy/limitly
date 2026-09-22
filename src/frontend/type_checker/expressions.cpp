@@ -10,7 +10,9 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
     
     TypePtr type = nullptr;
     
-    if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+    if (auto hole = std::dynamic_pointer_cast<LM::Frontend::AST::HoleExpr>(expr)) {
+        type = record_typed_hole(hole, expected_type);
+    } else if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         type = check_literal_expr(literal, expected_type);
     } else if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
         type = check_call_expr(call, expected_type);
@@ -76,7 +78,9 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
     
     TypePtr type = nullptr;
     
-    if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
+    if (auto hole = std::dynamic_pointer_cast<LM::Frontend::AST::HoleExpr>(expr)) {
+        type = record_typed_hole(hole, expected_type);
+    } else if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr)) {
         type = check_literal_expr_with_expected_type(literal, expected_type);
     } else if (auto call = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
         type = check_call_expr(call, expected_type);
@@ -2748,4 +2752,3 @@ std::shared_ptr<LM::Frontend::AST::Expression> TypeChecker::evaluate_staged_expr
 
 } // namespace Frontend
 } // namespace LM
-

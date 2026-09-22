@@ -20,6 +20,14 @@
 namespace LM {
 namespace Frontend {
 
+enum class VerificationPolicy { Hybrid, Strict };
+
+struct TypedHoleInfo {
+    int line = 0;
+    TypePtr expected_type;
+    std::vector<std::string> compatible_bindings;
+};
+
 // Module information structure (public for use in TypeCheckResult)
 struct ModuleInfo {
     std::string name;
@@ -37,6 +45,8 @@ private:
     
     // Symbol table for variable types
     std::unordered_map<std::string, TypePtr> variable_types;
+    std::vector<std::shared_ptr<LM::Frontend::AST::Expression>> verification_assumptions_;
+    std::vector<TypedHoleInfo> typed_holes_;
     
     // Track undefined symbols to suppress cascading errors
     std::unordered_set<std::string> undefined_symbols;
@@ -129,6 +139,7 @@ private:
     TypePtr current_return_type = nullptr;
     bool in_loop = false;
     bool in_unsafe_block = false;
+    VerificationPolicy verification_policy_ = VerificationPolicy::Hybrid;
     
     // Source context for error reporting
     std::string current_source;
@@ -259,6 +270,7 @@ public:
 
     // Constructor accepting TypeSystem and SymbolDatabase
     explicit TypeChecker(TypeSystem& ts, SymbolDatabase& symbol_db) : type_system(ts), symbol_db_(symbol_db) {}
+    void set_verification_policy(VerificationPolicy policy) { verification_policy_ = policy; }
 
     // Getter for SymbolDatabase
     SymbolDatabase& get_symbol_db() const { return symbol_db_; }
@@ -268,6 +280,9 @@ public:
     
     // Get errors after checking
     const std::vector<std::string>& get_errors() const { return errors; }
+    const std::vector<TypedHoleInfo>& get_typed_holes() const { return typed_holes_; }
+    TypePtr record_typed_hole(const std::shared_ptr<LM::Frontend::AST::HoleExpr>& hole,
+                              TypePtr expected_type);
     bool has_errors() const { return !errors.empty(); }
     
     // Get the type system (for LIR generator)
@@ -625,6 +640,13 @@ public:
         std::shared_ptr<LM::Frontend::AST::Expression> condition_ast,
         const std::vector<std::shared_ptr<LM::Frontend::AST::Expression>>& assumption_asts = {}
     );
+    // Prove a refinement predicate after replacing its canonical `value`
+    // variable with the expression being assigned to the refined type.
+    static SMTProofResult verify_refinement(
+        std::shared_ptr<LM::Frontend::AST::Expression> predicate,
+        std::shared_ptr<LM::Frontend::AST::Expression> value,
+        const std::vector<std::shared_ptr<LM::Frontend::AST::Expression>>& assumption_asts = {}
+    );
     static std::string ast_to_smtlib(std::shared_ptr<LM::Frontend::AST::Expression> expr);
 };
 
@@ -633,6 +655,7 @@ struct TypeCheckResult {
     std::shared_ptr<TypeSystem> type_system;
     bool success;
     std::vector<std::string> errors;
+    std::vector<TypedHoleInfo> typed_holes;
     std::unordered_map<std::string, std::string> import_aliases;  // Module import aliases
     std::unordered_map<std::string, ModuleInfo> registered_modules;  // Module information
     
@@ -647,7 +670,7 @@ struct TypeCheckResult {
 
 namespace TypeCheckerFactory {
     // Create and run type checker
-    TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source = "", const std::string& file_path = "");
+    TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source = "", const std::string& file_path = "", VerificationPolicy policy = VerificationPolicy::Hybrid);
     
     // Create type checker instance (for testing)
     std::unique_ptr<TypeChecker> create(TypeSystem& type_system, SymbolDatabase& symbol_db);

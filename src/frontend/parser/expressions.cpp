@@ -502,6 +502,12 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::finishCall(std::shared_pt
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
+    if (match({TokenType::QUESTION})) {
+        auto hole = std::make_shared<LM::Frontend::AST::HoleExpr>();
+        hole->line = previous().line;
+        attachTriviaFromToken(previous());
+        return hole;
+    }
     if (match({TokenType::STAGED})) {
         auto stagedExpr = createNodeWithContext<LM::Frontend::AST::StagedExpr>();
         stagedExpr->line = previous().line;

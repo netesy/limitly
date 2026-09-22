@@ -68,7 +68,11 @@ bool ConstraintEngine::add_constraint(const NormalizedConstraint& constraint) {
         variables_.insert(var);
     }
 
-    return update_intervals();
+    if (!update_intervals()) {
+        contradiction_ = true;
+        return false;
+    }
+    return true;
 }
 
 bool ConstraintEngine::update_intervals() {
@@ -292,6 +296,7 @@ bool ConstraintEngine::check_difference_graph() const {
 }
 
 bool ConstraintEngine::is_inconsistent() const {
+    if (contradiction_) return true;
     for (const auto& [var, iv] : intervals_) {
         if (iv.is_empty()) return true;
     }

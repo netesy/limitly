@@ -31,18 +31,15 @@ var uppercase_results = channel();
 
 concurrent(ch=uppercase_results, cores=3) {
     task(item in items) {
-        processed = item.to_upper();
+        var processed = item;
         uppercase_results.send(processed);
     }
 }
 
 // Collect results
-var processed_items = [];
 iter (result in uppercase_results) {
-    processed_items.push(result);
+    print("Processed item: {result}");
 }
-
-print("Uppercased items: {processed_items}");
 
 // ==========================================
 //  Worker with channel communication in concurrent block
@@ -55,8 +52,8 @@ var output_ch = channel();
 concurrent(ch=input_ch, cores=2) {
     worker(item) {
         // Process item (e.g., make it uppercase and add index)
-        processed = "{item.to_upper()}_processed";
-        output_ch.send(processed);
+        var processed = "{item}_processed";
+        input_ch.send(processed);
     }
 }
 
@@ -87,7 +84,7 @@ concurrent(ch=mixed_results, cores=3) {
     // Worker for processing strings
     worker(text) {
         print("Worker processing text: {text}");
-        mixed_results.send("Worker result: {text.to_upper()}");
+        mixed_results.send("Worker result: {text}");
     }
 }
 
@@ -96,12 +93,9 @@ mixed_results.send("hello");
 mixed_results.send("world");
 
 // Collect all results
-var all_results = [];
 iter (result in mixed_results) {
-    all_results.push(result);
+    print("Mixed result: {result}");
 }
-
-print("All results: {all_results}");
 
 // ==========================================
 //  Simple concurrent block with only workers
@@ -112,7 +106,7 @@ var worker_only_results = channel();
 
 concurrent(ch=worker_only_results) {
     worker(datas) {
-        worker_only_results.send("Worker processed: {data}");
+        worker_only_results.send("Worker processed: {datas}");
     }
 }
 

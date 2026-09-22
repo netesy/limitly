@@ -50,20 +50,6 @@ enum class CapabilityKind {
     DisjointSlice
 };
 
-struct ParallelSliceCapability {
-    std::string collection_name;
-    int64_t start_idx = 0;
-    int64_t end_idx = 0;
-    bool is_mutable = false;
-    int worker_id = 0;
-
-    bool overlaps_with(const ParallelSliceCapability& other) const {
-        if (collection_name != other.collection_name) return false;
-        if (!is_mutable && !other.is_mutable) return false; // Concurrent reads are safe
-        return (start_idx < other.end_idx && other.start_idx < end_idx);
-    }
-};
-
 // Information tracked for each variable's generation
 struct GenerationInfo {
     int region_id;
@@ -105,6 +91,8 @@ private:
     std::unordered_set<std::string> initialized_variables;
     std::unordered_map<std::string, int> variable_generations;
     std::unordered_map<std::string, int64_t> constant_variables;  // Track variables with constant values
+    std::unordered_set<std::string> atomic_variables;
+    std::unordered_map<std::string, TypePtr> variable_types;
     
     // Generational reference tracking
     std::deque<std::vector<std::shared_ptr<GenerationalRef>>> generation_stack;
@@ -112,10 +100,13 @@ private:
     std::unordered_map<std::string, std::vector<int>> generation_history;
     
     // Capability tracking
-    std::vector<ParallelSliceCapability> active_parallel_slices;
+    std::vector<AST::ParallelSliceCapability> active_parallel_slices;
 
     // Check parallel slice capability disjointness
-    bool verify_slice_disjointness(const ParallelSliceCapability& slice, int line);
+    bool verify_slice_disjointness(const AST::ParallelSliceCapability& slice, int line);
+    void infer_parallel_capabilities(const std::shared_ptr<AST::ParallelStatement>& stmt);
+    void validate_concurrent_isolation(const std::shared_ptr<AST::Node>& node,
+                                       std::unordered_set<std::string> locals = {});
 
     // Current context
     std::string current_source;

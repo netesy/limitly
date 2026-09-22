@@ -58,7 +58,35 @@ This document tracks the consistency between learning materials, usage guides, t
 **YES**. All outdated syntax guides, incorrect uppercase error constructor claims, invalid receiver keywords (`this`), and invalid frame field modifiers have been systematically resolved and corrected across `learn.md` and `guide.md`.
 
 ### Is the documentation system internally consistent?
-**YES**. The spec `language.md`, the developer guide `guide.md`, and the onboarding resource `learn.md` are completely synchronized on keyword usage (`frame`, `self`), optional/fallible semantics (`Type?`, `ok()`, `err()`), and pattern matching syntax (`val x`, `err e`). All planned or unimplemented features are clearly flagged with `(Planned)`.
+**PARTIALLY**. Core syntax is generally synchronized, but implementation-status
+claims must be checked against `implementation-audit.md`; several advanced
+verification, concurrency, and tooling features remain partial or planned.
 
 ### Is the philosophy actually enforced?
-**YES**. Philosophical principles defined in `zen.md` (Explicit over Implicit, Errors as Values, Structured Concurrency, Region Safety, Explicit Null Handling) map directly to active, checked compiler subsystems within `src/frontend/type_checker/` and `src/frontend/memory_checker.cpp`. No drift exists between philosophy and code.
+**PARTIALLY**. The compiler enforces many local type, error, and memory rules,
+but the audit identifies gaps in multicore execution, backend parity, complete
+verification conditions, and semantic incremental tooling. The design remains
+the target; it is not evidence that every subsystem is complete.
+# Verification policy
+
+Limitly supports two proof policies without changing source syntax:
+
+- `--verify=hybrid` (default) erases proven contracts and retains runtime
+  assertions for obligations outside the native solver fragment.
+- `--verify=strict` rejects every contract or refinement obligation that is
+  false, unsupported, or unknown. Strict builds therefore contain no dynamic
+  fallback for required verification conditions.
+
+The native verifier preserves boolean `and`, `or`, and `not` structure and
+uses exact linear-integer reasoning for arithmetic leaves. Counterexamples are
+compile errors in both modes.
+
+Despite the `SMTVerifier` API name, the current implementation is a native
+linear-constraint engine, not an integration with a general SMT solver. Calls,
+collections, nonlinear arithmetic, quantifiers, and path-sensitive
+interprocedural verification remain unsupported; strict mode rejects those
+unknown obligations while hybrid mode retains their runtime checks.
+
+Refinement obligations preserve `and`, `or`, and `not` structure. Proven
+contracts and successful hybrid runtime contracts become assumptions for later
+statements in the same lexical block; assumptions do not escape that block.

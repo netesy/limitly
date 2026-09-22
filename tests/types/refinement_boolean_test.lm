@@ -1,0 +1,7 @@
+type SmallPositive = int where value > 0 and value < 10;
+type Edge = int where value == 0 or value == 10;
+
+var middle: SmallPositive = 5;
+var edge: Edge = 10;
+assert(middle == 5, "conjunctive refinement remains inhabited");
+assert(edge == 10, "disjunctive refinement remains inhabited");

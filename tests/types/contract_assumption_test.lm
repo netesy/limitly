@@ -1,0 +1,7 @@
+fn checked(number: int): int {
+    contract(number > 0, "number must be positive");
+    contract(number >= 0, "positive implies non-negative");
+    return number;
+}
+
+assert(checked(3) == 3, "contract assumptions preserve the result");
