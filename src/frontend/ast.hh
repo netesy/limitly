@@ -537,6 +537,18 @@ namespace AST {
         std::shared_ptr<Expression> value;
     };
 
+    // A compile-time proof that a parallel iterator owns an exclusive,
+    // half-open portion of a linear collection.  This is frontend metadata;
+    // backends consume it but must not invent their own capability model.
+    struct ParallelSliceCapability {
+        std::string collection;
+        std::string index_variable;
+        int64_t begin = 0;
+        int64_t end = 0;
+        bool mutable_access = false;
+        TypePtr capability_type;
+    };
+
     // Concurrency constructs
     struct ParallelStatement : public Statement {
         std::string cores;     // Number of cores to use (or "auto")
@@ -544,6 +556,7 @@ namespace AST {
         std::string grace;     // Grace period for cleanup
         std::string on_error;  // Error handling strategy (Stop, Continue, Partial)
         std::shared_ptr<BlockStatement> body;
+        std::vector<ParallelSliceCapability> slice_capabilities;
     };
 
     struct ConcurrentStatement : public Statement {

@@ -62,9 +62,8 @@ pub fn decompress_hex(compressed_hex: str, max_limit: int = 10485760): str? {
     if (len(compressed_hex) == 0) {
         return ok("");
     }
-    var buf_size = len(compressed_hex) * 4;
-    if (buf_size > max_limit) { buf_size = max_limit; }
-    if (buf_size < 1024) { buf_size = 1024; }
+    var buf_size = max_limit;
+    if (buf_size <= 0) { buf_size = 10485760; }
 
     unsafe {
         var lib = hash._open_lib();

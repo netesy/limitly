@@ -42,35 +42,34 @@ frame HashMap {
 
     pub fn put(key: str, value: any): HashMap {
         var idx = self._hash(key);
-        var bucket = self.buckets[idx];
         var i = 0;
-        while (i < len(bucket)) {
-            if (bucket[i].key == key) {
-                bucket[i].value = value;
+        while (i < len(self.buckets[idx])) {
+            if (self.buckets[idx][i].key == key) {
+                self.buckets[idx][i].value = value;
                 return self;
             }
             i = i + 1;
         }
-        bucket.append(HashEntry(key, value));
+        self.buckets[idx].append(HashEntry(key, value));
         self.count = self.count + 1;
         return self;
     }
 
-    pub fn get(key: str): any {
+    pub fn get(key: str): any? {
         var idx = self._hash(key);
-        var bucket = self.buckets[idx];
         var i = 0;
-        while (i < len(bucket)) {
-            if (bucket[i].key == key) {
-                return bucket[i].value;
+        while (i < len(self.buckets[idx])) {
+            if (self.buckets[idx][i].key == key) {
+                return ok(self.buckets[idx][i].value);
             }
             i = i + 1;
         }
-        return nil;
+        return err();
     }
 
     pub fn contains_key(key: str): bool {
-        return (self.get(key) != nil);
+        var res = self.get(key);
+        return (res != nil);
     }
 
     pub fn size(): int {
@@ -79,6 +78,26 @@ frame HashMap {
 
     pub fn is_empty(): bool {
         return (self.count == 0);
+    }
+
+    pub fn remove(key: str): HashMap {
+        var idx = self._hash(key);
+        var i = 0;
+        var new_bucket = [] as [HashEntry];
+        var found = false;
+        while (i < len(self.buckets[idx])) {
+            if (self.buckets[idx][i].key == key) {
+                found = true;
+            } else {
+                new_bucket.append(self.buckets[idx][i]);
+            }
+            i = i + 1;
+        }
+        if (found) {
+            self.buckets[idx] = new_bucket;
+            self.count = self.count - 1;
+        }
+        return self;
     }
 
     pub fn clear(): HashMap {
@@ -93,6 +112,6 @@ frame HashMap {
     }
 }
 
-pub fn hashmap(): HashMap {
-    return HashMap();
+pub fn hashmap(initial_cap: int = 16): HashMap {
+    return HashMap(initial_cap);
 }

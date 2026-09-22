@@ -1,0 +1,23 @@
+var values = [1, 2, 3, 4];
+
+parallel(cores=Auto, timeout=2s, grace=10ms, on_error=Partial) {
+    iter(i in 0..4) {
+        values[i] = values[i] + 1;
+    }
+}
+
+var output = channel();
+concurrent(ch=output, mode=batch, cores=2, timeout=500ms,
+           grace=20ms, on_error=Continue, on_timeout=Partial) {
+    task(i in 1..2) {
+        output.send(i);
+    }
+}
+
+var received = 0;
+iter (item in output) {
+    received += 1;
+}
+
+assert(values[0] == 2, "parallel settings preserve results");
+assert(received == 2, "concurrent settings preserve scheduled tasks");

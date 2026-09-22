@@ -12,6 +12,8 @@ void printUsage(const char* programName) {
     std::cout << "    " << programName << " run [options] <source_file>\n";
     std::cout << "      Options:\n";
     std::cout << "        -debug                Enable debug output\n";
+    std::cout << "        --verify=strict       Reject unproved contracts/refinements\n";
+    std::cout << "        --verify=hybrid       Keep runtime checks for unknown proofs (default)\n";
     std::cout << "\n  Compilation (AOT/WASM):\n";
 #ifdef FYRA_AVAILABLE
     std::cout << "    " << programName << " build [options] <source_file>\n";
@@ -78,6 +80,8 @@ int main(int argc, char* argv[]) {
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
             if (arg == "-debug") options.debug = true;
+            else if (arg == "--verify=strict") options.strict_verification = true;
+            else if (arg == "--verify=hybrid") options.strict_verification = false;
             else if (arg[0] != '-') source_file = arg;
         }
         if (source_file.empty()) {
@@ -92,6 +96,8 @@ int main(int argc, char* argv[]) {
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
             if (arg == "-target" && i + 1 < argc) options.target = argv[++i];
+            else if (arg == "--verify=strict") options.strict_verification = true;
+            else if (arg == "--verify=hybrid") options.strict_verification = false;
             else if (arg == "-o" && i + 1 < argc) options.output_file = argv[++i];
             else if (arg == "-O" && i + 1 < argc) options.opt_level = std::stoi(argv[++i]);
             else if (arg == "-s" || arg == "--strip") options.strip = true;

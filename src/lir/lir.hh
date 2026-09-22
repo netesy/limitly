@@ -28,6 +28,25 @@ std::string type_to_string(Type type);
 // Used to encode type information and calling conventions in the 'imm' field
 
 namespace Metadata {
+    enum class ErrorPolicy : uint8_t { Stop = 0, Continue = 1, Partial = 2 };
+
+    // Concurrency configuration stored in imm: 24-bit grace milliseconds,
+    // then two bits each for error and timeout policies. Cores and timeout are
+    // carried by operands a and b on ParallelInit/SchedulerInit.
+    inline uint32_t make_concurrency_imm(uint32_t grace_ms, ErrorPolicy error,
+                                         ErrorPolicy timeout = ErrorPolicy::Stop) {
+        return (grace_ms & 0x00FFFFFFu) |
+               (static_cast<uint32_t>(error) << 24) |
+               (static_cast<uint32_t>(timeout) << 26);
+    }
+    inline uint32_t concurrency_grace_ms(uint32_t imm) { return imm & 0x00FFFFFFu; }
+    inline ErrorPolicy concurrency_error_policy(uint32_t imm) {
+        return static_cast<ErrorPolicy>((imm >> 24) & 0x3u);
+    }
+    inline ErrorPolicy concurrency_timeout_policy(uint32_t imm) {
+        return static_cast<ErrorPolicy>((imm >> 26) & 0x3u);
+    }
+
     // Marshal type encoding: source and target types for data conversions
     enum class MarshalType : uint16_t {
         StringToCString  = 0,
@@ -111,7 +130,7 @@ enum class LIR_Op : uint8_t {
     ChannelAlloc, ChannelPush, ChannelPop, ChannelHasData,
     ChannelSend, ChannelOffer, ChannelRecv, ChannelPoll, ChannelClose,
     SchedulerInit, SchedulerRun, SchedulerTick, SchedulerAddTask,
-    GetTickCount, DelayUntil, ParallelInit, ParallelSync,
+    GetTickCount, DelayUntil, CapabilityAcquire, CapabilityRelease, ParallelInit, ParallelSync,
     
     // === Collections ===
     ListCreate, ListAppend, ListIndex, ListSet, ListLen,
@@ -125,9 +144,6 @@ enum class LIR_Op : uint8_t {
     
     // === Module System ===
     ImportModule, ExportSymbol, BeginModule, EndModule, LoadGlobal, StoreGlobal,
-    
-    // === Shared Memory ===
-    SharedCellAlloc, SharedCellLoad, SharedCellStore, SharedCellAdd, SharedCellSub,
     
     // === Legacy Resource Operations ===
     ResourceCreate, ResourceDestroy, ResourceCall,
@@ -215,7 +231,7 @@ enum class LIR_Op : uint8_t {
     X(ChannelAlloc) X(ChannelPush) X(ChannelPop) X(ChannelHasData) \
     X(ChannelSend) X(ChannelOffer) X(ChannelRecv) X(ChannelPoll) X(ChannelClose) \
     X(SchedulerInit) X(SchedulerRun) X(SchedulerTick) X(SchedulerAddTask) \
-    X(GetTickCount) X(DelayUntil) X(ParallelInit) X(ParallelSync) \
+    X(GetTickCount) X(DelayUntil) X(CapabilityAcquire) X(CapabilityRelease) X(ParallelInit) X(ParallelSync) \
     /* === Collections === */ \
     X(ListCreate) X(ListAppend) X(ListIndex) X(ListSet) X(ListLen) \
     X(DictCreate) X(DictSet) X(DictGet) X(DictHas) X(DictLen) X(DictItems) \
@@ -230,8 +246,6 @@ enum class LIR_Op : uint8_t {
     X(ImportModule) X(ExportSymbol) X(BeginModule) X(EndModule) \
     X(LoadGlobal) X(StoreGlobal) \
     /* === Shared Memory === */ \
-    X(SharedCellAlloc) X(SharedCellLoad) X(SharedCellStore) \
-    X(SharedCellAdd) X(SharedCellSub) \
     /* === Legacy Resource Operations === */ \
     X(ResourceCreate) X(ResourceDestroy) X(ResourceCall) \
     /* === REDESIGNED: Memory Operations === */ \

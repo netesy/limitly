@@ -187,6 +187,9 @@ slow_tests = {
     "tests/stdlib/random_module_test.lm",
     "tests/stdlib/parse_module_test.lm",
     "tests/stdlib/format_module_test.lm",
+    "tests/interactive_controls_test.lm",
+    "tests/ffi/test_font_lib.lm",
+    "tests/stdlib/collections/queue_stack_bitset_test.lm",
 }
 
 if __name__ == "__main__":

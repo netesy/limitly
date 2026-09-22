@@ -7,7 +7,6 @@
 #include "../task.hh"
 #include "../scheduler.hh"
 #include "../channel.hh"
-#include "../shared_cell.hh"
 #include "vm_runtime.hh"
 #include "vm_value.hh"
 #include "callstack.hh"
@@ -19,6 +18,7 @@
 #include <mutex>
 #include <atomic>
 #include <queue>
+#include <chrono>
 
 namespace LM {
 namespace Backend {
@@ -188,9 +188,23 @@ private:
     std::vector<std::unique_ptr<LM::Backend::Channel>> channels;
     std::unique_ptr<Scheduler> scheduler;
     uint64_t current_time;
+    struct ConcurrencyExecutionConfig {
+        uint32_t cores = 1;
+        uint64_t timeout_ms = 0;
+        uint64_t grace_ms = 0;
+        LIR::Metadata::ErrorPolicy error_policy = LIR::Metadata::ErrorPolicy::Stop;
+        LIR::Metadata::ErrorPolicy timeout_policy = LIR::Metadata::ErrorPolicy::Stop;
+        std::chrono::steady_clock::time_point started{};
+    } parallel_config, scheduler_config;
+    struct RuntimeSliceCapability {
+        RegisterValue collection = VAL_NIL;
+        uint32_t begin = 0;
+        uint32_t end = 0;
+        bool active = true;
+    };
+    std::vector<RuntimeSliceCapability> slice_capabilities;
     
     std::unordered_map<std::string, std::atomic<int64_t>> shared_variables;
-    std::unordered_map<uint32_t, std::unique_ptr<SharedCell>> shared_cells;
     
     std::unordered_map<uint64_t, FrameInstancePtr> frame_instances;
     uint64_t next_frame_id = 1;

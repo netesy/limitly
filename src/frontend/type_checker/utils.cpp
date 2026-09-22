@@ -292,6 +292,51 @@ SMTProofResult SMTVerifier::verify_obligation(
 
     SMTProofResult res;
 
+    // Preserve boolean structure instead of forcing an entire verification
+    // condition into one arithmetic comparison. This gives contracts useful
+    // push-button behavior for conjunction, disjunction, and negation while
+    // each arithmetic leaf remains in the decidable native fragment.
+    if (auto literal = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(condition_ast)) {
+        if (std::holds_alternative<bool>(literal->value)) {
+            res.status = std::get<bool>(literal->value)
+                ? SMTProofStatus::Proven : SMTProofStatus::Counterexample;
+            res.message = std::get<bool>(literal->value)
+                ? "Boolean obligation is true" : "Boolean obligation is false";
+            return res;
+        }
+    }
+    if (auto unary = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(condition_ast)) {
+        if (unary->op == TokenType::BANG || unary->op == TokenType::NOT) {
+            SMTProofResult inner = verify_obligation(unary->right, assumption_asts);
+            if (inner.status == SMTProofStatus::Proven) inner.status = SMTProofStatus::Counterexample;
+            else if (inner.status == SMTProofStatus::Counterexample) inner.status = SMTProofStatus::Proven;
+            inner.message = "Negated obligation: " + inner.message;
+            return inner;
+        }
+    }
+    if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(condition_ast)) {
+        const bool is_and = binary->op == TokenType::AND || binary->op == TokenType::AMPERSAND_AMPERSAND;
+        const bool is_or = binary->op == TokenType::OR || binary->op == TokenType::PIPE_PIPE;
+        if (is_and || is_or) {
+            SMTProofResult left = verify_obligation(binary->left, assumption_asts);
+            SMTProofResult right = verify_obligation(binary->right, assumption_asts);
+            if (is_and) {
+                if (left.status == SMTProofStatus::Counterexample || right.status == SMTProofStatus::Counterexample)
+                    return {SMTProofStatus::Counterexample, "A conjunction member is false", ""};
+                if (left.status == SMTProofStatus::Proven && right.status == SMTProofStatus::Proven)
+                    return {SMTProofStatus::Proven, "All conjunction members are proven", ""};
+            } else {
+                if (left.status == SMTProofStatus::Proven || right.status == SMTProofStatus::Proven)
+                    return {SMTProofStatus::Proven, "A disjunction member is proven", ""};
+                if (left.status == SMTProofStatus::Counterexample && right.status == SMTProofStatus::Counterexample)
+                    return {SMTProofStatus::Counterexample, "All disjunction members are false", ""};
+            }
+            res.status = SMTProofStatus::Unknown;
+            res.message = "Boolean verification condition contains an unknown member";
+            return res;
+        }
+    }
+
     NormalizedConstraint target_constraint;
     if (!ConstraintBuilder::build_constraint(condition_ast, target_constraint)) {
         res.status = SMTProofStatus::Unsupported;
@@ -335,6 +380,44 @@ SMTProofResult SMTVerifier::verify_obligation(
             break;
     }
 
+    return res;
+}
+
+SMTProofResult SMTVerifier::verify_refinement(
+    std::shared_ptr<LM::Frontend::AST::Expression> predicate,
+    std::shared_ptr<LM::Frontend::AST::Expression> value) {
+    SMTProofResult res;
+    NormalizedConstraint target;
+    LinearTerm replacement;
+    if (!ConstraintBuilder::build_constraint(predicate, target) ||
+        !ConstraintBuilder::extract_linear_term(value, replacement)) {
+        res.status = SMTProofStatus::Unsupported;
+        res.message = "Refinement predicate or assigned value is outside linear integer arithmetic";
+        return res;
+    }
+
+    auto substitute = [&replacement](LinearTerm& term) {
+        auto it = term.coeffs.find("value");
+        if (it == term.coeffs.end()) return;
+        const int64_t coefficient = it->second;
+        term.coeffs.erase(it);
+        term.constant_offset += replacement.constant_offset * coefficient;
+        for (const auto& [name, value_coefficient] : replacement.coeffs) {
+            term.add_term(name, value_coefficient * coefficient);
+        }
+    };
+    substitute(target.lhs);
+    substitute(target.rhs);
+
+    NativeProofResult native = ConstraintEngine::verify_obligation(target);
+    switch (native.status) {
+        case NativeProofStatus::Proven: res.status = SMTProofStatus::Proven; break;
+        case NativeProofStatus::Counterexample: res.status = SMTProofStatus::Counterexample; break;
+        case NativeProofStatus::Unsupported: res.status = SMTProofStatus::Unsupported; break;
+        case NativeProofStatus::SolverError: res.status = SMTProofStatus::SolverError; break;
+        default: res.status = SMTProofStatus::Unknown; break;
+    }
+    res.message = native.message;
     return res;
 }
 

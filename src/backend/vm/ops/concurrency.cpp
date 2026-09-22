@@ -4,7 +4,6 @@
 #include "../vm_value.hh"
 #include "../../channel.hh"
 #include "../../scheduler.hh"
-#include "../../shared_cell.hh"
 #include "../../../lir/function_registry.hh"
 #include "../resource_manager.hh"
 #include <string>
@@ -85,10 +84,13 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
         }
         case LIR::LIR_Op::ChannelSend:
         case LIR::LIR_Op::ChannelPush: {
+            RegisterValue value = (pc->b != UINT32_MAX) ? registers[pc->b] : VAL_NIL;
             if (IS_PTR(registers[pc->a])) {
                 auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
-                RegisterValue value = (pc->b != UINT32_MAX) ? registers[pc->b] : VAL_NIL;
                 channel->send(value, get_current_fiber());
+            } else if (IS_INT(registers[pc->a])) {
+                rm.call(to_int(registers[pc->a]), ResourceOperation::SEND,
+                        {value}, get_current_fiber());
             }
             break;
         }
@@ -117,6 +119,10 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
                 RegisterValue out = VAL_NIL;
                 registers[pc->dst] = channel->poll(out) ? out : VAL_NIL;
+            } else if (IS_INT(registers[pc->a])) {
+                registers[pc->dst] = rm.call(to_int(registers[pc->a]),
+                                              ResourceOperation::POLL, {},
+                                              get_current_fiber());
             } else {
                 registers[pc->dst] = VAL_NIL;
             }
@@ -139,44 +145,50 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             }
             break;
         }
-        case LIR::LIR_Op::SharedCellAlloc: {
-            uint32_t id = static_cast<uint32_t>(shared_cells.size() + 1);
-            shared_cells[id] = std::make_unique<SharedCell>(id, 0);
-            registers[pc->dst] = make_i64(id);
-            break;
-        }
-        case LIR::LIR_Op::SharedCellLoad: {
-            uint32_t id = static_cast<uint32_t>(as_i64(registers[pc->a]));
-            auto it = shared_cells.find(id);
-            registers[pc->dst] = it == shared_cells.end() ? make_i64(0) : make_i64(it->second->value.load());
-            break;
-        }
-        case LIR::LIR_Op::SharedCellStore: {
-            uint32_t id = static_cast<uint32_t>(as_i64(registers[pc->a]));
-            auto it = shared_cells.find(id);
-            if (it != shared_cells.end()) it->second->value.store(as_i64(registers[pc->b]));
-            registers[pc->dst] = registers[pc->b];
-            break;
-        }
-        case LIR::LIR_Op::SharedCellAdd:
-        case LIR::LIR_Op::SharedCellSub: {
-            uint32_t id = static_cast<uint32_t>(as_i64(registers[pc->a]));
-            auto it = shared_cells.find(id);
-            int64_t delta = as_i64(registers[pc->b]);
-            int64_t value = 0;
-            if (it != shared_cells.end()) {
-                value = (pc->op == LIR::LIR_Op::SharedCellAdd)
-                    ? it->second->value.fetch_add(delta) + delta
-                    : it->second->value.fetch_sub(delta) - delta;
+        case LIR::LIR_Op::CapabilityAcquire: {
+            const RegisterValue collection = registers[pc->a];
+            const uint32_t begin = pc->b;
+            const uint32_t end = pc->imm;
+            if (end <= begin) throw std::runtime_error("invalid parallel slice capability");
+            for (const auto& capability : slice_capabilities) {
+                if (capability.active && capability.collection == collection &&
+                    begin < capability.end && capability.begin < end) {
+                    throw std::runtime_error("overlapping parallel slice capabilities");
+                }
             }
-            registers[pc->dst] = make_i64(value);
+            slice_capabilities.push_back({collection, begin, end, true});
+            registers[pc->dst] = make_i64(static_cast<int64_t>(slice_capabilities.size()));
+            break;
+        }
+        case LIR::LIR_Op::CapabilityRelease: {
+            const int64_t token = as_i64(registers[pc->a]);
+            if (token <= 0 || static_cast<size_t>(token) > slice_capabilities.size() ||
+                !slice_capabilities[static_cast<size_t>(token - 1)].active) {
+                throw std::runtime_error("invalid or reused parallel capability token");
+            }
+            slice_capabilities[static_cast<size_t>(token - 1)].active = false;
             break;
         }
         case LIR::LIR_Op::ParallelInit:
+            parallel_config.cores = std::max<uint32_t>(1, pc->a);
+            parallel_config.timeout_ms = pc->b;
+            parallel_config.grace_ms = LIR::Metadata::concurrency_grace_ms(pc->imm);
+            parallel_config.error_policy = LIR::Metadata::concurrency_error_policy(pc->imm);
+            parallel_config.timeout_policy = LIR::Metadata::concurrency_timeout_policy(pc->imm);
+            parallel_config.started = std::chrono::steady_clock::now();
             registers[pc->dst] = make_i64(1);
             break;
-        case LIR::LIR_Op::ParallelSync:
+        case LIR::LIR_Op::ParallelSync: {
+            if (parallel_config.timeout_ms != 0) {
+                const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - parallel_config.started).count();
+                if (static_cast<uint64_t>(elapsed) > parallel_config.timeout_ms &&
+                    parallel_config.timeout_policy == LIR::Metadata::ErrorPolicy::Stop) {
+                    throw std::runtime_error("parallel block exceeded its timeout");
+                }
+            }
             break;
+        }
         case LIR::LIR_Op::TaskContextAlloc: {
             auto context = std::make_unique<TaskContext>();
             auto* raw = context.get();
@@ -247,6 +259,12 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::SchedulerInit:
             scheduler = std::make_unique<Scheduler>();
             current_time = 0;
+            scheduler_config.cores = std::max<uint32_t>(1, pc->a);
+            scheduler_config.timeout_ms = pc->b;
+            scheduler_config.grace_ms = LIR::Metadata::concurrency_grace_ms(pc->imm);
+            scheduler_config.error_policy = LIR::Metadata::concurrency_error_policy(pc->imm);
+            scheduler_config.timeout_policy = LIR::Metadata::concurrency_timeout_policy(pc->imm);
+            scheduler_config.started = std::chrono::steady_clock::now();
             registers[pc->dst] = make_i64(1);
             break;
         case LIR::LIR_Op::SchedulerAddTask:
@@ -274,6 +292,15 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             const LIR::LIR_Function* saved_func = current_function_;
             auto& registry = LIR::FunctionRegistry::getInstance();
             for (auto& context_ptr : task_contexts) {
+                if (scheduler_config.timeout_ms != 0) {
+                    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - scheduler_config.started).count();
+                    if (static_cast<uint64_t>(elapsed) > scheduler_config.timeout_ms) {
+                        if (scheduler_config.timeout_policy == LIR::Metadata::ErrorPolicy::Continue)
+                            continue;
+                        break; // Stop and Partial both stop scheduling new work.
+                    }
+                }
                 TaskContext* context = context_ptr.get();
                 if (!context || context->state == TaskState::COMPLETED) continue;
                 auto name_it = context->fields.find(4);
@@ -291,25 +318,44 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 if (!func) continue;
 
                 auto run_once = [&](RegisterValue field1) {
-                    registers.assign(saved_registers.size(), VAL_NIL);
+                    if (registers.size() < saved_registers.size()) {
+                        registers.resize(saved_registers.size(), VAL_NIL);
+                    }
                     registers[1] = field1;
                     auto ch = context->fields.find(2);
                     if (ch != context->fields.end()) registers[2] = ch->second;
                     current_function_ = func;
-                    execute_instructions(*func, 0, func->instructions.size());
+                    try {
+                        execute_instructions(*func, 0, func->instructions.size());
+                    } catch (...) {
+                        if (scheduler_config.error_policy == LIR::Metadata::ErrorPolicy::Stop) throw;
+                        if (scheduler_config.error_policy == LIR::Metadata::ErrorPolicy::Partial)
+                            context->state = TaskState::COMPLETED;
+                    }
                 };
 
                 auto data_it = context->fields.find(1);
-                if (func_name.rfind("worker_", 0) == 0 && data_it != context->fields.end() && IS_PTR(data_it->second)) {
-                    auto* channel = (LM::Backend::Channel*)UNBOX_PTR(data_it->second);
-                    RegisterValue item = VAL_NIL;
-                    while (channel->poll(item)) run_once(item);
+                if (func_name.rfind("worker_", 0) == 0) {
+                    if (data_it != context->fields.end() && IS_PTR(data_it->second)) {
+                        auto* channel = (LM::Backend::Channel*)UNBOX_PTR(data_it->second);
+                        RegisterValue item = VAL_NIL;
+                        while (channel->poll(item)) run_once(item);
+                    } else if (data_it != context->fields.end() && IS_INT(data_it->second)) {
+                        RegisterValue item = VAL_NIL;
+                        do {
+                            item = rm.call(to_int(data_it->second), ResourceOperation::POLL,
+                                           {}, get_current_fiber());
+                            if (!IS_NIL(item)) run_once(item);
+                        } while (!IS_NIL(item));
+                    }
                 } else {
                     run_once(data_it == context->fields.end() ? VAL_NIL : data_it->second);
                 }
                 context->state = TaskState::COMPLETED;
             }
-            registers = saved_registers;
+            // Captured registers are the structured task environment. Keep
+            // mutations made by completed tasks; restoring saved_registers
+            // here previously discarded all task results at the join point.
             current_function_ = saved_func;
             break;
         }

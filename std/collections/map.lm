@@ -1,24 +1,24 @@
 // Standard Library Map Collection
 
-import std.collections.hashmap as hashmap;
+import std.collections.hashmap as hashmap_mod;
 
 frame HashMapWrapper {
-    pub impl: hashmap.HashMap;
+    pub impl: hashmap_mod.HashMap;
 
     pub init() {
-        self.impl = hashmap.HashMap(_keys=[] as [str], _values=[] as [int]);
+        self.impl = hashmap_mod.hashmap(16);
     }
 
-    pub fn put(key: str, value: int) {
-        self.impl = self.impl.put(key, value);
+    pub fn put(key: str, value: any) {
+        self.impl.put(key, value);
     }
 
-    pub fn get(key: str): int? {
+    pub fn get(key: str): any? {
         return self.impl.get(key);
     }
 
     pub fn remove(key: str) {
-        self.impl = self.impl.remove(key);
+        self.impl.remove(key);
     }
 
     pub fn contains_key(key: str): bool {
@@ -38,6 +38,6 @@ frame HashMapWrapper {
     }
 
     pub fn clear() {
-        self.impl = self.impl.clear();
+        self.impl.clear();
     }
 }

@@ -406,7 +406,12 @@ bool DefUseAnalysis::has_side_effects(const LIR_Inst& inst) {
         inst.op == LIR_Op::MemoryStore ||
         inst.op == LIR_Op::ChannelSend || inst.op == LIR_Op::ChannelRecv ||
         inst.op == LIR_Op::ChannelClose || inst.op == LIR_Op::Await ||
-        inst.op == LIR_Op::AsyncCall
+        inst.op == LIR_Op::AsyncCall ||
+        inst.op == LIR_Op::CapabilityAcquire ||
+        inst.op == LIR_Op::CapabilityRelease ||
+        inst.op == LIR_Op::ParallelInit || inst.op == LIR_Op::ParallelSync ||
+        inst.op == LIR_Op::SchedulerInit || inst.op == LIR_Op::SchedulerRun ||
+        inst.op == LIR_Op::SchedulerAddTask
     );
 }
 

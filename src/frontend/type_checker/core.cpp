@@ -116,6 +116,7 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
             if (module && !module->is_checked) {
                 module->is_checked = true;
                 TypeChecker checker(this->type_system, this->symbol_db_);
+                checker.set_verification_policy(verification_policy_);
                 checker.is_root = false; // Submodules are not root checkers
                 TypeCheckerFactory::register_builtin_functions(checker);
                 checker.set_source_context(module->source, module->path);

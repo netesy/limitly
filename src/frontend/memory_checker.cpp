@@ -34,6 +34,7 @@ MemoryCheckResult MemoryChecker::check_program(std::shared_ptr<LM::Frontend::AST
     variable_generation_info.clear();
     reference_chain.clear();
     generation_history.clear();
+    atomic_variables.clear();
     current_region_id = 0;
     current_generation = 0;
     current_scope_depth = 0;
@@ -160,6 +161,8 @@ void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement
         if (contract_stmt->message) check_expression(contract_stmt->message);
     } else if (auto parallel_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ParallelStatement>(stmt)) {
         active_parallel_slices.clear();
+        parallel_stmt->slice_capabilities.clear();
+        infer_parallel_capabilities(parallel_stmt);
         if (parallel_stmt->body) check_statement(parallel_stmt->body);
         active_parallel_slices.clear();
     } else if (auto task_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::TaskStatement>(stmt)) {
@@ -172,55 +175,6 @@ void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement
         if (task_stmt->iterable) {
             check_expression(task_stmt->iterable);
 
-            std::string coll_name;
-            std::shared_ptr<LM::Frontend::AST::RangeExpr> range;
-
-            if (auto idx_expr = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(task_stmt->iterable)) {
-                if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(idx_expr->object)) {
-                    coll_name = var_expr->name;
-                }
-                range = std::dynamic_pointer_cast<LM::Frontend::AST::RangeExpr>(idx_expr->index);
-            } else if (auto r_expr = std::dynamic_pointer_cast<LM::Frontend::AST::RangeExpr>(task_stmt->iterable)) {
-                range = r_expr;
-                if (task_stmt->body) {
-                    std::function<std::string(const std::shared_ptr<LM::Frontend::AST::Node>&)> find_coll;
-                    find_coll = [&](const std::shared_ptr<LM::Frontend::AST::Node>& n) -> std::string {
-                        if (!n) return "";
-                        if (auto idx = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(n)) {
-                            if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(idx->object)) {
-                                return v->name;
-                            }
-                        }
-                        if (auto blk = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(n)) {
-                            for (const auto& s : blk->statements) {
-                                std::string r = find_coll(s);
-                                if (!r.empty()) return r;
-                            }
-                        } else if (auto es = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(n)) {
-                            return find_coll(es->expression);
-                        } else if (auto as = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(n)) {
-                            return find_coll(as->value);
-                        } else if (auto bi = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(n)) {
-                            std::string r = find_coll(bi->left);
-                            if (!r.empty()) return r;
-                            return find_coll(bi->right);
-                        }
-                        return "";
-                    };
-                    coll_name = find_coll(task_stmt->body);
-                }
-            }
-
-            if (!coll_name.empty() && range && is_constant_expression(range->start) && is_constant_expression(range->end)) {
-                int64_t s = evaluate_constant_int(range->start);
-                int64_t e = evaluate_constant_int(range->end);
-                ParallelSliceCapability slice;
-                slice.collection_name = coll_name;
-                slice.start_idx = s;
-                slice.end_idx = e;
-                slice.is_mutable = true;
-                verify_slice_disjointness(slice, task_stmt->line);
-            }
         }
         if (task_stmt->body) check_statement(task_stmt->body);
     } else if (auto concurrent_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ConcurrentStatement>(stmt)) {
@@ -230,12 +184,23 @@ void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement
                 variable_generation_info[concurrent_stmt->channel].is_linear = true;
             }
         }
+        validate_concurrent_isolation(concurrent_stmt->body);
         if (concurrent_stmt->body) check_statement(concurrent_stmt->body);
+    } else if (auto worker_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::WorkerStatement>(stmt)) {
+        std::unordered_set<std::string> locals;
+        if (!worker_stmt->paramName.empty()) locals.insert(worker_stmt->paramName);
+        validate_concurrent_isolation(worker_stmt->body, std::move(locals));
+        if (worker_stmt->iterable) check_expression(worker_stmt->iterable);
+        if (worker_stmt->body) check_statement(worker_stmt->body);
     }
 }
 
 void MemoryChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::VarDeclaration> var_decl) {
     if (!var_decl) return;
+    if (var_decl->type && var_decl->type.value() &&
+        var_decl->type.value()->typeName == "atomic") {
+        atomic_variables.insert(var_decl->name);
+    }
     
     // Track generation history
     generation_history[var_decl->name].push_back(current_generation);
@@ -674,19 +639,166 @@ void MemoryChecker::check_block_statement(std::shared_ptr<LM::Frontend::AST::Blo
     }
 }
 
-bool MemoryChecker::verify_slice_disjointness(const ParallelSliceCapability& slice, int line) {
+bool MemoryChecker::verify_slice_disjointness(const AST::ParallelSliceCapability& slice, int line) {
+    if (slice.begin < 0 || slice.end <= slice.begin) {
+        add_memory_error("Capability Violation", slice.collection,
+                         "Data race capability violation: mutable slice range [" +
+                         std::to_string(slice.begin) + ", " +
+                         std::to_string(slice.end) +
+                         ") must be non-negative and non-empty", line);
+        return false;
+    }
     for (const auto& existing : active_parallel_slices) {
-        if (slice.overlaps_with(existing)) {
-            add_memory_error("Capability Violation", slice.collection_name,
+        const bool overlap = slice.collection == existing.collection &&
+            (slice.mutable_access || existing.mutable_access) &&
+            slice.begin < existing.end && existing.begin < slice.end;
+        if (overlap) {
+            add_memory_error("Capability Violation", slice.collection,
                              "Overlapping mutable slice capability in parallel worker: range [" +
-                             std::to_string(slice.start_idx) + ", " + std::to_string(slice.end_idx) +
-                             ") overlaps with range [" + std::to_string(existing.start_idx) + ", " +
-                             std::to_string(existing.end_idx) + ")", line);
+                             std::to_string(slice.begin) + ", " + std::to_string(slice.end) +
+                             ") overlaps with range [" + std::to_string(existing.begin) + ", " +
+                             std::to_string(existing.end) + ")", line);
             return false;
         }
     }
     active_parallel_slices.push_back(slice);
     return true;
+}
+
+void MemoryChecker::infer_parallel_capabilities(
+    const std::shared_ptr<AST::ParallelStatement>& parallel_stmt) {
+    if (!parallel_stmt || !parallel_stmt->body) return;
+
+    for (const auto& statement : parallel_stmt->body->statements) {
+        auto iteration = std::dynamic_pointer_cast<AST::IterStatement>(statement);
+        if (!iteration || iteration->loopVars.size() != 1) continue;
+
+        const std::string& index_name = iteration->loopVars.front();
+        std::unordered_set<std::string> written_collections;
+        std::function<void(const std::shared_ptr<AST::Node>&)> inspect;
+        inspect = [&](const std::shared_ptr<AST::Node>& node) {
+            if (!node) return;
+            if (auto block = std::dynamic_pointer_cast<AST::BlockStatement>(node)) {
+                for (const auto& child : block->statements) inspect(child);
+            } else if (auto expression = std::dynamic_pointer_cast<AST::ExprStatement>(node)) {
+                inspect(expression->expression);
+            } else if (auto assignment = std::dynamic_pointer_cast<AST::AssignExpr>(node)) {
+                auto collection = std::dynamic_pointer_cast<AST::VariableExpr>(assignment->object);
+                if (!collection || !assignment->index) return;
+                auto index = std::dynamic_pointer_cast<AST::VariableExpr>(assignment->index);
+                if (!index || index->name != index_name) {
+                    add_memory_error("Capability Violation", collection->name,
+                                     "Parallel write must be indexed by the iteration variable '" +
+                                     index_name + "' to prove exclusive ownership", assignment->line);
+                    return;
+                }
+                written_collections.insert(collection->name);
+            } else if (auto conditional = std::dynamic_pointer_cast<AST::IfStatement>(node)) {
+                inspect(conditional->thenBranch);
+                inspect(conditional->elseBranch);
+            } else if (auto loop = std::dynamic_pointer_cast<AST::WhileStatement>(node)) {
+                inspect(loop->body);
+            } else if (auto loop = std::dynamic_pointer_cast<AST::ForStatement>(node)) {
+                inspect(loop->initializer);
+                inspect(loop->body);
+            } else if (auto loop = std::dynamic_pointer_cast<AST::IterStatement>(node)) {
+                inspect(loop->body);
+            }
+        };
+        inspect(iteration->body);
+
+        // Read-only iterations need no exclusive capability and may use
+        // dynamically sized iterables. Bounds are required only once a write
+        // capability must be minted.
+        if (written_collections.empty()) continue;
+
+        auto range = std::dynamic_pointer_cast<AST::RangeExpr>(iteration->iterable);
+        if (!range || !is_constant_expression(range->start) ||
+            !is_constant_expression(range->end)) {
+            add_memory_error("Capability Violation", "",
+                             "Parallel mutable iteration requires a statically bounded range",
+                             statement->line);
+            continue;
+        }
+
+        for (const auto& collection : written_collections) {
+            AST::ParallelSliceCapability capability;
+            capability.collection = collection;
+            capability.index_variable = index_name;
+            capability.begin = evaluate_constant_int(range->start);
+            capability.end = evaluate_constant_int(range->end);
+            capability.mutable_access = true;
+            CapabilityType formal_type;
+            formal_type.region = "parallel@" + std::to_string(parallel_stmt->line);
+            formal_type.begin = capability.begin;
+            formal_type.end = capability.end;
+            formal_type.mutableAccess = true;
+            if (auto info = variable_generation_info.find(collection);
+                info != variable_generation_info.end()) {
+                // Collection element precision is retained by the typed AST;
+                // the capability owns the collection value when unavailable.
+                formal_type.valueType = nullptr;
+            }
+            capability.capability_type = std::make_shared<::Type>(TypeTag::Capability, formal_type);
+            if (verify_slice_disjointness(capability, statement->line)) {
+                parallel_stmt->slice_capabilities.push_back(capability);
+            }
+        }
+    }
+}
+
+void MemoryChecker::validate_concurrent_isolation(
+    const std::shared_ptr<AST::Node>& node,
+    std::unordered_set<std::string> locals) {
+    if (!node) return;
+    if (auto block = std::dynamic_pointer_cast<AST::BlockStatement>(node)) {
+        for (const auto& child : block->statements) {
+            if (auto declaration = std::dynamic_pointer_cast<AST::VarDeclaration>(child)) {
+                locals.insert(declaration->name);
+            }
+        }
+        for (const auto& child : block->statements) {
+            validate_concurrent_isolation(child, locals);
+        }
+        return;
+    }
+    if (auto assignment = std::dynamic_pointer_cast<AST::AssignExpr>(node)) {
+        std::string target = assignment->name;
+        if (target.empty()) {
+            if (auto object = std::dynamic_pointer_cast<AST::VariableExpr>(assignment->object)) {
+                target = object->name;
+            }
+        }
+        if (!target.empty() && initialized_variables.count(target) &&
+            !locals.count(target) && !atomic_variables.count(target)) {
+            add_memory_error("Data race", target,
+                             "Concurrent task mutates outer variable '" + target +
+                             "'; transfer data through a channel, use task-local state, or declare an atomic scalar",
+                             assignment->line);
+        }
+        return;
+    }
+    if (auto expression = std::dynamic_pointer_cast<AST::ExprStatement>(node)) {
+        validate_concurrent_isolation(expression->expression, std::move(locals));
+    } else if (auto task = std::dynamic_pointer_cast<AST::TaskStatement>(node)) {
+        if (!task->loopVar.empty()) locals.insert(task->loopVar);
+        validate_concurrent_isolation(task->body, std::move(locals));
+    } else if (auto worker = std::dynamic_pointer_cast<AST::WorkerStatement>(node)) {
+        if (!worker->paramName.empty()) locals.insert(worker->paramName);
+        validate_concurrent_isolation(worker->body, std::move(locals));
+    } else if (auto conditional = std::dynamic_pointer_cast<AST::IfStatement>(node)) {
+        validate_concurrent_isolation(conditional->thenBranch, locals);
+        validate_concurrent_isolation(conditional->elseBranch, std::move(locals));
+    } else if (auto loop = std::dynamic_pointer_cast<AST::WhileStatement>(node)) {
+        validate_concurrent_isolation(loop->body, std::move(locals));
+    } else if (auto loop = std::dynamic_pointer_cast<AST::ForStatement>(node)) {
+        validate_concurrent_isolation(loop->body, std::move(locals));
+    } else if (auto loop = std::dynamic_pointer_cast<AST::IterStatement>(node)) {
+        for (const auto& name : loop->loopVars) locals.insert(name);
+        validate_concurrent_isolation(loop->body, std::move(locals));
+    } else if (auto nested = std::dynamic_pointer_cast<AST::ConcurrentStatement>(node)) {
+        validate_concurrent_isolation(nested->body, std::move(locals));
+    }
 }
 
 // =============================================================================

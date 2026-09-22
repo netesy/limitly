@@ -61,7 +61,10 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
 
         LM::Frontend::ModuleManager::getInstance().resolve_all(ast, "root");
 
-        auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
+        const auto verification_policy = options.strict_verification
+            ? LM::Frontend::VerificationPolicy::Strict
+            : LM::Frontend::VerificationPolicy::Hybrid;
+        auto type_check_result = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename, verification_policy);
         if (!type_check_result.success || !type_check_result.errors.empty()) {
             for (const auto& err : type_check_result.errors) {
                 std::cerr << "Type Check Error: " << err << std::endl;
@@ -79,7 +82,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
         }
         ast = memory_check_result.program;
 
-        auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename);
+        auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename, verification_policy);
         if (!post_opt_type_check.success || !post_opt_type_check.errors.empty()) {
             std::cerr << "Post-opt Type Check Failed!" << std::endl;
             for (const auto& err : post_opt_type_check.errors) {
