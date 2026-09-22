@@ -51,6 +51,43 @@ frame PipePair {
         self.reader = r;
         self.writer = w;
     }
+
+    pub fn write(content: str): bool {
+        return self.writer.write(content);
+    }
+
+    pub fn read(buffer_size: int = 1024): str {
+        return self.reader.read(buffer_size);
+    }
+
+    pub fn close(): nil {
+        self.reader.close();
+        self.writer.close();
+    }
+}
+
+frame Pipe {
+    pub reader: PipeReader;
+    pub writer: PipeWriter;
+
+    pub init() {
+        var pair = create_pipe();
+        self.reader = pair.reader;
+        self.writer = pair.writer;
+    }
+
+    pub fn write(content: str): bool {
+        return self.writer.write(content);
+    }
+
+    pub fn read(buffer_size: int = 1024): str {
+        return self.reader.read(buffer_size);
+    }
+
+    pub fn close(): nil {
+        self.reader.close();
+        self.writer.close();
+    }
 }
 
 pub fn create_pipe(): PipePair {

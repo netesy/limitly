@@ -27,7 +27,12 @@ void RegisterVM::execute_cast(const LIR::LIR_Inst* pc) {
                             try {
                                 registers[pc->dst] = make_i64(std::stoll(str));
                                 break;
-                            } catch (...) {}
+                            } catch (...) {
+                                if (str[0] != '\0') {
+                                    registers[pc->dst] = make_i64(static_cast<unsigned char>(str[0]));
+                                    break;
+                                }
+                            }
                         }
                     }
                 }

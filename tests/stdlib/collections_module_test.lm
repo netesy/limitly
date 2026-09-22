@@ -84,24 +84,31 @@ fn test_linked_list(): int {
 fn test_maps(): int {
     print("Testing Maps...");
     var map_val = collections.Map() as map_col.HashMapWrapper;
+    print("Map created");
     map_val.put("key1", 42);
+    print("Put key1 done");
 
     var val1 = map_val.get("key1")? else {
         assert(false, "Failed to get key1");
         return 0;
     };
+    print("Get key1 done: {val1}");
     assert(val1 == 42, "Map get incorrect");
 
     var hashmap_val = collections.HashMap() as hashmap_col.HashMap;
+    print("HashMap created");
     hashmap_val = hashmap_val.put("key2", 100);
+    print("Put key2 done");
 
     var val2 = hashmap_val.get("key2")? else {
         assert(false, "Failed to get key2");
         return 0;
     };
+    print("Get key2 done: {val2}");
     assert(val2 == 100, "HashMap get incorrect");
 
     var btree_val = collections.BTreeMap() as btreemap_col.BTreeMapWrapper;
+    print("BTreeMap created");
     btree_val.put("bkey", "bval");
     assert(btree_val.get("bkey") == "bval", "BTreeMap get incorrect");
     return 1;

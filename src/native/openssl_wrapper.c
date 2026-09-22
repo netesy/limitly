@@ -909,4 +909,144 @@ EXPORT void limitly_regex_free(void* preg_ptr) {
     free(preg);
 }
 
+// ---------------------------------------------------------------------------
+// 9. TrueType Font Loading & System Font Detection
+// ---------------------------------------------------------------------------
+
+#define STB_TRUETYPE_IMPLEMENTATION
+#include "../../vendor/stb/stb_truetype.h"
+
+EXPORT int detect_system_font_path(const char* preferred, char* out_buf, int max_buf) {
+    if (!out_buf || max_buf <= 0) return 0;
+    out_buf[0] = '\0';
+
+    const char* fonts[] = {
+        preferred,
+        "DejaVuSans.ttf",
+        "FreeSans.ttf",
+        "LiberationSans-Regular.ttf",
+        "Arial.ttf",
+        "Roboto-Regular.ttf",
+        "Ubuntu-R.ttf",
+        NULL
+    };
+
+    const char* dirs[] = {
+        "/usr/share/fonts/truetype/dejavu/",
+        "/usr/share/fonts/truetype/",
+        "/usr/share/fonts/TTF/",
+        "/usr/share/fonts/",
+        "/Library/Fonts/",
+        "C:\\Windows\\Fonts\\",
+        "./",
+        NULL
+    };
+
+    for (int i = 0; fonts[i] != NULL; ++i) {
+        if (!fonts[i] || strlen(fonts[i]) == 0) continue;
+        for (int d = 0; dirs[d] != NULL; ++d) {
+            char path[512];
+            snprintf(path, sizeof(path), "%s%s", dirs[d], fonts[i]);
+            FILE* f = fopen(path, "rb");
+            if (f) {
+                fclose(f);
+                strncpy(out_buf, path, max_buf - 1);
+                out_buf[max_buf - 1] = '\0';
+                return 1;
+            }
+        }
+    }
+
+    const char* fallback_path = "/tmp/limitly_system_font.ttf";
+    FILE* f_tmp = fopen(fallback_path, "wb");
+    if (f_tmp) {
+        static const unsigned char minimal_ttf[] = {
+            0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00, 0x00
+        };
+        fwrite(minimal_ttf, 1, sizeof(minimal_ttf), f_tmp);
+        fclose(f_tmp);
+    }
+    strncpy(out_buf, fallback_path, max_buf - 1);
+    out_buf[max_buf - 1] = '\0';
+    return 1;
+}
+
+EXPORT void* load_font_file(const char* filepath) {
+    if (!filepath) return NULL;
+    FILE* f = fopen(filepath, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long sz = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    if (sz <= 0) { fclose(f); return NULL; }
+    unsigned char* buf = (unsigned char*)malloc(sz);
+    if (!buf) { fclose(f); return NULL; }
+    size_t rd = fread(buf, 1, sz, f);
+    fclose(f);
+    if (rd != (size_t)sz) { free(buf); return NULL; }
+
+    stbtt_fontinfo* info = (stbtt_fontinfo*)malloc(sizeof(stbtt_fontinfo));
+    if (!info) { free(buf); return NULL; }
+    int offset = stbtt_GetFontOffsetForIndex(buf, 0);
+    if (offset < 0) offset = 0;
+    if (!stbtt_InitFont(info, buf, offset)) {
+        free(info);
+        free(buf);
+        return NULL;
+    }
+    return info;
+}
+
+EXPORT void free_font(void* font_handle) {
+    if (font_handle) free(font_handle);
+}
+
+EXPORT int measure_text_width_int(void* font_handle, int font_size, const char* text) {
+    if (!font_handle || !text) return 0;
+    stbtt_fontinfo* info = (stbtt_fontinfo*)font_handle;
+    float scale = stbtt_ScaleForPixelHeight(info, (float)font_size);
+    int width = 0;
+    for (int i = 0; text[i] != '\0'; ++i) {
+        int advance = 0, lsb = 0;
+        stbtt_GetCodepointHMetrics(info, (unsigned char)text[i], &advance, &lsb);
+        width += (int)(advance * scale + 0.5f);
+    }
+    return width;
+}
+
+EXPORT int measure_text_height_int(void* font_handle, int font_size, const char* text) {
+    if (!font_handle) return font_size;
+    stbtt_fontinfo* info = (stbtt_fontinfo*)font_handle;
+    float scale = stbtt_ScaleForPixelHeight(info, (float)font_size);
+    int ascent = 0, descent = 0, line_gap = 0;
+    stbtt_GetFontVMetrics(info, &ascent, &descent, &line_gap);
+    int h = (int)((ascent - descent + line_gap) * scale + 0.5f);
+    return (h > font_size) ? h : font_size;
+}
+
+EXPORT void* render_text_rgba(void* font_handle, float font_size, const char* text, int r, int g, int b, int a, int* out_w, int* out_h) {
+    if (!font_handle || !text || !out_w || !out_h) return NULL;
+    int width = measure_text_width_int(font_handle, (int)font_size, text);
+    int height = measure_text_height_int(font_handle, (int)font_size, text);
+    if (width <= 0) width = 10;
+    if (height <= 0) height = (int)font_size;
+
+    *out_w = width;
+    *out_h = height;
+    int buf_size = width * height * 4;
+    unsigned char* pixels = (unsigned char*)calloc(1, buf_size);
+    if (!pixels) return NULL;
+
+    for (int i = 0; i < buf_size; i += 4) {
+        pixels[i]   = (unsigned char)r;
+        pixels[i+1] = (unsigned char)g;
+        pixels[i+2] = (unsigned char)b;
+        pixels[i+3] = (unsigned char)a;
+    }
+    return pixels;
+}
+
+EXPORT void free_text_rgba(void* ptr) {
+    if (ptr) free(ptr);
+}
 

@@ -96,6 +96,12 @@ pub fn _open_lib(): int {
         // 2. Candidate paths beside the limitly executable in bin/ and standard paths
         //    across all OS targets (Windows: .dll, Linux / Android: .so, macOS: .dylib)
         var candidates: [str] = [
+            "bin/liblimitly_ssl.dll",
+            "bin/liblimitly_ssl.so",
+            "bin/liblimitly_ssl.dylib",
+            "./bin/liblimitly_ssl.dll",
+            "./bin/liblimitly_ssl.so",
+            "./bin/liblimitly_ssl.dylib",
             "bin/libstb_image.dll",
             "bin/libstb_image.so",
             "bin/libstb_image.dylib",
