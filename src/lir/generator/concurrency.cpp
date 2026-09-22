@@ -89,6 +89,7 @@ void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
     // scalar atomic cells: doing that loses collection/channel identity and
     // corrupt pointers.  Disjoint collections remain zero-copy values.
     std::set<std::string> capability_collections;
+    std::vector<Reg> capability_tokens;
     for (const auto& capability : stmt.slice_capabilities) {
         if (!capability.mutable_access || capability.begin < 0 ||
             capability.end <= capability.begin ||
@@ -102,6 +103,12 @@ void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
                          capability.collection + "'.");
             return;
         }
+        Reg token = allocate_register();
+        emit_instruction(LIR_Inst(
+            LIR_Op::CapabilityAcquire, Type::I64, token,
+            resolve_variable(capability.collection),
+            static_cast<Reg>(capability.begin), static_cast<Imm>(capability.end)));
+        capability_tokens.push_back(token);
     }
     
     // 3. Initialize parallel execution system (using available operations)
@@ -136,6 +143,9 @@ void Generator::emit_parallel_stmt(LM::Frontend::AST::ParallelStatement& stmt) {
     
     // 6. Synchronize and complete parallel execution (using available operations)
     emit_instruction(LIR_Inst(LIR_Op::ParallelSync, parallel_context_reg, 0, 0));
+    for (auto it = capability_tokens.rbegin(); it != capability_tokens.rend(); ++it) {
+        emit_instruction(LIR_Inst(LIR_Op::CapabilityRelease, Type::Void, 0, *it, 0));
+    }
     
     // Restore the surrounding concurrency context. Collection ownership is
     // rejoined structurally at ParallelSync; no copy-back is necessary.

@@ -130,7 +130,7 @@ enum class LIR_Op : uint8_t {
     ChannelAlloc, ChannelPush, ChannelPop, ChannelHasData,
     ChannelSend, ChannelOffer, ChannelRecv, ChannelPoll, ChannelClose,
     SchedulerInit, SchedulerRun, SchedulerTick, SchedulerAddTask,
-    GetTickCount, DelayUntil, ParallelInit, ParallelSync,
+    GetTickCount, DelayUntil, CapabilityAcquire, CapabilityRelease, ParallelInit, ParallelSync,
     
     // === Collections ===
     ListCreate, ListAppend, ListIndex, ListSet, ListLen,
@@ -231,7 +231,7 @@ enum class LIR_Op : uint8_t {
     X(ChannelAlloc) X(ChannelPush) X(ChannelPop) X(ChannelHasData) \
     X(ChannelSend) X(ChannelOffer) X(ChannelRecv) X(ChannelPoll) X(ChannelClose) \
     X(SchedulerInit) X(SchedulerRun) X(SchedulerTick) X(SchedulerAddTask) \
-    X(GetTickCount) X(DelayUntil) X(ParallelInit) X(ParallelSync) \
+    X(GetTickCount) X(DelayUntil) X(CapabilityAcquire) X(CapabilityRelease) X(ParallelInit) X(ParallelSync) \
     /* === Collections === */ \
     X(ListCreate) X(ListAppend) X(ListIndex) X(ListSet) X(ListLen) \
     X(DictCreate) X(DictSet) X(DictGet) X(DictHas) X(DictLen) X(DictItems) \

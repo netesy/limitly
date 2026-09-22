@@ -73,6 +73,10 @@ TypePtr TypeChecker::check_contract_statement(std::shared_ptr<LM::Frontend::AST:
             add_error("compile-time contract violation: " + msg, contract_stmt->line);
         } else {
             contract_stmt->verification_state = LM::Frontend::AST::ContractVerificationState::UnsupportedOrUnknown;
+            if (verification_policy_ == VerificationPolicy::Strict) {
+                add_error("strict verification could not prove contract: " + smt_res.message,
+                          contract_stmt->line);
+            }
         }
     }
 

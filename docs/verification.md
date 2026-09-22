@@ -62,3 +62,16 @@ This document tracks the consistency between learning materials, usage guides, t
 
 ### Is the philosophy actually enforced?
 **YES**. Philosophical principles defined in `zen.md` (Explicit over Implicit, Errors as Values, Structured Concurrency, Region Safety, Explicit Null Handling) map directly to active, checked compiler subsystems within `src/frontend/type_checker/` and `src/frontend/memory_checker.cpp`. No drift exists between philosophy and code.
+# Verification policy
+
+Limitly supports two proof policies without changing source syntax:
+
+- `--verify=hybrid` (default) erases proven contracts and retains runtime
+  assertions for obligations outside the native solver fragment.
+- `--verify=strict` rejects every contract or refinement obligation that is
+  false, unsupported, or unknown. Strict builds therefore contain no dynamic
+  fallback for required verification conditions.
+
+The native verifier preserves boolean `and`, `or`, and `not` structure and
+uses exact linear-integer reasoning for arithmetic leaves. Counterexamples are
+compile errors in both modes.

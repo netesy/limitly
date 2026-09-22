@@ -728,6 +728,18 @@ void MemoryChecker::infer_parallel_capabilities(
             capability.begin = evaluate_constant_int(range->start);
             capability.end = evaluate_constant_int(range->end);
             capability.mutable_access = true;
+            CapabilityType formal_type;
+            formal_type.region = "parallel@" + std::to_string(parallel_stmt->line);
+            formal_type.begin = capability.begin;
+            formal_type.end = capability.end;
+            formal_type.mutableAccess = true;
+            if (auto info = variable_generation_info.find(collection);
+                info != variable_generation_info.end()) {
+                // Collection element precision is retained by the typed AST;
+                // the capability owns the collection value when unavailable.
+                formal_type.valueType = nullptr;
+            }
+            capability.capability_type = std::make_shared<::Type>(TypeTag::Capability, formal_type);
             if (verify_slice_disjointness(capability, statement->line)) {
                 parallel_stmt->slice_capabilities.push_back(capability);
             }

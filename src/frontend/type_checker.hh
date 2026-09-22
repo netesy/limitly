@@ -20,6 +20,8 @@
 namespace LM {
 namespace Frontend {
 
+enum class VerificationPolicy { Hybrid, Strict };
+
 // Module information structure (public for use in TypeCheckResult)
 struct ModuleInfo {
     std::string name;
@@ -129,6 +131,7 @@ private:
     TypePtr current_return_type = nullptr;
     bool in_loop = false;
     bool in_unsafe_block = false;
+    VerificationPolicy verification_policy_ = VerificationPolicy::Hybrid;
     
     // Source context for error reporting
     std::string current_source;
@@ -259,6 +262,7 @@ public:
 
     // Constructor accepting TypeSystem and SymbolDatabase
     explicit TypeChecker(TypeSystem& ts, SymbolDatabase& symbol_db) : type_system(ts), symbol_db_(symbol_db) {}
+    void set_verification_policy(VerificationPolicy policy) { verification_policy_ = policy; }
 
     // Getter for SymbolDatabase
     SymbolDatabase& get_symbol_db() const { return symbol_db_; }
@@ -653,7 +657,7 @@ struct TypeCheckResult {
 
 namespace TypeCheckerFactory {
     // Create and run type checker
-    TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source = "", const std::string& file_path = "");
+    TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> program, const std::string& source = "", const std::string& file_path = "", VerificationPolicy policy = VerificationPolicy::Hybrid);
     
     // Create type checker instance (for testing)
     std::unique_ptr<TypeChecker> create(TypeSystem& type_system, SymbolDatabase& symbol_db);

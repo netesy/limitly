@@ -196,6 +196,13 @@ private:
         LIR::Metadata::ErrorPolicy timeout_policy = LIR::Metadata::ErrorPolicy::Stop;
         std::chrono::steady_clock::time_point started{};
     } parallel_config, scheduler_config;
+    struct RuntimeSliceCapability {
+        RegisterValue collection = VAL_NIL;
+        uint32_t begin = 0;
+        uint32_t end = 0;
+        bool active = true;
+    };
+    std::vector<RuntimeSliceCapability> slice_capabilities;
     
     std::unordered_map<std::string, std::atomic<int64_t>> shared_variables;
     

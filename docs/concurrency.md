@@ -170,3 +170,19 @@ preserve:
 A backend may use native threads, a work-stealing pool, fibers, or a cooperative
 scheduler, but it may not weaken these observable semantics or introduce a
 backend-only capability instruction.
+
+## Determinism
+
+Capability tokens are acquired in lexical order and released in reverse order
+at the structured join. Concurrent tasks commit channel messages and failures
+in source iteration order. `Stop` reports the earliest failing task,
+`Continue` skips failed tasks while running later tasks in that same order, and
+`Partial` retains only the ordered prefix completed before cancellation.
+
+Parallel mutation is deterministic only through disjoint element capabilities.
+Cross-worker scalar accumulation is deliberately not an implicit reduction.
+The supported deterministic reduction is: publish one value per source
+iteration to a channel, join the structured block, then fold that channel in
+source iteration order. This fixes both the reduction tree (a left fold) and
+failure prefix, so results never depend on worker completion order. Atomic
+scalars remain synchronization primitives, not deterministic reductions.

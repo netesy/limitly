@@ -546,6 +546,7 @@ namespace AST {
         int64_t begin = 0;
         int64_t end = 0;
         bool mutable_access = false;
+        TypePtr capability_type;
     };
 
     // Concurrency constructs

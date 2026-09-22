@@ -40,6 +40,7 @@ size_t required_register_count(const LIR::LIR_Function& function) {
 RegisterVM::RegisterVM() : type_system(std::make_unique<TypeSystem>()) {
     registers.resize(1024, VAL_NIL);
     scheduler = std::make_unique<Scheduler>();
+    slice_capabilities.clear();
     current_time = 0;
     current_function_ = nullptr;
     // Initialize builtin functions
@@ -54,6 +55,7 @@ void RegisterVM::reset() {
     task_contexts.clear();
     channels.clear();
     scheduler = std::make_unique<Scheduler>();
+    slice_capabilities.clear();
     current_time = 0;
     current_function_ = nullptr;
     shared_variables.clear();
@@ -191,6 +193,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::SchedulerTick: case LIR::LIR_Op::SchedulerAddTask:
             case LIR::LIR_Op::GetTickCount: case LIR::LIR_Op::DelayUntil:
             case LIR::LIR_Op::ParallelInit: case LIR::LIR_Op::ParallelSync:
+            case LIR::LIR_Op::CapabilityAcquire: case LIR::LIR_Op::CapabilityRelease:
             case LIR::LIR_Op::TaskContextAlloc: case LIR::LIR_Op::TaskContextInit: case LIR::LIR_Op::TaskSetField:
             case LIR::LIR_Op::TaskGetField: case LIR::LIR_Op::TaskGetState: case LIR::LIR_Op::TaskSetState:
             case LIR::LIR_Op::ResourceCreate: case LIR::LIR_Op::ResourceDestroy: case LIR::LIR_Op::ResourceCall:

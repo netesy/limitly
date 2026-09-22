@@ -2044,6 +2044,15 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 store_reg(inst.dst, builder_->createLoad(addr), inst.result_type);
                 break;
             }
+            case LIR::LIR_Op::CapabilityAcquire: {
+                // Capabilities are proven by the frontend; retain an explicit
+                // linear token in Fyra IR so optimization cannot erase the
+                // split/join ordering boundary.
+                store_reg(inst.dst, load_reg(inst.a, LIR::Type::Ptr), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::CapabilityRelease:
+                break;
             case LIR::LIR_Op::ParallelInit:
             case LIR::LIR_Op::SchedulerInit: {
                 used_builtins_.insert("lm_list_new");

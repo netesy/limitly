@@ -291,6 +291,8 @@ enum class TypeTag {
 
     Refined,
 
+    Capability,
+
     Structural,
 
     Decimal2,
@@ -567,6 +569,15 @@ struct TraitObjectType
     // For dynamic dispatch, this will be resolved at runtime via vtable
 };
 
+struct CapabilityType
+{
+    TypePtr valueType;
+    std::string region;
+    int64_t begin = 0;
+    int64_t end = 0;
+    bool mutableAccess = false;
+};
+
 struct Type
 
 {
@@ -590,6 +601,7 @@ struct Type
                  TraitType,
                  TraitObjectType,
                  RefinedType,
+                 CapabilityType,
                  StructuralType>
 
         extra;
@@ -689,6 +701,10 @@ struct Type
         : tag(t)
         , extra(refinedType)
 
+    {}
+
+    Type(TypeTag t, const CapabilityType &capabilityType)
+        : tag(t), extra(capabilityType)
     {}
 
     Type(TypeTag t, const StructuralType &structuralType)
@@ -947,6 +963,16 @@ struct Type
             }
 
             return "RefinedType";
+        }
+
+        case TypeTag::Capability: {
+            if (const auto *capability = std::get_if<CapabilityType>(&extra)) {
+                return std::string(capability->mutableAccess ? "WriteSlice<" : "ReadSlice<") +
+                       (capability->valueType ? capability->valueType->toString() : "any") +
+                       ", " + std::to_string(capability->begin) + ".." +
+                       std::to_string(capability->end) + ", " + capability->region + ">";
+            }
+            return "Capability";
         }
 
         case TypeTag::Structural: {

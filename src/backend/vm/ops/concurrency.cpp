@@ -145,6 +145,30 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             }
             break;
         }
+        case LIR::LIR_Op::CapabilityAcquire: {
+            const RegisterValue collection = registers[pc->a];
+            const uint32_t begin = pc->b;
+            const uint32_t end = pc->imm;
+            if (end <= begin) throw std::runtime_error("invalid parallel slice capability");
+            for (const auto& capability : slice_capabilities) {
+                if (capability.active && capability.collection == collection &&
+                    begin < capability.end && capability.begin < end) {
+                    throw std::runtime_error("overlapping parallel slice capabilities");
+                }
+            }
+            slice_capabilities.push_back({collection, begin, end, true});
+            registers[pc->dst] = make_i64(static_cast<int64_t>(slice_capabilities.size()));
+            break;
+        }
+        case LIR::LIR_Op::CapabilityRelease: {
+            const int64_t token = as_i64(registers[pc->a]);
+            if (token <= 0 || static_cast<size_t>(token) > slice_capabilities.size() ||
+                !slice_capabilities[static_cast<size_t>(token - 1)].active) {
+                throw std::runtime_error("invalid or reused parallel capability token");
+            }
+            slice_capabilities[static_cast<size_t>(token - 1)].active = false;
+            break;
+        }
         case LIR::LIR_Op::ParallelInit:
             parallel_config.cores = std::max<uint32_t>(1, pc->a);
             parallel_config.timeout_ms = pc->b;

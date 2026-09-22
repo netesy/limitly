@@ -297,6 +297,10 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
                     add_error("type mismatch: refinement type violation for variable '" + var_decl->name +
                               "': initializer does not satisfy " + declared_type->toString(),
                               var_decl->line);
+                } else if (verification_policy_ == VerificationPolicy::Strict &&
+                           proof.status != SMTProofStatus::Proven) {
+                    add_error("strict verification could not prove refinement for variable '" +
+                              var_decl->name + "': " + proof.message, var_decl->line);
                 }
             }
         }
