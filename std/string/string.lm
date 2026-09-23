@@ -1,5 +1,3 @@
-// Standard Library String Module
-
 frame String {
     pub var value: str;
 

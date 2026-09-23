@@ -273,22 +273,9 @@ bool TypeChecker::can_implicitly_convert(TypePtr from, TypePtr to) {
     if (from == to) return true;
     if (to->tag == TypeTag::Any) return true;
     
-    // Numeric conversions
-    bool from_is_numeric = (from->tag == TypeTag::Int || from->tag == TypeTag::Int8 || 
-                           from->tag == TypeTag::Int16 || from->tag == TypeTag::Int32 || 
-                           from->tag == TypeTag::Int64 || from->tag == TypeTag::Int128 ||
-                           from->tag == TypeTag::UInt || from->tag == TypeTag::UInt8 || 
-                           from->tag == TypeTag::UInt16 || from->tag == TypeTag::UInt32 || 
-                           from->tag == TypeTag::UInt64 || from->tag == TypeTag::UInt128 ||
-                           from->tag == TypeTag::Float32 || from->tag == TypeTag::Float64);
-    
-    bool to_is_numeric = (to->tag == TypeTag::Int || to->tag == TypeTag::Int8 || 
-                         to->tag == TypeTag::Int16 || to->tag == TypeTag::Int32 || 
-                         to->tag == TypeTag::Int64 || to->tag == TypeTag::Int128 ||
-                         to->tag == TypeTag::UInt || to->tag == TypeTag::UInt8 || 
-                         to->tag == TypeTag::UInt16 || to->tag == TypeTag::UInt32 || 
-                         to->tag == TypeTag::UInt64 || to->tag == TypeTag::UInt128 ||
-                         to->tag == TypeTag::Float32 || to->tag == TypeTag::Float64);
+    // Numeric conversions using helper
+    bool from_is_numeric = is_numeric_type(from);
+    bool to_is_numeric = is_numeric_type(to);
     
     return from_is_numeric && to_is_numeric;
 }

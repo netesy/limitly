@@ -1,5 +1,3 @@
-// Standard Library Option Module
-
 frame Option {
     var present: bool;
     var value: any;

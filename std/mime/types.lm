@@ -1,5 +1,3 @@
-// Standard Library MIME Types Module
-
 frame MIMEParams {
     pub keys: [str];
     pub values: [str];

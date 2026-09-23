@@ -1,4 +1,3 @@
-// Standard Library Internal Runtime Module
 // This module provides thin wrappers around VM builtins.
 
 pub var RT_FILE: int = 0;

@@ -1,5 +1,3 @@
-// Standard Library Core Module Index
-
 import std.core.error as error;
 import std.core.option as opt;
 import std.core.result as res;

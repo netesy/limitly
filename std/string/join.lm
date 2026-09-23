@@ -1,5 +1,3 @@
-// Standard Library String Join Module
-
 pub fn join(values: [str], delimiter: str): str {
     if (values == nil) return "";
     var n = len(values);

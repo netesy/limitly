@@ -10,14 +10,23 @@
 #include <functional>
 #include <future>
 
+#include <filesystem>
+
 namespace LM {
 namespace Frontend {
+
+namespace fs = std::filesystem;
 
 std::string ModuleManager::find_module_file(const std::string& module_path) {
     std::string filePath = module_path;
     std::replace(filePath.begin(), filePath.end(), '.', '/');
-    filePath += ".lm";
-    return filePath;
+    if (fs::exists(filePath + ".lm")) {
+        return filePath + ".lm";
+    }
+    if (fs::exists(filePath) && fs::is_directory(filePath) && fs::exists(filePath + "/index.lm")) {
+        return filePath + "/index.lm";
+    }
+    return filePath + ".lm";
 }
 
 std::shared_ptr<Module> ModuleManager::get_module(const std::string& name) {

@@ -4,43 +4,43 @@ This document tracks the consistency between learning materials, usage guides, t
 
 ---
 
-## 📊 1. Concept Traceability Matrix
+## 1. Concept Traceability Matrix
 
 | Concept | learn.md | guide.md | language.md | Tests | Status |
 | :--- | :---: | :---: | :---: | :--- | :---: |
-| **Variables (`var`)** | [OK] | [OK] | [OK] | `tests/basic/variables.lm` | [OK] |
-| **Constants (`val`/`const`)** | [OK] | [OK] | [OK] | `tests/basic/variables.lm` | [OK] |
-| **Integers (`int`/`i32`/etc)** | [OK] | [OK] | [OK] | `tests/types/basic.lm` | [OK] |
-| **Decimals (`d2`/`d4`/`d6`)** | [OK] | [OK] | [OK] | `tests/decimal_tests.lm` | [OK] |
-| **Frames (`frame`)** | [OK] | [OK] | [OK] | `tests/oop/frame_declaration.lm` | [OK] |
-| **Self Reference (`self`)** | [OK] | [OK] | [OK] | `tests/oop/frame_declaration.lm` | [OK] |
-| **Traits (`trait`)** | [OK] | [OK] | [OK] | `tests/oop/traits_dynamic.lm` | [OK] |
-| **Modules (`import`)** | [OK] | [OK] | [OK] | `tests/modules/*` | [OK] |
-| **Fallible (`Type?`)** | [OK] | [OK] | [OK] | `tests/error_handling/unified_type_system.lm` | [OK] |
-| **Structured Concurrency** | [OK] | [OK] | [OK] | `tests/concurrency/*` | [OK] |
-| **Pattern Match (`match`)** | [OK] | [OK] | [OK] | `tests/loops/match.lm` | [OK] |
-| **Ternary (`? :`)** | [FAIL] | [WARN] (Planned) | [WARN] (Planned) | [FAIL] | 🚨 (Spec Drift) |
-| **Safe Access (`?.`)** | [FAIL] | [FAIL] | [WARN] (Planned) | [FAIL] | 🚨 (Spec Drift) |
-| **Elvis (`?:`)** | [FAIL] | [FAIL] | [WARN] (Planned) | [FAIL] | 🚨 (Spec Drift) |
+| **Variables (`var`)** | [x] | [x] | [x] | `tests/basic/variables.lm` | [x] |
+| **Constants (`val`/`const`)** | [x] | [x] | [x] | `tests/basic/variables.lm` | [x] |
+| **Integers (`int`/`i32`/etc)** | [x] | [x] | [x] | `tests/types/basic.lm` | [x] |
+| **Decimals (`d2`/`d4`/`d6`)** | [x] | [x] | [x] | `tests/decimal_tests.lm` | [x] |
+| **Frames (`frame`)** | [x] | [x] | [x] | `tests/oop/frame_declaration.lm` | [x] |
+| **Self Reference (`self`)** | [x] | [x] | [x] | `tests/oop/frame_declaration.lm` | [x] |
+| **Traits (`trait`)** | [x] | [x] | [x] | `tests/oop/traits_dynamic.lm` | [x] |
+| **Modules (`import`)** | [x] | [x] | [x] | `tests/modules/*` | [x] |
+| **Fallible (`Type?`)** | [x] | [x] | [x] | `tests/error_handling/unified_type_system.lm` | [x] |
+| **Structured Concurrency** | [x] | [x] | [x] | `tests/concurrency/*` | [x] |
+| **Pattern Match (`match`)** | [x] | [x] | [x] | `tests/loops/match.lm` | [x] |
+| **Ternary (`? :`)** | [ ] | [WARN] (Planned) | [WARN] (Planned) | [ ] | (Spec Drift) |
+| **Safe Access (`?.`)** | [ ] | [ ] | [WARN] (Planned) | [ ] | (Spec Drift) |
+| **Elvis (`?:`)** | [ ] | [ ] | [WARN] (Planned) | [ ] | (Spec Drift) |
 
 **Statuses:**
-- [OK] **Fully consistent**: Concept is fully documented, correctly taught, and covered by passing tests.
+- [x] **Fully consistent**: Concept is fully documented, correctly taught, and covered by passing tests.
 - [WARN] **Partial/missing links**: Concept is documented and tested, but omitted from some learning/introductory guides due to advanced scope (e.g. traits, concurrency).
-- 🚨 **Contradiction / Spec Drift**: Feature is mentioned in specifications/guides but is unimplemented in code/untested.
+- **Contradiction / Spec Drift**: Feature is mentioned in specifications/guides but is unimplemented in code/untested.
 
 ---
 
-## 🚨 2. Surfaced Violations & Gaps
+## 2. Surfaced Violations & Gaps
 
 ### 2.1 Documentation Coverage Gaps
 - **Traits/Interfaces in Onboarding**: `learn.md` does not introduce `trait` or polymorphic composition, focusing purely on basic frames. *[RESOLVED]*
 - **Structured Concurrency in Onboarding**: `learn.md` lacks a dedicated introduction to structured concurrency blocks (`parallel`/`concurrent`), leaving a gap for beginner systems-level learners. *[RESOLVED]*
 
-### 2.2 Doc ↔ Code Mismatches
+### 2.2 Doc <-> Code Mismatches
 - **Ok/Err Constructors**: Prior documentation taught uppercase `Ok(value)` and `Err(error)` constructs for native `Type?` return values. In reality, the compiler and TypeChecker expect lowercase `ok(value)` and `err()` (with uppercase variants reserved for stdlib wrappers in `std.result`). *[RESOLVED]*
 - **Frame Field `var` Keyword**: Prior onboarding code blocks taught frame field declarations as `pub var name: str`, whereas the compiler syntax parser disallows the `var` keyword inside frame field declarations (which must be `pub name: str`). *[RESOLVED]*
 
-### 2.3 Doc ↔ Test Mismatches
+### 2.3 Doc <-> Test Mismatches
 - **`this` Receiver**: Previous documentation mentioned `this` as a valid frame receiver. However, all test files (such as `tests/oop/frame_declaration.lm`) and compiler AST parsing strictly require `self` as the canonical receiver. *[RESOLVED]*
 - **`-repl` Command Line Flag**: Documentation mentioned a `-repl` flag. The actual CLI driver simply defaults to the REPL when run without arguments, and the flag is not natively supported. *[RESOLVED]*
 
@@ -52,7 +52,7 @@ This document tracks the consistency between learning materials, usage guides, t
 
 ---
 
-## 🏁 3. Final Integrity Check
+## 3. Final Integrity Check
 
 ### Is the language teachable without misleading users?
 **YES**. All outdated syntax guides, incorrect uppercase error constructor claims, invalid receiver keywords (`this`), and invalid frame field modifiers have been systematically resolved and corrected across `learn.md` and `guide.md`.
@@ -67,10 +67,10 @@ This document tracks the consistency between learning materials, usage guides, t
 Limitly supports two proof policies without changing source syntax:
 
 - `--verify=hybrid` (default) erases proven contracts and retains runtime
-  assertions for obligations outside the native solver fragment.
+ assertions for obligations outside the native solver fragment.
 - `--verify=strict` rejects every contract or refinement obligation that is
-  false, unsupported, or unknown. Strict builds therefore contain no dynamic
-  fallback for required verification conditions.
+ false, unsupported, or unknown. Strict builds therefore contain no dynamic
+ fallback for required verification conditions.
 
 The native verifier preserves boolean `and`, `or`, and `not` structure and
 uses exact linear-integer reasoning for arithmetic leaves. Counterexamples are

@@ -2,63 +2,63 @@
 
 Welcome to the official guide for the Limit programming language. This document will walk you through the core features of the language, from basic syntax to advanced concepts like structured concurrency.
 
+
 > **Canonical syntax note:** the `tests/` folder is the authoritative reference for currently supported language syntax/semantics in the VM-backed implementation. Keep guide examples aligned with passing tests.
 
 ## Table of Contents
 
-1.  [Getting Started](#getting-started)
-    *   [Building and Running Limit](#building-and-running-limit)
-2.  [Basic Syntax](#basic-syntax)
-    *   [Variables](#variables)
-    *   [Primitive Types](#primitive-types)
-    *   [Comments](#comments)
-    *   [Print Statements](#print-statements)
-    *   [String Interpolation](#string-interpolation)
-3.  [Control Flow](#control-flow)
-    *   [If-Else Statements](#if-else-statements)
-    *   [For Loops](#for-loops)
-    *   [While Loops](#while-loops)
-    *   [Iter Loops](#iter-loops)
-    *   [Ternary Operator](#ternary-operator)
-    *   [Match Statements](#match-statements)
-4.  [Data Structures](#data-structures)
-    *   [Lists](#lists)
-    *   [Dictionaries](#dictionaries)
-5.  [Functions](#functions)
-    *   [Defining Functions](#defining-functions)
-    *   [Parameters](#parameters)
-    *   [Return Values](#return-values)
-    *   [Optional Parameters](#optional-parameters)
-    *   [Default Parameters](#default-parameters)
-    *   [Higher-Order Functions](#higher-order-functions)
-    *   [Closures](#closures)
-6.  [Frames](#frames)
-    *   [Defining Frames](#defining-frames)
-    *   [Frame Members and Modifiers](#frame-members-and-modifiers)
-    *   [Fields and Methods](#fields-and-methods)
-    *   [The `init` Constructor](#the-init-constructor)
-    *   [The `self` Keyword](#the-self-keyword)
-    *   [Trait-Based Composition](#trait-based-composition)
-7.  [Modules and Imports](#modules-and-imports)
-    *   [Defining a Module](#defining-a-module)
-    *   [Importing a Module](#importing-a-module)
-    *   [Import with an Alias](#import-with-an-alias)
-    *   [Importing Specific Symbols](#importing-specific-symbols)
-    *   [Hiding Imported Symbols](#hiding-imported-symbols)
-    *   [Module Declarations](#module-declarations)
-8.  [The Type System](#the-type-system)
-    *   [Type Aliases](#type-aliases)
-    *   [Union Types](#union-types)
-    *   [Optional Values and Error Handling](#optional-values-and-error-handling)
-    *   [The Unified `Type?` System](#the-unified-type-system)
-    *   [The `?` Operator](#the--operator)
-9.  [Concurrency](#concurrency)
-    *   [Structured Concurrency](#structured-concurrency)
-    *   [`parallel` Blocks for CPU-Bound Tasks](#parallel-blocks-for-cpu-bound-tasks)
-    *   [`concurrent` Blocks for I/O-Bound Tasks](#concurrent-blocks-for-io-bound-tasks)
-    *   [Channels](#channels)
-    *   [Async/Await](#asyncawait)
-    *   [Atomics](#atomics)
+1. [Getting Started](#getting-started)
+ * [Building and Running Limit](#building-and-running-limit)
+2. [Basic Syntax](#basic-syntax)
+ * [Variables](#variables)
+ * [Primitive Types](#primitive-types)
+ * [Comments](#comments)
+ * [Print Statements](#print-statements)
+ * [String Interpolation](#string-interpolation)
+3. [Control Flow](#control-flow)
+ * [If-Else Statements](#if-else-statements)
+ * [For Loops](#for-loops)
+ * [While Loops](#while-loops)
+ * [Iter Loops](#iter-loops)
+ * [Match Statements](#match-statements)
+4. [Data Structures](#data-structures)
+ * [Lists](#lists)
+ * [Dictionaries](#dictionaries)
+5. [Functions](#functions)
+ * [Defining Functions](#defining-functions)
+ * [Parameters](#parameters)
+ * [Return Values](#return-values)
+ * [Optional Parameters](#optional-parameters)
+ * [Default Parameters](#default-parameters)
+ * [Higher-Order Functions](#higher-order-functions)
+ * [Closures](#closures)
+6. [Frames](#frames)
+ * [Defining Frames](#defining-frames)
+ * [Frame Members and Modifiers](#frame-members-and-modifiers)
+ * [Fields and Methods](#fields-and-methods)
+ * [The `init` Constructor](#the-init-constructor)
+ * [The `self` Keyword](#the-self-keyword)
+ * [Trait-Based Composition](#trait-based-composition)
+7. [Modules and Imports](#modules-and-imports)
+ * [Defining a Module](#defining-a-module)
+ * [Importing a Module](#importing-a-module)
+ * [Import with an Alias](#import-with-an-alias)
+ * [Importing Specific Symbols](#importing-specific-symbols)
+ * [Hiding Imported Symbols](#hiding-imported-symbols)
+ * [Module Declarations](#module-declarations)
+8. [The Type System](#the-type-system)
+ * [Type Aliases](#type-aliases)
+ * [Union Types](#union-types)
+ * [Optional Values and Error Handling](#optional-values-and-error-handling)
+ * [The Unified `Type?` System](#the-unified-type-system)
+ * [The `?` Operator](#the--operator)
+9. [Concurrency](#concurrency)
+ * [Structured Concurrency](#structured-concurrency)
+ * [`parallel` Blocks for CPU-Bound Tasks](#parallel-blocks-for-cpu-bound-tasks)
+ * [`concurrent` Blocks for I/O-Bound Tasks](#concurrent-blocks-for-io-bound-tasks)
+ * [Channels](#channels)
+ * [Async/Await](#asyncawait)
+ * [Atomics](#atomics)
 - [Tasks](#tasks)
 
 ---
@@ -70,46 +70,52 @@ This section covers how to build the Limit compiler and run Limit programs.
 ### Building and Running Limit
 
 **Prerequisites:**
-- A C++17 compatible compiler (like g++)
-- `make`
+- A C++20 compatible compiler (such as GCC 11+, Clang 13+, or MSVC)
+- GNU `make` (or CMake 3.20+)
 - For Windows: MSYS2 with MinGW64 is required.
 
 **Build Instructions:**
 
-You can build the project using `make`, a Windows batch script, or a Unix shell script. The recommended method is using `make linux`.
+You can build the project using `make`:
 
-*   **Using Make (recommended for cross-platform):**
-    By default, this builds the release version.
-    ```bash
-    make linux
-    ```
+* **Using Make (recommended for cross-platform):**
+  By default, this builds the release version into `bin/limitly` (or `bin/limitly.exe` on Windows).
+  ```bash
+  make
+  ```
 
-*   **Using Windows Batch (MSYS2/MinGW64):**
-    The script is located in the `docs` directory.
-    ```bash
-    docs\\build.bat
-    ```
+* **Debug Build:**
+  ```bash
+  make MODE=debug
+  ```
 
-*   **Using Unix Shell:**
-    The script is located in the `docs` directory.
-    ```bash
-    ./docs/build.sh
-    ```
+**Running the Compiler & VM:**
 
-**Running the Interpreter:**
+The `limitly` executable is the compiler and driver for the Limit language, located in `bin/`.
 
-The `limitly` executable is the interpreter for the Limit language, located in `bin/`. It can be used to execute source files, inspect the compilation process, or start an interactive session (REPL).
+* **Execute a source file using the Register VM:**
+  ```bash
+  ./bin/limitly run your_script.lm
+  ```
 
-*   **Execute a source file:**
-    ```bash
-    ./bin/limitly your_script.lm
-    ```
+* **Execute with debug tracing:**
+  ```bash
+  ./bin/limitly run -debug your_script.lm
+  ```
 
-*   **Start the REPL (interactive mode):**
-    Simply run the interpreter without any arguments:
-    ```bash
-    ./bin/limitly
-    ```
+* **Compile to native binary using Fyra AOT backend:**
+  ```bash
+  ./bin/limitly build -o output_binary your_script.lm
+  ```
+
+* **Inspect Intermediate Representations:**
+  ```bash
+  ./bin/limitly -ast your_script.lm     # Abstract Syntax Tree
+  ./bin/limitly -cst your_script.lm     # Concrete Syntax Tree
+  ./bin/limitly -tokens your_script.lm  # Token stream
+  ./bin/limitly -lir your_script.lm     # Low-level Intermediate Representation
+  ./bin/limitly -fyra-ir your_script.lm # Fyra Native IR
+  ```
 
 ## Basic Syntax
 
@@ -145,13 +151,13 @@ var c: int = 3;
 
 Limit has several built-in primitive types:
 
-*   **`int`**: A signed integer (e.g., `10`, `-5`, `0`).
-*   **`uint`**: An unsigned integer.
-*   **`float`**: A floating-point number (e.g., `3.14`, `-0.01`).
-*   **`decimal`**: Fixed-precision decimal (default scale 4). Also supports `d2`, `d4`, `d6`.
-*   **`bool`**: A boolean value, which can be `true` or `false`.
-*   **`str`**: A string of characters (e.g., `"Hello, World!"`).
-*   **`nil`**: A special value representing "nothing" or "null".
+* **`int`**: A signed integer (e.g., `10`, `-5`, `0`).
+* **`uint`**: An unsigned integer.
+* **`float`**: A floating-point number (e.g., `3.14`, `-0.01`).
+* **`decimal`**: Fixed-precision decimal (default scale 4). Also supports `d2`, `d4`, `d6`.
+* **`bool`**: A boolean value, which can be `true` or `false`.
+* **`str`**: A string of characters (e.g., `"Hello, World!"`).
+* **`nil`**: A special value representing "nothing" or "null".
 
 ```
 var my_integer: int = 42;
@@ -212,11 +218,11 @@ Limit provides several constructs for controlling the flow of execution in your 
 var score = 85;
 
 if (score >= 90) {
-    print("Grade: A");
+ print("Grade: A");
 } else if (score >= 80) {
-    print("Grade: B"); // This will be executed
+ print("Grade: B"); // This will be executed
 } else {
-    print("Grade: C or lower");
+ print("Grade: C or lower");
 }
 ```
 
@@ -227,15 +233,15 @@ var isActive = true;
 var isMember = false;
 
 if (isActive and isMember) {
-    print("Welcome, active member!");
+ print("Welcome, active member!");
 }
 
 if (isActive or isMember) {
-    print("Thank you for your interest!");
+ print("Thank you for your interest!");
 }
 
 if (!isMember) {
-    print("Please consider becoming a member.");
+ print("Please consider becoming a member.");
 }
 ```
 
@@ -246,12 +252,12 @@ Limit supports C-style `for` loops, which consist of an initializer, a condition
 ```
 // Loop from 0 to 4
 for (var i = 0; i < 5; i = i + 1) {
-    print("i = {i}");
+ print("i = {i}");
 }
 
 // Countdown from 3 to 1
 for (var j = 3; j > 0; j = j - 1) {
-    print("j = {j}");
+ print("j = {j}");
 }
 ```
 
@@ -262,8 +268,8 @@ for (var j = 3; j > 0; j = j - 1) {
 ```
 var count = 0;
 while (count < 3) {
-    print("count = {count}");
-    count += 1;
+ print("count = {count}");
+ count += 1;
 }
 ```
 
@@ -272,14 +278,14 @@ You can use `break` to exit a loop early and `continue` to skip to the next iter
 ```
 var i = 0;
 while (i < 10) {
-    if (i == 5) {
-        break; // Exit the loop when i is 5
-    }
-    i += 1;
-    if (i % 2 == 0) {
-        continue; // Skip even numbers
-    }
-    print(i); // Prints 1, 3
+ if (i == 5) {
+ break; // Exit the loop when i is 5
+ }
+ i += 1;
+ if (i % 2 == 0) {
+ continue; // Skip even numbers
+ }
+ print(i); // Prints 1, 3
 }
 ```
 
@@ -290,7 +296,7 @@ The `iter` loop is a modern way to iterate over ranges. The range `start..end` i
 ```limit
 // Iterate from 1 to 4
 iter (i in 1..5) {
-    print("i = {i}");
+ print("i = {i}");
 }
 ```
 
@@ -299,7 +305,7 @@ You can also specify a step value for the range.
 ```limit
 // Iterate from 0 to 9 with a step of 2
 iter (i in 0..10..2) {
-    print("i = {i}"); // Output: 0, 2, 4, 6, 8
+ print("i = {i}"); // Output: 0, 2, 4, 6, 8
 }
 ```
 > **Note:** The step value feature is planned but not yet fully implemented in the parser.
@@ -323,9 +329,9 @@ A `match` statement can match against literal values:
 ```
 var x = 2;
 match (x) {
-    1 => { print("One"); },
-    2 => { print("Two"); }, // This branch is executed
-    _ => { print("Something else"); } // The `_` is a wildcard
+ 1 => { print("One"); },
+ 2 => { print("Two"); }, // This branch is executed
+ _ => { print("Something else"); } // The `_` is a wildcard
 }
 ```
 
@@ -333,14 +339,14 @@ It can also match based on type:
 
 ```
 fn printType(value) {
-    match (value) {
-        int => { print("It's an integer."); },
-        str => { print("It's a string."); },
-        _   => { print("It's some other type."); }
-    }
+ match (value) {
+ int => { print("It's an integer."); },
+ str => { print("It's a string."); },
+ _ => { print("It's some other type."); }
+ }
 }
 
-printType(10);     // Output: It's an integer.
+printType(10); // Output: It's an integer.
 printType("hello"); // Output: It's a string.
 ```
 
@@ -349,9 +355,9 @@ You can add conditions to your patterns using `where` guards:
 ```
 var value = 15;
 match (value) {
-    x where x > 10 => { print("{x} is greater than 10"); },
-    x where x < 10 => { print("{x} is less than 10"); },
-    _              => { print("It must be 10"); }
+ x where x > 10 => { print("{x} is greater than 10"); },
+ x where x < 10 => { print("{x} is less than 10"); },
+ _ => { print("It must be 10"); }
 }
 ```
 
@@ -365,19 +371,19 @@ You can match on the structure of an enum or a struct and bind its inner values 
 
 ```limit
 enum Option {
-    Some(any),
-    None
+ Some(any),
+ None
 }
 
 fn print_option(opt: Option) {
-    match (opt) {
-        Some(value) => { print("Value is {value}"); },
-        None => { print("No value"); }
-    }
+ match (opt) {
+ Some(value) => { print("Value is {value}"); },
+ None => { print("No value"); }
+ }
 }
 
 print_option(Some(10)); // Output: Value is 10
-print_option(None);     // Output: No value
+print_option(None); // Output: No value
 ```
 
 You can also destructure records or objects with a similar syntax:
@@ -386,9 +392,9 @@ You can also destructure records or objects with a similar syntax:
 type Person = {name: str, age: int};
 
 fn greet(p: Person) {
-    match (p) {
-        {name: n, age: a} => { print("{n} is {a} years old."); }
-    }
+ match (p) {
+ {name: n, age: a} => { print("{n} is {a} years old."); }
+ }
 }
 
 greet({name: "Alice", age: 30}); // Output: Alice is 30 years old.
@@ -400,17 +406,17 @@ You can destructure dictionaries to bind values to variables based on their keys
 
 ```limit
 var person = {
-    "name": "Alice",
-    "age": 30,
-    "city": "New York"
+ "name": "Alice",
+ "age": 30,
+ "city": "New York"
 };
 
 match (person) {
-    {name: n, age: a, ...rest} => {
-        print("{n} is {a} years old.");
-        print("Other info: {rest}");
-    },
-    _ => { print("Not a person."); }
+ {name: n, age: a, ...rest} => {
+ print("{n} is {a} years old.");
+ print("Other info: {rest}");
+ },
+ _ => { print("Not a person."); }
 }
 // Output:
 // Alice is 30 years old.
@@ -425,13 +431,13 @@ You can destructure lists to bind elements to variables. The `...` syntax can be
 var my_list = [1, 2, 3, 4];
 
 match (my_list) {
-    [] => { print("Empty list"); },
-    [x] => { print("Single element: {x}"); },
-    [a, b, ...rest] => {
-        print("First: {a}, Second: {b}");
-        print("Rest: {rest}");
-    },
-    _ => { print("Some other list"); }
+ [] => { print("Empty list"); },
+ [x] => { print("Single element: {x}"); },
+ [a, b, ...rest] => {
+ print("First: {a}, Second: {b}");
+ print("Rest: {rest}");
+ },
+ _ => { print("Some other list"); }
 }
 // Output:
 // First: 1, Second: 2
@@ -446,8 +452,8 @@ Tuples can be destructured in a similar way.
 var my_tuple = ("Jules", 42);
 
 match (my_tuple) {
-    (name, age) => { print("{name} is {age} years old."); },
-    _ => { print("Not a person tuple."); }
+ (name, age) => { print("{name} is {age} years old."); },
+ _ => { print("Not a person tuple."); }
 }
 // Output: Jules is 42 years old.
 ```
@@ -479,9 +485,9 @@ A dictionary is an unordered collection of key-value pairs. Dictionaries are cre
 
 ```
 var person = {
-    "name": "Alice",
-    "age": 30,
-    "city": "New York"
+ "name": "Alice",
+ "age": 30,
+ "city": "New York"
 };
 ```
 
@@ -489,7 +495,7 @@ You can access values in a dictionary using their keys.
 
 ```
 print(person["name"]); // Output: Alice
-print(person["age"]);  // Output: 30
+print(person["age"]); // Output: 30
 ```
 
 ### Tuples
@@ -514,8 +520,8 @@ Object literals provide a way to create instances of user-defined types, like fr
 
 ```limit
 enum Option {
-    Some(any),
-    None
+ Some(any),
+ None
 }
 
 var my_option = Some { value: 42 };
@@ -531,7 +537,7 @@ Functions are defined using the `fn` keyword.
 
 ```
 fn sayHello() {
-    print("Hello, from a function!");
+ print("Hello, from a function!");
 }
 
 // Call the function
@@ -544,7 +550,7 @@ Functions can accept parameters. You must specify the type of each parameter.
 
 ```
 fn greet(name: str) {
-    print("Hello, {name}!");
+ print("Hello, {name}!");
 }
 
 greet("Alice"); // Output: Hello, Alice!
@@ -556,7 +562,7 @@ Functions can return a value using the `return` keyword. The return type must be
 
 ```
 fn add(a: int, b: int): int {
-    return a + b;
+ return a + b;
 }
 
 var sum: int = add(5, 10);
@@ -569,15 +575,15 @@ You can make a parameter optional by adding a `?` to its type. Inside the functi
 
 ```
 fn greet_optional(name: str?) {
-    if (name) {
-        print("Hello, {name}!");
-    } else {
-        print("Hello, stranger!");
-    }
+ if (name) {
+ print("Hello, {name}!");
+ } else {
+ print("Hello, stranger!");
+ }
 }
 
 greet_optional("Bob"); // Output: Hello, Bob!
-greet_optional();      // Output: Hello, stranger!
+greet_optional(); // Output: Hello, stranger!
 ```
 
 ### Default Parameters
@@ -586,11 +592,11 @@ You can assign a default value to a parameter, which will be used if the caller 
 
 ```
 fn greet_default(name: str = "World") {
-    print("Hello, {name}!");
+ print("Hello, {name}!");
 }
 
-greet_default();          // Output: Hello, World!
-greet_default("Alice");   // Output: Hello, Alice!
+greet_default(); // Output: Hello, World!
+greet_default("Alice"); // Output: Hello, Alice!
 ```
 
 ### Higher-Order Functions
@@ -600,11 +606,11 @@ Functions are first-class citizens in Limit, which means they can be passed as a
 ```
 // This function takes another function as a parameter
 fn apply(x: int, y: int, operation: fn(int, int): int): int {
-    return operation(x, y);
+ return operation(x, y);
 }
 
 fn multiply(a: int, b: int): int {
-    return a * b;
+ return a * b;
 }
 
 var result: int = apply(10, 5, multiply);
@@ -617,12 +623,12 @@ A function can be defined inside another function. This inner function "captures
 
 ```
 fn createCounter(): fn(): int {
-    var count: int = 0;
-    fn increment(): int {
-        count += 1;
-        return count;
-    }
-    return increment;
+ var count: int = 0;
+ fn increment(): int {
+ count += 1;
+ return count;
+ }
+ return increment;
 }
 
 var counter: fn(): int = createCounter();
@@ -643,11 +649,11 @@ Frames are defined using the `frame` keyword.
 
 ```limit
 frame Greeter {
-    var name: str = "World";
+ var name: str = "World";
 
-    fn say_hello() {
-        print("Hello, {self.name}!");
-    }
+ fn say_hello() {
+ print("Hello, {self.name}!");
+ }
 }
 
 var greeter: Greeter = Greeter();
@@ -662,19 +668,19 @@ Limit provides several modifiers to control the behavior and visibility of frame
 
 You can control the visibility of frame members (fields and methods) using `pub` (public) and `prot` (protected). By default, all members are **private** (there is no explicit `private` keyword).
 
-*   **private** (default): The member can only be accessed from within the frame or module.
-*   **`prot`** (protected): The member can be accessed from within the frame and by its subframes.
-*   **`pub`** (public): The member can be accessed from anywhere.
+* **private** (default): The member can only be accessed from within the frame or module.
+* **`prot`** (protected): The member can be accessed from within the frame and by its subframes.
+* **`pub`** (public): The member can be accessed from anywhere.
 
 ```limit
 frame MyFrame {
-    var private_field = 1;      // private by default
-    pub var public_field = 2;
-    prot var protected_field = 3;
+ var private_field = 1; // private by default
+ pub var public_field = 2;
+ prot var protected_field = 3;
 
-    fn private_method() {}      // private by default
-    pub fn public_method() {}
-    prot fn protected_method() {}
+ fn private_method() {} // private by default
+ pub fn public_method() {}
+ prot fn protected_method() {}
 }
 ```
 
@@ -684,11 +690,11 @@ You can declare `static` fields and methods, which belong to the frame itself ra
 
 ```limit
 frame Counter {
-    static count: int = 0;
+ static count: int = 0;
 
-    static fn increment() {
-        Counter.count = Counter.count + 1;
-    }
+ static fn increment() {
+ Counter.count = Counter.count + 1;
+ }
 }
 
 Counter.increment();
@@ -701,19 +707,19 @@ An `abstract` frame cannot be instantiated directly and is meant to be subframed
 
 ```limit
 abstract frame Shape {
-    abstract fn area(): float { return 0.0; }
+ abstract fn area(): float { return 0.0; }
 }
 
 frame Circle : Shape {
-    pub radius: float;
+ pub radius: float;
 
-    pub init(r: float) {
-        self.radius = r;
-    }
+ pub init(r: float) {
+ self.radius = r;
+ }
 
-    pub fn area(): float {
-        return 3.14 * self.radius * self.radius;
-    }
+ pub fn area(): float {
+ return 3.14 * self.radius * self.radius;
+ }
 }
 ```
 
@@ -725,7 +731,7 @@ A `final` frame cannot be subframed. A `final` method cannot be overridden by a 
 final frame Uninheritable {}
 
 frame Parent {
-    final fn cannot_override() {}
+ final fn cannot_override() {}
 }
 ```
 
@@ -735,21 +741,21 @@ Frame modifiers in Limitly include `abstract` and `final`. `abstract` frames can
 
 ```limit
 trait Identifiable {
-    fn id(): int;
+ fn id(): int;
 }
 
 frame User: Identifiable {
-    pub user_id: int;
-    pub name: str;
+ pub user_id: int;
+ pub name: str;
 
-    pub init(id: int, name: str) {
-        self.user_id = id;
-        self.name = name;
-    }
+ pub init(id: int, name: str) {
+ self.user_id = id;
+ self.name = name;
+ }
 
-    pub fn id(): int {
-        return self.user_id;
-    }
+ pub fn id(): int {
+ return self.user_id;
+ }
 }
 
 var user = User(1, "Alice");
@@ -766,17 +772,17 @@ The `init` method is a special method that acts as the frame constructor. It is 
 
 ```
 frame Person {
-    var name: str;
-    var age: int;
+ var name: str;
+ var age: int;
 
-    fn init(name_param: str, age_param: int) {
-        self.name = name_param;
-        self.age = age_param;
-    }
+ fn init(name_param: str, age_param: int) {
+ self.name = name_param;
+ self.age = age_param;
+ }
 
-    fn introduce() {
-        print("Hi, I'm {self.name} and I'm {self.age} years old.");
-    }
+ fn introduce() {
+ print("Hi, I'm {self.name} and I'm {self.age} years old.");
+ }
 }
 
 var person: Person = Person("Jules", 28);
@@ -793,24 +799,24 @@ Limit does not support frame inheritance. Instead, use **traits** to define shar
 
 ```limit
 trait Speaker {
-    fn speak();
+ fn speak();
 }
 
 frame Dog : Speaker {
-    fn speak() {
-        print("Woof!");
-    }
+ fn speak() {
+ print("Woof!");
+ }
 }
 
 frame Cat : Speaker {
-    fn speak() {
-        print("Meow!");
-    }
+ fn speak() {
+ print("Meow!");
+ }
 }
 
 var speakers: [Speaker] = [Dog(), Cat()];
 iter (s in speakers) {
-    s.speak();
+ s.speak();
 }
 // Output:
 // Woof!
@@ -821,13 +827,13 @@ Traits can also provide default method implementations:
 
 ```limit
 trait Greeter {
-    fn greet() {
-        print("Hello there!");
-    }
+ fn greet() {
+ print("Hello there!");
+ }
 }
 
 frame Friendly : Greeter {
-    // Inherits the default greet() implementation
+ // Inherits the default greet() implementation
 }
 
 var f: Friendly = Friendly();
@@ -845,7 +851,7 @@ A module is simply a Limit source file. For example, you could have a file named
 ```limit
 // my_module.lm
 fn greet() {
-    print("Hello from my_module!");
+ print("Hello from my_module!");
 }
 
 var my_variable = 123;
@@ -901,11 +907,11 @@ For more explicit control over what a module exposes, you can use a `module` blo
 ```limit
 // in file my_app_utils.lm
 module my_app_utils {
-    pub fn format_user(name: str): str {
-        return "User: {name}";
-    }
+ pub fn format_user(name: str): str {
+ return "User: {name}";
+ }
 
-    var api_key = "secret"; // private by default
+ var api_key = "secret"; // private by default
 }
 ```
 
@@ -920,7 +926,7 @@ Limit supports lambda expressions, also known as anonymous functions. These are 
 ```limit
 // A lambda that adds two numbers
 var add = fn(a: int, b: int): int {
-    return a + b;
+ return a + b;
 };
 
 var result = add(5, 10);
@@ -931,7 +937,7 @@ Lambdas are particularly useful when working with higher-order functions.
 
 ```limit
 fn apply(x: int, y: int, operation: fn(int, int): int): int {
-    return operation(x, y);
+ return operation(x, y);
 }
 
 // Pass a lambda directly to the apply function
@@ -955,8 +961,8 @@ print("{name} is {age} years old."); // Output: Alice is 30 years old.
 
 ```limit
 unsafe {
-    var ptr = ffi_alloc(64);
-    ffi_free(ptr);
+ var ptr = ffi_alloc(64);
+ ffi_free(ptr);
 }
 ```
 
@@ -966,8 +972,8 @@ unsafe {
 
 ```limit
 fn divide(a: int, b: int): int {
-    contract(BUFFER_SIZE > 0, "Buffer size must be positive");
-    return a / b;
+ contract(BUFFER_SIZE > 0, "Buffer size must be positive");
+ return a / b;
 }
 ```
 
@@ -977,7 +983,7 @@ Staged compile-time execution allows expressions and blocks to be evaluated duri
 
 ```limit
 staged {
-    var my_compile_time_var = 123;
+ var my_compile_time_var = 123;
 }
 ```
 
@@ -1004,8 +1010,8 @@ A union type is a type that can hold a value of one of several different types. 
 ```limit
 type Number = int | float;
 
-var my_num: Number = 10;       // This is valid
-my_num = 3.14;                 // This is also valid
+var my_num: Number = 10; // This is valid
+my_num = 3.14; // This is also valid
 ```
 
 Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
@@ -1016,17 +1022,17 @@ An intersection type is a type that combines multiple types into one. A value of
 
 ```limit
 trait HasName {
-    fn get_name(): str;
+ fn get_name(): str;
 }
 
 trait HasAge {
-    fn get_age(): int;
+ fn get_age(): int;
 }
 
 type Person = HasName and HasAge;
 
 fn print_person_details(p: Person) {
-    print("{p.get_name()} is {p.get_age()} years old.");
+ print("{p.get_name()} is {p.get_age()} years old.");
 }
 ```
 
@@ -1038,7 +1044,7 @@ A refined type allows you to add constraints to an existing type. This is useful
 type PositiveInt = int where value > 0;
 
 fn set_age(age: PositiveInt) {
-    // ...
+ // ...
 }
 
 set_age(10); // Valid
@@ -1053,7 +1059,7 @@ A structural type allows you to define a type based on its structure or shape, r
 type Point = {x: float, y: float};
 
 fn print_point(p: Point) {
-    print("({p.x}, {p.y})");
+ print("({p.x}, {p.y})");
 }
 
 var my_point = {x: 10.5, y: 20.0};
@@ -1075,10 +1081,10 @@ Enums (enumerations) allow you to define a type that can only be one of a specif
 
 ```limit
 enum Status {
-    Pending,
-    Running,
-    Completed,
-    Failed
+ Pending,
+ Running,
+ Completed,
+ Failed
 }
 
 var current_status: Status = Status.Running;
@@ -1090,13 +1096,13 @@ Traits and interfaces are used to define a set of methods that a frame must impl
 
 ```limit
 trait Speaker {
-    fn speak();
+ fn speak();
 }
 
 frame Dog : Speaker {
-    fn speak() {
-        print("Woof!");
-    }
+ fn speak() {
+ print("Woof!");
+ }
 }
 ```
 
@@ -1112,15 +1118,15 @@ When a value can be present or absent, you should use the `Option` enum, which h
 
 ```limit
 enum Option {
-    Some(any),
-    None
+ Some(any),
+ None
 }
 
 fn find_user(id: int): Option {
-    if (id == 1) {
-        return Some("Alice");
-    }
-    return None;
+ if (id == 1) {
+ return Some("Alice");
+ }
+ return None;
 }
 ```
 
@@ -1129,8 +1135,8 @@ You can then use a `match` statement to safely handle both cases:
 ```limit
 var user = find_user(1);
 match (user) {
-    Some(name) => { print("Found user: {name}"); },
-    None => { print("User not found"); }
+ Some(name) => { print("Found user: {name}"); },
+ None => { print("User not found"); }
 }
 ```
 
@@ -1142,33 +1148,33 @@ For operations that can either succeed or fail, Limit uses a `Result` type (ofte
 
 ```limit
 fn divide(a: int, b: int): int?DivisionByZero {
-    if (b == 0) {
-        return err(DivisionByZero("Cannot divide by zero"));
-    }
-    return ok(a / b);
+ if (b == 0) {
+ return err(DivisionByZero("Cannot divide by zero"));
+ }
+ return ok(a / b);
 }
 
 var result = divide(10, 2);
 match (result) {
-    val value => { print("Result: {value}"); },
-    err e => { print("Error: {e}"); }
+ val value => { print("Result: {value}"); },
+ err e => { print("Error: {e}"); }
 }
 ```
 
 ### The Unified `Type?` System
 
-For convenience, Limit provides the `Type?` syntax as a shorthand for fallible operations. The `Type?` syntax is syntactic sugar for `Result<Type, DefaultError>`.
-- **`Type?`**: A type that can either hold a value of `Type` or an error.
+Limit provides the native `Type?` syntax as a zero-cost compiler-level error union for fallible operations. Rather than generic `Result<T, E>` or `Option<T>` wrappers, `Type?` is built directly into the type system:
+- **`Type?`**: A type that can either hold a value of `Type` or a runtime error condition.
 - **`ok(value)`**: Constructs a success value.
-- **`err()`**: Constructs an error value.
+- **`err()`**: Constructs a generic error value (or `err(SpecificError)`).
 
 ### The `?` Operator for Propagating Errors
 
-The `?` operator is a convenient way to propagate errors up the call stack. If a function call returns an `Err`, the `?` operator will immediately return that `Err` from the current function.
+The `?` operator propagates errors and absent values up the call stack. If a function call returns an error, the `?` operator immediately returns that error from the current function.
 
 ```limit
 fn get_number_from_string(s: str): int? {
-    var number: int = to_int(s)?; // If to_int returns Err, this function also returns Err
+    var number: int = to_int(s)?; // If to_int returns err(), this function returns err()
     return ok(number * 2);
 }
 ```
@@ -1179,14 +1185,14 @@ You can use the `? else` construct to handle an error inline and provide a defau
 
 ```limit
 var value: int = divide(10, 0)? else {
-    print("Division failed");
-    return 0; // Default value
+ print("Division failed");
+ return 0; // Default value
 };
 // `value` will be 0.
 ```
 
 
-## 🧠 Memory Model
+## Memory Model
 
 Limitly uses a **region-based, deterministic memory model** designed for **low-level performance** without garbage collection.
 All allocation and cleanup are **fully deterministic** and **scope-bound**, but the language automatically manages this through **compiler inference**, not explicit user code.
@@ -1201,8 +1207,8 @@ Instead, the compiler inserts the appropriate region operations behind the scene
 
 ```limitly
 fn main() {
-    var message: str = "Hello Limitly!"
-    print(message)
+ var message: str = "Hello Limitly!"
+ print(message)
 } // region ends here — memory for `message` is deterministically released
 ```
 
@@ -1217,12 +1223,12 @@ Nested scopes form **nested regions**, which are cleaned up hierarchically — t
 
 ```limitly
 fn compute() {
-    var data: str = "temporary"
-    {
-        var temp: str = data
-        print(temp)
-    } // `temp` destroyed here
-    print(data)
+ var data: str = "temporary"
+ {
+ var temp: str = data
+ print(temp)
+ } // `temp` destroyed here
+ print(data)
 } // `data` destroyed here
 ```
 
@@ -1232,9 +1238,9 @@ Limitly’s compiler internally uses `makeLinear` and `makeRef` to manage memory
 They appear during AST lowering to mark ownership and reference semantics.
 
 * **Linear values** (created internally via `makeLinear`) have single ownership.
-  They must be consumed, moved, or destroyed once.
+ They must be consumed, moved, or destroyed once.
 * **References** (created internally via `makeRef`) are safe handles to linear values within the same or outer region.
-  They are invalidated automatically when their region ends.
+ They are invalidated automatically when their region ends.
 
 This allows the compiler to reason about lifetimes, avoid dangling references, and ensure every allocation is destroyed exactly once — all without runtime tracing.
 
@@ -1245,8 +1251,8 @@ The compiler determines where regions begin and end based on lexical scope — y
 
 ```limitly
 fn process() {
-    var buffer: str = "data"
-    print(buffer)
+ var buffer: str = "data"
+ print(buffer)
 } // compiler-inferred region ensures `buffer` is released here
 ```
 
@@ -1270,23 +1276,23 @@ This guarantees **no leaks** and **no invalid memory access** even in exceptiona
 
 ```limitly
 fn open_file(path: str): File? {
-    var f: File = File.open(path) ?else {
-        print("Could not open file")
-        return None
-    }
-    return f
+ var f: File = File.open(path) ?else {
+ print("Could not open file")
+ return None
+ }
+ return f
 } // if `open()` fails, region for `f` is cleaned up before returning
 ```
 
 ### Summary
 
-| Feature                         | Description                                          |
+| Feature | Description |
 | ------------------------------- | ---------------------------------------------------- |
-| **Region-based memory**         | Every scope is a deterministic memory region         |
-| **Compiler-managed lifetimes**  | No manual `makeRef` or `makeLinear` calls            |
+| **Region-based memory** | Every scope is a deterministic memory region |
+| **Compiler-managed lifetimes** | No manual `makeRef` or `makeLinear` calls |
 | **Linear and reference safety** | Ownership and borrowing are verified at compile time |
-| **No GC or tracing runtime**    | Cleanup is static and predictable                    |
-| **Error-safe regions**          | Errors trigger automatic region cleanup              |
+| **No GC or tracing runtime** | Cleanup is static and predictable |
+| **Error-safe regions** | Errors trigger automatic region cleanup |
 
 ### Why It Matters
 
@@ -1303,20 +1309,20 @@ The result is a **deterministic, region-scoped runtime** that feels automatic ye
 
 The `?` operator provides a convenient way to **propagate** both errors and absent values. When you append `?` to an expression that returns a `Type?`:
 
-*   If the value is `Ok(value)`, the operator unwraps the value and the program continues.
-*   If the value is `Err`, the `?` operator will cause the current function to immediately return that `Err`.
+* If the value is `Ok(value)`, the operator unwraps the value and the program continues.
+* If the value is `Err`, the `?` operator will cause the current function to immediately return that `Err`.
 
 This allows you to write cleaner code by avoiding deeply nested `match` statements when you simply want to pass an error or absent value up the call stack.
 
 ```limit
 // Function that might fail to parse
 fn to_int(s: str): int? {
-    // ... implementation that returns ok(parsed_int) or err()
+ // ... implementation that returns ok(parsed_int) or err()
 }
 
 // This function uses '?' to propagate errors/absent values from to_int
 fn get_number_from_string(s: str): int? {
-    var number: int = to_int(s)?; // If to_int returns Err, this function also returns Err
+    var number: int = to_int(s)?; // If to_int returns err(), this function also returns err()
 
     // This code only runs if to_int was successful
     print("Parsing was successful!");
@@ -1324,8 +1330,8 @@ fn get_number_from_string(s: str): int? {
 }
 
 // Example usage:
-var result1 = get_number_from_string("10"); // result1 will be Ok(20)
-var result2 = get_number_from_string("abc"); // result2 will be Err
+var result1 = get_number_from_string("10"); // result1 will be ok(20)
+var result2 = get_number_from_string("abc"); // result2 will be err()
 ```
 
 ### Inline Error Handling with `? else`
@@ -1334,16 +1340,16 @@ The `? else` construct provides a concise way to handle errors or absent values 
 
 ```limit
 fn divide(a: int, b: int): int? {
-    if (b == 0) {
-        return err(); // Division by zero results in absent value (error condition)
-    }
-    return ok(a / b);
+ if (b == 0) {
+ return err(); // Division by zero results in absent value (error condition)
+ }
+ return ok(a / b);
 }
 
 // Use `? else` to provide a default value on failure or absence
 var value: int = divide(10, 0)? else {
-    print("Division failed or result absent");
-    return 0; // Default value 
+ print("Division failed or result absent");
+ return 0; // Default value 
 };
 // `value` will be 0.
 ```
@@ -1368,11 +1374,11 @@ var messages = channel();
 
 // This block will run tasks on multiple cores
 parallel(ch=messages, mode=batch, cores="auto", timeout=10s, onError="stop") {
-    task(i in 1..4) {
-        print("Running task {i}...");
-        // Perform some CPU-intensive work here
-        messages.send("Task {i} is done.");
-    }
+ task(i in 1..4) {
+ print("Running task {i}...");
+ // Perform some CPU-intensive work here
+ messages.send("Task {i} is done.");
+ }
 }
 
 // The block will wait for all tasks to finish
@@ -1380,25 +1386,25 @@ print("All parallel tasks are complete.");
 
 // Process the results
 iter (message in messages) {
-    print("Received: {message}");
+ print("Received: {message}");
 }
 ```
 
 **Parameters for `parallel` and `concurrent` blocks:**
 
-*   `ch`: The channel to be used for communication between tasks.
-*   `mode`: The execution mode. `"batch"` (default for `concurrent`) waits for all tasks to be submitted before execution, while `"fork-join"` (default for `parallel`) executes tasks as they are submitted.
-*   `cores`: (parallel only) The number of CPU cores to use. Can be an integer or `"auto"` (default) to use all available cores.
-*   `onError`: Behavior upon task failure.
-    *   `"stop"` (default): Stop all tasks immediately.
-    *   `"continue"`: Allow other tasks to continue.
-    *   A function reference to a custom error handler.
-*   `timeout`: A duration for the entire block (e.g., `5s`, `100ms`).
-*   `grace`: A grace period for tasks to complete after a timeout is reached.
-*   `onTimeout`: Behavior upon timeout.
-    *   `"partial"` (default): Return results from completed tasks.
-    *   `"stop"`: Stop all tasks.
-    *   A function reference to a custom timeout handler.
+* `ch`: The channel to be used for communication between tasks.
+* `mode`: The execution mode. `"batch"` (default for `concurrent`) waits for all tasks to be submitted before execution, while `"fork-join"` (default for `parallel`) executes tasks as they are submitted.
+* `cores`: (parallel only) The number of CPU cores to use. Can be an integer or `"auto"` (default) to use all available cores.
+* `onError`: Behavior upon task failure.
+ * `"stop"` (default): Stop all tasks immediately.
+ * `"continue"`: Allow other tasks to continue.
+ * A function reference to a custom error handler.
+* `timeout`: A duration for the entire block (e.g., `5s`, `100ms`).
+* `grace`: A grace period for tasks to complete after a timeout is reached.
+* `onTimeout`: Behavior upon timeout.
+ * `"partial"` (default): Return results from completed tasks.
+ * `"stop"`: Stop all tasks.
+ * A function reference to a custom timeout handler.
 
 ### `concurrent` Blocks for I/O-Bound Tasks
 
@@ -1408,14 +1414,14 @@ iter (message in messages) {
 var results = channel();
 
 concurrent(ch=results, mode=batch) {
-    task() {
-        var data = await fetchData(); // Non-blocking network call
-        results.send(data);
-    }
-    task() {
-        var file_content = await readFile("data.txt"); // Non-blocking file I/O
-        results.send(file_content);
-    }
+ task() {
+ var data = await fetchData(); // Non-blocking network call
+ results.send(data);
+ }
+ task() {
+ var file_content = await readFile("data.txt"); // Non-blocking file I/O
+ results.send(file_content);
+ }
 }
 
 print("All concurrent tasks have completed.");
@@ -1437,9 +1443,9 @@ For simple cases of shared state, such as counters, you can use `atomic` variabl
 var shared_counter: atomic = 0;
 
 concurrent {
-    task(i in 1..10) {
-        shared_counter += 1; // This is a thread-safe operation
-    }
+ task(i in 1..10) {
+ shared_counter += 1; // This is a thread-safe operation
+ }
 }
 
 print("Final counter value: {shared_counter}"); // Output: 10
@@ -1451,14 +1457,14 @@ A `task` statement is used inside a `parallel` or `concurrent` block to define a
 
 ```limit
 concurrent {
-    // A simple task
-    task() {
-        print("Task 1");
-    }
+ // A simple task
+ task() {
+ print("Task 1");
+ }
 
-    // A task that iterates over a range
-    task(i in 1..5) {
-        print("Task {i}");
-    }
+ // A task that iterates over a range
+ task(i in 1..5) {
+ print("Task {i}");
+ }
 }
 ```

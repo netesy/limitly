@@ -1,5 +1,3 @@
-// Standard Library Scene Graph Module Index
-
 import std.scene.scene as scene;
 import std.scene.node as node;
 import std.scene.layer as layer;

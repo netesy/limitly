@@ -1,4 +1,3 @@
-// Standard Library String Module
 // Unified implementation of string utilities
 
 fn char_code(ch: str): int {

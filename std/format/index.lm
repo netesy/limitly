@@ -1,5 +1,3 @@
-// Standard Library Format Entrypoint Module
-
 import std.format.formatter as formatter_mod;
 import std.format.printf as printf_mod;
 

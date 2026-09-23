@@ -167,8 +167,7 @@ void TypeChecker::validate_pattern_compatibility(std::shared_ptr<LM::Frontend::A
                         }
                     }
                     if (!found) {
-                        // For structural patterns, we can be more lenient or strict.
-                        // Here we just match what we can.
+                        // For structural patterns, check compatibility with AnyType.
                         validate_pattern_compatibility(field.pattern, type_system.ANY_TYPE, line);
                     }
                 }

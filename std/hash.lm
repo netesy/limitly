@@ -1,4 +1,3 @@
-// Standard Library Hash Module
 // Non-cryptographic hash functions for hash tables, checksums, and general use.
 // For cryptographic hashing (SHA-256, SHA-512, MD5, SHA-1), see std/crypto/hash.lm.
 
@@ -46,8 +45,11 @@ fn fnv1a_64_str(s: str): int {
         var old_lo: int = lo;
         lo = (lo * prime_lo) & 0xFFFFFFFF;
         var cross: int = (old_lo * prime_hi) & 0xFFFFFFFF;
-        lo = (lo + cross) & 0xFFFFFFFF;
-        hi = ((hi * prime_lo) & 0xFFFFFFFF) + ((hi * prime_hi) & 0xFFFFFFFF) + (lo < cross ? 1 : 0);
+        var carry: int = 0;
+        if (lo < cross) {
+            carry = 1;
+        }
+        hi = ((hi * prime_lo) & 0xFFFFFFFF) + ((hi * prime_hi) & 0xFFFFFFFF) + carry;
         hi = hi & 0xFFFFFFFF;
         i = i + 1;
     }
@@ -164,7 +166,7 @@ fn crc32(s: str): int {
             }
             j = j + 1;
         }
-        table = table + [c];
+        append(table, c);
         i = i + 1;
     }
 
@@ -216,9 +218,68 @@ fn hash_with_seed(s: str, seed: int): int {
 fn byte_value(ch: str): int {
     // Simple byte value extraction for ASCII characters
     // Uses ordinal mapping for common characters
-    if (ch >= "a" and ch <= "z") return len(ch) == 1 ? ((ch - "a") + 97) : 0;
-    if (ch >= "A" and ch <= "Z") return len(ch) == 1 ? ((ch - "A") + 65) : 0;
-    if (ch >= "0" and ch <= "9") return len(ch) == 1 ? ((ch - "0") + 48) : 0;
+    if (ch == "a") return 97;
+    if (ch == "b") return 98;
+    if (ch == "c") return 99;
+    if (ch == "d") return 100;
+    if (ch == "e") return 101;
+    if (ch == "f") return 102;
+    if (ch == "g") return 103;
+    if (ch == "h") return 104;
+    if (ch == "i") return 105;
+    if (ch == "j") return 106;
+    if (ch == "k") return 107;
+    if (ch == "l") return 108;
+    if (ch == "m") return 109;
+    if (ch == "n") return 110;
+    if (ch == "o") return 111;
+    if (ch == "p") return 112;
+    if (ch == "q") return 113;
+    if (ch == "r") return 114;
+    if (ch == "s") return 115;
+    if (ch == "t") return 116;
+    if (ch == "u") return 117;
+    if (ch == "v") return 118;
+    if (ch == "w") return 119;
+    if (ch == "x") return 120;
+    if (ch == "y") return 121;
+    if (ch == "z") return 122;
+    if (ch == "A") return 65;
+    if (ch == "B") return 66;
+    if (ch == "C") return 67;
+    if (ch == "D") return 68;
+    if (ch == "E") return 69;
+    if (ch == "F") return 70;
+    if (ch == "G") return 71;
+    if (ch == "H") return 72;
+    if (ch == "I") return 73;
+    if (ch == "J") return 74;
+    if (ch == "K") return 75;
+    if (ch == "L") return 76;
+    if (ch == "M") return 77;
+    if (ch == "N") return 78;
+    if (ch == "O") return 79;
+    if (ch == "P") return 80;
+    if (ch == "Q") return 81;
+    if (ch == "R") return 82;
+    if (ch == "S") return 83;
+    if (ch == "T") return 84;
+    if (ch == "U") return 85;
+    if (ch == "V") return 86;
+    if (ch == "W") return 87;
+    if (ch == "X") return 88;
+    if (ch == "Y") return 89;
+    if (ch == "Z") return 90;
+    if (ch == "0") return 48;
+    if (ch == "1") return 49;
+    if (ch == "2") return 50;
+    if (ch == "3") return 51;
+    if (ch == "4") return 52;
+    if (ch == "5") return 53;
+    if (ch == "6") return 54;
+    if (ch == "7") return 55;
+    if (ch == "8") return 56;
+    if (ch == "9") return 57;
     if (ch == " ") return 32;
     if (ch == "!") return 33;
     if (ch == "\"") return 34;

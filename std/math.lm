@@ -1,5 +1,3 @@
-// Standard Library Math Module
-
 var PI: float = 3.14159265358979323846;
 var E: float = 2.71828182845904523536;
 var TAU: float = 6.28318530717958647692;

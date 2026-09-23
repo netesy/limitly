@@ -1,5 +1,3 @@
-// Standard Library UUID Core Module
-
 frame UUID {
     pub bytes: [int];
     pub is_valid: bool;

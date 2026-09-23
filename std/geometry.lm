@@ -1,4 +1,3 @@
-// Standard Library Geometry Module
 import std.math as math;
 import std.linear_algebra as la;
 

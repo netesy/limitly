@@ -1,5 +1,3 @@
-// Standard Library Algorithm Sort Module
-
 import std.sort as s;
 
 pub fn sort(items: [any]) {

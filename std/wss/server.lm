@@ -1,4 +1,3 @@
-// Standard Library WSS Server Module
 // Provides WebSocket server utilities built on the raw WebSocket client module.
 
 import std.core as core;

@@ -1,5 +1,3 @@
-// Standard Library MIME Module Index
-
 import std.mime.types as types_mod;
 
 pub fn MIMEType(m: str, s: str, p: any, v: bool): any {

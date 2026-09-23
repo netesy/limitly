@@ -1,5 +1,3 @@
-// Standard Library Unicode Entrypoint Module
-
 import std.unicode.rune as rune_mod;
 import std.unicode.category as category_mod;
 import std.unicode.normalize as normalize_mod;

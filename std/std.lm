@@ -1,5 +1,3 @@
-// Standard Library Main Module
-
 import std.core as core;
 import std.collections.index as collections;
 import std.iter as iter;

@@ -1,11 +1,10 @@
-// Standard Library Statistics Module
 import std.math as math;
 import std.sort as sort;
 
 fn sum(items: [any]): float {
     var s = 0.0;
     for (var i = 0; i < len(items); i = i + 1) {
-        s = s + items[i] as float;
+        s = s + (items[i] as float);
     }
     return s;
 }
@@ -21,13 +20,15 @@ fn median(items: [any]): float {
     
     // Create copy for sorting
     var copy = [];
-    for (var i = 0; i < n; i = i + 1) copy = copy + [items[i]];
+    for (var i = 0; i < n; i = i + 1) {
+        append(copy, items[i]);
+    }
     sort.sort(copy);
     
     if (n % 2 == 1) {
         return copy[n / 2] as float;
     } else {
-        return (copy[n / 2 - 1] as float + copy[n / 2] as float) / 2.0;
+        return ((copy[n / 2 - 1] as float) + (copy[n / 2] as float)) / 2.0;
     }
 }
 

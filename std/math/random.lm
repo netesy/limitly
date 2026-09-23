@@ -1,5 +1,3 @@
-// Standard Library Math Random Module
-
 import std.resource as res;
 
 frame Random {

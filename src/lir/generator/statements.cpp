@@ -210,8 +210,6 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
 }
 
 void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
-   // std::cout << "[DEBUG] emit_stmt called with type: " << typeid(stmt).name() << std::endl;
-   
    // Unified region management: emit RegionEnter based on memory_info
    emit_region_enter_from_memory_info(stmt);
     

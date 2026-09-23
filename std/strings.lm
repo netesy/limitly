@@ -1,9 +1,8 @@
-// Standard Library Strings Forwarder Module
-
 import std.string as s;
+import std.string.builder as sb;
 
 pub type String = s.String;
-pub type StringBuilder = s.StringBuilder;
+pub type StringBuilder = sb.StringBuilder;
 
 pub fn length(value: str): int { return s.length(value); }
 pub fn compare(left: str, right: str): int { return s.compare(left, right); }

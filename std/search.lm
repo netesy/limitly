@@ -1,5 +1,3 @@
-// Standard Library Search Module
-
 pub fn linear_search(items: [any], target: any): int {
     for (var i = 0; i < len(items); i = i + 1) {
         if (items[i] == target) return i;

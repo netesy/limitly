@@ -248,7 +248,7 @@ FYRA_AVAILABLE := $(shell if [ -f "$(FYRA_DIR)/include/ir/Module.h" ]; then echo
 ifeq ($(FYRA_AVAILABLE),yes)
 # Build Fyra using Makefile (excluding problematic debug files)
 $(FYRA_LIB): $(FYRA_OBJS)
-	@echo "🔨 Building Fyra library with Makefile..."
+	@echo "[BUILD] Building Fyra library with Makefile..."
 	@mkdir -p $(dir $@)
 	$(AR) rcs $@ $^
 	@echo "[OK] Fyra library built: $@"
@@ -264,7 +264,7 @@ endif
 # Lyra Package Manager
 # =============================
 $(LYRA_BIN): $(LYRA_OBJS) | $(BIN_DIR)
-	@echo "🔨 Building Lyra package manager..."
+	@echo "[BUILD] Building Lyra package manager..."
 	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include $(LYRA_OBJS) -o $@ -lssl -lcrypto
 	@echo "[OK] Lyra built: $@"
 
@@ -290,17 +290,17 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 liblimitly: $(OBJ_DIR)/libLimitly.a
 
 $(OBJ_DIR)/libLimitly.a: $(LIB_LIMITLY_OBJS) $(FYRA_LIB)
-	@echo "🔨 Building libLimitly.a ..."
+	@echo "[BUILD] Building libLimitly.a ..."
 	@mkdir -p $(dir $@)
 	$(AR) rcs $@ $(LIB_LIMITLY_OBJS)
 
 windows: $(BIN_DIR) $(MAIN_RSP) liblimitly $(LYRA_BIN)
-	@echo "🔨 Linking limitly.exe ..."
+	@echo "[BUILD] Linking limitly.exe ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLimitly.a $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS)
 	@echo "[OK] limitly.exe built."
 
 linux: $(BIN_DIR) $(MAIN_RSP) liblimitly ssl-lib
-	@echo "🔨 Linking limitly ..."
+	@echo "[BUILD] Linking limitly ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLimitly.a $(FYRA_LIB) -o $(BIN_DIR)/limitly$(EXE_EXT) $(LIBS) -lpthread
 	@echo "[OK] limitly built."
 
@@ -324,15 +324,15 @@ ifeq ($(PLATFORM),windows)
 else
 	rm -rf build bin $(FYRA_DIR)/build
 endif
-	@echo "🧹 Cleaned build artifacts."
+	@echo "[CLEAN] Cleaned build artifacts."
 
 # Clear generated text files
 clear:
 ifeq ($(PLATFORM),windows)
-	@echo "🧹 Cleaning generated .txt files..."
+	@echo "[CLEAN] Cleaning generated .txt files..."
 	@powershell -Command "Get-ChildItem -Recurse -Include *.ast.txt,*.bytecode.txt,*.cst.txt,*.tokens.txt | Remove-Item -Force -ErrorAction SilentlyContinue"
 else
-	@echo "🧹 Cleaning generated .txt files..."
+	@echo "[CLEAN] Cleaning generated .txt files..."
 	@find . -name "*.ast.txt" -type f -delete 2>/dev/null || true
 	@find . -name "*.bytecode.txt" -type f -delete 2>/dev/null || true
 	@find . -name "*.cst.txt" -type f -delete 2>/dev/null || true
@@ -343,10 +343,10 @@ endif
 # Clean .lm files from root folder only
 clean-lm:
 ifeq ($(PLATFORM),windows)
-	@echo "🧹 Cleaning .lm files from root folder..."
+	@echo "[CLEAN] Cleaning .lm files from root folder..."
 	@powershell -Command "Get-ChildItem -Path . -Filter *.lm -File | Remove-Item -Force -ErrorAction SilentlyContinue"
 else
-	@echo "🧹 Cleaning .lm files from root folder..."
+	@echo "[CLEAN] Cleaning .lm files from root folder..."
 	@find . -maxdepth 1 -name "*.lm" -type f -delete 2>/dev/null || true
 endif
 	@echo "[OK] Root .lm files cleaned (std/ and tests/ preserved)."
@@ -356,7 +356,7 @@ endif
 # Parser Test Target
 # =============================
 parser: $(BIN_DIR) $(TEST_RSP)
-	@echo "🔨 Building test_parser$(EXE_EXT)...."
+	@echo "[BUILD] Building test_parser$(EXE_EXT)...."
 	$(CXX) $(CXXFLAGS) @$(TEST_RSP) -o $(BIN_DIR)/test_parser$(EXE_EXT) $(LIBS)
 	@echo "[OK] $(BIN_DIR)/test_parser$(EXE_EXT) built."
 
@@ -391,7 +391,7 @@ tests: $(PLATFORM) stb-image
 stb-image: $(STB_IMAGE_LIB)
 
 $(STB_IMAGE_LIB): tests/ffi/stb_wrapper.c vendor/stb/stb_image.h vendor/stb/stb_image_write.h
-	@echo "🔨 Building STB image shared library beside limitly in bin/ → $@"
+	@echo "[BUILD] Building STB image shared library beside limitly in bin/ -> $@"
 	$(CC) $(STB_SHARED_FLAGS) \
 		-Ivendor/stb \
 		-o $@ \
@@ -409,7 +409,7 @@ else
 endif
 
 stb-image-android: tests/ffi/stb_wrapper.c vendor/stb/stb_image.h vendor/stb/stb_image_write.h
-	@echo "🔨 Building STB image shared library for Android in bin/ → bin/libstb_image.so"
+	@echo "[BUILD] Building STB image shared library for Android in bin/ -> bin/libstb_image.so"
 	$(ANDROID_CC) -shared -fPIC \
 		-Ivendor/stb \
 		-o bin/libstb_image.so \
@@ -436,12 +436,12 @@ endif
 ssl-lib: $(LIMITLY_SSL_LIB)
 
 $(LIMITLY_SSL_LIB): src/native/openssl_wrapper.c
-	@echo "🔨 Building OpenSSL native bridge beside limitly in bin/ → $@"
+	@echo "[BUILD] Building OpenSSL native bridge beside limitly in bin/ -> $@"
 	$(CC) $(SSL_SHARED_FLAGS) -o $@ src/native/openssl_wrapper.c $(SSL_LIBS)
 	@echo "[OK] $@ built."
 
 ssl-lib-android: src/native/openssl_wrapper.c
-	@echo "🔨 Building OpenSSL native bridge for Android in bin/ → bin/liblimitly_ssl.so"
+	@echo "[BUILD] Building OpenSSL native bridge for Android in bin/ -> bin/liblimitly_ssl.so"
 	$(ANDROID_CC) -shared -fPIC -O2 -o bin/liblimitly_ssl.so src/native/openssl_wrapper.c -lssl -lcrypto
 	@echo "[OK] bin/liblimitly_ssl.so built for Android."
 

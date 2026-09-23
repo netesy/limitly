@@ -1,5 +1,3 @@
-// Standard Library Matrix Module
-
 frame Matrix {
     pub data: [float];
 

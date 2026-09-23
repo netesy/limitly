@@ -1,10 +1,21 @@
-# Foreign Function Interface (FFI) in Limitly (`std.ffi`)
-
-`std.ffi` provides standard, typed C ABI interoperability for Limitly, allowing standard C and C++ dynamic libraries (`.so`, `.dll`, `.dylib`) to be loaded and called safely without exposing internal VM object headers or memory region semantics.
+# Foreign Function Interface (FFI) & Native Delegation in Limitly (`std.ffi`)
 
 ---
 
-## 1. High-Level Public API
+## 1. Overview and Core Philosophy
+
+Limitly uses FFI as an **implementation boundary**, not as the public standard-library API. Public modules retain Limitly-owned types, fallible results (`Type?`), deterministic resource lifetimes, and backend-neutral semantics. A small, versioned native adapter per dependency exposes a stable C ABI; that adapter, rather than arbitrary third-party headers, is loaded and invoked through `std.ffi`.
+
+This architecture follows the proven design of mature systems:
+- Rust hides platform bindings behind safe `std` abstractions.
+- Swift imports C/Objective-C behind Swift value and error types.
+- Dart places native calls behind safe Dart-facing libraries.
+
+---
+
+## 2. High-Level Public API
+
+User code interacts with foreign shared libraries (`.so`, `.dll`, `.dylib`) within `unsafe` blocks:
 
 ```limit
 import std.ffi as ffi;
@@ -15,7 +26,7 @@ fn main() {
         var lib = ffi.load("./libexample.so");
         assert(lib.is_loaded, "Failed to load library");
 
-        // Declare function signature
+        // Declare function signature: func(name, return_type, [param_types])
         var add = lib.func("add_i32", ffi.TYPE_I32, [ffi.TYPE_I32, ffi.TYPE_I32]);
 
         // Invoke native function
@@ -29,7 +40,7 @@ fn main() {
 
 ---
 
-## 2. ABI Type Mapping Table
+## 3. ABI Type Mapping Table
 
 | Limit Type Identification (`std.ffi`) | Native C Type | C++ Type |
 |---|---|---|
@@ -48,9 +59,9 @@ fn main() {
 
 ---
 
-## 3. Unmanaged Memory Operations
+## 4. Unmanaged Memory Operations
 
-Raw unmanaged memory allocation and direct pointer reads/writes require an `unsafe` block:
+Raw unmanaged memory allocation and direct pointer reads/writes are restricted to `unsafe` blocks:
 
 ```limit
 import std.ffi as ffi;
@@ -63,7 +74,7 @@ unsafe {
 }
 ```
 
-Available low-level intrinsics in `std.ffi`:
+### Low-Level Memory Intrinsics
 - `alloc(size: int): pubptr`
 - `free(ptr: pubptr): nil`
 - `realloc(ptr: pubptr, new_size: int): pubptr`
@@ -72,14 +83,11 @@ Available low-level intrinsics in `std.ffi`:
 - `memcpy`, `memset`, `memcmp`
 - `ptr_add`, `ptr_sub`, `ptr_diff`, `ptr_align`, `ptr_is_aligned`
 
-Raw allocations are ownership-tracked. `free` and `realloc` accept only pointers
-returned by `ffi.alloc`/`ffi.realloc`; use a library-specific destructor for
-memory returned by a foreign library. Negative buffer sizes and invalid
-alignments are rejected.
+Raw allocations are ownership-tracked. `free` and `realloc` accept only pointers returned by `ffi.alloc` / `ffi.realloc`. Foreign library allocations must be reclaimed using their matching foreign destructor.
 
 ---
 
-## 4. CString Helpers and Lifetime Rules
+## 5. CString Helpers and Lifetime Rules
 
 ```limit
 var c_str = ffi.string_to_cstring("Hello C");
@@ -87,14 +95,33 @@ var ret_len = strlen_func.call(c_str.ptr);
 ffi.cstring_free(c_str);
 ```
 
-For foreign strings whose allocation is not controlled by Limitly, prefer
-`cstring_to_string_bounded(ptr, capacity)`. It fails when a NUL terminator is not
-found within `capacity`; the unbounded helper is retained for compatibility and
-must only be used with a trusted, known-terminated pointer.
+For foreign strings whose allocation is not controlled by Limitly, use `cstring_to_string_bounded(ptr, capacity)` to prevent buffer overruns if a NUL terminator is absent.
 
 ### Memory Ownership Summary
 | Value / Boundary | Allocator | Owner | Freeing Rule |
 |---|---|---|---|
-| Limit String (`str`) | Limit Runtime GC/VM | Limit VM | Managed by Limit VM; passed as read-only C string pointer across FFI |
+| Limit String (`str`) | Limit Runtime / VM | Limit VM | Managed by Limit VM; passed as read-only pointer across FFI |
 | `ffi.string_to_cstring()` | Host `malloc()` via `std.ffi` | Limit `CString` holder | Explicitly freed via `ffi.cstring_free()` |
-| Native C Allocation (`malloc`) | Native C Library | Native C Library | Native C library owns and frees |
+| Native C Allocation | Native C Library | Native C Library | Native library owns and frees |
+
+---
+
+## 6. Standard-Library Delegation Architecture
+
+Every FFI-backed standard module follows a strict 3-tier layering model:
+
+1. **Safe Limitly Facade**: Validates arguments, owns native resource handles, exposes typed fallible returns (`Type?`), and never exposes raw pointers to user code.
+2. **Private Unsafe Binding**: Performs pure ABI marshalling without business logic.
+3. **Versioned C Adapter**: A C/C++ translation wrapper providing normalized, fixed-width scalars, opaque handles, and stable status codes (e.g., `limitly_native_v1_tls_connect`).
+
+### What to Delegate
+- **`std.net.tls`**: Platform TLS, OpenSSL, or BoringSSL adapter.
+- **`std.crypto`**: Vetted cryptographic libraries for SHA, HMAC, AES, and secure random entropy.
+- **`std.archive`**: zlib / zstd streaming compression adapters.
+- **`std.regex`**: PCRE2 / RE2 engines.
+- **`std.image`**: stb_image / libpng / libjpeg codecs.
+- **`std.unicode`**: utf8proc / ICU normalization.
+
+### What to Keep in Limitly
+- **Pure Language Algorithms**: Collections, iterators, string parsers, URL logic, JSON/TOML decoders, math algorithms.
+- **Runtime Cores**: Task scheduler, fiber lifecycles, memory regions, channels, and error propagation.

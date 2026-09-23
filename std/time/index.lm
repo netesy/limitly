@@ -1,5 +1,3 @@
-// Standard Library Time Entrypoint Module
-
 import std.time.instant as instant_mod;
 import std.time.duration as duration_mod;
 import std.time.datetime as datetime_mod;

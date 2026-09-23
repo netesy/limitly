@@ -1,5 +1,3 @@
-// Standard Library Archive Module - ZIP and TAR entry inspection and extraction
-
 import std.io as io;
 
 frame ArchiveEntry {

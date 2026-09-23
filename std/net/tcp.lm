@@ -1,5 +1,3 @@
-// Standard Library TCP Module
-
 import std.core as core;
 import std.core show Error;
 import std.resource as res;

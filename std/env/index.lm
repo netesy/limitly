@@ -1,5 +1,3 @@
-// Standard Library Environment Entrypoint Module
-
 import std.env.variables as variables_mod;
 import std.env.platform as platform_mod;
 

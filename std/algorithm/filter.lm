@@ -1,5 +1,3 @@
-// Standard Library Algorithm Filter Module
-
 pub fn filter(items: [any], p: fn(any): bool): [any] {
     var res: [any] = [];
     var i = 0;

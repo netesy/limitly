@@ -45,6 +45,47 @@ bool AlgebraicSimplifier::optimize_function(LIR_Function& func) {
             inst.b = UINT32_MAX;
             changed = true;
         }
+
+        // Algebraic simplification 4: Sub reg_a, reg_a -> LoadConst 0 (x - x => 0)
+        if (inst.op == LIR_Op::Sub && inst.a != UINT32_MAX && inst.a == inst.b) {
+            inst.op = LIR_Op::LoadConst;
+            inst.a = UINT32_MAX;
+            inst.b = UINT32_MAX;
+            inst.const_val = 0;
+            changed = true;
+        }
+
+        // Algebraic simplification 5: Xor reg_a, reg_a -> LoadConst 0 (x ^ x => 0)
+        if (inst.op == LIR_Op::Xor && inst.a != UINT32_MAX && inst.a == inst.b) {
+            inst.op = LIR_Op::LoadConst;
+            inst.a = UINT32_MAX;
+            inst.b = UINT32_MAX;
+            inst.const_val = 0;
+            changed = true;
+        }
+
+        // Algebraic simplification 6: Mul reg_a, 0 -> LoadConst 0 (x * 0 => 0)
+        if (inst.op == LIR_Op::Mul && inst.a != UINT32_MAX && inst.b == UINT32_MAX && inst.imm == 0) {
+            inst.op = LIR_Op::LoadConst;
+            inst.a = UINT32_MAX;
+            inst.const_val = 0;
+            changed = true;
+        }
+
+        // Algebraic simplification 7: And reg_a, 0 -> LoadConst 0 (x & 0 => 0)
+        if (inst.op == LIR_Op::And && inst.a != UINT32_MAX && inst.b == UINT32_MAX && inst.imm == 0) {
+            inst.op = LIR_Op::LoadConst;
+            inst.a = UINT32_MAX;
+            inst.const_val = 0;
+            changed = true;
+        }
+
+        // Algebraic simplification 8: Or reg_a, 0 -> Mov reg_a (x | 0 => x)
+        if (inst.op == LIR_Op::Or && inst.a != UINT32_MAX && inst.b == UINT32_MAX && inst.imm == 0) {
+            inst.op = LIR_Op::Mov;
+            inst.b = UINT32_MAX;
+            changed = true;
+        }
     }
 
     return changed;

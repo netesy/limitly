@@ -1,4 +1,3 @@
-// Standard Library Random Module
 import std.math as math;
 import std.resource as res;
 

@@ -1,4 +1,3 @@
-// Standard Library WebSocket Module
 // Uses the native WEBSOCKET resource for real WebSocket connections.
 
 import std.core as core;

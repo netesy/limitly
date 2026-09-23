@@ -1,5 +1,3 @@
-// Standard Library Random Entrypoint Module
-
 import std.random.random as random_mod;
 import std.random.distributions as distributions_mod;
 

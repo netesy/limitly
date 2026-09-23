@@ -1,5 +1,3 @@
-// Standard Library Parse Forwarder Module
-
 import std.parse.index as parse_mod;
 
 frame Parse {

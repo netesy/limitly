@@ -147,13 +147,13 @@ print("\n=== 4. CONTROL FLOW - IF/ELSE ===");
 var score = 85;
 
 if (score >= 90) {
-    print("Grade: A");
+ print("Grade: A");
 } elif (score >= 80) {
-    print("Grade: B");
+ print("Grade: B");
 } elif (score >= 70) {
-    print("Grade: C");
+ print("Grade: C");
 } else {
-    print("Grade: F");
+ print("Grade: F");
 }
 
 // Nested if statements
@@ -161,13 +161,13 @@ var weather = "sunny";
 var temperature = 75;
 
 if (weather == "sunny") {
-    if (temperature > 70) {
-        print("Perfect day for outdoor activities!");
-    } else {
-        print("Sunny but a bit cold.");
-    }
+ if (temperature > 70) {
+ print("Perfect day for outdoor activities!");
+ } else {
+ print("Sunny but a bit cold.");
+ }
 } else {
-    print("Not ideal weather.");
+ print("Not ideal weather.");
 }
 
 // ==========================================
@@ -178,27 +178,27 @@ print("\n=== 5. LOOPS - FOR LOOPS ===");
 // Basic for loop
 print("Basic for loop (0 to 4):");
 for (var i = 0; i < 5; i += 1) {
-    print("i = {i}");
+ print("i = {i}");
 }
 
 // For loop with different increment
 print("For loop with increment 2:");
 for (var j = 0; j < 10; j += 2) {
-    print("j = {j}");
+ print("j = {j}");
 }
 
 // Countdown loop
 print("Countdown loop:");
 for (var k = 5; k > 0; k -= 1) {
-    print("k = {k}");
+ print("k = {k}");
 }
 
 // Nested for loops
 print("Nested for loops (2x3 grid):");
 for (var row = 0; row < 2; row += 1) {
-    for (var col = 0; col < 3; col += 1) {
-        print("({row}, {col})");
-    }
+ for (var col = 0; col < 3; col += 1) {
+ print("({row}, {col})");
+ }
 }
 
 // ==========================================
@@ -209,29 +209,29 @@ print("\n=== 6. LOOPS - ITER LOOPS ===");
 // Basic range iteration
 print("Basic range (1 to 5):");
 iter (i in 1..6) {
-    print("i = {i}");
+ print("i = {i}");
 }
 
 // Range with different bounds
 print("Range (0 to 3):");
 iter (x in 0..4) {
-    print("x = {x}");
+ print("x = {x}");
 }
 
 // Nested iter loops
 // print("Nested iter loops:");
 // iter (i in 1..3) {
-//     iter (j in 10..12) {
-//         print("({i}, {j})");
-//     }
+// iter (j in 10..12) {
+// print("({i}, {j})");
+// }
 // }
 
 // // Mixed nested loops
 // print("Mixed loops (for outer, iter inner):");
 // for (var i = 0; i < 2; i += 1) {
-//     iter (j in 5..7) {
-//         print("for-iter: ({i}, {j})");
-//     }
+// iter (j in 5..7) {
+// print("for-iter: ({i}, {j})");
+// }
 // }
 
 // ==========================================
@@ -243,16 +243,16 @@ print("\n=== 7. LOOPS - WHILE LOOPS ===");
 var count = 0;
 print("While loop (count to 3):");
 while (count < 3) {
-    print("count = {count}");
-    count += 1;
+ print("count = {count}");
+ count += 1;
 }
 
 // While loop with complex condition
 var num = 1;
 print("Powers of 2 less than 20:");
 while (num < 20) {
-    print("num = {num}");
-    num *= 2;
+ print("num = {num}");
+ num *= 2;
 }
 
 // ==========================================
@@ -262,7 +262,7 @@ print("\n=== 8. FUNCTIONS - BASIC ===");
 
 // Simple function without parameters
 fn sayHello(): nil {
-    print("Hello from function!");
+ print("Hello from function!");
 }
 
 print("Calling simple function:");
@@ -270,7 +270,7 @@ sayHello();
 
 // Function with parameters
 fn add(a: int, b: int): int {
-    return a + b;
+ return a + b;
 }
 
 print("Function with parameters:");
@@ -280,7 +280,7 @@ print("add(5, 3) = {addResult}");
 
 // Function with return value
 fn square(x: int): int {
-    return x * x;
+ return x * x;
 }
 
 print("Square function:");
@@ -293,8 +293,8 @@ print("square(7) = {square7}");
 
 // Function with string parameter
 fn greet(name: str): str {
-    print("Hello, {name}!");
-    return "greeted";
+ print("Hello, {name}!");
+ return "greeted";
 }
 
 print("Function with string parameter:");
@@ -302,10 +302,10 @@ greet("Bob");
 
 // Function with local variables
 fn calculate(x: int, y: int): int {
-    var sum: int = x + y;
-    var product: int = x * y;
-    print("Local calculations: sum={sum}, product={product}");
-    return sum * product;
+ var sum: int = x + y;
+ var product: int = x * y;
+ print("Local calculations: sum={sum}, product={product}");
+ return sum * product;
 }
 
 print("Function with locals:");
@@ -315,10 +315,10 @@ print("Result: {calcResult}");
 
 // Recursive function
 fn factorial(n: int): int {
-    if (n <= 1) {
-        return 1;
-    }
-    return n * factorial(n - 1);
+ if (n <= 1) {
+ return 1;
+ }
+ return n * factorial(n - 1);
 }
 
 print("Recursive function:");
@@ -331,34 +331,34 @@ print("\n=== 9. FUNCTIONS - OPTIONAL PARAMETERS ===");
 
 // Function with optional parameter
 fn greetOptional(name: str?): str {
-    if (name) {
-        print("Hello, {name}!");
-        return "greeted {name}";
-    } else {
-        print("Hello, stranger!");
-        return "greeted stranger";
-    }
+ if (name) {
+ print("Hello, {name}!");
+ return "greeted {name}";
+ } else {
+ print("Hello, stranger!");
+ return "greeted stranger";
+ }
 }
 
 print("Testing optional parameter:");
-greetOptional("Charlie");     // Should print "Hello, Charlie!"
-greetOptional();              // Should print "Hello, stranger!"
+greetOptional("Charlie"); // Should print "Hello, Charlie!"
+greetOptional(); // Should print "Hello, stranger!"
 
 // Function with multiple optional parameters
 fn createUser(username: str, email: str?, age: int?): str {
-    print("Creating user: {username}");
-    if (email) {
-        print("Email: {email}");
-    }
-    if (age) {
-        print("Age: {age}");
-    }
-    return "user created";
+ print("Creating user: {username}");
+ if (email) {
+ print("Email: {email}");
+ }
+ if (age) {
+ print("Age: {age}");
+ }
+ return "user created";
 }
 
 print("Testing multiple optional parameters:");
-createUser("alice");                           // Only username
-createUser("bob", "bob@email.com");           // Username and email
+createUser("alice"); // Only username
+createUser("bob", "bob@email.com"); // Username and email
 createUser("charlie", "charlie@email.com", 25); // All parameters
 
 // ==========================================
@@ -368,26 +368,26 @@ print("\n=== 10. FUNCTIONS - DEFAULT PARAMETERS ===");
 
 // Function with default parameter value
 fn greetDefault(name: str = "World"): str {
-    print("Hello, {name}!");
-    return "greeted {name}";
+ print("Hello, {name}!");
+ return "greeted {name}";
 }
 
 print("Testing default parameter:");
-greetDefault();          // Should print "Hello, World!"
-greetDefault("Dave");    // Should print "Hello, Dave!"
+greetDefault(); // Should print "Hello, World!"
+greetDefault("Dave"); // Should print "Hello, Dave!"
 
 // Function with multiple default parameters
 fn createMessage(greeting: str = "Hello", name: str = "User", punctuation: str = "!"): str {
-    var message = "{greeting}, {name}{punctuation}";
-    print(message);
-    return message;
+ var message = "{greeting}, {name}{punctuation}";
+ print(message);
+ return message;
 }
 
 print("Testing multiple default parameters:");
-createMessage();                                    // All defaults
-createMessage("Hi");                               // Custom greeting
-createMessage("Hey", "Alice");                     // Custom greeting and name
-createMessage("Greetings", "Bob", ".");           // All custom
+createMessage(); // All defaults
+createMessage("Hi"); // Custom greeting
+createMessage("Hey", "Alice"); // Custom greeting and name
+createMessage("Greetings", "Bob", "."); // All custom
 
 // ==========================================
 // 11. TYPE SYSTEM - TYPE ALIASES
@@ -452,16 +452,16 @@ print("\n=== 14. ERROR HANDLING - WORKING ===");
 
 // Function with error union return type
 fn divide(a: int, b: int): int?DivisionByZero {
-    if (b == 0) {
-        return err(DivisionByZero);
-    }
-    return ok(a / b);
+ if (b == 0) {
+ return err(DivisionByZero);
+ }
+ return ok(a / b);
 }
 
 // Function that propagates errors
 fn safeDivide(x: int, y: int): int?DivisionByZero {
-    var result = divide(x, y)?;  // Error propagation
-    return ok(result);
+ var result = divide(x, y)?; // Error propagation
+ return ok(result);
 }
 
 print("Testing error handling:");
@@ -487,19 +487,19 @@ print("\n=== 15. CLASSES - BASIC SYNTAX ===");
 
 // Simple class definition
 class Person {
-    fn init(name, age) {
-        self.name = name;
-        self.age = age;
-    }
-    
-    fn greet() {
-        print("Hello, I'm {self.name} and I'm {self.age} years old");
-    }
-    
-    fn birthday() {
-        self.age += 1;
-        print("{self.name} is now {self.age} years old");
-    }
+ fn init(name, age) {
+ self.name = name;
+ self.age = age;
+ }
+ 
+ fn greet() {
+ print("Hello, I'm {self.name} and I'm {self.age} years old");
+ }
+ 
+ fn birthday() {
+ self.age += 1;
+ print("{self.name} is now {self.age} years old");
+ }
 }
 
 print("Class syntax defined (VM implementation in progress)");
@@ -525,10 +525,10 @@ print("\n=== 17. CONCURRENCY - BASIC SYNTAX ===");
 /*
 var messages = channel();
 parallel(ch=messages, mode=batch, cores=Auto) {
-    task(i in 1..3) {
-        print("Task {i} running");
-        messages.send("Task {i} done");
-    }
+ task(i in 1..3) {
+ print("Task {i} running");
+ messages.send("Task {i} done");
+ }
 }
 */
 
@@ -543,9 +543,9 @@ print("\n=== 18. PATTERN MATCHING - BASIC SYNTAX ===");
 /*
 var testValue = 42;
 match (testValue) {
-    0 => print("Zero"),
-    1..10 => print("Small number"),
-    _ => print("Other number")
+ 0 => print("Zero"),
+ 1..10 => print("Small number"),
+ _ => print("Other number")
 }
 */
 
@@ -555,17 +555,17 @@ print("Pattern matching syntax defined (VM implementation pending)");
 // SUMMARY
 // ==========================================
 print("\n=== COMPREHENSIVE TEST SUMMARY ===");
-print("[OK] Literals and variables");
-print("[OK] Expressions and operators");
-print("[OK] String interpolation");
-print("[OK] Control flow (if/else)");
-print("[OK] Loops (for, iter, while)");
-print("[OK] Functions (basic, optional params, default params)");
-print("[OK] Type system (aliases, unions, options)");
-print("[OK] Error handling (? operator, error propagation working)");
-print("🔄 Classes (syntax complete, VM in progress)");
-print("[OK] Modules (import/export working)");
-print("🔄 Concurrency (syntax complete, VM pending)");
-print("🔄 Pattern matching (match expressions - VM pending)");
+print("[x] Literals and variables");
+print("[x] Expressions and operators");
+print("[x] String interpolation");
+print("[x] Control flow (if/else)");
+print("[x] Loops (for, iter, while)");
+print("[x] Functions (basic, optional params, default params)");
+print("[x] Type system (aliases, unions, options)");
+print("[x] Error handling (? operator, error propagation working)");
+print("[~] Classes (syntax complete, VM in progress)");
+print("[x] Modules (import/export working)");
+print("[~] Concurrency (syntax complete, VM pending)");
+print("[~] Pattern matching (match expressions - VM pending)");
 
 print("\n=== TEST COMPLETE ===");

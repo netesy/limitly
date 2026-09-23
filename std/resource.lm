@@ -1,5 +1,3 @@
-// Standard Library Resource Module
-
 import std.internal.runtime as rt;
 
 frame Resource {

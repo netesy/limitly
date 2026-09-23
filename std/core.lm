@@ -1,5 +1,3 @@
-// Standard Library Core Module
-
 frame Error {
     pub var code: str;
     pub var message: str;

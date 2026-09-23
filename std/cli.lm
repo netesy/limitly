@@ -1,4 +1,3 @@
-// Standard Library CLI Module
 import std.strings as str;
 import std.collections.hash as hash;
 

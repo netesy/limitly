@@ -1,4 +1,3 @@
-// Standard Library HTTP Client Module
 // Full HTTP/1.1 client built on top of TCP and DNS resources.
 
 import std.core as core;

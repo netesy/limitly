@@ -95,7 +95,7 @@ pub fn free(img: HdrImage): nil {
     }
 }
 
-// Reinhard tone-map + sRGB gamma encode → standard u8 Image.
+// Reinhard tone-map + sRGB gamma encode -> standard u8 Image.
 pub fn to_ldr(img: HdrImage, exposure: float = 1.0): image.Image? {
     if (not img.is_valid()) { return err(); }
     var out_ch: int = 3;

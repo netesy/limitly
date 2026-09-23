@@ -190,6 +190,10 @@ enum class LIR_Op : uint8_t {
     RegionExit,         // Exit region
     RegionMove,         // Move register pointer ownership to another region
     
+    // === Algebraic Effects ===
+    EffectPerform,      // Perform algebraic effect (tag in a, payload in b)
+    EffectHandle,       // Register effect handler
+    EffectResume,       // Resume effect handler continuation
 };
 
 // ============================================================================
@@ -263,6 +267,8 @@ enum class LIR_Op : uint8_t {
     X(CallbackCreate) X(CallbackDestroy) \
     /* === Region Operations === */ \
     X(RegionEnter) X(RegionExit) X(RegionMove) \
+    /* === Algebraic Effects === */ \
+    X(EffectPerform) X(EffectHandle) X(EffectResume) \
 
 struct LIR_SourceLoc {
     std::string file;

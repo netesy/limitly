@@ -2,7 +2,7 @@
 
 This document describes the built-in functions and core modules available in the Limit standard library.
 
-See the [standard-library FFI delegation plan](ffi_stdlib_delegation.md) for the
+See the [standard-library FFI delegation architecture](ffi.md#6-standard-library-delegation-architecture) for the
 policy, validation rules, and migration order for native-backed system modules.
 
 ## 1. Global Built-in Functions

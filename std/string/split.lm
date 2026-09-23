@@ -1,5 +1,3 @@
-// Standard Library String Split Module
-
 pub fn split(value: str, delimiter: str): [str] {
     if (value == nil) return [""];
     var del = delimiter;

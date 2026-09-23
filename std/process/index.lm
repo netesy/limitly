@@ -1,5 +1,3 @@
-// Standard Library Process Entrypoint Module
-
 import std.process.process as process_mod;
 import std.process.command as command_mod;
 import std.process.pipe as pipe_mod;

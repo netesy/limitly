@@ -1,4 +1,3 @@
-// Standard Library HTTP Module (Index)
 // Re-exports client, server, and router submodules.
 
 pub import std.http.client as client;

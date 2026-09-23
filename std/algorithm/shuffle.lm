@@ -1,5 +1,3 @@
-// Standard Library Algorithm Shuffle Module
-
 pub fn shuffle(items: [any]) {
     var n = len(items);
     if (n <= 1) {

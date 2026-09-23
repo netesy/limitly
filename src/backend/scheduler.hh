@@ -74,40 +74,7 @@ struct Scheduler {
         return get_fiber(fiber_id);
     }
     
-    // Execute one instruction of the current fiber
-    void execute_current_fiber_step() {
-        Fiber* fiber = get_fiber(current_fiber_id);
-        if (fiber && fiber->is_running() && fiber->has_more_instructions()) {
-            // Advance instruction pointer
-            fiber->advance_instruction();
-            
-            // Check if fiber is completed
-            if (!fiber->has_more_instructions()) {
-                fiber->complete();
-            } else {
-                // Re-queue for next execution cycle
-                ready_queue.push(current_fiber_id);
-            }
-        }
-    }
     
-    // Main scheduler tick - process time-based events
-    void tick() {
-        current_time++;
-        
-        // Check sleeping tasks and wake them up
-        for (auto& fiber : fibers) {
-            if (fiber->task_context && 
-                fiber->task_context->state == TaskState::SLEEPING && 
-                current_time >= fiber->task_context->sleep_until) {
-                
-                fiber->task_context->state = TaskState::RUNNING;
-                if (fiber->is_suspended()) {
-                    resume_fiber(fiber->fiber_id);
-                }
-            }
-        }
-    }
     
     // Check if there are runnable fibers
     bool has_runnable_fibers() const {

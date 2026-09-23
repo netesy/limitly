@@ -1,5 +1,3 @@
-// Standard Library Algorithm Entrypoint Module
-
 import std.algorithm.search as search_mod;
 import std.algorithm.sort as sort_mod;
 import std.algorithm.partition as partition_mod;

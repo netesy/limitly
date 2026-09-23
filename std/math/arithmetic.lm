@@ -1,5 +1,3 @@
-// Standard Library Math Arithmetic Module
-
 import std.math.constants as const;
 
 frame Int {

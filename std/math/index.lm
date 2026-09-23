@@ -1,5 +1,3 @@
-// Standard Library Math Entrypoint Module
-
 import std.math.constants as constants_mod;
 import std.math.arithmetic as arithmetic_mod;
 import std.math.trigonometry as trigonometry_mod;

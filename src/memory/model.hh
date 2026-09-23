@@ -56,7 +56,7 @@ struct Value {
 
 
 /// ===============================================================
-/// 4. Move Semantics (After move → dead)
+/// 4. Move Semantics (After move -> dead)
 /// ===============================================================
 
 template<typename V>

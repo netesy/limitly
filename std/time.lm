@@ -1,5 +1,3 @@
-// Standard Library Time Forwarder Module
-
 import std.time.index as t;
 
 pub fn Instant(timestamp_ms: float): any { return t.Instant(timestamp_ms); }

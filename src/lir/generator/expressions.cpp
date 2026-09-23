@@ -133,6 +133,10 @@ Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
             }
             return last_reg;
         }
+    } else if (auto hole = dynamic_cast<LM::Frontend::AST::TypedHoleExpr*>(&expr)) {
+        Reg dst = allocate_register();
+        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, dst, make_i64(0)));
+        return dst;
     } else if (auto this_expr = dynamic_cast<LM::Frontend::AST::ThisExpr*>(&expr)) {
         return emit_this_expr(*this_expr);
     } else if (auto channel_offer = dynamic_cast<LM::Frontend::AST::ChannelOfferExpr*>(&expr)) {

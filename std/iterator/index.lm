@@ -1,5 +1,3 @@
-// Standard Library Iterator Entrypoint Module
-
 import std.iterator.iterator as iterator_mod;
 import std.iterator.iterable as iterable_mod;
 import std.iterator.map as map_mod;

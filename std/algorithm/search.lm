@@ -1,5 +1,3 @@
-// Standard Library Algorithm Search Module
-
 import std.search as s;
 
 pub fn find(items: [any], value: any): int {

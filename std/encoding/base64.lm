@@ -55,43 +55,41 @@ pub fn decode_base64(s: str): [int] {
     var res: [int] = [];
     var j: int = 0;
     var length = len(s);
-    while (j < length) {
-        if (j + 4 > length) {
-            break;
-        }
+    var done: bool = false;
+    while (j + 4 <= length and not done) {
         var c1: str = _builtin_substring(s, j, j + 1);
         var c2: str = _builtin_substring(s, j + 1, j + 2);
         var c3: str = _builtin_substring(s, j + 2, j + 3);
         var c4: str = _builtin_substring(s, j + 3, j + 4);
 
         if (c1 == "=" or c2 == "=") {
-            break;
-        }
+            done = true;
+        } else {
+            var v1: int = get_b64_index(c1);
+            var v2: int = get_b64_index(c2);
+            var v3: int = 0;
+            if (c3 != "=") {
+                v3 = get_b64_index(c3);
+            }
+            var v4: int = 0;
+            if (c4 != "=") {
+                v4 = get_b64_index(c4);
+            }
 
-        var v1: int = get_b64_index(c1);
-        var v2: int = get_b64_index(c2);
-        var v3: int = 0;
-        if (c3 != "=") {
-            v3 = get_b64_index(c3);
-        }
-        var v4: int = 0;
-        if (c4 != "=") {
-            v4 = get_b64_index(c4);
-        }
+            var b1: int = (v1 << 2) | (v2 >> 4);
+            res.append(b1);
 
-        var b1: int = (v1 << 2) | (v2 >> 4);
-        res.append(b1);
+            if (c3 != "=") {
+                var b2: int = ((v2 & 15) << 4) | (v3 >> 2);
+                res.append(b2);
+            }
+            if (c4 != "=") {
+                var b3: int = ((v3 & 3) << 6) | v4;
+                res.append(b3);
+            }
 
-        if (c3 != "=") {
-            var b2: int = ((v2 & 15) << 4) | (v3 >> 2);
-            res.append(b2);
+            j = j + 4;
         }
-        if (c4 != "=") {
-            var b3: int = ((v3 & 3) << 6) | v4;
-            res.append(b3);
-        }
-
-        j = j + 4;
     }
     return res;
 }

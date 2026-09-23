@@ -1,5 +1,3 @@
-// Standard Library Algorithm Partition Module
-
 pub fn partition(items: [any], p: fn(any): bool): int {
     var left = 0;
     var right = len(items) - 1;

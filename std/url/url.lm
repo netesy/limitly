@@ -1,5 +1,3 @@
-// Standard Library URL Core Module
-
 import std.encoding.percent as percent;
 import std.url.query as query_mod;
 

@@ -1,5 +1,3 @@
-// Standard Library Filesystem Forwarder Module
-
 import std.fs.index as fs_mod;
 import std.path.index as path;
 

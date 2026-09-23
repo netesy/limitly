@@ -1,5 +1,3 @@
-// Standard Library Result Module
-
 frame Result {
     var success: bool;
     var value: any;

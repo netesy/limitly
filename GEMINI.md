@@ -4,26 +4,26 @@ This document provides essential guidelines for AI agents generating code for th
 
 ---
 
-## 🚫 **DO NOT USE - Unsupported Features**
+## **DO NOT USE - Unsupported Features**
 
 ### **Reserved Keywords as Identifiers**
-- [FAIL] **DO NOT use reserved keywords as variable names, function names, or method names**. All language keywords (e.g., `iter`, `any`, `fn`, `if`, `while`, `for`, `return`, `var`, `val`, `const`, `frame`, `trait`, `import`, `match`, `in`, `type`, `enum`, `err`, `ok`, `and`, `or`, `not`, `as`, `where`, `self`, `super`, `true`, `false`, `nil`, `break`, `continue`, `parallel`, `concurrent`, `task`, `worker`, `contract`, `staged`, `unsafe`, `module`, `interface`, `mixin`, `implements`, `show`, `hide`, `from`, `elif`, `else`, `static`, `abstract`, `final`, `pub`, `prot`) are reserved and cannot be used as identifiers.
-- [FAIL] For example: `var iter = 5;` or `fn iter(): int { ... }` or `frame Foo { pub fn iter(): int { ... } }` are **INVALID**.
-- [OK] **Note**: `list`, `dict`, `array` are **NOT** reserved keywords and can be used as identifiers.
+- [ ] **DO NOT use reserved keywords as variable names, function names, or method names**. All language keywords (e.g., `iter`, `any`, `fn`, `if`, `while`, `for`, `return`, `var`, `val`, `const`, `frame`, `trait`, `import`, `match`, `in`, `type`, `enum`, `err`, `ok`, `and`, `or`, `not`, `as`, `where`, `self`, `super`, `true`, `false`, `nil`, `break`, `continue`, `parallel`, `concurrent`, `task`, `worker`, `contract`, `staged`, `unsafe`, `module`, `interface`, `mixin`, `implements`, `show`, `hide`, `from`, `elif`, `else`, `static`, `abstract`, `final`, `pub`, `prot`) are reserved and cannot be used as identifiers.
+- [ ] For example: `var iter = 5;` or `fn iter(): int { ... }` or `frame Foo { pub fn iter(): int { ... } }` are **INVALID**.
+- [x] **Note**: `list`, `dict`, `array` are **NOT** reserved keywords and can be used as identifiers.
 
 ### **Generics/Template Types**
-- [FAIL] `fn my_func<T>(param: T): T` - Generic type parameters are NOT supported.
-- [FAIL] `List<T>` / `Dict<K, V>` - Generic collections are NOT implemented (use `[int]` or `{str: int}`).
-- [FAIL] `Option<T>` / `Result<T, E>` - Generic option/result types are NOT supported as built-in generics (use option/result union types or standard library wrappers).
+- [ ] `fn my_func<T>(param: T): T` - Generic type parameters are NOT supported.
+- [ ] `List<T>` / `Dict<K, V>` - Generic collections are NOT implemented (use `[int]` or `{str: int}`).
+- [ ] `Option<T>` / `Result<T, E>` - Generic option/result types are NOT supported as built-in generics (use option/result union types or standard library wrappers).
 
 ### **List Concatenation**
-- [FAIL] `list1 + list2` - List concatenation using the `+` operator is NOT supported.
-- [OK] **Use `append(list, item)`** instead to add a single item to a list.
-- [OK] **Use `append(list, other_list)`** to append all elements from another list.
+- [ ] `list1 + list2` - List concatenation using the `+` operator is NOT supported.
+- [x] **Use `append(list, item)`** instead to add a single item to a list.
+- [x] **Use `append(list, other_list)`** to append all elements from another list.
 
 ---
 
-## [OK] **USE - Supported Features**
+## **USE - Supported Features**
 
 ### **1. Valid Syntax & Basic Constructs**
 
@@ -44,20 +44,20 @@ This document provides essential guidelines for AI agents generating code for th
 #### **Control Flow**
 - **Conditionals**: `if (cond) { ... } elif (cond) { ... } else { ... }`
 - **Loops**:
-  - `while (cond) { ... }`
-  - `for (var i = 0; i < 10; i = i + 1) { ... }`
-  - `iter (item in collection) { ... }` (for lists, dicts, ranges)
+ - `while (cond) { ... }`
+ - `for (var i = 0; i < 10; i = i + 1) { ... }`
+ - `iter (item in collection) { ... }` (for lists, dicts, ranges)
 - **Pattern Matching (Match)**: Uses block syntax `pattern => { statements }`.
-  ```limit
-  match (value) {
-      5 => { print("Literal match"); },
-      Color.Red => { print("Enum variant"); },
-      point => { print("Variable binding"); },
-      val success => { print("Fallible success: {success}"); },
-      err error => { print("Fallible error: {error}"); },
-      _ => { print("Wildcard"); }
-  }
-  ```
+ ```limit
+ match (value) {
+ 5 => { print("Literal match"); },
+ Color.Red => { print("Enum variant"); },
+ point => { print("Variable binding"); },
+ val success => { print("Fallible success: {success}"); },
+ err error => { print("Fallible error: {error}"); },
+ _ => { print("Wildcard"); }
+ }
+ ```
 
 #### **Basic Data Structures**
 - **Lists**: Homogeneous collection, shorthand: `[int]`. Literal: `[1, 2, 3]`.
@@ -96,22 +96,22 @@ Frames are class-like structures that define fields and methods.
 - **Modifiers**: Fields and methods use `pub` (public), `prot` (protected), or default to private.
 - **`self` Reference**: Inside methods, `self` is the canonical reference to the current instance (`this` is unsupported).
 - **Lifecycle Methods**:
-  - `pub init(...)` (constructor)
-  - `pub deinit()` (destructor)
+ - `pub init(...)` (constructor)
+ - `pub deinit()` (destructor)
 
 ```limit
 frame Rectangle {
-    pub width: int;
-    pub height: int;
+ pub width: int;
+ pub height: int;
 
-    pub init(w: int, h: int) {
-        self.width = w;
-        self.height = h;
-    }
+ pub init(w: int, h: int) {
+ self.width = w;
+ self.height = h;
+ }
 
-    pub fn area(): int {
-        return self.width * self.height;
-    }
+ pub fn area(): int {
+ return self.width * self.height;
+ }
 }
 ```
 
@@ -119,14 +119,14 @@ frame Rectangle {
 Traits define interface requirements that frames can implement.
 ```limit
 trait Shape {
-    fn area(): int
+ fn area(): int
 }
 
 frame Square: Shape {
-    pub side: int;
-    pub fn area(): int {
-        return self.side * self.side;
-    }
+ pub side: int;
+ pub fn area(): int {
+ return self.side * self.side;
+ }
 }
 ```
 
@@ -139,22 +139,22 @@ Limitly does not use generic `Result` types. Instead, it uses fallible annotatio
 
 - **Success/Error constructors**: Values must be returned using `ok(value)` or `err(ErrorType)` (or `err()` for generic fallible returns).
 - **Error construction syntax**:
-  - Simple error type: `return err(DivisionByZero);`
-  - Generic error: `return err();`
-  - Error with type and message: `return err("ValidationError", "Value cannot be negative");`
-  - Error with struct fields: `return err(UnknownError { message = "Value cannot be negative" });`
+ - Simple error type: `return err(DivisionByZero);`
+ - Generic error: `return err();`
+ - Error with type and message: `return err("ValidationError", "Value cannot be negative");`
+ - Error with struct fields: `return err(UnknownError { message = "Value cannot be negative" });`
 - **Propagator (`?`)**: Suffixing an expression with `?` will propagate the error up the call stack if it fails.
 - **Inline Handling (`? else`)**: You can handle errors inline with optional error variable capturing.
-  ```limit
-  var value = divide(a, b)? else {
-      return 0; // fallback default
-  };
+ ```limit
+ var value = divide(a, b)? else {
+ return 0; // fallback default
+ };
 
-  var value_with_err = divide(a, b)? else {
-      print("Failed: {err}");
-      return 0;
-  };
-  ```
+ var value_with_err = divide(a, b)? else {
+ print("Failed: {err}");
+ return 0;
+ };
+ ```
 
 ---
 
@@ -170,32 +170,32 @@ Limitly does not use generic `Result` types. Instead, it uses fallible annotatio
 ### **6. Stdlib Guidelines**
 
 #### **Type Ownership**
-- [FAIL] **DO NOT put type ownership in stdlib.** Type definitions (primitive types, collection types, enum types) are compiler-owned.
-- [OK] **Stdlib provides behavior only.** Stdlib modules implement functionality using compiler-defined types.
+- [ ] **DO NOT put type ownership in stdlib.** Type definitions (primitive types, collection types, enum types) are compiler-owned.
+- [x] **Stdlib provides behavior only.** Stdlib modules implement functionality using compiler-defined types.
 
 #### **Stdlib Implementation Rules**
-- [FAIL] **Do not define fake replacement types for compiler collections.** Stdlib should not redefine types like `List`, `Dict`, `Array` as type aliases.
-- [FAIL] **Do not solve missing typing by changing everything to `any`.** The `any` type is a dynamic escape hatch, not a replacement for real types.
-- [OK] **Use current supported mechanisms for generic-like behavior:**
-  - `any` (dynamic typing, use sparingly)
-  - `traits` (interface-based polymorphism)
-  - `frames` (class-like structures with methods)
-  - `union types` (e.g., `int | str`)
-  - `function types` (higher-order functions)
+- [ ] **Do not define fake replacement types for compiler collections.** Stdlib should not redefine types like `List`, `Dict`, `Array` as type aliases.
+- [ ] **Do not solve missing typing by changing everything to `any`.** The `any` type is a dynamic escape hatch, not a replacement for real types.
+- [x] **Use current supported mechanisms for generic-like behavior:**
+ - `any` (dynamic typing, use sparingly)
+ - `traits` (interface-based polymorphism)
+ - `frames` (class-like structures with methods)
+ - `union types` (e.g., `int | str`)
+ - `function types` (higher-order functions)
 
 #### **Example: Correct Stdlib Implementation**
 ```limit
 // std/collections/vector.lm
 frame Vector {
-    pub var data: [int];  // Uses compiler's list type
+ pub var data: [int]; // Uses compiler's list type
 
-    pub fn init(): Vector {
-        return Vector(data=[]);
-    }
+ pub fn init(): Vector {
+ return Vector(data=[]);
+ }
 
-    pub fn push(value: int): Vector {
-        // Implementation details...
-    }
+ pub fn push(value: int): Vector {
+ // Implementation details...
+ }
 }
 ```
 

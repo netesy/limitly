@@ -21,7 +21,7 @@ void CFGAnalysis::analyze() {
 
     inst_to_block_.resize(insts.size(), UINT32_MAX);
 
-    // Step 1: Identify basic block boundaries
+    // Identify basic block boundaries
     std::unordered_set<size_t> block_starts;
     block_starts.insert(0);
 
@@ -39,7 +39,7 @@ void CFGAnalysis::analyze() {
     std::vector<size_t> sorted_starts(block_starts.begin(), block_starts.end());
     std::sort(sorted_starts.begin(), sorted_starts.end());
 
-    // Step 2: Construct basic blocks
+    // Construct basic blocks
     for (size_t b = 0; b < sorted_starts.size(); ++b) {
         size_t start = sorted_starts[b];
         size_t end = (b + 1 < sorted_starts.size()) ? sorted_starts[b + 1] : insts.size();
@@ -72,7 +72,7 @@ void CFGAnalysis::analyze() {
         }
     }
 
-    // Step 3: Compute successors & predecessors
+    // Compute successors & predecessors
     for (auto& block : blocks_) {
         if (block.start_inst_idx >= block.end_inst_idx) continue;
         const auto& last_inst = insts[block.end_inst_idx - 1];
@@ -112,7 +112,7 @@ void CFGAnalysis::analyze() {
         }
     }
 
-    // Step 4: Reachability
+    // Compute reachability
     if (!blocks_.empty()) {
         std::queue<uint32_t> q;
         q.push(0);

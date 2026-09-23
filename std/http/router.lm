@@ -1,5 +1,3 @@
-// Standard Library Fluent HTTP Router Module
-
 frame Request {
     pub var method: str;
     pub var path: str;

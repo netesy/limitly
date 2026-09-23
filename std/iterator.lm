@@ -1,5 +1,3 @@
-// Standard Library Iterator Module
-
 trait Iterator {
     fn next(): any;
 }

@@ -1,5 +1,3 @@
-// Standard Library UUID Generator Module
-
 import std.uuid.uuid as uuid_mod;
 import std.random.random as random_mod;
 

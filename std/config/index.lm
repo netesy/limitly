@@ -1,5 +1,3 @@
-// Standard Library Config Module Index
-
 import std.env as env;
 
 frame Config {

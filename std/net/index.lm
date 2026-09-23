@@ -1,4 +1,3 @@
-// Standard Library Network Module (Index)
 // Re-exports all networking submodules for convenient access.
 //
 // Usage:

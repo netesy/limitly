@@ -1,5 +1,3 @@
-// Standard Library Sort Module
-
 pub fn _compare(a: any, b: any, descending: bool = false, cmp: fn(any, any): int = nil): int {
     var result: int = 0;
     if (cmp != nil) {

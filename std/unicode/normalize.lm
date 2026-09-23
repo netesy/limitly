@@ -1,5 +1,3 @@
-// Standard Library Unicode Normalization Module
-
 fn _char_to_lower(ch: str): str {
     if (ch == "A") { return "a"; }
     if (ch == "B") { return "b"; }

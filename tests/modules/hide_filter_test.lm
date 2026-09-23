@@ -3,14 +3,14 @@ print("=== Hide Filter Test ===");
 
 print("Test 1: Hide single identifier");
 import tests.modules.math_module as math1 hide E;
-print("✓ Imported with hide filter");
-print("✓ Non-hidden variable accessible: PI = {math1.pi}");
+print("[OK] Imported with hide filter");
+print("[OK] Non-hidden variable accessible: PI = {math1.pi}");
 assert(math1.pi == 3.14159, "Hide filter should allow access to non-hidden variables");
 
 print("Test 2: Hide multiple identifiers");
 // import tests.modules.string_module as str1 hide farewell, repeat_string;
-// print("✓ Imported with hide multiple filter");
-// print("✓ Non-hidden variable accessible: {str1.greeting}");
+// print("[OK] Imported with hide multiple filter");
+// print("[OK] Non-hidden variable accessible: {str1.greeting}");
 
 print("Test 3: Access hidden variable (should fail)");
 print("Expected: Error about missing property");

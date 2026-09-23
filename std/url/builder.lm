@@ -1,5 +1,3 @@
-// Standard Library URL Builder Module
-
 import std.url.url as url_mod;
 
 frame URLBuilder {

@@ -300,10 +300,10 @@ The LIR system includes several categories of builtin functions:
 ## 8. Integration with Limit Compiler
 
 ### 8.1 Compilation Pipeline
-1. **Frontend**: Limit source → AST
-2. **Type Checker**: AST → Typed AST
-3. **LIR Generator**: Typed AST → LIR
-4. **JIT Compiler**: LIR → Native Code
+1. **Frontend**: Limit source -> AST
+2. **Type Checker**: AST -> Typed AST
+3. **LIR Generator**: Typed AST -> LIR
+4. **JIT Compiler**: LIR -> Native Code
 
 ### 8.2 Register Allocation
 - The LIR generator performs register allocation during code generation

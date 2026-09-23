@@ -1,491 +1,355 @@
-# 🌟 Welcome to the Limit Language!
+# Welcome to the Limit Language!
 
 Hello, and welcome to the Limit programming language!
 
 **What is Limit?**
-Limit is a modern programming language designed to be both powerful and safe. It's a statically-typed language, which means it helps you catch errors early, before you even run your code.
+Limit is a modern systems-level programming language designed for both performance and safety. It features static typing, deterministic memory management, and first-class structured concurrency.
 
 **What can you build with it?**
-You can use Limit to build a wide variety of applications, from simple command-line tools to complex, high-performance systems. Its strong support for concurrency makes it especially great for programs that need to do many things at once.
+You can use Limit to build command-line utilities, concurrent network services, games, and high-performance systems.
 
 **What makes it unique?**
-Limit's most unique features are its focus on safety and its structured concurrency model. It's designed to help you write code that is less likely to crash and easier to reason about, especially when dealing with multiple tasks at the same time.
+Limit eliminates common programming errors through:
+- **Zero-cost Error Unions (`Type?`)**: Combining optionals and fallible results into a single compiler-checked type system without generic overhead.
+- **Structured Concurrency**: Task lifetimes bound to lexical scopes (`parallel` and `concurrent`), avoiding thread leaks.
+- **Deterministic Memory**: Region-aware deterministic memory without a tracing garbage collector.
+- **Canonical Receiver**: Clear OOP using `self` within `frame` constructs.
 
-**Why choose it over Python, JS, etc.?**
-If you're building a large or complex application where performance and correctness are critical, Limit is a great choice. It provides more safety guarantees than dynamically typed languages like Python or JavaScript, which can save you from many common bugs in the long run.
+---
 
-## ⚙️ Installing the Language
+## Installing and Building
 
-To get started with Limit, you'll need to build the interpreter from source. Don't worry, it's easy!
+Limitly is built from source using standard build tools.
 
 **Prerequisites:**
-- CMake 3.10 or higher
-- A C++17 compatible compiler (like GCC, Clang, or MSVC)
+- C++20 compatible compiler (GCC 11+, Clang 13+, or MSVC)
+- GNU `make` (or CMake 3.20+)
+- Windows users: MSYS2 MinGW64 environment (`mingw-w64-x86_64-gcc`, `make`)
 
 **Build Instructions:**
 
-*   **On macOS or Linux:**
-    ```bash
-    # Open your terminal
-    make linux
-    ```
-
-*   **On Windows (with MSYS2/MinGW64):**
-    ```bash
-    # Open the command prompt
-    build.bat
-    ```
-
-After building, you'll have a `limitly` executable in the `bin/` directory. This is the Limit interpreter!
-
-**Verify your installation:**
-While there isn't a `--version` command yet, you can verify your installation by running a simple print command:
-
 ```bash
-echo 'print("Limitly is working!");' > test.lm
-./bin/limitly test.lm
+# Clone the repository
+git clone https://github.com/netesy/limitly.git
+cd limitly
+
+# Build the compiler executable
+make
 ```
 
-If you see "Limitly is working!", you're all set!
+After compilation, the binary will be located in `bin/`:
+- Windows: `bin/limitly.exe`
+- Linux/macOS: `bin/limitly`
 
-## ✍️ Your First Program
+**Verify your installation:**
+
+```bash
+# Check compiler help and commands
+./bin/limitly help
+```
+
+---
+
+## Your First Program
 
 Let's write the classic "Hello, world!" program in Limit.
 
-1.  Create a new file named `hello.lm`.
-2.  Add the following code to the file:
+1. Create a file named `hello.lm`.
+2. Add the following code:
 
 ```limit
 // This is your first Limit program!
 print("Hello, world!");
 ```
 
-3.  Save the file and run it from your terminal:
+3. Run the program using the `run` subcommand:
 
 ```bash
-./bin/limitly hello.lm
+./bin/limitly run hello.lm
 ```
 
-You should see the following output:
-```
+Output:
+```text
 Hello, world!
 ```
 
-**Explanation:**
-*   `// This is your first Limit program!` is a comment. Comments are ignored by the interpreter and are used to leave notes for yourself or other programmers.
-*   `print(...)` is a built-in function that prints text to the console.
-*   `"Hello, world!"` is a string literal. A string is just a sequence of text.
+---
 
-## 🧱 Basic Concepts
+## Variables and Types
 
-Now that you've written your first program, let's learn some of the basic building blocks of the Limit language.
+### Variables (`var`) and Constants (`val` / `const`)
 
-### Variables and Types
-
-A variable is a name that refers to a value. You can create a variable using the `var` keyword. Immutable bindings use `const` or `val`. While Limit can sometimes infer the type, it's good practice to be explicit by adding a type annotation.
+- `var`: Declares a mutable variable.
+- `val` or `const`: Declares an immutable binding.
 
 ```limit
-var my_age: int = 28;
-const my_name: str = "Jules";
+// Mutable variable with type annotation
+var count: int = 10;
+print(count); // Output: 10
+
+count = 20;
+print(count); // Output: 20
+
+// Immutable bindings
+val name: str = "Limit";
+const pi: float = 3.14159;
 ```
 
-Limit is a statically-typed language, which means that every variable has a type that is known when you write the code. The basic types are:
-*   **`int`**: for integers (e.g., `10`, `-5`).
-*   **`float`**: for floating-point numbers (e.g., `3.14`).
-*   **`decimal`**: for fixed-precision numbers (e.g., `10.50`). Supports `d2`, `d4`, `d6`.
-*   **`bool`**: for `true` or `false`.
-*   **`str`**: for strings of text (e.g., `"Hello"`).
+### Primitive Types
 
-### Printing to Console
+- **Integers**: `int` (default 64-bit), fixed-width: `i8`, `i16`, `i32`, `i64`, `i128`, `uint`, `u8`, `u16`, `u32`, `u64`, `u128`.
+- **Floating-point**: `float` (default 64-bit), `f32`, `f64`.
+- **Decimals**: `d2`, `d4`, `d6`, `decimal` (fixed-precision currency/financial types).
+- **Boolean**: `bool` (`true` or `false`).
+- **String**: `str` (UTF-8 encoded string).
+- **Nil**: `nil` (represents absence or empty value).
 
-As you saw in the "Hello, world!" example, you can use the `print()` function to display output. You can also print the value of variables.
+### String Interpolation
+
+Embed expressions directly inside strings using `{expression}`:
 
 ```limit
-var planet: str = "Earth";
-print(planet); // Output: Earth
+var user: str = "Alice";
+var score: int = 95;
+print("Player {user} scored {score} points!");
 ```
 
-You can even embed variables directly into strings using curly braces `{}`. This is called **string interpolation**.
+---
+
+## Control Flow
+
+### If-Else Statements
 
 ```limit
-var name: str = "Alice";
-var age: int = 30;
-print("My name is {name} and I am {age} years old.");
-// Output: My name is Alice and I am 30 years old.
-```
-
-### Comments
-
-Comments are notes that are ignored by the interpreter. They are useful for explaining your code. In Limit, single-line comments start with `//`.
-
-```limit
-// This is a comment.
-var x = 10; // This is another comment.
-```
-
-### Math and Expressions
-
-You can perform mathematical calculations in Limit using the standard arithmetic operators.
-
-```limit
-var a = 10;
-var b = 5;
-
-print(a + b); // Output: 15
-print(a - b); // Output: 5
-print(a * b); // Output: 50
-print(a / b); // Output: 2
-```
-
-### If/Else Statements
-
-`if` statements allow you to run code conditionally.
-
-```limit
-var temperature = 25;
+var temperature: int = 25;
 
 if (temperature > 30) {
-    print("It's a hot day!");
-} else if (temperature > 20) {
-    print("It's a nice day.");
+    print("It's hot outside!");
+} elif (temperature >= 15) {
+    print("It's a pleasant day.");
 } else {
-    print("It's a cold day.");
+    print("It's cold.");
 }
 ```
 
-### Loops (For, While)
+### Loops
 
-Loops allow you to repeat a block of code multiple times.
-
-**`for` loop:**
-A C-style `for` loop is useful when you want to loop a specific number of times.
-
+#### For Loop (C-style)
 ```limit
 for (var i = 0; i < 3; i += 1) {
-    print("Looping... i = {i}");
+    print("Loop iteration: {i}");
 }
 ```
 
-**`while` loop:**
-A `while` loop continues as long as a condition is true.
-
+#### While Loop
 ```limit
-var count = 3;
-while (count > 0) {
-    print("{count}...");
-    count -= 1;
+var counter: int = 3;
+while (counter > 0) {
+    print("{counter}...");
+    counter -= 1;
 }
 print("Liftoff!");
 ```
 
-## 🧰 Functions
-
-Functions are reusable blocks of code that you can call by name. They help you organize your code and avoid repetition.
-
-**How to define and call a function:**
-You can define a function using the `fn` keyword.
-
+#### Iter Loop (Collections and Ranges)
 ```limit
-fn say_hello() {
-    print("Hello from a function!");
+iter (i in 1..5) {
+    print("Value: {i}");
 }
-
-// Call the function
-say_hello();
 ```
 
-**Parameters and return values:**
-Functions can take inputs, called **parameters**, and produce an output, called a **return value**. You must specify the type of each parameter and the type of the return value.
+---
+
+## Functions
+
+Functions are defined with the `fn` keyword. Specify parameter types and an optional return type:
 
 ```limit
-// This function takes a 'name' of type str as a parameter
+// Simple function
 fn greet(name: str) {
     print("Hello, {name}!");
 }
 
-greet("Bob"); // Output: Hello, Bob!
+greet("Bob");
 
-// This function takes two integers and returns an integer
+// Function with typed parameters and return type
 fn add(a: int, b: int): int {
     return a + b;
 }
 
-var result: int = add(5, 7);
-print("The result is {result}"); // Output: The result is 12
+var sum: int = add(10, 20);
+print("Sum is {sum}"); // Sum is 30
 ```
 
-## 📦 Organizing Your Code with Modules
+---
 
-As your programs grow larger, you'll want to split your code into multiple files. Limit's module system makes this easy.
+## Collections
 
-A module is just a separate `.lm` file. You can use the `import` keyword to use functions and variables from one file in another.
+### Lists
 
-**Example:**
+A list is a dynamic, ordered sequence declared using `[Type]`:
 
-Let's say you have a file named `greetings.lm`:
 ```limit
-// greetings.lm
-fn say_hi() {
-    print("Hi there!");
+var fruits: [str] = ["apple", "banana", "orange"];
+print(fruits[0]); // apple
+print(len(fruits)); // 3
+
+// Iterate over items
+iter (item in fruits) {
+    print("Fruit: {item}");
 }
 ```
 
-In your main file, you can import and use the `say_hi` function:
-```limit
-// main.lm
-import greetings;
+### Dictionaries
 
-greetings.say_hi(); // Output: Hi there!
-```
-
-This is just a brief introduction. The module system also supports aliasing, and importing or hiding specific parts of a module. To learn more, check out the [**Modules and Imports**](./guide.md#modules-and-imports) section in the full language guide.
-
-## 🧺 Working with Collections
-
-Collections are data structures that can hold multiple values. Limit has two main types of collections: lists and dictionaries.
-
-### Lists/Arrays
-
-A **list** is an ordered collection of items. You can create a list using square brackets `[]`. It's good practice to specify the type of items the list will hold.
+A dictionary maps keys to values declared using `{KeyType: ValueType}`:
 
 ```limit
-var fruits: [str] = ["apple", "banana", "cherry"];
-print(fruits);
-```
-
-You can get an item from a list by its **index**. The index is the item's position in the list, starting from 0.
-
-```limit
-print(fruits[0]); // Output: apple
-print(fruits[2]); // Output: cherry
-```
-
-### Maps/Dictionaries
-
-A **dictionary** (or map) is a collection of key-value pairs. You can create a dictionary using curly braces `{}`.
-
-```limit
-var person: {str: any} = {
-    "name": "Alice",
-    "age": 30
+var scores: {str: int} = {
+    "Alice": 100,
+    "Bob": 85
 };
+
+print(scores["Alice"]); // 100
 ```
 
-You can get a value from a dictionary by its **key**.
+---
 
-```limit
-print(person["name"]); // Output: Alice
-```
+## Object-Oriented Programming: Frames
 
-### Loops over Collections
-
-You can use the `iter` loop to go through each item in a collection.
-
-```limit
-var colors: [str] = ["red", "green", "blue"];
-
-iter (color: str in colors) {
-    print("Color: {color}");
-}
-```
-
-## 🧱 Object-Oriented Programming with Frames
-
-Limit uses **frames** for object-oriented programming. A frame is a blueprint for creating objects that bundle data and behavior.
+Limitly uses **frames** for data encapsulation and object-oriented programming. Frames use `self` as the instance receiver.
 
 ```limit
 frame Greeter {
-    pub var name: str = "World";
+    pub name: str;
+
+    pub init(greeting_name: str) {
+        self.name = greeting_name;
+    }
 
     pub fn say_hello() {
         print("Hello, {self.name}!");
     }
 }
 
-var greeter = Greeter();
-greeter.say_hello(); // Output: Hello, World!
+var g = Greeter("World");
+g.say_hello(); // Output: Hello, World!
 ```
 
-What is `self`? Inside a frame's method, `self` refers to the specific object you are working with.
+### Traits for Shared Interfaces
 
-### Traits for Shared Behavior
-
-While Limitly does not support traditional frame inheritance, it uses **traits** to define shared behavior that multiple frames can implement. This promotes composition over inheritance.
-
-> [WARN] **Syntax Note**: Traits and frames are implicitly public in their respective modules. You must **never** write the `pub` modifier keyword in front of `frame` or `trait` declarations (e.g. `pub frame Name` or `pub trait Name` are syntax errors).
-
-Here is how you declare a trait and implement it in a frame:
+Traits define abstract behavior that frames implement:
 
 ```limit
 trait Speaker {
     fn speak();
 }
 
-frame Dog : Speaker {
+frame Dog: Speaker {
     pub fn speak() {
         print("Woof!");
     }
 }
 
-frame Cat : Speaker {
+frame Cat: Speaker {
     pub fn speak() {
         print("Meow!");
     }
 }
 
-var s1: Speaker = Dog();
-s1.speak(); // Output: Woof!
+var dog = Dog();
+dog.speak(); // Woof!
 ```
 
-## [TEST] Errors and Optional Values
+---
 
-In Limit, errors and absent values are not seen as crashes, but as a normal part of a program's flow that you should plan for. The language gives you powerful tools to handle situations where things might go wrong or where values might be absent.
+## Error Handling: Unified `Type?` System
 
-**Key Principle**: Limit is designed to be safe. We use a unified system where potential failure is represented in the type itself.
+Limitly does not use exceptions or generic `Result<T, E>` / `Option<T>` templates. Instead, it has a native, zero-cost error union system denoted by `Type?`:
 
-### The Unified Error and Optional Value System
-
-Limit uses a single system for both error handling and optional values:
-- **`Type?`** represents a value that might be present or absent/error.
-- **`ok(value)`** creates a success value.
-- **`err()`** creates an error or "absent" value.
-
-### Handling Errors with `match`
-
-When you have a function that might fail or return an absent value, you can use a `match` statement to handle both possibilities:
-
-```limit
-fn might_fail(): int? {
-    // This function might return a value or be absent
-    return err(); 
-}
-
-fn do_something(): int? {
-    var result = might_fail();
-    
-    match result {
-        val value => {
-            print("Got value: {value}");
-            return ok(value * 2);
-        },
-        err => {
-            print("No value available");
-            return err();
-        }
-    }
-}
-```
-
-### Propagating Errors with `?`
-
-The `?` operator is a shortcut for passing errors up the line:
-
-```limit
-fn might_fail(): int? {
-    return err();
-}
-
-fn do_something(): int? {
-    // If might_fail() returns Err, '?' immediately returns it from do_something()
-    var result: int = might_fail()?;
-
-    print("It worked!");
-    return ok(result);
-}
-```
-
-### Inline Error Handling with `? else`
-
-Handle errors or absent values inline with a fallback value:
+- `Type?`: A value of `Type` or a runtime error condition.
+- `ok(value)`: Return a successful value.
+- `err()` or `err(ErrorType)`: Return an error condition.
+- `?`: Propagate an error up the call stack.
+- `? else { ... }`: Handle an error inline with a fallback.
 
 ```limit
 fn divide(a: int, b: int): int? {
     if (b == 0) {
-        return err(); 
+        return err();
     }
     return ok(a / b);
 }
 
-// Provide a default value if division fails
-var result: int = divide(10, 0)? else {
-    print("Division failed");
-    return -1; 
+// Inline fallback handling with ? else
+var safe_result: int = divide(10, 0)? else {
+    print("Cannot divide by zero, using default fallback.");
+    return 0;
 };
 
-print("The final result is: {result}"); // Output: The final result is: -1
+// Pattern matching on fallible return
+match (divide(10, 2)) {
+    val value => {
+        print("Success: {value}");
+    },
+    err => {
+        print("Calculation failed.");
+    }
+}
 ```
 
-## 🚦 Structured Concurrency
+---
 
-Limitly has first-class, built-in support for structured concurrency. In structured concurrency, the lifetime of concurrent tasks is bound to the lexical scope of a block (like `parallel` or `concurrent`). When the block completes, all spawned tasks are guaranteed to have finished, eliminating leaked threads or tasks.
+## Structured Concurrency
 
-- **`parallel`** blocks are used to split CPU-bound workloads across multiple cores.
-- **`concurrent`** blocks are used to run asynchronous I/O-bound tasks concurrently.
-- **`channel()`** is a built-in function to safely pass messages between concurrent tasks.
+Limitly binds concurrent execution to explicit lexical blocks:
 
-Here is a simple example of spawning a task inside a `concurrent` block and receiving its result via a channel:
+- `parallel`: Multi-core data parallelism over disjoint slice capabilities.
+- `concurrent`: Cooperative concurrent task blocks communicating through typed `channel` instances.
 
 ```limit
 var ch = channel();
 
 concurrent {
     task {
-        ch.send("Hello from concurrent task!");
+        ch.send("Message from worker task");
     }
 }
 
 var msg: str? = ch.receive();
 match (msg) {
     val text => { print(text); },
-    err => { print("No message received."); }
+    err => { print("Channel empty or closed."); }
 }
 ```
 
-## [RUN] Mini Project: Number Guessing Game
+---
 
-Now it's time to put everything you've learned together! Let's build a simple number guessing game.
+## Modules
+
+Organize programs across files with the `import` statement:
 
 ```limit
-// --- Number Guessing Game ---
-
-// Assuming built-in helpers
-// fn read_line(): str { ... }
-// fn to_int(s: str): int? { ... }
-
-var secret_number: int = 7; 
-print("I'm thinking of a number. Guess what it is!");
-
-while (true) { 
-    print("Please input your guess:");
-    var input_str: str = "7"; // Simulating input
-
-    var guess_result: int? = to_int(input_str);
-
-    match (guess_result) {
-        val guess => {
-            print("You guessed: {guess}");
-            if (guess < secret_number) {
-                print("Too low!");
-            } else if (guess > secret_number) {
-                print("Too high!");
-            } else {
-                print("You win!");
-                break; 
-            }
-        },
-        err => {
-            print("That's not a number! Please try again.");
-        }
-    }
-    break;
+// math_helper.lm
+pub fn square(n: int): int {
+    return n * n;
 }
 ```
 
-## 📎 Next Steps / Resources
+```limit
+// main.lm
+import math_helper as math;
 
-Congratulations! You've learned the fundamentals of the Limit language.
+var res: int = math.square(4);
+print("Result: {res}"); // 16
+```
 
-*   **Full Language Guide:** For a more in-depth look: [**Full Language Guide**](./guide.md).
-*   **Language Specification:** Formal details: [**Language Spec**](./language.md).
-*   **The Zen of Limit:** Our design philosophy: [**The Zen of Limit**](./zen.md).
-*   **Explore the Code:** Check out the `tests/` directory to see examples of every feature in action.
+---
+
+## Next Steps
+
+Explore the detailed technical documentation:
+- [Full Language Guide](./guide.md)
+- [Formal Language Specification](./language.md)
+- [Compiler & Architecture](./architecture.md)
+- [Philosophy: The Zen of Limit](./zen.md)

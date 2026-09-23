@@ -1,5 +1,3 @@
-// Standard Library Format Forwarder Module
-
 import std.format.index as format_mod;
 
 frame Format {

@@ -1,5 +1,3 @@
-// Standard Library Math Statistics Module
-
 import std.math.arithmetic as arith;
 import std.sort as sort;
 

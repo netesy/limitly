@@ -1,5 +1,3 @@
-// Standard Library Algorithm Reduce Module
-
 pub fn reduce(items: [any], f: fn(any, any): any, initial: any): any {
     var acc = initial;
     var i = 0;

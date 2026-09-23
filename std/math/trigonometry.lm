@@ -1,5 +1,3 @@
-// Standard Library Math Trigonometry Module
-
 import std.math.constants as const;
 import std.math.arithmetic as arith;
 

@@ -1,5 +1,3 @@
-// Standard Library UUID Module Index
-
 import std.uuid.uuid as uuid_mod;
 import std.uuid.generator as generator_mod;
 

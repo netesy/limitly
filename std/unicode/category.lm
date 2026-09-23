@@ -1,5 +1,3 @@
-// Standard Library Unicode Category Module
-
 pub fn is_upper(ch: str): bool {
     if (len(ch) == 0) return false;
     var c = _builtin_substring(ch, 0, 1);

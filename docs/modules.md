@@ -18,7 +18,7 @@ var PI = 3.14159;
 var E = 2.71828;
 
 fn square(x) {
-    return x * x;
+ return x * x;
 }
 ```
 
@@ -26,9 +26,9 @@ fn square(x) {
 // main.lm
 import math_utils as math;
 
-print(math.PI);        // 3.14159
-print(math.E);         // 2.71828
-var result = math.square(5);  // 25
+print(math.PI); // 3.14159
+print(math.E); // 2.71828
+var result = math.square(5); // 25
 ```
 
 ## Module Aliasing
@@ -39,8 +39,8 @@ You can import the same module with different aliases:
 import utils.math as math;
 import utils.math as mathematics;
 
-print(math.PI);         // 3.14159
-print(mathematics.PI);  // 3.14159 (same module, different alias)
+print(math.PI); // 3.14159
+print(mathematics.PI); // 3.14159 (same module, different alias)
 ```
 
 ## Import Filters
@@ -51,9 +51,9 @@ Only import specific identifiers from a module:
 ```limit
 import utils.math as math show PI, E;
 
-print(math.PI);  // ✓ Available
-print(math.E);   // ✓ Available
-// math.square(5);  // [FAIL] Not available (not in show list)
+print(math.PI); // [OK] Available
+print(math.E); // [OK] Available
+// math.square(5); // [ ] Not available (not in show list)
 ```
 
 ### Hide Filter
@@ -62,9 +62,9 @@ Import everything except specific identifiers:
 ```limit
 import utils.math as math hide square;
 
-print(math.PI);  // ✓ Available
-print(math.E);   // ✓ Available
-// math.square(5);  // [FAIL] Not available (hidden)
+print(math.PI); // [OK] Available
+print(math.E); // [OK] Available
+// math.square(5); // [ ] Not available (hidden)
 ```
 
 ### Multiple Identifiers
@@ -92,11 +92,11 @@ Modules are cached after first import. Subsequent imports of the same module ret
 
 ```limit
 import utils.math as math1;
-import utils.math as math2;  // Uses cached version
+import utils.math as math2; // Uses cached version
 
 // Both aliases reference the same module instance
-print(math1.PI);  // 3.14159
-print(math2.PI);  // 3.14159
+print(math1.PI); // 3.14159
+print(math2.PI); // 3.14159
 ```
 
 ## Current Limitations
@@ -174,29 +174,29 @@ import debug_module as debug hide internal_debug, verbose_logging;
 project/
 ├── main.lm
 ├── utils/
-│   ├── math.lm
-│   ├── string.lm
-│   └── file.lm
+│ ├── math.lm
+│ ├── string.lm
+│ └── file.lm
 ├── models/
-│   ├── user.lm
-│   └── product.lm
+│ ├── user.lm
+│ └── product.lm
 └── services/
-    ├── auth.lm
-    └── database.lm
+ ├── auth.lm
+ └── database.lm
 ```
 
 ## Testing
 
 The module system includes comprehensive tests covering:
 
-- [OK] Basic import and variable access
-- [OK] Module aliasing
-- [OK] Show/hide filters
-- [OK] Nested directory imports
-- [OK] Module caching
-- [OK] Multiple module imports
-- 🚧 Function calls with parameters (known limitation)
-- 🚧 Error handling improvements (in progress)
+- [x] Basic import and variable access
+- [x] Module aliasing
+- [x] Show/hide filters
+- [x] Nested directory imports
+- [x] Module caching
+- [x] Multiple module imports
+- Function calls with parameters (known limitation)
+- Error handling improvements (in progress)
 
 ## Future Enhancements
 

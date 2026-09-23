@@ -1,5 +1,3 @@
-// Standard Library Path Forwarder Module
-
 import std.path.index as p;
 
 pub type Path = p.Path;

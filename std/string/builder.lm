@@ -1,5 +1,3 @@
-// Standard Library StringBuilder Module
-
 frame StringBuilder {
     pub var parts: [str];
 

@@ -1,5 +1,3 @@
-// Standard Library URL Query Module
-
 import std.encoding.percent as percent;
 
 frame QueryParams {

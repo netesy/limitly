@@ -1,5 +1,3 @@
-// Standard Library Filesystem Entrypoint Module
-
 import std.fs.directory as directory_mod;
 import std.fs.permissions as permissions_mod;
 import std.path.index as path_mod;

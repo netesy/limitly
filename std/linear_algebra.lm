@@ -1,4 +1,3 @@
-// Standard Library Linear Algebra Module
 import std.math as math;
 
 frame Vec2 {
@@ -72,7 +71,7 @@ frame Mat4 {
         return self.data[row * 4 + col];
     }
     
-    pub fn set(row: int, col: int, val: float) {
-        self.data[row * 4 + col] = val;
+    pub fn set(row: int, col: int, value: float) {
+        self.data[row * 4 + col] = value;
     }
 }

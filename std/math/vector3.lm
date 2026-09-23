@@ -1,5 +1,3 @@
-// Standard Library 3D Vector Module
-
 import std.math.arithmetic as arith;
 
 frame Vector3 {

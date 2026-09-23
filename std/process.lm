@@ -1,5 +1,3 @@
-// Standard Library Process Forwarder Module
-
 import std.process.index as process_mod;
 
 frame Process {

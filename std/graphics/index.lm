@@ -1,4 +1,3 @@
-// Standard Library Graphics Module Index
 // Re-exports all graphics primitives and types
 
 import std.graphics.canvas as canvas;

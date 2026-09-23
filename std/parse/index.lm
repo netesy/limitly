@@ -1,5 +1,3 @@
-// Standard Library Parse Entrypoint Module
-
 import std.parse.numbers as numbers_mod;
 import std.parse.bool as bool_mod;
 import std.parse.datetime as datetime_mod;

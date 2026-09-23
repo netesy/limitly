@@ -1,5 +1,3 @@
-// Standard Library Range Module
-
 frame Range {
     var start: int;
     var stop: int;

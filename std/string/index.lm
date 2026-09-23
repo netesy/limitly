@@ -1,5 +1,3 @@
-// Standard Library String Entrypoint Module
-
 import std.string.string as string_mod;
 import std.string.builder as builder_mod;
 import std.string.split as split_mod;

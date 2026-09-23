@@ -1,5 +1,3 @@
-// Standard Library Encoding Module
-
 import std.encoding.base64 as base64;
 import std.encoding.hex as hex;
 import std.encoding.percent as percent;

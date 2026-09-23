@@ -1,5 +1,3 @@
-// Standard Library Regex Forwarder Module
-
 import std.regex.index as r;
 import std.regex.regex as regex_mod;
 

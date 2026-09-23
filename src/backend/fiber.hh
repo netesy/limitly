@@ -24,6 +24,31 @@ struct Fiber {
     uint64_t current_instruction;
     uint64_t suspend_count;
     
+    // Algebraic Effect Handler Frame Stack
+    struct EffectHandlerFrame {
+        uint64_t effect_tag;
+        uint64_t handler_pc;
+        uint64_t return_pc;
+    };
+    std::vector<EffectHandlerFrame> effect_handlers;
+
+    void push_effect_handler(uint64_t tag, uint64_t handler_pc, uint64_t return_pc) {
+        effect_handlers.push_back({tag, handler_pc, return_pc});
+    }
+
+    bool pop_effect_handler() {
+        if (effect_handlers.empty()) return false;
+        effect_handlers.pop_back();
+        return true;
+    }
+
+    const EffectHandlerFrame* find_effect_handler(uint64_t tag) const {
+        for (auto it = effect_handlers.rbegin(); it != effect_handlers.rend(); ++it) {
+            if (it->effect_tag == tag) return &(*it);
+        }
+        return nullptr;
+    }
+
     // Fiber stack/context information
     void* stack_pointer;
     size_t stack_size;

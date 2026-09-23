@@ -1,5 +1,3 @@
-// Standard Library Algorithm Module
-
 import std.collections.vector as vector;
 
 fn map(items: [any], f: fn(any): any): [any] {
