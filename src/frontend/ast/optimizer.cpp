@@ -608,50 +608,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::simplifyBranches(st
 }
 
 std::shared_ptr<LM::Frontend::AST::Expression> ASTOptimizer::simplifyAlgebraic(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
-    if (!expr) return nullptr;
-    
-    // Handle binary expressions
-    if (auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
-        // x + 0 -> x
-        if (binary->op == TokenType::PLUS && isLiteralConstant(binary->right)) {
-            if (auto rightLiteral = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(binary->right)) {
-                if (std::get_if<std::string>(&rightLiteral->value)) {
-                    auto strVal = std::get<std::string>(rightLiteral->value);
-                    if (strVal == "0") {
-                        context.stats.algebraic_simplifications++;
-                        return binary->left;
-                    }
-                }
-            }
-        }
-        
-        // x * 1 -> x
-        if (binary->op == TokenType::STAR && isLiteralConstant(binary->right)) {
-            if (auto rightLiteral = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(binary->right)) {
-                if (std::get_if<std::string>(&rightLiteral->value)) {
-                    auto strVal = std::get<std::string>(rightLiteral->value);
-                    if (strVal == "1") {
-                        context.stats.algebraic_simplifications++;
-                        return binary->left;
-                    }
-                }
-            }
-        }
-        
-        // x * 0 -> 0
-        if (binary->op == TokenType::STAR && isLiteralConstant(binary->right)) {
-            if (auto rightLiteral = std::dynamic_pointer_cast<LiteralExpr>(binary->right)) {
-                if (std::get_if<std::string>(&rightLiteral->value)) {
-                    auto strVal = std::get<std::string>(rightLiteral->value);
-                    if (strVal == "0") {
-                        context.stats.algebraic_simplifications++;
-                        return binary->right;
-                    }
-                }
-            }
-        }
-    }
-    
+    // Superseded by LIR-level algebraic simplifier (src/lir/algebraic_simplifier.cpp)
     return expr;
 }
 

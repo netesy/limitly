@@ -75,23 +75,6 @@ struct Scheduler {
     }
     
     
-    // Main scheduler tick - process time-based events
-    void tick() {
-        current_time++;
-        
-        // Check sleeping tasks and wake them up
-        for (auto& fiber : fibers) {
-            if (fiber->task_context && 
-                fiber->task_context->state == TaskState::SLEEPING && 
-                current_time >= fiber->task_context->sleep_until) {
-                
-                fiber->task_context->state = TaskState::RUNNING;
-                if (fiber->is_suspended()) {
-                    resume_fiber(fiber->fiber_id);
-                }
-            }
-        }
-    }
     
     // Check if there are runnable fibers
     bool has_runnable_fibers() const {
