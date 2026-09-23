@@ -537,6 +537,17 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::primary() {
         } else attachTriviaFromToken(previous());
         return literalExpr;
     }
+    if (match({TokenType::QUESTION})) {
+        auto holeExpr = createNodeWithContext<LM::Frontend::AST::TypedHoleExpr>();
+        holeExpr->line = previous().line;
+        if (check(TokenType::IDENTIFIER)) {
+            holeExpr->name = advance().lexeme;
+        } else {
+            holeExpr->name = "hole";
+        }
+        attachTriviaFromToken(previous());
+        return holeExpr;
+    }
     if (match({TokenType::NIL})) {
         auto literalExpr = createNodeWithContext<LM::Frontend::AST::LiteralExpr>();
         literalExpr->line = previous().line; literalExpr->value = nullptr;

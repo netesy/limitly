@@ -1,0 +1,39 @@
+// Test Layout Decoupling, Nested Frame Layouts, Collections & Copies
+frame Inner {
+    pub var x: int;
+    pub var y: int;
+
+    pub init(x: int = 0, y: int = 0) {
+        self.x = x;
+        self.y = y;
+    }
+}
+
+frame Outer {
+    pub var a: int;
+    pub var inner: Inner;
+    pub var b: int;
+
+    pub init(a: int = 0, inner: Inner = Inner(), b: int = 0) {
+        self.a = a;
+        self.inner = inner;
+        self.b = b;
+    }
+}
+
+fn test_layout() {
+    var in_obj = Inner(10, 20);
+    var out_obj = Outer(1, in_obj, 2);
+
+    assert(out_obj.a == 1, "Outer.a match");
+    assert(out_obj.inner.x == 10, "Nested Inner.x match");
+    assert(out_obj.inner.y == 20, "Nested Inner.y match");
+    assert(out_obj.b == 2, "Outer.b match");
+}
+
+fn main() {
+    test_layout();
+    print("Layout decoupling test PASSED");
+}
+
+main();

@@ -637,6 +637,7 @@ template auto Parser::createNodeWithContext<LM::Frontend::AST::ModuleDeclaration
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ImportStatement>() -> std::shared_ptr<LM::Frontend::AST::ImportStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::TypeDeclaration>() -> std::shared_ptr<LM::Frontend::AST::TypeDeclaration>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::InterfaceDeclaration>() -> std::shared_ptr<LM::Frontend::AST::InterfaceDeclaration>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::TypedHoleExpr>() -> std::shared_ptr<LM::Frontend::AST::TypedHoleExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::StagedExpr>() -> std::shared_ptr<LM::Frontend::AST::StagedExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::StagedBlockStatement>() -> std::shared_ptr<LM::Frontend::AST::StagedBlockStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::StagedStatement>() -> std::shared_ptr<LM::Frontend::AST::StagedStatement>;

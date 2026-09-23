@@ -1,0 +1,12 @@
+// Integration test for LSP proof-aware completion
+type Positive = int where value > 0;
+
+fn test_completion() {
+    var a: int = -5;
+    var b: int = 10;
+    var res: Positive = ?;
+}
+
+fn main() {
+    test_completion();
+}

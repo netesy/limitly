@@ -365,6 +365,28 @@ NativeProofResult ConstraintEngine::verify_obligation(
     return result;
 }
 
+bool ConstraintBuilder::extract_expr_name(
+    std::shared_ptr<AST::Expression> expr,
+    std::string& out_name) {
+
+    if (!expr) return false;
+
+    if (auto var = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
+        out_name = var->name;
+        return true;
+    } else if (auto mem = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+        std::string base;
+        if (extract_expr_name(mem->object, base)) {
+            out_name = base + "." + mem->name;
+            return true;
+        }
+    } else if (auto cast = std::dynamic_pointer_cast<AST::CastExpr>(expr)) {
+        return extract_expr_name(cast->expression, out_name);
+    }
+
+    return false;
+}
+
 bool ConstraintBuilder::extract_linear_term(
     std::shared_ptr<AST::Expression> expr,
     LinearTerm& out_term) {
@@ -388,6 +410,14 @@ bool ConstraintBuilder::extract_linear_term(
     } else if (auto var = std::dynamic_pointer_cast<AST::VariableExpr>(expr)) {
         out_term.add_term(var->name, 1);
         return true;
+    } else if (auto mem = std::dynamic_pointer_cast<AST::MemberExpr>(expr)) {
+        std::string name;
+        if (extract_expr_name(mem, name)) {
+            out_term.add_term(name, 1);
+            return true;
+        }
+    } else if (auto cast = std::dynamic_pointer_cast<AST::CastExpr>(expr)) {
+        return extract_linear_term(cast->expression, out_term);
     } else if (auto grp = std::dynamic_pointer_cast<AST::GroupingExpr>(expr)) {
         return extract_linear_term(grp->expression, out_term);
     } else if (auto un = std::dynamic_pointer_cast<AST::UnaryExpr>(expr)) {

@@ -60,6 +60,14 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
         type = check_frame_instantiation_expr(frame_inst);
     } else if (auto staged_expr = std::dynamic_pointer_cast<LM::Frontend::AST::StagedExpr>(expr)) {
         type = check_staged_expr(staged_expr);
+    } else if (auto hole = std::dynamic_pointer_cast<LM::Frontend::AST::TypedHoleExpr>(expr)) {
+        hole->expected_type = expected_type ? expected_type : type_system.ANY_TYPE;
+        hole->lexical_bindings.clear();
+        for (const auto& var_name : get_visible_variables()) {
+            TypePtr t = lookup_variable(var_name);
+            if (t) hole->lexical_bindings.push_back({var_name, t});
+        }
+        type = hole->expected_type;
     } else {
         add_error("Unknown expression type", expr->line);
         type = type_system.NIL_TYPE; // Default fallback
@@ -118,6 +126,14 @@ TypePtr TypeChecker::check_expression_with_expected_type(std::shared_ptr<LM::Fro
         type = check_frame_instantiation_expr(frame_inst);
     } else if (auto staged_expr = std::dynamic_pointer_cast<LM::Frontend::AST::StagedExpr>(expr)) {
         type = check_staged_expr(staged_expr);
+    } else if (auto hole = std::dynamic_pointer_cast<LM::Frontend::AST::TypedHoleExpr>(expr)) {
+        hole->expected_type = expected_type ? expected_type : type_system.ANY_TYPE;
+        hole->lexical_bindings.clear();
+        for (const auto& var_name : get_visible_variables()) {
+            TypePtr t = lookup_variable(var_name);
+            if (t) hole->lexical_bindings.push_back({var_name, t});
+        }
+        type = hole->expected_type;
     } else {
         add_error("Unknown expression type", expr->line);
         type = type_system.NIL_TYPE; // Default fallback

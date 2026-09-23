@@ -139,6 +139,10 @@ public:
     static bool extract_linear_term(
         std::shared_ptr<AST::Expression> expr,
         LinearTerm& out_term);
+
+    static bool extract_expr_name(
+        std::shared_ptr<AST::Expression> expr,
+        std::string& out_name);
 };
 
 } // namespace Frontend

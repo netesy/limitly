@@ -111,6 +111,7 @@ namespace AST {
     struct MakeRefExpr;
     struct MoveExpr;
     struct DropExpr;
+    struct TypedHoleExpr;
 }
 
 // AST Node definitions
@@ -929,6 +930,13 @@ namespace AST {
         
         DropExpr(std::shared_ptr<Expression> val, const std::string& target)
             : value(val), target_var(target) {}
+    };
+
+    // Typed hole expression (e.g. ? or _ or ?hole)
+    struct TypedHoleExpr : public Expression {
+        std::string name;
+        TypePtr expected_type = nullptr;
+        std::vector<std::pair<std::string, TypePtr>> lexical_bindings;
     };
 
     // ============================================================================
