@@ -20,6 +20,8 @@ namespace Backend {
 namespace VM {
 namespace Register {
 
+static std::mutex g_capability_mutex;
+
 void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
     auto& rm = ResourceManager::getInstance();
     switch (pc->op) {
@@ -88,9 +90,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             if (IS_PTR(registers[pc->a])) {
                 auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
                 channel->send(value, get_current_fiber());
-            } else if (IS_INT(registers[pc->a])) {
-                rm.call(to_int(registers[pc->a]), ResourceOperation::SEND,
-                        {value}, get_current_fiber());
             }
             break;
         }
@@ -119,10 +118,6 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
                 RegisterValue out = VAL_NIL;
                 registers[pc->dst] = channel->poll(out) ? out : VAL_NIL;
-            } else if (IS_INT(registers[pc->a])) {
-                registers[pc->dst] = rm.call(to_int(registers[pc->a]),
-                                              ResourceOperation::POLL, {},
-                                              get_current_fiber());
             } else {
                 registers[pc->dst] = VAL_NIL;
             }
@@ -146,12 +141,11 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::CapabilityAcquire: {
-            static std::mutex capability_mutex;
             const RegisterValue collection = registers[pc->a];
             const uint32_t begin = pc->b;
             const uint32_t end = pc->imm;
             if (end <= begin) throw std::runtime_error("invalid parallel slice capability");
-            std::lock_guard<std::mutex> lock(capability_mutex);
+            std::lock_guard<std::mutex> lock(g_capability_mutex);
             for (const auto& capability : slice_capabilities) {
                 if (capability.active && capability.collection == collection &&
                     begin < capability.end && capability.begin < end) {
@@ -163,8 +157,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::CapabilityRelease: {
-            static std::mutex capability_mutex;
-            std::lock_guard<std::mutex> lock(capability_mutex);
+            std::lock_guard<std::mutex> lock(g_capability_mutex);
             const int64_t token = as_i64(registers[pc->a]);
             if (token <= 0 || static_cast<size_t>(token) > slice_capabilities.size() ||
                 !slice_capabilities[static_cast<size_t>(token - 1)].active) {
@@ -274,19 +267,15 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::SchedulerAddTask:
             break;
         case LIR::LIR_Op::SchedulerTick:
-            if (scheduler) scheduler->tick();
             current_time++;
             break;
         case LIR::LIR_Op::GetTickCount:
-            registers[pc->dst] = make_i64(
-                static_cast<int64_t>(scheduler ? scheduler->current_time : current_time));
+            registers[pc->dst] = make_i64(static_cast<int64_t>(current_time));
             break;
         case LIR::LIR_Op::DelayUntil: {
             int64_t target = (pc->a != UINT32_MAX) ? as_i64(registers[pc->a])
                                                    : static_cast<int64_t>(pc->imm);
-            if (scheduler && (int64_t)scheduler->current_time < target) {
-                while ((int64_t)scheduler->current_time < target) scheduler->tick();
-            } else if ((int64_t)current_time < target) {
+            if ((int64_t)current_time < target) {
                 current_time = static_cast<uint64_t>(target);
             }
             break;

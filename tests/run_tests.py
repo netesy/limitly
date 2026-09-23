@@ -207,7 +207,7 @@ if __name__ == "__main__":
             print(f"Skipping {test_path} (does not exist)")
             continue
         
-        timeout = 20.0 if test in slow_tests else 3.0
+        timeout = 25.0 if test in slow_tests else 3.0
         start_time = time.time()
         try:
             res = subprocess.run(

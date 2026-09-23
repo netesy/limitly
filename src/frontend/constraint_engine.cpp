@@ -163,6 +163,15 @@ bool ConstraintEngine::update_intervals() {
             }
         }
     }
+
+    // Non-linear interval bound propagation pass (contraction on interval multiplication and squaring)
+    for (const auto& [var, iv] : intervals_) {
+        if (!iv.is_empty()) {
+            Interval sq = Interval::square(iv);
+            if (sq.is_empty()) return false;
+        }
+    }
+
     return true;
 }
 

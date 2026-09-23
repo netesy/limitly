@@ -2431,6 +2431,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 builder_->createExternCall("limitrt_callback_destroy", {handle}, nullptr);
                 break;
             }
+            case LIR::LIR_Op::EffectPerform:
+            case LIR::LIR_Op::EffectHandle:
+            case LIR::LIR_Op::EffectResume: {
+                ir::Value* payload = (inst.a != UINT32_MAX) ? load_reg(inst.a, inst.type_a) : context_->getConstantInt(context_->getIntegerType(64), 0);
+                if (inst.dst != UINT32_MAX) store_reg(inst.dst, payload, inst.result_type);
+                break;
+            }
             case LIR::LIR_Op::ForeignCallDirect: {
                 std::vector<ir::Value*> args;
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
