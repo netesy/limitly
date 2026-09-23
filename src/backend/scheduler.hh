@@ -74,22 +74,6 @@ struct Scheduler {
         return get_fiber(fiber_id);
     }
     
-    // Execute one instruction of the current fiber
-    void execute_current_fiber_step() {
-        Fiber* fiber = get_fiber(current_fiber_id);
-        if (fiber && fiber->is_running() && fiber->has_more_instructions()) {
-            // Advance instruction pointer
-            fiber->advance_instruction();
-            
-            // Check if fiber is completed
-            if (!fiber->has_more_instructions()) {
-                fiber->complete();
-            } else {
-                // Re-queue for next execution cycle
-                ready_queue.push(current_fiber_id);
-            }
-        }
-    }
     
     // Main scheduler tick - process time-based events
     void tick() {

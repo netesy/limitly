@@ -30,24 +30,6 @@ std::optional<CapabilityDescriptor> CapabilityMapper::map(LIR::LIR_Op op) {
         case LIR::LIR_Op::LibrarySymbol:
             return CapabilityDescriptor{"limitrt_symbol_lookup", 2, 2, true, true};
         
-        // Pointer Operations - no capability mapping, use Fyra IR arithmetic directly
-        case LIR::LIR_Op::PtrAdd:
-        case LIR::LIR_Op::PtrSub:
-        case LIR::LIR_Op::PtrDiff:
-        case LIR::LIR_Op::PtrAlign:
-        case LIR::LIR_Op::PtrIsAligned:
-            return std::nullopt;
-        
-        // Foreign Call Operations - handled directly via createCall/createExternCall
-        case LIR::LIR_Op::ForeignCall:
-        case LIR::LIR_Op::ForeignCallDirect:
-        case LIR::LIR_Op::CallbackCreate:
-        case LIR::LIR_Op::CallbackDestroy:
-        case LIR::LIR_Op::RegionEnter:
-        case LIR::LIR_Op::RegionExit:
-        case LIR::LIR_Op::RegionMove:
-            return std::nullopt;
-        
         default:
             return std::nullopt;
     }
