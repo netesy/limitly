@@ -128,9 +128,8 @@ def mutate_replace_with_keyword(code: str) -> Tuple[Optional[str], str, str]:
     for i, line in enumerate(lines):
         if line.strip().startswith('//'):
             continue
-        # Mask string literals so identifiers inside strings are not matched
-        line_code_only = re.sub(r'"([^"\\]|\\.)*"', lambda m: ' ' * len(m.group(0)), line)
-        for match in re.finditer(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', line_code_only):
+        # Find identifier words (starts with alpha or _, then alphanumeric)
+        for match in re.finditer(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\b', line):
             word = match.group(1)
             if word not in RESERVED_KEYWORDS and word not in ("print", "main", "int", "str", "bool", "float"):
                 words.append((i, match.start(), match.end(), word))
@@ -436,7 +435,7 @@ class FuzzTestRunner:
         ]
         # Check for Typechecker/Semantic patterns
         type_patterns = [
-            "error[E003]", "type mismatch", "cannot find function", "cannot find variable",
+            "error[E003]", "type mismatch", "cannot find function",
             "Type Check Error", "Semantic Error", "incompatible operations",
             "does not implement required trait", "signature doesn't match",
             "declares error type", "but function body cannot produce"

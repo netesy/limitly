@@ -462,7 +462,23 @@ bool ConstraintBuilder::extract_linear_term(
                 out_term.constant_offset = new_offset;
                 return true;
             }
+            // Non-linear integer multiplication (e.g., x * x) -> symbolic term binding
+            std::string non_linear_name;
+            if (extract_expr_name(bin->left, non_linear_name)) {
+                std::string right_name;
+                if (extract_expr_name(bin->right, right_name)) {
+                    out_term.add_term("(" + non_linear_name + "*" + right_name + ")", 1);
+                    return true;
+                }
+            }
             return false;
+        } else if (bin->op == TokenType::SLASH || bin->op == TokenType::MODULUS) {
+            std::string left_name, right_name;
+            if (extract_expr_name(bin->left, left_name) && extract_expr_name(bin->right, right_name)) {
+                std::string op_str = (bin->op == TokenType::SLASH) ? "/" : "%";
+                out_term.add_term("(" + left_name + op_str + right_name + ")", 1);
+                return true;
+            }
         }
     }
 
