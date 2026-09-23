@@ -62,7 +62,6 @@ void RegisterVM::reset() {
     default_atomic.store(0);
     work_queues.clear();
     work_queue_counter.store(0);
-    // instruction_count = 0;
 }
 
 std::string RegisterVM::to_string(const RegisterValue& value) const {
@@ -120,7 +119,6 @@ RegisterValue unbox_register_value(void* boxed_value) {
                 case LM_BOX_INT: return make_i64(box->value.as_int);
                 case LM_BOX_FLOAT: return make_float(box->value.as_float);
                 case LM_BOX_BOOL: return box->value.as_bool ? VAL_TRUE : VAL_FALSE;
-                case LM_BOX_NULLPTR: return VAL_NIL;
                 case LM_BOX_STRING: return BOX_PTR(box);
                 default: return VAL_NIL;
             }
@@ -143,9 +141,6 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
     const LIR::LIR_Inst* end_ptr = instructions_ptr + (end_pc < function.instructions.size() ? end_pc : function.instructions.size());
 
     while (pc < end_ptr) {
-        instruction_count++;
-        if (instruction_count > MAX_INSTRUCTIONS) { std::cerr << "Instruction limit exceeded at " << (int)pc->op << " " << instruction_count << std::endl; return; }
-
         // Bounds check for register indices
         auto safe_reg_access = [this](uint32_t reg) -> bool {
             return reg < registers.size();
