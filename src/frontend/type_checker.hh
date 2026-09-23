@@ -29,6 +29,42 @@ struct ModuleInfo {
 };
 
 class TypeChecker {
+public:
+    // Function signatures
+    struct FunctionSignature {
+        std::string name;
+        std::vector<TypePtr> param_types;
+        TypePtr return_type;
+        std::shared_ptr<LM::Frontend::AST::Statement> declaration;
+        bool can_fail = false;
+        std::vector<std::string> error_types;
+        std::vector<bool> optional_params;
+        std::vector<bool> has_default_values;
+        
+        FunctionSignature() = default;
+        FunctionSignature(const std::string& n, const std::vector<TypePtr>& params, TypePtr ret, 
+                       bool fail = false, const std::vector<std::string>& errors = {}, 
+                       int line = 0, const std::vector<bool>& opt = {}, 
+                       const std::vector<bool>& defaults = {})
+            : name(n), param_types(params), return_type(ret), can_fail(fail), 
+              error_types(errors), optional_params(opt), has_default_values(defaults) {}
+    };
+
+    // Frame declarations tracking
+    struct FrameInfo {
+        std::string name;
+        std::vector<std::pair<std::string, TypePtr>> fields;  // field name -> type
+        std::vector<std::pair<std::string, bool>> field_has_default;  // field name -> has default
+        std::shared_ptr<LM::Frontend::AST::FrameDeclaration> declaration;
+    };
+
+    // Trait declarations tracking
+    struct TraitInfo {
+        std::string name;
+        std::vector<std::string> extends;
+        std::shared_ptr<LM::Frontend::AST::TraitDeclaration> declaration;
+    };
+
 private:
     struct Scope;
 
@@ -60,42 +96,8 @@ private:
     std::size_t next_alloc_id = 0;
     std::vector<std::size_t> region_stack;
     
-    // Function signatures
-    struct FunctionSignature {
-        std::string name;
-        std::vector<TypePtr> param_types;
-        TypePtr return_type;
-        std::shared_ptr<LM::Frontend::AST::Statement> declaration;
-        bool can_fail = false;
-        std::vector<std::string> error_types;
-        std::vector<bool> optional_params;
-        std::vector<bool> has_default_values;
-        
-        FunctionSignature() = default;
-        FunctionSignature(const std::string& n, const std::vector<TypePtr>& params, TypePtr ret, 
-                       bool fail = false, const std::vector<std::string>& errors = {}, 
-                       int line = 0, const std::vector<bool>& opt = {}, 
-                       const std::vector<bool>& defaults = {})
-            : name(n), param_types(params), return_type(ret), can_fail(fail), 
-              error_types(errors), optional_params(opt), has_default_values(defaults) {}
-    };
     std::unordered_map<std::string, FunctionSignature> function_signatures;
-    
-    // Frame declarations tracking
-    struct FrameInfo {
-        std::string name;
-        std::vector<std::pair<std::string, TypePtr>> fields;  // field name -> type
-        std::vector<std::pair<std::string, bool>> field_has_default;  // field name -> has default
-        std::shared_ptr<LM::Frontend::AST::FrameDeclaration> declaration;
-    };
     std::unordered_map<std::string, FrameInfo> frame_declarations;
-    
-    // Trait declarations tracking
-    struct TraitInfo {
-        std::string name;
-        std::vector<std::string> extends;
-        std::shared_ptr<LM::Frontend::AST::TraitDeclaration> declaration;
-    };
     std::unordered_map<std::string, TraitInfo> trait_declarations;
 
     // =========================================================================
@@ -293,6 +295,11 @@ public:
     void register_builtin_function(const std::string& name, 
                                   const std::vector<TypePtr>& param_types,
                                   TypePtr return_type);
+
+    const std::unordered_map<std::string, FunctionSignature>& get_function_signatures() const { return function_signatures; }
+    const std::unordered_map<std::string, FrameInfo>& get_frame_declarations() const { return frame_declarations; }
+    const std::unordered_map<std::string, TraitInfo>& get_trait_declarations() const { return trait_declarations; }
+    const std::unordered_map<std::string, TypePtr>& get_variable_types() const { return variable_types; }
     
 public:
     // Diagnostic helpers & shared tracking
@@ -645,6 +652,10 @@ struct TypeCheckResult {
     std::vector<std::string> errors;
     std::unordered_map<std::string, std::string> import_aliases;  // Module import aliases
     std::unordered_map<std::string, ModuleInfo> registered_modules;  // Module information
+    std::unordered_map<std::string, TypeChecker::FunctionSignature> function_signatures;
+    std::unordered_map<std::string, TypeChecker::FrameInfo> frame_declarations;
+    std::unordered_map<std::string, TypeChecker::TraitInfo> trait_declarations;
+    std::unordered_map<std::string, TypePtr> variable_types;
     
     TypeCheckResult(std::shared_ptr<LM::Frontend::AST::Program> prog, std::shared_ptr<TypeSystem> ts, bool succ, 
                     const std::vector<std::string>& errs)

@@ -160,6 +160,10 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     TypeCheckResult result(program, type_system, success, checker->get_errors());
     result.import_aliases = checker->get_import_aliases();
     result.registered_modules = checker->get_registered_modules();
+    result.function_signatures = checker->get_function_signatures();
+    result.frame_declarations = checker->get_frame_declarations();
+    result.trait_declarations = checker->get_trait_declarations();
+    result.variable_types = checker->get_variable_types();
     return result;
 }
 

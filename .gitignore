@@ -32,6 +32,7 @@ tags
 *.debug
 *.prl
 *.app
+*.vsix
 moc_*.cpp
 ui_*.h
 qrc_*.cpp
@@ -41,6 +42,7 @@ build/
 bin/
 *.exe
 *.s
+node_modules/
 
 # Vendored dependencies (keep the structure but ignore generated files within)
 # vendor/fyra/
@@ -58,8 +60,9 @@ vendor/lyra/*.dll
 # qtcreator generated files
 *.pro.user*
 CMakeLists.txt.user*
-Limitly.*
-Luminar.*
+Limitly.pro*
+Luminar.pro*
+!editors/
 
 # xemacs temporary files
 *.flc

@@ -530,6 +530,9 @@ public:
         return nullptr;
     }
 
+    const std::map<std::string, FrameInfo>& getFrameRegistry() const { return frameRegistry; }
+    const std::map<std::string, TraitInfo>& getTraitRegistry() const { return traitRegistry; }
+
     // --- Canonicalization ---
     TypePtr getCanonicalType(const std::string& key, std::function<TypePtr()> creator) {
         if (typeCache.count(key)) return typeCache[key];

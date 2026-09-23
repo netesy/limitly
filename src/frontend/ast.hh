@@ -748,11 +748,12 @@ namespace AST {
         VisibilityLevel visibility;
         std::shared_ptr<Expression> defaultValue;  // Optional default value
         bool isConst = false;                      // True for const/val fields (immutable after init)
+        int line = 0;                              // Source line number
 
-        FrameField() : visibility(VisibilityLevel::Private), defaultValue(nullptr), isConst(false) {}
+        FrameField() : visibility(VisibilityLevel::Private), defaultValue(nullptr), isConst(false), line(0) {}
         FrameField(const std::string& n, std::shared_ptr<TypeAnnotation> t,
-                   VisibilityLevel v = VisibilityLevel::Private)
-            : name(n), type(t), visibility(v), defaultValue(nullptr), isConst(false) {}
+                   VisibilityLevel v = VisibilityLevel::Private, int l = 0)
+            : name(n), type(t), visibility(v), defaultValue(nullptr), isConst(false), line(l) {}
     };
 
     // Frame method with visibility

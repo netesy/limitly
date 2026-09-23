@@ -711,8 +711,9 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             else if (match({TokenType::FINAL})) memberFinal = true;
         }
         if (check(TokenType::IDENTIFIER) && peek().lexeme == "init") {
-            advance(); consume(TokenType::LEFT_PAREN, "Expected '(' after 'init'.");
+            Token initTok = advance(); consume(TokenType::LEFT_PAREN, "Expected '(' after 'init'.");
             auto initMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
+            initMethod->line = initTok.line;
             initMethod->name = "init"; initMethod->visibility = visibility; initMethod->isInit = true;
             initMethod->isStatic = memberStatic; initMethod->isAbstract = memberAbstract; initMethod->isFinal = memberFinal;
             if (!check(TokenType::RIGHT_PAREN)) {
@@ -733,8 +734,9 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             initMethod->body = block();
             frameDecl->init = initMethod;
         } else if (check(TokenType::IDENTIFIER) && peek().lexeme == "deinit") {
-            advance(); consume(TokenType::LEFT_PAREN, "Expected '(' after 'deinit'.");
+            Token deinitTok = advance(); consume(TokenType::LEFT_PAREN, "Expected '(' after 'deinit'.");
             auto deinitMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
+            deinitMethod->line = deinitTok.line;
             deinitMethod->name = "deinit"; deinitMethod->visibility = visibility; deinitMethod->isDeinit = true;
             deinitMethod->isStatic = memberStatic; deinitMethod->isAbstract = memberAbstract; deinitMethod->isFinal = memberFinal;
             if (!check(TokenType::RIGHT_PAREN)) error("deinit() method cannot have parameters.");
@@ -743,12 +745,14 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             deinitMethod->body = block();
             frameDecl->deinit = deinitMethod;
         } else if (match({TokenType::FN})) {
+            Token fnTok = previous();
             auto frameMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
             frameMethod->visibility = visibility;
             frameMethod->isStatic = memberStatic;
             frameMethod->isAbstract = memberAbstract;
             frameMethod->isFinal = memberFinal;
             Token methodName = consume(TokenType::IDENTIFIER, "Expected method name.");
+            frameMethod->line = methodName.line > 0 ? methodName.line : fnTok.line;
             frameMethod->name = methodName.lexeme;
             consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
             if (!check(TokenType::RIGHT_PAREN)) {
@@ -776,11 +780,14 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             else if (frameMethod->name == "deinit") { frameMethod->isDeinit = true; frameDecl->deinit = frameMethod; }
             else frameDecl->methods.push_back(frameMethod);
         } else if (match({TokenType::VAR}) || match({TokenType::CONST}) || match({TokenType::VAL})) {
-            bool fieldConst = (previous().type == TokenType::CONST || previous().type == TokenType::VAL);
-            auto fieldName = consume(TokenType::IDENTIFIER, "Expected field name.").lexeme;
+            Token varTok = previous();
+            bool fieldConst = (varTok.type == TokenType::CONST || varTok.type == TokenType::VAL);
+            Token fieldNameTok = consume(TokenType::IDENTIFIER, "Expected field name.");
+            auto fieldName = fieldNameTok.lexeme;
             consume(TokenType::COLON, "Expected ':' after field name.");
             auto fieldType = parseTypeAnnotation();
             auto field = std::make_shared<LM::Frontend::AST::FrameField>();
+            field->line = fieldNameTok.line > 0 ? fieldNameTok.line : varTok.line;
             field->name = fieldName; field->type = fieldType; field->visibility = visibility; field->isConst = fieldConst;
             if (match({TokenType::EQUAL})) field->defaultValue = expression();
             consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
@@ -791,6 +798,7 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             if (check(TokenType::COLON)) {
                 advance();
                 auto field = std::make_shared<LM::Frontend::AST::FrameField>();
+                field->line = fieldName.line;
                 field->name = fieldName.lexeme; field->type = parseTypeAnnotation(); field->visibility = visibility;
                 if (match({TokenType::EQUAL})) field->defaultValue = expression();
                 consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
