@@ -146,10 +146,12 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::CapabilityAcquire: {
+            static std::mutex capability_mutex;
             const RegisterValue collection = registers[pc->a];
             const uint32_t begin = pc->b;
             const uint32_t end = pc->imm;
             if (end <= begin) throw std::runtime_error("invalid parallel slice capability");
+            std::lock_guard<std::mutex> lock(capability_mutex);
             for (const auto& capability : slice_capabilities) {
                 if (capability.active && capability.collection == collection &&
                     begin < capability.end && capability.begin < end) {
@@ -161,6 +163,8 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::CapabilityRelease: {
+            static std::mutex capability_mutex;
+            std::lock_guard<std::mutex> lock(capability_mutex);
             const int64_t token = as_i64(registers[pc->a]);
             if (token <= 0 || static_cast<size_t>(token) > slice_capabilities.size() ||
                 !slice_capabilities[static_cast<size_t>(token - 1)].active) {
@@ -291,7 +295,79 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             auto saved_registers = registers;
             const LIR::LIR_Function* saved_func = current_function_;
             auto& registry = LIR::FunctionRegistry::getInstance();
-            for (auto& context_ptr : task_contexts) {
+
+            uint32_t num_cores = std::max<uint32_t>(1, scheduler_config.cores);
+            if (num_cores > 1 && task_contexts.size() > 1) {
+                std::mutex task_mutex;
+                size_t task_index = 0;
+                std::vector<std::thread> workers;
+
+                for (uint32_t c = 0; c < num_cores; ++c) {
+                    workers.emplace_back([&]() {
+                        RegisterVM worker_vm;
+                        while (true) {
+                            TaskContext* context = nullptr;
+                            {
+                                std::lock_guard<std::mutex> lock(task_mutex);
+                                if (task_index >= task_contexts.size()) break;
+                                context = task_contexts[task_index++].get();
+                            }
+                            if (!context || context->state == TaskState::COMPLETED || context->cancelled.load()) continue;
+
+                            auto name_it = context->fields.find(4);
+                            if (name_it == context->fields.end()) continue;
+                            std::string func_name = "";
+                            if (IS_PTR(name_it->second)) {
+                                ObjHeader* h = (ObjHeader*)UNBOX_PTR(name_it->second);
+                                if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                                    func_name = (char*)((LmBox*)h)->value.as_ptr;
+                                }
+                            }
+                            auto* func = registry.getFunction(func_name);
+                            if (!func) continue;
+
+                            auto run_once = [&](RegisterValue field1) {
+                                if (context->cancelled.load()) return;
+                                worker_vm.registers = saved_registers;
+                                if (worker_vm.registers.size() < saved_registers.size()) {
+                                    worker_vm.registers.resize(saved_registers.size(), VAL_NIL);
+                                }
+                                worker_vm.registers[1] = field1;
+                                auto ch = context->fields.find(2);
+                                if (ch != context->fields.end()) worker_vm.registers[2] = ch->second;
+                                worker_vm.current_function_ = func;
+                                try {
+                                    worker_vm.execute_instructions(*func, 0, func->instructions.size());
+                                } catch (...) {}
+                            };
+
+                            auto data_it = context->fields.find(1);
+                            if (func_name.rfind("worker_", 0) == 0) {
+                                if (data_it != context->fields.end() && IS_PTR(data_it->second)) {
+                                    auto* channel = (LM::Backend::Channel*)UNBOX_PTR(data_it->second);
+                                    RegisterValue item = VAL_NIL;
+                                    while (!context->cancelled.load() && channel->poll(item)) run_once(item);
+                                } else if (data_it != context->fields.end() && IS_INT(data_it->second)) {
+                                    RegisterValue item = VAL_NIL;
+                                    do {
+                                        if (context->cancelled.load()) break;
+                                        item = rm.call(to_int(data_it->second), ResourceOperation::POLL,
+                                                       {}, nullptr);
+                                        if (!IS_NIL(item)) run_once(item);
+                                    } while (!IS_NIL(item));
+                                }
+                            } else {
+                                run_once(data_it == context->fields.end() ? VAL_NIL : data_it->second);
+                            }
+                            context->state = TaskState::COMPLETED;
+                        }
+                    });
+                }
+                for (auto& w : workers) {
+                    if (w.joinable()) w.join();
+                }
+            } else {
+                for (auto& context_ptr : task_contexts) {
                 if (scheduler_config.timeout_ms != 0) {
                     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - scheduler_config.started).count();
@@ -302,7 +378,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                     }
                 }
                 TaskContext* context = context_ptr.get();
-                if (!context || context->state == TaskState::COMPLETED) continue;
+                if (!context || context->state == TaskState::COMPLETED || context->cancelled.load()) continue;
                 auto name_it = context->fields.find(4);
                 if (name_it == context->fields.end()) continue;
 
@@ -318,6 +394,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 if (!func) continue;
 
                 auto run_once = [&](RegisterValue field1) {
+                    if (context->cancelled.load()) return;
                     if (registers.size() < saved_registers.size()) {
                         registers.resize(saved_registers.size(), VAL_NIL);
                     }
@@ -339,10 +416,11 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                     if (data_it != context->fields.end() && IS_PTR(data_it->second)) {
                         auto* channel = (LM::Backend::Channel*)UNBOX_PTR(data_it->second);
                         RegisterValue item = VAL_NIL;
-                        while (channel->poll(item)) run_once(item);
+                        while (!context->cancelled.load() && channel->poll(item)) run_once(item);
                     } else if (data_it != context->fields.end() && IS_INT(data_it->second)) {
                         RegisterValue item = VAL_NIL;
                         do {
+                            if (context->cancelled.load()) break;
                             item = rm.call(to_int(data_it->second), ResourceOperation::POLL,
                                            {}, get_current_fiber());
                             if (!IS_NIL(item)) run_once(item);
@@ -352,6 +430,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                     run_once(data_it == context->fields.end() ? VAL_NIL : data_it->second);
                 }
                 context->state = TaskState::COMPLETED;
+            }
             }
             // Captured registers are the structured task environment. Keep
             // mutations made by completed tasks; restoring saved_registers

@@ -24,6 +24,19 @@
 
 namespace LM::Backend::Fyra {
 
+static inline uint32_t get_frame_field_offset(uint32_t field_index) {
+    constexpr uint32_t header_size = 8;
+    constexpr uint32_t field_stride = 8;
+    return header_size + (field_index * field_stride);
+}
+
+static inline uint32_t get_frame_type_size(uint32_t field_count) {
+    constexpr uint32_t header_size = 8;
+    constexpr uint32_t field_stride = 8;
+    uint32_t effective_fields = (field_count > 0) ? field_count : 2;
+    return header_size + (effective_fields * field_stride);
+}
+
 LIRToFyraIRBuilder::LIRToFyraIRBuilder(std::shared_ptr<ir::IRContext> context)
     : context_(context), builder_(std::make_unique<ir::IRBuilder>(context)) {
 }
@@ -1883,7 +1896,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::NewFrame: {
                 std::string name = !inst.type_name.empty() ? inst.type_name : (!inst.func_name.empty() ? inst.func_name : "Frame");
                 uint32_t fields = static_cast<uint32_t>(inst.imm);
-                uint32_t bytes = (fields > 0 ? fields + 1 : 3) * 8;
+                uint32_t bytes = get_frame_type_size(fields);
                 ir::Type* type = current_module_->getType(name);
                 if (!type) { ir::StructType* st = context_->createStructType(name); st->setBody({context_->getIntegerType(64), context_->getIntegerType(64)}); current_module_->addType(name, st); type = st; }
                 ir::Value* frame_ptr = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), bytes)}, lir_type_to_fyra_type(inst.result_type));
@@ -1892,9 +1905,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (fid == 0) fid = 1;
                 builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), fid), frame_ptr);
 
-                // Zero out allocated frame memory (fields start at offset 8)
                 for (uint32_t f_idx = 0; f_idx < (fields > 0 ? fields : 2); ++f_idx) {
-                    ir::Value* addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), (long long)(f_idx + 1) * 8));
+                    ir::Value* addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), get_frame_field_offset(f_idx)));
                     builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), addr);
                 }
                 store_reg(inst.dst, frame_ptr, inst.result_type);
@@ -1904,7 +1916,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::FrameGetFieldAtomic: {
                 uint32_t field_idx = (inst.b != UINT32_MAX) ? inst.b : static_cast<uint32_t>(inst.imm);
                 ir::Value* frame_ptr = load_reg(inst.a, LIR::Type::Ptr);
-                ir::Value* addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), (long long)(field_idx + 1) * 8));
+                ir::Value* addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), get_frame_field_offset(field_idx)));
                 LIR::Type res_t = inst.result_type;
                 if (res_t == LIR::Type::F64 || res_t == LIR::Type::F32 || is_float_op(inst)) {
                     ir::Value* val = builder_->createLoadd(addr);
@@ -1916,11 +1928,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::FrameSetField:
             case LIR::LIR_Op::FrameSetFieldAtomic: {
-                // In LIR_Inst for FrameSetField:
-                // dst = frame_ptr (object_reg), a = field_idx (offset), b = value_reg
                 ir::Value* frame_ptr = load_reg(inst.dst, LIR::Type::Ptr);
                 uint32_t field_idx = inst.a;
-                ir::Value* addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), (long long)(field_idx + 1) * 8));
+                ir::Value* addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), get_frame_field_offset(field_idx)));
                 LIR::Type b_type = reg_types.count(inst.b) ? reg_types[inst.b] : inst.type_b;
                 if (b_type == LIR::Type::F64 || b_type == LIR::Type::F32 || is_float_op(inst)) {
                     ir::Value* val = load_float_reg(inst.b, b_type);

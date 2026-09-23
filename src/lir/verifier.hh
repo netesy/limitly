@@ -20,6 +20,10 @@ private:
     // H27: conservative, linear / flow-insensitive checks.
     static bool verify_use_before_def(const LIR_Function& func, std::vector<std::string>& errors);
     static bool verify_terminators(const LIR_Function& func, std::vector<std::string>& errors);
+    static bool verify_bit_vector_semantics(const LIR_Function& func, std::vector<std::string>& errors);
+    static bool verify_float_arithmetic_semantics(const LIR_Function& func, std::vector<std::string>& errors);
+    static bool verify_collections_and_strings(const LIR_Function& func, std::vector<std::string>& errors);
+    static bool verify_enums_unions_and_contracts(const LIR_Function& func, std::vector<std::string>& errors);
 };
 
 } // namespace LIR

@@ -30,6 +30,18 @@ bool Verifier::verify(const LIR_Function& func, std::vector<std::string>& errors
     if (!verify_use_before_def(func, errors)) {
         success = false;
     }
+    if (!verify_bit_vector_semantics(func, errors)) {
+        success = false;
+    }
+    if (!verify_float_arithmetic_semantics(func, errors)) {
+        success = false;
+    }
+    if (!verify_collections_and_strings(func, errors)) {
+        success = false;
+    }
+    if (!verify_enums_unions_and_contracts(func, errors)) {
+        success = false;
+    }
     (void)verify_terminators(func, errors);
     
     return success;
@@ -223,6 +235,85 @@ bool Verifier::verify_terminators(const LIR_Function& func, std::vector<std::str
 
     // Warnings never fail the verifier.
     return true;
+}
+
+bool Verifier::verify_bit_vector_semantics(const LIR_Function& func, std::vector<std::string>& errors) {
+    for (size_t i = 0; i < func.instructions.size(); ++i) {
+        const auto& inst = func.instructions[i];
+        if (inst.op == LIR_Op::Shl || inst.op == LIR_Op::Shr) {
+            if (inst.imm >= 64 && inst.b == UINT32_MAX) {
+                errors.push_back("[warning] Function " + func.name + " instruction " + std::to_string(i) +
+                                 " (" + lir_op_to_string(inst.op) +
+                                 ") scalar bitwise shift count " + std::to_string(inst.imm) +
+                                 " wraps or exceeds 64-bit width");
+            }
+        }
+    }
+    return true;
+}
+
+bool Verifier::verify_float_arithmetic_semantics(const LIR_Function& func, std::vector<std::string>& errors) {
+    for (size_t i = 0; i < func.instructions.size(); ++i) {
+        const auto& inst = func.instructions[i];
+        if (inst.op == LIR_Op::Div) {
+            if (inst.type_a == Type::F64 || inst.type_b == Type::F64) {
+                if (inst.const_val == 0 && inst.b == UINT32_MAX) {
+                    errors.push_back("[warning] Function " + func.name + " instruction " + std::to_string(i) +
+                                     " (" + lir_op_to_string(inst.op) +
+                                     ") float division by literal zero creates IEEE infinity or NaN");
+                }
+            }
+        }
+    }
+    return true;
+}
+
+bool Verifier::verify_collections_and_strings(const LIR_Function& func, std::vector<std::string>& errors) {
+    bool ok = true;
+    for (size_t i = 0; i < func.instructions.size(); ++i) {
+        const auto& inst = func.instructions[i];
+        if (inst.op == LIR_Op::ListIndex || inst.op == LIR_Op::StringIndex || inst.op == LIR_Op::TupleGet) {
+            if (inst.a == UINT32_MAX) {
+                errors.push_back("Function " + func.name + " instruction " + std::to_string(i) +
+                                 " (" + lir_op_to_string(inst.op) +
+                                 ") missing collection object register");
+                ok = false;
+            }
+        } else if (inst.op == LIR_Op::CapabilityAcquire) {
+            uint32_t begin = inst.b;
+            uint32_t end = inst.imm;
+            if (end <= begin) {
+                errors.push_back("Function " + func.name + " instruction " + std::to_string(i) +
+                                 " (" + lir_op_to_string(inst.op) +
+                                 ") invalid capability slice range [" +
+                                 std::to_string(begin) + ".." + std::to_string(end) + ")");
+                ok = false;
+            }
+        }
+    }
+    return ok;
+}
+
+bool Verifier::verify_enums_unions_and_contracts(const LIR_Function& func, std::vector<std::string>& errors) {
+    bool ok = true;
+    for (size_t i = 0; i < func.instructions.size(); ++i) {
+        const auto& inst = func.instructions[i];
+        if (inst.op == LIR_Op::MakeEnum) {
+            if (inst.dst == UINT32_MAX) {
+                errors.push_back("Function " + func.name + " instruction " + std::to_string(i) +
+                                 " (MakeEnum) missing destination register");
+                ok = false;
+            }
+        } else if (inst.op == LIR_Op::GetTag || inst.op == LIR_Op::GetPayload) {
+            if (inst.a == UINT32_MAX) {
+                errors.push_back("Function " + func.name + " instruction " + std::to_string(i) +
+                                 " (" + lir_op_to_string(inst.op) +
+                                 ") missing enum/union object register");
+                ok = false;
+            }
+        }
+    }
+    return ok;
 }
 
 } // namespace LIR

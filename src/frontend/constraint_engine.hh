@@ -10,6 +10,7 @@
 #include <optional>
 #include <limits>
 #include <cstdint>
+#include <algorithm>
 
 namespace LM {
 namespace Frontend {
@@ -103,6 +104,45 @@ struct Interval {
     int64_t max_val = std::numeric_limits<int64_t>::max();
 
     bool is_empty() const { return min_val > max_val; }
+
+    static Interval multiply(const Interval& a, const Interval& b) {
+        if (a.is_empty() || b.is_empty()) return {1, 0};
+        int64_t inf = std::numeric_limits<int64_t>::max() / 2;
+        int64_t ninf = std::numeric_limits<int64_t>::min() / 2;
+
+        auto safe_mul_val = [&](int64_t x, int64_t y) -> int64_t {
+            if (x == 0 || y == 0) return 0;
+            if (x >= inf || y >= inf || x <= ninf || y <= ninf)
+                return ((x > 0) == (y > 0)) ? inf : ninf;
+            return x * y;
+        };
+
+        int64_t p1 = safe_mul_val(a.min_val, b.min_val);
+        int64_t p2 = safe_mul_val(a.min_val, b.max_val);
+        int64_t p3 = safe_mul_val(a.max_val, b.min_val);
+        int64_t p4 = safe_mul_val(a.max_val, b.max_val);
+
+        Interval res;
+        res.min_val = std::min({p1, p2, p3, p4});
+        res.max_val = std::max({p1, p2, p3, p4});
+        return res;
+    }
+
+    static Interval square(const Interval& a) {
+        if (a.is_empty()) return {1, 0};
+        Interval res;
+        if (a.min_val >= 0) {
+            res.min_val = a.min_val * a.min_val;
+            res.max_val = a.max_val * a.max_val;
+        } else if (a.max_val <= 0) {
+            res.min_val = a.max_val * a.max_val;
+            res.max_val = a.min_val * a.min_val;
+        } else {
+            res.min_val = 0;
+            res.max_val = std::max(a.min_val * a.min_val, a.max_val * a.max_val);
+        }
+        return res;
+    }
 };
 
 class ConstraintEngine {
