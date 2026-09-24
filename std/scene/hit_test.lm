@@ -1,0 +1,11 @@
+import std.scene.node as node;
+import std.graphics.vector2 as vector2;
+
+frame HitTest {
+    pub init() {}
+
+    pub fn test(root: node.Node, point: vector2.Vector2): node.Node {
+        // Simple hit test stub
+        return root;
+    }
+}

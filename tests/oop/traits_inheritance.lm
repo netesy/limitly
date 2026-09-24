@@ -1,0 +1,42 @@
+// tests/oop/traits_inheritance.lm
+trait Base {
+    fn name(): str;
+    fn greet(): str {
+        return "Hello from Base";
+    }
+}
+
+trait Extended : Base {
+    fn version(): int;
+}
+
+frame MyFrame : Extended {
+    var id: int;
+    
+    pub fn name(): str {
+        return "MyFrame";
+    }
+    
+    pub fn version(): int {
+        return 1;
+    }
+}
+
+fn main() {
+    var f = MyFrame(id=42);
+    
+    // Test static dispatch
+    print(f.name());
+    print(f.version());
+    
+    // Test default implementation from trait
+    print(f.greet());
+    
+    // Assert trait inheritance functionality
+    assert(f.name() == "MyFrame", "Frame should implement trait method");
+    assert(f.version() == 1, "Frame should implement extended trait method");
+    assert(f.greet() == "Hello from Base", "Frame should inherit default trait implementation");
+}
+
+// Top-level entry point
+main();

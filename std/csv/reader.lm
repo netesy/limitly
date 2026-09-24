@@ -1,0 +1,26 @@
+// CSV Reader Module
+
+import std.string.split as split_mod;
+
+pub fn parse_csv(text: str): [[str]] {
+    var rows: [[str]] = [];
+    var lines = split_mod.split(text, "\n");
+    var i = 0;
+    var lines_len = len(lines);
+    while (i < lines_len) {
+        var line = lines[i];
+        var line_len = len(line);
+        if (line_len > 0) {
+            var last_ch = _builtin_substring(line, line_len - 1, line_len);
+            if (last_ch == "\r") {
+                line = _builtin_substring(line, 0, line_len - 1);
+            }
+        }
+        if (line != "") {
+            var cols = split_mod.split(line, ",");
+            rows.append(cols);
+        }
+        i = i + 1;
+    }
+    return rows;
+}

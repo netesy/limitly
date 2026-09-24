@@ -1,0 +1,13 @@
+import std.ui.widget as widget;
+
+frame ScrollView {
+    pub var child: widget.Widget;
+
+    pub init() {
+        self.child = widget.Widget();
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

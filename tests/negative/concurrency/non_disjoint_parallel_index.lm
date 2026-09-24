@@ -1,0 +1,9 @@
+// @error:race_condition
+// Every iteration writes index zero, so workers cannot receive disjoint slices.
+var values = [1, 2, 3];
+
+parallel(cores=2) {
+    iter(i in 0..3) {
+        values[0] = i;
+    }
+}

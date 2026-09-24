@@ -1,0 +1,14 @@
+// @error:use_after_free
+// Accessing frame field after move
+
+frame Data {
+    pub value: int;
+}
+
+fn consume(d: Data) {
+    // d is consumed (moved)
+}
+
+var data = Data { value: 42 };
+consume(data);
+var x = data.value;  // ERROR: data already moved

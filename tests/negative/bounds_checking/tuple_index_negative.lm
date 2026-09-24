@@ -1,0 +1,6 @@
+// @error:bounds_error
+// Negative tuple index
+
+var tuple = (42, "hello");
+var value = tuple.(-1);  // Negative index not allowed
+print(value);

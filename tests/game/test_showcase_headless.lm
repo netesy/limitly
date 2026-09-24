@@ -1,0 +1,57 @@
+// tests/game/test_showcase_headless.lm
+import std.game as game;
+import std.game.types as types;
+import std.gg as gg;
+
+fn test_game_showcase_run() {
+    var cfg = game.GameConfig(
+        title="Game Showcase Smoke Test",
+        width=800,
+        height=600,
+        resizable=true
+    );
+    var app = game.Game(cfg);
+    assert(app.setup(), "Setup failed");
+
+    app.gui.set_theme(types.cyberpunk_theme());
+
+    // Run 3 simulation frames
+    var frame_idx = 0;
+    while (frame_idx < 3) {
+        app.begin_frame();
+
+        var sw = app.width as float;
+        var sh = app.height as float;
+        if (frame_idx == 0) {
+            assert(sw == 800.0, "sw is 800 initially");
+            assert(sh == 600.0, "sh is 600 initially");
+        } else {
+            assert(sw == 1024.0, "sw is 1024 after resize");
+            assert(sh == 720.0, "sh is 720 after resize");
+        }
+
+        if (app.gui.begin_window("Starship Command HUD", 16.0, 16.0, 250.0, sh - 32.0)) {
+            app.gui.label("VESSEL STATUS");
+            app.gui.progress_bar(0.85, 226.0, 14.0, "85%");
+            app.gui.end_window();
+        }
+
+        if (app.gui.begin_window("Theme & Display Studio", 280.0, 320.0, 240.0, 260.0)) {
+            app.gui.label("DISPLAY RESOLUTION");
+            // Test switching resolution
+            app.set_resolution(1024, 720);
+            app.gui.end_window();
+        }
+
+        app.end_frame();
+        frame_idx = frame_idx + 1;
+    }
+
+    assert(app.width == 1024, "Width updated to 1024");
+    assert(app.height == 720, "Height updated to 720");
+
+    app.shutdown();
+    print("PASS: Game showcase headless frame loop and resolution switch succeeded.");
+}
+
+test_game_showcase_run();

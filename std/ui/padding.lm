@@ -1,0 +1,13 @@
+import std.ui.widget as widget;
+
+frame Padding {
+    pub var padding: float;
+
+    pub init(p: float = 0.0) {
+        self.padding = p;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

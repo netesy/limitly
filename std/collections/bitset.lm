@@ -1,0 +1,39 @@
+// Standard Library BitSet Collection
+
+import std.collections.queue as queue;
+
+frame BitSetWrapper {
+    pub impl: queue.BitSet;
+
+    pub init(size: int = 64) {
+        self.impl = queue.BitSet(size);
+    }
+
+    pub fn set(bit: int) {
+        self.impl.set(bit);
+    }
+
+    pub fn unset(bit: int) {
+        self.impl.unset(bit);
+    }
+
+    pub fn toggle(bit: int) {
+        self.impl.toggle(bit);
+    }
+
+    pub fn contains(bit: int): bool {
+        return self.impl.contains(bit);
+    }
+
+    pub fn get(bit: int): bool {
+        return self.impl.get(bit);
+    }
+
+    pub fn count(): int {
+        return self.impl.count();
+    }
+
+    pub fn get_size(): int {
+        return self.impl.get_size();
+    }
+}

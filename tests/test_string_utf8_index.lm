@@ -1,0 +1,5 @@
+var s = "é";
+var b0 = s[0];
+var b1 = s[1];
+print(b0);
+print(b1);

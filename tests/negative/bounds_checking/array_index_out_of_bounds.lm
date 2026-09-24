@@ -1,0 +1,6 @@
+// @error:nil_bounds
+// Static array bounds violation returns nil safely
+
+var arr = [1, 2, 3];
+var x = arr[10];  // Index 10 is out of bounds (only 0-2 valid)
+assert(x == nil, "Array out of bounds index must return nil safely");

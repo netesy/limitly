@@ -1,0 +1,25 @@
+import std.collections.index as collections;
+
+fn main(): int {
+    var q = collections.Queue();
+    q.enqueue(1);
+    q.enqueue(2);
+    if (q.peek() != 1) { return 1; }
+    if (q.dequeue() != 1) { return 2; }
+
+    var s = collections.Stack();
+    s.push(3);
+    s.push(4);
+    if (s.peek() != 4) { return 3; }
+    if (s.pop() != 4) { return 4; }
+
+    var bits = collections.BitSet(130);
+    bits.set(64);
+    if (not bits.contains(64)) { return 5; }
+    bits.toggle(64);
+    if (bits.contains(64)) { return 6; }
+    bits.set(3);
+    bits.unset(3);
+    if (bits.count() != 0) { return 7; }
+    return 0;
+}

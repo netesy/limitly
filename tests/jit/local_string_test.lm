@@ -1,0 +1,4 @@
+{
+  var e = "hello";
+  print(e);
+}

@@ -1,0 +1,10 @@
+// Standard Library Environment Variables Submodule
+
+pub fn get(key: str): str? {
+    var fallback: str? = nil;
+    return fallback;
+}
+
+pub fn set(key: str, value: str): nil {
+    return nil;
+}

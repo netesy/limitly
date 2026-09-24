@@ -1,0 +1,6 @@
+// @error:type_error
+// Assigning wrong type to variable
+
+var x: int = 42;
+x = "this is a string";  // Cannot assign string to int variable
+print(x);

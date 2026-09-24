@@ -1,0 +1,58 @@
+// Unit Test Suite for Stdlib Fixes & Optimizations
+import std.html.parser as html_parser;
+import std.archive as archive;
+import std.collections.hashmap as hashmap;
+import std.process.pipe as pipe;
+
+fn test_html_parser(): nil {
+    print("Testing HTML5 Tokenizer...");
+    var doc = html_parser.parse("<div><h1>Title</h1><br><img src='test.png'></div>");
+    assert(doc.tag_name == "html", "html root tag");
+    assert(len(doc.children) > 0, "html children non empty");
+    print("HTML5 Tokenizer test passed.\n");
+}
+
+fn test_archive(): nil {
+    print("\nTesting Archive Module...");
+    var arch = archive.Archive("test_arch.zip");
+    arch.add_entry(archive.ArchiveEntry("file1.txt", 100, false));
+    arch.add_entry(archive.ArchiveEntry("docs", 0, true));
+
+    var files = arch.list();
+    assert(len(files) == 2, "archive 2 entries");
+    assert(files[0] == "file1.txt", "entry 0 filename match");
+    print("Archive test passed.\n");
+}
+
+fn test_generic_hashmap(): nil {
+    print("\nTesting Generic HashMap ($O(1)$ bucket hash table)...");
+    var hm = hashmap.hashmap();
+    hm.put("key1", "string value");
+    hm.put("key2", 42.5); // float value
+    hm.put("key1", "updated value"); // O(1) in-place bucket update
+
+    assert(hm.size() == 2, "hashmap size 2");
+    assert((hm.get("key1") as str) == "updated value", "updated key1 value match");
+    assert(hm.contains_key("key2") == true, "contains key2");
+    print("Generic HashMap test passed.\n");
+}
+
+fn test_pipe_ipc(): nil {
+    print("\nTesting Inter-Process Pipe Streams...");
+    var pair = pipe.create_pipe();
+    assert(pair.reader.resource != nil, "reader resource valid");
+    assert(pair.writer.resource != nil, "writer resource valid");
+    pair.reader.close();
+    pair.writer.close();
+    print("Pipe IPC test passed.\n");
+}
+
+fn main(): int {
+    print("=== Running Stdlib Fixes & Optimizations Unit Test Suite ===\n");
+    test_html_parser();
+    test_archive();
+    test_generic_hashmap();
+    test_pipe_ipc();
+    print("\n=== All Stdlib Fixes Tests Passed Successfully ===\n");
+    return 0;
+}

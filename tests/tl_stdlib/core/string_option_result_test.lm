@@ -1,0 +1,21 @@
+import std.string as string;
+import std.option as option;
+import std.result as result;
+
+fn twice(x: any): any { return x * 2; }
+fn positive(x: any): bool { return x > 0; }
+
+fn main(): int {
+    if (string.length("abc") != 3) { return 1; }
+    if (not string.starts_with("abc", "a")) { return 2; }
+    if (string.uppercase("a") != "A") { return 3; }
+    var some = option.Some(2).map(twice).filter(positive);
+    if (some.unwrap() != 4) { return 4; }
+    var none = option.None();
+    if (none.unwrap_or(9) != 9) { return 5; }
+    var ok = result.Ok(3).map(twice);
+    if (ok.unwrap() != 6) { return 6; }
+    var err = result.Err("bad");
+    if (not err.is_err()) { return 7; }
+    return 0;
+}

@@ -1,0 +1,92 @@
+// Test suite for Standard Library Validation Module
+
+import std.validation.index as val;
+
+fn make_float_str(): str {
+    var s = "";
+    s = s + "1";
+    s = s + "2";
+    s = s + "3";
+    s = s + ".";
+    s = s + "4";
+    s = s + "5";
+    return s;
+}
+
+fn make_neg_float_str(): str {
+    var s = "-";
+    s = s + "1";
+    s = s + "2";
+    s = s + "3";
+    s = s + ".";
+    s = s + "4";
+    s = s + "5";
+    return s;
+}
+
+fn make_other_float_str(): str {
+    var s = "";
+    s = s + "1";
+    s = s + "2";
+    s = s + ".";
+    s = s + "3";
+    s = s + "4";
+    return s;
+}
+
+fn main(): int {
+    print("=== Validation Module Test Suite ===");
+
+    // Basic validation
+    assert(val.is_empty("") == true, "empty check failed");
+    assert(val.is_empty("hello") == false, "non-empty check failed");
+
+    var v = val.Validate() as val.Validate;
+    assert(v.is_not_empty("hello") == true, "is_not_empty failed");
+    assert(v.is_blank("   \t\n") == true, "is_blank failed");
+    assert(v.is_blank("  a ") == false, "is_blank non-blank failed");
+
+    // Type validation
+    assert(v.is_number(make_float_str()) == true, "is_number float failed");
+    assert(v.is_number(make_neg_float_str()) == true, "is_number negative float failed");
+    assert(v.is_number("abc") == false, "is_number word failed");
+    assert(v.is_integer("1234") == true, "is_integer failed");
+    assert(v.is_integer(make_other_float_str()) == false, "is_integer float failed");
+    assert(v.is_alpha("Hello") == true, "is_alpha failed");
+    assert(v.is_alpha("Hello12") == false, "is_alpha digits failed");
+    assert(v.is_alphanumeric("Hello123") == true, "is_alphanumeric failed");
+
+    // Email, Phone, URL validation
+    assert(val.is_email("test@example.com") == true, "is_email failed");
+    assert(val.is_email("invalid-email") == false, "is_email invalid failed");
+
+    assert(val.is_phone("+1 555-123-4567") == true, "is_phone failed");
+    assert(val.is_phone("invalid-phone") == false, "is_phone invalid failed");
+
+    assert(val.is_url("https://google.com/path") == true, "is_url failed");
+    assert(val.is_url("google.com") == false, "is_url invalid failed");
+
+    assert(v.is_domain("example.com") == true, "is_domain failed");
+    assert(v.is_domain("example") == false, "is_domain invalid failed");
+
+    // UUID & IP validation
+    assert(v.is_uuid("123e4567-e89b-12d3-a456-426614174000") == true, "is_uuid failed");
+    assert(v.is_uuid("invalid-uuid") == false, "is_uuid invalid failed");
+
+    assert(v.is_ip_address("192.168.1.1") == true, "is_ip_address failed");
+    assert(v.is_ipv4("255.255.255.255") == true, "is_ipv4 failed");
+    assert(v.is_ipv4("256.0.0.1") == false, "is_ipv4 out of range failed");
+
+    // Length and Content validation
+    assert(v.length_range("hello", 3, 10) == true, "length_range failed");
+    assert(v.min_length("hello", 5) == true, "min_length failed");
+    assert(v.max_length("hello", 5) == true, "max_length failed");
+    assert(v.exact_length("hello", 5) == true, "exact_length failed");
+
+    assert(v.contains("hello world", "world") == true, "contains failed");
+    assert(v.starts_with("hello world", "hello") == true, "starts_with failed");
+    assert(v.ends_with("hello world", "world") == true, "ends_with failed");
+
+    print("All validation tests passed successfully!");
+    return 0;
+}

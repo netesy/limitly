@@ -1,0 +1,5 @@
+// Standard Library Core Comparable Trait
+
+trait Comparable {
+    fn compare(other: any): int;
+}

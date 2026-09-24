@@ -1,0 +1,189 @@
+// Test Suite for Standard Library Algorithm Module
+
+import std.algorithm.index as algo;
+
+fn is_even(x: any): bool {
+    var val_int = x as int;
+    return val_int % 2 == 0;
+}
+
+fn add_ten(x: any): any {
+    var val_int = x as int;
+    return val_int + 10;
+}
+
+fn sum_reducer(acc: any, x: any): any {
+    var val_acc = acc as int;
+    var val_x = x as int;
+    return val_acc + val_x;
+}
+
+fn test_search(): int {
+    print("Testing Search...");
+    var items = [1, 2, 3, 4, 5];
+
+    assert(algo.find(items, 3) == 2, "find failed");
+    assert(algo.find(items, 10) == -1, "find not found failed");
+
+    assert(algo.find_if(items, is_even) == 1, "find_if failed"); // index of 2
+
+    assert(algo.any_match(items, is_even) == true, "any_match true failed");
+    assert(algo.any_match([1, 3, 5], is_even) == false, "any_match false failed");
+
+    assert(algo.none([1, 3, 5], is_even) == true, "none true failed");
+    assert(algo.none(items, is_even) == false, "none failed");
+
+    assert(algo.all([2, 4, 6], is_even) == true, "all true failed");
+    assert(algo.all(items, is_even) == false, "all false failed");
+
+    assert(algo.count([1, 2, 2, 3, 2], 2) == 3, "count failed");
+    assert(algo.linear_search(items, 4) == 3, "linear_search failed");
+    return 1;
+}
+
+fn test_sort(): int {
+    print("Testing Sort...");
+    var items = [5, 3, 8, 1, 4];
+    algo.sort(items);
+    assert(items[0] == 1, "sort index 0 failed");
+    assert(items[1] == 3, "sort index 1 failed");
+    assert(items[2] == 4, "sort index 2 failed");
+    assert(items[3] == 5, "sort index 3 failed");
+    assert(items[4] == 8, "sort index 4 failed");
+
+    var items2 = [5, 3, 8, 1, 4];
+    algo.quicksort_descending(items2); // descending
+    assert(items2[0] == 8, "quicksort descending failed");
+
+    var items3 = [5, 3, 8, 1, 4];
+    algo.mergesort(items3);
+    assert(items3[0] == 1, "mergesort failed");
+
+    var items4 = [5, 3, 8, 1, 4];
+    algo.heapsort(items4);
+    assert(items4[0] == 1, "heapsort failed");
+
+    var items5 = [5, 3, 8, 1, 4];
+    algo.insertion_sort(items5);
+    assert(items5[0] == 1, "insertion_sort failed");
+    return 1;
+}
+
+fn test_partition(): int {
+    print("Testing Partition...");
+    var items = [1, 2, 3, 4, 5, 6];
+    var pivot_idx = algo.partition(items, is_even);
+    // Elements before pivot_idx should satisfy is_even, elements after should not
+    var i = 0;
+    while (i < pivot_idx) {
+        assert(is_even(items[i]) == true, "partition left failed");
+        i = i + 1;
+    }
+    while (i < len(items)) {
+        assert(is_even(items[i]) == false, "partition right failed");
+        i = i + 1;
+    }
+    return 1;
+}
+
+fn test_transform(): int {
+    print("Testing Transform...");
+    var items = [1, 2, 3];
+    var mapped = algo.map(items, add_ten);
+    assert(mapped[0] == 11, "map 0 failed");
+    assert(mapped[1] == 12, "map 1 failed");
+    assert(mapped[2] == 13, "map 2 failed");
+
+    var zipped = algo.zip([1, 2], ["a", "b"]);
+    var pair0 = zipped[0] as (any, any);
+    assert(pair0[0] == 1, "zip left failed");
+    assert(pair0[1] == "a", "zip right failed");
+
+    var unzipped = algo.unzip(zipped);
+    var un_left = unzipped[0] as [any];
+    var un_right = unzipped[1] as [any];
+    assert(un_left[0] == 1, "unzip left 0 failed");
+    assert(un_right[0] == "a", "unzip right 0 failed");
+    return 1;
+}
+
+fn test_reduce(): int {
+    print("Testing Reduce...");
+    var items = [1, 2, 3, 4];
+    var sum_val = algo.reduce(items, sum_reducer, 0);
+    assert(sum_val == 10, "reduce failed");
+
+    var fold_val = algo.fold(items, 10, sum_reducer);
+    assert(fold_val == 20, "fold failed");
+    return 1;
+}
+
+fn test_filter(): int {
+    print("Testing Filter...");
+    var items = [1, 2, 3, 4, 5, 6];
+    var filtered = algo.filter(items, is_even);
+    assert(len(filtered) == 3, "filter length failed");
+    assert(filtered[0] == 2, "filter 0 failed");
+    assert(filtered[1] == 4, "filter 1 failed");
+    assert(filtered[2] == 6, "filter 2 failed");
+
+    var removed = algo.remove_if(items, is_even);
+    assert(len(removed) == 3, "remove_if length failed");
+    assert(removed[0] == 1, "remove_if 0 failed");
+    return 1;
+}
+
+fn test_unique(): int {
+    print("Testing Unique...");
+    var items = [1, 2, 2, 3, 1, 4];
+    var unique_items = algo.unique(items);
+    assert(len(unique_items) == 4, "unique length failed");
+    assert(unique_items[0] == 1, "unique 0 failed");
+    assert(unique_items[1] == 2, "unique 1 failed");
+    assert(unique_items[2] == 3, "unique 2 failed");
+    assert(unique_items[3] == 4, "unique 3 failed");
+    return 1;
+}
+
+fn test_shuffle(): int {
+    print("Testing Shuffle...");
+    var items = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    algo.shuffle(items);
+    // Verify that elements are still the same, but potentially in different order
+    assert(len(items) == 10, "shuffle length changed failed");
+    assert(algo.count(items, 5) == 1, "shuffle lost elements failed");
+    return 1;
+}
+
+fn test_binary_search(): int {
+    print("Testing Binary Search...");
+    var items = [1, 3, 5, 5, 7, 9];
+
+    assert(algo.binary_search(items, 5) == 2 or algo.binary_search(items, 5) == 3, "binary_search failed");
+    assert(algo.binary_search(items, 6) == -1, "binary_search not found failed");
+
+    assert(algo.lower_bound(items, 5) == 2, "lower_bound failed");
+    assert(algo.upper_bound(items, 5) == 4, "upper_bound failed");
+
+    var range_val = algo.equal_range(items, 5);
+    assert(range_val[0] == 2, "equal_range lower failed");
+    assert(range_val[1] == 4, "equal_range upper failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Algorithm Module Test Suite ===");
+
+    assert(test_search() == 1, "Search test failed");
+    assert(test_sort() == 1, "Sort test failed");
+    assert(test_partition() == 1, "Partition test failed");
+    assert(test_transform() == 1, "Transform test failed");
+    assert(test_reduce() == 1, "Reduce test failed");
+    assert(test_filter() == 1, "Filter test failed");
+    assert(test_unique() == 1, "Unique test failed");
+    assert(test_shuffle() == 1, "Shuffle test failed");
+    assert(test_binary_search() == 1, "Binary Search test failed");
+
+    print("All algorithm tests passed successfully.");
+    return 0;
+}

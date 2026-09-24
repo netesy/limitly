@@ -1,0 +1,7 @@
+fn positive(value: int): bool {
+    return value > 0;
+}
+
+var number = 4;
+contract(positive(number), "number must be positive");
+print("verification policy test passed");

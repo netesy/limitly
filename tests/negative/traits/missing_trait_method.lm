@@ -1,0 +1,15 @@
+// @error:trait_not_impl
+// Trait requires multiple methods, some missing
+
+trait Container {
+    fn push(item: int);
+    fn pop(): int;
+    fn size(): int;
+}
+
+frame Stack: Container {
+    pub fn push(item: int) {
+        print("Push");
+    }
+    // Missing pop() and size() methods
+}

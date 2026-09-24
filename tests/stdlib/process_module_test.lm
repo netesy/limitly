@@ -1,0 +1,40 @@
+// Test Suite for Standard Library Process Module
+
+import std.process.index as process;
+
+fn test_process_frame(): int {
+    print("Testing Process Frame...");
+    var p = process.Process() as process.Process;
+    assert(p.id() == 0, "id failed");
+    assert(p.run("echo hello") == 0, "run failed");
+    return 1;
+}
+
+fn test_command_frame(): int {
+    print("Testing Command Frame...");
+    var cmd = process.Command("echo") as process.Command;
+    cmd.arg("hello");
+    assert(cmd.program == "echo", "program failed");
+    assert(len(cmd.args) == 1, "args failed");
+    assert(cmd.execute() == 0, "execute failed");
+    return 1;
+}
+
+fn test_pipe_frame(): int {
+    print("Testing Pipe Frame...");
+    var pipe = process.Pipe() as process.Pipe;
+    pipe.write("hello");
+    assert(pipe.read() == "", "pipe read failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Process Module Test Suite ===");
+
+    assert(test_process_frame() == 1, "Process frame test failed");
+    assert(test_command_frame() == 1, "Command frame test failed");
+    assert(test_pipe_frame() == 1, "Pipe frame test failed");
+
+    print("All process tests passed successfully.");
+    return 0;
+}

@@ -1,0 +1,74 @@
+// Standard Library BloomFilter Collection
+
+import std.collections.queue as queue;
+
+frame BloomFilter {
+    pub bitset: queue.BitSet;
+    pub size: int;
+    pub num_hashes: int;
+
+    pub init(size: int = 256, num_hashes: int = 3) {
+        self.bitset = queue.BitSet(size);
+        self.size = size;
+        self.num_hashes = num_hashes;
+    }
+
+    fn hash(item: any, seed: int): int {
+        var str_val = "{item}";
+        var h = seed;
+        var i = 0;
+        while (i < len(str_val)) {
+            var ch = substring(str_val, i, i + 1);
+            var code = self._byte_ord(ch);
+            h = h * 33 + code;
+            i = i + 1;
+        }
+        if (h < 0) {
+            h = 0 - h;
+        }
+        return h % self.size;
+    }
+
+    fn _byte_ord(ch: str): int {
+        var alphabet = "abcdefghijklmnopqrstuvwxyz";
+        var i: int = 0;
+        while (i < len(alphabet)) {
+            if (substring(alphabet, i, i + 1) == ch) return 97 + i;
+            i = i + 1;
+        }
+        var u_alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        i = 0;
+        while (i < len(u_alphabet)) {
+            if (substring(u_alphabet, i, i + 1) == ch) return 65 + i;
+            i = i + 1;
+        }
+        var digits = "0123456789";
+        i = 0;
+        while (i < len(digits)) {
+            if (substring(digits, i, i + 1) == ch) return 48 + i;
+            i = i + 1;
+        }
+        return 31;
+    }
+
+    pub fn add(item: any) {
+        var i = 0;
+        while (i < self.num_hashes) {
+            var idx = self.hash(item, i + 7);
+            self.bitset.set(idx);
+            i = i + 1;
+        }
+    }
+
+    pub fn contains(item: any): bool {
+        var i = 0;
+        while (i < self.num_hashes) {
+            var idx = self.hash(item, i + 7);
+            if (not self.bitset.contains(idx)) {
+                return false;
+            }
+            i = i + 1;
+        }
+        return true;
+    }
+}

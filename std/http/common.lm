@@ -1,0 +1,271 @@
+// HTTP Common: shared types, constants, and utilities for the HTTP module.
+
+import std.core as core;
+
+// --- HTTP Method constants ---
+var METHOD_GET = "GET";
+var METHOD_POST = "POST";
+var METHOD_PUT = "PUT";
+var METHOD_DELETE = "DELETE";
+var METHOD_PATCH = "PATCH";
+var METHOD_HEAD = "HEAD";
+var METHOD_OPTIONS = "OPTIONS";
+var METHOD_TRACE = "TRACE";
+var METHOD_CONNECT = "CONNECT";
+
+// --- HTTP Status codes ---
+var STATUS_CONTINUE = 100;
+var STATUS_SWITCHING_PROTOCOLS = 101;
+var STATUS_OK = 200;
+var STATUS_CREATED = 201;
+var STATUS_ACCEPTED = 202;
+var STATUS_NO_CONTENT = 204;
+var STATUS_MOVED_PERMANENTLY = 301;
+var STATUS_FOUND = 302;
+var STATUS_NOT_MODIFIED = 304;
+var STATUS_BAD_REQUEST = 400;
+var STATUS_UNAUTHORIZED = 401;
+var STATUS_FORBIDDEN = 403;
+var STATUS_NOT_FOUND = 404;
+var STATUS_METHOD_NOT_ALLOWED = 405;
+var STATUS_REQUEST_TIMEOUT = 408;
+var STATUS_CONFLICT = 409;
+var STATUS_INTERNAL_SERVER_ERROR = 500;
+var STATUS_NOT_IMPLEMENTED = 501;
+var STATUS_BAD_GATEWAY = 502;
+var STATUS_SERVICE_UNAVAILABLE = 503;
+var STATUS_GATEWAY_TIMEOUT = 504;
+
+// --- Common Header names ---
+var HDR_CONTENT_TYPE = "Content-Type";
+var HDR_CONTENT_LENGTH = "Content-Length";
+var HDR_TRANSFER_ENCODING = "Transfer-Encoding";
+var HDR_CONNECTION = "Connection";
+var HDR_HOST = "Host";
+var HDR_USER_AGENT = "User-Agent";
+var HDR_ACCEPT = "Accept";
+var HDR_ACCEPT_ENCODING = "Accept-Encoding";
+var HDR_AUTHORIZATION = "Authorization";
+var HDR_SET_COOKIE = "Set-Cookie";
+var HDR_LOCATION = "Location";
+var HDR_CACHE_CONTROL = "Cache-Control";
+
+// --- Common MIME types ---
+var MIME_TEXT_PLAIN = "text/plain";
+var MIME_TEXT_HTML = "text/html";
+var MIME_TEXT_CSS = "text/css";
+var MIME_TEXT_JAVASCRIPT = "application/javascript";
+var MIME_APPLICATION_JSON = "application/json";
+var MIME_APPLICATION_XML = "application/xml";
+var MIME_APPLICATION_FORM = "application/x-www-form-urlencoded";
+var MIME_MULTIPART_FORM = "multipart/form-data";
+var MIME_OCTET_STREAM = "application/octet-stream";
+
+// --- Default User-Agent string ---
+var DEFAULT_USER_AGENT = "Luminar/1.0";
+
+// --- Status code to reason phrase mapping ---
+fn status_text(code: int): str {
+    if (code == 100) { return "Continue"; }
+    if (code == 101) { return "Switching Protocols"; }
+    if (code == 200) { return "OK"; }
+    if (code == 201) { return "Created"; }
+    if (code == 202) { return "Accepted"; }
+    if (code == 204) { return "No Content"; }
+    if (code == 301) { return "Moved Permanently"; }
+    if (code == 302) { return "Found"; }
+    if (code == 304) { return "Not Modified"; }
+    if (code == 400) { return "Bad Request"; }
+    if (code == 401) { return "Unauthorized"; }
+    if (code == 403) { return "Forbidden"; }
+    if (code == 404) { return "Not Found"; }
+    if (code == 405) { return "Method Not Allowed"; }
+    if (code == 408) { return "Request Timeout"; }
+    if (code == 409) { return "Conflict"; }
+    if (code == 500) { return "Internal Server Error"; }
+    if (code == 501) { return "Not Implemented"; }
+    if (code == 502) { return "Bad Gateway"; }
+    if (code == 503) { return "Service Unavailable"; }
+    if (code == 504) { return "Gateway Timeout"; }
+    return "Unknown";
+}
+
+// --- Parse an HTTP status line (e.g. "HTTP/1.1 200 OK") ---
+// Returns [version, code_str, reason]
+fn parse_status_line(line: str): [str] {
+    // Format: HTTP/1.x CODE REASON
+    var parts: [str] = [];
+    var start: int = 0;
+    var i: int = 0;
+    while (i < len(line)) {
+        if (substring(line, i, i + 1) == " ") {
+            if (i > start) { parts = parts + [substring(line, start, i)]; }
+            start = i + 1;
+            // After the first space, the rest (after the second space) is the reason
+            if (len(parts) == 2) {
+                parts = parts + [substring(line, i + 1, len(line))];
+                return parts;
+            }
+        }
+        i = i + 1;
+    }
+    if (start < len(line)) { parts = parts + [substring(line, start, len(line))]; }
+    return parts;
+}
+
+// --- Parse HTTP headers from a block of text (after status line, before body) ---
+// Returns a list of header strings in "Name: Value" format
+fn parse_headers(block: str): [str] {
+    var lines: [str] = [];
+    var start: int = 0;
+    var i: int = 0;
+    while (i < len(block)) {
+        if (substring(block, i, i + 1) == "\n") {
+            var line = substring(block, start, i);
+            // Strip trailing \r
+            if (len(line) > 0 and substring(line, len(line) - 1, len(line)) == "\r") {
+                line = substring(line, 0, len(line) - 1);
+            }
+            if (line != "") { lines = lines + [line]; }
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    return lines;
+}
+
+// --- Get a specific header value from a list of "Name: Value" header strings ---
+// Header name comparison is case-insensitive. Returns nil if not found.
+fn get_header(headers: [str], name: str): str? {
+    var lower_name = __http_to_lower(name);
+    var i: int = 0;
+    while (i < len(headers)) {
+        var header = headers[i];
+        var colon_idx = __http_find(header, ":");
+        if (colon_idx != nil) {
+            var hname = __http_to_lower(substring(header, 0, colon_idx));
+            var hval = __http_trim(substring(header, colon_idx + 1, len(header)));
+            if (hname == lower_name) { return hval; }
+        }
+        i = i + 1;
+    }
+    return nil;
+}
+
+// --- Build a headers block string from a list of "Name: Value" strings ---
+fn build_headers_block(headers: [str]): str {
+    var block = "";
+    var i: int = 0;
+    while (i < len(headers)) {
+        block = block + headers[i] + "\r\n";
+        i = i + 1;
+    }
+    return block;
+}
+
+// --- Build a full HTTP request string ---
+fn build_request(method: str, host: str, path: str, headers: [str], body: str): str {
+    var req = method + " " + path + " HTTP/1.1\r\n";
+    // Ensure Host header is present
+    var has_host: bool = false;
+    var has_conn: bool = false;
+    var has_cl: bool = false;
+    var i: int = 0;
+    while (i < len(headers)) {
+        var h = headers[i];
+        var ci = __http_find(h, ":");
+        if (ci != nil) {
+            var hn = __http_to_lower(substring(h, 0, ci));
+            if (hn == "host") { has_host = true; }
+            if (hn == "connection") { has_conn = true; }
+            if (hn == "content-length") { has_cl = true; }
+        }
+        req = req + h + "\r\n";
+        i = i + 1;
+    }
+    if (!has_host) { req = req + "Host: " + host + "\r\n"; }
+    if (!has_conn) { req = req + "Connection: close\r\n"; }
+    if (!has_cl and body != "") { req = req + "Content-Length: " + len(body) as str + "\r\n"; }
+    req = req + "\r\n";
+    req = req + body;
+    return req;
+}
+
+// --- Parse URL-encoded form body into a list of "key=value" strings ---
+fn parse_form_body(body: str): [str] {
+    var pairs: [str] = [];
+    var start: int = 0;
+    var i: int = 0;
+    while (i < len(body)) {
+        if (substring(body, i, i + 1) == "&") {
+            if (i > start) { pairs = pairs + [substring(body, start, i)]; }
+            start = i + 1;
+        }
+        i = i + 1;
+    }
+    if (start < len(body)) { pairs = pairs + [substring(body, start, len(body))]; }
+    return pairs;
+}
+
+// --- Internal helpers ---
+
+fn __http_find(s: str, needle: str): int? {
+    if (needle == "") { return 0; }
+    if (len(needle) > len(s)) { return nil; }
+    var i = 0;
+    while (i <= len(s) - len(needle)) {
+        var found = true;
+        var j = 0;
+        while (j < len(needle)) {
+            if (substring(s, i + j, i + j + 1) != substring(needle, j, j + 1)) {
+                found = false;
+                j = len(needle);
+            } else {
+                j = j + 1;
+            }
+        }
+        if (found) { return i; }
+        i = i + 1;
+    }
+    return nil;
+}
+
+fn __http_to_lower(s: str): str {
+    var r = "";
+    var i = 0;
+    while (i < len(s)) {
+        var ch = substring(s, i, i + 1);
+        if (ch >= "A" and ch <= "Z") {
+            r = r + (ch as int + 32) as str;
+        } else {
+            r = r + ch;
+        }
+        i = i + 1;
+    }
+    return r;
+}
+
+fn __http_trim(s: str): str {
+    var start: int = 0;
+    var go: bool = true;
+    while (start < len(s) and go) {
+        var ch = substring(s, start, start + 1);
+        if (ch == " " or ch == "\t" or ch == "\r" or ch == "\n") {
+            start = start + 1;
+        } else {
+            go = false;
+        }
+    }
+    var end: int = len(s) - 1;
+    go = true;
+    while (end >= start and go) {
+        var ch = substring(s, end, end + 1);
+        if (ch == " " or ch == "\t" or ch == "\r" or ch == "\n") {
+            end = end - 1;
+        } else {
+            go = false;
+        }
+    }
+    if (start > end) { return ""; }
+    return substring(s, start, end + 1);
+}

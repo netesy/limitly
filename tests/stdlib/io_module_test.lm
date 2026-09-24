@@ -1,0 +1,76 @@
+// Test Suite for Standard Library I/O Module
+
+import std.io.index as io;
+import std.io.file as file_mod;
+
+fn test_console(): int {
+    print("Testing Console...");
+    io.print("Console printing works!");
+    return 1;
+}
+
+fn test_file_ops(): int {
+    print("Testing File Operations...");
+    var exists = io.exists("Makefile");
+    assert(exists, "io.exists fail for Makefile");
+
+    var non_existent = io.exists("non_existent_file_xyz.txt");
+    assert(!non_existent, "io.exists fail for non-existent file");
+
+    var f_res = file_mod.open("test_io_temp.txt", "w");
+    match (f_res) {
+        val f_obj => {
+            var f_obj_concrete = f_obj as file_mod.File;
+            f_obj_concrete.write("Hello Luminar");
+            f_obj_concrete.close();
+        }
+        err e => {
+            assert(false, "Failed to open file for writing");
+        }
+    }
+
+    var f_read_res = file_mod.open("test_io_temp.txt", "r");
+    match (f_read_res) {
+        val f_obj => {
+            var f_obj_concrete = f_obj as file_mod.File;
+            var content_res = f_obj_concrete.read();
+            match (content_res) {
+                val content => {
+                    assert(content == "Hello Luminar", "File content mismatch");
+                }
+                err e => {
+                    assert(false, "Failed to read file");
+                }
+            }
+            f_obj_concrete.close();
+        }
+        err e => {
+            assert(false, "Failed to open file for reading");
+        }
+    }
+
+    io.delete("test_io_temp.txt");
+    assert(!io.exists("test_io_temp.txt"), "File should be deleted");
+    return 1;
+}
+
+fn test_directory_ops(): int {
+    print("Testing Directory Operations...");
+    io.create_directory("test_io_temp_dir");
+    assert(io.exists("test_io_temp_dir"), "Directory should be created");
+
+    io.delete("test_io_temp_dir");
+    assert(!io.exists("test_io_temp_dir"), "Directory should be deleted");
+    return 1;
+}
+
+fn main(): int {
+    print("=== I/O Module Test Suite ===");
+
+    assert(test_console() == 1, "Console test failed");
+    assert(test_file_ops() == 1, "File ops test failed");
+    assert(test_directory_ops() == 1, "Directory ops test failed");
+
+    print("All I/O tests passed successfully.");
+    return 0;
+}

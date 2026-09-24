@@ -1,0 +1,438 @@
+// Application Module
+// Portable window application lifecycle, event loop, and timing driver
+
+import std.ui.context as ui_context;
+import std.ui.types as ui_types;
+import std.ui as std_ui;
+import std.gg as gg;
+
+// Event type constants
+pub var EVENT_QUIT: int = 0;
+pub var EVENT_RESIZE: int = 1;
+pub var EVENT_KEY_DOWN: int = 2;
+pub var EVENT_KEY_UP: int = 3;
+pub var EVENT_MOUSE_DOWN: int = 4;
+pub var EVENT_MOUSE_UP: int = 5;
+pub var EVENT_MOUSE_MOVE: int = 6;
+pub var EVENT_CHAR: int = 7;
+pub var EVENT_MOUSE_WHEEL: int = 8;
+
+// Modifier key flags
+pub var MOD_SHIFT: int = 1;
+pub var MOD_CONTROL: int = 2;
+pub var MOD_ALT: int = 4;
+pub var MOD_SUPER: int = 8;
+
+// Event frame
+frame Event {
+    pub var event_type: int;
+    pub var timestamp: int;
+    pub var window_id: int;
+    pub var x: int;
+    pub var y: int;
+    pub var key_code: int;
+
+    pub init(event_type: int = 0, timestamp: int = 0, window_id: int = 0, x: int = 0, y: int = 0, key_code: int = 0) {
+        self.event_type = event_type;
+        self.timestamp = timestamp;
+        self.window_id = window_id;
+        self.x = x;
+        self.y = y;
+        self.key_code = key_code;
+    }
+}
+
+// Key event frame
+frame KeyEvent {
+    pub var base: Event;
+    pub var key_code: int;
+    pub var modifiers: int;
+    pub var repeat: int;
+}
+
+// Mouse event frame
+frame MouseEvent {
+    pub var base: Event;
+    pub var x: int;
+    pub var y: int;
+    pub var button: int;
+    pub var modifiers: int;
+}
+
+// Resize event frame
+frame ResizeEvent {
+    pub var base: Event;
+    pub var width: int;
+    pub var height: int;
+    pub var framebuffer_width: int;
+    pub var framebuffer_height: int;
+}
+
+// Window configuration
+frame WindowConfig {
+    pub var width: int;
+    pub var height: int;
+    pub var title: str;
+    pub var resizable: int;
+    pub var fullscreen: int;
+    pub var high_dpi: int;
+    pub var sample_count: int;
+    pub var swap_interval: int;
+}
+
+// Default window configuration
+pub fn default_window_config(): WindowConfig {
+    return WindowConfig(
+        width=800,
+        height=600,
+        title="Limit Application",
+        resizable=1,
+        fullscreen=0,
+        high_dpi=1,
+        sample_count=1,
+        swap_interval=1
+    );
+}
+
+// Application state
+frame AppState {
+    pub var is_initialized: int;
+    pub var is_running: int;
+    pub var window_config: WindowConfig;
+    pub var window_id: int;
+    pub var width: int;
+    pub var height: int;
+    pub var framebuffer_width: int;
+    pub var framebuffer_height: int;
+    pub var dpi_scale: float;
+    pub var event_queue: [Event];
+    pub var frame_count: int;
+    pub var last_frame_time: int;
+    pub var delta_time: float;
+}
+
+fn make_default_event(): Event {
+    return Event(event_type=0, timestamp=0, window_id=0, x=0, y=0, key_code=0);
+}
+
+// Global application state
+pub var global_app_state: AppState = AppState(
+    is_initialized=0,
+    is_running=0,
+    window_config=default_window_config(),
+    window_id=0,
+    width=800,
+    height=600,
+    framebuffer_width=800,
+    framebuffer_height=600,
+    dpi_scale=1.0,
+    event_queue=[] as [Event],
+    frame_count=0,
+    last_frame_time=0,
+    delta_time=0.0
+);
+
+// Initialize application with window configuration
+pub fn app_init(config: WindowConfig): int {
+    if (global_app_state.is_initialized != 0) {
+        return 0;
+    }
+    
+    gg.setup();
+    global_app_state.window_config = config;
+    global_app_state.width = config.width;
+    global_app_state.height = config.height;
+    global_app_state.framebuffer_width = config.width;
+    global_app_state.framebuffer_height = config.height;
+    global_app_state.window_id = 1;
+    
+    global_app_state.is_initialized = 1;
+    global_app_state.is_running = 0;
+    global_app_state.frame_count = 0;
+    global_app_state.last_frame_time = 0;
+    global_app_state.delta_time = 0.0;
+    global_app_state.event_queue = [] as [Event];
+    ui_context.ui_init();
+    ui_context.set_viewport_size(config.width as float, config.height as float);
+    
+    return 1;
+}
+
+pub fn init(config: any = nil): int {
+    if (config != nil) {
+        var wc = config as WindowConfig;
+        if (wc != nil) {
+            return app_init(wc);
+        }
+    }
+    return app_init(default_window_config());
+}
+
+// Shutdown application and release resources
+pub fn app_shutdown(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_app_state.is_running != 0) {
+        global_app_state.is_running = 0;
+    }
+    
+    global_app_state.event_queue = [] as [Event];
+    global_app_state.is_initialized = 0;
+    global_app_state.window_id = 0;
+    gg.shutdown();
+}
+
+pub fn shutdown(): nil {
+    app_shutdown();
+}
+
+pub fn app_is_valid(): int {
+    return global_app_state.is_initialized;
+}
+
+pub fn app_is_running(): int {
+    return global_app_state.is_running;
+}
+
+pub fn ui(root: std_ui.Widget): nil {
+    ui_context.ui_init();
+    ui_context.set_root(root);
+}
+
+pub fn set_ui(root: any): nil {
+    ui_context.ui_init();
+    ui_context.set_root_any(root);
+}
+
+pub fn run_frame_step(): nil {
+    process_events();
+    present_frame();
+    global_app_state.frame_count = global_app_state.frame_count + 1;
+}
+
+pub fn app_run(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    
+    if (global_app_state.is_running != 0) {
+        return;
+    }
+    
+    show_window();
+    global_app_state.is_running = 1;
+    
+    // Main event loop
+    while (global_app_state.is_running != 0) {
+        run_frame_step();
+    }
+}
+
+pub fn run(root: any = nil): nil {
+    if (root != nil) {
+        set_ui(root);
+    }
+    app_run();
+}
+
+pub fn app_quit(): nil {
+    global_app_state.is_running = 0;
+}
+
+pub fn quit(): nil {
+    app_quit();
+}
+
+pub fn process_events(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    var raw_events = gg.poll_events();
+    if (raw_events != nil) {
+        var native_events: [int] = raw_events as [int];
+        var i: int = 0;
+        var num_events = len(native_events);
+        while (i + 3 < num_events) {
+            var ev_type: int = native_events[i];
+            var ev_x: int = native_events[i + 1];
+            var ev_y: int = native_events[i + 2];
+            var ev_k: int = native_events[i + 3];
+            push_event(Event(event_type=ev_type, timestamp=0, window_id=1, x=ev_x, y=ev_y, key_code=ev_k));
+            i = i + 4;
+        }
+    }
+    while (has_pending_events() != 0) {
+        var ev = poll_event();
+        if (ev.event_type == EVENT_QUIT) {
+            global_app_state.is_running = 0;
+        }
+        if (ev.event_type == EVENT_RESIZE) {
+            global_app_state.width = ev.x;
+            global_app_state.height = ev.y;
+            global_app_state.framebuffer_width = ev.x;
+            global_app_state.framebuffer_height = ev.y;
+            ui_context.set_viewport_size(ev.x as float, ev.y as float);
+        }
+        if (ev.event_type == EVENT_MOUSE_DOWN) {
+            ui_context.dispatch_pointer_down(ev.x as float, ev.y as float);
+        }
+        if (ev.event_type == EVENT_MOUSE_UP) {
+            ui_context.dispatch_pointer_up(ev.x as float, ev.y as float);
+        }
+        if (ev.event_type == EVENT_MOUSE_MOVE) {
+            ui_context.dispatch_pointer_move(ev.x as float, ev.y as float);
+        }
+        if (ev.event_type == EVENT_KEY_DOWN) {
+            ui_context.dispatch_key_down(ev.key_code);
+        }
+        if (ev.event_type == EVENT_CHAR) {
+            ui_context.dispatch_char_input(ev.key_code);
+        }
+        if (ev.event_type == EVENT_MOUSE_WHEEL) {
+            ui_context.dispatch_mouse_wheel(ev.y as float);
+        }
+    }
+}
+
+pub fn push_mouse_click(x: int, y: int): nil {
+    push_event(Event(event_type=EVENT_MOUSE_DOWN, timestamp=0, window_id=1, x=x, y=y, key_code=0));
+    push_event(Event(event_type=EVENT_MOUSE_UP, timestamp=0, window_id=1, x=x, y=y, key_code=0));
+}
+
+pub fn push_quit_event(): nil {
+    push_event(Event(event_type=EVENT_QUIT, timestamp=0, window_id=1, x=0, y=0));
+}
+
+pub fn push_event(event: Event): nil {
+    global_app_state.event_queue = global_app_state.event_queue + [event];
+}
+
+pub fn poll_event(): Event {
+    if (len(global_app_state.event_queue) == 0) {
+        return make_default_event();
+    }
+    
+    var event: Event = global_app_state.event_queue[0];
+    if (len(global_app_state.event_queue) > 1) {
+        var new_q: [Event] = [global_app_state.event_queue[1]];
+        var i: int = 2;
+        while (i < len(global_app_state.event_queue)) {
+            new_q = new_q + [global_app_state.event_queue[i]];
+            i = i + 1;
+        }
+        global_app_state.event_queue = new_q;
+    } else {
+        global_app_state.event_queue = [] as [Event];
+    }
+    return event;
+}
+
+pub fn has_pending_events(): int {
+    if (len(global_app_state.event_queue) > 0) {
+        return 1;
+    }
+    return 0;
+}
+
+pub fn present_frame(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    ui_context.set_viewport_size(global_app_state.width as float, global_app_state.height as float);
+    gg.begin_pass(global_app_state.width, global_app_state.height, 0.1, 0.1, 0.15, 1.0);
+    ui_context.frame_update(0.016);
+    gg.end_pass();
+    gg.commit();
+}
+
+pub fn set_window_size(width: int, height: int): nil {
+    global_app_state.width = width;
+    global_app_state.height = height;
+    global_app_state.framebuffer_width = width;
+    global_app_state.framebuffer_height = height;
+    ui_context.set_viewport_size(width as float, height as float);
+    gg.set_window_size(width, height);
+}
+
+pub fn get_window_width(): int {
+    return global_app_state.width;
+}
+
+pub fn get_window_height(): int {
+    return global_app_state.height;
+}
+
+pub fn get_framebuffer_width(): int {
+    return global_app_state.framebuffer_width;
+}
+
+pub fn get_framebuffer_height(): int {
+    return global_app_state.framebuffer_height;
+}
+
+pub fn get_dpi_scale(): float {
+    return global_app_state.dpi_scale;
+}
+
+pub fn get_frame_count(): int {
+    return global_app_state.frame_count;
+}
+
+pub fn get_delta_time(): float {
+    return global_app_state.delta_time;
+}
+
+pub fn set_window_title(title: str): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    global_app_state.window_config.title = title;
+}
+
+pub fn set_window_size(width: int, height: int): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    global_app_state.window_config.width = width;
+    global_app_state.window_config.height = height;
+    global_app_state.width = width;
+    global_app_state.height = height;
+}
+
+pub fn set_fullscreen(fullscreen: int): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    global_app_state.window_config.fullscreen = fullscreen;
+}
+
+pub fn set_swap_interval(interval: int): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    global_app_state.window_config.swap_interval = interval;
+}
+
+pub fn show_window(): nil {
+    if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    gg.spawn_window(global_app_state.width, global_app_state.height, global_app_state.window_config.title, global_app_state.window_config.resizable);
+}
+pub fn hide_window(): nil {}
+pub fn focus_window(): nil {}
+pub fn request_attention(): nil {}
+pub fn get_current_time(): int { return 0; }
+pub fn sleep_ms(milliseconds: int): nil {}
+pub fn get_clipboard_string(): str { return ""; }
+pub fn set_clipboard_string(text: str): nil {}
+pub fn get_mouse_position(): (int, int) { return (0, 0); }
+pub fn set_mouse_position(x: int, y: int): nil {}
+pub fn get_mouse_button_state(button: int): int { return 0; }
+pub fn get_key_state(key: int): int { return 0; }
+pub fn get_modifier_state(): int { return 0; }
+pub fn create_app_data_directory(): str { return ""; }
+pub fn get_executable_path(): str { return ""; }
+pub fn get_home_directory(): str { return ""; }

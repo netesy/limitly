@@ -1,0 +1,28 @@
+frame Resource {
+    pub name: str;
+    id: int;
+    prot secret: str;
+
+    pub init(n: str, i: int, s: str) {
+        self.name = n;
+        self.id = i;
+        self.secret = s;
+    }
+
+    pub fn print_all() {
+        print("Printing all fields");
+    }
+
+    fn secret_method() {
+        print("Secret");
+    }
+}
+
+var r = Resource("MyResource", 123, "shhh");
+//r.secret_method(); //should raise error
+r.print_all();
+
+// Assert visibility functionality
+assert(r.name == "MyResource", "Public field should be accessible");
+// Note: r.id and r.secret should NOT be accessible from external code
+// These are private/protected and should cause compile-time errors if accessed

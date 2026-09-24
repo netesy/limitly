@@ -1,0 +1,121 @@
+frame String {
+    pub var value: str;
+
+    pub init(value: str) {
+        self.value = value;
+    }
+
+    pub fn length(): int {
+        return len(self.value);
+    }
+
+    pub fn concat(other: str): str {
+        return self.value + other;
+    }
+
+    pub fn substring(start: int, end: int): str {
+        if (start < 0) return "";
+        var l = len(self.value);
+        var end_idx = end;
+        if (end_idx > l) end_idx = l;
+        if (start >= l) return "";
+        return _builtin_substring(self.value, start, end_idx);
+    }
+
+    pub fn contains(other: str): bool {
+        return _builtin_string_contains(self.value, other);
+    }
+
+    pub fn index_of(sub: str): int {
+        return _builtin_string_index_of(self.value, sub);
+    }
+
+    pub fn last_index_of(sub: str): int {
+        if (sub == "") return len(self.value);
+        var sub_len = len(sub);
+        var val_len = len(self.value);
+        if (sub_len > val_len) return -1;
+
+        var i = val_len - sub_len;
+        while (i >= 0) {
+            if (_builtin_substring(self.value, i, i + sub_len) == sub) {
+                return i;
+            }
+            i = i - 1;
+        }
+        return -1;
+    }
+
+    pub fn starts_with(prefix: str): bool {
+        return _builtin_string_starts_with(self.value, prefix);
+    }
+
+    pub fn ends_with(suffix: str): bool {
+        return _builtin_string_ends_with(self.value, suffix);
+    }
+
+    pub fn char_at(index: int): str {
+        if (index < 0 or index >= len(self.value)) return "";
+        return _builtin_substring(self.value, index, index + 1);
+    }
+
+    pub fn byte_at(index: int): int {
+        return _builtin_string_byte_at(self.value, index);
+    }
+
+    pub fn repeat(count: int): str {
+        var res = "";
+        var i = 0;
+        while (i < count) {
+            res = res + self.value;
+            i = i + 1;
+        }
+        return res;
+    }
+
+    pub fn pad_left(width: int, fill: str = " "): str {
+        var n = width - len(self.value);
+        if (n <= 0) return self.value;
+        return String(value=fill).repeat(n) + self.value;
+    }
+
+    pub fn pad_right(width: int, fill: str = " "): str {
+        var n = width - len(self.value);
+        if (n <= 0) return self.value;
+        return self.value + String(value=fill).repeat(n);
+    }
+}
+
+pub fn length(value: str): int {
+    return len(value);
+}
+
+fn char_code(ch: str): int {
+    if (len(ch) == 0) return 0;
+    return _builtin_string_byte_at(ch, 0);
+}
+
+pub fn compare(left: str, right: str): int {
+    if (left == right) return 0;
+    var len_l = len(left);
+    var len_r = len(right);
+    var min_len = len_l;
+    if (len_r < min_len) min_len = len_r;
+
+    var i = 0;
+    while (i < min_len) {
+        var b_l = _builtin_string_byte_at(left, i);
+        var b_r = _builtin_string_byte_at(right, i);
+        if (b_l != b_r) {
+            if (b_l < b_r) return -1;
+            return 1;
+        }
+        i = i + 1;
+    }
+    if (len_l < len_r) return -1;
+    return 1;
+}
+
+pub fn substring(value: str, start: int, end: int): str {
+    return String(value=value).substring(start, end);
+}

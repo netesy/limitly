@@ -1,0 +1,40 @@
+import std.collections.queue as q;
+
+fn main(): int {
+    var queue = q.Queue();
+    queue.enqueue(1);
+    queue.enqueue(2);
+    
+    assert(queue.length() == 2, "Queue length should be 2");
+    assert(queue.peek() == 1, "Peek should return 1");
+    assert(queue.dequeue() == 1, "Dequeue should return 1");
+    assert(queue.dequeue() == 2, "Dequeue should return 2");
+    assert(queue.dequeue() == nil, "Dequeue on empty queue should return nil");
+    
+    var stack = q.Stack();
+    stack.push(1);
+    stack.push(2);
+    
+    assert(stack.length() == 2, "Stack length should be 2");
+    assert(stack.peek() == 2, "Peek should return 2");
+    assert(stack.pop() == 2, "Pop should return 2");
+    assert(stack.pop() == 1, "Pop should return 1");
+    assert(stack.pop() == nil, "Pop on empty stack should return nil");
+    
+    var bitset = q.BitSet(100);
+    bitset.set(10);
+    bitset.set(20);
+    assert(bitset.contains(10), "BitSet should contain bit 10");
+    assert(bitset.contains(20), "BitSet should contain bit 20");
+    assert(!bitset.contains(15), "BitSet should not contain bit 15");
+    assert(bitset.count() == 2, "BitSet count should be 2");
+    bitset.unset(10);
+    assert(!bitset.contains(10), "BitSet should not contain bit 10 after unset");
+    
+    var bit_it = bitset.iterator();
+    assert(bit_it.next() == 20, "Iterator should return bit 20");
+    assert(bit_it.next() == nil, "Iterator should be exhausted");
+    
+    print("Queue/Stack/BitSet tests passed!");
+    return 0;
+}

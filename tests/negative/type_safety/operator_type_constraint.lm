@@ -1,0 +1,6 @@
+// @error:type_error
+// Operator type constraints - bitwise on non-integers
+
+var x: str = "hello";
+var y = x & "world";  // Cannot use bitwise AND on strings
+print(y);

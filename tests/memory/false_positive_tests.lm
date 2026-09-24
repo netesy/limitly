@@ -1,0 +1,135 @@
+// =============================================================================
+// FALSE POSITIVE REGRESSION TESTS
+// Tests that should NOT trigger memory safety errors
+// These test the fixes for the memory checker's overly aggressive move detection
+// =============================================================================
+
+// Test 1: Repeated reads (should not generate generation mismatch)
+var x = 42;
+print(x);
+print(x);
+print(x);
+
+// Test 2: Loop reads (should not advance generation each iteration)
+var loop_value = 100;
+var i = 0;
+while (i < 10) {
+    print(loop_value);
+    i = i + 1;
+}
+
+// Test 3: Repeated function calls with same variable (should not move)
+var inspect_value = 200;
+print(inspect_value);
+print(inspect_value);
+print(inspect_value);
+
+// Test 4: Copy semantics (source should remain valid)
+var a = 300;
+var b = a;  // Copy, not move
+print(a);   // Should work - a is still valid
+print(b);   // Should work - b is also valid
+
+// Test 5: Loop mutation (should not move variable)
+var counter = 0;
+while (counter < 100) {
+    counter = counter + 1;
+}
+print(counter);  // Should work
+
+// Test 6: Nested ownership (should not move on access)
+var d = {"items": [1, 2, 3]};
+print(d);
+print(d);
+print(d["items"]);
+
+// Test 7: Variable used in condition (should not move)
+var condition_value = 42;
+if (condition_value == 42) {
+    print("Condition works");
+}
+print(condition_value);  // Should still work
+
+// Test 8: Variable used in expression (should not move)
+var expr_value = 10;
+var result = expr_value + 5;
+print(expr_value);  // Should still work
+print(result);
+
+// Test 9: Array/list indexing (should not move)
+var list_value = [1, 2, 3];
+print(list_value[0]);
+print(list_value[1]);
+print(list_value[2]);
+print(list_value);  // Should still work
+
+// Test 10: Dictionary access (should not move)
+var dict_value = {"key": "value"};
+print(dict_value["key"]);
+print(dict_value);  // Should still work
+
+// Test 11: Variable in for loop condition (should not move)
+var for_limit = 5;
+for (var j = 0; j < for_limit; j = j + 1) {
+    print(j);
+}
+print(for_limit);  // Should still work
+
+// Test 12: Variable in iter loop (should not move)
+var iter_list = [10, 20, 30];
+iter (item in iter_list) {
+    print(item);
+}
+print(iter_list);  // Should still work
+
+// Test 13: Assignment to self (should not move)
+var self_assign = 100;
+self_assign = self_assign + 1;
+print(self_assign);  // Should work
+
+// Test 14: Multiple variables of same type (should not interfere)
+var var1 = 400;
+var var2 = 500;
+var var3 = 600;
+print(var1);
+print(var2);
+print(var3);
+print(var1);  // Should still work
+print(var2);  // Should still work
+print(var3);  // Should still work
+
+// Test 15: Variable used in comparison (should not move)
+var comp_a = 5;
+var comp_b = 10;
+if (comp_a < comp_b) {
+    print("Comparison works");
+}
+print(comp_a);  // Should still work
+print(comp_b);  // Should still work
+
+// Test 16: String interpolation (should not move)
+var name = "Alice";
+var greeting = "Hello {name}!";
+print(name);      // Should still work
+print(greeting);
+
+// Test 17: Variable used in function return expression (should not move)
+var return_input = 42;
+var return_output = return_input * 2;
+print(return_input);  // Should still work
+print(return_output);
+
+// Test 18: Nested blocks with same variable (should not move)
+var nested_var = 42;
+{
+    print(nested_var);
+    {
+        print(nested_var);
+        {
+            print(nested_var);
+        }
+    }
+}
+print(nested_var);  // Should still work
+
+print("All false positive tests passed!");

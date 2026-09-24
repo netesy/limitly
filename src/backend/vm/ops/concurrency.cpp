@@ -1,0 +1,440 @@
+#include "../register.hh"
+#include "../vm_runtime.hh"
+#include "../vm_list.hh"
+#include "../vm_value.hh"
+#include "../../channel.hh"
+#include "../../scheduler.hh"
+#include "../../../lir/function_registry.hh"
+#include "../resource_manager.hh"
+#include <string>
+#include <iostream>
+#include <vector>
+#include <memory>
+#include <mutex>
+#include <stdexcept>
+#include <thread>
+#include <chrono>
+
+namespace LM {
+namespace Backend {
+namespace VM {
+namespace Register {
+
+static std::mutex g_capability_mutex;
+
+void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
+    auto& rm = ResourceManager::getInstance();
+    switch (pc->op) {
+        case LIR::LIR_Op::ChannelAlloc: {
+            size_t capacity = pc->a == 0 ? 1024 : static_cast<size_t>(pc->a);
+            auto channel = std::make_unique<LM::Backend::Channel>(capacity);
+            channels.push_back(std::move(channel));
+            registers[pc->dst] = BOX_PTR(channels.back().get());
+            break;
+        }
+        case LIR::LIR_Op::ResourceCreate: {
+            ResourceType type = static_cast<ResourceType>(to_int(registers[pc->a]));
+            std::vector<RegisterValue> create_args;
+            if (pc->b != UINT32_MAX) {
+                RegisterValue list_val = registers[pc->b];
+                if (auto* list = reinterpret_cast<LmList*>(header_if_type(list_val, TYPE_LIST))) {
+                    size_t len = lm_list_len(list);
+                    for (size_t i = 0; i < len; ++i) {
+                        create_args.push_back(lm_list_get(list, i));
+                    }
+                } else {
+                    create_args.push_back(list_val);
+                }
+            }
+            int64_t id = rm.create(type, create_args);
+            registers[pc->dst] = (id != -1) ? BOX_INT(id) : VAL_NIL;
+            break;
+        }
+        case LIR::LIR_Op::ResourceCall: {
+            int64_t id = to_int(registers[pc->a]);
+            ResourceOperation op;
+            if (pc->b != UINT32_MAX) {
+                op = static_cast<ResourceOperation>(to_int(registers[pc->b]));
+            } else {
+                op = static_cast<ResourceOperation>(pc->imm);
+            }
+            
+            std::vector<RegisterValue> args;
+            // Unpack arguments from call_args registers
+            for (size_t i = 2; i < pc->call_args.size(); ++i) {
+                size_t reg_idx = pc->call_args[i];
+                if (reg_idx < registers.size()) {
+                    RegisterValue val = registers[reg_idx];
+                    if (auto* list = reinterpret_cast<LmList*>(header_if_type(val, TYPE_LIST))) {
+                        size_t len = lm_list_len(list);
+                        for (size_t k = 0; k < len; ++k) {
+                            args.push_back(lm_list_get(list, k));
+                        }
+                    } else if (val != VAL_NIL) {
+                        args.push_back(val);
+                    }
+                }
+            }
+
+            registers[pc->dst] = rm.call(id, op, args, get_current_fiber());
+            break;
+        }
+        case LIR::LIR_Op::ResourceDestroy: {
+            int64_t id = to_int(registers[pc->a]);
+            rm.destroy(id);
+            break;
+        }
+        case LIR::LIR_Op::ChannelSend:
+        case LIR::LIR_Op::ChannelPush: {
+            RegisterValue value = (pc->b != UINT32_MAX) ? registers[pc->b] : VAL_NIL;
+            if (IS_PTR(registers[pc->a])) {
+                auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
+                channel->send(value, get_current_fiber());
+            }
+            break;
+        }
+        case LIR::LIR_Op::ChannelOffer: {
+            if (IS_PTR(registers[pc->a])) {
+                auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
+                RegisterValue value = (pc->b != UINT32_MAX) ? registers[pc->b] : VAL_NIL;
+                registers[pc->dst] = channel->offer(value) ? VAL_TRUE : VAL_FALSE;
+            } else {
+                registers[pc->dst] = VAL_FALSE;
+            }
+            break;
+        }
+        case LIR::LIR_Op::ChannelRecv:
+        case LIR::LIR_Op::ChannelPop: {
+            if (IS_PTR(registers[pc->a])) {
+                auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
+                registers[pc->dst] = channel->recv(get_current_fiber());
+            } else {
+                registers[pc->dst] = VAL_NIL;
+            }
+            break;
+        }
+        case LIR::LIR_Op::ChannelPoll: {
+            if (IS_PTR(registers[pc->a])) {
+                auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
+                RegisterValue out = VAL_NIL;
+                registers[pc->dst] = channel->poll(out) ? out : VAL_NIL;
+            } else {
+                registers[pc->dst] = VAL_NIL;
+            }
+            break;
+        }
+        case LIR::LIR_Op::ChannelClose: {
+            if (IS_PTR(registers[pc->a])) {
+                auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
+                channel->close();
+            }
+            registers[pc->dst] = VAL_NIL;
+            break;
+        }
+        case LIR::LIR_Op::ChannelHasData: {
+            if (IS_PTR(registers[pc->a])) {
+                auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
+                registers[pc->dst] = channel->has_data() ? VAL_TRUE : VAL_FALSE;
+            } else {
+                registers[pc->dst] = VAL_FALSE;
+            }
+            break;
+        }
+        case LIR::LIR_Op::CapabilityAcquire: {
+            const RegisterValue collection = registers[pc->a];
+            const uint32_t begin = pc->b;
+            const uint32_t end = pc->imm;
+            if (end <= begin) throw std::runtime_error("invalid parallel slice capability");
+            std::lock_guard<std::mutex> lock(g_capability_mutex);
+            for (const auto& capability : slice_capabilities) {
+                if (capability.active && capability.collection == collection &&
+                    begin < capability.end && capability.begin < end) {
+                    throw std::runtime_error("overlapping parallel slice capabilities");
+                }
+            }
+            slice_capabilities.push_back({collection, begin, end, true});
+            registers[pc->dst] = make_i64(static_cast<int64_t>(slice_capabilities.size()));
+            break;
+        }
+        case LIR::LIR_Op::CapabilityRelease: {
+            std::lock_guard<std::mutex> lock(g_capability_mutex);
+            const int64_t token = as_i64(registers[pc->a]);
+            if (token <= 0 || static_cast<size_t>(token) > slice_capabilities.size() ||
+                !slice_capabilities[static_cast<size_t>(token - 1)].active) {
+                throw std::runtime_error("invalid or reused parallel capability token");
+            }
+            slice_capabilities[static_cast<size_t>(token - 1)].active = false;
+            break;
+        }
+        case LIR::LIR_Op::ParallelInit:
+            parallel_config.cores = std::max<uint32_t>(1, pc->a);
+            parallel_config.timeout_ms = pc->b;
+            parallel_config.grace_ms = LIR::Metadata::concurrency_grace_ms(pc->imm);
+            parallel_config.error_policy = LIR::Metadata::concurrency_error_policy(pc->imm);
+            parallel_config.timeout_policy = LIR::Metadata::concurrency_timeout_policy(pc->imm);
+            parallel_config.started = std::chrono::steady_clock::now();
+            registers[pc->dst] = make_i64(1);
+            break;
+        case LIR::LIR_Op::ParallelSync: {
+            if (parallel_config.timeout_ms != 0) {
+                const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - parallel_config.started).count();
+                if (static_cast<uint64_t>(elapsed) > parallel_config.timeout_ms &&
+                    parallel_config.timeout_policy == LIR::Metadata::ErrorPolicy::Stop) {
+                    throw std::runtime_error("parallel block exceeded its timeout");
+                }
+            }
+            break;
+        }
+        case LIR::LIR_Op::TaskContextAlloc: {
+            auto context = std::make_unique<TaskContext>();
+            auto* raw = context.get();
+            task_contexts.push_back(std::move(context));
+            registers[pc->dst] = BOX_PTR(raw);
+            break;
+        }
+        case LIR::LIR_Op::TaskContextInit:
+            if (IS_PTR(registers[pc->a])) ((TaskContext*)UNBOX_PTR(registers[pc->a]))->state = TaskState::RUNNING;
+            break;
+        case LIR::LIR_Op::TaskSetField: {
+            if (IS_PTR(registers[pc->a])) {
+                RegisterValue value;
+                if (pc->b != 0 && pc->b != UINT32_MAX) {
+                    value = registers[pc->b];
+                } else if (pc->dst != UINT32_MAX) {
+                    value = registers[pc->dst];
+                } else {
+                    value = VAL_NIL;
+                }
+                ((TaskContext*)UNBOX_PTR(registers[pc->a]))
+                    ->fields[static_cast<int>(pc->imm)] = value;
+            }
+            break;
+        }
+        case LIR::LIR_Op::TaskGetField:
+            if (IS_PTR(registers[pc->a])) {
+                auto* context = (TaskContext*)UNBOX_PTR(registers[pc->a]);
+                auto it = context->fields.find(static_cast<int>(pc->imm));
+                registers[pc->dst] = it == context->fields.end() ? VAL_NIL : it->second;
+            } else {
+                registers[pc->dst] = VAL_NIL;
+            }
+            break;
+        case LIR::LIR_Op::TaskGetState: {
+            if (IS_PTR(registers[pc->a])) {
+                auto* context = (TaskContext*)UNBOX_PTR(registers[pc->a]);
+                int64_t s = 0;
+                switch (context->state) {
+                    case TaskState::INIT:      s = 0; break;
+                    case TaskState::RUNNING:   s = 1; break;
+                    case TaskState::SLEEPING:  s = 2; break;
+                    case TaskState::COMPLETED: s = 3; break;
+                }
+                registers[pc->dst] = make_i64(s);
+            } else {
+                registers[pc->dst] = make_i64(0);
+            }
+            break;
+        }
+        case LIR::LIR_Op::TaskSetState: {
+            if (IS_PTR(registers[pc->a])) {
+                auto* context = (TaskContext*)UNBOX_PTR(registers[pc->a]);
+                int64_t s = (pc->b != UINT32_MAX) ? as_i64(registers[pc->b])
+                                                   : static_cast<int64_t>(pc->imm);
+                TaskState new_state;
+                switch (s) {
+                    case 0:  new_state = TaskState::INIT; break;
+                    case 1:  new_state = TaskState::RUNNING; break;
+                    case 2:  new_state = TaskState::SLEEPING; break;
+                    case 3:  new_state = TaskState::COMPLETED; break;
+                    default: new_state = TaskState::INIT; break;
+                }
+                context->state = new_state;
+            }
+            break;
+        }
+        case LIR::LIR_Op::SchedulerInit:
+            scheduler = std::make_unique<Scheduler>();
+            current_time = 0;
+            scheduler_config.cores = std::max<uint32_t>(1, pc->a);
+            scheduler_config.timeout_ms = pc->b;
+            scheduler_config.grace_ms = LIR::Metadata::concurrency_grace_ms(pc->imm);
+            scheduler_config.error_policy = LIR::Metadata::concurrency_error_policy(pc->imm);
+            scheduler_config.timeout_policy = LIR::Metadata::concurrency_timeout_policy(pc->imm);
+            scheduler_config.started = std::chrono::steady_clock::now();
+            registers[pc->dst] = make_i64(1);
+            break;
+        case LIR::LIR_Op::SchedulerAddTask:
+            break;
+        case LIR::LIR_Op::SchedulerTick:
+            current_time++;
+            break;
+        case LIR::LIR_Op::GetTickCount:
+            registers[pc->dst] = make_i64(static_cast<int64_t>(current_time));
+            break;
+        case LIR::LIR_Op::DelayUntil: {
+            int64_t target = (pc->a != UINT32_MAX) ? as_i64(registers[pc->a])
+                                                   : static_cast<int64_t>(pc->imm);
+            if ((int64_t)current_time < target) {
+                current_time = static_cast<uint64_t>(target);
+            }
+            break;
+        }
+        case LIR::LIR_Op::SchedulerRun: {
+            auto saved_registers = registers;
+            const LIR::LIR_Function* saved_func = current_function_;
+            auto& registry = LIR::FunctionRegistry::getInstance();
+
+            uint32_t num_cores = std::max<uint32_t>(1, scheduler_config.cores);
+            if (num_cores > 1 && task_contexts.size() > 1) {
+                std::mutex task_mutex;
+                size_t task_index = 0;
+                std::vector<std::thread> workers;
+
+                for (uint32_t c = 0; c < num_cores; ++c) {
+                    workers.emplace_back([&]() {
+                        RegisterVM worker_vm;
+                        while (true) {
+                            TaskContext* context = nullptr;
+                            {
+                                std::lock_guard<std::mutex> lock(task_mutex);
+                                if (task_index >= task_contexts.size()) break;
+                                context = task_contexts[task_index++].get();
+                            }
+                            if (!context || context->state == TaskState::COMPLETED || context->cancelled.load()) continue;
+
+                            auto name_it = context->fields.find(4);
+                            if (name_it == context->fields.end()) continue;
+                            std::string func_name = "";
+                            if (IS_PTR(name_it->second)) {
+                                ObjHeader* h = (ObjHeader*)UNBOX_PTR(name_it->second);
+                                if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                                    func_name = (char*)((LmBox*)h)->value.as_ptr;
+                                }
+                            }
+                            auto* func = registry.getFunction(func_name);
+                            if (!func) continue;
+
+                            auto run_once = [&](RegisterValue field1) {
+                                if (context->cancelled.load()) return;
+                                worker_vm.registers = saved_registers;
+                                if (worker_vm.registers.size() < saved_registers.size()) {
+                                    worker_vm.registers.resize(saved_registers.size(), VAL_NIL);
+                                }
+                                worker_vm.registers[1] = field1;
+                                auto ch = context->fields.find(2);
+                                if (ch != context->fields.end()) worker_vm.registers[2] = ch->second;
+                                worker_vm.current_function_ = func;
+                                try {
+                                    worker_vm.execute_instructions(*func, 0, func->instructions.size());
+                                } catch (...) {}
+                            };
+
+                            auto data_it = context->fields.find(1);
+                            if (func_name.rfind("worker_", 0) == 0) {
+                                if (data_it != context->fields.end() && IS_PTR(data_it->second)) {
+                                    auto* channel = (LM::Backend::Channel*)UNBOX_PTR(data_it->second);
+                                    RegisterValue item = VAL_NIL;
+                                    while (!context->cancelled.load() && channel->poll(item)) run_once(item);
+                                } else if (data_it != context->fields.end() && IS_INT(data_it->second)) {
+                                    RegisterValue item = VAL_NIL;
+                                    do {
+                                        if (context->cancelled.load()) break;
+                                        item = rm.call(to_int(data_it->second), ResourceOperation::POLL,
+                                                       {}, nullptr);
+                                        if (!IS_NIL(item)) run_once(item);
+                                    } while (!IS_NIL(item));
+                                }
+                            } else {
+                                run_once(data_it == context->fields.end() ? VAL_NIL : data_it->second);
+                            }
+                            context->state = TaskState::COMPLETED;
+                        }
+                    });
+                }
+                for (auto& w : workers) {
+                    if (w.joinable()) w.join();
+                }
+            } else {
+                for (auto& context_ptr : task_contexts) {
+                if (scheduler_config.timeout_ms != 0) {
+                    const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                        std::chrono::steady_clock::now() - scheduler_config.started).count();
+                    if (static_cast<uint64_t>(elapsed) > scheduler_config.timeout_ms) {
+                        if (scheduler_config.timeout_policy == LIR::Metadata::ErrorPolicy::Continue)
+                            continue;
+                        break; // Stop and Partial both stop scheduling new work.
+                    }
+                }
+                TaskContext* context = context_ptr.get();
+                if (!context || context->state == TaskState::COMPLETED || context->cancelled.load()) continue;
+                auto name_it = context->fields.find(4);
+                if (name_it == context->fields.end()) continue;
+
+                std::string func_name = "";
+                if (IS_PTR(name_it->second)) {
+                    ObjHeader* h = (ObjHeader*)UNBOX_PTR(name_it->second);
+                    if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                        func_name = (char*)((LmBox*)h)->value.as_ptr;
+                    }
+                }
+
+                auto* func = registry.getFunction(func_name);
+                if (!func) continue;
+
+                auto run_once = [&](RegisterValue field1) {
+                    if (context->cancelled.load()) return;
+                    if (registers.size() < saved_registers.size()) {
+                        registers.resize(saved_registers.size(), VAL_NIL);
+                    }
+                    registers[1] = field1;
+                    auto ch = context->fields.find(2);
+                    if (ch != context->fields.end()) registers[2] = ch->second;
+                    current_function_ = func;
+                    try {
+                        execute_instructions(*func, 0, func->instructions.size());
+                    } catch (...) {
+                        if (scheduler_config.error_policy == LIR::Metadata::ErrorPolicy::Stop) throw;
+                        if (scheduler_config.error_policy == LIR::Metadata::ErrorPolicy::Partial)
+                            context->state = TaskState::COMPLETED;
+                    }
+                };
+
+                auto data_it = context->fields.find(1);
+                if (func_name.rfind("worker_", 0) == 0) {
+                    if (data_it != context->fields.end() && IS_PTR(data_it->second)) {
+                        auto* channel = (LM::Backend::Channel*)UNBOX_PTR(data_it->second);
+                        RegisterValue item = VAL_NIL;
+                        while (!context->cancelled.load() && channel->poll(item)) run_once(item);
+                    } else if (data_it != context->fields.end() && IS_INT(data_it->second)) {
+                        RegisterValue item = VAL_NIL;
+                        do {
+                            if (context->cancelled.load()) break;
+                            item = rm.call(to_int(data_it->second), ResourceOperation::POLL,
+                                           {}, get_current_fiber());
+                            if (!IS_NIL(item)) run_once(item);
+                        } while (!IS_NIL(item));
+                    }
+                } else {
+                    run_once(data_it == context->fields.end() ? VAL_NIL : data_it->second);
+                }
+                context->state = TaskState::COMPLETED;
+            }
+            }
+            // Captured registers are the structured task environment. Keep
+            // mutations made by completed tasks; restoring saved_registers
+            // here previously discarded all task results at the join point.
+            current_function_ = saved_func;
+            break;
+        }
+        default:
+            throw std::runtime_error(
+                "VM: execute_concurrency: unsupported opcode " +
+                std::to_string(static_cast<int>(pc->op)));
+    }
+}
+
+} // namespace Register
+} // namespace VM
+} // namespace Backend
+} // namespace LM

@@ -1,0 +1,448 @@
+// tests/ffi/test_image_lib.lm
+//
+// Integration test for std.image — exercises every format and code path
+// through the FFI trampoline system backed by stb_image + stb_image_write.
+//
+// Minimum test image size: 150x150 for clear visual inspection.
+// Minimum number of test cases: 15 distinct tests.
+//
+// Build deps:   make stb-image
+// Run:          make stb-image-test
+//               limitly run tests/ffi/test_image_lib.lm
+
+import std.image.index as image;
+import std.image.png   as png;
+import std.image.jpg   as jpg;
+import std.image.bmp   as bmp;
+import std.image.tga   as tga;
+import std.image.hdr   as hdr;
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+
+fn pass(msg: str) {
+    print("[PASS] {msg}");
+}
+
+fn fail(msg: str) {
+    print("[FAIL] {msg}");
+    assert(false, msg);
+}
+
+fn check(cond: bool, msg: str): nil {
+    if (cond) { pass(msg); } else { fail(msg); }
+}
+
+// Fill an image with a colour gradient for visual verification.
+fn fill_gradient(img: image.Image): nil {
+    var y: int = 0;
+    while (y < img.height) {
+        var x: int = 0;
+        while (x < img.width) {
+            var r: int = (x * 255) / img.width;
+            var g: int = (y * 255) / img.height;
+            image.set_pixel(img, x, y, r, g, 128, 255);
+            x = x + 1;
+        }
+        y = y + 1;
+    }
+}
+
+// ── Test 1: create + pixel access (150x150) ──────────────────────────────
+
+fn test_pixel_access(): nil {
+    print("--- Test 1: create + pixel access (150x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 4);
+    var img: image.Image = img_opt? else {
+        fail("create(150,150,4) should succeed");
+        return;
+    };
+
+    check(img.is_valid(),      "created image is_valid");
+    check(img.width == 150,    "width == 150");
+    check(img.height == 150,   "height == 150");
+    check(img.channels == 4,   "channels == 4");
+
+    var bs: int = img.byte_size();
+    print("  byte_size = {bs}");
+    check(bs == 90000, "byte_size == 90000 (150*150*4)");
+
+    // Write black explicitly, read back
+    image.set_pixel(img, 0, 0, 0, 0, 0, 255);
+    var px0: image.Pixel = image.get_pixel(img, 0, 0);
+    check(px0.r == 0 and px0.g == 0 and px0.b == 0, "explicitly-set black pixel RGB == 0");
+    check(px0.a == 255, "explicitly-set black pixel A == 255");
+
+    // Write red, read back
+    image.set_pixel(img, 75, 75, 255, 0, 0, 255);
+    var px1: image.Pixel = image.get_pixel(img, 75, 75);
+    check(px1.r == 255, "R == 255 after set_pixel");
+    check(px1.g == 0,   "G == 0   after set_pixel");
+    check(px1.b == 0,   "B == 0   after set_pixel");
+    check(px1.a == 255, "A == 255 after set_pixel");
+
+    // Gradient + corner sample
+    fill_gradient(img);
+    var tl: image.Pixel = image.get_pixel(img, 0, 0);
+    check(tl.r == 0 and tl.g == 0, "top-left gradient is (0,0,128,255)");
+
+    // Out-of-bounds -> safe default alpha=255
+    var oob: image.Pixel = image.get_pixel(img, 999, 999);
+    check(oob.a == 255, "OOB pixel alpha defaults to 255");
+
+    image.free(img);
+    pass("pixel access round-trip complete");
+}
+
+// ── Test 2: PNG save + query + load (150x150) ─────────────────────────────
+
+fn test_png(): nil {
+    print("--- Test 2: PNG save + query + load (150x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 4);
+    var img: image.Image = img_opt? else { fail("create(150,150,4)"); return; };
+    fill_gradient(img);
+
+    var saved: bool? = png.save(img, "tests/ffi/test_out.png");
+    saved? else { fail("png.save failed"); image.free(img); return; };
+    print("  Saved tests/ffi/test_out.png (150x150)");
+    image.free(img);
+
+    // Query — no pixel load
+    var info_opt: image.ImageInfo? = image.query("tests/ffi/test_out.png");
+    var info: image.ImageInfo = info_opt? else { fail("image.query failed"); return; };
+    print("  query -> w={info.width} h={info.height} c={info.channels}");
+    check(info.width    == 150, "queried width  == 150");
+    check(info.height   == 150, "queried height == 150");
+    check(info.channels >= 1,   "queried channels >= 1");
+
+    // Generic load round-trip
+    var loaded_opt: image.Image? = image.load("tests/ffi/test_out.png");
+    var loaded: image.Image = loaded_opt? else { fail("image.load of PNG failed"); return; };
+    print("  Loaded -> w={loaded.width} h={loaded.height} c={loaded.channels}");
+    check(loaded.width  == 150, "loaded PNG width  == 150");
+    check(loaded.height == 150, "loaded PNG height == 150");
+    image.free(loaded);
+
+    pass("PNG save/query/load round-trip");
+}
+
+// ── Test 3: PNG save with stride (150x150) ────────────────────────────────
+
+fn test_png_stride(): nil {
+    print("--- Test 3: PNG save with stride (150x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 3);
+    var img: image.Image = img_opt? else { fail("create(150,150,3)"); return; };
+    fill_gradient(img);
+
+    var stride: int = img.width * img.channels;
+    var stride_ok: bool? = png.save_with_stride(img, "tests/ffi/test_out_stride.png", stride);
+    stride_ok? else { fail("png.save_with_stride failed"); image.free(img); return; };
+    print("  Saved tests/ffi/test_out_stride.png (stride={stride})");
+    image.free(img);
+
+    var loaded_opt: image.Image? = image.load("tests/ffi/test_out_stride.png");
+    var loaded: image.Image = loaded_opt? else { fail("image.load of stride PNG failed"); return; };
+    check(loaded.width == 150 and loaded.height == 150, "loaded stride PNG dimensions == 150x150");
+    image.free(loaded);
+
+    pass("PNG stride save and reload");
+}
+
+// ── Test 4: JPEG save + reload (150x150) ──────────────────────────────────
+
+fn test_jpg(): nil {
+    print("--- Test 4: JPEG save (150x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 3);
+    var img: image.Image = img_opt? else { fail("create(150,150,3)"); return; };
+    fill_gradient(img);
+
+    var ok85: bool? = jpg.save(img, "tests/ffi/test_out.jpg", 85);
+    ok85? else { fail("jpg.save quality=85 failed"); image.free(img); return; };
+    print("  Saved tests/ffi/test_out.jpg (quality=85, 150x150)");
+
+    var ok90: bool? = jpg.save_default(img, "tests/ffi/test_out_90.jpg");
+    ok90? else { fail("jpg.save_default failed"); image.free(img); return; };
+    print("  Saved tests/ffi/test_out_90.jpg (quality=90 default, 150x150)");
+
+    // Reload to confirm valid JPEG was written
+    var loaded_opt: image.Image? = image.load("tests/ffi/test_out.jpg");
+    var loaded: image.Image = loaded_opt? else { fail("image.load of JPEG failed"); return; };
+    print("  Reload -> w={loaded.width} h={loaded.height} c={loaded.channels}");
+    check(loaded.width  == 150, "reloaded JPEG width  == 150");
+    check(loaded.height == 150, "reloaded JPEG height == 150");
+    image.free(loaded);
+    image.free(img);
+
+    pass("JPEG save (q=85 + default q=90) + reload");
+}
+
+// ── Test 5: BMP save + reload (150x150) ───────────────────────────────────
+
+fn test_bmp(): nil {
+    print("--- Test 5: BMP save (150x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 3);
+    var img: image.Image = img_opt? else { fail("create(150,150,3)"); return; };
+    fill_gradient(img);
+
+    var saved: bool? = bmp.save(img, "tests/ffi/test_out.bmp");
+    saved? else { fail("bmp.save failed"); image.free(img); return; };
+    print("  Saved tests/ffi/test_out.bmp (150x150)");
+
+    var loaded_opt: image.Image? = bmp.load("tests/ffi/test_out.bmp");
+    var loaded: image.Image = loaded_opt? else { fail("bmp.load failed"); return; };
+    print("  Reload -> w={loaded.width} h={loaded.height} c={loaded.channels}");
+    check(loaded.width  == 150, "loaded BMP width  == 150");
+    check(loaded.height == 150, "loaded BMP height == 150");
+
+    image.free(loaded);
+    image.free(img);
+    pass("BMP save + load round-trip");
+}
+
+// ── Test 6: TGA save + reload (150x150) ───────────────────────────────────
+
+fn test_tga(): nil {
+    print("--- Test 6: TGA save (150x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 3);
+    var img: image.Image = img_opt? else { fail("create(150,150,3)"); return; };
+    fill_gradient(img);
+
+    var ok_plain: bool? = tga.save(img, "tests/ffi/test_out.tga");
+    ok_plain? else { fail("tga.save plain failed"); image.free(img); return; };
+    print("  Saved tests/ffi/test_out.tga (150x150)");
+
+    var loaded_opt: image.Image? = tga.load("tests/ffi/test_out.tga");
+    var loaded: image.Image = loaded_opt? else { fail("tga.load failed"); return; };
+    check(loaded.width == 150 and loaded.height == 150, "loaded TGA width & height == 150");
+
+    image.free(loaded);
+    image.free(img);
+    pass("TGA save plain + reload");
+}
+
+// ── Test 7: TGA RLE save + reload (150x150) ───────────────────────────────
+
+fn test_tga_rle(): nil {
+    print("--- Test 7: TGA RLE save (150x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 3);
+    var img: image.Image = img_opt? else { fail("create(150,150,3)"); return; };
+    fill_gradient(img);
+
+    var ok_rle: bool? = tga.save_rle(img, "tests/ffi/test_out_rle.tga");
+    ok_rle? else { fail("tga.save_rle failed"); image.free(img); return; };
+    print("  Saved tests/ffi/test_out_rle.tga (150x150)");
+
+    var loaded_opt: image.Image? = tga.load("tests/ffi/test_out_rle.tga");
+    var loaded: image.Image = loaded_opt? else { fail("tga.load RLE failed"); return; };
+    check(loaded.width == 150 and loaded.height == 150, "loaded TGA RLE width & height == 150");
+
+    image.free(loaded);
+    image.free(img);
+    pass("TGA RLE save + reload");
+}
+
+// ── Test 8: forced-channel load (RGBA=4, 150x150) ─────────────────────────
+
+fn test_load_forced(): nil {
+    print("--- Test 8: forced-channel load (RGBA=4, 150x150) ---");
+
+    // test_out.jpg is 3-channel RGB; force-load as 4-channel RGBA
+    var img_opt: image.Image? = image.load_forced("tests/ffi/test_out.jpg", 4);
+    var img: image.Image = img_opt? else { fail("load_forced failed"); return; };
+    print("  Forced load -> w={img.width} h={img.height} c={img.channels}");
+    check(img.channels == 4,   "forced channels == 4");
+    check(img.width    == 150, "forced load width == 150");
+    check(img.height   == 150, "forced load height == 150");
+
+    image.free(img);
+    pass("load_forced channel coercion");
+}
+
+// ── Test 9: edge guards ───────────────────────────────────────────────────
+
+fn test_edge_guards(): nil {
+    print("--- Test 9: edge guards ---");
+
+    var bad_w_ok: bool = false;
+    var res1 = image.create(-1, 150, 4)? else {
+        bad_w_ok = true;
+    };
+    check(bad_w_ok, "create(-1,150,4) correctly returns err");
+
+    var bad_c_ok: bool = false;
+    var res2 = image.create(150, 150, 0)? else {
+        bad_c_ok = true;
+    };
+    check(bad_c_ok, "create(150,150,0) correctly returns err");
+
+    var img_opt: image.Image? = image.create(150, 150, 4);
+    var img: image.Image = img_opt? else { fail("create(150,150,4)"); return; };
+    var px: image.Pixel = image.get_pixel(img, -5, -5);
+    check(px.a == 255, "OOB pixel alpha defaults to 255");
+    image.free(img);
+
+    pass("edge guards");
+}
+
+// ── Test 10: Image cloning (150x150) ──────────────────────────────────────
+
+fn test_clone(): nil {
+    print("--- Test 10: clone (150x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 4);
+    var img: image.Image = img_opt? else { return; };
+    fill_gradient(img);
+
+    var cl_opt: image.Image? = img.clone();
+    var cl: image.Image = cl_opt? else { fail("clone failed"); return; };
+    check(cl.width == 150 and cl.height == 150, "clone dimensions match (150x150)");
+
+    var p1: image.Pixel = img.get(75, 75);
+    var p2: image.Pixel = cl.get(75, 75);
+    check(p1.r == p2.r and p1.g == p2.g and p1.b == p2.b, "clone pixel values match");
+
+    img.free();
+    cl.free();
+    pass("clone verified");
+}
+
+// ── Test 11: Image resize (150x150 -> 200x150, 150x150 -> 100x100) ───────
+
+fn test_resize(): nil {
+    print("--- Test 11: resize (150x150 -> 200x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 4);
+    var img: image.Image = img_opt? else { return; };
+    fill_gradient(img);
+
+    var res_opt: image.Image? = img.resize(200, 150);
+    var res: image.Image = res_opt? else { fail("resize failed"); return; };
+    check(res.width == 200 and res.height == 150, "resized to 200x150x4");
+
+    var p_sample: image.Pixel = res.get(100, 75);
+    check(p_sample.a == 255, "resized content preserved");
+
+    img.free();
+    res.free();
+    pass("resize verified");
+}
+
+// ── Test 12: Image crop (150x150 -> 100x100) ──────────────────────────────
+
+fn test_crop(): nil {
+    print("--- Test 12: crop (150x150 -> 100x100) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 4);
+    var img: image.Image = img_opt? else { return; };
+    fill_gradient(img);
+
+    var crp_opt: image.Image? = img.crop(25, 25, 100, 100);
+    var crp: image.Image = crp_opt? else { fail("crop failed"); return; };
+    check(crp.width == 100 and crp.height == 100, "crop to 100x100");
+
+    img.free();
+    crp.free();
+    pass("crop verified");
+}
+
+// ── Test 13: Image blit (150x150 canvas) ──────────────────────────────────
+
+fn test_blit(): nil {
+    print("--- Test 13: blit onto 150x150 canvas ---");
+
+    var dst_opt: image.Image? = image.create(150, 150, 4);
+    var dst: image.Image = dst_opt? else { return; };
+    image.fill(dst, 0, 0, 0, 255);
+
+    var src_opt: image.Image? = image.create(50, 50, 4);
+    var src: image.Image = src_opt? else { return; };
+    image.fill(src, 255, 0, 0, 255);
+
+    image.blit(dst, src, 20, 20);
+    var p_inside: image.Pixel = image.get_pixel(dst, 30, 30);
+    check(p_inside.r == 255 and p_inside.g == 0, "blitted region has source color");
+
+    var p_outside: image.Pixel = image.get_pixel(dst, 10, 10);
+    check(p_outside.r == 0, "outside blit region unchanged");
+
+    image.free(dst);
+    image.free(src);
+    pass("blit verified");
+}
+
+// ── Test 14: Image rotation 90 deg (150x100 -> 100x150) ───────────────────
+
+fn test_rotate(): nil {
+    print("--- Test 14: rotate_90 (150x100 -> 100x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 100, 4);
+    var img: image.Image = img_opt? else { return; };
+    fill_gradient(img);
+
+    var rot_opt: image.Image? = image.rotate_90(img);
+    var rot: image.Image = rot_opt? else { fail("rotate_90 failed"); return; };
+    check(rot.width == 100 and rot.height == 150, "rotate_90 swapped dimensions (100x150)");
+
+    image.free(img);
+    image.free(rot);
+    pass("rotate_90 verified");
+}
+
+// ── Test 15: Image flips (150x150) ────────────────────────────────────────
+
+fn test_flip(): nil {
+    print("--- Test 15: flips (150x150) ---");
+
+    var img_opt: image.Image? = image.create(150, 150, 4);
+    var img: image.Image = img_opt? else { return; };
+    image.fill(img, 0, 0, 0, 255);
+    image.set_pixel(img, 0, 0, 255, 0, 0, 255);
+
+    image.flip_vertical(img);
+    var p_v: image.Pixel = image.get_pixel(img, 0, 149);
+    check(p_v.r == 255, "flip_vertical moved (0,0) to (0,149)");
+
+    image.flip_horizontal(img);
+    var p_h: image.Pixel = image.get_pixel(img, 149, 149);
+    check(p_h.r == 255, "flip_horizontal moved (0,149) to (149,149)");
+
+    image.free(img);
+    pass("flips verified");
+}
+
+// ── Main Entry ────────────────────────────────────────────────────────────
+
+fn main(): nil {
+    print("=======================================================");
+    print("  std.image Integration Test (15 Tests, Size >= 150)");
+    print("  Backend: stb_image + stb_image_write via FFI trampoline");
+    print("=======================================================");
+
+    test_pixel_access();
+    test_png();
+    test_png_stride();
+    test_jpg();
+    test_bmp();
+    test_tga();
+    test_tga_rle();
+    test_load_forced();
+    test_edge_guards();
+    test_clone();
+    test_resize();
+    test_crop();
+    test_blit();
+    test_rotate();
+    test_flip();
+
+    print("=======================================================");
+    print("  All 15 std.image tests PASSED (all >= 150x150)");
+    print("=======================================================");
+}
+
+main();

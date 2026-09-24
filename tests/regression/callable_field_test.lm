@@ -1,0 +1,30 @@
+// Test callable function fields in frames
+// This tests that frame fields with function types can be invoked
+
+frame TestFrame {
+    var op: fn(int): int;
+
+    pub init(op: fn(int): int) {
+        self.op = op;
+    }
+
+    pub fn run(x: int): int {
+        return self.op(x);
+    }
+}
+
+fn double(x: int): int {
+    return x * 2;
+}
+
+// Test at top level
+var test = TestFrame(op=double);
+var result = test.run(5);
+
+fn main(): int {
+    if (result != 10) {
+        return 1;
+    }
+    print("Callable field test passed!");
+    return 0;
+}

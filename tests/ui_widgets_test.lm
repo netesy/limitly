@@ -1,0 +1,162 @@
+// Comprehensive Integration Test Suite for Limit std.ui Widgets & Charts
+import std.ui as ui;
+import std.ui.context as ctx;
+
+fn test_widget_constructors(): nil {
+    print("Testing widget constructors...");
+
+    var btn = ui.button("Click Me");
+    assert(btn.kind == ui.KIND_BUTTON, "button kind");
+    assert(btn.text_val == "Click Me", "button label");
+
+    var tog = ui.toggle(true);
+    assert(tog.kind == ui.KIND_TOGGLE, "toggle kind");
+    assert(tog.is_checked == 1, "toggle checked state");
+
+    var stp = ui.stepper(5, 1, 0, 10);
+    assert(stp.kind == ui.KIND_STEPPER, "stepper kind");
+    assert(stp.slider_val == 5.0, "stepper val");
+
+    var acc = ui.accordion("Details", ui.text("Content"), true);
+    assert(acc.kind == ui.KIND_ACCORDION, "accordion kind");
+    assert(acc.is_open == 1, "accordion state");
+
+    var alrt = ui.alert("Warning!", "warning");
+    assert(alrt.kind == ui.KIND_ALERT, "alert kind");
+
+    var cal = ui.calendar("2025-06-15");
+    assert(cal.kind == ui.KIND_CALENDAR, "calendar kind");
+
+    var crd = ui.card("Stat Card", ui.text("Val: 100"));
+    assert(crd.kind == ui.KIND_CARD, "card kind");
+
+    var df = ui.diff("a", "b");
+    assert(df.kind == ui.KIND_DIFF, "diff kind");
+
+    var fi = ui.file_input("Upload");
+    assert(fi.kind == ui.KIND_FILE_INPUT, "file_input kind");
+
+    var ind = ui.indicator("online", "Status");
+    assert(ind.kind == ui.KIND_INDICATOR, "indicator kind");
+
+    var prg = ui.progress(0.75, 200.0);
+    assert(prg.kind == ui.KIND_PROGRESS, "progress kind");
+    assert(prg.slider_val == 0.75, "progress val");
+
+    var st = ui.stat("CPU", "45%", "Stable");
+    assert(st.kind == ui.KIND_STAT, "stat kind");
+
+    var tbl = ui.table(["Name", "Role"], [[ui.text("Alice"), ui.text("Dev")]]);
+    assert(tbl.kind == ui.KIND_TABLE, "table kind");
+
+    print("Widget constructors test passed.");
+}
+
+fn test_chart_constructors(): nil {
+    print("Testing chart constructors...");
+
+    var values = [10.0, 25.0, 50.0, 80.0, 60.0];
+
+    var pl = ui.plot_lines("Lines", values);
+    assert(pl.kind == ui.KIND_PLOT_LINES, "plot_lines kind");
+
+    var ph = ui.plot_histogram("Hist", values);
+    assert(ph.kind == ui.KIND_PLOT_HISTOGRAM, "plot_histogram kind");
+
+    var bc = ui.bar_chart("Bar", values);
+    assert(bc.kind == ui.KIND_BAR_CHART, "bar_chart kind");
+
+    var lc = ui.line_chart("Line", values);
+    assert(lc.kind == ui.KIND_LINE_CHART, "line_chart kind");
+
+    var pie = ui.pie_chart("Pie", values);
+    assert(pie.kind == ui.KIND_PIE_CHART, "pie_chart kind");
+
+    var dn = ui.doughnut_chart("Doughnut", values);
+    assert(dn.kind == ui.KIND_DOUGHNUT_CHART, "doughnut_chart kind");
+
+    var bub = ui.bubble_chart("Bubble", values);
+    assert(bub.kind == ui.KIND_BUBBLE_CHART, "bubble_chart kind");
+
+    var sc = ui.scatter_chart("Scatter", values);
+    assert(sc.kind == ui.KIND_SCATTER_CHART, "scatter_chart kind");
+
+    var pa = ui.polar_area_chart("Polar", values);
+    assert(pa.kind == ui.KIND_POLAR_AREA_CHART, "polar_area_chart kind");
+
+    var rad = ui.radar_chart("Radar", values);
+    assert(rad.kind == ui.KIND_RADAR_CHART, "radar_chart kind");
+
+    print("Chart constructors test passed.");
+}
+
+fn test_ui_context_rendering_and_dispatch(): nil {
+    print("Testing UI Context rendering and pointer dispatch pipeline...");
+
+    ctx.ui_init();
+    ctx.set_viewport_size(800.0, 600.0);
+
+    var root = ui.column([
+        ui.alert("System Normal", "success"),
+        ui.row([
+            ui.toggle(false),
+            ui.stepper(10, 1, 0, 100),
+            ui.progress(0.5)
+        ]),
+        ui.accordion("Settings", ui.column([
+            ui.color_picker("Theme", ui.blue),
+            ui.file_input("Config File")
+        ]), true),
+        ui.bar_chart("Revenue", [30.0, 60.0, 90.0]),
+        ui.pie_chart("Share", [40.0, 60.0]),
+        ui.table(["Service", "Status"], [
+            [ui.text("Auth"), ui.indicator("online", "OK")],
+            [ui.text("DB"), ui.indicator("online", "OK")]
+        ])
+    ]).spacing(8.0).padding(10.0);
+
+    ctx.set_root(root);
+
+    // Frame update pass (measures & draws nodes)
+    ctx.frame_update(0.016);
+
+    // Dispatch pointer click over viewport
+    ctx.dispatch_pointer_click(30.0, 30.0);
+    ctx.dispatch_pointer_move(35.0, 35.0);
+
+    print("UI Context rendering and dispatch pipeline test passed.");
+}
+
+fn test_overlay_and_form_field(): nil {
+    print("Testing Overlay and FormField primitives...");
+
+    var ff = ui.form_field("Username", ui.input("jules"), "Enter username", "Username is required");
+    assert(ff.kind == ui.KIND_FORM_FIELD, "form_field kind");
+    assert(ff.text_val == "Username", "form_field label");
+    assert(ff.placeholder_val == "Enter username", "form_field help_text");
+    assert(ff.focus_key == "Username is required", "form_field error_text");
+
+    var ov = ui.overlay(ui.card("Modal", ui.text("Top Level Layer")), 100.0, 100.0, 300.0, 200.0);
+    assert(ov.kind == ui.KIND_OVERLAY, "overlay kind");
+    assert(ov.padding_left == 100.0 and ov.padding_top == 100.0, "overlay coordinates");
+
+    ctx.push_overlay(ov);
+    assert(len(ctx.global_ui_context.active_overlays) == 1, "overlay pushed to context");
+
+    ctx.clear_overlays();
+    assert(len(ctx.global_ui_context.active_overlays) == 0, "overlays cleared");
+
+    print("Overlay and FormField test passed.");
+}
+
+fn main(): int {
+    print("=== Running Comprehensive std.ui Widget & Chart Test Suite ===");
+    test_widget_constructors();
+    test_chart_constructors();
+    test_ui_context_rendering_and_dispatch();
+    test_overlay_and_form_field();
+    print("=== All Widget & Chart Tests Passed Successfully ===");
+    return 0;
+}
+
+main();

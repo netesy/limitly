@@ -1,0 +1,272 @@
+#include "../parser.hh"
+
+using namespace LM::Frontend;
+
+// Helper method to create TypeAnnotation from any type token
+std::shared_ptr<LM::Frontend::AST::TypeAnnotation> Parser::createTypeAnnotationFromToken(const Token& token) {
+    auto type = std::make_shared<LM::Frontend::AST::TypeAnnotation>();
+    
+    switch (token.type) {
+        case TokenType::INT_TYPE: type->typeName = "int"; type->isPrimitive = true; break;
+        case TokenType::INT8_TYPE: type->typeName = "i8"; type->isPrimitive = true; break;
+        case TokenType::INT16_TYPE: type->typeName = "i16"; type->isPrimitive = true; break;
+        case TokenType::INT32_TYPE: type->typeName = "i32"; type->isPrimitive = true; break;
+        case TokenType::INT64_TYPE: type->typeName = "i64"; type->isPrimitive = true; break;
+        case TokenType::INT128_TYPE: type->typeName = "i128"; type->isPrimitive = true; break;
+        case TokenType::UINT_TYPE: type->typeName = "uint"; type->isPrimitive = true; break;
+        case TokenType::UINT8_TYPE: type->typeName = "u8"; type->isPrimitive = true; break;
+        case TokenType::UINT16_TYPE: type->typeName = "u16"; type->isPrimitive = true; break;
+        case TokenType::UINT32_TYPE: type->typeName = "u32"; type->isPrimitive = true; break;
+        case TokenType::UINT64_TYPE: type->typeName = "u64"; type->isPrimitive = true; break;
+        case TokenType::UINT128_TYPE: type->typeName = "u128"; type->isPrimitive = true; break;
+        case TokenType::FLOAT_TYPE: type->typeName = "float"; type->isPrimitive = true; break;
+        case TokenType::FLOAT32_TYPE: type->typeName = "f32"; type->isPrimitive = true; break;
+        case TokenType::FLOAT64_TYPE: type->typeName = "f64"; type->isPrimitive = true; break;
+        case TokenType::STR_TYPE: type->typeName = "str"; type->isPrimitive = true; break;
+        case TokenType::BOOL_TYPE: type->typeName = "bool"; type->isPrimitive = true; break;
+        case TokenType::USER_TYPE: type->typeName = token.lexeme; type->isUserDefined = true; break;
+        case TokenType::FUNCTION_TYPE: type->typeName = "function"; type->isFunction = true; break;
+        // LIST_TYPE, DICT_TYPE, ARRAY_TYPE removed - collection syntax uses [int], {str:int}, (int,str)
+        case TokenType::ENUM_TYPE: type->typeName = "enum"; break;
+        case TokenType::SUM_TYPE: type->typeName = "sum"; type->isUnion = true; break;
+        case TokenType::UNION_TYPE: type->typeName = "union"; type->isUnion = true; break;
+        case TokenType::OPTION_TYPE: type->typeName = "option"; break;
+        case TokenType::RESULT_TYPE: type->typeName = "result"; break;
+        case TokenType::ANY_TYPE: type->typeName = "any"; type->isPrimitive = true; break;
+        case TokenType::NIL_TYPE: type->typeName = "nil"; type->isPrimitive = true; break;
+        case TokenType::CHANNEL_TYPE: type->typeName = "channel"; break;
+        case TokenType::ATOMIC_TYPE: type->typeName = "atomic"; break;
+        default:
+            // Fallback for unknown tokens
+            type->typeName = token.lexeme;
+            break;
+    }
+    
+    return type;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parsePattern() {
+    auto first = parseSinglePattern();
+    // Or-patterns: A | B | C
+    if (check(TokenType::PIPE)) {
+        auto orPattern = std::make_shared<LM::Frontend::AST::OrPatternExpr>();
+        orPattern->line = first->line;
+        orPattern->patterns.push_back(first);
+        while (match({TokenType::PIPE})) {
+            orPattern->patterns.push_back(parseSinglePattern());
+        }
+        return orPattern;
+    }
+    return first;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseSinglePattern() {
+    if (match({TokenType::UNDERSCORE, TokenType::DEFAULT})) {
+        auto varExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
+        varExpr->line = previous().line;
+        varExpr->name = "_";
+        return varExpr;
+    }
+    if (match({TokenType::VAL})) return parseValPattern();
+    if (match({TokenType::ERR})) return parseErrPattern();
+    // Handle all type keywords as type patterns comprehensively
+    if (check(TokenType::INT_TYPE) || check(TokenType::INT8_TYPE) || check(TokenType::INT16_TYPE) ||
+        check(TokenType::INT32_TYPE) || check(TokenType::INT64_TYPE) || check(TokenType::INT128_TYPE) ||
+        check(TokenType::UINT_TYPE) || check(TokenType::UINT8_TYPE) || check(TokenType::UINT16_TYPE) ||
+        check(TokenType::UINT32_TYPE) || check(TokenType::UINT64_TYPE) || check(TokenType::UINT128_TYPE) ||
+        check(TokenType::FLOAT_TYPE) || check(TokenType::FLOAT32_TYPE) || check(TokenType::FLOAT64_TYPE) ||
+        check(TokenType::STR_TYPE) || check(TokenType::BOOL_TYPE) || check(TokenType::USER_TYPE) ||
+        check(TokenType::FUNCTION_TYPE) || check(TokenType::D2_TYPE) || check(TokenType::D4_TYPE) || check(TokenType::D6_TYPE) ||
+        check(TokenType::ENUM_TYPE) || check(TokenType::SUM_TYPE) ||
+        check(TokenType::UNION_TYPE) || check(TokenType::OPTION_TYPE) || check(TokenType::RESULT_TYPE) ||
+        check(TokenType::ANY_TYPE) || check(TokenType::NIL_TYPE) || check(TokenType::CHANNEL_TYPE) ||
+        check(TokenType::ATOMIC_TYPE)) {
+        
+        auto token = advance();
+        auto typePattern = std::make_shared<LM::Frontend::AST::TypePatternExpr>();
+        typePattern->line = token.line;
+        typePattern->type = createTypeAnnotationFromToken(token);
+        return typePattern;
+    }
+    if (match({TokenType::LEFT_BRACKET})) return parseListPattern();
+    if (match({TokenType::LEFT_BRACE})) return parseDictPattern();
+    if (match({TokenType::LEFT_PAREN})) return parseTuplePattern();
+    if (check(TokenType::IDENTIFIER)) {
+        if (isErrorType(peek().lexeme)) return parseErrorTypePattern();
+
+        const auto& tokens = scanner.getTokens();
+        
+        // Peek ahead to see if it's qualified or has args
+        bool isQualified = (current + 1 < tokens.size() && tokens[current + 1].type == TokenType::DOT);
+        bool hasArgs = (current + 1 < tokens.size() && tokens[current + 1].type == TokenType::LEFT_PAREN);
+        
+        if (isQualified || hasArgs) {
+             return parseBindingPattern();
+        }
+
+        if (isKnownTypeName(peek().lexeme)) {
+             auto token = advance();
+             auto typePattern = std::make_shared<LM::Frontend::AST::TypePatternExpr>();
+             typePattern->line = token.line;
+             typePattern->type = createTypeAnnotationFromToken(token);
+             return typePattern;
+        }
+        
+        // Otherwise, it's a variable binding
+        auto token = advance();
+        auto varExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
+        varExpr->line = token.line;
+        varExpr->name = token.lexeme;
+        return varExpr;
+    }
+    // Parse literal patterns (integers, hex, floats, scientific, strings, booleans, nil, and negative numbers)
+    if (check(TokenType::INT_LITERAL) || check(TokenType::HEX_LITERAL) || check(TokenType::FLOAT_LITERAL) ||
+        check(TokenType::SCIENTIFIC_LITERAL) || check(TokenType::STRING) || check(TokenType::TRUE) ||
+        check(TokenType::FALSE) || check(TokenType::NIL) || check(TokenType::MINUS)) {
+        return expression();
+    }
+    // Fallback: if we can't parse a pattern, advance to avoid infinite loop
+    if (!isAtEnd()) {
+        error("Expected pattern in match case", false);
+        advance();
+    }
+    return expression();
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseBindingPattern() {
+    std::string typeName = consume(TokenType::IDENTIFIER, "Expected type name for binding pattern.").lexeme;
+    while (match({TokenType::DOT})) {
+        typeName += "." + consume(TokenType::IDENTIFIER, "Expected variant name after '.' in binding pattern.").lexeme;
+    }
+
+    auto pattern = std::make_shared<LM::Frontend::AST::BindingPatternExpr>();
+    pattern->line = previous().line;
+    pattern->typeName = typeName;
+    // Parentheses are optional - handle both Status.Active and Status.Active(x, y)
+    if (match({TokenType::LEFT_PAREN})) {
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                pattern->patterns.push_back(parsePattern());
+            } while (match({TokenType::COMMA}));
+        }
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after binding variables.");
+    }
+    return pattern;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseListPattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::ListPatternExpr>();
+    pattern->line = previous().line;
+    if (!check(TokenType::RIGHT_BRACKET)) {
+        int maxElements = 100; // Prevent infinite loop
+        int elementCount = 0;
+        do {
+            if (match({TokenType::ELLIPSIS})) {
+                if (check(TokenType::IDENTIFIER)) pattern->restElement = consume(TokenType::IDENTIFIER, "Expected identifier after '...'.").lexeme;
+                break;
+            }
+            pattern->elements.push_back(parsePattern());
+            elementCount++;
+            if (elementCount >= maxElements) {
+                error("Too many elements in list pattern");
+                break;
+            }
+        } while (match({TokenType::COMMA}));
+    }
+    consume(TokenType::RIGHT_BRACKET, "Expected ']' after list pattern.");
+    return pattern;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseDictPattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::DictPatternExpr>();
+    pattern->line = previous().line;
+    if (!check(TokenType::RIGHT_BRACE)) {
+        int maxFields = 100; // Prevent infinite loop
+        int fieldCount = 0;
+        do {
+            if (match({TokenType::ELLIPSIS})) {
+                pattern->hasRestElement = true;
+                if (check(TokenType::IDENTIFIER)) pattern->restBinding = consume(TokenType::IDENTIFIER, "Expected identifier after '...'.").lexeme;
+                break;
+            }
+            auto key = consume(TokenType::IDENTIFIER, "Expected key in dict pattern.").lexeme;
+            std::shared_ptr<LM::Frontend::AST::Expression> nestedPattern;
+            if (match({TokenType::COLON})) {
+                nestedPattern = parsePattern();
+            } else {
+                // Record destructuring shorthand: {name} means {name: name}
+                auto varExpr = std::make_shared<LM::Frontend::AST::VariableExpr>();
+                varExpr->line = previous().line;
+                varExpr->name = key;
+                nestedPattern = varExpr;
+            }
+            pattern->fields.push_back({key, nestedPattern});
+            fieldCount++;
+            if (fieldCount >= maxFields) {
+                error("Too many fields in dict pattern");
+                break;
+            }
+        } while (match({TokenType::COMMA}));
+    }
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after dict pattern.");
+    return pattern;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseTuplePattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::TuplePatternExpr>();
+    pattern->line = previous().line;
+    if (!check(TokenType::RIGHT_PAREN)) {
+        int maxElements = 100; // Prevent infinite loop
+        int elementCount = 0;
+        do {
+            pattern->elements.push_back(parsePattern());
+            elementCount++;
+            if (elementCount >= maxElements) {
+                error("Too many elements in tuple pattern");
+                break;
+            }
+        } while (match({TokenType::COMMA}));
+    }
+    consume(TokenType::RIGHT_PAREN, "Expected ')' after tuple pattern.");
+    return pattern;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseValPattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::ValPatternExpr>();
+    pattern->line = previous().line;
+    pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name after 'val'.").lexeme;
+    return pattern;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseErrPattern() {
+    auto pattern = std::make_shared<LM::Frontend::AST::ErrPatternExpr>();
+    pattern->line = previous().line;
+    // Variable name is optional in err patterns
+    if (check(TokenType::IDENTIFIER)) {
+        pattern->variableName = consume(TokenType::IDENTIFIER, "Expected variable name after 'err'.").lexeme;
+    }
+    if (match({TokenType::COLON})) pattern->errorType = consume(TokenType::IDENTIFIER, "Expected error type after ':'.").lexeme;
+    return pattern;
+}
+
+std::shared_ptr<LM::Frontend::AST::Expression> Parser::parseErrorTypePattern() {
+    auto typeName = consume(TokenType::IDENTIFIER, "Expected error type name.").lexeme;
+    auto pattern = std::make_shared<LM::Frontend::AST::ErrorTypePatternExpr>();
+    pattern->line = previous().line;
+    pattern->errorType = typeName;
+    if (match({TokenType::LEFT_PAREN})) {
+        if (!check(TokenType::RIGHT_PAREN)) {
+            do {
+                pattern->parameterNames.push_back(consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme);
+            } while (match({TokenType::COMMA}));
+        }
+        consume(TokenType::RIGHT_PAREN, "Expected ')' after error parameters.");
+    }
+    return pattern;
+}
+
+bool Parser::isErrorType(const std::string& name) {
+    if (name.length() >= 5 && name.substr(name.length() - 5) == "Error") return true;
+    static const std::set<std::string> builtins = {"IOError", "NetworkError", "TypeError", "ValueError", "KeyError"};
+    return builtins.count(name) > 0;
+}

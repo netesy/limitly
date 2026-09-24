@@ -1,0 +1,13 @@
+import std.regex.index as r;
+import std.regex.regex as regex_mod;
+
+pub type Regex = regex_mod.Regex;
+pub type RegexPatterns = regex_mod.RegexPatterns;
+
+pub fn is_match(pattern: str, text: str): bool {
+    return r.is_match(pattern, text);
+}
+
+pub fn replace(pattern: str, text: str, replacement: str): str {
+    return r.replace(pattern, text, replacement);
+}

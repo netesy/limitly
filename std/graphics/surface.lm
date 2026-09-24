@@ -1,0 +1,11 @@
+frame Surface {
+    pub var width: float;
+    pub var height: float;
+    pub var format: int;
+
+    pub init(w: float = 800.0, h: float = 600.0, fmt: int = 1) {
+        self.width = w;
+        self.height = h;
+        self.format = fmt;
+    }
+}

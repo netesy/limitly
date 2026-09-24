@@ -1,0 +1,92 @@
+// Basic Function Tests - No String Operations
+// Tests fundamental function features: declarations, calls, parameters, returns
+
+print("=== Basic Function Tests ===");
+
+// Test 1: Simple function declaration and call
+print("\n--- Test 1: Simple Functions ---");
+fn sayHello() {
+    print("Hello from function!");
+}
+
+sayHello();
+
+// Test 2: Function with parameters
+print("\n--- Test 2: Functions with Parameters ---");
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+var sum = add(5, 3);
+print("add(5, 3) =");
+print(sum);
+
+// Test 3: Function with return values
+print("\n--- Test 3: Return Values ---");
+fn square(x: int): int {
+    return x * x;
+}
+
+var result1 = square(4);
+var result2 = square(7);
+print("square(4) =");
+print(result1);
+print("square(7) =");
+print(result2);
+
+// Test 4: Function with local variables
+print("\n--- Test 4: Local Variables ---");
+fn calculate(x: int, y: int): int {
+    var sum = x + y;
+    var product = x * y;
+    var result = sum * product;
+    return result;
+}
+
+var calcResult = calculate(3, 4);
+print("calculate(3, 4) =");
+print(calcResult);
+
+// Test 5: Recursive function
+print("\n--- Test 5: Recursion ---");
+fn factorial(n: int): int {
+    if (n <= 1) {
+        return 1;
+    } else {
+        return n * factorial(n - 1);
+    }
+}
+
+var fact5 = factorial(5);
+print("factorial(5) =");
+print(fact5);
+
+// Test 6: Multiple functions
+print("\n--- Test 6: Multiple Functions ---");
+fn subtract(a: int, b: int): int {
+    return a - b;
+}
+
+fn multiply(a: int, b: int): int {
+    return a * b;
+}
+
+fn isEven(n: int): bool {
+    return (n % 2) == 0;
+}
+
+var subResult = subtract(10, 3);
+var multResult = multiply(6, 7);
+var evenCheck = isEven(8);
+var oddCheck = isEven(9);
+
+print("subtract(10, 3) =");
+print(subResult);
+print("multiply(6, 7) =");
+print(multResult);
+print("isEven(8) =");
+print(evenCheck);
+print("isEven(9) =");
+print(oddCheck);
+
+print("\n=== Basic Function Tests Complete ===");

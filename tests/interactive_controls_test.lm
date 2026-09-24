@@ -1,0 +1,218 @@
+// Interactive Controls Test
+// Verifies single click, checkbox toggle, slider adjustment, text input, tabs, and scroll
+
+import std.app as app;
+import std.ui as ui;
+import std.ui.context as ui_context;
+
+fn test_click_action() {
+    print("Button clicked callback executed");
+}
+
+fn run_tests() {
+    print("=== Testing Interactive Controls and Single Click ===");
+
+    var cfg = app.default_window_config();
+    app.init(cfg);
+
+    var btn = ui.button("Submit", test_click_action);
+    var chk = ui.checkbox(false);
+    var sld = ui.slider(20.0, 0.0, 100.0);
+    var inp = ui.input("test", "Placeholder");
+    var tab_bar = ui.tabs(["Tab1", "Tab2", "Tab3"], [ui.empty(), ui.empty(), ui.empty()], 0).height(36.0);
+    var scr = ui.scroll(ui.column([
+        ui.text("Line 1"),
+        ui.text("Line 2"),
+        ui.text("Line 3"),
+        ui.text("Line 4"),
+        ui.text("Line 5"),
+        ui.text("Line 6"),
+        ui.text("Line 7"),
+        ui.text("Line 8"),
+        ui.text("Line 9"),
+        ui.text("Line 10")
+    ])).height(60.0);
+
+    var root = ui.column([
+        tab_bar,
+        btn,
+        chk,
+        sld,
+        inp,
+        scr
+    ]).spacing(10.0);
+    app.ui(root);
+    app.present_frame();
+    // 1. Verify Single Click (Mouse Down + Mouse Up should invoke callback ONCE)
+    assert(btn.click_count == 0, "Initial button click count should be 0");
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, xdest=50, ydest=70, x=50, y=70));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, xdest=50, ydest=70, x=50, y=70));
+    app.process_events();
+    assert(btn.click_count == 1, "Button click should be invoked exactly once");
+    print("Pass: Single click verified (invoked exactly once)");
+
+    // 2. Verify Checkbox Toggle
+    assert(chk.is_checked == 0, "Initial checkbox unchecked");
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=35, y=125));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=35, y=125));
+    app.process_events();
+    assert(chk.is_checked == 1, "Checkbox should toggle to checked");
+    assert(chk.text_val == "[X]", "Checkbox text should be [X]");
+    print("Pass: Checkbox toggle verified");
+
+    // 3. Verify Text Input Typing, Unicode, and Backspace
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=50, y=195));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=50, y=195));
+    app.process_events();
+    assert(inp.is_focused == 1, "Input field should be focused");
+
+    // Send char '1' (49)
+    app.push_event(app.Event(event_type=app.EVENT_CHAR, key_code=49));
+    app.process_events();
+    assert(inp.text_val == "test1", "Input text should have '1' appended");
+
+    // Send Unicode character codepoint 0x00E9 (Latin small letter e with acute: é, 233)
+    app.push_event(app.Event(event_type=app.EVENT_CHAR, key_code=233));
+    app.process_events();
+    assert(len(inp.text_val) > 5, "Input text should contain Unicode character");
+
+    // Send Backspace (8) via KEY_DOWN
+    app.push_event(app.Event(event_type=app.EVENT_KEY_DOWN, key_code=8));
+    app.process_events();
+    assert(inp.text_val == "test1", "Backspace should remove Unicode character cleanly");
+
+    // Send Backspace again
+    app.push_event(app.Event(event_type=app.EVENT_KEY_DOWN, key_code=8));
+    app.process_events();
+    assert(inp.text_val == "test", "Backspace should remove '1'");
+    print("Pass: Text input typing, Unicode, and backspace verified");
+
+    // 4. Verify Tabs Switching
+    assert(tab_bar.active_tab == 0, "Initial tab should be 0");
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=110, y=30));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=110, y=30));
+    app.process_events();
+    assert(tab_bar.active_tab == 1, "Active tab should be switched to 1");
+    print("Pass: Tab switching verified");
+
+    // 5. Verify Mouse Wheel Scroll
+    app.present_frame();
+    assert(scr.scroll_y == 0.0, "Initial scroll should be 0");
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_MOVE, x=50, y=250));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_WHEEL, y=-120));
+    app.process_events();
+    assert(scr.scroll_y > 0.0, "Scroll offset should increase on wheel scroll down");
+    print("Pass: ScrollView mouse wheel verified");
+
+    // 6. Verify Hover State
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_MOVE, x=50, y=70));
+    app.process_events();
+    assert(btn.is_hovered == 1, "Button should be hovered when cursor is inside");
+
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_MOVE, x=500, y=500));
+    app.process_events();
+    assert(btn.is_hovered == 0, "Button hover should clear when cursor leaves");
+    print("Pass: Hover state verified");
+
+    // 7. Verify Button Pointer State Machine: Drag-out cancellation & re-entry restore
+    var init_clicks = btn.click_count;
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=50, y=70));
+    app.process_events();
+    assert(btn.is_pressed == 1, "Button should be pressed on mouse down");
+
+    // Cursor leaves button area while held -> pressed visual resets
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_MOVE, x=500, y=500));
+    app.process_events();
+    assert(btn.is_pressed == 0, "Pressed visual must reset when cursor leaves button area");
+
+    // Release outside -> CANCELLED click (callback must NOT fire)
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=500, y=500));
+    app.process_events();
+    assert(btn.click_count == init_clicks, "Click count must not increment on release outside");
+
+    // Down inside, move outside, move BACK inside, release inside -> FIRED
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=50, y=70));
+    app.process_events();
+    assert(btn.is_pressed == 1, "Button pressed on down");
+
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_MOVE, x=500, y=500));
+    app.process_events();
+    assert(btn.is_pressed == 0, "Button pressed resets on leave");
+
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_MOVE, x=50, y=70));
+    app.process_events();
+    assert(btn.is_pressed == 1, "Button pressed restores on re-entry while held");
+
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=50, y=70));
+    app.process_events();
+    assert(btn.click_count == init_clicks + 1, "Button click should fire on release inside");
+    print("Pass: Button pointer state machine (drag-out cancel & re-entry) verified");
+
+    // 8. Verify Slider Drag Semantics
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=30, y=160));
+    app.process_events();
+    var val_after_down = sld.slider_val;
+
+    // Drag while held
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_MOVE, x=100, y=160));
+    app.process_events();
+    assert(sld.slider_val != val_after_down, "Slider value should update continuously during drag");
+
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=100, y=160));
+    app.process_events();
+    print("Pass: Slider drag semantics verified");
+
+    // 9. Verify Badge Widget
+    var bdg = ui.badge("ACTIVE").background(ui.green).foreground(ui.white);
+    assert(bdg.kind == ui.KIND_BADGE, "Badge kind must be KIND_BADGE");
+    assert(bdg.text_val == "ACTIVE", "Badge text should match label");
+    print("Pass: Badge widget verified");
+
+    // 10. Verify True Dropdown Select Widget
+    var sel = ui.select(["Option Alpha", "Option Beta", "Option Gamma"], 0);
+    assert(sel.kind == ui.KIND_SELECT, "Select kind must be KIND_SELECT");
+    assert(sel.selected_idx == 0, "Initial select index should be 0");
+    assert(sel.text_val == "Option Alpha", "Initial select text should match first option");
+    assert(sel.is_open == 0, "Select should start closed");
+
+    var sel_root = ui.column([sel]);
+    app.ui(sel_root);
+    app.present_frame();
+
+    // Click 1: Click select header -> opens dropdown menu
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=30, y=30));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=30, y=30));
+    app.process_events();
+    assert(sel.is_open == 1, "Select menu should be open after clicking header");
+
+    // Click 2: Click Option Beta in dropdown list (menu starts at y=50, item 1 is y=76..102)
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=30, y=85));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=30, y=85));
+    app.process_events();
+    assert(sel.selected_idx == 1, "Select index should update to Option Beta (1)");
+    assert(sel.text_val == "Option Beta", "Select text should update to Option Beta");
+    assert(sel.is_open == 0, "Select menu should close after option selection");
+    print("Pass: True Select dropdown open/select/close semantics verified");
+
+    // 11. Verify Tab View Page Switching
+    var page_a = ui.text("Content Alpha");
+    var page_b = ui.text("Content Beta");
+    var tv = ui.tabs(["Page A", "Page B"], [page_a, page_b], 0);
+    assert(tv.kind == ui.KIND_TABS, "Tab view kind must be KIND_TABS");
+    assert(tv.active_tab == 0, "Initial tab view page should be 0");
+
+    var tv_root = ui.column([tv]);
+    app.ui(tv_root);
+    app.present_frame();
+
+    // Click tab 1 (Page B)
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=100, y=30));
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=100, y=30));
+    app.process_events();
+    assert(tv.active_tab == 1, "Tab view active tab should be switched to 1");
+    print("Pass: Tab view page switching verified");
+
+    print("=== All Interactive Controls Tests Passed ===");
+}
+
+run_tests();

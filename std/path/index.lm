@@ -1,0 +1,200 @@
+// Path module - Cross-platform path manipulation
+import std.io as io;
+
+frame Path {
+    pub value: str;
+
+    pub init(value: str) {
+        self.value = value;
+    }
+
+    // Factory methods
+    pub fn from_string(path: str): Path {
+        return Path(path);
+    }
+
+    pub fn join(other: str): Path {
+        if (self.value == "") return Path(other);
+        if (other == "") return Path(self.value);
+        
+        // Handle path separators
+        var separator = "/";
+        if (ends_with(self.value, separator) or starts_with(other, separator)) {
+            return Path(self.value + other);
+        }
+        return Path(self.value + separator + other);
+    }
+
+    pub fn join_multiple(parts: [str]): Path {
+        var p = Path(self.value);
+        var i: int = 0;
+        while (i < len(parts)) {
+            p = p.join(parts[i]);
+            i = i + 1;
+        }
+        return p;
+    }
+
+    // Path components
+    pub fn parent(): Path? {
+        if (self.value == "" or self.value == "/") {
+            var fallback: Path? = nil;
+            return fallback;
+        }
+        
+        var last_sep = last_index_of(self.value, "/");
+        if (last_sep == -1) return ok(Path(""));
+        
+        var parent_path = substring(self.value, 0, last_sep);
+        if (parent_path != "") {
+            return ok(Path(parent_path));
+        } else {
+            return ok(Path("/"));
+        }
+    }
+
+    pub fn basename(): str {
+        if (self.value == "" or self.value == "/") return self.value;
+        
+        var last_sep = last_index_of(self.value, "/");
+        if (last_sep == -1) return self.value;
+        
+        if (last_sep + 1 < len(self.value)) {
+            return substring(self.value, last_sep + 1, len(self.value));
+        } else {
+            return "";
+        }
+    }
+
+    pub fn stem(): str {
+        var base = self.basename();
+        var last_dot = last_index_of(base, ".");
+        if (last_dot == -1 or last_dot == 0) return base;
+        
+        return substring(base, 0, last_dot);
+    }
+
+    pub fn extension(): str {
+        var base = self.basename();
+        var last_dot = last_index_of(base, ".");
+        if (last_dot == -1 or last_dot == 0 or last_dot == len(base) - 1) return "";
+        
+        return substring(base, last_dot + 1, len(base));
+    }
+
+    // Path normalization
+    pub fn normalize(): Path {
+        // Simplified normalization
+        return Path(self.value);
+    }
+
+    pub fn resolve(): Path {
+        return self.normalize();
+    }
+
+    // Path properties
+    pub fn is_absolute(): bool {
+        return starts_with(self.value, "/") or starts_with(self.value, "C:") or starts_with(self.value, "D:");
+    }
+
+    pub fn is_relative(): bool {
+        return not self.is_absolute();
+    }
+
+    pub fn exists(): bool {
+        return io.exists(self.value);
+    }
+
+    // Path operations
+    pub fn with_extension(extension: str): Path {
+        var base = self.stem();
+        var parent_val = self.parent();
+        match (parent_val) {
+            val parent_path => return parent_path.join(base + "." + extension),
+            nil => return Path(base + "." + extension)
+        }
+    }
+
+    pub fn with_basename(basename: str): Path {
+        var parent_val = self.parent();
+        match (parent_val) {
+            val parent_path => return parent_path.join(basename),
+            nil => return Path(basename)
+        }
+    }
+
+    // Comparison
+    pub fn equals(other: Path): bool {
+        return self.normalize().value == other.normalize().value;
+    }
+
+    pub fn starts_with(prefix: Path): bool {
+        return starts_with(self.normalize().value, prefix.normalize().value);
+    }
+
+    pub fn ends_with(suffix: Path): bool {
+        return ends_with(self.normalize().value, suffix.normalize().value);
+    }
+
+    // Formatting
+    pub fn to_string(): str {
+        return self.value;
+    }
+
+    pub fn display(): str {
+        return self.to_string();
+    }
+}
+
+// Utility functions
+pub fn from_string(v: str): Path { 
+    return Path.from_string(v); 
+}
+
+pub fn join(paths: [str]): Path {
+    if (len(paths) == 0) return Path("");
+    if (len(paths) == 1) return Path.from_string(paths[0]);
+    
+    var result = Path.from_string(paths[0]);
+    var i: int = 1;
+    while (i < len(paths)) {
+        result = result.join(paths[i]);
+        i = i + 1;
+    }
+    return result;
+}
+
+pub fn normalize(path_str: str): Path {
+    return Path.from_string(path_str).normalize();
+}
+
+pub fn is_relative(path_str: str): bool {
+    return Path(path_str).is_relative();
+}
+
+// Helper functions for string operations since primitive strings don't have methods
+fn starts_with(s: str, prefix: str): bool {
+    var plen: int = len(prefix);
+    var slen: int = len(s);
+    if (plen > slen) return false;
+    return substring(s, 0, plen) == prefix;
+}
+
+fn ends_with(s: str, suffix: str): bool {
+    var suflen: int = len(suffix);
+    var slen: int = len(s);
+    if (suflen > slen) return false;
+    return substring(s, slen - suflen, slen) == suffix;
+}
+
+fn last_index_of(s: str, pattern: str): int {
+    var plen: int = len(pattern);
+    var slen: int = len(s);
+    if (plen > slen) return -1;
+    var i: int = slen - plen;
+    while (i >= 0) {
+        if (substring(s, i, i + plen) == pattern) return i;
+        i = i - 1;
+    }
+    return -1;
+}

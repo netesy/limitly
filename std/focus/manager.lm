@@ -1,0 +1,22 @@
+frame FocusManager {
+    pub var current_id: str;
+
+    pub init() {
+        self.current_id = "";
+    }
+
+    pub fn request_focus(id: str): nil {
+        self.current_id = id;
+    }
+
+    pub fn clear_focus(): nil {
+        self.current_id = "";
+    }
+
+    pub fn has_focus(id: str): bool {
+        if (len(self.current_id) == 0) {
+            return false;
+        }
+        return self.current_id == id;
+    }
+}

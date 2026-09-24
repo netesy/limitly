@@ -1,0 +1,10 @@
+// @error:use_after_free
+// Moving same dict twice
+
+fn consume_dict(map: {str: int}) {
+    // map is consumed
+}
+
+var data = {"x": 10, "y": 20};
+consume_dict(data);
+consume_dict(data);  // ERROR: data already moved

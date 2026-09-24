@@ -1,0 +1,21 @@
+// Standard Library I/O Console Submodule
+
+import std.resource as res;
+
+frame Console {
+    var resource: res.Resource;
+    var writer: res.ResourceWriter;
+
+    pub init() {
+        self.resource = res.stdout;
+        self.writer = res.ResourceWriter(r=self.resource);
+    }
+
+    pub fn print(msg: any): nil {
+        self.writer.write(args=[msg]);
+    }
+
+    pub fn read_line(): str {
+        return input("");
+    }
+}

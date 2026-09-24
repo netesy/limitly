@@ -1,0 +1,11 @@
+import std.graphics.color as color;
+
+frame Gradient {
+    pub var colors: [color.Color];
+    pub var stops: [float];
+
+    pub init(cols: [color.Color] = [color.Color()], stps: [float] = [0.0]) {
+        self.colors = cols;
+        self.stops = stps;
+    }
+}

@@ -1,0 +1,1454 @@
+# The Lymar Programming Language: A Step-by-Step Guide
+
+Welcome to the official guide for the Lymar programming language. This document will walk you through the core features of the language, from basic syntax to advanced concepts like structured concurrency.
+
+
+> **Canonical syntax note:** the `tests/` folder is the authoritative reference for currently supported language syntax/semantics in the VM-backed implementation. Keep guide examples aligned with passing tests.
+
+## Table of Contents
+
+1. [Getting Started](#getting-started)
+ * [Building and Running Lymar](#building-and-running-lymar)
+2. [Basic Syntax](#basic-syntax)
+ * [Variables](#variables)
+ * [Primitive Types](#primitive-types)
+ * [Comments](#comments)
+ * [Print Statements](#print-statements)
+ * [String Interpolation](#string-interpolation)
+3. [Control Flow](#control-flow)
+ * [If-Else Statements](#if-else-statements)
+ * [For Loops](#for-loops)
+ * [While Loops](#while-loops)
+ * [Iter Loops](#iter-loops)
+ * [Match Statements](#match-statements)
+4. [Data Structures](#data-structures)
+ * [Lists](#lists)
+ * [Dictionaries](#dictionaries)
+5. [Functions](#functions)
+ * [Defining Functions](#defining-functions)
+ * [Parameters](#parameters)
+ * [Return Values](#return-values)
+ * [Optional Parameters](#optional-parameters)
+ * [Default Parameters](#default-parameters)
+ * [Higher-Order Functions](#higher-order-functions)
+ * [Closures](#closures)
+6. [Frames](#frames)
+ * [Defining Frames](#defining-frames)
+ * [Frame Members and Modifiers](#frame-members-and-modifiers)
+ * [Fields and Methods](#fields-and-methods)
+ * [The `init` Constructor](#the-init-constructor)
+ * [The `self` Keyword](#the-self-keyword)
+ * [Trait-Based Composition](#trait-based-composition)
+7. [Modules and Imports](#modules-and-imports)
+ * [Defining a Module](#defining-a-module)
+ * [Importing a Module](#importing-a-module)
+ * [Import with an Alias](#import-with-an-alias)
+ * [Importing Specific Symbols](#importing-specific-symbols)
+ * [Hiding Imported Symbols](#hiding-imported-symbols)
+ * [Module Declarations](#module-declarations)
+8. [The Type System](#the-type-system)
+ * [Type Aliases](#type-aliases)
+ * [Union Types](#union-types)
+ * [Optional Values and Error Handling](#optional-values-and-error-handling)
+ * [The Unified `Type?` System](#the-unified-type-system)
+ * [The `?` Operator](#the--operator)
+9. [Concurrency](#concurrency)
+ * [Structured Concurrency](#structured-concurrency)
+ * [`parallel` Blocks for CPU-Bound Tasks](#parallel-blocks-for-cpu-bound-tasks)
+ * [`concurrent` Blocks for I/O-Bound Tasks](#concurrent-blocks-for-io-bound-tasks)
+ * [Channels](#channels)
+ * [Atomics](#atomics)
+- [Tasks](#tasks)
+
+---
+
+## Getting Started
+
+This section covers how to build the Lymar compiler and run Lymar programs.
+
+### Building and Running Lymar
+
+**Prerequisites:**
+- A C++20 compatible compiler (such as GCC 11+, Clang 13+, or MSVC)
+- GNU `make` (or CMake 3.20+)
+- For Windows: MSYS2 with MinGW64 is required.
+
+**Build Instructions:**
+
+You can build the project using `make`:
+
+* **Using Make (recommended for cross-platform):**
+  By default, this builds the release version into `bin/lymar` (or `bin/lymar.exe` on Windows).
+  ```bash
+  make
+  ```
+
+* **Debug Build:**
+  ```bash
+  make MODE=debug
+  ```
+
+**Running the Compiler & VM:**
+
+The `lymar` executable is the compiler and driver for the Lymar language, located in `bin/`.
+
+* **Execute a source file using the Register VM:**
+  ```bash
+  ./bin/lymar run your_script.lm
+  ```
+
+* **Execute with debug tracing:**
+  ```bash
+  ./bin/lymar run -debug your_script.lm
+  ```
+
+* **Compile to native binary using Fyra AOT backend:**
+  ```bash
+  ./bin/lymar build -o output_binary your_script.lm
+  ```
+
+* **Inspect Intermediate Representations:**
+  ```bash
+  ./bin/lymar -ast your_script.lm     # Abstract Syntax Tree
+  ./bin/lymar -cst your_script.lm     # Concrete Syntax Tree
+  ./bin/lymar -tokens your_script.lm  # Token stream
+  ./bin/lymar -lir your_script.lm     # Low-level Intermediate Representation
+  ./bin/lymar -fyra-ir your_script.lm # Fyra Native IR
+  ```
+
+## Basic Syntax
+
+This section covers the fundamental syntax of the Lymar language.
+
+### Variables
+
+Variables are declared using the `var` keyword. Constant bindings use `const` or `val`. While the compiler can infer types, it is good practice to use explicit type annotations.
+
+```
+// Declare a variable with a type annotation
+var x: int = 10;
+print(x); // Output: 10
+
+// Reassign the variable
+x = 20;
+print(x); // Output: 20
+
+// Immutable bindings
+const pi = 3.14;
+val name = "Lymar";
+```
+
+You can also declare multiple variables in a sequence.
+
+```
+var a: int = 1;
+var b: int = 2;
+var c: int = 3;
+```
+
+### Primitive Types
+
+Lymar has several built-in primitive types:
+
+* **`int`**: A signed integer (e.g., `10`, `-5`, `0`).
+* **`uint`**: An unsigned integer.
+* **`float`**: A floating-point number (e.g., `3.14`, `-0.01`).
+* **`decimal`**: Fixed-precision decimal (default scale 4). Also supports `d2`, `d4`, `d6`.
+* **`bool`**: A boolean value, which can be `true` or `false`.
+* **`str`**: A string of characters (e.g., `"Hello, World!"`).
+* **`nil`**: A special value representing "nothing" or "null".
+
+```
+var my_integer: int = 42;
+var my_float: float = 3.14;
+var my_decimal: d2 = 10.50;
+var my_boolean: bool = true;
+var my_string: str = "Hello, Lymar!";
+var my_nil: nil = nil;
+```
+
+### Comments
+
+Comments are used to leave notes in the code. Single-line comments start with `//`.
+
+```
+// This is a single-line comment.
+var x = 1; // This comment is at the end of a line.
+```
+
+### Print Statements
+
+The `print()` function is used to display output to the console.
+
+```
+print("Hello, World!");
+
+var name = "Lymar";
+print(name);
+
+print(10 + 5); // You can print the result of expressions
+```
+
+### String Interpolation
+
+You can embed expressions directly into strings using curly braces `{}`.
+
+```
+var name = "Jules";
+var year = 2025;
+
+print("Hello, {name}!"); // Output: Hello, Jules!
+print("The year is {year}."); // Output: The year is 2025.
+
+var a = 5;
+var b = 10;
+print("The sum of {a} and {b} is {a + b}."); // Output: The sum of 5 and 10 is 15.
+```
+
+## Control Flow
+
+Lymar provides several constructs for controlling the flow of execution in your programs.
+
+### If-Else Statements
+
+`if` statements allow you to execute code conditionally. You can also use `else if` and `else` to handle alternative conditions.
+
+```
+var score = 85;
+
+if (score >= 90) {
+ print("Grade: A");
+} else if (score >= 80) {
+ print("Grade: B"); // This will be executed
+} else {
+ print("Grade: C or lower");
+}
+```
+
+Boolean logic can be used in conditions with the `and`, `or`, and `not` (`!`) operators.
+
+```
+var isActive = true;
+var isMember = false;
+
+if (isActive and isMember) {
+ print("Welcome, active member!");
+}
+
+if (isActive or isMember) {
+ print("Thank you for your interest!");
+}
+
+if (!isMember) {
+ print("Please consider becoming a member.");
+}
+```
+
+### For Loops
+
+Lymar supports C-style `for` loops, which consist of an initializer, a condition, and an incrementor.
+
+```
+// Loop from 0 to 4
+for (var i = 0; i < 5; i = i + 1) {
+ print("i = {i}");
+}
+
+// Countdown from 3 to 1
+for (var j = 3; j > 0; j = j - 1) {
+ print("j = {j}");
+}
+```
+
+### While Loops
+
+`while` loops execute a block of code as long as a condition is true.
+
+```
+var count = 0;
+while (count < 3) {
+ print("count = {count}");
+ count += 1;
+}
+```
+
+You can use `break` to exit a loop early and `continue` to skip to the next iteration.
+
+```
+var i = 0;
+while (i < 10) {
+ if (i == 5) {
+ break; // Exit the loop when i is 5
+ }
+ i += 1;
+ if (i % 2 == 0) {
+ continue; // Skip even numbers
+ }
+ print(i); // Prints 1, 3
+}
+```
+
+### Iter Loops
+
+The `iter` loop is a modern way to iterate over ranges. The range `start..end` is inclusive of `start` and exclusive of `end`.
+
+```lymar
+// Iterate from 1 to 4
+iter (i in 1..5) {
+ print("i = {i}");
+}
+```
+
+You can also specify a step value for the range.
+
+```lymar
+// Iterate from 0 to 9 with a step of 2
+iter (i in 0..10..2) {
+ print("i = {i}"); // Output: 0, 2, 4, 6, 8
+}
+```
+
+### Match Statements
+
+The `match` statement is a powerful tool for pattern matching. It can be used as an advanced `switch` statement.
+
+A `match` statement can match against literal values:
+
+```
+var x = 2;
+match (x) {
+ 1 => { print("One"); },
+ 2 => { print("Two"); }, // This branch is executed
+ _ => { print("Something else"); } // The `_` is a wildcard
+}
+```
+
+It can also match based on type:
+
+```
+fn printType(value) {
+ match (value) {
+ int => { print("It's an integer."); },
+ str => { print("It's a string."); },
+ _ => { print("It's some other type."); }
+ }
+}
+
+printType(10); // Output: It's an integer.
+printType("hello"); // Output: It's a string.
+```
+
+You can add conditions to your patterns using `where` guards:
+
+```
+var value = 15;
+match (value) {
+ x where x > 10 => { print("{x} is greater than 10"); },
+ x where x < 10 => { print("{x} is less than 10"); },
+ _ => { print("It must be 10"); }
+}
+```
+
+### Advanced Pattern Matching
+
+Lymar's `match` statement supports more than just literal and type matching. You can also destructure complex data types like enums, structs, lists, and tuples.
+
+#### Destructuring Structs and Enums
+
+You can match on the structure of an enum or a struct and bind its inner values to variables.
+
+```lymar
+enum Option {
+ Some(any),
+ None
+}
+
+fn print_option(opt: Option) {
+ match (opt) {
+ Option.Some(value) => { print("Value is {value}"); },
+ Option.None => { print("No value"); }
+ }
+}
+
+print_option(Option.Some(10)); // Output: Value is 10
+print_option(Option.None); // Output: No value
+```
+
+You can also destructure records or objects with a similar syntax:
+
+```lymar
+type Person = {name: str, age: int};
+
+fn greet(p: Person) {
+ match (p) {
+ {name: n, age: a} => { print("{n} is {a} years old."); }
+ }
+}
+
+greet({name: "Alice", age: 30}); // Output: Alice is 30 years old.
+```
+
+#### Destructuring Dictionaries
+
+You can destructure dictionaries to bind values to variables based on their keys. You can also capture the remaining key-value pairs using the `...` syntax.
+
+```lymar
+var person = {
+ "name": "Alice",
+ "age": 30,
+ "city": "New York"
+};
+
+match (person) {
+ {name: n, age: a, ...rest} => {
+ print("{n} is {a} years old.");
+ print("Other info: {rest}");
+ },
+ _ => { print("Not a person."); }
+}
+// Output:
+// Alice is 30 years old.
+// Other info: {city: "New York"}
+```
+
+#### Destructuring Lists
+
+You can destructure lists to bind elements to variables. The `...` syntax can be used to bind the rest of the list to a variable.
+
+```lymar
+var my_list = [1, 2, 3, 4];
+
+match (my_list) {
+ [] => { print("Empty list"); },
+ [x] => { print("Single element: {x}"); },
+ [a, b, ...rest] => {
+ print("First: {a}, Second: {b}");
+ print("Rest: {rest}");
+ },
+ _ => { print("Some other list"); }
+}
+// Output:
+// First: 1, Second: 2
+// Rest: [3, 4]
+```
+
+#### Destructuring Tuples
+
+Tuples can be destructured in a similar way.
+
+```lymar
+var my_tuple = ("Jules", 42);
+
+match (my_tuple) {
+ (name, age) => { print("{name} is {age} years old."); },
+ _ => { print("Not a person tuple."); }
+}
+// Output: Jules is 42 years old.
+```
+
+## Data Structures
+
+Lymar provides built-in support for common data structures.
+
+### Lists
+
+A list is an ordered collection of values. Lists are created using square brackets `[]`.
+
+```
+var numbers = [1, 2, 3, 4, 5];
+var mixed = [1, "two", true]; // Lists can hold different types
+```
+
+You can access elements in a list using zero-based indexing.
+
+```
+var fruits = ["apple", "banana", "cherry"];
+print(fruits[0]); // Output: apple
+print(fruits[2]); // Output: cherry
+```
+
+### Dictionaries
+
+A dictionary is an unordered collection of key-value pairs. Dictionaries are created using curly braces `{}`.
+
+```
+var person = {
+ "name": "Alice",
+ "age": 30,
+ "city": "New York"
+};
+```
+
+You can access values in a dictionary using their keys.
+
+```
+print(person["name"]); // Output: Alice
+print(person["age"]); // Output: 30
+```
+
+### Tuples
+
+A tuple is a fixed-size, ordered collection of elements that can be of different types. Tuples are created using parentheses `()`.
+
+```lymar
+var my_tuple = (1, "hello", true);
+```
+
+You can access elements in a tuple using zero-based indexing with dot notation.
+
+```lymar
+var person = ("Alice", 30);
+print(person[0]); // Output: Alice
+print(person[1]); // Output: 30
+```
+
+### Object Literals
+
+Object literals provide a way to create instances of user-defined types, like frames or enums, with a specific structure. This is especially useful for enums with associated data.
+
+```lymar
+enum Option {
+ Some(any),
+ None
+}
+
+var my_option = Option.Some(42);
+```
+
+## Functions
+
+Functions are fundamental building blocks in Lymar. They allow you to group code into reusable blocks.
+
+### Defining Functions
+
+Functions are defined using the `fn` keyword.
+
+```
+fn sayHello() {
+ print("Hello, from a function!");
+}
+
+// Call the function
+sayHello();
+```
+
+### Parameters
+
+Functions can accept parameters. You must specify the type of each parameter.
+
+```
+fn greet(name: str) {
+ print("Hello, {name}!");
+}
+
+greet("Alice"); // Output: Hello, Alice!
+```
+
+### Return Values
+
+Functions can return a value using the `return` keyword. The return type must be specified after the parameter list.
+
+```
+fn add(a: int, b: int): int {
+ return a + b;
+}
+
+var sum: int = add(5, 10);
+print(sum); // Output: 15
+```
+
+### Optional Parameters
+
+You can make a parameter optional by adding a `?` to its type. Inside the function, you can check if the parameter was provided.
+
+```
+fn greet_optional(name: str?) {
+ if (name) {
+ print("Hello, {name}!");
+ } else {
+ print("Hello, stranger!");
+ }
+}
+
+greet_optional("Bob"); // Output: Hello, Bob!
+greet_optional(); // Output: Hello, stranger!
+```
+
+### Default Parameters
+
+You can assign a default value to a parameter, which will be used if the caller doesn't provide one.
+
+```
+fn greet_default(name: str = "World") {
+ print("Hello, {name}!");
+}
+
+greet_default(); // Output: Hello, World!
+greet_default("Alice"); // Output: Hello, Alice!
+```
+
+### Higher-Order Functions
+
+Functions are first-class citizens in Lymar, which means they can be passed as arguments to other functions.
+
+```
+// This function takes another function as a parameter
+fn apply(x: int, y: int, operation: fn(int, int): int): int {
+ return operation(x, y);
+}
+
+fn multiply(a: int, b: int): int {
+ return a * b;
+}
+
+var result: int = apply(10, 5, multiply);
+print(result); // Output: 50
+```
+
+### Closures
+
+A function can be defined inside another function. This inner function "captures" the variables from its containing scope, creating a closure.
+
+```
+fn createCounter(): fn(): int {
+ var count: int = 0;
+ fn increment(): int {
+ count += 1;
+ return count;
+ }
+ return increment;
+}
+
+var counter: fn(): int = createCounter();
+print(counter()); // Output: 1
+print(counter()); // Output: 2
+print(counter()); // Output: 3
+```
+
+## Frames
+
+Lymar is an object-oriented language and supports **frames** for creating user-defined types. Frames are the primary mechanism for bundling data and behavior.
+
+### Defining Frames
+
+Frames are defined using the `frame` keyword.
+
+> [WARN] **Critical Visibility Rule**: Frames and traits are implicitly public at the module level. You must **never** write the `pub` keyword in front of a `frame` or `trait` definition (e.g., `pub frame Greeter` or `pub trait Speaker` are syntax errors). Visibility modifiers (like `pub` and `prot`) can only be placed on fields and methods *inside* a frame or trait.
+
+```lymar
+frame Greeter {
+ pub name: str = "World";
+
+ pub fn say_hello() {
+ print("Hello, {self.name}!");
+ }
+}
+
+var greeter: Greeter = Greeter();
+greeter.say_hello(); // Output: Hello, World!
+```
+
+### Frame Members and Modifiers
+
+Lymar provides several modifiers to control the behavior and visibility of frames and their members.
+
+#### Visibility Modifiers
+
+You can control the visibility of frame members (fields and methods) using `pub` (public) and `prot` (protected). By default, all members are **private** (there is no explicit `private` keyword).
+
+* **private** (default): The member can only be accessed from within the frame or module.
+* **`prot`** (protected): The member can be accessed from within the frame and by its subframes.
+* **`pub`** (public): The member can be accessed from anywhere.
+
+```lymar
+frame MyFrame {
+ private_field: int = 1; // private by default
+ pub public_field: int = 2;
+ prot protected_field: int = 3;
+
+ fn private_method() {} // private by default
+ pub fn public_method() {}
+ prot fn protected_method() {}
+}
+```
+
+#### Static Members
+
+You can declare `static` fields and methods, which belong to the frame itself rather than to an instance.
+
+```lymar
+frame Counter {
+ pub static count: int = 0;
+
+ pub static fn increment() {
+ Counter.count = Counter.count + 1;
+ }
+}
+
+Counter.increment();
+print(Counter.count); // Output: 1
+```
+
+#### Abstract Frames and Methods
+
+An `abstract` frame cannot be instantiated directly and is meant to be subframed. It can contain `abstract` methods, which are declared without a body and must be implemented by subframes.
+
+```lymar
+abstract frame Shape {
+ pub abstract fn area(): float;
+}
+
+frame Circle : Shape {
+ pub radius: float;
+
+ pub init(r: float) {
+ self.radius = r;
+ }
+
+ pub fn area(): float {
+ return 3.14 * self.radius * self.radius;
+ }
+}
+```
+
+#### Final Frames and Methods
+
+A `final` frame cannot be subframed. A `final` method cannot be overridden by a subframe.
+
+```lymar
+final frame Uninheritable {}
+
+frame Parent {
+ final fn cannot_override() {}
+}
+```
+
+#### Frame Modifiers & Traits
+
+Frame modifiers in Lymar include `abstract` and `final`. `abstract` frames cannot be instantiated directly and can declare abstract methods that subframes must implement. `final` frames cannot be extended, and `final` methods cannot be overridden. Traits provide interface contracts and structural guarantees for frames.
+
+```lymar
+trait Identifiable {
+ fn id(): int;
+}
+
+frame User: Identifiable {
+ pub user_id: int;
+ pub name: str;
+
+ pub init(id: int, name: str) {
+ self.user_id = id;
+ self.name = name;
+ }
+
+ pub fn id(): int {
+ return self.user_id;
+ }
+}
+
+var user = User(1, "Alice");
+print(user.name); // Output: Alice
+```
+
+### Fields and Methods
+
+Frames can have both data (fields) and behavior (methods). Fields are variables declared within the frame, and methods are functions defined within the frame.
+
+### The `init` Constructor
+
+The `init` method is a special method that acts as the frame constructor. It is called when a new instance of the frame is created.
+
+```
+frame Person {
+ var name: str;
+ var age: int;
+
+ fn init(name_param: str, age_param: int) {
+ self.name = name_param;
+ self.age = age_param;
+ }
+
+ fn introduce() {
+ print("Hi, I'm {self.name} and I'm {self.age} years old.");
+ }
+}
+
+var person: Person = Person("Jules", 28);
+person.introduce(); // Output: Hi, I'm Jules and I'm 28 years old.
+```
+
+### The `self` Keyword
+
+The `self` keyword refers to the current instance of the frame. It is used to access the instance's fields and methods.
+
+### Trait-Based Composition
+
+Lymar does not support frame inheritance. Instead, use **traits** to define shared interfaces and implement them across frames. This promotes composition over inheritance.
+
+```lymar
+trait Speaker {
+ fn speak();
+}
+
+frame Dog : Speaker {
+ fn speak() {
+ print("Woof!");
+ }
+}
+
+frame Cat : Speaker {
+ fn speak() {
+ print("Meow!");
+ }
+}
+
+var speakers: [Speaker] = [Dog() as Speaker, Cat() as Speaker];
+iter (s in speakers) {
+ s.speak();
+}
+// Output:
+// Woof!
+// Meow!
+```
+
+Traits can also provide default method implementations:
+
+```lymar
+trait Greeter {
+ fn greet() {
+ print("Hello there!");
+ }
+}
+
+frame Friendly : Greeter {
+ // Inherits the default greet() implementation
+}
+
+var f: Friendly = Friendly();
+f.greet(); // Output: Hello there!
+```
+
+## Modules and Imports
+
+Lymar supports a module system that allows you to organize your code into separate files and reuse code across your project.
+
+### Defining a Module
+
+A module is simply a Lymar source file. For example, you could have a file named `my_module.lm` with the following content:
+
+```lymar
+// my_module.lm
+fn greet() {
+ print("Hello from my_module!");
+}
+
+var my_variable = 123;
+```
+
+### Importing a Module
+
+You can import a module using the `import` statement. The module path is specified using dot notation, and it corresponds to the file path. For example, to import `my_module.lm` from the same directory, you would write:
+
+```lymar
+import my_module;
+
+my_module.greet(); // Output: Hello from my_module!
+print(my_module.my_variable); // Output: 123
+```
+
+### Import with an Alias
+
+You can provide an alias for an imported module to make it easier to reference.
+
+```lymar
+import my_module as mod;
+
+mod.greet();
+```
+
+### Importing Specific Symbols
+
+If you only need specific functions or variables from a module, you can use the `show` keyword to import only them into the current scope.
+
+```lymar
+import my_module show greet, my_variable;
+
+greet(); // Directly accessible
+print(my_variable);
+```
+
+### Hiding Imported Symbols
+
+Conversely, you can use the `hide` keyword to import all symbols from a module *except* for the ones specified.
+
+```lymar
+import my_module hide my_variable;
+
+greet(); // greet is imported
+// my_variable is not imported
+```
+
+### Module Declarations
+
+For more explicit control over what a module exposes, you can use a `module` block with `pub` and `prot` visibility keywords. By default, members are private.
+
+```lymar
+// in file my_app_utils.lm
+module my_app_utils {
+ pub fn format_user(name: str): str {
+ return "User: {name}";
+ }
+
+ var api_key = "secret"; // private by default
+}
+```
+
+When another file imports this module, it will only have access to `pub` members. `prot` members would be available to other modules within the `my_app` namespace (not yet fully implemented), and unmarked members are private (internal to the module).
+
+## Advanced Features
+
+### Lambda Expressions (Anonymous Functions)
+
+Lymar supports lambda expressions, also known as anonymous functions. These are functions that do not have a name and can be defined on the fly.
+
+```lymar
+// A lambda that adds two numbers
+var add = fn(a: int, b: int): int {
+ return a + b;
+};
+
+var result = add(5, 10);
+print(result); // Output: 15
+```
+
+Lambdas are particularly useful when working with higher-order functions.
+
+```lymar
+fn apply(x: int, y: int, operation: fn(int, int): int): int {
+ return operation(x, y);
+}
+
+// Pass a lambda directly to the apply function
+var result = apply(10, 5, fn(a: int, b: int): int { return a * b; });
+print(result); // Output: 50
+```
+
+### Destructuring Assignments
+
+You can unpack values from tuples and lists into separate variables.
+
+```lymar
+// Destructuring a tuple
+var (name, age) = ("Alice", 30);
+print("{name} is {age} years old."); // Output: Alice is 30 years old.
+```
+
+### Unsafe Blocks
+
+`unsafe` blocks create explicit scope boundaries for operations bypassing standard safety checks (such as raw memory allocations and FFI pointer operations). Raw FFI operations (`ffi_alloc`, `ffi_free`, `ffi_memset`, `ffi_memcpy`, `ffi_store_*`, `ffi_load_*`) outside an `unsafe` block raise a compile-time diagnostic.
+
+```lymar
+unsafe {
+ var ptr = ffi_alloc(64);
+ ffi_free(ptr);
+}
+```
+
+### Contract Statements
+
+`contract(condition, message)` statements provide static contract enforcement. Conditions composed of compile-time constants (including arithmetic, logical, and comparison operations) are evaluated at compile time. Dynamic contracts or unfulfilled static contracts fall back to runtime assertions.
+
+```lymar
+fn divide(a: int, b: int): int {
+ contract(BUFFER_SIZE > 0, "Buffer size must be positive");
+ return a / b;
+}
+```
+
+### Compile-Time Execution (`staged { ... }`)
+
+Staged compile-time execution allows expressions and blocks to be evaluated during stage 0 semantic analysis.
+
+```lymar
+staged {
+ var my_compile_time_var = 123;
+}
+```
+
+## The Type System
+
+Lymar has a rich type system that allows for creating complex and expressive data structures while maintaining null-safety by design.
+
+### Type Aliases
+
+You can create an alias for an existing type using the `type` keyword. This is useful for making your code more readable.
+
+```lymar
+type UserID = int;
+type Email = str;
+
+var my_id: UserID = 12345;
+var my_email: Email = "test@example.com";
+```
+
+### Union Types
+
+A union type is a type that can hold a value of one of several different types. Union types are defined using the pipe (`|`) character.
+
+```lymar
+type Number = int | float;
+
+var my_num: Number = 10; // This is valid
+my_num = 3.14; // This is also valid
+```
+
+Union types are especially powerful when combined with `match` statements to handle all possible types that a variable could be.
+
+### Intersection Types
+
+An intersection type is a type that combines multiple types into one. A value of an intersection type must satisfy the requirements of all the types in the intersection. Intersection types are defined using the ampersand (`&`) character.
+
+```lymar
+trait HasName {
+ fn get_name(): str;
+}
+
+trait HasAge {
+ fn get_age(): int;
+}
+
+type Person = HasName & HasAge;
+
+fn print_person_details(p: Person) {
+ print("{p.get_name()} is {p.get_age()} years old.");
+}
+```
+
+### Refined Types
+
+A refined type allows you to add constraints to an existing type. This is useful for enforcing invariants at the type level. Refined types are defined using the `where` keyword.
+
+```lymar
+type PositiveInt = int where value > 0;
+
+fn set_age(age: PositiveInt) {
+ // ...
+}
+
+set_age(10); // Valid
+set_age(-5); // This would be a runtime error
+```
+
+### Structural Types
+
+A structural type allows you to define a type based on its structure or shape, rather than by a specific name. This is useful for working with data that has a consistent structure but may not be an instance of a named frame.
+
+```lymar
+type Point = {x: float, y: float};
+
+fn print_point(p: Point) {
+ print("({p.x}, {p.y})");
+}
+
+var my_point = {x: 10.5, y: 20.0};
+print_point(my_point); // Output: (10.5, 20.0)
+```
+
+### Tuple Types
+
+A tuple is a fixed-size, ordered collection of elements of different types. Tuple types are defined using parentheses.
+
+```lymar
+// Tuple type aliases are planned. Currently tuples are typed as (str, int, str).
+var person: (str, int, str) = ("Alice", 30, "New York");
+```
+
+### Enum Declarations
+
+Enums (enumerations) allow you to define a type that can only be one of a specific set of values.
+
+```lymar
+enum Status {
+ Pending,
+ Running,
+ Completed,
+ Failed
+}
+
+var current_status: Status = Status.Running;
+```
+
+### Traits and Interfaces
+
+Traits and interfaces are used to define a set of methods that a frame must implement. This is a powerful tool for abstraction and polymorphism.
+
+```lymar
+trait Speaker {
+ fn speak();
+}
+
+frame Dog : Speaker {
+ fn speak() {
+ print("Woof!");
+ }
+}
+```
+
+### Error Handling
+
+**Key Design Principle**: Lymar is designed to be safe. It does not use exceptions for expected errors. Instead, Lymar uses a robust type-based system to handle optionality and errors.
+
+### The `Option` Type for Optional Values
+
+When a value can be present or absent, you should use the `Option` enum, which has two variants:
+- **`Some(value)`**: Represents the presence of a value.
+- **`None`**: Represents the absence of a value.
+
+```lymar
+enum Option {
+ Some(any),
+ None
+}
+
+fn find_user(id: int): Option {
+ if (id == 1) {
+ return Some("Alice");
+ }
+ return None;
+}
+```
+
+You can then use a `match` statement to safely handle both cases:
+
+```lymar
+var user = find_user(1);
+match (user) {
+ Some(name) => { print("Found user: {name}"); },
+ None => { print("User not found"); }
+}
+```
+
+### The `Result` Type for Operations That Can Fail
+
+For operations that can either succeed or fail, Lymar uses a `Result` type (often implemented as a `Type?` or a custom enum). The common convention is:
+- **`ok(value)`**: Represents a successful result.
+- **`err(error)`**: Represents a failure, containing an error value.
+
+```lymar
+fn divide(a: int, b: int): int?DivisionByZero {
+ if (b == 0) {
+ return err(DivisionByZero("Cannot divide by zero"));
+ }
+ return ok(a / b);
+}
+
+var result = divide(10, 2);
+match (result) {
+ val value => { print("Result: {value}"); },
+ err e => { print("Error: {e}"); }
+}
+```
+
+### The Unified `Type?` System
+
+Lymar provides the native `Type?` syntax as a zero-cost compiler-level error union for fallible operations. Rather than generic `Result<T, E>` or `Option<T>` wrappers, `Type?` is built directly into the type system:
+- **`Type?`**: A type that can either hold a value of `Type` or a runtime error condition.
+- **`ok(value)`**: Constructs a success value.
+- **`err()`**: Constructs a generic error value (or `err(SpecificError)`).
+
+### The `?` Operator for Propagating Errors
+
+The `?` operator propagates errors and absent values up the call stack. If a function call returns an error, the `?` operator immediately returns that error from the current function.
+
+```lymar
+fn get_number_from_string(s: str): int? {
+    var number: int = to_int(s)?; // If to_int returns err(), this function returns err()
+    return ok(number * 2);
+}
+```
+
+### Inline Error Handling with `? else`
+
+You can use the `? else` construct to handle an error inline and provide a default value or an alternative code path.
+
+```lymar
+var value: int = divide(10, 0)? else {
+ print("Division failed");
+ return 0; // Default value
+};
+// `value` will be 0.
+```
+
+
+## Memory Model
+
+Lymar uses a **region-based, deterministic memory model** designed for **low-level performance** without garbage collection.
+All allocation and cleanup are **fully deterministic** and **scope-bound**, but the language automatically manages this through **compiler inference**, not explicit user code.
+
+### Overview
+
+In Lymar, every block of code — whether a function, loop, or local scope — defines a **region**.
+A region owns all values created within it, and when that scope ends, the region and all its allocations are **destroyed automatically** in a predictable order.
+
+You never allocate or free memory manually.
+Instead, the compiler inserts the appropriate region operations behind the scenes.
+
+```lymar
+fn main() {
+ var message: str = "Hello Lymar!"
+ print(message)
+} // region ends here — memory for `message` is deterministically released
+```
+
+### How Regions Work
+
+* Each **lexical scope** (function, loop, or block) forms a **region**.
+* All variables created inside that scope belong to that region.
+* When the scope exits (normally or through error propagation), the region is destroyed.
+* Destruction is **deterministic** and happens in **reverse declaration order**.
+
+Nested scopes form **nested regions**, which are cleaned up hierarchically — the inner region is always destroyed before the outer one.
+
+```lymar
+fn compute() {
+ var data: str = "temporary"
+ {
+ var temp: str = data
+ print(temp)
+ } // `temp` destroyed here
+ print(data)
+} // `data` destroyed here
+```
+
+### Compiler-Inserted Memory Operations
+
+Lymar’s compiler internally uses `makeLinear` and `makeRef` to manage memory, but these are **not visible in user code**.
+They appear during AST lowering to mark ownership and reference semantics.
+
+* **Linear values** (created internally via `makeLinear`) have single ownership.
+ They must be consumed, moved, or destroyed once.
+* **References** (created internally via `makeRef`) are safe handles to linear values within the same or outer region.
+ They are invalidated automatically when their region ends.
+
+This allows the compiler to reason about lifetimes, avoid dangling references, and ensure every allocation is destroyed exactly once — all without runtime tracing.
+
+### Region Inference
+
+Regions are **implicit**.
+The compiler determines where regions begin and end based on lexical scope — you never need to write region code or think about region models directly.
+
+```lymar
+fn process() {
+ var buffer: str = "data"
+ print(buffer)
+} // compiler-inferred region ensures `buffer` is released here
+```
+
+Because the compiler handles region setup, Lymar behaves like a **manual-memory language with automatic discipline**:
+deterministic cleanup, but no runtime cost or garbage collection.
+
+### Deterministic Runtime
+
+Lymar’s runtime is **fully deterministic**.
+Since every region is tied to scope lifetime and cleaned up predictably, there’s no background thread, collector, or delayed deallocation queue.
+This makes it ideal for **systems programming**, **embedded**, and **real-time** environments where timing precision matters.
+
+The runtime is only a thin layer that orchestrates region destruction when the compiler marks a scope exit — it does not track allocations dynamically.
+
+### Region Safety and Error Propagation
+
+Error propagation integrates directly with the region system.
+When an error is propagated (`?`) or handled inline (`?else{}`), all active regions in that scope are cleaned up before control moves.
+
+This guarantees **no leaks** and **no invalid memory access** even in exceptional paths.
+
+```lymar
+fn open_file(path: str): File? {
+ var f: File = File.open(path) ?else {
+ print("Could not open file")
+ return None
+ }
+ return f
+} // if `open()` fails, region for `f` is cleaned up before returning
+```
+
+### Summary
+
+| Feature | Description |
+| ------------------------------- | ---------------------------------------------------- |
+| **Region-based memory** | Every scope is a deterministic memory region |
+| **Compiler-managed lifetimes** | No manual `makeRef` or `makeLinear` calls |
+| **Linear and reference safety** | Ownership and borrowing are verified at compile time |
+| **No GC or tracing runtime** | Cleanup is static and predictable |
+| **Error-safe regions** | Errors trigger automatic region cleanup |
+
+### Why It Matters
+
+This model gives Lymar **predictable performance** and **memory safety** while keeping the syntax clean and intuitive.
+It combines the control of C, the safety of Rust, and the simplicity of Swift — but with **no annotations, lifetimes, or garbage collector**.
+
+The result is a **deterministic, region-scoped runtime** that feels automatic yet remains fully transparent and suitable for **system-level** development.
+
+
+
+
+
+### The `?` Operator
+
+The `?` operator provides a convenient way to **propagate** both errors and absent values. When you append `?` to an expression that returns a `Type?`:
+
+* If the value is `Ok(value)`, the operator unwraps the value and the program continues.
+* If the value is `Err`, the `?` operator will cause the current function to immediately return that `Err`.
+
+This allows you to write cleaner code by avoiding deeply nested `match` statements when you simply want to pass an error or absent value up the call stack.
+
+```lymar
+// Function that might fail to parse
+fn to_int(s: str): int? {
+ // ... implementation that returns ok(parsed_int) or err()
+}
+
+// This function uses '?' to propagate errors/absent values from to_int
+fn get_number_from_string(s: str): int? {
+    var number: int = to_int(s)?; // If to_int returns err(), this function also returns err()
+
+    // This code only runs if to_int was successful
+    print("Parsing was successful!");
+    return ok(number * 2);
+}
+
+// Example usage:
+var result1 = get_number_from_string("10"); // result1 will be ok(20)
+var result2 = get_number_from_string("abc"); // result2 will be err()
+```
+
+### Inline Error Handling with `? else`
+
+The `? else` construct provides a concise way to handle errors or absent values inline, providing a fallback value without a full `match` statement.
+
+```lymar
+fn divide(a: int, b: int): int? {
+ if (b == 0) {
+ return err(); // Division by zero results in absent value (error condition)
+ }
+ return ok(a / b);
+}
+
+// Use `? else` to provide a default value on failure or absence
+var value: int = divide(10, 0)? else {
+ print("Division failed or result absent");
+ return 0; // Default value 
+};
+// `value` will be 0.
+```
+
+This syntax is particularly useful for providing default values while maintaining Lymar's safe design principles.
+
+## Concurrency
+
+Lymar has powerful, high-level features for managing concurrent and parallel tasks.
+
+### Structured Concurrency
+
+Lymar's concurrency model is "structured," which means that the lifetime of concurrent tasks is tied to a specific block of code. When the block finishes, all the tasks spawned within it are guaranteed to be completed. This eliminates many common concurrency bugs, such as leaked threads.
+
+### `parallel` Blocks for CPU-Bound Tasks
+
+`parallel` blocks are designed for CPU-bound workloads, where you want to take full advantage of multiple CPU cores.
+
+```
+// Create a channel to receive messages from the tasks
+var messages = channel();
+
+// This block will run tasks on multiple cores
+parallel(ch=messages, mode=batch, cores="auto", timeout=10s, onError="stop") {
+ task(i in 1..4) {
+ print("Running task {i}...");
+ // Perform some CPU-intensive work here
+ messages.send("Task {i} is done.");
+ }
+}
+
+// The block will wait for all tasks to finish
+print("All parallel tasks are complete.");
+
+// Process the results
+iter (message in messages) {
+ print("Received: {message}");
+}
+```
+
+**Parameters for `parallel` and `concurrent` blocks:**
+
+* `ch`: The channel to be used for communication between tasks.
+* `mode`: The execution mode. `"batch"` (default for `concurrent`) waits for all tasks to be submitted before execution, while `"fork-join"` (default for `parallel`) executes tasks as they are submitted.
+* `cores`: (parallel only) The number of CPU cores to use. Can be an integer or `"auto"` (default) to use all available cores.
+* `onError`: Behavior upon task failure.
+ * `"stop"` (default): Stop all tasks immediately.
+ * `"continue"`: Allow other tasks to continue.
+ * A function reference to a custom error handler.
+* `timeout`: A duration for the entire block (e.g., `5s`, `100ms`).
+* `grace`: A grace period for tasks to complete after a timeout is reached.
+* `onTimeout`: Behavior upon timeout.
+ * `"partial"` (default): Return results from completed tasks.
+ * `"stop"`: Stop all tasks.
+ * A function reference to a custom timeout handler.
+
+### `concurrent` Blocks for I/O-Bound Tasks
+
+`concurrent` blocks are designed for I/O-bound workloads, such as waiting for network requests or reading from files. These tasks can be run efficiently on a smaller number of threads because they spend most of their time waiting.
+
+```
+var results = channel();
+
+concurrent(ch=results, mode=batch) {
+ task() {
+ var data = "Fetched network data";
+ results.send(data);
+ }
+ task() {
+ var file_content = "File content data";
+ results.send(file_content);
+ }
+}
+
+print("All concurrent tasks have completed.");
+```
+
+### Channels
+
+Channels are the primary way for concurrent tasks to communicate. One or more tasks can send messages to a channel, and another task can receive them.
+
+### Atomics
+
+For simple cases of shared state, such as counters, you can use `atomic` variables. These variables can be safely accessed and modified from multiple tasks at the same time without causing data races.
+
+```
+var shared_counter: atomic = 0;
+
+concurrent {
+ task(i in 1..10) {
+ shared_counter += 1; // This is a thread-safe operation
+ }
+}
+
+print("Final counter value: {shared_counter}"); // Output: 10
+```
+
+### Tasks
+
+A `task` statement is used inside a `parallel` or `concurrent` block to define a unit of work that can be executed concurrently. A task can also iterate over a collection, creating a new concurrent task for each item.
+
+```lymar
+concurrent {
+ // A simple task
+ task() {
+ print("Task 1");
+ }
+
+ // A task that iterates over a range
+ task(i in 1..5) {
+ print("Task {i}");
+ }
+}
+```

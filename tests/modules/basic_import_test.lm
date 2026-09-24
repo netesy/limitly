@@ -1,0 +1,28 @@
+// Test 1: Basic module import and variable access
+print("=== Basic Import Test ===");
+
+import tests.modules.basic_module as basic;
+
+print("Test 1.1: Access module variable");
+print(basic.moduleVar);
+
+print("Test 1.2: Access module number");
+print(basic.number);
+
+print("Test 1.3: Call module function");
+basic.greet();
+
+print("Test 1.4: Call function with parameters");
+var result = basic.add(5, 3);
+print("5 + 3 = {result}");
+
+print("Test 1.5: Call function that returns module variable ");
+var moduleVarResult = basic.getModuleVar();
+print("Module variable via function: " + moduleVarResult);
+
+assert(basic.moduleVar == "Hello from basic module", "Module variable should be accessible");
+assert(basic.number == 42, "Module number should be accessible");
+assert(result == 8, "Module function should work: 5 + 3 = 8");
+assert(moduleVarResult == "Hello from basic module", "Module function should return correct variable");
+
+print("=== Basic Import Test Complete ===");

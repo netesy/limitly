@@ -1,0 +1,13 @@
+import std.string as string;
+
+fn main() {
+    var replaced = "Hello, Limitly Language!";
+    print("Testing contains...");
+    var res = string.contains(replaced, "Language");
+    print("Contains res:");
+    print(res);
+    assert(res == true, "Contains failure");
+    print("Contains passed!");
+}
+
+main();

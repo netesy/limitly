@@ -1,0 +1,13 @@
+// Test 5: Import from nested directory
+print("=== Nested Import Test ===");
+
+import tests.modules.nested.deep_module as deep;
+
+print("Test 5.1: Access nested module variable");
+print(deep.deep_value);
+
+print("Test 5.2: Call nested module function");
+var deep_result = deep.deep_function();
+print("Deep function result: " + deep_result);
+
+print("=== Nested Import Test Complete ===");

@@ -1,0 +1,27 @@
+// Standard Library PriorityQueue Collection
+
+import std.collections.queue as queue;
+
+frame PriorityQueueWrapper {
+    pub impl: queue.PriorityQueue;
+
+    pub init(comparator: any) {
+        self.impl = queue.PriorityQueue(comparator);
+    }
+
+    pub fn push(item: any) {
+        self.impl.push(item);
+    }
+
+    pub fn pop(): any {
+        return self.impl.pop();
+    }
+
+    pub fn peek(): any {
+        return self.impl.peek();
+    }
+
+    pub fn length(): int {
+        return self.impl.length();
+    }
+}

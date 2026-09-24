@@ -1,0 +1,9 @@
+frame Shader {
+    pub var source: str;
+    pub var stage: int; // 0 = vertex, 1 = fragment, 2 = compute
+
+    pub init(src: str = "", stg: int = 0) {
+        self.source = src;
+        self.stage = stg;
+    }
+}

@@ -1,0 +1,18 @@
+// Simple string test
+print("=== Simple String Test ===");
+
+// Test 1: Basic string constants
+var str1 = "Hello";
+print("str1 = {str1}");
+
+// Test 2: String concatenation
+var str2 = "World";
+var result = str1 + " " + str2;
+print("result = {result}");
+
+// Test 3: String + number
+var num = 42;
+var concat_num = "Answer: " + num;
+print("concat_num = {concat_num}");
+
+print("=== Test Completed ===");

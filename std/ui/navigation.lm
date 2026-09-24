@@ -1,0 +1,9 @@
+import std.ui.widget as widget;
+
+frame Navigation {
+    pub var stack: [widget.Widget];
+
+    pub init(s: [widget.Widget] = [widget.Widget()]) {
+        self.stack = s;
+    }
+}

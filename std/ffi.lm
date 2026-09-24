@@ -1,0 +1,432 @@
+// Foreign Function Interface (FFI) Module
+// Standard C ABI Interoperability, Type Mapping, and Unmanaged Memory Operations
+
+// Primitive C integer types
+type c_char = int;
+type c_short = int;
+type c_int = int;
+type c_long = int;
+type c_longlong = int;
+
+type c_uchar = int;
+type c_ushort = int;
+type c_uint = int;
+type c_ulong = int;
+type c_ulonglong = int;
+
+type c_size_t = int;
+type c_ssize_t = int;
+type c_ptrdiff_t = int;
+
+type c_float = float;
+type c_double = float;
+
+// Opaque pointer types
+type pubptr = int;
+type fnptr = int;
+
+type c_bool = int;
+type c_void = int;
+
+// Alignment constants
+pub var ALIGNMENT_CHAR: int = 1;
+pub var ALIGNMENT_SHORT: int = 2;
+pub var ALIGNMENT_INT: int = 4;
+pub var ALIGNMENT_LONG: int = 8;
+pub var ALIGNMENT_LONGLONG: int = 8;
+pub var ALIGNMENT_PTR: int = 8;
+pub var ALIGNMENT_FLOAT: int = 4;
+pub var ALIGNMENT_DOUBLE: int = 8;
+pub var ALIGNMENT_MAX: int = 8;
+
+// Clean FFI Type Identifiers
+pub var TYPE_I8: int = 0;
+pub var TYPE_U8: int = 1;
+pub var TYPE_I16: int = 2;
+pub var TYPE_U16: int = 3;
+pub var TYPE_I32: int = 4;
+pub var TYPE_U32: int = 5;
+pub var TYPE_I64: int = 6;
+pub var TYPE_U64: int = 7;
+pub var TYPE_F32: int = 8;
+pub var TYPE_F64: int = 9;
+pub var TYPE_PTR: int = 10;
+pub var TYPE_CSTRING: int = 11;
+pub var TYPE_VOID: int = 12;
+
+// C ABI calling conventions
+enum CallingConvention {
+    CDecl,
+    StdCall,
+    FastCall,
+    ThisCall,
+    VectorCall
+}
+
+// Memory Allocation Intrinsics
+pub fn alloc(size: int): pubptr {
+    if (size < 0) { return 0; }
+    return 0;
+}
+pub fn free(ptr: pubptr): nil {}
+pub fn realloc(ptr: pubptr, new_size: int): pubptr {
+    if (new_size < 0) { return 0; }
+    return 0;
+}
+
+// Memory Manipulation
+pub fn memcpy(dest: pubptr, src: pubptr, size: int): nil {}
+pub fn memset(ptr: pubptr, value: int, size: int): nil {}
+pub fn memcmp(ptr1: pubptr, ptr2: pubptr, size: int): int { return 0; }
+
+// Pointer Arithmetic
+pub fn ptr_add(ptr: pubptr, offset: int): pubptr { return ptr + offset; }
+fn _ffi_alloc(size: int): pubptr { return 0; }
+fn _ffi_free(ptr: pubptr): nil {}
+fn _ffi_load_i8(ptr: pubptr): int { return 0; }
+fn _ffi_load_u8(ptr: pubptr): int { return 0; }
+fn _ffi_store_i8(ptr: pubptr, value: int): nil {}
+fn _ffi_ptr_add(ptr: pubptr, offset: int): pubptr { return ptr + offset; }
+pub fn ptr_sub(ptr: pubptr, offset: int): pubptr { return ptr - offset; }
+pub fn ptr_diff(ptr1: pubptr, ptr2: pubptr): int { return ptr1 - ptr2; }
+
+pub fn ptr_align(ptr: pubptr, alignment: int): pubptr {
+    if (alignment <= 0 or (alignment & (alignment - 1)) != 0) { return 0; }
+    var remainder: int = ptr % alignment;
+    if (remainder == 0) { return ptr; }
+    return ptr + (alignment - remainder);
+}
+
+pub fn ptr_is_aligned(ptr: pubptr, alignment: int): bool {
+    if (alignment <= 0 or (alignment & (alignment - 1)) != 0) { return false; }
+    return (ptr % alignment) == 0;
+}
+
+// Raw Memory Loading
+pub fn load_i8(ptr: pubptr): int { return 0; }
+pub fn load_u8(ptr: pubptr): int { return 0; }
+pub fn load_i16(ptr: pubptr): int { return 0; }
+pub fn load_u16(ptr: pubptr): int { return 0; }
+pub fn load_i32(ptr: pubptr): int { return 0; }
+pub fn load_u32(ptr: pubptr): int { return 0; }
+pub fn load_i64(ptr: pubptr): int { return 0; }
+pub fn load_u64(ptr: pubptr): int { return 0; }
+pub fn load_f32(ptr: pubptr): float { return 0.0; }
+pub fn load_f64(ptr: pubptr): float { return 0.0; }
+pub fn load_ptr(ptr: pubptr): pubptr { return 0; }
+
+// Raw Memory Storing
+pub fn store_i8(ptr: pubptr, value: int): nil {}
+pub fn store_u8(ptr: pubptr, value: int): nil {}
+pub fn store_i16(ptr: pubptr, value: int): nil {}
+pub fn store_u16(ptr: pubptr, value: int): nil {}
+pub fn store_i32(ptr: pubptr, value: int): nil {}
+pub fn store_u32(ptr: pubptr, value: int): nil {}
+pub fn store_i64(ptr: pubptr, value: int): nil {}
+pub fn store_u64(ptr: pubptr, value: int): nil {}
+pub fn store_f32(ptr: pubptr, value: float): nil {}
+pub fn store_f64(ptr: pubptr, value: float): nil {}
+pub fn store_ptr(ptr: pubptr, value: pubptr): nil {}
+
+// Dynamic Linking Operations
+pub fn library_load(path: str): pubptr { return 0; }
+pub fn library_unload(handle: pubptr): nil {}
+pub fn library_get_symbol(handle: pubptr, symbol: str): fnptr { return 0; }
+
+// Foreign Calls
+pub fn foreign_call(func_ptr: fnptr, args: [any], return_type: int = 6, param_types: [any] = []): any { return 0; }
+
+// Typed calls are the supported safe-wrapper building blocks. Unlike
+// `foreign_call`, their complete ABI signature is visible in LIR and can be
+// implemented identically by every backend.
+pub fn call_i64_0(func_ptr: fnptr): int { return 0; }
+pub fn call_i64_1(func_ptr: fnptr, arg1: int): int { return 0; }
+pub fn call_i64_2(func_ptr: fnptr, arg1: int, arg2: int): int { return 0; }
+pub fn call_f64_2(func_ptr: fnptr, arg1: f64, arg2: f64): f64 { return 0.0; }
+pub fn call_void_1(func_ptr: fnptr, arg1: pubptr): nil {}
+
+// CString wrapper
+frame CString {
+    pub var ptr: pubptr;
+    pub var length: int;
+    pub var is_owned: int;
+}
+
+pub fn string_to_cstring(s: str): CString {
+    var len_val: int = len(s);
+    var p: pubptr = 0;
+    unsafe {
+        p = _ffi_alloc(len_val + 1);
+        if (p != 0 and len_val > 0) {
+            var i: int = 0;
+            while (i < len_val) {
+                _ffi_store_i8(_ffi_ptr_add(p, i), s[i]);
+                i = i + 1;
+            }
+        }
+        if (p != 0) {
+            _ffi_store_i8(_ffi_ptr_add(p, len_val), 0);
+        }
+    }
+    return CString(ptr=p, length=len_val, is_owned=1);
+}
+
+pub fn cstring_to_string(p: pubptr): str {
+    if (p == 0) { return ""; }
+    var len_val: int = 0;
+    var bytes: [int] = [];
+    unsafe {
+        var current: pubptr = p;
+        while (_ffi_load_i8(current) != 0) {
+            len_val = len_val + 1;
+            current = _ffi_ptr_add(current, 1);
+        }
+        if (len_val > 0) {
+            var i: int = 0;
+            while (i < len_val) {
+                var b: int = _ffi_load_i8(_ffi_ptr_add(p, i));
+                bytes.append(b);
+                i = i + 1;
+            }
+        }
+    }
+    return _builtin_string_from_bytes(bytes);
+}
+
+// Convert a foreign C string without scanning beyond caller-owned memory.
+// Returns nil when no terminator occurs within max_length bytes.
+pub fn cstring_to_string_bounded(p: pubptr, max_length: int): str? {
+    if (p == 0 or max_length < 0) { return err(); }
+    var bytes: [int] = [];
+    unsafe {
+        var i: int = 0;
+        while (i < max_length) {
+            var b: int = _ffi_load_u8(_ffi_ptr_add(p, i));
+            if (b == 0) { return ok(_builtin_string_from_bytes(bytes)); }
+            bytes.append(b);
+            i = i + 1;
+        }
+    }
+    return err();
+}
+
+pub fn cstring_free(cs: CString): nil {
+    if (cs.is_owned != 0 and cs.ptr != 0) {
+        unsafe {
+            _ffi_free(cs.ptr);
+        }
+    }
+}
+
+pub fn cstring_as_ptr(cs: CString): pubptr {
+    return cs.ptr;
+}
+
+pub fn cstring_from_ptr(p: pubptr, take_ownership: int): CString {
+    var len_val: int = 0;
+    if (p != 0) {
+        unsafe {
+            var current: pubptr = p;
+            while (_ffi_load_i8(current) != 0) {
+                len_val = len_val + 1;
+                current = _ffi_ptr_add(current, 1);
+            }
+        }
+    }
+    return CString(ptr=p, length=len_val, is_owned=take_ownership);
+}
+
+// High-Level Foreign Function Descriptor & Call Wrapper
+frame ForeignFunction {
+    pub var name: str;
+    pub var func_ptr: fnptr;
+    pub var param_types: [any];
+    pub var return_type: int;
+
+    pub fn call(arg1: any = nil, arg2: any = nil, arg3: any = nil, arg4: any = nil, arg5: any = nil, arg6: any = nil): any {
+        var call_args: [any] = [];
+        if (arg1 != nil) { call_args.append(arg1); }
+        if (arg2 != nil) { call_args.append(arg2); }
+        if (arg3 != nil) { call_args.append(arg3); }
+        if (arg4 != nil) { call_args.append(arg4); }
+        if (arg5 != nil) { call_args.append(arg5); }
+        if (arg6 != nil) { call_args.append(arg6); }
+        unsafe {
+            return foreign_call(self.func_ptr, call_args, self.return_type, self.param_types);
+        }
+    }
+
+    pub fn call_list(call_args: [any]): any {
+        unsafe {
+            return foreign_call(self.func_ptr, call_args, self.return_type, self.param_types);
+        }
+    }
+}
+
+pub fn declare(name: str, func_ptr: fnptr, param_types: [any], return_type: int): ForeignFunction {
+    return ForeignFunction(
+        name=name,
+        func_ptr=func_ptr,
+        param_types=param_types,
+        return_type=return_type
+    );
+}
+
+// High-level Library Abstraction
+frame Library {
+    pub var handle: pubptr;
+    pub var path: str;
+    pub var is_loaded: bool;
+
+    pub fn symbol(symbol_name: str): fnptr {
+        if (not self.is_loaded or self.handle == 0) { return 0; }
+        unsafe {
+            return library_get_symbol(self.handle, symbol_name);
+        }
+    }
+
+    pub fn func(name: str, return_type: int, param_types: [any]): ForeignFunction {
+        var sym: fnptr = self.symbol(name);
+        return declare(name, sym, param_types, return_type);
+    }
+
+    pub fn close(): nil {
+        if (self.is_loaded and self.handle != 0) {
+            unsafe {
+                library_unload(self.handle);
+            }
+            self.is_loaded = false;
+        }
+    }
+}
+
+pub fn load(path: str): Library {
+    var h: pubptr = 0;
+    unsafe {
+        h = library_load(path);
+    }
+    if (h != 0 and h != nil) {
+        return Library(handle=h, path=path, is_loaded=true);
+    }
+
+    // Try cross-platform shared library extensions across Windows (.dll),
+    // Linux / Android (.so), and macOS (.dylib).
+    var exts: [str] = [".dll", ".so", ".dylib"];
+    var i: int = 0;
+    while (i < len(exts)) {
+        var ext: str = exts[i];
+        var candidate_path: str = path + ext;
+        unsafe {
+            h = library_load(candidate_path);
+        }
+        if (h != 0 and h != nil) {
+            return Library(handle=h, path=candidate_path, is_loaded=true);
+        }
+        i = i + 1;
+    }
+
+    return Library(handle=0, path=path, is_loaded=false);
+}
+
+// Load the first available library from a list of candidate paths.
+pub fn load_first(candidates: [str]): Library {
+    var i: int = 0;
+    var count: int = len(candidates);
+    while (i < count) {
+        var lib: Library = load(candidates[i]);
+        if (lib.is_loaded) {
+            return lib;
+        }
+        i = i + 1;
+    }
+    return Library(handle=0, path="", is_loaded=false);
+}
+
+// ── Native Callback / Trampoline API ──────────────────────────────────────
+//
+// These three functions allow a pure Limitly function to be exposed as a
+// genuine C-ABI callable address (e.g. for use with Win32 RegisterClassEx,
+// SetWindowsHookEx, qsort, or any other OS/library that requires a real
+// function pointer).
+//
+// Usage:
+//   // 1. Define the Limitly function to expose:
+//   pub fn my_handler(a: int, b: int): int { return a + b; }
+//
+//   // 2. Create the native trampoline:
+//   var handle = ffi.callback_create("my_handler",
+//                                     [ffi.TYPE_I64, ffi.TYPE_I64],
+//                                     ffi.TYPE_I64);
+//
+//   // 3. Get the C-callable address:
+//   var fn_ptr = ffi.callback_ptr(handle);
+//
+//   // 4. Pass fn_ptr to OS / C library as a CALLBACK or WNDPROC etc.
+//
+//   // 5. Release when done:
+//   ffi.callback_destroy(handle);
+//
+// Notes:
+//   - The Limitly function must be declared `pub` in the same module.
+//   - arg_types is a list of TYPE_* constants (TYPE_I64, TYPE_F64, etc.).
+//   - ret_type is a single TYPE_* constant.
+//   - The handle is an opaque integer — treat it as an ownership token.
+//   - callback_ptr returns 0 (nil) if the handle is invalid.
+
+// callback_create: wrap a Limitly function as a C-ABI native callable.
+// Returns an integer handle that can be passed to callback_ptr/callback_destroy.
+pub fn callback_create(func_name: str, arg_types: [any], ret_type: int): int {
+    return 0; // implemented by the CallbackCreate LIR intrinsic via intrinsic_registry
+}
+
+// callback_ptr: retrieve the executable machine-code address for the trampoline.
+// This address is safe to cast to any C function-pointer type and pass to OS APIs.
+pub fn callback_ptr(handle: int): fnptr {
+    return 0; // implemented by the CallbackCreate/type_id=1 LIR intrinsic
+}
+
+// callback_destroy: release the trampoline and free the libffi closure page.
+// After calling this, the code pointer returned by callback_ptr is invalid.
+pub fn callback_destroy(handle: int): nil {}
+fn _ffi_callback_create(func_name: str, arg_types: [any], ret_type: int): int { return 0; }
+fn _ffi_callback_ptr(handle: int): fnptr { return 0; }
+fn _ffi_callback_destroy(handle: int): nil {}
+
+// Owning callback wrapper. Prefer this over passing a bare callback handle
+// through safe standard-library APIs.
+frame Callback {
+    pub var handle: int;
+    pub var pointer: fnptr;
+    pub var is_open: bool;
+
+    pub fn close(): nil {
+        if (self.is_open and self.handle > 0) {
+            unsafe { _ffi_callback_destroy(self.handle); }
+            self.handle = 0;
+            self.pointer = 0;
+            self.is_open = false;
+        }
+    }
+}
+
+pub fn create_callback(func_name: str, arg_types: [any], ret_type: int): Callback? {
+    if (func_name == "" or ret_type < TYPE_I8 or ret_type > TYPE_VOID or ret_type == TYPE_CSTRING) {
+        return err();
+    }
+    var i: int = 0;
+    while (i < len(arg_types)) {
+        var type_id: int = arg_types[i] as int;
+        if (type_id < TYPE_I8 or type_id > TYPE_CSTRING) { return err(); }
+        i = i + 1;
+    }
+    unsafe {
+        var h: int = _ffi_callback_create(func_name, arg_types, ret_type);
+        if (h == nil or h <= 0) { return err(); }
+        var p: fnptr = _ffi_callback_ptr(h);
+        if (p == nil or p == 0) {
+            _ffi_callback_destroy(h);
+            return err();
+        }
+        return ok(Callback(handle=h, pointer=p, is_open=true));
+    }
+}

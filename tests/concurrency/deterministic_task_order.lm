@@ -1,0 +1,18 @@
+var seed = 0;
+var output = channel();
+
+concurrent(ch=output, cores=4, on_error=Stop) {
+    task(i in 1..2) {
+        output.send(i);
+    }
+}
+
+var expected = 1;
+var sum = 0;
+iter (item in output) {
+    assert(item == expected, "tasks must commit in source iteration order");
+    sum += item;
+    expected += 1;
+}
+assert(expected == 3, "all deterministic tasks completed");
+assert(sum == 3, "post-join reductions use deterministic source order");

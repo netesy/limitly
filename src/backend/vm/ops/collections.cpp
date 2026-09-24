@@ -1,0 +1,170 @@
+#include "../register.hh"
+#include "../vm_runtime.hh"
+#include "../vm_list.hh"
+#include "../vm_dict.hh"
+#include "../vm_tuple.hh"
+#include "../vm_value.hh"
+#include <cstdlib>
+
+namespace LM {
+namespace Backend {
+namespace VM {
+namespace Register {
+
+void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
+    switch (pc->op) {
+        case LIR::LIR_Op::ListCreate: {
+            LmList* list = lm_list_new();
+            registers[pc->dst] = BOX_PTR(list);
+            // Register allocation with current active region
+            if (list && !vm_region_stack.empty()) {
+                uintptr_t ptr = reinterpret_cast<uintptr_t>(list);
+                vm_allocation_regions[ptr] = active_region_id;
+            }
+            break;
+        }
+        case LIR::LIR_Op::ListAppend:
+            if (auto* list = reinterpret_cast<LmList*>(header_if_type(registers[pc->a], TYPE_LIST))) {
+                lm_list_append(list, registers[pc->b]);
+                transfer_ownership(registers[pc->b], registers[pc->a]);
+            }
+            break;
+        case LIR::LIR_Op::ListLen:
+            if (auto* list = reinterpret_cast<LmList*>(header_if_type(registers[pc->a], TYPE_LIST))) {
+                registers[pc->dst] = make_i64(lm_list_len(list));
+            } else {
+                registers[pc->dst] = make_i64(0);
+            }
+            break;
+        case LIR::LIR_Op::ListIndex:
+            if (IS_PTR(registers[pc->a])) {
+                ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
+                uint64_t index = static_cast<uint64_t>(as_i64(registers[pc->b]));
+                if (h->type_id == TYPE_LIST) {
+                    registers[pc->dst] = lm_list_get((LmList*)h, index);
+                } else if (h->type_id == TYPE_TUPLE) {
+                    registers[pc->dst] = lm_tuple_get((LmTuple*)h, index);
+                } else {
+                    registers[pc->dst] = VAL_NIL;
+                }
+            } else {
+                registers[pc->dst] = VAL_NIL;
+            }
+            break;
+        case LIR::LIR_Op::DictCreate: {
+            LmDict* dict = lm_dict_new(hash_boxed_value, cmp_boxed_value);
+            registers[pc->dst] = BOX_PTR(dict);
+            // Register allocation with current active region
+            if (dict && !vm_region_stack.empty()) {
+                uintptr_t ptr = reinterpret_cast<uintptr_t>(dict);
+                vm_allocation_regions[ptr] = active_region_id;
+            }
+            break;
+        }
+        case LIR::LIR_Op::ListSet:
+        case LIR::LIR_Op::DictSet:
+            if (IS_PTR(registers[pc->dst])) {
+                ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->dst]);
+                if (h->type_id == TYPE_DICT) {
+                    lm_dict_set((LmDict*)h, registers[pc->a], registers[pc->b]);
+                    transfer_ownership(registers[pc->a], registers[pc->dst]);
+                    transfer_ownership(registers[pc->b], registers[pc->dst]);
+                } else if (h->type_id == TYPE_LIST) {
+                    uint64_t index = static_cast<uint64_t>(as_i64(registers[pc->a]));
+                    lm_list_set((LmList*)h, index, registers[pc->b]);
+                    transfer_ownership(registers[pc->b], registers[pc->dst]);
+                } else if (h->type_id == TYPE_TUPLE) {
+                    uint64_t index = static_cast<uint64_t>(as_i64(registers[pc->a]));
+                    lm_tuple_set((LmTuple*)h, index, registers[pc->b]);
+                    transfer_ownership(registers[pc->b], registers[pc->dst]);
+                }
+            }
+            break;
+        case LIR::LIR_Op::DictGet:
+            if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->a], TYPE_DICT))) {
+                RegisterValue res = lm_dict_get(dict, registers[pc->b]);
+                registers[pc->dst] = res;
+            } else {
+                registers[pc->dst] = VAL_NIL;
+            }
+            break;
+        case LIR::LIR_Op::DictHas:
+            if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->a], TYPE_DICT))) {
+                registers[pc->dst] = lm_dict_contains(dict, registers[pc->b]) ? VAL_TRUE : VAL_FALSE;
+            } else {
+                registers[pc->dst] = VAL_FALSE;
+            }
+            break;
+        case LIR::LIR_Op::DictLen:
+            if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->a], TYPE_DICT))) {
+                registers[pc->dst] = make_i64(static_cast<int64_t>(dict->size));
+            } else {
+                registers[pc->dst] = make_i64(0);
+            }
+            break;
+        case LIR::LIR_Op::DictItems:
+            if (pc->call_args.size() >= 2 && header_if_type(registers[pc->call_args[0]], TYPE_DICT)) {
+                uint64_t count = 0;
+                LmValue* items = lm_dict_items(reinterpret_cast<LmDict*>(header_if_type(registers[pc->call_args[0]], TYPE_DICT)), &count);
+                int64_t wanted = as_i64(registers[pc->call_args[1]]);
+                if (items && wanted >= 0 && static_cast<uint64_t>(wanted) < count) {
+                    registers[pc->dst] = items[static_cast<uint64_t>(wanted) * 2];
+                } else {
+                    registers[pc->dst] = VAL_NIL;
+                }
+                if (items) free(items);
+            } else if (auto* dict = reinterpret_cast<LmDict*>(header_if_type(registers[pc->a], TYPE_DICT))) {
+                uint64_t count = 0;
+                LmValue* items = lm_dict_items(dict, &count);
+                LmList* list = lm_list_new();
+                for (uint64_t i = 0; items && i < count; ++i) {
+                    LmTuple* entry = lm_tuple_new(2);
+                    lm_tuple_set(entry, 0, items[i * 2]);
+                    lm_tuple_set(entry, 1, items[i * 2 + 1]);
+                    lm_list_append(list, BOX_PTR(entry));
+                }
+                if (items) free(items);
+                registers[pc->dst] = BOX_PTR(list);
+            } else {
+                registers[pc->dst] = BOX_PTR(lm_list_new());
+            }
+            break;
+        case LIR::LIR_Op::TupleCreate: {
+            LmTuple* tuple = lm_tuple_new(pc->imm);
+            registers[pc->dst] = BOX_PTR(tuple);
+            // Register allocation with current active region
+            if (tuple && !vm_region_stack.empty()) {
+                uintptr_t ptr = reinterpret_cast<uintptr_t>(tuple);
+                vm_allocation_regions[ptr] = active_region_id;
+            }
+            break;
+        }
+        case LIR::LIR_Op::TupleSet:
+            if (auto* tuple = reinterpret_cast<LmTuple*>(header_if_type(registers[pc->dst], TYPE_TUPLE))) {
+                lm_tuple_set(tuple, static_cast<uint64_t>(as_i64(registers[pc->a])), registers[pc->b]);
+                transfer_ownership(registers[pc->b], registers[pc->dst]);
+            }
+            break;
+        case LIR::LIR_Op::TupleGet:
+            if (auto* tuple = reinterpret_cast<LmTuple*>(header_if_type(registers[pc->a], TYPE_TUPLE))) {
+                registers[pc->dst] = lm_tuple_get(tuple, static_cast<uint64_t>(as_i64(registers[pc->b])));
+            } else {
+                registers[pc->dst] = VAL_NIL;
+            }
+            break;
+        case LIR::LIR_Op::TupleLen:
+            if (auto* tuple = reinterpret_cast<LmTuple*>(header_if_type(registers[pc->a], TYPE_TUPLE))) {
+                registers[pc->dst] = make_i64(static_cast<int64_t>(lm_tuple_size(tuple)));
+            } else {
+                registers[pc->dst] = make_i64(0);
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+} // namespace Register
+} // namespace VM
+} // namespace Backend
+} // namespace LM

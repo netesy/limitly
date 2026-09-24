@@ -1,0 +1,18 @@
+// @error:trait_not_impl
+// Using frame without implementing required trait
+
+trait Drawable {
+    fn draw();
+}
+
+frame Square {
+    pub side: int;
+    
+    pub init(s: int) {
+        self.side = s;
+    }
+    // Missing draw() method - trait not implemented!
+}
+
+var sq = Square { side: 10 };
+sq.draw();  // ERROR: draw() method doesn't exist

@@ -1,0 +1,34 @@
+// Test suite for Standard Library Config Module
+
+import std.config as config;
+
+fn main(): int {
+    print("=== Config Module Test Suite ===");
+
+    // Test Config frame
+    var cfg = config.new_config() as config.Config;
+    cfg.set("app_name", "LimitlyApp");
+    cfg.set("port", 8080);
+    cfg.set("debug_mode", true);
+
+    assert(cfg.get("app_name", "default") == "LimitlyApp", "get app_name failed");
+    assert(cfg.get("port", 3000) == 8080, "get port failed");
+    assert(cfg.get("debug_mode", false) == true, "get debug_mode failed");
+    assert(cfg.get("nonexistent", "fallback") == "fallback", "get nonexistent failed");
+    assert(cfg.has("app_name") == true, "has app_name failed");
+    assert(cfg.has("nonexistent") == false, "has nonexistent failed");
+
+    // Test load_json by avoiding string interpolation { } parsing
+    var o_brace = "{";
+    var c_brace = "}";
+    var json_str = o_brace + "\"db_host\": \"localhost\", \"db_port\": 5432, \"db_enable\": true" + "}";
+    var parsed_cfg = config.load_json(json_str);
+    var db_host = parsed_cfg.get("db_host", "") as str;
+    assert(db_host == "localhost", "parsed db_host failed");
+
+    var db_port = parsed_cfg.get("db_port", 0) as int;
+    assert(db_port == 5432, "parsed db_port failed");
+
+    print("All config tests passed successfully!");
+    return 0;
+}

@@ -1,0 +1,15 @@
+import std.ui.widget as widget;
+
+frame Button {
+    pub var label: str;
+    pub var enabled: bool;
+
+    pub init(lbl: str = "", en: bool = true) {
+        self.label = lbl;
+        self.enabled = en;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

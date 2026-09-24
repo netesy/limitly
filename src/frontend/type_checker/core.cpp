@@ -1,0 +1,505 @@
+#include "../type_checker.hh"
+#include "../module_manager.hh"
+#include "../../error/debugger.hh"
+#include "../../memory/model.hh"
+#include "../parser.hh"
+#include "../scanner.hh"
+#include <memory>
+#include <vector>
+#include <unordered_map>
+#include <string>
+#include <set>
+#include <cmath>
+#include <limits>
+#include <algorithm>
+#include <unordered_set>
+#include <fstream>
+#include <sstream>
+
+namespace LM {
+namespace Frontend {
+using namespace LM::Error;
+
+bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> program) {
+    if (!program) {
+        add_error("Null program provided");
+        return false;
+    }
+    
+    current_program_ = program;  // Store for import handling
+    
+    Debugger::resetError();
+    errors.clear();
+    current_scope = std::make_unique<Scope>();
+
+    // PASS -1: Basic Type Discovery (Pre-registration)
+    auto register_custom_type = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
+        if (auto enum_decl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) {
+            EnumType enumTypeInfo;
+            enumTypeInfo.name = name;
+            for (const auto& variant : enum_decl->variants) {
+                std::vector<TypePtr> associated;
+                for (const auto& t : variant.second) {
+                    // Try to resolve type annotation - may fail if forward reference, but that's OK
+                    try {
+                        TypePtr resolved = resolve_type_annotation(t);
+                        if (resolved) associated.push_back(resolved);
+                    } catch (...) {
+                        // If resolution fails, leave empty - will be filled in Pass 2
+                    }
+                }
+                enumTypeInfo.addVariant(variant.first, associated);
+            }
+            TypePtr enumType = std::make_shared<::Type>(TypeTag::Enum, enumTypeInfo);
+            type_system.addUserDefinedType(name, enumType);
+
+            // Register variants in global scope (qualified only) and track ownership
+            for (const auto& variant : enum_decl->variants) {
+                std::string qualified = name + "." + variant.first;
+                variant_owners[variant.first].push_back(enumType);
+                
+                if (variant.second.empty()) {
+                    variable_types[qualified] = enumType;
+                    FunctionSignature sig;
+                    sig.name = variant.first;
+                    sig.return_type = enumType;
+                    function_signatures[qualified] = sig;
+                } else {
+                    std::vector<TypePtr> paramTypes;
+                    for (const auto& t : variant.second) paramTypes.push_back(type_system.ANY_TYPE);
+                    TypePtr constructorType = type_system.createFunctionType(paramTypes, enumType);
+                    variable_types[qualified] = constructorType;
+                    FunctionSignature sig;
+                    sig.name = variant.first;
+                    sig.param_types = paramTypes;
+                    sig.return_type = enumType;
+                    function_signatures[qualified] = sig;
+                }
+            }
+        } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
+            type_system.addUserDefinedType(name, type_system.ANY_TYPE);
+        } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            type_system.addUserDefinedType(name, type_system.createFrameType(name));
+        }
+    };
+
+    for (const auto& stmt : program->statements) {
+        std::string name;
+        if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) name = frame->name;
+        else if (auto trait = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) name = trait->name;
+        else if (auto enm = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) name = enm->name;
+        else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) name = type_decl->name;
+        if (!name.empty()) register_custom_type(name, stmt);
+    }
+    for (const auto& [name, stmt] : program->imported_symbols) {
+        register_custom_type(name, stmt);
+    }
+
+    // PASS 0: Module Resolution and Type Checking
+    if (is_root) {
+        auto& manager = ModuleManager::getInstance();
+        // manager.clear(); // Removed to prevent infinite recursion
+        // manager.resolve_all(program, "root"); // Handled by factory or initial call
+        if (manager.has_circular_dependencies()) {
+            add_error("Circular dependency detected in modules");
+        }
+
+        // Type check all loaded modules recursively
+        auto all_modules = manager.get_all_modules();
+        std::vector<std::string> topo_order = manager.get_topological_order();
+
+        for (const auto& path : topo_order) {
+            if (path == "root") continue; // Skip root module recursion
+            auto it = all_modules.find(path);
+            if (it == all_modules.end()) continue;
+            auto module = it->second;
+            if (module && !module->is_checked) {
+                module->is_checked = true;
+                TypeChecker checker(this->type_system, this->symbol_db_);
+                checker.set_verification_policy(verification_policy_);
+                checker.is_root = false; // Submodules are not root checkers
+                TypeCheckerFactory::register_builtin_functions(checker);
+                checker.set_source_context(module->source, module->path);
+                if (!checker.check_program(module->ast)) {
+                    add_error("Failed to type check module: " + path);
+                    failed_modules.insert(path);
+                    size_t last_dot = path.find_last_of('.');
+                    if (last_dot != std::string::npos) {
+                        failed_modules.insert(path.substr(0, last_dot));
+                    }
+                    for (const auto& err : checker.get_errors()) {
+                        std::cerr << "  Module [" << path << "] local error: " << err << std::endl;
+                    }
+                }
+
+                for (const auto& [name, info] : checker.frame_declarations) {
+                    this->frame_declarations[name] = info;
+                    if (!name.starts_with(path + ".")) {
+                        FrameInfo info_copy = info;
+                        info_copy.name = path + "." + name;
+                        this->frame_declarations[path + "." + name] = info_copy;
+                    }
+                }
+                for (const auto& [name, info] : checker.trait_declarations) {
+                    this->trait_declarations[name] = info;
+                    if (!name.starts_with(path + ".")) {
+                        TraitInfo info_copy = info;
+                        info_copy.name = path + "." + name;
+                        this->trait_declarations[path + "." + name] = info_copy;
+                    }
+                }
+                for (const auto& [name, sig] : checker.function_signatures) {
+                    this->function_signatures[name] = sig;
+                    if (!name.starts_with(path + ".")) {
+                        FunctionSignature sig_copy = sig;
+                        sig_copy.name = path + "." + name;
+                        this->function_signatures[path + "." + name] = sig_copy;
+                    }
+                }
+                for (const auto& [name, type] : checker.variable_types) {
+                    if (type != nullptr) {
+                        this->variable_types[name] = type;
+                        if (!name.starts_with(path + ".")) {
+                            this->variable_types[path + "." + name] = type;
+                        }
+                    }
+                }
+                // Do not merge a dependency module's lexical import aliases into the
+                // importing/root checker. Aliases are scoped to the source file that
+                // declares the import; leaking them globally makes unrelated modules
+                // resolve through one another and weakens module namespace isolation.
+            }
+        }
+    }
+
+    for (const auto& stmt : program->statements) {
+        if (auto mod_decl = std::dynamic_pointer_cast<LM::Frontend::AST::ModuleDeclaration>(stmt)) {
+            check_module_declaration(mod_decl);
+        } else if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+            check_import_statement(import_stmt);
+        }
+    }
+
+    // PASS 1: Name Registration (including inlined symbols)
+    auto register_name = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
+        if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            type_system.addUserDefinedType(name, type_system.createFrameType(name));
+        } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+            TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait, TraitType{name, {}, {}});
+            type_system.addUserDefinedType(name, trait_type);
+        }
+    };
+
+    for (const auto& stmt : program->statements) {
+        std::string name;
+        if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) name = frame->name;
+        else if (auto trait = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) name = trait->name;
+        else if (auto enm = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) name = enm->name;
+        if (!name.empty()) register_name(name, stmt);
+    }
+    for (const auto& [name, stmt] : program->imported_symbols) {
+        register_name(name, stmt);
+    }
+
+    // PASS 2: Signature Resolution (including inlined symbols)
+    auto resolve_sig = [&](const std::string& name, const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
+        if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            TypeSystem::FrameInfo info;
+            info.name = name;
+            info.declaration = frame_decl;
+            info.implements = frame_decl->implements;
+            info.hasInit = (frame_decl->init != nullptr);
+            info.hasDeinit = (frame_decl->deinit != nullptr);
+
+            size_t offset = 0;
+            for (const auto& field : frame_decl->fields) {
+                TypePtr field_type = field->type ? resolve_type_annotation(field->type) : type_system.ANY_TYPE;
+                info.fields.push_back({field->name, field_type});
+                info.fieldVisibilities[field->name] = field->visibility;
+                info.fieldOffsets[field->name] = offset++;
+            }
+            info.totalFieldSize = offset;
+
+            auto& fd = frame_declarations[name];
+            fd.name = name;
+            fd.declaration = frame_decl;
+            fd.fields = info.fields;
+            fd.field_has_default.clear();
+            for (const auto& field : frame_decl->fields) {
+                fd.field_has_default.push_back({field->name, field->defaultValue != nullptr});
+            }
+
+            if (frame_decl->init) {
+                std::string init_name = name + ".init";
+                FunctionSignature sig;
+                sig.name = init_name;
+                sig.declaration = frame_decl->init;
+                sig.return_type = type_system.NIL_TYPE;
+                sig.param_types.push_back(type_system.createFrameType(name));
+                for (const auto& p : frame_decl->init->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
+                for (const auto& op : frame_decl->init->optionalParams) sig.param_types.push_back(resolve_type_annotation(op.second.first));
+                function_signatures[init_name] = sig;
+            }
+            for (const auto& m : frame_decl->methods) {
+                std::string m_name = name + "." + m->name;
+                FunctionSignature sig;
+                sig.name = m_name;
+                sig.declaration = m;
+                sig.return_type = m->returnType ? resolve_type_annotation(m->returnType) : type_system.NIL_TYPE;
+                sig.param_types.push_back(type_system.createFrameType(name));
+                for (const auto& p : m->parameters) sig.param_types.push_back(resolve_type_annotation(p.second));
+                for (const auto& op : m->optionalParams) sig.param_types.push_back(resolve_type_annotation(op.second.first));
+                function_signatures[m_name] = sig;
+                info.methodSignatures[m->name] = sig.return_type;
+            }
+            if (frame_decl->deinit) {
+                std::string deinit_name = name + ".deinit";
+                FunctionSignature sig;
+                sig.name = deinit_name;
+                sig.declaration = frame_decl->deinit;
+                sig.return_type = type_system.NIL_TYPE;
+                sig.param_types.push_back(type_system.createFrameType(name));
+                function_signatures[deinit_name] = sig;
+            }
+
+            type_system.registerFrame(name, info);
+            frame_declarations[name].name = info.name;
+            frame_declarations[name].declaration = frame_decl;
+            frame_declarations[name].fields = info.fields;
+
+        } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+            TypeSystem::TraitInfo info;
+            info.name = name;
+            info.declaration = trait_decl;
+            info.extends = trait_decl->extends;
+            for (const auto& m : trait_decl->methods) {
+                std::string m_name = name + "." + m->name;
+                FunctionSignature sig;
+                sig.name = m_name;
+                sig.return_type = m->returnType ? resolve_type_annotation(m->returnType.value()) : type_system.NIL_TYPE;
+                sig.param_types.push_back(type_system.ANY_TYPE);
+                for (const auto& p : m->params) sig.param_types.push_back(resolve_type_annotation(p.second));
+                function_signatures[m_name] = sig;
+                info.methodSignatures[m->name] = sig.return_type;
+            }
+            type_system.registerTrait(name, info);
+        } else if (auto func_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+            FunctionSignature sig;
+            sig.name = name;
+            if (func_decl->name == "main") {
+                 sig.return_type = type_system.INT64_TYPE;
+            } else {
+                 sig.return_type = func_decl->returnType ? resolve_type_annotation(func_decl->returnType.value()) : type_system.NIL_TYPE;
+            }
+            sig.declaration = func_decl;
+            sig.can_fail = func_decl->canFail || func_decl->throws;
+            sig.error_types = func_decl->declaredErrorTypes;
+            for (const auto& p : func_decl->params) {
+                sig.param_types.push_back(resolve_type_annotation(p.second));
+                sig.optional_params.push_back(false);
+            }
+            for (const auto& op : func_decl->optionalParams) {
+                sig.param_types.push_back(resolve_type_annotation(op.second.first));
+                sig.optional_params.push_back(true);
+            }
+            function_signatures[name] = sig;
+            
+            std::vector<std::string> param_names;
+            std::vector<bool> has_defaults;
+            for (const auto& p : func_decl->params) {
+                param_names.push_back(p.first);
+                has_defaults.push_back(false);
+            }
+            for (const auto& op : func_decl->optionalParams) {
+                param_names.push_back(op.first);
+                has_defaults.push_back(op.second.second != nullptr);
+            }
+            TypePtr func_type = type_system.createFunctionType(param_names, sig.param_types, sig.return_type, has_defaults);
+            variable_types[name] = func_type;
+            declare_variable(name, func_type);
+        } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
+            TypePtr var_type = (var_decl->type && var_decl->type.value()) ? resolve_type_annotation(var_decl->type.value()) : type_system.ANY_TYPE;
+            declare_variable(name, var_type);
+        } else if (auto enum_decl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) {
+            check_enum_declaration(enum_decl);
+        } else if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
+            check_type_declaration(type_decl);
+        }
+    };
+
+    for (const auto& stmt : program->statements) {
+        std::string name;
+        if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) name = frame->name;
+        else if (auto trait = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) name = trait->name;
+        else if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) name = func->name;
+        else if (auto enm = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) name = enm->name;
+        if (!name.empty()) resolve_sig(name, stmt);
+    }
+    for (const auto& [name, stmt] : program->imported_symbols) {
+        resolve_sig(name, stmt);
+    }
+
+    // PASS 2.5: Global Scope Population
+    // Register built-in and already-discovered symbols in the global scope
+    for (const auto& pair : function_signatures) {
+        TypePtr type = nullptr;
+        auto vt_it = variable_types.find(pair.first);
+        if (vt_it != variable_types.end()) {
+            type = vt_it->second;
+        } else {
+            type = type_system.createFunctionType(pair.second.param_types, pair.second.return_type);
+        }
+        declare_variable(pair.first, type);
+    }
+
+    // PASS 3: Body Verification (local and inlined symbols)
+    // We only verify statements in the current program.
+    // Imported symbols were already verified in their own module's type-check pass.
+    for (const auto& stmt : program->statements) {
+        check_statement(stmt);
+    }
+    
+
+    program->inferred_type = type_system.NIL_TYPE;
+    return !Debugger::hasError();
+}
+
+void TypeChecker::add_error(const std::string& message, int line) {
+    errors.push_back(message);
+
+    int column = 1;
+    std::string lexeme = "";
+    std::string context = "";
+
+    // Auto-extract context, column, and lexeme if current_source and line are available
+    if (line > 0 && !current_source.empty()) {
+        std::vector<std::string> lines = Debugger::splitLines(current_source);
+        if (line <= int(lines.size())) {
+            std::string line_text = lines[line - 1];
+            context = line_text;
+
+            // Try to find a sensible column and lexeme based on the error message
+            // E.g., if error contains "Cannot find variable `foo`" or "variable 'foo'"
+            size_t start_quote = message.find('`');
+            size_t end_quote = std::string::npos;
+            if (start_quote != std::string::npos) {
+                end_quote = message.find('`', start_quote + 1);
+            }
+            if (start_quote == std::string::npos) {
+                start_quote = message.find('\'');
+                if (start_quote != std::string::npos) {
+                    end_quote = message.find('\'', start_quote + 1);
+                }
+            }
+
+            if (start_quote != std::string::npos && end_quote != std::string::npos) {
+                lexeme = message.substr(start_quote + 1, end_quote - start_quote - 1);
+                size_t pos = line_text.find(lexeme);
+                if (pos != std::string::npos) {
+                    column = static_cast<int>(pos) + 1;
+                }
+            } else {
+                // Find first non-whitespace character as fallback
+                size_t first_non_ws = line_text.find_first_not_of(" \t");
+                if (first_non_ws != std::string::npos) {
+                    column = static_cast<int>(first_non_ws) + 1;
+                }
+            }
+        }
+    }
+    
+    if (line > 0 && !current_source.empty()) {
+        Debugger::error(message, line, column, InterpretationStage::SEMANTIC, current_source, current_file_path, lexeme, "");
+    } else {
+        Debugger::error(message, line, column, InterpretationStage::SEMANTIC, "(in REPL)", "(in REPL)", "", "");
+    }
+}
+
+void TypeChecker::add_error(const std::string& message, int line, int column, const std::string& context, 
+                         const std::string& lexeme, const std::string& expected_value) {
+    // Enhanced error with lexeme and expected value information
+    std::string enhancedMessage = message;
+    if (!lexeme.empty()) {
+        enhancedMessage += " (at '" + lexeme + "')";
+    }
+    if (!expected_value.empty()) {
+        enhancedMessage += " - expected: " + expected_value;
+    }
+    
+    errors.push_back(enhancedMessage);
+    if (line > 0 && !current_source.empty()) {
+        Debugger::error(enhancedMessage, line, column, InterpretationStage::SEMANTIC, current_source, current_file_path, context, "");
+    } else {
+        Debugger::error(enhancedMessage, line, column, InterpretationStage::SEMANTIC, "repl", "repl", context, "");
+    }
+}
+
+void TypeChecker::add_type_error(const std::string& expected, const std::string& found, int line) {
+    // Generate more specific type error messages
+    std::string enhancedMessage = "type mismatch\n\n= expected: `" + expected + "`\n= found: `" + found + "`";
+    
+    // Add specific reasons for common type mismatches
+    if (found == "Any" || found == "any") {
+        enhancedMessage += "\n\n= reason: the value has type `any`, which cannot be used where a specific type is required";
+        enhancedMessage += "\n= help: provide a value of type `" + expected + "` or add explicit type annotation";
+    } else if (expected.find("List") != std::string::npos && found.find("List") != std::string::npos) {
+        enhancedMessage += "\n\n= reason: list element types do not match";
+        enhancedMessage += "\n= help: ensure all list elements have the same type";
+    } else if (expected.find("Dict") != std::string::npos && found.find("Dict") != std::string::npos) {
+        enhancedMessage += "\n\n= reason: dictionary key or value types do not match";
+        enhancedMessage += "\n= help: ensure dictionary keys and values have consistent types";
+    } else if (expected == "String" || expected == "str") {
+        enhancedMessage += "\n\n= reason: a string value is required here";
+        enhancedMessage += "\n= help: provide a string literal or convert the value to a string";
+    } else if (expected == "Int" || expected == "int" || expected.find("int") != std::string::npos) {
+        enhancedMessage += "\n\n= reason: an integer value is required here";
+        enhancedMessage += "\n= help: provide an integer literal or convert the value to an integer";
+    } else if (expected == "Bool" || expected == "bool") {
+        enhancedMessage += "\n\n= reason: a boolean value is required here";
+        enhancedMessage += "\n= help: provide a boolean literal (true or false) or a boolean expression";
+    }
+    
+    add_error(enhancedMessage, line);
+}
+
+// =============================================================================
+// SCOPE MANAGEMENT (declare_variable/lookup_variable/enter_scope/exit_scope)
+// Memory-safety helpers, get_code_context, check_assert_call, is_visible and
+// related utilities live in their canonical TUs (memory.cpp / utils.cpp).
+// =============================================================================
+
+void TypeChecker::enter_scope() {
+    current_scope_level++;
+    current_scope = std::make_unique<Scope>(std::move(current_scope), current_function);
+    type_system.pushScope();
+}
+
+void TypeChecker::exit_scope() {
+    current_scope_level--;
+    if (current_scope && current_scope->parent) {
+        current_scope = std::move(current_scope->parent);
+    }
+    type_system.popScope();
+}
+
+void TypeChecker::declare_variable(const std::string& name, TypePtr type) {
+    if (type && type->tag == TypeTag::Function) {
+        declare_variable_memory(name, type);
+        mark_variable_initialized(name);
+    }
+    if (current_scope) {
+        current_scope->declare(name, type);
+    }
+}
+
+TypePtr TypeChecker::lookup_variable(const std::string& name) {
+    TypePtr res = current_scope ? current_scope->lookup(name) : nullptr;
+    if (!res) {
+        auto it = variable_types.find(name);
+        if (it != variable_types.end()) res = it->second;
+    }
+    return res;
+}
+
+} // namespace Frontend
+} // namespace LM

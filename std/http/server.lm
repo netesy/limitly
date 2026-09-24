@@ -1,0 +1,152 @@
+// HTTP Server Module
+// Built on the standard resource abstraction.
+
+import std.core as core;
+import std.resource as res;
+
+pub type ServerRequest = {
+    method: str,
+    path: str,
+    query_string: str,
+    version: str,
+    headers: {str: str},
+    body: str,
+    remote_addr: str,
+    client_resource: res.Resource?
+};
+
+pub type ServerResponse = {
+    status: int,
+    headers: {str: str},
+    body: str
+};
+
+pub type ResultServerRequest = ServerRequest | str; // Simplified Result pattern
+
+frame HTTPServer {
+    var host: str;
+    var port: int;
+    var handle: int;
+    var running: bool;
+    pub var resource: res.Resource?;
+    pub var binder: res.Binder?;
+    pub var listener: res.Listener?;
+    pub var accepter: res.Accepter?;
+
+    pub fn init() {
+        self.host = "0.0.0.0";
+        self.port = 80;
+        self.handle = -1;
+        self.running = false;
+        self.resource = nil;
+        self.binder = nil;
+        self.listener = nil;
+        self.accepter = nil;
+    }
+
+    // Bind and listen
+    pub fn listen(host: str, port: int, backlog: int): core.ResultInt {
+        self.host = host;
+        self.port = port;
+
+        match (res.create_socket()) {
+            val r => {
+                var binder = res.Binder(r=r);
+                if (not binder.bind(args=[host, port])) {
+                    r.close();
+                    return core.err_int("failed to bind to " + host + ":" + port as str);
+                }
+
+                var listener = res.Listener(r=r);
+                if (not listener.listen(args=[backlog])) {
+                    r.close();
+                    return core.err_int("listen failed on port " + port as str);
+                }
+
+                self.resource = r;
+                self.binder = binder;
+                self.listener = listener;
+                self.accepter = res.Accepter(r=r);
+                self.handle = r._handle();
+                self.running = true;
+                return core.ok_int(self.handle);
+            },
+            err e => return core.err_int("failed to create socket")
+        }
+    }
+
+    // Accept a single connection and process the request
+    pub fn accept_request(): ResultServerRequest {
+        match (self.accepter) {
+            val acc => {
+                var client_fd = acc.accept();
+                if (client_fd == -1) return "accept returned nil (no connection)" as ResultServerRequest;
+
+                var cr = res.adopt_socket(fd=client_fd);
+                var rd = res.Reader(r=cr);
+                // Read request data
+                var request_data: str = "";
+                var max_read: int = 1048576; // 1MB max
+                var total: int = 0;
+                while (total < max_read) {
+                    var chunk = rd.read(args=[ []]);
+                    if (chunk == nil) break;
+                    request_data = request_data + (chunk as str);
+                    total = total + len(chunk as str);
+                    if (index_of_h(request_data, "\r\n\r\n") != -1) {
+                        total = max_read; // Simplified
+                    }
+                }
+
+                var req: ServerRequest = parse_server_request(request_data);
+                req.client_resource = cr;
+                req.remote_addr = "client";
+                return req as ResultServerRequest;
+            },
+            nil => return "server not listening" as ResultServerRequest
+        }
+    }
+
+    // Close the server
+    pub fn close(): core.ResultInt {
+        self.running = false;
+        match (self.resource) {
+            val r => {
+                r.close();
+            },
+            nil => {}
+        }
+        self.resource = nil;
+        self.handle = -1;
+        return core.ok_int(0);
+    }
+
+    // Check for incoming connections (non-blocking)
+    pub fn has_connection(): bool {
+        match (self.resource) {
+            val r => {
+                var poller = res.Poller(r=r);
+                return poller.poll();
+            },
+            nil => return false
+        }
+    }
+}
+
+fn parse_server_request(raw: str): ServerRequest {
+    var req: ServerRequest = {
+        method: "", path: "", query_string: "", version: "", 
+        headers: {}, body: "", remote_addr: "", client_resource: nil
+    };
+    // ... Simplified parser ...
+    return req;
+}
+
+fn index_of_h(s: str, pattern: str): int {
+    var i: int = 0;
+    while (i <= len(s) - len(pattern)) {
+        if (substring(s, i, i + len(pattern)) == pattern) return i;
+        i = i + 1;
+    }
+    return -1;
+}

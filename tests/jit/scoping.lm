@@ -1,0 +1,38 @@
+// tests/jit/scoping.lm
+
+print("--- Global Scope ---");
+var global_var = "I am global";
+print(global_var);
+
+{
+  print("--- Nested Scope 1 ---");
+  var local_var = "I am local";
+  print(global_var);
+  print(local_var);
+}
+
+print("--- Back to Global Scope ---");
+print(global_var);
+// print(local_var); // This would cause an error, as expected.
+
+print("--- Shadowing ---");
+var shadow_var = "global";
+print(shadow_var);
+
+{
+  print("--- Shadowing in Nested Scope ---");
+  var shadow_var = "local";
+  print(shadow_var);
+}
+
+print("--- Shadowing back in Global Scope ---");
+print(shadow_var);
+
+print("--- For Loop Scope ---");
+for (var i = 0; i < 2; i = i + 1) {
+  var loop_local = "loop local";
+  print(i);
+  print(loop_local);
+}
+// print(i); // Error
+// print(loop_local); // Error

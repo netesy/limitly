@@ -1,0 +1,26 @@
+var a = 0x0F;
+var b = 0xF0;
+
+print("a: ", a);
+print("b: ", b);
+
+var c = a | b;
+print("a | b: ", c);
+
+var d = a & b;
+print("a & b: ", d);
+
+var e = a ^ 255;
+print("a ^ 255: ", e);
+
+var f = 1 << 4;
+print("1 << 4: ", f);
+
+var g = 16 >> 2;
+print("16 >> 2: ", g);
+
+var h = ~0;
+print("~0: ", h);
+
+var i = 0x1234;
+print("0x1234: ", i);

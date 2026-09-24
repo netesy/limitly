@@ -1,0 +1,26 @@
+frame Rect {
+    pub var x: float;
+    pub var y: float;
+    pub var w: float;
+    pub var h: float;
+    
+    pub init(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0) {
+        self.x = x;
+        self.y = y;
+        self.w = w;
+        self.h = h;
+    }
+    
+    pub fn contains(px: float, py: float): bool {
+        return px >= self.x and px <= self.x + self.w and py >= self.y and py <= self.y + self.h;
+    }
+    
+    pub fn intersects(other: Rect): bool {
+        return !(other.x > self.x + self.w or 
+                 other.x + other.w < self.x or 
+                 other.y > self.y + self.h or 
+                 other.y + other.h < self.y);
+    }
+    
+    pub fn area(): float { return self.w * self.h; }
+}

@@ -1,0 +1,208 @@
+// std/image/font.lm
+// TrueType Font loading, rasterization, and system font detection using stb_truetype.
+
+import std.ffi as ffi;
+import std.image.index as image;
+
+frame FontMetrics {
+    pub var ascent: float;
+    pub var descent: float;
+    pub var line_gap: float;
+    pub var line_height: float;
+
+    pub init(ascent: float = 0.0, descent: float = 0.0, line_gap: float = 0.0, line_height: float = 0.0) {
+        self.ascent = ascent;
+        self.descent = descent;
+        self.line_gap = line_gap;
+        self.line_height = line_height;
+    }
+}
+
+frame Font {
+    pub var handle: int;
+    pub var path: str;
+    pub var is_valid: bool;
+
+    pub init(handle: int = 0, path: str = "") {
+        self.handle = handle;
+        self.path = path;
+        self.is_valid = (handle != 0 and handle != nil);
+    }
+
+    pub fn free(): nil {
+        if (self.is_valid and self.handle != 0) {
+            unsafe {
+                var lib: int = image._open_lib();
+                if (lib != nil) {
+                    var fn_free: int = ffi.library_get_symbol(lib, "free_font");
+                    if (fn_free != nil) {
+                        ffi.call_void_1(fn_free, self.handle);
+                    }
+                    ffi.library_unload(lib);
+                }
+            }
+            self.handle = 0;
+            self.is_valid = false;
+        }
+    }
+
+    pub fn text_width(text: str, font_size: float = 16.0): float {
+        if (not self.is_valid or text == "") { return 0.0; }
+        unsafe {
+            var lib: int = image._open_lib();
+            if (lib == nil) { return 0.0; }
+            var fn_meas: int = ffi.library_get_symbol(lib, "measure_text_width_int");
+            if (fn_meas == nil) { ffi.library_unload(lib); return 0.0; }
+            var cs: ffi.CString = ffi.string_to_cstring(text);
+            var sz_int: int = font_size as int;
+            var w: int = ffi.foreign_call(
+                fn_meas,
+                [self.handle, sz_int, ffi.cstring_as_ptr(cs)],
+                ffi.TYPE_I32,
+                [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_PTR]
+            ) as int;
+            ffi.cstring_free(cs);
+            ffi.library_unload(lib);
+            return w as float;
+        }
+    }
+
+    pub fn text_height(text: str, font_size: float = 16.0): float {
+        if (not self.is_valid or text == "") { return 0.0; }
+        unsafe {
+            var lib: int = image._open_lib();
+            if (lib == nil) { return 0.0; }
+            var fn_meas: int = ffi.library_get_symbol(lib, "measure_text_height_int");
+            if (fn_meas == nil) { ffi.library_unload(lib); return 0.0; }
+            var cs: ffi.CString = ffi.string_to_cstring(text);
+            var sz_int: int = font_size as int;
+            var h: int = ffi.foreign_call(
+                fn_meas,
+                [self.handle, sz_int, ffi.cstring_as_ptr(cs)],
+                ffi.TYPE_I32,
+                [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_PTR]
+            ) as int;
+            ffi.cstring_free(cs);
+            ffi.library_unload(lib);
+            return h as float;
+        }
+    }
+
+    pub fn render(text: str, font_size: float = 16.0, color: any = nil): image.Image? {
+        if (not self.is_valid or text == "") { return err(); }
+        var c: image.Pixel = image.white;
+        if (color != nil) {
+            c = color as image.Pixel;
+        }
+        unsafe {
+            var lib: int = image._open_lib();
+            if (lib == nil) { return err(); }
+            var fn_render: int = ffi.library_get_symbol(lib, "render_text_rgba");
+            var fn_free_buf: int = ffi.library_get_symbol(lib, "free_text_rgba");
+            if (fn_render == nil) { ffi.library_unload(lib); return err(); }
+
+            var w_p: int = ffi.alloc(4);
+            var h_p: int = ffi.alloc(4);
+            var cs: ffi.CString = ffi.string_to_cstring(text);
+
+            var raw_buf: int = ffi.foreign_call(
+                fn_render,
+                [self.handle, font_size, ffi.cstring_as_ptr(cs), c.r, c.g, c.b, c.a, w_p, h_p],
+                ffi.TYPE_I64,
+                [ffi.TYPE_PTR, ffi.TYPE_F32, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_PTR]
+            ) as int;
+
+
+            ffi.cstring_free(cs);
+            var w: int = ffi.load_i32(w_p);
+            var h: int = ffi.load_i32(h_p);
+            ffi.free(w_p);
+            ffi.free(h_p);
+
+            if (raw_buf == nil or w <= 0 or h <= 0) {
+                ffi.library_unload(lib);
+                return err();
+            }
+
+            var total_bytes: int = w * h * 4;
+            var img_p: int = ffi.alloc(total_bytes);
+            if (img_p == nil) {
+                if (fn_free_buf != nil) { ffi.call_void_1(fn_free_buf, raw_buf); }
+                ffi.library_unload(lib);
+                return err();
+            }
+            ffi.memcpy(img_p, raw_buf, total_bytes);
+            if (fn_free_buf != nil) {
+                ffi.call_void_1(fn_free_buf, raw_buf);
+            }
+
+            return ok(image.Image(w=w, h=h, c=4, p=img_p, lib=lib));
+        }
+    }
+}
+
+pub fn detect_system_font(preferred_name: str = ""): str {
+    unsafe {
+        var lib: int = image._open_lib();
+        if (lib == nil) { return ""; }
+        var fn_detect: int = ffi.library_get_symbol(lib, "detect_system_font_path");
+        if (fn_detect == nil) { ffi.library_unload(lib); return ""; }
+
+        var cs_pref: ffi.CString = ffi.string_to_cstring(preferred_name);
+        var out_buf: int = ffi.alloc(512);
+        ffi.memset(out_buf, 0, 512);
+
+        var found: int = ffi.foreign_call(
+            fn_detect,
+            [ffi.cstring_as_ptr(cs_pref), out_buf, 512],
+            ffi.TYPE_I32,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32]
+        ) as int;
+
+        ffi.cstring_free(cs_pref);
+        var result: str = "";
+        if (found != 0) {
+            result = ffi.cstring_to_string(out_buf);
+        }
+        ffi.free(out_buf);
+        ffi.library_unload(lib);
+        return result;
+    }
+}
+
+pub fn load_font(filepath: str): Font? {
+    unsafe {
+        var lib: int = image._open_lib();
+        if (lib == nil) { return err(); }
+        var fn_load: int = ffi.library_get_symbol(lib, "load_font_file");
+        if (fn_load == nil or fn_load == 0) {
+            ffi.library_unload(lib);
+            return err();
+        }
+
+        var cs: ffi.CString = ffi.string_to_cstring(filepath);
+        var handle: int = ffi.foreign_call(
+            fn_load,
+            [ffi.cstring_as_ptr(cs)],
+            ffi.TYPE_I64,
+            [ffi.TYPE_PTR]
+        ) as int;
+        ffi.cstring_free(cs);
+
+        if (handle == nil or handle == 0) {
+            ffi.library_unload(lib);
+            return err();
+        }
+        return ok(Font(handle=handle, path=filepath));
+    }
+}
+
+
+
+pub fn load_system_font(preferred_name: str = ""): Font? {
+    var path: str = detect_system_font(preferred_name);
+    if (path == "") {
+        return err();
+    }
+    return load_font(path);
+}

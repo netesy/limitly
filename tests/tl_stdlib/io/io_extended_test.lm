@@ -1,0 +1,40 @@
+// IO tests - STDOUT/STDERR resources and file resource lifecycle
+
+print("=== IO Tests ===");
+
+// STDOUT resource (type 9)
+var stdout_h = resource_create(9);
+assert(stdout_h > 0, "IO: stdout positive");
+var sw: bool = resource_call(stdout_h, 3, "IO: stdout ok");
+assert(sw, "IO: stdout write");
+resource_call(stdout_h, 1, "x");
+resource_destroy(stdout_h);
+
+// STDERR resource (type 10)
+var stderr_h = resource_create(10);
+assert(stderr_h > 0, "IO: stderr positive");
+var ew: bool = resource_call(stderr_h, 3, "IO: stderr ok");
+assert(ew, "IO: stderr write");
+resource_call(stderr_h, 1, "x");
+resource_destroy(stderr_h);
+
+// File resource (type 0) lifecycle
+var r = resource_create(0);
+assert(r > 0, "IO: file resource positive");
+resource_destroy(r);
+resource_destroy(r);
+
+// Invalid resource type
+var bad_r = resource_create(99);
+assert(bad_r == -1 or bad_r == nil, "IO: invalid type");
+
+// Handles are unique and incrementing
+var h1 = resource_create(9);
+var h2 = resource_create(10);
+var h3 = resource_create(9);
+assert(h3 > h1, "IO: handles increment");
+resource_destroy(h1);
+resource_destroy(h2);
+resource_destroy(h3);
+
+print("IO tests passed!");

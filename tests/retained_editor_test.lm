@@ -1,0 +1,78 @@
+// Retained Mode Text Editor Example & Test in Limit std.ui
+import std.ui as ui;
+import std.ui.context as ctx;
+import std.text.controller as text_ctrl;
+
+fn main(): int {
+    print("=== Retained Mode Text Editor Test ===\n");
+
+    // 1. Initialize UI Context
+    ctx.ui_init();
+    ctx.set_viewport_size(800.0, 600.0);
+
+    // 2. Initial Document Content
+    var initial_code = "# Limit Language Text Editor\nfn main(): int\n    var x: int = 42\n    return 0";
+
+    // 3. Create Retained Mode Textarea Widget
+    var editor_widget = ui.textarea(initial_code, "Type code here...")
+        .width(500.0)
+        .height(250.0)
+        .background(ui.rgb(20, 22, 28))
+        .foreground(ui.white)
+        .corner_radius(6.0)
+        .padding(10.0);
+
+    // Get reference to EditorController from text_editor_state
+    var controller = editor_widget.text_editor_state as text_ctrl.EditorController;
+    if (controller == nil) {
+        print("ERROR: EditorController was not initialized in textarea widget!\n");
+        return 1;
+    }
+
+    print("Initial Document Text:\n");
+    print(controller.get_text() + "\n");
+    print("Initial Line Count: " + (controller.get_line_count() as str) + "\n");
+
+    // 4. Test Text Controller Operations (Insert, Backspace, Navigation)
+    print("\nPerforming Editing Operations...\n");
+
+    // Insert new line
+    controller.insert_newline();
+    controller.insert_text("// Added comment via controller");
+    print("Updated Line Count: " + (controller.get_line_count() as str) + "\n");
+
+    // Move cursor and test selection
+    controller.move_up(false);
+    controller.move_left(false);
+    print("Cursor Position: Line " + (controller.get_cursor_line() as str) + ", Col " + (controller.get_cursor_col() as str) + "\n");
+
+    // Test Undo / Redo
+    print("\nTesting Undo / Redo in Retained Editor Controller...\n");
+    controller.undo();
+    print("After Undo - Line Count: " + (controller.get_line_count() as str) + "\n");
+    controller.redo();
+    print("After Redo - Line Count: " + (controller.get_line_count() as str) + "\n");
+
+    // 5. Build Complete Retained UI Layout Tree (Toolbar + Editor + Status Bar)
+    var status_text = "Lines: " + (controller.get_line_count() as str) + " | Cursor: (" + (controller.get_cursor_line() as str) + ", " + (controller.get_cursor_col() as str) + ")";
+
+    var editor_view = ui.column([
+        ui.text("Limit Retained Text Editor").bold().font_size(18.0).color(ui.rgb(100, 180, 255)),
+        ui.row([
+            ui.button("Undo", nil).background(ui.rgb(40, 45, 60)),
+            ui.spacer(0.1),
+            ui.button("Redo", nil).background(ui.rgb(40, 45, 60)),
+            ui.spacer(0.1),
+            ui.button("Clear", nil).background(ui.rgb(80, 30, 35))
+        ]).spacing(8.0),
+        editor_widget,
+        ui.text(status_text).font_size(12.0).color(ui.rgb(150, 160, 180))
+    ]).spacing(12.0).padding(16.0).background(ui.rgb(14, 16, 22));
+
+    // Set root layout and update frame pass
+    ctx.set_root(editor_view);
+    ctx.frame_update(0.016);
+
+    print("\n=== Retained Mode Text Editor Test Passed Successfully ===\n");
+    return 0;
+}

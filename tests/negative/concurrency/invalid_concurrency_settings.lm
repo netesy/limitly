@@ -1,0 +1,7 @@
+// @error:type_error
+// Invalid core counts are rejected instead of silently falling back.
+parallel(cores=0, on_error=Stop) {
+    iter(i in 0..1) {
+        print(i);
+    }
+}

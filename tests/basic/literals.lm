@@ -1,0 +1,134 @@
+// Test literal values
+print("=== Literal Value Tests ===");
+
+// Integer literals
+print("Integers:");
+var int1 = 0;
+var int2 = 42;
+var int3 = -17;
+var int4 = 999999;
+
+assert(int1 == 0, "Integer literal 0 should be 0");
+assert(int2 == 42, "Integer literal 42 should be 42");
+assert(int3 == -17, "Integer literal -17 should be -17");
+assert(int4 == 999999, "Integer literal 999999 should be 999999");
+
+print(int1);
+print(int2);
+print(int3);
+print(int4);
+
+// Float literals
+print("Floats:");
+var float1 = 0.0;
+var float2 = 3.14159;
+var float3 = -2.71828;
+var float4 = 1.23e-14;
+var emptyStr = "";
+
+assert(float1 == 0.0, "Float literal 0.0 should be 0.0");
+assert(float2 == 3.14159, "Float literal 3.14159 should be 3.14159");
+assert(float3 == -2.71828, "Float literal -2.71828 should be -2.71828");
+assert(float4 == 1.23e-14, "Float literal 1.23e-14 should be 1.23e-14");
+assert(emptyStr == "", "Empty string should be empty");
+
+print(float1);
+print(float2);
+print(float3);
+print(float4);
+print(emptyStr);
+
+// String literals
+print("Strings:");
+var str1 = "Hello, World!";
+var str2 = "";
+var str3 = "Special chars: \n\t\\\"";
+
+assert(str1 == "Hello, World!", "String literal should match");
+assert(str2 == "", "Empty string should be empty");
+assert(str3 == "Special chars: \n\t\\\"", "Special chars string should match");
+
+print(str1);
+print(str2);
+print(str3);
+
+// Boolean literals
+print("Booleans:");
+var bool1 = true;
+var bool2 = false;
+
+assert(bool1 == true, "Boolean literal true should be true");
+assert(bool2 == false, "Boolean literal false should be false");
+
+print(bool1);
+print(bool2);
+
+// Nil literal
+print("Nil:");
+var nilValue = nil;
+
+assert(nilValue == nil, "Nil literal should be nil");
+
+print(nilValue);
+
+fn test_same_scale() {
+    var a: d2 = 10.25;
+    var b: d2 = 5.75;
+    var c = a + b;
+    assert(c == 16.00, "d2 + d2 should be 16.00");
+
+    var d: d4 = 1.2345;
+    var e: d4 = 0.7655;
+    var f = d + e;
+    assert(f == 2.0000, "d4 + d4 should be 2.0000");
+
+    var g = a * b; 
+}
+
+fn test_mixed_scale() {
+    var a: d2 = 10.25;
+    var b: d4 = 5.2500;
+    var c = a + b;
+    print("c: {c} shoud be 15.5000");
+    assert(c == 15.5000, "d2 + d4 should be 15.5000 (d4)");
+
+    var d: d6 = 0.000001;
+    var e = a + d;
+    print("{e} should be 10.250001");
+    assert(e == 10.250001, "d2 + d6 should be 10.250001 (d6)");
+}
+
+fn test_comparison() {
+    var a: d2 = 10.25;
+    var b: d2 = 10.25;
+    assert(a == b, "10.25 == 10.25");
+
+    var c: d4 = 10.2500;
+    // assert(a == c); // Should fail to compile in a real scenario, or trap if I didn't catch it in type checker.
+    var a_as_d4 = a as d4;
+    assert(a_as_d4 == c, "a as d4 == 10.2500");
+}
+
+fn test_narrowing_trap() {
+    // This should trap. I'll test it separately or use a try-catch equivalent if available.
+    // var a: d4 = 10.2534;
+    // var b: d2 = a as d2;
+}
+
+fn test_arithmetic() {
+    var a: d4 = 10.0000;
+    var b: d4 = 3.0000;
+    var c = a / b;
+    assert(c == 3.3333, "10.0000 / 3.0000 should be 3.3333");
+
+    var d = a % b;
+    assert(d == 1.0000, "10.0000 % 3.0000 should be 1.0000");
+}
+
+
+    print("Running decimal tests...");
+    test_same_scale();
+    test_mixed_scale();
+    test_comparison();
+    test_arithmetic();
+    print("Decimal tests passed!");

@@ -1,0 +1,120 @@
+// Test task and worker statements in concurrent blocks
+print("=== Task and Worker Tests ===");
+
+// ==========================================
+//  Simple task statement in concurrent block
+// ==========================================
+print("\nTesting simple task statement in concurrent block...");
+
+var task_results = channel();
+
+concurrent(ch=task_results, cores=2) {
+    task(i in 1..3) {
+        result = i * i;
+        print("Task {i} result: {result}");
+        task_results.send("Task {i} result: {result}");
+    }
+}
+
+// Print results
+iter (msg in task_results) {
+    print(msg);
+}
+
+// ==========================================
+//  Task with custom iterable in concurrent block
+// ==========================================
+print("\nTesting task with custom iterable in concurrent block...");
+
+var items = ["apple", "banana", "cherry"];
+var uppercase_results = channel();
+
+concurrent(ch=uppercase_results, cores=3) {
+    task(item in items) {
+        var processed = item;
+        uppercase_results.send(processed);
+    }
+}
+
+// Collect results
+iter (result in uppercase_results) {
+    print("Processed item: {result}");
+}
+
+// ==========================================
+//  Worker with channel communication in concurrent block
+// ==========================================
+print("\nTesting worker with channel communication...");
+
+var input_ch = channel();
+var output_ch = channel();
+
+concurrent(ch=input_ch, cores=2) {
+    worker(item) {
+        // Process item (e.g., make it uppercase and add index)
+        var processed = "{item}_processed";
+        input_ch.send(processed);
+    }
+}
+
+// Send data to workers
+input_ch.send("first");
+input_ch.send("second");
+input_ch.send("third");
+
+// Process results
+iter (result in output_ch) {
+    print("Processed: {result}");
+}
+
+// ==========================================
+//  Mixed task and worker in concurrent block
+// ==========================================
+print("\nTesting mixed task and worker in concurrent block...");
+
+var mixed_results = channel();
+
+concurrent(ch=mixed_results, cores=3) {
+    // Task for processing numbers
+    task(i in 1..3) {
+        print("Task processing number: {i}");
+        mixed_results.send("Task result: {i * 10}");
+    }
+    
+    // Worker for processing strings
+    worker(text) {
+        print("Worker processing text: {text}");
+        mixed_results.send("Worker result: {text}");
+    }
+}
+
+// Send data to worker
+mixed_results.send("hello");
+mixed_results.send("world");
+
+// Collect all results
+iter (result in mixed_results) {
+    print("Mixed result: {result}");
+}
+
+// ==========================================
+//  Simple concurrent block with only workers
+// ==========================================
+print("\nTesting concurrent block with only workers...");
+
+var worker_only_results = channel();
+
+concurrent(ch=worker_only_results) {
+    worker(datas) {
+        worker_only_results.send("Worker processed: {datas}");
+    }
+}
+
+worker_only_results.send("test1");
+worker_only_results.send("test2");
+
+iter (result in worker_only_results) {
+    print(result);
+}
+
+print("\n=== Task and Worker Tests Complete ===");

@@ -1,0 +1,6 @@
+var items = [1, 2, 3];
+items.append(4);
+items.append(5);
+print(len(items));
+print(items[3]);
+print(items[4]);

@@ -1,0 +1,15 @@
+// @error:closure_capture
+// Invalid closure variable capture
+
+fn outer() {
+    var x = 10;
+    
+    fn inner() {
+        var y = x + 5;  // Capturing from enclosing scope
+        return y;
+    }
+    
+    return inner();
+}
+
+print(outer());

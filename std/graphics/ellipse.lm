@@ -1,0 +1,19 @@
+var PI: float = 3.141592653589793;
+
+frame Ellipse {
+    pub var cx: float;
+    pub var cy: float;
+    pub var rx: float;
+    pub var ry: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, r1: float = 0.0, r2: float = 0.0) {
+        self.cx = x;
+        self.cy = y;
+        self.rx = r1;
+        self.ry = r2;
+    }
+
+    pub fn area(): float {
+        return PI * self.rx * self.ry;
+    }
+}

@@ -1,0 +1,50 @@
+// tests/ffi/test_font_lib.lm
+// Verification for TrueType Font Loading, System Font Detection, and Text Rasterization.
+
+import std.image as image;
+import std.image.font as font;
+
+fn main(): int {
+    print("=== Test 1: System Font Detection ===");
+    var sys_font_path = image.detect_system_font();
+    print("Detected system font: " + sys_font_path);
+    assert(sys_font_path != "", "Expected system font to be detected");
+
+    print("=== Test 2: System Font Loading ===");
+    var fnt = image.load_system_font()? else {
+        print("Failed to load system font");
+        return 1;
+    };
+    assert(fnt.is_valid, "Expected font to be valid");
+
+    print("=== Test 3: Text Measurement ===");
+    var w = fnt.text_width("Hello Limitly!", 24.0);
+    var h = fnt.text_height("Hello Limitly!", 24.0);
+    print("Measured 'Hello Limitly!' size: width={w}, height={h}");
+    assert(w > 20.0, "Expected text width > 20");
+    assert(h > 10.0, "Expected text height > 10");
+
+    print("=== Test 4: Text Rasterization ===");
+    var text_img_opt = fnt.render("Limitly GUI Engine", 28.0, image.white);
+    assert(text_img_opt != nil, "Expected font.render to succeed");
+    var text_img = text_img_opt?;
+    assert(text_img.is_valid(), "Expected text image to be valid");
+    print("Rendered text image dimensions: {text_img.width}x{text_img.height}");
+    assert(text_img.width > 0 and text_img.height > 0, "Dimensions must be > 0");
+
+
+    print("=== Test 5: Alpha Blend Blitting onto Canvas ===");
+    var canvas = image.create(300, 150)?;
+    canvas.fill(image.rgb(30, 32, 40)); // Dark background
+    image.blend_blit(canvas, text_img, 20, 50);
+
+    var save_res = canvas.save("test_font_render.png");
+    assert(save_res != nil, "Failed to save font test image");
+
+    text_img.free();
+    canvas.free();
+    fnt.free();
+
+    print("=== Font & System Detection Tests Passed! ===");
+    return 0;
+}

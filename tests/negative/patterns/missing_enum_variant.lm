@@ -1,0 +1,18 @@
+// @error:pattern_exhaustive
+// Missing variant in enum match
+
+enum Status {
+    Pending,
+    Running,
+    Complete,
+    Failed
+}
+
+var status = Status.Pending;
+
+match (status) {
+    Status.Pending => { print("Waiting"); },
+    Status.Running => { print("In progress"); },
+    Status.Complete => { print("Done"); }
+    // Missing Status.Failed case
+}

@@ -1,0 +1,13 @@
+// XML Module Gateway Index
+
+import std.xml.document as doc;
+import std.xml.parser as parser_mod;
+import std.xml.writer as writer_mod;
+
+pub fn parse(text: str): doc.XMLDocument {
+    return parser_mod.parse(text);
+}
+
+pub fn stringify(node_val: any): str {
+    return writer_mod.stringify_node(node_val);
+}

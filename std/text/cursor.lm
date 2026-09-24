@@ -1,0 +1,54 @@
+frame Cursor {
+    pub var line: int;
+    pub var col: int;
+    pub var pref_col: int;
+
+    pub init(l: int = 0, c: int = 0) {
+        self.line = l;
+        self.col = c;
+        self.pref_col = c;
+    }
+
+    pub fn set(l: int, c: int): nil {
+        self.line = l;
+        self.col = c;
+        self.pref_col = c;
+    }
+}
+
+frame Selection {
+    pub var anchor_line: int;
+    pub var anchor_col: int;
+    pub var active_line: int;
+    pub var active_col: int;
+
+    pub init() {
+        self.anchor_line = 0;
+        self.anchor_col = 0;
+        self.active_line = 0;
+        self.active_col = 0;
+    }
+
+    pub fn set(line: int, col: int): nil {
+        self.anchor_line = line;
+        self.anchor_col = col;
+        self.active_line = line;
+        self.active_col = col;
+    }
+
+    pub fn extend_to(line: int, col: int): nil {
+        self.active_line = line;
+        self.active_col = col;
+    }
+
+    pub fn is_empty(): bool {
+        return self.anchor_line == self.active_line and self.anchor_col == self.active_col;
+    }
+
+    pub fn get_range(): (int, int, int, int) {
+        if (self.anchor_line < self.active_line or (self.anchor_line == self.active_line and self.anchor_col <= self.active_col)) {
+            return (self.anchor_line, self.anchor_col, self.active_line, self.active_col);
+        }
+        return (self.active_line, self.active_col, self.anchor_line, self.anchor_col);
+    }
+}

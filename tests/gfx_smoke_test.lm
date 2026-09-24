@@ -1,0 +1,5 @@
+import std.gfx.types as gfx;
+print("GFX Smoke Test");
+var v = gfx.Viewport(x=10, y=20);
+print("Viewport X: ");
+print(v.x);

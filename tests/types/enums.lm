@@ -1,0 +1,224 @@
+// Enum Type Tests - Comprehensive Coverage
+// Tests enum declarations, variants, pattern matching, and edge cases
+
+print("=== Enum Type Tests ===");
+
+// Test 1: Basic enum declaration
+print("\n--- Test 1: Basic Enum Declaration ---");
+enum Color {
+    Red,
+    Green,
+    Blue
+}
+
+var color1: Color = Color.Red;
+var color2: Color = Color.Green;
+var color3: Color = Color.Blue;
+
+print("Color 1: {color1}");
+print("Color 2: {color2}");
+print("Color 3: {color3}");
+
+// Test 2: Enum with associated values
+print("\n--- Test 2: Enum with Associated Values ---");
+enum Result {
+    Success(str),
+    Error(str),
+    Pending
+}
+
+var result1: Result = Result.Success("Operation completed");
+var result2: Result = Result.Error("Something went wrong");
+var result3: Result = Result.Pending;
+
+print("Result 1: {result1}");
+print("Result 2: {result2}");
+print("Result 3: {result3}");
+
+// Test 3: Enum pattern matching
+print("\n--- Test 3: Enum Pattern Matching ---");
+fn describeColor(color: Color): str {
+    match (color) {
+        Color.Red => { return "The color red"; },
+        Color.Green => { return "The color green"; },
+        Color.Blue => { return "The color blue"; }
+    }
+}
+
+var desc1 = describeColor(Color.Red);
+var desc2 = describeColor(Color.Green);
+var desc3 = describeColor(Color.Blue);
+
+print("Description 1: {desc1}");
+print("Description 2: {desc2}");
+print("Description 3: {desc3}");
+
+// Test 4: Enum with multiple variants
+print("\n--- Test 4: Enum with Multiple Variants ---");
+enum Status {
+    Active,
+    Inactive,
+    Pending,
+    Archived,
+    Deleted
+}
+
+var status1: Status = Status.Active;
+var status2: Status = Status.Pending;
+var status3: Status = Status.Archived;
+var status4: Status = Status.Inactive;
+var status5: Status = Status.Deleted;
+
+print("Status 1: {status1}");
+print("Status 2: {status2}");
+print("Status 3: {status3}");
+print("Status 4: {status4}");
+print("Status 5: {status5}");
+
+// Test 5: Enum in function parameters
+print("\n--- Test 5: Enum in Function Parameters ---");
+fn isActive(status: Status): bool {
+    match (status) {
+        Status.Active => { return true; },
+        _ => { return false; }
+    }
+}
+
+var active1 = isActive(Status.Active);
+var active2 = isActive(Status.Inactive);
+var active3 = isActive(Status.Pending);
+
+print("Is Active 1: {active1}");
+print("Is Active 2: {active2}");
+print("Is Active 3: {active3}");
+
+// Test 6: Enum with numeric association
+print("\n--- Test 6: Enum with Numeric Association ---");
+enum Priority {
+    Low(int),
+    Medium(int),
+    High(int)
+}
+
+var priority1: Priority =  Priority.Low(1);
+var priority2: Priority =  Priority.Medium(5);
+var priority3: Priority =  Priority.High(10);
+
+print("Priority 1: {priority1}");
+print("Priority 2: {priority2}");
+print("Priority 3: {priority3}");
+
+// Test 7: Enum type compatibility
+print("\n--- Test 7: Enum Type Compatibility ---");
+type ColorType = Color;
+type StatusType = Status;
+
+var colorVar: ColorType = Color.Red;
+var statusVar: StatusType = Status.Active;
+
+print("Color variable: {colorVar}");
+print("Status variable: {statusVar}");
+
+// Test 8: Enum in collections
+print("\n--- Test 8: Enum in Collections ---");
+var colors: [Color] = [Color.Red, Color.Green, Color.Blue, Color.Red, Color.Green];
+var statuses: [Status] = [Status.Active, Status.Inactive, Status.Pending, Status.Active];
+
+print("Colors list: {colors}");
+print("Statuses list: {statuses}");
+
+// Test 9: Enum exhaustiveness checking
+print("\n--- Test 9: Enum Exhaustiveness ---");
+fn getColorCode(color: Color): int {
+    match (color) {
+        Color.Red => { return 255; },
+        Color.Green => { return 128; },
+        Color.Blue => { return 64; }
+    }
+}
+
+// Test 7: Complex Enum with Mixed Variants
+print("\n--- Test 7: Complex Enum with Mixed Variants ---");
+enum Message {
+    Quit,
+    Move(int, int),
+    Write(str),
+    ChangeColor(int, int, int)
+}
+
+fn processMessage(msg: Message) {
+    match (msg) {
+        Message.Quit => { print("Quitting..."); },
+        Message.Move(x, y) => { print("Moving to ({x}, {y})"); },
+        Message.Write(text) => { print("Writing: {text}"); },
+        Message.ChangeColor(r, g, b) => { print("Changing color to RGB({r}, {g}, {b})"); }
+    }
+}
+
+processMessage(Message.Quit);
+processMessage(Message.Move(10, 20));
+processMessage(Message.Write("Hello World"));
+processMessage(Message.ChangeColor(255, 0, 0));
+
+// Test 8: Nested Enum Usage
+print("\n--- Test 8: Nested Enum Usage ---");
+enum Shape {
+    Circle(float),
+    Rectangle(float, float)
+}
+
+enum ShapeStatus {
+    Visible(Shape),
+    Hidden
+}
+
+var s1 = ShapeStatus.Visible(Shape.Circle(5.0));
+var s2 = ShapeStatus.Hidden;
+
+fn describeShapeStatus(ss: ShapeStatus) {
+    match (ss) {
+        ShapeStatus.Visible(shape) => {
+            match (shape) {
+                Shape.Circle(r) => { print("Visible Circle with radius {r}"); },
+                Shape.Rectangle(w, h) => { print("Visible Rectangle with {w}x{h}"); }
+            }
+        },
+        ShapeStatus.Hidden => { print("Shape is hidden"); }
+    }
+}
+
+describeShapeStatus(s1);
+describeShapeStatus(s2);
+
+// Test 9: Enum with Type Aliases for context (Simulating Ambiguity)
+print("\n--- Test 9: Enum Ambiguity Handling ---");
+enum State {
+    Running,
+    Stopped,
+    Pending
+}
+
+// Result.Pending vs Status.Pending vs State.Pending
+// Enforced qualification should resolve self
+var state1: State = State.Pending;
+var status6: Status = Status.Pending;
+var result4: Result = Result.Pending;
+
+print("State: {state1}");
+print("Status: {status6}");
+print("Result: {result4}");
+
+// Test 10: Using wildcards in enum matching
+print("\n--- Test 10: Wildcards in Matching ---");
+fn checkConnectivity(status: Status) {
+    match (status) {
+        Status.Active => { print("Connected and active"); },
+        _ => { print("Not active ({status})"); }
+    }
+}
+
+checkConnectivity(Status.Active);
+checkConnectivity(Status.Inactive);
+checkConnectivity(Status.Deleted);
+
+print("\n=== Enum Type Tests Complete ===");

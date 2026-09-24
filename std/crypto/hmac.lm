@@ -1,0 +1,80 @@
+// std/crypto/hmac.lm
+// Clean HMAC implementation using OpenSSL EVP HMAC
+
+import std.ffi as ffi;
+import std.crypto.hash as hash;
+
+frame HMAC {
+    pub fn compute(key: str, data: str, algo: str = "sha256"): str {
+        return hmac(algo, key, data);
+    }
+
+    pub fn sha256(key: str, data: str): str {
+        return hmac("sha256", key, data);
+    }
+
+    pub fn sha512(key: str, data: str): str {
+        return hmac("sha512", key, data);
+    }
+
+    pub fn sha384(key: str, data: str): str {
+        return hmac("sha384", key, data);
+    }
+
+    pub fn md5(key: str, data: str): str {
+        return hmac("md5", key, data);
+    }
+
+    pub fn sha1(key: str, data: str): str {
+        return hmac("sha1", key, data);
+    }
+}
+
+pub fn hmac(algo: str, key: str, data: str): str {
+    var out_str: str = "";
+    unsafe {
+        var lib = hash._open_lib();
+        if (lib != nil and lib != 0) {
+            var fn_hmac = ffi.library_get_symbol(lib, "crypto_hmac");
+            if (fn_hmac != nil and fn_hmac != 0) {
+                var cs_algo: ffi.CString = ffi.string_to_cstring(algo);
+                var cs_key: ffi.CString  = ffi.string_to_cstring(key);
+                var cs_data: ffi.CString = ffi.string_to_cstring(data);
+                var out_buf: int = ffi.alloc(130);
+
+                var ok_code = ffi.foreign_call(
+                    fn_hmac,
+                    [
+                        ffi.cstring_as_ptr(cs_algo),
+                        ffi.cstring_as_ptr(cs_key), len(key),
+                        ffi.cstring_as_ptr(cs_data), len(data),
+                        out_buf
+                    ],
+                    ffi.TYPE_I32,
+                    [
+                        ffi.TYPE_PTR,
+                        ffi.TYPE_PTR, ffi.TYPE_I32,
+                        ffi.TYPE_PTR, ffi.TYPE_I32,
+                        ffi.TYPE_PTR
+                    ]
+                );
+
+                if (ok_code == 1) {
+                    out_str = ffi.cstring_to_string(out_buf);
+                }
+
+                ffi.cstring_free(cs_algo);
+                ffi.cstring_free(cs_key);
+                ffi.cstring_free(cs_data);
+                ffi.free(out_buf);
+            }
+        }
+    }
+    return out_str;
+}
+
+pub fn sha256(key: str, data: str): str { return hmac("sha256", key, data); }
+pub fn sha512(key: str, data: str): str { return hmac("sha512", key, data); }
+pub fn sha384(key: str, data: str): str { return hmac("sha384", key, data); }
+pub fn sha1(key: str, data: str): str   { return hmac("sha1", key, data); }
+pub fn md5(key: str, data: str): str    { return hmac("md5", key, data); }

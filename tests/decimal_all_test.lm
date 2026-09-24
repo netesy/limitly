@@ -1,0 +1,11 @@
+var d2_val: d2 = 12.34;
+print(d2_val);
+
+var d4_val: d4 = 12.3458;
+print(d4_val);
+
+var d6_val: d6 = 12.3456780;
+print(d6_val);
+
+var dec_val: decimal = 99.88;
+print(dec_val);

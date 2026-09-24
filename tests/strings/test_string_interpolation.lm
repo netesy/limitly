@@ -1,0 +1,9 @@
+// Test string interpolation
+var i = 5;
+var j = 10;
+
+print("Simple string");
+print("Value of i: {i}");
+print("Values: {i}, {j}");
+print("Expression: {i + j}");
+print("{i}, {j}");

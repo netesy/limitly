@@ -1,0 +1,109 @@
+#include "intrinsic_registry.hh"
+#include "lir.hh"
+
+namespace LM {
+namespace LIR {
+
+IntrinsicRegistry& IntrinsicRegistry::getInstance() {
+    static IntrinsicRegistry instance;
+    return instance;
+}
+
+IntrinsicRegistry::IntrinsicRegistry() {
+    registerIntrinsic("std.ffi.alloc", {LIR_Op::MemoryAlloc, 0, 0, 1, 0});
+    registerIntrinsic("_ffi_alloc", {LIR_Op::MemoryAlloc, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi.free", {LIR_Op::MemoryFree, 0, 0, 1, 0});
+    registerIntrinsic("_ffi_free", {LIR_Op::MemoryFree, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi.realloc", {LIR_Op::MemoryResize, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.load_i8", {LIR_Op::MemoryLoad, 0, 0, 1, 0});
+    registerIntrinsic("_ffi_load_i8", {LIR_Op::MemoryLoad, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi.load_u8", {LIR_Op::MemoryLoad, 0, 0, 1, 1});
+    registerIntrinsic("_ffi_load_u8", {LIR_Op::MemoryLoad, 0, 0, 1, 1});
+    registerIntrinsic("std.ffi.load_i16", {LIR_Op::MemoryLoad, 0, 0, 1, 2});
+    registerIntrinsic("std.ffi.load_u16", {LIR_Op::MemoryLoad, 0, 0, 1, 3});
+    registerIntrinsic("std.ffi.load_i32", {LIR_Op::MemoryLoad, 0, 0, 1, 4});
+    registerIntrinsic("std.ffi.load_u32", {LIR_Op::MemoryLoad, 0, 0, 1, 5});
+    registerIntrinsic("std.ffi.load_i64", {LIR_Op::MemoryLoad, 0, 0, 1, 6});
+    registerIntrinsic("std.ffi.load_u64", {LIR_Op::MemoryLoad, 0, 0, 1, 7});
+    registerIntrinsic("std.ffi.load_f32", {LIR_Op::MemoryLoad, 0, 0, 1, 8});
+    registerIntrinsic("std.ffi.load_f64", {LIR_Op::MemoryLoad, 0, 0, 1, 9});
+    registerIntrinsic("std.ffi.load_ptr", {LIR_Op::MemoryLoad, 0, 0, 1, 10});
+    registerIntrinsic("std.ffi.store_i8", {LIR_Op::MemoryStore, 0, 0, 2, 0});
+    registerIntrinsic("_ffi_store_i8", {LIR_Op::MemoryStore, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.store_u8", {LIR_Op::MemoryStore, 0, 0, 2, 1});
+    registerIntrinsic("std.ffi.store_i16", {LIR_Op::MemoryStore, 0, 0, 2, 2});
+    registerIntrinsic("std.ffi.store_u16", {LIR_Op::MemoryStore, 0, 0, 2, 3});
+    registerIntrinsic("std.ffi.store_i32", {LIR_Op::MemoryStore, 0, 0, 2, 4});
+    registerIntrinsic("std.ffi.store_u32", {LIR_Op::MemoryStore, 0, 0, 2, 5});
+    registerIntrinsic("std.ffi.store_i64", {LIR_Op::MemoryStore, 0, 0, 2, 6});
+    registerIntrinsic("std.ffi.store_u64", {LIR_Op::MemoryStore, 0, 0, 2, 7});
+    registerIntrinsic("std.ffi.store_f32", {LIR_Op::MemoryStore, 0, 0, 2, 8});
+    registerIntrinsic("std.ffi.store_f64", {LIR_Op::MemoryStore, 0, 0, 2, 9});
+    registerIntrinsic("std.ffi.store_ptr", {LIR_Op::MemoryStore, 0, 0, 2, 10});
+    registerIntrinsic("std.ffi.memset", {LIR_Op::MemoryFill, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.memcpy", {LIR_Op::MemoryCopy, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.memcmp", {LIR_Op::MemoryCompare, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.ptr_add", {LIR_Op::PtrAdd, 0, 0, 2, 0});
+    // Private in-module alias used by std.ffi helpers. Calls made inside the
+    // defining module are not import-qualified by the resolver.
+    registerIntrinsic("_ffi_ptr_add", {LIR_Op::PtrAdd, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.ptr_sub", {LIR_Op::PtrSub, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.ptr_diff", {LIR_Op::PtrDiff, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.library_load", {LIR_Op::LibraryLoad, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi.library_unload", {LIR_Op::LibraryUnload, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi.library_get_symbol", {LIR_Op::LibrarySymbol, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.ccall_execute1", {LIR_Op::ForeignCall, 0, 0, 0, 0});
+    registerIntrinsic("std.ffi.ccall_execute1_ptr", {LIR_Op::ForeignCall, 0, 0, 0, 0});
+    registerIntrinsic("std.ffi.ccall_execute1_void", {LIR_Op::ForeignCall, 0, 0, 0, 0});
+    registerIntrinsic("std.ffi.ccall_execute3_ifps_ptr", {LIR_Op::ForeignCall, 0, 0, 0, 0});
+    registerIntrinsic("std.ffi.ccall_execute3_piif", {LIR_Op::ForeignCall, 0, 0, 0, 0});
+    registerIntrinsic("std.ffi.ccall_execute4_sppp_ptr", {LIR_Op::ForeignCall, 0, 0, 0, 0});
+    registerIntrinsic("std.ffi.ccall_execute5_siiip_int", {LIR_Op::ForeignCall, 0, 0, 0, 0});
+    registerIntrinsic("std.ffi.foreign_call", {LIR_Op::ForeignCall, 0, 0, 0, 0});
+    registerIntrinsic("std.ffi.call_i64_0", {LIR_Op::ForeignCall, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi.call_i64_1", {LIR_Op::ForeignCall, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.call_i64_2", {LIR_Op::ForeignCall, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.call_f64_2", {LIR_Op::ForeignCall, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.call_void_1", {LIR_Op::ForeignCall, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.ffi_alloc", {LIR_Op::MemoryAlloc, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi.ffi_free", {LIR_Op::MemoryFree, 0, 0, 1, 0});
+    registerIntrinsic("std.ffi.ffi_realloc", {LIR_Op::MemoryResize, 0, 0, 2, 0});
+    registerIntrinsic("std.ffi.ffi_memset", {LIR_Op::MemoryFill, 0, 0, 3, 0});
+    registerIntrinsic("std.ffi.ffi_memcpy", {LIR_Op::MemoryCopy, 0, 0, 3, 0});
+
+    // Callback trampoline intrinsics
+    // type_id == 0 : create a native trampoline  (returns integer handle)
+    // type_id == 1 : retrieve the code pointer   (returns fnptr)
+    registerIntrinsic("std.ffi.callback_create",  {LIR_Op::CallbackCreate,  0, 0, 3, 0});
+    registerIntrinsic("_ffi_callback_create",      {LIR_Op::CallbackCreate,  0, 0, 3, 0});
+    registerIntrinsic("std.ffi.callback_ptr",     {LIR_Op::CallbackCreate,  0, 0, 1, 1});
+    registerIntrinsic("_ffi_callback_ptr",         {LIR_Op::CallbackCreate,  0, 0, 1, 1});
+    registerIntrinsic("std.ffi.callback_destroy", {LIR_Op::CallbackDestroy, 0, 0, 1, 0});
+    registerIntrinsic("_ffi_callback_destroy",     {LIR_Op::CallbackDestroy, 0, 0, 1, 0});
+    // Also register under the alias form (import std.ffi as ffi)
+    registerIntrinsic("ffi.callback_create",      {LIR_Op::CallbackCreate,  0, 0, 3, 0});
+    registerIntrinsic("ffi.callback_ptr",         {LIR_Op::CallbackCreate,  0, 0, 1, 1});
+    registerIntrinsic("ffi.callback_destroy",     {LIR_Op::CallbackDestroy, 0, 0, 1, 0});
+
+    // Unified Resource Intrinsics
+    registerIntrinsic("resource_create", {LIR_Op::ResourceCreate, 0, 0, 1, 0});
+    registerIntrinsic("resource_call", {LIR_Op::ResourceCall, 0, 0, 0, 0});
+    registerIntrinsic("resource_destroy", {LIR_Op::ResourceDestroy, 0, 0, 1, 0});
+}
+
+void IntrinsicRegistry::registerIntrinsic(const std::string& qualified_name, const IntrinsicMetadata& meta) {
+    intrinsics_[qualified_name] = meta;
+}
+
+std::optional<IntrinsicMetadata> IntrinsicRegistry::getIntrinsic(const std::string& qualified_name) const {
+    auto it = intrinsics_.find(qualified_name);
+    if (it != intrinsics_.end()) return it->second;
+    return std::nullopt;
+}
+
+bool IntrinsicRegistry::isIntrinsic(const std::string& qualified_name) const {
+    return intrinsics_.find(qualified_name) != intrinsics_.end();
+}
+
+} // namespace LIR
+} // namespace LM

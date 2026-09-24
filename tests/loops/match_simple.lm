@@ -1,0 +1,42 @@
+// Simple match test for debugging
+
+print("=== Simple Match Test ===");
+
+// Test 1: Basic literal match
+print("\nTest 1: Basic literal match");
+var x: int = 10;
+print("x = {x}");
+
+match (x) {
+    10 => { print("matched 10"); },
+    _ => { print("matched wildcard"); }
+}
+
+// Test 2: Multiple literals
+print("\nTest 2: Multiple literals");
+var y: int = 5;
+print("y = {y}");
+
+match (y) {
+    5 => { print("matched 5"); },
+    10 => { print("matched 10"); },
+    _ => { print("matched wildcard"); }
+}
+
+// Test 3: Variable binding
+print("\nTest 3: Variable binding");
+var z: int = 42;
+
+match (z) {
+    n => { print("matched with binding: {n}"); }
+}
+
+// Test 4: Wildcard only
+print("\nTest 4: Wildcard only");
+var w: int = 99;
+
+match (w) {
+    _ => { print("matched wildcard"); }
+}
+
+print("\n=== Simple Match Test Complete ===");

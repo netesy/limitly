@@ -1,0 +1,43 @@
+// Tests for improved name resolution diagnostics and did you mean suggestions
+
+fn calculate_totals(x: int): int {
+    return x + 10;
+}
+
+frame User {
+    pub name: str;
+    pub age: int;
+
+    pub init(name: str, age: int) {
+        self.name = name;
+        self.age = age;
+    }
+
+    pub fn get_name(): str {
+        return self.name;
+    }
+}
+
+fn test_errors() {
+    // 1. Undefined variable suggestion
+    var count = 10;
+    print(coutn); // Should suggest count
+
+    // 2. Undefined function suggestion
+    calculate_total(10); // Should suggest calculate_totals
+
+    // 3. Undefined type suggestion
+    var name: Strng = "Limit"; // Should suggest String
+
+    // 4. Undefined field suggestion
+    var u = User(name="Alice", age=25) as User;
+    print(u.naem); // Should suggest name
+
+    // 5. Undefined method suggestion
+    print(u.get_naem()); // Should suggest get_name
+}
+
+fn main(): int {
+    test_errors();
+    return 0;
+}

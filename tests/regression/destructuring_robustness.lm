@@ -1,0 +1,13 @@
+// Verification of Destructuring LIR Generation
+var (a, b) = (10, 20);
+print("a: {a}, b: {b}");
+
+var (x, y) = [100, 200];
+print("x: {x}, y: {y}");
+
+fn getTuple(): (int, int, int) {
+    return (1, 2, 3);
+}
+
+var (f, g, h) = getTuple();
+print("f: {f}, g: {g}, h: {h}");

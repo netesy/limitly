@@ -1,0 +1,733 @@
+#include "builtin_functions.hh"
+#include "function_registry.hh"
+#include "lir.hh"
+#include "backend/utf8.hh"
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+#include <functional>
+#include <cmath>
+#include <sstream>
+#include <iomanip>
+#include <ctime>
+#include <chrono>
+#include <thread>
+#include <fstream>
+#include <unordered_map>
+#include <filesystem>
+#include <mutex>
+
+namespace LM {
+namespace LIR {
+
+namespace {
+    std::mutex g_file_table_mutex;
+    int64_t g_next_file_handle = 1;
+    std::unordered_map<int64_t, std::shared_ptr<std::fstream>> g_file_table;
+
+    std::ios_base::openmode parse_open_mode(const std::string& mode) {
+        if (mode == "r" || mode == "read") return std::ios::in;
+        if (mode == "w" || mode == "write") return std::ios::out | std::ios::trunc;
+        if (mode == "a" || mode == "append") return std::ios::out | std::ios::app;
+        if (mode == "r+") return std::ios::in | std::ios::out;
+        if (mode == "w+") return std::ios::in | std::ios::out | std::ios::trunc;
+        if (mode == "a+") return std::ios::in | std::ios::out | std::ios::app;
+        throw std::runtime_error("file_open: unsupported mode '" + mode + "'");
+    }
+}
+
+// LIRBuiltinFunction implementation
+LIRBuiltinFunction::LIRBuiltinFunction(const std::string& name,
+                                     const std::vector<TypeTag>& paramTypes,
+                                     TypeTag returnType,
+                                     LIRBuiltinImpl impl)
+    : name_(name), paramTypes_(paramTypes), returnType_(returnType), implementation_(impl) {
+    
+    // Create LIR-specific signature
+    signature_.name = name_;
+    for (size_t i = 0; i < paramTypes_.size(); i++) {
+        LIRParameter param;
+        param.name = "arg" + std::to_string(i);
+        param.type = typeTagToLIRType(paramTypes_[i]);
+        signature_.parameters.push_back(param);
+    }
+    signature_.returnType = typeTagToLIRType(returnType_);
+}
+
+ValuePtr LIRBuiltinFunction::execute(const std::vector<ValuePtr>& args) {
+    if (!implementation_) {
+        throw std::runtime_error("No implementation for LIR builtin function: " + name_);
+    }
+    
+    // Validate argument count (allow variable arguments if paramTypes is empty)
+    if (!paramTypes_.empty() && args.size() != paramTypes_.size()) {
+        throw std::runtime_error("Argument count mismatch for LIR builtin function: " + name_ + 
+                              " (expected " + std::to_string(paramTypes_.size()) + 
+                              ", got " + std::to_string(args.size()) + ")");
+    }
+    
+    // Validate argument types (skip if variable arguments)
+    for (size_t i = 0; i < args.size() && i < paramTypes_.size(); i++) {
+        if (!args[i]) {
+            throw std::runtime_error("Argument type mismatch for LIR builtin function: " + name_ + 
+                                  " at position " + std::to_string(i) + " (null argument)");
+        }
+        
+        TypeTag expected = paramTypes_[i];
+        TypeTag actual = args[i]->type->tag;
+        
+        bool type_compatible = (expected == actual) || (expected == TypeTag::Any);
+        
+        if (!type_compatible && 
+            (expected == TypeTag::Int || expected == TypeTag::Int32 || expected == TypeTag::Int64 || expected == TypeTag::Int128 || expected == TypeTag::UInt || expected == TypeTag::UInt32 || expected == TypeTag::UInt64 || expected == TypeTag::UInt128) &&
+            (actual == TypeTag::Int || actual == TypeTag::Int32 || actual == TypeTag::Int64 || actual == TypeTag::Int128 || actual == TypeTag::UInt || actual == TypeTag::UInt32 || actual == TypeTag::UInt64 || actual == TypeTag::UInt128)) {
+            type_compatible = true;
+        }
+        
+        if (!type_compatible &&
+            (expected == TypeTag::Float32 || expected == TypeTag::Float64) &&
+            (actual == TypeTag::Float32 || actual == TypeTag::Float64)) {
+            type_compatible = true;
+        }
+        
+        if (!type_compatible) {
+            throw std::runtime_error("Argument type mismatch for LIR builtin function: " + name_ + 
+                                  " at position " + std::to_string(i) + 
+                                  " (expected " + std::to_string(static_cast<int>(expected)) + 
+                                  ", got " + std::to_string(static_cast<int>(actual)) + ")");
+        }
+    }
+    
+    return implementation_(args);
+}
+
+bool LIRBuiltinFunction::isNative() const {
+    return true;
+}
+
+const LIRFunctionSignature& LIRBuiltinFunction::getSignature() const {
+    return signature_;
+}
+
+// LIRBuiltinFunctions implementation
+LIRBuiltinFunctions* LIRBuiltinFunctions::instance = nullptr;
+
+LIRBuiltinFunctions& LIRBuiltinFunctions::getInstance() {
+    if (!instance) {
+        instance = new LIRBuiltinFunctions();
+    }
+    return *instance;
+}
+
+void LIRBuiltinFunctions::initialize() {
+    if (initialized_) {
+        return;
+    }
+    
+    registerIOFunctions();      // print, input
+    registerUtilityFunctions(); // typeof, clock, sleep, time, assert, channel
+    
+    initialized_ = true;
+}
+
+void LIRBuiltinFunctions::registerIOFunctions() {
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "print",
+        std::vector<TypeTag>{},  // Variable arguments - empty vector
+        TypeTag::Nil,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            for (size_t i = 0; i < args.size(); ++i) {
+                const auto& value = args[i];
+                if (value && value->type) {
+                    switch (value->type->tag) {
+                        case TypeTag::Int:
+                        case TypeTag::Int32:
+                        case TypeTag::Int64:
+                        case TypeTag::Int128:
+                        case TypeTag::UInt:
+                        case TypeTag::UInt32:
+                        case TypeTag::UInt64:
+                        case TypeTag::UInt128:
+                            std::cout << value->as<int64_t>();
+                            break;
+                        case TypeTag::Float32:
+                        case TypeTag::Float64:
+                            std::cout << value->as<double>();
+                            break;
+                        case TypeTag::Decimal2:
+                        case TypeTag::Decimal4:
+                        case TypeTag::Decimal6:
+                            // Decimal types are stored as integers with fixed scale
+                            {
+                                int64_t intVal = value->as<int64_t>();
+                                int scale = 2;
+                                if (value->type->tag == TypeTag::Decimal4) scale = 4;
+                                else if (value->type->tag == TypeTag::Decimal6) scale = 6;
+                                
+                                double decimalVal = static_cast<double>(intVal) / std::pow(10, scale);
+                                std::cout << std::fixed << std::setprecision(scale) << decimalVal;
+                                std::cout.unsetf(std::ios::fixed);
+                            }
+                            break;
+                        case TypeTag::Bool:
+                            std::cout << (value->as<bool>() ? "true" : "false");
+                            break;
+                        case TypeTag::String:
+                            std::cout << value->as<std::string>();
+                            break;
+                        case TypeTag::Nil:
+                            std::cout << "nil";
+                            break;
+                        case TypeTag::Any:
+                            // Try to print any type by converting to string
+                            std::cout << value->toString();
+                            break;
+                        default:
+                            std::cout << value->toString();
+                            break;
+                    }
+                    // Add space between arguments
+                    if (i < args.size() - 1) {
+                        std::cout << " ";
+                    }
+                }
+            }
+            std::cout << std::endl;
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+            return std::make_shared<Value>(nil_type);
+        }
+    ));
+    
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "input",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string prompt = args[0]->as<std::string>();
+            std::cout << prompt;
+            std::string line;
+            std::getline(std::cin, line);
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, line);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_open",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String},
+        TypeTag::Int64,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const std::string path = args[0]->as<std::string>();
+            const std::string mode = args[1]->as<std::string>();
+
+            auto file = std::make_shared<std::fstream>();
+            file->open(path, parse_open_mode(mode));
+            if (!file->is_open()) {
+                throw std::runtime_error("file_open: failed to open '" + path + "'");
+            }
+
+            std::lock_guard<std::mutex> lock(g_file_table_mutex);
+            const int64_t handle = g_next_file_handle++;
+            g_file_table[handle] = file;
+
+            auto int64_type = std::make_shared<::Type>(TypeTag::Int64);
+            return std::make_shared<Value>(int64_type, handle);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_read",
+        std::vector<TypeTag>{TypeTag::Int64},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const int64_t handle = args[0]->as<int64_t>();
+
+            std::shared_ptr<std::fstream> file;
+            {
+                std::lock_guard<std::mutex> lock(g_file_table_mutex);
+                auto it = g_file_table.find(handle);
+                if (it == g_file_table.end()) {
+                    throw std::runtime_error("file_read: invalid file handle");
+                }
+                file = it->second;
+            }
+
+            file->clear();
+            file->seekg(0, std::ios::beg);
+            std::ostringstream buffer;
+            buffer << file->rdbuf();
+
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, buffer.str());
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_write",
+        std::vector<TypeTag>{TypeTag::Int64, TypeTag::String},
+        TypeTag::Nil,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const int64_t handle = args[0]->as<int64_t>();
+            const std::string content = args[1]->as<std::string>();
+
+            std::shared_ptr<std::fstream> file;
+            {
+                std::lock_guard<std::mutex> lock(g_file_table_mutex);
+                auto it = g_file_table.find(handle);
+                if (it == g_file_table.end()) {
+                    throw std::runtime_error("file_write: invalid file handle");
+                }
+                file = it->second;
+            }
+
+            file->clear();
+            (*file) << content;
+            file->flush();
+
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+            return std::make_shared<Value>(nil_type);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_close",
+        std::vector<TypeTag>{TypeTag::Int64},
+        TypeTag::Nil,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const int64_t handle = args[0]->as<int64_t>();
+
+            std::shared_ptr<std::fstream> file;
+            {
+                std::lock_guard<std::mutex> lock(g_file_table_mutex);
+                auto it = g_file_table.find(handle);
+                if (it == g_file_table.end()) {
+                    auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+                    return std::make_shared<Value>(nil_type);
+                }
+                file = it->second;
+                g_file_table.erase(it);
+            }
+
+            if (file->is_open()) {
+                file->close();
+            }
+
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+            return std::make_shared<Value>(nil_type);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_exists",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::Bool,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const std::string path = args[0]->as<std::string>();
+            const bool exists = std::filesystem::exists(path);
+            auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+            return std::make_shared<Value>(bool_type, exists);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "file_delete",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::Bool,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const std::string path = args[0]->as<std::string>();
+            const bool removed = std::filesystem::remove(path);
+            auto bool_type = std::make_shared<::Type>(TypeTag::Bool);
+            return std::make_shared<Value>(bool_type, removed);
+        }
+    ));
+}
+
+void LIRBuiltinFunctions::registerUtilityFunctions() {
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "typeof",
+        std::vector<TypeTag>{TypeTag::Any},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            TypeTag tag = args[0]->type->tag;
+            std::string type_name;
+            switch (tag) {
+                case TypeTag::Int: 
+                case TypeTag::Int64: type_name = "int"; break;
+                case TypeTag::Float32:
+                case TypeTag::Float64: type_name = "float"; break;
+                case TypeTag::Bool: type_name = "bool"; break;
+                case TypeTag::String: type_name = "string"; break;
+                case TypeTag::Nil: type_name = "nil"; break;
+                case TypeTag::ErrorUnion: type_name = "Type?"; break;
+                case TypeTag::Function: type_name = "function"; break;
+                default: type_name = "unknown"; break;
+            }
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, type_name);
+        }
+    ));
+    
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "clock",
+        std::vector<TypeTag>{},
+        TypeTag::Float64,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            long double cpuTime = static_cast<long double>(std::clock()) / CLOCKS_PER_SEC;
+            auto float64_type = std::make_shared<::Type>(TypeTag::Float64);
+            return std::make_shared<Value>(float64_type, cpuTime);
+        }
+    ));
+    
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "sleep",
+        std::vector<TypeTag>{TypeTag::Float64},
+        TypeTag::Nil,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            double seconds = args[0]->as<double>();
+            if (seconds < 0) throw std::runtime_error("sleep: cannot sleep for negative time");
+            std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(seconds * 1000)));
+            auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+            return std::make_shared<Value>(nil_type);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "time",
+        std::vector<TypeTag>{},
+        TypeTag::Int64,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            auto timestamp = std::chrono::duration_cast<std::chrono::seconds>(
+                std::chrono::system_clock::now().time_since_epoch()).count();
+            auto int64_type = std::make_shared<::Type>(TypeTag::Int64);
+            return std::make_shared<Value>(int64_type, static_cast<int64_t>(timestamp));
+        }
+    ));
+    
+    // Assert is handled directly by VM, not as a builtin function
+    // registerFunction(std::make_shared<LIRBuiltinFunction>(
+    //     "assert",
+    //     std::vector<TypeTag>{TypeTag::Bool, TypeTag::String},
+    //     TypeTag::Nil,
+    //     [](const std::vector<ValuePtr>& args) -> ValuePtr {
+    //         bool condition = args[0]->as<bool>();
+    //         std::string message = args[1]->as<std::string>();
+    //         if (!condition) {
+    //             throw std::runtime_error("Assertion failed: " + message);
+    //         }
+    //         auto nil_type = std::make_shared<::Type>(TypeTag::Nil);
+    //         return std::make_shared<Value>(nil_type);
+    //     }
+    // ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "len",
+        std::vector<TypeTag>{TypeTag::Any},
+        TypeTag::Int,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const auto& value = args[0];
+            size_t length = 0;
+            
+            switch (value->type->tag) {
+                case TypeTag::String: {
+                    length = value->data.length();
+                    break;
+                }
+                case TypeTag::List: {
+                    if (std::holds_alternative<ListValue>(value->complexData)) {
+                        length = std::get<ListValue>(value->complexData).elements.size();
+                    }
+                    break;
+                }
+                case TypeTag::Dict: {
+                    if (std::holds_alternative<DictValue>(value->complexData)) {
+                        length = std::get<DictValue>(value->complexData).elements.size();
+                    }
+                    break;
+                }
+                case TypeTag::Frame: {
+                    if (std::holds_alternative<UserDefinedValue>(value->complexData)) {
+                        const auto& udv = std::get<UserDefinedValue>(value->complexData);
+                        if (udv.fields.count("size")) {
+                            length = static_cast<size_t>(udv.fields.at("size")->as<int64_t>());
+                        } else if (udv.fields.count("length")) {
+                            length = static_cast<size_t>(udv.fields.at("length")->as<int64_t>());
+                        }
+                    }
+                    break;
+                }
+                default:
+                    throw std::runtime_error("len: unsupported type " + value->type->toString());
+            }
+            
+            auto int_type = std::make_shared<::Type>(TypeTag::Int);
+            return std::make_shared<Value>(int_type, static_cast<int64_t>(length));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "channel",
+        std::vector<TypeTag>{},
+        TypeTag::Channel,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            auto channel_type = std::make_shared<::Type>(TypeTag::Channel);
+            return std::make_shared<Value>(channel_type, static_cast<int64_t>(0));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "substring",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Int, TypeTag::Int},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            int64_t start = args[1]->as<int64_t>();
+            int64_t end = args[2]->as<int64_t>();
+            
+            if (start < 0) start = 0;
+            if (end > (int64_t)str.length()) end = str.length();
+            if (start > end) return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), std::string(""));
+            
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, str.substr(start, end - start));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_substring",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Int, TypeTag::Int},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            int64_t start = args[1]->as<int64_t>();
+            int64_t end = args[2]->as<int64_t>();
+            
+            if (start < 0) start = 0;
+            if (end > (int64_t)str.length()) end = str.length();
+            if (start > end) return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), std::string(""));
+            
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, str.substr(start, end - start));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_byte_at",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Int},
+        TypeTag::Int,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            int64_t index = args[1]->as<int64_t>();
+            uint8_t byte_val = (index >= 0 && (size_t)index < str.length()) ? (uint8_t)str[index] : 0;
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int), (int64_t)byte_val);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_index_of",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String},
+        TypeTag::Int,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            std::string sub = args[1]->as<std::string>();
+            size_t pos = str.find(sub);
+            int64_t res = (pos != std::string::npos) ? (int64_t)pos : -1;
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int), res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_contains",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String},
+        TypeTag::Bool,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            std::string sub = args[1]->as<std::string>();
+            bool res = (str.find(sub) != std::string::npos);
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Bool), res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_starts_with",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String},
+        TypeTag::Bool,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            std::string prefix = args[1]->as<std::string>();
+            bool res = (str.rfind(prefix, 0) == 0);
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Bool), res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_ends_with",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String},
+        TypeTag::Bool,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            std::string suffix = args[1]->as<std::string>();
+            bool res = (str.length() >= suffix.length() && str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0);
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Bool), res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_replace",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::String, TypeTag::String},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            std::string old_sub = args[1]->as<std::string>();
+            std::string new_sub = args[2]->as<std::string>();
+            if (old_sub.empty()) return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), str);
+            size_t pos = 0;
+            while ((pos = str.find(old_sub, pos)) != std::string::npos) {
+                str.replace(pos, old_sub.length(), new_sub);
+                pos += new_sub.length();
+            }
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), str);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_trim",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            size_t start = str.find_first_not_of(" \t\n\r\f\v");
+            if (start == std::string::npos) return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), std::string(""));
+            size_t end = str.find_last_not_of(" \t\n\r\f\v");
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), str.substr(start, end - start + 1));
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_to_lower",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            for (char& c : str) if (c >= 'A' && c <= 'Z') c += ('a' - 'A');
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), str);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_to_upper",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            for (char& c : str) if (c >= 'a' && c <= 'z') c -= ('a' - 'A');
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), str);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_decode_next",
+        std::vector<TypeTag>{TypeTag::String, TypeTag::Int64},
+        TypeTag::Int64,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            int64_t offset_val = args[1]->as<int64_t>();
+            uint64_t offset = offset_val >= 0 ? (uint64_t)offset_val : 0;
+            uint32_t cp = 0;
+            uint8_t consumed = 0;
+            if (!utf8_decode_next(str.c_str(), str.length(), &offset, &cp, &consumed)) {
+                return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int64), (int64_t)0);
+            }
+            uint64_t res = ((uint64_t)cp << 8) | (uint64_t)consumed;
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int64), (int64_t)res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_byte_len",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::Int64,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int64), (int64_t)str.length());
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_from_bytes",
+        std::vector<TypeTag>{TypeTag::List},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string res = "";
+            if (args[0] && std::holds_alternative<ListValue>(args[0]->complexData)) {
+                const auto& elements = std::get<ListValue>(args[0]->complexData).elements;
+                res.reserve(elements.size());
+                for (const auto& elem : elements) {
+                    if (elem) {
+                        res.push_back(static_cast<char>((uint8_t)elem->as<int64_t>()));
+                    }
+                }
+            }
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_codepoints",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::List,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string str = args[0]->as<std::string>();
+            ListValue list_val;
+            uint64_t offset = 0;
+            uint32_t cp = 0;
+            uint8_t consumed = 0;
+            auto int_type = std::make_shared<::Type>(TypeTag::Int64);
+            while (offset < str.length()) {
+                if (!utf8_decode_next(str.c_str(), str.length(), &offset, &cp, &consumed)) break;
+                list_val.elements.push_back(std::make_shared<Value>(int_type, (int64_t)cp));
+            }
+            auto list_type = std::make_shared<::Type>(TypeTag::List, ListType(int_type));
+            return std::make_shared<Value>(list_type, list_val);
+        }
+    ));
+}
+
+void LIRBuiltinFunctions::registerFunction(std::shared_ptr<LIRBuiltinFunction> function) {
+    if (!function) {
+        throw std::runtime_error("Cannot register null LIR builtin function");
+    }
+    builtinFunctions_[function->getName()] = function;
+}
+
+std::shared_ptr<LIRBuiltinFunction> LIRBuiltinFunctions::getFunction(const std::string& name) {
+    auto it = builtinFunctions_.find(name);
+    return (it != builtinFunctions_.end()) ? it->second : nullptr;
+}
+
+bool LIRBuiltinFunctions::hasFunction(const std::string& name) const {
+    return builtinFunctions_.find(name) != builtinFunctions_.end();
+}
+
+std::vector<std::string> LIRBuiltinFunctions::getFunctionNames() const {
+    std::vector<std::string> names;
+    for (const auto& [name, function] : builtinFunctions_) {
+        names.push_back(name);
+    }
+    return names;
+}
+
+namespace BuiltinUtils {
+    void initializeBuiltins() { LIRBuiltinFunctions::getInstance().initialize(); }
+    std::vector<std::string> getBuiltinFunctionNames() { return LIRBuiltinFunctions::getInstance().getFunctionNames(); }
+    bool isBuiltinFunction(const std::string& name) { return LIRBuiltinFunctions::getInstance().hasFunction(name); }
+    ValuePtr callBuiltinFunction(const std::string& name, const std::vector<ValuePtr>& args) {
+        auto func = LIRBuiltinFunctions::getInstance().getFunction(name);
+        if (!func) throw std::runtime_error("LIR builtin function not found: " + name);
+        return func->execute(args);
+    }
+}
+
+} // namespace LIR
+} // namespace LM

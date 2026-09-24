@@ -1,0 +1,9 @@
+// @error:syntax_error
+// Malformed function declaration
+
+fn broken(int a, str b  // Missing closing paren and colon
+{
+    return a;
+}
+
+print(broken(5, "test"));

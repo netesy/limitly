@@ -1,0 +1,21 @@
+import std.string as s;
+import std.string.builder as sb;
+
+pub type String = s.String;
+pub type StringBuilder = sb.StringBuilder;
+
+pub fn length(value: str): int { return s.length(value); }
+pub fn compare(left: str, right: str): int { return s.compare(left, right); }
+pub fn substring(value: str, start: int, end: int): str { return s.substring(value, start, end); }
+pub fn split(value: str, delimiter: str): [str] { return s.split(value, delimiter); }
+pub fn join(values: [str], delimiter: str): str { return s.join(values, delimiter); }
+pub fn replace(value: str, old: str, replacement: str): str { return s.replace(value, old, replacement); }
+pub fn trim(value: str): str { return s.trim(value); }
+
+pub fn contains(value: str, needle: str): bool { return s.contains(value, needle); }
+pub fn starts_with(value: str, prefix: str): bool { return s.starts_with(value, prefix); }
+pub fn ends_with(value: str, suffix: str): bool { return s.ends_with(value, suffix); }
+pub fn to_lower(value: str): str { return s.to_lower(value); }
+pub fn to_upper(value: str): str { return s.to_upper(value); }
+pub fn uppercase(value: str): str { return s.uppercase(value); }
+pub fn substr(value: str, start: int, end: int): str { return s.substr(value, start, end); }

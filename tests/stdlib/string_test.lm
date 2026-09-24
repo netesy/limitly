@@ -1,0 +1,31 @@
+import std.string as s;
+
+fn main(): int {
+    var text = "Hello World";
+    
+    assert(s.length(text) == 11, "Length fail");
+    assert(s.contains(text, "World"), "Contains fail");
+    assert(s.starts_with(text, "Hello"), "StartsWith fail");
+    assert(s.ends_with(text, "World"), "EndsWith fail");
+    
+    var parts = s.split(text, " ");
+    assert(parts.length == 2 and parts[0] == "Hello", "Split fail");
+    
+    var joined = s.join(["A", "B", "C"], "-");
+    assert(joined == "A-B-C", "Join fail");
+    
+    var trimmed = s.trim("  abc  ");
+    assert(trimmed == "abc", "Trim fail");
+    
+    var replaced = s.replace(text, "World", "Limit");
+    assert(replaced == "Hello Limit", "Replace fail");
+    
+    var sub = s.substring(text, 0, 5);
+    assert(sub == "Hello", "Substring fail");
+    
+    assert(s.to_lower("ABC") == "abc", "ToLower fail");
+    assert(s.to_upper("abc") == "ABC", "ToUpper fail");
+    
+    print("String tests passed!");
+    return 0;
+}

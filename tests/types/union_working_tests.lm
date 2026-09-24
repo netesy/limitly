@@ -1,0 +1,144 @@
+// =============================================================================
+// WORKING UNION TYPE TESTS
+// Tests union type functionality that works perfectly with current system
+// =============================================================================
+
+print(" === Union Type Tests === ");
+
+// Test 1: Basic union types
+print("\n --- Test 1: Basic Union Types --- ");
+type NumberOrString = int | str;
+    type BoolOrFloat = bool | float;
+
+        var numStr1: NumberOrString = 42;
+        var numStr2: NumberOrString = "hello";
+        var boolFloat1: BoolOrFloat = true;
+        var boolFloat2: BoolOrFloat = 3.14;
+
+        print("NumberOrString (int): {numStr1}");
+        print("NumberOrString (str): {numStr2}");
+        print("BoolOrFloat (bool): {boolFloat1}");
+        print("BoolOrFloat (float): {boolFloat2}");
+
+        // Test 2: Three-way union types
+        print("\n --- Test 2: Three - way Union Types --- ");
+        type Value = int | str | bool;
+
+            var val1: Value = 123;
+            var val2: Value = "test";
+            var val3: Value = true;
+
+            print("Value (int): {val1}");
+            print("Value (str): {val2}");
+            print("Value (bool): {val3}");
+
+            // Test 3: Union with nil (Option-like types)
+            print("\n --- Test 3: Option - like Union Types --- ");
+            type MaybeInt = int | nil;
+                type MaybeString = str | nil;
+
+                    var maybeInt1: MaybeInt = 42;
+                    var maybeString1: MaybeString = "hello";
+
+                    print("Maybe int (value): {maybeInt1}");
+                    print("Maybe string (value): {maybeString1}");
+
+                    // Test 4: Complex union combinations
+                    print("\n --- Test 4: Complex Union Combinations --- ");
+                    type NumberType = int | float;
+                        type TextType = str;
+                            type DataType = NumberType | TextType | bool;
+
+                                var data1: DataType = 42;
+                                var data2: DataType = 3.14;
+                                var data3: DataType = "data";
+                                var data4: DataType = true;
+
+                                print("Data 1 (int): {data1}");
+                                print("Data 2 (float): {data2}");
+                                print("Data 3 (str): {data3}");
+                                print("Data 4 (bool): {data4}");
+
+                                // Test 5: Union type assignments
+                                print("\n --- Test 5: Union Type Assignments --- ");
+                                type FlexibleType = int | str | bool | float;
+
+                                    var flexible: FlexibleType = 100;
+                                    print("Flexible (int): {flexible}");
+
+                                    flexible = "changed";
+                                    print("Flexible (str): {flexible}");
+
+                                    flexible = false;
+                                    print("Flexible (bool): {flexible}");
+
+                                    flexible = 2.718;
+                                    print("Flexible (float): {flexible}");
+
+                                    // Test 6: Union types with string interpolation
+                                    print("\n --- Test 6: Union Types with String Interpolation --- ");
+                                    type DisplayValue = int | str | bool;
+
+                                        var display1: DisplayValue = 42;
+                                        var display2: DisplayValue = "hello";
+                                        var display3: DisplayValue = true;
+
+                                        var message1: str = "Value 1: {display1}";
+                                        var message2: str = "Value 2: {display2}";
+                                        var message3: str = "Value 3: {display3}";
+
+                                        print(message1);
+                                        print(message2);
+                                        print(message3);
+
+                                        // Test 7: Multiple union type variables
+                                        print("\n --- Test 7: Multiple Union Type Variables --- ");
+                                        type MultiType = int | str | bool | float;
+
+                                            var multi1: MultiType = 1;
+                                            var multi2: MultiType = "two";
+                                            var multi3: MultiType = true;
+                                            var multi4: MultiType = 4.0;
+
+                                            print("Multi 1: {multi1}");
+                                            print("Multi 2: {multi2}");
+                                            print("Multi 3: {multi3}");
+                                            print("Multi 4: {multi4}");
+
+                                            // Test 8: Union type compatibility
+                                            print("\n --- Test 8: Union Type Compatibility --- ");
+                                            type IntOrStr = int | str;
+                                                type StrOrBool = str | bool;
+
+                                                    var intStr: IntOrStr = 100;
+                                                    var strBool: StrOrBool = "shared";
+
+                                                    print("IntOrStr: {intStr}");
+                                                    print("StrOrBool: {strBool}");
+
+                                                    // Test 9: Nested union type aliases
+                                                    print("\n --- Test 9: Nested Union Type Aliases --- ");
+                                                    type BaseType = int | str;
+                                                        type ExtendedType = BaseType | bool;
+
+                                                            var base: BaseType = 42;
+                                                            var extended: ExtendedType = true;
+
+                                                            print("Base type: {base}");
+                                                            print("Extended type: {extended}");
+
+                                                            // Test 10: Union types with different literal types
+                                                            print("\n --- Test 10: Union Types with Literals --- ");
+                                                            type LiteralUnion = int | str | bool | float;
+
+                                                                var lit1: LiteralUnion = 42;
+                                                                var lit2: LiteralUnion = "literal";
+                                                                var lit3: LiteralUnion = false;
+                                                                var lit4: LiteralUnion = 3.14159;
+
+                                                                print("Literal 1: {lit1}");
+                                                                print("Literal 2: {lit2}");
+                                                                print("Literal 3: {lit3}");
+                                                                print("Literal 4: {lit4}");
+
+                                                                print("\n === Union Type Tests Complete === ");

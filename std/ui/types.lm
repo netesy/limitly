@@ -1,0 +1,601 @@
+// std.ui.types - Type definitions for Fluent, Retained UI System
+
+import std.text.controller as text_ctrl;
+
+frame Color {
+    pub var r: float; // 0.0 to 1.0
+    pub var g: float;
+    pub var b: float;
+    pub var a: float;
+
+    pub init(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0) {
+        self.r = r;
+        self.g = g;
+        self.b = b;
+        self.a = a;
+    }
+}
+
+pub fn rgb(r: int, g: int, b: int): Color {
+    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=1.0);
+}
+
+pub fn rgba(r: int, g: int, b: int, a: float): Color {
+    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=a);
+}
+
+pub fn color_rgb(r: float, g: float, b: float): Color {
+    return Color(r=r, g=g, b=b, a=1.0);
+}
+
+pub fn color_rgba(r: float, g: float, b: float, a: float): Color {
+    return Color(r=r, g=g, b=b, a=a);
+}
+
+pub fn color_rgb8(r: int, g: int, b: int): Color {
+    return rgb(r, g, b);
+}
+
+// Built-in Semantic Colors
+pub var white: Color = Color(r=1.0, g=1.0, b=1.0, a=1.0);
+pub var black: Color = Color(r=0.0, g=0.0, b=0.0, a=1.0);
+pub var red: Color = Color(r=0.9, g=0.2, b=0.2, a=1.0);
+pub var green: Color = Color(r=0.2, g=0.8, b=0.3, a=1.0);
+pub var blue: Color = Color(r=0.2, g=0.6, b=0.95, a=1.0);
+pub var indigo: Color = Color(r=0.35, g=0.35, b=0.9, a=1.0);
+pub var yellow: Color = Color(r=0.95, g=0.8, b=0.15, a=1.0);
+pub var gray: Color = Color(r=0.55, g=0.55, b=0.55, a=1.0);
+pub var dark_gray: Color = Color(r=0.15, g=0.15, b=0.18, a=1.0);
+pub var light_gray: Color = Color(r=0.85, g=0.85, b=0.88, a=1.0);
+pub var transparent: Color = Color(r=0.0, g=0.0, b=0.0, a=0.0);
+
+frame Point {
+    pub var x: float;
+    pub var y: float;
+}
+
+pub fn point(x: float, y: float): Point {
+    return Point(x=x, y=y);
+}
+
+frame Size {
+    pub var width: float;
+    pub var height: float;
+}
+
+pub fn size(w: float, h: float): Size {
+    return Size(width=w, height=h);
+}
+
+frame Rect {
+    pub var x: float;
+    pub var y: float;
+    pub var w: float;
+    pub var h: float;
+}
+
+pub fn rect(x: float, y: float, w: float, h: float): Rect {
+    return Rect(x=x, y=y, w=w, h=h);
+}
+
+frame Axis {
+    pub var is_vertical: int;
+}
+
+pub var AXIS_HORIZONTAL: Axis = Axis(is_vertical=0);
+pub var AXIS_VERTICAL: Axis = Axis(is_vertical=1);
+
+frame Alignment {
+    pub var align_type: int;
+}
+
+pub var align_start: Alignment = Alignment(align_type=0);
+pub var align_center: Alignment = Alignment(align_type=1);
+pub var align_end: Alignment = Alignment(align_type=2);
+
+pub var normal: int = 400;
+pub var bold: int = 700;
+
+// Reusable Style Model (LVGL / CSS Inspired)
+frame Style {
+    pub var has_bg: bool;
+    pub var bg: Color;
+    pub var has_fg: bool;
+    pub var fg: Color;
+    pub var has_padding: bool;
+    pub var pad_l: float;
+    pub var pad_t: float;
+    pub var pad_r: float;
+    pub var pad_b: float;
+    pub var has_radius: bool;
+    pub var radius: float;
+    pub var has_font_size: bool;
+    pub var font_size_val: float;
+    pub var has_weight: bool;
+    pub var weight_val: int;
+    pub var has_spacing: bool;
+    pub var spacing_val: float;
+
+    pub init() {
+        self.has_bg = false;
+        self.bg = transparent;
+        self.has_fg = false;
+        self.fg = white;
+        self.has_padding = false;
+        self.pad_l = 0.0;
+        self.pad_t = 0.0;
+        self.pad_r = 0.0;
+        self.pad_b = 0.0;
+        self.has_radius = false;
+        self.radius = 0.0;
+        self.has_font_size = false;
+        self.font_size_val = 14.0;
+        self.has_weight = false;
+        self.weight_val = 400;
+        self.has_spacing = false;
+        self.spacing_val = 0.0;
+    }
+
+    pub fn background(c: Color): Style {
+        self.has_bg = true;
+        self.bg = c;
+        return self;
+    }
+
+    pub fn foreground(c: Color): Style {
+        self.has_fg = true;
+        self.fg = c;
+        return self;
+    }
+
+    pub fn color(c: Color): Style {
+        return self.foreground(c);
+    }
+
+    pub fn padding(p: float): Style {
+        self.has_padding = true;
+        self.pad_l = p;
+        self.pad_t = p;
+        self.pad_r = p;
+        self.pad_b = p;
+        return self;
+    }
+
+    pub fn padding_xy(x: float, y: float): Style {
+        self.has_padding = true;
+        self.pad_l = x;
+        self.pad_t = y;
+        self.pad_r = x;
+        self.pad_b = y;
+        return self;
+    }
+
+    pub fn corner_radius(r: float): Style {
+        self.has_radius = true;
+        self.radius = r;
+        return self;
+    }
+
+    pub fn font_size(s: float): Style {
+        self.has_font_size = true;
+        self.font_size_val = s;
+        return self;
+    }
+
+    pub fn weight(w: int): Style {
+        self.has_weight = true;
+        self.weight_val = w;
+        return self;
+    }
+
+    pub fn bold(): Style {
+        return self.weight(700);
+    }
+
+    pub fn spacing(s: float): Style {
+        self.has_spacing = true;
+        self.spacing_val = s;
+        return self;
+    }
+}
+
+pub fn style(): Style {
+    return Style();
+}
+
+pub var KIND_CONTAINER: int = 1;
+pub var KIND_TEXT: int = 2;
+pub var KIND_BUTTON: int = 3;
+pub var KIND_SPACER: int = 4;
+pub var KIND_IMAGE: int = 5;
+pub var KIND_TEXTAREA: int = 13;
+
+// Unified Retained UI Node with Fluent Modifiers
+frame Widget {
+    pub var kind: int;
+    pub var text_val: str;
+    pub var on_click_action: fn(): nil;
+    pub var children: [Widget];
+
+    pub var foreground_color: Color;
+    pub var background_color: Color;
+    pub var font_size_val: float;
+    pub var font_weight_val: int;
+    pub var padding_left: float;
+    pub var padding_top: float;
+    pub var padding_right: float;
+    pub var padding_bottom: float;
+    pub var corner_radius_val: float;
+    pub var spacing_val: float;
+    pub var is_vertical: int;
+    pub var align_val: int;
+    pub var flex_val: float;
+    pub var is_enabled: int;
+    pub var is_pressed: int;
+    pub var width_val: float;
+    pub var height_val: float;
+    pub var pressed_style_val: Style;
+
+    pub var text_editor_state: any;
+    pub var scroll_x: float;
+    pub var scroll_y: float;
+    pub var max_scroll_x: float;
+    pub var max_scroll_y: float;
+    pub var placeholder_val: str;
+    pub var focus_key: str;
+
+    pub init(k: int) {
+        self.kind = k;
+        self.text_val = "";
+        self.on_click_action = nil;
+        self.children = [] as [Widget];
+        self.foreground_color = white;
+        self.background_color = transparent;
+        self.font_size_val = 14.0;
+        self.font_weight_val = 400;
+        self.padding_left = 0.0;
+        self.padding_top = 0.0;
+        self.padding_right = 0.0;
+        self.padding_bottom = 0.0;
+        self.corner_radius_val = 0.0;
+        self.spacing_val = 0.0;
+        self.is_vertical = 1;
+        self.align_val = 0;
+        self.flex_val = 1.0;
+        self.is_enabled = 1;
+        self.is_pressed = 0;
+        self.width_val = 0.0;
+        self.height_val = 0.0;
+        self.pressed_style_val = Style();
+
+        self.text_editor_state = nil;
+        self.scroll_x = 0.0;
+        self.scroll_y = 0.0;
+        self.max_scroll_x = 0.0;
+        self.max_scroll_y = 0.0;
+        self.placeholder_val = "";
+        self.focus_key = "";
+    }
+
+    pub fn color(c: Color): Widget {
+        self.foreground_color = c;
+        return self;
+    }
+
+    pub fn foreground(c: Color): Widget {
+        self.foreground_color = c;
+        return self;
+    }
+
+    pub fn background(c: Color): Widget {
+        self.background_color = c;
+        return self;
+    }
+
+    pub fn font_size(s: float): Widget {
+        self.font_size_val = s;
+        return self;
+    }
+
+    pub fn weight(w: int): Widget {
+        self.font_weight_val = w;
+        return self;
+    }
+
+    pub fn bold(): Widget {
+        self.font_weight_val = 700;
+        return self;
+    }
+
+    pub fn padding(p: float): Widget {
+        self.padding_left = p;
+        self.padding_top = p;
+        self.padding_right = p;
+        self.padding_bottom = p;
+        return self;
+    }
+
+    pub fn padding_xy(x: float, y: float): Widget {
+        self.padding_left = x;
+        self.padding_top = y;
+        self.padding_right = x;
+        self.padding_bottom = y;
+        return self;
+    }
+
+    pub fn padding_rect(l: float, t: float, r: float, b: float): Widget {
+        self.padding_left = l;
+        self.padding_top = t;
+        self.padding_right = r;
+        self.padding_bottom = b;
+        return self;
+    }
+
+    pub fn corner_radius(r: float): Widget {
+        self.corner_radius_val = r;
+        return self;
+    }
+
+    pub fn spacing(s: float): Widget {
+        self.spacing_val = s;
+        return self;
+    }
+
+    pub fn align(a: Alignment): Widget {
+        self.align_val = a.align_type;
+        return self;
+    }
+
+    pub fn width(w: float): Widget {
+        self.width_val = w;
+        return self;
+    }
+
+    pub fn height(h: float): Widget {
+        self.height_val = h;
+        return self;
+    }
+
+    pub fn size(w: float, h: float): Widget {
+        self.width_val = w;
+        self.height_val = h;
+        return self;
+    }
+
+    pub fn on_click(act: fn(): nil): Widget {
+        self.on_click_action = act;
+        return self;
+    }
+
+    pub fn pressed(s: Style): Widget {
+        self.pressed_style_val = s;
+        return self;
+    }
+
+    pub fn style(s: Style): Widget {
+        if (s.has_bg) {
+            self.background_color = s.bg;
+        }
+        if (s.has_fg) {
+            self.foreground_color = s.fg;
+        }
+        if (s.has_padding) {
+            self.padding_left = s.pad_l;
+            self.padding_top = s.pad_t;
+            self.padding_right = s.pad_r;
+            self.padding_bottom = s.pad_b;
+        }
+        if (s.has_radius) {
+            self.corner_radius_val = s.radius;
+        }
+        if (s.has_font_size) {
+            self.font_size_val = s.font_size_val;
+        }
+        if (s.has_weight) {
+            self.font_weight_val = s.weight_val;
+        }
+        if (s.has_spacing) {
+            self.spacing_val = s.spacing_val;
+        }
+        return self;
+    }
+}
+
+// Semantic Widget Constructors
+pub fn text(content: str): Widget {
+    var w = Widget(KIND_TEXT);
+    w.text_val = content;
+    w.foreground_color = white;
+    return w;
+}
+
+pub fn button(label: str, on_click: fn(): nil = nil): Widget {
+    var w = Widget(KIND_BUTTON);
+    w.text_val = label;
+    w.on_click_action = on_click;
+    w.background_color = blue;
+    w.foreground_color = white;
+    w.padding_left = 10.0;
+    w.padding_top = 8.0;
+    w.padding_right = 10.0;
+    w.padding_bottom = 8.0;
+    w.corner_radius_val = 4.0;
+    w.height_val = 36.0;
+    return w;
+}
+
+pub fn textarea(content: str): Widget {
+    var w = Widget(KIND_TEXTAREA);
+    w.text_val = content;
+    w.text_editor_state = text_ctrl.EditorController(content);
+    w.focus_key = "ta_default";
+    w.foreground_color = white;
+    w.padding_left = 8.0;
+    w.padding_top = 8.0;
+    w.padding_right = 8.0;
+    w.padding_bottom = 8.0;
+    w.width_val = 300.0;
+    w.height_val = 120.0;
+    return w;
+}
+
+pub fn column(children: [Widget]): Widget {
+    var w = Widget(KIND_CONTAINER);
+    w.is_vertical = 1;
+    w.children = children;
+    return w;
+}
+
+pub fn row(children: [Widget]): Widget {
+    var w = Widget(KIND_CONTAINER);
+    w.is_vertical = 0;
+    w.children = children;
+    return w;
+}
+
+pub fn stack(children: [Widget]): Widget {
+    var w = Widget(KIND_CONTAINER);
+    w.is_vertical = 2;
+    w.children = children;
+    return w;
+}
+
+pub fn spacer(flex: float = 1.0): Widget {
+    var w = Widget(KIND_SPACER);
+    w.flex_val = flex;
+    return w;
+}
+
+pub fn empty(): Widget {
+    return Widget(KIND_CONTAINER);
+}
+
+// Legacy structures maintained for compatibility
+frame ContainerData {
+    pub var axis: Axis;
+    pub var spacing: float;
+    pub var padding: Rect;
+    pub var background: Color;
+}
+
+pub fn container_data(axis: Axis): ContainerData {
+    return ContainerData(
+        axis=axis,
+        spacing=0.0,
+        padding=rect(0.0, 0.0, 0.0, 0.0),
+        background=color_rgba(0.0, 0.0, 0.0, 0.0)
+    );
+}
+
+frame TextData {
+    pub var content: str;
+    pub var font_size: float;
+    pub var color: Color;
+    pub var font_weight: int;
+}
+
+pub fn text_data(content: str): TextData {
+    return TextData(content=content, font_size=14.0, color=color_rgb(1.0, 1.0, 1.0), font_weight=400);
+}
+
+frame ButtonData {
+    pub var label: str;
+    pub var background: Color;
+    pub var text_color: Color;
+    pub var corner_radius: float;
+    pub var padding: Rect;
+    pub var enabled: int;
+}
+
+pub fn button_data(label: str): ButtonData {
+    return ButtonData(
+        label=label,
+        background=color_rgb8(60, 120, 210),
+        text_color=color_rgb8(255, 255, 255),
+        corner_radius=4.0,
+        padding=rect(8.0, 4.0, 8.0, 4.0),
+        enabled=1
+    );
+}
+
+frame ImageData {
+    pub var texture_id: int;
+    pub var tint: Color;
+    pub var fit_mode: int;
+}
+
+pub fn image_data(tex_id: int): ImageData {
+    return ImageData(texture_id=tex_id, tint=color_rgb(1.0, 1.0, 1.0), fit_mode=0);
+}
+
+frame TextFieldData {
+    pub var prompt_text: str;
+    pub var text: str;
+    pub var font_size: float;
+    pub var background: Color;
+    pub var corner_radius: float;
+    pub var editable: int;
+}
+
+pub fn text_field_data(prompt_text: str): TextFieldData {
+    return TextFieldData(
+        prompt_text=prompt_text,
+        text="",
+        font_size=14.0,
+        background=color_rgb8(40, 40, 40),
+        corner_radius=4.0,
+        editable=1
+    );
+}
+
+frame ScrollData {
+    pub var axis: Axis;
+    pub var scrollbar_width: float;
+    pub var scrollbar_color: Color;
+}
+
+pub fn scroll_data(axis: Axis): ScrollData {
+    return ScrollData(axis=axis, scrollbar_width=8.0, scrollbar_color=color_rgb8(100, 100, 100));
+}
+
+frame CustomData {
+    pub var type_id: int;
+    pub var state_size: int;
+    pub var render_callback: int;
+}
+
+pub fn custom_data(type_id: int, state_size: int): CustomData {
+    return CustomData(type_id=type_id, state_size=state_size, render_callback=0);
+}
+
+frame LayoutConstraint {
+    pub var mode: int;
+    pub var value_num: int;
+}
+
+frame Blueprint {
+    pub var variant_type: int; // 1 = Container, 2 = Text, 3 = Button
+    pub var container_data_val: ContainerData;
+    pub var text_data_val: TextData;
+    pub var button_data_val: ButtonData;
+    pub var constraints: [LayoutConstraint];
+    pub var children: [Blueprint];
+}
+
+pub fn empty_constraints(): [LayoutConstraint] {
+    var res: [LayoutConstraint] = [];
+    return res;
+}
+
+pub fn empty_blueprints(): [Blueprint] {
+    var res: [Blueprint] = [];
+    return res;
+}
+
+pub fn blueprint_add_constraint(bp: Blueprint, c: LayoutConstraint): Blueprint {
+    return Blueprint(variant_type=bp.variant_type, container_data_val=bp.container_data_val, text_data_val=bp.text_data_val, button_data_val=bp.button_data_val, constraints=bp.constraints + [c], children=bp.children);
+}
+
+pub fn blueprint_add_child(bp: Blueprint, child: Blueprint): Blueprint {
+    return Blueprint(variant_type=bp.variant_type, container_data_val=bp.container_data_val, text_data_val=bp.text_data_val, button_data_val=bp.button_data_val, constraints=bp.constraints, children=bp.children + [child]);
+}

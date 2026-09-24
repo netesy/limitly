@@ -1,0 +1,210 @@
+# Structured Concurrency in Lymar
+
+Lymar has two deliberately separate structured-concurrency models:
+
+- `parallel` is CPU-oriented, fork/join data parallelism. Mutable collections
+  require compiler-proven linear slice capabilities.
+- `concurrent` is task-oriented cooperative concurrency. Tasks and workers
+  communicate through channels; mutable collection sharing is not permitted.
+
+Neither construct exposes backend-specific threading primitives.
+
+---
+
+## Architectural Evaluation: `async` / `await` vs. Lymar's Model
+
+Factual evaluation of function-level `async`/`await` primitives against Lymar's memory, region, safety, and uniformity model reveals fundamental conflicts:
+
+### 1. Function Coloring ("Function Poisoning")
+In traditional `async`/`await` models (Node.js, C#, Python), declaring a function `async` changes its return type into a `Future`/`Promise`/`Task`. Callers must either become `async` themselves or explicitly `await`. This fractures the language into two incompatible function ecosystems ("colored functions"), destroying code composability and inflating standard library API signatures.
+
+### 2. Region Memory Invalidation & Task Leaks
+Lymar employs a **deterministic, region-based memory model** where allocations are scope-bound and destroyed in reverse declaration order upon scope exit.
+Function-level `async` tasks return handle objects (`Promise`/`Future`) that can escape their enclosing lexical scope. If an escaping `async` task outlives its spawning region, it retains dangling pointers to destroyed scope variables. This directly violates Lymar's region safety invariants.
+
+### 3. Redundancy with Fiber & Channel Architecture
+Lymar's Register VM executes concurrent tasks as lightweight, cooperative **fibers**. Channel operations (`ch.send()`, `ch.recv()`) yield execution at the fiber level without blocking OS threads.
+Because cooperative yielding is built natively into channels, adding `async` and `await` keywords provides zero additional execution power while adding syntactic overhead, function coloring, and region safety hazards.
+
+### Conclusion: Rejection of Unstructured `async`/`await`
+Lymar rejects function-level `async`/`await`. Asynchronous execution remains strictly **structured, scope-bound, and block-based** via `concurrent` and `parallel` blocks communicating through typed `channel` instances.
+
+---
+
+## `parallel`
+
+```lm
+parallel(
+    cores = Auto | Int,
+    timeout = Duration?,
+    grace = Duration?,
+    on_error = Stop | Continue | Partial
+) {
+    iter(i in 0..length(output)) {
+        output[i] = transform(input[i]);
+    }
+}
+```
+
+### Configuration
+
+| Option | Meaning |
+|---|---|
+| `cores` | `Auto` uses the host concurrency level; an integer must be 1–256. |
+| `timeout` | Maximum duration for the structured operation. Durations accept `ns`, `us`, `ms`, or `s`. Zero disables the deadline. |
+| `grace` | Cleanup window after cancellation. Durations use the same units. |
+| `on_error=Stop` | Cancel remaining work and surface the first failure. |
+| `on_error=Continue` | Continue independent work and report failures at the join. |
+| `on_error=Partial` | Stop scheduling new work, join completed work, and retain completed results. |
+
+Names are case-insensitive. Invalid values are compile errors rather than silent
+fallbacks.
+
+### Linear slice capability rules
+
+For every mutable collection accessed by a parallel iterator, the compiler
+creates a capability:
+
+```text
+(collection identity, iterator, begin, end, mutable)
+```
+
+The range is half-open. The capability is valid only when:
+
+1. its bounds are compile-time integers;
+2. `0 <= begin < end`;
+3. every write is indexed by that iterator's own index variable; and
+4. no simultaneously active mutable capability overlaps the collection.
+
+Thus `output[i] = ...` is accepted, while `output[0] = ...` is rejected because
+every iteration would receive authority to mutate the same element. Read-only
+iterations do not need an exclusive capability.
+
+Capabilities are frontend-owned metadata on `ParallelStatement`. Lowering
+validates them again, preserves collection identity, emits the common
+`ParallelInit`/`ParallelSync` LIR boundary, and rejoins ownership at the end of
+the block. There is no implicit shared-memory box or copy-back step.
+
+`task` and `worker` are not legal inside `parallel`; use `iter` so the compiler
+can prove the mapping between iterations and owned slices.
+
+## `concurrent`
+
+```lm
+var events = channel();
+var results = channel();
+
+concurrent(
+    ch = events,
+    cores = Auto,
+    timeout = 30s,
+    grace = 250ms,
+    on_error = Stop,
+    on_timeout = Partial
+) {
+    worker(event in events) {
+        results.send(handle(event));
+    }
+}
+```
+
+### Why concurrent uses a different guarantee
+
+A linear slice proof relies on a finite index space and a one-to-one mapping
+from an iteration index to an element. Concurrent tasks may be created from
+channels, timers, network events, and unbounded streams, so that proof does not
+exist in general.
+
+Instead, `concurrent` guarantees isolation by ownership transfer and channel
+communication:
+
+- task-local values may be mutated by their owning task;
+- immutable values may be read by multiple tasks;
+- channels may be shared for communication;
+- an outer mutable collection may not be mutated by multiple tasks;
+- a value sent through a channel crosses the task boundary explicitly.
+
+Use `parallel` for finite indexed mutation and `concurrent` for asynchronous
+message processing. The guarantees are complementary rather than weaker and
+stronger versions of one mechanism.
+
+### Tasks and workers
+
+- `task(i in 1..10)` creates discrete scheduled jobs.
+- `worker(item in source)` drains a channel or iterable.
+- A worker with no input source does not receive a synthetic `nil` item.
+- The structured block joins its scheduled work before the enclosing scope
+  continues.
+
+Resource-backed and pointer-backed channels have identical send, receive,
+poll, and close semantics in the VM.
+
+## Examples
+
+### Valid parallel mutation
+
+```lm
+var output = [0, 0, 0, 0];
+parallel(cores=2) {
+    iter(i in 0..4) {
+        output[i] = i * i;
+    }
+}
+```
+
+### Rejected parallel race
+
+```lm
+var output = [0, 0, 0, 0];
+parallel(cores=2) {
+    iter(i in 0..4) {
+        output[0] = i; // error: all iterations target the same element
+    }
+}
+```
+
+### Concurrent channel pipeline
+
+```lm
+var output = channel();
+concurrent(ch=output, cores=4, on_error=Continue) {
+    task(i in 1..10) {
+        output.send(process(i));
+    }
+}
+
+iter (value in output) {
+    consume(value);
+}
+```
+
+## Backend contract
+
+The LIR concurrency instructions are backend-neutral. Every backend must
+preserve:
+
+1. structured join behavior;
+2. channel ordering and ownership transfer;
+3. configured deadlines and error policy;
+4. capability-approved collection identity; and
+5. absence of data races for accepted programs.
+
+A backend may use native threads, a work-stealing pool, fibers, or a cooperative
+scheduler, but it may not weaken these observable semantics or introduce a
+backend-only capability instruction.
+
+## Determinism
+
+Capability tokens are acquired in lexical order and released in reverse order
+at the structured join. Concurrent tasks commit channel messages and failures
+in source iteration order. `Stop` reports the earliest failing task,
+`Continue` skips failed tasks while running later tasks in that same order, and
+`Partial` retains only the ordered prefix completed before cancellation.
+
+Parallel mutation is deterministic only through disjoint element capabilities.
+Cross-worker scalar accumulation is deliberately not an implicit reduction.
+The supported deterministic reduction is: publish one value per source
+iteration to a channel, join the structured block, then fold that channel in
+source iteration order. This fixes both the reduction tree (a left fold) and
+failure prefix, so results never depend on worker completion order. Atomic
+scalars remain synchronization primitives, not deterministic reductions.

@@ -1,0 +1,7 @@
+// Logging module
+
+frame Logger {
+    pub fn log(msg: str): nil { print("[INFO] " + msg); }
+    pub fn warn(msg: str): nil { print("[WARN] " + msg); }
+    pub fn error(msg: str): nil { print("[ERROR] " + msg); }
+}

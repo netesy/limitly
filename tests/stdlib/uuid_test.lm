@@ -1,0 +1,74 @@
+import std.uuid.index as uuid;
+import std.uuid.uuid as uuid_mod;
+
+fn test_parsing(): int {
+    print("Running UUID parsing tests...");
+
+    // Standard valid UUID
+    var u1_str = "f81d4fae-7dec-11d0-a765-00a0c91e6bf6";
+    var u1 = uuid.parse(u1_str) as uuid_mod.UUID;
+    assert(u1.is_valid == true, "u1 should be valid");
+    assert(u1.to_string() == "f81d4fae-7dec-11d0-a765-00a0c91e6bf6", "to_string matches input");
+    assert(u1.version() == 1, "u1 version should be 1");
+    assert(u1.variant() == 1, "u1 variant should be 1 (RFC 4122)");
+
+    // Braced and uppercase format
+    var brace_open = "{";
+    var brace_close = "}";
+    var u2_str = brace_open + "F81D4FAE-7DEC-11D0-A765-00A0C91E6BF6" + brace_close;
+    var u2 = uuid.parse(u2_str) as uuid_mod.UUID;
+    assert(u2.is_valid == true, "u2 should be valid");
+    assert(u2.to_string() == "f81d4fae-7dec-11d0-a765-00a0c91e6bf6", "to_string should be lowercase");
+    assert(u1.equals(u2) == true, "u1 should equal u2");
+
+    // Invalid format: missing separator
+    var u3 = uuid.parse("f81d4fae7dec-11d0-a765-00a0c91e6bf6") as uuid_mod.UUID;
+    assert(u3.is_valid == false, "u3 should be invalid (missing dash)");
+
+    // Invalid format: incorrect characters
+    var u4 = uuid.parse("f81d4fae-7dec-11d0-a765-00a0c91e6bfg") as uuid_mod.UUID;
+    assert(u4.is_valid == false, "u4 should be invalid (invalid hex character g)");
+
+    // Invalid format: short length
+    var u5 = uuid.parse("f81d4fae-7dec-11d0") as uuid_mod.UUID;
+    assert(u5.is_valid == false, "u5 should be invalid (short)");
+
+    print("Parsing tests passed!");
+    return 1;
+}
+
+fn test_generation(): int {
+    print("Running UUID generation tests...");
+
+    var g1 = uuid.generate_v4() as uuid_mod.UUID;
+    assert(g1.is_valid == true, "g1 should be valid");
+    assert(g1.version() == 4, "g1 version should be 4");
+    assert(g1.variant() == 1, "g1 variant should be 1 (RFC 4122)");
+
+    var g2 = uuid.generate_v4() as uuid_mod.UUID;
+    assert(g2.is_valid == true, "g2 should be valid");
+    assert(g2.version() == 4, "g2 version should be 4");
+    assert(g1.equals(g2) == false, "g1 should not equal g2 (must be unique)");
+
+    // Formatting check
+    var g1_str = g1.to_string();
+    assert(len(g1_str) == 36, "g1_str should be 36 characters");
+
+    // Round-trip check
+    var parsed_g1 = uuid.parse(g1_str) as uuid_mod.UUID;
+    assert(parsed_g1.is_valid == true, "parsed_g1 should be valid");
+    assert(g1.equals(parsed_g1) == true, "parsed_g1 should equal g1");
+
+    print("Generation tests passed!");
+    return 1;
+}
+
+fn main(): int {
+    print("=== UUID Module Test Suite ===");
+
+    assert(test_parsing() == 1, "Parsing tests failed");
+    assert(test_generation() == 1, "Generation tests failed");
+
+    print("All UUID tests completed successfully.");
+    return 0;
+}

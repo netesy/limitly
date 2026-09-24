@@ -1,0 +1,18 @@
+// Unit Test for Cryptographic Random Entropy Generation
+import std.crypto.random as rand;
+
+fn main(): int {
+    print("=== Cryptographic Random Entropy Unit Test ===\n");
+
+    var b1 = rand.bytes(16);
+    assert(len(b1) == 16, "16 random bytes generated");
+
+    var b2 = rand.bytes(16);
+    assert(len(b2) == 16, "second 16 random bytes generated");
+
+    var h1 = rand.hex(8);
+    assert(len(h1) == 16, "hex string length 16");
+
+    print("Random Entropy Tests Passed Successfully.\n");
+    return 0;
+}

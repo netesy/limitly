@@ -1,0 +1,5 @@
+// @error:type_error
+// A refinement is an enforced type invariant, not merely a base-type alias.
+type Positive = int where value > 0;
+
+var impossible: Positive = -1;

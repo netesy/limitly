@@ -1,0 +1,149 @@
+// std/game/app.lm
+// High-level game loop and application runner for std.game
+
+import std.app as app;
+import std.gg as gg;
+import std.game.gui as gui_mod;
+import std.game.types as types;
+
+frame GameConfig {
+    pub var title: str;
+    pub var width: int;
+    pub var height: int;
+    pub var resizable: bool;
+    pub var bg_color: types.Color;
+
+    pub init(title: str = "Limit Game", width: int = 800, height: int = 600, resizable: bool = true) {
+        self.title = title;
+        self.width = width;
+        self.height = height;
+        self.resizable = resizable;
+        self.bg_color = types.hex(0x1e1e24, 1.0);
+    }
+}
+
+pub fn default_config(): GameConfig {
+    return GameConfig();
+}
+
+frame Game {
+    pub var config: GameConfig;
+    pub var gui: gui_mod.GUI;
+    pub var is_running: bool;
+    pub var mouse_x: float;
+    pub var mouse_y: float;
+    pub var mouse_down: bool;
+    pub var mouse_wheel: float;
+    pub var width: int;
+    pub var height: int;
+
+    pub init(cfg: any = nil) {
+        if (cfg == nil) {
+            self.config = default_config();
+        } else {
+            self.config = cfg as GameConfig;
+        }
+        self.gui = gui_mod.GUI();
+        self.is_running = false;
+        self.mouse_x = 0.0;
+        self.mouse_y = 0.0;
+        self.mouse_down = false;
+        self.mouse_wheel = 0.0;
+        self.width = self.config.width;
+        self.height = self.config.height;
+    }
+
+    pub fn setup(): bool {
+        var r_val = 0;
+        if (self.config.resizable) {
+            r_val = 1;
+        }
+        var wc = app.WindowConfig(
+            width=self.config.width,
+            height=self.config.height,
+            title=self.config.title,
+            resizable=r_val,
+            fullscreen=0,
+            high_dpi=1,
+            sample_count=1,
+            swap_interval=1
+        );
+        var ok_init = app.app_init(wc);
+        if (ok_init != 0) {
+            app.show_window();
+            self.is_running = true;
+        } else {
+            self.is_running = false;
+        }
+        return self.is_running;
+    }
+
+    pub fn begin_frame(): nil {
+        var raw_events = gg.poll_events();
+        if (raw_events != nil) {
+            var native_events: [int] = raw_events as [int];
+            var i: int = 0;
+            var num_events = len(native_events);
+            while (i + 3 < num_events) {
+                var ev_type: int = native_events[i];
+                var ev_x: int = native_events[i + 1];
+                var ev_y: int = native_events[i + 2];
+                var ev_k: int = native_events[i + 3];
+
+                if (ev_type == app.EVENT_QUIT) {
+                    self.is_running = false;
+                } elif (ev_type == app.EVENT_RESIZE) {
+                    self.width = ev_x;
+                    self.height = ev_y;
+                } elif (ev_type == app.EVENT_MOUSE_MOVE) {
+                    self.mouse_x = ev_x as float;
+                    self.mouse_y = ev_y as float;
+                } elif (ev_type == app.EVENT_MOUSE_DOWN) {
+                    self.mouse_down = true;
+                    self.mouse_x = ev_x as float;
+                    self.mouse_y = ev_y as float;
+                } elif (ev_type == app.EVENT_MOUSE_UP) {
+                    self.mouse_down = false;
+                    self.mouse_x = ev_x as float;
+                    self.mouse_y = ev_y as float;
+                } elif (ev_type == app.EVENT_MOUSE_WHEEL) {
+                    self.mouse_wheel = ev_y as float;
+                }
+                i = i + 4;
+            }
+        }
+
+        // Start pass with clear color
+        var bg = self.config.bg_color;
+        gg.begin_pass(self.width, self.height, bg.r, bg.g, bg.b, bg.a);
+
+        // Update IMGUI input snapshot
+        self.gui.begin(self.mouse_x, self.mouse_y, self.mouse_down, self.mouse_wheel, 0.016);
+    }
+
+    pub fn end_frame(): nil {
+        self.gui.end();
+        gg.end_pass();
+        gg.commit();
+        self.mouse_wheel = 0.0;
+    }
+
+    pub fn set_resolution(w: int, h: int): nil {
+        self.width = w;
+        self.height = h;
+        app.set_window_size(w, h);
+    }
+
+    pub fn set_size(w: int, h: int): nil {
+        self.set_resolution(w, h);
+    }
+
+    pub fn quit(): nil {
+        self.is_running = false;
+    }
+
+    pub fn shutdown(): nil {
+        self.is_running = false;
+        app.app_shutdown();
+    }
+}

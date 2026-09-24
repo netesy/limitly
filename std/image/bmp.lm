@@ -1,0 +1,17 @@
+// std/image/bmp.lm
+// BMP-specific load/save API.
+
+import std.ffi as ffi;
+import std.image.index as image;
+
+pub fn load(path: str): image.Image? {
+    return image.load(path);
+}
+
+pub fn load_as(path: str, channels: int): image.Image? {
+    return image.load_forced(path, channels);
+}
+
+pub fn save(img: image.Image, path: str): bool? {
+    return image.save_bmp(img, path);
+}

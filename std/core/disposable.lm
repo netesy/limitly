@@ -1,0 +1,5 @@
+// Standard Library Core Disposable Trait
+
+trait Disposable {
+    fn dispose(): nil;
+}

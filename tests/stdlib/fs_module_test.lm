@@ -1,0 +1,42 @@
+// Test Suite for Standard Library Filesystem Module
+
+import std.fs.index as fs;
+import std.path.index as path;
+
+fn test_fs_operations(): int {
+    print("Testing FS Operations...");
+    var fs_obj = fs.FS() as fs.FS;
+    var p = path.Path("test_fs_temp_dir") as path.Path;
+
+    fs_obj.create_dir(p);
+    assert(fs_obj.exists(p) == true, "exists true failed");
+
+    var p_new = path.Path("test_fs_temp_dir_renamed") as path.Path;
+    fs_obj.rename(p, p_new);
+    assert(fs_obj.exists(p) == false, "rename old exists failed");
+    assert(fs_obj.exists(p_new) == true, "rename new exists failed");
+
+    fs_obj.remove(p_new);
+    assert(fs_obj.exists(p_new) == false, "remove failed");
+    return 1;
+}
+
+fn test_permissions(): int {
+    print("Testing Permissions...");
+    var perm = fs.Permissions(true) as fs.Permissions;
+    assert(perm.is_readonly() == true, "is_readonly true failed");
+
+    var perm2 = fs.Permissions(false) as fs.Permissions;
+    assert(perm2.is_readonly() == false, "is_readonly false failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== FS Module Test Suite ===");
+
+    assert(test_fs_operations() == 1, "FS operations test failed");
+    assert(test_permissions() == 1, "Permissions test failed");
+
+    print("All FS tests passed successfully.");
+    return 0;
+}

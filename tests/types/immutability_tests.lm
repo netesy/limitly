@@ -1,0 +1,40 @@
+fn test_isolation(): int {
+    var y = 10;
+    val x = y;
+    y += 5;
+    assert(x == 10, "x should retain original value 10");
+    assert(y == 15, "y should be updated to 15");
+    return 0;
+}
+
+fn test_grouped_isolation(): int {
+    var y = 100;
+    val x = (y);
+    y += 50;
+    assert(x == 100, "x should retain 100 even with grouping");
+    assert(y == 150, "y should be 150");
+    return 0;
+}
+
+fn test_direct_binding(): int {
+    val a = 10;
+    val b = 20;
+    val c = a + b;
+    assert(c == 30, "c should equal 30");
+    return 0;
+}
+
+fn test_var_literal(): int {
+    var x = 42;
+    assert(x == 42, "var literal should be 42");
+    return 0;
+}
+
+fn main(): int {
+    test_isolation();
+    test_grouped_isolation();
+    test_direct_binding();
+    test_var_literal();
+    print("Immutability & Lowering tests passed");
+    return 0;
+}

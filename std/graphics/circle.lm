@@ -1,0 +1,15 @@
+var PI: float = 3.141592653589793;
+
+frame Circle {
+    pub var cx: float;
+    pub var cy: float;
+    pub var r: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, radius: float = 0.0) {
+        self.cx = x;
+        self.cy = y;
+        self.r = radius;
+    }
+
+    pub fn area(): float { return PI * self.r * self.r; }
+}

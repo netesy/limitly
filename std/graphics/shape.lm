@@ -1,0 +1,9 @@
+import std.graphics.path as path;
+
+frame Shape {
+    pub var path_val: path.Path;
+
+    pub init(p: path.Path = path.Path()) {
+        self.path_val = p;
+    }
+}

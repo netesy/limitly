@@ -1,0 +1,22 @@
+frame Animation {
+    pub var duration: float;
+    pub var current_time: float;
+    pub var loop_val: bool;
+
+    pub init(dur: float = 1.0, loop_val: bool = false) {
+        self.duration = dur;
+        self.current_time = 0.0;
+        self.loop_val = loop_val;
+    }
+
+    pub fn update(dt: float): nil {
+        self.current_time = self.current_time + dt;
+        if (self.current_time > self.duration) {
+            if (self.loop_val) {
+                self.current_time = self.current_time - self.duration;
+            } else {
+                self.current_time = self.duration;
+            }
+        }
+    }
+}

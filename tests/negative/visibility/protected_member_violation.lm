@@ -1,0 +1,9 @@
+// @error:visibility_error
+// Accessing protected member from outside
+
+frame Base {
+   prot value: int;
+}
+
+var base = Base { value: 42 };
+print(base.value);  // protected not accessible

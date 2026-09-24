@@ -1,0 +1,9 @@
+import std.graphics.matrix as matrix;
+
+frame Transform {
+    pub var matrix_val: matrix.Matrix;
+
+    pub init(m: matrix.Matrix = matrix.Matrix()) {
+        self.matrix_val = m;
+    }
+}

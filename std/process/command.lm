@@ -1,0 +1,19 @@
+// Standard Library Process Command Submodule
+
+frame Command {
+    pub var program: str;
+    pub var args: [str];
+
+    pub init(program: str) {
+        self.program = program;
+        self.args = [] as [str];
+    }
+
+    pub fn arg(s: str) {
+        self.args.append(s);
+    }
+
+    pub fn execute(): int {
+        return 0;
+    }
+}

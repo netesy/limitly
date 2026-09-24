@@ -1,0 +1,13 @@
+import std.ui.widget as widget;
+
+frame Gesture {
+    pub var gesture_type: int;
+
+    pub init(gt: int = 0) {
+        self.gesture_type = gt;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

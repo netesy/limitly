@@ -1,0 +1,26 @@
+import std.option as o;
+import std.result as r;
+
+fn main(): int {
+    var some = o.Some(42);
+    var none = o.None();
+    
+    assert(some.is_some(), "Some is_some fail");
+    assert(none.is_none(), "None is_none fail");
+    assert(some.unwrap() == 42, "Some unwrap fail");
+    assert(none.unwrap_or(10) == 10, "None unwrap_or fail");
+    
+    var mapped = some.map(fn(x: any): any { return (x as int) + 1; });
+    assert(mapped.unwrap() == 43, "Option map fail");
+    
+    var res_ok = r.Ok("success");
+    var res_err = r.Err("failure");
+    
+    assert(res_ok.is_ok(), "Ok is_ok fail");
+    assert(res_err.is_err(), "Err is_err fail");
+    assert(res_ok.unwrap() == "success", "Ok unwrap fail");
+    assert(res_err.unwrap_err() == "failure", "Err unwrap_error fail");
+    
+    print("Option/Result tests passed!");
+    return 0;
+}

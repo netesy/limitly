@@ -1,0 +1,99 @@
+// UI Builder Module
+// Declarative builder API for constructing UI blueprints
+
+import std.ui.types as ui_types;
+
+// VStack builder (vertical stack container)
+pub fn vstack(children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var cdata = ui_types.container_data(ui_types.AXIS_VERTICAL);
+    return ui_types.Blueprint(
+        variant_type=1,
+        container_data_val=cdata,
+        text_data_val=ui_types.text_data(""),
+        button_data_val=ui_types.button_data(""),
+        constraints=ui_types.empty_constraints(),
+        children=children
+    );
+}
+
+// HStack builder (horizontal stack container)
+pub fn hstack(children: [ui_types.Blueprint]): ui_types.Blueprint {
+    var cdata = ui_types.container_data(ui_types.AXIS_HORIZONTAL);
+    return ui_types.Blueprint(
+        variant_type=1,
+        container_data_val=cdata,
+        text_data_val=ui_types.text_data(""),
+        button_data_val=ui_types.button_data(""),
+        constraints=ui_types.empty_constraints(),
+        children=children
+    );
+}
+
+// Text builder
+pub fn text(content: str): ui_types.Blueprint {
+    var tdata = ui_types.text_data(content);
+    return ui_types.Blueprint(
+        variant_type=2,
+        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
+        text_data_val=tdata,
+        button_data_val=ui_types.button_data(""),
+        constraints=ui_types.empty_constraints(),
+        children=ui_types.empty_blueprints()
+    );
+}
+
+pub fn text_color(content: str, c: ui_types.Color): ui_types.Blueprint {
+    var tdata = ui_types.text_data(content);
+    tdata.color = c;
+    return ui_types.Blueprint(
+        variant_type=2,
+        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
+        text_data_val=tdata,
+        button_data_val=ui_types.button_data(""),
+        constraints=ui_types.empty_constraints(),
+        children=ui_types.empty_blueprints()
+    );
+}
+
+// Button builder
+pub fn button(label: str): ui_types.Blueprint {
+    var bdata = ui_types.button_data(label);
+    return ui_types.Blueprint(
+        variant_type=3,
+        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
+        text_data_val=ui_types.text_data(""),
+        button_data_val=bdata,
+        constraints=ui_types.empty_constraints(),
+        children=ui_types.empty_blueprints()
+    );
+}
+
+pub fn button_background(label: str, bg: ui_types.Color): ui_types.Blueprint {
+    var bdata = ui_types.button_data(label);
+    bdata.background = bg;
+    return ui_types.Blueprint(
+        variant_type=3,
+        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
+        text_data_val=ui_types.text_data(""),
+        button_data_val=bdata,
+        constraints=ui_types.empty_constraints(),
+        children=ui_types.empty_blueprints()
+    );
+}
+
+// Empty blueprint
+pub fn empty(): ui_types.Blueprint {
+    return ui_types.Blueprint(
+        variant_type=1,
+        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
+        text_data_val=ui_types.text_data(""),
+        button_data_val=ui_types.button_data(""),
+        constraints=ui_types.empty_constraints(),
+        children=ui_types.empty_blueprints()
+    );
+}
+
+// Color helper
+pub fn color_rgb8(r: int, g: int, b: int): ui_types.Color {
+    return ui_types.color_rgb8(r, g, b);
+}

@@ -1,0 +1,103 @@
+print(" === Concurrent Block Tests === ");
+
+// ==========================================
+//  Basic concurrent execution (tasks only)
+// ==========================================
+var output_results = channel();
+
+concurrent(ch = output_results, cores = 2) {
+    task(i in 1..3) {
+        print("Concurrent task {i} running");
+        output_results.send("Task {i} completed");
+        }
+    }
+
+    var result_count = 0;
+    iter (result in output_results) {
+        print("Received result: {result}");
+        result_count = result_count + 1;
+    }
+
+    print("Concurrent block finished");
+    assert(result_count == 3, "Concurrent block should execute 3 tasks");
+
+    // ==========================================
+    //  Multiple workers, same stream input
+    // ==========================================
+    var results = channel();
+    var jobs = channel();
+
+    // Seed the jobs channel
+    jobs.send("job1");
+    jobs.send("job2");
+    jobs.send("job3");
+    jobs.close();
+
+    concurrent(ch = results, cores = 2) {
+        worker(item from jobs) {
+            results.send("Processed: {item}");
+            }
+        }
+
+        var final_result_count = 0;
+        iter (result in results) {
+            print("Final result: {result}");
+            final_result_count = final_result_count + 1;
+        }
+        
+        assert(final_result_count == 3, "Worker should process 3 jobs");
+
+        // ==========================================
+        //  Tasks seeding a worker stream
+        // ==========================================
+        print(" === Tasks seeding a worker stream === ");
+
+        var seeded_results = channel();
+        var seed_stream = channel();
+
+        // Seed the stream
+        seed_stream.send("bootstrap - 1");
+        seed_stream.send("bootstrap - 2");
+        seed_stream.close();
+
+        // Worker consumes the pre-seeded stream
+        concurrent(ch = seeded_results) {
+            worker(x from seed_stream) {
+                seeded_results.send("Handled: {x}");
+                }
+            }
+
+            var seeded_result_count = 0;
+            iter (msg in seeded_results) {
+                print("Seeded result: {msg}");
+                seeded_result_count = seeded_result_count + 1;
+            }
+            
+            assert(seeded_result_count == 2, "Seeded worker should process 2 items");
+            // ==========================================
+            //  Tasks seeding a worker stream
+            // ==========================================
+            print(" === Tasks seeding a worker stream === ");
+
+            var seeded_results = channel();
+            var seed_stream = channel();
+
+            // Seed the stream
+            seed_stream.send("bootstrap - 1");
+            seed_stream.send("bootstrap - 2");
+            seed_stream.close();
+
+            // Worker consumes the pre-seeded stream
+            concurrent(ch = seeded_results) {
+                worker(x from seed_stream) {
+                    seeded_results.send("Handled: {x}");
+                    }
+                }
+
+                var seeded_result_count2 = 0;
+                iter (msg in seeded_results) {
+                    print("Seeded result: {msg}");
+                    seeded_result_count2 = seeded_result_count2 + 1;
+                }
+                
+                assert(seeded_result_count2 == 2, "Second seeded worker should process 2 items");

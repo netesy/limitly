@@ -1,0 +1,11 @@
+// @error:memory_leak
+// Linear type may leak on break
+
+fn test_loop() {
+    var data = [1, 2, 3];
+    while (true) {
+        break;  // ERROR: data may leak on break
+    }
+}
+
+test_loop();

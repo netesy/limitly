@@ -1,0 +1,6 @@
+// @error:divide_by_zero
+// Division by zero literal (compile-time detection possible)
+
+var x = 10;
+var y = x / 0;  // Divide by zero
+print(y);

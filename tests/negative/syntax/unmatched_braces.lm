@@ -1,0 +1,9 @@
+// @error:syntax_error
+// Unmatched braces
+
+fn broken() {
+    if (true) {
+        print("Missing closing brace");
+    // Missing }
+
+print("End");

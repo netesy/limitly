@@ -1,0 +1,39 @@
+// Test suite for Standard Library YAML Module
+
+import std.yaml.index as yaml;
+import std.yaml.value as yval;
+
+fn main(): int {
+    print("=== YAML Module Test Suite ===");
+
+    var yaml_str = "name: \"John\"\nage: 30\nis_valid: true\n";
+
+    var parsed_any = yaml.parse(yaml_str);
+    var parsed_val = parsed_any as yval.YAMLValue;
+    assert(parsed_val.type_tag == "object", "type tag should be object");
+    assert(len(parsed_val.obj_keys) == 3, "obj keys count failed");
+
+    assert(parsed_val.obj_keys[0] == "name", "key 0 failed");
+    var name_val = parsed_val.obj_vals[0] as yval.YAMLValue;
+    assert(name_val.type_tag == "string", "name val type tag failed");
+    assert(name_val.str_val == "John", "name val failed");
+
+    assert(parsed_val.obj_keys[1] == "age", "key 1 failed");
+    var age_val = parsed_val.obj_vals[1] as yval.YAMLValue;
+    assert(age_val.type_tag == "number", "age val type tag failed");
+
+    var actual_num = age_val.num_val;
+    assert("{actual_num}" == "30", "age val failed");
+
+    assert(parsed_val.obj_keys[2] == "is_valid", "key 2 failed");
+    var bool_val = parsed_val.obj_vals[2] as yval.YAMLValue;
+    assert(bool_val.type_tag == "bool", "bool val type tag failed");
+    assert(bool_val.bool_val == true, "bool val failed");
+
+    // Test stringify
+    var serialized = yaml.stringify(parsed_val);
+    assert(serialized == yaml_str, "stringify failed: " + serialized);
+
+    print("All YAML tests passed successfully!");
+    return 0;
+}

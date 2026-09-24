@@ -1,0 +1,58 @@
+// UI Viewport Abstraction
+frame Viewport {
+    pub var width: float;
+    pub var height: float;
+    pub var content_w: float;
+    pub var content_h: float;
+    pub var scroll_x: float;
+    pub var scroll_y: float;
+
+    pub init(w: float = 0.0, h: float = 0.0, cw: float = 0.0, ch: float = 0.0) {
+        self.width = w;
+        self.height = h;
+        self.content_w = cw;
+        self.content_h = ch;
+        self.scroll_x = 0.0;
+        self.scroll_y = 0.0;
+    }
+
+    pub fn max_scroll_x(): float {
+        var max_s = self.content_w - self.width;
+        if (max_s < 0.0) { return 0.0; }
+        return max_s;
+    }
+
+    pub fn max_scroll_y(): float {
+        var max_s = self.content_h - self.height;
+        if (max_s < 0.0) { return 0.0; }
+        return max_s;
+    }
+
+    pub fn clamp_scroll() {
+        if (self.scroll_x < 0.0) { self.scroll_x = 0.0; }
+        var max_x = self.max_scroll_x();
+        if (self.scroll_x > max_x) { self.scroll_x = max_x; }
+
+        if (self.scroll_y < 0.0) { self.scroll_y = 0.0; }
+        var max_y = self.max_scroll_y();
+        if (self.scroll_y > max_y) { self.scroll_y = max_y; }
+    }
+
+    pub fn ensure_visible(item_x: float, item_y: float, item_w: float, item_h: float) {
+        // Vertical adjustment
+        if (item_y < self.scroll_y) {
+            self.scroll_y = item_y;
+        } elif (item_y + item_h > self.scroll_y + self.height) {
+            self.scroll_y = item_y + item_h - self.height;
+        }
+
+        // Horizontal adjustment
+        if (item_x < self.scroll_x) {
+            self.scroll_x = item_x;
+        } elif (item_x + item_w > self.scroll_x + self.width) {
+            self.scroll_x = item_x + item_w - self.width;
+        }
+
+        self.clamp_scroll();
+    }
+}

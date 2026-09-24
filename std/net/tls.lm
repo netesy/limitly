@@ -1,0 +1,220 @@
+// std/net/tls.lm
+// Clean, secure TLS 1.2/1.3 client connection backed by OpenSSL
+
+import std.ffi as ffi;
+import std.crypto.hash as hash;
+
+frame TLSConfig {
+    pub var cert_file: str;
+    pub var key_file: str;
+    pub var ca_file: str;
+    pub var verify_peer: bool;
+    pub var sni: str;
+    pub var timeout_ms: int;
+
+    pub init() {
+        self.cert_file = "";
+        self.key_file = "";
+        self.ca_file = "";
+        self.verify_peer = true;
+        self.sni = "";
+        self.timeout_ms = 5000;
+    }
+
+    pub fn with_verify(verify: bool): TLSConfig {
+        self.verify_peer = verify;
+        return self;
+    }
+
+    pub fn with_sni(sni_host: str): TLSConfig {
+        self.sni = sni_host;
+        return self;
+    }
+
+    pub fn with_ca(ca_path: str): TLSConfig {
+        self.ca_file = ca_path;
+        return self;
+    }
+
+    pub fn with_cert(cert_path: str, key_path: str): TLSConfig {
+        self.cert_file = cert_path;
+        self.key_file = key_path;
+        return self;
+    }
+
+    pub fn with_timeout(ms: int): TLSConfig {
+        self.timeout_ms = ms;
+        return self;
+    }
+}
+
+frame TLSSocket {
+    pub var handle: any;
+    pub var host: str;
+    pub var port: int;
+    pub var is_open: bool;
+
+    pub init(h: any = nil, host: str = "", port: int = 0) {
+        self.handle = h;
+        self.host = host;
+        self.port = port;
+        self.is_open = (h != nil and h != 0);
+    }
+
+    pub fn write(data: str): int {
+        if (not self.is_open or self.handle == nil or self.handle == 0) { return -1; }
+        var bytes_written = 0;
+        unsafe {
+            var lib = hash._open_lib();
+            if (lib != nil and lib != 0) {
+                var fn_write = ffi.library_get_symbol(lib, "tls_write");
+                if (fn_write != nil and fn_write != 0) {
+                    var cs = ffi.string_to_cstring(data);
+                    var res = ffi.foreign_call(
+                        fn_write,
+                        [self.handle, ffi.cstring_as_ptr(cs), len(data)],
+                        ffi.TYPE_I32,
+                        [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32]
+                    );
+                    bytes_written = res as int;
+                    ffi.cstring_free(cs);
+                }
+            }
+        }
+        return bytes_written;
+    }
+
+    pub fn read(max_bytes: int = 4096): str {
+        if (not self.is_open or self.handle == nil or self.handle == 0 or max_bytes <= 0) { return ""; }
+        var result_str = "";
+        unsafe {
+            var lib = hash._open_lib();
+            if (lib != nil and lib != 0) {
+                var fn_read = ffi.library_get_symbol(lib, "tls_read");
+                if (fn_read != nil and fn_read != 0) {
+                    var buf = ffi.alloc(max_bytes + 1);
+                    var n = ffi.foreign_call(
+                        fn_read,
+                        [self.handle, buf, max_bytes],
+                        ffi.TYPE_I32,
+                        [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32]
+                    ) as int;
+                    if (n > 0) {
+                        result_str = ffi.cstring_to_string(buf);
+                    }
+                    ffi.free(buf);
+                }
+            }
+        }
+        return result_str;
+    }
+
+    pub fn peer_certificate(): str {
+        if (not self.is_open or self.handle == nil or self.handle == 0) { return ""; }
+        var result_str = "";
+        unsafe {
+            var lib = hash._open_lib();
+            if (lib != nil and lib != 0) {
+                var fn_cert = ffi.library_get_symbol(lib, "tls_get_peer_cert");
+                if (fn_cert != nil and fn_cert != 0) {
+                    var buf = ffi.alloc(512);
+                    var is_ok = ffi.foreign_call(
+                        fn_cert,
+                        [self.handle, buf, 512],
+                        ffi.TYPE_I32,
+                        [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32]
+                    ) as int;
+                    if (is_ok == 1) {
+                        result_str = ffi.cstring_to_string(buf);
+                    }
+                    ffi.free(buf);
+                }
+            }
+        }
+        return result_str;
+    }
+
+    pub fn close(): nil {
+        if (not self.is_open or self.handle == nil or self.handle == 0) { return; }
+        unsafe {
+            var lib = hash._open_lib();
+            if (lib != nil and lib != 0) {
+                var fn_close = ffi.library_get_symbol(lib, "tls_close");
+                if (fn_close != nil and fn_close != 0) {
+                    ffi.foreign_call(
+                        fn_close,
+                        [self.handle],
+                        ffi.TYPE_VOID,
+                        [ffi.TYPE_PTR]
+                    );
+                }
+            }
+        }
+        self.is_open = false;
+        self.handle = nil;
+    }
+}
+
+pub fn connect(host: str, port: int, config: TLSConfig = nil): TLSSocket? {
+    var cfg = config;
+    if (cfg == nil) {
+        cfg = TLSConfig();
+    }
+    var sni = cfg.sni;
+    if (sni == "") {
+        sni = host;
+    }
+
+    unsafe {
+        var lib = hash._open_lib();
+        if (lib != nil and lib != 0) {
+            var fn_conn = ffi.library_get_symbol(lib, "tls_client_connect");
+            if (fn_conn != nil and fn_conn != 0) {
+                var cs_host = ffi.string_to_cstring(host);
+                var cs_sni  = ffi.string_to_cstring(sni);
+                var cs_ca   = ffi.string_to_cstring(cfg.ca_file);
+                var cs_cert = ffi.string_to_cstring(cfg.cert_file);
+                var cs_key  = ffi.string_to_cstring(cfg.key_file);
+
+                var verify_int = 0;
+                if (cfg.verify_peer) {
+                    verify_int = 1;
+                }
+
+                var raw_sock = ffi.foreign_call(
+                    fn_conn,
+                    [
+                        ffi.cstring_as_ptr(cs_host), port,
+                        ffi.cstring_as_ptr(cs_sni),
+                        verify_int,
+                        ffi.cstring_as_ptr(cs_ca),
+                        ffi.cstring_as_ptr(cs_cert),
+                        ffi.cstring_as_ptr(cs_key),
+                        cfg.timeout_ms
+                    ],
+                    ffi.TYPE_PTR,
+                    [
+                        ffi.TYPE_PTR, ffi.TYPE_I32,
+                        ffi.TYPE_PTR,
+                        ffi.TYPE_I32,
+                        ffi.TYPE_PTR,
+                        ffi.TYPE_PTR,
+                        ffi.TYPE_PTR,
+                        ffi.TYPE_I32
+                    ]
+                );
+
+                ffi.cstring_free(cs_host);
+                ffi.cstring_free(cs_sni);
+                ffi.cstring_free(cs_ca);
+                ffi.cstring_free(cs_cert);
+                ffi.cstring_free(cs_key);
+
+                if (raw_sock != nil and raw_sock != 0) {
+                    return ok(TLSSocket(raw_sock, host, port));
+                }
+            }
+        }
+    }
+    return err();
+}

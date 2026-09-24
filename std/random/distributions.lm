@@ -1,0 +1,17 @@
+// Standard Library Random Distributions Submodule
+
+import std.random.random as r;
+
+frame Uniform {
+    pub var min_val: float;
+    pub var max_val: float;
+
+    pub init(min_val: float, max_val: float) {
+        self.min_val = min_val;
+        self.max_val = max_val;
+    }
+
+    pub fn sample(rng: r.Random): float {
+        return rng.range_float(self.min_val, self.max_val);
+    }
+}

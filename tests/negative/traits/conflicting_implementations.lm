@@ -1,0 +1,14 @@
+// @error:trait_not_impl
+// Conflicting trait implementations
+
+trait A {
+    fn method(): int;
+}
+
+trait B {
+    fn method(): str;
+}
+
+frame Both: A, B {
+    // Cannot implement both - method() return type conflict
+}

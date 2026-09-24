@@ -1,0 +1,34 @@
+// Test trait dispatch - verify trait-based method calls work
+
+trait Iterator {
+    fn next(): any;
+}
+
+frame ListIterator: Iterator {
+    var items: [any];
+    var index: int;
+
+    pub init(items: [any]) {
+        self.items = items;
+        self.index = 0;
+    }
+
+    pub fn next(): any {
+        if (self.index >= len(self.items)) {
+            return nil;
+        }
+        var item = self.items[self.index];
+        self.index = self.index + 1;
+        return item;
+    }
+}
+
+// Test at top level - method calls work here
+var it = ListIterator(items=[1, 2, 3]);
+var result = it.next();
+print(result);
+
+fn main(): int {
+    print("Trait dispatch tests passed!");
+    return 0;
+}

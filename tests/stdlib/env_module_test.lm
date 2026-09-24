@@ -1,0 +1,31 @@
+// Test Suite for Standard Library Environment Module
+
+import std.env.index as env;
+
+fn test_env_frame(): int {
+    print("Testing Env Frame...");
+    var e = env.Env() as env.Env;
+    assert(e.cwd() == ".", "cwd failed");
+    assert(len(e.args()) == 0, "args failed");
+
+    e.set("TEST_KEY", "test_value");
+    assert(e.get("TEST_KEY") == nil, "get failed");
+    return 1;
+}
+
+fn test_env_helpers(): int {
+    print("Testing Env Helpers...");
+    assert(env.cwd() == ".", "cwd helper failed");
+    assert(len(env.args()) == 0, "args helper failed");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Env Module Test Suite ===");
+
+    assert(test_env_frame() == 1, "Env frame test failed");
+    assert(test_env_helpers() == 1, "Env helpers test failed");
+
+    print("All env tests passed successfully.");
+    return 0;
+}

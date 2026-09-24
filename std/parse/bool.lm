@@ -1,0 +1,5 @@
+// Standard Library Parse Bool Submodule
+
+pub fn parse_bool(value: str): bool {
+    return value == "true" or value == "1";
+}

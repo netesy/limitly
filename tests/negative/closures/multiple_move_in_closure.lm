@@ -1,0 +1,16 @@
+// @error:closure_capture
+// Moving same variable twice in different closures
+
+fn test() {
+    var data = [1, 2, 3];
+    
+    var f1 = fn() {
+        var x = data;  // Move
+    };
+    
+    var f2 = fn() {
+        var y = data;  // Move again - already moved
+    };
+}
+
+test();

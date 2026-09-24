@@ -1,0 +1,140 @@
+// Phase 3 Stress Testing and Shared Semantic Validation
+import std.gg as gg;
+import std.app as app;
+import std.ui as ui;
+import std.ui.context as ui_context;
+import std.game.gui as gui;
+import std.text.controller as text_ctrl;
+import std.string as std_string;
+
+fn int_to_str(n_val: int): str {
+    if (n_val == 0) { return "0"; }
+    var digit_strs = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"];
+    var v = n_val;
+    var neg = false;
+    if (v < 0) {
+        neg = true;
+        v = -v;
+    }
+    var digits = "";
+    while (v > 0) {
+        var d = v % 10;
+        var ch = digit_strs[d];
+        digits = ch + digits;
+        v = v / 10;
+    }
+    if (neg) {
+        return "-" + digits;
+    }
+    return digits;
+}
+
+fn build_large_lines(line_count: int): [str] {
+    var lines: [str] = [];
+    var line_str = "Line content: Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
+    var i = 0;
+    while (i < line_count) {
+        lines.append(line_str);
+        i = i + 1;
+    }
+    return lines;
+}
+
+fn test_shared_semantics() {
+    print("--- 1. Shared Semantics Validation ---");
+    print("A1");
+    var doc_text = std_string.join(build_large_lines(100), "\n");
+    print("A2");
+
+    var imgui = gui.GUI();
+    print("A3");
+    imgui.begin(96.0, 100.0, true, 0.0, 0.016);
+    print("A4");
+    imgui.input_text_multiline("TestArea", doc_text, 400.0, 200.0);
+    print("A5");
+    imgui.end();
+
+    var i_ctrl = imgui.editor_controllers["TestArea"] as text_ctrl.EditorController;
+    assert(i_ctrl != nil, "immediate ctrl should exist");
+    var i_line = i_ctrl.get_cursor_line();
+    var i_col = i_ctrl.get_cursor_col();
+
+    // Retained UI test: rel_x = 108 - 28 = 80.0, rel_y = 128 - 44 = 84.0 -> line 5, col 10
+    var ta = ui.textarea(doc_text).width(400.0).height(200.0);
+    var root = ui.column([ta]);
+
+    var cfg = app.default_window_config();
+    assert(app.init(cfg) == 1, "app init failed");
+    app.ui(root);
+    app.run_frame_step();
+
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=108, y=128));
+    app.run_frame_step();
+
+    var root_w = ui_context.global_ui_context.current_widget;
+    var actual_ta = root_w.children[0];
+    var actual_r_ctrl = actual_ta.text_editor_state as text_ctrl.EditorController;
+    var r_line = actual_r_ctrl.get_cursor_line();
+    var r_col = actual_r_ctrl.get_cursor_col();
+
+    app.shutdown();
+
+    print("Retained cursor: line=" + int_to_str(r_line) + ", col=" + int_to_str(r_col));
+    print("Immediate cursor: line=" + int_to_str(i_line) + ", col=" + int_to_str(i_col));
+    assert(r_line == i_line, "retained and immediate mouse hit-test lines must match");
+    assert(r_col == i_col, "retained and immediate mouse hit-test cols must match");
+
+    print("Shared semantics PASSED.");
+}
+
+fn test_large_document_stress() {
+    print("--- 2. Large Document Stress Testing ---");
+
+    var sizes = [100, 1000, 10000];
+    var s_idx = 0;
+    while (s_idx < len(sizes)) {
+        var n = sizes[s_idx];
+        print("Testing document with " + int_to_str(n) + " lines...");
+
+        var start_t = time();
+        var lines = build_large_lines(n);
+        var gen_t = time() - start_t;
+
+        start_t = time();
+        var ctrl = text_ctrl.EditorController("");
+        ctrl.document.lines = lines;
+        var init_t = time() - start_t;
+
+        assert(ctrl.get_line_count() == n, "line count mismatch");
+
+        // Simulate rendering 10 frames with viewport optimization
+        start_t = time();
+        var imgui = gui.GUI();
+        imgui.editor_controllers["StressArea"] = ctrl;
+        var frame_i = 0;
+        while (frame_i < 10) {
+            imgui.begin(100.0, 100.0, false, 0.0, 0.016);
+            imgui.input_text_multiline("StressArea", "", 400.0, 200.0);
+            imgui.end();
+            frame_i = frame_i + 1;
+        }
+        var render_t = time() - start_t;
+
+        print("  Document generation: " + (gen_t as str) + " s");
+        print("  Controller init: " + (init_t as str) + " s");
+        print("  10 frames rendering time: " + (render_t as str) + " s");
+
+        s_idx = s_idx + 1;
+    }
+
+    print("Large document stress test PASSED.");
+}
+
+fn main() {
+    print("=== Phase 3 Stress Testing and Shared Semantic Validation ===");
+    test_shared_semantics();
+    test_large_document_stress();
+    print("All Phase 3 Stress & Semantic Tests Passed.");
+}
+
+main();

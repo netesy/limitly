@@ -1,0 +1,12 @@
+// @error:closure_capture
+// Nested function capturing reference that goes out of scope
+
+fn create_closure(): any {
+    var x = 42;
+    fn inner(): int {
+        return x;  // Nested function capturing from outer scope
+    }
+    return inner;
+}
+
+create_closure();

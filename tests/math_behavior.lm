@@ -1,0 +1,13 @@
+import std.math as math;
+
+fn main() {
+    var a = 1.0;
+    var b = 0.0;
+    var c = a / b;
+    print("1.0 / 0.0 = ");
+    print(c);
+
+    var d = 0.0 / 0.0;
+    print("0.0 / 0.0 = ");
+    print(d);
+}

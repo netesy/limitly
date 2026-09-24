@@ -1,0 +1,13 @@
+// @error:closure_capture
+// Capturing mutable variable in nested function is not allowed
+
+fn outer() {
+    var x = 10;
+    fn f() {
+        x = 20;  // Cannot capture or mutate in nested function
+    }
+    f();
+    print(x);
+}
+
+outer();

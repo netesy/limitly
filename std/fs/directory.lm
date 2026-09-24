@@ -1,0 +1,11 @@
+// Standard Library Filesystem Directory Submodule
+
+import std.io as io;
+
+pub fn create_dir(path_str: str): any {
+    return io.create_directory(path_str);
+}
+
+pub fn list_dir(path_str: str): any {
+    return io.list_directory(path_str);
+}

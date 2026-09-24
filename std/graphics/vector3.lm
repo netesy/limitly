@@ -1,0 +1,34 @@
+import std.math as math;
+
+frame Vector3 {
+    pub var x: float;
+    pub var y: float;
+    pub var z: float;
+    
+    pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+    }
+    
+    pub fn add(other: Vector3): Vector3 { return Vector3(self.x + other.x, self.y + other.y, self.z + other.z); }
+    pub fn sub(other: Vector3): Vector3 { return Vector3(self.x - other.x, self.y - other.y, self.z - other.z); }
+    pub fn scale(s: float): Vector3 { return Vector3(self.x * s, self.y * s, self.z * s); }
+    pub fn dot(other: Vector3): float { return self.x * other.x + self.y * other.y + self.z * other.z; }
+    
+    pub fn cross(other: Vector3): Vector3 {
+        return Vector3(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x
+        );
+    }
+    
+    pub fn mag(): float { return math.sqrt(self.x * self.x + self.y * self.y + self.z * self.z); }
+    
+    pub fn normalize(): Vector3 {
+        var m = self.mag();
+        if (m == 0.0) return Vector3();
+        return self.scale(1.0 / m);
+    }
+}

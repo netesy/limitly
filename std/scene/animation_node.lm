@@ -1,0 +1,12 @@
+import std.scene.node as node;
+import std.graphics.animation as animation;
+
+frame AnimationNode {
+    pub var base_node: node.Node;
+    pub var anim: animation.Animation;
+
+    pub init(b: node.Node = node.Node(), a: animation.Animation = animation.Animation()) {
+        self.base_node = b;
+        self.anim = a;
+    }
+}

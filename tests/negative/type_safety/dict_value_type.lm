@@ -1,0 +1,6 @@
+// @error:type_error
+// Dictionary value type mismatch
+
+var map: {str: int} = {"a": 1, "b": 2};
+map["c"] = "string";  // Cannot assign string to int value
+print(map["c"]);

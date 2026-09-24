@@ -1,0 +1,52 @@
+// Retained UI Interactive End-to-End Regression Test
+// Verifies std.app -> std.ui -> std.graphics -> std.gg -> C++ VM Software Backend
+
+import std.app as app;
+import std.gg as gg;
+import std.ui as ui;
+
+fn main() {
+    print("=== Retained UI Interactive End-to-End Test ===");
+
+    var cfg = app.default_window_config();
+    assert(app.init(cfg) == 1, "app init failed");
+
+    // Construct retained UI tree using modern fluent std.ui API
+    var btn = ui.button("Click Me")
+        .background(ui.rgb(60, 120, 210));
+    var lbl = ui.text("Hello Retained UI")
+        .color(ui.white);
+    var root = ui.column([btn, lbl]);
+
+    app.ui(root);
+
+    // Frame 1: Render initial retained UI
+    app.run_frame_step();
+    var pixel_frame1 = gg.readback_pixel(50, 25);
+    assert(pixel_frame1 != nil, "pixel readback frame 1 failed");
+
+    // Frame 2: Queue mouse down event targeting button at (x=50, y=25) -> button enters pressed state
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_DOWN, x=50, y=25));
+    app.run_frame_step();
+    var pixel_frame2 = gg.readback_pixel(50, 25);
+    assert(pixel_frame2 != nil, "pixel readback frame 2 failed");
+    assert(pixel_frame1 != pixel_frame2, "pixel state did not change after mouse down event");
+    assert(btn.is_pressed == 1, "button should be pressed on mouse down");
+
+    // Frame 3: Mouse up -> button activates callback and resets pressed state
+    app.push_event(app.Event(event_type=app.EVENT_MOUSE_UP, x=50, y=25));
+    app.run_frame_step();
+    assert(btn.click_count == 1, "button click count should be 1 after release");
+    assert(btn.is_pressed == 0, "button should reset pressed state after release");
+
+    // Frame 4: Step another frame without interaction and verify state persistence
+    app.run_frame_step();
+    assert(btn.click_count == 1, "click count must persist across frames");
+
+    // Clean shutdown
+    app.shutdown();
+    gg.shutdown();
+    print("Retained UI Interactive Test Passed.");
+}
+
+main();

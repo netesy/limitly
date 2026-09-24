@@ -1,0 +1,13 @@
+import std.ui.widget as widget;
+
+frame Checkbox {
+    pub var checked: bool;
+
+    pub init(ch: bool = false) {
+        self.checked = ch;
+    }
+
+    pub fn build(): widget.Widget {
+        return widget.Widget();
+    }
+}

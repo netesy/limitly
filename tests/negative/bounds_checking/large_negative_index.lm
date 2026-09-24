@@ -1,0 +1,6 @@
+// @error:nil_bounds
+// Very large negative index returns nil safely
+
+var arr = [1, 2, 3];
+var x = arr[-1000];  // Large negative index returns nil safely
+assert(x == nil, "Large negative index must return nil safely");

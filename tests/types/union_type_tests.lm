@@ -1,0 +1,139 @@
+// =============================================================================
+// COMPREHENSIVE UNION TYPE TESTS
+// Tests union type functionality with current working features
+// =============================================================================
+
+print("=== Union Type Tests ===");
+
+// Test 1: Basic union types
+print("\n--- Test 1: Basic Union Types ---");
+type NumberOrString = int | str;
+type BoolOrFloat = bool | float;
+
+var numStr1: NumberOrString = 42;
+var numStr2: NumberOrString = "hello";
+var boolFloat1: BoolOrFloat = true;
+var boolFloat2: BoolOrFloat = 3.14;
+
+print("NumberOrString (int): {numStr1}");
+print("NumberOrString (str): {numStr2}");
+print("BoolOrFloat (bool): {boolFloat1}");
+print("BoolOrFloat (float): {boolFloat2}");
+
+// Test 2: Three-way union types
+print("\n--- Test 2: Three-way Union Types ---");
+type Value = int | str | bool;
+
+var val1: Value = 123;
+var val2: Value = "test";
+var val3: Value = true;
+
+print("Value (int): {val1}");
+print("Value (str): {val2}");
+print("Value (bool): {val3}");
+
+// Test 3: Union with nil (Option-like types)
+print("\n--- Test 3: Option-like Union Types ---");
+type MaybeInt = int | nil;
+type MaybeString = str | nil;
+
+var maybeInt1: MaybeInt = 42;
+var maybeString1: MaybeString = "hello";
+
+print("Maybe int (value): {maybeInt1}");
+print("Maybe string (value): {maybeString1}");
+
+// Test 4: Complex union combinations
+print("\n--- Test 4: Complex Union Combinations ---");
+type NumberType = int | float;
+type TextType = str;
+type DataType = NumberType | TextType | bool;
+
+var data1: DataType = 42;
+var data2: DataType = 3.14;
+var data3: DataType = "data";
+var data4: DataType = true;
+
+print("Data 1 (int): {data1}");
+print("Data 2 (float): {data2}");
+print("Data 3 (str): {data3}");
+print("Data 4 (bool): {data4}");
+
+// Test 5: Union type assignments
+print("\n--- Test 5: Union Type Assignments ---");
+type FlexibleType = int | str | bool | float;
+
+var flexible: FlexibleType = 100;
+print("Flexible (int): {flexible}");
+
+flexible = "changed";
+print("Flexible (str): {flexible}");
+
+flexible = false;
+print("Flexible (bool): {flexible}");
+
+flexible = 2.718;
+print("Flexible (float): {flexible}");
+
+// Test 6: Nested union expressions
+print("\n--- Test 6: Nested Union Expressions ---");
+type Result = int | str;
+
+var result1: Result = 42 + 8;
+var result2: Result = "Result: " + "Success";
+
+print("Result 1: {result1}");
+print("Result 2: {result2}");
+
+// Test 7: Union types in assignments
+print("\n--- Test 7: Union Types in Assignments ---");
+type Status = int | str;
+
+var status: Status = 200;
+print("Status (int): {status}");
+
+status = "OK";
+print("Status (str): {status}");
+
+// Test 8: Union types with string interpolation
+print("\n--- Test 8: Union Types with String Interpolation ---");
+type DisplayValue = int | str | bool;
+
+var display1: DisplayValue = 42;
+var display2: DisplayValue = "hello";
+var display3: DisplayValue = true;
+
+var message1: str = "Value 1: {display1}";
+var message2: str = "Value 2: {display2}";
+var message3: str = "Value 3: {display3}";
+
+print(message1);
+print(message2);
+print(message3);
+
+// Test 9: Multiple union type variables
+print("\n--- Test 9: Multiple Union Type Variables ---");
+type MultiType = int | str | bool | float;
+
+var multi1: MultiType = 1;
+var multi2: MultiType = "two";
+var multi3: MultiType = true;
+var multi4: MultiType = 4.0;
+
+print("Multi 1: {multi1}");
+print("Multi 2: {multi2}");
+print("Multi 3: {multi3}");
+print("Multi 4: {multi4}");
+
+// Test 10: Union type compatibility
+print("\n--- Test 10: Union Type Compatibility ---");
+type IntOrStr = int | str;
+type StrOrBool = str | bool;
+
+var intStr: IntOrStr = 100;
+var strBool: StrOrBool = "shared";
+
+print("IntOrStr: {intStr}");
+print("StrOrBool: {strBool}");
+
+print("\n=== Union Type Tests Complete ===");

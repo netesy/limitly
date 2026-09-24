@@ -1,0 +1,50 @@
+import std.ffi as ffi;
+
+fn native_add_limitly(a: int, b: int): int {
+    return a + b;
+}
+
+fn main() {
+    print("=== FFI Benchmark Overhead Measurement ===");
+
+    unsafe {
+        var lib = ffi.load("./tests/ffi/native/libffi_test.so");
+        assert(lib.is_loaded, "Failed to load libffi_test.so");
+        var add_func = lib.func("add_i32", ffi.TYPE_I32, [ffi.TYPE_I32, ffi.TYPE_I32]);
+
+        var iterations: int = 10000;
+
+        // 1. Measure direct Limitly loop cost
+        var t0 = clock();
+        var i: int = 0;
+        var sum_limitly: int = 0;
+        while (i < iterations) {
+            sum_limitly = native_add_limitly(sum_limitly, 1);
+            i = i + 1;
+        }
+        var t1 = clock();
+        var limitly_time = t1 - t0;
+
+        // 2. Measure Limitly -> std.ffi -> C loop cost
+        var t2 = clock();
+        var j: int = 0;
+        var sum_ffi: int = 0;
+        while (j < iterations) {
+            sum_ffi = add_func.call(sum_ffi, 1);
+            j = j + 1;
+        }
+        var t3 = clock();
+        var ffi_time = t3 - t2;
+
+        print("Iterations:");
+        print(iterations);
+        print("Native Limitly Function Time (s):");
+        print(limitly_time);
+        print("std.ffi C Call Time (s):");
+        print(ffi_time);
+
+        lib.close();
+    }
+
+    print("=== FFI Benchmark Complete ===");
+}

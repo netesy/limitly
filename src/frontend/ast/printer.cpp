@@ -1,0 +1,1143 @@
+#include "printer.hh"
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+
+namespace {
+    std::string escapeString(const std::string& str) {
+        std::ostringstream out;
+        for (char c : str) {
+            switch (c) {
+                case '\n': out << "\\n"; break;
+                case '\r': out << "\\r"; break;
+                case '\t': out << "\\t"; break;
+                case '\\': out << "\\\\"; break;
+                case '"': out << "\\\""; break;
+                default: out << c; break;
+            }
+        }
+        return out.str();
+    }
+
+        std::string typeToString(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& type) {
+        if (!type) return "<unknown>";
+        
+        std::string result = type->typeName;
+        
+
+        // Handle error union types
+        if (type->isFallible) {
+            result += "?";
+            if (!type->errorTypes.empty()) {
+                for (size_t i = 0; i < type->errorTypes.size(); ++i) {
+                    if (i > 0) result += ", ";
+                    result += type->errorTypes[i];
+                }
+            }
+        } else if (type->isOptional) {
+            result += "?";
+        }
+        
+        // Handle list types
+        if (type->isList && type->elementType) {
+            result = "[" + typeToString(type->elementType) + "]";
+        }
+        
+        // Handle function types
+        if (type->isFunction) {
+            result = "(";
+            for (size_t i = 0; i < type->functionParams.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += typeToString(type->functionParams[i]);
+            }
+            result += ") : ";
+            if (type->returnType) {
+                result += typeToString(type->returnType);
+            } else {
+                result += "nil";
+            }
+        }
+        
+        return result;
+    }
+}
+
+namespace LM {
+namespace Frontend {
+    namespace AST {
+
+
+void ASTPrinter::process(const std::shared_ptr<LM::Frontend::AST::Program>& program) {
+    std::cout << "AST Dump:" << std::endl;
+    std::cout << "==========" << std::endl;
+    
+    for (const auto& stmt : program->statements) {
+        if (!stmt) {
+            std::cout << "  (null stmt)\n";
+            continue;
+        }
+        std::cout << "  [DEBUG stmt ptr: " << stmt.get() << "]\n";
+        printNode(stmt);
+    }
+}
+
+void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node, int indent) {
+    std::string indentation = getIndentation(indent);
+    
+    if (!node) {
+        std::cout << indentation << "(null)\n";
+        return;
+    }
+    
+    if (auto program = std::dynamic_pointer_cast<LM::Frontend::AST::Program>(node)) {
+        std::cout << indentation << "Program:" << std::endl;
+        for (const auto& stmt : program->statements) {
+            if (stmt) printNode(stmt, indent + 1);
+        }
+    }
+    else if (auto varDecl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(node)) {
+        std::cout << indentation << "VarDeclaration: ";
+        
+        // Show visibility modifiers
+        auto getVisibilityString = [](LM::Frontend::AST::VisibilityLevel vis) -> std::string {
+            switch (vis) {
+                case LM::Frontend::AST::VisibilityLevel::Private: return "private";
+                case LM::Frontend::AST::VisibilityLevel::Protected: return "prot";
+                case LM::Frontend::AST::VisibilityLevel::Public: return "pub";
+                case LM::Frontend::AST::VisibilityLevel::Const: return "const";
+                default: return "unknown";
+            }
+        };
+        
+        std::cout << "[" << getVisibilityString(varDecl->visibility) << "] ";
+        if (varDecl->isStatic) {
+            std::cout << "[static] ";
+        }
+        
+        std::cout << varDecl->name << std::endl;
+        
+        if (varDecl->type) {
+            std::cout << indentation << "  Type: " << typeToString(*varDecl->type) << std::endl;
+        }
+        
+        if (varDecl->initializer) {
+            std::cout << indentation << "  Initializer:" << std::endl;
+            printNode(varDecl->initializer, indent + 2);
+        }
+    }
+    else if (auto destructDecl = std::dynamic_pointer_cast<LM::Frontend::AST::DestructuringDeclaration>(node)) {
+        std::cout << indentation << "DestructuringDeclaration: (";
+        for (size_t i = 0; i < destructDecl->names.size(); ++i) {
+            if (i > 0) std::cout << ", ";
+            std::cout << destructDecl->names[i];
+        }
+        std::cout << ")" << std::endl;
+        
+        if (destructDecl->initializer) {
+            std::cout << indentation << "  Initializer:" << std::endl;
+            printNode(destructDecl->initializer, indent + 2);
+        }
+    }
+    else if (auto funcDecl = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(node)) {
+        std::cout << indentation << "FunctionDeclaration: ";
+        
+        // Show visibility modifiers
+        auto getVisibilityString = [](LM::Frontend::AST::VisibilityLevel vis) -> std::string {
+            switch (vis) {
+                case LM::Frontend::AST::VisibilityLevel::Private: return "private";
+                case LM::Frontend::AST::VisibilityLevel::Protected: return "prot";
+                case LM::Frontend::AST::VisibilityLevel::Public: return "pub";
+                case LM::Frontend::AST::VisibilityLevel::Const: return "const";
+                default: return "unknown";
+            }
+        };
+        
+        std::cout << "[" << getVisibilityString(funcDecl->visibility) << "] ";
+        if (funcDecl->isStatic) {
+            std::cout << "[static] ";
+        }
+        if (funcDecl->isAbstract) {
+            std::cout << "[abstract] ";
+        }
+        if (funcDecl->isFinal) {
+            std::cout << "[final] ";
+        }
+        
+        std::cout << funcDecl->name << std::endl;
+        
+        if (!funcDecl->genericParams.empty()) {
+            std::cout << indentation << "  GenericParams: <";
+            for (size_t i = 0; i < funcDecl->genericParams.size(); ++i) {
+                if (i > 0) std::cout << ", ";
+                std::cout << funcDecl->genericParams[i];
+            }
+            std::cout << ">" << std::endl;
+        }
+        
+        if (!funcDecl->params.empty() || !funcDecl->optionalParams.empty()) {
+            std::cout << indentation << "  Parameters:" << std::endl;
+            
+            // Required parameters
+            for (const auto& param : funcDecl->params) {
+                std::cout << indentation << "    " << param.first;
+                if (param.second) {
+                    std::cout << ": " << typeToString(param.second);
+                }
+                std::cout << std::endl;
+            }
+            
+            // Optional parameters
+            for (const auto& optParam : funcDecl->optionalParams) {
+                std::cout << indentation << "    " << optParam.first << " (optional)";
+                if (optParam.second.first) {
+                    std::cout << ": " << typeToString(optParam.second.first);
+                }
+                std::cout << std::endl;
+                
+                if (optParam.second.second) {
+                    std::cout << indentation << "      Default value:" << std::endl;
+                    printNode(optParam.second.second, indent + 3);
+                }
+            }
+        }
+        
+        if (funcDecl->returnType) {
+            std::cout << indentation << "  ReturnType: " << typeToString(funcDecl->returnType.value()) << std::endl;
+        }
+        
+        if (funcDecl->throws) {
+            std::cout << indentation << "  Throws: true" << std::endl;
+        }
+        
+        if (funcDecl->body) {
+            std::cout << indentation << "  Body:" << std::endl;
+            printNode(funcDecl->body, indent + 2);
+        }
+    }
+    else if (auto blockStmt = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(node)) {
+        std::cout << indentation << "BlockStatement:" << std::endl;
+        for (const auto& stmt : blockStmt->statements) {
+            if (stmt) printNode(stmt, indent + 1);
+        }
+    }
+    else if (auto ifStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IfStatement>(node)) {
+        std::cout << indentation << "IfStatement:" << std::endl;
+        
+        std::cout << indentation << "  Condition:" << std::endl;
+        printNode(ifStmt->condition, indent + 2);
+        
+        std::cout << indentation << "  Then:" << std::endl;
+        printNode(ifStmt->thenBranch, indent + 2);
+        
+        if (ifStmt->elseBranch) {
+            std::cout << indentation << "  Else:" << std::endl;
+            printNode(ifStmt->elseBranch, indent + 2);
+        }
+    }
+    else if (auto forStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ForStatement>(node)) {
+        std::cout << indentation << "ForStatement (traditional):" << std::endl;
+        
+        if (forStmt->initializer) {
+            std::cout << indentation << "  Initializer:" << std::endl;
+            printNode(forStmt->initializer, indent + 2);
+        }
+        
+        if (forStmt->condition) {
+            std::cout << indentation << "  Condition:" << std::endl;
+            printNode(forStmt->condition, indent + 2);
+        }
+        
+        if (forStmt->increment) {
+            std::cout << indentation << "  Increment:" << std::endl;
+            printNode(forStmt->increment, indent + 2);
+        }
+        
+        if (forStmt->body) {
+            std::cout << indentation << "  Body:" << std::endl;
+            printNode(forStmt->body, indent + 2);
+        }
+    }
+    else if (auto whileStmt = std::dynamic_pointer_cast<LM::Frontend::AST::WhileStatement>(node)) {
+        std::cout << indentation << "WhileStatement:" << std::endl;
+        
+        std::cout << indentation << "  Condition:" << std::endl;
+        printNode(whileStmt->condition, indent + 2);
+        
+        std::cout << indentation << "  Body:" << std::endl;
+        printNode(whileStmt->body, indent + 2);
+    }
+    // Handle ReturnStatement in its respective case below
+    else if (auto parallelStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ParallelStatement>(node)) {
+        std::cout << indentation << "ParallelStatement:" << std::endl;
+        printNode(parallelStmt->body, indent + 1);
+    }
+    else if (auto concurrentStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ConcurrentStatement>(node)) {
+        std::cout << indentation << "ConcurrentStatement:" << std::endl;
+        printNode(concurrentStmt->body, indent + 1);
+    }
+    else if (auto importStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(node)) {
+        std::cout << indentation << "ImportStatement: " << importStmt->modulePath;
+        if (importStmt->alias) {
+            std::cout << " as " << *importStmt->alias;
+        }
+        if (importStmt->filter) {
+            if (importStmt->filter->type == LM::Frontend::AST::ImportFilterType::Show) {
+                std::cout << " show ";
+            } else {
+                std::cout << " hide ";
+            }
+            for (size_t i = 0; i < importStmt->filter->identifiers.size(); ++i) {
+                std::cout << importStmt->filter->identifiers[i] << (i < importStmt->filter->identifiers.size() - 1 ? ", " : "");
+            }
+        }
+        std::cout << std::endl;
+    }
+    else if (auto enumDecl = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(node)) {
+        std::cout << indentation << "EnumDeclaration: " << enumDecl->name << std::endl;
+        for (const auto& variant : enumDecl->variants) {
+            std::cout << indentation << "  Variant: " << variant.first;
+            if (!variant.second.empty()) {
+                std::cout << " (types: ";
+                for (size_t i = 0; i < variant.second.size(); ++i) {
+                    if (i > 0) std::cout << ", ";
+                    std::cout << typeToString(variant.second[i]);
+                }
+                std::cout << ")";
+            }
+            std::cout << std::endl;
+        }
+    }
+    else if (auto frameInstExpr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameInstantiationExpr>(node)) {
+        std::cout << indentation << "FrameInstantiation: " << frameInstExpr->frameName << std::endl;
+        if (!frameInstExpr->positionalArgs.empty()) {
+            std::cout << indentation << "  PositionalArgs:" << std::endl;
+            for (const auto& arg : frameInstExpr->positionalArgs) {
+                printNode(arg, indent + 2);
+            }
+        }
+        if (!frameInstExpr->namedArgs.empty()) {
+            std::cout << indentation << "  NamedArgs:" << std::endl;
+            for (const auto& [name, arg] : frameInstExpr->namedArgs) {
+                std::cout << indentation << "    " << name << ":" << std::endl;
+                printNode(arg, indent + 3);
+            }
+        }
+    }
+    else if (auto matchStmt = std::dynamic_pointer_cast<LM::Frontend::AST::MatchStatement>(node)) {
+        std::cout << indentation << "MatchStatement:" << std::endl;
+        std::cout << indentation << "  Value:" << std::endl;
+        printNode(matchStmt->value, indent + 2);
+        
+        std::cout << indentation << "  Cases:" << std::endl;
+        for (const auto& matchCase : matchStmt->cases) {
+            std::cout << indentation << "    Case:" << std::endl;
+            std::cout << indentation << "      Pattern:" << std::endl;
+            printNode(matchCase.pattern, indent + 3);
+            std::cout << indentation << "      Body:" << std::endl;
+            printNode(matchCase.body, indent + 3);
+        }
+    }
+    else if (auto typeDecl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(node)) {
+        std::cout << indentation << "TypeDeclaration: " << typeDecl->name << " = " 
+                  << typeToString(typeDecl->type) << std::endl;
+    }
+    else if (auto traitDecl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(node)) {
+        std::cout << indentation << "TraitDeclaration: " << traitDecl->name;
+        if (traitDecl->isOpen) std::cout << " (open)";
+        std::cout << std::endl;
+        
+        if (!traitDecl->methods.empty()) {
+            std::cout << indentation << "  Methods:" << std::endl;
+            for (const auto& method : traitDecl->methods) {
+                printNode(method, indent + 2);
+            }
+        }
+    }
+    else if (auto interfaceDecl = std::dynamic_pointer_cast<LM::Frontend::AST::InterfaceDeclaration>(node)) {
+        std::cout << indentation << "InterfaceDeclaration: " << interfaceDecl->name;
+        if (interfaceDecl->isOpen) std::cout << " (open)";
+        std::cout << std::endl;
+        
+        if (!interfaceDecl->methods.empty()) {
+            std::cout << indentation << "  Methods:" << std::endl;
+            for (const auto& method : interfaceDecl->methods) {
+                printNode(method, indent + 2);
+            }
+        }
+    }
+    else if (auto frameDecl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(node)) {
+        std::cout << indentation << "FrameDeclaration: " << frameDecl->name;
+        
+        // Show frame modifiers
+        if (frameDecl->isAbstract) std::cout << " (abstract)";
+        if (frameDecl->isFinal) std::cout << " (final)";
+        
+        std::cout << std::endl;
+        
+        // Show implemented traits
+        if (!frameDecl->implements.empty()) {
+            std::cout << indentation << "  Implements:";
+            for (size_t i = 0; i < frameDecl->implements.size(); ++i) {
+                if (i > 0) std::cout << ",";
+                std::cout << " " << frameDecl->implements[i];
+            }
+            std::cout << std::endl;
+        }
+        
+        // Helper function to get visibility string
+        auto getVisibilityString = [](LM::Frontend::AST::VisibilityLevel vis) -> std::string {
+            switch (vis) {
+                case LM::Frontend::AST::VisibilityLevel::Private: return "private";
+                case LM::Frontend::AST::VisibilityLevel::Protected: return "prot";
+                case LM::Frontend::AST::VisibilityLevel::Public: return "pub";
+                case LM::Frontend::AST::VisibilityLevel::Const: return "const";
+                default: return "unknown";
+            }
+        };
+        
+        // Print fields
+        if (!frameDecl->fields.empty()) {
+            std::cout << indentation << "  Fields:" << std::endl;
+            for (const auto& field : frameDecl->fields) {
+                std::cout << indentation << "    [" << getVisibilityString(field->visibility) << "] ";
+                std::cout << field->name;
+                if (field->type) {
+                    std::cout << ": " << typeToString(field->type);
+                }
+                if (field->defaultValue) {
+                    std::cout << " = <default>";
+                }
+                std::cout << std::endl;
+                
+                // Print default value if present
+                if (field->defaultValue) {
+                    std::cout << indentation << "      Default:" << std::endl;
+                    printNode(field->defaultValue, indent + 3);
+                }
+            }
+        }
+        
+        // Print init method if present
+        if (frameDecl->init) {
+            std::cout << indentation << "  Init Method:" << std::endl;
+            std::cout << indentation << "    [" << getVisibilityString(frameDecl->init->visibility) << "] init()" << std::endl;
+            
+            if (!frameDecl->init->parameters.empty() || !frameDecl->init->optionalParams.empty()) {
+                std::cout << indentation << "      Parameters:" << std::endl;
+                
+                // Required parameters
+                for (const auto& param : frameDecl->init->parameters) {
+                    std::cout << indentation << "        " << param.first;
+                    if (param.second) {
+                        std::cout << ": " << typeToString(param.second);
+                    }
+                    std::cout << std::endl;
+                }
+                
+                // Optional parameters
+                for (const auto& optParam : frameDecl->init->optionalParams) {
+                    std::cout << indentation << "        " << optParam.first << " (optional)";
+                    if (optParam.second.first) {
+                        std::cout << ": " << typeToString(optParam.second.first);
+                    }
+                    std::cout << std::endl;
+                    
+                    if (optParam.second.second) {
+                        std::cout << indentation << "          Default value:" << std::endl;
+                        printNode(optParam.second.second, indent + 5);
+                    }
+                }
+            }
+            
+            if (frameDecl->init->body) {
+                std::cout << indentation << "      Body:" << std::endl;
+                printNode(frameDecl->init->body, indent + 3);
+            }
+        }
+        
+        // Print deinit method if present
+        if (frameDecl->deinit) {
+            std::cout << indentation << "  Deinit Method:" << std::endl;
+            std::cout << indentation << "    [" << getVisibilityString(frameDecl->deinit->visibility) << "] deinit()" << std::endl;
+            
+            if (frameDecl->deinit->body) {
+                std::cout << indentation << "      Body:" << std::endl;
+                printNode(frameDecl->deinit->body, indent + 3);
+            }
+        }
+        
+        // Print regular methods
+        if (!frameDecl->methods.empty()) {
+            std::cout << indentation << "  Methods:" << std::endl;
+            for (const auto& method : frameDecl->methods) {
+                std::cout << indentation << "    [" << getVisibilityString(method->visibility) << "] ";
+                std::cout << method->name << "()" << std::endl;
+                
+                if (!method->parameters.empty() || !method->optionalParams.empty()) {
+                    std::cout << indentation << "      Parameters:" << std::endl;
+                    
+                    // Required parameters
+                    for (const auto& param : method->parameters) {
+                        std::cout << indentation << "          " << param.first;
+                        if (param.second) {
+                            std::cout << ": " << typeToString(param.second);
+                        }
+                        std::cout << std::endl;
+                    }
+                    
+                    // Optional parameters
+                    for (const auto& optParam : method->optionalParams) {
+                        std::cout << indentation << "          " << optParam.first << " (optional)";
+                        if (optParam.second.first) {
+                            std::cout << ": " << typeToString(optParam.second.first);
+                        }
+                        std::cout << std::endl;
+                        
+                        if (optParam.second.second) {
+                            std::cout << indentation << "          Default value:" << std::endl;
+                            printNode(optParam.second.second, indent + 6);
+                        }
+                    }
+                }
+                
+                if (method->returnType) {
+                    std::cout << indentation << "      ReturnType: " << typeToString(method->returnType) << std::endl;
+                }
+                
+                if (method->body) {
+                    std::cout << indentation << "      Body:" << std::endl;
+                    printNode(method->body, indent + 3);
+                }
+            }
+        }
+    }
+    else if (auto moduleDecl = std::dynamic_pointer_cast<LM::Frontend::AST::ModuleDeclaration>(node)) {
+        std::cout << indentation << "ModuleDeclaration: " << moduleDecl->name << std::endl;
+        
+        if (!moduleDecl->publicMembers.empty()) {
+            std::cout << indentation << "  Public Members:" << std::endl;
+            for (const auto& member : moduleDecl->publicMembers) {
+                printNode(member, indent + 2);
+            }
+        }
+        
+        if (!moduleDecl->protectedMembers.empty()) {
+            std::cout << indentation << "  Protected Members:" << std::endl;
+            for (const auto& member : moduleDecl->protectedMembers) {
+                printNode(member, indent + 2);
+            }
+        }
+        
+        if (!moduleDecl->privateMembers.empty()) {
+            std::cout << indentation << "  Private Members:" << std::endl;
+            for (const auto& member : moduleDecl->privateMembers) {
+                printNode(member, indent + 2);
+            }
+        }
+    }
+    else if (auto iterStmt = std::dynamic_pointer_cast<LM::Frontend::AST::IterStatement>(node)) {
+        std::cout << indentation << "IterStatement:" << std::endl;
+        std::cout << indentation << "  Variables:";
+        for (const auto& var : iterStmt->loopVars) {
+            std::cout << " " << var;
+        }
+        std::cout << std::endl;
+        
+        std::cout << indentation << "  Iterable:" << std::endl;
+        printNode(iterStmt->iterable, indent + 2);
+        
+        std::cout << indentation << "  Body:" << std::endl;
+        printNode(iterStmt->body, indent + 2);
+    }
+    else if (auto unsafeStmt = std::dynamic_pointer_cast<LM::Frontend::AST::UnsafeStatement>(node)) {
+        std::cout << indentation << "UnsafeStatement:" << std::endl;
+        printNode(unsafeStmt->body, indent + 1);
+    }
+    else if (auto contractStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContractStatement>(node)) {
+        std::cout << indentation << "ContractStatement:" << std::endl;
+        std::cout << indentation << "  Condition:" << std::endl;
+        printNode(contractStmt->condition, indent + 2);
+        
+        if (contractStmt->message) {
+            std::cout << indentation << "  Message:" << std::endl;
+            printNode(contractStmt->message, indent + 2);
+        }
+    }
+    else if (auto stagedStmt = std::dynamic_pointer_cast<LM::Frontend::AST::StagedStatement>(node)) {
+        std::cout << indentation << "StagedStatement:" << std::endl;
+        if (stagedStmt->declaration) {
+            printNode(stagedStmt->declaration, indent + 1);
+        }
+        if (stagedStmt->block) {
+            printNode(stagedStmt->block, indent + 1);
+        }
+        if (stagedStmt->expression) {
+            printNode(stagedStmt->expression, indent + 1);
+        }
+    }
+    else if (auto stagedBlock = std::dynamic_pointer_cast<LM::Frontend::AST::StagedBlockStatement>(node)) {
+        std::cout << indentation << "StagedBlockStatement:" << std::endl;
+        if (stagedBlock->body) {
+            printNode(stagedBlock->body, indent + 1);
+        }
+    }
+    else if (auto stagedExpr = std::dynamic_pointer_cast<LM::Frontend::AST::StagedExpr>(node)) {
+        std::cout << indentation << "StagedExpr:" << std::endl;
+        if (stagedExpr->expression) {
+            printNode(stagedExpr->expression, indent + 1);
+        }
+        if (stagedExpr->block) {
+            printNode(stagedExpr->block, indent + 1);
+        }
+    }
+    // Consolidated ReturnStatement case
+    else if (auto returnStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(node)) {
+        std::cout << indentation << "ReturnStatement";
+        if (returnStmt->value) {
+            std::cout << ":" << std::endl << indentation << "  Value:" << std::endl;
+            printNode(returnStmt->value, indent + 2);
+        } else {
+            std::cout << std::endl;
+        }
+    }
+    else if (auto binaryExpr = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(node)) {
+        std::cout << indentation << "BinaryExpression: " << tokenTypeToString(binaryExpr->op) << std::endl;
+        
+        std::cout << indentation << "  Left:" << std::endl;
+        printNode(binaryExpr->left, indent + 2);
+        
+        std::cout << indentation << "  Operator: " << tokenTypeToString(binaryExpr->op) << std::endl;
+        
+        std::cout << indentation << "  Right:" << std::endl;
+        printNode(binaryExpr->right, indent + 2);
+    }
+    else if (auto unaryExpr = std::dynamic_pointer_cast<LM::Frontend::AST::UnaryExpr>(node)) {
+        std::cout << indentation << "UnaryExpression: " << tokenTypeToString(unaryExpr->op) << std::endl;
+        
+        std::cout << indentation << "  Operand:" << std::endl;
+        printNode(unaryExpr->right, indent + 2);
+    }
+    else if (auto literalExpr = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(node)) {
+        std::string typeInfo = "";
+        if (literalExpr->inferred_type) {
+            typeInfo = " [type: " + typePtrToString(literalExpr->inferred_type) + "]";
+        }
+        std::cout << indentation << "Literal: " << valueToString(literalExpr->value) << typeInfo << std::endl;
+    }
+    else if (auto interpolatedExpr = std::dynamic_pointer_cast<LM::Frontend::AST::InterpolatedStringExpr>(node)) {
+        std::cout << indentation << "InterpolatedString:" << std::endl;
+        for (size_t i = 0; i < interpolatedExpr->parts.size(); ++i) {
+            if (std::holds_alternative<std::string>(interpolatedExpr->parts[i])) {
+                std::cout << indentation << "  String: \"" << escapeString(std::get<std::string>(interpolatedExpr->parts[i])) << "\"" << std::endl;
+            } else {
+                std::cout << indentation << "  Expression:" << std::endl;
+                printNode(std::get<std::shared_ptr<LM::Frontend::AST::Expression>>(interpolatedExpr->parts[i]), indent + 2);
+            }
+        }
+    }
+    else if (auto varExpr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(node)) {
+        std::cout << indentation << "Variable: " << varExpr->name << std::endl;
+    }
+    else if (auto callExpr = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(node)) {
+        std::cout << indentation << "CallExpression:" << std::endl;
+        
+        std::cout << indentation << "  Callee:" << std::endl;
+        printNode(callExpr->callee, indent + 2);
+        
+        if (!callExpr->arguments.empty()) {
+            std::cout << indentation << "  Arguments:" << std::endl;
+            for (const auto& arg : callExpr->arguments) {
+                printNode(arg, indent + 2);
+            }
+        }
+        
+        if (!callExpr->namedArgs.empty()) {
+            std::cout << indentation << "  Named Arguments:" << std::endl;
+            for (const auto& [name, arg] : callExpr->namedArgs) {
+                std::cout << indentation << "    " << name << ":" << std::endl;
+                printNode(arg, indent + 3);
+            }
+        }
+    }
+    else if (auto exprStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ExprStatement>(node)) {
+        std::cout << indentation << "ExpressionStatement:" << std::endl;
+        printNode(exprStmt->expression, indent + 1);
+    }
+    else if (auto thisExpr = std::dynamic_pointer_cast<LM::Frontend::AST::ThisExpr>(node)) {
+        std::cout << indentation << "This" << std::endl;
+    }
+    else if (auto superExpr = std::dynamic_pointer_cast<LM::Frontend::AST::SuperExpr>(node)) {
+        std::cout << indentation << "Super" << std::endl;
+    }
+    else if (auto assignExpr = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(node)) {
+        std::cout << indentation << "Assignment: " << tokenTypeToString(assignExpr->op) << std::endl;
+        if (!assignExpr->name.empty()) {
+            std::cout << indentation << "  Target: " << assignExpr->name << std::endl;
+        } else if (assignExpr->member) {
+            std::cout << indentation << "  Member: " << *assignExpr->member << std::endl;
+            if (assignExpr->object) {
+                std::cout << indentation << "  Object:" << std::endl;
+                printNode(assignExpr->object, indent + 2);
+            }
+        } else if (assignExpr->index) {
+            std::cout << indentation << "  Index:" << std::endl;
+            printNode(assignExpr->index, indent + 1);
+            if (assignExpr->object) {
+                std::cout << indentation << "  Object:" << std::endl;
+                printNode(assignExpr->object, indent + 2);
+            }
+        }
+        std::cout << indentation << "  Value:" << std::endl;
+        printNode(assignExpr->value, indent + 1);
+    }
+    else if (auto groupExpr = std::dynamic_pointer_cast<LM::Frontend::AST::GroupingExpr>(node)) {
+        std::cout << indentation << "Grouping:" << std::endl;
+        printNode(groupExpr->expression, indent + 1);
+    }
+    else if (auto indexExpr = std::dynamic_pointer_cast<LM::Frontend::AST::IndexExpr>(node)) {
+        std::cout << indentation << "IndexExpression:" << std::endl;
+        std::cout << indentation << "  Object:" << std::endl;
+        printNode(indexExpr->object, indent + 2);
+        std::cout << indentation << "  Index:" << std::endl;
+        printNode(indexExpr->index, indent + 2);
+    }
+    else if (auto memberExpr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(node)) {
+        std::cout << indentation << "MemberExpression: " << (memberExpr->isSafeAccess ? "?." : ".") << memberExpr->name << std::endl;
+        std::cout << indentation << "  Object:" << std::endl;
+        printNode(memberExpr->object, indent + 2);
+    }
+    else if (auto listExpr = std::dynamic_pointer_cast<LM::Frontend::AST::ListExpr>(node)) {
+        std::cout << indentation << "ListExpression: [" << listExpr->elements.size() << " elements]" << std::endl;
+        for (const auto& element : listExpr->elements) {
+            // Convert Expression to Node using static_pointer_cast since Expression inherits from Node
+            printNode(std::static_pointer_cast<LM::Frontend::AST::Node>(element), indent + 1);
+        }
+    }
+    else if (auto tupleExpr = std::dynamic_pointer_cast<LM::Frontend::AST::TupleExpr>(node)) {
+        std::cout << indentation << "TupleExpression: (" << tupleExpr->elements.size() << " elements)" << std::endl;
+        for (const auto& element : tupleExpr->elements) {
+            // Convert Expression to Node using static_pointer_cast since Expression inherits from Node
+            printNode(std::static_pointer_cast<LM::Frontend::AST::Node>(element), indent + 1);
+        }
+    }
+    else if (auto dictExpr = std::dynamic_pointer_cast<LM::Frontend::AST::DictExpr>(node)) {
+        std::cout << indentation << "DictionaryExpression: {" << dictExpr->entries.size() << " entries}" << std::endl;
+        for (const auto& entry : dictExpr->entries) {
+            std::cout << indentation << "  Key:" << std::endl;
+            printNode(std::static_pointer_cast<LM::Frontend::AST::Node>(entry.first), indent + 2);
+            std::cout << indentation << "  Value:" << std::endl;
+            printNode(std::static_pointer_cast<LM::Frontend::AST::Node>(entry.second), indent + 2);
+        }
+    }
+    else if (auto rangeExpr = std::dynamic_pointer_cast<LM::Frontend::AST::RangeExpr>(node)) {
+        std::cout << indentation << "RangeExpression:" << std::endl;
+        std::cout << indentation << "  Start:" << std::endl;
+        printNode(rangeExpr->start, indent + 2);
+        std::cout << indentation << "  End:" << std::endl;
+        printNode(rangeExpr->end, indent + 2);
+        if (rangeExpr->step) {
+            std::cout << indentation << "  Step:" << std::endl;
+            printNode(rangeExpr->step, indent + 2);
+        }
+        std::cout << indentation << "  Inclusive: " << (rangeExpr->inclusive ? "true" : "false") << std::endl;
+    }
+    else if (auto breakStmt = std::dynamic_pointer_cast<LM::Frontend::AST::BreakStatement>(node)) {
+        std::cout << indentation << "BreakStatement" << std::endl;
+    }
+    else if (auto continueStmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContinueStatement>(node)) {
+        std::cout << indentation << "ContinueStatement" << std::endl;
+    }
+    else if (auto taskStmt = std::dynamic_pointer_cast<LM::Frontend::AST::TaskStatement>(node)) {
+        std::cout << indentation << "TaskStatement" << std::endl;
+        
+        if (!taskStmt->loopVar.empty()) {
+            std::cout << indentation << "  LoopVar: " << taskStmt->loopVar << std::endl;
+            if (taskStmt->iterable) {
+                std::cout << indentation << "  Iterable:" << std::endl;
+                printNode(taskStmt->iterable, indent + 2);
+            }
+        }
+        
+        if (taskStmt->body) {
+            std::cout << indentation << "  Body:" << std::endl;
+            printNode(taskStmt->body, indent + 2);
+        }
+    }
+    else if (auto workerStmt = std::dynamic_pointer_cast<LM::Frontend::AST::WorkerStatement>(node)) {
+        std::cout << indentation << "WorkerStatement" << std::endl;
+        
+        if (!workerStmt->param.empty()) {
+            std::cout << indentation << "  Parameter: " << workerStmt->param << std::endl;
+        }
+        
+        if (workerStmt->body) {
+            std::cout << indentation << "  Body:" << std::endl;
+            printNode(workerStmt->body, indent + 2);
+        }
+    }
+    else if (auto typePatternExpr = std::dynamic_pointer_cast<LM::Frontend::AST::TypePatternExpr>(node)) {
+        std::cout << indentation << "TypePattern: " << typeToString(typePatternExpr->type) << std::endl;
+    }
+    else if (auto bindingPatternExpr = std::dynamic_pointer_cast<LM::Frontend::AST::BindingPatternExpr>(node)) {
+        std::cout << indentation << "BindingPattern: " << bindingPatternExpr->typeName;
+        if (!bindingPatternExpr->patterns.empty()) {
+            std::cout << "(";
+            for (size_t i = 0; i < bindingPatternExpr->patterns.size(); ++i) {
+                if (i > 0) std::cout << ", ";
+                printNode(bindingPatternExpr->patterns[i], 0);
+            }
+            std::cout << ")";
+        }
+        std::cout << std::endl;
+    }
+    else if (auto listPatternExpr = std::dynamic_pointer_cast<LM::Frontend::AST::ListPatternExpr>(node)) {
+        std::cout << indentation << "ListPattern: [" << listPatternExpr->elements.size() << " elements";
+        if (listPatternExpr->restElement) {
+            std::cout << ", ..." << *listPatternExpr->restElement;
+        }
+        std::cout << "]" << std::endl;
+        
+        for (const auto& element : listPatternExpr->elements) {
+            printNode(element, indent + 1);
+        }
+    }
+    else if (auto dictPatternExpr = std::dynamic_pointer_cast<LM::Frontend::AST::DictPatternExpr>(node)) {
+        std::cout << indentation << "DictPattern: {" << dictPatternExpr->fields.size() << " fields";
+        if (dictPatternExpr->hasRestElement) {
+            std::cout << ", ...";
+            if (dictPatternExpr->restBinding) {
+                std::cout << *dictPatternExpr->restBinding;
+            }
+        }
+        std::cout << "}" << std::endl;
+        
+        for (const auto& field : dictPatternExpr->fields) {
+            std::cout << indentation << "  Field: " << field.key;
+            if (field.pattern) {
+                printNode(field.pattern, 0);
+            }
+            std::cout << std::endl;
+        }
+    }
+    else if (auto tuplePatternExpr = std::dynamic_pointer_cast<LM::Frontend::AST::TuplePatternExpr>(node)) {
+        std::cout << indentation << "TuplePattern: (" << tuplePatternExpr->elements.size() << " elements)" << std::endl;
+        
+        for (const auto& element : tuplePatternExpr->elements) {
+            printNode(element, indent + 1);
+        }
+    }
+    else if (auto fallibleExpr = std::dynamic_pointer_cast<LM::Frontend::AST::FallibleExpr>(node)) {
+        std::cout << indentation << "FallibleExpression:" << std::endl;
+        std::cout << indentation << "  Expression:" << std::endl;
+        printNode(fallibleExpr->expression, indent + 2);
+        
+        if (fallibleExpr->elseHandler) {
+            std::cout << indentation << "  ElseHandler:" << std::endl;
+            if (!fallibleExpr->elseVariable.empty()) {
+                std::cout << indentation << "    ErrorVariable: " << fallibleExpr->elseVariable << std::endl;
+            }
+            printNode(fallibleExpr->elseHandler, indent + 2);
+        }
+    }
+    else if (auto errorExpr = std::dynamic_pointer_cast<LM::Frontend::AST::ErrorConstructExpr>(node)) {
+        std::cout << indentation << "ErrorConstruct: " << errorExpr->errorType << std::endl;
+        
+        if (!errorExpr->arguments.empty()) {
+            std::cout << indentation << "  Arguments:" << std::endl;
+            for (const auto& arg : errorExpr->arguments) {
+                printNode(arg, indent + 2);
+            }
+        }
+    }
+    else if (auto okExpr = std::dynamic_pointer_cast<LM::Frontend::AST::OkConstructExpr>(node)) {
+        std::cout << indentation << "OkConstruct:" << std::endl;
+        std::cout << indentation << "  Value:" << std::endl;
+        printNode(okExpr->value, indent + 2);
+    }
+    else if (auto lambdaExpr = std::dynamic_pointer_cast<LM::Frontend::AST::LambdaExpr>(node)) {
+        std::cout << indentation << "LambdaExpression:" << std::endl;
+        
+        if (!lambdaExpr->params.empty()) {
+            std::cout << indentation << "  Parameters:" << std::endl;
+            for (const auto& param : lambdaExpr->params) {
+                std::cout << indentation << "    " << param.first;
+                if (param.second) {
+                    std::cout << ": " << typeToString(param.second);
+                }
+                std::cout << std::endl;
+            }
+        }
+        
+        if (lambdaExpr->returnType) {
+            std::cout << indentation << "  ReturnType: " << typeToString(*lambdaExpr->returnType) << std::endl;
+        }
+        
+        if (lambdaExpr->body) {
+            std::cout << indentation << "  Body:" << std::endl;
+            printNode(lambdaExpr->body, indent + 2);
+        }
+        
+        if (!lambdaExpr->capturedVars.empty()) {
+            std::cout << indentation << "  CapturedVars:";
+            for (const auto& var : lambdaExpr->capturedVars) {
+                std::cout << " " << var;
+            }
+            std::cout << std::endl;
+        }
+    }
+    else {
+        std::cout << indentation << "Unknown node type" << std::endl;
+    }
+}
+
+std::string ASTPrinter::getIndentation(int indent) const {
+    return std::string(indent * 2, ' ');
+}
+
+std::string ASTPrinter::tokenTypeToString(LM::Frontend::TokenType type) const {
+    switch (type) {
+        // Delimiters
+        case LM::Frontend::TokenType::LEFT_PAREN: return "(";
+        case LM::Frontend::TokenType::RIGHT_PAREN: return ")";
+        case LM::Frontend::TokenType::LEFT_BRACE: return "{";
+        case LM::Frontend::TokenType::RIGHT_BRACE: return "}";
+        case LM::Frontend::TokenType::LEFT_BRACKET: return "[";
+        case LM::Frontend::TokenType::RIGHT_BRACKET: return "]";
+        case LM::Frontend::TokenType::COMMA: return ",";
+        case LM::Frontend::TokenType::DOT: return ".";
+        case LM::Frontend::TokenType::SEMICOLON: return ";";
+        case LM::Frontend::TokenType::QUESTION: return "?";
+        case LM::Frontend::TokenType::SAFE: return "?.";
+        case LM::Frontend::TokenType::ARROW: return "->";
+        case LM::Frontend::TokenType::RANGE: return "..";
+        case LM::Frontend::TokenType::ELLIPSIS: return "...";
+        case LM::Frontend::TokenType::COLON_COLON: return "::";
+        
+        // Operators
+        case LM::Frontend::TokenType::PLUS: return "+";
+        case LM::Frontend::TokenType::PLUS_EQUAL: return "+=";
+        case LM::Frontend::TokenType::MINUS: return "-";
+        case LM::Frontend::TokenType::MINUS_EQUAL: return "-=";
+        case LM::Frontend::TokenType::SLASH: return "/";
+        case LM::Frontend::TokenType::SLASH_EQUAL: return "/=";
+        case LM::Frontend::TokenType::MODULUS: return "%";
+        case LM::Frontend::TokenType::MODULUS_EQUAL: return "%=";
+        case LM::Frontend::TokenType::STAR: return "*";
+        case LM::Frontend::TokenType::STAR_EQUAL: return "*=";
+        case LM::Frontend::TokenType::BANG: return "!";
+        case LM::Frontend::TokenType::BANG_EQUAL: return "!=";
+        case LM::Frontend::TokenType::EQUAL: return "=";
+        case LM::Frontend::TokenType::EQUAL_EQUAL: return "==";
+        case LM::Frontend::TokenType::GREATER: return ">";
+        case LM::Frontend::TokenType::GREATER_EQUAL: return ">=";
+        case LM::Frontend::TokenType::LESS: return "<";
+        case LM::Frontend::TokenType::LESS_EQUAL: return "<=";
+        case LM::Frontend::TokenType::AMPERSAND: return "&";
+        case LM::Frontend::TokenType::PIPE: return "|";
+        case LM::Frontend::TokenType::CARET: return "^";
+        case LM::Frontend::TokenType::TILDE: return "~";
+        case LM::Frontend::TokenType::POWER: return "**";
+        
+        // Literals
+        case LM::Frontend::TokenType::IDENTIFIER: return "identifier";
+        case LM::Frontend::TokenType::STRING: return "string";
+        case LM::Frontend::TokenType::INT_LITERAL: return "int literal";
+        case LM::Frontend::TokenType::FLOAT_LITERAL: return "float literal";
+        case LM::Frontend::TokenType::SCIENTIFIC_LITERAL: return "scientific literal";
+        
+        // Types
+        case LM::Frontend::TokenType::INT_TYPE: return "int";
+        case LM::Frontend::TokenType::INT8_TYPE: return "i8";
+        case LM::Frontend::TokenType::INT16_TYPE: return "i16";
+        case LM::Frontend::TokenType::INT32_TYPE: return "i32";
+        case LM::Frontend::TokenType::INT64_TYPE: return "i64";
+        case LM::Frontend::TokenType::UINT_TYPE: return "uint";
+        case LM::Frontend::TokenType::UINT8_TYPE: return "u8";
+        case LM::Frontend::TokenType::UINT16_TYPE: return "u16";
+        case LM::Frontend::TokenType::UINT32_TYPE: return "u32";
+        case LM::Frontend::TokenType::UINT64_TYPE: return "u64";
+        case LM::Frontend::TokenType::FLOAT_TYPE: return "float";
+        case LM::Frontend::TokenType::FLOAT32_TYPE: return "f32";
+        case LM::Frontend::TokenType::FLOAT64_TYPE: return "f64";
+        case LM::Frontend::TokenType::STR_TYPE: return "str";
+        case LM::Frontend::TokenType::BOOL_TYPE: return "bool";
+        case LM::Frontend::TokenType::USER_TYPE: return "user_type";
+        case LM::Frontend::TokenType::FUNCTION_TYPE: return "fn";
+        // LIST_TYPE, DICT_TYPE, ARRAY_TYPE removed - collection syntax uses [int], {str:int}, (int,str)
+        case LM::Frontend::TokenType::ENUM_TYPE: return "enum";
+        case LM::Frontend::TokenType::SUM_TYPE: return "sum";
+        case LM::Frontend::TokenType::UNION_TYPE: return "union";
+        case LM::Frontend::TokenType::OPTION_TYPE: return "option";
+        case LM::Frontend::TokenType::RESULT_TYPE: return "result";
+        case LM::Frontend::TokenType::ANY_TYPE: return "any";
+        case LM::Frontend::TokenType::NIL_TYPE: return "nil";
+        case LM::Frontend::TokenType::CHANNEL_TYPE: return "channel";
+        case LM::Frontend::TokenType::ATOMIC_TYPE: return "atomic";
+        
+        // Keywords
+        case LM::Frontend::TokenType::AND: return "and";
+        case LM::Frontend::TokenType::OR: return "or";
+        case LM::Frontend::TokenType::FRAME: return "frame";
+        case LM::Frontend::TokenType::FALSE: return "false";
+        case LM::Frontend::TokenType::FN: return "fn";
+        case LM::Frontend::TokenType::ELSE: return "else";
+        case LM::Frontend::TokenType::FOR: return "for";
+        case LM::Frontend::TokenType::WHILE: return "while";
+        case LM::Frontend::TokenType::MATCH: return "match";
+        case LM::Frontend::TokenType::IF: return "if";
+        case LM::Frontend::TokenType::IN: return "in";
+        case LM::Frontend::TokenType::ITER: return "iter";
+        
+        // Add more keywords as needed...
+        
+        default: return "<unknown>";
+    }
+}
+
+std::string ASTPrinter::valueToString(const std::variant<std::string, bool, std::nullptr_t>& value) const {
+    if (std::holds_alternative<std::string>(value)) {
+        return "\"" + std::get<std::string>(value) + "\"";
+    } else if (std::holds_alternative<bool>(value)) {
+        return std::get<bool>(value) ? "true" : "false";
+    } else if (std::holds_alternative<std::nullptr_t>(value)) {
+        return "nil";
+    }
+    return "<unknown>";
+}
+
+std::string ASTPrinter::typeToString(const std::shared_ptr<LM::Frontend::AST::TypeAnnotation>& type) const {
+    if (!type) return "<unknown>";
+    
+    // Safety check: ensure we're not in an infinite recursion
+    static thread_local std::set<LM::Frontend::AST::TypeAnnotation*> visiting;
+    if (visiting.count(type.get())) return type->typeName.empty() ? "<circular>" : type->typeName;
+    visiting.insert(type.get());
+
+    struct ExitGuard {
+        LM::Frontend::AST::TypeAnnotation* t;
+        ExitGuard(LM::Frontend::AST::TypeAnnotation* ptr) : t(ptr) {}
+        ~ExitGuard() { visiting.erase(t); }
+    } guard(type.get());
+
+    std::string result = type->typeName;
+    
+    // Handle optional type
+    if (type->isOptional) {
+        result += "?";
+    }
+    
+    // Handle list type
+    if (type->isList && type->elementType) {
+        std::string elem = typeToString(type->elementType);
+        return "[" + elem + "]";
+    }
+    
+    // Handle dictionary type
+    if (type->isDict && type->keyType && type->valueType) {
+        return "{" + typeToString(type->keyType) + ": " + typeToString(type->valueType) + "}";
+    }
+    
+    // Handle function type
+    if (type->isFunction) {
+        result = "(";
+        for (size_t i = 0; i < type->functionParams.size(); ++i) {
+            if (i > 0) result += ", ";
+            result += typeToString(type->functionParams[i]);
+        }
+        result += ") -> ";
+        if (type->returnType) {
+            result += typeToString(type->returnType);
+        } else {
+            result += "void";
+        }
+        return result;
+    }
+    
+    // Handle union type
+    if (type->isUnion && !type->unionTypes.empty()) {
+        result = "";
+        for (size_t i = 0; i < type->unionTypes.size(); ++i) {
+            if (i > 0) result += " | ";
+            result += typeToString(type->unionTypes[i]);
+        }
+        return result;
+    }
+    
+    // Handle intersection type
+    if (type->isIntersection) {
+        // For structural types, show the fields
+        if (type->isStructural && !type->structuralFields.empty()) {
+            result = "{";
+            for (size_t i = 0; i < type->structuralFields.size(); ++i) {
+                if (i > 0) result += ", ";
+                result += type->structuralFields[i].name + ": " + 
+                         typeToString(type->structuralFields[i].type);
+            }
+            if (type->hasRest) {
+                if (!type->structuralFields.empty()) result += ", ";
+                result += "...";
+            }
+            result += "}";
+            return result;
+        }
+        // For named intersection types
+        else if (!type->baseRecords.empty()) {
+            result = "";
+            for (size_t i = 0; i < type->baseRecords.size(); ++i) {
+                if (i > 0) result += " & ";
+                result += type->baseRecords[i];
+            }
+            return result;
+        }
+    }
+    
+    // Handle refined types
+    if (type->isRefined && type->refinementCondition) {
+        // In a real implementation, we might want to print the refinement condition
+        return result + " where <condition>";
+    }
+    
+    return result;
+}
+
+std::string ASTPrinter::typePtrToString(const TypePtr& type) const {
+    if (!type) return "<null>";
+    
+    switch (type->tag) {
+        case TypeTag::Nil: return "nil";
+        case TypeTag::Bool: return "bool";
+        case TypeTag::Int: return "int";
+        case TypeTag::Int8: return "int8";
+        case TypeTag::Int16: return "int16";
+        case TypeTag::Int32: return "int32";
+        case TypeTag::Int64: return "int64";
+        case TypeTag::Int128: return "int128";
+        case TypeTag::UInt: return "uint";
+        case TypeTag::UInt8: return "uint8";
+        case TypeTag::UInt16: return "uint16";
+        case TypeTag::UInt32: return "uint32";
+        case TypeTag::UInt64: return "uint64";
+        case TypeTag::UInt128: return "uint128";
+        case TypeTag::Float32: return "float32";
+        case TypeTag::Float64: return "float64";
+        case TypeTag::String: return "string";
+        case TypeTag::List: return "list";
+        case TypeTag::Dict: return "dict";
+        case TypeTag::Tuple: return "tuple";
+        case TypeTag::Enum: return "enum";
+        case TypeTag::Sum: return "sum";
+        case TypeTag::Union: return "union";
+        case TypeTag::ErrorUnion: return "error_union";
+        case TypeTag::Function: return "function";
+        case TypeTag::Closure: return "closure";
+        case TypeTag::Object: return "object";
+        case TypeTag::Module: return "module";
+        case TypeTag::Any: return "any";
+        case TypeTag::UserDefined: return "user_defined";
+        default: return "unknown";
+    }
+}
+
+} // namespace AST
+} // namespace Frontend
+} // namespace LM

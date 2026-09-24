@@ -1,0 +1,28 @@
+import std.fs.index as fs_mod;
+import std.path.index as path;
+
+pub type Permissions = fs_mod.Permissions;
+
+frame FS {
+    pub init() {}
+    pub fn exists(p: path.Path): bool {
+        var f = fs_mod.FS();
+        return f.exists(p);
+    }
+    pub fn create_dir(p: path.Path): any {
+        var f = fs_mod.FS();
+        return f.create_dir(p);
+    }
+    pub fn remove(p: path.Path): any {
+        var f = fs_mod.FS();
+        return f.remove(p);
+    }
+    pub fn rename(from_path: path.Path, to_path: path.Path): any {
+        var f = fs_mod.FS();
+        return f.rename(from_path, to_path);
+    }
+    pub fn list_dir(p: path.Path): any {
+        var f = fs_mod.FS();
+        return f.list_dir(p);
+    }
+}

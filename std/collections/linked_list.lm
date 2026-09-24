@@ -1,0 +1,35 @@
+// Standard Library LinkedList Collection
+
+import std.collections.linkedlist as linkedlist;
+
+frame DLL {
+    pub impl: linkedlist.LinkedList;
+
+    pub init() {
+        self.impl = linkedlist.LinkedList();
+    }
+
+    pub fn push_back(value: any) {
+        self.impl.push_back(value);
+    }
+
+    pub fn push_front(value: any) {
+        self.impl.push_front(value);
+    }
+
+    pub fn pop_back(): any {
+        return self.impl.pop_back();
+    }
+
+    pub fn pop_front(): any {
+        return self.impl.pop_front();
+    }
+
+    pub fn length(): int {
+        return self.impl.length();
+    }
+
+    pub fn is_empty(): bool {
+        return self.impl.is_empty();
+    }
+}
