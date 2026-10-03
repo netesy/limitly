@@ -1,0 +1,126 @@
+// std/font/reader.lm
+// Big-endian binary reader for TrueType/OpenType font structures.
+
+frame ByteReader {
+    pub var data: [int];
+    pub var pos: int;
+    pub var size: int;
+
+    pub init(bytes: [int]) {
+        self.data = bytes;
+        self.pos = 0;
+        self.size = len(bytes);
+    }
+
+    pub fn tell(): int {
+        return self.pos;
+    }
+
+    pub fn seek(offset: int) {
+        if (offset < 0) {
+            self.pos = 0;
+        } elif (offset > self.size) {
+            self.pos = self.size;
+        } else {
+            self.pos = offset;
+        }
+    }
+
+    pub fn skip(n: int) {
+        self.seek(self.pos + n);
+    }
+
+    pub fn has_more(): bool {
+        return self.pos < self.size;
+    }
+
+    pub fn remaining(): int {
+        return self.size - self.pos;
+    }
+
+    pub fn read_u8(): int {
+        if (self.pos >= self.size) { return 0; }
+        var b = self.data[self.pos];
+        self.pos = self.pos + 1;
+        return b & 0xFF;
+    }
+
+    pub fn read_i8(): int {
+        var v = self.read_u8();
+        if (v >= 128) {
+            return v - 256;
+        }
+        return v;
+    }
+
+    pub fn read_u16(): int {
+        var b0 = self.read_u8();
+        var b1 = self.read_u8();
+        return (b0 << 8) | b1;
+    }
+
+    pub fn read_i16(): int {
+        var v = self.read_u16();
+        if (v >= 32768) {
+            return v - 65536;
+        }
+        return v;
+    }
+
+    pub fn read_u24(): int {
+        var b0 = self.read_u8();
+        var b1 = self.read_u8();
+        var b2 = self.read_u8();
+        return (b0 << 16) | (b1 << 8) | b2;
+    }
+
+    pub fn read_u32(): int {
+        var b0 = self.read_u8();
+        var b1 = self.read_u8();
+        var b2 = self.read_u8();
+        var b3 = self.read_u8();
+        return (b0 << 24) | (b1 << 16) | (b2 << 8) | b3;
+    }
+
+    pub fn read_i32(): int {
+        var v = self.read_u32();
+        if (v >= 2147483648) {
+            return v - 4294967296;
+        }
+        return v;
+    }
+
+    pub fn read_fixed_16_16(): float {
+        var whole = self.read_i16();
+        var frac = self.read_u16();
+        return (whole as float) + ((frac as float) / 65536.0);
+    }
+
+    pub fn read_tag(): int {
+        return self.read_u32();
+    }
+
+    pub fn peek_u8(offset: int): int {
+        if (offset < 0 or offset >= self.size) { return 0; }
+        return self.data[offset] & 0xFF;
+    }
+
+    pub fn peek_u16(offset: int): int {
+        if (offset < 0 or offset + 1 >= self.size) { return 0; }
+        return ((self.data[offset] & 0xFF) << 8) | (self.data[offset + 1] & 0xFF);
+    }
+
+    pub fn peek_i16(offset: int): int {
+        var v = self.peek_u16(offset);
+        if (v >= 32768) { return v - 65536; }
+        return v;
+    }
+
+    pub fn peek_u32(offset: int): int {
+        if (offset < 0 or offset + 3 >= self.size) { return 0; }
+        return ((self.data[offset] & 0xFF) << 24) |
+               ((self.data[offset + 1] & 0xFF) << 16) |
+               ((self.data[offset + 2] & 0xFF) << 8) |
+               (self.data[offset + 3] & 0xFF);
+    }
+}

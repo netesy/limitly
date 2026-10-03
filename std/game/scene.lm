@@ -1,0 +1,369 @@
+// std/game/scene.lm
+// State machine, scene graph lifecycle hooks, scene stack, and transition engine
+
+import std.math as math;
+import std.gg as gg;
+import std.game.types as types;
+
+// Transition modes
+pub var TRANSITION_NONE: int = 0;
+pub var TRANSITION_FADE: int = 1;
+
+// ── Scene Base ────────────────────────────────────────────────────────────────
+
+frame Scene {
+    pub var name: str;
+    pub var is_active: bool;
+    pub var is_paused: bool;
+    pub var is_visible: bool;
+
+    // Optional functional callback delegates
+    pub var on_enter_cb: any;
+    pub var on_exit_cb: any;
+    pub var on_pause_cb: any;
+    pub var on_resume_cb: any;
+    pub var update_cb: any;
+    pub var fixed_update_cb: any;
+    pub var draw_cb: any;
+    pub var draw_gui_cb: any;
+    pub var on_event_cb: any;
+
+    pub init(name: str = "Scene") {
+        self.name = name;
+        self.is_active = false;
+        self.is_paused = false;
+        self.is_visible = true;
+
+        self.on_enter_cb = nil;
+        self.on_exit_cb = nil;
+        self.on_pause_cb = nil;
+        self.on_resume_cb = nil;
+        self.update_cb = nil;
+        self.fixed_update_cb = nil;
+        self.draw_cb = nil;
+        self.draw_gui_cb = nil;
+        self.on_event_cb = nil;
+    }
+
+    pub fn on_enter(): nil {
+        self.is_active = true;
+        self.is_paused = false;
+        if (self.on_enter_cb != nil) {
+            var cb = self.on_enter_cb as fn(): nil;
+            cb();
+        }
+    }
+
+    pub fn on_exit(): nil {
+        self.is_active = false;
+        if (self.on_exit_cb != nil) {
+            var cb = self.on_exit_cb as fn(): nil;
+            cb();
+        }
+    }
+
+    pub fn on_pause(): nil {
+        self.is_paused = true;
+        if (self.on_pause_cb != nil) {
+            var cb = self.on_pause_cb as fn(): nil;
+            cb();
+        }
+    }
+
+    pub fn on_resume(): nil {
+        self.is_paused = false;
+        if (self.on_resume_cb != nil) {
+            var cb = self.on_resume_cb as fn(): nil;
+            cb();
+        }
+    }
+
+    pub fn update(dt: float): nil {
+        if (not self.is_active or self.is_paused) return;
+        if (self.update_cb != nil) {
+            var cb = self.update_cb as fn(float): nil;
+            cb(dt);
+        }
+    }
+
+    pub fn fixed_update(dt: float): nil {
+        if (not self.is_active or self.is_paused) return;
+        if (self.fixed_update_cb != nil) {
+            var cb = self.fixed_update_cb as fn(float): nil;
+            cb(dt);
+        }
+    }
+
+    pub fn draw(): nil {
+        if (not self.is_visible) return;
+        if (self.draw_cb != nil) {
+            var cb = self.draw_cb as fn(): nil;
+            cb();
+        }
+    }
+
+    pub fn draw_gui(gui: any): nil {
+        if (not self.is_visible) return;
+        if (self.draw_gui_cb != nil) {
+            var cb = self.draw_gui_cb as fn(any): nil;
+            cb(gui);
+        }
+    }
+
+    pub fn on_event(event_type: int, p1: any, p2: any): bool {
+        if (not self.is_active or self.is_paused) return false;
+        if (self.on_event_cb != nil) {
+            var cb = self.on_event_cb as fn(int, any, any): bool;
+            return cb(event_type, p1, p2);
+        }
+        return false;
+    }
+}
+
+pub fn scene(name: str = "Scene"): Scene {
+    return Scene(name=name);
+}
+
+// ── Scene Manager ─────────────────────────────────────────────────────────────
+
+frame SceneManager {
+    pub var scenes: {str: any};
+    pub var stack: [any];
+    pub var current_name: str;
+
+    // Transition State Machine
+    pub var is_transitioning: bool;
+    pub var transition_mode: int;       // 0: None, 1: FadeOut, 2: FadeIn
+    pub var transition_timer: float;
+    pub var transition_duration: float;
+    pub var transition_alpha: float;
+    pub var transition_color: types.Color;
+    pub var pending_scene_name: str;
+
+    pub init() {
+        self.scenes = {} as {str: any};
+        self.stack = [] as [any];
+        self.current_name = "";
+
+        self.is_transitioning = false;
+        self.transition_mode = TRANSITION_NONE;
+        self.transition_timer = 0.0;
+        self.transition_duration = 0.3;
+        self.transition_alpha = 0.0;
+        self.transition_color = types.hex(0x000000, 1.0);
+        self.pending_scene_name = "";
+    }
+
+    pub fn register(name: str, s: any): nil {
+        var sc = s as Scene;
+        sc.name = name;
+        self.scenes[name] = sc;
+    }
+
+    pub fn get(name: str): any {
+        if (self.scenes[name] != nil) {
+            return self.scenes[name];
+        }
+        return nil;
+    }
+
+    pub fn current(): any {
+        var n = len(self.stack);
+        if (n == 0) return nil;
+        return self.stack[n - 1];
+    }
+
+    pub fn stack_size(): int {
+        return len(self.stack);
+    }
+
+    pub fn has_scenes(): bool {
+        return len(self.stack) > 0;
+    }
+
+    // Direct scene switch
+    fn _perform_switch(name: str): nil {
+        // Exit and clear entire current stack
+        var i = len(self.stack) - 1;
+        while (i >= 0) {
+            var old_s = self.stack[i] as Scene;
+            old_s.on_exit();
+            i = i - 1;
+        }
+        self.stack = [] as [any];
+
+        // Push and enter new scene
+        var next_s = self.get(name);
+        if (next_s != nil) {
+            var sc = next_s as Scene;
+            self.stack.append(sc);
+            self.current_name = name;
+            sc.on_enter();
+        } else {
+            self.current_name = "";
+        }
+    }
+
+    pub fn switch_to(name: str, transition_time: float = 0.0): nil {
+        if (transition_time <= 0.0) {
+            self._perform_switch(name);
+            return;
+        }
+
+        // Start fade out transition
+        self.is_transitioning = true;
+        self.transition_mode = 1; // FadeOut
+        self.transition_duration = transition_time * 0.5;
+        if (self.transition_duration <= 0.001) {
+            self.transition_duration = 0.001;
+        }
+        self.transition_timer = 0.0;
+        self.transition_alpha = 0.0;
+        self.pending_scene_name = name;
+    }
+
+    // Modal push: pauses active scene and mounts a new scene on top
+    pub fn push(name: str): nil {
+        var cur = self.current();
+        if (cur != nil) {
+            var cur_s = cur as Scene;
+            cur_s.on_pause();
+        }
+
+        var next_s = self.get(name);
+        if (next_s != nil) {
+            var sc = next_s as Scene;
+            self.stack.append(sc);
+            self.current_name = name;
+            sc.on_enter();
+        }
+    }
+
+    // Modal pop: exits top scene, removes it, and resumes previously paused scene
+    pub fn pop(): any {
+        var n = len(self.stack);
+        if (n == 0) return nil;
+
+        var top = self.stack[n - 1] as Scene;
+        top.on_exit();
+
+        // Create new stack without top element
+        var new_stack: [any] = [];
+        var i = 0;
+        while (i < n - 1) {
+            new_stack.append(self.stack[i]);
+            i = i + 1;
+        }
+        self.stack = new_stack;
+
+        // Resume now-top scene
+        var new_top = self.current();
+        if (new_top != nil) {
+            var resumed_s = new_top as Scene;
+            self.current_name = resumed_s.name;
+            resumed_s.on_resume();
+        } else {
+            self.current_name = "";
+        }
+
+        return top;
+    }
+
+    pub fn update(dt: float): nil {
+        // Handle screen transitions
+        if (self.is_transitioning) {
+            self.transition_timer = self.transition_timer + dt;
+            var t = self.transition_timer / self.transition_duration;
+            if (t > 1.0) t = 1.0;
+
+            if (self.transition_mode == 1) { // FadeOut
+                self.transition_alpha = t;
+                if (t >= 1.0) {
+                    // Switch scenes at full black
+                    self._perform_switch(self.pending_scene_name);
+                    self.transition_mode = 2; // FadeIn
+                    self.transition_timer = 0.0;
+                }
+            } elif (self.transition_mode == 2) { // FadeIn
+                self.transition_alpha = 1.0 - t;
+                if (t >= 1.0) {
+                    self.is_transitioning = false;
+                    self.transition_mode = TRANSITION_NONE;
+                    self.transition_alpha = 0.0;
+                    self.pending_scene_name = "";
+                }
+            }
+        }
+
+        // Update active scene
+        var cur = self.current();
+        if (cur != nil) {
+            var cur_s = cur as Scene;
+            cur_s.update(dt);
+        }
+    }
+
+    pub fn fixed_update(dt: float): nil {
+        var cur = self.current();
+        if (cur != nil) {
+            var cur_s = cur as Scene;
+            cur_s.fixed_update(dt);
+        }
+    }
+
+    pub fn draw(): nil {
+        // Draw visible scenes in stack order (bottom to top)
+        var i = 0;
+        while (i < len(self.stack)) {
+            var sc = self.stack[i] as Scene;
+            if (sc.is_visible) {
+                sc.draw();
+            }
+            i = i + 1;
+        }
+
+        // Draw transition overlay if active
+        if (self.is_transitioning and self.transition_alpha > 0.0) {
+            // Draw fullscreen quad overlay
+            gg.draw_rect_primitive(
+                0.0, 0.0, 100000.0, 100000.0,
+                self.transition_color.r,
+                self.transition_color.g,
+                self.transition_color.b,
+                self.transition_alpha
+            );
+        }
+    }
+
+    pub fn draw_gui(gui: any): nil {
+        var i = 0;
+        while (i < len(self.stack)) {
+            var sc = self.stack[i] as Scene;
+            if (sc.is_visible) {
+                sc.draw_gui(gui);
+            }
+            i = i + 1;
+        }
+    }
+
+    pub fn on_event(event_type: int, p1: any, p2: any): bool {
+        // Events route from top of stack down until handled
+        var i = len(self.stack) - 1;
+        while (i >= 0) {
+            var sc = self.stack[i] as Scene;
+            if (sc.is_active and not sc.is_paused) {
+                if (sc.on_event(event_type, p1, p2)) {
+                    return true;
+                }
+            }
+            i = i - 1;
+        }
+        return false;
+    }
+}
+
+pub fn SceneManager(): SceneManager {
+    return SceneManager();
+}
+
+pub var default_scene_manager: SceneManager = SceneManager();

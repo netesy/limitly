@@ -1,9 +1,111 @@
-frame Dialog {
-    pub var title: str;
-    pub var message: str;
+// std/ui/dialog - Modal dialog and overlay widgets
+import std.ui.types as ui_types;
+import std.ui.viewport as viewport_mod;
 
-    pub init(t: str = "Alert", msg: str = "") {
-        self.title = t;
-        self.message = msg;
+// Modal dialog with title, content, close button, and dynamic viewport centering
+pub fn dialog(title: str, content: ui_types.Widget, is_open: bool = true, width: float = 400.0, height: float = 300.0, on_close: any = nil): ui_types.Widget {
+    if (is_open == false) {
+        return ui_types.empty();
     }
+    
+    var close_btn = ui_types.button("✕")
+        .width(32.0)
+        .height(32.0)
+        .background(ui_types.rgb(255, 100, 100))
+        .on_click(on_close);
+    
+    var header = ui_types.row([
+        ui_types.text(title).font_size(18.0).bold(),
+        ui_types.spacer(1.0),
+        close_btn
+    ]);
+    header.spacing_val = 8.0;
+    header.padding_bottom = 12.0;
+    
+    var dialog_content = ui_types.column([
+        header,
+        content
+    ]);
+    dialog_content.background_color = ui_types.rgb(24, 26, 34);
+    dialog_content.foreground_color = ui_types.white;
+    dialog_content.padding_left = 20.0;
+    dialog_content.padding_top = 20.0;
+    dialog_content.padding_right = 20.0;
+    dialog_content.padding_bottom = 20.0;
+    dialog_content.corner_radius_val = 8.0;
+    dialog_content.spacing_val = 12.0;
+    dialog_content.width_val = width;
+    dialog_content.height_val = height;
+    
+    // Dynamic centering using active viewport
+    var vw = viewport_mod.global_viewport.width;
+    if (vw <= 0.0) { vw = 800.0; }
+    var vh = viewport_mod.global_viewport.height;
+    if (vh <= 0.0) { vh = 600.0; }
+
+    var x = (vw - width) / 2.0;
+    var y = (vh - height) / 2.0;
+    if (x < 0.0) { x = 0.0; }
+    if (y < 0.0) { y = 0.0; }
+    
+    return ui_types.overlay(dialog_content, x, y, width, height);
+}
+
+// Alert dialog (modal with message and OK button)
+pub fn alert(title: str, message: str, on_ok: any = nil): ui_types.Widget {
+    var ok_btn = ui_types.button("OK").on_click(on_ok);
+    
+    var content = ui_types.column([
+        ui_types.text(message),
+        ui_types.spacer(0.5),
+        ok_btn
+    ]);
+    content.spacing_val = 12.0;
+    
+    return dialog(title, content, true, 320.0, 180.0, on_ok);
+}
+
+pub fn alert_dialog(title: str, message: str, on_ok: any = nil): ui_types.Widget {
+    return alert(title, message, on_ok);
+}
+
+// Confirm dialog (modal with message and Yes/No buttons)
+pub fn confirm(title: str, message: str, on_yes: any = nil, on_no: any = nil): ui_types.Widget {
+    var yes_btn = ui_types.button("Yes")
+        .background(ui_types.rgb(80, 220, 130))
+        .on_click(on_yes);
+    var no_btn = ui_types.button("No")
+        .background(ui_types.rgb(255, 100, 100))
+        .on_click(on_no);
+    
+    var buttons = ui_types.row([yes_btn, no_btn]);
+    buttons.spacing_val = 12.0;
+    
+    var content = ui_types.column([
+        ui_types.text(message),
+        ui_types.spacer(0.5),
+        buttons
+    ]);
+    content.spacing_val = 12.0;
+    
+    return dialog(title, content, true, 360.0, 200.0, on_no);
+}
+
+pub fn confirm_dialog(title: str, message: str, on_yes: any = nil, on_no: any = nil): ui_types.Widget {
+    return confirm(title, message, on_yes, on_no);
+}
+
+// Modal backdrop (darkened background behind dialog)
+pub fn modal_backdrop(alpha: float = 0.6): ui_types.Widget {
+    var vw = viewport_mod.global_viewport.width;
+    if (vw <= 0.0) { vw = 800.0; }
+    var vh = viewport_mod.global_viewport.height;
+    if (vh <= 0.0) { vh = 600.0; }
+
+    var backdrop = ui_types.empty();
+    backdrop.kind = ui_types.KIND_CONTAINER;
+    backdrop.background_color = ui_types.rgba(0.0, 0.0, 0.0, alpha);
+    backdrop.width_val = vw;
+    backdrop.height_val = vh;
+    return backdrop;
 }

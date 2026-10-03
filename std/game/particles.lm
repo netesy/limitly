@@ -1,0 +1,231 @@
+// std/game/particles.lm
+// High-performance 2D particle simulation and emitter engine for game effects
+
+import std.math as math;
+import std.gg as gg;
+import std.game.types as types;
+import std.game.camera as camera_mod;
+
+frame Particle {
+    pub var pos: types.Vec2;
+    pub var vel: types.Vec2;
+    pub var acc: types.Vec2;
+    pub var color_start: types.Color;
+    pub var color_end: types.Color;
+    pub var size_start: float;
+    pub var size_end: float;
+    pub var life: float;
+    pub var max_life: float;
+    pub var alive: bool;
+
+    pub init() {
+        self.pos = types.Vec2();
+        self.vel = types.Vec2();
+        self.acc = types.Vec2();
+        self.color_start = types.white;
+        self.color_end = types.white;
+        self.size_start = 4.0;
+        self.size_end = 0.0;
+        self.life = 0.0;
+        self.max_life = 1.0;
+        self.alive = false;
+    }
+
+    pub fn spawn(
+        pos: any,
+        vel: any,
+        acc: any,
+        c_start: any,
+        c_end: any,
+        s_start: float,
+        s_end: float,
+        life_span: float
+    ): nil {
+        self.pos = pos as types.Vec2;
+        self.vel = vel as types.Vec2;
+        self.acc = acc as types.Vec2;
+        self.color_start = c_start as types.Color;
+        self.color_end = c_end as types.Color;
+        self.size_start = s_start;
+        self.size_end = s_end;
+        self.life = 0.0;
+        self.max_life = life_span;
+        self.alive = true;
+    }
+
+    pub fn update(dt: float): nil {
+        if (not self.alive) return;
+        self.life = self.life + dt;
+        if (self.life >= self.max_life) {
+            self.alive = false;
+            return;
+        }
+
+        self.vel = self.vel.add(self.acc.scale(dt));
+        self.pos = self.pos.add(self.vel.scale(dt));
+    }
+
+    pub fn current_color(): types.Color {
+        var t = 0.0;
+        if (self.max_life > 0.0) {
+            t = self.life / self.max_life;
+        }
+        if (t > 1.0) t = 1.0;
+        return types.Color(
+            r=self.color_start.r + (self.color_end.r - self.color_start.r) * t,
+            g=self.color_start.g + (self.color_end.g - self.color_start.g) * t,
+            b=self.color_start.b + (self.color_end.b - self.color_start.b) * t,
+            a=self.color_start.a + (self.color_end.a - self.color_start.a) * t
+        );
+    }
+
+    pub fn current_size(): float {
+        var t = 0.0;
+        if (self.max_life > 0.0) {
+            t = self.life / self.max_life;
+        }
+        if (t > 1.0) t = 1.0;
+        return self.size_start + (self.size_end - self.size_start) * t;
+    }
+}
+
+frame ParticleEmitter2D {
+    pub var position: any;
+    pub var particles: [Particle];
+    pub var max_particles: int;
+    pub var active: bool;
+
+    pub var emission_rate: float;  // particles per second
+    pub var emission_timer: float;
+
+    // Configurable Particle Ranges
+    pub var life_min: float;
+    pub var life_max: float;
+    pub var speed_min: float;
+    pub var speed_max: float;
+    pub var angle_min: float;
+    pub var angle_max: float;
+    pub var gravity: any;
+    pub var size_start: float;
+    pub var size_end: float;
+    pub var color_start: any;
+    pub var color_end: any;
+
+    // Seed state for deterministic fast random numbers
+    pub var rng_state: int;
+
+    pub init(max_count: int = 150) {
+        self.position = types.Vec2();
+        self.max_particles = max_count;
+        self.particles = [];
+        var i = 0;
+        while (i < max_count) {
+            self.particles.append(Particle());
+            i = i + 1;
+        }
+
+        self.active = true;
+        self.emission_rate = 30.0;
+        self.emission_timer = 0.0;
+
+        self.life_min = 0.5;
+        self.life_max = 1.5;
+        self.speed_min = 40.0;
+        self.speed_max = 120.0;
+        self.angle_min = 0.0;
+        self.angle_max = 6.28318530718;
+        self.gravity = types.Vec2(x=0.0, y=98.0);
+        self.size_start = 6.0;
+        self.size_end = 1.0;
+        self.color_start = types.hex(0xffd700, 1.0); // Gold
+        self.color_end = types.hex(0xff0044, 0.0);   // Fading red
+
+        self.rng_state = 123456789;
+    }
+
+    fn next_float(): float {
+        // Linear congruential generator
+        self.rng_state = (self.rng_state * 1103515245 + 12345) & 2147483647;
+        return (self.rng_state as float) / 2147483647.0;
+    }
+
+    fn spawn_one(): nil {
+        var i = 0;
+        var spawned = false;
+        while (i < len(self.particles) and not spawned) {
+            var p = self.particles[i];
+            if (not p.alive) {
+                var angle = self.angle_min + (self.angle_max - self.angle_min) * self.next_float();
+                var speed = self.speed_min + (self.speed_max - self.speed_min) * self.next_float();
+                var vel = types.Vec2(x=math.cos(angle) * speed, y=math.sin(angle) * speed);
+                var life = self.life_min + (self.life_max - self.life_min) * self.next_float();
+
+                p.spawn(
+                    self.position,
+                    vel,
+                    self.gravity,
+                    self.color_start,
+                    self.color_end,
+                    self.size_start,
+                    self.size_end,
+                    life
+                );
+                spawned = true;
+            }
+            i = i + 1;
+        }
+    }
+
+    pub fn burst(count: int): nil {
+        var k = 0;
+        while (k < count) {
+            self.spawn_one();
+            k = k + 1;
+        }
+    }
+
+    pub fn update(dt: float): nil {
+        if (self.active and self.emission_rate > 0.0) {
+            var interval = 1.0 / self.emission_rate;
+            self.emission_timer = self.emission_timer + dt;
+            while (self.emission_timer >= interval) {
+                self.emission_timer = self.emission_timer - interval;
+                self.spawn_one();
+            }
+        }
+
+        var i = 0;
+        while (i < len(self.particles)) {
+            self.particles[i].update(dt);
+            i = i + 1;
+        }
+    }
+
+    pub fn draw(camera: any = nil): nil {
+        var i = 0;
+        while (i < len(self.particles)) {
+            var p = self.particles[i];
+            if (p.alive) {
+                var screen_pos = p.pos;
+                var zoom = 1.0;
+                if (camera != nil) {
+                    var cam = camera as camera_mod.Camera2D;
+                    screen_pos = cam.world_to_screen(p.pos);
+                    zoom = cam.zoom;
+                }
+
+                var col = p.current_color();
+                var sz = p.current_size() * zoom;
+                if (sz > 0.0) {
+                    var half_sz = sz * 0.5;
+                    gg.draw_rect_primitive(screen_pos.x - half_sz, screen_pos.y - half_sz, sz, sz, col.r, col.g, col.b, col.a);
+                }
+            }
+            i = i + 1;
+        }
+    }
+}
+
+pub fn ParticleEmitter(max_count: int = 150): ParticleEmitter2D {
+    return ParticleEmitter2D(max_count=max_count);
+}

@@ -1,13 +1,6 @@
-import std.ui.widget as widget;
+// std/ui/progress_bar - Progress bar widget
+import std.ui.types as ui_types;
 
-frame ProgressBar {
-    pub var progress: float; // 0.0 to 1.0
-
-    pub init(p: float = 0.0) {
-        self.progress = p;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn progress_bar(fraction: float = 0.0, width_val: float = 160.0): ui_types.Widget {
+    return ui_types.progress(fraction, width_val);
 }

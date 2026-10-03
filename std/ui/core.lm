@@ -1,0 +1,20 @@
+// std/ui/core - Core UI primitives and utilities
+import std.ui.types as ui_types;
+
+// Re-export fundamental types
+pub var Widget = ui_types.Widget;
+pub var Style = ui_types.Style;
+pub var Color = ui_types.Color;
+
+// Core utility functions
+pub fn style(): ui_types.Style {
+    return ui_types.style();
+}
+
+pub fn color(r: float, g: float, b: float): ui_types.Color {
+    return ui_types.color_rgb(r, g, b);
+}
+
+pub fn color_with_alpha(r: float, g: float, b: float, a: float): ui_types.Color {
+    return ui_types.color_rgba(r, g, b, a);
+}

@@ -1,13 +1,6 @@
-import std.ui.widget as widget;
+// std/ui/table_view - Table data grid widget
+import std.ui.types as ui_types;
 
-frame TableView {
-    pub var children: [widget.Widget];
-
-    pub init(ch: [widget.Widget] = [widget.Widget()]) {
-        self.children = ch;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn table_view(headers: [str], rows: [[ui_types.Widget]]): ui_types.Widget {
+    return ui_types.table(headers, rows);
 }

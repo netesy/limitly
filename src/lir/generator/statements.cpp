@@ -1917,7 +1917,7 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
         }
         
         // Jump to first pattern label
-        emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, pattern_labels[0]));
+        emit_label_jump(LIR_Op::Jump, 0, pattern_labels[0]);
         
         for (size_t i = 0; i < stmt.cases.size(); ++i) {
             const auto& match_case = stmt.cases[i];
@@ -1925,7 +1925,7 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
             uint32_t body_label = body_labels[i];
             uint32_t next_pattern_label = (i + 1 < stmt.cases.size()) ? pattern_labels[i + 1] : exit_label;
             
-            emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, pattern_label, 0, 0));
+            place_label(pattern_label);
             enter_scope();
             
             // 1. Pattern Matching Logic
@@ -1934,24 +1934,24 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
             // 2. Guard Logic
             if (match_case.guard) {
                 Reg guard_res = emit_expr(*match_case.guard);
-                emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, Type::Void, 0, guard_res, 0, next_pattern_label));
+                emit_label_jump(LIR_Op::JumpIfFalse, guard_res, next_pattern_label);
             }
             
             // Fall-through (or jump) to body
-            emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, body_label));
+            emit_label_jump(LIR_Op::Jump, 0, body_label);
             
             // 3. Body Logic
-            emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, body_label, 0, 0));
+            place_label(body_label);
             bind_all_vars(this, match_case.pattern, value_reg);
             if (match_case.body) {
                 emit_stmt(*match_case.body);
             }
             
-            emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, exit_label));
+            emit_label_jump(LIR_Op::Jump, 0, exit_label);
             exit_scope();
         }
         
-        emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, exit_label, 0, 0));
+        place_label(exit_label);
     }
     
     cfg_context_.in_control_flow = prev_in_control_flow;
@@ -1962,7 +1962,7 @@ void Generator::emit_pattern_match_jump(LIR_Op op, Reg cond_reg, LIR_BasicBlock*
         emit_instruction(LIR_Inst(op, 0, cond_reg, 0, failure_target->id));
         add_block_edge(get_current_block(), failure_target);
     } else {
-        emit_instruction(LIR_Inst(op, Type::Void, 0, cond_reg, 0, failure_label));
+        emit_label_jump(op, cond_reg, failure_label);
     }
 }
 

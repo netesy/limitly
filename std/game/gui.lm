@@ -10,6 +10,7 @@ import std.focus.manager as focus_mod;
 import std.graphics.text_layout as layout_mod;
 import std.ui.viewport as viewport_mod;
 import std.animation as anim;
+import std.graphics.shadow as shadow_mod;
 
 frame WindowState {
     pub var x: float;
@@ -78,11 +79,24 @@ frame GUI {
     // Scrolling & Popups
     pub var scroll_y: float;
     pub var active_popup_id: str;
+    pub var popup_x: float;
+    pub var popup_y: float;
+    pub var popup_w: float;
+    pub var popup_h: float;
     pub var cur_tab_bar_id: str;
     pub var combo_open_id: str;
     pub var editor_controllers: {str: any};
     pub var scroll_offsets: {str: float};
     pub var focus_manager: focus_mod.FocusManager;
+
+    // Immediate-mode Modifier Support (Shadows, Opacity, Disabled)
+    pub var next_shadow: any;
+    pub var has_next_shadow: bool;
+    pub var shadow_stack: [any];
+    pub var next_opacity: float;
+    pub var has_next_opacity: bool;
+    pub var next_disabled: bool;
+    pub var has_next_disabled: bool;
 
     // Window management
     pub var in_window: bool;
@@ -141,11 +155,23 @@ frame GUI {
 
         self.scroll_y = 0.0;
         self.active_popup_id = "";
+        self.popup_x = 0.0;
+        self.popup_y = 0.0;
+        self.popup_w = 0.0;
+        self.popup_h = 0.0;
         self.cur_tab_bar_id = "";
         self.combo_open_id = "";
         self.editor_controllers = {} as {str: any};
         self.scroll_offsets = {} as {str: float};
         self.focus_manager = focus_mod.FocusManager();
+
+        self.next_shadow = nil;
+        self.has_next_shadow = false;
+        self.shadow_stack = [] as [any];
+        self.next_opacity = 1.0;
+        self.has_next_opacity = false;
+        self.next_disabled = false;
+        self.has_next_disabled = false;
 
         self.in_window = false;
         self.cur_window_title = "";
@@ -191,6 +217,31 @@ frame GUI {
         self.prev_item_hovered = false;
         self.columns_count = 1;
         self.columns_idx = 0;
+        self.has_next_shadow = false;
+        self.next_shadow = nil;
+        self.has_next_opacity = false;
+        self.next_opacity = 1.0;
+        self.has_next_disabled = false;
+        self.next_disabled = false;
+
+        // Auto-dismiss popup & combo on outside click
+        if ((self.active_popup_id != "" or self.combo_open_id != "") and self.mouse_pressed) {
+            if (not (self.mouse_x >= self.popup_x and self.mouse_x <= (self.popup_x + self.popup_w) and
+                     self.mouse_y >= self.popup_y and self.mouse_y <= (self.popup_y + self.popup_h))) {
+                self.active_popup_id = "";
+                self.combo_open_id = "";
+            }
+        }
+    }
+
+    pub fn is_occluded(x: float, y: float, w: float, h: float): bool {
+        if (self.active_popup_id != "" or self.combo_open_id != "") {
+            if (self.mouse_x >= self.popup_x and self.mouse_x <= (self.popup_x + self.popup_w) and
+                self.mouse_y >= self.popup_y and self.mouse_y <= (self.popup_y + self.popup_h)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     pub fn end(): nil {
@@ -214,21 +265,20 @@ frame GUI {
     }
 
     pub fn pop_style_color(count: int = 1): nil {
-        var c = count;
-        while (c > 0 and len(self.style_color_indices) > 0) {
-            var n = len(self.style_color_indices);
-            var new_indices: [int] = [];
-            var new_stack: [types.Color] = [];
-            var i = 0;
-            while (i < n - 1) {
-                new_indices.append(self.style_color_indices[i]);
-                new_stack.append(self.style_color_stack[i]);
-                i = i + 1;
-            }
-            self.style_color_indices = new_indices;
-            self.style_color_stack = new_stack;
-            c = c - 1;
+        var n = len(self.style_color_indices);
+        var new_n = n - count;
+        if (new_n < 0) { new_n = 0; }
+        // Truncate to new_n elements in a single pass (O(new_n) not O(n*count))
+        var new_indices: [int] = [];
+        var new_stack: [types.Color] = [];
+        var i = 0;
+        while (i < new_n) {
+            new_indices.append(self.style_color_indices[i]);
+            new_stack.append(self.style_color_stack[i]);
+            i = i + 1;
         }
+        self.style_color_indices = new_indices;
+        self.style_color_stack = new_stack;
     }
 
     pub fn push_style_var(idx: int, value: float): nil {
@@ -237,21 +287,78 @@ frame GUI {
     }
 
     pub fn pop_style_var(count: int = 1): nil {
-        var c = count;
-        while (c > 0 and len(self.style_var_indices) > 0) {
-            var n = len(self.style_var_indices);
-            var new_indices: [int] = [];
-            var new_stack: [float] = [];
+        var n = len(self.style_var_indices);
+        var new_n = n - count;
+        if (new_n < 0) { new_n = 0; }
+        // Truncate to new_n elements in a single pass (O(new_n) not O(n*count))
+        var new_indices: [int] = [];
+        var new_stack: [float] = [];
+        var i = 0;
+        while (i < new_n) {
+            new_indices.append(self.style_var_indices[i]);
+            new_stack.append(self.style_var_stack[i]);
+            i = i + 1;
+        }
+        self.style_var_indices = new_indices;
+        self.style_var_stack = new_stack;
+    }
+
+    // ── Immediate-Mode Modifiers (Shadows & Effects) ─────────────────────────
+
+    pub fn set_next_shadow(s: any): nil {
+        self.next_shadow = s;
+        self.has_next_shadow = true;
+    }
+
+    pub fn shadow(s: any): GUI {
+        self.set_next_shadow(s);
+        return self;
+    }
+
+    pub fn opacity(o: float): GUI {
+        self.next_opacity = o;
+        self.has_next_opacity = true;
+        return self;
+    }
+
+    pub fn disabled(d: bool = true): GUI {
+        self.next_disabled = d;
+        self.has_next_disabled = true;
+        return self;
+    }
+
+    pub fn push_shadow(s: any): nil {
+        self.shadow_stack.append(s);
+    }
+
+    pub fn pop_shadow(): nil {
+        var n = len(self.shadow_stack);
+        if (n > 0) {
+            var new_stack: [any] = [];
             var i = 0;
             while (i < n - 1) {
-                new_indices.append(self.style_var_indices[i]);
-                new_stack.append(self.style_var_stack[i]);
+                new_stack.append(self.shadow_stack[i]);
                 i = i + 1;
             }
-            self.style_var_indices = new_indices;
-            self.style_var_stack = new_stack;
-            c = c - 1;
+            self.shadow_stack = new_stack;
         }
+    }
+
+    pub fn get_active_shadow(theme_default: any = nil): any {
+        if (self.has_next_shadow) {
+            var s = self.next_shadow;
+            self.has_next_shadow = false;
+            self.next_shadow = nil;
+            return s;
+        }
+        var n = len(self.shadow_stack);
+        if (n > 0) {
+            return self.shadow_stack[n - 1];
+        }
+        if (theme_default != nil) {
+            return theme_default;
+        }
+        return nil;
     }
 
     pub fn get_style_color(idx: int): types.Color {
@@ -351,7 +458,8 @@ frame GUI {
             sp = self.get_style_var(types.VAR_SPACING, self.theme.spacing);
         }
         self.same_line_flag = true;
-        self.cursor_x = self.cursor_x + self.prev_item_w + sp;
+        self.cursor_x = self.prev_item_rect.x + self.prev_item_rect.w + sp;
+        self.cursor_y = self.prev_item_rect.y;
     }
 
     pub fn spacing(amount: float = -1.0): nil {
@@ -377,16 +485,18 @@ frame GUI {
 
     fn advance(item_w: float, item_h: float): nil {
         self.prev_item_w = item_w;
+        var sp = self.get_style_var(types.VAR_SPACING, self.theme.spacing);
         if (self.same_line_flag) {
             self.same_line_flag = false;
             if (item_h > self.line_h) {
                 self.line_h = item_h;
             }
+            self.cursor_y = self.prev_item_rect.y + self.line_h + sp;
+            self.cursor_x = self.start_x + self.indent_x;
         } else {
             self.cursor_x = self.start_x + self.indent_x;
-            var sp = self.get_style_var(types.VAR_SPACING, self.theme.spacing);
-            self.cursor_y = self.cursor_y + item_h + sp;
             self.line_h = item_h;
+            self.cursor_y = self.prev_item_rect.y + item_h + sp;
         }
     }
 
@@ -423,6 +533,10 @@ frame GUI {
 
     // ── Basic IMGUI Controls ───────────────────────────────────────────────────
 
+    pub fn draw_rect(x: float, y: float, w: float, h: float, color: types.Color): nil {
+        gg.draw_rect_primitive(x, y, w, h, color.r, color.g, color.b, color.a);
+    }
+
     pub fn label(text: str, custom_color: any = nil): nil {
         var c = self.get_style_color(types.COLOR_TEXT);
         if (custom_color != nil) {
@@ -448,6 +562,20 @@ frame GUI {
             h = self.get_style_var(types.VAR_ITEM_HEIGHT, self.theme.item_height);
         }
 
+        var is_disabled = false;
+        if (self.has_next_disabled) {
+            is_disabled = self.next_disabled;
+            self.has_next_disabled = false;
+            self.next_disabled = false;
+        }
+
+        var active_opacity = 1.0;
+        if (self.has_next_opacity) {
+            active_opacity = self.next_opacity;
+            self.has_next_opacity = false;
+            self.next_opacity = 1.0;
+        }
+
         var id = self.make_id(text);
         var bx = self.cursor_x;
         var by = self.cursor_y;
@@ -455,20 +583,41 @@ frame GUI {
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
                        self.mouse_y >= by and self.mouse_y <= (by + h));
 
+        if (hovered and self.is_occluded(bx, by, w, h)) {
+            var in_active_popup = (bx >= self.popup_x and (bx + w) <= (self.popup_x + self.popup_w) and
+                                   by >= self.popup_y and (by + h) <= (self.popup_y + self.popup_h));
+            if (not in_active_popup) {
+                hovered = false;
+            }
+        }
+
+        if (is_disabled) {
+            hovered = false;
+        }
+
         if (hovered) {
             self.hot_id = id;
         }
 
         var clicked = false;
-        if (self.active_id == id) {
-            if (self.mouse_released) {
-                self.active_id = "";
-                if (hovered) {
-                    clicked = true;
+        var is_focused = false;
+        if (not is_disabled) {
+            if (self.active_id == id) {
+                if (self.mouse_released) {
+                    self.active_id = "";
+                    if (hovered) {
+                        clicked = true;
+                    }
                 }
+            } elif (hovered and self.mouse_pressed) {
+                self.active_id = id;
+                self.focus_manager.request_focus(id);
             }
-        } elif (hovered and self.mouse_pressed) {
-            self.active_id = id;
+
+            is_focused = (self.active_id == id or self.focus_manager.has_focus(id));
+            if (is_focused and (self.is_key_pressed(13) or self.is_key_pressed(32))) {
+                clicked = true;
+            }
         }
 
         var hover_target = 0.0;
@@ -477,7 +626,10 @@ frame GUI {
         var hover_t = ast.animate_property("hover_t", hover_target, 0.15, anim.EASE_OUT, self.dt);
 
         var bg = self.get_style_color(types.COLOR_BUTTON);
-        if (self.active_id == id) {
+        if (is_disabled) {
+            bg = self.get_style_color(types.COLOR_FRAME_BG);
+            bg.a = bg.a * 0.5;
+        } elif (self.active_id == id) {
             bg = self.get_style_color(types.COLOR_BUTTON_ACTIVE);
         } else if (hover_t > 0.0) {
             var hbg = self.get_style_color(types.COLOR_BUTTON_HOVER);
@@ -489,12 +641,55 @@ frame GUI {
             );
         }
 
+        if (active_opacity < 1.0) {
+            bg.a = bg.a * active_opacity;
+        }
+
+        // Optional Button Elevation Drop Shadow (opt-in via set_next_shadow, shadow(), shadow_stack, or theme)
+        var raw_sh = self.get_active_shadow(self.theme.button_shadow);
+        if (raw_sh != nil and not is_disabled) {
+            var sh = raw_sh as shadow_mod.Shadow;
+            if (sh.a > 0.0) {
+                var s_alpha = sh.a * active_opacity;
+                var s_y = sh.offset_y;
+                var s_blur = sh.blur_radius;
+                if (self.active_id == id) {
+                    s_alpha = s_alpha * 0.5;
+                    s_y = s_y * 0.5;
+                    s_blur = s_blur * 0.5;
+                } elif (hovered) {
+                    s_alpha = s_alpha * 1.25;
+                    if (s_alpha > 1.0) { s_alpha = 1.0; }
+                    s_y = s_y * 1.3;
+                    s_blur = s_blur * 1.3;
+                }
+                gg.draw_shadow_primitive(bx, by, w, h, sh.r, sh.g, sh.b, s_alpha, sh.offset_x, s_y, s_blur, sh.spread_radius);
+            }
+        }
+
+        // Button Base
         gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
+
+        // Focus Highlight Ring
+        if (is_focused and not is_disabled) {
+            var focus_color = self.get_style_color(types.COLOR_ACCENT);
+            var f_alpha = 0.95 * active_opacity;
+            gg.draw_rect_primitive(bx - 1.0, by - 1.0, w + 2.0, 1.0, focus_color.r, focus_color.g, focus_color.b, f_alpha);
+            gg.draw_rect_primitive(bx - 1.0, by + h, w + 2.0, 1.0, focus_color.r, focus_color.g, focus_color.b, f_alpha);
+            gg.draw_rect_primitive(bx - 1.0, by, 1.0, h, focus_color.r, focus_color.g, focus_color.b, f_alpha);
+            gg.draw_rect_primitive(bx + w, by, 1.0, h, focus_color.r, focus_color.g, focus_color.b, f_alpha);
+        }
 
         var text_w = (len(text) * 8 * self.theme.font_scale) as float;
         var text_x = bx + (w - text_w) / 2.0;
         var text_y = by + (h - 8.0 * (self.theme.font_scale as float)) / 2.0;
         var tc = self.get_style_color(types.COLOR_TEXT);
+        if (is_disabled) {
+            tc = self.get_style_color(types.COLOR_TEXT_MUTED);
+        }
+        if (active_opacity < 1.0) {
+            tc.a = tc.a * active_opacity;
+        }
         gg.draw_text(text, text_x, text_y, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
 
         self.prev_item_hovered = hovered;
@@ -822,7 +1017,47 @@ frame GUI {
         return self.typed_chars;
     }
 
-    pub fn input_text_multiline(label: str, text: str, width: float, height: float): str {
+    pub fn get_editor_controller(label: str): any {
+        var id = self.make_id(label);
+        return self.editor_controllers[id];
+    }
+
+    pub fn set_multiline_selection(label: str, line: int, col: int, end_line: int, end_col: int): nil {
+        var id = self.make_id(label);
+        var ctrl_val = self.editor_controllers[id];
+        if (ctrl_val != nil) {
+            var ctrl = ctrl_val as text_ctrl.EditorController;
+            ctrl.set_cursor(line, col);
+            ctrl.set_selection(end_line, end_col);
+            var lh = gg.get_line_height(self.theme.font_scale);
+            var target_scroll = (line as float) * lh - 60.0;
+            if (target_scroll < 0.0) { target_scroll = 0.0; }
+            if (self.scroll_offsets != nil) {
+                self.scroll_offsets[id] = target_scroll;
+            }
+        }
+    }
+
+    pub fn set_multiline_text(label: str, new_text: str): nil {
+        var id = self.make_id(label);
+        var ctrl_val = self.editor_controllers[id];
+        if (ctrl_val != nil) {
+            var ctrl = ctrl_val as text_ctrl.EditorController;
+            ctrl.set_text(new_text);
+        }
+    }
+
+    pub fn get_multiline_cursor(label: str): (int, int) {
+        var id = self.make_id(label);
+        var ctrl_val = self.editor_controllers[id];
+        if (ctrl_val != nil) {
+            var ctrl = ctrl_val as text_ctrl.EditorController;
+            return (ctrl.get_cursor_line(), ctrl.get_cursor_col());
+        }
+        return (0, 0);
+    }
+
+    pub fn input_text_multiline(label: str, text: str, width: float, height: float, show_line_numbers: bool = true): str {
         var w = width;
         var h = height;
         var id = self.make_id(label);
@@ -837,6 +1072,11 @@ frame GUI {
         ctrl.get_clipboard = self.get_clipboard_cb;
         ctrl.set_clipboard = self.set_clipboard_cb;
 
+        var is_focused = (self.active_id == id or self.focus_manager.has_focus(id));
+        if (not is_focused and text != ctrl.get_text()) {
+            ctrl.set_text(text);
+        }
+
         var lh = gg.get_line_height(self.theme.font_scale);
         var cur_scroll = 0.0;
         if (self.scroll_offsets != nil) {
@@ -846,25 +1086,44 @@ frame GUI {
             }
         }
 
+        var gutter_w = 0.0;
+        if (show_line_numbers) {
+            gutter_w = 46.0;
+        }
+        var text_area_w = w - gutter_w - 2.0;
+        var text_origin_x = bx + gutter_w + 8.0;
+
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
                        self.mouse_y >= by and self.mouse_y <= (by + h));
+        if (hovered and self.is_occluded(bx, by, w, h)) {
+            hovered = false;
+        }
         if (hovered) { self.hot_id = id; }
         if (hovered and self.mouse_pressed) {
             self.active_id = id;
             self.focus_manager.request_focus(id);
 
-            var rel_x = self.mouse_x - (bx + 6.0);
+            var rel_x = self.mouse_x - text_origin_x;
+            if (rel_x < 0.0) { rel_x = 0.0; }
             var rel_y = self.mouse_y - (by + 6.0) + cur_scroll;
             var hit = layout_mod.hit_test_multiline(ctrl.get_lines(), rel_x, rel_y, lh, self.theme.font_scale);
-            ctrl.set_cursor(hit[0], hit[1]);
+            if (show_line_numbers and self.mouse_x < (bx + gutter_w)) {
+                ctrl.set_cursor(hit[0], 0);
+                var l_str = ctrl.get_line(hit[0]);
+                var l_len = 0;
+                if (l_str != nil) { l_len = len(l_str); }
+                ctrl.set_selection(hit[0], l_len);
+            } else {
+                ctrl.set_cursor(hit[0], hit[1]);
+            }
         } elif (self.active_id == id and self.mouse_down) {
-            var rel_x = self.mouse_x - (bx + 6.0);
+            var rel_x = self.mouse_x - text_origin_x;
+            if (rel_x < 0.0) { rel_x = 0.0; }
             var rel_y = self.mouse_y - (by + 6.0) + cur_scroll;
             var hit = layout_mod.hit_test_multiline(ctrl.get_lines(), rel_x, rel_y, lh, self.theme.font_scale);
             ctrl.set_selection(hit[0], hit[1]);
         }
 
-        var is_focused = (self.active_id == id or self.focus_manager.has_focus(id));
         var bg = self.get_style_color(types.COLOR_FRAME_BG);
         if (is_focused) {
             bg = self.get_style_color(types.COLOR_FRAME_BG_ACTIVE);
@@ -886,7 +1145,13 @@ frame GUI {
                 }
             }
 
-            if (self.is_key_pressed(8)) { ctrl.backspace(); }
+            if (self.is_key_pressed(8) or self.is_key_pressed(259)) { ctrl.backspace(); }
+            if (self.is_key_pressed(257) or self.is_key_pressed(13) or self.is_key_pressed(10) or self.is_key_pressed(335)) {
+                ctrl.insert_newline();
+            }
+            if (self.is_key_pressed(258) or self.is_key_pressed(9)) {
+                ctrl.insert_text("    ");
+            }
             if (self.is_key_pressed(262)) { ctrl.move_right(false); }
             if (self.is_key_pressed(263)) { ctrl.move_left(false); }
             if (self.is_key_pressed(264)) { ctrl.move_down(false); }
@@ -907,7 +1172,7 @@ frame GUI {
         }
 
         var total_content_h = (ctrl.get_line_count() as float) * lh + 12.0;
-        var vp = viewport_mod.Viewport(w - 2.0, h - 2.0, w, total_content_h);
+        var vp = viewport_mod.Viewport(text_area_w, h - 2.0, text_area_w, total_content_h);
         vp.scroll_y = cur_scroll;
 
         if (is_focused) {
@@ -932,6 +1197,13 @@ frame GUI {
 
         gg.draw_rect_primitive(bx, by, w, h, bg.r, bg.g, bg.b, bg.a);
 
+        if (show_line_numbers) {
+            var gbg = types.Color(r=bg.r * 0.85, g=bg.g * 0.85, b=bg.b * 0.85, a=bg.a);
+            gg.draw_rect_primitive(bx + 1.0, by + 1.0, gutter_w, h - 2.0, gbg.r, gbg.g, gbg.b, gbg.a);
+            var sep = self.get_style_color(types.COLOR_SEPARATOR);
+            gg.draw_rect_primitive(bx + gutter_w, by + 1.0, 1.0, h - 2.0, sep.r, sep.g, sep.b, sep.a);
+        }
+
         var border = self.theme.checkbox_border;
         if (is_focused) {
             border = self.get_style_color(types.COLOR_ACCENT);
@@ -942,7 +1214,6 @@ frame GUI {
         gg.draw_rect_primitive(bx + w - 1.0, by, 1.0, h, border.r, border.g, border.b, border.a);
 
         var tc = self.get_style_color(types.COLOR_TEXT);
-        gg.push_clip(bx + 1.0, by + 1.0, w - 2.0, h - 2.0);
 
         var start_line = (vp.scroll_y / lh) as int;
         if (start_line < 0) start_line = 0;
@@ -950,23 +1221,79 @@ frame GUI {
         var end_line = start_line + visible_lines;
         if (end_line > ctrl.get_line_count()) end_line = ctrl.get_line_count();
 
+        // 1. Draw line numbers in gutter
+        if (show_line_numbers) {
+            gg.push_clip(bx + 1.0, by + 1.0, gutter_w - 1.0, h - 2.0);
+            var gi = start_line;
+            while (gi < end_line) {
+                var g_cy = by + 6.0 - vp.scroll_y + (gi as float) * lh;
+                var line_num_str = "{gi + 1}";
+                var num_w = gg.measure_text(line_num_str, self.theme.font_scale);
+                var num_x = bx + gutter_w - num_w - 6.0;
+                var num_c = self.get_style_color(types.COLOR_TEXT_MUTED);
+                if (is_focused and gi == ctrl.get_cursor_line()) {
+                    num_c = self.get_style_color(types.COLOR_ACCENT);
+                    gg.draw_rect_primitive(bx + 1.0, g_cy, gutter_w - 1.0, lh, num_c.r, num_c.g, num_c.b, 0.18);
+                }
+                gg.draw_text(line_num_str, num_x, g_cy, num_c.r, num_c.g, num_c.b, num_c.a, self.theme.font_scale);
+                gi = gi + 1;
+            }
+            gg.pop_clip();
+        }
+
+        // 2. Draw text area content
+        gg.push_clip(bx + gutter_w + 1.0, by + 1.0, text_area_w, h - 2.0);
+
         var ii = start_line;
         while (ii < end_line) {
             var cy = by + 6.0 - vp.scroll_y + (ii as float) * lh;
             var line_text = ctrl.get_line(ii);
             if (line_text == nil) { line_text = ""; }
+
+            // Draw selection highlight if line intersects selection range
+            if (ctrl.is_selected()) {
+                var sel_rng = ctrl.get_selection_range();
+                var r_s_line = sel_rng[0];
+                var r_s_col = sel_rng[1];
+                var r_e_line = sel_rng[2];
+                var r_e_col = sel_rng[3];
+
+                if (ii >= r_s_line and ii <= r_e_line) {
+                    var l_start_col = 0;
+                    var l_end_col = len(line_text);
+                    if (ii == r_s_line) { l_start_col = r_s_col; }
+                    if (ii == r_e_line) { l_end_col = r_e_col; }
+                    if (l_start_col < 0) { l_start_col = 0; }
+                    if (l_end_col > len(line_text)) { l_end_col = len(line_text); }
+
+                    if (l_end_col > l_start_col) {
+                        var pre_sel = "";
+                        if (l_start_col > 0) {
+                            pre_sel = std_string.substring(line_text, 0, l_start_col);
+                        }
+                        var sel_str = std_string.substring(line_text, l_start_col, l_end_col);
+                        var s_x = gg.measure_text(pre_sel, self.theme.font_scale);
+                        var s_w = gg.measure_text(sel_str, self.theme.font_scale);
+                        if (s_w < 4.0) { s_w = 4.0; }
+                        var sel_col = self.get_style_color(types.COLOR_ACCENT);
+                        gg.draw_rect_primitive(text_origin_x + s_x, cy, s_w, lh, sel_col.r, sel_col.g, sel_col.b, 0.4);
+                    }
+                }
+            }
+
+            // Draw text
+            gg.draw_text(line_text, text_origin_x, cy, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+
+            // Draw cursor bar
             if (is_focused and ii == ctrl.get_cursor_line()) {
                 var cur_col = ctrl.get_cursor_col();
-                var line_len = len(line_text);
+                if (cur_col > len(line_text)) { cur_col = len(line_text); }
                 var prefix = "";
                 if (cur_col > 0) { prefix = std_string.substring(line_text, 0, cur_col); }
-                if (prefix == nil) { prefix = ""; }
-                var suffix = "";
-                if (cur_col < line_len) { suffix = std_string.substring(line_text, cur_col, line_len); }
-                if (suffix == nil) { suffix = ""; }
-                line_text = prefix + "|" + suffix;
+                var cur_x = gg.measure_text(prefix, self.theme.font_scale);
+                gg.draw_rect_primitive(text_origin_x + cur_x, cy, 2.0, lh, tc.r, tc.g, tc.b, tc.a);
             }
-            gg.draw_text(line_text, bx + 6.0, cy, tc.r, tc.g, tc.b, tc.a, self.theme.font_scale);
+
             ii = ii + 1;
         }
 
@@ -991,6 +1318,9 @@ frame GUI {
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
                        self.mouse_y >= by and self.mouse_y <= (by + h));
+        if (hovered and self.is_occluded(bx, by, w, h)) {
+            hovered = false;
+        }
         if (hovered) { self.hot_id = id; }
         if (hovered and self.mouse_pressed) {
             self.active_id = id;
@@ -1015,7 +1345,26 @@ frame GUI {
         gg.draw_rect_primitive(bx, by, 1.0, h, border.r, border.g, border.b, border.a);
         gg.draw_rect_primitive(bx + w - 1.0, by, 1.0, h, border.r, border.g, border.b, border.a);
 
-        var display_text = text;
+        var res_text = text;
+        if (is_focused) {
+            if (self.typed_chars != nil) {
+                var ch_i = 0;
+                var chars = self.typed_chars;
+                while (ch_i < len(chars)) {
+                    var cp = chars[ch_i];
+                    if (cp >= 32 and cp <= 126 and len(res_text) < max_len) {
+                        var ch = _builtin_string_from_bytes([cp]);
+                        res_text = res_text + ch;
+                    }
+                    ch_i = ch_i + 1;
+                }
+            }
+            if ((self.is_key_pressed(8) or self.is_key_pressed(259)) and len(res_text) > 0) {
+                res_text = std_string.substring(res_text, 0, len(res_text) - 1);
+            }
+        }
+
+        var display_text = res_text;
         if (is_focused) {
             display_text = display_text + "|";
         }
@@ -1030,7 +1379,7 @@ frame GUI {
         self.prev_item_hovered = hovered;
         self.prev_item_rect = types.rect(bx, by, w, h);
         self.advance(w + 80.0, h);
-        return text;
+        return res_text;
     }
 
     pub fn combo_box(label: str, items: [str], selected_idx: int): int {
@@ -1039,15 +1388,21 @@ frame GUI {
         var id = self.make_id(label);
         var bx = self.cursor_x;
         var by = self.cursor_y;
+        if (id == "") {
+            var ix = bx as int;
+            var iy = by as int;
+            id = "combo_{ix}_{iy}";
+        }
 
         var hovered = (self.mouse_x >= bx and self.mouse_x <= (bx + w) and
                        self.mouse_y >= by and self.mouse_y <= (by + h));
         if (hovered) { self.hot_id = id; }
 
-        var is_open = (self.combo_open_id == id);
+        var is_open = (self.combo_open_id != "" and self.combo_open_id == id);
         if (hovered and self.mouse_pressed) {
             if (is_open) {
                 self.combo_open_id = "";
+                self.active_popup_id = "";
             } else {
                 self.combo_open_id = id;
             }
@@ -1086,8 +1441,30 @@ frame GUI {
             var item_count = len(items);
             var popup_h = (item_count as float) * h;
             var popup_y = by + h + 2.0;
+
+            self.popup_x = bx;
+            self.popup_y = popup_y;
+            self.popup_w = w;
+            self.popup_h = popup_h;
+            self.active_popup_id = id;
+
+            // Optional elevation drop shadow for combo dropdown (opt-in)
+            var raw_csh = self.get_active_shadow(self.theme.popup_shadow);
+            if (raw_csh != nil) {
+                var csh = raw_csh as shadow_mod.Shadow;
+                if (csh.a > 0.0) {
+                    gg.draw_shadow_primitive(bx, popup_y, w, popup_h, csh.r, csh.g, csh.b, csh.a, csh.offset_x, csh.offset_y, csh.blur_radius, csh.spread_radius);
+                }
+            }
+
             var pbg = self.get_style_color(types.COLOR_PANEL_BG);
             gg.draw_rect_primitive(bx, popup_y, w, popup_h, pbg.r, pbg.g, pbg.b, pbg.a);
+
+            var border = self.get_style_color(types.COLOR_ACCENT);
+            gg.draw_rect_primitive(bx, popup_y, w, 1.0, border.r, border.g, border.b, border.a);
+            gg.draw_rect_primitive(bx, popup_y + popup_h - 1.0, w, 1.0, border.r, border.g, border.b, border.a);
+            gg.draw_rect_primitive(bx, popup_y, 1.0, popup_h, border.r, border.g, border.b, border.a);
+            gg.draw_rect_primitive(bx + w - 1.0, popup_y, 1.0, popup_h, border.r, border.g, border.b, border.a);
 
             var k = 0;
             while (k < item_count) {
@@ -1100,6 +1477,7 @@ frame GUI {
                     if (self.mouse_pressed) {
                         new_idx = k;
                         self.combo_open_id = "";
+                        self.active_popup_id = "";
                     }
                 }
                 var itc = self.get_style_color(types.COLOR_TEXT);
@@ -1111,7 +1489,11 @@ frame GUI {
 
         self.prev_item_hovered = hovered;
         self.prev_item_rect = types.rect(bx, by, w, h);
-        self.advance(w + 80.0, h);
+        var adv_w = w;
+        if (label != "") {
+            adv_w = w + 80.0;
+        }
+        self.advance(adv_w, h);
         return new_idx;
     }
 
@@ -1467,6 +1849,20 @@ frame GUI {
         if (self.active_popup_id != id) {
             return false;
         }
+        self.popup_x = x;
+        self.popup_y = y;
+        self.popup_w = w;
+        self.popup_h = h;
+
+        // Optional popup drop shadow (opt-in)
+        var raw_psh = self.get_active_shadow(self.theme.popup_shadow);
+        if (raw_psh != nil) {
+            var psh = raw_psh as shadow_mod.Shadow;
+            if (psh.a > 0.0) {
+                gg.draw_shadow_primitive(x, y, w, h, psh.r, psh.g, psh.b, psh.a, psh.offset_x, psh.offset_y, psh.blur_radius, psh.spread_radius);
+            }
+        }
+
         var bg = self.get_style_color(types.COLOR_PANEL_BG);
         gg.draw_rect_primitive(x, y, w, h, bg.r, bg.g, bg.b, bg.a);
         var border = self.get_style_color(types.COLOR_ACCENT);
@@ -1475,7 +1871,7 @@ frame GUI {
         gg.draw_rect_primitive(x, y, 1.0, h, border.r, border.g, border.b, border.a);
         gg.draw_rect_primitive(x + w - 1.0, y, 1.0, h, border.r, border.g, border.b, border.a);
 
-        var pad = self.get_style_var(types.VAR_PADDING, self.theme.padding);
+        var pad = self.get_style_var(types.VAR_PADDING, 6.0);
         self.cursor_x = x + pad;
         self.cursor_y = y + pad;
         self.start_x = self.cursor_x;
@@ -1622,6 +2018,16 @@ frame GUI {
         if (win.collapsed) {
             panel_h = titlebar_h;
         }
+
+        // Optional window elevation drop shadow (opt-in)
+        var raw_wsh = self.get_active_shadow(self.theme.window_shadow);
+        if (raw_wsh != nil) {
+            var wsh = raw_wsh as shadow_mod.Shadow;
+            if (wsh.a > 0.0) {
+                gg.draw_shadow_primitive(wx, wy, ww, panel_h, wsh.r, wsh.g, wsh.b, wsh.a, wsh.offset_x, wsh.offset_y, wsh.blur_radius, wsh.spread_radius);
+            }
+        }
+
         gg.draw_rect_primitive(wx, wy, ww, panel_h, bg.r, bg.g, bg.b, bg.a);
 
         var tb = self.get_style_color(types.COLOR_WINDOW_TITLE);
@@ -1663,6 +2069,18 @@ frame GUI {
         }
         self.in_window = false;
         self.cur_window_title = "";
+    }
+
+    pub fn show_debug_hud(fps: float, dt: float, entity_count: int = 0): nil {
+        if (self.begin_window("Engine Metrics", 10.0, 10.0, 220.0, 160.0)) {
+            self.label("FPS: {fps as int}");
+            self.label("Frame: {dt * 1000.0} ms");
+            if (entity_count > 0) {
+                self.label("Entities: {entity_count}");
+            }
+            self.separator();
+            self.end_window();
+        }
     }
 }
 

@@ -1,13 +1,6 @@
-import std.ui.widget as widget;
+// std/ui/spacer - Flexible space filler widget
+import std.ui.types as ui_types;
 
-frame Spacer {
-    pub var flex: float;
-
-    pub init(f: float = 1.0) {
-        self.flex = f;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn spacer(flex: float = 1.0): ui_types.Widget {
+    return ui_types.spacer(flex);
 }

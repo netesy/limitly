@@ -1,3 +1,6 @@
+// std/string/string.lm
+// Core string frame and utilities
+
 frame String {
     pub var value: str;
 
@@ -76,13 +79,33 @@ frame String {
     pub fn pad_left(width: int, fill: str = " "): str {
         var n = width - len(self.value);
         if (n <= 0) return self.value;
-        return String(value=fill).repeat(n) + self.value;
+        return String(fill).repeat(n) + self.value;
     }
 
     pub fn pad_right(width: int, fill: str = " "): str {
         var n = width - len(self.value);
         if (n <= 0) return self.value;
-        return self.value + String(value=fill).repeat(n);
+        return self.value + String(fill).repeat(n);
+    }
+
+    pub fn trim(): str {
+        return _builtin_string_trim(self.value);
+    }
+
+    pub fn to_upper(): str {
+        return _builtin_string_to_upper(self.value);
+    }
+
+    pub fn to_lower(): str {
+        return _builtin_string_to_lower(self.value);
+    }
+
+    pub fn split(delimiter: str): [str] {
+        return split(self.value, delimiter);
+    }
+
+    pub fn replace(old: str, replacement: str): str {
+        return _builtin_string_replace(self.value, old, replacement);
     }
 }
 
@@ -117,5 +140,84 @@ pub fn compare(left: str, right: str): int {
 }
 
 pub fn substring(value: str, start: int, end: int): str {
-    return String(value=value).substring(start, end);
+    return String(value).substring(start, end);
+}
+
+pub fn contains(value: str, needle: str): bool {
+    return _builtin_string_contains(value, needle);
+}
+
+pub fn starts_with(value: str, prefix: str): bool {
+    return _builtin_string_starts_with(value, prefix);
+}
+
+pub fn ends_with(value: str, suffix: str): bool {
+    return _builtin_string_ends_with(value, suffix);
+}
+
+pub fn split(value: str, delimiter: str): [str] {
+    var dlen = len(delimiter);
+    var vlen = len(value);
+    var parts: [str] = [];
+    if (dlen == 0) {
+        var i = 0;
+        while (i < vlen) {
+            parts.append(_builtin_substring(value, i, i + 1));
+            i = i + 1;
+        }
+        return parts;
+    }
+    var start = 0;
+    var i = 0;
+    while (i <= vlen - dlen) {
+        if (_builtin_substring(value, i, i + dlen) == delimiter) {
+            parts.append(_builtin_substring(value, start, i));
+            start = i + dlen;
+            i = start;
+        } else {
+            i = i + 1;
+        }
+    }
+    parts.append(_builtin_substring(value, start, vlen));
+    return parts;
+}
+
+pub fn join(values: [str], delimiter: str): str {
+    var n = len(values);
+    if (n == 0) { return ""; }
+    var result = values[0];
+    var i = 1;
+    while (i < n) {
+        result = result + delimiter + values[i];
+        i = i + 1;
+    }
+    return result;
+}
+
+pub fn trim(value: str): str {
+    return _builtin_string_trim(value);
+}
+
+pub fn replace(value: str, old: str, replacement: str): str {
+    return _builtin_string_replace(value, old, replacement);
+}
+
+pub fn to_lower(value: str): str {
+    return _builtin_string_to_lower(value);
+}
+
+pub fn to_upper(value: str): str {
+    return _builtin_string_to_upper(value);
+}
+
+pub fn uppercase(value: str): str {
+    return _builtin_string_to_upper(value);
+}
+
+pub fn byte_at(value: str, index: int): int {
+    return _builtin_string_byte_at(value, index);
+}
+
+pub fn substr(value: str, start: int, end: int): str {
+    return _builtin_substring(value, start, end);
 }

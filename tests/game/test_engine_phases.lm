@@ -1,0 +1,256 @@
+// tests/game/test_engine_phases.lm
+// Comprehensive verification suite for Phase 1 to Phase 4 std.game upgrades:
+// - Phase 1: Core App, Timestep, and Event Infrastructure
+// - Phase 2: Game Math, Circles, Rays, and Collision Detection
+// - Phase 3: 2D Camera Projections and Input Action Mapping
+// - Phase 4: Sprites, SpriteSheets, Frame Animation, and Particle Emitter
+
+import std.game as game;
+import std.math as math;
+
+fn test_phase1_timing_and_app() {
+    print("=== Testing Phase 1: Core App & Timing Foundation ===");
+
+    var cfg = game.GameConfig(
+        title="Lymar Engine Test",
+        width=1024,
+        height=768,
+        resizable=true
+    );
+    assert(cfg.title == "Lymar Engine Test", "Config title mismatch");
+    assert(cfg.width == 1024, "Config width mismatch");
+    assert(cfg.height == 768, "Config height mismatch");
+    assert(cfg.fixed_dt > 0.01 and cfg.fixed_dt < 0.02, "Default fixed_dt should be ~0.0166");
+
+    var app = game.Game(cfg);
+    assert(app.is_running == false, "Game should not be running before setup");
+    assert(app.dt() > 0.0, "Delta time should have initial non-zero fallback");
+    assert(app.time_scale == 1.0, "Time scale should default to 1.0");
+
+    // Test fixed timestep accumulator logic
+    app.accumulator = 0.05; // 50ms accumulated
+    var steps = 0;
+    while (app.step_physics()) {
+        steps = steps + 1;
+    }
+    assert(steps == 3, "0.05s accumulator with 1/60s fixed_dt should yield exactly 3 physics steps");
+    assert(app.accumulator < app.fixed_dt, "Accumulator should be less than fixed_dt after stepping");
+
+    print("[OK] Phase 1 Timing & App passed");
+}
+
+fn test_phase2_vector_math() {
+    print("=== Testing Phase 2A: Vec2 Algebra ===");
+
+    var v1 = game.Vec2(3.0, 4.0);
+    assert(v1.x == 3.0 and v1.y == 4.0, "Vec2 init failed");
+    assert(v1.mag_sq() == 25.0, "Vec2 mag_sq failed");
+    assert(v1.mag() == 5.0, "Vec2 mag failed");
+
+    var v2 = game.Vec2(1.0, 2.0);
+    var v_add = v1.add(v2);
+    assert(v_add.x == 4.0 and v_add.y == 6.0, "Vec2 add failed");
+
+    var v_sub = v1.sub(v2);
+    assert(v_sub.x == 2.0 and v_sub.y == 2.0, "Vec2 sub failed");
+
+    var v_scale = v2.scale(3.0);
+    assert(v_scale.x == 3.0 and v_scale.y == 6.0, "Vec2 scale failed");
+
+    var v_dot = v1.dot(v2);
+    assert(v_dot == 11.0, "Vec2 dot product failed");
+
+    var v_norm = v1.normalize();
+    assert(math.abs(v_norm.mag() - 1.0) < 0.0001, "Vec2 normalize failed");
+    assert(math.abs(v_norm.x - 0.6) < 0.0001, "Normalized x failed");
+    assert(math.abs(v_norm.y - 0.8) < 0.0001, "Normalized y failed");
+
+    var v_lerp = game.Vec2(0.0, 0.0).lerp(game.Vec2(10.0, 20.0), 0.5);
+    assert(v_lerp.x == 5.0 and v_lerp.y == 10.0, "Vec2 lerp failed");
+
+    var v_perp = game.Vec2(1.0, 0.0).perpendicular();
+    assert(v_perp.x == 0.0 and v_perp.y == 1.0, "Vec2 perpendicular failed");
+
+    var v_clamp = game.Vec2(30.0, 40.0).clamp_length(10.0);
+    assert(math.abs(v_clamp.mag() - 10.0) < 0.0001, "Vec2 clamp_length failed");
+
+    print("[OK] Phase 2A Vec2 Algebra passed");
+}
+
+fn test_phase2_geometry_and_collisions() {
+    print("=== Testing Phase 2B: Geometry & Collisions ===");
+
+    var r1 = game.Rect(0.0, 0.0, 100.0, 100.0);
+    var r2 = game.Rect(50.0, 50.0, 100.0, 100.0);
+    var r3 = game.Rect(200.0, 200.0, 50.0, 50.0);
+
+    assert(r1.intersects(r2) == true, "r1 and r2 should intersect");
+    assert(r1.intersects(r3) == false, "r1 and r3 should not intersect");
+
+    var inter = r1.intersection(r2);
+    assert(inter.x == 50.0 and inter.y == 50.0, "Intersection top-left mismatch");
+    assert(inter.w == 50.0 and inter.h == 50.0, "Intersection size mismatch");
+
+    var center = r1.center();
+    assert(center.x == 50.0 and center.y == 50.0, "Rect center mismatch");
+
+    // AABB vs AABB Collision Manifold
+    var contact_aabb = game.test_aabb_aabb(r1, r2);
+    assert(contact_aabb.collided == true, "AABB contact should be true");
+    assert(contact_aabb.penetration > 0.0, "AABB penetration should be positive");
+
+    // Circle vs Circle
+    var c1 = game.Circle(center=game.Vec2(0.0, 0.0), radius=10.0);
+    var c2 = game.Circle(center=game.Vec2(15.0, 0.0), radius=10.0);
+    var c3 = game.Circle(center=game.Vec2(50.0, 50.0), radius=5.0);
+
+    assert(c1.intersects_circle(c2) == true, "c1 and c2 should overlap");
+    assert(c1.intersects_circle(c3) == false, "c1 and c3 should not overlap");
+
+    var contact_cc = game.test_circle_circle(c1, c2);
+    assert(contact_cc.collided == true, "Circle contact should be true");
+    assert(math.abs(contact_cc.penetration - 5.0) < 0.0001, "Circle penetration should be 5.0");
+    assert(contact_cc.normal.x == 1.0 and contact_cc.normal.y == 0.0, "Circle collision normal mismatch");
+
+    // Circle vs AABB
+    var c_box = game.Circle(center=game.Vec2(95.0, 50.0), radius=10.0);
+    var contact_ca = game.test_circle_aabb(c_box, r1);
+    assert(contact_ca.collided == true, "Circle vs AABB should collide");
+    assert(contact_ca.penetration > 0.0, "Circle vs AABB penetration should be > 0");
+
+    // Raycasting AABB
+    var ray_box = game.Ray2D(origin=game.Vec2(-50.0, 50.0), direction=game.Vec2(1.0, 0.0));
+    var hit_box = game.raycast_aabb(ray_box, r1);
+    assert(hit_box.hit == true, "Ray should hit box");
+    assert(math.abs(hit_box.distance - 50.0) < 0.001, "Ray hit distance should be 50.0");
+    assert(hit_box.normal.x == -1.0, "Ray hit normal should point left");
+
+    // Raycasting Circle
+    var ray_c = game.Ray2D(origin=game.Vec2(0.0, -50.0), direction=game.Vec2(0.0, 1.0));
+    var hit_c = game.raycast_circle(ray_c, c1);
+    assert(hit_c.hit == true, "Ray should hit circle");
+    assert(math.abs(hit_c.distance - 40.0) < 0.001, "Ray hit distance should be 40.0");
+
+    print("[OK] Phase 2B Geometry & Collisions passed");
+}
+
+fn test_phase3_camera_and_input() {
+    print("=== Testing Phase 3: 2D Camera & Input System ===");
+
+    // Camera 2D
+    var cam = game.Camera2D(
+        target=game.Vec2(100.0, 100.0),
+        offset=game.Vec2(400.0, 300.0),
+        zoom=2.0
+    );
+
+    // World to Screen: (100, 100) target should map exactly to screen offset (400, 300)
+    var screen_p = cam.world_to_screen(game.Vec2(100.0, 100.0));
+    assert(screen_p.x == 400.0 and screen_p.y == 300.0, "Camera world_to_screen target mismatch");
+
+    // Screen to World: screen offset (400, 300) should map back to target (100, 100)
+    var world_p = cam.screen_to_world(game.Vec2(400.0, 300.0));
+    assert(math.abs(world_p.x - 100.0) < 0.001 and math.abs(world_p.y - 100.0) < 0.001, "Camera screen_to_world roundtrip failed");
+
+    // Camera trauma & shake
+    cam.add_trauma(0.8);
+    assert(cam.trauma == 0.8, "Camera trauma not set");
+    cam.update(0.1);
+    assert(cam.trauma < 0.8, "Camera trauma should decay over time");
+
+    // Input Manager & Action Mapping
+    var input = game.InputManager();
+    input.bind_action("jump", [game.KEY_SPACE, game.KEY_UP, game.KEY_W]);
+    input.bind_axis("horizontal", game.KEY_A, game.KEY_D);
+
+    // Simulate key down
+    input.on_key_down(game.KEY_SPACE);
+    assert(input.is_key_down(game.KEY_SPACE) == true, "Space should be down");
+    assert(input.is_key_pressed(game.KEY_SPACE) == true, "Space should be pressed this frame");
+    assert(input.is_action_down("jump") == true, "Jump action should be down");
+    assert(input.is_action_pressed("jump") == true, "Jump action should be pressed");
+
+    // Test axis
+    input.on_key_down(game.KEY_D);
+    assert(input.get_axis("horizontal") == 1.0, "Horizontal axis with D pressed should be 1.0");
+
+    // Mouse buttons
+    input.on_mouse_down(game.MOUSE_LEFT, 250.0, 150.0);
+    assert(input.is_mouse_down(game.MOUSE_LEFT) == true, "Mouse left should be down");
+    assert(input.is_mouse_pressed(game.MOUSE_LEFT) == true, "Mouse left should be pressed");
+    assert(input.mouse_x == 250.0 and input.mouse_y == 150.0, "Mouse position mismatch");
+
+    print("[OK] Phase 3 Camera & Input passed");
+}
+
+fn test_phase4_sprites_and_particles() {
+    print("=== Testing Phase 4: Sprites, Animation & Particles ===");
+
+    // Sprite & SpriteSheet
+    var tex = game.Texture(1, 256, 256);
+    var sheet = game.SpriteSheet(tex, 32, 32);
+    assert(sheet.columns == 8, "256/32 columns should be 8");
+    assert(sheet.rows == 8, "256/32 rows should be 8");
+
+    var frame0 = sheet.get_frame_index(0);
+    assert(frame0.x == 0.0 and frame0.y == 0.0 and frame0.w == 32.0 and frame0.h == 32.0, "Frame 0 mismatch");
+    var frame9 = sheet.get_frame_index(9); // col 1, row 1
+    assert(frame9.x == 32.0 and frame9.y == 32.0, "Frame 9 mismatch");
+
+    // Animated Sprite
+    var anim = game.AnimatedSprite(tex, game.Vec2(100.0, 200.0));
+    var run_clip = game.AnimationClip("run", [frame0, frame9], 10.0, true);
+    anim.add_clip(run_clip);
+    anim.play("run");
+
+    assert(anim.is_playing == true, "Animation should be playing");
+    assert(anim.frame_index == 0, "Initial frame index should be 0");
+
+    // Update by 0.12s (1 frame duration is 0.1s at 10 FPS)
+    anim.update(0.12);
+    assert(anim.frame_index == 1, "Animation should advance to frame 1 after 0.12s");
+
+    // Particle Emitter
+    var emitter = game.ParticleEmitter(50);
+    assert(len(emitter.particles) == 50, "Emitter should preallocate 50 particles");
+
+    emitter.position = game.Vec2(300.0, 400.0);
+    emitter.burst(20);
+
+    var alive_count = 0;
+    var i = 0;
+    while (i < len(emitter.particles)) {
+        if (emitter.particles[i].alive) {
+            alive_count = alive_count + 1;
+        }
+        i = i + 1;
+    }
+    assert(alive_count == 20, "Burst of 20 should spawn 20 alive particles");
+
+    // Update particles
+    emitter.update(0.1);
+    var p0 = emitter.particles[0];
+    assert(p0.life > 0.0, "Particle life should progress");
+    assert(p0.pos.y != 400.0 or p0.pos.x != 300.0, "Particle should move over time");
+
+    print("[OK] Phase 4 Sprites, Animation & Particles passed");
+}
+
+fn main(): int {
+    print("========================================");
+    print("Running Full std.game Phase 1-4 Verification Suite");
+    print("========================================");
+
+    test_phase1_timing_and_app();
+    test_phase2_vector_math();
+    test_phase2_geometry_and_collisions();
+    test_phase3_camera_and_input();
+    test_phase4_sprites_and_particles();
+
+    print("========================================");
+    print("ALL Phase 1-4 subsystems passed with 100% success!");
+    print("========================================");
+    return 0;
+}
+
+main();

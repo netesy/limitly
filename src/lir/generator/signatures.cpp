@@ -77,6 +77,15 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
                         : import_stmt->modulePath;
                 }
                 import_aliases_[alias] = import_stmt->modulePath;
+            } else if (auto var_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
+                if (var_stmt->initializer) {
+                    if (auto var_init = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(var_stmt->initializer)) {
+                        auto it = import_aliases_.find(var_init->name);
+                        if (it != import_aliases_.end()) {
+                            import_aliases_[var_stmt->name] = it->second;
+                        }
+                    }
+                }
             }
         }
 
@@ -158,6 +167,7 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         LIR::FunctionRegistry::getInstance().registerFunction(init_func_name, std::move(result));
 
         current_module_ = prev_mod;
+        import_aliases_ = prev_import_aliases;
     }
 
     // Bodies from imported symbols are already lowered in the module loop above.
@@ -268,6 +278,54 @@ void Generator::collect_frame_signatures(LM::Frontend::AST::Program& program) {
                 std::string qname = path + "." + frame_decl->name;
                 if (!frame_table_.count(qname)) {
                     collect_frame_signature(frame_decl, qname);
+                }
+            }
+        }
+    }
+
+    // Collect frame aliases from TypeDeclarations
+    for (const auto& [path, module] : modules) {
+        if (path == "root" || !module || !module->ast) continue;
+        for (const auto& stmt : module->ast->statements) {
+            if (auto type_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
+                std::string qname = path + "." + type_decl->name;
+                if (!frame_table_.count(qname) && type_decl->type) {
+                    std::string target = type_decl->type->typeName;
+                    for (const auto& s : module->ast->statements) {
+                        if (auto imp = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(s)) {
+                            std::string imp_alias = imp->alias ? imp->alias.value() : "";
+                            if (imp_alias.empty()) {
+                                size_t dot = imp->modulePath.find_last_of('.');
+                                imp_alias = (dot != std::string::npos) ? imp->modulePath.substr(dot + 1) : imp->modulePath;
+                            }
+                            if (target == imp_alias) {
+                                target = imp->modulePath;
+                                break;
+                            } else if (target.starts_with(imp_alias + ".")) {
+                                target = imp->modulePath + target.substr(imp_alias.length());
+                                break;
+                            }
+                        }
+                    }
+                    std::string resolved = resolve_qualified_frame_name(target);
+                    auto fit = frame_table_.find(resolved);
+                    if (fit != frame_table_.end()) {
+                        frame_table_[qname] = fit->second;
+                        for (const auto& m_name : fit->second.method_names) {
+                            std::string orig_func = resolved + "." + m_name;
+                            std::string alias_func = qname + "." + m_name;
+                            if (function_table_.count(orig_func) && !function_table_.count(alias_func)) {
+                                const auto& src_info = function_table_[orig_func];
+                                FunctionInfo alias_info;
+                                alias_info.name = alias_func;
+                                alias_info.visibility = src_info.visibility;
+                                alias_info.param_count = src_info.param_count;
+                                alias_info.optional_param_count = src_info.optional_param_count;
+                                alias_info.has_closure = src_info.has_closure;
+                                function_table_[alias_func] = std::move(alias_info);
+                            }
+                        }
+                    }
                 }
             }
         }

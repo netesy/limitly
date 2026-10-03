@@ -1,0 +1,9 @@
+pub import std.collections.list show List;
+pub import std.collections.vector show Vector, ArrayList;
+pub import std.collections.deque show DoubleEndedQueue, Deque;
+pub import std.collections.linked_list show DLL, LinkedList;
+
+fn main(): int {
+    print("first 4 pub imports worked");
+    return 0;
+}

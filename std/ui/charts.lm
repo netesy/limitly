@@ -1,7 +1,7 @@
 // std/ui/charts.lm
 // Comprehensive Charts & Data Visualization Module for std.ui
 
-import std.ui as ui;
+import std.ui.types as ui;
 
 pub fn plot_lines(label: str, values: [float], min_val: float = 0.0, max_val: float = 1.0): ui.Widget {
     var w = ui.Widget(ui.KIND_PLOT_LINES);

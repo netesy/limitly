@@ -252,8 +252,21 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
             }
         }
 
-        // Check if initializing from another variable (potential move)
+        // Check if initializing from another variable (potential move or module alias)
         if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(var_decl->initializer)) {
+            if (import_aliases.count(var_expr->name)) {
+                std::string target_mod = import_aliases[var_expr->name];
+                import_aliases[var_decl->name] = target_mod;
+                FrameInfo alias_info;
+                alias_info.name = var_decl->name;
+                frame_declarations[var_decl->name] = alias_info;
+                TypePtr mod_frame = type_system.createFrameType(var_decl->name);
+                declare_variable(var_decl->name, mod_frame);
+                variable_types[var_decl->name] = mod_frame;
+                var_decl->inferred_type = mod_frame;
+                return mod_frame;
+            }
+
             TypePtr rhs_type = lookup_variable(var_expr->name);
             bool is_copyable = (rhs_type &&
                 (rhs_type->tag == TypeTag::Function ||
@@ -367,6 +380,19 @@ TypePtr TypeChecker::check_type_declaration(std::shared_ptr<LM::Frontend::AST::T
     if (!current_module_name.empty()) {
         type_system.registerTypeAlias(current_module_name + "." + type_decl->name, underlying_type);
         type_system.addUserDefinedType(current_module_name + "." + type_decl->name, underlying_type);
+    }
+    
+    // If the underlying type is a Frame, propagate FrameInfo to frame_declarations
+    if (underlying_type->tag == TypeTag::Frame) {
+        if (auto* fd = std::get_if<FrameType>(&underlying_type->extra)) {
+            auto it = frame_declarations.find(fd->name);
+            if (it != frame_declarations.end()) {
+                frame_declarations[type_decl->name] = it->second;
+                if (!current_module_name.empty()) {
+                    frame_declarations[current_module_name + "." + type_decl->name] = it->second;
+                }
+            }
+        }
     }
     
     // Set the inferred type on the type declaration statement

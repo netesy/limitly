@@ -77,6 +77,7 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     exit_scope();
     this_register_ = UINT32_MAX;
     
+    resolve_linear_labels(current_function_.get());
     auto result = std::move(current_function_);
     current_function_ = nullptr;
     
@@ -210,6 +211,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     exit_scope();
     this_register_ = UINT32_MAX;  // Clear this_register_
     
+    resolve_linear_labels(current_function_.get());
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
     current_function_ = nullptr;
@@ -339,6 +341,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     exit_scope();
     this_register_ = UINT32_MAX;  // Clear this_register_
     
+    resolve_linear_labels(current_function_.get());
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
     current_function_ = nullptr;
@@ -454,6 +457,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     exit_scope();
     this_register_ = UINT32_MAX;  // Clear this_register_
     
+    resolve_linear_labels(current_function_.get());
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
     current_function_ = nullptr;
@@ -493,30 +497,43 @@ void Generator::emit_frame_stmt(LM::Frontend::AST::FrameDeclaration& stmt) {
 
 
 std::string Generator::resolve_qualified_frame_name(const std::string& name) {
+    auto canonical_if_known = [&](const std::string& n) {
+        std::string c = LM::Frontend::ModuleManager::getInstance().canonical_symbol(n);
+        return (c != n && frame_table_.count(c)) ? c : n;
+    };
     std::string resolved = name;
     if (name.find('.') != std::string::npos) {
-        size_t dot_pos = name.find('.');
-        std::string mod_alias = name.substr(0, dot_pos);
-        std::string frame_part = name.substr(dot_pos + 1);
-        auto it = import_aliases_.find(mod_alias);
+        size_t last_dot = name.rfind('.');
+        std::string mod_prefix = name.substr(0, last_dot);
+        std::string frame_part = name.substr(last_dot + 1);
+        auto it = import_aliases_.find(mod_prefix);
         if (it != import_aliases_.end()) {
             resolved = it->second + "." + frame_part;
+        } else {
+            size_t dot_pos = name.find('.');
+            std::string mod_alias = name.substr(0, dot_pos);
+            std::string frame_rest = name.substr(dot_pos + 1);
+            it = import_aliases_.find(mod_alias);
+            if (it != import_aliases_.end()) {
+                resolved = it->second + "." + frame_rest;
+            }
         }
     } else {
         if (!current_module_.empty() && current_module_ != "root") {
             std::string qname = current_module_ + "." + name;
             if (frame_table_.count(qname)) {
-                return qname;
+                return canonical_if_known(qname);
             }
         }
         for (const auto& [alias, mod_path] : import_aliases_) {
             std::string qname = mod_path + "." + name;
             if (frame_table_.count(qname)) {
-                return qname;
+                return canonical_if_known(qname);
             }
         }
     }
 
+    resolved = LM::Frontend::ModuleManager::getInstance().canonical_symbol(resolved);
     if (frame_table_.count(resolved)) {
         return resolved;
     }

@@ -1,13 +1,20 @@
-import std.ui.widget as widget;
+// std/ui/padding - Add spacing around child widget
+import std.ui.types as ui_types;
 
-frame Padding {
-    pub var padding: float;
+pub fn padding(child: ui_types.Widget, pad: float): ui_types.Widget {
+    var w = ui_types.column([child]);
+    w.padding_left = pad;
+    w.padding_top = pad;
+    w.padding_right = pad;
+    w.padding_bottom = pad;
+    return w;
+}
 
-    pub init(p: float = 0.0) {
-        self.padding = p;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn padding_xy(child: ui_types.Widget, x: float, y: float): ui_types.Widget {
+    var w = ui_types.column([child]);
+    w.padding_left = x;
+    w.padding_top = y;
+    w.padding_right = x;
+    w.padding_bottom = y;
+    return w;
 }

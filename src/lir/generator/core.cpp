@@ -835,6 +835,57 @@ void Generator::flatten_cfg_to_instructions() {
 }
 
 
+void Generator::emit_label_jump(LIR_Op op, Reg cond, uint32_t label) {
+    if (!current_function_) return;
+    if (cfg_context_.building_cfg) {
+        report_error("Internal error: symbolic label jump emitted while building CFG");
+        return;
+    }
+    auto& state = linear_label_states_[current_function_.get()];
+    state.fixups.emplace_back(current_function_->instructions.size(), label);
+    // Target is a placeholder; resolve_linear_labels() patches it.
+    if (op == LIR_Op::Jump) {
+        emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, 0));
+    } else {
+        emit_instruction(LIR_Inst(op, Type::Void, 0, cond, 0, 0));
+    }
+}
+
+
+void Generator::place_label(uint32_t label) {
+    if (!current_function_) return;
+    auto& state = linear_label_states_[current_function_.get()];
+    state.positions[label] = current_function_->instructions.size();
+    // dst/a/b are unused (UINT32_MAX = no register); imm is set to the label's own
+    // instruction index by resolve_linear_labels(), which is the convention the
+    // verifier, optimizer and Fyra builder all read (Label.imm == Jump.imm).
+    emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, UINT32_MAX, UINT32_MAX, UINT32_MAX, label));
+}
+
+
+void Generator::resolve_linear_labels(LIR_Function* func) {
+    if (!func) return;
+    auto it = linear_label_states_.find(func);
+    if (it == linear_label_states_.end()) return;
+    LinearLabelState state = std::move(it->second);
+    linear_label_states_.erase(it);
+
+    for (const auto& [label, position] : state.positions) {
+        // Label.imm becomes its own position so Jump.imm == Label.imm identifies it uniquely.
+        func->instructions[position].imm = static_cast<Imm>(position);
+    }
+    for (const auto& [jump_index, label] : state.fixups) {
+        auto pos = state.positions.find(label);
+        if (pos == state.positions.end()) {
+            report_error("Internal error: jump to unplaced label " + std::to_string(label) +
+                         " in function " + func->name);
+            continue;
+        }
+        func->instructions[jump_index].imm = pos->second;
+    }
+}
+
+
 LIR_BasicBlock* Generator::create_basic_block(const std::string& label) {
     if (!cfg_context_.building_cfg) {
         report_error("Cannot create basic block outside of CFG build");

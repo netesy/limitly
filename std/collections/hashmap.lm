@@ -1,6 +1,5 @@
 // HashMap Frame - $O(1)$ amortized bucket hash table
 
-import std.core as core;
 
 frame HashEntry {
     pub key: str;

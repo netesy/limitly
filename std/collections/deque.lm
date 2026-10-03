@@ -1,53 +1,94 @@
 // Standard Library Deque Collection
 
-import std.collections.vector as vector;
-
-frame DoubleEndedQueue {
-    pub impl: vector.Deque;
+frame Deque {
+    pub var data: [any];
 
     pub init() {
-        self.impl = vector.Deque();
+        self.data = [];
     }
 
-    pub fn push_back(item: any): DoubleEndedQueue {
-        self.impl.push_back(item);
+    pub fn push_back(item: any): Deque {
+        self.data.append(item);
         return self;
     }
 
-    pub fn push_front(item: any): DoubleEndedQueue {
-        self.impl.push_front(item);
+    pub fn push_front(item: any): Deque {
+        var new_data: [any] = [];
+        new_data.append(item);
+        var i = 0;
+        while (i < len(self.data)) {
+            new_data.append(self.data[i]);
+            i = i + 1;
+        }
+        self.data = new_data;
         return self;
-    }
-
-    pub fn pop_back(): any {
-        return self.impl.pop_back();
-    }
-
-    pub fn pop_front(): any {
-        return self.impl.pop_front();
     }
 
     pub fn peek_back(): any {
-        return self.impl.peek_back();
+        var n = len(self.data);
+        if (n == 0) {
+            return nil;
+        }
+        return self.data[n - 1];
     }
 
     pub fn peek_front(): any {
-        return self.impl.peek_front();
+        if (len(self.data) == 0) {
+            return nil;
+        }
+        return self.data[0];
+    }
+
+    pub fn pop_back(): any {
+        var n = len(self.data);
+        if (n == 0) {
+            return nil;
+        }
+        var item = self.data[n - 1];
+        var new_data: [any] = [];
+        var i = 0;
+        while (i < n - 1) {
+            new_data.append(self.data[i]);
+            i = i + 1;
+        }
+        self.data = new_data;
+        return item;
+    }
+
+    pub fn pop_front(): any {
+        if (len(self.data) == 0) {
+            return nil;
+        }
+        var item = self.data[0];
+        var new_data: [any] = [];
+        var i = 1;
+        while (i < len(self.data)) {
+            new_data.append(self.data[i]);
+            i = i + 1;
+        }
+        self.data = new_data;
+        return item;
     }
 
     pub fn length(): int {
-        return self.impl.length();
+        return len(self.data);
+    }
+
+    pub fn len(): int {
+        return len(self.data);
     }
 
     pub fn is_empty(): bool {
-        return (self.length() == 0);
+        return len(self.data) == 0;
     }
 
-    pub fn clear(): nil {
-        self.impl = vector.Deque();
+    pub fn clear() {
+        self.data = [];
     }
 }
 
-pub fn Deque(): DoubleEndedQueue {
-    return DoubleEndedQueue();
+pub type DoubleEndedQueue = Deque;
+
+pub fn DoubleEndedQueue(): Deque {
+    return Deque();
 }

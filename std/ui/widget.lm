@@ -1,13 +1,11 @@
+// std/ui/widget - Re-export canonical Widget type
+import std.ui.types as ui_types;
 import std.ui.build_context as build_context;
 
-frame Widget {
-    pub var key: str;
+// Re-export the canonical Widget type from types
+pub var Widget = ui_types.Widget;
 
-    pub init(k: str = "") {
-        self.key = k;
-    }
-
-    pub fn build(context: build_context.BuildContext): Widget {
-        return self;
-    }
+pub fn empty_widget(): ui_types.Widget {
+    return ui_types.empty();
 }
+

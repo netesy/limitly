@@ -938,8 +938,19 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             }
         }
     } else if (auto member_expr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
-        if (auto var_obj = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(member_expr->object)) {
-            auto alias_it = import_aliases.find(var_obj->name);
+        std::function<std::string(const std::shared_ptr<LM::Frontend::AST::Expression>&)> get_callee_obj_path =
+            [&](const std::shared_ptr<LM::Frontend::AST::Expression>& e) -> std::string {
+            if (!e) return "";
+            if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(e)) return v->name;
+            if (auto m = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(e)) {
+                std::string p = get_callee_obj_path(m->object);
+                return p.empty() ? "" : (p + "." + m->name);
+            }
+            return "";
+        };
+        std::string obj_path = get_callee_obj_path(member_expr->object);
+        if (!obj_path.empty()) {
+            auto alias_it = import_aliases.find(obj_path);
             if (alias_it != import_aliases.end()) {
                 std::string qualified = alias_it->second + "." + member_expr->name;
                 auto frame_it = frame_declarations.find(qualified);
@@ -1212,18 +1223,27 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
     
     // Check if callee is a member expression (method call or module function call)
     if (auto member_expr = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
-        // Check if this is a module member access (e.g., math.add)
-        if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(member_expr->object)) {
-            // Check if this is an import alias
-            auto alias_it = import_aliases.find(var_expr->name);
-            if (alias_it != import_aliases.end()) {
-                // Resolve alias to full module path
-                std::string module_path = alias_it->second;
-                std::string qualified_name = module_path + "." + member_expr->name;
+        // Check if this is a module member access (e.g., math.add or ui.animation.Transition)
+        std::function<std::string(const std::shared_ptr<LM::Frontend::AST::Expression>&)> get_callee_obj_path =
+            [&](const std::shared_ptr<LM::Frontend::AST::Expression>& e) -> std::string {
+            if (!e) return "";
+            if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(e)) return v->name;
+            if (auto m = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(e)) {
+                std::string p = get_callee_obj_path(m->object);
+                return p.empty() ? "" : (p + "." + m->name);
+            }
+            return "";
+        };
+        std::string obj_path = get_callee_obj_path(member_expr->object);
+        auto alias_it = obj_path.empty() ? import_aliases.end() : import_aliases.find(obj_path);
+        if (alias_it != import_aliases.end()) {
+            // Resolve alias to full module path
+            std::string module_path = alias_it->second;
+            std::string qualified_name = module_path + "." + member_expr->name;
 
                 // 1. Check if it's a frame instantiation (e.g., test.Counter())
                 auto frame_it = frame_declarations.find(qualified_name);
-                if (frame_it != frame_declarations.end()) {
+                if (frame_it != frame_declarations.end() && (frame_it->second.declaration != nullptr || function_signatures.find(qualified_name) == function_signatures.end())) {
                     const FrameInfo& frame_info = frame_it->second;
                     std::string init_name = qualified_name + ".init";
                     auto sig_it = function_signatures.find(init_name);
@@ -1393,7 +1413,6 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 add_error("Module '" + module_path + "' has no member '" + member_expr->name + "'", expr->line);
                 return type_system.ANY_TYPE;
             }
-        }
         
         // Get the object type
         TypePtr object_type = check_expression(member_expr->object);
@@ -1938,6 +1957,7 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         auto* fData = std::get_if<FrameType>(&object_type->extra);
         if (fData && import_aliases.count(fData->name)) {
             std::string alias = fData->name;
+            std::string target_mod = import_aliases[alias];
             auto find_member = [&](const std::string& qname) -> TypePtr {
                 if (variable_types.count(qname)) return variable_types[qname];
                 std::string q_low = qname; for(char& c : q_low) c = std::tolower(c);
@@ -1948,6 +1968,7 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
                 return nullptr;
             };
             TypePtr res = find_member(alias + "." + member_name);
+            if (!res && !target_mod.empty()) res = find_member(target_mod + "." + member_name);
             if (!res) res = find_member(member_name);
             if (!res) for (const auto& kv : variable_types) if (kv.first.ends_with("." + member_name)) { res = kv.second; break; }
             if (res) return wrap_result(res);
@@ -2025,6 +2046,10 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         if (import_aliases.count(frame_name)) {
             std::string qualified_name = frame_name + "." + member_name;
             TypePtr member_type = lookup_variable(qualified_name);
+            std::string target_mod = import_aliases[frame_name];
+            if ((!member_type || member_type->tag == TypeTag::Nil) && !target_mod.empty()) {
+                member_type = lookup_variable(target_mod + "." + member_name);
+            }
             if (member_type && member_type->tag != TypeTag::Nil) {
                 return wrap_result(member_type);
             }
@@ -2033,6 +2058,16 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
                 const auto& sig = function_signatures[qualified_name];
                 TypePtr func_type = type_system.createFunctionType(sig.param_types, sig.return_type);
                 return wrap_result(func_type);
+            }
+            if (!target_mod.empty() && function_signatures.count(target_mod + "." + member_name)) {
+                const auto& sig = function_signatures[target_mod + "." + member_name];
+                TypePtr func_type = type_system.createFunctionType(sig.param_types, sig.return_type);
+                return wrap_result(func_type);
+            }
+            // Check for frames
+            if (!target_mod.empty() && frame_declarations.count(target_mod + "." + member_name)) {
+                TypePtr ft = type_system.createFrameType(target_mod + "." + member_name);
+                return wrap_result(ft);
             }
         }
 
@@ -2232,7 +2267,18 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
         }
         return type_system.INT64_TYPE;
     } else if (object_type->tag == TypeTag::Tuple) {
-        if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
+        bool is_valid_index = (index_type->tag == TypeTag::Int || index_type->tag == TypeTag::Int64);
+        if (!is_valid_index) {
+            if (auto lit = std::dynamic_pointer_cast<LM::Frontend::AST::LiteralExpr>(expr->index)) {
+                if (std::holds_alternative<std::string>(lit->value)) {
+                    const auto& str_val = std::get<std::string>(lit->value);
+                    if (!str_val.empty() && std::all_of(str_val.begin(), str_val.end(), ::isdigit)) {
+                        is_valid_index = true;
+                    }
+                }
+            }
+        }
+        if (!is_valid_index) {
              add_error("Tuple index must be an integer, got " + index_type->toString(), expr->line);
         }
         if (auto tt = std::get_if<TupleType>(&object_type->extra)) {

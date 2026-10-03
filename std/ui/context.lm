@@ -2,7 +2,10 @@
 // Retained UI Pipeline implementation with Dynamic Layout, Flexbox Spacers, Hit Testing, and Callback Dispatch
 
 import std.ui.types as ui_types;
-import std.ui as ui;
+import std.ui.types as ui;
+import std.ui.theme as theme_mod;
+import std.ui.theme_renderer as theme_renderer;
+import std.ui.layout as layout_mod;
 import std.animation as anim;
 import std.string as std_string;
 import std.text.controller as text_ctrl;
@@ -13,6 +16,11 @@ import std.graphics.paint as paint;
 import std.graphics.color as color;
 import std.graphics.rect as rect;
 import std.graphics.shadow as shadow_mod;
+import std.ui.state as state_mod;
+import std.ui.viewport as viewport_mod;
+import std.ui.builder as builder_mod;
+import std.ui.draw_list as dl_mod;
+import std.ui.replay as replay_mod;
 
 frame UIContextState {
     pub var is_initialized: int;
@@ -38,6 +46,7 @@ frame UIContextState {
     pub var last_pointer_y: float;
     pub var is_pointer_down: int;
     pub var active_overlays: [ui.Widget];
+    pub var cached_draw_list: any;
 }
 
 pub var global_ui_context: UIContextState = UIContextState(
@@ -66,7 +75,8 @@ pub var global_ui_context: UIContextState = UIContextState(
     last_pointer_x=0.0,
     last_pointer_y=0.0,
     is_pointer_down=0,
-    active_overlays=[] as [ui.Widget]
+    active_overlays=[] as [ui.Widget],
+    cached_draw_list=nil
 );
 
 pub fn push_overlay(w: ui.Widget): nil {
@@ -89,7 +99,14 @@ pub fn ui_init(): int {
     global_ui_context.root_element = 1;
     global_ui_context.dirty = 1;
     
+    // Wire signal state changes into the UI dirty flag
+    state_mod.register_dirty_notifier(_signal_dirty_cb);
+    
     return 1;
+}
+
+fn _signal_dirty_cb(): nil {
+    global_ui_context.dirty = 1;
 }
 
 pub fn mark_element_dirty(element_id: int): nil {
@@ -101,6 +118,8 @@ pub fn set_viewport_size(w: float, h: float): nil {
         if (global_ui_context.viewport_w != w or global_ui_context.viewport_h != h) {
             global_ui_context.viewport_w = w;
             global_ui_context.viewport_h = h;
+            viewport_mod.global_viewport.width = w;
+            viewport_mod.global_viewport.height = h;
             global_ui_context.dirty = 1;
         }
     }
@@ -118,6 +137,7 @@ pub fn set_root(w: ui.Widget): nil {
     global_ui_context.current_widget = w;
     global_ui_context.has_widget = 1;
     global_ui_context.dirty = 1;
+    global_ui_context.cached_draw_list = nil;
 }
 
 pub fn update_blueprint(bp: ui_types.Blueprint): nil {
@@ -489,7 +509,7 @@ pub fn hit_test_and_click_blueprint(bp: ui_types.Blueprint, px: float, py: float
         while (i < len(bp.children)) {
             var child_bp = bp.children[i];
             var updated_child = hit_test_and_click_blueprint(child_bp, px, py, curr_x, curr_y, child_w, child_h);
-            new_children = new_children + [updated_child];
+            new_children.append(updated_child);
             if (data.axis.is_vertical == 1) {
                 curr_y = curr_y + child_h + 8.0 + data.spacing;
             } else {
@@ -845,6 +865,15 @@ if (w.kind == ui.KIND_INPUT) {
     }
 }
 
+fn blur_focus_recursive(w: ui.Widget): nil {
+    w.is_focused = 0;
+    var i = 0;
+    while (i < len(w.children)) {
+        blur_focus_recursive(w.children[i]);
+        i = i + 1;
+    }
+}
+
 pub fn dispatch_pointer_down(px: float, py: float): nil {
     global_ui_context.is_pointer_down = 1;
     global_ui_context.last_pointer_x = px;
@@ -858,7 +887,94 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
         content_h = 100.0;
     }
     if (global_ui_context.has_widget == 1) {
-        hit_test_and_click_widget(global_ui_context.current_widget, px, py, 20.0, 20.0, content_w, content_h);
+        if (global_ui_context.cached_draw_list == nil or global_ui_context.dirty != 0) {
+            global_ui_context.cached_draw_list = builder_mod.build(global_ui_context.current_widget, content_w, content_h, nil, 20.0, 20.0);
+        }
+        var dl = global_ui_context.cached_draw_list as dl_mod.DrawList;
+        var hz = dl_mod.dl_hit_test(dl, px, py);
+        if (hz.kind == dl_mod.HZONE_BUTTON) {
+            if (hz.widget != nil) {
+                var w = hz.widget as ui.Widget;
+                if (w.kind == ui.KIND_TABS) {
+                    w.active_tab = hz.tab_index;
+                    if (w.on_change_action != nil) {
+                        var act: fn(): nil = w.on_change_action as fn(): nil;
+                        act();
+                    }
+                    mark_element_dirty(1);
+                    return;
+                }
+                w.is_pressed = 1;
+                global_ui_context.captured_widget = w;
+                global_ui_context.has_captured = 1;
+                global_ui_context.captured_bounds_x = hz.x;
+                global_ui_context.captured_bounds_y = hz.y;
+                global_ui_context.captured_bounds_w = hz.w;
+                global_ui_context.captured_bounds_h = hz.h;
+                mark_element_dirty(1);
+            }
+        } elif (hz.kind == dl_mod.HZONE_SLIDER) {
+            if (hz.widget != nil) {
+                var w = hz.widget as ui.Widget;
+                global_ui_context.captured_widget = w;
+                global_ui_context.has_captured = 1;
+                global_ui_context.captured_bounds_x = hz.x;
+                global_ui_context.captured_bounds_y = hz.y;
+                global_ui_context.captured_bounds_w = hz.w;
+                global_ui_context.captured_bounds_h = hz.h;
+                var ratio = (px - hz.x) / hz.w;
+                if (ratio < 0.0) ratio = 0.0;
+                if (ratio > 1.0) ratio = 1.0;
+                w.slider_val = w.slider_min + ratio * (w.slider_max - w.slider_min);
+                if (w.on_change_action != nil) {
+                    var act: fn(): nil = w.on_change_action as fn(): nil;
+                    act();
+                }
+                mark_element_dirty(1);
+            }
+        } elif (hz.kind == dl_mod.HZONE_CHECKBOX) {
+            if (hz.widget != nil) {
+                var w = hz.widget as ui.Widget;
+                global_ui_context.captured_widget = w;
+                global_ui_context.has_captured = 1;
+                global_ui_context.captured_bounds_x = hz.x;
+                global_ui_context.captured_bounds_y = hz.y;
+                global_ui_context.captured_bounds_w = hz.w;
+                global_ui_context.captured_bounds_h = hz.h;
+            }
+        } elif (hz.kind == dl_mod.HZONE_INPUT) {
+            if (hz.widget != nil) {
+                var w = hz.widget as ui.Widget;
+                blur_focus_recursive(global_ui_context.current_widget);
+                w.is_focused = 1;
+                mark_element_dirty(1);
+            }
+        } elif (hz.kind == dl_mod.HZONE_SELECT) {
+            if (hz.widget != nil) {
+                var w = hz.widget as ui.Widget;
+                if (hz.tab_index >= 0 and hz.tab_index < len(w.select_options)) {
+                    w.selected_idx = hz.tab_index;
+                    w.text_val = w.select_options[hz.tab_index];
+                    w.is_open = 0;
+                    if (w.on_change_action != nil) {
+                        var act: fn(): nil = w.on_change_action as fn(): nil;
+                        act();
+                    }
+                    mark_element_dirty(1);
+                    return;
+                } else {
+                    if (w.is_open == 1) {
+                        w.is_open = 0;
+                    } else {
+                        w.is_open = 1;
+                    }
+                    mark_element_dirty(1);
+                    return;
+                }
+            }
+        } else {
+            hit_test_and_click_widget(global_ui_context.current_widget, px, py, 20.0, 20.0, content_w, content_h);
+        }
     } else {
         var updated = hit_test_and_click_blueprint(global_ui_context.current_blueprint, px, py, 20.0, 20.0, content_w, content_h);
         global_ui_context.current_blueprint = updated;
@@ -868,134 +984,6 @@ pub fn dispatch_pointer_down(px: float, py: float): nil {
 pub fn dispatch_pointer_click(px: float, py: float): nil {
     dispatch_pointer_down(px, py);
     dispatch_pointer_up(px, py);
-}
-
-pub fn hit_test_hover_widget(w: ui.Widget, px: float, py: float, x: float, y: float, available_w: float, available_h: float): nil {
-    var inside = 0;
-    var w_w = available_w;
-    if (w.width_val > 0.0) w_w = w.width_val;
-    var w_h = measure_widget_height(w);
-
-    if (px >= x and px <= x + w_w and py >= y and py <= y + w_h) {
-        inside = 1;
-    }
-
-    if (inside == 1) {
-        if (w.is_hovered == 0) {
-            w.is_hovered = 1;
-            mark_element_dirty(1);
-        }
-    } else {
-        if (w.is_hovered == 1) {
-            w.is_hovered = 0;
-            mark_element_dirty(1);
-        }
-    }
-
-    if (w.kind == ui.KIND_CONTAINER) {
-        var curr_x = x + w.padding_left;
-        var curr_y = y + w.padding_top;
-        var inner_w = available_w - w.padding_left - w.padding_right;
-        var inner_h = available_h - w.padding_top - w.padding_bottom;
-
-        if (w.is_vertical == 1) { // Column
-            var i = 0;
-            while (i < len(w.children)) {
-                var child = w.children[i];
-                var child_h = measure_widget_height(child);
-                var child_w = inner_w;
-                if (child.width_val > 0.0) child_w = child.width_val;
-                hit_test_hover_widget(child, px, py, curr_x, curr_y, child_w, child_h);
-                curr_y = curr_y + child_h + w.spacing_val;
-                i = i + 1;
-            }
-        } elif (w.is_vertical == 0) { // Row
-            var fixed_w = 0.0;
-            var num_spacers = 0;
-            var total_flex = 0.0;
-            var i = 0;
-            while (i < len(w.children)) {
-                var child = w.children[i];
-                if (child.kind == ui.KIND_SPACER) {
-                    num_spacers = num_spacers + 1;
-                    total_flex = total_flex + child.flex_val;
-                } else {
-                    var cw = measure_widget_width(child, inner_w);
-                    fixed_w = fixed_w + cw;
-                }
-                i = i + 1;
-            }
-            var spacing_total = 0.0;
-            if (len(w.children) > 1) {
-                var num_gaps: float = (len(w.children) - 1) as float;
-                spacing_total = num_gaps * w.spacing_val;
-            }
-            var remaining_w = inner_w - fixed_w - spacing_total;
-            var spacer_unit = 0.0;
-            if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
-                spacer_unit = remaining_w / total_flex;
-            }
-
-            i = 0;
-            while (i < len(w.children)) {
-                var child = w.children[i];
-                var child_h = measure_widget_height(child);
-                var child_w = 0.0;
-                if (child.kind == ui.KIND_SPACER) {
-                    child_w = spacer_unit * child.flex_val;
-                } else {
-                    child_w = measure_widget_width(child, inner_w);
-                    hit_test_hover_widget(child, px, py, curr_x, curr_y, child_w, child_h);
-                }
-                curr_x = curr_x + child_w + w.spacing_val;
-                i = i + 1;
-            }
-        } else { // Stack
-            var i = 0;
-            while (i < len(w.children)) {
-                var child = w.children[i];
-                var child_h = measure_widget_height(child);
-                hit_test_hover_widget(child, px, py, curr_x, curr_y, inner_w, child_h);
-                i = i + 1;
-            }
-        }
-    }
-
-    if (w.kind == ui.KIND_TABS) {
-        var tab_x = x;
-        var tab_h = 32.0;
-        var i = 0;
-        var found_hover = 0 - 1;
-        while (i < len(w.tab_titles)) {
-            var title = w.tab_titles[i];
-            var item_w = (len(title) as float) * 8.0 + 24.0;
-            if (px >= tab_x and px <= tab_x + item_w and py >= y and py <= y + tab_h) {
-                found_hover = i;
-            }
-            tab_x = tab_x + item_w + w.spacing_val;
-            i = i + 1;
-        }
-        if (w.hovered_tab != found_hover) {
-            w.hovered_tab = found_hover;
-            mark_element_dirty(1);
-        }
-        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
-            hit_test_hover_widget(w.children[w.active_tab], px, py, x, y + 40.0, available_w, available_h - 40.0);
-        }
-    }
-
-    if (w.kind == ui.KIND_SCROLL) {
-        var v_w = available_w;
-        var v_h = available_h;
-        if (w.height_val > 0.0) v_h = w.height_val;
-        if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
-            if (len(w.children) > 0) {
-                var child = w.children[0];
-                var total_child_h = measure_widget_height(child);
-                hit_test_hover_widget(child, px, py + w.scroll_y, x + 6.0, y + 6.0, v_w - 12.0, total_child_h);
-            }
-        }
-    }
 }
 
 pub fn dispatch_pointer_move(px: float, py: float): nil {
@@ -1041,7 +1029,7 @@ pub fn dispatch_pointer_move(px: float, py: float): nil {
         content_h = 100.0;
     }
     if (global_ui_context.has_widget == 1) {
-        hit_test_hover_widget(global_ui_context.current_widget, px, py, 20.0, 20.0, content_w, content_h);
+        update_hover_state_recursive(global_ui_context.current_widget, px, py, 20.0, 20.0, content_w, content_h, 1);
     }
 }
 
@@ -1087,6 +1075,13 @@ fn render_blueprint_node(bp: ui_types.Blueprint, x: float, y: float, available_w
     }
 }
 
+// Helper to draw focus ring if widget is focused
+fn draw_widget_focus_ring(w: ui.Widget, x: float, y: float, width: float, height: float, cvs: canvas.Canvas): nil {
+    if (w.is_focused == 1) {
+        theme_renderer.draw_focus_ring(cvs, x, y, width, height, 2.0);
+    }
+}
+
 fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, available_h: float, cvs: canvas.Canvas): nil {
     if (w.kind == ui.KIND_FORM_FIELD) {
         var lbl_p = paint.Paint();
@@ -1122,8 +1117,11 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
     if (w.kind == ui.KIND_CONTAINER) {
         if (w.background_color.a > 0.0) {
             var p = paint.Paint();
-            p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, w.background_color.a);
+            // Apply opacity_val to background color alpha
+            var alpha_val = w.background_color.a * w.opacity_val;
+            p.color_val = color.rgba((w.background_color.r * 255.0) as int, (w.background_color.g * 255.0) as int, (w.background_color.b * 255.0) as int, alpha_val);
             cvs.draw_rect(rect.Rect(x=x, y=y, w=available_w, h=available_h), p);
+            // TODO: Apply corner_radius_val with cvs.draw_rounded_rect() when available
         }
         var curr_x = x + w.padding_left;
         var curr_y = y + w.padding_top;
@@ -1331,23 +1329,19 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
             if (w.pressed_style_val.has_bg) {
                 bg = w.pressed_style_val.bg;
             } else {
-                bg = ui.rgb(220, 80, 50);
+                bg = theme_mod.global_theme.colors.primary;
             }
         } elif (w.is_hovered == 1) {
             if (w.hover_style_val.has_bg) {
                 bg = w.hover_style_val.bg;
             } else {
-                var r_val = ((bg.r * 255.0) as int) + 25;
-                if (r_val > 255) r_val = 255;
-                var g_val = ((bg.g * 255.0) as int) + 25;
-                if (g_val > 255) g_val = 255;
-                var b_val = ((bg.b * 255.0) as int) + 30;
-                if (b_val > 255) b_val = 255;
-                bg = ui.rgb(r_val, g_val, b_val);
+                bg = ui.rgb(150, 200, 255);
             }
         }
         var p = paint.Paint();
-        p.color_val = color.rgba((bg.r * 255.0) as int, (bg.g * 255.0) as int, (bg.b * 255.0) as int, bg.a);
+        // Apply opacity_val
+        var alpha_val = bg.a * w.opacity_val;
+        p.color_val = color.rgba((bg.r * 255.0) as int, (bg.g * 255.0) as int, (bg.b * 255.0) as int, alpha_val);
         var btn_h = measure_widget_height(w);
         var btn_w = available_w;
         if (w.width_val > 0.0) {
@@ -1362,7 +1356,9 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
             fg = w.hover_style_val.fg;
         }
         var text_p = paint.Paint();
-        text_p.color_val = color.rgba((fg.r * 255.0) as int, (fg.g * 255.0) as int, (fg.b * 255.0) as int, fg.a);
+        // Apply opacity_val to text
+        var text_alpha = fg.a * w.opacity_val;
+        text_p.color_val = color.rgba((fg.r * 255.0) as int, (fg.g * 255.0) as int, (fg.b * 255.0) as int, text_alpha);
         
         // Vertically and horizontally align text inside button
         var ty = y + (btn_h - 8.0) / 2.0;
@@ -1371,6 +1367,9 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
             tx = x + w.padding_left;
         }
         cvs.draw_text(w.text_val, tx, ty, text_p, 1);
+        
+        // Draw focus ring if focused
+        draw_widget_focus_ring(w, x, y, btn_w, btn_h, cvs);
     }
         if (w.kind == ui.KIND_TEXTAREA) {
         var inp_w = available_w;
@@ -1475,9 +1474,9 @@ if (w.kind == ui.KIND_INPUT) {
 
         var border_p = paint.Paint();
         if (w.is_focused == 1) {
-            border_p.color_val = color.rgb(90, 130, 240);
+            border_p.color_val = theme_mod.global_theme.colors.focus_ring;
         } elif (w.is_hovered == 1) {
-            border_p.color_val = color.rgb(75, 85, 110);
+            border_p.color_val = theme_mod.global_theme.colors.border;
         } else {
             border_p.color_val = color.rgb(55, 60, 75);
         }
@@ -1495,13 +1494,13 @@ if (w.kind == ui.KIND_INPUT) {
             if (w.is_focused == 1) {
                 var caret_x = tx + (len(w.text_val) as float) * 8.0;
                 var caret_p = paint.Paint();
-                caret_p.color_val = color.rgb(100, 180, 255);
+                caret_p.color_val = theme_mod.global_theme.colors.focus_ring;
                 cvs.draw_text("|", caret_x, ty, caret_p, 1);
             }
         } else {
             if (w.is_focused == 1) {
                 var caret_p = paint.Paint();
-                caret_p.color_val = color.rgb(100, 180, 255);
+                caret_p.color_val = theme_mod.global_theme.colors.focus_ring;
                 cvs.draw_text("|", tx, ty, caret_p, 1);
             } else {
                 var ph_p = paint.Paint();
@@ -1509,6 +1508,9 @@ if (w.kind == ui.KIND_INPUT) {
                 cvs.draw_text(w.placeholder_val, tx, ty, ph_p, 1);
             }
         }
+        
+        // Draw focus ring if focused
+        draw_widget_focus_ring(w, x, y, inp_w, inp_h, cvs);
     }
     if (w.kind == ui.KIND_CHECKBOX) {
         var chk_w = 42.0;
@@ -2052,10 +2054,25 @@ pub fn update_animations_recursive(w: ui.Widget, dt: float): nil {
     w.children = remaining;
 }
 
+// Render using pre-computed layout boxes for better performance
+// This is called when layout.lm's LayoutBox system is integrated
+fn render_from_layout_boxes(boxes: [layout_mod.LayoutBox], cvs: canvas.Canvas): nil {
+    var i = 0;
+    while (i < len(boxes)) {
+        var box = boxes[i];
+        if (box.widget != nil) {
+            render_widget_node(box.widget, box.x, box.y, box.width, box.height, cvs);
+        }
+        i = i + 1;
+    }
+}
+
+// Update layout box positions for a widget tree (layout pass)
+// Delegated to layout_mod.compute_layout — this function is no longer needed.
+
 pub fn frame_update(delta_time: float): nil {
     var vw = global_ui_context.viewport_w;
     var vh = global_ui_context.viewport_h;
-    var cvs = canvas.Canvas(w=vw, h=vh);
     var content_w = vw - 40.0;
     var content_h = vh - 40.0;
     if (content_w < 100.0) {
@@ -2066,29 +2083,40 @@ pub fn frame_update(delta_time: float): nil {
     }
     if (global_ui_context.has_widget == 1) {
         update_animations_recursive(global_ui_context.current_widget, delta_time);
-        render_widget_node(global_ui_context.current_widget, 20.0, 20.0, content_w, content_h, cvs);
-    } else {
-        render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, content_w, content_h, cvs);
-    }
 
-    // Top-Level Overlay / Portal Pass
-    var o_idx = 0;
-    while (o_idx < len(global_ui_context.active_overlays)) {
-        var ov = global_ui_context.active_overlays[o_idx];
-        if (len(ov.children) > 0) {
-            var child = ov.children[0];
-            var ox = ov.padding_left;
-            var oy = ov.padding_top;
-            var ow = ov.width_val;
-            if (ow <= 0.0) ow = measure_widget_width(child, content_w);
-            var oh = ov.height_val;
-            if (oh <= 0.0) oh = measure_widget_height(child);
-            render_widget_node(child, ox, oy, ow, oh, cvs);
+        // Hybrid Single-Pass Rebuild: only re-evaluates tree into DrawList if dirty or list missing
+        if (global_ui_context.dirty != 0 or global_ui_context.cached_draw_list == nil) {
+            var dl = builder_mod.build(global_ui_context.current_widget, content_w, content_h, nil, 20.0, 20.0);
+
+            // Append active overlays if any
+            var o_idx = 0;
+            while (o_idx < len(global_ui_context.active_overlays)) {
+                var ov = global_ui_context.active_overlays[o_idx];
+                var ov_dl = builder_mod.build(ov, content_w, content_h, nil, ov.padding_left, ov.padding_top);
+                var c_idx = 0;
+                while (c_idx < len(ov_dl.cmds)) {
+                    dl_mod.dl_add(dl, ov_dl.cmds[c_idx]);
+                    c_idx = c_idx + 1;
+                }
+                var h_idx = 0;
+                while (h_idx < len(ov_dl.hits)) {
+                    dl_mod.dl_add_hit(dl, ov_dl.hits[h_idx]);
+                    h_idx = h_idx + 1;
+                }
+                o_idx = o_idx + 1;
+            }
+
+            global_ui_context.cached_draw_list = dl;
+            global_ui_context.dirty = 0;
         }
-        o_idx = o_idx + 1;
-    }
 
-    global_ui_context.dirty = 0;
+        // Linear GPU replay — pure immediate mode underneath, zero recursion, zero allocations
+        replay_mod.replay(global_ui_context.cached_draw_list as dl_mod.DrawList);
+    } else {
+        var cvs = canvas.Canvas(w=vw, h=vh);
+        render_blueprint_node(global_ui_context.current_blueprint, 20.0, 20.0, content_w, content_h, cvs);
+        global_ui_context.dirty = 0;
+    }
 }
 
 fn reset_pressed_recursive(w: ui.Widget): nil {
@@ -2100,6 +2128,125 @@ fn reset_pressed_recursive(w: ui.Widget): nil {
     while (i < len(w.children)) {
         reset_pressed_recursive(w.children[i]);
         i = i + 1;
+    }
+}
+
+// Update hover states for interactive widgets
+fn update_hover_state_recursive(w: ui.Widget, px: float, py: float, x: float, y: float, available_w: float, available_h: float, mark_dirty: int): nil {
+    if (w.kind == ui.KIND_CONTAINER) {
+        var curr_x = x + w.padding_left;
+        var curr_y = y + w.padding_top;
+        var inner_w = available_w - w.padding_left - w.padding_right;
+        var inner_h = available_h - w.padding_top - w.padding_bottom;
+
+        if (w.is_vertical == 1) { // Column
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = inner_w;
+                if (child.width_val > 0.0) {
+                    child_w = child.width_val;
+                }
+                update_hover_state_recursive(child, px, py, curr_x, curr_y, child_w, child_h, mark_dirty);
+                curr_y = curr_y + child_h + w.spacing_val;
+                i = i + 1;
+            }
+        } elif (w.is_vertical == 0) { // Row
+            var fixed_w = 0.0;
+            var num_spacers = 0;
+            var total_flex = 0.0;
+            var i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                if (child.kind == ui.KIND_SPACER) {
+                    num_spacers = num_spacers + 1;
+                    total_flex = total_flex + child.flex_val;
+                } else {
+                    var cw = measure_widget_width(child, inner_w);
+                    fixed_w = fixed_w + cw;
+                }
+                i = i + 1;
+            }
+            var spacing_total = 0.0;
+            if (len(w.children) > 1) {
+                var num_gaps: float = (len(w.children) - 1) as float;
+                spacing_total = num_gaps * w.spacing_val;
+            }
+            var remaining_w = inner_w - fixed_w - spacing_total;
+            var spacer_unit = 0.0;
+            if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
+                spacer_unit = remaining_w / total_flex;
+            }
+
+            i = 0;
+            while (i < len(w.children)) {
+                var child = w.children[i];
+                var child_h = measure_widget_height(child);
+                var child_w = 0.0;
+                if (child.kind == ui.KIND_SPACER) {
+                    child_w = spacer_unit * child.flex_val;
+                } else {
+                    child_w = measure_widget_width(child, inner_w);
+                    update_hover_state_recursive(child, px, py, curr_x, curr_y, child_w, child_h, mark_dirty);
+                }
+                curr_x = curr_x + child_w + w.spacing_val;
+                i = i + 1;
+            }
+        }
+    }
+
+    if (w.kind == ui.KIND_BUTTON or w.kind == ui.KIND_CHECKBOX or w.kind == ui.KIND_TOGGLE) {
+        var w_val = available_w;
+        if (w.width_val > 0.0) w_val = w.width_val;
+        var h_val = measure_widget_height(w);
+        if (w.height_val > 0.0) h_val = w.height_val;
+
+        var was_hovered = w.is_hovered;
+        if (px >= x and px <= x + w_val and py >= y and py <= y + h_val) {
+            w.is_hovered = 1;
+        } else {
+            w.is_hovered = 0;
+        }
+        if (was_hovered != w.is_hovered) {
+            mark_element_dirty(1);
+        }
+    }
+
+    if (w.kind == ui.KIND_TABS) {
+        var tab_x = x;
+        var tab_h = 32.0;
+        var i = 0;
+        var found_hover = 0 - 1;
+        while (i < len(w.tab_titles)) {
+            var title = w.tab_titles[i];
+            var item_w = (len(title) as float) * 8.0 + 24.0;
+            if (px >= tab_x and px <= tab_x + item_w and py >= y and py <= y + tab_h) {
+                found_hover = i;
+            }
+            tab_x = tab_x + item_w + w.spacing_val;
+            i = i + 1;
+        }
+        if (w.hovered_tab != found_hover) {
+            w.hovered_tab = found_hover;
+            mark_element_dirty(1);
+        }
+        if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+            update_hover_state_recursive(w.children[w.active_tab], px, py, x, y + 40.0, available_w, available_h - 40.0, mark_dirty);
+        }
+    }
+
+    if (w.kind == ui.KIND_SCROLL) {
+        var v_w = available_w;
+        var v_h = available_h;
+        if (w.height_val > 0.0) v_h = w.height_val;
+        if (px >= x and px <= x + v_w and py >= y and py <= y + v_h) {
+            if (len(w.children) > 0) {
+                var child = w.children[0];
+                var total_child_h = measure_widget_height(child);
+                update_hover_state_recursive(child, px, py + w.scroll_y, x + 6.0, y + 6.0, v_w - 12.0, total_child_h, mark_dirty);
+            }
+        }
     }
 }
 
@@ -2119,8 +2266,8 @@ pub fn dispatch_pointer_up(px: float, py: float): nil {
                 py <= global_ui_context.captured_bounds_y + global_ui_context.captured_bounds_h) {
                 cap.click_count = cap.click_count + 1;
                 if (cap.on_click_action != nil) {
-                    var act: fn(): nil = cap.on_click_action as fn(): nil;
-                    act();
+                    var f: fn(): nil = cap.on_click_action as fn(): nil;
+                    f();
                 }
                 mark_element_dirty(1);
             }
@@ -2290,6 +2437,35 @@ if (w.kind == ui.KIND_INPUT and w.is_focused == 1) {
                 }
                 mark_element_dirty(1);
             }
+            return 1;
+        }
+    }
+    // Activate button on Enter or Space if focused
+    if (w.kind == ui.KIND_BUTTON and w.is_focused == 1) {
+        if (key_code == 13 or key_code == 32) { // Enter or Space
+            if (w.on_click_action != nil) {
+                var f: fn(): nil = w.on_click_action as fn(): nil;
+                f();
+            }
+            mark_element_dirty(1);
+            return 1;
+        }
+    }
+    // Toggle checkbox on Space if focused
+    if (w.kind == ui.KIND_CHECKBOX and w.is_focused == 1) {
+        if (key_code == 32) { // Space
+            if (w.is_checked == 1) {
+                w.is_checked = 0;
+                w.text_val = "[ ]";
+            } else {
+                w.is_checked = 1;
+                w.text_val = "[X]";
+            }
+            if (w.on_change_action != nil) {
+                var act: fn(): nil = w.on_change_action as fn(): nil;
+                act();
+            }
+            mark_element_dirty(1);
             return 1;
         }
     }

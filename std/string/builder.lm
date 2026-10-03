@@ -1,5 +1,5 @@
 frame StringBuilder {
-    pub var parts: [str];
+    pub var parts: [str] = [] as [str];
 
     pub init() {
         self.parts = [] as [str];

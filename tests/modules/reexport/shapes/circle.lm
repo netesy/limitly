@@ -1,0 +1,23 @@
+frame Circle {
+    pub radius: int;
+
+    pub init(r: int) {
+        if (r < 0) {
+            self.radius = 0;
+        } else {
+            self.radius = r;
+        }
+    }
+
+    pub fn area(): int {
+        return self.radius * self.radius * 3;
+    }
+}
+
+fn helper_scale(n: int): int {
+    return n * 2;
+}
+
+pub fn scaled_area(c: Circle): int {
+    return helper_scale(c.area());
+}

@@ -1,0 +1,33 @@
+// Minimal window test
+import std.app as app;
+import std.ui as ui;
+
+fn main() {
+    print("Creating window...");
+    
+    var cfg = app.default_window_config();
+    cfg.title = "Minimal Test";
+    cfg.width = 400;
+    cfg.height = 300;
+    
+    print("Initializing app...");
+    assert(app.init(cfg) == 1, "app init failed");
+    
+    print("Creating simple UI...");
+    var root = ui.column([
+        ui.text("Hello World").font_size(20.0),
+        ui.button("Click Me", fn(): nil {
+            print("Button clicked!");
+        })
+    ]).padding(20.0);
+    
+    app.ui(root);
+    
+    print("Starting main loop...");
+    app.run();
+    
+    print("Main loop exited");
+    //app.shutdown();
+    print("Shutdown complete");
+}
+

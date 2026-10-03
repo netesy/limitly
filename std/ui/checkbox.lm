@@ -1,13 +1,6 @@
-import std.ui.widget as widget;
+// std/ui/checkbox - Toggle checkbox widget
+import std.ui.types as ui_types;
 
-frame Checkbox {
-    pub var checked: bool;
-
-    pub init(ch: bool = false) {
-        self.checked = ch;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn checkbox(checked: bool = false, on_change: any = nil): ui_types.Widget {
+    return ui_types.checkbox(checked, on_change);
 }

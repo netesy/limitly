@@ -1,0 +1,40 @@
+// std/ui/replay.lm
+// Replays a DrawList to the GPU.
+// Pure linear iteration — zero recursion, zero tree traversal.
+// This is the final GPU submission stage of the hybrid pipeline.
+
+import std.gg as gg;
+import std.ui.draw_list as dl_mod;
+
+// Replays a DrawList to the GPU — pure linear iteration, zero recursion.
+pub fn replay(dl: dl_mod.DrawList): nil {
+    var i = 0;
+    var n = len(dl.cmds);
+    while (i < n) {
+        var cmd = dl.cmds[i];
+        if (cmd.kind == dl_mod.DCMD_RECT or cmd.kind == dl_mod.DCMD_RECT_ROUNDED) {
+            // gg has no native rounded rect — use plain rect (visual parity to come when gg gains it)
+            gg.draw_rect_primitive(cmd.x, cmd.y, cmd.w, cmd.h, cmd.r, cmd.g, cmd.b, cmd.a);
+        } elif (cmd.kind == dl_mod.DCMD_TEXT) {
+            var scale_i: int = 1;
+            if (cmd.font_scale >= 1.5) { scale_i = 2; }
+            gg.draw_text(cmd.text, cmd.x, cmd.y, cmd.r, cmd.g, cmd.b, cmd.a, scale_i);
+        } elif (cmd.kind == dl_mod.DCMD_LINE) {
+            // Approximate line as a thin rect
+            var dx = cmd.x2 - cmd.x;
+            var dy = cmd.y2 - cmd.y;
+            if (dx < 0.0) { dx = -dx; }
+            if (dy < 0.0) { dy = -dy; }
+            if (dx > dy) {
+                gg.draw_rect_primitive(cmd.x, cmd.y, dx, 1.0, cmd.r, cmd.g, cmd.b, cmd.a);
+            } else {
+                gg.draw_rect_primitive(cmd.x, cmd.y, 1.0, dy, cmd.r, cmd.g, cmd.b, cmd.a);
+            }
+        } elif (cmd.kind == dl_mod.DCMD_CLIP_PUSH) {
+            gg.push_clip(cmd.x, cmd.y, cmd.w, cmd.h);
+        } elif (cmd.kind == dl_mod.DCMD_CLIP_POP) {
+            gg.pop_clip();
+        }
+        i = i + 1;
+    }
+}

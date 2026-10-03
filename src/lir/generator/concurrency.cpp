@@ -485,6 +485,7 @@ void Generator::create_parallel_work_item(const std::string& work_item_name, std
     exit_scope();
     
     // Register work item function
+    resolve_linear_labels(current_function_.get());
     auto& func_registry = LIR::FunctionRegistry::getInstance();
     func_registry.registerFunction(work_item_name, std::move(current_function_));
     
@@ -571,6 +572,7 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     exit_scope();
     
     // Register task function
+    resolve_linear_labels(current_function_.get());
     auto& func_registry = LIR::FunctionRegistry::getInstance();
     func_registry.registerFunction(task_name, std::move(current_function_));
     
@@ -647,6 +649,7 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
     exit_scope();
     
     // Register worker function
+    resolve_linear_labels(current_function_.get());
     auto& func_registry = LIR::FunctionRegistry::getInstance();
     func_registry.registerFunction(worker_name, std::move(current_function_));
     
@@ -823,6 +826,7 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
     exit_scope();
     
     // Register the task function with the FunctionRegistry instead of storing locally
+    resolve_linear_labels(current_function_.get());
     auto& func_registry = LIR::FunctionRegistry::getInstance();
     func_registry.registerFunction(task_func_name, std::move(current_function_));
     
@@ -915,6 +919,7 @@ void Generator::lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt) {
     exit_scope();
     
     // Register the worker function with the FunctionRegistry
+    resolve_linear_labels(current_function_.get());
     auto& func_registry = LIR::FunctionRegistry::getInstance();
     func_registry.registerFunction(worker_func_name, std::move(current_function_));
     

@@ -1,13 +1,20 @@
-import std.ui.widget as widget;
+// std/ui/align - Alignment and justification control
+import std.ui.types as ui_types;
 
-frame Align {
-    pub var alignment: int;
+pub fn align_start(): ui_types.Alignment {
+    return ui_types.align_start;
+}
 
-    pub init(a: int = 0) {
-        self.alignment = a;
-    }
+pub fn align_center(): ui_types.Alignment {
+    return ui_types.align_center;
+}
 
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn align_end(): ui_types.Alignment {
+    return ui_types.align_end;
+}
+
+pub fn center(child: ui_types.Widget): ui_types.Widget {
+    var w = ui_types.column([child]);
+    w.align_val = ui_types.align_center.align_type;
+    return w;
 }

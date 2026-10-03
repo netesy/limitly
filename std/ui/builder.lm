@@ -1,99 +1,890 @@
-// UI Builder Module
-// Declarative builder API for constructing UI blueprints
+// std/ui/builder.lm
+// Single-pass hybrid builder: walks Widget tree ONCE, emits DrawList + HitZones.
+//
+// Retained mode in syntax and developer ergonomics, but immediate mode in execution:
+//   - Walks the composable Widget tree in a single linear pass
+//   - Emits flat DrawCmds and HitZones directly into a DrawList
+//   - The DrawList is cached and replayed by replay.lm each frame at zero cost
+//   - Interactive events hit-test against the flat HitZone list in O(n) time
 
-import std.ui.types as ui_types;
+import std.ui.types as ui;
+import std.ui.draw_list as dl_mod;
+import std.ui.theme as theme_mod;
+import std.animation as anim;
+import std.text.controller as text_ctrl;
 
-// VStack builder (vertical stack container)
-pub fn vstack(children: [ui_types.Blueprint]): ui_types.Blueprint {
-    var cdata = ui_types.container_data(ui_types.AXIS_VERTICAL);
-    return ui_types.Blueprint(
-        variant_type=1,
-        container_data_val=cdata,
-        text_data_val=ui_types.text_data(""),
-        button_data_val=ui_types.button_data(""),
-        constraints=ui_types.empty_constraints(),
-        children=children
+// ── Theme snapshot ────────────────────────────────────────────────────────────
+// Flat color values extracted once per build — avoids repeated field access
+frame ThemeSnap {
+    pub var text_r: float; pub var text_g: float; pub var text_b: float;
+    pub var text2_r: float; pub var text2_g: float; pub var text2_b: float;
+    pub var bg_r: float; pub var bg_g: float; pub var bg_b: float;
+    pub var surface_r: float; pub var surface_g: float; pub var surface_b: float;
+    pub var accent_r: float; pub var accent_g: float; pub var accent_b: float;
+    pub var border_r: float; pub var border_g: float; pub var border_b: float;
+    pub var btn_r: float; pub var btn_g: float; pub var btn_b: float;
+    pub var btn_hover_r: float; pub var btn_hover_g: float; pub var btn_hover_b: float;
+    pub var font_scale: float;
+    pub var spacing: float;
+    pub var corner_radius: float;
+}
+
+pub fn default_theme_snap(): ThemeSnap {
+    return ThemeSnap(
+        text_r=0.9, text_g=0.9, text_b=0.92,
+        text2_r=0.6, text2_g=0.6, text2_b=0.65,
+        bg_r=0.08, bg_g=0.08, bg_b=0.1,
+        surface_r=0.14, surface_g=0.14, surface_b=0.18,
+        accent_r=0.2, accent_g=0.5, accent_b=0.9,
+        border_r=0.25, border_g=0.25, border_b=0.3,
+        btn_r=0.18, btn_g=0.18, btn_b=0.24,
+        btn_hover_r=0.25, btn_hover_g=0.35, btn_hover_b=0.55,
+        font_scale=1.0,
+        spacing=6.0,
+        corner_radius=6.0
     );
 }
 
-// HStack builder (horizontal stack container)
-pub fn hstack(children: [ui_types.Blueprint]): ui_types.Blueprint {
-    var cdata = ui_types.container_data(ui_types.AXIS_HORIZONTAL);
-    return ui_types.Blueprint(
-        variant_type=1,
-        container_data_val=cdata,
-        text_data_val=ui_types.text_data(""),
-        button_data_val=ui_types.button_data(""),
-        constraints=ui_types.empty_constraints(),
-        children=children
+pub fn snap_theme(pal: theme_mod.ColorPalette, font_scale: float): ThemeSnap {
+    var text_c = pal.text_primary;
+    var text2_c = pal.text_secondary;
+    var bg_c = pal.background;
+    var surf_c = pal.surface;
+    var surf_v = pal.surface_variant;
+    var acc_c = pal.primary;
+    var bord_c = pal.border;
+    var s = ThemeSnap(
+        text_r=text_c.r, text_g=text_c.g, text_b=text_c.b,
+        text2_r=text2_c.r, text2_g=text2_c.g, text2_b=text2_c.b,
+        bg_r=bg_c.r, bg_g=bg_c.g, bg_b=bg_c.b,
+        surface_r=surf_c.r, surface_g=surf_c.g, surface_b=surf_c.b,
+        accent_r=acc_c.r, accent_g=acc_c.g, accent_b=acc_c.b,
+        border_r=bord_c.r, border_g=bord_c.g, border_b=bord_c.b,
+        btn_r=surf_v.r, btn_g=surf_v.g, btn_b=surf_v.b,
+        btn_hover_r=acc_c.r, btn_hover_g=acc_c.g, btn_hover_b=acc_c.b,
+        font_scale=font_scale,
+        spacing=6.0,
+        corner_radius=6.0
     );
+    return s;
 }
 
-// Text builder
-pub fn text(content: str): ui_types.Blueprint {
-    var tdata = ui_types.text_data(content);
-    return ui_types.Blueprint(
-        variant_type=2,
-        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
-        text_data_val=tdata,
-        button_data_val=ui_types.button_data(""),
-        constraints=ui_types.empty_constraints(),
-        children=ui_types.empty_blueprints()
-    );
+// ── Layout context (stack-based, no heap alloc) ───────────────────────────────
+frame LayoutCtx {
+    pub var x: float;         // current cursor x
+    pub var y: float;         // current cursor y
+    pub var avail_w: float;   // available width for this container
+    pub var avail_h: float;   // available height for this container
+    pub var spacing: float;   // vertical spacing between items
+    pub var clip_x: float;    // active clip rect x
+    pub var clip_y: float;    // active clip rect y
+    pub var clip_w: float;    // active clip rect width (0.0 = unclipped)
+    pub var clip_h: float;    // active clip rect height (0.0 = unclipped)
 }
 
-pub fn text_color(content: str, c: ui_types.Color): ui_types.Blueprint {
-    var tdata = ui_types.text_data(content);
-    tdata.color = c;
-    return ui_types.Blueprint(
-        variant_type=2,
-        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
-        text_data_val=tdata,
-        button_data_val=ui_types.button_data(""),
-        constraints=ui_types.empty_constraints(),
-        children=ui_types.empty_blueprints()
-    );
+fn _add_hit(dl: dl_mod.DrawList, hz: dl_mod.HitZone, ctx: LayoutCtx): nil {
+    hz.clip_x = ctx.clip_x;
+    hz.clip_y = ctx.clip_y;
+    hz.clip_w = ctx.clip_w;
+    hz.clip_h = ctx.clip_h;
+    dl_mod.dl_add_hit(dl, hz);
 }
 
-// Button builder
-pub fn button(label: str): ui_types.Blueprint {
-    var bdata = ui_types.button_data(label);
-    return ui_types.Blueprint(
-        variant_type=3,
-        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
-        text_data_val=ui_types.text_data(""),
-        button_data_val=bdata,
-        constraints=ui_types.empty_constraints(),
-        children=ui_types.empty_blueprints()
+// ── Main build entry point ────────────────────────────────────────────────────
+// Walks root Widget once and emits a fully-populated DrawList.
+pub fn build(root: ui.Widget, vw: float, vh: float, ts: any = nil, x: float = 0.0, y: float = 0.0): dl_mod.DrawList {
+    var dl = dl_mod.draw_list();
+    var actual_ts = default_theme_snap();
+    if (ts != nil) {
+        actual_ts = ts as ThemeSnap;
+    }
+    var ctx = LayoutCtx(
+        x=x, y=y, avail_w=vw, avail_h=vh, spacing=actual_ts.spacing,
+        clip_x=0.0, clip_y=0.0, clip_w=0.0, clip_h=0.0
     );
+    _emit(dl, root, ctx, actual_ts);
+    dl.is_valid = 1;
+    return dl;
 }
 
-pub fn button_background(label: str, bg: ui_types.Color): ui_types.Blueprint {
-    var bdata = ui_types.button_data(label);
-    bdata.background = bg;
-    return ui_types.Blueprint(
-        variant_type=3,
-        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
-        text_data_val=ui_types.text_data(""),
-        button_data_val=bdata,
-        constraints=ui_types.empty_constraints(),
-        children=ui_types.empty_blueprints()
-    );
+// ── Widget emitter ────────────────────────────────────────────────────────────
+// Returns height consumed. Adds DrawCmds and HitZones to dl in place.
+fn _emit(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    if (w.kind == ui.KIND_TEXT) {
+        return _emit_text(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_BUTTON) {
+        return _emit_button(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_CONTAINER) {
+        return _emit_container(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_SPACER) {
+        if (w.height_val > 0.0) { return w.height_val; }
+        return ts.spacing;
+    }
+    if (w.kind == ui.KIND_SLIDER) {
+        return _emit_slider(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_CHECKBOX) {
+        return _emit_checkbox(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_INPUT) {
+        return _emit_input(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_PROGRESS) {
+        return _emit_progress(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_TOGGLE) {
+        return _emit_toggle(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_BADGE) {
+        return _emit_badge(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_CARD) {
+        return _emit_card(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_ALERT or w.kind == ui.KIND_TOAST) {
+        return _emit_alert(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_SCROLL) {
+        return _emit_scroll(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_TABS) {
+        return _emit_tabs(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_SELECT) {
+        return _emit_select(dl, w, ctx, ts);
+    }
+    if (w.kind == ui.KIND_TEXTAREA) {
+        return _emit_textarea(dl, w, ctx, ts);
+    }
+    // Unknown widget — emit a placeholder rect
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(ctx.x, ctx.y, ctx.avail_w, 24.0, 0.3, 0.3, 0.3, 0.5));
+    return 24.0;
 }
 
-// Empty blueprint
-pub fn empty(): ui_types.Blueprint {
-    return ui_types.Blueprint(
-        variant_type=1,
-        container_data_val=ui_types.container_data(ui_types.AXIS_VERTICAL),
-        text_data_val=ui_types.text_data(""),
-        button_data_val=ui_types.button_data(""),
-        constraints=ui_types.empty_constraints(),
-        children=ui_types.empty_blueprints()
-    );
+// ── Text ──────────────────────────────────────────────────────────────────────
+fn _emit_text(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var fs = w.font_size_val;
+    if (fs <= 0.0) { fs = 14.0; }
+    var scale = fs / 14.0;
+    var text_len = len(w.text_val) as float;
+    var text_w = text_len * 8.0 * scale;
+    var total_w = text_w + w.padding_left + w.padding_right;
+    if (w.width_val > 0.0) { total_w = w.width_val; }
+
+    var h = fs + w.padding_top + w.padding_bottom + 4.0;
+    if (w.height_val > 0.0) { h = w.height_val; }
+
+    // Optional background
+    if (w.background_color.a > 0.0) {
+        var rad = w.corner_radius_val;
+        if (rad > 0.0) {
+            dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(ctx.x, ctx.y, total_w, h, rad, w.background_color.r, w.background_color.g, w.background_color.b, w.background_color.a));
+        } else {
+            dl_mod.dl_add(dl, dl_mod.dcmd_rect(ctx.x, ctx.y, total_w, h, w.background_color.r, w.background_color.g, w.background_color.b, w.background_color.a));
+        }
+    }
+
+    var tx = ctx.x + w.padding_left;
+    var ty = ctx.y + w.padding_top;
+    var cr = ts.text_r; var cg = ts.text_g; var cb = ts.text_b; var ca = 1.0;
+    if (w.foreground_color.a > 0.0) {
+        cr = w.foreground_color.r;
+        cg = w.foreground_color.g;
+        cb = w.foreground_color.b;
+        ca = w.foreground_color.a;
+    }
+    dl_mod.dl_add(dl, dl_mod.dcmd_text(w.text_val, tx, ty, cr, cg, cb, ca, scale));
+
+    if (w.on_click_action != nil) {
+        _add_hit(dl, dl_mod.make_button_zone(w.text_val, ctx.x, ctx.y, total_w, h, w.on_click_action, w), ctx);
+    }
+
+    return h;
 }
 
-// Color helper
-pub fn color_rgb8(r: int, g: int, b: int): ui_types.Color {
-    return ui_types.color_rgb8(r, g, b);
+// ── Button ────────────────────────────────────────────────────────────────────
+fn _emit_button(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var bw = w.width_val;
+    if (bw <= 0.0) {
+        bw = (len(w.text_val) as float) * 8.0 + w.padding_left + w.padding_right + 16.0;
+        if (bw < 60.0) { bw = 60.0; }
+    }
+    var bh = w.height_val;
+    if (bh <= 0.0) { bh = 28.0 + w.padding_top + w.padding_bottom; }
+
+    var bx = ctx.x; var by = ctx.y;
+    var rad = w.corner_radius_val;
+    if (rad <= 0.0) { rad = ts.corner_radius; }
+
+    // Background color resolution (custom color -> theme fallback -> state variations)
+    var bgr = ts.btn_r; var bgg = ts.btn_g; var bgb = ts.btn_b; var bga = 1.0;
+    if (w.background_color.a > 0.0) {
+        bgr = w.background_color.r;
+        bgg = w.background_color.g;
+        bgb = w.background_color.b;
+        bga = w.background_color.a;
+    }
+
+    if (w.is_pressed != 0) {
+        if (w.pressed_style_val != nil) {
+            var ps = w.pressed_style_val as ui.Style;
+            if (ps.has_bg) {
+                bgr = ps.bg.r; bgg = ps.bg.g; bgb = ps.bg.b; bga = ps.bg.a;
+            } else {
+                bgr = bgr * 0.7; bgg = bgg * 0.7; bgb = bgb * 0.7;
+            }
+        } else {
+            bgr = bgr * 0.7; bgg = bgg * 0.7; bgb = bgb * 0.7;
+        }
+    } elif (w.is_hovered != 0) {
+        bgr = ts.btn_hover_r; bgg = ts.btn_hover_g; bgb = ts.btn_hover_b;
+    }
+
+    if (rad > 0.0) {
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(bx, by, bw, bh, rad, bgr, bgg, bgb, bga));
+    } else {
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect(bx, by, bw, bh, bgr, bgg, bgb, bga));
+    }
+
+    // Label
+    var fs = w.font_size_val;
+    var scale = 1.0;
+    if (fs > 0.0) { scale = fs / 14.0; }
+    var text_w = (len(w.text_val) as float) * 8.0 * scale;
+    var tx = bx + (bw - text_w) / 2.0;
+    var ty = by + (bh - 12.0 * scale) / 2.0;
+
+    var tr = ts.text_r; var tg = ts.text_g; var tb = ts.text_b; var ta = 1.0;
+    if (w.foreground_color.a > 0.0) {
+        tr = w.foreground_color.r;
+        tg = w.foreground_color.g;
+        tb = w.foreground_color.b;
+        ta = w.foreground_color.a;
+    }
+    if (w.is_pressed != 0 and w.pressed_style_val != nil) {
+        var ps = w.pressed_style_val as ui.Style;
+        if (ps.has_fg) {
+            tr = ps.fg.r; tg = ps.fg.g; tb = ps.fg.b; ta = ps.fg.a;
+        }
+    }
+    dl_mod.dl_add(dl, dl_mod.dcmd_text(w.text_val, tx, ty, tr, tg, tb, ta, scale));
+
+    // Hit zone: record widget reference so click_count and is_pressed are updated automatically
+    _add_hit(dl, dl_mod.make_button_zone(w.text_val, bx, by, bw, bh, w.on_click_action, w), ctx);
+
+    return bh;
 }
+
+// ── Container (Column / Row / Stack) ──────────────────────────────────────────
+fn _emit_container(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var ox = ctx.x + w.padding_left;
+    var oy = ctx.y + w.padding_top;
+    var inner_w = ctx.avail_w - w.padding_left - w.padding_right;
+    var spacing = w.spacing_val;
+    if (spacing <= 0.0) { spacing = ts.spacing; }
+
+    var i = 0;
+    var n = len(w.children);
+
+    if (w.is_vertical == 1) {
+        // Column layout
+        // First compute total height to draw background properly
+        var cy = oy;
+        var total_h = w.padding_top + w.padding_bottom;
+        
+        // Background added first if container has known height or bounds
+        var bg_h = ctx.avail_h;
+        if (w.height_val > 0.0) { bg_h = w.height_val; }
+        if (w.background_color.a > 0.0) {
+            var rad = w.corner_radius_val;
+            var bg = w.background_color;
+            if (rad > 0.0) {
+                dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(ctx.x, ctx.y, ctx.avail_w, bg_h, rad, bg.r, bg.g, bg.b, bg.a));
+            } else {
+                dl_mod.dl_add(dl, dl_mod.dcmd_rect(ctx.x, ctx.y, ctx.avail_w, bg_h, bg.r, bg.g, bg.b, bg.a));
+            }
+        }
+
+        while (i < n) {
+            var child_ctx = LayoutCtx(
+                x=ox, y=cy, avail_w=inner_w, avail_h=0.0, spacing=spacing,
+                clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+            );
+            var ch = _emit(dl, w.children[i], child_ctx, ts);
+            cy = cy + ch;
+            total_h = total_h + ch;
+            if (i < n - 1) {
+                cy = cy + spacing;
+                total_h = total_h + spacing;
+            }
+            i = i + 1;
+        }
+        return total_h;
+    } elif (w.is_vertical == 0) {
+        // Row layout — measure fixed widths first, then distribute remaining to spacers/grow children
+        var fixed_total = 0.0;
+        var grow_count = 0;
+        var j = 0;
+        while (j < n) {
+            var child = w.children[j];
+            if (child.kind == ui.KIND_SPACER or child.grow > 0.0) {
+                grow_count = grow_count + 1;
+            } else {
+                var cw = child.width_val;
+                if (cw <= 0.0) {
+                    if (child.kind == ui.KIND_BUTTON) {
+                        cw = (len(child.text_val) as float) * 8.0 + child.padding_left + child.padding_right + 16.0;
+                        if (cw < 60.0) { cw = 60.0; }
+                    } elif (child.kind == ui.KIND_TEXT) {
+                        cw = (len(child.text_val) as float) * 8.0 + child.padding_left + child.padding_right;
+                    } else {
+                        cw = 80.0;
+                    }
+                }
+                fixed_total = fixed_total + cw;
+            }
+            j = j + 1;
+        }
+        var gap_total = 0.0;
+        if (n > 1) {
+            gap_total = ((n - 1) as float) * spacing;
+        }
+        var grow_unit = 0.0;
+        if (grow_count > 0) {
+            var remaining = inner_w - fixed_total - gap_total;
+            if (remaining > 0.0) {
+                grow_unit = remaining / (grow_count as float);
+            }
+        }
+
+        var bg_h = ctx.avail_h;
+        if (w.height_val > 0.0) { bg_h = w.height_val; }
+        if (w.background_color.a > 0.0) {
+            var rad = w.corner_radius_val;
+            var bg = w.background_color;
+            if (rad > 0.0) {
+                dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(ctx.x, ctx.y, ctx.avail_w, bg_h, rad, bg.r, bg.g, bg.b, bg.a));
+            } else {
+                dl_mod.dl_add(dl, dl_mod.dcmd_rect(ctx.x, ctx.y, ctx.avail_w, bg_h, bg.r, bg.g, bg.b, bg.a));
+            }
+        }
+
+        var cx = ox;
+        var max_h = 0.0;
+        while (i < n) {
+            var child = w.children[i];
+            if (child.kind == ui.KIND_SPACER) {
+                cx = cx + grow_unit;
+            } else {
+                var cw = child.width_val;
+                if (child.grow > 0.0) {
+                    cw = grow_unit * child.grow;
+                } elif (cw <= 0.0) {
+                    if (child.kind == ui.KIND_BUTTON) {
+                        cw = (len(child.text_val) as float) * 8.0 + child.padding_left + child.padding_right + 16.0;
+                        if (cw < 60.0) { cw = 60.0; }
+                    } elif (child.kind == ui.KIND_TEXT) {
+                        cw = (len(child.text_val) as float) * 8.0 + child.padding_left + child.padding_right;
+                    } else {
+                        cw = 80.0;
+                    }
+                }
+                var child_ctx = LayoutCtx(
+                    x=cx, y=oy, avail_w=cw, avail_h=0.0, spacing=spacing,
+                    clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+                );
+                var ch = _emit(dl, child, child_ctx, ts);
+                if (ch > max_h) { max_h = ch; }
+                cx = cx + cw;
+            }
+            if (i < n - 1) { cx = cx + spacing; }
+            i = i + 1;
+        }
+        return w.padding_top + w.padding_bottom + max_h;
+    } else {
+        // Stack layout
+        if (w.background_color.a > 0.0) {
+            var rad = w.corner_radius_val;
+            var bg = w.background_color;
+            if (rad > 0.0) {
+                dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(ctx.x, ctx.y, ctx.avail_w, ctx.avail_h, rad, bg.r, bg.g, bg.b, bg.a));
+            } else {
+                dl_mod.dl_add(dl, dl_mod.dcmd_rect(ctx.x, ctx.y, ctx.avail_w, ctx.avail_h, bg.r, bg.g, bg.b, bg.a));
+            }
+        }
+        var max_h = 0.0;
+        while (i < n) {
+            var child_ctx = LayoutCtx(
+                x=ox, y=oy, avail_w=inner_w, avail_h=0.0, spacing=spacing,
+                clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+            );
+            var ch = _emit(dl, w.children[i], child_ctx, ts);
+            if (ch > max_h) { max_h = ch; }
+            i = i + 1;
+        }
+        return w.padding_top + w.padding_bottom + max_h;
+    }
+}
+
+// ── Slider ────────────────────────────────────────────────────────────────────
+fn _emit_slider(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var sw = w.width_val;
+    if (sw <= 0.0) { sw = ctx.avail_w - w.padding_left - w.padding_right; }
+    if (sw <= 0.0) { sw = 140.0; }
+    var sh = 24.0;
+    var sx = ctx.x + w.padding_left;
+    var sy = ctx.y + w.padding_top + 8.0;
+
+    // Track
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(sx, sy, sw, 4.0, 2.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
+
+    // Fill
+    var range = w.slider_max - w.slider_min;
+    var t = 0.0;
+    if (range > 0.0) {
+        t = (w.slider_val - w.slider_min) / range;
+    }
+    var fill_w = sw * t;
+    if (fill_w > 0.0) {
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(sx, sy, fill_w, 4.0, 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+    }
+
+    // Thumb
+    var thumb_x = sx + fill_w - 6.0;
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(thumb_x, sy - 4.0, 12.0, 12.0, 6.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+
+    // Hit zone
+    _add_hit(dl, dl_mod.make_slider_zone(
+        w.text_val, sx, ctx.y + w.padding_top, sw, sh,
+        w.slider_min, w.slider_max, w.slider_val, w.on_change_action, w
+    ), ctx);
+
+    return sh + w.padding_top + w.padding_bottom;
+}
+
+// ── Checkbox ──────────────────────────────────────────────────────────────────
+fn _emit_checkbox(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var cx = ctx.x + w.padding_left;
+    var cy = ctx.y + w.padding_top;
+    var box_size = 16.0;
+
+    // Box border
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(cx, cy, box_size, box_size, 3.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
+
+    // Checked fill
+    if (w.is_checked != 0) {
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(cx + 2.0, cy + 2.0, box_size - 4.0, box_size - 4.0, 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+    }
+
+    // Label
+    if (len(w.text_val) > 0) {
+        dl_mod.dl_add(dl, dl_mod.dcmd_text(w.text_val, cx + box_size + 6.0, cy + 1.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+    }
+
+    // Hit zone
+    var label_w = (len(w.text_val) as float) * 8.0;
+    _add_hit(dl, dl_mod.make_checkbox_zone(w.text_val, cx, cy, box_size + label_w + 6.0, box_size, w.is_checked, w.on_change_action, w), ctx);
+
+    return box_size + w.padding_top + w.padding_bottom;
+}
+
+// ── Input ─────────────────────────────────────────────────────────────────────
+fn _emit_input(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var iw = w.width_val;
+    if (iw <= 0.0) { iw = ctx.avail_w - w.padding_left - w.padding_right; }
+    if (iw <= 0.0) { iw = 220.0; }
+    var ih = 28.0;
+    var ix = ctx.x + w.padding_left;
+    var iy = ctx.y + w.padding_top;
+
+    // Background
+    var focused_border = ts.border_r;
+    if (w.is_focused != 0) { focused_border = ts.accent_r; }
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(ix, iy, iw, ih, 4.0, ts.surface_r, ts.surface_g, ts.surface_b, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(ix, iy, iw, 1.0, 0.0, focused_border, ts.border_g, ts.border_b, 1.0));
+
+    // Text or placeholder
+    var display = w.text_val;
+    var tr = ts.text_r; var tg = ts.text_g; var tb = ts.text_b;
+    if (len(display) == 0 and len(w.placeholder_val) > 0) {
+        display = w.placeholder_val;
+        tr = ts.text2_r; tg = ts.text2_g; tb = ts.text2_b;
+    }
+    if (len(display) > 0) {
+        dl_mod.dl_add(dl, dl_mod.dcmd_text(display, ix + 6.0, iy + 6.0, tr, tg, tb, 1.0, 1.0));
+    }
+
+    _add_hit(dl, dl_mod.make_input_zone(w.text_val, ix, iy, iw, ih, w), ctx);
+
+    return ih + w.padding_top + w.padding_bottom;
+}
+
+// ── Progress ──────────────────────────────────────────────────────────────────
+fn _emit_progress(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var pw = ctx.avail_w - w.padding_left - w.padding_right;
+    var ph = 8.0;
+    var px = ctx.x + w.padding_left;
+    var py = ctx.y + w.padding_top + 4.0;
+
+    // Track
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(px, py, pw, ph, 4.0, ts.border_r, ts.border_g, ts.border_b, 1.0));
+
+    // Fill
+    var fill_w = pw * w.slider_val; // slider_val used as 0-1 progress value
+    if (fill_w > pw) { fill_w = pw; }
+    if (fill_w > 0.0) {
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(px, py, fill_w, ph, 4.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+    }
+
+    return ph + w.padding_top + w.padding_bottom + 8.0;
+}
+
+// ── Toggle ────────────────────────────────────────────────────────────────────
+fn _emit_toggle(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var tx = ctx.x + w.padding_left;
+    var ty = ctx.y + w.padding_top;
+    var tw = 36.0; var th = 18.0;
+
+    // Track
+    var track_r = ts.border_r; var track_g = ts.border_g; var track_b = ts.border_b;
+    if (w.is_checked != 0) {
+        track_r = ts.accent_r; track_g = ts.accent_g; track_b = ts.accent_b;
+    }
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(tx, ty, tw, th, 9.0, track_r, track_g, track_b, 1.0));
+
+    // Thumb
+    var thumb_x = tx + 2.0;
+    if (w.is_checked != 0) { thumb_x = tx + tw - 16.0; }
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(thumb_x, ty + 2.0, 14.0, 14.0, 7.0, 1.0, 1.0, 1.0, 1.0));
+
+    // Label
+    if (len(w.text_val) > 0) {
+        dl_mod.dl_add(dl, dl_mod.dcmd_text(w.text_val, tx + tw + 6.0, ty + 2.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+    }
+
+    // Hit zone
+    _add_hit(dl, dl_mod.make_checkbox_zone(w.text_val, tx, ty, tw, th, w.is_checked, w.on_change_action, w), ctx);
+
+    return th + w.padding_top + w.padding_bottom;
+}
+
+// ── Badge ─────────────────────────────────────────────────────────────────────
+fn _emit_badge(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var bw = (len(w.text_val) as float) * 7.0 + w.padding_left + w.padding_right + 10.0;
+    var bh = 18.0 + w.padding_top + w.padding_bottom;
+    var bx = ctx.x; var by = ctx.y;
+    var bg = w.background_color;
+    var bgr = ts.accent_r; var bgg = ts.accent_g; var bgb = ts.accent_b;
+    if (bg.a > 0.0) { bgr = bg.r; bgg = bg.g; bgb = bg.b; }
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(bx, by, bw, bh, bh / 2.0, bgr, bgg, bgb, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_text(w.text_val, bx + w.padding_left + 4.0, by + w.padding_top + 2.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 0.85));
+    return bh;
+}
+
+// ── Card ──────────────────────────────────────────────────────────────────────
+fn _emit_card(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var cw = ctx.avail_w;
+    if (w.width_val > 0.0) { cw = w.width_val; }
+    var rad = w.corner_radius_val;
+    if (rad <= 0.0) { rad = ts.corner_radius; }
+
+    var bgr = ts.surface_r; var bgg = ts.surface_g; var bgb = ts.surface_b; var bga = 1.0;
+    if (w.background_color.a > 0.0) {
+        bgr = w.background_color.r; bgg = w.background_color.g; bgb = w.background_color.b; bga = w.background_color.a;
+    }
+
+    var cy = ctx.y + w.padding_top;
+    if (len(w.text_val) > 0) {
+        cy = cy + 22.0;
+    }
+    var i = 0;
+    while (i < len(w.children)) {
+        var child_ctx = LayoutCtx(
+            x=ctx.x + w.padding_left, y=cy, avail_w=cw - w.padding_left - w.padding_right, avail_h=0.0, spacing=ts.spacing,
+            clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+        );
+        var ch = _emit(dl, w.children[i], child_ctx, ts);
+        cy = cy + ch + ts.spacing;
+        i = i + 1;
+    }
+    var total_h = cy - ctx.y + w.padding_bottom;
+    if (w.height_val > 0.0) { total_h = w.height_val; }
+
+    // Card background
+    if (rad > 0.0) {
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(ctx.x, ctx.y, cw, total_h, rad, bgr, bgg, bgb, bga));
+    } else {
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect(ctx.x, ctx.y, cw, total_h, bgr, bgg, bgb, bga));
+    }
+
+    // Card title
+    if (len(w.text_val) > 0) {
+        dl_mod.dl_add(dl, dl_mod.dcmd_text(w.text_val, ctx.x + w.padding_left + 4.0, ctx.y + w.padding_top + 4.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+    }
+
+    return total_h;
+}
+
+// ── Alert / Toast ─────────────────────────────────────────────────────────────
+fn _emit_alert(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var aw = ctx.avail_w;
+    if (w.width_val > 0.0) { aw = w.width_val; }
+    var ah = 36.0;
+    var bgr = ts.surface_r; var bgg = ts.surface_g; var bgb = ts.surface_b; var bga = 1.0;
+    if (w.background_color.a > 0.0) {
+        bgr = w.background_color.r; bgg = w.background_color.g; bgb = w.background_color.b; bga = w.background_color.a;
+    }
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(ctx.x, ctx.y, aw, ah, 4.0, bgr, bgg, bgb, bga));
+    dl_mod.dl_add(dl, dl_mod.dcmd_text(w.text_val, ctx.x + 10.0, ctx.y + 10.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+    return ah + ts.spacing;
+}
+
+// ── Scroll ────────────────────────────────────────────────────────────────────
+fn _emit_scroll(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var sw = ctx.avail_w;
+    if (w.width_val > 0.0) { sw = w.width_val; }
+    var sh = ctx.avail_h;
+    if (w.height_val > 0.0) { sh = w.height_val; }
+    if (sh <= 0.0) { sh = 200.0; }
+
+    // Push clip rect for scroll viewport
+    dl_mod.dl_add(dl, dl_mod.dcmd_clip_push(ctx.x, ctx.y, sw, sh));
+
+    // Calculate intersected clip bounds for children
+    var sc_x = ctx.x;
+    var sc_y = ctx.y;
+    var sc_w = sw;
+    var sc_h = sh;
+    if (ctx.clip_w > 0.0 and ctx.clip_h > 0.0) {
+        var r1 = sc_x + sc_w;
+        var b1 = sc_y + sc_h;
+        var r2 = ctx.clip_x + ctx.clip_w;
+        var b2 = ctx.clip_y + ctx.clip_h;
+        if (ctx.clip_x > sc_x) { sc_x = ctx.clip_x; }
+        if (ctx.clip_y > sc_y) { sc_y = ctx.clip_y; }
+        var min_r = r1; if (r2 < min_r) { min_r = r2; }
+        var min_b = b1; if (b2 < min_b) { min_b = b2; }
+        sc_w = min_r - sc_x;
+        sc_h = min_b - sc_y;
+        if (sc_w < 0.0) { sc_w = 0.0; }
+        if (sc_h < 0.0) { sc_h = 0.0; }
+    }
+
+    // Emit children with scroll offset and measure total height for max_scroll_y
+    var child_ctx = LayoutCtx(
+        x=ctx.x, y=ctx.y - w.scroll_y, avail_w=sw, avail_h=0.0, spacing=ts.spacing,
+        clip_x=sc_x, clip_y=sc_y, clip_w=sc_w, clip_h=sc_h
+    );
+    var i = 0;
+    var total_child_h = 0.0;
+    while (i < len(w.children)) {
+        var ch = _emit(dl, w.children[i], child_ctx, ts);
+        total_child_h = total_child_h + ch;
+        child_ctx.y = child_ctx.y + ch + ts.spacing;
+        i = i + 1;
+    }
+
+    var max_s = total_child_h - sh;
+    if (max_s < 0.0) { max_s = 0.0; }
+    w.max_scroll_y = max_s;
+    if (w.scroll_y > max_s) { w.scroll_y = max_s; }
+    if (w.scroll_y < 0.0) { w.scroll_y = 0.0; }
+
+    // Pop clip
+    dl_mod.dl_add(dl, dl_mod.dcmd_clip_pop());
+    return sh;
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+fn _emit_tabs(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    // 1. Emit active page content first
+    var content_h = 0.0;
+    if (len(w.children) > 0 and w.active_tab < len(w.children)) {
+        var page_ctx = LayoutCtx(
+            x=ctx.x, y=ctx.y + 40.0, avail_w=ctx.avail_w, avail_h=ctx.avail_h - 40.0, spacing=ts.spacing,
+            clip_x=ctx.clip_x, clip_y=ctx.clip_y, clip_w=ctx.clip_w, clip_h=ctx.clip_h
+        );
+        content_h = _emit(dl, w.children[w.active_tab], page_ctx, ts);
+    }
+
+    // 2. Emit tab header bar on top of page content
+    var tab_x = ctx.x;
+    var tab_h = 32.0;
+    var i = 0;
+    while (i < len(w.tab_titles)) {
+        var title = w.tab_titles[i];
+        var item_w = (len(title) as float) * 8.0 + 24.0;
+        var is_sel = 0;
+        if (i == w.active_tab) { is_sel = 1; }
+
+        var bgr = ts.surface_r; var bgg = ts.surface_g; var bgb = ts.surface_b;
+        if (is_sel == 1) {
+            bgr = ts.surface_r * 1.5; bgg = ts.surface_g * 1.5; bgb = ts.surface_b * 1.8;
+        }
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect(tab_x, ctx.y, item_w, tab_h, bgr, bgg, bgb, 1.0));
+
+        if (is_sel == 1) {
+            dl_mod.dl_add(dl, dl_mod.dcmd_rect(tab_x, ctx.y + tab_h - 2.0, item_w, 2.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+        }
+
+        var tr = ts.text2_r; var tg = ts.text2_g; var tb = ts.text2_b;
+        if (is_sel == 1) {
+            tr = ts.text_r; tg = ts.text_g; tb = ts.text_b;
+        }
+        var tx = tab_x + 12.0;
+        var ty = ctx.y + (tab_h - 12.0) / 2.0;
+        dl_mod.dl_add(dl, dl_mod.dcmd_text(title, tx, ty, tr, tg, tb, 1.0, 1.0));
+
+        // Add hit zone for tab switching
+        var hz = dl_mod.make_button_zone(title, tab_x, ctx.y, item_w, tab_h, nil, w);
+        hz.tab_index = i;
+        _add_hit(dl, hz, ctx);
+
+        tab_x = tab_x + item_w + w.spacing_val;
+        i = i + 1;
+    }
+
+    return 40.0 + content_h;
+}
+
+// ── Select ────────────────────────────────────────────────────────────────────
+fn _emit_select(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var sel_w = 180.0;
+    if (w.width_val > 0.0) { sel_w = w.width_val; }
+    var sel_h = 28.0;
+    if (w.height_val > 0.0) { sel_h = w.height_val; }
+    var sx = ctx.x + w.padding_left;
+    var sy = ctx.y + w.padding_top;
+
+    // Background
+    var bgr = ts.surface_r; var bgg = ts.surface_g; var bgb = ts.surface_b;
+    if (w.is_hovered != 0 or w.is_open != 0) {
+        bgr = ts.surface_r * 1.3; bgg = ts.surface_g * 1.3; bgb = ts.surface_b * 1.5;
+    }
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(sx, sy, sel_w, sel_h, 4.0, bgr, bgg, bgb, 1.0));
+
+    // Border
+    var bord_r = ts.border_r; var bord_g = ts.border_g; var bord_b = ts.border_b;
+    if (w.is_open != 0) {
+        bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
+    }
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(sx, sy, sel_w, 1.0, bord_r, bord_g, bord_b, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(sx, sy + sel_h - 1.0, sel_w, 1.0, bord_r, bord_g, bord_b, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(sx, sy, 1.0, sel_h, bord_r, bord_g, bord_b, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(sx + sel_w - 1.0, sy, 1.0, sel_h, bord_r, bord_g, bord_b, 1.0));
+
+    // Text
+    var ty = sy + (sel_h - 12.0) / 2.0;
+    dl_mod.dl_add(dl, dl_mod.dcmd_text(w.text_val, sx + 10.0, ty, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+
+    // Chevron
+    var chev = "v";
+    if (w.is_open != 0) { chev = "^"; }
+    dl_mod.dl_add(dl, dl_mod.dcmd_text(chev, sx + sel_w - 18.0, ty, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 1.0));
+
+    // Hit zone for select header (-1 indicates toggling dropdown)
+    var hz = dl_mod.make_button_zone(w.text_val, sx, sy, sel_w, sel_h, nil, w);
+    hz.kind = dl_mod.HZONE_SELECT;
+    hz.tab_index = -1;
+    _add_hit(dl, hz, ctx);
+
+    // If open, render options list
+    if (w.is_open != 0 and len(w.select_options) > 0) {
+        var menu_y = sy + sel_h + 2.0;
+        var item_h = 26.0;
+        var num_opts = len(w.select_options);
+        var menu_h = (num_opts as float) * item_h + 4.0;
+
+        // Menu background and border
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(sx, menu_y, sel_w, menu_h, 4.0, ts.surface_r * 0.8, ts.surface_g * 0.8, ts.surface_b * 0.8, 1.0));
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect(sx, menu_y, sel_w, 1.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect(sx, menu_y + menu_h - 1.0, sel_w, 1.0, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect(sx, menu_y, 1.0, menu_h, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+        dl_mod.dl_add(dl, dl_mod.dcmd_rect(sx + sel_w - 1.0, menu_y, 1.0, menu_h, ts.accent_r, ts.accent_g, ts.accent_b, 1.0));
+
+        var opt_idx = 0;
+        while (opt_idx < num_opts) {
+            var opt_item_y = menu_y + 2.0 + (opt_idx as float) * item_h;
+            if (opt_idx == w.selected_idx) {
+                dl_mod.dl_add(dl, dl_mod.dcmd_rect(sx + 2.0, opt_item_y, sel_w - 4.0, item_h, ts.accent_r * 0.4, ts.accent_g * 0.4, ts.accent_b * 0.4, 1.0));
+            }
+            var opt_text = w.select_options[opt_idx];
+            dl_mod.dl_add(dl, dl_mod.dcmd_text(opt_text, sx + 10.0, opt_item_y + 4.0, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+
+            var opt_hz = dl_mod.make_button_zone(opt_text, sx, opt_item_y, sel_w, item_h, nil, w);
+            opt_hz.kind = dl_mod.HZONE_SELECT;
+            opt_hz.tab_index = opt_idx;
+            _add_hit(dl, opt_hz, ctx);
+
+            opt_idx = opt_idx + 1;
+        }
+    }
+
+    return sel_h + w.padding_top + w.padding_bottom;
+}
+
+// ── Textarea ──────────────────────────────────────────────────────────────────
+fn _emit_textarea(dl: dl_mod.DrawList, w: ui.Widget, ctx: LayoutCtx, ts: ThemeSnap): float {
+    var iw = ctx.avail_w;
+    if (w.width_val > 0.0) { iw = w.width_val; }
+    var ih = 120.0;
+    if (w.height_val > 0.0) { ih = w.height_val; }
+    var ix = ctx.x + w.padding_left;
+    var iy = ctx.y + w.padding_top;
+
+    if (w.text_editor_state == nil) {
+        w.text_editor_state = text_ctrl.EditorController(w.text_val);
+    }
+    var ctrl = w.text_editor_state as text_ctrl.EditorController;
+
+    // Background
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(ix, iy, iw, ih, 4.0, ts.surface_r * 0.8, ts.surface_g * 0.8, ts.surface_b * 0.8, 1.0));
+
+    // Border
+    var bord_r = ts.border_r; var bord_g = ts.border_g; var bord_b = ts.border_b;
+    if (w.is_focused != 0) {
+        bord_r = ts.accent_r; bord_g = ts.accent_g; bord_b = ts.accent_b;
+    }
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(ix, iy, iw, 1.0, bord_r, bord_g, bord_b, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(ix, iy + ih - 1.0, iw, 1.0, bord_r, bord_g, bord_b, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(ix, iy, 1.0, ih, bord_r, bord_g, bord_b, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(ix + iw - 1.0, iy, 1.0, ih, bord_r, bord_g, bord_b, 1.0));
+
+    // Clip to textarea interior
+    dl_mod.dl_add(dl, dl_mod.dcmd_clip_push(ix + 1.0, iy + 1.0, iw - 2.0, ih - 2.0));
+
+    var is_empty_doc = (ctrl.get_line_count() == 1);
+    if (is_empty_doc) {
+        var line0 = ctrl.get_line(0);
+        if (len(line0) > 0) { is_empty_doc = false; }
+    }
+
+    if (is_empty_doc and len(w.placeholder_val) > 0 and w.is_focused == 0) {
+        dl_mod.dl_add(dl, dl_mod.dcmd_text(w.placeholder_val, ix + 8.0, iy + 8.0, ts.text2_r, ts.text2_g, ts.text2_b, 1.0, 1.0));
+    } else {
+        var line_idx = 0;
+        var line_h = 18.0;
+        var cur_y = iy + 8.0;
+        var total_lines = ctrl.get_line_count();
+        while (line_idx < total_lines) {
+            var line_text = ctrl.get_line(line_idx);
+            if (line_text == nil) { line_text = ""; }
+            if (len(line_text) > 0) {
+                dl_mod.dl_add(dl, dl_mod.dcmd_text(line_text, ix + 8.0, cur_y, ts.text_r, ts.text_g, ts.text_b, 1.0, 1.0));
+            }
+            cur_y = cur_y + line_h;
+            line_idx = line_idx + 1;
+        }
+    }
+
+    dl_mod.dl_add(dl, dl_mod.dcmd_clip_pop());
+
+    // Hit zone
+    _add_hit(dl, dl_mod.make_input_zone(w.text_val, ix, iy, iw, ih, w), ctx);
+
+    return ih + w.padding_top + w.padding_bottom;
+}
+

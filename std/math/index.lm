@@ -3,27 +3,240 @@ import std.math.arithmetic as arithmetic_mod;
 import std.math.trigonometry as trigonometry_mod;
 import std.math.statistics as statistics_mod;
 import std.math.random as random_mod;
-import std.math.vector2 as vector2_mod;
-import std.math.vector3 as vector3_mod;
-import std.math.vector4 as vector4_mod;
-import std.math.quaternion as quaternion_mod;
-import std.math.matrix as matrix_mod;
 
-// Types
-pub type Vector2 = vector2_mod.Vector2;
-pub type Vector3 = vector3_mod.Vector3;
-pub type Vector4 = vector4_mod.Vector4;
-pub type Quaternion = quaternion_mod.Quaternion;
-pub type Matrix = matrix_mod.Matrix;
 pub type Random = random_mod.Random;
 pub type SecureRandom = random_mod.SecureRandom;
 
-// Constructors
-pub fn Vector2(x: float, y: float): Vector2 { return vector2_mod.Vector2(x, y); }
-pub fn Vector3(x: float, y: float, z: float): Vector3 { return vector3_mod.Vector3(x, y, z); }
-pub fn Vector4(x: float, y: float, z: float, w: float): Vector4 { return vector4_mod.Vector4(x, y, z, w); }
-pub fn Quaternion(x: float, y: float, z: float, w: float): Quaternion { return quaternion_mod.Quaternion(x, y, z, w); }
-pub fn Matrix(): Matrix { return matrix_mod.Matrix(); }
+frame Vector2 {
+    pub x: float;
+    pub y: float;
+
+    pub init(x: float = 0.0, y: float = 0.0) {
+        self.x = x;
+        self.y = y;
+    }
+
+    pub fn add(other: Vector2): Vector2 {
+        return Vector2(self.x + other.x, self.y + other.y);
+    }
+
+    pub fn sub(other: Vector2): Vector2 {
+        return Vector2(self.x - other.x, self.y - other.y);
+    }
+
+    pub fn scale(s: float): Vector2 {
+        return Vector2(self.x * s, self.y * s);
+    }
+
+    pub fn dot(other: Vector2): float {
+        return self.x * other.x + self.y * other.y;
+    }
+
+    pub fn mag(): float {
+        return arithmetic_mod.sqrt(self.x * self.x + self.y * self.y);
+    }
+
+    pub fn normalize(): Vector2 {
+        var m = self.mag();
+        if (m == 0.0) {
+            return Vector2(0.0, 0.0);
+        }
+        return self.scale(1.0 / m);
+    }
+}
+
+frame Vector3 {
+    pub x: float;
+    pub y: float;
+    pub z: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+    }
+
+    pub fn add(other: Vector3): Vector3 {
+        return Vector3(self.x + other.x, self.y + other.y, self.z + other.z);
+    }
+
+    pub fn sub(other: Vector3): Vector3 {
+        return Vector3(self.x - other.x, self.y - other.y, self.z - other.z);
+    }
+
+    pub fn scale(s: float): Vector3 {
+        return Vector3(self.x * s, self.y * s, self.z * s);
+    }
+
+    pub fn dot(other: Vector3): float {
+        return self.x * other.x + self.y * other.y + self.z * other.z;
+    }
+
+    pub fn cross(other: Vector3): Vector3 {
+        return Vector3(
+            self.y * other.z - self.z * other.y,
+            self.z * other.x - self.x * other.z,
+            self.x * other.y - self.y * other.x
+        );
+    }
+
+    pub fn mag(): float {
+        return arithmetic_mod.sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
+    }
+
+    pub fn normalize(): Vector3 {
+        var m = self.mag();
+        if (m == 0.0) {
+            return Vector3(0.0, 0.0, 0.0);
+        }
+        return self.scale(1.0 / m);
+    }
+}
+
+frame Vector4 {
+    pub x: float;
+    pub y: float;
+    pub z: float;
+    pub w: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0, w: float = 0.0) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+        self.w = w;
+    }
+
+    pub fn add(other: Vector4): Vector4 {
+        return Vector4(self.x + other.x, self.y + other.y, self.z + other.z, self.w + other.w);
+    }
+
+    pub fn sub(other: Vector4): Vector4 {
+        return Vector4(self.x - other.x, self.y - other.y, self.z - other.z, self.w - other.w);
+    }
+
+    pub fn scale(s: float): Vector4 {
+        return Vector4(self.x * s, self.y * s, self.z * s, self.w * s);
+    }
+
+    pub fn dot(other: Vector4): float {
+        return self.x * other.x + self.y * other.y + self.z * other.z + self.w * other.w;
+    }
+
+    pub fn mag(): float {
+        return arithmetic_mod.sqrt(self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w);
+    }
+
+    pub fn normalize(): Vector4 {
+        var m = self.mag();
+        if (m == 0.0) {
+            return Vector4(0.0, 0.0, 0.0, 0.0);
+        }
+        return self.scale(1.0 / m);
+    }
+}
+
+frame Quaternion {
+    pub x: float;
+    pub y: float;
+    pub z: float;
+    pub w: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, z: float = 0.0, w: float = 0.0) {
+        self.x = x;
+        self.y = y;
+        self.z = z;
+        self.w = w;
+    }
+
+    pub fn add(other: Quaternion): Quaternion {
+        return Quaternion(self.x + other.x, self.y + other.y, self.z + other.z, self.w + other.w);
+    }
+
+    pub fn sub(other: Quaternion): Quaternion {
+        return Quaternion(self.x - other.x, self.y - other.y, self.z - other.z, self.w - other.w);
+    }
+
+    pub fn scale(s: float): Quaternion {
+        return Quaternion(self.x * s, self.y * s, self.z * s, self.w * s);
+    }
+
+    pub fn mag(): float {
+        return arithmetic_mod.sqrt(self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w);
+    }
+
+    pub fn normalize(): Quaternion {
+        var m = self.mag();
+        if (m == 0.0) {
+            return Quaternion(0.0, 0.0, 0.0, 1.0);
+        }
+        return self.scale(1.0 / m);
+    }
+}
+
+frame Matrix {
+    pub data: [float];
+
+    pub init() {
+        self.data = [
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0
+        ];
+    }
+
+    pub fn get(row: int, col: int): float {
+        return self.data[row * 4 + col];
+    }
+
+    pub fn set(row: int, col: int, value_val: float) {
+        self.data[row * 4 + col] = value_val;
+    }
+}
+
+frame Int {
+    pub var value: int;
+    pub init(value: int) {
+        self.value = value;
+    }
+    pub fn abs(): int { if (self.value < 0) return -self.value; return self.value; }
+    pub fn min(other: int): int { if (self.value < other) return self.value; return other; }
+    pub fn max(other: int): int { if (self.value > other) return self.value; return other; }
+}
+
+frame Float {
+    pub var value: float;
+    pub init(value: float) {
+        self.value = value;
+    }
+    pub fn abs(): float { if (self.value < 0.0) return -self.value; return self.value; }
+    pub fn min(other: float): float { if (self.value < other) return self.value; return other; }
+    pub fn max(other: float): float { if (self.value > other) return self.value; return other; }
+    pub fn floor(): int { 
+        var i: int = self.value as int; 
+        if ((i as float) > self.value) return i - 1; 
+        return i; 
+    }
+    pub fn ceil(): int { 
+        var i: int = self.value as int; 
+        if ((i as float) < self.value) return i + 1; 
+        return i; 
+    }
+    pub fn round(): int { 
+        if (self.value >= 0.0) return Float(self.value + 0.5).floor(); 
+        return Float(self.value - 0.5).ceil(); 
+    }
+    pub fn trunc(): int { return self.value as int; }
+    pub fn fract(): float { return self.value - (self.value as int as float); }
+    pub fn is_nan(): bool { return self.value != self.value; }
+    pub fn is_inf(): bool { return self.value == INF or self.value == -INF; }
+    pub fn is_finite(): bool { return not self.is_nan() and not self.is_inf(); }
+}
+
+pub fn is_nan(x: float): bool { return x != x; }
+pub fn is_inf(x: float): bool { return x == INF or x == -INF; }
+pub fn is_finite(x: float): bool { return not is_nan(x) and not is_inf(x); }
+pub fn nearly_equal(a: float, b: float, epsilon: float = 0.000001): bool { return abs(a - b) <= epsilon; }
 
 // Constants Re-exports
 pub var PI: float = 3.14159265358979323846;

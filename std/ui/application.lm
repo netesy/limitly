@@ -1,37 +1,25 @@
-import std.ui.window as window;
+import std.ui.types as ui_types;
 import std.app as app;
-import std.gg as gg;
-import std.ui.context as ui_context;
 
 frame Application {
     pub var name: str;
-    pub var windows: [window.Window];
+    pub var root_widget: ui_types.Widget;
 
     pub init(n: str = "LimitApp") {
         self.name = n;
-        self.windows = [window.Window()];
+        self.root_widget = ui_types.empty();
     }
 
-    pub fn render_frame(): nil {
-        gg.begin_pass(800, 600, 0.1, 0.1, 0.15, 1.0);
-        ui_context.frame_update(0.016);
-        gg.end_pass();
-        gg.commit();
+    pub fn set_root(widget: ui_types.Widget): nil {
+        self.root_widget = widget;
     }
 
     pub fn run(): nil {
-        gg.setup();
         var cfg = app.default_window_config();
         cfg.title = self.name;
-        app.app_init(cfg);
-
-        ui_context.ui_init();
-        if (len(self.windows) > 0) {
-            ui_context.update_blueprint(self.windows[0].root_blueprint);
-        }
-
-        self.render_frame();
-        app.push_quit_event();
-        app.app_run();
+        app.init(cfg);
+        app.set_ui(self.root_widget);
+        app.run();
+        app.shutdown();
     }
 }

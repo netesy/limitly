@@ -1,10 +1,16 @@
 // std/game/app.lm
-// High-level game loop and application runner for std.game
+// High-level game loop, event polling, timing driver, and application runner for std.game
 
 import std.app as app;
 import std.gg as gg;
+import std.time as time;
+import std.time.timer as timer_mod;
+import std.time.duration as dur_mod;
+import std.math as math;
 import std.game.gui as gui_mod;
 import std.game.types as types;
+import std.game.input as input_mod;
+import std.game.scene as scene_mod;
 
 frame GameConfig {
     pub var title: str;
@@ -12,13 +18,15 @@ frame GameConfig {
     pub var height: int;
     pub var resizable: bool;
     pub var bg_color: types.Color;
+    pub var fixed_dt: float;
 
-    pub init(title: str = "Limit Game", width: int = 800, height: int = 600, resizable: bool = true) {
+    pub init(title: str = "Lymar Game", width: int = 800, height: int = 600, resizable: bool = true) {
         self.title = title;
         self.width = width;
         self.height = height;
         self.resizable = resizable;
         self.bg_color = types.hex(0x1e1e24, 1.0);
+        self.fixed_dt = 1.0 / 60.0;
     }
 }
 
@@ -29,13 +37,30 @@ pub fn default_config(): GameConfig {
 frame Game {
     pub var config: GameConfig;
     pub var gui: gui_mod.GUI;
+    pub var input: input_mod.InputManager;
+    pub var scenes: scene_mod.SceneManager;
     pub var is_running: bool;
+
+    // Window dimensions
+    pub var width: int;
+    pub var height: int;
+
+    // High-resolution timing & loop state
+    pub var timer: timer_mod.Timer;
+    pub var delta_time: float;
+    pub var unscaled_delta_time: float;
+    pub var time_scale: float;
+    pub var total_time: float;
+    pub var frame_count: int;
+    pub var fps: float;
+    pub var accumulator: float;
+    pub var fixed_dt: float;
+
+    // Legacy fields for backward compatibility
     pub var mouse_x: float;
     pub var mouse_y: float;
     pub var mouse_down: bool;
     pub var mouse_wheel: float;
-    pub var width: int;
-    pub var height: int;
 
     pub init(cfg: any = nil) {
         if (cfg == nil) {
@@ -44,13 +69,27 @@ frame Game {
             self.config = cfg as GameConfig;
         }
         self.gui = gui_mod.GUI();
+        self.input = input_mod.InputManager();
+        self.scenes = scene_mod.SceneManager();
         self.is_running = false;
+
+        self.width = self.config.width;
+        self.height = self.config.height;
+
+        self.timer = timer_mod.Timer();
+        self.delta_time = 0.01666667;
+        self.unscaled_delta_time = 0.01666667;
+        self.time_scale = 1.0;
+        self.total_time = 0.0;
+        self.frame_count = 0;
+        self.fps = 60.0;
+        self.accumulator = 0.0;
+        self.fixed_dt = self.config.fixed_dt;
+
         self.mouse_x = 0.0;
         self.mouse_y = 0.0;
         self.mouse_down = false;
         self.mouse_wheel = 0.0;
-        self.width = self.config.width;
-        self.height = self.config.height;
     }
 
     pub fn setup(): bool {
@@ -72,6 +111,7 @@ frame Game {
         if (ok_init != 0) {
             app.show_window();
             self.is_running = true;
+            self.timer.reset();
         } else {
             self.is_running = false;
         }
@@ -79,6 +119,30 @@ frame Game {
     }
 
     pub fn begin_frame(): nil {
+        // High-precision frame delta calculation
+        var el = self.timer.elapsed();
+        self.timer.reset();
+        var raw_dt = el.to_seconds();
+        if (raw_dt <= 0.00001) {
+            raw_dt = 0.01666667;
+        } elif (raw_dt > 0.1) {
+            raw_dt = 0.1; // Clamp maximum delta to avoid spiral of death
+        }
+
+        self.unscaled_delta_time = raw_dt;
+        self.delta_time = raw_dt * self.time_scale;
+        self.total_time = self.total_time + self.delta_time;
+        self.frame_count = self.frame_count + 1;
+        self.accumulator = self.accumulator + self.delta_time;
+
+        // Exponential smoothing for FPS
+        var current_inst_fps = 1.0 / raw_dt;
+        self.fps = self.fps * 0.9 + current_inst_fps * 0.1;
+
+        // Reset per-frame input transients
+        self.input.begin_frame();
+
+        // Process all events
         var raw_events = gg.poll_events();
         if (raw_events != nil) {
             var native_events: [int] = raw_events as [int];
@@ -96,37 +160,103 @@ frame Game {
                     self.width = ev_x;
                     self.height = ev_y;
                 } elif (ev_type == app.EVENT_MOUSE_MOVE) {
-                    self.mouse_x = ev_x as float;
-                    self.mouse_y = ev_y as float;
+                    self.input.on_mouse_move(ev_x as float, ev_y as float);
                 } elif (ev_type == app.EVENT_MOUSE_DOWN) {
-                    self.mouse_down = true;
-                    self.mouse_x = ev_x as float;
-                    self.mouse_y = ev_y as float;
+                    self.input.on_mouse_down(ev_k, ev_x as float, ev_y as float);
                 } elif (ev_type == app.EVENT_MOUSE_UP) {
-                    self.mouse_down = false;
-                    self.mouse_x = ev_x as float;
-                    self.mouse_y = ev_y as float;
+                    self.input.on_mouse_up(ev_k, ev_x as float, ev_y as float);
                 } elif (ev_type == app.EVENT_MOUSE_WHEEL) {
-                    self.mouse_wheel = ev_y as float;
+                    self.input.on_mouse_wheel(ev_y as float);
+                } elif (ev_type == app.EVENT_KEY_DOWN) {
+                    self.input.on_key_down(ev_k);
+                } elif (ev_type == app.EVENT_KEY_UP) {
+                    self.input.on_key_up(ev_k);
+                } elif (ev_type == app.EVENT_CHAR) {
+                    self.input.on_char(ev_k);
                 }
                 i = i + 4;
             }
         }
 
-        // Start pass with clear color
+        // Backward compatibility synchronization
+        self.mouse_x = self.input.mouse_x;
+        self.mouse_y = self.input.mouse_y;
+        self.mouse_down = self.input.is_mouse_down(0);
+        self.mouse_wheel = self.input.mouse_wheel;
+
+        // Synchronize input to IMGUI engine
+        self.gui.keys_down = self.input.keys_down;
+        self.gui.keys_pressed = self.input.keys_pressed;
+        self.gui.typed_chars = self.input.typed_chars;
+        self.gui.active_modifiers = self.input.active_modifiers;
+
+        // Clear pass
         var bg = self.config.bg_color;
+        if (self.gui != nil and self.gui.theme != nil) {
+            bg = self.gui.theme.bg_window;
+        }
         gg.begin_pass(self.width, self.height, bg.r, bg.g, bg.b, bg.a);
 
-        // Update IMGUI input snapshot
-        self.gui.begin(self.mouse_x, self.mouse_y, self.mouse_down, self.mouse_wheel, 0.016);
+        // Begin IMGUI
+        self.gui.begin(self.mouse_x, self.mouse_y, self.mouse_down, self.mouse_wheel, self.delta_time);
+
+        // Update active scenes
+        if (self.scenes.has_scenes()) {
+            self.scenes.update(self.delta_time);
+        }
     }
 
     pub fn end_frame(): nil {
+        // Draw scene layers before finishing IMGUI & render pass
+        if (self.scenes.has_scenes()) {
+            self.scenes.draw();
+            self.scenes.draw_gui(self.gui);
+        }
         self.gui.end();
         gg.end_pass();
         gg.commit();
         self.mouse_wheel = 0.0;
     }
+
+    pub fn dt(): float {
+        return self.delta_time;
+    }
+
+    pub fn step_physics(): bool {
+        if (self.accumulator >= self.fixed_dt) {
+            self.accumulator = self.accumulator - self.fixed_dt;
+            if (self.scenes.has_scenes()) {
+                self.scenes.fixed_update(self.fixed_dt);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    // Scene state machine helpers
+    pub fn register_scene(name: str, sc: any): nil { self.scenes.register(name, sc); }
+    pub fn switch_scene(name: str, transition_duration: float = 0.0): nil { self.scenes.switch_to(name, transition_duration); }
+    pub fn push_scene(name: str): nil { self.scenes.push(name); }
+    pub fn pop_scene(): any { return self.scenes.pop(); }
+    pub fn current_scene(): any { return self.scenes.current(); }
+
+    // Direct input query helpers
+    pub fn is_key_down(key: int): bool { return self.input.is_key_down(key); }
+    pub fn is_key_pressed(key: int): bool { return self.input.is_key_pressed(key); }
+    pub fn is_key_released(key: int): bool { return self.input.is_key_released(key); }
+    pub fn is_mouse_down(button: int = 0): bool { return self.input.is_mouse_down(button); }
+    pub fn is_mouse_pressed(button: int = 0): bool { return self.input.is_mouse_pressed(button); }
+    pub fn is_mouse_released(button: int = 0): bool { return self.input.is_mouse_released(button); }
+    pub fn mouse_pos(): types.Vec2 { return self.input.mouse_pos(); }
+    pub fn mouse_delta(): types.Vec2 { return self.input.mouse_delta(); }
+
+    pub fn bind_action(action: str, keys: [int]): nil { self.input.bind_action(action, keys); }
+    pub fn is_action_down(action: str): bool { return self.input.is_action_down(action); }
+    pub fn is_action_pressed(action: str): bool { return self.input.is_action_pressed(action); }
+    pub fn is_action_released(action: str): bool { return self.input.is_action_released(action); }
+
+    pub fn bind_axis(axis: str, neg_key: int, pos_key: int): nil { self.input.bind_axis(axis, neg_key, pos_key); }
+    pub fn get_axis(axis: str): float { return self.input.get_axis(axis); }
 
     pub fn set_resolution(w: int, h: int): nil {
         self.width = w;

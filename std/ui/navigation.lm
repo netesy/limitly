@@ -1,9 +1,532 @@
-import std.ui.widget as widget;
+// std/ui/navigation.lm
+// Complete client-side router for Lymar UI applications.
+//
+// Concepts:
+//   Route        — pattern string + builder function that returns a Widget
+//   Router       — owns the route table, history stack, and current match
+//   RouterParams — key-value pairs extracted from a matched URL pattern
+//   Middleware   — optional pre-navigation guard (e.g. auth check)
 
-frame Navigation {
-    pub var stack: [widget.Widget];
+import std.ui.types as ui;
 
-    pub init(s: [widget.Widget] = [widget.Widget()]) {
-        self.stack = s;
+// ── Route Params ──────────────────────────────────────────────────────────────
+frame RouterParams {
+    pub var keys:   [str];
+    pub var values: [str];
+
+    pub init() {
+        self.keys   = [];
+        self.values = [];
     }
+
+    pub fn get(key: str): str {
+        var i = 0;
+        while (i < len(self.keys)) {
+            if (self.keys[i] == key) {
+                return self.values[i];
+            }
+            i = i + 1;
+        }
+        return "";
+    }
+
+    pub fn get_int(key: str): int {
+        var s = self.get(key);
+        if (len(s) == 0) { return 0; }
+        return s as int;
+    }
+
+    pub fn has(key: str): bool {
+        var i = 0;
+        while (i < len(self.keys)) {
+            if (self.keys[i] == key) { return true; }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn set(key: str, value: str): nil {
+        var i = 0;
+        while (i < len(self.keys)) {
+            if (self.keys[i] == key) {
+                self.values[i] = value;
+                return;
+            }
+            i = i + 1;
+        }
+        self.keys.append(key);
+        self.values.append(value);
+    }
+
+    pub fn to_str(): str {
+        var out = "{";
+        var i = 0;
+        while (i < len(self.keys)) {
+            if (i > 0) { out = out + ", "; }
+            out = out + self.keys[i] + ": " + self.values[i];
+            i = i + 1;
+        }
+        return out + "}";
+    }
+}
+
+// ── Pattern Matching ──────────────────────────────────────────────────────────
+// Split a string by "/" into segments.
+fn split_path(path: str): [str] {
+    var segments: [str] = [];
+    var current = "";
+    var i = 0;
+    while (i < len(path)) {
+        var ch = _builtin_substring(path, i, i + 1);
+        if (ch == "/") {
+            if (len(current) > 0) {
+                segments.append(current);
+                current = "";
+            }
+        } else {
+            current = current + ch;
+        }
+        i = i + 1;
+    }
+    if (len(current) > 0) {
+        segments.append(current);
+    }
+    return segments;
+}
+
+// Attempt to match `path` against `pattern`.
+// Returns (matched: bool, params: RouterParams).
+fn match_pattern(pattern: str, path: str): (bool, RouterParams) {
+    var params = RouterParams();
+    var pat_segs = split_path(pattern);
+    var path_segs = split_path(path);
+
+    // Wildcard pattern matches everything after its position
+    var has_wildcard = false;
+    var wildcard_idx = 0;
+    var w = 0;
+    while (w < len(pat_segs)) {
+        if (pat_segs[w] == "*") {
+            has_wildcard = true;
+            wildcard_idx = w;
+        }
+        w = w + 1;
+    }
+
+    if (not has_wildcard) {
+        if (len(pat_segs) != len(path_segs)) {
+            return (false, params);
+        }
+    } else {
+        if (len(path_segs) < wildcard_idx) {
+            return (false, params);
+        }
+    }
+
+    var i = 0;
+    var check_limit = len(pat_segs);
+    if (has_wildcard) { check_limit = wildcard_idx; }
+
+    while (i < check_limit) {
+        var p = pat_segs[i];
+        var s = path_segs[i];
+
+        if (len(p) > 0 and _builtin_substring(p, 0, 1) == ":") {
+            var param_name = _builtin_substring(p, 1, len(p));
+            params.set(param_name, s);
+        } elif (p != s) {
+            return (false, params);
+        }
+        i = i + 1;
+    }
+
+    if (has_wildcard) {
+        var rest = "";
+        var k = wildcard_idx;
+        while (k < len(path_segs)) {
+            if (len(rest) > 0) { rest = rest + "/"; }
+            rest = rest + path_segs[k];
+            k = k + 1;
+        }
+        params.set("*", rest);
+    }
+
+    return (true, params);
+}
+
+// ── Route ─────────────────────────────────────────────────────────────────────
+type RouteFn = fn(RouterParams): ui.Widget;
+
+frame Route {
+    pub var pattern: str;
+    pub var handler:  RouteFn;
+    pub var name:     str;
+    pub var meta:     str;  // arbitrary JSON / tag string for the route
+
+    pub init(pattern: str, handler: RouteFn, name: str = "", meta: str = "") {
+        self.pattern = pattern;
+        self.handler = handler;
+        self.name    = name;
+        self.meta    = meta;
+    }
+}
+
+// ── Navigation Entry ──────────────────────────────────────────────────────────
+frame HistoryEntry {
+    pub var path:   str;
+    pub var title:  str;
+    pub var state:  str;  // serialised page state (opaque str payload)
+
+    pub init(path: str = "/", title: str = "", state: str = "") {
+        self.path  = path;
+        self.title = title;
+        self.state = state;
+    }
+}
+
+// ── Middleware ────────────────────────────────────────────────────────────────
+// Return "" to allow, or a redirect path string to redirect.
+type MiddlewareFn = fn(str, str): str;
+
+// ── Router ────────────────────────────────────────────────────────────────────
+frame Router {
+    pub var routes:          [Route];
+    pub var history:         [HistoryEntry];
+    pub var history_idx:     int;         // current position in history
+    pub var current_path:    str;
+    pub var current_params:  RouterParams;
+    pub var current_route:   int;         // index into routes, -1 if no match
+    pub var not_found_fn:    RouteFn;
+    pub var middlewares:     [MiddlewareFn];
+    pub var base_path:       str;         // prefix stripped before matching
+
+    pub init(base_path: str = "") {
+        self.routes        = [];
+        self.history       = [];
+        self.history_idx   = -1;
+        self.current_path  = "";
+        self.current_params = RouterParams();
+        self.current_route = -1;
+        self.not_found_fn  = fn(p: RouterParams): ui.Widget {
+            return ui.column([
+                ui.text("404 — Page Not Found").font_size(24.0),
+                ui.text("The requested path was not found.").opacity(0.6)
+            ]).padding(40.0);
+        };
+        self.middlewares = [];
+        self.base_path   = base_path;
+    }
+
+    // ── Route registration ────────────────────────────────────────────
+    pub fn add(pattern: str, handler: RouteFn): Router {
+        self.routes.append(Route(pattern=pattern, handler=handler));
+        return self;
+    }
+
+    pub fn add_named(pattern: str, handler: RouteFn, name: str): Router {
+        self.routes.append(Route(pattern=pattern, handler=handler, name=name));
+        return self;
+    }
+
+    pub fn not_found(handler: RouteFn): Router {
+        self.not_found_fn = handler;
+        return self;
+    }
+
+    pub fn use_middleware(mw: MiddlewareFn): Router {
+        self.middlewares.append(mw);
+        return self;
+    }
+
+    // ── Middleware dispatch ───────────────────────────────────────────
+    fn run_middlewares(from_path: str, to_path: str): str {
+        var result = to_path;
+        var i = 0;
+        while (i < len(self.middlewares)) {
+            var mw: MiddlewareFn = self.middlewares[i];
+            var redirect = mw(from_path, result);
+            if (len(redirect) > 0 and redirect != result) {
+                result = redirect;
+            }
+            i = i + 1;
+        }
+        return result;
+    }
+
+    // ── Normalise path against base_path ──────────────────────────────
+    fn strip_base(path: str): str {
+        if (len(self.base_path) == 0) { return path; }
+        var blen = len(self.base_path);
+        if (len(path) >= blen and _builtin_substring(path, 0, blen) == self.base_path) {
+            var rest = _builtin_substring(path, blen, len(path));
+            if (len(rest) == 0 or _builtin_substring(rest, 0, 1) != "/") {
+                rest = "/" + rest;
+            }
+            return rest;
+        }
+        return path;
+    }
+
+    // ── Match resolution ──────────────────────────────────────────────
+    fn find_match(path: str): int {
+        var rel_path = self.strip_base(path);
+        if (len(rel_path) == 0) { rel_path = "/"; }
+
+        // 1. Exact match pass
+        var e = 0;
+        while (e < len(self.routes)) {
+            if (self.routes[e].pattern == rel_path) {
+                self.current_params = RouterParams();
+                return e;
+            }
+            e = e + 1;
+        }
+
+        // 2. Pattern match pass (dynamic segments & wildcards)
+        var i = 0;
+        while (i < len(self.routes)) {
+            var result = match_pattern(self.routes[i].pattern, rel_path);
+            if (result.0) {
+                self.current_params = result.1;
+                return i;
+            }
+            i = i + 1;
+        }
+        self.current_params = RouterParams();
+        return -1;
+    }
+
+    // ── Navigation ────────────────────────────────────────────────────
+    pub fn navigate(path: str, title: str = "", state: str = ""): nil {
+        var target = self.run_middlewares(self.current_path, path);
+        if (len(target) == 0) { return; }
+
+        var idx = self.find_match(target);
+        self.current_route = idx;
+        self.current_path  = target;
+
+        // Truncate forward history when navigating from mid-stack
+        if (self.history_idx < len(self.history) - 1) {
+            var new_history: [HistoryEntry] = [];
+            var j = 0;
+            while (j <= self.history_idx) {
+                new_history.append(self.history[j]);
+                j = j + 1;
+            }
+            self.history = new_history;
+        }
+
+        self.history.append(HistoryEntry(path=target, title=title, state=state));
+        self.history_idx = len(self.history) - 1;
+    }
+
+    // ── History traversal ─────────────────────────────────────────────
+    pub fn can_go_back(): bool {
+        return self.history_idx > 0;
+    }
+
+    pub fn can_go_forward(): bool {
+        return self.history_idx < len(self.history) - 1;
+    }
+
+    pub fn go_back(): nil {
+        if (self.can_go_back()) {
+            self.history_idx = self.history_idx - 1;
+            var entry = self.history[self.history_idx];
+            self.current_path  = entry.path;
+            self.current_route = self.find_match(entry.path);
+        }
+    }
+
+    pub fn go_forward(): nil {
+        if (self.can_go_forward()) {
+            self.history_idx = self.history_idx + 1;
+            var entry = self.history[self.history_idx];
+            self.current_path  = entry.path;
+            self.current_route = self.find_match(entry.path);
+        }
+    }
+
+    pub fn go(delta: int): nil {
+        var new_idx = self.history_idx + delta;
+        if (new_idx < 0) { new_idx = 0; }
+        if (new_idx >= len(self.history)) { new_idx = len(self.history) - 1; }
+        self.history_idx   = new_idx;
+        var entry = self.history[new_idx];
+        self.current_path  = entry.path;
+        self.current_route = self.find_match(entry.path);
+    }
+
+    pub fn replace(path: str, title: str = "", state: str = ""): nil {
+        if (self.history_idx >= 0 and self.history_idx < len(self.history)) {
+            self.history[self.history_idx] = HistoryEntry(path=path, title=title, state=state);
+        } else {
+            self.history.append(HistoryEntry(path=path, title=title, state=state));
+            self.history_idx = len(self.history) - 1;
+        }
+        var idx = self.find_match(path);
+        self.current_route = idx;
+        self.current_path  = path;
+    }
+
+    // ── Named navigation ──────────────────────────────────────────────
+    pub fn navigate_to(name: str, params: RouterParams): nil {
+        var i = 0;
+        while (i < len(self.routes)) {
+            if (self.routes[i].name == name) {
+                var pattern = self.routes[i].pattern;
+                var built_path = "";
+                var segs = split_path(pattern);
+                var j = 0;
+                while (j < len(segs)) {
+                    built_path = built_path + "/";
+                    var seg = segs[j];
+                    if (len(seg) > 0 and _builtin_substring(seg, 0, 1) == ":") {
+                        var key = _builtin_substring(seg, 1, len(seg));
+                        var param_val = params.get(key);
+                        if (len(param_val) > 0) {
+                            built_path = built_path + param_val;
+                        } else {
+                            built_path = built_path + seg;
+                        }
+                    } else {
+                        built_path = built_path + seg;
+                    }
+                    j = j + 1;
+                }
+                if (len(built_path) == 0) { built_path = "/"; }
+                self.navigate(built_path);
+                return;
+            }
+            i = i + 1;
+        }
+    }
+
+    // ── Rendering ─────────────────────────────────────────────────────
+    pub fn current_widget(): ui.Widget {
+        if (self.current_route >= 0 and self.current_route < len(self.routes)) {
+            var handler: RouteFn = self.routes[self.current_route].handler;
+            return handler(self.current_params);
+        }
+        return self.not_found_fn(self.current_params);
+    }
+
+    pub fn widget_for(path: str): ui.Widget {
+        var saved_path   = self.current_path;
+        var saved_route  = self.current_route;
+        var saved_params = self.current_params;
+
+        var idx = self.find_match(path);
+        var w = ui.empty();
+        if (idx >= 0) {
+            var handler: RouteFn = self.routes[idx].handler;
+            w = handler(self.current_params);
+        } else {
+            w = self.not_found_fn(self.current_params);
+        }
+
+        self.current_path   = saved_path;
+        self.current_route  = saved_route;
+        self.current_params = saved_params;
+        return w;
+    }
+
+    // ── URL helpers ───────────────────────────────────────────────────
+    pub fn url_for(name: str, params: RouterParams): str {
+        var i = 0;
+        while (i < len(self.routes)) {
+            if (self.routes[i].name == name) {
+                var pattern = self.routes[i].pattern;
+                var segs = split_path(pattern);
+                var built = "";
+                var j = 0;
+                while (j < len(segs)) {
+                    built = built + "/";
+                    var seg = segs[j];
+                    if (len(seg) > 0 and _builtin_substring(seg, 0, 1) == ":") {
+                        var key = _builtin_substring(seg, 1, len(seg));
+                        var param_val = params.get(key);
+                        if (len(param_val) > 0) { built = built + param_val; }
+                        else { built = built + seg; }
+                    } else {
+                        built = built + seg;
+                    }
+                    j = j + 1;
+                }
+                if (len(built) == 0) { return "/"; }
+                return built;
+            }
+            i = i + 1;
+        }
+        return "";
+    }
+
+    pub fn current_entry(): HistoryEntry {
+        if (self.history_idx >= 0 and self.history_idx < len(self.history)) {
+            return self.history[self.history_idx];
+        }
+        return HistoryEntry();
+    }
+
+    pub fn history_len(): int {
+        return len(self.history);
+    }
+}
+
+// ── Factory ───────────────────────────────────────────────────────────────────
+pub fn make_router(): Router {
+    return Router(base_path="");
+}
+
+pub fn make_router_with_base(base: str): Router {
+    return Router(base_path=base);
+}
+
+// ── Link Widget ───────────────────────────────────────────────────────────────
+pub fn router_link(label: str, path: str, router: Router): ui.Widget {
+    return ui.button(label, fn(): nil {
+        router.navigate(path);
+    })
+    .aria_label(label)
+    .role("link");
+}
+
+// ── Tab Bar Widget ────────────────────────────────────────────────────────────
+pub fn tab_bar(routes: [(str, str)], router: Router): ui.Widget {
+    var btns: [ui.Widget] = [];
+    var i = 0;
+    while (i < len(routes)) {
+        var label = routes[i].0;
+        var path  = routes[i].1;
+        var is_active = (router.current_path == path);
+        var btn = ui.button(label, fn(): nil { router.navigate(path); });
+        if (is_active) {
+            btn = btn.background(ui.indigo);
+        } else {
+            btn = btn.background(ui.transparent);
+        }
+        btns.append(btn.role("tab").aria_label(label));
+        i = i + 1;
+    }
+    return ui.row(btns).spacing(4.0);
+}
+
+// ── Breadcrumb Widget ─────────────────────────────────────────────────────────
+pub fn breadcrumbs(router: Router): ui.Widget {
+    var items: [ui.Widget] = [];
+    var i = 0;
+    while (i <= router.history_idx and i < len(router.history)) {
+        var entry = router.history[i];
+        var path  = entry.path;
+        if (i > 0) {
+            items.append(ui.text(" › ").opacity(0.4));
+        }
+        if (i == router.history_idx) {
+            items.append(ui.text(path).opacity(1.0));
+        } else {
+            items.append(router_link(path, path, router));
+        }
+        i = i + 1;
+    }
+    return ui.row(items).spacing(2.0).aria_label("Breadcrumb navigation").role("navigation");
 }

@@ -1383,7 +1383,30 @@ public:
                 buf[rd] = 0;
                 return make_string_value(buf.data());
             }
+            case ResourceOperation::READ_BYTES: {
+                // Binary read — returns a [int] list of raw byte values (0..255).
+                // Unlike READ (make_string_value), handles embedded \0 bytes correctly.
+                if (!fp_) return VAL_NIL;
+                long cur = std::ftell(fp_);
+                if (cur < 0) return VAL_NIL;
+                std::fseek(fp_, 0, SEEK_END);
+                long end = std::ftell(fp_);
+                std::fseek(fp_, cur, SEEK_SET);
+
+                size_t n = (size_t)(end - cur);
+                LmList* list = lm_list_new();
+                if (!list) return VAL_NIL;
+                if (n > 0) {
+                    std::vector<uint8_t> rawbuf(n);
+                    size_t rd = std::fread(rawbuf.data(), 1, n, fp_);
+                    for (size_t i = 0; i < rd; ++i) {
+                        lm_list_append(list, BOX_INT((int64_t)(uint8_t)rawbuf[i]));
+                    }
+                }
+                return BOX_PTR(list);
+            }
             case ResourceOperation::WRITE: {
+
                 if (!fp_) return VAL_FALSE;
                 const char* data = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
                 if (!data) return VAL_FALSE;

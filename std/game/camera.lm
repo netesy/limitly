@@ -1,0 +1,159 @@
+// std/game/camera.lm
+// 2D Camera system with coordinate projection, tracking, zoom, rotation, and trauma-based screen shake
+
+import std.math as math;
+import std.gg as gg;
+import std.game.types as types;
+
+frame Camera2D {
+    pub var target: types.Vec2;
+    pub var offset: types.Vec2;
+    pub var rotation: float;
+    pub var zoom: float;
+
+    // Screenshake (trauma-based shake system)
+    pub var trauma: float;
+    pub var trauma_decay: float;
+    pub var max_shake_offset: float;
+    pub var max_shake_angle: float;
+    pub var shake_time: float;
+    pub var shake_offset: types.Vec2;
+    pub var shake_rotation: float;
+
+    pub init(target: any = nil, offset: any = nil, zoom: float = 1.0, rotation: float = 0.0) {
+        if (target == nil) {
+            self.target = types.Vec2(x=0.0, y=0.0);
+        } else {
+            self.target = target as types.Vec2;
+        }
+
+        if (offset == nil) {
+            self.offset = types.Vec2(x=0.0, y=0.0);
+        } else {
+            self.offset = offset as types.Vec2;
+        }
+
+        self.zoom = zoom;
+        if (self.zoom <= 0.0) {
+            self.zoom = 1.0;
+        }
+        self.rotation = rotation;
+
+        self.trauma = 0.0;
+        self.trauma_decay = 1.2;
+        self.max_shake_offset = 18.0;
+        self.max_shake_angle = 0.08;
+        self.shake_time = 0.0;
+        self.shake_offset = types.Vec2();
+        self.shake_rotation = 0.0;
+    }
+
+    pub fn set_viewport(width: float, height: float): nil {
+        self.offset = types.Vec2(x=width * 0.5, y=height * 0.5);
+    }
+
+    pub fn screen_to_world(screen_pos: any): types.Vec2 {
+        var sp = screen_pos as types.Vec2;
+        var total_shake_rot = self.rotation + self.shake_rotation;
+        var p = sp.sub(self.offset).sub(self.shake_offset);
+        if (self.zoom != 0.0) {
+            p = p.scale(1.0 / self.zoom);
+        }
+        if (total_shake_rot != 0.0) {
+            p = p.rotate(-total_shake_rot);
+        }
+        return p.add(self.target);
+    }
+
+    pub fn world_to_screen(world_pos: any): types.Vec2 {
+        var wp = world_pos as types.Vec2;
+        var total_shake_rot = self.rotation + self.shake_rotation;
+        var p = wp.sub(self.target);
+        if (total_shake_rot != 0.0) {
+            p = p.rotate(total_shake_rot);
+        }
+        p = p.scale(self.zoom);
+        return p.add(self.offset).add(self.shake_offset);
+    }
+
+    pub fn follow(target_pos: any, smoothness: float = 0.1, dt: float = 0.016): nil {
+        var tp = target_pos as types.Vec2;
+        var s = math.clamp(smoothness * dt * 60.0, 0.0, 1.0);
+        self.target = self.target.lerp(tp, s);
+    }
+
+    pub fn add_trauma(amount: float): nil {
+        self.trauma = math.clamp(self.trauma + amount, 0.0, 1.0);
+    }
+
+    pub fn update(dt: float): nil {
+        self.shake_time = self.shake_time + dt;
+        if (self.trauma > 0.0) {
+            self.trauma = math.max(0.0, self.trauma - self.trauma_decay * dt);
+            var shake = self.trauma * self.trauma; // Non-linear response curve
+
+            var s1 = math.sin(self.shake_time * 38.0);
+            var s2 = math.cos(self.shake_time * 47.0);
+            var s3 = math.sin(self.shake_time * 31.0);
+
+            self.shake_offset = types.Vec2(
+                x=s1 * self.max_shake_offset * shake,
+                y=s2 * self.max_shake_offset * shake
+            );
+            self.shake_rotation = s3 * self.max_shake_angle * shake;
+        } else {
+            self.shake_offset = types.Vec2(x=0.0, y=0.0);
+            self.shake_rotation = 0.0;
+        }
+    }
+
+    // ── World-Space Primitive Drawing Helpers ─────────────────────────────────
+
+    pub fn draw_rect(world_rect: any, r: float, g: float, b: float, a: float): nil {
+        var wr = world_rect as types.Rect;
+        var screen_pos = self.world_to_screen(types.Vec2(x=wr.x, y=wr.y));
+        var sw = wr.w * self.zoom;
+        var sh = wr.h * self.zoom;
+        gg.draw_rect_primitive(screen_pos.x, screen_pos.y, sw, sh, r, g, b, a);
+    }
+
+    pub fn draw_circle(world_center: any, radius: float, r: float, g: float, b: float, a: float, segments: int = 16): nil {
+        var screen_center = self.world_to_screen(world_center);
+        var sr = radius * self.zoom;
+        var segs = segments;
+        if (segs < 8) segs = 8;
+        var step = (6.28318530718) / (segs as float);
+        var i = 0;
+        while (i < segs) {
+            var a1 = (i as float) * step;
+            var a2 = ((i + 1) as float) * step;
+            var p1_x = screen_center.x + math.cos(a1) * sr;
+            var p1_y = screen_center.y + math.sin(a1) * sr;
+            var p2_x = screen_center.x + math.cos(a2) * sr;
+            var p2_y = screen_center.y + math.sin(a2) * sr;
+            gg.draw_triangle_primitive(screen_center.x, screen_center.y, p1_x, p1_y, p2_x, p2_y, r, g, b, a);
+            i = i + 1;
+        }
+    }
+
+    pub fn draw_line(p1: any, p2: any, thickness: float, r: float, g: float, b: float, a: float): nil {
+        var sp1 = self.world_to_screen(p1);
+        var sp2 = self.world_to_screen(p2);
+        var diff = sp2.sub(sp1);
+        var len = diff.mag();
+        if (len <= 0.0) return;
+        var perp = types.Vec2(x=-diff.y, y=diff.x).scale(1.0 / len).scale(thickness * 0.5 * self.zoom);
+
+        var v1 = sp1.add(perp);
+        var v2 = sp1.sub(perp);
+        var v3 = sp2.sub(perp);
+        var v4 = sp2.add(perp);
+
+        gg.draw_triangle_primitive(v1.x, v1.y, v2.x, v2.y, v3.x, v3.y, r, g, b, a);
+        gg.draw_triangle_primitive(v1.x, v1.y, v3.x, v3.y, v4.x, v4.y, r, g, b, a);
+    }
+}
+
+pub fn Camera(target: any = nil, offset: any = nil, zoom: float = 1.0): Camera2D {
+    return Camera2D(target=target, offset=offset, zoom=zoom);
+}

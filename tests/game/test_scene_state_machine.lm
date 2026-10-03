@@ -1,0 +1,229 @@
+// tests/game/test_scene_state_machine.lm
+// Comprehensive verification suite for Phase 5 std.game Scene State Machine & IMGUI Refactoring
+
+import std.game as game;
+import std.math as math;
+
+fn test_scene_lifecycle_and_switching() {
+    print("=== Testing Scene Lifecycle & Direct Switching ===");
+
+    var sm = game.SceneManager();
+    assert(sm.has_scenes() == false, "SceneManager should initially have no active scenes");
+    assert(sm.stack_size() == 0, "Stack size should initially be 0");
+
+    var state = {
+        "menu_entered": false,
+        "menu_exited": false,
+        "menu_updates": 0,
+        "play_entered": false
+    };
+
+    var menu = game.Scene("Menu");
+    menu.on_enter_cb = fn(): nil {
+        state["menu_entered"] = true;
+    };
+    menu.on_exit_cb = fn(): nil {
+        state["menu_exited"] = true;
+    };
+    menu.update_cb = fn(dt: float): nil {
+        var u = state["menu_updates"] as int;
+        state["menu_updates"] = u + 1;
+    };
+
+    var play = game.Scene("Play");
+    play.on_enter_cb = fn(): nil {
+        state["play_entered"] = true;
+    };
+
+    sm.register("menu", menu);
+    sm.register("play", play);
+
+    assert(sm.get("menu") != nil, "Registered menu scene should be retrievable");
+    assert(sm.get("play") != nil, "Registered play scene should be retrievable");
+
+    // Switch to menu
+    sm.switch_to("menu");
+    assert(sm.has_scenes() == true, "SceneManager should have active scene after switch_to");
+    assert(sm.stack_size() == 1, "Stack size should be 1");
+    assert((state["menu_entered"] as bool) == true, "Menu on_enter should have been called");
+    assert(menu.is_active == true, "Menu should be active");
+
+    // Update
+    sm.update(0.016);
+    sm.update(0.016);
+    assert((state["menu_updates"] as int) == 2, "Menu update should have been called twice");
+
+    // Switch to play
+    sm.switch_to("play");
+    assert((state["menu_exited"] as bool) == true, "Menu on_exit should have been called upon switching");
+    assert(menu.is_active == false, "Menu should no longer be active");
+    assert((state["play_entered"] as bool) == true, "Play on_enter should have been called");
+    assert(sm.stack_size() == 1, "Stack size should remain 1 after switch_to");
+    assert(sm.current_name == "play", "Current scene name should be play");
+
+    print("[OK] Scene Lifecycle & Direct Switching passed");
+}
+
+fn test_scene_stack_push_pop() {
+    print("=== Testing Scene Stack Modal Push & Pop ===");
+
+    var sm = game.SceneManager();
+
+    var state = {
+        "game_paused": false,
+        "game_resumed": false,
+        "game_updates": 0,
+        "pause_entered": false,
+        "pause_exited": false,
+        "pause_updates": 0
+    };
+
+    var gameplay = game.Scene("Gameplay");
+    gameplay.on_pause_cb = fn(): nil {
+        state["game_paused"] = true;
+    };
+    gameplay.on_resume_cb = fn(): nil {
+        state["game_resumed"] = true;
+    };
+    gameplay.update_cb = fn(dt: float): nil {
+        var u = state["game_updates"] as int;
+        state["game_updates"] = u + 1;
+    };
+
+    var pause_menu = game.Scene("PauseMenu");
+    pause_menu.on_enter_cb = fn(): nil {
+        state["pause_entered"] = true;
+    };
+    pause_menu.on_exit_cb = fn(): nil {
+        state["pause_exited"] = true;
+    };
+    pause_menu.update_cb = fn(dt: float): nil {
+        var u = state["pause_updates"] as int;
+        state["pause_updates"] = u + 1;
+    };
+
+    sm.register("gameplay", gameplay);
+    sm.register("pause", pause_menu);
+
+    // Start gameplay
+    sm.switch_to("gameplay");
+    assert(sm.stack_size() == 1, "Stack size should be 1");
+
+    sm.update(0.016);
+    assert((state["game_updates"] as int) == 1, "Gameplay should have updated once");
+
+    // Push pause menu
+    sm.push("pause");
+    assert(sm.stack_size() == 2, "Stack size should be 2 after push");
+    assert((state["game_paused"] as bool) == true, "Gameplay on_pause should be invoked");
+    assert(gameplay.is_paused == true, "Gameplay should be paused");
+    assert((state["pause_entered"] as bool) == true, "Pause menu on_enter should be invoked");
+    assert(sm.current_name == "pause", "Current top scene should be pause");
+
+    // Update: only the top scene updates while gameplay is paused
+    sm.update(0.016);
+    assert((state["pause_updates"] as int) == 1, "Pause menu should update");
+    assert((state["game_updates"] as int) == 1, "Paused gameplay should NOT update");
+
+    // Pop pause menu to resume gameplay
+    var popped = sm.pop();
+    assert(popped != nil, "Popped scene should not be nil");
+    assert((state["pause_exited"] as bool) == true, "Pause menu on_exit should be invoked");
+    assert(sm.stack_size() == 1, "Stack size should return to 1 after pop");
+    assert((state["game_resumed"] as bool) == true, "Gameplay on_resume should be invoked");
+    assert(gameplay.is_paused == false, "Gameplay should no longer be paused");
+    assert(sm.current_name == "gameplay", "Current scene name should return to gameplay");
+
+    // Update again: gameplay updates normally
+    sm.update(0.016);
+    assert((state["game_updates"] as int) == 2, "Gameplay should update after being resumed");
+
+    print("[OK] Scene Stack Modal Push & Pop passed");
+}
+
+fn test_scene_transitions() {
+    print("=== Testing Screen Transitions ===");
+
+    var sm = game.SceneManager();
+
+    var s1 = game.Scene("Scene1");
+    var s2 = game.Scene("Scene2");
+    sm.register("s1", s1);
+    sm.register("s2", s2);
+
+    sm.switch_to("s1");
+    assert(sm.current_name == "s1", "Current scene should be s1");
+
+    // Initiate 0.2s transition to s2 (0.1s fade out, 0.1s fade in)
+    sm.switch_to("s2", 0.2);
+    assert(sm.is_transitioning == true, "Should be in transitioning state");
+    assert(sm.transition_mode == 1, "Transition mode should be 1 (FadeOut)");
+    assert(sm.current_name == "s1", "Current scene should still be s1 during fade out");
+
+    // Update 0.05s (halfway through fade out)
+    sm.update(0.05);
+    assert(sm.is_transitioning == true, "Should still be transitioning");
+    assert(sm.transition_alpha > 0.4 and sm.transition_alpha < 0.6, "Alpha should be ~0.5");
+    assert(sm.current_name == "s1", "Current scene should still be s1 halfway through fade out");
+
+    // Update 0.06s (now past 0.1s fade out: scene switches to s2, mode switches to FadeIn)
+    sm.update(0.06);
+    assert(sm.current_name == "s2", "Scene should have switched to s2 at peak fade");
+    assert(sm.transition_mode == 2, "Transition mode should now be 2 (FadeIn)");
+
+    // Update 0.1s to finish fade in
+    sm.update(0.1);
+    assert(sm.is_transitioning == false, "Transition should be finished");
+    assert(sm.transition_alpha == 0.0, "Transition alpha should be 0.0");
+    assert(sm.current_name == "s2", "Current scene should be s2");
+
+    print("[OK] Screen Transitions passed");
+}
+
+fn test_game_harness_integration() {
+    print("=== Testing Game Harness Scene Integration ===");
+
+    var cfg = game.GameConfig(title="Scene Test", width=800, height=600);
+    var app = game.Game(cfg);
+
+    var tracker = {"steps": 0};
+    var level = game.Scene("Level");
+    level.fixed_update_cb = fn(dt: float): nil {
+        var s = tracker["steps"] as int;
+        tracker["steps"] = s + 1;
+    };
+
+    app.register_scene("level", level);
+    app.switch_scene("level");
+
+    assert(app.current_scene() != nil, "app.current_scene() should return active level");
+
+    // Test physics dispatch
+    app.accumulator = 0.05; // 3 physics steps
+    while (app.step_physics()) {
+    }
+    assert((tracker["steps"] as int) == 3, "Fixed update should be called 3 times through app.step_physics");
+
+    // Test IMGUI debug HUD helper
+    app.gui.show_debug_hud(app.fps, app.delta_time, 42);
+
+    print("[OK] Game Harness Scene Integration passed");
+}
+
+fn main(): int {
+    print("========================================");
+    print("Running Full std.game Phase 5 Verification Suite");
+    print("========================================");
+
+    test_scene_lifecycle_and_switching();
+    test_scene_stack_push_pop();
+    test_scene_transitions();
+    test_game_harness_integration();
+
+    print("========================================");
+    print("ALL Phase 5 Scene & IMGUI tests passed with 100% success!");
+    print("========================================");
+    return 0;
+}
+
+main();

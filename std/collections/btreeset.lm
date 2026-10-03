@@ -21,3 +21,7 @@ frame BTreeSetWrapper {
         return self.impl.length();
     }
 }
+
+pub fn BTreeSet(): BTreeSetWrapper {
+    return BTreeSetWrapper();
+}

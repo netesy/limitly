@@ -1,6 +1,5 @@
 // Set Frame - Unique element collection implementation
 
-import std.core as core;
 
 frame Set {
     pub elements: [int];

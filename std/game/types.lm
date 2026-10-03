@@ -1,6 +1,7 @@
 // std/game/types.lm
 // Fundamental math primitives, color definitions, and themes for std.game IMGUI
 
+import std.math as math;
 import std.graphics.shadow as shadow_mod;
 
 pub var Shadow = shadow_mod.Shadow;
@@ -13,6 +14,112 @@ frame Vec2 {
     pub init(x: float = 0.0, y: float = 0.0) {
         self.x = x;
         self.y = y;
+    }
+
+    pub fn add(other: any): Vec2 {
+        var o = other as Vec2;
+        return Vec2(x=self.x + o.x, y=self.y + o.y);
+    }
+
+    pub fn sub(other: any): Vec2 {
+        var o = other as Vec2;
+        return Vec2(x=self.x - o.x, y=self.y - o.y);
+    }
+
+    pub fn scale(s: float): Vec2 {
+        return Vec2(x=self.x * s, y=self.y * s);
+    }
+
+    pub fn mul(other: any): Vec2 {
+        var o = other as Vec2;
+        return Vec2(x=self.x * o.x, y=self.y * o.y);
+    }
+
+    pub fn div(s: float): Vec2 {
+        if (s == 0.0) { return Vec2(); }
+        return Vec2(x=self.x / s, y=self.y / s);
+    }
+
+    pub fn dot(other: any): float {
+        var o = other as Vec2;
+        return self.x * o.x + self.y * o.y;
+    }
+
+    pub fn cross(other: any): float {
+        var o = other as Vec2;
+        return self.x * o.y - self.y * o.x;
+    }
+
+    pub fn mag_sq(): float {
+        return self.x * self.x + self.y * self.y;
+    }
+
+    pub fn mag(): float {
+        return math.sqrt(self.mag_sq());
+    }
+
+    pub fn length(): float {
+        return self.mag();
+    }
+
+    pub fn length_sq(): float {
+        return self.mag_sq();
+    }
+
+    pub fn normalize(): Vec2 {
+        var m = self.mag();
+        if (m == 0.0) { return Vec2(); }
+        return self.scale(1.0 / m);
+    }
+
+    pub fn dist_sq(other: any): float {
+        var o = other as Vec2;
+        var dx = self.x - o.x;
+        var dy = self.y - o.y;
+        return dx * dx + dy * dy;
+    }
+
+    pub fn dist(other: any): float {
+        return math.sqrt(self.dist_sq(other));
+    }
+
+    pub fn lerp(target: any, t: float): Vec2 {
+        var tgt = target as Vec2;
+        return Vec2(
+            x=self.x + (tgt.x - self.x) * t,
+            y=self.y + (tgt.y - self.y) * t
+        );
+    }
+
+    pub fn angle(): float {
+        return math.atan2(self.y, self.x);
+    }
+
+    pub fn rotate(radians: float): Vec2 {
+        var c = math.cos(radians);
+        var s = math.sin(radians);
+        return Vec2(
+            x=self.x * c - self.y * s,
+            y=self.x * s + self.y * c
+        );
+    }
+
+    pub fn perpendicular(): Vec2 {
+        return Vec2(x=-self.y, y=self.x);
+    }
+
+    pub fn reflect(normal: any): Vec2 {
+        var n = normal as Vec2;
+        var d = self.dot(n) * 2.0;
+        return self.sub(n.scale(d));
+    }
+
+    pub fn clamp_length(max_len: float): Vec2 {
+        var l_sq = self.mag_sq();
+        if (l_sq > max_len * max_len and l_sq > 0.0) {
+            return self.normalize().scale(max_len);
+        }
+        return Vec2(x=self.x, y=self.y);
     }
 }
 
@@ -35,6 +142,60 @@ frame Rect {
 
     pub fn contains(px: float, py: float): bool {
         return px >= self.x and px <= (self.x + self.w) and py >= self.y and py <= (self.y + self.h);
+    }
+
+    pub fn contains_vec(p: any): bool {
+        var pt = p as Vec2;
+        return self.contains(pt.x, pt.y);
+    }
+
+    pub fn intersects(other: any): bool {
+        var o = other as Rect;
+        return not (self.x + self.w < o.x or
+                    o.x + o.w < self.x or
+                    self.y + self.h < o.y or
+                    o.y + o.h < self.y);
+    }
+
+    pub fn intersection(other: any): Rect {
+        var o = other as Rect;
+        var ix = math.max(self.x, o.x);
+        var iy = math.max(self.y, o.y);
+        var rx = math.min(self.x + self.w, o.x + o.w);
+        var by = math.min(self.y + self.h, o.y + o.h);
+        if (rx > ix and by > iy) {
+            return Rect(x=ix, y=iy, w=rx - ix, h=by - iy);
+        }
+        return Rect();
+    }
+
+    pub fn union_rect(other: any): Rect {
+        var o = other as Rect;
+        var min_x = math.min(self.x, o.x);
+        var min_y = math.min(self.y, o.y);
+        var max_x = math.max(self.x + self.w, o.x + o.w);
+        var max_y = math.max(self.y + self.h, o.y + o.h);
+        return Rect(x=min_x, y=min_y, w=max_x - min_x, h=max_y - min_y);
+    }
+
+    pub fn center(): Vec2 {
+        return Vec2(x=self.x + self.w * 0.5, y=self.y + self.h * 0.5);
+    }
+
+    pub fn expand(amount: float): Rect {
+        return Rect(
+            x=self.x - amount,
+            y=self.y - amount,
+            w=self.w + amount * 2.0,
+            h=self.h + amount * 2.0
+        );
+    }
+
+    pub fn clamp_point(p: any): Vec2 {
+        var pt = p as Vec2;
+        var cx = math.clamp(pt.x, self.x, self.x + self.w);
+        var cy = math.clamp(pt.y, self.y, self.y + self.h);
+        return Vec2(x=cx, y=cy);
     }
 }
 
@@ -142,6 +303,9 @@ frame GUITheme {
     pub var press_duration: float;
     pub var enter_duration: float;
     pub var exit_duration: float;
+    pub var button_shadow: any;
+    pub var window_shadow: any;
+    pub var popup_shadow: any;
 
     pub init() {
         // Modern game engine slate/dark palette
@@ -176,6 +340,9 @@ frame GUITheme {
         self.press_duration     = 0.08;
         self.enter_duration     = 0.25;
         self.exit_duration      = 0.20;
+        self.button_shadow      = nil;
+        self.window_shadow      = nil;
+        self.popup_shadow       = nil;
     }
 }
 

@@ -1,6 +1,5 @@
 // Stack Frame - LIFO (Last In, First Out) implementation
 
-import std.core as core;
 
 frame Stack {
     pub data: [any];

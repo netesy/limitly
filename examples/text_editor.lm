@@ -1,0 +1,696 @@
+// examples/text_editor.lm
+// Feature-rich, interactive Text Editor application built with std.game
+// Exercises tabs, file buffers, input handling, custom themes, dialogs, and metrics.
+
+import std.game as game;
+import std.math as math;
+import std.string as str_mod;
+
+frame EditorDocument {
+    pub var title: str;
+    pub var path: str;
+    pub var content: str;
+    pub var is_dirty: bool;
+    pub var cursor_line: int;
+    pub var cursor_col: int;
+
+    pub init(title: str = "Untitled.txt", path: str = "", content: str = "") {
+        self.title = title;
+        self.path = path;
+        self.content = content;
+        self.is_dirty = false;
+        self.cursor_line = 1;
+        self.cursor_col = 1;
+    }
+}
+
+pub fn EditorDocument(title: str = "Untitled.txt", path: str = "", content: str = ""): EditorDocument {
+    return EditorDocument(title=title, path=path, content=content);
+}
+
+fn find_substring_from(haystack: str, needle: str, start_pos: int): int {
+    var h_len = len(haystack);
+    var n_len = len(needle);
+    if (n_len == 0) return -1;
+    if (start_pos < 0) start_pos = 0;
+    if (start_pos + n_len > h_len) return -1;
+    var sub = str_mod.substring(haystack, start_pos, h_len);
+    var idx = str_mod.String(value=sub).index_of(needle);
+    if (idx < 0) return -1;
+    return start_pos + idx;
+}
+
+fn char_to_line_col(text: str, target_idx: int): (int, int) {
+    var line = 0;
+    var col = 0;
+    var ci = 0;
+    var t_len = len(text);
+    if (target_idx > t_len) target_idx = t_len;
+    while (ci < target_idx) {
+        if (text[ci] == "\n") {
+            line = line + 1;
+            col = 0;
+        } else {
+            col = col + 1;
+        }
+        ci = ci + 1;
+    }
+    return (line, col);
+}
+
+frame TextEditorApp {
+    pub var game_app: game.Game;
+    pub var documents: [EditorDocument];
+    pub var active_tab_idx: int;
+    pub var status_message: str;
+    pub var status_timer: float;
+
+    // Dialog & overlay states
+    pub var show_find_dialog: bool;
+    pub var find_query: str;
+    pub var replace_query: str;
+    pub var last_find_idx: int;
+    pub var show_about_dialog: bool;
+    pub var show_metrics: bool;
+
+    // Theme tracking
+    pub var current_theme_name: str;
+    pub var theme_names: [str];
+    pub var current_theme_idx: int;
+
+    pub init() {
+        var cfg = game.GameConfig(
+            title="Lymar Studio - Text Editor",
+            width=1080,
+            height=720,
+            resizable=true
+        );
+        self.game_app = game.Game(cfg);
+
+        self.documents = [];
+        self.active_tab_idx = 0;
+        self.status_message = "Ready";
+        self.status_timer = 3.0;
+
+        self.show_find_dialog = false;
+        self.find_query = "";
+        self.replace_query = "";
+        self.last_find_idx = 0;
+        self.show_about_dialog = false;
+        self.show_metrics = false;
+
+        self.current_theme_name = "Retro";
+        self.theme_names = ["Dark", "Cyberpunk", "Light", "Retro"];
+        self.current_theme_idx = 0;
+
+        // Preload sample documents
+        var doc1 = EditorDocument(
+            title="Welcome.lm",
+            path="welcome.lm",
+            content="// Welcome to Lymar Studio Text Editor!\n// Built entirely with the std.game framework.\n\nfn main(): int\n    return 0;\n"
+        );
+        var doc2 = EditorDocument(
+            title="notes.txt",
+            path="notes.txt",
+            content="Project Todo:\n- [x] Complete Phases 1-5 of std.game engine\n- [x] Vector math, camera, particles, and scenes\n- [ ] Build awesome desktop applications in Lymar!\n"
+        );
+
+        self.documents.append(doc1);
+        self.documents.append(doc2);
+    }
+
+    pub fn new_document(): nil {
+        var count = len(self.documents) + 1;
+        var name = "Untitled-{count}.txt";
+        var doc = EditorDocument(title=name, path="", content="");
+        self.documents.append(doc);
+        self.active_tab_idx = len(self.documents) - 1;
+        self.set_status("Created " + name);
+    }
+
+    pub fn close_current_document(): nil {
+        var n = len(self.documents);
+        if (n <= 1) {
+            self.set_status("Cannot close last remaining buffer");
+            return;
+        }
+
+        var new_docs: [EditorDocument] = [];
+        var i = 0;
+        while (i < n) {
+            if (i != self.active_tab_idx) {
+                new_docs.append(self.documents[i]);
+            }
+            i = i + 1;
+        }
+        self.documents = new_docs;
+        if (self.active_tab_idx >= len(self.documents)) {
+            self.active_tab_idx = len(self.documents) - 1;
+        }
+        self.set_status("Closed document");
+    }
+
+    pub fn save_current_document(): nil {
+        if (self.active_tab_idx >= 0 and self.active_tab_idx < len(self.documents)) {
+            var doc = self.documents[self.active_tab_idx];
+            doc.is_dirty = false;
+            self.set_status("Saved " + doc.title);
+        }
+    }
+
+    pub fn set_status(msg: str): nil {
+        self.status_message = msg;
+        self.status_timer = 4.0;
+    }
+
+    pub fn set_theme(theme_name: str): nil {
+        self.current_theme_name = theme_name;
+        if (theme_name == "Dark") {
+            self.game_app.gui.set_theme(game.dark_theme());
+        } elif (theme_name == "Cyberpunk") {
+            self.game_app.gui.set_theme(game.cyberpunk_theme());
+        } elif (theme_name == "Light") {
+            self.game_app.gui.set_theme(game.light_theme());
+        } elif (theme_name == "Retro") {
+            self.game_app.gui.set_theme(game.retro_theme());
+        }
+        self.game_app.config.bg_color = self.game_app.gui.theme.bg_window;
+        self.set_status("Switched theme to " + theme_name);
+    }
+
+    pub fn render_menu_bar(gui: any): nil {
+        var g = gui as game.GUI;
+        var win_w = self.game_app.width as float;
+
+        // Solid menu header surface (ensures higher z-index than editor content)
+        var mbg = g.get_style_color(game.COLOR_PANEL_BG);
+        g.draw_rect(0.0, 0.0, win_w, 36.0, mbg);
+        var sep = g.get_style_color(game.COLOR_SEPARATOR);
+        g.draw_rect(0.0, 35.0, win_w, 1.0, sep);
+
+        g.set_cursor(10.0, 6.0);
+
+        // Top navigation bar buttons
+        if (g.button("  File  ", 60.0, 24.0)) {
+            g.open_popup("menu_file");
+        }
+        g.same_line(6.0);
+
+        if (g.button("  Edit  ", 60.0, 24.0)) {
+            g.open_popup("menu_edit");
+        }
+        g.same_line(6.0);
+
+        if (g.button("  View  ", 60.0, 24.0)) {
+            g.open_popup("menu_view");
+        }
+        g.same_line(6.0);
+
+        if (g.button("  Help  ", 60.0, 24.0)) {
+            self.show_about_dialog = true;
+        }
+        g.same_line(20.0);
+
+        // Toolbar Action Shortcuts
+        if (g.button("+ New", 58.0, 24.0)) {
+            self.new_document();
+        }
+        g.same_line(4.0);
+
+        if (g.button("Save", 54.0, 24.0)) {
+            self.save_current_document();
+        }
+        g.same_line(4.0);
+
+        if (g.button("Close Tab", 76.0, 24.0)) {
+            self.close_current_document();
+        }
+        g.same_line(16.0);
+
+        if (g.button("Find", 50.0, 24.0)) {
+            self.show_find_dialog = not self.show_find_dialog;
+        }
+        g.same_line(4.0);
+
+        if (g.button("Metrics", 66.0, 24.0)) {
+            self.show_metrics = not self.show_metrics;
+        }
+        g.same_line(14.0);
+
+        // Quick Theme Select Dropdown
+        var new_t_idx = g.combo_box("", self.theme_names, self.current_theme_idx);
+        if (new_t_idx != self.current_theme_idx) {
+            self.current_theme_idx = new_t_idx;
+            self.set_theme(self.theme_names[new_t_idx]);
+        }
+    }
+
+    pub fn render_dropdowns(gui: any): nil {
+        var g = gui as game.GUI;
+
+        // Dropdown popups rendered in the overlay pass (on top of editor area)
+        if (g.begin_popup("menu_file", 10.0, 36.0, 140.0, 96.0)) {
+            if (g.button("New File", 128.0, 22.0)) {
+                self.new_document();
+                g.close_popup("menu_file");
+            }
+            if (g.button("Save File", 128.0, 22.0)) {
+                self.save_current_document();
+                g.close_popup("menu_file");
+            }
+            if (g.button("Close Tab", 128.0, 22.0)) {
+                self.close_current_document();
+                g.close_popup("menu_file");
+            }
+            g.end_popup();
+        }
+
+        if (g.begin_popup("menu_edit", 76.0, 36.0, 140.0, 72.0)) {
+            if (g.button("Find...", 128.0, 22.0)) {
+                self.show_find_dialog = true;
+                g.close_popup("menu_edit");
+            }
+            if (g.button("Select All", 128.0, 22.0)) {
+                self.set_status("Selected all text");
+                g.close_popup("menu_edit");
+            }
+            g.end_popup();
+        }
+
+        if (g.begin_popup("menu_view", 142.0, 36.0, 150.0, 120.0)) {
+            if (g.button("Dark Theme", 138.0, 22.0)) {
+                self.current_theme_idx = 0;
+                self.set_theme("Dark");
+                g.close_popup("menu_view");
+            }
+            if (g.button("Cyberpunk Theme", 138.0, 22.0)) {
+                self.current_theme_idx = 1;
+                self.set_theme("Cyberpunk");
+                g.close_popup("menu_view");
+            }
+            if (g.button("Light Theme", 138.0, 22.0)) {
+                self.current_theme_idx = 2;
+                self.set_theme("Light");
+                g.close_popup("menu_view");
+            }
+            if (g.button("Retro Theme", 138.0, 22.0)) {
+                self.current_theme_idx = 3;
+                self.set_theme("Retro");
+                g.close_popup("menu_view");
+            }
+            g.end_popup();
+        }
+    }
+
+    pub fn render_tabs(gui: any): nil {
+        var g = gui as game.GUI;
+        var win_w = self.game_app.width as float;
+
+        // Solid tab bar surface (higher z-index than editor)
+        var tbg = g.get_style_color(game.COLOR_WINDOW_BG);
+        g.draw_rect(0.0, 36.0, win_w, 34.0, tbg);
+        var sep = g.get_style_color(game.COLOR_SEPARATOR);
+        g.draw_rect(0.0, 69.0, win_w, 1.0, sep);
+
+        g.set_cursor(10.0, 40.0);
+
+        var i = 0;
+        var num_docs = len(self.documents);
+        while (i < num_docs) {
+            var doc = self.documents[i];
+            var tab_title = doc.title;
+            if (doc.is_dirty) {
+                tab_title = tab_title + " *";
+            }
+
+            var is_active = (i == self.active_tab_idx);
+            var tab_w = 120.0;
+            if (is_active) {
+                // Active tab highlighted
+                g.push_style_color(game.COLOR_BUTTON, g.theme.accent);
+                if (g.button(tab_title, tab_w, 26.0)) {
+                    self.active_tab_idx = i;
+                }
+                g.pop_style_color(1);
+            } else {
+                if (g.button(tab_title, tab_w, 26.0)) {
+                    self.active_tab_idx = i;
+                }
+            }
+            g.same_line(4.0);
+            i = i + 1;
+        }
+    }
+
+    pub fn render_editor_area(gui: any): nil {
+        var g = gui as game.GUI;
+        var cur_doc = self.documents[self.active_tab_idx];
+
+        var area_x = 10.0;
+        var area_y = 74.0;
+        var area_w = (self.game_app.width as float) - 20.0;
+        var area_h = (self.game_app.height as float) - 110.0;
+
+        g.set_cursor(area_x, area_y);
+
+        // Edit text multiline with document-namespaced widget ID
+        var editor_id = "doc_editor_" + cur_doc.title;
+        var new_text = g.input_text_multiline(editor_id, cur_doc.content, area_w, area_h);
+        if (new_text != cur_doc.content) {
+            cur_doc.content = new_text;
+            cur_doc.is_dirty = true;
+        }
+    }
+
+    pub fn render_status_bar(gui: any): nil {
+        var g = gui as game.GUI;
+        var cur_doc = self.documents[self.active_tab_idx];
+
+        var win_w = self.game_app.width as float;
+        var win_h = self.game_app.height as float;
+        var bar_h = 28.0;
+        var bar_y = win_h - bar_h;
+
+        // Solid status bar footer surface matching theme
+        var sbg = g.get_style_color(game.COLOR_PANEL_BG);
+        g.draw_rect(0.0, bar_y, win_w, bar_h, sbg);
+        var sep = g.get_style_color(game.COLOR_SEPARATOR);
+        g.draw_rect(0.0, bar_y, win_w, 1.0, sep);
+
+        g.set_cursor(10.0, bar_y + 6.0);
+
+        var line_count = 1;
+        var char_count = len(cur_doc.content);
+        var ci = 0;
+        while (ci < char_count) {
+            if (cur_doc.content[ci] == "\n") {
+                line_count = line_count + 1;
+            }
+            ci = ci + 1;
+        }
+
+        var editor_id = "doc_editor_" + cur_doc.title;
+        var cur_pos = g.get_multiline_cursor(editor_id);
+        var cur_ln = cur_pos.0 + 1;
+        var cur_cl = cur_pos.1 + 1;
+
+        var fps_int = self.game_app.fps as int;
+        var status_str = "{self.status_message}  |  Ln {cur_ln}, Col {cur_cl}  |  Lines: {line_count}  |  Chars: {char_count}  |  Theme: {self.current_theme_name}  |  FPS: {fps_int}";
+
+        g.label(status_str);
+    }
+
+    pub fn count_matches(): int {
+        if (len(self.find_query) == 0) return 0;
+        var cur_doc = self.documents[self.active_tab_idx];
+        var content = cur_doc.content;
+        var q_len = len(self.find_query);
+        var c_len = len(content);
+        var count = 0;
+        var pos = 0;
+        while (pos + q_len <= c_len) {
+            var sub = str_mod.substring(content, pos, c_len);
+            var idx = str_mod.String(value=sub).index_of(self.find_query);
+            if (idx < 0) return count;
+            count = count + 1;
+            pos = pos + idx + q_len;
+        }
+        return count;
+    }
+
+    pub fn find_next(gui: any): nil {
+        var g = gui as game.GUI;
+        if (len(self.find_query) == 0) {
+            self.set_status("Find: query is empty");
+            return;
+        }
+
+        var cur_doc = self.documents[self.active_tab_idx];
+        var content = cur_doc.content;
+        var q_len = len(self.find_query);
+        var c_len = len(content);
+        if (c_len == 0) {
+            self.set_status("Document is empty");
+            return;
+        }
+
+        var start_search = self.last_find_idx;
+        var found_idx = find_substring_from(content, self.find_query, start_search);
+        var wrapped = false;
+
+        if (found_idx < 0 and start_search > 0) {
+            found_idx = find_substring_from(content, self.find_query, 0);
+            wrapped = true;
+        }
+
+        if (found_idx >= 0) {
+            self.last_find_idx = found_idx + q_len;
+
+            var lc_start = char_to_line_col(content, found_idx);
+            var lc_end = char_to_line_col(content, found_idx + q_len);
+
+            var editor_id = "doc_editor_" + cur_doc.title;
+            g.set_multiline_selection(editor_id, lc_start.0, lc_start.1, lc_end.0, lc_end.1);
+
+            var line_display = lc_start.0 + 1;
+            var col_display = lc_start.1 + 1;
+            if (wrapped) {
+                self.set_status("Found '{self.find_query}' at Ln {line_display}, Col {col_display} (wrapped)");
+            } else {
+                self.set_status("Found '{self.find_query}' at Ln {line_display}, Col {col_display}");
+            }
+        } else {
+            self.set_status("Not found: '{self.find_query}'");
+        }
+    }
+
+    pub fn replace_current(gui: any): nil {
+        var g = gui as game.GUI;
+        if (len(self.find_query) == 0) {
+            self.set_status("Replace: query is empty");
+            return;
+        }
+
+        var cur_doc = self.documents[self.active_tab_idx];
+        var content = cur_doc.content;
+        var q_len = len(self.find_query);
+
+        var match_pos = self.last_find_idx - q_len;
+        if (match_pos < 0 or match_pos + q_len > len(content)) {
+            self.find_next(g);
+            return;
+        }
+
+        var current_match = str_mod.substring(content, match_pos, match_pos + q_len);
+        if (current_match != self.find_query) {
+            self.find_next(g);
+            return;
+        }
+
+        var prefix = str_mod.substring(content, 0, match_pos);
+        var suffix = str_mod.substring(content, match_pos + q_len, len(content));
+        var new_content = prefix + self.replace_query + suffix;
+
+        cur_doc.content = new_content;
+        cur_doc.is_dirty = true;
+
+        var editor_id = "doc_editor_" + cur_doc.title;
+        g.set_multiline_text(editor_id, new_content);
+
+        self.last_find_idx = match_pos + len(self.replace_query);
+        self.set_status("Replaced 1 occurrence");
+
+        self.find_next(g);
+    }
+
+    pub fn replace_all(gui: any): nil {
+        var g = gui as game.GUI;
+        if (len(self.find_query) == 0) {
+            self.set_status("Replace: query is empty");
+            return;
+        }
+
+        var cur_doc = self.documents[self.active_tab_idx];
+        var content = cur_doc.content;
+        var count = self.count_matches();
+
+        if (count == 0) {
+            self.set_status("No occurrences of '{self.find_query}' found");
+            return;
+        }
+
+        var new_content = str_mod.replace(content, self.find_query, self.replace_query);
+        cur_doc.content = new_content;
+        cur_doc.is_dirty = true;
+
+        var editor_id = "doc_editor_" + cur_doc.title;
+        g.set_multiline_text(editor_id, new_content);
+
+        self.last_find_idx = 0;
+        self.set_status("Replaced {count} occurrence(s) of '{self.find_query}'");
+    }
+
+    pub fn render_find_dialog(gui: any): nil {
+        var g = gui as game.GUI;
+        if (not self.show_find_dialog) return;
+
+        if (g.begin_window("Find and Replace", 300.0, 140.0, 420.0, 210.0)) {
+            g.label("Search text:");
+            self.find_query = g.input_text("find_input", self.find_query, 64);
+            g.spacing(4.0);
+
+            g.label("Replace with:");
+            self.replace_query = g.input_text("replace_input", self.replace_query, 64);
+            g.spacing(8.0);
+
+            if (g.button("Find Next", 90.0, 24.0)) {
+                self.find_next(g);
+            }
+            g.same_line(6.0);
+            if (g.button("Replace", 80.0, 24.0)) {
+                self.replace_current(g);
+            }
+            g.same_line(6.0);
+            if (g.button("Replace All", 95.0, 24.0)) {
+                self.replace_all(g);
+            }
+            g.same_line(6.0);
+            if (g.button("Close", 65.0, 24.0)) {
+                self.show_find_dialog = false;
+            }
+
+            g.spacing(6.0);
+            if (len(self.find_query) > 0) {
+                var mc = self.count_matches();
+                if (mc == 0) {
+                    g.label("No matches found in active document");
+                } elif (mc == 1) {
+                    g.label("1 match found");
+                } else {
+                    g.label("{mc} matches found");
+                }
+            }
+
+            g.end_window();
+        }
+    }
+
+    pub fn render_about_dialog(gui: any): nil {
+        var g = gui as game.GUI;
+        if (not self.show_about_dialog) return;
+
+        if (g.begin_window("About Lymar Studio", 320.0, 200.0, 340.0, 210.0)) {
+            g.label("Lymar Studio Text Editor v1.0");
+            g.separator();
+            g.label("A complete desktop text editor built with:");
+            g.label("- std.game high-level engine harness");
+            g.label("- std.game immediate-mode GUI engine");
+            g.label("- std.game vector & collision math");
+            g.label("- Pure Lymar language execution");
+            g.separator();
+            if (g.button("OK", 80.0, 24.0)) {
+                self.show_about_dialog = false;
+            }
+            g.end_window();
+        }
+    }
+
+    pub fn handle_shortcuts(): nil {
+        var input = self.game_app.input;
+
+        // Ctrl+S: Save
+        if (input.is_key_pressed(game.KEY_S) and (input.active_modifiers & game.KEY_MOD_CTRL) != 0) {
+            self.save_current_document();
+        }
+
+        // Ctrl+W: Close File
+        if (input.is_key_pressed(game.KEY_W) and (input.active_modifiers & game.KEY_MOD_CTRL) != 0) {
+            self.close_current_document();
+        }
+
+        // Ctrl+F: Open Find Dialog
+        if (input.is_key_pressed(game.KEY_F) and (input.active_modifiers & game.KEY_MOD_CTRL) != 0) {
+            self.show_find_dialog = true;
+        }
+
+        // Ctrl+H: Open Find and Replace Dialog
+        if (input.is_key_pressed(game.KEY_H) and (input.active_modifiers & game.KEY_MOD_CTRL) != 0) {
+            self.show_find_dialog = true;
+        }
+
+        // F3: Find Next
+        if (input.is_key_pressed(game.KEY_F3)) {
+            self.find_next(self.game_app.gui);
+        }
+
+        // Escape: Close Dialogs
+        if (input.is_key_pressed(game.KEY_ESCAPE)) {
+            if (self.show_find_dialog) self.show_find_dialog = false;
+            if (self.show_about_dialog) self.show_about_dialog = false;
+        }
+    }
+
+    pub fn run_one_frame(): nil {
+        var app = self.game_app;
+        app.begin_frame();
+
+        // Update status timer
+        if (self.status_timer > 0.0) {
+            self.status_timer = self.status_timer - app.delta_time;
+            if (self.status_timer <= 0.0) {
+                self.status_message = "Ready";
+            }
+        }
+
+        // Handle shortcuts
+        self.handle_shortcuts();
+
+        // 1. Base editor content layer (lowest z-index)
+        self.render_editor_area(app.gui);
+        self.render_status_bar(app.gui);
+
+        // 2. Tab strip navigation layer (higher z-index than editor)
+        self.render_tabs(app.gui);
+
+        // 3. Menu bar & Toolbar chrome layer (higher z-index than tabs and editor)
+        self.render_menu_bar(app.gui);
+
+        // 4. Overlays layer (popups & dropdown menus on top of everything)
+        self.render_dropdowns(app.gui);
+
+        // 5. Modals & Panels layer
+        self.render_find_dialog(app.gui);
+        self.render_about_dialog(app.gui);
+
+        // Diagnostics
+        if (self.show_metrics) {
+            app.gui.show_debug_hud(app.fps, app.delta_time, len(self.documents));
+        }
+
+        app.end_frame();
+    }
+}
+
+pub fn main(): int {
+    print(" === Launching Lymar Studio Text Editor === ");
+    var editor = TextEditorApp();
+
+    if (not editor.game_app.setup()) {
+        print("Error: Failed to initialize graphics context & application window.");
+        return 1;
+    }
+
+    var doc_count = len(editor.documents);
+    print("Editor window opened with {doc_count} documents.");
+    print("Interactive editor running. Close window to exit.");
+
+    while (editor.game_app.is_running) {
+        editor.run_one_frame();
+    }
+
+    editor.game_app.shutdown();
+    print("Lymar Studio Text Editor closed cleanly.");
+    return 0;
+}
+
+main();

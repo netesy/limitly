@@ -1,9 +1,57 @@
-import std.ui.widget as widget;
+// std/ui/list_view - List widget with virtual scrolling for large datasets
+import std.ui.types as ui_types;
 
-frame ListView {
-    pub var children: [widget.Widget];
+// Virtual list state for windowed rendering
+frame VirtualListState {
+    pub var scroll_offset: int;
+    pub var visible_count: int;
+    pub var item_height: float;
+    pub var total_items: int;
 
-    pub init(ch: [widget.Widget] = [widget.Widget()]) {
-        self.children = ch;
+    pub init(height: float = 24.0, visible: int = 10) {
+        self.scroll_offset = 0;
+        self.visible_count = visible;
+        self.item_height = height;
+        self.total_items = 0;
     }
+}
+
+// Create a scrollable list of items
+pub fn list_view(items: [ui_types.Widget]): ui_types.Widget {
+    return ui_types.list(items);
+}
+
+// Virtual list (windowed) - only renders visible items
+pub fn virtual_list(items: [ui_types.Widget], item_height: float = 24.0, max_visible: int = 10): ui_types.Widget {
+    var list = ui_types.list(items);
+    list.height_val = (max_visible as float) * item_height;
+    list.scroll_y = 0.0;
+    list.max_scroll_y = (len(items) as float) * item_height - (max_visible as float) * item_height;
+    list.text_editor_state = VirtualListState(item_height, max_visible);
+    return list;
+}
+
+// Get visible range for virtual rendering
+pub fn get_visible_range(state: VirtualListState, viewport_height: float): (int, int) {
+    var start_idx = (state.scroll_offset / (state.item_height as int));
+    var visible_count = ((viewport_height / state.item_height) as int) + 1;
+    var end_idx = start_idx + visible_count;
+    if (end_idx > state.total_items) {
+        end_idx = state.total_items;
+    }
+    return (start_idx, end_idx);
+}
+
+// Render only visible items (performance optimization)
+pub fn render_virtual_list(items: [ui_types.Widget], state: VirtualListState, viewport_height: float): [ui_types.Widget] {
+    var visible: [ui_types.Widget] = [];
+    var range = get_visible_range(state, viewport_height);
+    var i = range.0;
+    while (i < range.1) {
+        if (i >= 0 and i < len(items)) {
+            visible.append(items[i]);
+        }
+        i = i + 1;
+    }
+    return visible;
 }

@@ -1,13 +1,88 @@
-import std.ui.widget as widget;
+// std/ui/grid - Grid layout container (CSS-grid like layout)
+import std.ui.types as ui_types;
+import std.ui.layout as layout_mod;
 
-frame Grid {
-    pub var children: [widget.Widget];
-
-    pub init(ch: [widget.Widget] = [widget.Widget()]) {
-        self.children = ch;
+// Create a grid layout with columns × rows
+pub fn grid(columns_count: int, children: [ui_types.Widget], spacing_val: float = 8.0): ui_types.Widget {
+    if (columns_count <= 0) {
+        return ui_types.column(children).spacing(spacing_val);
     }
 
-    pub fn build(): widget.Widget {
-        return widget.Widget();
+    // Create rows from children
+    var rows: [ui_types.Widget] = [];
+    var cur_row: [ui_types.Widget] = [];
+    var i = 0;
+    while (i < len(children)) {
+        cur_row.append(children[i]);
+        if (len(cur_row) == columns_count) {
+            // Create row with spacing
+            var row_widget = ui_types.row(cur_row);
+            row_widget.spacing_val = spacing_val;
+            rows.append(row_widget);
+            cur_row = [] as [ui_types.Widget];
+        }
+        i = i + 1;
     }
+
+    // Handle remaining items (fill with spacers)
+    if (len(cur_row) > 0) {
+        while (len(cur_row) < columns_count) {
+            cur_row.append(ui_types.spacer(1.0));
+        }
+        var row_widget = ui_types.row(cur_row);
+        row_widget.spacing_val = spacing_val;
+        rows.append(row_widget);
+    }
+
+    // Return column of rows
+    var result = ui_types.column(rows);
+    result.spacing_val = spacing_val;
+    return result;
+}
+
+// Grid widget with auto layout
+frame GridLayout {
+    pub var columns: int;
+    pub var gap: float;
+    pub var children: [ui_types.Widget];
+
+    pub init(cols: int = 2, gap_size: float = 8.0) {
+        self.columns = cols;
+        self.gap = gap_size;
+        self.children = [] as [ui_types.Widget];
+    }
+}
+
+// Two-column grid (common pattern)
+pub fn grid_two_column(left: ui_types.Widget, right: ui_types.Widget, gap: float = 16.0): ui_types.Widget {
+    var row = ui_types.row([left, right]);
+    row.spacing_val = gap;
+    return row;
+}
+
+// Three-column grid (common pattern)
+pub fn grid_three_column(a: ui_types.Widget, b: ui_types.Widget, c: ui_types.Widget, gap: float = 12.0): ui_types.Widget {
+    var row = ui_types.row([a, b, c]);
+    row.spacing_val = gap;
+    return row;
+}
+
+// Grid with aspect ratio constraint on cells
+pub fn grid_with_aspect(columns_count: int, children: [ui_types.Widget], aspect_ratio: float, spacing_val: float = 8.0): ui_types.Widget {
+    var i = 0;
+    while (i < len(children)) {
+        children[i].aspect_ratio = aspect_ratio;
+        i = i + 1;
+    }
+    return grid(columns_count, children, spacing_val);
+}
+
+// Grid using enhanced layout system
+pub fn grid_enhanced(spec: layout_mod.GridSpec, children: [ui_types.Widget]): ui_types.Widget {
+    var w = ui_types.Widget(ui_types.KIND_CONTAINER);
+    w.is_vertical = 0;
+    w.active_tab = spec.columns;
+    w.children = children;
+    w.spacing_val = spec.column_gap;
+    return w;
 }

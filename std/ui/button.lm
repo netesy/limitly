@@ -1,15 +1,7 @@
-import std.ui.widget as widget;
+// std/ui/button - Interactive button widget
+import std.ui.types as ui_types;
 
-frame Button {
-    pub var label: str;
-    pub var enabled: bool;
-
-    pub init(lbl: str = "", en: bool = true) {
-        self.label = lbl;
-        self.enabled = en;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn button(label: str, on_click: any = nil): ui_types.Widget {
+    return ui_types.button(label, on_click);
 }
+

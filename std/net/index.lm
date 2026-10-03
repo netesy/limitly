@@ -24,5 +24,10 @@ pub type DNS = dns.DNS;
 
 // TLS
 pub type TLSConfig = tls.TLSConfig;
-pub type TLSClient = tls.TLSClient;
-pub type TLSServer = tls.TLSServer;
+pub type TLSSocket = tls.TLSSocket;
+pub fn TLSConfig(): tls.TLSConfig { return tls.TLSConfig(); }
+pub fn connect_tls(host: str, port: int, cfg: any = nil): any { return tls.connect(host, port, cfg); }
+
+pub var TCP = tcp;
+pub var UDP = udp;
+pub var DNS = dns;

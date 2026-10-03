@@ -36,6 +36,12 @@ frame ResourceReader {
     pub fn read(args: [any]): any {
         return rt.call(self.resource.handle, rt.OP_READ, args);
     }
+    // Binary read: returns [int] list of raw byte values (handles \0 bytes correctly).
+    pub fn read_bytes(): [int] {
+        var result = rt.call(self.resource.handle, rt.OP_READ_BYTES, []);
+        if (result == nil) { return [] as [int]; }
+        return result as [int];
+    }
 }
 
 frame ResourceWriter {
@@ -47,6 +53,7 @@ frame ResourceWriter {
         return rt.call(self.resource.handle, rt.OP_WRITE, args);
     }
 }
+
 
 frame Pollable {
     pub var resource: Resource;
@@ -204,6 +211,7 @@ pub var OP_READDIR: int = rt.OP_READDIR;
 pub var OP_RENAME: int = rt.OP_RENAME;
 pub var OP_EXISTS: int = rt.OP_EXISTS;
 pub var OP_DELETE: int = rt.OP_DELETE;
+pub var OP_READ_BYTES: int = rt.OP_READ_BYTES;
 
 pub var KIND_FILE: int = rt.RT_FILE;
 pub var KIND_SOCKET: int = rt.RT_SOCKET;

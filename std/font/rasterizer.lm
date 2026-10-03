@@ -1,0 +1,174 @@
+// std/font/rasterizer.lm
+// Subpixel supersampled scanline rasterizer for font glyphs.
+// Produces 8-bit alpha coverage bitmaps (0..255) using standard non-zero winding rule.
+
+import std.font.glyph as g;
+
+frame GlyphBitmap {
+    pub var width: int;
+    pub var height: int;
+    pub var x_offset: int;
+    pub var y_offset: int;
+    pub var pixels: [int];
+
+    pub init(w: int = 0, h: int = 0, xoff: int = 0, yoff: int = 0, px: [int] = [] as [int]) {
+        self.width = w;
+        self.height = h;
+        self.x_offset = xoff;
+        self.y_offset = yoff;
+        self.pixels = px;
+    }
+}
+
+frame Intersection {
+    pub var x: float;
+    pub var direction: int; // +1 for upward, -1 for downward
+
+    pub init(x_val: float = 0.0, dir: int = 0) {
+        self.x = x_val;
+        self.direction = dir;
+    }
+}
+
+pub fn rasterize_glyph(outline: g.GlyphOutline, scale: float): GlyphBitmap {
+    if (outline.is_empty) {
+        return GlyphBitmap(0, 0, 0, 0, [] as [int]);
+    }
+
+    // Convert outline into scaled segments with inverted Y for raster screen coordinates
+    // TrueType Y points up; screen Y points down.
+    var raw_segments = outline.get_scaled_segments(scale, scale);
+    if (len(raw_segments) == 0) {
+        return GlyphBitmap(0, 0, 0, 0, [] as [int]);
+    }
+
+    var segments: [g.LineSegment] = [];
+    var min_x = 999999.0;
+    var max_x = -999999.0;
+    var min_y = 999999.0;
+    var max_y = -999999.0;
+
+    for (var i = 0; i < len(raw_segments); i = i + 1) {
+        var seg = raw_segments[i];
+        var sx0 = seg.x0;
+        var sy0 = 0.0 - seg.y0; // Invert Y
+        var sx1 = seg.x1;
+        var sy1 = 0.0 - seg.y1; // Invert Y
+
+        if (sx0 < min_x) min_x = sx0;
+        if (sx1 < min_x) min_x = sx1;
+        if (sx0 > max_x) max_x = sx0;
+        if (sx1 > max_x) max_x = sx1;
+
+        if (sy0 < min_y) min_y = sy0;
+        if (sy1 < min_y) min_y = sy1;
+        if (sy0 > max_y) max_y = sy0;
+        if (sy1 > max_y) max_y = sy1;
+
+        segments = segments + [g.LineSegment(sx0, sy0, sx1, sy1)];
+    }
+
+    var i_min_x = min_x as int;
+    if (min_x < 0.0 and (min_x - (i_min_x as float)) != 0.0) {
+        i_min_x = i_min_x - 1;
+    }
+    var i_max_x = (max_x + 0.999) as int;
+
+    var i_min_y = min_y as int;
+    if (min_y < 0.0 and (min_y - (i_min_y as float)) != 0.0) {
+        i_min_y = i_min_y - 1;
+    }
+    var i_max_y = (max_y + 0.999) as int;
+
+    var width = i_max_x - i_min_x;
+    var height = i_max_y - i_min_y;
+
+    if (width <= 0 or height <= 0) {
+        return GlyphBitmap(0, 0, i_min_x, i_min_y, [] as [int]);
+    }
+
+    var total_pixels = width * height;
+    var pixels: [int] = [];
+    for (var i = 0; i < total_pixels; i = i + 1) {
+        pixels = pixels + [0];
+    }
+
+    // 4x vertical supersampling offsets: 1/8, 3/8, 5/8, 7/8
+    var sub_offsets = [0.125, 0.375, 0.625, 0.875];
+    var sub_weight = 64; // 64 * 4 = 256 (~255)
+
+    for (var py = 0; py < height; py = py + 1) {
+        var screen_y = (i_min_y + py) as float;
+
+        for (var s_idx = 0; s_idx < 4; s_idx = s_idx + 1) {
+            var sample_y = screen_y + sub_offsets[s_idx];
+            var intersections: [Intersection] = [];
+
+            // Find all segments that intersect sample_y
+            for (var seg_i = 0; seg_i < len(segments); seg_i = seg_i + 1) {
+                var s = segments[seg_i];
+                var crosses = (s.y0 <= sample_y and s.y1 > sample_y) or (s.y1 <= sample_y and s.y0 > sample_y);
+                if (crosses) {
+                    var dy = s.y1 - s.y0;
+                    if (dy != 0.0) {
+                        var ix = s.x0 + (sample_y - s.y0) * (s.x1 - s.x0) / dy;
+                        var dir = 1;
+                        if (s.y1 < s.y0) {
+                            dir = -1;
+                        }
+                        intersections = intersections + [Intersection(ix, dir)];
+                    }
+                }
+            }
+
+            // Simple bubble sort intersections by X
+            var num_inter = len(intersections);
+            for (var a = 0; a < num_inter; a = a + 1) {
+                for (var b = a + 1; b < num_inter; b = b + 1) {
+                    if (intersections[b].x < intersections[a].x) {
+                        var tmp = intersections[a];
+                        intersections[a] = intersections[b];
+                        intersections[b] = tmp;
+                    }
+                }
+            }
+
+            // Fill spans using non-zero winding rule
+            var winding = 0;
+            var inside_x_start = 0.0;
+            var was_inside = false;
+
+            for (var inter_i = 0; inter_i < num_inter; inter_i = inter_i + 1) {
+                var it = intersections[inter_i];
+                var old_winding = winding;
+                winding = winding + it.direction;
+
+                var is_inside = (winding != 0);
+                if (!was_inside and is_inside) {
+                    inside_x_start = it.x;
+                    was_inside = true;
+                } elif (was_inside and !is_inside) {
+                    var x0 = inside_x_start - (i_min_x as float);
+                    var x1 = it.x - (i_min_x as float);
+                    was_inside = false;
+
+                    var px_start = x0 as int;
+                    if (px_start < 0) px_start = 0;
+                    var px_end = (x1 + 0.999) as int;
+                    if (px_end > width) px_end = width;
+
+                    for (var px = px_start; px < px_end; px = px + 1) {
+                        var idx = py * width + px;
+                        var current_val = pixels[idx] + sub_weight;
+                        if (current_val > 255) {
+                            current_val = 255;
+                        }
+                        pixels[idx] = current_val;
+                    }
+                }
+            }
+        }
+    }
+
+    return GlyphBitmap(width, height, i_min_x, i_min_y, pixels);
+}

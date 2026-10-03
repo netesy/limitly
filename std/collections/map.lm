@@ -1,6 +1,7 @@
 // Standard Library Map Collection
-
 import std.collections.hashmap as hashmap_mod;
+
+pub import std.collections.hashmap show HashMap, hashmap;
 
 frame HashMapWrapper {
     pub impl: hashmap_mod.HashMap;
@@ -40,4 +41,8 @@ frame HashMapWrapper {
     pub fn clear() {
         self.impl.clear();
     }
+}
+
+pub fn Map(): HashMapWrapper {
+    return HashMapWrapper();
 }

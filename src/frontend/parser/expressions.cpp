@@ -393,6 +393,7 @@ std::shared_ptr<LM::Frontend::AST::Expression> Parser::call() {
                 indexExpr->object = expr;
                 auto indexLiteral = std::make_shared<LM::Frontend::AST::LiteralExpr>();
                 indexLiteral->line = numberToken.line;
+                indexLiteral->literalType = TokenType::INT_LITERAL;
                 try {
                     size_t pos;
                     long long indexValue = std::stoll(numberToken.lexeme, &pos);

@@ -48,15 +48,4 @@ pub fn Err(error: any): Result {
     return Result(false, nil, error);
 }
 
-// Compatibility exports for typed core result helpers.
-import std.core as core;
-var OptionInt = core.OptionInt;
-var OptionStr = core.OptionStr;
-var ResultInt = core.ResultInt;
-var ResultStr = core.ResultStr;
-var some_int = core.some_int;
-var some_str = core.some_str;
-var ok_int = core.ok_int;
-var err_int = core.err_int;
-var ok_str = core.ok_str;
-var err_str = core.err_str;
+

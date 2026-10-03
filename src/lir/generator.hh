@@ -162,6 +162,11 @@ private:
     void flatten_cfg_to_instructions();
     bool validate_cfg(); // CFG validator
     
+    // Linear-mode (non-CFG) symbolic labels.
+    void emit_label_jump(LIR_Op op, Reg cond, uint32_t label);
+    void place_label(uint32_t label);
+    void resolve_linear_labels(LIR_Function* func);
+    
     // Loop management methods
     uint32_t generate_label();
     void enter_loop();
@@ -312,6 +317,12 @@ private:
     static size_t lambda_counter_;
     uint32_t next_register_ = 0;
     uint32_t next_label_ = 0;
+    struct LinearLabelState {
+        std::vector<std::pair<size_t, uint32_t>> fixups;   // (jump instruction index, label handle)
+        std::unordered_map<uint32_t, size_t> positions;    // label handle -> Label instruction index
+    };
+    // Keyed by function so nested function generation (lambdas, tasks) cannot mix state.
+    std::unordered_map<LIR_Function*, LinearLabelState> linear_label_states_;
     uint32_t generator_region_counter_ = 0;
     std::vector<uint32_t> generator_region_stack_;
     std::map<std::string, TypePtr> variable_types_;

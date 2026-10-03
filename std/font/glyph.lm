@@ -1,0 +1,331 @@
+// std/font/glyph.lm
+// TrueType glyf contour extraction and quadratic Bézier curve flattening into line segments.
+
+import std.font.reader as r;
+import std.font.tables as t;
+
+frame Point {
+    pub var x: float;
+    pub var y: float;
+    pub var on_curve: bool;
+
+    pub init(x_val: float = 0.0, y_val: float = 0.0, on_c: bool = true) {
+        self.x = x_val;
+        self.y = y_val;
+        self.on_curve = on_c;
+    }
+}
+
+frame LineSegment {
+    pub var x0: float;
+    pub var y0: float;
+    pub var x1: float;
+    pub var y1: float;
+
+    pub init(x0: float = 0.0, y0: float = 0.0, x1: float = 0.0, y1: float = 0.0) {
+        self.x0 = x0;
+        self.y0 = y0;
+        self.x1 = x1;
+        self.y1 = y1;
+    }
+}
+
+frame GlyphOutline {
+    pub var x_min: int;
+    pub var y_min: int;
+    pub var x_max: int;
+    pub var y_max: int;
+    pub var contours: [[Point]];
+    pub var is_empty: bool;
+
+    pub init() {
+        self.x_min = 0;
+        self.y_min = 0;
+        self.x_max = 0;
+        self.y_max = 0;
+        self.contours = [] as [[Point]];
+        self.is_empty = true;
+    }
+
+    // Flattens quadratic Bézier contours into linear segments scaled to target pixel dimensions.
+    pub fn get_scaled_segments(scale_x: float, scale_y: float): [LineSegment] {
+        var segments: [LineSegment] = [];
+
+        for (var c = 0; c < len(self.contours); c = c + 1) {
+            var pts = self.contours[c];
+            var count = len(pts);
+            if (count >= 2) {
+                // Extract to primitive arrays so we don't hold or move linear frames
+                var raw_x: [float] = [];
+                var raw_y: [float] = [];
+                var raw_on: [bool] = [];
+                for (var k = 0; k < count; k = k + 1) {
+                    raw_x = raw_x + [pts[k].x];
+                    raw_y = raw_y + [pts[k].y];
+                    raw_on = raw_on + [pts[k].on_curve];
+                }
+
+                var fx: [float] = [];
+                var fy: [float] = [];
+                var fon: [bool] = [];
+
+                if (!raw_on[0]) {
+                    if (raw_on[count - 1]) {
+                        fx = [raw_x[count - 1]];
+                        fy = [raw_y[count - 1]];
+                        fon = [true];
+                        for (var i = 0; i < count - 1; i = i + 1) {
+                            fx = fx + [raw_x[i]];
+                            fy = fy + [raw_y[i]];
+                            fon = fon + [raw_on[i]];
+                        }
+                    } else {
+                        var mid_x = (raw_x[0] + raw_x[count - 1]) * 0.5;
+                        var mid_y = (raw_y[0] + raw_y[count - 1]) * 0.5;
+                        fx = [mid_x];
+                        fy = [mid_y];
+                        fon = [true];
+                        for (var i = 0; i < count; i = i + 1) {
+                            fx = fx + [raw_x[i]];
+                            fy = fy + [raw_y[i]];
+                            fon = fon + [raw_on[i]];
+                        }
+                    }
+                } else {
+                    fx = raw_x;
+                    fy = raw_y;
+                    fon = raw_on;
+                }
+
+                var n = len(fx);
+                var i = 0;
+                var curr_x = fx[0];
+                var curr_y = fy[0];
+
+                while (i < n) {
+                    var next_idx = (i + 1) % n;
+                    var p1_x = fx[next_idx];
+                    var p1_y = fy[next_idx];
+                    var p1_on = fon[next_idx];
+
+                    if (p1_on) {
+                        segments = segments + [LineSegment(curr_x * scale_x, curr_y * scale_y, p1_x * scale_x, p1_y * scale_y)];
+                        curr_x = p1_x;
+                        curr_y = p1_y;
+                        i = i + 1;
+                    } else {
+                        var next2_idx = (i + 2) % n;
+                        var p2_x = fx[next2_idx];
+                        var p2_y = fy[next2_idx];
+                        var p2_on = fon[next2_idx];
+
+                        var end_x = p2_x;
+                        var end_y = p2_y;
+                        if (!p2_on) {
+                            end_x = (p1_x + p2_x) * 0.5;
+                            end_y = (p1_y + p2_y) * 0.5;
+                            i = i + 1;
+                        } else {
+                            i = i + 2;
+                        }
+
+                        var steps = 4;
+                        var prev_bx = curr_x;
+                        var prev_by = curr_y;
+
+                        for (var step = 1; step <= steps; step = step + 1) {
+                            var t_val = (step as float) / (steps as float);
+                            var omt = 1.0 - t_val;
+                            var bx = (omt * omt * curr_x) + (2.0 * omt * t_val * p1_x) + (t_val * t_val * end_x);
+                            var by = (omt * omt * curr_y) + (2.0 * omt * t_val * p1_y) + (t_val * t_val * end_y);
+
+                            segments = segments + [LineSegment(prev_bx * scale_x, prev_by * scale_y, bx * scale_x, by * scale_y)];
+                            prev_bx = bx;
+                            prev_by = by;
+                        }
+
+                        curr_x = end_x;
+                        curr_y = end_y;
+                    }
+                }
+            }
+        }
+
+        return segments;
+    }
+}
+
+pub fn parse_glyph(reader: r.ByteReader, info: t.FontInfo, glyph_idx: int): GlyphOutline {
+    var outline = GlyphOutline();
+    var off_len = info.get_glyph_offset_and_length(reader, glyph_idx);
+    var offset = off_len[0];
+    var length = off_len[1];
+
+    if (offset == 0 or length == 0) {
+        return outline; // Empty glyph (e.g. space)
+    }
+
+    reader.seek(offset);
+    var num_contours = reader.read_i16();
+    outline.x_min = reader.read_i16();
+    outline.y_min = reader.read_i16();
+    outline.x_max = reader.read_i16();
+    outline.y_max = reader.read_i16();
+
+    if (num_contours == 0) {
+        return outline;
+    }
+
+    if (num_contours > 0) {
+        // Simple Glyph
+        var end_pts: [int] = [];
+        for (var i = 0; i < num_contours; i = i + 1) {
+            end_pts = end_pts + [reader.read_u16()];
+        }
+
+        var num_points = end_pts[num_contours - 1] + 1;
+        var instruction_length = reader.read_u16();
+        reader.skip(instruction_length);
+
+        // Read flags
+        var flags: [int] = [];
+        var p = 0;
+        while (p < num_points) {
+            var flag = reader.read_u8();
+            flags = flags + [flag];
+            p = p + 1;
+            if ((flag & 8) != 0) { // REPEAT flag
+                var repeat_count = reader.read_u8();
+                for (var r_idx = 0; r_idx < repeat_count; r_idx = r_idx + 1) {
+                    flags = flags + [flag];
+                    p = p + 1;
+                }
+            }
+        }
+
+        // Read X coordinates (delta decoded)
+        var x_coords: [float] = [];
+        var curr_x: float = 0.0;
+        for (var i = 0; i < num_points; i = i + 1) {
+            var flag = flags[i];
+            var dx: float = 0.0;
+            if ((flag & 2) != 0) { // X_SHORT_VECTOR
+                var byte_val = reader.read_u8();
+                dx = byte_val as float;
+                if ((flag & 16) == 0) { // Negative if bit 4 not set
+                    dx = 0.0 - dx;
+                }
+            } else {
+                if ((flag & 16) == 0) { // If bit 4 not set, read i16 delta
+                    dx = reader.read_i16() as float;
+                }
+                // If bit 4 is set, dx is 0 (same as previous)
+            }
+            curr_x = curr_x + dx;
+            x_coords = x_coords + [curr_x];
+        }
+
+        // Read Y coordinates (delta decoded)
+        var y_coords: [float] = [];
+        var curr_y: float = 0.0;
+        for (var i = 0; i < num_points; i = i + 1) {
+            var flag = flags[i];
+            var dy: float = 0.0;
+            if ((flag & 4) != 0) { // Y_SHORT_VECTOR
+                var byte_val = reader.read_u8();
+                dy = byte_val as float;
+                if ((flag & 32) == 0) { // Negative if bit 5 not set
+                    dy = 0.0 - dy;
+                }
+            } else {
+                if ((flag & 32) == 0) { // If bit 5 not set, read i16 delta
+                    dy = reader.read_i16() as float;
+                }
+                // If bit 5 is set, dy is 0 (same as previous)
+            }
+            curr_y = curr_y + dy;
+            y_coords = y_coords + [curr_y];
+        }
+
+        // Assemble contours
+        var contours: [[Point]] = [];
+        var pt_idx = 0;
+        for (var c = 0; c < num_contours; c = c + 1) {
+            var end_idx = end_pts[c];
+            var contour_pts: [Point] = [];
+            while (pt_idx <= end_idx) {
+                var on_c = ((flags[pt_idx] & 1) != 0);
+                contour_pts = contour_pts + [Point(x_coords[pt_idx], y_coords[pt_idx], on_c)];
+                pt_idx = pt_idx + 1;
+            }
+            contours = contours + [contour_pts];
+        }
+
+        outline.contours = contours;
+        outline.is_empty = false;
+        return outline;
+    } else {
+        // Composite Glyph (num_contours == -1)
+        var composite_contours: [[Point]] = [];
+        var more_components = true;
+
+        while (more_components) {
+            var comp_flags = reader.read_u16();
+            var sub_glyph_idx = reader.read_u16();
+
+            var arg1 = 0;
+            var arg2 = 0;
+            if ((comp_flags & 1) != 0) { // ARG_1_AND_2_ARE_WORDS
+                arg1 = reader.read_i16();
+                arg2 = reader.read_i16();
+            } else {
+                arg1 = reader.read_i8();
+                arg2 = reader.read_i8();
+            }
+
+            var scale_a: float = 1.0;
+            var scale_b: float = 0.0;
+            var scale_c: float = 0.0;
+            var scale_d: float = 1.0;
+
+            if ((comp_flags & 8) != 0) { // WE_HAVE_A_SCALE
+                scale_a = (reader.read_i16() as float) / 16384.0;
+                scale_d = scale_a;
+            } elif ((comp_flags & 64) != 0) { // WE_HAVE_AN_X_AND_Y_SCALE
+                scale_a = (reader.read_i16() as float) / 16384.0;
+                scale_d = (reader.read_i16() as float) / 16384.0;
+            } elif ((comp_flags & 128) != 0) { // WE_HAVE_A_TWO_BY_TWO
+                scale_a = (reader.read_i16() as float) / 16384.0;
+                scale_b = (reader.read_i16() as float) / 16384.0;
+                scale_c = (reader.read_i16() as float) / 16384.0;
+                scale_d = (reader.read_i16() as float) / 16384.0;
+            }
+
+            // Save reader position and recursively parse subglyph
+            var saved_pos = reader.tell();
+            var sub_outline = parse_glyph(reader, info, sub_glyph_idx);
+            reader.seek(saved_pos);
+
+            var dx = arg1 as float;
+            var dy = arg2 as float;
+
+            for (var c = 0; c < len(sub_outline.contours); c = c + 1) {
+                var sub_pts = sub_outline.contours[c];
+                var transformed: [Point] = [];
+                for (var p_i = 0; p_i < len(sub_pts); p_i = p_i + 1) {
+                    var pt = sub_pts[p_i];
+                    var tx = (scale_a * pt.x + scale_c * pt.y) + dx;
+                    var ty = (scale_b * pt.x + scale_d * pt.y) + dy;
+                    transformed = transformed + [Point(tx, ty, pt.on_curve)];
+                }
+                composite_contours = composite_contours + [transformed];
+            }
+
+            more_components = ((comp_flags & 32) != 0); // MORE_COMPONENTS
+        }
+
+        outline.contours = composite_contours;
+        outline.is_empty = (len(composite_contours) == 0);
+        return outline;
+    }
+}

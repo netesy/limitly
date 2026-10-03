@@ -4,13 +4,7 @@ import std.path.index as path_mod;
 import std.io as io;
 import std.io.file as file_mod;
 
-// Types
-pub type Permissions = permissions_mod.Permissions;
-
-// Constructors
-pub fn Permissions(readonly: bool): any {
-    return permissions_mod.Permissions(readonly);
-}
+pub import std.fs.permissions show Permissions;
 
 frame FS {
     pub init() {}

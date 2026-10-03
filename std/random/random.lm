@@ -93,14 +93,13 @@ frame SecureRandom {
     }
 
     pub fn next_int(): int {
-        match (self.reader) {
-            val rd => {
-                var s = rd.read(args=[ []]);
-                if (s != nil) return s as int;
-                return 0;
-            },
-            nil => return 0
+        if (self.reader != nil) {
+            var rd = self.reader as res.ResourceReader;
+            var s = rd.read(args=[ []]);
+            if (s != nil) return s as int;
+            return 0;
         }
+        return 0;
     }
 
     pub fn next_float(): float {

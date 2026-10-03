@@ -22,15 +22,15 @@ pub fn _open_lib(): any {
         }
 
         var candidates: [str] = [
-            "bin/liblimitly_ssl.dll",
-            "bin/liblimitly_ssl.so",
-            "bin/liblimitly_ssl.dylib",
-            "./bin/liblimitly_ssl.dll",
-            "./bin/liblimitly_ssl.so",
-            "./bin/liblimitly_ssl.dylib",
-            "liblimitly_ssl.dll",
-            "liblimitly_ssl.so",
-            "liblimitly_ssl.dylib"
+            "bin/libliblymar_ssl.dll",
+            "bin/libliblymar_ssl.so",
+            "bin/libliblymar_ssl.dylib",
+            "./bin/libliblymar_ssl.dll",
+            "./bin/libliblymar_ssl.so",
+            "./bin/libliblymar_ssl.dylib",
+            "libliblymar_ssl.dll",
+            "libliblymar_ssl.so",
+            "libliblymar_ssl.dylib"
         ];
 
         var i: int = 0;

@@ -1,0 +1,254 @@
+// ── State Management with Batch Updates ──────────────────────────────────────
+// Dirty notification callback — set by context.lm at startup via register_dirty_notifier()
+pub var _dirty_notifier: fn(): nil = nil;
+
+pub fn register_dirty_notifier(cb: fn(): nil): nil {
+    _dirty_notifier = cb;
+}
+
+frame Signal {
+    pub var value: any;
+    pub var subscribers: [fn(any): nil];
+    pub init(init_val: any) {
+        self.value = init_val;
+        self.subscribers = [] as [fn(any): nil];
+    }
+    pub fn get(): any { return self.value; }
+    pub fn set(new_val: any): nil {
+        self.value = new_val;
+        // Notify subscribers
+        var i = 0;
+        while (i < len(self.subscribers)) {
+            var sub = self.subscribers[i];
+            sub(new_val);
+            i = i + 1;
+        }
+        // Mark dirty only if not in batch
+        if (_batch_depth == 0) {
+            mark_element_dirty_signal();
+        }
+    }
+    pub fn subscribe(callback: fn(any): nil): nil {
+        self.subscribers.append(callback);
+    }
+}
+
+frame ComputedSignal {
+    pub var compute_fn: fn(): any;
+    pub var dependencies: [Signal];
+    pub var value: any;
+    pub var subscribers: [fn(any): nil];
+    pub var is_dirty: int;
+
+    pub init(compute: fn(): any, deps: [Signal]) {
+        self.compute_fn = compute;
+        self.dependencies = deps;
+        self.value = compute();
+        self.subscribers = [] as [fn(any): nil];
+        self.is_dirty = 0;
+        // Subscribe to dependency changes
+        var i = 0;
+        while (i < len(deps)) {
+            deps[i].subscribe(fn(nv: any): nil { self._computed_dep_changed(nv); });
+            i = i + 1;
+        }
+    }
+
+    pub fn get(): any {
+        if (self.is_dirty == 1) {
+            self.value = self.compute_fn();
+            self.is_dirty = 0;
+        }
+        return self.value;
+    }
+
+    pub fn subscribe(callback: fn(any): nil): nil {
+        self.subscribers.append(callback);
+    }
+
+    fn _computed_dep_changed(new_val: any): nil {
+        self.is_dirty = 1;
+        // Notify subscribers
+        var i = 0;
+        while (i < len(self.subscribers)) {
+            var sub = self.subscribers[i];
+            sub(self.get());
+            i = i + 1;
+        }
+        mark_element_dirty_signal();
+    }
+}
+
+frame Effect {
+    pub var effect_fn: fn(): nil;
+    pub var dependencies: [Signal];
+    pub var cleanup_fn: fn(): nil;
+    pub var is_active: int;
+
+    pub init(user_effect: fn(): nil, deps: [Signal]) {
+        self.effect_fn = user_effect;
+        self.dependencies = deps;
+        self.cleanup_fn = nil;
+        self.is_active = 1;
+        // Subscribe to dependency changes
+        var i = 0;
+        while (i < len(deps)) {
+            deps[i].subscribe(fn(nv: any): nil { self._effect_dep_changed(nv); });
+            i = i + 1;
+        }
+        // Run effect immediately
+        user_effect();
+    }
+
+    pub fn dispose(): nil {
+        if (self.is_active == 1 and self.cleanup_fn != nil) {
+            var cleanup: fn(): nil = self.cleanup_fn as fn(): nil;
+            cleanup();
+        }
+        self.is_active = 0;
+    }
+
+    fn _effect_dep_changed(new_val: any): nil {
+        if (self.is_active == 1) {
+            // Run cleanup if exists
+            if (self.cleanup_fn != nil) {
+                var cleanup: fn(): nil = self.cleanup_fn as fn(): nil;
+                cleanup();
+            }
+            // Re-run effect
+            self.effect_fn();
+        }
+    }
+}
+
+pub var _batch_depth: int = 0;
+pub var _active_effects: [Effect] = [] as [Effect];
+
+pub fn signal(init_val: any): Signal { return Signal(init_val); }
+pub fn signal_bool(init_val: bool): Signal { return Signal(init_val); }
+pub fn signal_int(init_val: int): Signal { return Signal(init_val); }
+pub fn signal_float(init_val: float): Signal { return Signal(init_val); }
+pub fn signal_str(init_val: str): Signal { return Signal(init_val); }
+
+// Computed signal (derived state)
+pub fn computed(compute_fn: fn(): any, deps: [Signal]): ComputedSignal {
+    return ComputedSignal(compute_fn, deps);
+}
+
+// Effect (side effect that runs when dependencies change)
+pub fn effect(effect_fn: fn(): nil, deps: [Signal]): Effect {
+    var eff = Effect(effect_fn, deps);
+    _active_effects.append(eff);
+    return eff;
+}
+
+// Effect with cleanup
+pub fn effect_with_cleanup(effect_fn: fn(): nil, cleanup_fn: fn(): nil, deps: [Signal]): Effect {
+    var eff = Effect(effect_fn, deps);
+    eff.cleanup_fn = cleanup_fn;
+    _active_effects.append(eff);
+    return eff;
+}
+
+// Dispose all active effects
+pub fn dispose_all_effects(): nil {
+    var i = 0;
+    while (i < len(_active_effects)) {
+        _active_effects[i].dispose();
+        i = i + 1;
+    }
+    _active_effects = [] as [Effect];
+}
+
+// Batch state updates (debounces dirty marking)
+pub fn batch_begin(): nil {
+    _batch_depth = _batch_depth + 1;
+}
+
+pub fn batch_end(): nil {
+    _batch_depth = _batch_depth - 1;
+    if (_batch_depth == 0) {
+        mark_element_dirty_signal();
+    }
+}
+
+// Notify the UI context that something changed
+fn mark_element_dirty_signal(): nil {
+    if (_dirty_notifier != nil) {
+        var f: fn(): nil = _dirty_notifier as fn(): nil;
+        f();
+    }
+}
+
+// Batch update pattern
+pub fn batch_updates(updates: fn(): nil): nil {
+    batch_begin();
+    updates();
+    batch_end();
+}
+
+// ── Widget Signal Binding Helpers ───────────────────────────────────────────
+// Bind a signal's value to a widget's text property
+pub fn bind_text(sig: Signal, widget_mutator: fn(str): nil): nil {
+    sig.subscribe(fn(new_val: any): nil {
+        var s = new_val as str;
+        widget_mutator(s);
+    });
+}
+
+// Bind a signal's value to a widget's boolean property (e.g., is_checked, is_enabled)
+pub fn bind_bool(sig: Signal, widget_mutator: fn(bool): nil): nil {
+    sig.subscribe(fn(new_val: any): nil {
+        var b = new_val as bool;
+        widget_mutator(b);
+    });
+}
+
+// Bind a signal's value to a widget's float property (e.g., slider_val, opacity_val)
+pub fn bind_float(sig: Signal, widget_mutator: fn(float): nil): nil {
+    sig.subscribe(fn(new_val: any): nil {
+        var f = new_val as float;
+        widget_mutator(f);
+    });
+}
+
+// Bind a signal's value to a widget's int property
+pub fn bind_int(sig: Signal, widget_mutator: fn(int): nil): nil {
+    sig.subscribe(fn(new_val: any): nil {
+        var i = new_val as int;
+        widget_mutator(i);
+    });
+}
+
+// Two-way binding: signal to widget and widget to signal
+// Returns a cleanup function to unsubscribe
+pub fn bind_two_way_text(sig: Signal, get_widget_fn: fn(): str, set_widget_fn: fn(str): nil): fn(): nil {
+    // Signal -> Widget
+    sig.subscribe(fn(new_val: any): nil {
+        var s = new_val as str;
+        set_widget_fn(s);
+    });
+    // Widget -> Signal (caller must invoke this on widget change)
+    return fn(): nil {
+        // Cleanup would require unsubscribe capability
+        // For now, this is a placeholder
+    };
+}
+
+// Two-way binding for boolean (checkbox, toggle)
+pub fn bind_two_way_bool(sig: Signal, get_widget_fn: fn(): bool, set_widget_fn: fn(bool): nil): fn(): nil {
+    sig.subscribe(fn(new_val: any): nil {
+        var b = new_val as bool;
+        set_widget_fn(b);
+    });
+    return fn(): nil {};
+}
+
+// Two-way binding for float (slider)
+pub fn bind_two_way_float(sig: Signal, get_widget_fn: fn(): float, set_widget_fn: fn(float): nil): fn(): nil {
+    sig.subscribe(fn(new_val: any): nil {
+        var f = new_val as float;
+        set_widget_fn(f);
+    });
+    return fn(): nil {};
+}

@@ -95,8 +95,8 @@ fn test_ffi_memory_operations(): int {
     
     // Test memset
     ffi.ffi_memset(src, 42, 64);
-    var val: int = ffi.ffi_load_int8(src);
-    passed = passed + assert_equal(val, 42, "FFI: Memory set");
+    var loaded_val: int = ffi.ffi_load_int8(src);
+    passed = passed + assert_equal(loaded_val, 42, "FFI: Memory set");
     
     // Test memcpy
     ffi.ffi_memcpy(dst, src, 64);

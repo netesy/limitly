@@ -2,53 +2,255 @@
 // Clean unified standard library facade for std.game
 
 import std.game.types as types;
+import std.game.math as math_mod;
+import std.game.input as input_mod;
+import std.game.camera as camera_mod;
+import std.game.sprite as sprite_mod;
+import std.game.particles as particles_mod;
 import std.game.gui as gui_mod;
+import std.game.scene as scene_mod;
 import std.game.app as app_mod;
+import std.graphics.shadow as shadow_mod;
 
 // ── Types & Math ───────────────────────────────────────────────────────────
 pub fn Vec2(x: float = 0.0, y: float = 0.0): types.Vec2 {
+    return types.Vec2(x=x, y=y);
+}
+pub fn vec2(x: float, y: float): types.Vec2 {
     return types.Vec2(x=x, y=y);
 }
 
 pub fn Rect(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0): types.Rect {
     return types.Rect(x=x, y=y, w=w, h=h);
 }
+pub fn rect(x: float, y: float, w: float, h: float): types.Rect {
+    return types.Rect(x=x, y=y, w=w, h=h);
+}
 
+pub fn Circle(center: any = nil, radius: float = 10.0): math_mod.Circle {
+    return math_mod.Circle(center=center, radius=radius);
+}
+pub fn circle(center: any = nil, radius: float = 10.0): math_mod.Circle {
+    return math_mod.Circle(center=center, radius=radius);
+}
+
+pub fn Ray2D(origin: any = nil, direction: any = nil): math_mod.Ray2D {
+    return math_mod.Ray2D(origin=origin, direction=direction);
+}
+pub fn ray2d(origin: any = nil, direction: any = nil): math_mod.Ray2D {
+    return math_mod.Ray2D(origin=origin, direction=direction);
+}
+
+// Collision functions
+pub fn test_aabb_aabb(a: any, b: any): math_mod.Contact2D {
+    return math_mod.test_aabb_aabb(a, b);
+}
+pub fn test_circle_circle(a: any, b: any): math_mod.Contact2D {
+    return math_mod.test_circle_circle(a, b);
+}
+pub fn test_circle_aabb(c: any, b: any): math_mod.Contact2D {
+    return math_mod.test_circle_aabb(c, b);
+}
+pub fn raycast_aabb(ray: any, b: any, max_dist: float = 10000.0): math_mod.RayHit2D {
+    return math_mod.raycast_aabb(ray, b, max_dist);
+}
+pub fn raycast_circle(ray: any, c: any, max_dist: float = 10000.0): math_mod.RayHit2D {
+    return math_mod.raycast_circle(ray, c, max_dist);
+}
+
+// Colors & Themes
 pub fn Color(r: float = 0.0, g: float = 0.0, b: float = 0.0, a: float = 1.0): types.Color {
     return types.Color(r=r, g=g, b=b, a=a);
 }
-
 pub fn rgb(r: int, g: int, b: int): types.Color {
     return types.rgb(r, g, b);
 }
-
 pub fn rgba(r: int, g: int, b: int, a: float): types.Color {
     return types.rgba(r, g, b, a);
 }
-
 pub fn hex(c: int, a: float = 1.0): types.Color {
     return types.hex(c, a);
+}
+
+// Shadows & Effects
+pub var Shadow = shadow_mod.Shadow;
+pub fn shadow(
+    r: float = 0.0,
+    g: float = 0.0,
+    b: float = 0.0,
+    a: float = 0.25,
+    off_x: float = 0.0,
+    off_y: float = 4.0,
+    blur: float = 8.0,
+    spread: float = 0.0
+): shadow_mod.Shadow {
+    return shadow_mod.shadow(r, g, b, a, off_x, off_y, blur, spread);
 }
 
 pub fn GUITheme(): types.GUITheme {
     return types.GUITheme();
 }
-
 pub var default_theme: types.GUITheme = types.default_theme();
+pub fn dark_theme(): types.GUITheme { return types.dark_theme(); }
+pub fn light_theme(): types.GUITheme { return types.light_theme(); }
+pub fn cyberpunk_theme(): types.GUITheme { return types.cyberpunk_theme(); }
+pub fn retro_theme(): types.GUITheme { return types.retro_theme(); }
+
+// Style Color Indices
+pub var COLOR_WINDOW_BG: int       = types.COLOR_WINDOW_BG;
+pub var COLOR_WINDOW_TITLE: int    = types.COLOR_WINDOW_TITLE;
+pub var COLOR_PANEL_BG: int        = types.COLOR_PANEL_BG;
+pub var COLOR_TEXT: int            = types.COLOR_TEXT;
+pub var COLOR_TEXT_MUTED: int      = types.COLOR_TEXT_MUTED;
+pub var COLOR_ACCENT: int          = types.COLOR_ACCENT;
+pub var COLOR_BUTTON: int          = types.COLOR_BUTTON;
+pub var COLOR_BUTTON_HOVER: int    = types.COLOR_BUTTON_HOVER;
+pub var COLOR_BUTTON_ACTIVE: int   = types.COLOR_BUTTON_ACTIVE;
+pub var COLOR_SLIDER_TRACK: int    = types.COLOR_SLIDER_TRACK;
+pub var COLOR_SLIDER_THUMB: int    = types.COLOR_SLIDER_THUMB;
+pub var COLOR_CHECKBOX_BORDER: int = types.COLOR_CHECKBOX_BORDER;
+pub var COLOR_CHECKBOX_CHECK: int  = types.COLOR_CHECKBOX_CHECK;
+pub var COLOR_SEPARATOR: int       = types.COLOR_SEPARATOR;
+pub var COLOR_FRAME_BG: int        = types.COLOR_FRAME_BG;
+pub var COLOR_FRAME_BG_HOVER: int  = types.COLOR_FRAME_BG_HOVER;
+pub var COLOR_FRAME_BG_ACTIVE: int = types.COLOR_FRAME_BG_ACTIVE;
+pub var COLOR_TAB: int             = types.COLOR_TAB;
+pub var COLOR_TAB_ACTIVE: int      = types.COLOR_TAB_ACTIVE;
+pub var COLOR_PLOT_LINES: int      = types.COLOR_PLOT_LINES;
+pub var COLOR_PLOT_HISTOGRAM: int  = types.COLOR_PLOT_HISTOGRAM;
+
+// Style Var Indices
+pub var VAR_PADDING: int           = types.VAR_PADDING;
+pub var VAR_SPACING: int           = types.VAR_SPACING;
+pub var VAR_ITEM_HEIGHT: int       = types.VAR_ITEM_HEIGHT;
+pub var VAR_ROUNDING: int          = types.VAR_ROUNDING;
+
+// Built-in Colors
+pub var white: types.Color         = types.white;
+pub var black: types.Color         = types.black;
+pub var transparent: types.Color   = types.transparent;
+pub var red: types.Color           = types.red;
+pub var green: types.Color         = types.green;
+pub var blue: types.Color          = types.blue;
+pub var yellow: types.Color        = types.yellow;
+pub var cyan: types.Color          = types.cyan;
+
+// ── 2D Camera ──────────────────────────────────────────────────────────────
+pub fn Camera(target: any = nil, offset: any = nil, zoom: float = 1.0): camera_mod.Camera2D {
+    return camera_mod.Camera2D(target=target, offset=offset, zoom=zoom);
+}
+pub fn Camera2D(target: any = nil, offset: any = nil, zoom: float = 1.0, rotation: float = 0.0): camera_mod.Camera2D {
+    return camera_mod.Camera2D(target=target, offset=offset, zoom=zoom, rotation=rotation);
+}
+
+// ── Sprites & Animation ───────────────────────────────────────────────────
+pub fn Texture(id: int = -1, width: int = 0, height: int = 0): sprite_mod.Texture2D {
+    return sprite_mod.Texture2D(id=id, width=width, height=height);
+}
+pub fn Sprite(
+    texture: any = nil,
+    position: any = nil,
+    src_rect: any = nil,
+    origin: any = nil,
+    scale: any = nil,
+    rotation: float = 0.0,
+    tint: any = nil
+): sprite_mod.Sprite {
+    return sprite_mod.Sprite(
+        texture=texture,
+        position=position,
+        src_rect=src_rect,
+        origin=origin,
+        scale=scale,
+        rotation=rotation,
+        tint=tint
+    );
+}
+pub fn SpriteSheet(texture: any = nil, cell_w: int = 16, cell_h: int = 16): sprite_mod.SpriteSheet {
+    return sprite_mod.SpriteSheet(texture=texture, cell_w=cell_w, cell_h=cell_h);
+}
+pub fn AnimationClip(name: str = "", frames: any = nil, fps: float = 10.0, loop: bool = true): sprite_mod.AnimationClip {
+    return sprite_mod.AnimationClip(name=name, frames=frames, fps=fps, loop=loop);
+}
+pub fn AnimatedSprite(texture: any = nil, position: any = nil): sprite_mod.AnimatedSprite {
+    return sprite_mod.AnimatedSprite(texture=texture, position=position);
+}
+
+// ── Particles ─────────────────────────────────────────────────────────────
+pub fn ParticleEmitter(max_count: int = 150): particles_mod.ParticleEmitter2D {
+    return particles_mod.ParticleEmitter2D(max_count=max_count);
+}
+pub fn ParticleEmitter2D(max_count: int = 150): particles_mod.ParticleEmitter2D {
+    return particles_mod.ParticleEmitter2D(max_count=max_count);
+}
+
+// ── Input System ──────────────────────────────────────────────────────────
+pub fn InputManager(): input_mod.InputManager {
+    return input_mod.InputManager();
+}
+pub var input: input_mod.InputManager = input_mod.default_input;
+
+// Key constants
+pub var KEY_SPACE: int         = input_mod.KEY_SPACE;
+pub var KEY_ENTER: int         = input_mod.KEY_ENTER;
+pub var KEY_ESCAPE: int        = input_mod.KEY_ESCAPE;
+pub var KEY_LEFT: int          = input_mod.KEY_LEFT;
+pub var KEY_RIGHT: int         = input_mod.KEY_RIGHT;
+pub var KEY_UP: int            = input_mod.KEY_UP;
+pub var KEY_DOWN: int          = input_mod.KEY_DOWN;
+pub var KEY_W: int             = input_mod.KEY_W;
+pub var KEY_A: int             = input_mod.KEY_A;
+pub var KEY_S: int             = input_mod.KEY_S;
+pub var KEY_D: int             = input_mod.KEY_D;
+pub var KEY_F: int             = input_mod.KEY_F;
+pub var KEY_H: int             = input_mod.KEY_H;
+pub var KEY_F3: int            = input_mod.KEY_F3;
+pub var KEY_TAB: int           = input_mod.KEY_TAB;
+pub var KEY_BACKSPACE: int     = input_mod.KEY_BACKSPACE;
+
+pub var MOUSE_LEFT: int        = input_mod.MOUSE_LEFT;
+pub var MOUSE_RIGHT: int       = input_mod.MOUSE_RIGHT;
+pub var MOUSE_MIDDLE: int      = input_mod.MOUSE_MIDDLE;
+
+// Key Modifiers
+pub var KEY_MOD_NONE: int      = 0;
+pub var KEY_MOD_SHIFT: int     = input_mod.MOD_SHIFT;
+pub var KEY_MOD_CTRL: int      = input_mod.MOD_CONTROL;
+pub var KEY_MOD_CONTROL: int   = input_mod.MOD_CONTROL;
+pub var KEY_MOD_ALT: int       = input_mod.MOD_ALT;
+pub var KEY_MOD_SUPER: int     = input_mod.MOD_SUPER;
+
+pub var MOD_NONE: int          = 0;
+pub var MOD_SHIFT: int         = input_mod.MOD_SHIFT;
+pub var MOD_CTRL: int          = input_mod.MOD_CONTROL;
+pub var MOD_CONTROL: int       = input_mod.MOD_CONTROL;
+pub var MOD_ALT: int           = input_mod.MOD_ALT;
+pub var MOD_SUPER: int         = input_mod.MOD_SUPER;
 
 // ── IMGUI Engine ───────────────────────────────────────────────────────────
 pub fn GUI(theme: any = nil): gui_mod.GUI {
     return gui_mod.GUI(theme);
 }
-
-// Global default GUI instance ready for immediate use
 pub var gui: gui_mod.GUI = gui_mod.default_gui;
 
 // ── Game Application Harness ───────────────────────────────────────────────
-pub fn GameConfig(title: str = "Limit Game", width: int = 800, height: int = 600, resizable: bool = true): app_mod.GameConfig {
+pub fn GameConfig(title: str = "Lymar Game", width: int = 800, height: int = 600, resizable: bool = true): app_mod.GameConfig {
     return app_mod.GameConfig(title=title, width=width, height=height, resizable=resizable);
 }
-
 pub fn Game(cfg: any = nil): app_mod.Game {
     return app_mod.Game(cfg);
 }
+
+// ── Scene State Machine ────────────────────────────────────────────────────
+pub fn Scene(name: str = "Scene"): scene_mod.Scene {
+    return scene_mod.Scene(name=name);
+}
+pub fn scene(name: str = "Scene"): scene_mod.Scene {
+    return scene_mod.Scene(name=name);
+}
+pub fn SceneManager(): scene_mod.SceneManager {
+    return scene_mod.SceneManager();
+}
+pub var scenes: scene_mod.SceneManager = scene_mod.default_scene_manager;
+pub var TRANSITION_NONE: int = scene_mod.TRANSITION_NONE;
+pub var TRANSITION_FADE: int = scene_mod.TRANSITION_FADE;

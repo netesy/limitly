@@ -62,3 +62,67 @@ pub fn collect(it: Iterator): [any] {
     }
     return res;
 }
+
+frame ChunkIterator: Iterator {
+    pub size: int;
+    pub source: Iterator;
+    pub init(source: Iterator, size: int) { self.source = source; self.size = size; }
+    pub fn next(): any {
+        var chunk: [any] = [];
+        var i = 0;
+        while (i < self.size) {
+            var item = self.source.next();
+            if (item == nil) {
+                if (len(chunk) == 0) { return nil; }
+                return chunk;
+            }
+            chunk.append(item);
+            i = i + 1;
+        }
+        return chunk;
+    }
+}
+
+frame CycleIterator: Iterator {
+    pub index: int;
+    pub items: [any];
+    pub init(items: [any]) { self.items = items; self.index = 0; }
+    pub fn next(): any {
+        if (len(self.items) == 0) { return nil; }
+        var item = self.items[self.index];
+        self.index = (self.index + 1) % len(self.items);
+        return item;
+    }
+}
+
+frame StepByIterator: Iterator {
+    pub source: Iterator;
+    pub step: int;
+    pub init(source: Iterator, step: int) { self.source = source; self.step = step; }
+    pub fn next(): any {
+        var item = self.source.next();
+        var i = 1;
+        while (i < self.step) {
+            var skipped = self.source.next();
+            if (skipped == nil) { return item; }
+            i = i + 1;
+        }
+        return item;
+    }
+}
+
+pub fn chunk(it: Iterator, size: int): Iterator {
+    return ChunkIterator(it, size);
+}
+
+pub fn cycle(items: [any]): Iterator {
+    return CycleIterator(items);
+}
+
+pub fn step_by(it: Iterator, step: int): Iterator {
+    return StepByIterator(it, step);
+}
+
+pub fn peekable(it: Iterator): PeekableIterator {
+    return PeekableIterator(it);
+}

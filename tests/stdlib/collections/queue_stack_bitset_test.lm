@@ -1,4 +1,4 @@
-import std.collections.index as collections;
+import std.collections.queue as collections;
 
 fn main(): int {
     var q = collections.Queue();

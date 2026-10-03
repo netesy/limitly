@@ -8,7 +8,7 @@ import os
 import glob
 import time
 
-limitly_path = os.path.abspath("bin/limitly.exe" if os.name == "nt" else "bin/limitly")
+limitly_path = os.path.abspath("bin/lymar.exe" if os.name == "nt" else "bin/lymar")
 
 tests = [
  # Basic

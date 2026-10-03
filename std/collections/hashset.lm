@@ -1,10 +1,10 @@
 // Standard Library HashSet Collection
 
-frame HashSetWrapper {
+frame HashSet {
     pub elements: [any];
 
     pub init() {
-        self.elements = [] as [any];
+        self.elements = [];
     }
 
     pub fn add(item: any) {
@@ -38,4 +38,18 @@ frame HashSetWrapper {
     pub fn length(): int {
         return len(self.elements);
     }
+
+    pub fn len(): int {
+        return len(self.elements);
+    }
+
+    pub fn is_empty(): bool {
+        return len(self.elements) == 0;
+    }
+}
+
+pub type HashSetWrapper = HashSet;
+
+pub fn HashSetWrapper(): HashSet {
+    return HashSet();
 }

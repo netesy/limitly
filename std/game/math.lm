@@ -1,0 +1,318 @@
+// std/game/math.lm
+// 2D Game Math, Geometry, Collision Detection, and Raycasting Primitives
+
+import std.math as math;
+import std.game.types as types;
+
+// Re-export core types
+pub fn Vec2(x: float = 0.0, y: float = 0.0): types.Vec2 { return types.Vec2(x=x, y=y); }
+pub fn vec2(x: float, y: float): types.Vec2 { return types.Vec2(x=x, y=y); }
+pub fn Rect(x: float = 0.0, y: float = 0.0, w: float = 0.0, h: float = 0.0): types.Rect { return types.Rect(x=x, y=y, w=w, h=h); }
+pub fn rect(x: float, y: float, w: float, h: float): types.Rect { return types.Rect(x=x, y=y, w=w, h=h); }
+
+// ── Circle Primitive ──────────────────────────────────────────────────────────
+
+frame Circle {
+    pub var center: types.Vec2;
+    pub var radius: float;
+
+    pub init(center: any = nil, radius: float = 10.0) {
+        if (center == nil) {
+            self.center = types.Vec2(x=0.0, y=0.0);
+        } else {
+            self.center = center as types.Vec2;
+        }
+        self.radius = radius;
+    }
+
+    pub fn contains(p: any): bool {
+        var pt = p as types.Vec2;
+        return self.center.dist_sq(pt) <= (self.radius * self.radius);
+    }
+
+    pub fn intersects_circle(other: any): bool {
+        var o = other as Circle;
+        var r_sum = self.radius + o.radius;
+        return self.center.dist_sq(o.center) <= (r_sum * r_sum);
+    }
+
+    pub fn intersects_rect(r: any): bool {
+        var rt = r as types.Rect;
+        var closest_x = math.clamp(self.center.x, rt.x, rt.x + rt.w);
+        var closest_y = math.clamp(self.center.y, rt.y, rt.y + rt.h);
+        var closest = types.Vec2(x=closest_x, y=closest_y);
+        return self.center.dist_sq(closest) <= (self.radius * self.radius);
+    }
+}
+
+pub fn circle(center: any, radius: float): Circle {
+    return Circle(center=center, radius=radius);
+}
+
+// ── Ray2D Primitive ───────────────────────────────────────────────────────────
+
+frame Ray2D {
+    pub var origin: types.Vec2;
+    pub var direction: types.Vec2;
+
+    pub init(origin: any = nil, direction: any = nil) {
+        if (origin == nil) {
+            self.origin = types.Vec2(x=0.0, y=0.0);
+        } else {
+            self.origin = origin as types.Vec2;
+        }
+
+        if (direction == nil) {
+            self.direction = types.Vec2(x=1.0, y=0.0);
+        } else {
+            var d = direction as types.Vec2;
+            self.direction = d.normalize();
+        }
+    }
+
+    pub fn point_at(t: float): types.Vec2 {
+        return self.origin.add(self.direction.scale(t));
+    }
+}
+
+pub fn ray2d(origin: any, direction: any): Ray2D {
+    return Ray2D(origin=origin, direction=direction);
+}
+
+// ── Contact & Hit Result Types ────────────────────────────────────────────────
+
+frame Contact2D {
+    pub var collided: bool;
+    pub var normal: types.Vec2;
+    pub var penetration: float;
+    pub var point: types.Vec2;
+
+    pub init(collided: bool = false, normal: any = nil, penetration: float = 0.0, point: any = nil) {
+        self.collided = collided;
+        if (normal == nil) {
+            self.normal = types.Vec2();
+        } else {
+            self.normal = normal as types.Vec2;
+        }
+        self.penetration = penetration;
+        if (point == nil) {
+            self.point = types.Vec2();
+        } else {
+            self.point = point as types.Vec2;
+        }
+    }
+}
+
+frame RayHit2D {
+    pub var hit: bool;
+    pub var point: types.Vec2;
+    pub var normal: types.Vec2;
+    pub var distance: float;
+
+    pub init(hit: bool = false, point: any = nil, normal: any = nil, distance: float = 0.0) {
+        self.hit = hit;
+        if (point == nil) {
+            self.point = types.Vec2();
+        } else {
+            self.point = point as types.Vec2;
+        }
+        if (normal == nil) {
+            self.normal = types.Vec2();
+        } else {
+            self.normal = normal as types.Vec2;
+        }
+        self.distance = distance;
+    }
+}
+
+// ── Collision Detection & Resolution Functions ────────────────────────────────
+
+pub fn test_aabb_aabb(a: any, b: any): Contact2D {
+    var a_rect = a as types.Rect;
+    var b_rect = b as types.Rect;
+    if (not a_rect.intersects(b_rect)) {
+        return Contact2D(collided=false);
+    }
+
+    var a_center = a_rect.center();
+    var b_center = b_rect.center();
+    var diff = b_center.sub(a_center);
+
+    var a_half_w = a_rect.w * 0.5;
+    var a_half_h = a_rect.h * 0.5;
+    var b_half_w = b_rect.w * 0.5;
+    var b_half_h = b_rect.h * 0.5;
+
+    var overlap_x = (a_half_w + b_half_w) - math.abs(diff.x);
+    var overlap_y = (a_half_h + b_half_h) - math.abs(diff.y);
+
+    var normal = types.Vec2();
+    var penetration = 0.0;
+    var point = types.Vec2();
+
+    if (overlap_x < overlap_y) {
+        penetration = overlap_x;
+        if (diff.x > 0.0) {
+            normal = types.Vec2(x=1.0, y=0.0);
+            point = types.Vec2(x=a_rect.x + a_rect.w, y=b_center.y);
+        } else {
+            normal = types.Vec2(x=-1.0, y=0.0);
+            point = types.Vec2(x=a_rect.x, y=b_center.y);
+        }
+    } else {
+        penetration = overlap_y;
+        if (diff.y > 0.0) {
+            normal = types.Vec2(x=0.0, y=1.0);
+            point = types.Vec2(x=b_center.x, y=a_rect.y + a_rect.h);
+        } else {
+            normal = types.Vec2(x=0.0, y=-1.0);
+            point = types.Vec2(x=b_center.x, y=a_rect.y);
+        }
+    }
+
+    return Contact2D(collided=true, normal=normal, penetration=penetration, point=point);
+}
+
+pub fn test_circle_circle(a: any, b: any): Contact2D {
+    var a_c = a as Circle;
+    var b_c = b as Circle;
+    var diff = b_c.center.sub(a_c.center);
+    var dist = diff.mag();
+    var r_sum = a_c.radius + b_c.radius;
+
+    if (dist >= r_sum or dist <= 0.0) {
+        if (dist <= 0.0 and (a_c.radius > 0.0 or b_c.radius > 0.0)) {
+            return Contact2D(
+                collided=true,
+                normal=types.Vec2(x=1.0, y=0.0),
+                penetration=r_sum,
+                point=a_c.center
+            );
+        }
+        return Contact2D(collided=false);
+    }
+
+    var normal = diff.scale(1.0 / dist);
+    var penetration = r_sum - dist;
+    var point = a_c.center.add(normal.scale(a_c.radius));
+
+    return Contact2D(collided=true, normal=normal, penetration=penetration, point=point);
+}
+
+pub fn test_circle_aabb(c: any, b: any): Contact2D {
+    var c_c = c as Circle;
+    var b_r = b as types.Rect;
+    var closest_x = math.clamp(c_c.center.x, b_r.x, b_r.x + b_r.w);
+    var closest_y = math.clamp(c_c.center.y, b_r.y, b_r.y + b_r.h);
+    var closest = types.Vec2(x=closest_x, y=closest_y);
+
+    var diff = closest.sub(c_c.center);
+    var dist = diff.mag();
+
+    if (dist > c_c.radius) {
+        return Contact2D(collided=false);
+    }
+
+    if (dist == 0.0) {
+        var left = c_c.center.x - b_r.x;
+        var right = (b_r.x + b_r.w) - c_c.center.x;
+        var top = c_c.center.y - b_r.y;
+        var bottom = (b_r.y + b_r.h) - c_c.center.y;
+
+        var min_d = math.min(math.min(left, right), math.min(top, bottom));
+        var normal = types.Vec2(x=0.0, y=-1.0);
+        if (min_d == left) { normal = types.Vec2(x=-1.0, y=0.0); }
+        elif (min_d == right) { normal = types.Vec2(x=1.0, y=0.0); }
+        elif (min_d == top) { normal = types.Vec2(x=0.0, y=-1.0); }
+        else { normal = types.Vec2(x=0.0, y=1.0); }
+
+        return Contact2D(
+            collided=true,
+            normal=normal,
+            penetration=c_c.radius + min_d,
+            point=closest
+        );
+    }
+
+    var normal = diff.scale(1.0 / dist);
+    var penetration = c_c.radius - dist;
+    return Contact2D(collided=true, normal=normal, penetration=penetration, point=closest);
+}
+
+pub fn raycast_aabb(ray: any, box: any, max_dist: float = 10000.0): RayHit2D {
+    var r = ray as Ray2D;
+    var b = box as types.Rect;
+    var inv_x = 0.0;
+    if (r.direction.x != 0.0) {
+        inv_x = 1.0 / r.direction.x;
+    } else {
+        inv_x = 1000000.0;
+    }
+
+    var inv_y = 0.0;
+    if (r.direction.y != 0.0) {
+        inv_y = 1.0 / r.direction.y;
+    } else {
+        inv_y = 1000000.0;
+    }
+
+    var t1 = (b.x - r.origin.x) * inv_x;
+    var t2 = (b.x + b.w - r.origin.x) * inv_x;
+    var t3 = (b.y - r.origin.y) * inv_y;
+    var t4 = (b.y + b.h - r.origin.y) * inv_y;
+
+    var tmin = math.max(math.min(t1, t2), math.min(t3, t4));
+    var tmax = math.min(math.max(t1, t2), math.max(t3, t4));
+
+    if (tmax < 0.0 or tmin > tmax or tmin > max_dist) {
+        return RayHit2D(hit=false);
+    }
+
+    var t = tmin;
+    if (t < 0.0) { t = tmax; }
+    if (t < 0.0 or t > max_dist) {
+        return RayHit2D(hit=false);
+    }
+
+    var hit_point = r.point_at(t);
+    var normal = types.Vec2();
+
+    var eps = 0.001;
+    if (math.abs(hit_point.x - b.x) < eps) { normal = types.Vec2(x=-1.0, y=0.0); }
+    elif (math.abs(hit_point.x - (b.x + b.w)) < eps) { normal = types.Vec2(x=1.0, y=0.0); }
+    elif (math.abs(hit_point.y - b.y) < eps) { normal = types.Vec2(x=0.0, y=-1.0); }
+    elif (math.abs(hit_point.y - (b.y + b.h)) < eps) { normal = types.Vec2(x=0.0, y=1.0); }
+
+    return RayHit2D(hit=true, point=hit_point, normal=normal, distance=t);
+}
+
+pub fn raycast_circle(ray: any, c: any, max_dist: float = 10000.0): RayHit2D {
+    var r = ray as Ray2D;
+    var c_c = c as Circle;
+    var oc = r.origin.sub(c_c.center);
+    var b = oc.dot(r.direction);
+    var c_term = oc.dot(oc) - c_c.radius * c_c.radius;
+
+    if (c_term > 0.0 and b > 0.0) {
+        return RayHit2D(hit=false);
+    }
+
+    var discriminant = b * b - c_term;
+    if (discriminant < 0.0) {
+        return RayHit2D(hit=false);
+    }
+
+    var t = -b - math.sqrt(discriminant);
+    if (t < 0.0) {
+        t = -b + math.sqrt(discriminant);
+    }
+
+    if (t < 0.0 or t > max_dist) {
+        return RayHit2D(hit=false);
+    }
+
+    var hit_point = r.point_at(t);
+    var normal = hit_point.sub(c_c.center).normalize();
+
+    return RayHit2D(hit=true, point=hit_point, normal=normal, distance=t);
+}

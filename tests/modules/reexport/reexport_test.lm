@@ -1,0 +1,10 @@
+import tests.modules.reexport.shapes as shapes;
+
+fn main(): int {
+    var c = shapes.Circle(4);
+    print("area = {c.area()}");
+    print("scaled = {shapes.scaled_area(c)}");
+    var neg = shapes.Circle(-5);
+    print("neg radius = {neg.radius}");
+    return 0;
+}

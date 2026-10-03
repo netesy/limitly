@@ -925,6 +925,9 @@ public:
         return nullptr; // Return nullptr if not found, let caller handle
     }
 
+    const std::map<std::string, TypePtr>& getUserDefinedTypes() const { return userDefinedTypes; }
+    const std::map<std::string, TypePtr>& getTypeAliases() const { return typeAliases; }
+
     // Legacy methods for backward compatibility
     void addTypeAlias(const std::string &alias, TypePtr type) { 
         registerTypeAlias(alias, type);

@@ -1,13 +1,9 @@
-import std.ui.widget as widget;
+// std/ui/label - Semantic text label widget
+import std.ui.types as ui_types;
 
-frame Label {
-    pub var text: str;
-
-    pub init(txt: str = "") {
-        self.text = txt;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn label(text_val: str): ui_types.Widget {
+    var w = ui_types.text(text_val);
+    w.font_size_val = 12.0;
+    w.foreground_color = ui_types.gray;
+    return w;
 }

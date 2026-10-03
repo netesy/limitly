@@ -20,21 +20,11 @@ frame Canvas {
     }
 
     pub fn draw_rect(r: rect.Rect, p: paint.Paint): nil {
-        var vbuf = gg.make_buffer_data(8, false, [r.x, r.y, r.w, r.h, p.color_val.r, p.color_val.g, p.color_val.b, p.color_val.a]);
-        var pip = gg.make_pipeline(1, 0); // 0 = rect
-        var bindings = gg.make_bindings(vbuf.id, 0, 0, 0);
-        gg.apply_pipeline(pip.id);
-        gg.apply_bindings(vbuf.id, 0);
-        gg.draw(0, 1, 1);
+        gg.draw_rect_primitive(r.x, r.y, r.w, r.h, p.color_val.r, p.color_val.g, p.color_val.b, p.color_val.a);
     }
 
     pub fn draw_triangle(x1: float, y1: float, x2: float, y2: float, x3: float, y3: float, p: paint.Paint): nil {
-        var vbuf = gg.make_buffer_data(10, false, [x1, y1, x2, y2, x3, y3, p.color_val.r, p.color_val.g, p.color_val.b, p.color_val.a]);
-        var pip = gg.make_pipeline(1, 1); // 1 = triangle
-        var bindings = gg.make_bindings(vbuf.id, 0, 0, 0);
-        gg.apply_pipeline(pip.id);
-        gg.apply_bindings(vbuf.id, 0);
-        gg.draw(0, 1, 1);
+        gg.draw_triangle_primitive(x1, y1, x2, y2, x3, y3, p.color_val.r, p.color_val.g, p.color_val.b, p.color_val.a);
     }
 
     pub fn draw_color(c: color.Color): nil {

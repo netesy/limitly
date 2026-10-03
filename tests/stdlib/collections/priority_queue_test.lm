@@ -1,5 +1,5 @@
 import std.collections.priority_queue as pq;
-import std.collections.index as collections;
+import std.collections.priority_queue as collections;
 
 fn main(): int {
     var p = collections.PriorityQueue(nil) as pq.PriorityQueueWrapper; // Min-heap by default

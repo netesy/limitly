@@ -1,0 +1,59 @@
+import std.ffi as ffi;
+
+fn test_read(): int {
+    unsafe {
+        var lib: int = ffi.library_load("msvcrt.dll");
+        if (lib == 0 or lib == nil) {
+            print("Failed to load msvcrt.dll");
+            return 1;
+        }
+        var fn_fopen: int = ffi.library_get_symbol(lib, "fopen");
+        var fn_fclose: int = ffi.library_get_symbol(lib, "fclose");
+        var fn_fseek: int = ffi.library_get_symbol(lib, "fseek");
+        var fn_ftell: int = ffi.library_get_symbol(lib, "ftell");
+        var fn_fread: int = ffi.library_get_symbol(lib, "fread");
+        var fn_malloc: int = ffi.library_get_symbol(lib, "malloc");
+        var fn_free: int = ffi.library_get_symbol(lib, "free");
+
+        var path_cs = ffi.string_to_cstring("C:/Windows/Fonts/arial.ttf");
+        var mode_cs = ffi.string_to_cstring("rb");
+
+        var fp = ffi.foreign_call(
+            fn_fopen,
+            [ffi.cstring_as_ptr(path_cs), ffi.cstring_as_ptr(mode_cs)],
+            ffi.TYPE_PTR,
+            [ffi.TYPE_PTR, ffi.TYPE_PTR]
+        ) as int;
+
+        ffi.cstring_free(path_cs);
+        ffi.cstring_free(mode_cs);
+
+        if (fp == 0 or fp == nil) {
+            print("Failed to open file");
+            return 2;
+        }
+
+        ffi.foreign_call(fn_fseek, [fp, 0, 2], ffi.TYPE_I32, [ffi.TYPE_PTR, ffi.TYPE_I64, ffi.TYPE_I32]);
+        var sz = ffi.foreign_call(fn_ftell, [fp], ffi.TYPE_I64, [ffi.TYPE_PTR]) as int;
+        ffi.foreign_call(fn_fseek, [fp, 0, 0], ffi.TYPE_I32, [ffi.TYPE_PTR, ffi.TYPE_I64, ffi.TYPE_I32]);
+
+        print("File size: {sz}");
+
+        var mem = ffi.foreign_call(fn_malloc, [sz], ffi.TYPE_PTR, [ffi.TYPE_I64]) as int;
+        var read_bytes = ffi.foreign_call(fn_fread, [mem, 1, sz, fp], ffi.TYPE_I64, [ffi.TYPE_PTR, ffi.TYPE_I64, ffi.TYPE_I64, ffi.TYPE_PTR]) as int;
+        print("Read bytes: {read_bytes}");
+
+        var b0 = ffi.load_u8(mem);
+        var b1 = ffi.load_u8(mem + 1);
+        var b2 = ffi.load_u8(mem + 2);
+        var b3 = ffi.load_u8(mem + 3);
+        print("First 4 bytes: {b0}, {b1}, {b2}, {b3}");
+
+        ffi.foreign_call(fn_free, [mem], ffi.TYPE_VOID, [ffi.TYPE_PTR]);
+        ffi.foreign_call(fn_fclose, [fp], ffi.TYPE_I32, [ffi.TYPE_PTR]);
+        ffi.library_unload(lib);
+        return 0;
+    }
+}
+
+test_read();

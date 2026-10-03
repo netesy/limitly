@@ -1,15 +1,6 @@
-import std.ui.widget as widget;
+// std/ui/text_field - Single-line text input widget
+import std.ui.types as ui_types;
 
-frame TextField {
-    pub var placeholder: str;
-    pub var text: str;
-
-    pub init(ph: str = "", txt: str = "") {
-        self.placeholder = ph;
-        self.text = txt;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn text_field(value: str = "", placeholder: str = "Type here...", on_change: any = nil): ui_types.Widget {
+    return ui_types.input(value, placeholder, on_change);
 }

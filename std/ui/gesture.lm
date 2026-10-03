@@ -1,13 +1,128 @@
-import std.ui.widget as widget;
+// std/ui/gesture - Gesture recognition and handling
+import std.ui.types as ui_types;
 
-frame Gesture {
-    pub var gesture_type: int;
+// Gesture state tracking
+frame GestureState {
+    pub var pointer_down_time: float;
+    pub var pointer_down_x: float;
+    pub var pointer_down_y: float;
+    pub var last_tap_time: float;
+    pub var tap_count: int;
+    pub var is_long_press_active: int;
 
-    pub init(gt: int = 0) {
-        self.gesture_type = gt;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
+    pub init() {
+        self.pointer_down_time = 0.0;
+        self.pointer_down_x = 0.0;
+        self.pointer_down_y = 0.0;
+        self.last_tap_time = 0.0;
+        self.tap_count = 0;
+        self.is_long_press_active = 0;
     }
 }
+
+// Global gesture state per widget (using focus_key as identifier)
+pub var gesture_states: {str: GestureState} = {};
+
+// Detect and handle tap gesture
+pub fn detect_tap(child: ui_types.Widget, on_tap: any): ui_types.Widget {
+    child.on_click_action = on_tap;
+    return child;
+}
+
+// Detect and handle long press (hold for 500ms)
+pub fn detect_long_press(child: ui_types.Widget, on_long_press: any): ui_types.Widget {
+    child.on_change_action = on_long_press;
+    return child;
+}
+
+// Detect double tap (two taps within 300ms)
+pub fn detect_double_tap(child: ui_types.Widget, on_double_tap: any): ui_types.Widget {
+    child.placeholder_val = "double_tap";
+    child.on_click_action = on_double_tap;
+    return child;
+}
+
+// Detect swipe gesture (fast drag in one direction)
+pub fn detect_swipe(child: ui_types.Widget, on_swipe: any): ui_types.Widget {
+    child.a11y_hint = "swipe_gesture";
+    return child;
+}
+
+// Detect pan/drag gesture (continuous movement)
+pub fn detect_pan(child: ui_types.Widget, on_pan: any): ui_types.Widget {
+    child.a11y_live = "pan_gesture";
+    return child;
+}
+
+// Update gesture state based on pointer down event
+pub fn update_gesture_on_pointer_down(gesture_key: str, x: float, y: float, current_time: float): nil {
+    var state = GestureState();
+    if (gesture_key in gesture_states) {
+        state = gesture_states[gesture_key];
+    }
+    
+    // Check for double tap
+    var time_since_last = current_time - state.last_tap_time;
+    if (time_since_last < 0.3) {
+        state.tap_count = state.tap_count + 1;
+    } else {
+        state.tap_count = 1;
+    }
+    
+    state.pointer_down_time = current_time;
+    state.pointer_down_x = x;
+    state.pointer_down_y = y;
+    state.is_long_press_active = 0;
+    
+    gesture_states[gesture_key] = state;
+}
+
+// Update gesture state based on pointer move (for swipe/pan detection)
+pub fn update_gesture_on_pointer_move(gesture_key: str, x: float, y: float): float {
+    if (gesture_key in gesture_states) {
+        var state = gesture_states[gesture_key];
+        var dx = x - state.pointer_down_x;
+        var dy = y - state.pointer_down_y;
+        
+        // Return distance moved (can be used to detect swipe threshold)
+        var distance = (dx * dx + dy * dy) as float;
+        return distance;
+    }
+    return 0.0;
+}
+
+// Update gesture state based on pointer up (for long press and tap)
+pub fn update_gesture_on_pointer_up(gesture_key: str, current_time: float): int {
+    if (gesture_key in gesture_states) {
+        var state = gesture_states[gesture_key];
+        var hold_time = current_time - state.pointer_down_time;
+        
+        // Long press detected (held for 500ms)
+        if (hold_time >= 0.5) {
+            state.is_long_press_active = 1;
+        }
+        
+        state.last_tap_time = current_time;
+        gesture_states[gesture_key] = state;
+        return state.tap_count;
+    }
+    return 0;
+}
+
+// Get last detected gesture type
+pub fn get_last_gesture(gesture_key: str): str {
+    if (gesture_key in gesture_states) {
+        var state = gesture_states[gesture_key];
+        if (state.is_long_press_active == 1) {
+            return "long_press";
+        }
+        if (state.tap_count == 2) {
+            return "double_tap";
+        }
+        if (state.tap_count == 1) {
+            return "tap";
+        }
+    }
+    return "none";
+}
+

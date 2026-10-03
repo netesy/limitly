@@ -1,13 +1,6 @@
-import std.ui.widget as widget;
+// std/ui/text - Text display widget
+import std.ui.types as ui_types;
 
-frame Text {
-    pub var content: str;
-
-    pub init(cnt: str = "") {
-        self.content = cnt;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn text(content: str): ui_types.Widget {
+    return ui_types.text(content);
 }

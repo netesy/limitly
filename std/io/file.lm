@@ -25,13 +25,19 @@ frame File {
     }
 
     pub fn read(): str?IOError {
-        var r = self.reader.read(args=[]);
+        var r = self.reader.read([]);
         if (r == nil) return err(UnknownError(message="fail"));
         return ok(r as str);
     }
 
+    pub fn read_bytes(): [int]?IOError {
+        var r = self.reader.read_bytes();
+        if (len(r) == 0) return err(UnknownError(message="empty"));
+        return ok(r);
+    }
+
     pub fn write(content: str): nil?IOError {
-        var success = self.writer.write(args=[content]);
+        var success = self.writer.write([content]);
         if (success == nil) return err(UnknownError(message="fail"));
         return ok(nil);
     }

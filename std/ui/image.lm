@@ -1,14 +1,6 @@
-import std.graphics.image as graphics_image;
-import std.ui.widget as widget;
+// std/ui/image - Image display widget
+import std.ui.types as ui_types;
 
-frame Image {
-    pub var source: graphics_image.Image;
-
-    pub init(src: graphics_image.Image = graphics_image.Image()) {
-        self.source = src;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn image(source: str = ""): ui_types.Widget {
+    return ui_types.image(source);
 }

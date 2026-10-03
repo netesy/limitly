@@ -1,18 +1,53 @@
-import std.collections.index as collections;
+// Testing stdlib Vector operations
+import std.collections.vector as collections;
 
 fn main(): int {
+    print("Step 1: creating Vector...");
     var v = collections.Vector();
+    print("Vector created successfully");
+
+    print("Step 2: push(1)...");
     v.push(1);
+    print("v after push(1), len: {v.len()}");
+
+    print("Step 3: append(2)...");
     v.append(2);
+    print("v after append(2), len: {v.len()}");
+
+    print("Step 4: insert(1, 9)...");
     v.insert(1, 9);
-    if (v.len() != 3) { return 1; }
-    if (v.get(1) != 9) { return 2; }
-    if (v.remove(1) != 9) { return 3; }
+    print("v after insert(1, 9), len: {v.len()}");
+
+    assert(v.len() == 3, "Length should be 3");
+    print("Assert len == 3 PASSED");
+
+    assert(v.get(1) == 9, "Element at 1 should be 9");
+    print("Assert get(1) == 9 PASSED");
+
+    var removed = v.remove(1);
+    print("Step 5: remove(1) returned: {removed}");
+    assert(removed == 9, "Removed element should be 9");
+    print("Assert remove(1) == 9 PASSED");
+
+    print("Step 6: resize(5, 7)...");
     v.resize(5, 7);
-    if (v.len() != 5) { return 4; }
+    print("v after resize(5, 7), len: {v.len()}");
+    assert(v.len() == 5, "Length should be 5");
+    print("Assert len == 5 PASSED");
+
+    print("Step 7: iterator test...");
     var it = v.iterator();
-    if (it.next() != 1) { return 5; }
+    var first_item = it.next();
+    print("it.next() returned: {first_item}");
+    assert(first_item == 1, "Iterator first element should be 1");
+    print("Assert it.next() == 1 PASSED");
+
+    print("Step 8: clear()...");
     v.clear();
-    if (not v.is_empty()) { return 6; }
+    print("v after clear, len: {v.len()}");
+    assert(v.is_empty(), "Vector should be empty");
+    print("Assert is_empty() PASSED");
+
+    print("All Vector tests PASSED successfully!");
     return 0;
 }

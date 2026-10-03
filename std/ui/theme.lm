@@ -1,11 +1,106 @@
-import std.graphics.color as color;
+// std/ui/theme - Design tokens and theming system
+import std.ui.types as ui_types;
 
-frame Theme {
-    pub var primary_color: color.Color;
-    pub var background_color: color.Color;
+// Color palette token
+frame ColorPalette {
+    pub var primary: ui_types.Color;
+    pub var secondary: ui_types.Color;
+    pub var tertiary: ui_types.Color;
+    pub var background: ui_types.Color;
+    pub var surface: ui_types.Color;
+    pub var surface_variant: ui_types.Color;
+    pub var error: ui_types.Color;
+    pub var success: ui_types.Color;
+    pub var warning: ui_types.Color;
+    pub var info: ui_types.Color;
+    pub var text_primary: ui_types.Color;
+    pub var text_secondary: ui_types.Color;
+    pub var border: ui_types.Color;
+    pub var focus_ring: ui_types.Color;
 
-    pub init(p: color.Color = color.Color(), bg: color.Color = color.Color()) {
-        self.primary_color = p;
-        self.background_color = bg;
+    pub init() {
+        self.primary = ui_types.blue;
+        self.secondary = ui_types.indigo;
+        self.tertiary = ui_types.rgb(100, 200, 100);
+        self.background = ui_types.rgb(15, 15, 20);
+        self.surface = ui_types.rgb(24, 26, 34);
+        self.surface_variant = ui_types.rgb(35, 38, 48);
+        self.error = ui_types.red;
+        self.success = ui_types.rgb(80, 220, 130);
+        self.warning = ui_types.rgb(255, 200, 80);
+        self.info = ui_types.blue;
+        self.text_primary = ui_types.white;
+        self.text_secondary = ui_types.rgb(180, 185, 200);
+        self.border = ui_types.rgb(60, 65, 75);
+        self.focus_ring = ui_types.rgb(100, 180, 255);
     }
 }
+
+// Spacing tokens
+frame SpacingTokens {
+    pub var xs: float;
+    pub var sm: float;
+    pub var md: float;
+    pub var lg: float;
+    pub var xl: float;
+
+    pub init() {
+        self.xs = 4.0;
+        self.sm = 8.0;
+        self.md = 16.0;
+        self.lg = 24.0;
+        self.xl = 32.0;
+    }
+}
+
+// Typography tokens
+frame TypographyTokens {
+    pub var font_family: str;
+    pub var display_size: float;
+    pub var headline_size: float;
+    pub var title_size: float;
+    pub var body_size: float;
+    pub var label_size: float;
+
+    pub init() {
+        self.font_family = "";
+        self.display_size = 32.0;
+        self.headline_size = 24.0;
+        self.title_size = 18.0;
+        self.body_size = 14.0;
+        self.label_size = 12.0;
+    }
+}
+
+// Border radius tokens
+frame ShapeTokens {
+    pub var corner_xs: float;
+    pub var corner_sm: float;
+    pub var corner_md: float;
+    pub var corner_lg: float;
+
+    pub init() {
+        self.corner_xs = 2.0;
+        self.corner_sm = 4.0;
+        self.corner_md = 8.0;
+        self.corner_lg = 16.0;
+    }
+}
+
+// Complete theme
+frame Theme {
+    pub var colors: ColorPalette;
+    pub var spacing: SpacingTokens;
+    pub var typography: TypographyTokens;
+    pub var shape: ShapeTokens;
+
+    pub init() {
+        self.colors = ColorPalette();
+        self.spacing = SpacingTokens();
+        self.typography = TypographyTokens();
+        self.shape = ShapeTokens();
+    }
+}
+
+// Global theme instance
+pub var global_theme: Theme = Theme();

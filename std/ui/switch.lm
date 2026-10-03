@@ -1,13 +1,6 @@
-import std.ui.widget as widget;
+// std/ui/switch - Toggle switch widget
+import std.ui.types as ui_types;
 
-frame Switch {
-    pub var active: bool;
-
-    pub init(act: bool = false) {
-        self.active = act;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn switch(enabled: bool = false, on_change: any = nil): ui_types.Widget {
+    return ui_types.toggle(enabled, on_change);
 }

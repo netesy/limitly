@@ -48,10 +48,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol -Ivendor/stb $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol -Ivendor/stb $(if $(wildcard vendor/fyra/include/ir/Module.h),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I. -Isrc -Ivendor/sokol -Ivendor/stb
 else
-	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol -Ivendor/stb $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol -Ivendor/stb $(if $(wildcard vendor/fyra/include/ir/Module.h),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O2 -fPIC -I. -Isrc -Ivendor/sokol -Ivendor/stb
 endif
 
@@ -84,51 +84,24 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp src/frontend/constraint_engine.cpp src/frontend/module_graph.cpp src/frontend/declaration_resolver.cpp \
               src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp
 
-BACK_SRCS := $(if $(shell [ -f "vendor/fyra/include/ir/Module.h" ] && echo yes),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp src/backend/fyra/capability_mapper.cpp,)
+# Recursive wildcard function for pure GNU Make file discovery
+rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
+
+BACK_SRCS := $(if $(wildcard vendor/fyra/include/ir/Module.h),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp src/backend/fyra/capability_mapper.cpp,)
 
 FYRA_DIR := vendor/fyra
-FYRA_SRCS := $(if $(shell [ -f "$(FYRA_DIR)/include/ir/Module.h" ] && echo yes),\
-             $(wildcard $(FYRA_DIR)/src/ir/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/*.cpp) \
-			 $(wildcard $(FYRA_DIR)/src/codegen/abi/*.cpp) \
-			 $(wildcard $(FYRA_DIR)/src/codegen/asm/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/debug/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/target/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/objectgen/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/profiling/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/regalloc/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/validation/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/codegen/optimize/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/architecture/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/architecture/aarch64/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/architecture/riscv64/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/architecture/wasm32/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/architecture/x64/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/artifact/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/artifact/apk/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/artifact/archive/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/artifact/executable/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/artifact/linker/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/artifact/object/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/capabilities/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/core/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/os/linux/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/os/macos/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/os/wasi/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/target/os/windows/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/transforms/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/parser/*.cpp) \
-             $(wildcard $(FYRA_DIR)/src/fyra/*.cpp),)
+FYRA_SRCS := $(if $(wildcard $(FYRA_DIR)/include/ir/Module.h),\
+             $(call rwildcard,$(FYRA_DIR)/src,*.cpp),)
 
-FYRA_OBJS := $(patsubst vendor/fyra/src/%.cpp,$(OBJ_DIR)/fyra/%.o,$(FYRA_SRCS))
+FYRA_OBJS := $(patsubst $(FYRA_DIR)/src/%.cpp,$(OBJ_DIR)/fyra/%.o,$(FYRA_SRCS))
 FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
 # =============================
 # Lyra Package Manager
 # =============================
 LYRA_DIR := vendor/lyra
-LYRA_SRCS := $(wildcard $(LYRA_DIR)/src/*.cpp)
+LYRA_SRCS := $(if $(wildcard $(LYRA_DIR)/src),\
+             $(call rwildcard,$(LYRA_DIR)/src,*.cpp),)
 LYRA_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_SRCS))
 LYRA_BIN := $(BIN_DIR)/lyra$(EXE_EXT)
 
@@ -200,9 +173,6 @@ $(BIN_DIR):
 $(RSP_DIR):
 	@mkdir -p $@
 
-$(OBJ_DIR)/runtime:
-	@mkdir -p $@
-
 # =============================
 # Object compilation - C++ files
 # =============================
@@ -220,31 +190,13 @@ $(OBJ_DIR)/fyra/%.o: vendor/fyra/src/%.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 # =============================
-# Object compilation - Runtime C files
-# =============================
-$(OBJ_DIR)/runtime/%.o: $(RUNTIME_DIR)/%.c | $(OBJ_DIR)/runtime
-	@echo "Compiling runtime: $<"
-	$(CC) $(CFLAGS) -c $< -o $@
-
-# =============================
-# Runtime library
-# =============================
-
-
-: $(RUNTIME_OBJS)
-	@echo "Building runtime library: $@"
-	@mkdir -p $(dir $@)
-	$(AR) rcs $@ $^
-	@echo "[OK] Runtime library built: $@"
-
-# =============================
 # Fyra library configuration
 # =============================
 FYRA_DIR := vendor/fyra
 FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
 # Check if Fyra is available
-FYRA_AVAILABLE := $(shell if [ -f "$(FYRA_DIR)/include/ir/Module.h" ]; then echo "yes"; else echo "no"; fi)
+FYRA_AVAILABLE := $(if $(wildcard $(FYRA_DIR)/include/ir/Module.h),yes,no)
 
 ifeq ($(FYRA_AVAILABLE),yes)
 # Build Fyra using Makefile (excluding problematic debug files)
@@ -288,21 +240,21 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 # Build targets
 # =============================
-liblymar: $(OBJ_DIR)/libLymar.a
+liblymar: $(OBJ_DIR)/liblymar.a
 
-$(OBJ_DIR)/libLymar.a: $(LIB_LIMITLY_OBJS) $(FYRA_LIB)
-	@echo "[BUILD] Building libLymar.a ..."
+$(OBJ_DIR)/liblymar.a: $(LIB_LIMITLY_OBJS) $(FYRA_LIB)
+	@echo "[BUILD] Building liblymar.a ..."
 	@mkdir -p $(dir $@)
 	$(AR) rcs $@ $(LIB_LIMITLY_OBJS)
 
 windows: $(BIN_DIR) $(MAIN_RSP) liblymar $(LYRA_BIN)
 	@echo "[BUILD] Linking lymar.exe ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLymar.a $(FYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS)
 	@echo "[OK] lymar.exe built."
 
 linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib
 	@echo "[BUILD] Linking lymar ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/libLymar.a $(FYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lpthread
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lpthread
 	@echo "[OK] lymar built."
 
 # =============================
@@ -365,9 +317,9 @@ parser: $(BIN_DIR) $(TEST_RSP)
 # LIR Round-Trip Test Target (C17)
 # =============================
 .PHONY: lir-test
-lir-test: $(BIN_DIR) $(OBJ_DIR)/libLymar.a $(LIR_TEST_OBJS)
+lir-test: $(BIN_DIR) $(OBJ_DIR)/liblymar.a $(LIR_TEST_OBJS)
 	@echo "\360\237\223\260 Linking lir_test ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIR_TEST_OBJS) $(OBJ_DIR)/libLymar.a -o $(BIN_DIR)/lir_test $(LIBS) -lpthread
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIR_TEST_OBJS) $(OBJ_DIR)/liblymar.a -o $(BIN_DIR)/lir_test $(LIBS) -lpthread
 	@echo "\342\234\205 lir_test built."
 	@echo "\360\237\247\252 Running lir_test ..."
 	./bin/lir_test

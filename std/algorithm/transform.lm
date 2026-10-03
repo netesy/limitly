@@ -34,3 +34,42 @@ pub fn unzip(pairs: [any]): ([any], [any]) {
     }
     return (left_res, right_res);
 }
+
+pub fn transform(items: [any], f: fn(any): any): [any] {
+    return map(items, f);
+}
+
+fn _reverse_range(items: [any], start: int, end: int) {
+    var s = start;
+    var e = end;
+    while (s < e) {
+        var tmp = items[s];
+        items[s] = items[e];
+        items[e] = tmp;
+        s = s + 1;
+        e = e - 1;
+    }
+}
+
+pub fn reverse(items: [any]) {
+    var n = len(items);
+    var i = 0;
+    while (i < n / 2) {
+        var tmp = items[i];
+        items[i] = items[n - 1 - i];
+        items[n - 1 - i] = tmp;
+        i = i + 1;
+    }
+}
+
+pub fn rotate(items: [any], k: int) {
+    var n = len(items);
+    if (n == 0) return;
+    var shift = k % n;
+    if (shift < 0) shift = shift + n;
+    if (shift == 0) return;
+
+    _reverse_range(items, 0, n - 1);
+    _reverse_range(items, 0, shift - 1);
+    _reverse_range(items, shift, n - 1);
+}

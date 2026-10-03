@@ -1,0 +1,68 @@
+import std.ui.types as ui_types;
+
+pub type Color = ui_types.Color;
+
+pub fn rgb(r: int, g: int, b: int): Color { return ui_types.rgb(r, g, b); }
+pub fn rgba(r: int, g: int, b: int, a: float): Color { return ui_types.rgba(r, g, b, a); }
+pub fn color_rgb(r: float, g: float, b: float): Color { return ui_types.color_rgb(r, g, b); }
+pub fn color_rgba(r: float, g: float, b: float, a: float): Color { return ui_types.color_rgba(r, g, b, a); }
+pub fn color_rgb8(r: int, g: int, b: int): Color { return ui_types.rgb(r, g, b); }
+
+pub fn hex(h: int): Color {
+    var r = (((h >> 16) & 255) as float) / 255.0;
+    var g = (((h >> 8) & 255) as float) / 255.0;
+    var b = ((h & 255) as float) / 255.0;
+    return Color(r = r, g = g, b = b, a = 1.0);
+}
+
+fn hue_to_rgb(p: float, q: float, t: float): float {
+    var tv = t;
+    if (tv < 0.0) tv = tv + 1.0;
+    if (tv > 1.0) tv = tv - 1.0;
+    if (tv < 0.1667) return p + (q - p) * 6.0 * tv;
+    if (tv < 0.5) return q;
+    if (tv < 0.6667) return p + (q - p) * (0.6667 - tv) * 6.0;
+    return p;
+}
+
+pub fn hsl(h: float, s: float, l: float): Color {
+    var hn = h;
+    while (hn < 0.0) { hn = hn + 360.0; }
+    while (hn >= 360.0) { hn = hn - 360.0; }
+    var sn = s;
+    if (sn < 0.0) sn = 0.0;
+    if (sn > 1.0) sn = 1.0;
+    var ln = l;
+    if (ln < 0.0) ln = 0.0;
+    if (ln > 1.0) ln = 1.0;
+
+    if (sn == 0.0) {
+        return Color(r = ln, g = ln, b = ln, a = 1.0);
+    }
+
+    var q = 0.0;
+    if (ln < 0.5) {
+        q = ln * (1.0 + sn);
+    } else {
+        q = ln + sn - ln * sn;
+    }
+    var p = 2.0 * ln - q;
+    var hk = hn / 360.0;
+
+    var r = hue_to_rgb(p, q, hk + 0.3333);
+    var g = hue_to_rgb(p, q, hk);
+    var b = hue_to_rgb(p, q, hk - 0.3333);
+    return Color(r = r, g = g, b = b, a = 1.0);
+}
+
+pub var white: Color = ui_types.white;
+pub var black: Color = ui_types.black;
+pub var red: Color = ui_types.red;
+pub var green: Color = ui_types.green;
+pub var blue: Color = ui_types.blue;
+pub var indigo: Color = ui_types.indigo;
+pub var yellow: Color = ui_types.yellow;
+pub var gray: Color = ui_types.gray;
+pub var dark_gray: Color = ui_types.dark_gray;
+pub var light_gray: Color = ui_types.light_gray;
+pub var transparent: Color = ui_types.transparent;

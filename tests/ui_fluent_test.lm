@@ -110,8 +110,9 @@ fn test_state_styling(): int {
         .background(ui.blue)
         .pressed(pressed_style);
 
-    assert(btn.pressed_style_val.has_bg == true, "pressed style missing bg");
-    assert(btn.pressed_style_val.has_fg == true, "pressed style missing fg");
+    var ps = btn.pressed_style_val as ui.Style;
+    assert(ps.has_bg == true, "pressed style missing bg");
+    assert(ps.has_fg == true, "pressed style missing fg");
     print("[PASS] 5. State-specific styling (LVGL-inspired)");
     return 1;
 }

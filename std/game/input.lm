@@ -1,0 +1,391 @@
+// std/game/input.lm
+// Comprehensive input management, event capture, and action mapping for std.game
+
+import std.game.types as types;
+
+// Common Key Code Constants
+pub var KEY_SPACE: int         = 32;
+pub var KEY_APOSTROPHE: int    = 39;
+pub var KEY_COMMA: int         = 44;
+pub var KEY_MINUS: int         = 45;
+pub var KEY_PERIOD: int        = 46;
+pub var KEY_SLASH: int         = 47;
+pub var KEY_0: int             = 48;
+pub var KEY_1: int             = 49;
+pub var KEY_2: int             = 50;
+pub var KEY_3: int             = 51;
+pub var KEY_4: int             = 52;
+pub var KEY_5: int             = 53;
+pub var KEY_6: int             = 54;
+pub var KEY_7: int             = 55;
+pub var KEY_8: int             = 56;
+pub var KEY_9: int             = 57;
+pub var KEY_SEMICOLON: int     = 59;
+pub var KEY_EQUAL: int         = 61;
+pub var KEY_A: int             = 65;
+pub var KEY_B: int             = 66;
+pub var KEY_C: int             = 67;
+pub var KEY_D: int             = 68;
+pub var KEY_E: int             = 69;
+pub var KEY_F: int             = 70;
+pub var KEY_G: int             = 71;
+pub var KEY_H: int             = 72;
+pub var KEY_I: int             = 73;
+pub var KEY_J: int             = 74;
+pub var KEY_K: int             = 75;
+pub var KEY_L: int             = 76;
+pub var KEY_M: int             = 77;
+pub var KEY_N: int             = 78;
+pub var KEY_O: int             = 79;
+pub var KEY_P: int             = 80;
+pub var KEY_Q: int             = 81;
+pub var KEY_R: int             = 82;
+pub var KEY_S: int             = 83;
+pub var KEY_T: int             = 84;
+pub var KEY_U: int             = 85;
+pub var KEY_V: int             = 86;
+pub var KEY_W: int             = 87;
+pub var KEY_X: int             = 88;
+pub var KEY_Y: int             = 89;
+pub var KEY_Z: int             = 90;
+pub var KEY_LEFT_BRACKET: int  = 91;
+pub var KEY_BACKSLASH: int     = 92;
+pub var KEY_RIGHT_BRACKET: int = 93;
+pub var KEY_GRAVE_ACCENT: int  = 96;
+
+pub var KEY_ESCAPE: int        = 256;
+pub var KEY_ENTER: int         = 257;
+pub var KEY_TAB: int           = 258;
+pub var KEY_BACKSPACE: int     = 259;
+pub var KEY_INSERT: int        = 260;
+pub var KEY_DELETE: int        = 261;
+pub var KEY_RIGHT: int         = 262;
+pub var KEY_LEFT: int          = 263;
+pub var KEY_DOWN: int          = 264;
+pub var KEY_UP: int            = 265;
+pub var KEY_PAGE_UP: int       = 266;
+pub var KEY_PAGE_DOWN: int     = 267;
+pub var KEY_HOME: int          = 268;
+pub var KEY_END: int           = 269;
+pub var KEY_CAPS_LOCK: int     = 280;
+pub var KEY_SCROLL_LOCK: int   = 281;
+pub var KEY_NUM_LOCK: int      = 282;
+pub var KEY_PRINT_SCREEN: int  = 283;
+pub var KEY_PAUSE: int         = 284;
+
+pub var KEY_F1: int            = 290;
+pub var KEY_F2: int            = 291;
+pub var KEY_F3: int            = 292;
+pub var KEY_F4: int            = 293;
+pub var KEY_F5: int            = 294;
+pub var KEY_F6: int            = 295;
+pub var KEY_F7: int            = 296;
+pub var KEY_F8: int            = 297;
+pub var KEY_F9: int            = 298;
+pub var KEY_F10: int           = 299;
+pub var KEY_F11: int           = 300;
+pub var KEY_F12: int           = 301;
+
+pub var KEY_LEFT_SHIFT: int    = 340;
+pub var KEY_LEFT_CONTROL: int  = 341;
+pub var KEY_LEFT_ALT: int      = 342;
+pub var KEY_LEFT_SUPER: int    = 343;
+pub var KEY_RIGHT_SHIFT: int   = 344;
+pub var KEY_RIGHT_CONTROL: int = 345;
+pub var KEY_RIGHT_ALT: int     = 346;
+pub var KEY_RIGHT_SUPER: int   = 347;
+
+// Mouse Buttons
+pub var MOUSE_LEFT: int   = 0;
+pub var MOUSE_RIGHT: int  = 1;
+pub var MOUSE_MIDDLE: int = 2;
+
+// Modifier Bitflags
+pub var MOD_SHIFT: int   = 1;
+pub var MOD_CONTROL: int = 2;
+pub var MOD_ALT: int     = 4;
+pub var MOD_SUPER: int   = 8;
+
+frame InputManager {
+    // Mouse tracking
+    pub var mouse_x: float;
+    pub var mouse_y: float;
+    pub var mouse_prev_x: float;
+    pub var mouse_prev_y: float;
+    pub var mouse_delta_x: float;
+    pub var mouse_delta_y: float;
+    pub var mouse_wheel: float;
+
+    // Mouse buttons (index 0 = left, 1 = right, 2 = middle)
+    pub var mouse_buttons_down: [bool];
+    pub var mouse_buttons_pressed: [bool];
+    pub var mouse_buttons_released: [bool];
+
+    // Keys
+    pub var keys_down: [int];
+    pub var keys_pressed: [int];
+    pub var keys_released: [int];
+    pub var typed_chars: [int];
+    pub var active_modifiers: int;
+
+    // Action mappings: action name -> [key codes]
+    pub var actions: {str: [int]};
+    // Axis mappings: axis name -> [negative_key, positive_key]
+    pub var axes: {str: [int]};
+
+    pub init() {
+        self.mouse_x = 0.0;
+        self.mouse_y = 0.0;
+        self.mouse_prev_x = 0.0;
+        self.mouse_prev_y = 0.0;
+        self.mouse_delta_x = 0.0;
+        self.mouse_delta_y = 0.0;
+        self.mouse_wheel = 0.0;
+
+        self.mouse_buttons_down = [false, false, false];
+        self.mouse_buttons_pressed = [false, false, false];
+        self.mouse_buttons_released = [false, false, false];
+
+        self.keys_down = [];
+        self.keys_pressed = [];
+        self.keys_released = [];
+        self.typed_chars = [];
+        self.active_modifiers = 0;
+
+        self.actions = {} as {str: [int]};
+        self.axes = {} as {str: [int]};
+    }
+
+    pub fn begin_frame(): nil {
+        self.mouse_delta_x = 0.0;
+        self.mouse_delta_y = 0.0;
+        self.mouse_wheel = 0.0;
+
+        self.mouse_buttons_pressed = [false, false, false];
+        self.mouse_buttons_released = [false, false, false];
+
+        self.keys_pressed = [];
+        self.keys_released = [];
+        self.typed_chars = [];
+    }
+
+    pub fn on_mouse_move(x: float, y: float): nil {
+        self.mouse_delta_x = x - self.mouse_x;
+        self.mouse_delta_y = y - self.mouse_y;
+        self.mouse_prev_x = self.mouse_x;
+        self.mouse_prev_y = self.mouse_y;
+        self.mouse_x = x;
+        self.mouse_y = y;
+    }
+
+    pub fn on_mouse_down(button: int, x: float, y: float): nil {
+        self.on_mouse_move(x, y);
+        var b = button;
+        if (b >= 0 and b < 3) {
+            if (not self.mouse_buttons_down[b]) {
+                self.mouse_buttons_pressed[b] = true;
+            }
+            self.mouse_buttons_down[b] = true;
+        }
+    }
+
+    pub fn on_mouse_up(button: int, x: float, y: float): nil {
+        self.on_mouse_move(x, y);
+        var b = button;
+        if (b >= 0 and b < 3) {
+            if (self.mouse_buttons_down[b]) {
+                self.mouse_buttons_released[b] = true;
+            }
+            self.mouse_buttons_down[b] = false;
+        }
+    }
+
+    pub fn on_mouse_wheel(wheel: float): nil {
+        self.mouse_wheel = wheel;
+    }
+
+    pub fn on_key_down(key: int): nil {
+        var already_down = false;
+        var i = 0;
+        while (i < len(self.keys_down)) {
+            if (self.keys_down[i] == key) {
+                already_down = true;
+            }
+            i = i + 1;
+        }
+
+        if (not already_down) {
+            self.keys_down.append(key);
+            self.keys_pressed.append(key);
+        }
+
+        // Update modifiers
+        if (key == KEY_LEFT_SHIFT or key == KEY_RIGHT_SHIFT) {
+            self.active_modifiers = self.active_modifiers | MOD_SHIFT;
+        } elif (key == KEY_LEFT_CONTROL or key == KEY_RIGHT_CONTROL) {
+            self.active_modifiers = self.active_modifiers | MOD_CONTROL;
+        } elif (key == KEY_LEFT_ALT or key == KEY_RIGHT_ALT) {
+            self.active_modifiers = self.active_modifiers | MOD_ALT;
+        } elif (key == KEY_LEFT_SUPER or key == KEY_RIGHT_SUPER) {
+            self.active_modifiers = self.active_modifiers | MOD_SUPER;
+        }
+    }
+
+    pub fn on_key_up(key: int): nil {
+        var new_keys: [int] = [];
+        var i = 0;
+        var was_down = false;
+        while (i < len(self.keys_down)) {
+            if (self.keys_down[i] == key) {
+                was_down = true;
+            } else {
+                new_keys.append(self.keys_down[i]);
+            }
+            i = i + 1;
+        }
+        self.keys_down = new_keys;
+
+        if (was_down) {
+            self.keys_released.append(key);
+        }
+
+        // Update modifiers
+        if (key == KEY_LEFT_SHIFT or key == KEY_RIGHT_SHIFT) {
+            self.active_modifiers = self.active_modifiers & (~MOD_SHIFT);
+        } elif (key == KEY_LEFT_CONTROL or key == KEY_RIGHT_CONTROL) {
+            self.active_modifiers = self.active_modifiers & (~MOD_CONTROL);
+        } elif (key == KEY_LEFT_ALT or key == KEY_RIGHT_ALT) {
+            self.active_modifiers = self.active_modifiers & (~MOD_ALT);
+        } elif (key == KEY_LEFT_SUPER or key == KEY_RIGHT_SUPER) {
+            self.active_modifiers = self.active_modifiers & (~MOD_SUPER);
+        }
+    }
+
+    pub fn on_char(codepoint: int): nil {
+        self.typed_chars.append(codepoint);
+    }
+
+    // ── Direct Queries ─────────────────────────────────────────────────────────
+
+    pub fn is_key_down(key: int): bool {
+        var i = 0;
+        while (i < len(self.keys_down)) {
+            if (self.keys_down[i] == key) {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn is_key_pressed(key: int): bool {
+        var i = 0;
+        while (i < len(self.keys_pressed)) {
+            if (self.keys_pressed[i] == key) {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn is_key_released(key: int): bool {
+        var i = 0;
+        while (i < len(self.keys_released)) {
+            if (self.keys_released[i] == key) {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn is_mouse_down(button: int = 0): bool {
+        if (button >= 0 and button < 3) {
+            return self.mouse_buttons_down[button];
+        }
+        return false;
+    }
+
+    pub fn is_mouse_pressed(button: int = 0): bool {
+        if (button >= 0 and button < 3) {
+            return self.mouse_buttons_pressed[button];
+        }
+        return false;
+    }
+
+    pub fn is_mouse_released(button: int = 0): bool {
+        if (button >= 0 and button < 3) {
+            return self.mouse_buttons_released[button];
+        }
+        return false;
+    }
+
+    pub fn mouse_pos(): types.Vec2 {
+        return types.Vec2(x=self.mouse_x, y=self.mouse_y);
+    }
+
+    pub fn mouse_delta(): types.Vec2 {
+        return types.Vec2(x=self.mouse_delta_x, y=self.mouse_delta_y);
+    }
+
+    // ── Semantic Action & Axis Mapping ─────────────────────────────────────────
+
+    pub fn bind_action(action_name: str, key_codes: [int]): nil {
+        self.actions[action_name] = key_codes;
+    }
+
+    pub fn is_action_down(action_name: str): bool {
+        var keys = self.actions[action_name];
+        if (keys == nil) { return false; }
+        var i = 0;
+        while (i < len(keys)) {
+            if (self.is_key_down(keys[i])) {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn is_action_pressed(action_name: str): bool {
+        var keys = self.actions[action_name];
+        if (keys == nil) { return false; }
+        var i = 0;
+        while (i < len(keys)) {
+            if (self.is_key_pressed(keys[i])) {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn is_action_released(action_name: str): bool {
+        var keys = self.actions[action_name];
+        if (keys == nil) { return false; }
+        var i = 0;
+        while (i < len(keys)) {
+            if (self.is_key_released(keys[i])) {
+                return true;
+            }
+            i = i + 1;
+        }
+        return false;
+    }
+
+    pub fn bind_axis(axis_name: str, neg_key: int, pos_key: int): nil {
+        self.axes[axis_name] = [neg_key, pos_key];
+    }
+
+    pub fn get_axis(axis_name: str): float {
+        var keys = self.axes[axis_name];
+        if (keys == nil or len(keys) < 2) { return 0.0; }
+        var axis_val = 0.0;
+        if (self.is_key_down(keys[0])) { axis_val = axis_val - 1.0; }
+        if (self.is_key_down(keys[1])) { axis_val = axis_val + 1.0; }
+        return axis_val;
+    }
+}
+
+pub var default_input: InputManager = InputManager();

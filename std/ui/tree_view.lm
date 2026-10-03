@@ -1,13 +1,6 @@
-import std.ui.widget as widget;
+// std/ui/tree_view - Hierarchical tree widget
+import std.ui.types as ui_types;
 
-frame TreeView {
-    pub var children: [widget.Widget];
-
-    pub init(ch: [widget.Widget] = [widget.Widget()]) {
-        self.children = ch;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn tree_view(label: str, children: [ui_types.Widget], default_open: bool = false): ui_types.Widget {
+    return ui_types.tree_node(label, children, default_open);
 }

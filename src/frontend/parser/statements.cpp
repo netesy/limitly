@@ -132,7 +132,11 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
         }
         if (match({TokenType::IMPORT})) {
             auto decl = importStatement();
-            if (decl) decl->annotations = annotations;
+            if (decl) {
+                decl->annotations = annotations;
+                decl->visibility = visibility;
+                decl->hasExplicitVisibility = hasExplicitVisibility;
+            }
             return decl;
         }
         if (match({TokenType::TYPE})) {
@@ -1368,7 +1372,7 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::typeDeclaration() {
             consume(TokenType::RIGHT_BRACE, "Expected '}' after structural type.");
             typeDecl->type = structType;
         }
-    } else if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type)) {
+    } else if (check(TokenType::IDENTIFIER) || isPrimitiveType(peek().type) || check(TokenType::FN) || check(TokenType::FUNCTION_TYPE)) {
         auto firstType = parseTypeAnnotation();
         if (match({TokenType::PIPE})) {
             auto unionType = std::make_shared<LM::Frontend::AST::TypeAnnotation>();

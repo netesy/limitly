@@ -17,21 +17,61 @@ namespace Frontend {
 
 namespace fs = std::filesystem;
 
+void ModuleManager::set_include_dirs(const std::vector<std::string>& dirs) {
+    std::lock_guard<std::mutex> lock(modules_mutex_);
+    include_dirs_ = dirs;
+}
+
 std::string ModuleManager::find_module_file(const std::string& module_path) {
-    std::string filePath = module_path;
-    std::replace(filePath.begin(), filePath.end(), '.', '/');
-    if (fs::exists(filePath + ".lm")) {
-        return filePath + ".lm";
+    std::string relPath = module_path;
+    std::replace(relPath.begin(), relPath.end(), '.', '/');
+
+    auto check_path = [](const std::string& base) -> std::string {
+        if (fs::exists(base + ".lm")) {
+            return base + ".lm";
+        }
+        if (fs::exists(base) && fs::is_directory(base) && fs::exists(base + "/index.lm")) {
+            return base + "/index.lm";
+        }
+        return "";
+    };
+
+    // Check directly relative to current directory
+    std::string found = check_path(relPath);
+    if (!found.empty()) {
+        return found;
     }
-    if (fs::exists(filePath) && fs::is_directory(filePath) && fs::exists(filePath + "/index.lm")) {
-        return filePath + "/index.lm";
+
+    // Check configured include directories
+    std::vector<std::string> dirs;
+    {
+        std::lock_guard<std::mutex> lock(modules_mutex_);
+        dirs = include_dirs_;
     }
-    return filePath + ".lm";
+    for (const auto& dir : dirs) {
+        std::string candidate = (fs::path(dir) / relPath).string();
+        found = check_path(candidate);
+        if (!found.empty()) {
+            return found;
+        }
+    }
+
+    return relPath + ".lm";
 }
 
 std::shared_ptr<Module> ModuleManager::get_module(const std::string& name) {
     std::lock_guard<std::mutex> lock(modules_mutex_);
     return get_module_unlocked(name);
+}
+
+std::string ModuleManager::canonical_symbol(const std::string& qualified_name) {
+    size_t dot = qualified_name.rfind('.');
+    if (dot == std::string::npos) return qualified_name;
+    auto mod = get_module(qualified_name.substr(0, dot));
+    if (!mod) return qualified_name;
+    auto it = mod->reexport_sources.find(qualified_name.substr(dot + 1));
+    if (it == mod->reexport_sources.end()) return qualified_name;
+    return it->second + "." + it->first;
 }
 
 std::shared_ptr<Module> ModuleManager::get_module_unlocked(const std::string& name) const {
@@ -85,11 +125,11 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
     module->ast = ast;
 
     extract_metadata(module);
-
     {
         std::lock_guard<std::mutex> lock(modules_mutex_);
         modules_[module_path] = module;
     }
+    expand_reexports(module);
 
     return module;
 }
@@ -125,6 +165,59 @@ void ModuleManager::extract_metadata(std::shared_ptr<Module> module) {
     }
 }
 
+void ModuleManager::expand_reexports(std::shared_ptr<Module> module) {
+    if (!module || !module->ast) return;
+
+    // Guards against `pub import` cycles (A re-exports B which re-exports A).
+    static thread_local std::set<std::string> expanding;
+    if (!expanding.insert(module->name).second) return;
+
+    auto declared_name = [](const std::shared_ptr<AST::Statement>& stmt) -> std::string {
+        if (auto f = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) return f->name;
+        if (auto v = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) return v->name;
+        if (auto fr = std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt)) return fr->name;
+        if (auto t = std::dynamic_pointer_cast<AST::TraitDeclaration>(stmt)) return t->name;
+        if (auto e = std::dynamic_pointer_cast<AST::EnumDeclaration>(stmt)) return e->name;
+        if (auto td = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) return td->name;
+        return "";
+    };
+
+    for (const auto& stmt : module->ast->statements) {
+        auto imp = std::dynamic_pointer_cast<AST::ImportStatement>(stmt);
+        if (!imp || imp->visibility != AST::VisibilityLevel::Public) continue;
+        // Re-exports must name their symbols explicitly (`show A, B`); there is no
+        // wildcard re-export, so a module cannot widen its API by accident.
+        if (!imp->filter || imp->filter->type != AST::ImportFilterType::Show) continue;
+
+        auto source = load_module(imp->modulePath);
+        if (!source || !source->ast) continue;
+
+        for (const auto& id : imp->filter->identifiers) {
+            // Only symbols the source module itself exposes can be re-exported, and a
+            // local declaration always wins over a re-export of the same name.
+            if (!source->public_symbols.count(id)) continue;
+            if (module->public_symbols.count(id)) continue;
+
+            std::shared_ptr<AST::Statement> found;
+            for (const auto& s : source->ast->statements) {
+                if (declared_name(s) == id) { found = s; break; }
+            }
+            if (!found) {
+                for (const auto& s : source->reexports) {
+                    if (declared_name(s) == id) { found = s; break; }
+                }
+            }
+            if (!found) continue;
+            module->reexports.push_back(found);
+            auto chained = source->reexport_sources.find(id);
+            module->reexport_sources[id] = (chained != source->reexport_sources.end()) ? chained->second : imp->modulePath;
+            module->public_symbols.insert(id);
+        }
+    }
+
+    expanding.erase(module->name);
+}
+
 void ModuleManager::resolve_all(std::shared_ptr<AST::Program> root_program, const std::string& root_path) {
     if (!root_program) return;
 
@@ -145,22 +238,24 @@ void ModuleManager::resolve_all(std::shared_ptr<AST::Program> root_program, cons
         }
     }
 
-    std::set<std::string> processing;
+    std::set<std::string> visited;
     while (!worklist.empty()) {
-        std::vector<std::future<std::shared_ptr<Module>>> futures;
         std::vector<std::string> next_worklist;
 
         for (const auto& path : worklist) {
+            if (!visited.insert(path).second) continue;
+
+            std::shared_ptr<Module> mod = nullptr;
             {
                 std::lock_guard<std::mutex> lock(modules_mutex_);
-                if (modules_.count(path) || processing.count(path)) continue;
+                auto it = modules_.find(path);
+                if (it != modules_.end()) mod = it->second;
             }
-            processing.insert(path);
-            futures.push_back(std::async(std::launch::async, &ModuleManager::load_module, this, path));
-        }
 
-        for (auto& f : futures) {
-            auto mod = f.get();
+            if (!mod) {
+                mod = load_module(path);
+            }
+
             if (mod) {
                 for (const auto& dep : mod->dependencies) {
                     next_worklist.push_back(dep);

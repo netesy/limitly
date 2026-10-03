@@ -1,15 +1,51 @@
-import std.ui.widget as widget;
+// std/ui/icon - Icon widget with Unicode symbols
+import std.ui.types as ui_types;
 
-frame Icon {
-    pub var glyph: str;
-    pub var size: float;
+// Common icon symbols (Unicode)
+pub var ICON_CLOSE: str = "✕";
+pub var ICON_MENU: str = "☰";
+pub var ICON_HOME: str = "🏠";
+pub var ICON_SETTINGS: str = "⚙";
+pub var ICON_STAR: str = "★";
+pub var ICON_HEART: str = "♥";
+pub var ICON_ALERT: str = "⚠";
+pub var ICON_CHECK: str = "✓";
+pub var ICON_CROSS: str = "✗";
+pub var ICON_ARROW_UP: str = "▲";
+pub var ICON_ARROW_DOWN: str = "▼";
+pub var ICON_ARROW_LEFT: str = "◀";
+pub var ICON_ARROW_RIGHT: str = "▶";
+pub var ICON_SEARCH: str = "🔍";
+pub var ICON_LOCK: str = "🔒";
+pub var ICON_USER: str = "👤";
+pub var ICON_TRASH: str = "🗑";
+pub var ICON_EDIT: str = "✎";
 
-    pub init(gl: str = "", sz: float = 24.0) {
-        self.glyph = gl;
-        self.size = sz;
+// Create an icon widget
+pub fn icon(glyph: str, size: float = 24.0, color: ui_types.Color = ui_types.white): ui_types.Widget {
+    var w = ui_types.text(glyph);
+    w.font_size_val = size;
+    w.width_val = size;
+    w.height_val = size;
+    w.foreground_color = color;
+    w.is_a11y_hidden = true;
+    return w;
+}
+
+// Icon button (icon + optional label)
+pub fn icon_button(glyph: str, label: str = "", on_click: any = nil, size: float = 20.0): ui_types.Widget {
+    if (len(label) > 0) {
+        var row = ui_types.row([
+            icon(glyph, size),
+            ui_types.text(label)
+        ]);
+        row.spacing_val = 8.0;
+        var btn = ui_types.button("").on_click(on_click);
+        btn.children = [row];
+        return btn;
     }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+    var ic = icon(glyph, size);
+    var btn = ui_types.button("").on_click(on_click);
+    btn.children = [ic];
+    return btn;
 }

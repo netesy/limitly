@@ -1,0 +1,73 @@
+// std/ui/theme_renderer - Theme-aware rendering helpers
+import std.ui.types as ui_types;
+import std.ui.theme as theme_mod;
+import std.graphics.canvas as canvas;
+import std.graphics.paint as paint;
+import std.graphics.color as color;
+import std.graphics.rect as rect;
+
+// Apply theme color to paint based on context
+pub fn apply_theme_color(p: paint.Paint, color_token: ui_types.Color): paint.Paint {
+    p.color_val = color.rgba(
+        (color_token.r * 255.0) as int,
+        (color_token.g * 255.0) as int,
+        (color_token.b * 255.0) as int,
+        color_token.a
+    );
+    return p;
+}
+
+// Draw focus ring around a widget
+pub fn draw_focus_ring(cvs: canvas.Canvas, x: float, y: float, w: float, h: float, thickness: float = 2.0): nil {
+    var ring_p = paint.Paint();
+    ring_p.color_val = color.rgba(100, 180, 255, 1.0); // Use theme focus_ring color
+    
+    // Top border
+    cvs.draw_rect(rect.Rect(x=x - thickness, y=y - thickness, w=w + (2.0 * thickness), h=thickness), ring_p);
+    // Bottom border
+    cvs.draw_rect(rect.Rect(x=x - thickness, y=y + h, w=w + (2.0 * thickness), h=thickness), ring_p);
+    // Left border
+    cvs.draw_rect(rect.Rect(x=x - thickness, y=y, w=thickness, h=h), ring_p);
+    // Right border
+    cvs.draw_rect(rect.Rect(x=x + w, y=y, w=thickness, h=h), ring_p);
+}
+
+// Draw corner radius on a rect using theme
+pub fn draw_rounded_rect(cvs: canvas.Canvas, r: rect.Rect, radius: float, bg_color: ui_types.Color): nil {
+    var p = paint.Paint();
+    apply_theme_color(p, bg_color);
+    
+    // Simple approximation: draw rect with corner rectangles trimmed
+    // Full implementation would require canvas.draw_rounded_rect
+    cvs.draw_rect(r, p);
+}
+
+// Get button background color based on state
+pub fn get_button_bg_color(w: ui_types.Widget, theme: theme_mod.Theme): ui_types.Color {
+    if (w.is_pressed == 1) {
+        if (w.pressed_style_val.has_bg) {
+            return w.pressed_style_val.bg;
+        }
+        return theme.colors.primary;
+    } elif (w.is_hovered == 1) {
+        if (w.hover_style_val.has_bg) {
+            return w.hover_style_val.bg;
+        }
+        // Lighten primary color for hover
+        return ui_types.rgb(150, 200, 255);
+    }
+    if (w.background_color.a > 0.0) {
+        return w.background_color;
+    }
+    return theme.colors.primary;
+}
+
+// Get input border color based on state and focus
+pub fn get_input_border_color(w: ui_types.Widget, has_focus: bool, theme: theme_mod.Theme): ui_types.Color {
+    if (has_focus or w.is_focused == 1) {
+        return theme.colors.focus_ring;
+    } elif (w.is_hovered == 1) {
+        return theme.colors.border;
+    }
+    return ui_types.rgb(55, 60, 75);
+}

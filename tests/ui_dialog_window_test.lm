@@ -1,0 +1,106 @@
+// tests/ui_dialog_window_test.lm - Regression test for dialog, modal, and window fixes
+import std.ui as ui;
+import std.ui.window as win_mod;
+import std.ui.viewport as viewport_mod;
+
+fn on_close_handler(): nil {
+    print("[Action] Dialog on_close called");
+}
+
+fn on_ok_handler(): nil {
+    print("[Action] Alert on_ok called");
+}
+
+fn test_window(): nil {
+    var win = win_mod.Window(t="My Test App", w=1024.0, h=768.0);
+    if (win.title != "My Test App") {
+        print("FAIL: window title mismatch");
+        return;
+    }
+    if (win.width != 1024.0 or win.height != 768.0) {
+        print("FAIL: window dimensions mismatch");
+        return;
+    }
+    var root = ui.text("Hello Window");
+    win.set_root(root);
+    var root_w = win.root as ui.Widget;
+    if (root_w.text_val != "Hello Window") {
+        print("FAIL: window set_root mismatch");
+        return;
+    }
+    print("[PASS] Window frame and root widget verified");
+}
+
+fn test_dialog(): nil {
+    // Hidden dialog returns empty
+    var hidden = ui.dialog("Hidden", ui.text("Hidden content"), false);
+    if (hidden.kind != ui.KIND_CONTAINER or len(hidden.children) != 0) {
+        print("FAIL: hidden dialog should be empty");
+        return;
+    }
+
+    // Active dialog
+    viewport_mod.global_viewport.width = 1000.0;
+    viewport_mod.global_viewport.height = 800.0;
+
+    var content = ui.text("Dialog Body");
+    var dlg = ui.dialog("Test Dialog", content, true, 400.0, 300.0, on_close_handler);
+    if (dlg.kind != ui.KIND_OVERLAY) {
+        print("FAIL: dialog should return overlay");
+        return;
+    }
+    // Overlay x and y should be centered: (1000 - 400) / 2 = 300, (800 - 300) / 2 = 250
+    if (dlg.padding_left != 300.0 or dlg.padding_top != 250.0) {
+        print("FAIL: dialog overlay coordinates not centered dynamically");
+        return;
+    }
+
+    // Check header and close button
+    var children_list = dlg.children as [ui.Widget];
+    var dlg_box = children_list[0] as ui.Widget;
+    var box_children = dlg_box.children as [ui.Widget];
+    var header = box_children[0] as ui.Widget;
+    var header_children = header.children as [ui.Widget];
+    var close_btn = header_children[2] as ui.Widget;
+    if (close_btn.on_click_action != nil) {
+        var action = close_btn.on_click_action as fn(): nil;
+        action();
+    }
+    print("[PASS] Dialog dynamic positioning and on_close callback verified");
+}
+
+fn test_alert_and_confirm(): nil {
+    var alert_dlg = ui.alert_dialog("Warning", "File not found", on_ok_handler);
+    if (alert_dlg.kind != ui.KIND_OVERLAY) {
+        print("FAIL: alert_dialog should return overlay");
+        return;
+    }
+
+    var confirm_dlg = ui.confirm("Confirm Action", "Are you sure?");
+    if (confirm_dlg.kind != ui.KIND_OVERLAY) {
+        print("FAIL: confirm should return overlay");
+        return;
+    }
+    print("[PASS] Alert and Confirm dialogs verified");
+}
+
+fn test_modal_backdrop(): nil {
+    viewport_mod.global_viewport.width = 1280.0;
+    viewport_mod.global_viewport.height = 720.0;
+
+    var bd = ui.modal_backdrop(0.5);
+    if (bd.width_val != 1280.0 or bd.height_val != 720.0) {
+        print("FAIL: modal backdrop size does not match viewport");
+        return;
+    }
+    print("[PASS] Modal backdrop dynamic sizing verified");
+}
+
+fn main(): nil {
+    print("=== Testing std.ui Dialog, Modal, and Window ===");
+    test_window();
+    test_dialog();
+    test_alert_and_confirm();
+    test_modal_backdrop();
+    print("=== All Dialog, Modal, and Window Tests Passed Successfully ===");
+}

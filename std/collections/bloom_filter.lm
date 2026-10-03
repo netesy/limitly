@@ -1,14 +1,14 @@
 // Standard Library BloomFilter Collection
 
-import std.collections.queue as queue;
+import std.collections.bitset as bitset;
 
 frame BloomFilter {
-    pub bitset: queue.BitSet;
+    pub bitset: bitset.BitSet;
     pub size: int;
     pub num_hashes: int;
 
     pub init(size: int = 256, num_hashes: int = 3) {
-        self.bitset = queue.BitSet(size);
+        self.bitset = bitset.BitSet(size);
         self.size = size;
         self.num_hashes = num_hashes;
     }

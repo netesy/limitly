@@ -3,7 +3,6 @@
 
 import std.ui.context as ui_context;
 import std.ui.types as ui_types;
-import std.ui as std_ui;
 import std.gg as gg;
 
 // Event type constants
@@ -106,6 +105,7 @@ frame AppState {
     pub var framebuffer_height: int;
     pub var dpi_scale: float;
     pub var event_queue: [Event];
+    pub var event_queue_head: int;  // O(1) dequeue: advance head instead of copying
     pub var frame_count: int;
     pub var last_frame_time: int;
     pub var delta_time: float;
@@ -127,6 +127,7 @@ pub var global_app_state: AppState = AppState(
     framebuffer_height=600,
     dpi_scale=1.0,
     event_queue=[] as [Event],
+    event_queue_head=0,
     frame_count=0,
     last_frame_time=0,
     delta_time=0.0
@@ -152,6 +153,7 @@ pub fn app_init(config: WindowConfig): int {
     global_app_state.last_frame_time = 0;
     global_app_state.delta_time = 0.0;
     global_app_state.event_queue = [] as [Event];
+    global_app_state.event_queue_head = 0;
     ui_context.ui_init();
     ui_context.set_viewport_size(config.width as float, config.height as float);
     
@@ -196,7 +198,7 @@ pub fn app_is_running(): int {
     return global_app_state.is_running;
 }
 
-pub fn ui(root: std_ui.Widget): nil {
+pub fn ui(root: ui_types.Widget): nil {
     ui_context.ui_init();
     ui_context.set_root(root);
 }
@@ -227,6 +229,7 @@ pub fn app_run(): nil {
     // Main event loop
     while (global_app_state.is_running != 0) {
         run_frame_step();
+        sleep(0.008);
     }
 }
 
@@ -263,8 +266,13 @@ pub fn process_events(): nil {
             i = i + 4;
         }
     }
-    while (has_pending_events() != 0) {
-        var ev = poll_event();
+    // Drain and reset - compact the queue if head has advanced significantly
+    var q = global_app_state.event_queue;
+    global_app_state.event_queue = [] as [Event];
+    global_app_state.event_queue_head = 0;
+    var q_idx = 0;
+    while (q_idx < len(q)) {
+        var ev = q[q_idx];
         if (ev.event_type == EVENT_QUIT) {
             global_app_state.is_running = 0;
         }
@@ -293,6 +301,7 @@ pub fn process_events(): nil {
         if (ev.event_type == EVENT_MOUSE_WHEEL) {
             ui_context.dispatch_mouse_wheel(ev.y as float);
         }
+        q_idx = q_idx + 1;
     }
 }
 
@@ -306,25 +315,27 @@ pub fn push_quit_event(): nil {
 }
 
 pub fn push_event(event: Event): nil {
-    global_app_state.event_queue = global_app_state.event_queue + [event];
+    global_app_state.event_queue.append(event);
 }
 
 pub fn poll_event(): Event {
-    if (len(global_app_state.event_queue) == 0) {
+    var head = global_app_state.event_queue_head;
+    if (head >= len(global_app_state.event_queue)) {
         return make_default_event();
     }
-    
-    var event: Event = global_app_state.event_queue[0];
-    if (len(global_app_state.event_queue) > 1) {
-        var new_q: [Event] = [global_app_state.event_queue[1]];
-        var i: int = 2;
+    // O(1) dequeue: advance head index instead of copying the array
+    var event: Event = global_app_state.event_queue[head];
+    global_app_state.event_queue_head = head + 1;
+    // Compact when more than half the buffer is consumed to bound memory
+    if (global_app_state.event_queue_head > 8) {
+        var new_q: [Event] = [] as [Event];
+        var i: int = global_app_state.event_queue_head;
         while (i < len(global_app_state.event_queue)) {
-            new_q = new_q + [global_app_state.event_queue[i]];
+            new_q.append(global_app_state.event_queue[i]);
             i = i + 1;
         }
         global_app_state.event_queue = new_q;
-    } else {
-        global_app_state.event_queue = [] as [Event];
+        global_app_state.event_queue_head = 0;
     }
     return event;
 }
@@ -338,6 +349,9 @@ pub fn has_pending_events(): int {
 
 pub fn present_frame(): nil {
     if (global_app_state.is_initialized == 0) {
+        return;
+    }
+    if (ui_context.global_ui_context.dirty == 0 and global_app_state.frame_count > 2) {
         return;
     }
     ui_context.set_viewport_size(global_app_state.width as float, global_app_state.height as float);
@@ -391,15 +405,8 @@ pub fn set_window_title(title: str): nil {
     global_app_state.window_config.title = title;
 }
 
-pub fn set_window_size(width: int, height: int): nil {
-    if (global_app_state.is_initialized == 0) {
-        return;
-    }
-    global_app_state.window_config.width = width;
-    global_app_state.window_config.height = height;
-    global_app_state.width = width;
-    global_app_state.height = height;
-}
+// NOTE: set_window_size is defined above at line ~353 with the gg.set_window_size call.
+// This duplicate was removed to avoid shadowing the correct definition.
 
 pub fn set_fullscreen(fullscreen: int): nil {
     if (global_app_state.is_initialized == 0) {

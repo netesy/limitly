@@ -1,7 +1,97 @@
-frame Menu {
-    pub var items: [str];
+// std/ui/menu - Dropdown and context menus
+import std.ui.types as ui_types;
 
-    pub init(itms: [str] = ["Item"]) {
-        self.items = itms;
+// Menu item frame
+frame MenuItem {
+    pub var label: str;
+    pub var icon: str;
+    pub var action: any;
+    pub var enabled: bool;
+
+    pub init(lbl: str, icn: str = "", act: any = nil) {
+        self.label = lbl;
+        self.icon = icn;
+        self.action = act;
+        self.enabled = true;
     }
 }
+
+// Create a simple dropdown menu from items
+pub fn menu(items: [str], on_select: any = nil): ui_types.Widget {
+    var item_widgets: [ui_types.Widget] = [];
+    var i = 0;
+    while (i < len(items)) {
+        var item = ui_types.button(items[i])
+            .background(ui_types.rgb(28, 30, 40))
+            .width(160.0)
+            .height(28.0);
+        item_widgets.append(item);
+        i = i + 1;
+    }
+    
+    var w = ui_types.column(item_widgets);
+    w.background_color = ui_types.rgb(24, 26, 34);
+    w.foreground_color = ui_types.white;
+    w.padding_left = 4.0;
+    w.padding_top = 4.0;
+    w.padding_right = 4.0;
+    w.padding_bottom = 4.0;
+    w.spacing_val = 2.0;
+    w.corner_radius_val = 4.0;
+    w.on_change_action = on_select;
+    
+    return w;
+}
+
+// Create menu from MenuItems
+pub fn menu_items(items: [MenuItem]): ui_types.Widget {
+    var item_widgets: [ui_types.Widget] = [];
+    var i = 0;
+    while (i < len(items)) {
+        var mi = items[i];
+        var label = mi.label;
+        if (len(mi.icon) > 0) {
+            label = mi.icon + " " + mi.label;
+        }
+        var btn = ui_types.button(label)
+            .background(ui_types.rgb(28, 30, 40))
+            .width(180.0)
+            .height(32.0)
+            .on_click(mi.action);
+        if (mi.enabled == false) {
+            btn = btn.disabled();
+        }
+        item_widgets.append(btn);
+        i = i + 1;
+    }
+    
+    var w = ui_types.column(item_widgets);
+    w.background_color = ui_types.rgb(20, 22, 28);
+    w.foreground_color = ui_types.white;
+    w.padding_left = 4.0;
+    w.padding_top = 4.0;
+    w.padding_right = 4.0;
+    w.padding_bottom = 4.0;
+    w.spacing_val = 2.0;
+    w.corner_radius_val = 6.0;
+    w.shadow_val = ui_types.shadow(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+    
+    return w;
+}
+
+// Context menu (positioned absolutely)
+pub fn context_menu(x: float, y: float, items: [str], on_select: any = nil): ui_types.Widget {
+    var m = menu(items, on_select);
+    return ui_types.overlay(m, x, y, 0.0, 0.0);
+}
+
+// Dropdown menu button
+pub fn dropdown_menu(button_label: str, items: [str], on_select: any = nil): ui_types.Widget {
+    var btn = ui_types.button(button_label);
+    var dropdown = menu(items, on_select);
+    
+    var container = ui_types.column([btn, dropdown]);
+    container.spacing_val = 0.0;
+    return container;
+}
+

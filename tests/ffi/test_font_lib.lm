@@ -11,7 +11,7 @@ fn main(): int {
     assert(sys_font_path != "", "Expected system font to be detected");
 
     print("=== Test 2: System Font Loading ===");
-    var fnt = image.load_system_font()? else {
+    var fnt = font.load_system_font()? else {
         print("Failed to load system font");
         return 1;
     };

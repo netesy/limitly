@@ -1,0 +1,43 @@
+// Test with modest complexity
+import std.app as app;
+import std.ui as ui;
+
+fn main() {
+    print("Modest UI test");
+
+    var cfg = app.default_window_config();
+    cfg.title = "Test";
+    cfg.width = 500;
+    cfg.height = 300;
+
+    assert(app.init(cfg) == 1, "app init failed");
+
+    // Create widgets as separate variables - avoid nesting
+    var title = ui.text("Header");
+    var btn1 = ui.button("Button 1", fn(): nil { print("B1"); });
+    var btn2 = ui.button("Button 2", fn(): nil { print("B2"); });
+    var spacer = ui.spacer();
+    
+    var header = ui.row([title, spacer, btn1, btn2]);
+    
+    var text1 = ui.text("Item 1");
+    var text2 = ui.text("Item 2");
+    var text3 = ui.text("Item 3");
+    
+    var content = ui.column([text1, text2, text3]);
+    
+    var check = ui.checkbox(false, fn(): nil { print("Check"); });
+    var slider = ui.slider(50.0, 0.0, 100.0, fn(): nil { print("Slide"); });
+    var input = ui.input("", "Type...", fn(): nil { print("Input"); });
+    
+    var controls = ui.column([check, slider, input]);
+    
+    var root = ui.column([header, content, controls]);
+    app.ui(root);
+
+    print("Running...");
+    app.run();
+    print("Done");
+}
+
+main();

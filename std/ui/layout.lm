@@ -1,9 +1,340 @@
-import std.ui.widget as widget;
+// std/ui/layout - Layout measurement and box model
+import std.ui.types as ui_types;
 
-frame Layout {
-    pub var children: [widget.Widget];
+// Layout box representing a measured widget with position and size
+frame LayoutBox {
+    pub var x: float;
+    pub var y: float;
+    pub var width: float;
+    pub var height: float;
+    pub var widget: ui_types.Widget;
+    pub var children: [LayoutBox];
 
-    pub init(ch: [widget.Widget] = [widget.Widget()]) {
-        self.children = ch;
+    pub init(widget_val: ui_types.Widget = ui_types.empty()) {
+        self.x = 0.0;
+        self.y = 0.0;
+        self.width = 0.0;
+        self.height = 0.0;
+        self.widget = widget_val;
+        self.children = [] as [LayoutBox];
     }
 }
+
+// Grid layout specification
+frame GridSpec {
+    pub var columns: int;
+    pub var rows: int;
+    pub var column_gap: float;
+    pub var row_gap: float;
+
+    pub init(cols: int = 2, rows: int = 0, col_gap: float = 8.0, row_gap: float = 8.0) {
+        self.columns = cols;
+        self.rows = rows;
+        self.column_gap = col_gap;
+        self.row_gap = row_gap;
+    }
+}
+
+// Responsive breakpoint specification
+frame Breakpoint {
+    pub var min_width: float;
+    pub var widget: ui_types.Widget;
+
+    pub init(min_w: float, w: ui_types.Widget) {
+        self.min_width = min_w;
+        self.widget = w;
+    }
+}
+
+// Measure widget height (from context.lm)
+fn measure_height(w: ui_types.Widget): float {
+    if (w.height_val > 0.0) {
+        return w.height_val + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui_types.KIND_TEXT) {
+        return 16.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui_types.KIND_BUTTON) {
+        return 28.0 + w.padding_top + w.padding_bottom;
+    }
+    if (w.kind == ui_types.KIND_CONTAINER) {
+        var h = w.padding_top + w.padding_bottom;
+        var i = 0;
+        while (i < len(w.children)) {
+            h = h + measure_height(w.children[i]);
+            if (i < len(w.children) - 1) {
+                h = h + w.spacing_val;
+            }
+            i = i + 1;
+        }
+        return h;
+    }
+    return 16.0;
+}
+
+// Measure widget width (from context.lm)
+fn measure_width(w: ui_types.Widget, available_w: float): float {
+    if (w.width_val > 0.0) {
+        return w.width_val + w.padding_left + w.padding_right;
+    }
+    if (w.kind == ui_types.KIND_TEXT) {
+        return ((len(w.text_val) as float) * 8.0) + w.padding_left + w.padding_right;
+    }
+    if (w.kind == ui_types.KIND_BUTTON) {
+        var cw = 8.0;
+        var tw = ((len(w.text_val) as float) * cw) + w.padding_left + w.padding_right + 16.0;
+        if (tw > available_w) tw = available_w;
+        return tw;
+    }
+    if (w.kind == ui_types.KIND_CONTAINER) {
+        if (w.is_vertical == 0) { // Row
+            var total = w.padding_left + w.padding_right;
+            var i = 0;
+            while (i < len(w.children)) {
+                total = total + measure_width(w.children[i], available_w);
+                if (i < len(w.children) - 1) {
+                    total = total + w.spacing_val;
+                }
+                i = i + 1;
+            }
+            if (total > available_w) total = available_w;
+            return total;
+        }
+        return available_w;
+    }
+    return available_w;
+}
+
+// Compute full layout tree with positions and sizes
+pub fn compute_layout(widget: ui_types.Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox {
+    var box = LayoutBox(widget);
+    box.x = x;
+    box.y = y;
+    box.width = available_w;
+    box.height = available_h;
+    
+    if (widget.kind == ui_types.KIND_CONTAINER) {
+        var curr_x = x + widget.padding_left;
+        var curr_y = y + widget.padding_top;
+        var inner_w = available_w - widget.padding_left - widget.padding_right;
+        var inner_h = available_h - widget.padding_top - widget.padding_bottom;
+        
+        if (widget.is_vertical == 1) { // Column layout
+            var i = 0;
+            while (i < len(widget.children)) {
+                var child = widget.children[i];
+                var child_h = measure_height(child);
+                var child_w = inner_w;
+                if (child.width_val > 0.0) {
+                    child_w = child.width_val;
+                }
+                
+                var child_box = compute_layout(child, curr_x, curr_y, child_w, child_h);
+                box.children.append(child_box);
+                
+                curr_y = curr_y + child_h + widget.spacing_val;
+                i = i + 1;
+            }
+        } elif (widget.is_vertical == 0) { // Row layout with flexbox
+            var fixed_w = 0.0;
+            var num_spacers = 0;
+            var total_flex = 0.0;
+            var i = 0;
+            while (i < len(widget.children)) {
+                var child = widget.children[i];
+                if (child.kind == ui_types.KIND_SPACER) {
+                    num_spacers = num_spacers + 1;
+                    total_flex = total_flex + child.flex_val;
+                } else {
+                    var cw = measure_width(child, inner_w);
+                    fixed_w = fixed_w + cw;
+                }
+                i = i + 1;
+            }
+            
+            var spacing_total = 0.0;
+            if (len(widget.children) > 1) {
+                var num_gaps: float = (len(widget.children) - 1) as float;
+                spacing_total = num_gaps * widget.spacing_val;
+            }
+            var remaining_w = inner_w - fixed_w - spacing_total;
+            var spacer_unit = 0.0;
+            if (num_spacers > 0 and remaining_w > 0.0 and total_flex > 0.0) {
+                spacer_unit = remaining_w / total_flex;
+            }
+            
+            i = 0;
+            while (i < len(widget.children)) {
+                var child = widget.children[i];
+                var child_h = measure_height(child);
+                var child_w = 0.0;
+                if (child.kind == ui_types.KIND_SPACER) {
+                    child_w = spacer_unit * child.flex_val;
+                } else {
+                    child_w = measure_width(child, inner_w);
+                }
+                
+                var child_box = compute_layout(child, curr_x, curr_y, child_w, child_h);
+                box.children.append(child_box);
+                
+                curr_x = curr_x + child_w + widget.spacing_val;
+                i = i + 1;
+            }
+        }
+    }
+    
+    return box;
+}
+
+// Flatten layout tree to list for efficient rendering and hit-testing
+pub fn flatten_layout(box: LayoutBox): [LayoutBox] {
+    var result: [LayoutBox] = [box];
+    var i = 0;
+    while (i < len(box.children)) {
+        var child_list = flatten_layout(box.children[i]);
+        var j = 0;
+        while (j < len(child_list)) {
+            result.append(child_list[j]);
+            j = j + 1;
+        }
+        i = i + 1;
+    }
+    return result;
+}
+
+// Hit-test a flat layout box list
+pub fn hit_test_boxes(boxes: [LayoutBox], px: float, py: float): LayoutBox {
+    var result = LayoutBox();
+    var i = len(boxes) - 1; // Iterate backwards to get topmost widget
+    while (i >= 0) {
+        var box = boxes[i];
+        if (px >= box.x and px <= box.x + box.width and py >= box.y and py <= box.y + box.height) {
+            return box;
+        }
+        i = i - 1;
+    }
+    return result;
+}
+
+// ── Aspect Ratio Layout ─────────────────────────────────────────────────────
+// Compute layout with aspect ratio constraint
+fn apply_aspect_ratio(box: LayoutBox, ratio: float): LayoutBox {
+    if (ratio <= 0.0) {
+        return box;
+    }
+    // If width is constrained, adjust height
+    if (box.width > 0.0) {
+        box.height = box.width / ratio;
+    }
+    // If height is constrained, adjust width
+    elif (box.height > 0.0) {
+        box.width = box.height * ratio;
+    }
+    return box;
+}
+
+// ── Enhanced Grid Layout ───────────────────────────────────────────────────
+// Compute grid layout with explicit column/row specification
+pub fn compute_grid_layout(spec: GridSpec, children: [ui_types.Widget], x: float, y: float, available_w: float, available_h: float): [LayoutBox] {
+    var result: [LayoutBox] = [];
+
+    if (spec.columns <= 0) {
+        return result;
+    }
+
+    var col_width = (available_w - (spec.column_gap * (spec.columns - 1 as float))) / (spec.columns as float);
+    var num_rows = 0;
+    if (spec.rows > 0) {
+        num_rows = spec.rows;
+    } else {
+        num_rows = (len(children) + spec.columns - 1) / spec.columns;
+    }
+    var row_height = (available_h - (spec.row_gap * ((num_rows - 1) as float))) / (num_rows as float);
+
+    var i = 0;
+    while (i < len(children)) {
+        var col = i % spec.columns;
+        var row = i / spec.columns;
+        var child_x = x + (col as float) * (col_width + spec.column_gap);
+        var child_y = y + (row as float) * (row_height + spec.row_gap);
+
+        var child_box = LayoutBox(children[i]);
+        child_box.x = child_x;
+        child_box.y = child_y;
+        child_box.width = col_width;
+        child_box.height = row_height;
+
+        // Apply aspect ratio if specified
+        if (children[i].aspect_ratio > 0.0) {
+            child_box = apply_aspect_ratio(child_box, children[i].aspect_ratio);
+        }
+
+        result.append(child_box);
+        i = i + 1;
+    }
+
+    return result;
+}
+
+// ── Responsive Layout Helpers ───────────────────────────────────────────────
+// Select widget based on viewport width (responsive design)
+pub fn responsive_layout(breakpoints: [Breakpoint], viewport_w: float, default_widget: ui_types.Widget): ui_types.Widget {
+    var selected = default_widget;
+    var i = 0;
+    while (i < len(breakpoints)) {
+        if (viewport_w >= breakpoints[i].min_width) {
+            selected = breakpoints[i].widget;
+        }
+        i = i + 1;
+    }
+    return selected;
+}
+
+// Mobile-first responsive helper
+pub fn responsive(mobile: ui_types.Widget, tablet: ui_types.Widget, desktop: ui_types.Widget, viewport_w: float): ui_types.Widget {
+    if (viewport_w < 768.0) {
+        return mobile;
+    } elif (viewport_w < 1024.0) {
+        return tablet;
+    } else {
+        return desktop;
+    }
+}
+
+// Simple breakpoint helper (two breakpoints)
+pub fn breakpoint(small: ui_types.Widget, large: ui_types.Widget, threshold: float = 768.0, viewport_w: float): ui_types.Widget {
+    if (viewport_w < threshold) {
+        return small;
+    } else {
+        return large;
+    }
+}
+
+// ── Constraint-Based Layout Helpers ─────────────────────────────────────────
+// Apply min/max width constraints to a layout box
+fn apply_size_constraints(box: LayoutBox, widget: ui_types.Widget): LayoutBox {
+    if (widget.min_width > 0.0 and box.width < widget.min_width) {
+        box.width = widget.min_width;
+    }
+    if (widget.max_width > 0.0 and box.width > widget.max_width) {
+        box.width = widget.max_width;
+    }
+    if (widget.min_height > 0.0 and box.height < widget.min_height) {
+        box.height = widget.min_height;
+    }
+    if (widget.max_height > 0.0 and box.height > widget.max_height) {
+        box.height = widget.max_height;
+    }
+    return box;
+}
+
+// Enhanced compute_layout with constraints and aspect ratio
+pub fn compute_layout_enhanced(widget: ui_types.Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox {
+    var box = compute_layout(widget, x, y, available_w, available_h);
+    box = apply_size_constraints(box, widget);
+    if (widget.aspect_ratio > 0.0) {
+        box = apply_aspect_ratio(box, widget.aspect_ratio);
+    }
+    return box;
+}
+

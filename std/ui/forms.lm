@@ -1,0 +1,443 @@
+// std/ui/forms - Form State Management with Validation
+import std.ui.types as ui;
+import std.ui.state as state_mod;
+
+// ── Validation Result ───────────────────────────────────────────────────────
+frame ValidationResult {
+    pub var is_valid: bool;
+    pub var error_message: str;
+    pub var field_name: str;
+
+    pub init(valid: bool = true, error: str = "", field: str = "") {
+        self.is_valid = valid;
+        self.error_message = error;
+        self.field_name = field;
+    }
+
+    pub fn ok(): ValidationResult {
+        return ValidationResult(valid=true, error="", field="");
+    }
+
+    pub fn error(message: str, field: str): ValidationResult {
+        return ValidationResult(valid=false, error=message, field=field);
+    }
+}
+
+// ── Validation Rule ────────────────────────────────────────────────────────
+frame ValidationRule {
+    pub var field_name: str;
+    pub var validator: fn(any): ValidationResult;
+    pub var is_required: bool;
+
+    pub init(field: str, validator_fn: fn(any): ValidationResult, required: bool = false) {
+        self.field_name = field;
+        self.validator = validator_fn;
+        self.is_required = required;
+    }
+}
+
+// ── Common Validators ────────────────────────────────────────────────────────
+pub fn required_validator(field_name: str): ValidationRule {
+    return ValidationRule(
+        field=field_name,
+        validator_fn=fn(value: any): ValidationResult {
+            if (value == nil) {
+                return ValidationResult().error(field_name + " is required", field_name);
+            }
+            var s = value as str;
+            if (len(s) == 0) {
+                return ValidationResult().error(field_name + " is required", field_name);
+            }
+            return ValidationResult().ok();
+        },
+        required=true
+    );
+}
+
+pub fn min_length_validator(field_name: str, min_len: int): ValidationRule {
+    return ValidationRule(
+        field=field_name,
+        validator_fn=fn(value: any): ValidationResult {
+            var s = value as str;
+            if (len(s) < min_len) {
+                return ValidationResult().error(field_name + " must be at least " + (min_len as str) + " characters", field_name);
+            }
+            return ValidationResult().ok();
+        },
+        required=false
+    );
+}
+
+pub fn max_length_validator(field_name: str, max_len: int): ValidationRule {
+    return ValidationRule(
+        field=field_name,
+        validator_fn=fn(value: any): ValidationResult {
+            var s = value as str;
+            if (len(s) > max_len) {
+                return ValidationResult().error(field_name + " must be at most " + (max_len as str) + " characters", field_name);
+            }
+            return ValidationResult().ok();
+        },
+        required=false
+    );
+}
+
+pub fn email_validator(field_name: str): ValidationRule {
+    return ValidationRule(
+        field=field_name,
+        validator_fn=fn(value: any): ValidationResult {
+            var s = value as str;
+            var has_at = false;
+            var i = 0;
+            while (i < len(s)) {
+                if (_builtin_substring(s, i, i + 1) == "@") {
+                    has_at = true;
+                }
+                i = i + 1;
+            }
+            if (not has_at) {
+                return ValidationResult().error(field_name + " must be a valid email", field_name);
+            }
+            return ValidationResult().ok();
+        },
+        required=false
+    );
+}
+
+pub fn min_value_validator(field_name: str, min_val: float): ValidationRule {
+    return ValidationRule(
+        field=field_name,
+        validator_fn=fn(value: any): ValidationResult {
+            var f = value as float;
+            if (f < min_val) {
+                return ValidationResult().error(field_name + " must be at least " + (min_val as str), field_name);
+            }
+            return ValidationResult().ok();
+        },
+        required=false
+    );
+}
+
+pub fn max_value_validator(field_name: str, max_val: float): ValidationRule {
+    return ValidationRule(
+        field=field_name,
+        validator_fn=fn(value: any): ValidationResult {
+            var f = value as float;
+            if (f > max_val) {
+                return ValidationResult().error(field_name + " must be at most " + (max_val as str), field_name);
+            }
+            return ValidationResult().ok();
+        },
+        required=false
+    );
+}
+
+pub fn pattern_validator(field_name: str, pattern: str): ValidationRule {
+    return ValidationRule(
+        field=field_name,
+        validator_fn=fn(value: any): ValidationResult {
+            var s = value as str;
+            // Simple pattern matching - in real implementation would use regex
+            if (len(s) == 0) {
+                return ValidationResult().ok();
+            }
+            // Placeholder for actual pattern matching
+            return ValidationResult().ok();
+        },
+        required=false
+    );
+}
+
+// ── Form State ─────────────────────────────────────────────────────────────
+frame FormState {
+    pub var values: {str: state_mod.Signal};
+    pub var errors: {str: state_mod.Signal};
+    pub var touched: {str: state_mod.Signal};
+    pub var rules: [ValidationRule];
+    pub var is_valid: state_mod.Signal;
+    pub var is_submitting: state_mod.Signal;
+    pub var on_submit: fn({str: any}): nil;
+    pub var on_success: fn({str: any}): nil;
+    pub var on_error: fn([ValidationResult]): nil;
+    pub var initial_values: {str: any};
+
+    pub init() {
+        self.values = {};
+        self.errors = {};
+        self.touched = {};
+        self.rules = [] as [ValidationRule];
+        self.is_valid = state_mod.signal_bool(true);
+        self.is_submitting = state_mod.signal_bool(false);
+        self.on_submit = fn(values: {str: any}): nil {};
+        self.on_success = fn(values: {str: any}): nil {};
+        self.on_error = fn(errors: [ValidationResult]): nil {};
+        self.initial_values = {};
+    }
+
+    pub fn add_field(field_name: str, initial_value: any): nil {
+        self.values[field_name] = state_mod.signal(initial_value);
+        self.errors[field_name] = state_mod.signal_str("");
+        self.touched[field_name] = state_mod.signal_bool(false);
+        self.initial_values[field_name] = initial_value;
+    }
+
+    pub fn add_rule(rule: ValidationRule): nil {
+        self.rules.append(rule);
+    }
+
+    pub fn set_value(field_name: str, value: any): nil {
+        if (field_name in self.values) {
+            self.values[field_name].set(value);
+            self.validate_field(field_name);
+        }
+    }
+
+    pub fn get_value(field_name: str): any {
+        if (field_name in self.values) {
+            return self.values[field_name].get();
+        }
+        return nil;
+    }
+
+    pub fn mark_touched(field_name: str): nil {
+        if (field_name in self.touched) {
+            self.touched[field_name].set(true);
+        }
+    }
+
+    pub fn validate_field(field_name: str): ValidationResult {
+        var value = self.get_value(field_name);
+        var result = ValidationResult().ok();
+
+        var i = 0;
+        while (i < len(self.rules)) {
+            var rule = self.rules[i];
+            if (rule.field_name == field_name) {
+                var v_result = rule.validator(value);
+                if (not v_result.is_valid) {
+                    result = v_result;
+                    break;
+                }
+            }
+            i = i + 1;
+        }
+
+        if (field_name in self.errors) {
+            self.errors[field_name].set(result.error_message);
+        }
+
+        self.validate_all();
+        return result;
+    }
+
+    pub fn validate_all(): nil {
+        var all_valid = true;
+        var i = 0;
+        while (i < len(self.rules)) {
+            var rule = self.rules[i];
+            var value = self.get_value(rule.field_name);
+            var v_result = rule.validator(value);
+            if (not v_result.is_valid) {
+                all_valid = false;
+                if (rule.field_name in self.errors) {
+                    self.errors[rule.field_name].set(v_result.error_message);
+                }
+            } else {
+                if (rule.field_name in self.errors) {
+                    self.errors[rule.field_name].set("");
+                }
+            }
+            i = i + 1;
+        }
+        self.is_valid.set(all_valid);
+    }
+
+    pub fn get_values(): {str: any} {
+        var result: {str: any} = {};
+        var keys = [] as [str];
+        // Get all keys from values dict
+        // In real implementation, would iterate over dict keys
+        return result;
+    }
+
+    pub fn submit(): nil {
+        self.validate_all();
+        var valid = self.is_valid.get() as bool;
+        if (valid) {
+            self.is_submitting.set(true);
+            self.on_submit(self.get_values());
+        } else {
+            var errors: [ValidationResult] = [];
+            var i = 0;
+            while (i < len(self.rules)) {
+                var rule = self.rules[i];
+                var value = self.get_value(rule.field_name);
+                var v_result = rule.validator(value);
+                if (not v_result.is_valid) {
+                    errors.append(v_result);
+                }
+                i = i + 1;
+            }
+            self.on_error(errors);
+        }
+    }
+
+    pub fn submit_success(values: {str: any}): nil {
+        self.is_submitting.set(false);
+        self.on_success(values);
+    }
+
+    pub fn submit_failure(errors: [ValidationResult]): nil {
+        self.is_submitting.set(false);
+        self.on_error(errors);
+    }
+
+    pub fn reset(): nil {
+        // Reset all fields to initial values
+        var i = 0;
+        while (i < len(self.rules)) {
+            var field = self.rules[i].field_name;
+            if (field in self.touched) {
+                self.touched[field].set(false);
+            }
+            if (field in self.errors) {
+                self.errors[field].set("");
+            }
+            if (field in self.values and field in self.initial_values) {
+                self.values[field].set(self.initial_values[field]);
+            }
+            i = i + 1;
+        }
+        self.is_valid.set(true);
+        self.is_submitting.set(false);
+    }
+}
+
+// ── Form Builder ───────────────────────────────────────────────────────────
+frame FormBuilder {
+    pub var form_state: FormState;
+
+    pub init() {
+        self.form_state = FormState();
+    }
+
+    pub fn field(name: str, initial: any): FormBuilder {
+        self.form_state.add_field(name, initial);
+        return self;
+    }
+
+    pub fn rule(rule: ValidationRule): FormBuilder {
+        self.form_state.add_rule(rule);
+        return self;
+    }
+
+    pub fn required(field_name: str): FormBuilder {
+        self.form_state.add_rule(required_validator(field_name));
+        return self;
+    }
+
+    pub fn min_length(field_name: str, min_len: int): FormBuilder {
+        self.form_state.add_rule(min_length_validator(field_name, min_len));
+        return self;
+    }
+
+    pub fn max_length(field_name: str, max_len: int): FormBuilder {
+        self.form_state.add_rule(max_length_validator(field_name, max_len));
+        return self;
+    }
+
+    pub fn email(field_name: str): FormBuilder {
+        self.form_state.add_rule(email_validator(field_name));
+        return self;
+    }
+
+    pub fn min_value(field_name: str, min_val: float): FormBuilder {
+        self.form_state.add_rule(min_value_validator(field_name, min_val));
+        return self;
+    }
+
+    pub fn max_value(field_name: str, max_val: float): FormBuilder {
+        self.form_state.add_rule(max_value_validator(field_name, max_val));
+        return self;
+    }
+
+    pub fn pattern(field_name: str, pattern: str): FormBuilder {
+        self.form_state.add_rule(pattern_validator(field_name, pattern));
+        return self;
+    }
+
+    pub fn submit_handler(handler: fn({str: any}): nil): FormBuilder {
+        self.form_state.on_submit = handler;
+        return self;
+    }
+
+    pub fn success_handler(handler: fn({str: any}): nil): FormBuilder {
+        self.form_state.on_success = handler;
+        return self;
+    }
+
+    pub fn error_handler(handler: fn([ValidationResult]): nil): FormBuilder {
+        self.form_state.on_error = handler;
+        return self;
+    }
+
+    pub fn build(): FormState {
+        return self.form_state;
+    }
+}
+
+// ── Factory Functions ──────────────────────────────────────────────────────
+pub fn form_builder(): FormBuilder {
+    return FormBuilder();
+}
+
+pub fn create_form(): FormState {
+    return FormState();
+}
+
+// ── Field Binding Helpers ───────────────────────────────────────────────────
+pub fn bind_text_field(form: FormState, field_name: str, widget: ui.Widget): ui.Widget {
+    var signal = form.values[field_name];
+    if (signal != nil) {
+        widget.bind_text(signal);
+    }
+    var error_signal = form.errors[field_name];
+    if (error_signal != nil) {
+        error_signal.subscribe(fn(error: any): nil {
+            var err = error as str;
+            if (len(err) > 0) {
+                widget.foreground_color = ui.rgb(255, 100, 100);
+            } else {
+                widget.foreground_color = ui.white;
+            }
+        });
+    }
+    return widget;
+}
+
+pub fn bind_checkbox_field(form: FormState, field_name: str, widget: ui.Widget): ui.Widget {
+    var signal = form.values[field_name];
+    if (signal != nil) {
+        widget.bind_checked(signal);
+    }
+    return widget;
+}
+
+pub fn bind_slider_field(form: FormState, field_name: str, widget: ui.Widget): ui.Widget {
+    var signal = form.values[field_name];
+    if (signal != nil) {
+        widget.bind_value(signal);
+    }
+    return widget;
+}
+
+pub fn field_error_widget(form: FormState, field_name: str): ui.Widget {
+    var error_signal = form.errors[field_name];
+    var error_widget = ui.text("");
+    if (error_signal != nil) {
+        error_widget.bind_text(error_signal);
+        error_widget.foreground_color = ui.rgb(255, 100, 100);
+        error_widget.font_size_val = 12.0;
+    }
+    return error_widget;
+}

@@ -1,0 +1,361 @@
+// std/font/tables.lm
+// TrueType and OpenType table directory and core table parsing (cmap, head, hhea, hmtx, loca, maxp).
+
+import std.font.reader as r;
+
+pub var TAG_HEAD: int = 0x68656164;
+pub var TAG_HHEA: int = 0x68686561;
+pub var TAG_MAXP: int = 0x6D617870;
+pub var TAG_HMTX: int = 0x686D7478;
+pub var TAG_LOCA: int = 0x6C6F6361;
+pub var TAG_GLYF: int = 0x676C7966;
+pub var TAG_CMAP: int = 0x636D6170;
+
+frame TableRecord {
+    pub var tag: int;
+    pub var offset: int;
+    pub var length: int;
+
+    pub init(t: int = 0, off: int = 0, len_val: int = 0) {
+        self.tag = t;
+        self.offset = off;
+        self.length = len_val;
+    }
+}
+
+frame CmapFormat4 {
+    pub var seg_count: int;
+    pub var end_codes: [int];
+    pub var start_codes: [int];
+    pub var id_deltas: [int];
+    pub var id_range_offsets: [int];
+    pub var id_range_offsets_base: int;
+    pub var is_valid: bool;
+
+    pub init() {
+        self.seg_count = 0;
+        self.end_codes = [] as [int];
+        self.start_codes = [] as [int];
+        self.id_deltas = [] as [int];
+        self.id_range_offsets = [] as [int];
+        self.id_range_offsets_base = 0;
+        self.is_valid = false;
+    }
+
+    pub fn get_glyph_index(reader: r.ByteReader, codepoint: int): int {
+        if (!self.is_valid or codepoint > 0xFFFF) { return 0; }
+        for (var i = 0; i < self.seg_count; i = i + 1) {
+            if (codepoint <= self.end_codes[i]) {
+                if (codepoint < self.start_codes[i]) {
+                    return 0;
+                }
+                var ro = self.id_range_offsets[i];
+                if (ro == 0) {
+                    var gid = (codepoint + self.id_deltas[i]) & 0xFFFF;
+                    return gid;
+                } else {
+                    // idRangeOffset points into the glyphIdArray
+                    // offset from current id_range_offset location:
+                    // location = self.id_range_offsets_base + (i * 2) + ro + ((codepoint - startCode) * 2)
+                    var glyph_offset = self.id_range_offsets_base + (i * 2) + ro + ((codepoint - self.start_codes[i]) * 2);
+                    var gid = reader.peek_u16(glyph_offset);
+                    if (gid != 0) {
+                        gid = (gid + self.id_deltas[i]) & 0xFFFF;
+                    }
+                    return gid;
+                }
+            }
+        }
+        return 0;
+    }
+}
+
+frame CmapGroup {
+    pub var start_char: int;
+    pub var end_char: int;
+    pub var start_glyph: int;
+
+    pub init(s: int = 0, e: int = 0, g: int = 0) {
+        self.start_char = s;
+        self.end_char = e;
+        self.start_glyph = g;
+    }
+}
+
+frame CmapFormat12 {
+    pub var groups: [CmapGroup];
+    pub var is_valid: bool;
+
+    pub init() {
+        self.groups = [] as [CmapGroup];
+        self.is_valid = false;
+    }
+
+    pub fn get_glyph_index(codepoint: int): int {
+        if (!self.is_valid) { return 0; }
+        for (var i = 0; i < len(self.groups); i = i + 1) {
+            var g = self.groups[i];
+            if (codepoint >= g.start_char and codepoint <= g.end_char) {
+                return g.start_glyph + (codepoint - g.start_char);
+            }
+        }
+        return 0;
+    }
+}
+
+frame FontInfo {
+    pub var units_per_em: int;
+    pub var index_to_loc_format: int; // 0 for short (u16*2), 1 for long (u32)
+    pub var num_glyphs: int;
+    pub var ascent: int;
+    pub var descent: int;
+    pub var line_gap: int;
+    pub var num_h_metrics: int;
+
+    pub var loca_offset: int;
+    pub var glyf_offset: int;
+    pub var hmtx_offset: int;
+    pub var cmap_format4: CmapFormat4;
+    pub var cmap_format12: CmapFormat12;
+
+    pub var is_valid: bool;
+
+    pub init() {
+        self.units_per_em = 1000;
+        self.index_to_loc_format = 0;
+        self.num_glyphs = 0;
+        self.ascent = 0;
+        self.descent = 0;
+        self.line_gap = 0;
+        self.num_h_metrics = 0;
+        self.loca_offset = 0;
+        self.glyf_offset = 0;
+        self.hmtx_offset = 0;
+        self.cmap_format4 = CmapFormat4();
+        self.cmap_format12 = CmapFormat12();
+        self.is_valid = false;
+    }
+
+    pub fn get_glyph_index(reader: r.ByteReader, codepoint: int): int {
+        if (self.cmap_format12.is_valid) {
+            var idx = self.cmap_format12.get_glyph_index(codepoint);
+            if (idx != 0) { return idx; }
+        }
+        if (self.cmap_format4.is_valid) {
+            return self.cmap_format4.get_glyph_index(reader, codepoint);
+        }
+        return 0;
+    }
+
+    pub fn get_glyph_offset_and_length(reader: r.ByteReader, glyph_idx: int): (int, int) {
+        if (glyph_idx < 0 or glyph_idx >= self.num_glyphs or self.loca_offset == 0) {
+            return (0, 0);
+        }
+
+        var start_off = 0;
+        var end_off = 0;
+
+        if (self.index_to_loc_format == 0) {
+            var pos = self.loca_offset + (glyph_idx * 2);
+            start_off = reader.peek_u16(pos) * 2;
+            end_off = reader.peek_u16(pos + 2) * 2;
+        } else {
+            var pos = self.loca_offset + (glyph_idx * 4);
+            start_off = reader.peek_u32(pos);
+            end_off = reader.peek_u32(pos + 4);
+        }
+
+        if (end_off <= start_off) {
+            return (0, 0);
+        }
+        return (self.glyf_offset + start_off, end_off - start_off);
+    }
+
+    pub fn get_glyph_hmetrics(reader: r.ByteReader, glyph_idx: int): (int, int) {
+        if (glyph_idx < 0 or glyph_idx >= self.num_glyphs or self.hmtx_offset == 0) {
+            return (self.units_per_em, 0);
+        }
+
+        if (glyph_idx < self.num_h_metrics) {
+            var pos = self.hmtx_offset + (glyph_idx * 4);
+            var advance = reader.peek_u16(pos);
+            var lsb = reader.peek_i16(pos + 2);
+            return (advance, lsb);
+        } else {
+            // Monospace or shared advance width from last hmetric
+            var last_pos = self.hmtx_offset + ((self.num_h_metrics - 1) * 4);
+            var advance = reader.peek_u16(last_pos);
+            var lsb_pos = self.hmtx_offset + (self.num_h_metrics * 4) + ((glyph_idx - self.num_h_metrics) * 2);
+            var lsb = reader.peek_i16(lsb_pos);
+            return (advance, lsb);
+        }
+    }
+}
+
+pub fn parse_tables(reader: r.ByteReader): FontInfo? {
+    reader.seek(0);
+    var scalar_type = reader.read_u32();
+
+    // Check for TrueType Collection ('ttcf')
+    var font_offset = 0;
+    if (scalar_type == 0x74746366) { // 'ttcf'
+        reader.skip(4); // version
+        var num_fonts = reader.read_u32();
+        if (num_fonts > 0) {
+            font_offset = reader.read_u32();
+            reader.seek(font_offset);
+            scalar_type = reader.read_u32();
+        }
+    }
+
+    var num_tables = reader.read_u16();
+    reader.skip(6); // searchRange, entrySelector, rangeShift
+
+    var tables: [TableRecord] = [];
+    for (var i = 0; i < num_tables; i = i + 1) {
+        var tag = reader.read_tag();
+        reader.skip(4); // checkSum
+        var offset = reader.read_u32();
+        var length = reader.read_u32();
+        tables = tables + [TableRecord(tag, offset, length)];
+    }
+
+    var find_table_offset = fn(t_tag: int): int {
+        for (var i = 0; i < len(tables); i = i + 1) {
+            if (tables[i].tag == t_tag) {
+                return tables[i].offset;
+            }
+        }
+        return -1;
+    };
+
+    var info = FontInfo();
+
+    // 1. Parse 'head' table
+    var head_offset = find_table_offset(TAG_HEAD);
+    if (head_offset < 0) { return err(); }
+    reader.seek(head_offset + 18);
+    info.units_per_em = reader.read_u16();
+    reader.seek(head_offset + 50);
+    info.index_to_loc_format = reader.read_i16();
+
+    // 2. Parse 'maxp' table
+    var maxp_offset = find_table_offset(TAG_MAXP);
+    if (maxp_offset < 0) { return err(); }
+    reader.seek(maxp_offset + 4);
+    info.num_glyphs = reader.read_u16();
+
+    // 3. Parse 'hhea' table
+    var hhea_offset = find_table_offset(TAG_HHEA);
+    if (hhea_offset < 0) { return err(); }
+    reader.seek(hhea_offset + 4);
+    info.ascent = reader.read_i16();
+    info.descent = reader.read_i16();
+    info.line_gap = reader.read_i16();
+    reader.seek(hhea_offset + 34);
+    info.num_h_metrics = reader.read_u16();
+
+    // 4. Save offsets for 'hmtx', 'loca', 'glyf'
+    var hmtx_offset = find_table_offset(TAG_HMTX);
+    if (hmtx_offset < 0) { return err(); }
+    info.hmtx_offset = hmtx_offset;
+
+    var loca_offset = find_table_offset(TAG_LOCA);
+    if (loca_offset < 0) { return err(); }
+    info.loca_offset = loca_offset;
+
+    var glyf_offset = find_table_offset(TAG_GLYF);
+    if (glyf_offset < 0) { return err(); }
+    info.glyf_offset = glyf_offset;
+
+    // 5. Parse 'cmap' table
+    var cmap_offset = find_table_offset(TAG_CMAP);
+    if (cmap_offset < 0) { return err(); }
+
+    reader.seek(cmap_offset + 2);
+    var num_subtables = reader.read_u16();
+    var format4_offset = 0;
+    var format12_offset = 0;
+
+    for (var i = 0; i < num_subtables; i = i + 1) {
+        var platform_id = reader.read_u16();
+        var encoding_id = reader.read_u16();
+        var sub_offset = cmap_offset + reader.read_u32();
+
+        var current_pos = reader.tell();
+        reader.seek(sub_offset);
+        var format = reader.read_u16();
+        reader.seek(current_pos);
+
+        if (format == 4 and format4_offset == 0) {
+            if (platform_id == 0 or (platform_id == 3 and (encoding_id == 1 or encoding_id == 0))) {
+                format4_offset = sub_offset;
+            }
+        } elif (format == 12 and format12_offset == 0) {
+            if (platform_id == 0 or (platform_id == 3 and encoding_id == 10)) {
+                format12_offset = sub_offset;
+            }
+        }
+    }
+
+    // Parse format 4 if found
+    if (format4_offset > 0) {
+        reader.seek(format4_offset);
+        reader.skip(6); // format, length, language
+        var seg_count_x2 = reader.read_u16();
+        var seg_count = seg_count_x2 / 2;
+        reader.skip(6); // searchRange, entrySelector, rangeShift
+
+        var end_codes: [int] = [];
+        for (var i = 0; i < seg_count; i = i + 1) {
+            end_codes = end_codes + [reader.read_u16()];
+        }
+        reader.skip(2); // reservedPad
+
+        var start_codes: [int] = [];
+        for (var i = 0; i < seg_count; i = i + 1) {
+            start_codes = start_codes + [reader.read_u16()];
+        }
+
+        var id_deltas: [int] = [];
+        for (var i = 0; i < seg_count; i = i + 1) {
+            id_deltas = id_deltas + [reader.read_i16()];
+        }
+
+        var id_range_offsets_base = reader.tell();
+        var id_range_offsets: [int] = [];
+        for (var i = 0; i < seg_count; i = i + 1) {
+            id_range_offsets = id_range_offsets + [reader.read_u16()];
+        }
+
+        var cmap4 = CmapFormat4();
+        cmap4.seg_count = seg_count;
+        cmap4.end_codes = end_codes;
+        cmap4.start_codes = start_codes;
+        cmap4.id_deltas = id_deltas;
+        cmap4.id_range_offsets = id_range_offsets;
+        cmap4.id_range_offsets_base = id_range_offsets_base;
+        cmap4.is_valid = true;
+        info.cmap_format4 = cmap4;
+    }
+
+    // Parse format 12 if found
+    if (format12_offset > 0) {
+        reader.seek(format12_offset + 12);
+        var num_groups = reader.read_u32();
+        var groups: [CmapGroup] = [];
+        for (var i = 0; i < num_groups; i = i + 1) {
+            var s_char = reader.read_u32();
+            var e_char = reader.read_u32();
+            var s_glyph = reader.read_u32();
+            groups = groups + [CmapGroup(s_char, e_char, s_glyph)];
+        }
+        var cmap12 = CmapFormat12();
+        cmap12.groups = groups;
+        cmap12.is_valid = true;
+        info.cmap_format12 = cmap12;
+    }
+
+    info.is_valid = true;
+    return ok(info);
+}

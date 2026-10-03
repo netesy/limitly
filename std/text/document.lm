@@ -48,21 +48,21 @@ frame TextDocument {
             var new_lines: [str] = [];
             var i = 0;
             while (i <= line) {
-                new_lines = new_lines + [self.lines[i]];
+                new_lines.append(self.lines[i]);
                 i = i + 1;
             }
 
             var j = 1;
             while (j < len(s_lines) - 1) {
-                new_lines = new_lines + [s_lines[j]];
+                new_lines.append(s_lines[j]);
                 j = j + 1;
             }
 
             var last_line = s_lines[len(s_lines) - 1];
-            new_lines = new_lines + [last_line + suffix];
+            new_lines.append(last_line + suffix);
 
             while (i < len(self.lines)) {
-                new_lines = new_lines + [self.lines[i]];
+                new_lines.append(self.lines[i]);
                 i = i + 1;
             }
             self.lines = new_lines;
@@ -90,7 +90,7 @@ frame TextDocument {
                 var i = 0;
                 while (i < len(self.lines)) {
                     if (i <= start_line or i > end_line) {
-                        new_lines = new_lines + [self.lines[i]];
+                        new_lines.append(self.lines[i]);
                     }
                     i = i + 1;
                 }
@@ -112,12 +112,12 @@ frame TextDocument {
         var new_lines: [str] = [];
         var i = 0;
         while (i <= line) {
-            new_lines = new_lines + [self.lines[i]];
+            new_lines.append(self.lines[i]);
             i = i + 1;
         }
-        new_lines = new_lines + [suffix];
+        new_lines.append(suffix);
         while (i < len(self.lines)) {
-            new_lines = new_lines + [self.lines[i]];
+            new_lines.append(self.lines[i]);
             i = i + 1;
         }
         self.lines = new_lines;

@@ -1,0 +1,50 @@
+// tests/draw_list_test.lm
+// Minimal test: only std/ui/draw_list + std/ui/replay — no builder2
+
+import std.ui.draw_list as dl_mod;
+import std.ui.replay as replay_mod;
+import std.app as app;
+import std.gg as gg;
+
+fn main(): nil {
+    print("=== DrawList Module Test ===");
+
+    var dl = dl_mod.draw_list();
+
+    // Manually add some draw commands
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(10.0, 10.0, 200.0, 40.0, 0.2, 0.4, 0.8, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect(10.0, 60.0, 300.0, 30.0, 0.3, 0.3, 0.3, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_text("Hello Hybrid!", 20.0, 16.0, 1.0, 1.0, 1.0, 1.0, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_rect_rounded(10.0, 100.0, 120.0, 36.0, 8.0, 0.2, 0.6, 0.9, 1.0));
+    dl_mod.dl_add(dl, dl_mod.dcmd_text("Button", 40.0, 112.0, 1.0, 1.0, 1.0, 1.0, 1.0));
+
+    // Add a hit zone
+    dl_mod.dl_add_hit(dl, dl_mod.make_button_zone("btn_ok", 10.0, 100.0, 120.0, 36.0, nil));
+
+    print("Commands: {len(dl.cmds)}");
+    print("HitZones: {len(dl.hits)}");
+
+    // Hit test
+    var hz = dl_mod.dl_hit_test(dl, 60.0, 115.0);
+    if (hz.kind == dl_mod.HZONE_BUTTON) {
+        print("Hit: '{hz.id}' (button)");
+    } else {
+        print("No hit zone");
+    }
+
+    // Replay to GPU for 3 frames
+    app.init();
+    app.show_window();
+    var fn_idx = 0;
+    while (fn_idx < 3) {
+        gg.begin_pass(800, 600, 0.08, 0.08, 0.12, 1.0);
+        replay_mod.replay(dl);
+        gg.end_pass();
+        gg.commit();
+        sleep(0.016);
+        fn_idx = fn_idx + 1;
+    }
+
+    print("Done. Replayed {fn_idx} frames with zero tree traversal.");
+    app.shutdown();
+}

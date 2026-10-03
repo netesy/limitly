@@ -1,0 +1,56 @@
+// std/game/gui/state.lm
+// Modular layout state, window tracking, and style state for IMGUI
+
+import std.game.types as types;
+
+frame WindowState {
+    pub var x: float;
+    pub var y: float;
+    pub var w: float;
+    pub var h: float;
+    pub var collapsed: bool;
+    pub var is_dragging: bool;
+    pub var drag_off_x: float;
+    pub var drag_off_y: float;
+
+    pub init(x: float = 0.0, y: float = 0.0, w: float = 200.0, h: float = 200.0) {
+        self.x = x;
+        self.y = y;
+        self.w = w;
+        self.h = h;
+        self.collapsed = false;
+        self.is_dragging = false;
+        self.drag_off_x = 0.0;
+        self.drag_off_y = 0.0;
+    }
+}
+
+pub fn WindowState(x: float = 0.0, y: float = 0.0, w: float = 200.0, h: float = 200.0): WindowState {
+    return WindowState(x=x, y=y, w=w, h=h);
+}
+
+frame LayoutCursor {
+    pub var x: float;
+    pub var y: float;
+    pub var start_x: float;
+    pub var start_y: float;
+    pub var line_h: float;
+    pub var same_line_flag: bool;
+    pub var prev_item_w: float;
+    pub var indent_x: float;
+
+    pub init(start_x: float = 10.0, start_y: float = 10.0) {
+        self.x = start_x;
+        self.y = start_y;
+        self.start_x = start_x;
+        self.start_y = start_y;
+        self.line_h = 0.0;
+        self.same_line_flag = false;
+        self.prev_item_w = 0.0;
+        self.indent_x = 0.0;
+    }
+}
+
+pub fn LayoutCursor(start_x: float = 10.0, start_y: float = 10.0): LayoutCursor {
+    return LayoutCursor(start_x=start_x, start_y=start_y);
+}

@@ -1,0 +1,23 @@
+// std/ui/builder2.lm
+// Backwards-compatibility alias for std.ui.builder.
+// All single-pass hybrid UI build logic has been unified into std/ui/builder.lm.
+
+import std.ui.builder as b;
+import std.ui.types as ui;
+import std.ui.draw_list as dl_mod;
+import std.ui.theme as theme_mod;
+
+pub type ThemeSnap = b.ThemeSnap;
+pub type LayoutCtx = b.LayoutCtx;
+
+pub fn default_theme_snap(): b.ThemeSnap {
+    return b.default_theme_snap();
+}
+
+pub fn snap_theme(pal: theme_mod.ColorPalette, font_scale: float): b.ThemeSnap {
+    return b.snap_theme(pal, font_scale);
+}
+
+pub fn build(root: ui.Widget, vw: float, vh: float, ts: any = nil, x: float = 0.0, y: float = 0.0): dl_mod.DrawList {
+    return b.build(root, vw, vh, ts, x, y);
+}

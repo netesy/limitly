@@ -1,5 +1,4 @@
 import std.math.arithmetic as arith;
-import std.sort as sort;
 
 pub fn sum(items: [any]): float {
     var s = 0.0;
@@ -23,7 +22,17 @@ pub fn median(items: [any]): float {
     for (var i = 0; i < n; i = i + 1) {
         copy.append(items[i]);
     }
-    sort.sort(copy, false, nil);
+    var idx = 1;
+    while (idx < n) {
+        var key = copy[idx];
+        var j = idx - 1;
+        while (j >= 0 and copy[j] > key) {
+            copy[j + 1] = copy[j];
+            j = j - 1;
+        }
+        copy[j + 1] = key;
+        idx = idx + 1;
+    }
 
     if (n % 2 == 1) {
         return copy[n / 2] as float;

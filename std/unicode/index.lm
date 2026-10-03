@@ -2,13 +2,7 @@ import std.unicode.rune as rune_mod;
 import std.unicode.category as category_mod;
 import std.unicode.normalize as normalize_mod;
 
-// Types
-pub type Rune = rune_mod.Rune;
-
-// Rune constructor helper
-pub fn Rune(value: str): any {
-    return rune_mod.Rune(value);
-}
+pub import std.unicode.rune show Rune;
 
 // Category function re-exports
 pub fn is_upper(ch: str): bool {

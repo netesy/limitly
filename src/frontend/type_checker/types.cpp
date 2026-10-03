@@ -102,12 +102,19 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
     }
     else {
         std::string type_name = annotation->typeName;
-        size_t dot_pos = type_name.find('.');
-        if (dot_pos != std::string::npos) {
-            std::string alias = type_name.substr(0, dot_pos);
-            std::string member = type_name.substr(dot_pos + 1);
+        size_t last_dot = type_name.rfind('.');
+        if (last_dot != std::string::npos) {
+            std::string alias = type_name.substr(0, last_dot);
+            std::string member = type_name.substr(last_dot + 1);
             if (import_aliases.count(alias)) {
                 type_name = import_aliases[alias] + "." + member;
+            } else {
+                size_t dot_pos = type_name.find('.');
+                std::string first_alias = type_name.substr(0, dot_pos);
+                std::string rest = type_name.substr(dot_pos + 1);
+                if (import_aliases.count(first_alias)) {
+                    type_name = import_aliases[first_alias] + "." + rest;
+                }
             }
         }
 
@@ -253,6 +260,14 @@ bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
         auto* aData = std::get_if<TraitType>(&actual->extra);
         auto* eData = std::get_if<TraitType>(&expected->extra);
         if (aData && eData && get_base(aData->name) == get_base(eData->name)) return true;
+    }
+    if (actual->tag == TypeTag::Frame && expected->tag == TypeTag::Frame) {
+        auto* aData = std::get_if<FrameType>(&actual->extra);
+        auto* eData = std::get_if<FrameType>(&expected->extra);
+        if (aData && eData) {
+            if (aData->name == eData->name) return true;
+            if (get_base(aData->name) == get_base(eData->name)) return true;
+        }
     }
     if (expected->tag == TypeTag::Refined) {
         if (const auto* refined = std::get_if<RefinedType>(&expected->extra)) return is_type_compatible(refined->baseType, actual);

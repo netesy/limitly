@@ -76,7 +76,8 @@ enum class ResourceOperation : uint32_t {
     MAKE_BINDINGS = 43,
     END_PASS = 44,
     MEASURE_TEXT = 45,
-    GET_FONT_METRICS = 46
+    GET_FONT_METRICS = 46,
+    READ_BYTES = 47
 };
 
 } // namespace VM

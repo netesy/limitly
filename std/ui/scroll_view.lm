@@ -1,13 +1,8 @@
-import std.ui.widget as widget;
+// std/ui/scroll_view - Scrollable container widget
+import std.ui.types as ui_types;
 
-frame ScrollView {
-    pub var child: widget.Widget;
-
-    pub init() {
-        self.child = widget.Widget();
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn scroll_view(child: ui_types.Widget, height_val: float = 200.0): ui_types.Widget {
+    var w = ui_types.scroll(child);
+    w.height_val = height_val;
+    return w;
 }

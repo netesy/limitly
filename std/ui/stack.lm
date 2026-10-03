@@ -1,13 +1,6 @@
-import std.ui.widget as widget;
+// std/ui/stack - Absolute/overlay positioned container
+import std.ui.types as ui_types;
 
-frame Stack {
-    pub var children: [widget.Widget];
-
-    pub init(ch: [widget.Widget] = [widget.Widget()]) {
-        self.children = ch;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn stack(children: [ui_types.Widget]): ui_types.Widget {
+    return ui_types.stack(children);
 }

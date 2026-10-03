@@ -1,0 +1,130 @@
+// UI State Management and Layout Engine Demo
+// Demonstrates signals, computed values, effects, and responsive layout
+import std.app as app;
+import std.ui as ui;
+
+fn main() {
+    print("UI State & Layout Demo");
+
+    var cfg = app.default_window_config();
+    cfg.title = "State & Layout Demo";
+    cfg.width = 800;
+    cfg.height = 600;
+
+    assert(app.init(cfg) == 1, "app init failed");
+
+    // Create reactive signals
+    var count_signal = ui.signal_int(0);
+    var name_signal = ui.signal_str("World");
+    var enabled_signal = ui.signal_bool(true);
+
+    // Create a computed signal (derived state)
+    var greeting_computed = ui.computed(fn(): any {
+        var n = name_signal.get() as str;
+        var c = count_signal.get() as int;
+        return "Hello, " + n + "! Count: " + (c as str);
+    }, [count_signal, name_signal]);
+
+    // Create an effect (side effect when signals change)
+    ui.effect(fn(): nil {
+        var c = count_signal.get() as int;
+        print("Count changed to: " + (c as str));
+    }, [count_signal]);
+
+    // Build UI with signal binding
+    var title = ui.text("State Management Demo").font_size(24.0).bold();
+
+    var greeting_label = ui.text("Loading...");
+    greeting_label.bind_text(greeting_computed);
+
+    var increment_btn = ui.button("Increment", fn(): nil {
+        var current = count_signal.get() as int;
+        count_signal.set(current + 1);
+    });
+
+    var decrement_btn = ui.button("Decrement", fn(): nil {
+        var current = count_signal.get() as int;
+        count_signal.set(current - 1);
+    });
+
+    var button_row = ui.row([increment_btn, decrement_btn]).spacing(12.0);
+
+    var name_input = ui.input("World", "Enter name...", fn(): nil {
+        // In a full implementation, this would update the signal
+        print("Name input changed");
+    });
+
+    var enabled_toggle = ui.toggle(true, fn(): nil {
+        var current = enabled_signal.get() as bool;
+        enabled_signal.set(not current);
+    });
+    enabled_toggle.bind_checked(enabled_signal);
+
+    var controls = ui.column([
+        ui.text("Controls").font_size(18.0),
+        button_row,
+        name_input,
+        enabled_toggle
+    ]).spacing(12.0);
+
+    // Responsive layout example
+    var mobile_layout = ui.column([
+        title,
+        greeting_label,
+        controls
+    ]).spacing(16.0);
+
+    var desktop_layout = ui.row([
+        ui.column([title, greeting_label]).spacing(16.0),
+        controls
+    ]).spacing(24.0);
+
+    var viewport_w = 800.0; // In real app, this would come from viewport
+    var responsive_root = ui.responsive(mobile_layout, desktop_layout, desktop_layout, viewport_w);
+
+    // Grid layout example
+    var grid_spec = ui.GridSpec(columns=3, col_gap=12.0, row_gap=12.0);
+    var grid_items = [
+        ui.text("Item 1").background(ui.blue).padding(16.0),
+        ui.text("Item 2").background(ui.green).padding(16.0),
+        ui.text("Item 3").background(ui.red).padding(16.0),
+        ui.text("Item 4").background(ui.yellow).padding(16.0),
+        ui.text("Item 5").background(ui.indigo).padding(16.0),
+        ui.text("Item 6").background(ui.gray).padding(16.0)
+    ];
+
+    var grid_layout = ui.column([
+        ui.text("Grid Layout").font_size(18.0),
+        ui.row(grid_items).spacing(12.0)
+    ]).spacing(12.0);
+
+    // Aspect ratio example
+    var aspect_box = ui.text("16:9 Aspect Ratio")
+        .background(ui.indigo)
+        .foreground(ui.white)
+        .padding(20.0)
+        .aspect_ratio(16.0 / 9.0);
+
+    var aspect_section = ui.column([
+        ui.text("Aspect Ratio").font_size(18.0),
+        aspect_box
+    ]).spacing(12.0);
+
+    // Combine everything
+    var root = ui.column([
+        responsive_root,
+        grid_layout,
+        aspect_section
+    ]).spacing(24.0).padding(24.0);
+
+    app.ui(root);
+
+    print("Running...");
+    app.run();
+    print("Done");
+
+    // Cleanup effects
+    ui.dispose_all_effects();
+}
+
+main();

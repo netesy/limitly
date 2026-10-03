@@ -1,7 +1,6 @@
 import std.core as core;
 import std.core show Error;
 import std.resource as res;
-import std.net.tcp as tcp;
 
 frame Datagram {
     var resource: res.Resource;
@@ -16,7 +15,7 @@ frame Datagram {
 
 frame UDP {
     var resource: res.Resource?;
-    var binder: tcp.Binder?;
+    var binder: res.Binder?;
     var datagram: Datagram?;
     var poller: res.Pollable?;
 
@@ -30,31 +29,34 @@ frame UDP {
     pub fn bind(address: str, port: int): int?core.Error {
         match (res.create_udp_socket()) {
             val r => {
-                var b = tcp.Binder(r=r);
+                var b = res.Binder(r=r);
                 if (b.bind(args=[address, port])) {
-                    self.resource = ok(r);
-                    self.binder = ok(b);
-                    self.datagram = ok(Datagram(r=r));
-                    self.poller = ok(res.Pollable(r=r));
+                    self.resource = r;
+                    self.binder = b;
+                    self.datagram = Datagram(r=r);
+                    self.poller = res.Pollable(r=r);
                     return ok(r.handle);
-                } else {
-                    r.close();
-                    return err(Error(code="ERR", message="fail"));
                 }
+                r.close();
+                return err(Error(code="ERR", message="fail"));
             },
-            err e => return err(Error(code="ERR", message="fail"))
+            err e => {
+                return err(Error(code="ERR", message="fail"));
+            }
         }
     }
 
     pub fn create(): int?core.Error {
         match (res.create_udp_socket()) {
             val r => {
-                self.resource = ok(r);
-                self.datagram = ok(Datagram(r=r));
-                self.poller = ok(res.Pollable(r=r));
+                self.resource = r;
+                self.datagram = Datagram(r=r);
+                self.poller = res.Pollable(r=r);
                 return ok(r.handle);
             },
-            err e => return err(Error(code="ERR", message="fail"))
+            err e => {
+                return err(Error(code="ERR", message="fail"));
+            }
         }
     }
 
@@ -65,7 +67,7 @@ frame UDP {
                 if (result == nil) return err(Error(code="ERR", message="fail"));
                 return ok(result as int);
             },
-            nil => return err(Error(code="ERR", message="fail"))
+            _ => return err(Error(code="ERR", message="fail"))
         }
     }
 
@@ -76,14 +78,14 @@ frame UDP {
                 if (result == nil) return err(Error(code="ERR", message="fail"));
                 return ok(result as str);
             },
-            nil => return err(Error(code="ERR", message="fail"))
+            _ => return err(Error(code="ERR", message="fail"))
         }
     }
 
     pub fn has_data(): bool {
         match (self.poller) {
-            val p => return p.poll(),
-            nil => return false
+            val p => { return p.poll(); },
+            _ => { return false; }
         }
     }
 
@@ -97,7 +99,7 @@ frame UDP {
                 self.poller = nil;
                 return ok(nil);
             },
-            nil => return ok(nil)
+            _ => return ok(nil)
         }
     }
 }

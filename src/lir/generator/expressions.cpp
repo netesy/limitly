@@ -69,7 +69,22 @@ bool resolve_enum_variant_info(TypeSystem* type_system,
     }
 
     return false;
-} }
+}
+
+std::string get_expr_qualified_path(const LM::Frontend::AST::Expression* e) {
+    if (!e) return "";
+    if (auto var = dynamic_cast<const LM::Frontend::AST::VariableExpr*>(e)) {
+        return var->name;
+    }
+    if (auto mem = dynamic_cast<const LM::Frontend::AST::MemberExpr*>(e)) {
+        std::string base = get_expr_qualified_path(mem->object.get());
+        if (!base.empty()) {
+            return base + "." + mem->name;
+        }
+    }
+    return "";
+}
+}
 
 Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
     if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(&expr)) {
@@ -1214,7 +1229,7 @@ Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
             uint32_t continue_label = generate_label();
             
             // If it's an error, jump to error propagation
-            emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, is_error_reg, 0, error_label));
+            emit_label_jump(LIR_Op::JumpIf, is_error_reg, error_label);
             
             // Success path: unwrap the value
             Reg unwrapped_reg = allocate_register();
@@ -1231,16 +1246,16 @@ Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
             emit_instruction(LIR_Inst(LIR_Op::Mov, Type::I64, dst, unwrapped_reg, 0));
             
             // Jump to continue execution
-            emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, continue_label));
+            emit_label_jump(LIR_Op::Jump, 0, continue_label);
             
             // Error propagation block
-            emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, error_label, 0, 0));
+            place_label(error_label);
             
             // For proper error propagation, return the error value directly
             emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, operand, 0, 0));
             
             // Continue execution label
-            emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, continue_label, 0, 0));
+            place_label(continue_label);
         }
         
        // std::cout << "[DEBUG] Generated error propagation (?) for register " << operand 
@@ -1364,14 +1379,17 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         func_name = resolve_qualified_frame_name(func_name);
         auto frame_it = frame_table_.find(func_name);
         if (frame_it != frame_table_.end()) {
+            // A type alias (`pub type Foo = sub.Foo;`) shares the underlying FrameInfo, whose
+            // `name` is the canonical frame. Construction must run the canonical init().
+            const std::string canonical_name = frame_it->second.name.empty() ? func_name : frame_it->second.name;
             LIR_Inst new_inst(LIR_Op::NewFrame, Type::Ptr, result, 0, 0, (uint32_t)frame_it->second.total_field_size);
-            new_inst.type_name = func_name;
+            new_inst.type_name = canonical_name;
             emit_instruction(new_inst);
             set_register_type(result, expr.inferred_type);
             set_register_language_type(result, expr.inferred_type);
             
             if (!scope_stack_.empty() && frame_it->second.has_deinit) {
-                scope_stack_.back().frame_instances.push_back({func_name, result});
+                scope_stack_.back().frame_instances.push_back({canonical_name, result});
             }
             
             const auto& frame_decl = frame_it->second.declaration;
@@ -1407,7 +1425,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 }
 
                 Reg dummy = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::Call, dummy, func_name + ".init", args, arg_types));
+                emit_instruction(LIR_Inst(LIR_Op::Call, dummy, canonical_name + ".init", args, arg_types));
             } else {
                 if (frame_decl) {
                     for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
@@ -1448,9 +1466,14 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
     else if (auto member_expr = dynamic_cast<LM::Frontend::AST::MemberExpr*>(expr.callee.get())) {
         std::string method_name = member_expr->name;
 
-        // Check if object is a module alias
-        if (auto var_obj = dynamic_cast<LM::Frontend::AST::VariableExpr*>(member_expr->object.get())) {
-            // First check if this could be an enum variant construction (before module alias check)
+        // Check if object is a module alias (direct or chained) or variable
+        std::string obj_mod_path = get_expr_qualified_path(member_expr->object.get());
+        auto alias_it = obj_mod_path.empty() ? import_aliases_.end() : import_aliases_.find(obj_mod_path);
+        auto var_obj = dynamic_cast<LM::Frontend::AST::VariableExpr*>(member_expr->object.get());
+
+        if (var_obj || alias_it != import_aliases_.end()) {
+            if (var_obj) {
+                // First check if this could be an enum variant construction (before module alias check)
             int64_t tag = 0;
             size_t expected_arity = 0;
             std::string qualified_variant = var_obj->name + "." + method_name;
@@ -1561,11 +1584,11 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 }
                 return result;
             }
+            }
 
             // Then check for module alias
-            auto alias_it = import_aliases_.find(var_obj->name);
             if (alias_it != import_aliases_.end()) {
-                std::string qualified_name = alias_it->second + "." + method_name;
+                std::string qualified_name = LM::Frontend::ModuleManager::getInstance().canonical_symbol(alias_it->second + "." + method_name);
 
                 // Frame instantiation via module alias check
                 auto frame_it = frame_table_.find(qualified_name);
@@ -1575,14 +1598,15 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                     for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
                     Reg result = allocate_register();
                     
+                    const std::string canonical_name = frame_it->second.name.empty() ? qualified_name : frame_it->second.name;
                     LIR_Inst new_inst(LIR_Op::NewFrame, Type::Ptr, result, 0, 0, (uint32_t)frame_it->second.total_field_size);
-                    new_inst.type_name = qualified_name;
+                    new_inst.type_name = canonical_name;
                     emit_instruction(new_inst);
                     set_register_type(result, expr.inferred_type);
                     set_register_language_type(result, expr.inferred_type);
                     
                     if (!scope_stack_.empty() && frame_it->second.has_deinit) {
-                        scope_stack_.back().frame_instances.push_back({qualified_name, result});
+                        scope_stack_.back().frame_instances.push_back({canonical_name, result});
                     }
                     
                     const auto& frame_decl = frame_it->second.declaration;
@@ -1602,7 +1626,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                         args.push_back(result);
                         for (Reg r : arg_regs) args.push_back(r);
                         Reg dummy = allocate_register();
-                        emit_instruction(LIR_Inst(LIR_Op::Call, dummy, qualified_name + ".init", args));
+                        emit_instruction(LIR_Inst(LIR_Op::Call, dummy, canonical_name + ".init", args));
                     } else {
                         if (frame_decl) {
                             for (size_t i = 0; i < frame_decl->fields.size(); ++i) {
@@ -1658,6 +1682,9 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 inst.op = op; inst.dst = result; inst.func_name = vm_name; inst.call_args = arg_regs;
                 if (expr.inferred_type) {
                     inst.result_type = language_type_to_abi_type(expr.inferred_type);
+                    set_register_type(result, expr.inferred_type);
+                    set_register_language_type(result, expr.inferred_type);
+                    set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
                 } else {
                     inst.result_type = Type::I64;
                 }
@@ -2186,9 +2213,10 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         }
     }
 
-    // Check if it's a module alias access (e.g. math.version)
-    if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.object.get())) {
-        auto alias_it = import_aliases_.find(var_expr->name);
+    // Check if it's a module alias access (e.g. math.version or ui.animation.EASE_OUT)
+    std::string obj_mod_path = get_expr_qualified_path(expr.object.get());
+    if (!obj_mod_path.empty()) {
+        auto alias_it = import_aliases_.find(obj_mod_path);
         if (alias_it != import_aliases_.end()) {
             std::string module_path = alias_it->second;
             std::string qualified_name = module_path + "." + expr.name;
@@ -2307,9 +2335,10 @@ Reg Generator::emit_member_access_with_obj(LM::Frontend::AST::MemberExpr& expr, 
         }
     }
 
-    // Check if it's a module alias access (e.g. math.version)
-    if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.object.get())) {
-        auto alias_it = import_aliases_.find(var_expr->name);
+    // Check if it's a module alias access (e.g. math.version or ui.animation.EASE_OUT)
+    std::string obj_mod_path = get_expr_qualified_path(expr.object.get());
+    if (!obj_mod_path.empty()) {
+        auto alias_it = import_aliases_.find(obj_mod_path);
         if (alias_it != import_aliases_.end()) {
             std::string module_path = alias_it->second;
             std::string qualified_name = module_path + "." + expr.name;
@@ -2795,7 +2824,7 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
         uint32_t continue_label = generate_label();
         
         // If it's an error, jump to error handling
-        emit_instruction(LIR_Inst(LIR_Op::JumpIf, Type::Void, 0, is_error_reg, 0, error_label));
+        emit_label_jump(LIR_Op::JumpIf, is_error_reg, error_label);
         
         // Success path: unwrap the value
         Reg unwrapped_reg = allocate_register();
@@ -2805,10 +2834,10 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
         emit_instruction(LIR_Inst(LIR_Op::Unwrap, Type::I64, unwrapped_reg, result_reg, 0));
         
         // Jump to continue execution
-        emit_instruction(LIR_Inst(LIR_Op::Jump, Type::Void, 0, 0, 0, continue_label));
+        emit_label_jump(LIR_Op::Jump, 0, continue_label);
         
         // Error handling block
-        emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, error_label, 0, 0));
+        place_label(error_label);
         
         if (expr.elseHandler) {
             // ? else {} construct - execute the else block           
@@ -2829,7 +2858,7 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
         }
         
         // Continue label
-        emit_instruction(LIR_Inst(LIR_Op::Label, Type::Void, continue_label, 0, 0));
+        place_label(continue_label);
         
         return unwrapped_reg;
     }

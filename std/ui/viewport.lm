@@ -1,4 +1,4 @@
-// UI Viewport Abstraction
+// ── Viewport & MediaQuery ─────────────────────────────────────────────────────
 frame Viewport {
     pub var width: float;
     pub var height: float;
@@ -56,3 +56,11 @@ frame Viewport {
         self.clamp_scroll();
     }
 }
+
+pub var global_viewport: Viewport = Viewport(w=800.0, h=600.0);
+frame MediaQuery {
+    pub fn is_mobile(): bool { return global_viewport.width <= 480.0; }
+    pub fn is_tablet(): bool { return global_viewport.width > 480.0 and global_viewport.width <= 768.0; }
+    pub fn is_desktop(): bool { return global_viewport.width > 768.0; }
+}
+pub var media: MediaQuery = MediaQuery();

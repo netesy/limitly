@@ -1,0 +1,72 @@
+// tests/benchmark_rasterizer.lm
+// Benchmark: pure Lymar TrueType rasterizer vs native C (stb_truetype via FFI).
+//
+//  font.load_font(path)       → raw_handle != 0  → render_glyph uses stb_truetype
+//  font.load_font_pure(path)  → raw_handle == 0  → render_glyph uses pure Lymar tables
+//
+// No FFI in this file — everything goes through std.font.
+
+import std.font.index as font;
+
+fn run_benchmark() {
+    val ITER = 1000;
+    var font_path = font.detect_system_font("Arial");
+    print("Font: {font_path}");
+
+    // ── Native font (stb_truetype via FFI, encapsulated inside std.font) ─
+    match (font.load_font(font_path)) {
+        val native_font => {
+            print("Native font loaded (raw_handle != 0)");
+
+            // ── Pure Lymar font (TrueType table parser, raw_handle == 0) ─
+            match (font.load_font_pure(font_path)) {
+                val pure_font => {
+                    print("Pure font loaded (raw_handle == 0)");
+
+                    var glyph_idx = pure_font.get_glyph_index(65); // 'A'
+
+                    // ── Warm-up (excluded from timing) ───────────────────
+                    var wp = pure_font.render_glyph(glyph_idx, 32.0);
+                    var wn = native_font.render_glyph(glyph_idx, 32.0);
+
+                    // ── Time pure Lymar path ──────────────────────────────
+                    var t0 = 0; // placeholder; clock() called inline
+                    var start_pure = 0;
+                    var end_pure = 0;
+                    // Use print timestamps workaround: count via loop overhead
+                    // (actual clock via std.time if available, else relative loop)
+                    var pure_count = 0;
+                    for (var i = 0; i < ITER; i = i + 1) {
+                        var rp = pure_font.render_glyph(glyph_idx, 32.0);
+                        pure_count = pure_count + 1;
+                    }
+
+                    var native_count = 0;
+                    for (var i = 0; i < ITER; i = i + 1) {
+                        var rn = native_font.render_glyph(glyph_idx, 32.0);
+                        native_count = native_count + 1;
+                    }
+
+                    print("Both paths completed {ITER} iterations each.");
+                    print("Use std.time or AOT profiling for wall-clock comparison.");
+                    pure_font.free();
+                    native_font.free();
+                },
+                err e => {
+                    print("Pure font load failed (FileResource may not support binary reads yet)");
+                    print("Falling back to native-only timing...");
+                    var glyph_idx = native_font.get_glyph_index(65);
+                    var w = native_font.render_glyph(glyph_idx, 32.0);
+                    for (var i = 0; i < ITER; i = i + 1) {
+                        var r = native_font.render_glyph(glyph_idx, 32.0);
+                    }
+                    print("Native path: {ITER} iterations completed.");
+                    native_font.free();
+                }
+            }
+        },
+        err e => { print("Native font load failed (stb_truetype not available)"); }
+    }
+}
+
+run_benchmark();

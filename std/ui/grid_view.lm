@@ -1,13 +1,6 @@
-import std.ui.widget as widget;
+// std/ui/grid_view - Grid-based item list widget
+import std.ui.types as ui_types;
 
-frame GridView {
-    pub var children: [widget.Widget];
-
-    pub init(ch: [widget.Widget] = [widget.Widget()]) {
-        self.children = ch;
-    }
-
-    pub fn build(): widget.Widget {
-        return widget.Widget();
-    }
+pub fn grid_view(columns_count: int, items: [ui_types.Widget], spacing_val: float = 8.0): ui_types.Widget {
+    return ui_types.grid(columns_count, items, spacing_val);
 }
