@@ -405,9 +405,6 @@ pub fn set_window_title(title: str): nil {
     global_app_state.window_config.title = title;
 }
 
-// NOTE: set_window_size is defined above at line ~353 with the gg.set_window_size call.
-// This duplicate was removed to avoid shadowing the correct definition.
-
 pub fn set_fullscreen(fullscreen: int): nil {
     if (global_app_state.is_initialized == 0) {
         return;

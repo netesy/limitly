@@ -1,4 +1,4 @@
-import std.strings as str;
+import std.string as str;
 import std.collections.hash as hash;
 
 frame ArgParser {

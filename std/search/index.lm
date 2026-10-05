@@ -1,4 +1,4 @@
-// std/search.lm
+// std/search/index.lm
 // Compatibility re-export forwarding to std.algorithm.search and std.algorithm.binary_search
 
 import std.algorithm.search as search_mod;

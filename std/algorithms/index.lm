@@ -1,4 +1,4 @@
-// std/algorithms.lm
+// std/algorithms/index.lm
 // Compatibility re-export for std.algorithm
 
 import std.algorithm as algo;

@@ -1,4 +1,4 @@
-// std/sort.lm
+// std/sort/index.lm
 // Compatibility re-export forwarding to std.algorithm.sort
 
 import std.algorithm.sort as s;

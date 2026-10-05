@@ -47,5 +47,3 @@ pub fn Ok(value: any): Result {
 pub fn Err(error: any): Result {
     return Result(false, nil, error);
 }
-
-

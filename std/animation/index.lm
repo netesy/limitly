@@ -1,4 +1,4 @@
-// std/animation.lm
+// std/animation/index.lm
 // Shared Generic Animation Core Engine for Limit
 // Time-based, interruptible, easing curves, spring physics, transitions, keyframes, composition, and ID-keyed state store
 
