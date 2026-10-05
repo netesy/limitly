@@ -14,3 +14,5 @@ pub import std.collections.stack show Stack;
 pub import std.collections.priority_queue show PriorityQueueWrapper, PriorityQueue;
 pub import std.collections.bitset show BitSetWrapper, BitSet;
 pub import std.collections.bloom_filter show BloomFilter;
+pub import std.collections.btreemap show BTreeMapWrapper, BTreeMap, SortedMap;
+pub import std.collections.btreeset show BTreeSetWrapper, BTreeSet;

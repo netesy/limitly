@@ -1325,11 +1325,14 @@ fn render_widget_node(w: ui.Widget, x: float, y: float, available_w: float, avai
     }
     if (w.kind == ui.KIND_BUTTON) {
         var bg = w.background_color;
+        if (bg.a <= 0.0) {
+            bg = theme_mod.global_theme.colors.primary;
+        }
         if (w.is_pressed == 1) {
             if (w.pressed_style_val.has_bg) {
                 bg = w.pressed_style_val.bg;
             } else {
-                bg = theme_mod.global_theme.colors.primary;
+                bg = ui_types.Color(r=bg.r * 0.7, g=bg.g * 0.7, b=bg.b * 0.7, a=bg.a);
             }
         } elif (w.is_hovered == 1) {
             if (w.hover_style_val.has_bg) {

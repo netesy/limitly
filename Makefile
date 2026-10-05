@@ -149,7 +149,7 @@ TEST_RSP := $(RSP_DIR)/build_test.rsp
 # =============================
 # Default target
 # =============================
-all: check-deps liblymar $(PLATFORM)
+all: check-deps liblymar $(PLATFORM) stb-image
 
 # =============================
 # Dependency check
@@ -341,7 +341,7 @@ tests: $(PLATFORM) stb-image
 #   macOS       : bin/libstb_image.dylib
 #   Windows     : bin/libstb_image.dll
 #
-stb-image: $(STB_IMAGE_LIB)
+stb-image: $(BIN_DIR) $(STB_IMAGE_LIB)
 
 $(STB_IMAGE_LIB): tests/ffi/stb_wrapper.c vendor/stb/stb_image.h vendor/stb/stb_image_write.h
 	@echo "[BUILD] Building STB image shared library beside lymar in bin/ -> $@"
@@ -386,7 +386,7 @@ endif
 # =============================
 # OpenSSL TLS & Crypto shared library (compiled beside lymar in bin/)
 # =============================
-ssl-lib: $(LIMITLY_SSL_LIB)
+ssl-lib: $(BIN_DIR) $(LIMITLY_SSL_LIB)
 
 $(LIMITLY_SSL_LIB): src/native/openssl_wrapper.c
 	@echo "[BUILD] Building OpenSSL native bridge beside lymar in bin/ -> $@"

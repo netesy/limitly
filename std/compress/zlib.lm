@@ -29,7 +29,7 @@ pub fn compress_hex(data: str, level: int = 6): str? {
     unsafe {
         var lib = hash._open_lib();
         if (lib != nil and lib != 0) {
-            var fn_comp = ffi.library_get_symbol(lib, "limitly_zlib_compress_hex");
+            var fn_comp = ffi.library_get_symbol(lib, "lymar_zlib_compress_hex");
             if (fn_comp != nil and fn_comp != 0) {
                 var cs_data = ffi.string_to_cstring(data);
                 var out_buf = ffi.alloc(len(data) * 2 + 256);
@@ -68,7 +68,7 @@ pub fn decompress_hex(compressed_hex: str, max_limit: int = 10485760): str? {
     unsafe {
         var lib = hash._open_lib();
         if (lib != nil and lib != 0) {
-            var fn_decomp = ffi.library_get_symbol(lib, "limitly_zlib_decompress_hex");
+            var fn_decomp = ffi.library_get_symbol(lib, "lymar_zlib_decompress_hex");
             if (fn_decomp != nil and fn_decomp != 0) {
                 var cs_hex = ffi.string_to_cstring(compressed_hex);
                 var out_buf = ffi.alloc(buf_size + 4);

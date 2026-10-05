@@ -20,6 +20,10 @@ pub fn upper_bound(items: [any], target: any): int {
     return bs_mod.upper_bound(items, target);
 }
 
+pub fn equal_range(items: [any], target: any): (int, int) {
+    return bs_mod.equal_range(items, target);
+}
+
 pub fn interpolation_search(items: [int], target: int): int {
     return search_mod.interpolation_search(items, target);
 }

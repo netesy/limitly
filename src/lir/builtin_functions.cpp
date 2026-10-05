@@ -456,6 +456,9 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
                     }
                     break;
                 }
+                case TypeTag::Nil:
+                    length = 0;
+                    break;
                 default:
                     throw std::runtime_error("len: unsupported type " + value->type->toString());
             }

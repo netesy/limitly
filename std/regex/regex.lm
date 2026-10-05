@@ -45,7 +45,7 @@ frame Regex {
         unsafe {
             var lib = hash._open_lib();
             if (lib != nil and lib != 0) {
-                var fn_comp = ffi.library_get_symbol(lib, "limitly_regex_compile");
+                var fn_comp = ffi.library_get_symbol(lib, "lymar_regex_compile");
                 if (fn_comp != nil and fn_comp != 0) {
                     var cs = ffi.string_to_cstring(pattern);
                     var p = ffi.foreign_call(
@@ -84,7 +84,7 @@ frame Regex {
             unsafe {
                 var lib = hash._open_lib();
                 if (lib != nil and lib != 0) {
-                    var fn_match = ffi.library_get_symbol(lib, "limitly_regex_match");
+                    var fn_match = ffi.library_get_symbol(lib, "lymar_regex_match");
                     if (fn_match != nil and fn_match != 0) {
                         var cs = ffi.string_to_cstring(text);
                         var s_buf = ffi.alloc(4);
