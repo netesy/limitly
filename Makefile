@@ -13,7 +13,7 @@ ifeq ($(OS),Windows_NT)
 	LIBS := -lws2_32 -lffi -lgdi32 -luser32 -lshell32
 	STB_IMAGE_LIB := bin/libstb_image.dll
 	STB_SHARED_FLAGS := -shared -static -static-libgcc
-	LIMITLY_SSL_LIB := bin/liblymar_ssl.dll
+	LYMAR_SSL_LIB := bin/liblymar_ssl.dll
 	SSL_SHARED_FLAGS := -shared -O2 -I $(MSYS2_PATH)/mingw64/include -L $(MSYS2_PATH)/mingw64/lib
 	SSL_LIBS := -lssl -lcrypto -lz -lregex -lcrypt32 -lws2_32
 else ifeq ($(shell uname),Darwin)
@@ -25,7 +25,7 @@ else ifeq ($(shell uname),Darwin)
 	LIBS := -lffi -ldl
 	STB_IMAGE_LIB := bin/libstb_image.dylib
 	STB_SHARED_FLAGS := -shared -fPIC
-	LIMITLY_SSL_LIB := bin/liblymar_ssl.dylib
+	LYMAR_SSL_LIB := bin/liblymar_ssl.dylib
 	SSL_SHARED_FLAGS := -shared -fPIC -O2
 	SSL_LIBS := -lssl -lcrypto -lz
 else
@@ -37,7 +37,7 @@ else
 	LIBS := -lffi -ldl
 	STB_IMAGE_LIB := bin/libstb_image.so
 	STB_SHARED_FLAGS := -shared -fPIC
-	LIMITLY_SSL_LIB := bin/liblymar_ssl.so
+	LYMAR_SSL_LIB := bin/liblymar_ssl.so
 	SSL_SHARED_FLAGS := -shared -fPIC -O2
 	SSL_LIBS := -lssl -lcrypto -lz
 endif
@@ -118,7 +118,7 @@ BACKEND_COMMON_SRCS := src/backend/symbol_table.cpp src/frontend/value.cpp src/b
 
 ERROR_SRCS := src/error/debugger.cpp
 
-LIB_LIMITLY_SRCS := src/lymar.cpp src/formatter.cpp src/lsp.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
+LIB_LYMAR_SRCS := src/lymar.cpp src/formatter.cpp src/lsp.cpp $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS)
 
 MAIN_SRCS := src/main.cpp
@@ -134,7 +134,7 @@ LIR_TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(LIR_TEST_SRCS))
 # =============================
 # Objects and response files
 # =============================
-LIB_LIMITLY_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(LIB_LIMITLY_SRCS)) $(FYRA_OBJS)
+LIB_LYMAR_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(LIB_LYMAR_SRCS)) $(FYRA_OBJS)
 MAIN_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(MAIN_SRCS))
 TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(TEST_SRCS))
 
@@ -242,10 +242,10 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 liblymar: $(OBJ_DIR)/liblymar.a
 
-$(OBJ_DIR)/liblymar.a: $(LIB_LIMITLY_OBJS) $(FYRA_LIB)
+$(OBJ_DIR)/liblymar.a: $(LIB_LYMAR_OBJS) $(FYRA_LIB)
 	@echo "[BUILD] Building liblymar.a ..."
 	@mkdir -p $(dir $@)
-	$(AR) rcs $@ $(LIB_LIMITLY_OBJS)
+	$(AR) rcs $@ $(LIB_LYMAR_OBJS)
 
 windows: $(BIN_DIR) $(MAIN_RSP) liblymar $(LYRA_BIN)
 	@echo "[BUILD] Linking lymar.exe ..."
@@ -386,9 +386,9 @@ endif
 # =============================
 # OpenSSL TLS & Crypto shared library (compiled beside lymar in bin/)
 # =============================
-ssl-lib: $(BIN_DIR) $(LIMITLY_SSL_LIB)
+ssl-lib: $(BIN_DIR) $(LYMAR_SSL_LIB)
 
-$(LIMITLY_SSL_LIB): src/native/openssl_wrapper.c
+$(LYMAR_SSL_LIB): src/native/openssl_wrapper.c
 	@echo "[BUILD] Building OpenSSL native bridge beside lymar in bin/ -> $@"
 	$(CC) $(SSL_SHARED_FLAGS) -o $@ src/native/openssl_wrapper.c $(SSL_LIBS)
 	@echo "[OK] $@ built."
