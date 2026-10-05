@@ -64,16 +64,45 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
 
     auto& registry = LIR::FunctionRegistry::getInstance();
 
-    // Perform reachability analysis starting from the entry function
+    // Perform reachability analysis starting from entry and exported module symbols
     std::unordered_set<std::string> reachable_funcs;
     std::vector<std::string> worklist;
 
-    reachable_funcs.insert(lir_func.name);
-    worklist.push_back(lir_func.name);
+    if (!lir_func.name.empty()) {
+        reachable_funcs.insert(lir_func.name);
+        worklist.push_back(lir_func.name);
+    }
 
     if (lir_func.name == "__top_level_wrapper__" && registry.getFunction("main")) {
         reachable_funcs.insert("main");
         worklist.push_back("main");
+    }
+
+    // Exported module functions and module initialization entry points act as reachability roots.
+    // Identify target module prefixes (modules whose .__init__ function is present)
+    std::vector<std::string> mod_prefixes;
+    for (const auto& fname : registry.getFunctionNames()) {
+        if (fname.ends_with(".__init__")) {
+            std::string prefix = fname.substr(0, fname.length() - 8); // strip .__init__
+            if (!prefix.empty()) mod_prefixes.push_back(prefix);
+        }
+    }
+
+    for (const auto& fname : registry.getFunctionNames()) {
+        if (fname == lir_func.name || fname == "main") continue;
+        bool is_target_module_symbol = false;
+        for (const auto& pfx : mod_prefixes) {
+            if (fname == pfx || fname.rfind(pfx + ".", 0) == 0) {
+                is_target_module_symbol = true;
+                break;
+            }
+        }
+        if (is_target_module_symbol) {
+            if (!reachable_funcs.count(fname)) {
+                reachable_funcs.insert(fname);
+                worklist.push_back(fname);
+            }
+        }
     }
 
     auto inspect_instructions = [&](const LIR::LIR_Function& f) {
@@ -2415,20 +2444,20 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::CallbackCreate: {
                 if (inst.imm == 1) {
                     ir::Value* handle = load_reg(inst.a, LIR::Type::I64);
-                    ir::Value* res = builder_->createExternCall("limitrt_callback_get_ptr", {handle}, lir_type_to_fyra_type(inst.result_type));
+                    ir::Value* res = builder_->createExternCall("lymarrt_callback_get_ptr", {handle}, lir_type_to_fyra_type(inst.result_type));
                     if (inst.dst != UINT32_MAX) store_reg(inst.dst, res, inst.result_type);
                 } else {
                     ir::Value* name_str = (!inst.call_args.empty()) ? load_reg(inst.call_args[0], LIR::Type::Ptr) : context_->getConstantInt(context_->getIntegerType(64), 0);
                     ir::Value* arg_types = (inst.call_args.size() >= 2) ? load_reg(inst.call_args[1], LIR::Type::Ptr) : context_->getConstantInt(context_->getIntegerType(64), 0);
                     ir::Value* ret_type = (inst.call_args.size() >= 3) ? load_reg(inst.call_args[2], LIR::Type::I64) : context_->getConstantInt(context_->getIntegerType(64), 0);
-                    ir::Value* res = builder_->createExternCall("limitrt_callback_create", {name_str, arg_types, ret_type}, lir_type_to_fyra_type(inst.result_type));
+                    ir::Value* res = builder_->createExternCall("lymarrt_callback_create", {name_str, arg_types, ret_type}, lir_type_to_fyra_type(inst.result_type));
                     if (inst.dst != UINT32_MAX) store_reg(inst.dst, res, inst.result_type);
                 }
                 break;
             }
             case LIR::LIR_Op::CallbackDestroy: {
                 ir::Value* handle = load_reg(inst.a, LIR::Type::I64);
-                builder_->createExternCall("limitrt_callback_destroy", {handle}, nullptr);
+                builder_->createExternCall("lymarrt_callback_destroy", {handle}, nullptr);
                 break;
             }
             case LIR::LIR_Op::EffectPerform:

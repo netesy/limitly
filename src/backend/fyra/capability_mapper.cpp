@@ -22,13 +22,13 @@ std::optional<CapabilityDescriptor> CapabilityMapper::map(LIR::LIR_Op op) {
         case LIR::LIR_Op::MemoryCompare:
             return CapabilityDescriptor{"memory.compare", 3, 3, true, false};
         
-        // Dynamic Linking Operations -> limitrt C ABI runtime functions
+        // Dynamic Linking Operations -> lymarrt C ABI runtime functions
         case LIR::LIR_Op::LibraryLoad:
-            return CapabilityDescriptor{"limitrt_library_open", 1, 1, true, true};
+            return CapabilityDescriptor{"lymarrt_library_open", 1, 1, true, true};
         case LIR::LIR_Op::LibraryUnload:
-            return CapabilityDescriptor{"limitrt_library_close", 1, 1, false, false};
+            return CapabilityDescriptor{"lymarrt_library_close", 1, 1, false, false};
         case LIR::LIR_Op::LibrarySymbol:
-            return CapabilityDescriptor{"limitrt_symbol_lookup", 2, 2, true, true};
+            return CapabilityDescriptor{"lymarrt_symbol_lookup", 2, 2, true, true};
         
         default:
             return std::nullopt;

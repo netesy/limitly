@@ -52,7 +52,7 @@ set(BACKEND_COMMON_SOURCES
     src/backend/value.cpp
     src/backend/vm/resource_manager.cpp
     src/runtime/sokol/sokol_app_runtime.cpp
-    src/runtime/limitrt/limitrt.cpp
+    src/runtime/lymarrt/lymarrt.cpp
     src/backend/vm/register.cpp
     src/backend/vm/register_helpers.cpp
     src/backend/vm/ops/arithmetic.cpp

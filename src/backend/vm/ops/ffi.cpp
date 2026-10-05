@@ -4,7 +4,7 @@
 #include "../vm_list.hh"
 #include "../../../lir/functions.hh"
 #include "../vm_string.hh"
-#include "../../../runtime/limitrt/limitrt.h"
+#include "../../../runtime/lymarrt/lymarrt.h"
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -47,41 +47,41 @@ namespace {
         return nullptr;
     }
 
-    limitrt_type lir_type_to_limitrt_type(LIR::Type type) {
+    lymarrt_type lir_type_to_lymarrt_type(LIR::Type type) {
         switch (type) {
-            case LIR::Type::I8:   return LIMITRT_TYPE_I8;
-            case LIR::Type::U8:   return LIMITRT_TYPE_U8;
-            case LIR::Type::I16:  return LIMITRT_TYPE_I16;
-            case LIR::Type::U16:  return LIMITRT_TYPE_U16;
-            case LIR::Type::I32:  return LIMITRT_TYPE_I32;
-            case LIR::Type::U32:  return LIMITRT_TYPE_U32;
-            case LIR::Type::I64:  return LIMITRT_TYPE_I64;
-            case LIR::Type::U64:  return LIMITRT_TYPE_U64;
-            case LIR::Type::F32:  return LIMITRT_TYPE_F32;
-            case LIR::Type::F64:  return LIMITRT_TYPE_F64;
-            case LIR::Type::Bool: return LIMITRT_TYPE_U8;
-            case LIR::Type::Ptr:  return LIMITRT_TYPE_PTR;
-            case LIR::Type::Void: return LIMITRT_TYPE_VOID;
-            default:              return LIMITRT_TYPE_VOID;
+            case LIR::Type::I8:   return LYMARRT_TYPE_I8;
+            case LIR::Type::U8:   return LYMARRT_TYPE_U8;
+            case LIR::Type::I16:  return LYMARRT_TYPE_I16;
+            case LIR::Type::U16:  return LYMARRT_TYPE_U16;
+            case LIR::Type::I32:  return LYMARRT_TYPE_I32;
+            case LIR::Type::U32:  return LYMARRT_TYPE_U32;
+            case LIR::Type::I64:  return LYMARRT_TYPE_I64;
+            case LIR::Type::U64:  return LYMARRT_TYPE_U64;
+            case LIR::Type::F32:  return LYMARRT_TYPE_F32;
+            case LIR::Type::F64:  return LYMARRT_TYPE_F64;
+            case LIR::Type::Bool: return LYMARRT_TYPE_U8;
+            case LIR::Type::Ptr:  return LYMARRT_TYPE_PTR;
+            case LIR::Type::Void: return LYMARRT_TYPE_VOID;
+            default:              return LYMARRT_TYPE_VOID;
         }
     }
 
-    bool ffi_type_id_to_limitrt(int64_t id, bool allow_void, limitrt_type& out) {
+    bool ffi_type_id_to_lymarrt(int64_t id, bool allow_void, lymarrt_type& out) {
         switch (id) {
-            case 0:  out = LIMITRT_TYPE_I8;  return true;
-            case 1:  out = LIMITRT_TYPE_U8;  return true;
-            case 2:  out = LIMITRT_TYPE_I16; return true;
-            case 3:  out = LIMITRT_TYPE_U16; return true;
-            case 4:  out = LIMITRT_TYPE_I32; return true;
-            case 5:  out = LIMITRT_TYPE_U32; return true;
-            case 6:  out = LIMITRT_TYPE_I64; return true;
-            case 7:  out = LIMITRT_TYPE_U64; return true;
-            case 8:  out = LIMITRT_TYPE_F32; return true;
-            case 9:  out = LIMITRT_TYPE_F64; return true;
-            case 10: out = LIMITRT_TYPE_PTR; return true;
-            case 11: out = LIMITRT_TYPE_CSTRING; return true;
+            case 0:  out = LYMARRT_TYPE_I8;  return true;
+            case 1:  out = LYMARRT_TYPE_U8;  return true;
+            case 2:  out = LYMARRT_TYPE_I16; return true;
+            case 3:  out = LYMARRT_TYPE_U16; return true;
+            case 4:  out = LYMARRT_TYPE_I32; return true;
+            case 5:  out = LYMARRT_TYPE_U32; return true;
+            case 6:  out = LYMARRT_TYPE_I64; return true;
+            case 7:  out = LYMARRT_TYPE_U64; return true;
+            case 8:  out = LYMARRT_TYPE_F32; return true;
+            case 9:  out = LYMARRT_TYPE_F64; return true;
+            case 10: out = LYMARRT_TYPE_PTR; return true;
+            case 11: out = LYMARRT_TYPE_CSTRING; return true;
             case 12:
-                if (allow_void) { out = LIMITRT_TYPE_VOID; return true; }
+                if (allow_void) { out = LYMARRT_TYPE_VOID; return true; }
                 return false;
             default: return false;
         }
@@ -101,23 +101,23 @@ namespace {
         return nullptr;
     }
 
-    limitrt_value vm_val_to_limitrt_val(RegisterValue val, limitrt_type type) {
-        limitrt_value v;
+    lymarrt_value vm_val_to_lymarrt_val(RegisterValue val, lymarrt_type type) {
+        lymarrt_value v;
         std::memset(&v, 0, sizeof(v));
         v.type = type;
         switch (type) {
-            case LIMITRT_TYPE_I8:  v.val.i8 = (int8_t)as_i64(val); break;
-            case LIMITRT_TYPE_U8:  v.val.u8 = (uint8_t)as_i64(val); break;
-            case LIMITRT_TYPE_I16: v.val.i16 = (int16_t)as_i64(val); break;
-            case LIMITRT_TYPE_U16: v.val.u16 = (uint16_t)as_i64(val); break;
-            case LIMITRT_TYPE_I32: v.val.i32 = (int32_t)as_i64(val); break;
-            case LIMITRT_TYPE_U32: v.val.u32 = (uint32_t)as_i64(val); break;
-            case LIMITRT_TYPE_I64: v.val.i64 = as_i64(val); break;
-            case LIMITRT_TYPE_U64: v.val.u64 = (uint64_t)as_i64(val); break;
-            case LIMITRT_TYPE_F32: v.val.f32 = (float)as_float(val); break;
-            case LIMITRT_TYPE_F64: v.val.f64 = as_float(val); break;
-            case LIMITRT_TYPE_PTR:
-            case LIMITRT_TYPE_CSTRING: {
+            case LYMARRT_TYPE_I8:  v.val.i8 = (int8_t)as_i64(val); break;
+            case LYMARRT_TYPE_U8:  v.val.u8 = (uint8_t)as_i64(val); break;
+            case LYMARRT_TYPE_I16: v.val.i16 = (int16_t)as_i64(val); break;
+            case LYMARRT_TYPE_U16: v.val.u16 = (uint16_t)as_i64(val); break;
+            case LYMARRT_TYPE_I32: v.val.i32 = (int32_t)as_i64(val); break;
+            case LYMARRT_TYPE_U32: v.val.u32 = (uint32_t)as_i64(val); break;
+            case LYMARRT_TYPE_I64: v.val.i64 = as_i64(val); break;
+            case LYMARRT_TYPE_U64: v.val.u64 = (uint64_t)as_i64(val); break;
+            case LYMARRT_TYPE_F32: v.val.f32 = (float)as_float(val); break;
+            case LYMARRT_TYPE_F64: v.val.f64 = as_float(val); break;
+            case LYMARRT_TYPE_PTR:
+            case LYMARRT_TYPE_CSTRING: {
                 void* p = value_to_ptr(val);
                 const char* cstr = get_cstring_from_value(val);
                 if (cstr) p = (void*)cstr;
@@ -129,20 +129,20 @@ namespace {
         return v;
     }
 
-    RegisterValue limitrt_val_to_vm_val(const limitrt_value& v, limitrt_type type) {
+    RegisterValue lymarrt_val_to_vm_val(const lymarrt_value& v, lymarrt_type type) {
         switch (type) {
-            case LIMITRT_TYPE_I8:  return BOX_INT((int64_t)v.val.i8);
-            case LIMITRT_TYPE_U8:  return BOX_INT((int64_t)v.val.u8);
-            case LIMITRT_TYPE_I16: return BOX_INT((int64_t)v.val.i16);
-            case LIMITRT_TYPE_U16: return BOX_INT((int64_t)v.val.u16);
-            case LIMITRT_TYPE_I32: return BOX_INT((int64_t)v.val.i32);
-            case LIMITRT_TYPE_U32: return BOX_INT((int64_t)v.val.u32);
-            case LIMITRT_TYPE_I64: return BOX_INT(v.val.i64);
-            case LIMITRT_TYPE_U64: return BOX_INT((int64_t)v.val.u64);
-            case LIMITRT_TYPE_F32: return make_float((double)v.val.f32);
-            case LIMITRT_TYPE_F64: return make_float(v.val.f64);
-            case LIMITRT_TYPE_PTR:
-            case LIMITRT_TYPE_CSTRING:
+            case LYMARRT_TYPE_I8:  return BOX_INT((int64_t)v.val.i8);
+            case LYMARRT_TYPE_U8:  return BOX_INT((int64_t)v.val.u8);
+            case LYMARRT_TYPE_I16: return BOX_INT((int64_t)v.val.i16);
+            case LYMARRT_TYPE_U16: return BOX_INT((int64_t)v.val.u16);
+            case LYMARRT_TYPE_I32: return BOX_INT((int64_t)v.val.i32);
+            case LYMARRT_TYPE_U32: return BOX_INT((int64_t)v.val.u32);
+            case LYMARRT_TYPE_I64: return BOX_INT(v.val.i64);
+            case LYMARRT_TYPE_U64: return BOX_INT((int64_t)v.val.u64);
+            case LYMARRT_TYPE_F32: return make_float((double)v.val.f32);
+            case LYMARRT_TYPE_F64: return make_float(v.val.f64);
+            case LYMARRT_TYPE_PTR:
+            case LYMARRT_TYPE_CSTRING:
                 return v.val.ptr ? lm_alloc_foreign_ptr(v.val.ptr) : VAL_NIL;
             default:
                 return VAL_NIL;
@@ -151,9 +151,9 @@ namespace {
 
     void vm_callback_trampoline_handler(
         void* userdata,
-        const limitrt_value* args,
+        const lymarrt_value* args,
         size_t num_args,
-        limitrt_value* out_result)
+        lymarrt_value* out_result)
     {
         auto* data = static_cast<VmCallbackUserData*>(userdata);
         RegisterVM* vm = data->vm;
@@ -161,12 +161,12 @@ namespace {
         std::vector<RegisterValue> vm_args;
         vm_args.reserve(num_args);
         for (size_t i = 0; i < num_args; ++i) {
-            vm_args.push_back(limitrt_val_to_vm_val(args[i], (limitrt_type)args[i].type));
+            vm_args.push_back(lymarrt_val_to_vm_val(args[i], (lymarrt_type)args[i].type));
         }
 
         RegisterValue rv = vm->invoke_for_callback(data->func_name, vm_args);
         if (out_result) {
-            *out_result = vm_val_to_limitrt_val(rv, (limitrt_type)out_result->type);
+            *out_result = vm_val_to_lymarrt_val(rv, (lymarrt_type)out_result->type);
         }
     }
 
@@ -223,7 +223,7 @@ void RegisterVM::execute_extern_library_load(const LIR::LIR_Inst* pc) {
     LIR::Reg path_reg = arg_reg(pc, 0, pc->a);
     const char* path = get_cstring_from_value(registers[path_reg]);
     if (!path) { registers[pc->dst] = VAL_NIL; return; }
-    void* handle = limitrt_library_open(path);
+    void* handle = lymarrt_library_open(path);
     if (!handle) { registers[pc->dst] = VAL_NIL; return; }
     RegisterValue val = lm_alloc_foreign_ptr(handle);
     registers[pc->dst] = val;
@@ -236,7 +236,7 @@ void RegisterVM::execute_extern_library_load(const LIR::LIR_Inst* pc) {
 void RegisterVM::execute_extern_library_unload(const LIR::LIR_Inst* pc) {
     void* handle = value_to_ptr(registers[pc->a]);
     if (handle) {
-        limitrt_library_close(handle);
+        lymarrt_library_close(handle);
     }
 }
 
@@ -247,7 +247,7 @@ void RegisterVM::execute_extern_library_get_symbol(const LIR::LIR_Inst* pc) {
     if (!handle) { registers[pc->dst] = VAL_NIL; return; }
     const char* symbol = get_cstring_from_value(registers[symbol_reg]);
     if (!symbol) { registers[pc->dst] = VAL_NIL; return; }
-    void* ptr = limitrt_symbol_lookup(handle, symbol);
+    void* ptr = lymarrt_symbol_lookup(handle, symbol);
     RegisterValue val = ptr ? lm_alloc_foreign_ptr(ptr) : VAL_NIL;
     registers[pc->dst] = val;
     if (IS_PTR(val) && !vm_region_stack.empty()) {
@@ -261,15 +261,15 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
     void* func_ptr = value_to_ptr(func_ptr_val);
     if (!func_ptr) { registers[pc->dst] = VAL_NIL; return; }
 
-    limitrt_type ret_type = lir_type_to_limitrt_type(pc->result_type);
+    lymarrt_type ret_type = lir_type_to_lymarrt_type(pc->result_type);
     std::vector<LIR::Reg> arg_regs = pc->call_args;
     std::vector<RegisterValue> call_arg_values;
-    std::vector<limitrt_type> resolved_arg_types;
+    std::vector<lymarrt_type> resolved_arg_types;
 
     if (pc->func_name == "std.ffi.foreign_call" || pc->func_name == "ffi.foreign_call") {
         if (pc->call_args.size() > 2) {
             int64_t ret_id = as_i64(registers[pc->call_args[2]]);
-            ffi_type_id_to_limitrt(ret_id, true, ret_type);
+            ffi_type_id_to_lymarrt(ret_id, true, ret_type);
         }
 
         LmList* pt_list = nullptr;
@@ -287,16 +287,16 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
                 for (uint64_t i = 0; i < args_list->size; ++i) {
                     RegisterValue val = args_list->data[i];
                     call_arg_values.push_back(val);
-                    limitrt_type arg_t = LIMITRT_TYPE_I64;
+                    lymarrt_type arg_t = LYMARRT_TYPE_I64;
                     bool got_type = false;
                     if (pt_list && i < pt_list->size) {
                         int64_t tid = as_i64(pt_list->data[i]);
-                        got_type = ffi_type_id_to_limitrt(tid, false, arg_t);
+                        got_type = ffi_type_id_to_lymarrt(tid, false, arg_t);
                     }
                     if (!got_type) {
-                        if (is_float(val)) arg_t = LIMITRT_TYPE_F64;
-                        else if (IS_PTR(val)) arg_t = LIMITRT_TYPE_PTR;
-                        else arg_t = LIMITRT_TYPE_I64;
+                        if (is_float(val)) arg_t = LYMARRT_TYPE_F64;
+                        else if (IS_PTR(val)) arg_t = LYMARRT_TYPE_PTR;
+                        else arg_t = LYMARRT_TYPE_I64;
                     }
                     resolved_arg_types.push_back(arg_t);
                 }
@@ -308,26 +308,26 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
         for (size_t i = arg_start; i < arg_regs.size(); ++i) {
             call_arg_values.push_back(registers[arg_regs[i]]);
             if (i < pc->call_arg_types.size() && pc->call_arg_types[i] != LIR::Type::Void) {
-                resolved_arg_types.push_back(lir_type_to_limitrt_type(pc->call_arg_types[i]));
+                resolved_arg_types.push_back(lir_type_to_lymarrt_type(pc->call_arg_types[i]));
             } else {
                 RegisterValue val = registers[arg_regs[i]];
-                if (is_float(val)) resolved_arg_types.push_back(LIMITRT_TYPE_F64);
-                else if (IS_PTR(val)) resolved_arg_types.push_back(LIMITRT_TYPE_PTR);
-                else resolved_arg_types.push_back(LIMITRT_TYPE_I64);
+                if (is_float(val)) resolved_arg_types.push_back(LYMARRT_TYPE_F64);
+                else if (IS_PTR(val)) resolved_arg_types.push_back(LYMARRT_TYPE_PTR);
+                else resolved_arg_types.push_back(LYMARRT_TYPE_I64);
             }
         }
     }
 
     size_t num_args = call_arg_values.size();
-    std::vector<limitrt_value> limitrt_args(num_args);
+    std::vector<lymarrt_value> lymarrt_args(num_args);
     for (size_t i = 0; i < num_args; ++i) {
-        limitrt_args[i] = vm_val_to_limitrt_val(call_arg_values[i], resolved_arg_types[i]);
+        lymarrt_args[i] = vm_val_to_lymarrt_val(call_arg_values[i], resolved_arg_types[i]);
     }
 
-    limitrt_value out_res;
+    lymarrt_value out_res;
     std::memset(&out_res, 0, sizeof(out_res));
-    if (limitrt_ffi_call(func_ptr, ret_type, resolved_arg_types.data(), limitrt_args.data(), num_args, &out_res)) {
-        RegisterValue val = limitrt_val_to_vm_val(out_res, ret_type);
+    if (lymarrt_ffi_call(func_ptr, ret_type, resolved_arg_types.data(), lymarrt_args.data(), num_args, &out_res)) {
+        RegisterValue val = lymarrt_val_to_vm_val(out_res, ret_type);
         registers[pc->dst] = val;
         if (IS_PTR(val) && !vm_region_stack.empty()) {
             uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
@@ -371,7 +371,7 @@ void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
         return;
     }
 
-    std::vector<limitrt_type> arg_types;
+    std::vector<lymarrt_type> arg_types;
     bool valid_arg_list = false;
     if (pc->call_args.size() >= 2) {
         RegisterValue list_val = registers[pc->call_args[1]];
@@ -389,8 +389,8 @@ void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
                 arg_types.reserve(count);
                 for (uint64_t i = 0; i < count; ++i) {
                     int64_t type_id = as_i64(lm_list_get(lst, i));
-                    limitrt_type type;
-                    if (!ffi_type_id_to_limitrt(type_id, false, type)) {
+                    lymarrt_type type;
+                    if (!ffi_type_id_to_lymarrt(type_id, false, type)) {
                         std::cerr << "[ffi] callback_create: invalid argument type id "
                                   << type_id << " at index " << i << '\n';
                         registers[pc->dst] = VAL_NIL;
@@ -415,16 +415,16 @@ void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
         return;
     }
 
-    limitrt_type ret_type;
+    lymarrt_type ret_type;
     int64_t rid = as_i64(registers[pc->call_args[2]]);
-    if (!ffi_type_id_to_limitrt(rid, true, ret_type)) {
+    if (!ffi_type_id_to_lymarrt(rid, true, ret_type)) {
         std::cerr << "[ffi] callback_create: invalid return type id " << rid << '\n';
         registers[pc->dst] = VAL_NIL;
         return;
     }
 
     VmCallbackUserData* udata = new VmCallbackUserData{this, lymar_func_name};
-    int64_t id = limitrt_callback_create(
+    int64_t id = lymarrt_callback_create(
         vm_callback_trampoline_handler,
         udata,
         arg_types.data(),
@@ -442,16 +442,16 @@ void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
 
 void RegisterVM::execute_extern_unregister_callback(const LIR::LIR_Inst* pc) {
     int64_t id = as_i64(registers[pc->a]);
-    void* udata = limitrt_callback_get_userdata(id);
+    void* udata = lymarrt_callback_get_userdata(id);
     if (udata) {
         delete static_cast<VmCallbackUserData*>(udata);
     }
-    limitrt_callback_destroy(id);
+    lymarrt_callback_destroy(id);
 }
 
 void RegisterVM::execute_extern_get_callback_ptr(const LIR::LIR_Inst* pc) {
     int64_t id = as_i64(registers[pc->a]);
-    void* code_ptr = limitrt_callback_get_ptr(id);
+    void* code_ptr = lymarrt_callback_get_ptr(id);
     if (code_ptr) {
         RegisterValue val = lm_alloc_foreign_ptr(code_ptr);
         registers[pc->dst] = val;
