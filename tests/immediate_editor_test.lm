@@ -1,4 +1,4 @@
-// Immediate Mode Text Editor Example & Test in Limit std.game.gui
+// Immediate Mode Text Editor Example & Test in Lymar std.game.gui
 import std.game.gui as gui;
 import std.text.controller as text_ctrl;
 
@@ -17,7 +17,7 @@ fn main(): int {
 
     // Begin Window Container
     if (g.begin_window("Editor Window", 20.0, 20.0, 520.0, 360.0)) {
-        g.label("Limit Immediate Text Editor");
+        g.label("Lymar Immediate Text Editor");
 
         // Immediate mode toolbar buttons
         g.same_line(-1.0);
@@ -58,7 +58,7 @@ fn main(): int {
 
     g.begin(0.0, 0.0, false, 0.0, 0.016);
     if (g.begin_window("Editor Window", 20.0, 20.0, 520.0, 360.0)) {
-        g.label("Limit Immediate Text Editor");
+        g.label("Lymar Immediate Text Editor");
         var frame2_text = g.input_text_multiline("code_editor_1", initial_code, 500.0, 250.0);
         g.end_window();
     }

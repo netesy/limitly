@@ -1,5 +1,5 @@
 // std.ui - Public Fluent & Composable UI Framework for Lymar
-// Canonical entry point for Limit Retained UI System
+// Canonical entry point for Lymar Retained UI System
 
 import std.ui.types as ui_types;
 pub import std.ui.types show Widget, Style, Alignment;

@@ -1,5 +1,5 @@
 // std/graphics/shadow.lm
-// Shared First-Class Shadow Abstraction for Limit Graphics, UI, and Game GUI
+// Shared First-Class Shadow Abstraction for Lymar Graphics, UI, and Game GUI
 
 frame Shadow {
     pub var r: float;

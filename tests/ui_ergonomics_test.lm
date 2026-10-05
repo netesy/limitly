@@ -13,7 +13,7 @@ import std.gg as gg;
 // Snippet 1: Simple label + button
 fn snippet_1_simple(): ui.Widget {
     return ui.column([
-        ui.text("Welcome to Limit!").color(ui.white),
+        ui.text("Welcome to Lymar!").color(ui.white),
         ui.button("Get Started").background(ui.blue).foreground(ui.white)
     ]).spacing(12.0).padding(16.0);
 }
@@ -103,7 +103,7 @@ fn snippet_5_settings(): ui.Widget {
 
 fn build_all_forms_gallery(): ui.Widget {
     return ui.column([
-        ui.text("Limit UI Form Gallery").font_size(22.0).bold().color(ui.white),
+        ui.text("Lymar UI Form Gallery").font_size(22.0).bold().color(ui.white),
         snippet_1_simple(),
         snippet_2_login(),
         snippet_3_counter(),

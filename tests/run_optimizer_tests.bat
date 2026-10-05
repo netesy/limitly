@@ -5,7 +5,7 @@ REM Runs all optimizer-specific tests
 setlocal enabledelayedexpansion
 
 echo ========================================
-echo Running Limit Language Optimizer Tests
+echo Running Lymar Language Optimizer Tests
 echo ========================================
 
 set PASSED=0

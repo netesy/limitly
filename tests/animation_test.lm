@@ -1,4 +1,4 @@
-// Comprehensive Integration Tests for Limit Unified Animation System
+// Comprehensive Integration Tests for Lymar Unified Animation System
 import std.animation as anim;
 import std.ui as ui;
 import std.ui.context as ctx;

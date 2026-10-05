@@ -5,7 +5,7 @@ frame Application {
     pub var name: str;
     pub var root_widget: ui_types.Widget;
 
-    pub init(n: str = "LimitApp") {
+    pub init(n: str = "LymarApp") {
         self.name = n;
         self.root_widget = ui_types.empty();
     }

@@ -1,4 +1,4 @@
-// Retained Mode Text Editor Example & Test in Limit std.ui
+// Retained Mode Text Editor Example & Test in Lymar std.ui
 import std.ui as ui;
 import std.ui.context as ctx;
 import std.text.controller as text_ctrl;
@@ -11,7 +11,7 @@ fn main(): int {
     ctx.set_viewport_size(800.0, 600.0);
 
     // 2. Initial Document Content
-    var initial_code = "# Limit Language Text Editor\nfn main(): int\n    var x: int = 42\n    return 0";
+    var initial_code = "# Lymar Language Text Editor\nfn main(): int\n    var x: int = 42\n    return 0";
 
     // 3. Create Retained Mode Textarea Widget
     var editor_widget = ui.textarea(initial_code, "Type code here...")
@@ -57,7 +57,7 @@ fn main(): int {
     var status_text = "Lines: " + (controller.get_line_count() as str) + " | Cursor: (" + (controller.get_cursor_line() as str) + ", " + (controller.get_cursor_col() as str) + ")";
 
     var editor_view = ui.column([
-        ui.text("Limit Retained Text Editor").bold().font_size(18.0).color(ui.rgb(100, 180, 255)),
+        ui.text("Lymar Retained Text Editor").bold().font_size(18.0).color(ui.rgb(100, 180, 255)),
         ui.row([
             ui.button("Undo", nil).background(ui.rgb(40, 45, 60)),
             ui.spacer(0.1),

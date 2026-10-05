@@ -15,7 +15,7 @@ fn main(): int {
     var f_res = io.open("test_io_temp.txt", "w");
     match (f_res) {
         val f => {
-            f.write("Hello Luminar");
+            f.write("Hello Lymar");
             f.close();
             nil;
         },
@@ -31,7 +31,7 @@ fn main(): int {
             var content_res = f.read();
             match (content_res) {
                 val content => {
-                    assert(content == "Hello Luminar", "File content mismatch");
+                    assert(content == "Hello Lymar", "File content mismatch");
                     nil;
                 },
                 err e => {

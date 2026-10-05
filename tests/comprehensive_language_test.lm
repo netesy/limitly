@@ -38,12 +38,12 @@ print(nil);
 // Variable declarations
 var x = 42;
 var y = 3.14;
-var name = "Limit";
+var name = "Lymar";
 var isActive = true;
 
 assert(x == 42, "Variable x should be 42");
 assert(y == 3.14, "Variable y should be 3.14");
-assert(name == "Limit", "Variable name should be 'Limit'");
+assert(name == "Lymar", "Variable name should be 'Lymar'");
 assert(isActive == true, "Variable isActive should be true");
 
 print("Variables:");

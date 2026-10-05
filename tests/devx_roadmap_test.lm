@@ -42,7 +42,7 @@ fn test_http_router(): nil {
 fn test_json_helpers(): nil {
     print("\nTesting JSON Serialization Helpers...");
     var keys = ["name", "status", "role"];
-    var vals = ["Limit", "Active", "Compiler"];
+    var vals = ["Lymar", "Active", "Compiler"];
 
     var json_str = json.encode_object(keys, vals);
     print("Encoded JSON successfully.\n");

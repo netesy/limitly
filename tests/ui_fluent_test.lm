@@ -18,13 +18,13 @@ fn test_button_callback() {
 }
 
 fn test_fluent_text_styling(): int {
-    var t = ui.text("Hello Limit")
+    var t = ui.text("Hello Lymar")
         .color(ui.red)
         .font_size(24.0)
         .bold();
 
     assert(t.kind == ui.KIND_TEXT, "text kind mismatch");
-    assert(t.text_val == "Hello Limit", "text content mismatch");
+    assert(t.text_val == "Hello Lymar", "text content mismatch");
     assert(t.foreground_color.r > 0.8, "text color R mismatch");
     assert(t.font_size_val == 24.0, "text font size mismatch");
     assert(t.font_weight_val == 700, "text weight mismatch");
@@ -180,7 +180,7 @@ fn test_style_merge(): int {
 }
 
 fn main() {
-    print("=== Limit Fluent UI Comprehensive Test Suite ===");
+    print("=== Lymar Fluent UI Comprehensive Test Suite ===");
     test_fluent_text_styling();
     test_fluent_button_styling();
     test_layout_modifiers();

@@ -33,9 +33,9 @@ pub fn main(): int {
 
  // 3. String passing (int32_t string_len(const char*))
  var sym_slen: int = lib.symbol("string_len");
- var cs: ffi.CString = ffi.string_to_cstring("Hello Limit FFI!");
+ var cs: ffi.CString = ffi.string_to_cstring("Hello Lymar FFI!");
  var len_val: int = ffi.call_i64_1(sym_slen, ffi.cstring_as_ptr(cs));
- print("string_len('Hello Limit FFI!') = " + (len_val as str));
+ print("string_len('Hello Lymar FFI!') = " + (len_val as str));
  assert(len_val == 16, "string_len failed");
  ffi.cstring_free(cs);
 

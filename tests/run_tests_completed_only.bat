@@ -1,7 +1,7 @@
 @echo off
 setlocal enabledelayedexpansion
 echo ========================================
-echo Running Limit Language Test Suite (Completed Features Only)
+echo Running Lymar Language Test Suite (Completed Features Only)
 echo ========================================
 
 set LIMITLY=.\bin\lymar.exe

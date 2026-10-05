@@ -21,7 +21,7 @@ fn test_file_ops(): int {
     match (f_res) {
         val f_obj => {
             var f_obj_concrete = f_obj as file_mod.File;
-            f_obj_concrete.write("Hello Luminar");
+            f_obj_concrete.write("Hello Lymar");
             f_obj_concrete.close();
         }
         err e => {
@@ -36,7 +36,7 @@ fn test_file_ops(): int {
             var content_res = f_obj_concrete.read();
             match (content_res) {
                 val content => {
-                    assert(content == "Hello Luminar", "File content mismatch");
+                    assert(content == "Hello Lymar", "File content mismatch");
                 }
                 err e => {
                     assert(false, "Failed to read file");

@@ -29,7 +29,7 @@ fn test_round_trip() {
 }
 
 fn test_decompression_limits() {
- print("=== Testing Decompression Limits (Zip-bomb / Exhaustion protection) ===");
+ print("=== Testing Decompression Lymars (Zip-bomb / Exhaustion protection) ===");
  var text = "Data payload that expands significantly when unpacked! " +
  "Repeat block 1234567890. Repeat block 1234567890. Repeat block 1234567890.";
 

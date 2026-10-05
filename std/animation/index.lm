@@ -1,5 +1,5 @@
 // std/animation/index.lm
-// Shared Generic Animation Core Engine for Limit
+// Shared Generic Animation Core Engine for Lymar
 // Time-based, interruptible, easing curves, spring physics, transitions, keyframes, composition, and ID-keyed state store
 
 import std.graphics.shadow as shadow_mod;

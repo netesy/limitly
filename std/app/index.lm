@@ -84,7 +84,7 @@ pub fn default_window_config(): WindowConfig {
     return WindowConfig(
         width=800,
         height=600,
-        title="Limit Application",
+        title="Lymar Application",
         resizable=1,
         fullscreen=0,
         high_dpi=1,

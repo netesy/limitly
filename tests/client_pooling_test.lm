@@ -5,7 +5,7 @@ fn main(): int {
     print("=== Running TOML Parser Optimization Test ===\n");
 
     print("Testing TOML Parser with optimized key trimming...");
-    var toml_doc = "title = \"Limit Language\"\nversion = \"1.0.0\"\n";
+    var toml_doc = "title = \"Lymar Language\"\nversion = \"1.0.0\"\n";
     var parsed = toml.parse(toml_doc);
     assert(parsed != nil, "TOML parsed successfully");
     print("TOML Parser test passed.\n");

@@ -27,7 +27,7 @@ fn test_errors() {
     calculate_total(10); // Should suggest calculate_totals
 
     // 3. Undefined type suggestion
-    var name: Strng = "Limit"; // Should suggest String
+    var name: Strng = "Lymar"; // Should suggest String
 
     // 4. Undefined field suggestion
     var u = User(name="Alice", age=25) as User;

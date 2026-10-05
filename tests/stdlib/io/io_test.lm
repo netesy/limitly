@@ -17,7 +17,7 @@ fn main(): int {
     match (f_res) {
         val f => {
             var f_obj = f as file_mod.File;
-            f_obj.write("Hello Luminar");
+            f_obj.write("Hello Lymar");
             f_obj.close();
         }
         err e => {
@@ -32,7 +32,7 @@ fn main(): int {
             var content_res = f_obj.read();
             match (content_res) {
                 val content => {
-                    assert(content == "Hello Luminar", "File content mismatch");
+                    assert(content == "Hello Lymar", "File content mismatch");
                 }
                 err e => {
                     assert(false, "Failed to read file");

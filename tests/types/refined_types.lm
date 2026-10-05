@@ -267,10 +267,10 @@ print("Validate 3: {val3}");
 // Test 20: Refined type comprehensive coverage
 print("\n--- Test 20: Refined Type Comprehensive Coverage ---");
 type RangeType = int where value > 0;
-type LimitType = int where value < 1000;
+type LymarType = int where value < 1000;
 type MidType = int where value > 100;
 
-fn processRefined(r: RangeType, l: LimitType, m: MidType): int {
+fn processRefined(r: RangeType, l: LymarType, m: MidType): int {
     return r + l + m;
 }
 

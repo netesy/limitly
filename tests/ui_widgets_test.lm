@@ -1,4 +1,4 @@
-// Comprehensive Integration Test Suite for Limit std.ui Widgets & Charts
+// Comprehensive Integration Test Suite for Lymar std.ui Widgets & Charts
 import std.ui as ui;
 import std.ui.context as ctx;
 

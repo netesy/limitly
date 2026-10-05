@@ -41,7 +41,7 @@ run_aot_windows_test() {
     rm -f "$exe_file"
 }
 echo "========================================"
-echo "Running Limit Windows AOT Test Suite"
+echo "Running Lymar Windows AOT Test Suite"
 echo "========================================"
 for f in tests/basic/*.lm; do run_aot_windows_test "$f"; done
 for f in tests/expressions/*.lm; do run_aot_windows_test "$f"; done

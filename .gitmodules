@@ -1,13 +1,6 @@
-[submodule "lyra"]
-    path = vendor/lyra
-    url = https://github.com/lymarlang/lyra.git
-
-[submodule "fyra"]
+[submodule "vendor/fyra"]
     path = vendor/fyra
     url = https://github.com/netesy/fyra.git
 [submodule "vendor/lyra"]
 	path = vendor/lyra
 	url = https://github.com/lymarlang/lyra.git
-[submodule "vendor/fyra"]
-	path = vendor/fyra
-	url = https://github.com/netesy/fyra.git
