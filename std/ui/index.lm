@@ -2,32 +2,46 @@
 // Canonical entry point for Limit Retained UI System
 
 import std.ui.types as ui_types;
+pub import std.ui.types show Widget, Style, Alignment;
+
 import std.ui.color as color_mod;
+pub import std.ui.types show Color;
+
 import std.ui.state as state_mod;
+pub import std.ui.state show Signal, ComputedSignal, Effect;
+
 import std.ui.viewport as viewport_mod;
+
 import std.ui.layout as layout_mod;
+pub import std.ui.layout show LayoutBox, GridSpec, Breakpoint;
+
 import std.ui.navigation as nav_mod;
+pub import std.ui.navigation show Router, RouterParams, Route;
+
 import std.ui.charts as charts_mod;
+
 import std.ui.application as app_mod;
+pub import std.ui.application show Application;
+
 import std.ui.window as win_mod;
+pub import std.ui.window show Window;
+
 import std.ui.theme as theme_mod;
 import std.ui.dialog as dialog_mod;
+
 import std.ui.grid as grid_mod;
+pub import std.ui.grid show GridLayout;
+
 import std.animation as anim_mod;
+pub import std.animation as animation;
+
 import std.graphics.shadow as shadow_mod;
 import std.ui.builder as builder_mod;
-import std.ui.draw_list as dl_mod;
-import std.ui.replay as replay_mod;
 
-pub type Widget = ui_types.Widget;
-pub type Style = ui_types.Style;
-pub type Color = color_mod.Color;
-pub type Signal = state_mod.Signal;
-pub type ComputedSignal = state_mod.ComputedSignal;
-pub type Effect = state_mod.Effect;
-pub type Alignment = ui_types.Alignment;
-pub type DrawList = dl_mod.DrawList;
-pub type HitZone = dl_mod.HitZone;
+import std.ui.draw_list as dl_mod;
+pub import std.ui.draw_list show DrawList, HitZone;
+
+import std.ui.replay as replay_mod;
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 pub var white: Color = color_mod.white;
@@ -117,9 +131,6 @@ pub var LIFECYCLE_EXITING: int = ui_types.LIFECYCLE_EXITING;
 pub var LIFECYCLE_REMOVED: int = ui_types.LIFECYCLE_REMOVED;
 
 // ── Application & Window ──────────────────────────────────────────────────────
-pub var Application = app_mod.Application;
-pub var Window = win_mod.Window;
-pub var animation = anim_mod;
 pub var Shadow = shadow_mod.Shadow;
 pub var shadow = shadow_mod.shadow;
 
@@ -136,9 +147,6 @@ pub fn batch_updates(updates: fn(): nil): nil { return state_mod.batch_updates(u
 pub fn dispose_all_effects(): nil { return state_mod.dispose_all_effects(); }
 
 // ── Layout Helpers ───────────────────────────────────────────────────────────
-pub type LayoutBox = layout_mod.LayoutBox;
-pub type GridSpec = layout_mod.GridSpec;
-pub type Breakpoint = layout_mod.Breakpoint;
 pub fn compute_layout(widget: Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox { return layout_mod.compute_layout(widget, x, y, available_w, available_h); }
 pub fn compute_layout_enhanced(widget: Widget, x: float, y: float, available_w: float, available_h: float): LayoutBox { return layout_mod.compute_layout_enhanced(widget, x, y, available_w, available_h); }
 pub fn flatten_layout(box: LayoutBox): [LayoutBox] { return layout_mod.flatten_layout(box); }
@@ -149,16 +157,12 @@ pub fn responsive(mobile: Widget, tablet: Widget, desktop: Widget, viewport_w: f
 pub fn breakpoint(small: Widget, large: Widget, threshold: float = 768.0, viewport_w: float): Widget { return layout_mod.breakpoint(small, large, threshold, viewport_w); }
 
 // ── Grid Layout ─────────────────────────────────────────────────────────────
-pub type GridLayout = grid_mod.GridLayout;
 pub fn grid_two_column(left: Widget, right: Widget, gap: float = 16.0): Widget { return grid_mod.grid_two_column(left, right, gap); }
 pub fn grid_three_column(a: Widget, b: Widget, c: Widget, gap: float = 12.0): Widget { return grid_mod.grid_three_column(a, b, c, gap); }
 pub fn grid_with_aspect(columns_count: int, children: [Widget], aspect_ratio: float, spacing_val: float = 8.0): Widget { return grid_mod.grid_with_aspect(columns_count, children, aspect_ratio, spacing_val); }
 pub fn grid_enhanced(spec: GridSpec, children: [Widget]): Widget { return grid_mod.grid_enhanced(spec, children); }
 
 // ── Navigation & Routing ─────────────────────────────────────────────────────
-pub type Router = nav_mod.Router;
-pub type RouterParams = nav_mod.RouterParams;
-pub type Route = nav_mod.Route;
 pub fn make_router(): Router { return nav_mod.make_router(); }
 pub fn make_router_with_base(base: str): Router { return nav_mod.make_router_with_base(base); }
 pub fn router_link(label: str, path: str, router: Router): Widget { return nav_mod.router_link(label, path, router); }
@@ -237,4 +241,3 @@ pub fn replay(dl: dl_mod.DrawList): nil {
 pub fn dl_hit_test(dl: dl_mod.DrawList, px: float, py: float): dl_mod.HitZone {
     return dl_mod.dl_hit_test(dl, px, py);
 }
-

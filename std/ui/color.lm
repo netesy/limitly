@@ -1,6 +1,6 @@
 import std.ui.types as ui_types;
 
-pub type Color = ui_types.Color;
+pub import std.ui.types show Color;
 
 pub fn rgb(r: int, g: int, b: int): Color { return ui_types.rgb(r, g, b); }
 pub fn rgba(r: int, g: int, b: int, a: float): Color { return ui_types.rgba(r, g, b, a); }
