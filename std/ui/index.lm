@@ -2,6 +2,7 @@
 // Canonical entry point for Limit Retained UI System
 
 import std.ui.types as ui_types;
+import std.ui.types show Widget, Style, Alignment;
 import std.ui.color as color_mod;
 import std.ui.state as state_mod;
 import std.ui.viewport as viewport_mod;
@@ -19,13 +20,10 @@ import std.ui.builder as builder_mod;
 import std.ui.draw_list as dl_mod;
 import std.ui.replay as replay_mod;
 
-pub type Widget = ui_types.Widget;
-pub type Style = ui_types.Style;
 pub type Color = color_mod.Color;
 pub type Signal = state_mod.Signal;
 pub type ComputedSignal = state_mod.ComputedSignal;
 pub type Effect = state_mod.Effect;
-pub type Alignment = ui_types.Alignment;
 pub type DrawList = dl_mod.DrawList;
 pub type HitZone = dl_mod.HitZone;
 
@@ -117,9 +115,6 @@ pub var LIFECYCLE_EXITING: int = ui_types.LIFECYCLE_EXITING;
 pub var LIFECYCLE_REMOVED: int = ui_types.LIFECYCLE_REMOVED;
 
 // ── Application & Window ──────────────────────────────────────────────────────
-pub var Application = app_mod.Application;
-pub var Window = win_mod.Window;
-pub var animation = anim_mod;
 pub var Shadow = shadow_mod.Shadow;
 pub var shadow = shadow_mod.shadow;
 
