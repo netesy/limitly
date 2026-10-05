@@ -1,5 +1,5 @@
 """
-Limitly Test Suite Runner
+Lymar Test Suite Runner
 """
 
 import subprocess
@@ -8,7 +8,7 @@ import os
 import glob
 import time
 
-limitly_path = os.path.abspath("bin/lymar.exe" if os.name == "nt" else "bin/lymar")
+lymar_path = os.path.abspath("bin/lymar.exe" if os.name == "nt" else "bin/lymar")
 
 tests = [
  # Basic
@@ -202,7 +202,7 @@ if __name__ == "__main__":
     hung = 0
 
     print("====================================================")
-    print("Running Limitly Tests Individually (3s/10s Timeout)")
+    print("Running Lymar Tests Individually (3s/10s Timeout)")
     print("====================================================")
 
     for test in tests:
@@ -215,7 +215,7 @@ if __name__ == "__main__":
         start_time = time.time()
         try:
             res = subprocess.run(
-                [limitly_path, "run", test_path],
+                [lymar_path, "run", test_path],
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,

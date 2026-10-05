@@ -28,7 +28,7 @@ for %%T in (%TESTS%) do (
     set /a TOTAL=!TOTAL!+1
     echo Running %%T...
     
-    call bin\limitly.exe %%T >nul 2>&1
+    call bin\lymar.exe %%T >nul 2>&1
     if !errorlevel! equ 0 (
         echo   PASS: %%T
         set /a PASSED=!PASSED!+1

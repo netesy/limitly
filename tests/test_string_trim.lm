@@ -1,7 +1,7 @@
 import std.string as string;
 
 fn main() {
-    var text = "  Hello, Limitly World!  ";
+    var text = "  Hello, Lymar World!  ";
     var trimmed = string.trim(text);
     print(trimmed);
 }

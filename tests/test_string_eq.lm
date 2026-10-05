@@ -1,14 +1,14 @@
 import std.string as string;
 
 fn main() {
-    var text = "  Hello, Limitly World!  ";
+    var text = "  Hello, Lymar World!  ";
     var trimmed = string.trim(text);
     var replaced = string.replace(trimmed, "World", "Language");
     print("Checking eq:");
-    var is_eq = (replaced == "Hello, Limitly Language!");
+    var is_eq = (replaced == "Hello, Lymar Language!");
     print("is_eq:");
     print(is_eq);
-    assert(replaced == "Hello, Limitly Language!", "Replace failure");
+    assert(replaced == "Hello, Lymar Language!", "Replace failure");
     print("Assert passed!");
 }
 

@@ -15,12 +15,12 @@ if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
 
 try:
-    from tests.run_tests import tests, slow_tests, limitly_path
+    from tests.run_tests import tests, slow_tests, lymar_path
 except ImportError:
     # Fallback/Direct import if run_tests is in the current directory
-    from run_tests import tests, slow_tests, limitly_path
+    from run_tests import tests, slow_tests, lymar_path
 
-parser = argparse.ArgumentParser(description="Run Limitly AOT Validation Tests")
+parser = argparse.ArgumentParser(description="Run Lymar AOT Validation Tests")
 parser.add_argument(
     "-target", "--target",
     default=None,
@@ -48,7 +48,7 @@ output_mismatches = 0
 timeouts = 0
 
 print("====================================================")
-print(f"Running Limitly AOT Validation Tests ({target_platform.upper()})")
+print(f"Running Lymar AOT Validation Tests ({target_platform.upper()})")
 print("====================================================")
 
 for test in tests:
@@ -63,7 +63,7 @@ for test in tests:
     # 1. Run the test with the interpreter to get the expected output
     try:
         interpreter_res = subprocess.run(
-            [limitly_path, "run", test_path],
+            [lymar_path, "run", test_path],
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
@@ -90,7 +90,7 @@ for test in tests:
 
     # 3. Build using Fyra backend
     build_cmd = [
-        limitly_path, "build",
+        lymar_path, "build",
         "-target", target_platform,
         "-O", "2",
         "-o", output_bin,
@@ -109,15 +109,15 @@ for test in tests:
         if build_res.returncode == 0 and os.path.exists(output_bin):
             build_success = True
         else:
-            build_reason = f"limitly build exited with code {build_res.returncode}"
+            build_reason = f"lymar build exited with code {build_res.returncode}"
             build_stdout = build_res.stdout
             build_stderr = build_res.stderr
     except subprocess.TimeoutExpired:
-        build_reason = "limitly build timed out (30s limit)"
+        build_reason = "lymar build timed out (30s limit)"
         build_stdout = ""
         build_stderr = ""
     except Exception as e:
-        build_reason = f"limitly build failed to execute: {e}"
+        build_reason = f"lymar build failed to execute: {e}"
         build_stdout = ""
         build_stderr = ""
 

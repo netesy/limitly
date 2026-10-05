@@ -1,11 +1,11 @@
 @echo off
-REM Negative Test Runner for Limitly Language (Windows)
+REM Negative Test Runner for Lymar Language (Windows)
 REM Tests that programs SHOULD FAIL compilation/execution
 
 setlocal enabledelayedexpansion
 
-if not exist "bin\limitly.exe" (
-    echo Error: bin\limitly.exe not found
+if not exist "bin\lymar.exe" (
+    echo Error: bin\lymar.exe not found
     exit /b 1
 )
 

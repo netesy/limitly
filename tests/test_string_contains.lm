@@ -1,7 +1,7 @@
 import std.string as string;
 
 fn main() {
-    var replaced = "Hello, Limitly Language!";
+    var replaced = "Hello, Lymar Language!";
     print("Testing contains...");
     var res = string.contains(replaced, "Language");
     print("Contains res:");

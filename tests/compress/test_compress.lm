@@ -1,13 +1,13 @@
 // tests/compress/test_compress.lm
-// Test suite for Limitly std.compress (zlib compression round-trips & decompression limits)
+// Test suite for Lymar std.compress (zlib compression round-trips & decompression limits)
 
 import std.compress.index as compress;
 
 fn test_round_trip() {
  print("=== Testing Compression Round Trip ===");
- var text = "Limitly is a modern, fast, and concurrent systems programming language. " +
+ var text = "Lymar is a modern, fast, and concurrent systems programming language. " +
  "Repeating sentences compress exceptionally well under deflate. " +
- "Limitly is a modern, fast, and concurrent systems programming language.";
+ "Lymar is a modern, fast, and concurrent systems programming language.";
 
  var comp_opt = compress.compress(text, 6);
  var comp = comp_opt? else {

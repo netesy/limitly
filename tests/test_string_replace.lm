@@ -1,11 +1,11 @@
 import std.string as string;
 
 fn main() {
-    var trimmed = "Hello, Limitly World!";
+    var trimmed = "Hello, Lymar World!";
     var replaced = string.replace(trimmed, "World", "Language");
     print("Replaced:");
     print(replaced);
-    assert(replaced == "Hello, Limitly Language!", "Replace failure");
+    assert(replaced == "Hello, Lymar Language!", "Replace failure");
 }
 
 main();

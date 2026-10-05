@@ -4,9 +4,9 @@ fn main() {
     var lower = string.to_lower("LIMITLY");
     print("Lower:");
     print(lower);
-    assert(lower == "limitly", "Lower failure");
+    assert(lower == "lymar", "Lower failure");
 
-    var upper = string.to_upper("limitly");
+    var upper = string.to_upper("lymar");
     print("Upper:");
     print(upper);
     assert(upper == "LIMITLY", "Upper failure");

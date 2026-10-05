@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Wrapper script to run the Limitly Fuzzy Test Suite.
+# Wrapper script to run the Lymar Fuzzy Test Suite.
 # It automatically runs the Python test suite and passes through any command line arguments.
 
 set -e

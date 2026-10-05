@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Fuzzy Test Suite for the Limitly Programming Language
+Fuzzy Test Suite for the Lymar Programming Language
 =====================================================
 
 A robust, self-contained fuzzing tool that:
-1. Loads valid/invalid Limitly seed files or generates chaotic structural code.
+1. Loads valid/invalid Lymar seed files or generates chaotic structural code.
 2. Applies smart mutation strategies representing:
  - Parser/Syntax errors (missing semicolons, unbalanced braces/parens, keyword misuse).
  - Typechecker/Semantic errors (incompatible literals, wrong arguments, return mismatches).
@@ -35,7 +35,7 @@ COLOR_CYAN = "\033[1;36m"
 COLOR_BOLD = "\033[1m"
 COLOR_RESET = "\033[0m"
 
-# Reserved Keywords in Limitly (cannot be used as identifiers)
+# Reserved Keywords in Lymar (cannot be used as identifiers)
 RESERVED_KEYWORDS = [
  "iter", "any", "fn", "if", "while", "for", "return", "var", "val", "const",
  "frame", "trait", "import", "match", "in", "type", "enum", "err", "ok",
@@ -394,7 +394,7 @@ class FuzzTestRunner:
  self.total_runs = 0
 
  def run_source(self, code: str) -> Tuple[int, str, str, bool]:
- """Runs the Limitly compiler on the given code. Returns (exit_code, stdout, stderr, timed_out)."""
+ """Runs the Lymar compiler on the given code. Returns (exit_code, stdout, stderr, timed_out)."""
  temp_file = "tests/fuzz_temp_test.lm"
  with open(temp_file, "w") as f:
  f.write(code)
@@ -532,7 +532,7 @@ def discover_seed_files(seeds_dir: str) -> List[str]:
  return sorted(small_files)
 
 def main():
- parser = argparse.ArgumentParser(description="Limitly Fuzzy Test Suite with Human-Readable Diagnostics")
+ parser = argparse.ArgumentParser(description="Lymar Fuzzy Test Suite with Human-Readable Diagnostics")
  parser.add_argument("--num-runs", type=int, default=100, help="Number of fuzz test iterations (default: 100)")
  parser.add_argument("--timeout", type=float, default=1.0, help="Timeout in seconds for compiler executions (default: 1.0)")
  parser.add_argument("--verbose", action="store_true", help="Print verbose details for every mutation executed")
@@ -549,9 +549,9 @@ def main():
  random.seed(seed)
  print(f"Using random seed: {seed} (Pass --seed {seed} to reproduce this run)")
 
- compiler_path = os.path.abspath("bin/limitly.exe" if os.name == "nt" else "bin/limitly")
+ compiler_path = os.path.abspath("bin/lymar.exe" if os.name == "nt" else "bin/lymar")
  if not os.path.exists(compiler_path):
- print_color(f"[ ] Error: Limitly executable not found at {compiler_path}", COLOR_RED)
+ print_color(f"[ ] Error: Lymar executable not found at {compiler_path}", COLOR_RED)
  print("Please build the compiler first by running 'make' or './build.sh'.")
  sys.exit(1)
 

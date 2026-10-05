@@ -8,7 +8,7 @@
 //
 // Build deps:   make stb-image
 // Run:          make stb-image-test
-//               limitly run tests/ffi/test_image_lib.lm
+//               lymar run tests/ffi/test_image_lib.lm
 
 import std.image.index as image;
 import std.image.png   as png;

@@ -30,7 +30,7 @@ for %%T in (%TESTS%) do (
     echo.
     echo --- Running %%T ---
     
-    call bin\limitly.exe %%T
+    call bin\lymar.exe %%T
     if !errorlevel! equ 0 (
         echo [PASS: %%T]
         set /a PASSED=!PASSED!+1

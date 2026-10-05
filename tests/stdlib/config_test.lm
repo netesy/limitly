@@ -7,11 +7,11 @@ fn main(): int {
 
     // Test Config frame
     var cfg = config.new_config() as config.Config;
-    cfg.set("app_name", "LimitlyApp");
+    cfg.set("app_name", "LymarApp");
     cfg.set("port", 8080);
     cfg.set("debug_mode", true);
 
-    assert(cfg.get("app_name", "default") == "LimitlyApp", "get app_name failed");
+    assert(cfg.get("app_name", "default") == "LymarApp", "get app_name failed");
     assert(cfg.get("port", 3000) == 8080, "get port failed");
     assert(cfg.get("debug_mode", false) == true, "get debug_mode failed");
     assert(cfg.get("nonexistent", "fallback") == "fallback", "get nonexistent failed");

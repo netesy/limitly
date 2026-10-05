@@ -18,14 +18,14 @@ fn main(): int {
     assert(fnt.is_valid, "Expected font to be valid");
 
     print("=== Test 3: Text Measurement ===");
-    var w = fnt.text_width("Hello Limitly!", 24.0);
-    var h = fnt.text_height("Hello Limitly!", 24.0);
-    print("Measured 'Hello Limitly!' size: width={w}, height={h}");
+    var w = fnt.text_width("Hello Lymar!", 24.0);
+    var h = fnt.text_height("Hello Lymar!", 24.0);
+    print("Measured 'Hello Lymar!' size: width={w}, height={h}");
     assert(w > 20.0, "Expected text width > 20");
     assert(h > 10.0, "Expected text height > 10");
 
     print("=== Test 4: Text Rasterization ===");
-    var text_img_opt = fnt.render("Limitly GUI Engine", 28.0, image.white);
+    var text_img_opt = fnt.render("Lymar GUI Engine", 28.0, image.white);
     assert(text_img_opt != nil, "Expected font.render to succeed");
     var text_img = text_img_opt?;
     assert(text_img.is_valid(), "Expected text image to be valid");

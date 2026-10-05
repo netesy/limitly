@@ -1,6 +1,6 @@
 import os, sys, subprocess, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from run_tests import tests, limitly_path
+from run_tests import tests, lymar_path
 
 results = {
     'pass': [],
@@ -15,7 +15,7 @@ for test in tests:
         continue
     
     # 1. Expected output from VM
-    r_vm = subprocess.run([limitly_path, 'run', test_path], capture_output=True, text=True, timeout=30)
+    r_vm = subprocess.run([lymar_path, 'run', test_path], capture_output=True, text=True, timeout=30)
     expected_out = r_vm.stdout
     
     # 2. Build AOT
@@ -24,7 +24,7 @@ for test in tests:
         try: os.remove(bin_path)
         except: pass
         
-    r_build = subprocess.run([limitly_path, 'build', '-target', 'windows', '-O', '2', '-o', bin_path, test_path], capture_output=True, text=True, timeout=30)
+    r_build = subprocess.run([lymar_path, 'build', '-target', 'windows', '-O', '2', '-o', bin_path, test_path], capture_output=True, text=True, timeout=30)
     if r_build.returncode != 0:
         results['build_fail'].append((test_path, r_build.stderr))
         continue

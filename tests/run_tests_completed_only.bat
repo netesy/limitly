@@ -4,7 +4,7 @@ echo ========================================
 echo Running Limit Language Test Suite (Completed Features Only)
 echo ========================================
 
-set LIMITLY=.\bin\limitly.exe
+set LIMITLY=.\bin\lymar.exe
 set FAILED=0
 set PASSED=0
 set TOTAL=0

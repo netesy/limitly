@@ -24,7 +24,7 @@ echo ===========================================================================
 
 set /a TOTAL_TESTS+=1
 echo Testing: Basic Type Tests
-bin\limitly.exe tests\types\basic_type_tests.lm > temp_output.txt 2>&1
+bin\lymar.exe tests\types\basic_type_tests.lm > temp_output.txt 2>&1
 if errorlevel 1 (
  echo FAILED: Basic Type Tests
  echo Error output:
@@ -41,7 +41,7 @@ echo ===========================================================================
 
 set /a TOTAL_TESTS+=1
 echo Testing: Type Error Detection
-bin\limitly.exe tests\types\type_error_tests.lm > temp_output.txt 2>&1
+bin\lymar.exe tests\types\type_error_tests.lm > temp_output.txt 2>&1
 if errorlevel 1 (
  echo [OK] PASSED: Type Error Detection (correctly detected errors)
  echo Detected errors:
@@ -58,7 +58,7 @@ echo ===========================================================================
 
 set /a TOTAL_TESTS+=1
 echo Testing: Basic Memory Safety Tests
-bin\limitly.exe tests\memory\basic_memory_tests.lm > temp_output.txt 2>&1
+bin\lymar.exe tests\memory\basic_memory_tests.lm > temp_output.txt 2>&1
 if errorlevel 1 (
  echo FAILED: Basic Memory Safety Tests
  echo Error output:
@@ -71,7 +71,7 @@ if errorlevel 1 (
 
 set /a TOTAL_TESTS+=1
 echo Testing: Memory Error Detection (Should Detect Errors)
-bin\limitly.exe tests\memory\memory_error_tests.lm > temp_output.txt 2>&1
+bin\lymar.exe tests\memory\memory_error_tests.lm > temp_output.txt 2>&1
 if errorlevel 1 (
  echo [OK] PASSED: Memory Error Detection (correctly detected errors))
  echo Detected errors:

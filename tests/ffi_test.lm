@@ -1,7 +1,7 @@
 import std.ffi as ffi
 
 fn main() {
-    print("=== Limitly FFI Validity Test ===");
+    print("=== Lymar FFI Validity Test ===");
     var ptr: int = ffi.alloc(1024);
     if (ptr != 0) {
         print("[PASS] ffi.alloc should return non-zero pointer");

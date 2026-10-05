@@ -3,20 +3,20 @@
 // End-to-end test for OS-native FFI callback trampolines.
 //
 // Strategy:
-//   1. Define a pure Limitly function (the "handler") to be exposed as a
+//   1. Define a pure Lymar function (the "handler") to be exposed as a
 //      C-ABI callback.
 //   2. Create a native trampoline via the CallbackCreate opcode, obtaining a
-//      Limitly-side handle (an integer ID).
+//      Lymar-side handle (an integer ID).
 //   3. Retrieve the executable native code pointer via CallbackGet.
 //   4. Call that pointer back through the standard ForeignCall path, passing
 //      known arguments.
-//   5. Assert the return value matches what the Limitly function computes.
+//   5. Assert the return value matches what the Lymar function computes.
 //
 // This test does NOT require any external shared library.
 
 import std.ffi as ffi;
 
-// ── Limitly functions that will be exposed as C callbacks ──────────────────
+// ── Lymar functions that will be exposed as C callbacks ──────────────────
 
 // Simple: add two 64-bit integers and return their sum.
 pub fn cb_add(a: int, b: int): int {

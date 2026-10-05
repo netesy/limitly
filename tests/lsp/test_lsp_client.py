@@ -4,7 +4,7 @@ import sys
 import os
 
 def run_lsp_test():
-    exe_path = os.path.abspath("bin/limitly.exe")
+    exe_path = os.path.abspath("bin/lymar.exe")
     print(f"Testing LSP server at: {exe_path}")
 
     proc = subprocess.Popen(
@@ -82,7 +82,7 @@ def run_lsp_test():
         "params": {
             "textDocument": {
                 "uri": "file:///test.lm",
-                "languageId": "limitly",
+                "languageId": "lymar",
                 "version": 1,
                 "text": "var x: int = 100;\nfn get_num(): int { return x; }"
             }

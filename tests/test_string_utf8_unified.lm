@@ -33,25 +33,25 @@ fn main() {
     assert(last_cp == 233, "Codepoint value of 'é' must be 233 (U+00E9)");
 
     print("=== TEST 2: NATIVE STRING UTILITIES ===");
-    var text = "  Hello, Limitly World!  ";
+    var text = "  Hello, Lymar World!  ";
     var trimmed = string.trim(text);
     print("Trimmed text:");
     print(trimmed);
-    assert(trimmed == "Hello, Limitly World!", "Trim failure");
+    assert(trimmed == "Hello, Lymar World!", "Trim failure");
 
     var replaced = string.replace(trimmed, "World", "Language");
     print("Replaced text:");
     print(replaced);
-    assert(replaced == "Hello, Limitly Language!", "Replace failure");
+    assert(replaced == "Hello, Lymar Language!", "Replace failure");
 
     assert(string.contains(replaced, "Language") == true, "Contains failure");
     assert(string.starts_with(replaced, "Hello") == true, "Starts with failure");
     assert(string.ends_with(replaced, "Language!") == true, "Ends with failure");
 
     var lower = string.to_lower("LIMITLY");
-    assert(lower == "limitly", "Lower failure");
+    assert(lower == "lymar", "Lower failure");
 
-    var upper = string.to_upper("limitly");
+    var upper = string.to_upper("lymar");
     assert(upper == "LIMITLY", "Upper failure");
 
     print("=== ALL UNIFIED STRING ARCHITECTURE TESTS PASSED ===");

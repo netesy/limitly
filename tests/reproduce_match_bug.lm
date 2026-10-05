@@ -1,5 +1,5 @@
 // Reproduction script for match statement payload binding bugs
-// Uses verified Limitly syntax from tests/loops/match.lm
+// Uses verified Lymar syntax from tests/loops/match.lm
 
 // --- Test 1: Enum with associated values (single payload) ---
 enum Result {

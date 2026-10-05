@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Negative Test Runner for Limitly Language
+Negative Test Runner for Lymar Language
 ==========================================
 
 Tests programs that SHOULD FAIL to compile or execute.
@@ -99,8 +99,8 @@ class NegativeTestRunner:
  "shift_error", # Invalid shift operations (negative shift, shift overflow)
  }
  
- def __init__(self, limitly_path: str, verbose: bool = False):
- self.limitly_path = limitly_path
+ def __init__(self, lymar_path: str, verbose: bool = False):
+ self.lymar_path = lymar_path
  self.verbose = verbose
  self.results: List[TestResult] = []
  self.test_dir = Path("tests/negative")
@@ -178,7 +178,7 @@ class NegativeTestRunner:
  
  try:
  result = subprocess.run(
- [self.limitly_path, "run", test.path],
+ [self.lymar_path, "run", test.path],
  stdout=subprocess.PIPE,
  stderr=subprocess.PIPE,
  text=True,
@@ -372,7 +372,7 @@ def main():
  import argparse
  
  parser = argparse.ArgumentParser(
- description="Run negative tests for Limitly language"
+ description="Run negative tests for Lymar language"
  )
  parser.add_argument(
  "-v", "--verbose",
@@ -381,8 +381,8 @@ def main():
  )
  parser.add_argument(
  "-p", "--path",
- default="bin/limitly.exe" if os.name == "nt" else "bin/limitly",
- help="Path to Limitly executable"
+ default="bin/lymar.exe" if os.name == "nt" else "bin/lymar",
+ help="Path to Lymar executable"
  )
  parser.add_argument(
  "-c", "--category",
@@ -397,12 +397,12 @@ def main():
  args = parser.parse_args()
  
  # Get absolute path
- limitly_path = os.path.abspath(args.path)
- if not os.path.exists(limitly_path):
- print(f"Error: Limitly executable not found at {limitly_path}")
+ lymar_path = os.path.abspath(args.path)
+ if not os.path.exists(lymar_path):
+ print(f"Error: Lymar executable not found at {lymar_path}")
  sys.exit(1)
  
- runner = NegativeTestRunner(limitly_path, verbose=args.verbose)
+ runner = NegativeTestRunner(lymar_path, verbose=args.verbose)
  tests = runner.discover_tests()
  
  if args.list:

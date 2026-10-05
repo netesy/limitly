@@ -3,7 +3,7 @@
 import std.env as env;
 
 pub fn load_from_env(keys: [str]): {str: str} {
-    var result = {"_limitly_init": "nil"};
+    var result = {"_Lymar_init": "nil"};
     var e = env.Env() as env.Env;
     var i: int = 0;
     while (i < len(keys)) {

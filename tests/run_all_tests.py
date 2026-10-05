@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Unified Test Harness for Limitly Compiler
+Unified Test Harness for Lymar Compiler
 Runs both positive and negative tests to prevent regressions
 """
 
@@ -31,7 +31,7 @@ def main():
  project_root = script_dir.parent
  
  print("=" * 70)
- print("Unified Test Harness for Limitly Compiler")
+ print("Unified Test Harness for Lymar Compiler")
  print("=" * 70)
  print()
  

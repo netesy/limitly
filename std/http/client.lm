@@ -20,7 +20,7 @@ frame HTTPRequest {
         self.headers = {} as {str: str};
         self.body = "";
         // Set default headers
-        self.headers["User-Agent"] = "LimitlyHTTP/1.0";
+        self.headers["User-Agent"] = "LymarHTTP/1.0";
         self.headers["Accept"] = "*/*";
         self.headers["Connection"] = "close";
     }

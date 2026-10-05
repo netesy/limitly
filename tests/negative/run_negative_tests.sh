@@ -1,11 +1,11 @@
 #!/bin/bash
-# Negative Test Runner for Limitly Language (Linux/macOS)
+# Negative Test Runner for Lymar Language (Linux/macOS)
 # Tests that programs SHOULD FAIL compilation/execution
 
-LIMITLY_PATH="${LIMITLY_PATH:-./bin/limitly}"
+LIMITLY_PATH="${LIMITLY_PATH:-./bin/lymar}"
 
 if [ ! -f "$LIMITLY_PATH" ]; then
-    echo "Error: Limitly executable not found at $LIMITLY_PATH"
+    echo "Error: Lymar executable not found at $LIMITLY_PATH"
     exit 1
 fi
 

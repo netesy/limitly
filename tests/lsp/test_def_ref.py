@@ -2,7 +2,7 @@ import subprocess
 import json
 import os
 
-proc = subprocess.Popen(['bin/limitly.exe', '-lsp'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+proc = subprocess.Popen(['bin/lymar.exe', '-lsp'], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 
 def send(msg):
     p = json.dumps(msg).encode('utf-8')
@@ -48,8 +48,8 @@ send({
     'method': 'textDocument/didOpen',
     'params': {
         'textDocument': {
-            'uri': 'file:///c:/Projects/limitly/tests/collections/list_test.lm',
-            'languageId': 'limitly',
+            'uri': 'file:///c:/Projects/lymar/tests/collections/list_test.lm',
+            'languageId': 'lymar',
             'version': 1,
             'text': test_code
         }
@@ -65,7 +65,7 @@ send({
     'id': 2,
     'method': 'textDocument/definition',
     'params': {
-        'textDocument': {'uri': 'file:///c:/Projects/limitly/tests/collections/list_test.lm'},
+        'textDocument': {'uri': 'file:///c:/Projects/lymar/tests/collections/list_test.lm'},
         'position': {'line': 3, 'character': 8}
     }
 })
@@ -83,7 +83,7 @@ send({
     'id': 3,
     'method': 'textDocument/definition',
     'params': {
-        'textDocument': {'uri': 'file:///c:/Projects/limitly/tests/collections/list_test.lm'},
+        'textDocument': {'uri': 'file:///c:/Projects/lymar/tests/collections/list_test.lm'},
         'position': {'line': 2, 'character': 26}
     }
 })
@@ -101,7 +101,7 @@ send({
     'id': 4,
     'method': 'textDocument/definition',
     'params': {
-        'textDocument': {'uri': 'file:///c:/Projects/limitly/tests/collections/list_test.lm'},
+        'textDocument': {'uri': 'file:///c:/Projects/lymar/tests/collections/list_test.lm'},
         'position': {'line': 2, 'character': 14}
     }
 })
@@ -119,7 +119,7 @@ send({
     'id': 5,
     'method': 'textDocument/definition',
     'params': {
-        'textDocument': {'uri': 'file:///c:/Projects/limitly/tests/collections/list_test.lm'},
+        'textDocument': {'uri': 'file:///c:/Projects/lymar/tests/collections/list_test.lm'},
         'position': {'line': 3, 'character': 4}
     }
 })
@@ -137,7 +137,7 @@ send({
     'id': 6,
     'method': 'textDocument/references',
     'params': {
-        'textDocument': {'uri': 'file:///c:/Projects/limitly/tests/collections/list_test.lm'},
+        'textDocument': {'uri': 'file:///c:/Projects/lymar/tests/collections/list_test.lm'},
         'position': {'line': 2, 'character': 8},
         'context': {'includeDeclaration': True}
     }
@@ -156,7 +156,7 @@ send({
     'id': 7,
     'method': 'textDocument/references',
     'params': {
-        'textDocument': {'uri': 'file:///c:/Projects/limitly/tests/collections/list_test.lm'},
+        'textDocument': {'uri': 'file:///c:/Projects/lymar/tests/collections/list_test.lm'},
         'position': {'line': 3, 'character': 8},
         'context': {'includeDeclaration': True}
     }

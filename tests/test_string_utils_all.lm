@@ -1,7 +1,7 @@
 import std.string as string;
 
 fn main() {
-    var text = "  Hello, Limitly World!  ";
+    var text = "  Hello, Lymar World!  ";
     var trimmed = string.trim(text);
     var replaced = string.replace(trimmed, "World", "Language");
 
@@ -14,10 +14,10 @@ fn main() {
 
     print("Checking to_lower...");
     var lower = string.to_lower("LIMITLY");
-    assert(lower == "limitly", "Lower failure");
+    assert(lower == "lymar", "Lower failure");
 
     print("Checking to_upper...");
-    var upper = string.to_upper("limitly");
+    var upper = string.to_upper("lymar");
     assert(upper == "LIMITLY", "Upper failure");
 
     print("ALL PASSED");

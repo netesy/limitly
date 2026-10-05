@@ -14,7 +14,7 @@ fn main() {
         if (create_p != nil) {
             print("Symbols resolved successfully");
             
-            var label = "Hello Limitly!";
+            var label = "Hello Lymar!";
             var packet = ffi.ccall_execute3_ifps_ptr(create_p, 101, 42.5, label);
             if (packet != nil) {
                 print("Packet created");

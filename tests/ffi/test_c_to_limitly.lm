@@ -1,7 +1,7 @@
 import std.ffi as ffi;
 
 fn main() {
-    print("=== C -> Limitly Acceptance Test ===");
+    print("=== C -> Lymar Acceptance Test ===");
 
     unsafe {
         var lib = ffi.load("./tests/ffi/native/libffi_test.so");
@@ -34,9 +34,9 @@ fn main() {
         // 4. String length (String / Pointer passing)
         var len_func = lib.func("string_length", ffi.TYPE_I64, [ffi.TYPE_PTR]);
         assert(len_func.func_ptr != 0, "Failed to locate string_length symbol");
-        var c_str = ffi.string_to_cstring("hello Limitly ffi");
+        var c_str = ffi.string_to_cstring("hello Lymar ffi");
         var res_len = len_func.call(c_str.ptr);
-        print("string_length('hello Limitly ffi') =");
+        print("string_length('hello Lymar ffi') =");
         print(res_len);
         assert(res_len == 17, "string_length should return 17");
         ffi.cstring_free(c_str);
@@ -56,5 +56,5 @@ fn main() {
 
         lib.close();
     }
-    print("=== C -> Limitly Acceptance Test PASSED ===");
+    print("=== C -> Lymar Acceptance Test PASSED ===");
 }

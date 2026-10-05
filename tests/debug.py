@@ -3,7 +3,7 @@ import sys
 import os
 import time
 
-limitly_path = os.path.abspath("bin/limitly.exe" if os.name == "nt" else "bin/limitly")
+lymar_path = os.path.abspath("bin/lymar.exe" if os.name == "nt" else "bin/lymar")
 
 # Focused tests for trait dispatch, callable fields, and any type behavior
 debug_tests = [
@@ -39,7 +39,7 @@ for test in debug_tests:
  start_time = time.time()
  try:
  res = subprocess.run(
- [limitly_path, "run", test_path],
+ [lymar_path, "run", test_path],
  stdout=subprocess.PIPE,
  stderr=subprocess.PIPE,
  text=True,
