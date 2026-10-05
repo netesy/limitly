@@ -750,7 +750,7 @@ EXPORT int tls_get_peer_cert(void* sock_ptr, char* out_buf, int max_len) {
 }
 
 // ---------------------------------------------------------------------------
-// 7. Zlib Compression & Decompression (with Limits)
+// 7. Zlib Compression & Decompression (with Lymars)
 // ---------------------------------------------------------------------------
 
 EXPORT int lymar_zlib_compress(const unsigned char* in_data, int in_len,
@@ -814,7 +814,7 @@ EXPORT int lymar_zlib_decompress(const unsigned char* in_data, int in_len,
 
         if (strm.avail_out == 0 && total_decompressed >= max_limit) {
             inflateEnd(&strm);
-            return -2; // Limit exceeded
+            return -2; // Lymar exceeded
         }
     }
 

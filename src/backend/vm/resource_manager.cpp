@@ -1235,7 +1235,7 @@ public:
             }
             case ResourceOperation::SPAWN: {
                 int w = width_, h = height_;
-                std::string title = "Limit Application";
+                std::string title = "Lymar Application";
                 bool resizable = true;
                 if (!args.empty()) {
                     if (auto* list = reinterpret_cast<LmList*>(check_header_type(args[0], TYPE_LIST))) {

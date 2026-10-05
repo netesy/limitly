@@ -16,7 +16,7 @@ struct RuntimeAppEvent {
 struct SokolAppConfig {
     int width = 800;
     int height = 600;
-    std::string title = "Limit Application";
+    std::string title = "Lymar Application";
     bool resizable = true;
     bool high_dpi = true;
 };
@@ -44,7 +44,7 @@ private:
     Impl* impl_;
 };
 
-// Process-wide runtime application owner. Limit v1 intentionally supports one
+// Process-wide runtime application owner. Lymar v1 intentionally supports one
 // authoritative native application window.
 SokolAppRuntime& sokol_app_runtime();
 

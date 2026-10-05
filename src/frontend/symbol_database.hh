@@ -1,4 +1,4 @@
-// SymbolDatabase for Limitly compiler
+// SymbolDatabase for Lymarly compiler
 #ifndef SYMBOL_DATABASE_H
 #define SYMBOL_DATABASE_H
 

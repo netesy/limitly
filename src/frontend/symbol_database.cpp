@@ -1,4 +1,4 @@
-// SymbolDatabase implementation for Limitly compiler
+// SymbolDatabase implementation for Lymarly compiler
 #include "symbol_database.hh"
 
 namespace LM {

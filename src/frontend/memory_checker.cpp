@@ -217,7 +217,7 @@ void MemoryChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Var
         }
         
         // Check if initializing from another variable
-        // For Limit, we use COPY semantics by default, not MOVE semantics
+        // For Lymar, we use COPY semantics by default, not MOVE semantics
         // The source variable remains valid unless this is an explicit move operation
         if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(var_decl->initializer)) {
             if (is_variable_moved(var_expr->name)) {
@@ -226,7 +226,7 @@ void MemoryChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Var
                                var_expr->line);
             }
             // NOTE: We do NOT mark source as moved here
-            // In Limit, assignment is COPY by default, not MOVE
+            // In Lymar, assignment is COPY by default, not MOVE
             // Only explicit move operations should transfer ownership
         }
     } else {
@@ -249,7 +249,7 @@ void MemoryChecker::check_assignment(std::shared_ptr<LM::Frontend::AST::AssignEx
                            var_expr->line);
         }
         // NOTE: We do NOT mark source as moved here
-        // In Limit, assignment is COPY by default for primitive types
+        // In Lymar, assignment is COPY by default for primitive types
         // For linear types, we need explicit move semantics
         // This is a mutation/rebinding operation, not ownership transfer
     }

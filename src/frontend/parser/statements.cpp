@@ -815,7 +815,7 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
         } else if (isBuiltInType(peek().type)) {
             // Built-in type used as field name - report error and skip entire declaration
             Token typeName = advance();
-            error("`" + typeName.lexeme + "` cannot be used as a field name\n\n= reason: `" + typeName.lexeme + "` is a built-in type name in Limit\n= help: choose a different field name");
+            error("`" + typeName.lexeme + "` cannot be used as a field name\n\n= reason: `" + typeName.lexeme + "` is a built-in type name in Lymar\n= help: choose a different field name");
             // Skip tokens until we hit semicolon or closing brace
             while (!isAtEnd() && peek().type != TokenType::RIGHT_BRACE && peek().type != TokenType::SEMICOLON) {
                 advance();

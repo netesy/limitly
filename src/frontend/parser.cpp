@@ -884,9 +884,9 @@ std::string Parser::generateIdentifierError(const std::string& context, const To
     }
     
     if (category == "reserved keyword") {
-        return "`" + lexeme + "` cannot be used as a " + context + "\n\n= reason: `" + lexeme + "` is a reserved keyword in Limit\n= help: choose a different " + context;
+        return "`" + lexeme + "` cannot be used as a " + context + "\n\n= reason: `" + lexeme + "` is a reserved keyword in Lymar\n= help: choose a different " + context;
     } else if (category == "built-in type name") {
-        return "`" + lexeme + "` cannot be used as a " + context + "\n\n= reason: `" + lexeme + "` is a built-in type name in Limit\n= help: choose a different " + context;
+        return "`" + lexeme + "` cannot be used as a " + context + "\n\n= reason: `" + lexeme + "` is a built-in type name in Lymar\n= help: choose a different " + context;
     } else {
         return "Expected a " + context;
     }
