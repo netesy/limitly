@@ -9,6 +9,7 @@
 #include <iostream>
 #include <functional>
 #include <future>
+#include <iomanip>
 
 #include <filesystem>
 
@@ -16,6 +17,123 @@ namespace LM {
 namespace Frontend {
 
 namespace fs = std::filesystem;
+
+std::string CompiledModuleMeta::serialize() const {
+    std::stringstream ss;
+    ss << "module_name=" << module_name << "\n";
+    ss << "abi_version=" << abi_version << "\n";
+    ss << "target_triple=" << target_triple << "\n";
+    ss << "architecture=" << architecture << "\n";
+    ss << "os=" << os << "\n";
+    ss << "artifact_kind=" << artifact_kind << "\n";
+    ss << "artifact_path=" << artifact_path << "\n";
+    ss << "source_hash=" << source_hash << "\n";
+
+    ss << "exports=";
+    for (size_t i = 0; i < exports.size(); ++i) {
+        if (i > 0) ss << ",";
+        ss << exports[i];
+    }
+    ss << "\n";
+
+    ss << "dependencies=";
+    for (size_t i = 0; i < dependencies.size(); ++i) {
+        if (i > 0) ss << ",";
+        ss << dependencies[i];
+    }
+    ss << "\n";
+
+    ss << "signatures=";
+    size_t sig_idx = 0;
+    for (const auto& [name, sig] : export_signatures) {
+        if (sig_idx > 0) ss << ";";
+        ss << name << ":" << sig;
+        sig_idx++;
+    }
+    ss << "\n";
+
+    return ss.str();
+}
+
+bool CompiledModuleMeta::deserialize(const std::string& input, CompiledModuleMeta& out_meta) {
+    std::stringstream ss(input);
+    std::string line;
+    while (std::getline(ss, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        size_t eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        std::string key = line.substr(0, eq);
+        std::string val = line.substr(eq + 1);
+
+        if (key == "module_name") out_meta.module_name = val;
+        else if (key == "abi_version") out_meta.abi_version = val;
+        else if (key == "target_triple") out_meta.target_triple = val;
+        else if (key == "architecture") out_meta.architecture = val;
+        else if (key == "os") out_meta.os = val;
+        else if (key == "artifact_kind") out_meta.artifact_kind = val;
+        else if (key == "artifact_path") out_meta.artifact_path = val;
+        else if (key == "source_hash") out_meta.source_hash = val;
+        else if (key == "exports") {
+            out_meta.exports.clear();
+            std::stringstream list_ss(val);
+            std::string item;
+            while (std::getline(list_ss, item, ',')) {
+                if (!item.empty()) out_meta.exports.push_back(item);
+            }
+        } else if (key == "dependencies") {
+            out_meta.dependencies.clear();
+            std::stringstream list_ss(val);
+            std::string item;
+            while (std::getline(list_ss, item, ',')) {
+                if (!item.empty()) out_meta.dependencies.push_back(item);
+            }
+        } else if (key == "signatures") {
+            out_meta.export_signatures.clear();
+            std::stringstream sigs_ss(val);
+            std::string pair;
+            while (std::getline(sigs_ss, pair, ';')) {
+                size_t colon = pair.find(':');
+                if (colon != std::string::npos) {
+                    out_meta.export_signatures[pair.substr(0, colon)] = pair.substr(colon + 1);
+                }
+            }
+        }
+    }
+    return !out_meta.module_name.empty() && !out_meta.artifact_kind.empty();
+}
+
+bool ModuleManager::register_compiled_module(const CompiledModuleMeta& meta) {
+    std::lock_guard<std::mutex> lock(modules_mutex_);
+    compiled_modules_[meta.module_name].push_back(meta);
+    return true;
+}
+
+bool ModuleManager::find_compiled_module(const std::string& module_name, const std::string& target_triple, const std::string& required_kind, CompiledModuleMeta& out_meta) {
+    std::lock_guard<std::mutex> lock(modules_mutex_);
+    auto it = compiled_modules_.find(module_name);
+    if (it == compiled_modules_.end()) return false;
+
+    for (const auto& meta : it->second) {
+        if ((target_triple.empty() || meta.target_triple == target_triple) &&
+            (required_kind.empty() || meta.artifact_kind == required_kind)) {
+            out_meta = meta;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool ModuleManager::is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) const {
+    if (!fs::exists(meta.artifact_path)) return false;
+    if (current_source_path.empty() || !fs::exists(current_source_path)) return true;
+
+    // Source modification time vs artifact modification time
+    auto src_time = fs::last_write_time(current_source_path);
+    auto art_time = fs::last_write_time(meta.artifact_path);
+    if (src_time > art_time) return false;
+
+    return true;
+}
 
 void ModuleManager::set_include_dirs(const std::vector<std::string>& dirs) {
     std::lock_guard<std::mutex> lock(modules_mutex_);

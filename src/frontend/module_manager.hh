@@ -13,6 +13,23 @@
 namespace LM {
 namespace Frontend {
 
+struct CompiledModuleMeta {
+    std::string module_name;
+    std::string abi_version = "1.0.0"; // Lymar/lymarrt ABI version
+    std::string target_triple; // e.g. x86_64-linux-gnu
+    std::string architecture; // e.g. x86_64
+    std::string os; // e.g. linux
+    std::string artifact_kind; // "shared" or "static"
+    std::string artifact_path; // path to .so or .a file
+    std::vector<std::string> exports;
+    std::map<std::string, std::string> export_signatures;
+    std::vector<std::string> dependencies;
+    std::string source_hash; // Content SHA256 hash for stale detection
+
+    std::string serialize() const;
+    static bool deserialize(const std::string& input, CompiledModuleMeta& out_meta);
+};
+
 struct Module {
     std::string name;
     std::string path;
@@ -59,6 +76,11 @@ public:
     // Set search directories for module imports
     void set_include_dirs(const std::vector<std::string>& dirs);
 
+    // Precompiled module discovery and registration
+    bool register_compiled_module(const CompiledModuleMeta& meta);
+    bool find_compiled_module(const std::string& module_name, const std::string& target_triple, const std::string& required_kind, CompiledModuleMeta& out_meta);
+    bool is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) const;
+
     void clear() {
         std::lock_guard<std::mutex> lock(modules_mutex_);
         modules_.clear();
@@ -70,6 +92,7 @@ private:
 
     std::unordered_map<std::string, std::shared_ptr<Module>> modules_;
     std::vector<std::string> include_dirs_;
+    std::unordered_map<std::string, std::vector<CompiledModuleMeta>> compiled_modules_;
     mutable std::mutex modules_mutex_;
 
     std::shared_ptr<Module> get_module_unlocked(const std::string& name) const;
