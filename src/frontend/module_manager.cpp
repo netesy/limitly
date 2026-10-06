@@ -18,6 +18,132 @@ namespace Frontend {
 
 namespace fs = std::filesystem;
 
+namespace {
+class SHA256Helper {
+public:
+    SHA256Helper() { reset(); }
+
+    void reset() {
+        state_[0] = 0x6a09e667; state_[1] = 0xbb67ae85;
+        state_[2] = 0x3c6ef372; state_[3] = 0xa54ff53a;
+        state_[4] = 0x510e527f; state_[5] = 0x9b05688c;
+        state_[6] = 0x1f83d9ab; state_[7] = 0x5be0cd19;
+        buflen_ = 0; totlen_ = 0;
+    }
+
+    void update(const uint8_t* data, size_t len) {
+        totlen_ += len;
+        size_t i = 0;
+        while (i < len) {
+            size_t space = 64 - buflen_;
+            size_t chunk = (len - i < space) ? (len - i) : space;
+            std::memcpy(buf_ + buflen_, data + i, chunk);
+            buflen_ += chunk;
+            i += chunk;
+            if (buflen_ == 64) {
+                transform(buf_);
+                buflen_ = 0;
+            }
+        }
+    }
+
+    std::string digest() {
+        uint64_t total_bits = totlen_ * 8;
+        uint8_t pad = 0x80;
+        update(&pad, 1);
+        pad = 0;
+        while (buflen_ != 56) update(&pad, 1);
+        uint8_t len_be[8];
+        for (int i = 7; i >= 0; i--) {
+            len_be[i] = (uint8_t)(total_bits & 0xFF);
+            total_bits >>= 8;
+        }
+        update(len_be, 8);
+
+        char hex[65];
+        std::snprintf(hex, sizeof(hex),
+            "%08x%08x%08x%08x%08x%08x%08x%08x",
+            state_[0], state_[1], state_[2], state_[3],
+            state_[4], state_[5], state_[6], state_[7]);
+        return std::string(hex);
+    }
+
+private:
+    static uint32_t rotr(uint32_t x, int n) { return (x >> n) | (x << (32 - n)); }
+    static uint32_t ch(uint32_t x, uint32_t y, uint32_t z) { return (x & y) ^ (~x & z); }
+    static uint32_t maj(uint32_t x, uint32_t y, uint32_t z) { return (x & y) ^ (x & z) ^ (y & z); }
+    static uint32_t ep0(uint32_t x) { return rotr(x,2) ^ rotr(x,13) ^ rotr(x,22); }
+    static uint32_t ep1(uint32_t x) { return rotr(x,6) ^ rotr(x,11) ^ rotr(x,25); }
+    static uint32_t sig0(uint32_t x) { return rotr(x,7) ^ rotr(x,18) ^ (x >> 3); }
+    static uint32_t sig1(uint32_t x) { return rotr(x,17) ^ rotr(x,19) ^ (x >> 10); }
+
+    void transform(const uint8_t block[64]) {
+        static const uint32_t K[64] = {
+            0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+            0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+            0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+            0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+            0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+            0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+            0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+            0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+        };
+        uint32_t W[64];
+        for (int i = 0; i < 16; i++) {
+            W[i] = ((uint32_t)block[i*4] << 24) | ((uint32_t)block[i*4+1] << 16) |
+                   ((uint32_t)block[i*4+2] << 8) | (uint32_t)block[i*4+3];
+        }
+        for (int i = 16; i < 64; i++) {
+            W[i] = sig1(W[i-2]) + W[i-7] + sig0(W[i-15]) + W[i-16];
+        }
+        uint32_t a = state_[0], b = state_[1], c = state_[2], d = state_[3];
+        uint32_t e = state_[4], f = state_[5], g = state_[6], h = state_[7];
+        for (int i = 0; i < 64; i++) {
+            uint32_t t1 = h + ep1(e) + ch(e,f,g) + K[i] + W[i];
+            uint32_t t2 = ep0(a) + maj(a,b,c);
+            h = g; g = f; f = e; e = d + t1;
+            d = c; c = b; b = a; a = t1 + t2;
+        }
+        state_[0] += a; state_[1] += b; state_[2] += c; state_[3] += d;
+        state_[4] += e; state_[5] += f; state_[6] += g; state_[7] += h;
+    }
+
+    uint32_t state_[8];
+    uint8_t buf_[64];
+    size_t buflen_;
+    uint64_t totlen_;
+};
+
+static std::string format_type_annotation(const std::shared_ptr<AST::TypeAnnotation>& type_ann) {
+    if (!type_ann) return "any";
+    std::string res;
+    if (type_ann->isList) {
+        res = "[" + format_type_annotation(type_ann->elementType) + "]";
+    } else if (type_ann->isDict) {
+        res = "{" + format_type_annotation(type_ann->keyType) + ": " + format_type_annotation(type_ann->valueType) + "}";
+    } else if (type_ann->isTuple) {
+        res = "(";
+        for (size_t i = 0; i < type_ann->tupleTypes.size(); ++i) {
+            if (i > 0) res += ", ";
+            res += format_type_annotation(type_ann->tupleTypes[i]);
+        }
+        res += ")";
+    } else {
+        res = type_ann->typeName.empty() ? "any" : type_ann->typeName;
+    }
+    if (type_ann->isOptional) {
+        res += "?";
+    }
+    return res;
+}
+} // anonymous namespace
+
+std::string CompiledModuleMeta::compute_sha256(const std::string& input) {
+    SHA256Helper h;
+    h.update(reinterpret_cast<const uint8_t*>(input.data()), input.size());
+    return h.digest();
+}
+
 std::string CompiledModuleMeta::serialize() const {
     std::stringstream ss;
     ss << "module_name=" << module_name << "\n";
@@ -125,6 +251,7 @@ bool ModuleManager::find_compiled_module(const std::string& module_name, const s
 
 bool ModuleManager::is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) const {
     if (!fs::exists(meta.artifact_path)) return false;
+    if (meta.abi_version != "1.0.0") return false;
     if (current_source_path.empty() || !fs::exists(current_source_path)) return true;
 
     // Source modification time vs artifact modification time
@@ -132,7 +259,98 @@ bool ModuleManager::is_artifact_valid(const CompiledModuleMeta& meta, const std:
     auto art_time = fs::last_write_time(meta.artifact_path);
     if (src_time > art_time) return false;
 
+    // Check content hash if current source exists
+    std::ifstream src_file(current_source_path);
+    if (src_file.is_open()) {
+        std::stringstream ss;
+        ss << src_file.rdbuf();
+        std::string current_hash = CompiledModuleMeta::compute_sha256(ss.str());
+        if (!meta.source_hash.empty() && meta.source_hash != "00000000" && meta.source_hash != current_hash) {
+            return false;
+        }
+    }
+
     return true;
+}
+
+CompiledModuleMeta ModuleManager::generate_metadata(
+    std::shared_ptr<Module> module,
+    const std::string& target,
+    const std::string& arch,
+    const std::string& artifact_kind,
+    const std::string& artifact_path)
+{
+    CompiledModuleMeta meta;
+    if (!module) return meta;
+
+    meta.module_name = module->name;
+    if (meta.module_name.length() > 6 && meta.module_name.substr(meta.module_name.length() - 6) == ".index") {
+        meta.module_name = meta.module_name.substr(0, meta.module_name.length() - 6);
+    }
+    meta.abi_version = "1.0.0";
+    meta.target_triple = arch + "-" + target;
+    meta.architecture = arch;
+    meta.os = target;
+    meta.artifact_kind = artifact_kind;
+    meta.artifact_path = artifact_path;
+    meta.source_hash = CompiledModuleMeta::compute_sha256(module->source);
+
+    // Dependencies
+    for (const auto& dep : module->dependencies) {
+        if (std::find(meta.dependencies.begin(), meta.dependencies.end(), dep) == meta.dependencies.end()) {
+            meta.dependencies.push_back(dep);
+        }
+    }
+
+    // Exports and signatures
+    std::string mod_prefix = meta.module_name;
+    if (module->ast) {
+        for (const auto& stmt : module->ast->statements) {
+            if (auto func = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
+                if (func->visibility == AST::VisibilityLevel::Public) {
+                    std::string sym_name = mod_prefix + "." + func->name;
+                    meta.exports.push_back(sym_name);
+                    
+                    std::stringstream sig_ss;
+                    sig_ss << "fn(";
+                    for (size_t i = 0; i < func->params.size(); ++i) {
+                        if (i > 0) sig_ss << ", ";
+                        sig_ss << func->params[i].first << ": " << format_type_annotation(func->params[i].second);
+                    }
+                    sig_ss << "): " << (func->returnType.has_value() ? format_type_annotation(func->returnType.value()) : "nil");
+                    meta.export_signatures[sym_name] = sig_ss.str();
+                }
+            } else if (auto frame = std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt)) {
+                std::string frame_sym = mod_prefix + "." + frame->name;
+                meta.exports.push_back(frame_sym);
+                meta.export_signatures[frame_sym] = "frame";
+
+                for (const auto& method : frame->methods) {
+                    if (method->visibility == AST::VisibilityLevel::Public) {
+                        std::string method_sym = frame_sym + "." + method->name;
+                        meta.exports.push_back(method_sym);
+
+                        std::stringstream sig_ss;
+                        sig_ss << "fn(";
+                        for (size_t i = 0; i < method->parameters.size(); ++i) {
+                            if (i > 0) sig_ss << ", ";
+                            sig_ss << method->parameters[i].first << ": " << format_type_annotation(method->parameters[i].second);
+                        }
+                        sig_ss << "): " << (method->returnType ? format_type_annotation(method->returnType) : "nil");
+                        meta.export_signatures[method_sym] = sig_ss.str();
+                    }
+                }
+            } else if (auto var = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) {
+                if (var->visibility == AST::VisibilityLevel::Public || var->isConst) {
+                    std::string var_sym = mod_prefix + "." + var->name;
+                    meta.exports.push_back(var_sym);
+                    meta.export_signatures[var_sym] = var->type.has_value() ? format_type_annotation(var->type.value()) : "any";
+                }
+            }
+        }
+    }
+
+    return meta;
 }
 
 void ModuleManager::set_include_dirs(const std::vector<std::string>& dirs) {
@@ -248,6 +466,41 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
         modules_[module_path] = module;
     }
     expand_reexports(module);
+
+    // Discover precompiled module artifacts (.meta files) for module_path
+    std::string mod_leaf = module_path;
+    size_t dot_pos = mod_leaf.rfind('.');
+    if (dot_pos != std::string::npos) mod_leaf = mod_leaf.substr(dot_pos + 1);
+
+    std::vector<std::string> candidate_paths = {
+        "bin/lib" + mod_leaf + ".so",
+        "bin/" + mod_leaf + ".so",
+        "bin/lib" + mod_leaf + ".a",
+        "bin/" + mod_leaf + ".a",
+        filePath + ".so",
+        filePath + ".a",
+        (fs::path(filePath).parent_path() / ("lib" + mod_leaf + ".so")).string(),
+        (fs::path(filePath).parent_path() / (mod_leaf + ".so")).string(),
+        (fs::path(filePath).parent_path() / ("lib" + mod_leaf + ".a")).string(),
+        (fs::path(filePath).parent_path() / (mod_leaf + ".a")).string()
+    };
+
+    for (const auto& cp : candidate_paths) {
+        std::string meta_p = cp + ".meta";
+        if (fs::exists(meta_p) && fs::exists(cp)) {
+            std::ifstream mf(meta_p);
+            if (mf.is_open()) {
+                std::stringstream mbuf;
+                mbuf << mf.rdbuf();
+                CompiledModuleMeta meta;
+                if (CompiledModuleMeta::deserialize(mbuf.str(), meta)) {
+                    if (is_artifact_valid(meta, filePath)) {
+                        register_compiled_module(meta);
+                    }
+                }
+            }
+        }
+    }
 
     return module;
 }

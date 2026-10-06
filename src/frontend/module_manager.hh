@@ -28,6 +28,7 @@ struct CompiledModuleMeta {
 
     std::string serialize() const;
     static bool deserialize(const std::string& input, CompiledModuleMeta& out_meta);
+    static std::string compute_sha256(const std::string& input);
 };
 
 struct Module {
@@ -80,6 +81,13 @@ public:
     bool register_compiled_module(const CompiledModuleMeta& meta);
     bool find_compiled_module(const std::string& module_name, const std::string& target_triple, const std::string& required_kind, CompiledModuleMeta& out_meta);
     bool is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) const;
+    CompiledModuleMeta generate_metadata(
+        std::shared_ptr<Module> module,
+        const std::string& target,
+        const std::string& arch,
+        const std::string& artifact_kind,
+        const std::string& artifact_path
+    );
 
     void clear() {
         std::lock_guard<std::mutex> lock(modules_mutex_);

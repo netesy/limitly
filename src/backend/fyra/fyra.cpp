@@ -7,11 +7,13 @@
 #include "target/core/TargetDescriptor.h"
 #include "ir/IRContext.h"
 #include "ir/Module.h"
+#include "frontend/module_manager.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
 #include <cstdlib>
 #include <optional>
+#include <filesystem>
 
 namespace LM::Backend::Fyra {
 
@@ -130,6 +132,17 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
             case OptimizationLevel::O3: opt_level = ::fyra::OptimizationLevel::O2; break;
         }
         backend.optimize(opt_level);
+
+        // Automatically link discovered precompiled static libraries
+        auto all_mods = LM::Frontend::ModuleManager::getInstance().get_all_modules();
+        for (const auto& [mname, mptr] : all_mods) {
+            LM::Frontend::CompiledModuleMeta meta;
+            if (LM::Frontend::ModuleManager::getInstance().find_compiled_module(mname, "", "static", meta)) {
+                if (std::filesystem::exists(meta.artifact_path)) {
+                    backend.addStaticLibrary(meta.artifact_path);
+                }
+            }
+        }
 
         bool is_wasm = (options.target == CompileTarget::WASM || options.target == CompileTarget::WASI ||
                         options.arch == Architecture::WASM32 || options.platform == Platform::WASM ||

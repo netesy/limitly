@@ -1,0 +1,12 @@
+
+pub fn exported_entry(): int {
+    return private_helper();
+}
+
+fn private_helper(): int {
+    return 42;
+}
+
+fn private_dead_code(): int {
+    return 999;
+}

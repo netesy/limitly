@@ -175,35 +175,20 @@ int main(int argc, char* argv[]) {
 
             // Automatically output precompiled metadata file if building a library
             if (options.artifact_type == LM::ArtifactType::StaticLibrary || options.artifact_type == LM::ArtifactType::SharedLibrary) {
-                LM::Frontend::CompiledModuleMeta meta;
                 std::string mod_name = source_file;
                 size_t dot = mod_name.rfind(".lm");
                 if (dot != std::string::npos) mod_name.erase(dot);
                 std::replace(mod_name.begin(), mod_name.end(), '/', '.');
-                meta.module_name = mod_name;
 
-                meta.abi_version = "1.0.0";
-                meta.target_triple = options.target + "-" + options.arch;
-                meta.architecture = options.arch;
-                meta.os = options.target;
-                meta.artifact_kind = (options.artifact_type == LM::ArtifactType::SharedLibrary) ? "shared" : "static";
-                meta.artifact_path = options.output_file;
-
-                std::ifstream src_file(source_file);
-                if (src_file.is_open()) {
-                    std::stringstream src_buf;
-                    src_buf << src_file.rdbuf();
-                    std::string src_content = src_buf.str();
-                    std::hash<std::string> hasher;
-                    std::stringstream hash_ss;
-                    hash_ss << std::hex << hasher(src_content);
-                    meta.source_hash = hash_ss.str();
-                } else {
-                    meta.source_hash = "00000000";
+                auto mod = LM::Frontend::ModuleManager::getInstance().get_module(mod_name);
+                if (!mod) {
+                    mod = LM::Frontend::ModuleManager::getInstance().load_module(mod_name);
                 }
 
-                meta.exports.push_back(mod_name);
-                meta.export_signatures[mod_name] = "fn()";
+                std::string kind = (options.artifact_type == LM::ArtifactType::SharedLibrary) ? "shared" : "static";
+                LM::Frontend::CompiledModuleMeta meta = LM::Frontend::ModuleManager::getInstance().generate_metadata(
+                    mod, options.target, options.arch, kind, options.output_file
+                );
 
                 std::string meta_path = options.output_file + ".meta";
                 std::ofstream meta_file(meta_path);

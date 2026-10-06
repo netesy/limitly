@@ -1,0 +1,19 @@
+import std.image.font as font;
+
+var font_path = font.detect_system_font("DejaVu");
+if (font_path == "") {
+    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
+}
+
+match (font.load_font(font_path)) {
+    val f => {
+        var total_w = 0.0;
+        for (var i = 0; i < 50; i = i + 1) {
+            total_w = total_w + f.text_width("The quick brown fox jumps over the lazy dog 1234567890", 16.0);
+        }
+        print("WORKLOAD_DONE: {total_w}");
+    },
+    err e => {
+        print("Failed to load font");
+    }
+}

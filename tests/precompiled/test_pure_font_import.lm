@@ -1,0 +1,7 @@
+import std.font as font;
+
+print("Testing precompiled std.font import...");
+var m = font.FontMetrics(asc=12.0, desc=-4.0, gap=2.0, h=16.0, upem=1000);
+assert(m.ascent == 12.0, "Ascent should match");
+assert(m.units_per_em == 1000, "Units per em should match");
+print("FontMetrics instantiated successfully!");

@@ -21,6 +21,7 @@
 #include <cmath>
 #include "../../lir/function_registry.hh"
 #include "../../lir/builtin_functions.hh"
+#include "../../frontend/module_manager.hh"
 
 namespace LM::Backend::Fyra {
 
@@ -88,19 +89,27 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         }
     }
 
-    for (const auto& fname : registry.getFunctionNames()) {
-        if (fname == lir_func.name || fname == "main") continue;
-        bool is_target_module_symbol = false;
-        for (const auto& pfx : mod_prefixes) {
-            if (fname == pfx || fname.rfind(pfx + ".", 0) == 0) {
-                is_target_module_symbol = true;
-                break;
-            }
+    for (const auto& pfx : mod_prefixes) {
+        std::string init_sym = pfx + ".__init__";
+        if (registry.getFunction(init_sym) && !reachable_funcs.count(init_sym)) {
+            reachable_funcs.insert(init_sym);
+            worklist.push_back(init_sym);
         }
-        if (is_target_module_symbol) {
-            if (!reachable_funcs.count(fname)) {
-                reachable_funcs.insert(fname);
-                worklist.push_back(fname);
+        auto mod = LM::Frontend::ModuleManager::getInstance().get_module(pfx);
+        if (mod) {
+            for (const auto& pub_sym : mod->public_symbols) {
+                std::string full_sym = pfx + "." + pub_sym;
+                if (registry.getFunction(full_sym) && !reachable_funcs.count(full_sym)) {
+                    reachable_funcs.insert(full_sym);
+                    worklist.push_back(full_sym);
+                }
+            }
+        } else {
+            for (const auto& fname : registry.getFunctionNames()) {
+                if (fname.rfind(pfx + ".", 0) == 0 && !reachable_funcs.count(fname)) {
+                    reachable_funcs.insert(fname);
+                    worklist.push_back(fname);
+                }
             }
         }
     }
@@ -317,14 +326,26 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         }
     }
 
+    ir::BasicBlock* exit_bb = nullptr;
     auto get_target_block = [&](uint32_t target_imm, size_t current_inst_index) -> ir::BasicBlock* {
         if (label_to_index.count(target_imm)) {
-            size_t target_idx = label_to_index[target_imm];
-            if (block_map.count(target_idx)) {
-                return block_map[target_idx];
+            size_t idx = label_to_index[target_imm];
+            if (block_map.count(idx)) {
+                return block_map.at(idx);
             }
-        } else if (block_map.count(target_imm)) {
-            return block_map[target_imm];
+        }
+        if (block_map.count(target_imm)) {
+            return block_map.at(target_imm);
+        }
+        if (target_imm >= lir_func.instructions.size()) {
+            if (!exit_bb) {
+                exit_bb = builder_->createBasicBlock("exit_block", main_fn);
+                auto saved_ip = builder_->getInsertPoint();
+                builder_->setInsertPoint(exit_bb);
+                builder_->createRet(context_->getConstantInt(context_->getIntegerType(64), 0));
+                if (saved_ip) builder_->setInsertPoint(saved_ip);
+            }
+            return exit_bb;
         }
         return nullptr;
     };
@@ -436,7 +457,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     }
 
     if (block_map.count(0)) {
-        builder_->createJmp(block_map[0]);
+        builder_->createJmp(block_map.at(0));
     }
 
     auto load_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
@@ -488,10 +509,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         const auto& inst = lir_func.instructions[i];
 
         if (block_map.count(i)) {
-            if (!terminated && builder_->getInsertPoint() && i > 0 && builder_->getInsertPoint() != block_map[i]) {
-                builder_->createJmp(block_map[i]);
+            if (!terminated && builder_->getInsertPoint() && i > 0 && builder_->getInsertPoint() != block_map.at(i)) {
+                builder_->createJmp(block_map.at(i));
             }
-            builder_->setInsertPoint(block_map[i]);
+            builder_->setInsertPoint(block_map.at(i));
             terminated = false;
         }
 
@@ -942,7 +963,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::JumpIfFalse: {
                 ir::BasicBlock* target = get_target_block(inst.imm, i);
                 if (target) {
-                    ir::BasicBlock* fallthrough = block_map[i + 1];
+                    ir::BasicBlock* fallthrough = nullptr;
+                    if (block_map.count(i + 1)) {
+                        fallthrough = block_map.at(i + 1);
+                    } else {
+                        std::string block_name = "block_" + std::to_string(i + 1);
+                        fallthrough = builder_->createBasicBlock(block_name, main_fn);
+                        block_map[i + 1] = fallthrough;
+                    }
                     ir::Value* cond = load_reg(inst.a, inst.type_a);
                     ir::Value* is_not_zero = builder_->createCne(cond, context_->getConstantInt(context_->getIntegerType(64), 0));
                     ir::Value* is_not_vfalse = builder_->createCne(cond, context_->getConstantInt(context_->getIntegerType(64), VAL_FALSE));

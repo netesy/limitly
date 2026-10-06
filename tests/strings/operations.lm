@@ -56,7 +56,7 @@ assert(quoted == "He said \"Hello\"", "Quoted strings should work");
 // String indexing
 var testStr = "Lymar";
 assert(testStr[0] == "L", "First character should be 'L'");
-assert(testStr[4] == "t", "Last character should be 't'");
+assert(testStr[4] == "r", "Last character should be 'r'");
 
 print("String 'Lymar' first char: {testStr[0]}, last char: {testStr[4]}");
 

@@ -1,0 +1,57 @@
+fn test_branches(x: int): int {
+    if (x > 10) {
+        if (x > 20) {
+            return 1;
+        } else {
+            return 2;
+        }
+    } else {
+        if (x < 0) {
+            return 3;
+        } else {
+            return 4;
+        }
+    }
+}
+
+fn test_loops(): int {
+    var sum = 0;
+    for (var i = 0; i < 10; i = i + 1) {
+        var j = 0;
+        while (j < 5) {
+            if (j == 3) {
+                j = j + 1;
+                continue;
+            }
+            sum = sum + i + j;
+            j = j + 1;
+        }
+    }
+    return sum;
+}
+
+fn test_match(x: int): int {
+    match (x) {
+        1 => { return 100; },
+        2 => { return 200; },
+        _ => { return 300; }
+    }
+}
+
+fn main(): int {
+    print("Testing AOT Control Flow...");
+    assert(test_branches(25) == 1, "test_branches(25) failed");
+    assert(test_branches(15) == 2, "test_branches(15) failed");
+    assert(test_branches(-5) == 3, "test_branches(-5) failed");
+    assert(test_branches(5) == 4, "test_branches(5) failed");
+
+    var loop_res = test_loops();
+    assert(loop_res > 0, "test_loops failed");
+
+    assert(test_match(1) == 100, "test_match(1) failed");
+    assert(test_match(2) == 200, "test_match(2) failed");
+    assert(test_match(99) == 300, "test_match(99) failed");
+
+    print("AOT Control Flow Tests Passed!");
+    return 0;
+}

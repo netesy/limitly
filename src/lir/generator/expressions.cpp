@@ -670,22 +670,17 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
         }
     }
 
-    // Check if it's a global module variable accessed directly (e.g. within the module itself)
-    if (!current_module_.empty() && current_module_ != "root") {
-        std::string qualified_name = current_module_ + "." + expr.name;
-        Reg result = allocate_register();
-        LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
-        load_inst.func_name = qualified_name;
-        emit_instruction(load_inst);
-        if (expr.inferred_type) {
-            set_register_language_type(result, expr.inferred_type);
-            set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
-        }
-        return result;
+    // Check if it's a global module variable accessed directly
+    std::string qualified_name = (!current_module_.empty() && current_module_ != "root") ? (current_module_ + "." + expr.name) : expr.name;
+    Reg result = allocate_register();
+    LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, result, 0, 0);
+    load_inst.func_name = qualified_name;
+    emit_instruction(load_inst);
+    if (expr.inferred_type) {
+        set_register_language_type(result, expr.inferred_type);
+        set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
     }
-
-    report_error("Undefined variable: " + expr.name);
-    return 0;
+    return result;
     
     // Set the type information for the register if available
     if (expr.inferred_type) {
