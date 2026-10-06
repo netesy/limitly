@@ -1,7 +1,7 @@
 // tests/crypto/test_crypto.lm
 // Comprehensive test suite for Lymar std.crypto standard library powered by OpenSSL
 
-import std.crypto.index as crypto;
+import std.crypto as crypto;
 
 fn test_hashing() {
  print("=== Testing Cryptographic Hashing ===");

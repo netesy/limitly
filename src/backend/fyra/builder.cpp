@@ -89,6 +89,18 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         }
     }
 
+        // Also add all functions matching module prefixes or non-std functions
+        for (const auto& fname : registry.getFunctionNames()) {
+            for (const auto& pfx : mod_prefixes) {
+                if (fname.rfind(pfx + ".", 0) == 0) {
+                    if (!reachable_funcs.count(fname)) {
+                        reachable_funcs.insert(fname);
+                        worklist.push_back(fname);
+                    }
+                }
+            }
+        }
+
     for (const auto& pfx : mod_prefixes) {
         std::string init_sym = pfx + ".__init__";
         if (registry.getFunction(init_sym) && !reachable_funcs.count(init_sym)) {

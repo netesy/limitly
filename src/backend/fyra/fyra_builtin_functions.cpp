@@ -1175,13 +1175,17 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
 
         ir::BasicBlock* b_cap_double = builder->createBasicBlock("cap_double", fn_set);
         ir::BasicBlock* b_cap_idx = builder->createBasicBlock("cap_idx", fn_set);
+        ir::BasicBlock* b_cap_done = builder->createBasicBlock("cap_done", fn_set);
         builder->createBr(is_double_larger, b_cap_double, b_cap_idx);
+
+        builder->setInsertPoint(b_cap_double);
+        builder->createJmp(b_cap_done);
 
         builder->setInsertPoint(b_cap_idx);
         builder->createStore(idx_plus_one, new_cap_slot);
-        builder->createJmp(b_cap_double);
+        builder->createJmp(b_cap_done);
 
-        builder->setInsertPoint(b_cap_double);
+        builder->setInsertPoint(b_cap_done);
         ir::Value* new_cap = builder->createLoad(new_cap_slot);
         ir::Value* new_bytes = builder->createMul(new_cap, ctx->getConstantInt(i64, 8));
         ir::Instruction* new_data = builder->createExternCall("memory.alloc", {new_bytes}, i64);

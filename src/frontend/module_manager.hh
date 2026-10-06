@@ -78,6 +78,9 @@ public:
     void set_include_dirs(const std::vector<std::string>& dirs);
 
     // Precompiled module discovery and registration
+    const std::unordered_map<std::string, std::vector<CompiledModuleMeta>>& get_compiled_modules() const {
+        return compiled_modules_;
+    }
     bool register_compiled_module(const CompiledModuleMeta& meta);
     bool find_compiled_module(const std::string& module_name, const std::string& target_triple, const std::string& required_kind, CompiledModuleMeta& out_meta);
     bool is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) const;

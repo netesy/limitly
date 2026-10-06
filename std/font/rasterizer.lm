@@ -31,6 +31,10 @@ frame Intersection {
 }
 
 pub fn rasterize_glyph(outline: g.GlyphOutline, scale: float): GlyphBitmap {
+    return rasterize_glyph_subpixel(outline, scale, 1, 1, 0.0, 0.0);
+}
+
+pub fn rasterize_glyph_subpixel(outline: g.GlyphOutline, scale: float, oversample_x: int = 1, oversample_y: int = 1, shift_x: float = 0.0, shift_y: float = 0.0): GlyphBitmap {
     if (outline.is_empty) {
         return GlyphBitmap(0, 0, 0, 0, [] as [int]);
     }
@@ -48,12 +52,12 @@ pub fn rasterize_glyph(outline: g.GlyphOutline, scale: float): GlyphBitmap {
     var min_y = 999999.0;
     var max_y = -999999.0;
 
-    for (var i = 0; i < len(raw_segments); i = i + 1) {
-        var seg = raw_segments[i];
-        var sx0 = seg.x0;
-        var sy0 = 0.0 - seg.y0; // Invert Y
-        var sx1 = seg.x1;
-        var sy1 = 0.0 - seg.y1; // Invert Y
+    for (var seg_idx = 0; seg_idx < len(raw_segments); seg_idx = seg_idx + 1) {
+        var seg = raw_segments[seg_idx];
+        var sx0 = seg.x0 + shift_x;
+        var sy0 = 0.0 - seg.y0 + shift_y; // Invert Y
+        var sx1 = seg.x1 + shift_x;
+        var sy1 = 0.0 - seg.y1 + shift_y; // Invert Y
 
         if (sx0 < min_x) min_x = sx0;
         if (sx1 < min_x) min_x = sx1;
@@ -89,24 +93,32 @@ pub fn rasterize_glyph(outline: g.GlyphOutline, scale: float): GlyphBitmap {
 
     var total_pixels = width * height;
     var pixels: [int] = [];
-    for (var i = 0; i < total_pixels; i = i + 1) {
+    for (var idx = 0; idx < total_pixels; idx = idx + 1) {
         pixels = pixels + [0];
     }
 
-    // 4x vertical supersampling offsets: 1/8, 3/8, 5/8, 7/8
-    var sub_offsets = [0.125, 0.375, 0.625, 0.875];
-    var sub_weight = 64; // 64 * 4 = 256 (~255)
+    // Supersampling based on oversample parameters
+    var sub_y_count = oversample_y;
+    if (sub_y_count < 1) sub_y_count = 1;
+    if (sub_y_count > 8) sub_y_count = 8;
+
+    var sub_offsets: [float] = [];
+    var sub_weight = 256 / (sub_y_count * oversample_x);
+
+    for (var idx = 0; idx < sub_y_count; idx = idx + 1) {
+        sub_offsets = sub_offsets + [((idx as float) + 0.5) / (sub_y_count as float)];
+    }
 
     for (var py = 0; py < height; py = py + 1) {
         var screen_y = (i_min_y + py) as float;
 
-        for (var s_idx = 0; s_idx < 4; s_idx = s_idx + 1) {
+        for (var s_idx = 0; s_idx < sub_y_count; s_idx = s_idx + 1) {
             var sample_y = screen_y + sub_offsets[s_idx];
             var intersections: [Intersection] = [];
 
             // Find all segments that intersect sample_y
-            for (var seg_i = 0; seg_i < len(segments); seg_i = seg_i + 1) {
-                var s = segments[seg_i];
+            for (var seg_idx = 0; seg_idx < len(segments); seg_idx = seg_idx + 1) {
+                var s = segments[seg_idx];
                 var crosses = (s.y0 <= sample_y and s.y1 > sample_y) or (s.y1 <= sample_y and s.y0 > sample_y);
                 if (crosses) {
                     var dy = s.y1 - s.y0;
@@ -138,8 +150,8 @@ pub fn rasterize_glyph(outline: g.GlyphOutline, scale: float): GlyphBitmap {
             var inside_x_start = 0.0;
             var was_inside = false;
 
-            for (var inter_i = 0; inter_i < num_inter; inter_i = inter_i + 1) {
-                var it = intersections[inter_i];
+            for (var inter_idx = 0; inter_idx < num_inter; inter_idx = inter_idx + 1) {
+                var it = intersections[inter_idx];
                 var old_winding = winding;
                 winding = winding + it.direction;
 
@@ -158,15 +170,166 @@ pub fn rasterize_glyph(outline: g.GlyphOutline, scale: float): GlyphBitmap {
                     if (px_end > width) px_end = width;
 
                     for (var px = px_start; px < px_end; px = px + 1) {
-                        var idx = py * width + px;
-                        var current_val = pixels[idx] + sub_weight;
+                        var pidx = py * width + px;
+                        var current_val = pixels[pidx] + sub_weight;
                         if (current_val > 255) {
                             current_val = 255;
                         }
-                        pixels[idx] = current_val;
+                        pixels[pidx] = current_val;
                     }
                 }
             }
+        }
+    }
+
+    return GlyphBitmap(width, height, i_min_x, i_min_y, pixels);
+}
+
+// Helper: Square root using Newton-Raphson approximation
+fn sqrt_approx(x: float): float {
+    if (x <= 0.0) { return 0.0; }
+    if (x == 1.0) { return 1.0; }
+
+    var guess = x;
+    if (x < 1.0) { guess = 1.0; }
+
+    var idx: int = 0;
+    while (idx < 10) {
+        guess = 0.5 * (guess + x / guess);
+        idx = idx + 1;
+    }
+
+    return guess;
+}
+
+// Helper: Calculate squared distance from point to line segment
+fn dist_to_segment_squared(px: float, py: float, x1: float, y1: float, x2: float, y2: float): float {
+    var l2 = ((x2 - x1) * (x2 - x1)) + ((y2 - y1) * (y2 - y1));
+    if (l2 == 0.0) {
+        return ((px - x1) * (px - x1)) + ((py - y1) * (py - y1));
+    }
+
+    var t_val = ((px - x1) * (x2 - x1) + (py - y1) * (y2 - y1)) / l2;
+    if (t_val < 0.0) t_val = 0.0;
+    if (t_val > 1.0) t_val = 1.0;
+
+    var proj_x = x1 + t_val * (x2 - x1);
+    var proj_y = y1 + t_val * (y2 - y1);
+
+    return ((px - proj_x) * (px - proj_x)) + ((py - proj_y) * (py - proj_y));
+}
+
+// Helper: Check if point is inside glyph using winding rule
+fn point_inside_outline(px: float, py: float, segments: [g.LineSegment]): bool {
+    var winding = 0;
+    for (var idx = 0; idx < len(segments); idx = idx + 1) {
+        var s = segments[idx];
+        var crosses = (s.y0 <= py and s.y1 > py) or (s.y1 <= py and s.y0 > py);
+        if (crosses) {
+            var dy = s.y1 - s.y0;
+            if (dy != 0.0) {
+                var ix = s.x0 + (py - s.y0) * (s.x1 - s.x0) / dy;
+                if (s.y1 < s.y0) {
+                    winding = winding - 1;
+                } else {
+                    winding = winding + 1;
+                }
+            }
+        }
+    }
+    return winding != 0;
+}
+
+pub fn rasterize_glyph_sdf(outline: g.GlyphOutline, scale: float, padding: int = 0, onedge_value: float = 128.0, pixel_dist_scale: float = 1.0): GlyphBitmap {
+    if (outline.is_empty) {
+        return GlyphBitmap(0, 0, 0, 0, [] as [int]);
+    }
+
+    var raw_segments = outline.get_scaled_segments(scale, scale);
+    if (len(raw_segments) == 0) {
+        return GlyphBitmap(0, 0, 0, 0, [] as [int]);
+    }
+
+    var segments: [g.LineSegment] = [];
+    var min_x = 999999.0;
+    var max_x = -999999.0;
+    var min_y = 999999.0;
+    var max_y = -999999.0;
+
+    for (var seg_idx = 0; seg_idx < len(raw_segments); seg_idx = seg_idx + 1) {
+        var seg = raw_segments[seg_idx];
+        var sx0 = seg.x0;
+        var sy0 = 0.0 - seg.y0;
+        var sx1 = seg.x1;
+        var sy1 = 0.0 - seg.y1;
+
+        if (sx0 < min_x) min_x = sx0;
+        if (sx1 < min_x) min_x = sx1;
+        if (sx0 > max_x) max_x = sx0;
+        if (sx1 > max_x) max_x = sx1;
+
+        if (sy0 < min_y) min_y = sy0;
+        if (sy1 < min_y) min_y = sy1;
+        if (sy0 > max_y) max_y = sy0;
+        if (sy1 > max_y) max_y = sy1;
+
+        segments = segments + [g.LineSegment(sx0, sy0, sx1, sy1)];
+    }
+
+    var padding_f = padding as float;
+    var i_min_x = (min_x - padding_f) as int;
+    var i_max_x = (max_x + padding_f + 0.999) as int;
+    var i_min_y = (min_y - padding_f) as int;
+    var i_max_y = (max_y + padding_f + 0.999) as int;
+
+    var width = i_max_x - i_min_x;
+    var height = i_max_y - i_min_y;
+
+    if (width <= 0 or height <= 0) {
+        return GlyphBitmap(0, 0, i_min_x, i_min_y, [] as [int]);
+    }
+
+    var total_pixels = width * height;
+    var pixels: [int] = [];
+    for (var j = 0; j < total_pixels; j = j + 1) {
+        pixels = pixels + [0];
+    }
+
+    for (var py = 0; py < height; py = py + 1) {
+        var screen_y = (i_min_y + py) as float;
+
+        for (var px = 0; px < width; px = px + 1) {
+            var screen_x = (i_min_x + px) as float;
+
+            // Find minimum distance to any segment
+            var min_dist_sq = 999999999.0;
+            for (var seg_idx = 0; seg_idx < len(segments); seg_idx = seg_idx + 1) {
+                var s = segments[seg_idx];
+                var dist_sq = dist_to_segment_squared(screen_x, screen_y, s.x0, s.y0, s.x1, s.y1);
+                if (dist_sq < min_dist_sq) {
+                    min_dist_sq = dist_sq;
+                }
+            }
+
+            var min_dist = sqrt_approx(min_dist_sq);
+
+            // Check if point is inside glyph
+            var inside = point_inside_outline(screen_x, screen_y, segments);
+
+            // Convert to SDF value
+            var sdf_val = 0.0;
+            if (inside) {
+                sdf_val = onedge_value + min_dist * pixel_dist_scale;
+            } else {
+                sdf_val = onedge_value - min_dist * pixel_dist_scale;
+            }
+
+            // Clamp to 0-255
+            if (sdf_val < 0.0) sdf_val = 0.0;
+            if (sdf_val > 255.0) sdf_val = 255.0;
+
+            var pidx = py * width + px;
+            pixels[pidx] = sdf_val as int;
         }
     }
 

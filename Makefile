@@ -6,6 +6,8 @@
 ifeq ($(OS),Windows_NT)
 	PLATFORM := windows
 	EXE_EXT := .exe
+	SO_EXT := .dll
+	A_EXT := .lib
 	MSYS2_PATH := C:/msys64
 	CXX := $(MSYS2_PATH)/mingw64/bin/g++.exe
 	CC := $(MSYS2_PATH)/mingw64/bin/gcc.exe
@@ -19,6 +21,8 @@ ifeq ($(OS),Windows_NT)
 else ifeq ($(shell uname),Darwin)
 	PLATFORM := linux
 	EXE_EXT :=
+	SO_EXT := .dylib
+	A_EXT := .a
 	CXX := g++
 	CC := gcc
 	AR := ar
@@ -31,6 +35,8 @@ else ifeq ($(shell uname),Darwin)
 else
 	PLATFORM := linux
 	EXE_EXT :=
+	SO_EXT := .so
+	A_EXT := .a
 	CXX := g++
 	CC := gcc
 	AR := ar
@@ -67,12 +73,12 @@ OBJ_DIR := build/obj/$(MODE)
 RSP_DIR := build/rsp
 
 # =============================
-# Runtime library configuration
+# Precompilation configuration
 # =============================
+PRECOMPILE_MODULES ?= std.font std.ui
 
-
-
-
+# Helper to find all precompilable modules (directories in std/ containing index.lm)
+ALL_PRECOMPILE_MODULES := $(patsubst std/%/,std.%,$(dir $(wildcard std/*/index.lm)))
 
 # =============================
 # Sources
@@ -126,8 +132,7 @@ MAIN_SRCS := src/main.cpp
 TEST_SRCS := src/test_parser.cpp $(BACKEND_COMMON_SRCS) $(LIR_CORE_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS)
 
-# LIR round-trip test (C17): builds a small test binary that exercises every
-# field of LIR_Inst through serialize() -> deserialize() -> compare.
+# LIR round-trip test (C17)
 LIR_TEST_SRCS := tests/lir/test_round_trip.cpp
 LIR_TEST_OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(LIR_TEST_SRCS))
 
@@ -144,7 +149,7 @@ TEST_RSP := $(RSP_DIR)/build_test.rsp
 # =============================
 # Phony targets
 # =============================
-.PHONY: all clean clear clean-lm check-deps windows linux release debug runtime tests aot-tests stb-image stb-image-test
+.PHONY: all clean clear clean-lm check-deps windows linux release debug runtime tests aot-tests stb-image stb-image-test precompile precompile-all
 
 # =============================
 # Default target
@@ -180,7 +185,7 @@ $(OBJ_DIR)/%.o: %.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
-# Exclude src/backend/fyra from general rule - they're handled separately
+# Exclude src/backend/fyra from general rule
 $(OBJ_DIR)/src/backend/fyra/%.o: src/backend/fyra/%.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) --param ggc-min-expand=20 --param ggc-min-heapsize=32768 -c $< -o $@
@@ -195,18 +200,15 @@ $(OBJ_DIR)/fyra/%.o: vendor/fyra/src/%.cpp | $(OBJ_DIR)
 FYRA_DIR := vendor/fyra
 FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
-# Check if Fyra is available
 FYRA_AVAILABLE := $(if $(wildcard $(FYRA_DIR)/include/ir/Module.h),yes,no)
 
 ifeq ($(FYRA_AVAILABLE),yes)
-# Build Fyra using Makefile (excluding problematic debug files)
 $(FYRA_LIB): $(FYRA_OBJS)
 	@echo "[BUILD] Building Fyra library with Makefile..."
 	@mkdir -p $(dir $@)
 	$(AR) rcs $@ $^
 	@echo "[OK] Fyra library built: $@"
 else
-# Fyra not available - create empty library
 $(FYRA_LIB):
 	@echo "[WARN]  Fyra not found at $(FYRA_DIR) - AOT/WASM compilation disabled"
 	@mkdir -p $(dir $@)
@@ -221,7 +223,6 @@ $(LYRA_BIN): $(LYRA_OBJS) | $(BIN_DIR)
 	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include $(LYRA_OBJS) -o $@ -lssl -lcrypto
 	@echo "[OK] Lyra built: $@"
 
-# Lyra object compilation
 $(OBJ_DIR)/lyra/%.o: $(LYRA_DIR)/src/%.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
 	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include -c $< -o $@
@@ -258,6 +259,33 @@ linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib
 	@echo "[OK] lymar built."
 
 # =============================
+# Precompilation targets
+# =============================
+precompile: $(PLATFORM)
+	@for mod in $(PRECOMPILE_MODULES); do \
+		mod_path="std/$$(echo $$mod | sed 's/std\.//')/index.lm"; \
+		lib_name="lib$$(echo $$mod | sed 's/std\.//')"; \
+		sh_out="bin/$${lib_name}$(SO_EXT)"; \
+		st_out="bin/$${lib_name}$(A_EXT)"; \
+		rebuild=0; \
+		if [ ! -f "$$sh_out" ] || [ ! -f "$$st_out" ] || [ ! -f "$$sh_out.meta" ]; then rebuild=1; \
+		else \
+			src_dir="std/$$(echo $$mod | sed 's/std\.//')"; \
+			if [ -n "$$(find $$src_dir -type f -newer $$sh_out 2>/dev/null)" ]; then rebuild=1; fi; \
+		fi; \
+		if [ $$rebuild -eq 1 ]; then \
+			echo "[PRECOMPILE] Building precompiled module $$mod -> $$sh_out and $$st_out ..."; \
+			./bin/lymar$(EXE_EXT) build -shared $$mod_path -o $$sh_out || exit 1; \
+			./bin/lymar$(EXE_EXT) build -static $$mod_path -o $$st_out || exit 1; \
+		else \
+			echo "[PRECOMPILE] Module $$mod is up-to-date."; \
+		fi \
+	done
+
+precompile-all: $(PLATFORM)
+	@$(MAKE) precompile PRECOMPILE_MODULES="$(ALL_PRECOMPILE_MODULES)"
+
+# =============================
 # Build modes
 # =============================
 release:
@@ -279,7 +307,6 @@ else
 endif
 	@echo "[CLEAN] Cleaned build artifacts."
 
-# Clear generated text files
 clear:
 ifeq ($(PLATFORM),windows)
 	@echo "[CLEAN] Cleaning generated .txt files..."
@@ -293,7 +320,6 @@ else
 endif
 	@echo "[OK] Generated files cleaned."
 
-# Clean .lm files from root folder only
 clean-lm:
 ifeq ($(PLATFORM),windows)
 	@echo "[CLEAN] Cleaning .lm files from root folder..."
@@ -303,7 +329,6 @@ else
 	@find . -maxdepth 1 -name "*.lm" -type f -delete 2>/dev/null || true
 endif
 	@echo "[OK] Root .lm files cleaned (std/ and tests/ preserved)."
-
 
 # =============================
 # Parser Test Target
@@ -318,10 +343,10 @@ parser: $(BIN_DIR) $(TEST_RSP)
 # =============================
 .PHONY: lir-test
 lir-test: $(BIN_DIR) $(OBJ_DIR)/liblymar.a $(LIR_TEST_OBJS)
-	@echo "\360\237\223\260 Linking lir_test ..."
+	@echo "[BUILD] Linking lir_test ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIR_TEST_OBJS) $(OBJ_DIR)/liblymar.a -o $(BIN_DIR)/lir_test $(LIBS) -lpthread
-	@echo "\342\234\205 lir_test built."
-	@echo "\360\237\247\252 Running lir_test ..."
+	@echo "[OK] lir_test built."
+	@echo "[RUN] Running lir_test ..."
 	./bin/lir_test
 
 # =============================
@@ -331,16 +356,8 @@ tests: $(PLATFORM) stb-image
 	@python3 tests/run_tests.py || python tests/run_tests.py
 
 # =============================
-# STB Image shared library (compiled beside lymar executable in bin/)
+# STB Image shared library
 # =============================
-# Compiles tests/ffi/stb_wrapper.c (which includes stb_image + stb_image_write)
-# into a platform-native shared library stored beside lymar in bin/.
-#
-#   Linux       : bin/libstb_image.so
-#   Android     : bin/libstb_image.so
-#   macOS       : bin/libstb_image.dylib
-#   Windows     : bin/libstb_image.dll
-#
 stb-image: $(BIN_DIR) $(STB_IMAGE_LIB)
 
 $(STB_IMAGE_LIB): tests/ffi/stb_wrapper.c vendor/stb/stb_image.h vendor/stb/stb_image_write.h
@@ -352,7 +369,6 @@ $(STB_IMAGE_LIB): tests/ffi/stb_wrapper.c vendor/stb/stb_image.h vendor/stb/stb_
 		-lm
 	@echo "[OK] $@ built."
 
-# Android target (using NDK clang or CC)
 ANDROID_API ?= 24
 ANDROID_TARGET ?= aarch64-linux-android
 ifeq ($(strip $(ANDROID_NDK)),)
@@ -370,8 +386,6 @@ stb-image-android: tests/ffi/stb_wrapper.c vendor/stb/stb_image.h vendor/stb/stb
 		-lm
 	@echo "[OK] bin/libstb_image.so built for Android."
 
-# Build the STB lib and run the image integration test.
-# Requires lymar to be built first (depends on $(PLATFORM)).
 stb-image-test: $(PLATFORM) stb-image
 	@echo "[TEST] Running std.image integration test ..."
 ifeq ($(PLATFORM),windows)
@@ -384,7 +398,7 @@ endif
 	@echo "[OK] std.image integration test finished."
 
 # =============================
-# OpenSSL TLS & Crypto shared library (compiled beside lymar in bin/)
+# OpenSSL TLS & Crypto shared library
 # =============================
 ssl-lib: $(BIN_DIR) $(LYMAR_SSL_LIB)
 

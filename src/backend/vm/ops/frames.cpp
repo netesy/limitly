@@ -2,6 +2,7 @@
 #include "../vm_runtime.hh"
 #include "../vm_value.hh"
 #include "../../../lir/functions.hh"
+#include "../compiled_resolver.hh"
 #include <cstdio>
 #include <stdexcept>
 #include <string>
@@ -145,12 +146,20 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             std::string frame_name = f->name;
             std::string resolved_func_name = frame_name + "." + pc->func_name;
             
+            if (CompiledResolver::getInstance().dispatch(resolved_func_name, reinterpret_cast<uint64_t>(registers.data()), this)) {
+                break;
+            }
+
+            std::string trait_func_name = pc->type_name + "." + pc->func_name;
+            if (CompiledResolver::getInstance().dispatch(trait_func_name, reinterpret_cast<uint64_t>(registers.data()), this)) {
+                break;
+            }
+
             auto& func_manager = LIR::LIRFunctionManager::getInstance();
             std::string final_func_name = "";
             if (func_manager.hasFunction(resolved_func_name)) {
                 final_func_name = resolved_func_name;
             } else {
-                std::string trait_func_name = pc->type_name + "." + pc->func_name;
                 if (func_manager.hasFunction(trait_func_name)) {
                     final_func_name = trait_func_name;
                 }

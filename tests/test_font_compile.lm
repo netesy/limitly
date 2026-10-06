@@ -1,0 +1,21 @@
+// tests/test_font_compile.lm
+// Simple compilation test for pure Lymar std.font module.
+
+import std.font as font;
+
+fn main(): int {
+    print("Testing std.font module compilation...");
+
+    // Just test that the module loads and types are accessible
+    var metrics = font.FontMetrics();
+    print("FontMetrics created: ascent={metrics.ascent}");
+
+    var typo_metrics = font.TypoMetrics();
+    print("TypoMetrics created: ascent={typo_metrics.ascent}");
+
+    var glyph_metrics = font.GlyphMetrics();
+    print("GlyphMetrics created: advance={glyph_metrics.advance_width}");
+
+    print("std.font module compiles successfully!");
+    return 0;
+}

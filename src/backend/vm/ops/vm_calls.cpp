@@ -8,6 +8,7 @@
 #include "../vm_value.hh"
 #include "../vm_tuple.hh"
 #include "../constant_utils.hh"
+#include "../compiled_resolver.hh"
 
 namespace LM {
 namespace Backend {
@@ -148,66 +149,10 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     mod_prefix = mod_prefix.substr(0, last_dot);
                 }
 
-                LM::Frontend::CompiledModuleMeta meta;
-                bool found_precompiled = LM::Frontend::ModuleManager::getInstance().find_compiled_module(mod_prefix, "", "shared", meta) ||
-                                         LM::Frontend::ModuleManager::getInstance().find_compiled_module(pc->func_name, "", "shared", meta);
+            }
 
-                if (found_precompiled) {
-                    static std::unordered_map<std::string, void*> loaded_precompiled_handles;
-                    void* handle = loaded_precompiled_handles[meta.artifact_path];
-                    if (!handle) {
-                        handle = lymarrt_library_open(meta.artifact_path.c_str());
-                        if (handle) {
-                            loaded_precompiled_handles[meta.artifact_path] = handle;
-                        }
-                    }
-
-                    if (handle) {
-                        void* sym = lymarrt_symbol_lookup(handle, pc->func_name.c_str());
-                        if (!sym && last_dot != std::string::npos) {
-                            std::string alt_sym = mod_prefix + ".index." + pc->func_name.substr(last_dot + 1);
-                            sym = lymarrt_symbol_lookup(handle, alt_sym.c_str());
-                        }
-                        if (!sym && last_dot != std::string::npos) {
-                            std::string short_sym = pc->func_name.substr(last_dot + 1);
-                            sym = lymarrt_symbol_lookup(handle, short_sym.c_str());
-                        }
-
-                        if (sym) {
-                            size_t num_args = pc->call_args.size();
-                            std::vector<lymarrt_value> lym_args(num_args);
-                            std::vector<lymarrt_type> lym_types(num_args, LYMARRT_TYPE_I64);
-
-                            for (size_t i = 0; i < num_args; ++i) {
-                                RegisterValue rv = registers[pc->call_args[i]];
-                                std::memset(&lym_args[i], 0, sizeof(lymarrt_value));
-                                lym_args[i].type = LYMARRT_TYPE_I64;
-                                lym_args[i].val.i64 = as_i64(rv);
-                                if (IS_PTR(rv)) {
-                                    ObjHeader* h = (ObjHeader*)UNBOX_PTR(rv);
-                                    if (h && h->type_id == TYPE_FOREIGN_PTR) {
-                                        lym_args[i].type = LYMARRT_TYPE_PTR;
-                                        lym_args[i].val.ptr = ((ObjForeignPtr*)h)->ptr;
-                                    } else {
-                                        lym_args[i].type = LYMARRT_TYPE_PTR;
-                                        lym_args[i].val.ptr = UNBOX_PTR(rv);
-                                    }
-                                } else if (is_float(rv)) {
-                                    lym_args[i].type = LYMARRT_TYPE_F64;
-                                    lym_args[i].val.f64 = as_float(rv);
-                                }
-                                lym_types[i] = (lymarrt_type)lym_args[i].type;
-                            }
-
-                            lymarrt_value res;
-                            std::memset(&res, 0, sizeof(res));
-                            if (lymarrt_ffi_call(sym, LYMARRT_TYPE_I64, lym_types.data(), lym_args.data(), num_args, &res)) {
-                                registers[pc->dst] = BOX_INT(res.val.i64);
-                                break;
-                            }
-                        }
-                    }
-                }
+            if (CompiledResolver::getInstance().dispatch(pc->func_name, reinterpret_cast<uint64_t>(registers.data()), this)) {
+                break;
             }
 
             if (func_manager.hasFunction(pc->func_name)) {
@@ -305,6 +250,10 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
             }
             
             if (!func_name.empty()) {
+                if (CompiledResolver::getInstance().dispatch(func_name, reinterpret_cast<uint64_t>(registers.data()), this)) {
+                    break;
+                }
+
                 auto& func_manager = LIR::LIRFunctionManager::getInstance();
                 if (func_manager.hasFunction(func_name)) {
                     auto func = func_manager.getFunction(func_name);

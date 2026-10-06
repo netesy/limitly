@@ -10,6 +10,8 @@ pub var TAG_HMTX: int = 0x686D7478;
 pub var TAG_LOCA: int = 0x6C6F6361;
 pub var TAG_GLYF: int = 0x676C7966;
 pub var TAG_CMAP: int = 0x636D6170;
+pub var TAG_OS2:  int = 0x4F532F32;
+pub var TAG_KERN: int = 0x6B65726E;
 
 frame TableRecord {
     pub var tag: int;
@@ -20,6 +22,18 @@ frame TableRecord {
         self.tag = t;
         self.offset = off;
         self.length = len_val;
+    }
+}
+
+frame KerningEntry {
+    pub var glyph1: int;
+    pub var glyph2: int;
+    pub var advance: int;
+
+    pub init(g1: int = 0, g2: int = 0, adv: int = 0) {
+        self.glyph1 = g1;
+        self.glyph2 = g2;
+        self.advance = adv;
     }
 }
 
@@ -118,6 +132,17 @@ frame FontInfo {
     pub var cmap_format4: CmapFormat4;
     pub var cmap_format12: CmapFormat12;
 
+    // OS/2 table metrics (typographic)
+    pub var has_os2: bool;
+    pub var typo_ascent: int;
+    pub var typo_descent: int;
+    pub var typo_line_gap: int;
+
+    // Kerning table
+    pub var has_kern: bool;
+    pub var kern_offset: int;
+    pub var kerning_pairs: [KerningEntry];
+
     pub var is_valid: bool;
 
     pub init() {
@@ -133,6 +158,13 @@ frame FontInfo {
         self.hmtx_offset = 0;
         self.cmap_format4 = CmapFormat4();
         self.cmap_format12 = CmapFormat12();
+        self.has_os2 = false;
+        self.typo_ascent = 0;
+        self.typo_descent = 0;
+        self.typo_line_gap = 0;
+        self.has_kern = false;
+        self.kern_offset = 0;
+        self.kerning_pairs = [] as [KerningEntry];
         self.is_valid = false;
     }
 
@@ -190,6 +222,64 @@ frame FontInfo {
             return (advance, lsb);
         }
     }
+
+    pub fn get_kern_advance(glyph1: int, glyph2: int): int {
+        if (!self.has_kern or len(self.kerning_pairs) == 0) {
+            return 0;
+        }
+
+        // Binary search for kerning pair
+        var left = 0;
+        var right = len(self.kerning_pairs) - 1;
+
+        while (left <= right) {
+            var mid = (left + right) / 2;
+            var entry = self.kerning_pairs[mid];
+
+            if (entry.glyph1 == glyph1 and entry.glyph2 == glyph2) {
+                return entry.advance;
+            } elif (entry.glyph1 < glyph1 or (entry.glyph1 == glyph1 and entry.glyph2 < glyph2)) {
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+
+        return 0;
+    }
+}
+
+pub fn get_num_fonts(reader: r.ByteReader): int {
+    reader.seek(0);
+    var scalar_type = reader.read_u32();
+
+    if (scalar_type == 0x74746366) { // 'ttcf'
+        reader.skip(4); // version
+        return reader.read_u32();
+    }
+
+    return 1; // Single font file
+}
+
+pub fn get_font_offset(reader: r.ByteReader, font_index: int): int {
+    reader.seek(0);
+    var scalar_type = reader.read_u32();
+
+    if (scalar_type == 0x74746366) { // 'ttcf'
+        reader.skip(4); // version
+        var num_fonts = reader.read_u32();
+        if (font_index < 0 or font_index >= num_fonts) {
+            return -1;
+        }
+        reader.skip(font_index * 4);
+        return reader.read_u32();
+    }
+
+    if (font_index == 0) {
+        return 0;
+    }
+
+    return -1;
 }
 
 pub fn parse_tables(reader: r.ByteReader): FontInfo? {
@@ -354,6 +444,61 @@ pub fn parse_tables(reader: r.ByteReader): FontInfo? {
         cmap12.groups = groups;
         cmap12.is_valid = true;
         info.cmap_format12 = cmap12;
+    }
+
+    // 6. Parse OS/2 table (typographic metrics)
+    var os2_offset = find_table_offset(TAG_OS2);
+    if (os2_offset >= 0) {
+        reader.seek(os2_offset + 68);
+        info.typo_ascent = reader.read_i16();
+        info.typo_descent = reader.read_i16();
+        info.typo_line_gap = reader.read_i16();
+        info.has_os2 = true;
+    }
+
+    // 7. Parse kern table (kerning pairs)
+    var kern_offset = find_table_offset(TAG_KERN);
+    if (kern_offset >= 0) {
+        reader.seek(kern_offset);
+        var version = reader.read_u16();
+        var num_tables = reader.read_u16();
+
+        // Look for horizontal format 0 table
+        if (num_tables > 0) {
+            var kern_found = false;
+            var k = 0;
+            while (k < num_tables and !kern_found) {
+                var subtable_start = reader.tell();
+                var subtable_length = reader.read_u32();
+                var coverage = reader.read_u16();
+                var format = (coverage >> 8) & 0xFF;
+                var horizontal = (coverage & 1) != 0;
+
+                // We only support format 0 horizontal kerning
+                if (format == 0 and horizontal) {
+                    var num_pairs = reader.read_u16();
+                    // Skip searchRange, entrySelector, rangeShift (6 bytes)
+                    reader.skip(6);
+
+                    var kerning_pairs: [KerningEntry] = [];
+                    for (var p = 0; p < num_pairs; p = p + 1) {
+                        var left = reader.read_u16();
+                        var right = reader.read_u16();
+                        var value = reader.read_i16();
+                        kerning_pairs = kerning_pairs + [KerningEntry(left, right, value)];
+                    }
+
+                    info.kerning_pairs = kerning_pairs;
+                    info.has_kern = true;
+                    info.kern_offset = kern_offset;
+                    kern_found = true;
+                }
+
+                // Skip to next subtable
+                reader.seek(subtable_start + subtable_length);
+                k = k + 1;
+            }
+        }
     }
 
     info.is_valid = true;

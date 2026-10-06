@@ -1,12 +1,10 @@
 // std/font/index.lm
 // TrueType & OpenType Font Loading, Typography Metrics, and Antialiased Text Rasterization.
 
-import std.ffi as ffi;
 import std.font.reader as r;
 import std.font.tables as t;
 import std.font.glyph as g;
 import std.font.rasterizer as rast;
-import std.image.index as img;
 import std.io.file as _iof;
 
 pub type GlyphBitmap = rast.GlyphBitmap;
@@ -24,6 +22,20 @@ frame FontMetrics {
         self.line_gap = gap;
         self.line_height = h;
         self.units_per_em = upem;
+    }
+}
+
+frame TypoMetrics {
+    pub var ascent: float;
+    pub var descent: float;
+    pub var line_gap: float;
+    pub var line_height: float;
+
+    pub init(asc: float = 0.0, desc: float = 0.0, gap: float = 0.0, h: float = 0.0) {
+        self.ascent = asc;
+        self.descent = desc;
+        self.line_gap = gap;
+        self.line_height = h;
     }
 }
 
@@ -48,14 +60,12 @@ frame Font {
     pub var is_valid: bool;
     pub var info: t.FontInfo;
     pub var reader: r.ByteReader;
-    pub var raw_handle: int;
 
-    pub init(font_path: str = "", font_info: t.FontInfo = t.FontInfo(), rdr: r.ByteReader = r.ByteReader([] as [int]), handle: int = 0) {
+    pub init(font_path: str = "", font_info: t.FontInfo = t.FontInfo(), rdr: r.ByteReader = r.ByteReader([] as [int])) {
         self.path = font_path;
         self.info = font_info;
         self.reader = rdr;
-        self.raw_handle = handle;
-        self.is_valid = (font_info.is_valid or handle != 0);
+        self.is_valid = font_info.is_valid;
     }
 
     pub fn get_metrics(font_size: float = 16.0): FontMetrics {
@@ -93,44 +103,61 @@ frame Font {
         return GlyphMetrics(glyph_idx, adv, lsb, adv, font_size);
     }
 
+    pub fn get_kern_advance(glyph1: int, glyph2: int, font_size: float = 16.0): float {
+        if (!self.is_valid) { return 0.0; }
+        var kern = self.info.get_kern_advance(glyph1, glyph2);
+        var upem = self.info.units_per_em;
+        if (upem <= 0) upem = 1000;
+        var scale = font_size / (upem as float);
+        return (kern as float) * scale;
+    }
+
+    pub fn get_kern_advance_codepoint(ch1: int, ch2: int, font_size: float = 16.0): float {
+        if (!self.is_valid) { return 0.0; }
+        var g1 = self.get_glyph_index(ch1);
+        var g2 = self.get_glyph_index(ch2);
+        return self.get_kern_advance(g1, g2, font_size);
+    }
+
+    pub fn get_typo_metrics(font_size: float = 16.0): TypoMetrics {
+        if (!self.is_valid or !self.info.has_os2) {
+            return TypoMetrics();
+        }
+        var upem = self.info.units_per_em;
+        if (upem <= 0) upem = 1000;
+        var scale = font_size / (upem as float);
+
+        var asc = (self.info.typo_ascent as float) * scale;
+        var desc = (self.info.typo_descent as float) * scale;
+        var gap = (self.info.typo_line_gap as float) * scale;
+        var lh = (asc - desc) + gap;
+        if (lh < font_size) lh = font_size;
+
+        return TypoMetrics(asc, desc, gap, lh);
+    }
+
     pub fn text_width(text: str, font_size: float = 16.0): float {
         if (!self.is_valid or text == "") { return 0.0; }
 
-        // If native FFI handle is active, use native speed
-        if (self.raw_handle != 0) {
-            unsafe {
-                var lib: int = img._open_lib();
-                if (lib != 0 and lib != nil) {
-                    var fn_meas: int = ffi.library_get_symbol(lib, "measure_text_width_int");
-                    if (fn_meas != 0 and fn_meas != nil) {
-                        var cs: ffi.CString = ffi.string_to_cstring(text);
-                        var sz_int: int = font_size as int;
-                        var w: int = ffi.foreign_call(
-                            fn_meas,
-                            [self.raw_handle, sz_int, ffi.cstring_as_ptr(cs)],
-                            ffi.TYPE_I32,
-                            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_PTR]
-                        ) as int;
-                        ffi.cstring_free(cs);
-                        ffi.library_unload(lib);
-                        return w as float;
-                    }
-                    ffi.library_unload(lib);
-                }
-            }
-        }
-
-        // Pure TrueType table-driven measurement
         var upem = self.info.units_per_em;
         if (upem <= 0) upem = 1000;
         var scale = font_size / (upem as float);
         var total_w = 0.0;
 
+        var prev_gid = -1;
         for (var i = 0; i < len(text); i = i + 1) {
             var ch = text[i];
             var gid = self.get_glyph_index(ch);
             var hmet = self.info.get_glyph_hmetrics(self.reader, gid);
             total_w = total_w + ((hmet[0] as float) * scale);
+
+            // Add kerning if available
+            if (prev_gid >= 0 and self.info.has_kern) {
+                var kern = self.info.get_kern_advance(prev_gid, gid);
+                total_w = total_w + ((kern as float) * scale);
+            }
+
+            prev_gid = gid;
         }
 
         return total_w;
@@ -138,29 +165,6 @@ frame Font {
 
     pub fn text_height(text: str, font_size: float = 16.0): float {
         if (!self.is_valid or text == "") { return 0.0; }
-
-        if (self.raw_handle != 0) {
-            unsafe {
-                var lib: int = img._open_lib();
-                if (lib != 0 and lib != nil) {
-                    var fn_meas: int = ffi.library_get_symbol(lib, "measure_text_height_int");
-                    if (fn_meas != 0 and fn_meas != nil) {
-                        var cs: ffi.CString = ffi.string_to_cstring(text);
-                        var sz_int: int = font_size as int;
-                        var h: int = ffi.foreign_call(
-                            fn_meas,
-                            [self.raw_handle, sz_int, ffi.cstring_as_ptr(cs)],
-                            ffi.TYPE_I32,
-                            [ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_PTR]
-                        ) as int;
-                        ffi.cstring_free(cs);
-                        ffi.library_unload(lib);
-                        return h as float;
-                    }
-                    ffi.library_unload(lib);
-                }
-            }
-        }
 
         var m = self.get_metrics(font_size);
         return m.line_height;
@@ -178,126 +182,58 @@ frame Font {
         return rast.rasterize_glyph(outline, scale);
     }
 
-    pub fn render(text: str, font_size: float = 16.0, color: any = nil): img.Image? {
-        if (!self.is_valid or text == "") { return err(); }
-
-        var c: img.Pixel = img.white;
-        if (color != nil) {
-            c = color as img.Pixel;
+    pub fn render_glyph_subpixel(glyph_idx: int, font_size: float = 16.0, oversample_x: int = 1, oversample_y: int = 1, shift_x: float = 0.0, shift_y: float = 0.0): rast.GlyphBitmap {
+        if (!self.is_valid) {
+            return rast.GlyphBitmap(0, 0, 0, 0, [] as [int]);
         }
+        var upem = self.info.units_per_em;
+        if (upem <= 0) upem = 1000;
+        var scale = font_size / (upem as float);
 
-        if (self.raw_handle != 0) {
-            unsafe {
-                var lib: int = img._open_lib();
-                if (lib == 0 or lib == nil) { return err(); }
-                var fn_render: int = ffi.library_get_symbol(lib, "render_text_rgba");
-                var fn_free_buf: int = ffi.library_get_symbol(lib, "free_text_rgba");
-                if (fn_render == 0 or fn_render == nil) { ffi.library_unload(lib); return err(); }
+        var outline = g.parse_glyph(self.reader, self.info, glyph_idx);
+        return rast.rasterize_glyph_subpixel(outline, scale, oversample_x, oversample_y, shift_x, shift_y);
+    }
 
-                var w_p: int = ffi.alloc(4);
-                var h_p: int = ffi.alloc(4);
-                var cs: ffi.CString = ffi.string_to_cstring(text);
-
-                var raw_buf: int = ffi.foreign_call(
-                    fn_render,
-                    [self.raw_handle, font_size, ffi.cstring_as_ptr(cs), c.r, c.g, c.b, c.a, w_p, h_p],
-                    ffi.TYPE_I64,
-                    [ffi.TYPE_PTR, ffi.TYPE_F32, ffi.TYPE_PTR, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_I32, ffi.TYPE_PTR, ffi.TYPE_PTR]
-                ) as int;
-
-                ffi.cstring_free(cs);
-                var w: int = ffi.load_i32(w_p);
-                var h: int = ffi.load_i32(h_p);
-                ffi.free(w_p);
-                ffi.free(h_p);
-
-                if (raw_buf == 0 or raw_buf == nil or w <= 0 or h <= 0) {
-                    ffi.library_unload(lib);
-                    return err();
-                }
-
-                var total_bytes: int = w * h * 4;
-                var img_p: int = ffi.alloc(total_bytes);
-                if (img_p == 0 or img_p == nil) {
-                    if (fn_free_buf != 0 and fn_free_buf != nil) { ffi.call_void_1(fn_free_buf, raw_buf); }
-                    ffi.library_unload(lib);
-                    return err();
-                }
-                ffi.memcpy(img_p, raw_buf, total_bytes);
-                if (fn_free_buf != 0 and fn_free_buf != nil) {
-                    ffi.call_void_1(fn_free_buf, raw_buf);
-                }
-
-                return ok(img.Image(w=w, h=h, c=4, p=img_p, lib=lib));
-            }
+    pub fn render_glyph_sdf(glyph_idx: int, font_size: float = 16.0, padding: int = 0, onedge_value: float = 128.0, pixel_dist_scale: float = 1.0): rast.GlyphBitmap {
+        if (!self.is_valid) {
+            return rast.GlyphBitmap(0, 0, 0, 0, [] as [int]);
         }
+        var upem = self.info.units_per_em;
+        if (upem <= 0) upem = 1000;
+        var scale = font_size / (upem as float);
 
+        var outline = g.parse_glyph(self.reader, self.info, glyph_idx);
+        return rast.rasterize_glyph_sdf(outline, scale, padding, onedge_value, pixel_dist_scale);
+    }
+}
+
+pub fn load_font_from_bytes(bytes: [int], filepath: str = "", font_index: int = 0): Font? {
+    var reader = r.ByteReader(bytes);
+
+    // Get font offset for TTC files
+    var font_offset = t.get_font_offset(reader, font_index);
+    if (font_offset < 0) {
         return err();
     }
 
-    pub fn free(): nil {
-        if (self.raw_handle != 0) {
-            unsafe {
-                var lib: int = img._open_lib();
-                if (lib != 0 and lib != nil) {
-                    var fn_free: int = ffi.library_get_symbol(lib, "free_font");
-                    if (fn_free != 0 and fn_free != nil) {
-                        ffi.call_void_1(fn_free, self.raw_handle);
-                    }
-                    ffi.library_unload(lib);
-                }
-            }
-            self.raw_handle = 0;
-            self.is_valid = false;
-        }
-    }
-}
-
-pub fn detect_system_font(preferred_name: str = ""): str {
-    unsafe {
-        var lib: int = img._open_lib();
-        if (lib == 0 or lib == nil) { return ""; }
-        var fn_detect: int = ffi.library_get_symbol(lib, "detect_system_font_path");
-        if (fn_detect == 0 or fn_detect == nil) { ffi.library_unload(lib); return ""; }
-
-        var cs_pref: ffi.CString = ffi.string_to_cstring(preferred_name);
-        var out_buf: int = ffi.alloc(512);
-        ffi.memset(out_buf, 0, 512);
-
-        var found: int = ffi.foreign_call(
-            fn_detect,
-            [ffi.cstring_as_ptr(cs_pref), out_buf, 512],
-            ffi.TYPE_I32,
-            [ffi.TYPE_PTR, ffi.TYPE_PTR, ffi.TYPE_I32]
-        ) as int;
-
-        ffi.cstring_free(cs_pref);
-        var result: str = "";
-        if (found != 0) {
-            result = ffi.cstring_to_string(out_buf);
-        }
-        ffi.free(out_buf);
-        ffi.library_unload(lib);
-        return result;
-    }
-}
-
-pub fn load_font_from_bytes(bytes: [int], filepath: str = ""): Font? {
-    var reader = r.ByteReader(bytes);
+    reader.seek(font_offset);
     match (t.parse_tables(reader)) {
-        val info => return ok(Font(font_path=filepath, font_info=info, rdr=reader, handle=0)),
+        val info => return ok(Font(font_path=filepath, font_info=info, rdr=reader)),
         err e => return err()
     }
 }
 
-// Load a font using only the pure Lymar TrueType parser (raw_handle = 0).
-// File reading is handled by the VM FileResource — no FFI required from calling code.
-pub fn load_font_pure(filepath: str): Font? {
+pub fn get_num_fonts_from_bytes(bytes: [int]): int {
+    var reader = r.ByteReader(bytes);
+    return t.get_num_fonts(reader);
+}
+
+pub fn load_font(filepath: str, font_index: int = 0): Font? {
     match (_iof.open(filepath, "rb")) {
         val f => {
             match (f.read_bytes()) {
                 val bytes => {
-                    return load_font_from_bytes(bytes, filepath);
+                    return load_font_from_bytes(bytes, filepath, font_index);
                 },
                 err e => { return err(); }
             }
@@ -306,37 +242,16 @@ pub fn load_font_pure(filepath: str): Font? {
     }
 }
 
-pub fn load_font(filepath: str): Font? {
-    unsafe {
-        var lib: int = img._open_lib();
-        if (lib == 0 or lib == nil) { return err(); }
-        var fn_load: int = ffi.library_get_symbol(lib, "load_font_file");
-        if (fn_load == 0 or fn_load == nil) {
-            ffi.library_unload(lib);
-            return err();
-        }
-
-        var cs: ffi.CString = ffi.string_to_cstring(filepath);
-        var handle: int = ffi.foreign_call(
-            fn_load,
-            [ffi.cstring_as_ptr(cs)],
-            ffi.TYPE_I64,
-            [ffi.TYPE_PTR]
-        ) as int;
-        ffi.cstring_free(cs);
-
-        if (handle == 0 or handle == nil) {
-            ffi.library_unload(lib);
-            return err();
-        }
-        return ok(Font(font_path=filepath, handle=handle));
+pub fn get_num_fonts(filepath: str): int {
+    match (_iof.open(filepath, "rb")) {
+        val f => {
+            match (f.read_bytes()) {
+                val bytes => {
+                    return get_num_fonts_from_bytes(bytes);
+                },
+                err e => { return 0; }
+            }
+        },
+        err e => { return 0; }
     }
-}
-
-pub fn load_system_font(preferred_name: str = ""): Font? {
-    var path = detect_system_font(preferred_name);
-    if (path == "") {
-        return err();
-    }
-    return load_font(path);
 }

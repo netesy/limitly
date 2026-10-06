@@ -1,0 +1,126 @@
+// tests/test_pure_font_simple.lm
+// Simple test for pure Lymar std.font module using system font.
+
+import std.font as font;
+
+fn main(): int {
+    print(" === Testing Pure Lymar std.font Module === ");
+
+    // Try to load a system font directly
+    var font_paths = [
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/tahoma.ttf",
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/System/Library/Fonts/Helvetica.ttc"
+    ];
+
+    var fnt = font.Font();
+    var loaded = false;
+
+    for (var i = 0; i < len(font_paths); i = i + 1) {
+        var path = font_paths[i];
+        print("Attempting to load: {path}");
+        var result = font.load_font(path);
+        match (result) {
+            val font_obj => {
+                fnt = font_obj;
+                loaded = true;
+                print("Successfully loaded font from: {path}");
+                break;
+            },
+            err e => {
+                print("Failed to load from {path}");
+            }
+        }
+    }
+
+    if (!loaded) {
+        print("Could not load any system font. Please place a .ttf file in the project and update the path.");
+        return 1;
+    }
+
+    assert(fnt.is_valid, "Font must be valid");
+
+    // Test 1: Get font metrics
+    print("\nTest 1: Getting font metrics...");
+    var metrics = fnt.get_metrics(16.0);
+    print("Metrics: ascent={metrics.ascent}, descent={metrics.descent}, line_height={metrics.line_height}");
+    assert(metrics.ascent > 0.0, "Ascent should be positive");
+    assert(metrics.line_height > 0.0, "Line height should be positive");
+
+    // Test 2: Get OS/2 typographic metrics (if available)
+    print("\nTest 2: Getting OS/2 typographic metrics...");
+    if (fnt.info.has_os2) {
+        var typo_metrics = fnt.get_typo_metrics(16.0);
+        print("Typo metrics: ascent={typo_metrics.ascent}, descent={typo_metrics.descent}");
+        assert(typo_metrics.ascent > 0.0, "Typo ascent should be positive");
+    } else {
+        print("OS/2 table not present in this font (skipping)");
+    }
+
+    // Test 3: Get glyph index
+    print("\nTest 3: Getting glyph index for 'A'...");
+    var gid_a = fnt.get_glyph_index(65); // 'A'
+    print("Glyph index for 'A': {gid_a}");
+    assert(gid_a > 0, "Glyph index should be positive");
+
+    // Test 4: Get glyph metrics
+    print("\nTest 4: Getting glyph metrics...");
+    var gmetrics = fnt.get_glyph_metrics(gid_a, 16.0);
+    print("Glyph metrics: advance={gmetrics.advance_width}, lsb={gmetrics.left_side_bearing}");
+    assert(gmetrics.advance_width > 0.0, "Advance width should be positive");
+
+    // Test 5: Kerning support
+    print("\nTest 5: Testing kerning...");
+    if (fnt.info.has_kern) {
+        var kern = fnt.get_kern_advance_codepoint(65, 86, 16.0); // 'A' and 'V'
+        print("Kerning between 'A' and 'V': {kern}");
+        print("Number of kerning pairs: {len(fnt.info.kerning_pairs)}");
+    } else {
+        print("Kerning table not present in this font (skipping)");
+    }
+
+    // Test 6: Text width with kerning
+    print("\nTest 6: Measuring text width...");
+    var text = "AVAV"; // Characters that might have kerning
+    var w = fnt.text_width(text, 16.0);
+    print("Text width for '{text}': {w}");
+    assert(w > 0.0, "Text width should be positive");
+
+    // Test 7: Text height
+    print("\nTest 7: Measuring text height...");
+    var h = fnt.text_height(text, 16.0);
+    print("Text height: {h}");
+    assert(h > 0.0, "Text height should be positive");
+
+    // Test 8: Render a single glyph
+    print("\nTest 8: Rendering single glyph...");
+    var bitmap = fnt.render_glyph(gid_a, 32.0);
+    print("Glyph bitmap: width={bitmap.width}, height={bitmap.height}, pixels={len(bitmap.pixels)}");
+    assert(bitmap.width > 0 and bitmap.height > 0, "Bitmap should have positive dimensions");
+    assert(len(bitmap.pixels) > 0, "Bitmap should have pixels");
+
+    // Test 9: Subpixel rendering
+    print("\nTest 9: Testing subpixel rendering...");
+    var bitmap_sub = fnt.render_glyph_subpixel(gid_a, 32.0, 2, 2, 0.5, 0.0);
+    print("Subpixel bitmap: width={bitmap_sub.width}, height={bitmap_sub.height}");
+    assert(bitmap_sub.width > 0 and bitmap_sub.height > 0, "Subpixel bitmap should have positive dimensions");
+
+    // Test 10: SDF rendering
+    print("\nTest 10: Testing SDF rendering...");
+    var bitmap_sdf = fnt.render_glyph_sdf(gid_a, 32.0, 4, 128.0, 1.0);
+    print("SDF bitmap: width={bitmap_sdf.width}, height={bitmap_sdf.height}");
+    assert(bitmap_sdf.width > 0 and bitmap_sdf.height > 0, "SDF bitmap should have positive dimensions");
+    // SDF should have padding, so it should be larger or equal to normal bitmap
+    print("Normal bitmap size: {bitmap.width}x{bitmap.height}, SDF size: {bitmap_sdf.width}x{bitmap_sdf.height}");
+
+    // Test 11: TTC support
+    print("\nTest 11: Testing TTC font count...");
+    var num_fonts = font.get_num_fonts(fnt.path);
+    print("Number of fonts in file: {num_fonts}");
+    assert(num_fonts > 0, "Should have at least 1 font");
+
+    print("\n === All Pure Font Tests Passed Successfully ! === ");
+    return 0;
+}

@@ -1,8 +1,7 @@
 // tests/regex/test_regex_matches.lm
 // Test suite for rich regex Match objects, spans, and POSIX regex patterns in std.regex
 
-import std.regex.index as r;
-import std.regex.regex as regex_mod;
+import std.regex as r, show Regex,Match;
 
 fn test_match_spans() {
  print("=== Testing Regex Match Spans & Attributes ===");

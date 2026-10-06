@@ -81,7 +81,7 @@ fn build_header(): ui.Widget {
 
     ui.button("Sync State", on_sync)
     .background(ui.rgb(45, 50, 68))
-    .foreground(ui.rgb(160, 200, 255))
+    .foreground(ui.rgba(160, 200, 255, 1))
     .padding_xy(14.0, 7.0)
     .corner_radius(6.0)
     ]).spacing(10.0);
