@@ -1,0 +1,6 @@
+diff --git a/vendor/fyra b/vendor/fyra
+--- a/vendor/fyra
++++ b/vendor/fyra
+@@ -1 +1 @@
+-Subproject commit ecf4e4c305a4931088fa140eafcf1e24293ee6a5
++Subproject commit ecf4e4c305a4931088fa140eafcf1e24293ee6a5-dirty
