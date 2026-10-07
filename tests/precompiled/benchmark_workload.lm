@@ -1,23 +1,13 @@
 import std.font as font;
-import std.time.instant as inst_mod;
 
-var font_path = font.detect_system_font("DejaVu");
-if (font_path == "") {
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-}
+var font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
-var inst = inst_mod.Instant(0.0);
-match (font.load_font_pure(font_path)) {
+match (font.load_font(font_path)) {
     val f => {
-        var elapsed_load = inst.elapsed();
         var total_w = 0.0;
-        var inst2 = inst_mod.Instant(0.0);
         for (var i = 0; i < 100; i = i + 1) {
             total_w = total_w + f.text_width("The quick brown fox jumps over the lazy dog 1234567890", 16.0);
         }
-        var elapsed_exec = inst2.elapsed();
-        print("LOAD_TIME_SEC: {elapsed_load.seconds}");
-        print("EXEC_TIME_SEC: {elapsed_exec.seconds}");
         print("TOTAL_WIDTH: {total_w}");
     },
     err e => {

@@ -86,7 +86,7 @@ def test_8_signature_mismatch():
     setup_base()
     with open("bin/libfont.so.meta", "r") as f:
         meta = f.read()
-    meta = meta.replace("signatures=", "signatures=std.font.load_font_pure:fn(x: int, y: int): float;")
+    meta = meta.replace("signatures=", "signatures=std.font.load_font:fn(x: int, y: int): float;")
     with open("bin/libfont.so.meta", "w") as f:
         f.write(meta)
     code, out, err = run_cmd("./bin/lymar run tests/precompiled/benchmark_workload_pure.lm")

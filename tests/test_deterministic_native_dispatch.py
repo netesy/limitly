@@ -31,12 +31,9 @@ def test_deterministic_native_dispatch():
 
     test_script = """import std.font as font;
 
-var font_path = font.detect_system_font("DejaVu");
-if (font_path == "") {
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-}
+var font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 
-match (font.load_font_pure(font_path)) {
+match (font.load_font(font_path)) {
     val f => {
         var width = f.text_width("Hello Native Lymar World!", 16.0);
         print("SUCCESS text_width={width}");

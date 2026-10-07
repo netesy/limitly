@@ -148,8 +148,7 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
                         options.arch == Architecture::WASM32 || options.platform == Platform::WASM ||
                         target_triple.find("wasm") != std::string::npos);
 
-        if ((options.platform == Platform::Windows || target_triple.find("windows") != std::string::npos || target_triple.find("win") != std::string::npos) &&
-            options.artifact_kind == ArtifactKind::Executable) {
+        if (options.platform == Platform::Windows || target_triple.find("windows") != std::string::npos || target_triple.find("win") != std::string::npos) {
             backend.importSymbol("ExitProcess", "kernel32.dll");
             backend.importSymbol("VirtualAlloc", "kernel32.dll");
             backend.importSymbol("VirtualFree", "kernel32.dll");

@@ -37,6 +37,16 @@ frame KerningEntry {
     }
 }
 
+frame CachedGlyphMetrics {
+    pub var advance: int;
+    pub var lsb: int;
+
+    pub init(adv: int = 0, lsb: int = 0) {
+        self.advance = adv;
+        self.lsb = lsb;
+    }
+}
+
 frame CmapFormat4 {
     pub var seg_count: int;
     pub var end_codes: [int];
@@ -143,6 +153,9 @@ frame FontInfo {
     pub var kern_offset: int;
     pub var kerning_pairs: [KerningEntry];
 
+    // Cached glyph metrics for fast lookup (like stb_truetype)
+    pub var glyph_metrics_cache: [CachedGlyphMetrics];
+
     pub var is_valid: bool;
 
     pub init() {
@@ -165,6 +178,7 @@ frame FontInfo {
         self.has_kern = false;
         self.kern_offset = 0;
         self.kerning_pairs = [] as [KerningEntry];
+        self.glyph_metrics_cache = [] as [CachedGlyphMetrics];
         self.is_valid = false;
     }
 
@@ -204,7 +218,18 @@ frame FontInfo {
     }
 
     pub fn get_glyph_hmetrics(reader: r.ByteReader, glyph_idx: int): (int, int) {
-        if (glyph_idx < 0 or glyph_idx >= self.num_glyphs or self.hmtx_offset == 0) {
+        if (glyph_idx < 0 or glyph_idx >= self.num_glyphs) {
+            return (self.units_per_em, 0);
+        }
+
+        // Use cached metrics if available
+        if (len(self.glyph_metrics_cache) > glyph_idx) {
+            var cached = self.glyph_metrics_cache[glyph_idx];
+            return (cached.advance, cached.lsb);
+        }
+
+        // Fallback to file read if cache not built
+        if (self.hmtx_offset == 0) {
             return (self.units_per_em, 0);
         }
 
@@ -221,6 +246,30 @@ frame FontInfo {
             var lsb = reader.peek_i16(lsb_pos);
             return (advance, lsb);
         }
+    }
+
+    pub fn build_glyph_metrics_cache(reader: r.ByteReader) {
+        if (self.hmtx_offset == 0 or self.num_glyphs == 0) {
+            return;
+        }
+
+        var cache: [CachedGlyphMetrics] = [];
+        for (var i = 0; i < self.num_glyphs; i = i + 1) {
+            if (i < self.num_h_metrics) {
+                var pos = self.hmtx_offset + (i * 4);
+                var advance = reader.peek_u16(pos);
+                var lsb = reader.peek_i16(pos + 2);
+                cache = cache + [CachedGlyphMetrics(advance, lsb)];
+            } else {
+                // Monospace or shared advance width from last hmetric
+                var last_pos = self.hmtx_offset + ((self.num_h_metrics - 1) * 4);
+                var advance = reader.peek_u16(last_pos);
+                var lsb_pos = self.hmtx_offset + (self.num_h_metrics * 4) + ((i - self.num_h_metrics) * 2);
+                var lsb = reader.peek_i16(lsb_pos);
+                cache = cache + [CachedGlyphMetrics(advance, lsb)];
+            }
+        }
+        self.glyph_metrics_cache = cache;
     }
 
     pub fn get_kern_advance(glyph1: int, glyph2: int): int {
@@ -357,6 +406,9 @@ pub fn parse_tables(reader: r.ByteReader): FontInfo? {
     var glyf_offset = find_table_offset(TAG_GLYF);
     if (glyf_offset < 0) { return err(); }
     info.glyf_offset = glyf_offset;
+
+    // Build glyph metrics cache for fast lookup (like stb_truetype)
+    info.build_glyph_metrics_cache(reader);
 
     // 5. Parse 'cmap' table
     var cmap_offset = find_table_offset(TAG_CMAP);

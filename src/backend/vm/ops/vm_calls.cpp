@@ -142,13 +142,6 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                         throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
                     }
                 }
-            } else {
-                std::string mod_prefix = pc->func_name;
-                size_t last_dot = mod_prefix.rfind('.');
-                if (last_dot != std::string::npos) {
-                    mod_prefix = mod_prefix.substr(0, last_dot);
-                }
-
             }
 
             if (CompiledResolver::getInstance().dispatch(pc->func_name, reinterpret_cast<uint64_t>(registers.data()), this)) {
