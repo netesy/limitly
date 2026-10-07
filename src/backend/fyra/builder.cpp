@@ -57,7 +57,8 @@ std::string LIRToFyraIRBuilder::generate_label() {
     return "label_" + std::to_string(label_counter_++);
 }
 
-std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& lir_func) {
+std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& lir_func,
+                                                   const std::string& exported_module) {
     LIR::LIRBuiltinFunctions::getInstance().initialize();
     current_module_ = std::make_shared<ir::Module>(lir_func.name, context_);
     builder_->setModule(current_module_.get());
@@ -84,8 +85,10 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     std::vector<std::string> mod_prefixes;
     for (const auto& fname : registry.getFunctionNames()) {
         if (fname.ends_with(".__init__")) {
-            std::string prefix = fname.substr(0, fname.length() - 8); // strip .__init__
-            if (!prefix.empty()) mod_prefixes.push_back(prefix);
+            std::string prefix = fname.substr(0, fname.length() - std::string(".__init__").size());
+            // Dependencies are reached through calls, not through all their
+            // unused exports. Only the library being built is an export root.
+            if (!prefix.empty() && prefix == exported_module) mod_prefixes.push_back(prefix);
         }
     }
 
@@ -363,6 +366,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     };
 
     std::unordered_map<uint32_t, ir::Value*> regs;
+    std::unordered_map<uint32_t, ir::BasicBlock*> register_definitions;
     std::unordered_map<uint32_t, LIR::Type> reg_types;
     std::unordered_map<uint32_t, int> reg_decimal_scales;
     std::unordered_map<uint32_t, int64_t> reg_int_values;
@@ -436,6 +440,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     std::unordered_map<uint32_t, ir::Instruction*> reg_slots;
     for (size_t r = 0; r <= max_reg + 10; ++r) {
         reg_slots[r] = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+        reg_slots[r]->setName("slot_r" + std::to_string(r));
         builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), reg_slots[r]);
     }
 
@@ -444,6 +449,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     for (const auto& param : main_fn->getParameters()) {
         builder_->createStore(param.get(), reg_slots[param_idx]);
         regs[param_idx] = param.get();
+        register_definitions[param_idx] = nullptr;
         if (param->getType() && (param->getType()->isDoubleTy() || param->getType()->isFloatTy())) {
             reg_types[param_idx] = LIR::Type::F64;
         } else {
@@ -473,8 +479,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     }
 
     auto load_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
+        // Use a dominating SSA value within its defining block. This also avoids
+        // redundant store/load pairs for parameters and straight-line expressions.
+        if (regs.count(r) && register_definitions.count(r) &&
+            (!register_definitions[r] || register_definitions[r] == builder_->getInsertPoint())) {
+            return regs[r];
+        }
         if (reg_slots.count(r)) {
-            return builder_->createLoad(reg_slots[r]);
+            const auto actual = reg_types.count(r) ? reg_types[r] : t;
+            auto* load = (actual == LIR::Type::F64 || actual == LIR::Type::F32)
+                ? builder_->createLoadd(reg_slots[r]) : builder_->createLoad(reg_slots[r]);
+            load->setName("load_r" + std::to_string(r) + "_" + std::to_string(label_counter_++));
+            return load;
         }
         if (regs.count(r)) return regs[r];
         ir::Type* fty = lir_type_to_fyra_type(t);
@@ -497,6 +513,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
         }
         regs[r] = v;
+        register_definitions[r] = builder_->getInsertPoint();
         reg_types[r] = t;
     };
 

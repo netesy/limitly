@@ -62,7 +62,7 @@ var MIME_MULTIPART_FORM = "multipart/form-data";
 var MIME_OCTET_STREAM = "application/octet-stream";
 
 // --- Default User-Agent string ---
-var DEFAULT_USER_AGENT = "Luminar/1.0";
+var DEFAULT_USER_AGENT = "Lymar/1.0";
 
 // --- Status code to reason phrase mapping ---
 fn status_text(code: int): str {

@@ -1265,7 +1265,7 @@ public:
                     height_ = h;
                     pixels_.assign(width_ * height_ * 4, 0);
                 }
-                const char* headless = std::getenv("LIMITLY_HEADLESS");
+                const char* headless = std::getenv("LYMAR_HEADLESS");
                 if (!(headless && std::string(headless) != "0")) {
                     sokol_app_runtime().start(SokolAppConfig{width_, height_, title, resizable, true});
                 }

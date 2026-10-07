@@ -121,15 +121,13 @@ void LIRFunctionManager::registerFunction(std::shared_ptr<LIRFunction> function)
     lir_func->name = name;
     lir_func->param_count = function->getParameters().size();
     
-    // Set up register types for parameters
+    lir_func->register_types = function->getRegisterTypes();
+    // Fill parameter types without discarding metadata for temporary registers.
     for (size_t i = 0; i < function->getParameters().size(); ++i) {
         lir_func->register_types[i] = function->getParameters()[i].type;
     }
     
-    // Set return type if available
-    if (function->getReturnType()) {
-        lir_func->register_types[0] = *function->getReturnType(); // Return value in register 0
-    }
+    // Register zero is the first parameter, not a dedicated return slot in LIR.
     
     // Copy instructions if available
     lir_func->instructions = function->getInstructions();

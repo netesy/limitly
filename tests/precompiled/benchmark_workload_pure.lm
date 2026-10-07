@@ -1,17 +1,28 @@
 import std.font as font;
 
-// Use Windows-specific font path for benchmark
-var font_path = "C:\\Windows\\Fonts\\arial.ttf";
+import std.io as font_file;
+
+// The runner overrides this path so all modes use the same file.
+var font_path = "";
+var candidates = ["C:/Windows/Fonts/arial.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/System/Library/Fonts/Supplemental/Arial.ttf"];
+iter (candidate in candidates) {
+    if (font_path == "" and font_file.exists(candidate)) {
+        font_path = candidate;
+    }
+}
+assert(font_path != "", "No system font available for the benchmark");
 
 match (font.load_font(font_path)) {
     val f => {
+        assert(f.is_valid, "Pure Lymar font is invalid");
         var total_w = 0.0;
         for (var i = 0; i < 50; i = i + 1) {
             total_w = total_w + f.text_width("The quick brown fox jumps over the lazy dog 1234567890", 16.0);
         }
+        assert(total_w > 0.0, "Pure Lymar workload did not measure any width");
         print("WORKLOAD_DONE: {total_w}");
     },
     err e => {
-        print("Failed to load font: {e}");
+        assert(false, "Failed to load benchmark font: {e}");
     }
 }

@@ -41,13 +41,7 @@ frame StringBuilder {
     }
 
     pub fn to_string(): str {
-        var res = "";
-        var i = 0;
-        while (i < len(self.parts)) {
-            res = res + self.parts[i];
-            i = i + 1;
-        }
-        return res;
+        return _builtin_string_join(self.parts, "");
     }
 }
 

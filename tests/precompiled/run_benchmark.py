@@ -1,104 +1,158 @@
+"""Validate equivalent font work before reporting measured process timings."""
+import argparse
+from contextlib import contextmanager
+import math
 import os
-import time
-import subprocess
+from pathlib import Path
+import re
+import statistics
 import shutil
-import platform
+import subprocess
+import tempfile
+import time
 
-def measure_run(cmd, env=None):
-    t0 = time.perf_counter()
-    p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=env)
-    t1 = time.perf_counter()
-    return (t1 - t0) * 1000.0, p.stdout, p.stderr
+ROOT = Path(__file__).resolve().parents[2]
+MARKER = re.compile(r"WORKLOAD_DONE: ([+\-0-9.eE]+)")
 
-def run_average(cmd, runs=5, env=None):
-    times = []
-    stdout = ""
-    stderr = ""
+
+def measure_run(cmd, env=None, timeout=120):
+    start = time.perf_counter()
+    result = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, env=env, timeout=timeout)
+    elapsed = (time.perf_counter() - start) * 1000
+    if result.returncode:
+        raise RuntimeError(f"{cmd}: exited {result.returncode}\n{result.stdout}\n{result.stderr}")
+    return elapsed, result.stdout, result.stderr
+
+
+def workload_result(output):
+    matches = MARKER.findall(output)
+    if len(matches) != 1:
+        raise RuntimeError(f"Expected one completed workload, got {len(matches)}: {output}")
+    value = float(matches[0])
+    if not math.isfinite(value) or value <= 0:
+        raise RuntimeError(f"Invalid workload result: {value}")
+    return value
+
+
+def run_average(cmd, runs=5, env=None, native=False):
+    times, values = [], []
     for _ in range(runs):
         ms, out, err = measure_run(cmd, env)
+        value = workload_result(out)
+        if native:
+            width_calls = re.findall(r"^PRECOMPILED_CALL: std\.font\.Font\.text_width$", err, re.MULTILINE)
+            if len(width_calls) != 50 or "PRECOMPILED_CALL: std.font.load_font" not in err:
+                raise RuntimeError("Mode B must load the font and execute all 50 text_width calls natively")
         times.append(ms)
-        stdout = out
-        stderr = err
-    avg = sum(times) / len(times)
-    return avg, stdout, stderr
+        values.append(value)
+    if any(not math.isclose(values[0], v, rel_tol=1e-5, abs_tol=0.01) for v in values):
+        raise RuntimeError("Workload results changed between runs")
+    return statistics.mean(times), values[0]
+
+
+@contextmanager
+def preserve_artifacts(paths):
+    # Restore any user artifacts even when a build, run, or validation fails.
+    with tempfile.TemporaryDirectory(prefix="lymar-artifacts-") as backup:
+        saved = []
+        for i, path in enumerate(paths):
+            if path.exists() or path.is_symlink():
+                destination = Path(backup) / str(i)
+                shutil.copy2(path, destination, follow_symlinks=False)
+                saved.append((path, destination))
+        try:
+            # Finish all backups before removing anything. Copying also works
+            # when the temporary directory is on another filesystem.
+            for path, _ in saved:
+                path.unlink()
+            yield
+        finally:
+            for path in paths:
+                path.unlink(missing_ok=True)
+            for path, destination in saved:
+                shutil.copy2(destination, path, follow_symlinks=False)
+
+
+def resolve_font(requested=None):
+    candidates = [Path(requested)] if requested else [
+        Path(os.environ.get("WINDIR", "C:/Windows")) / "Fonts" / "arial.ttf",
+        Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+        Path("/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf"),
+        Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+    ]
+    for path in candidates:
+        if path.is_file():
+            return path.resolve()
+    raise RuntimeError("No benchmark font found; use --font /path/to/font.ttf")
+
 
 def main():
-    print("================================================================================")
-    print("                    STD.FONT BENCHMARK COMPARISON MATRIX                        ")
-    print("================================================================================")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--font")
+    parser.add_argument("--runs", type=int, default=5)
+    parser.add_argument("--skip-aot", action="store_true", help="Validate A/B/D only")
+    parser.add_argument("--oracle-only", action="store_true", help="Validate A/D without native compilation")
+    parser.add_argument("--opt-level", choices=("0", "1", "2", "3"), default="2")
+    args = parser.parse_args()
+    if args.runs < 1:
+        parser.error("--runs must be positive")
+    font = resolve_font(args.font)
+    windows = os.name == "nt"
+    shared_ext = ".dll" if windows else (".dylib" if os.sys.platform == "darwin" else ".so")
+    static_ext = ".lib" if windows else ".a"
+    compiler = str(ROOT / "bin" / ("lymar.exe" if windows else "lymar"))
+    paths = [ROOT / "bin" / ("libfont" + ext + suffix)
+             for ext in (".so", ".dll", ".dylib", ".a", ".lib") for suffix in ("", ".meta")]
+    (ROOT / "build").mkdir(exist_ok=True)
+    with preserve_artifacts(paths), tempfile.TemporaryDirectory(dir=ROOT / "build", prefix="font-benchmark-") as tmp:
+        tmp = Path(tmp)
+        sources = []
+        # Bind exactly the same font in both workloads, independent of host defaults.
+        literal = str(font).replace("\\", "\\\\").replace('"', '\\"')
+        for kind in ("pure", "stb"):
+            source = (ROOT / "tests" / "precompiled" / f"benchmark_workload_{kind}.lm").read_text()
+            start = source.index("var font_path =")
+            end = source.index("assert(font_path !=", start)
+            source = source[:start] + f'var font_path = "{literal}";\n' + source[end:]
+            path = tmp / f"{kind}.lm"
+            path.write_text(source)
+            sources.append(str(path))
+        rows = {}
+        rows["A. Interpreted Lymar"] = run_average([compiler, "run", sources[0]], args.runs)
+        # D is an em-sized floating-point C oracle, matching std.font semantics.
+        rows["D. STB C oracle"] = run_average([compiler, "run", sources[1]], args.runs)
+        reference = rows["D. STB C oracle"][1]
+        if not math.isclose(rows["A. Interpreted Lymar"][1], reference, rel_tol=1e-5, abs_tol=0.01):
+            raise RuntimeError(f"Interpreted width {rows['A. Interpreted Lymar'][1]} differs from oracle {reference}")
+        print(f"Validated A/D: total width={reference:.6f}; A={rows['A. Interpreted Lymar'][0]:.2f} ms; D={rows['D. STB C oracle'][0]:.2f} ms", flush=True)
+        if args.oracle_only:
+            return
+        shared = ROOT / "bin" / ("libfont" + shared_ext)
+        measure_run([compiler, "build", "-O", args.opt_level, "-shared", "std/font/index.lm", "-o", str(shared)], timeout=600)
+        native_env = dict(os.environ, LYMAR_DISABLE_INTERPRETER_FALLBACK="1", LYMAR_TRACE_PRECOMPILED="1")
+        rows["B. VM + native font"] = run_average([compiler, "run", sources[0]], args.runs, native_env, native=True)
+        native_ms, native_value = rows["B. VM + native font"]
+        if not math.isclose(native_value, reference, rel_tol=1e-5, abs_tol=0.01):
+            raise RuntimeError(f"Native width {native_value} differs from oracle {reference}")
+        print(f"Validated B: total width={native_value:.6f}; B={native_ms:.2f} ms", flush=True)
+        if not args.skip_aot:
+            print("Building Mode C (static library and standalone AOT)...", flush=True)
+            static = ROOT / "bin" / ("libfont" + static_ext)
+            measure_run([compiler, "build", "-O", args.opt_level, "-static", "std/font/index.lm", "-o", str(static)], timeout=600)
+            exe = tmp / ("benchmark.exe" if windows else "benchmark")
+            measure_run([compiler, "build", "-O", args.opt_level, sources[0], "-o", str(exe)], timeout=600)
+            rows["C. Native AOT"] = run_average([str(exe)], args.runs)
+        reference = rows["D. STB C oracle"][1]
+        for mode, (_, value) in rows.items():
+            if not math.isclose(value, reference, rel_tol=1e-5, abs_tol=0.01):
+                raise RuntimeError(f"{mode}: result {value} differs from oracle {reference}")
+        print(f"Font: {font}\nCompleted iterations per run: 50")
+        print(f"{'Mode':<28} | {'End-to-end mean (ms)':>20} | {'Total width':>14}")
+        for mode in sorted(rows):
+            ms, value = rows[mode]
+            print(f"{mode:<28} | {ms:20.2f} | {value:14.6f}")
+        print("Timings include process startup, font loading, and the workload. No unmeasured phase estimates.")
 
-    # Detect platform and set appropriate extensions
-    is_windows = platform.system() == "Windows"
-    if is_windows:
-        shared_ext = ".dll"
-        static_ext = ".lib"
-        exe_ext = ".exe"
-        lymar_cmd = os.path.join("bin", "lymar.exe")
-    else:
-        shared_ext = ".so"
-        static_ext = ".a"
-        exe_ext = ""
-        lymar_cmd = os.path.join(".", "bin", "lymar")
-
-    # Measure process startup time alone (empty script execution)
-    startup_cmd = f"{lymar_cmd} run -e ''"
-    startup_ms, _, _ = run_average(startup_cmd, runs=5)
-
-    # 1. Build shared and static libraries for std.font
-    shared_lib = os.path.join("bin", f"libfont{shared_ext}")
-    static_lib = os.path.join("bin", f"libfont{static_ext}")
-    subprocess.run(f"{lymar_cmd} build -shared std/font/index.lm -o {shared_lib}", shell=True, check=True)
-    subprocess.run(f"{lymar_cmd} build -static std/font/index.lm -o {static_lib}", shell=True, check=True)
-
-    # Build AOT executable for Mode C
-    aot_exe = os.path.join("bin", f"benchmark_aot{exe_ext}")
-    subprocess.run(f"{lymar_cmd} build -o {aot_exe} tests/precompiled/benchmark_workload_pure.lm", shell=True, check=True)
-
-    # Ensure shared library is temporarily hidden for Mode A (Interpreted)
-    if os.path.exists(shared_lib):
-        shutil.move(shared_lib, f"{shared_lib}.tmp")
-    if os.path.exists(f"{shared_lib}.meta"):
-        shutil.move(f"{shared_lib}.meta", f"{shared_lib}.meta.tmp")
-
-    # Mode A: std.font interpreted pure Lymar
-    avg_a, out_a, err_a = run_average(f"{lymar_cmd} run tests/precompiled/benchmark_workload_pure.lm")
-
-    # Restore shared library for Mode B
-    if os.path.exists(f"{shared_lib}.tmp"):
-        shutil.move(f"{shared_lib}.tmp", shared_lib)
-    if os.path.exists(f"{shared_lib}.meta.tmp"):
-        shutil.move(f"{shared_lib}.meta.tmp", f"{shared_lib}.meta")
-
-    # Mode B: std.font VM + Fyra-compiled shared library
-    avg_b, out_b, err_b = run_average(f"{lymar_cmd} run tests/precompiled/benchmark_workload_pure.lm")
-
-    # Mode C: std.font AOT + static library
-    avg_c, out_c, err_c = run_average(aot_exe)
-
-    # Mode D: stb_truetype reference oracle
-    avg_d, out_d, err_d = run_average(f"{lymar_cmd} run tests/precompiled/benchmark_workload_stb.lm")
-
-    # Estimate phase breakdowns
-    # Discovery / dynamic loading overhead for VM compiled module
-    disc_dyn_ms = 0.15 # ~150 microseconds for dlopen/dlsym & meta validation
-
-    # Execution = End-to-end minus process startup for VM/Interpreted modes
-    exec_a = max(0.0, avg_a - startup_ms)
-    exec_b = max(0.0, avg_b - startup_ms - disc_dyn_ms)
-    exec_c = max(0.0, avg_c - 1.0) # AOT native startup is ~1.0 ms
-    exec_d = max(0.0, avg_d - startup_ms)
-
-    print(f"Process Startup Overhead (Interpreter VM) : {startup_ms:.2f} ms\n")
-
-    lib_name = f"font{shared_ext}"
-    static_name = f"font{static_ext}"
-    print(f"{'Mode':<35} | {'Discovery':<10} | {'Dynamic Load':<12} | {'Execution':<11} | {'End-to-End':<10}")
-    print("-" * 88)
-    print(f"{'A. std.font Interpreted Pure Lymar':<35} | {'0.00 ms':<10} | {'0.00 ms':<12} | {exec_a:6.2f} ms    | {avg_a:6.2f} ms")
-    print(f"{'B. std.font VM + Fyra ' + lib_name:<35} | {'0.05 ms':<10} | {'0.10 ms':<12} | {exec_b:6.2f} ms    | {avg_b:6.2f} ms")
-    print(f"{'C. std.font AOT + ' + static_name:<35} | {'0.00 ms':<10} | {'0.00 ms':<12} | {exec_c:6.2f} ms    | {avg_c:6.2f} ms")
-    print(f"{'D. stb_truetype C Reference Oracle':<35} | {'0.00 ms':<10} | {'0.05 ms':<12} | {exec_d:6.2f} ms    | {avg_d:6.2f} ms")
-    print("================================================================================")
 
 if __name__ == "__main__":
     main()

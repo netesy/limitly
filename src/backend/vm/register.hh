@@ -45,6 +45,11 @@ public:
     
     RegisterValue get_global(const std::string& name) const;
     void set_global(const std::string& name, RegisterValue value);
+    // Native modules share tagged heap objects and the caller's ownership region.
+    void register_native_allocation(RegisterValue value);
+    void transfer_native_ownership(RegisterValue child, RegisterValue container) {
+        transfer_ownership(child, container);
+    }
 
     bool has_active_fibers() const;
     std::string to_string(const RegisterValue& value) const;
@@ -59,9 +64,15 @@ public:
     // Saves full VM state, executes `func_name` with `args`, restores state,
     // and returns whatever the Lymar function left in registers[0].
     RegisterValue invoke_for_callback(const std::string& func_name,
-                                      const std::vector<RegisterValue>& args);
+                                      const std::vector<RegisterValue>& args,
+                                      bool propagate_errors = false);
 
 private:
+    RegisterValue call_interpreted(const std::string& name,
+                                   const std::vector<RegisterValue>& args);
+    // Reuse register storage across calls; caller values remain isolated.
+    std::vector<std::vector<RegisterValue>> spare_register_files_;
+
     // Opcode execution modules
     void execute_arithmetic(const LIR::LIR_Inst* pc);
     void execute_comparison(const LIR::LIR_Inst* pc);

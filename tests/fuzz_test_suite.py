@@ -556,7 +556,7 @@ def main():
  sys.exit(1)
 
  print_color("======================================================================", COLOR_CYAN)
- print_color(" STARTING LIMITLY FUZZY TEST SUITE (WITH HUMAN READABILITY) ", COLOR_BOLD + COLOR_CYAN)
+ print_color(" STARTING LYMAR FUZZY TEST SUITE (WITH HUMAN READABILITY) ", COLOR_BOLD + COLOR_CYAN)
  print_color("======================================================================", COLOR_CYAN)
  print(f"Compiler: {compiler_path}")
  print(f"Timeout: {args.timeout}s per execution")

@@ -174,10 +174,11 @@ namespace {
 
 RegisterValue RegisterVM::invoke_for_callback(
     const std::string& func_name,
-    const std::vector<RegisterValue>& args)
+    const std::vector<RegisterValue>& args, bool propagate_errors)
 {
     auto& func_manager = LIR::LIRFunctionManager::getInstance();
     if (!func_manager.hasFunction(func_name)) {
+        if (propagate_errors) throw std::runtime_error("Native callback function not found: " + func_name);
         std::cerr << "[trampoline] function '" << func_name << "' not found in registry\n";
         return VAL_NIL;
     }
@@ -204,9 +205,19 @@ RegisterValue RegisterVM::invoke_for_callback(
     try {
         execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
     } catch (const std::exception& e) {
+        if (propagate_errors) {
+            registers = saved_registers;
+            current_function_ = saved_func;
+            throw;
+        }
         std::cerr << "[trampoline] Lymar callback '" << func_name
                   << "' threw: " << e.what() << '\n';
     } catch (...) {
+        if (propagate_errors) {
+            registers = saved_registers;
+            current_function_ = saved_func;
+            throw;
+        }
         std::cerr << "[trampoline] Lymar callback '" << func_name
                   << "' threw unknown exception\n";
     }

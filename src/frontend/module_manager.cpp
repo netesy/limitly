@@ -3,6 +3,7 @@
 #include "parser.hh"
 #include "type_checker.hh"
 #include "../error/debugger.hh"
+#include "../lir/function_registry.hh"
 #include <fstream>
 #include <sstream>
 #include <algorithm>
@@ -10,6 +11,7 @@
 #include <functional>
 #include <future>
 #include <iomanip>
+#include <cstdlib>
 
 #include <filesystem>
 
@@ -154,6 +156,7 @@ std::string CompiledModuleMeta::serialize() const {
     ss << "artifact_kind=" << artifact_kind << "\n";
     ss << "artifact_path=" << artifact_path << "\n";
     ss << "source_hash=" << source_hash << "\n";
+    for (const auto& [name, hash] : dependency_hashes) ss << "dependency_hash." << name << "=" << hash << "\n";
 
     ss << "exports=";
     for (size_t i = 0; i < exports.size(); ++i) {
@@ -199,6 +202,7 @@ bool CompiledModuleMeta::deserialize(const std::string& input, CompiledModuleMet
         else if (key == "artifact_kind") out_meta.artifact_kind = val;
         else if (key == "artifact_path") out_meta.artifact_path = val;
         else if (key == "source_hash") out_meta.source_hash = val;
+        else if (key.starts_with("dependency_hash.")) out_meta.dependency_hashes[key.substr(16)] = val;
         else if (key == "exports") {
             out_meta.exports.clear();
             std::stringstream list_ss(val);
@@ -230,7 +234,9 @@ bool CompiledModuleMeta::deserialize(const std::string& input, CompiledModuleMet
 
 bool ModuleManager::register_compiled_module(const CompiledModuleMeta& meta) {
     std::lock_guard<std::mutex> lock(modules_mutex_);
-    compiled_modules_[meta.module_name].push_back(meta);
+    auto& variants = compiled_modules_[meta.module_name];
+    for (const auto& existing : variants) if (existing.artifact_path == meta.artifact_path) return true;
+    variants.push_back(meta);
     return true;
 }
 
@@ -249,9 +255,16 @@ bool ModuleManager::find_compiled_module(const std::string& module_name, const s
     return false;
 }
 
-bool ModuleManager::is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) const {
+bool ModuleManager::is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) {
     if (!fs::exists(meta.artifact_path)) return false;
     if (meta.abi_version != "1.0.0") return false;
+    for (const auto& [name, hash] : meta.dependency_hashes) {
+        std::ifstream dependency(find_module_file(name));
+        if (!dependency) return false;
+        std::stringstream contents;
+        contents << dependency.rdbuf();
+        if (CompiledModuleMeta::compute_sha256(contents.str()) != hash) return false;
+    }
     if (current_source_path.empty() || !fs::exists(current_source_path)) return true;
 
     // Source modification time vs artifact modification time
@@ -294,6 +307,11 @@ CompiledModuleMeta ModuleManager::generate_metadata(
     meta.artifact_kind = artifact_kind;
     meta.artifact_path = artifact_path;
     meta.source_hash = CompiledModuleMeta::compute_sha256(module->source);
+    for (const auto& [name, dependency] : get_all_modules()) {
+        if (!dependency->path.empty() && name != module->name) {
+            meta.dependency_hashes[name] = CompiledModuleMeta::compute_sha256(dependency->source);
+        }
+    }
 
     // Dependencies
     for (const auto& dep : module->dependencies) {
@@ -324,6 +342,10 @@ CompiledModuleMeta ModuleManager::generate_metadata(
                 std::string frame_sym = mod_prefix + "." + frame->name;
                 meta.exports.push_back(frame_sym);
                 meta.export_signatures[frame_sym] = "frame";
+                if (frame->init) {
+                    meta.exports.push_back(frame_sym + ".init");
+                    meta.export_signatures[frame_sym + ".init"] = "constructor";
+                }
 
                 for (const auto& method : frame->methods) {
                     if (method->visibility == AST::VisibilityLevel::Public) {
@@ -350,12 +372,36 @@ CompiledModuleMeta ModuleManager::generate_metadata(
         }
     }
 
+    // Returned closures need native dispatch metadata as well as an exported entry.
+    for (const auto& name : LIR::FunctionRegistry::getInstance().getFunctionNames()) {
+        if (name.starts_with(mod_prefix + ".") && name.find(".__lambda_") != std::string::npos) {
+            meta.exports.push_back(name);
+            meta.export_signatures[name] = "closure";
+        }
+    }
+
+    // A facade such as std.collections re-exports implementations from child
+    // modules. Their canonical symbols must be discoverable in the library's
+    // metadata, just as they are in its native export table.
+    for (const auto& [name, child] : get_all_modules()) {
+        std::string canonical = name;
+        if (canonical.ends_with(".index")) canonical.resize(canonical.size() - 6);
+        if (!canonical.starts_with(mod_prefix + ".")) continue;
+        auto child_meta = generate_metadata(child, target, arch, artifact_kind, artifact_path);
+        for (const auto& symbol : child_meta.exports) {
+            if (std::find(meta.exports.begin(), meta.exports.end(), symbol) == meta.exports.end()) {
+                meta.exports.push_back(symbol);
+                meta.export_signatures[symbol] = child_meta.export_signatures[symbol];
+            }
+        }
+    }
     return meta;
 }
 
 void ModuleManager::set_include_dirs(const std::vector<std::string>& dirs) {
     std::lock_guard<std::mutex> lock(modules_mutex_);
     include_dirs_ = dirs;
+    if (const char* home = std::getenv("LYMAR_HOME")) include_dirs_.push_back(home);
 }
 
 std::string ModuleManager::find_module_file(const std::string& module_path) {
@@ -441,7 +487,8 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
 
     Scanner scanner(source, filePath);
     scanner.scanTokens();
-    Parser parser(scanner);
+    // Imported modules need semantic ASTs; their concrete syntax trees are never displayed.
+    Parser parser(scanner, false);
     auto ast = parser.parse();
 
     if (!ast || LM::Error::Debugger::hasError()) {
@@ -469,6 +516,7 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
 
     // Discover precompiled module artifacts (.meta files) for module_path
     std::string mod_leaf = module_path;
+    if (mod_leaf.ends_with(".index")) mod_leaf.resize(mod_leaf.size() - 6);
     size_t dot_pos = mod_leaf.rfind('.');
     if (dot_pos != std::string::npos) mod_leaf = mod_leaf.substr(dot_pos + 1);
 
@@ -485,6 +533,32 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
         (fs::path(filePath).parent_path() / (mod_leaf + ".a")).string()
     };
 
+    // Discover the native artifact extensions on each supported host.
+    const auto linux_candidates = candidate_paths;
+    for (const auto& path : linux_candidates) {
+        fs::path candidate(path);
+        for (const char* extension : {".dll", ".dylib", ".lib"}) {
+            candidate.replace_extension(extension);
+            candidate_paths.push_back(candidate.string());
+        }
+    }
+    for (const auto& dir : include_dirs_) {
+        for (const char* extension : {".so", ".dll", ".dylib", ".a", ".lib"}) {
+            candidate_paths.push_back((fs::path(dir) / "bin" / ("lib" + mod_leaf + extension)).string());
+        }
+    }
+
+    // Umbrella libraries can also serve imports of a child module directly.
+    std::string parent = module_path;
+    while (parent.find_last_of('.') != std::string::npos) {
+        parent.resize(parent.find_last_of('.'));
+        const auto leaf = parent.substr(parent.find_last_of('.') == std::string::npos ? 0 : parent.find_last_of('.') + 1);
+        for (const char* extension : {".so", ".dll", ".dylib", ".a", ".lib"}) {
+            candidate_paths.push_back((fs::path("bin") / ("lib" + leaf + extension)).string());
+            for (const auto& dir : include_dirs_) candidate_paths.push_back((fs::path(dir) / "bin" / ("lib" + leaf + extension)).string());
+        }
+    }
+
     for (const auto& cp : candidate_paths) {
         std::string meta_p = cp + ".meta";
         if (fs::exists(meta_p) && fs::exists(cp)) {
@@ -494,7 +568,14 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
                 mbuf << mf.rdbuf();
                 CompiledModuleMeta meta;
                 if (CompiledModuleMeta::deserialize(mbuf.str(), meta)) {
-                    if (is_artifact_valid(meta, filePath)) {
+                    // A sidecar describes the binary beside it. Bind to that
+                    // candidate so moving an installation cannot retain a path
+                    // to the original build machine or checkout.
+                    meta.artifact_path = fs::absolute(cp).string();
+                    std::string canonical = module_path;
+                    if (canonical.ends_with(".index")) canonical.resize(canonical.size() - 6);
+                    if ((canonical == meta.module_name || canonical.starts_with(meta.module_name + ".")) &&
+                        is_artifact_valid(meta, find_module_file(meta.module_name))) {
                         register_compiled_module(meta);
                     }
                 }

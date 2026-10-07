@@ -647,6 +647,44 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
     ));
 
     registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_join", std::vector<TypeTag>{TypeTag::List, TypeTag::String}, TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string result;
+            const auto& parts = args.at(0);
+            const auto& separator = args.at(1);
+            std::string delimiter = separator && separator->type->tag != TypeTag::Nil ? separator->as<std::string>() : "";
+            if (parts && std::holds_alternative<ListValue>(parts->complexData)) {
+                const auto& elements = std::get<ListValue>(parts->complexData).elements;
+                size_t length = 0;
+                for (size_t i = 0; i < elements.size(); ++i) {
+                    if (i) length += delimiter.size();
+                    if (elements[i] && elements[i]->type->tag != TypeTag::Nil) length += elements[i]->as<std::string>().size();
+                }
+                result.reserve(length);
+                for (size_t i = 0; i < elements.size(); ++i) {
+                    if (i) result += delimiter;
+                    if (elements[i] && elements[i]->type->tag != TypeTag::Nil) result += elements[i]->as<std::string>();
+                }
+            }
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::String), result);
+        }
+    ));
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_list_slice", std::vector<TypeTag>{TypeTag::List, TypeTag::Int, TypeTag::Int}, TypeTag::List,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            ListValue result;
+            if (args.at(0) && std::holds_alternative<ListValue>(args[0]->complexData)) {
+                const auto& elements = std::get<ListValue>(args[0]->complexData).elements;
+                auto start = std::min(elements.size(), static_cast<size_t>(std::max(int64_t(0), args.at(1)->as<int64_t>())));
+                auto end = std::min(elements.size(), static_cast<size_t>(std::max(int64_t(0), args.at(2)->as<int64_t>())));
+                if (end > start) result.elements.assign(elements.begin() + start, elements.begin() + end);
+            }
+            auto type = std::make_shared<::Type>(TypeTag::List, ListType(std::make_shared<::Type>(TypeTag::Any)));
+            return std::make_shared<Value>(type, result);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
         "_builtin_string_byte_len",
         std::vector<TypeTag>{TypeTag::String},
         TypeTag::Int64,

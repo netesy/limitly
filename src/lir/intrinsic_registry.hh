@@ -1,5 +1,5 @@
-#ifndef LIMITLY_LIR_INTRINSIC_REGISTRY_H
-#define LIMITLY_LIR_INTRINSIC_REGISTRY_H
+#ifndef LYMAR_LIR_INTRINSIC_REGISTRY_H
+#define LYMAR_LIR_INTRINSIC_REGISTRY_H
 
 #include "lir.hh"
 #include <string>
@@ -34,4 +34,4 @@ private:
 } // namespace LIR
 } // namespace LM
 
-#endif // LIMITLY_LIR_INTRINSIC_REGISTRY_H
+#endif // LYMAR_LIR_INTRINSIC_REGISTRY_H

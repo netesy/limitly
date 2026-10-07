@@ -286,10 +286,11 @@ EXPORT int get_font_vmetrics(void* font_handle, float font_size, float* ascent, 
     return 1;
 }
 
-EXPORT float measure_text_width(void* font_handle, float font_size, const char* text) {
+static float measure_text_width_scaled(void* font_handle, float font_size, const char* text, int em_size) {
     if (!font_handle || !text) return 0.0f;
     FontHandle* handle = (FontHandle*)font_handle;
-    float scale = stbtt_ScaleForPixelHeight(&handle->info, font_size);
+    float scale = em_size ? stbtt_ScaleForMappingEmToPixels(&handle->info, font_size)
+                          : stbtt_ScaleForPixelHeight(&handle->info, font_size);
     float max_width = 0.0f;
     float cur_width = 0.0f;
     int len = (int)strlen(text);
@@ -309,6 +310,15 @@ EXPORT float measure_text_width(void* font_handle, float font_size, const char* 
     }
     if (cur_width > max_width) max_width = cur_width;
     return max_width;
+}
+
+EXPORT float measure_text_width(void* font_handle, float font_size, const char* text) {
+    return measure_text_width_scaled(font_handle, font_size, text, 0);
+}
+
+// Oracle for std.font.text_width: floating point em sizing, without integer rounding.
+EXPORT float measure_text_width_em(void* font_handle, float font_size, const char* text) {
+    return measure_text_width_scaled(font_handle, font_size, text, 1);
 }
 
 EXPORT int measure_text_width_int(void* font_handle, int font_size, const char* text) {
@@ -523,4 +533,3 @@ EXPORT int detect_system_font_path(const char* preferred_name, char* out_path, i
 
     return 0;
 }
-

@@ -50,6 +50,7 @@ enum class ArtifactKind {
 };
 
 struct FyraCompileOptions {
+    std::string exported_module;
     CompileTarget target = CompileTarget::AOT;
     Platform platform = Platform::Windows;
     Architecture arch = Architecture::X86_64;

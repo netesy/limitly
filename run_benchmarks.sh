@@ -2,7 +2,7 @@
 set -e
 
 echo "================================================================================"
-echo "                   LIMITLY LIR OPTIMIZATION BENCHMARK SUITE                     "
+echo "                   LYMAR LIR OPTIMIZATION BENCHMARK SUITE                     "
 echo "================================================================================"
 echo
 
@@ -26,14 +26,14 @@ for bm in "${BENCHMARKS[@]}"; do
 
     # Run baseline (unoptimized)
     start_time=$(date +%s%N)
-    ./bin/limitly "$bm" > /dev/null 2>&1
+    ./bin/lymar run "$bm" > /dev/null 2>&1
     end_time=$(date +%s%N)
     baseline_ms=$(( (end_time - start_time) / 1000000 ))
     baseline_sec=$(awk -v ms="$baseline_ms" 'BEGIN { printf "%.3f", ms/1000 }')
 
     # Run optimized
     start_time=$(date +%s%N)
-    LIMITLY_PRINT_OPT_REPORT=1 ./bin/limitly "$bm" > /dev/null 2>&1
+    LYMAR_PRINT_OPT_REPORT=1 ./bin/lymar run "$bm" > /dev/null 2>&1
     end_time=$(date +%s%N)
     opt_ms=$(( (end_time - start_time) / 1000000 ))
     opt_sec=$(awk -v ms="$opt_ms" 'BEGIN { printf "%.3f", ms/1000 }')

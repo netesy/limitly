@@ -25,7 +25,12 @@ void RegisterVM::execute_objects(const LIR::LIR_Inst* pc) {
             // Error union with [is_error=1, payload]
             void* err_obj = lm_frame_alloc("__lir_internal_error__", 2);
             lm_frame_set_field(err_obj, 0, make_i64(1));
-            lm_frame_set_field(err_obj, 1, pc->a == UINT32_MAX ? VAL_NIL : registers[pc->a]);
+            LmValue payload = pc->a == UINT32_MAX ? VAL_NIL : registers[pc->a];
+            if (!argument_stack.empty()) {
+                payload = argument_stack.back();
+                argument_stack.pop_back();
+            }
+            lm_frame_set_field(err_obj, 1, payload);
             registers[pc->dst] = BOX_PTR(err_obj);
             break;
         }

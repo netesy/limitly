@@ -1,7 +1,7 @@
 #pragma once
 
 //
-// compiler_memory.hh  
+// compiler_memory.hh
 // Pure Compile-Time Memory Safety
 // Zero runtime presence - all safety verified at compile-time
 //
@@ -23,7 +23,7 @@ struct CompileTimeRegion {
     std::size_t id;
     std::size_t generation;
     int scope_depth;
-    
+
     constexpr CompileTimeRegion(std::size_t region_id, std::size_t gen, int depth)
         : id(region_id), generation(gen), scope_depth(depth) {}
 };
@@ -33,7 +33,7 @@ struct CompileTimeAllocation {
     std::size_t generation;
     bool is_linear;
     bool is_moved;
-    
+
     constexpr CompileTimeAllocation(std::size_t rid, std::size_t gen, bool linear = false)
         : region_id(rid), generation(gen), is_linear(linear), is_moved(false) {}
 };
@@ -67,16 +67,16 @@ constexpr bool is_generation_valid(std::size_t ref_gen, std::size_t current_gen)
 // These macros are used by the compiler to insert appropriate cleanup code
 // In release builds, they compile to nothing or simple instructions
 
-#ifdef LIMITLY_DEBUG_MEMORY
-    #define LIMITLY_REGION_ENTER(id) /* Debug: track region entry */
-    #define LIMITLY_REGION_EXIT(id)  /* Debug: track region exit */  
-    #define LIMITLY_LINEAR_MOVE(var) /* Debug: track move */
-    #define LIMITLY_LINEAR_DROP(var) /* Debug: track drop */
+#ifdef LYMAR_DEBUG_MEMORY
+    #define LYMAR_REGION_ENTER(id) /* Debug: track region entry */
+    #define LYMAR_REGION_EXIT(id)  /* Debug: track region exit */
+    #define LYMAR_LINEAR_MOVE(var) /* Debug: track move */
+    #define LYMAR_LINEAR_DROP(var) /* Debug: track drop */
 #else
-    #define LIMITLY_REGION_ENTER(id) /* No-op in release */
-    #define LIMITLY_REGION_EXIT(id)  /* No-op in release */
-    #define LIMITLY_LINEAR_MOVE(var) /* No-op in release */
-    #define LIMITLY_LINEAR_DROP(var) /* No-op in release */
+    #define LYMAR_REGION_ENTER(id) /* No-op in release */
+    #define LYMAR_REGION_EXIT(id)  /* No-op in release */
+    #define LYMAR_LINEAR_MOVE(var) /* No-op in release */
+    #define LYMAR_LINEAR_DROP(var) /* No-op in release */
 #endif
 
 } // namespace compiler_memory
@@ -110,8 +110,8 @@ extern "C" {
     // Optional custom allocator (user can provide)
     void* lymar_alloc(size_t size) __attribute__((weak));
     void lymar_free(void* ptr) __attribute__((weak));
-    
-    // Optional panic handler (user can provide)  
+
+    // Optional panic handler (user can provide)
     void lymar_panic(const char* message) __attribute__((weak, noreturn));
 }
 

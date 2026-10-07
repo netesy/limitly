@@ -48,11 +48,11 @@ fn main() {
     assert(string.starts_with(replaced, "Hello") == true, "Starts with failure");
     assert(string.ends_with(replaced, "Language!") == true, "Ends with failure");
 
-    var lower = string.to_lower("LIMITLY");
+    var lower = string.to_lower("LYMAR");
     assert(lower == "lymar", "Lower failure");
 
     var upper = string.to_upper("lymar");
-    assert(upper == "LIMITLY", "Upper failure");
+    assert(upper == "LYMAR", "Upper failure");
 
     print("=== ALL UNIFIED STRING ARCHITECTURE TESTS PASSED ===");
 }

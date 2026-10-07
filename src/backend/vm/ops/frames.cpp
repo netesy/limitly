@@ -103,25 +103,8 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
                     std::string deinit_func_name = frame_name + ".deinit";
                     auto& func_manager = LIR::LIRFunctionManager::getInstance();
                     if (func_manager.hasFunction(deinit_func_name)) {
-                        auto func = func_manager.getFunction(deinit_func_name);
-                        
                         // Execute deinitializer with 'this' (registers[pc->a]) as argument 0
-                        auto saved_registers = registers;
-                        const LIR::LIR_Function* saved_func = current_function_;
-
-                        registers.assign(registers.size(), VAL_NIL);
-                        registers[0] = saved_registers[pc->a]; // 'this' is in reg 0
-
-                        LIR::LIR_Function temp_wrapper(func->getName(), 1);
-                        temp_wrapper.instructions = func->getInstructions();
-                        temp_wrapper.register_language_types = func->getRegisterLanguageTypes();
-                        temp_wrapper.register_types = func->getRegisterTypes();
-                        current_function_ = &temp_wrapper;
-
-                        execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
-
-                        registers = saved_registers;
-                        current_function_ = saved_func;
+                        call_interpreted(deinit_func_name, {registers[pc->a]});
                     }
                 }
             }
@@ -146,12 +129,12 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             std::string frame_name = f->name;
             std::string resolved_func_name = frame_name + "." + pc->func_name;
             
-            if (CompiledResolver::getInstance().dispatch(resolved_func_name, reinterpret_cast<uint64_t>(registers.data()), this)) {
+            if (CompiledResolver::getInstance().dispatch(resolved_func_name, *pc, registers, this)) {
                 break;
             }
 
             std::string trait_func_name = pc->type_name + "." + pc->func_name;
-            if (CompiledResolver::getInstance().dispatch(trait_func_name, reinterpret_cast<uint64_t>(registers.data()), this)) {
+            if (CompiledResolver::getInstance().dispatch(trait_func_name, *pc, registers, this)) {
                 break;
             }
 

@@ -1,7 +1,7 @@
 import std.string as string;
 
 fn main() {
-    var lower = string.to_lower("LIMITLY");
+    var lower = string.to_lower("LYMAR");
     print("Lower:");
     print(lower);
     assert(lower == "lymar", "Lower failure");
@@ -9,7 +9,7 @@ fn main() {
     var upper = string.to_upper("lymar");
     print("Upper:");
     print(upper);
-    assert(upper == "LIMITLY", "Upper failure");
+    assert(upper == "LYMAR", "Upper failure");
 }
 
 main();

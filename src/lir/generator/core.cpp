@@ -18,7 +18,6 @@ namespace LIR {
 // Static member initialization
 bool Generator::optimization_enabled_ = true;
 bool Generator::show_optimization_debug_ = false;
-size_t Generator::lambda_counter_ = 0;
 
 Generator::Generator() : current_function_(nullptr), next_register_(0), next_label_(0) {
     // Initialize LIR function system
@@ -139,6 +138,8 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     
     // Save current function state to allow recursive calls (e.g. lambdas)
     auto saved_function = std::move(current_function_);
+    size_t saved_lambda_counter = lambda_counter_;
+    lambda_counter_ = 0;
     uint32_t saved_next_reg = next_register_;
     uint32_t saved_next_label = next_label_;
     auto saved_scope_stack = std::move(scope_stack_);
@@ -268,6 +269,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
 
     // Restore previous state
     current_function_ = std::move(saved_function);
+    lambda_counter_ = saved_lambda_counter;
     next_register_ = saved_next_reg;
     next_label_ = saved_next_label;
     scope_stack_ = std::move(saved_scope_stack);

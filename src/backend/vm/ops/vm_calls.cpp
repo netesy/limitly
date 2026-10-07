@@ -7,6 +7,8 @@
 #include "../vm_runtime.hh"
 #include "../vm_value.hh"
 #include "../vm_tuple.hh"
+#include "../vm_list.hh"
+#include "../vm_dict.hh"
 #include "../constant_utils.hh"
 #include "../compiled_resolver.hh"
 
@@ -15,12 +17,69 @@ namespace Backend {
 namespace VM {
 namespace Register {
 
+RegisterValue RegisterVM::call_interpreted(const std::string& name,
+                                            const std::vector<RegisterValue>& args) {
+    auto* function = LIR::FunctionRegistry::getInstance().getFunction(name);
+    if (!function) throw std::runtime_error("Missing interpreted function: " + name);
+
+    auto caller_registers = std::move(registers);
+    const auto* caller_function = current_function_;
+    if (!spare_register_files_.empty()) {
+        registers = std::move(spare_register_files_.back());
+        spare_register_files_.pop_back();
+    }
+    registers.assign(std::max(size_t(256), args.size()), VAL_NIL);
+    std::copy(args.begin(), args.end(), registers.begin());
+    current_function_ = function;
+    try {
+        // The registry already owns the immutable instructions and type maps.
+        execute_instructions(*function, 0, function->instructions.size());
+        auto result = registers[0];
+        spare_register_files_.push_back(std::move(registers));
+        registers = std::move(caller_registers);
+        current_function_ = caller_function;
+        return result;
+    } catch (...) {
+        spare_register_files_.push_back(std::move(registers));
+        registers = std::move(caller_registers);
+        current_function_ = caller_function;
+        throw;
+    }
+}
+
 void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
     ResourceManager::getInstance().setCurrentFiber(get_current_fiber());
     switch (pc->op) {
         case LIR::LIR_Op::CallBuiltin:
         case LIR::LIR_Op::Call: {
             auto& func_manager = LIR::LIRFunctionManager::getInstance();
+            // Length queries must inspect the runtime header, never copy a graph.
+            // Keep unsupported types on the existing builtin validation path.
+            if (pc->call_args.size() == 1 &&
+                (pc->func_name == "len" || pc->func_name == "_builtin_string_byte_len")) {
+                auto value = registers[pc->call_args[0]];
+                auto* header = IS_PTR(value) ? static_cast<ObjHeader*>(UNBOX_PTR(value)) : nullptr;
+                bool handled = false;
+                uint64_t length = 0;
+                if (header && header->type_id == TYPE_STRING) {
+                    length = reinterpret_cast<LmStringHeader*>(header)->len;
+                    handled = true;
+                } else if (pc->func_name == "len") {
+                    if (header && header->type_id == TYPE_LIST) {
+                        length = reinterpret_cast<LmList*>(header)->size;
+                        handled = true;
+                    } else if (header && header->type_id == TYPE_DICT) {
+                        length = reinterpret_cast<LmDict*>(header)->size;
+                        handled = true;
+                    } else if (value == VAL_NIL) {
+                        handled = true;
+                    }
+                }
+                if (handled) {
+                    registers[pc->dst] = make_i64(length);
+                    break;
+                }
+            }
             bool is_builtin_target = (pc->op == LIR::LIR_Op::CallBuiltin) ||
                                      (pc->func_name.rfind("_builtin_", 0) == 0);
 
@@ -41,7 +100,14 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
 
                 const std::string& fname = pc->func_name;
                 bool handled = false;
-                if (fname == "_builtin_substring" && pc->call_args.size() >= 3) {
+                if (fname == "_builtin_string_join" || fname == "_builtin_list_slice") {
+                    std::vector<LmValue> args;
+                    for (auto reg : pc->call_args) args.push_back(registers[reg]);
+                    registers[pc->dst] = Backend::Native::host_api().helper(this,
+                        static_cast<uint32_t>(Backend::Native::Helper::Builtin),
+                        VAL_NIL, VAL_NIL, VAL_NIL, fname.c_str(), args.data(), args.size());
+                    handled = true;
+                } else if (fname == "_builtin_substring" && pc->call_args.size() >= 3) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     int64_t start = as_i64(registers[pc->call_args[1]]);
                     int64_t end = as_i64(registers[pc->call_args[2]]);
@@ -142,9 +208,10 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                         throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
                     }
                 }
+                break;
             }
 
-            if (CompiledResolver::getInstance().dispatch(pc->func_name, reinterpret_cast<uint64_t>(registers.data()), this)) {
+            if (CompiledResolver::getInstance().dispatch(pc->func_name, *pc, registers, this)) {
                 break;
             }
 
@@ -164,27 +231,8 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     arg_vals.push_back(VAL_NIL);
                 }
 
-                auto saved_registers = registers;
-                const LIR::LIR_Function* saved_func = current_function_;
-
-                registers.assign(registers.size(), VAL_NIL);
-                for (size_t i = 0; i < arg_vals.size() && i < registers.size(); ++i) {
-                    registers[i] = arg_vals[i];
-                }
-
-                LIR::LIR_Function temp_wrapper(func->getName(), static_cast<uint32_t>(arg_vals.size()));
-                temp_wrapper.instructions = func->getInstructions();
-                temp_wrapper.register_language_types = func->getRegisterLanguageTypes();
-                temp_wrapper.register_types = func->getRegisterTypes();
-                current_function_ = &temp_wrapper;
-
-                execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
-
-                RegisterValue return_value = registers[0];
-
-                registers = saved_registers;
-                current_function_ = saved_func;
-                registers[pc->dst] = return_value;
+                auto return_value = call_interpreted(pc->func_name, arg_vals);
+                if (pc->dst != UINT32_MAX) registers[pc->dst] = return_value;
             } else if (pc->func_name == "channel") {
                 // Allocate a real runtime Channel pointer boxed as a pointer!
                 auto channel = std::make_unique<LM::Backend::Channel>(1024);
@@ -243,7 +291,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
             }
             
             if (!func_name.empty()) {
-                if (CompiledResolver::getInstance().dispatch(func_name, reinterpret_cast<uint64_t>(registers.data()), this)) {
+                if (CompiledResolver::getInstance().dispatch(func_name, *pc, registers, this, closure_extra_args)) {
                     break;
                 }
 
@@ -260,27 +308,8 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                         arg_vals.push_back(VAL_NIL);
                     }
 
-                    auto saved_registers = registers;
-                    const LIR::LIR_Function* saved_func = current_function_;
-
-                    registers.assign(256, VAL_NIL);
-                    for (size_t i = 0; i < arg_vals.size() && i < registers.size(); ++i) {
-                        registers[i] = arg_vals[i];
-                    }
-
-                    LIR::LIR_Function temp_wrapper(func->getName(), static_cast<uint32_t>(arg_vals.size()));
-                    temp_wrapper.instructions = func->getInstructions();
-                    temp_wrapper.register_language_types = func->getRegisterLanguageTypes();
-                    temp_wrapper.register_types = func->getRegisterTypes();
-                    current_function_ = &temp_wrapper;
-
-                    execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
-
-                    RegisterValue return_value = registers[0];
-
-                    registers = saved_registers;
-                    current_function_ = saved_func;
-                    registers[pc->dst] = return_value;
+                    auto return_value = call_interpreted(func_name, arg_vals);
+                    if (pc->dst != UINT32_MAX) registers[pc->dst] = return_value;
                 }
             }
             break;

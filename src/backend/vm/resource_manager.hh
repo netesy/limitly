@@ -1,5 +1,5 @@
-#ifndef LIMITLY_BACKEND_VM_RESOURCE_MANAGER_H
-#define LIMITLY_BACKEND_VM_RESOURCE_MANAGER_H
+#ifndef LYMAR_BACKEND_VM_RESOURCE_MANAGER_H
+#define LYMAR_BACKEND_VM_RESOURCE_MANAGER_H
 
 #include <unordered_map>
 #include <memory>
@@ -65,4 +65,4 @@ private:
 } // namespace Backend
 } // namespace LM
 
-#endif // LIMITLY_BACKEND_VM_RESOURCE_MANAGER_H
+#endif // LYMAR_BACKEND_VM_RESOURCE_MANAGER_H

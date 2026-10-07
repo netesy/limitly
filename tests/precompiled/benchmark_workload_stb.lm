@@ -1,19 +1,34 @@
-import std.image.font as font;
+import std.image.font as system_font;
+import std.ffi as ffi;
 
-var font_path = font.detect_system_font("DejaVu");
-if (font_path == "") {
-    font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
-}
+// The runner overrides this path so all modes use the same file.
+var font_path = system_font.detect_system_font("Arial");
+if (font_path == "") font_path = system_font.detect_system_font("DejaVu");
+assert(font_path != "", "No system font available for the benchmark");
 
-match (font.load_font(font_path)) {
-    val f => {
-        var total_w = 0.0;
-        for (var i = 0; i < 50; i = i + 1) {
-            total_w = total_w + f.text_width("The quick brown fox jumps over the lazy dog 1234567890", 16.0);
-        }
-        print("WORKLOAD_DONE: {total_w}");
-    },
-    err e => {
-        print("Failed to load font");
+unsafe {
+    var lib = ffi.library_load("bin/libstb_image.dll");
+    if (lib == nil) lib = ffi.library_load("bin/libstb_image.so");
+    if (lib == nil) lib = ffi.library_load("bin/libstb_image.dylib");
+    assert(lib != nil, "STB benchmark library could not be loaded");
+    var load = ffi.library_get_symbol(lib, "load_font_file");
+    var measure = ffi.library_get_symbol(lib, "measure_text_width_em");
+    var release = ffi.library_get_symbol(lib, "free_font");
+    assert(load != nil and measure != nil and release != nil, "STB benchmark exports missing");
+    var path = ffi.string_to_cstring(font_path);
+    var handle = ffi.foreign_call(load, [ffi.cstring_as_ptr(path)], ffi.TYPE_I64, [ffi.TYPE_PTR]) as int;
+    ffi.cstring_free(path);
+    assert(handle != nil and handle != 0, "STB failed to load benchmark font");
+    var text = ffi.string_to_cstring("The quick brown fox jumps over the lazy dog 1234567890");
+    var total_w = 0.0;
+    for (var i = 0; i < 50; i = i + 1) {
+        total_w = total_w + (ffi.foreign_call(measure,
+            [handle, 16.0, ffi.cstring_as_ptr(text)], ffi.TYPE_F32,
+            [ffi.TYPE_PTR, ffi.TYPE_F32, ffi.TYPE_PTR]) as float);
     }
+    ffi.cstring_free(text);
+    ffi.call_void_1(release, handle);
+    ffi.library_unload(lib);
+    assert(total_w > 0.0, "STB workload did not run");
+    print("WORKLOAD_DONE: {total_w}");
 }

@@ -1,5 +1,5 @@
-#ifndef LIMITLY_BACKEND_UTF8_H
-#define LIMITLY_BACKEND_UTF8_H
+#ifndef LYMAR_BACKEND_UTF8_H
+#define LYMAR_BACKEND_UTF8_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -31,4 +31,4 @@ uint64_t utf8_codepoint_count(const char* data, uint64_t len);
 }
 #endif
 
-#endif // LIMITLY_BACKEND_UTF8_H
+#endif // LYMAR_BACKEND_UTF8_H

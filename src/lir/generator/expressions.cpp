@@ -830,12 +830,11 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
         return result;
     }
 
+    // Evaluate each operand exactly once, including side-effecting reader calls.
+    Reg left = emit_expr(*expr.left);
+    Reg right = emit_expr(*expr.right);
     // Handle PLUS operator - check for string concatenation first
     if (expr.op == LM::Frontend::TokenType::PLUS) {
-        // Emit left and right operands FIRST to get their types
-        Reg left = emit_expr(*expr.left);
-        Reg right = emit_expr(*expr.right);
-        
         TypePtr left_type = get_register_type(left);
         TypePtr right_type = get_register_type(right);
         
@@ -870,8 +869,6 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     }
     
     // Handle as arithmetic operation
-    Reg left = emit_expr(*expr.left);
-    Reg right = emit_expr(*expr.right);
     Reg dst = allocate_register();
     
     // Map operator to LIR operation
@@ -2581,7 +2578,8 @@ Reg Generator::emit_range_expr(LM::Frontend::AST::RangeExpr& expr) {
 
 
 Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
-    std::string lambda_name = "__lambda_" + std::to_string(lambda_counter_++);
+    // Stable lexical names prevent collisions across separately compiled modules.
+    std::string lambda_name = current_function_->name + ".__lambda_" + std::to_string(lambda_counter_++);
     
     auto fn_decl = std::make_shared<LM::Frontend::AST::FunctionDeclaration>();
     fn_decl->name = lambda_name;

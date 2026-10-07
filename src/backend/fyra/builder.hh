@@ -20,7 +20,8 @@ class LIRToFyraIRBuilder {
 public:
     LIRToFyraIRBuilder(std::shared_ptr<ir::IRContext> context);
 
-    std::shared_ptr<ir::Module> build(const LIR::LIR_Function& lir_func);
+    std::shared_ptr<ir::Module> build(const LIR::LIR_Function& lir_func,
+                                      const std::string& exported_module = "");
 
     const std::vector<std::string>& get_errors() const { return errors_; }
     bool has_errors() const { return !errors_.empty(); }

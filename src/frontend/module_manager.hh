@@ -25,6 +25,7 @@ struct CompiledModuleMeta {
     std::map<std::string, std::string> export_signatures;
     std::vector<std::string> dependencies;
     std::string source_hash; // Content SHA256 hash for stale detection
+    std::map<std::string, std::string> dependency_hashes;
 
     std::string serialize() const;
     static bool deserialize(const std::string& input, CompiledModuleMeta& out_meta);
@@ -83,7 +84,7 @@ public:
     }
     bool register_compiled_module(const CompiledModuleMeta& meta);
     bool find_compiled_module(const std::string& module_name, const std::string& target_triple, const std::string& required_kind, CompiledModuleMeta& out_meta);
-    bool is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) const;
+    bool is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path);
     CompiledModuleMeta generate_metadata(
         std::shared_ptr<Module> module,
         const std::string& target,
@@ -95,7 +96,9 @@ public:
     void clear() {
         std::lock_guard<std::mutex> lock(modules_mutex_);
         modules_.clear();
-        include_dirs_.clear();
+        compiled_modules_.clear();
+        // Type checking reloads modules after resolution; keep the configured
+        // search paths so -I and installed LYMAR_HOME modules remain available.
     }
 
 private:

@@ -13,12 +13,12 @@ fn main() {
     assert(string.ends_with(replaced, "Language!") == true, "Ends with failure");
 
     print("Checking to_lower...");
-    var lower = string.to_lower("LIMITLY");
+    var lower = string.to_lower("LYMAR");
     assert(lower == "lymar", "Lower failure");
 
     print("Checking to_upper...");
     var upper = string.to_upper("lymar");
-    assert(upper == "LIMITLY", "Upper failure");
+    assert(upper == "LYMAR", "Upper failure");
 
     print("ALL PASSED");
 }

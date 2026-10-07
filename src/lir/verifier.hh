@@ -1,5 +1,5 @@
-#ifndef LIMITLY_LIR_VERIFIER_H
-#define LIMITLY_LIR_VERIFIER_H
+#ifndef LYMAR_LIR_VERIFIER_H
+#define LYMAR_LIR_VERIFIER_H
 
 #include "lir.hh"
 #include <string>
@@ -29,4 +29,4 @@ private:
 } // namespace LIR
 } // namespace LM
 
-#endif // LIMITLY_LIR_VERIFIER_H
+#endif // LYMAR_LIR_VERIFIER_H

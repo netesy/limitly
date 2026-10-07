@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <ctype.h>
+#include <string_view>
 #include "vm_string.hh"
 #include "vm_list.hh"
 #include "backend/utf8.hh"
@@ -79,12 +80,11 @@ RUNTIME_API uint8_t lm_str_byte_at(const LmStringHeader* str, uint64_t index) {
 
 RUNTIME_API int64_t lm_str_index_of(const LmStringHeader* str, const LmStringHeader* needle) {
     if (!str || !needle || needle->len == 0 || needle->len > str->len) return -1;
-    for (uint64_t i = 0; i <= str->len - needle->len; i++) {
-        if (memcmp(str->data + i, needle->data, needle->len) == 0) {
-            return (int64_t)i;
-        }
-    }
-    return -1;
+    // The standard library skips nonmatching first bytes with optimized searches.
+    // Explicit lengths preserve embedded NULs and byte-index semantics.
+    auto position = std::string_view(str->data, str->len).find(
+        std::string_view(needle->data, needle->len));
+    return position == std::string_view::npos ? -1 : static_cast<int64_t>(position);
 }
 
 RUNTIME_API bool lm_str_contains(const LmStringHeader* str, const LmStringHeader* needle) {

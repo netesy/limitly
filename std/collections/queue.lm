@@ -18,13 +18,7 @@ frame Queue {
             return nil;
         }
         var first = self.items[0];
-        var new_items: [any] = [];
-        var i = 1;
-        while (i < len(self.items)) {
-            new_items.append(self.items[i]);
-            i = i + 1;
-        }
-        self.items = new_items;
+        self.items = _builtin_list_slice(self.items, 1, len(self.items));
         return first;
     }
 

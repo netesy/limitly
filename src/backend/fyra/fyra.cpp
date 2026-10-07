@@ -1,8 +1,10 @@
 // fyra.cpp - Fyra Backend Integration Implementation
 
 #include "fyra.hh"
+#include <chrono>
 #include "fyra_ir_generator.hh"
 #include "builder.hh"
+#include "backend/native/emitter.hh"
 #include "fyra/BackendBuilder.h"
 #include "target/core/TargetDescriptor.h"
 #include "ir/IRContext.h"
@@ -96,8 +98,21 @@ CompileResult FyraCompiler::compile_ast(std::shared_ptr<Frontend::AST::Program> 
 
 CompileResult FyraCompiler::compile(const LIR::LIR_Function& lir_func,
                                    const FyraCompileOptions& options) {
+#if defined(__linux__) && defined(__x86_64__)
+    // Shared VM modules use the canonical tagged object ABI. Lower their LIR
+    // directly through the host compiler, keeping control flow native while
+    // sharing the VM runtime rather than maintaining a second heap layout.
+    if (options.artifact_kind == ArtifactKind::SharedLibrary &&
+        options.platform == Platform::Linux && options.arch == Architecture::X86_64 &&
+        !options.exported_module.empty() && options.triple.empty()) {
+        CompileResult result;
+        result.success = Native::emit_shared_module(lir_func, options.exported_module,
+            options.output_file, static_cast<int>(options.opt_level), result.error_message);
+        return result;
+    }
+#endif
     LIRToFyraIRBuilder builder(context_);
-    auto module = builder.build(lir_func);
+    auto module = builder.build(lir_func, options.exported_module);
     if (builder.has_errors()) {
         CompileResult result;
         result.success = false;
@@ -190,6 +205,30 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
                     build_res = backend.emitStaticLibrary(options.output_file);
                     break;
                 case ArtifactKind::SharedLibrary:
+#if defined(__linux__)
+                    if (options.arch == Architecture::X86_64 && options.platform == Platform::Linux) {
+                        // Use the host linker for ELF shared objects. Its program
+                        // headers explicitly declare a non-executable stack, unlike
+                        // the raw backend DSO writer, which recent loaders reject.
+                        const auto temporary = options.output_file + ".lymar-" +
+                            std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".s";
+                        build_res = backend.emitAssembly(temporary);
+                        if (build_res.success) {
+                            auto quote = [](const std::string& path) {
+                                std::string result = "'";
+                                for (char c : path) result += c == '\'' ? "'\\''" : std::string(1, c);
+                                return result + "'";
+                            };
+                            const std::string command = "cc -shared -Wl,-z,noexecstack " + quote(temporary) +
+                                " -o " + quote(options.output_file);
+                            if (std::system(command.c_str()) != 0) {
+                                build_res.success = false;
+                                build_res.errors.push_back("Host linker failed to produce the shared library");
+                            }
+                        }
+                        std::filesystem::remove(temporary);
+                    } else
+#endif
                     build_res = backend.emitSharedLibrary(options.output_file);
                     break;
                 case ArtifactKind::Assembly:

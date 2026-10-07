@@ -56,8 +56,7 @@ vendor/lyra/*.dll
 # qtcreator generated files
 *.pro.user*
 CMakeLists.txt.user*
-Limitly.pro*
-Luminar.pro*
+Lymar.pro*
 !editors/
 
 # xemacs temporary files

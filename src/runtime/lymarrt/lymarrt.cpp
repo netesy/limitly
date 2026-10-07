@@ -6,6 +6,7 @@
 #include <mutex>
 #include <vector>
 #include <ffi.h>
+#include <filesystem>
 
 #ifdef _WIN32
 #include <windows.h>
@@ -133,6 +134,16 @@ void* lymarrt_library_open(const char* path) {
 #else
     void* handle = dlopen(path, RTLD_LAZY | RTLD_LOCAL);
 #endif
+    if (!handle) {
+        if (const char* home = std::getenv("LYMAR_HOME")) {
+            auto bundled = std::filesystem::path(home) / "bin" / std::filesystem::path(path).filename();
+#ifdef _WIN32
+            handle = static_cast<void*>(LoadLibraryA(bundled.string().c_str()));
+#else
+            handle = dlopen(bundled.string().c_str(), RTLD_LAZY | RTLD_LOCAL);
+#endif
+        }
+    }
     if (!handle) return NULL;
     std::lock_guard<std::mutex> lock(g_lymarrt_lib_mutex);
     g_lymarrt_libraries[reinterpret_cast<uintptr_t>(handle)] = path;

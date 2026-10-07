@@ -1,5 +1,5 @@
-#ifndef LIMITLY_CONSTRAINT_ENGINE_HH
-#define LIMITLY_CONSTRAINT_ENGINE_HH
+#ifndef LYMAR_CONSTRAINT_ENGINE_HH
+#define LYMAR_CONSTRAINT_ENGINE_HH
 
 #include <string>
 #include <vector>
@@ -188,4 +188,4 @@ public:
 } // namespace Frontend
 } // namespace LM
 
-#endif // LIMITLY_CONSTRAINT_ENGINE_HH
+#endif // LYMAR_CONSTRAINT_ENGINE_HH

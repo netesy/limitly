@@ -1,5 +1,5 @@
-#ifndef LIMITLY_BACKEND_VM_CONSTANT_UTILS_H
-#define LIMITLY_BACKEND_VM_CONSTANT_UTILS_H
+#ifndef LYMAR_BACKEND_VM_CONSTANT_UTILS_H
+#define LYMAR_BACKEND_VM_CONSTANT_UTILS_H
 
 #include "frontend/value.hh"
 #include "backend/value.hh"
@@ -128,4 +128,4 @@ inline LM::Backend::Value compiler_value_to_backend_value(const std::shared_ptr<
 } // namespace Backend
 } // namespace LM
 
-#endif // LIMITLY_BACKEND_VM_CONSTANT_UTILS_H
+#endif // LYMAR_BACKEND_VM_CONSTANT_UTILS_H

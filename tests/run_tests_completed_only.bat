@@ -4,7 +4,7 @@ echo ========================================
 echo Running Lymar Language Test Suite (Completed Features Only)
 echo ========================================
 
-set LIMITLY=.\bin\lymar.exe
+set LYMAR=.\bin\lymar.exe
 set FAILED=0
 set PASSED=0
 set TOTAL=0

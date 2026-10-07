@@ -125,7 +125,7 @@ bool Optimizer::optimize() {
     report_.final_loads = MetricsCollector::count_loads(func_);
     report_.final_stores = MetricsCollector::count_stores(func_);
 
-    if (std::getenv("LIMITLY_PRINT_OPT_REPORT")) {
+    if (std::getenv("LYMAR_PRINT_OPT_REPORT")) {
         report_.print();
     }
 
@@ -968,8 +968,18 @@ bool Optimizer::remove_redundant_entry_calls() {
         if ((first.op == LIR_Op::Call || first.op == LIR_Op::CallVoid) &&
             (second.op == LIR_Op::Call || second.op == LIR_Op::CallVoid)) {
 
-            if (first.func_name == second.func_name && !first.func_name.empty()) {
+            // Only module initialization is idempotent. Repeated ordinary calls
+            // (including print and side-effecting functions) must both execute.
+            if (first.func_name == second.func_name && first.func_name.ends_with(".__init__")) {
+                const size_t removed = i + 1;
                 func_.instructions.erase(func_.instructions.begin() + i + 1);
+                // Linearized branches contain instruction indices, not labels.
+                for (auto& instruction : func_.instructions) {
+                    if ((instruction.op == LIR_Op::Jump || instruction.op == LIR_Op::JumpIf ||
+                         instruction.op == LIR_Op::JumpIfFalse) && instruction.imm > removed) {
+                        --instruction.imm;
+                    }
+                }
                 changed = true;
                 --i;
             }

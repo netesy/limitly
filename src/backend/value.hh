@@ -1,5 +1,5 @@
-#ifndef LIMITLY_BACKEND_VALUE_H
-#define LIMITLY_BACKEND_VALUE_H
+#ifndef LYMAR_BACKEND_VALUE_H
+#define LYMAR_BACKEND_VALUE_H
 
 #include "backend/vm/vm_value_base.hh"
 
@@ -9,4 +9,4 @@ namespace Backend {
 }
 }
 
-#endif // LIMITLY_BACKEND_VALUE_H
+#endif // LYMAR_BACKEND_VALUE_H

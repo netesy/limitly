@@ -1,5 +1,5 @@
-#ifndef LIMITLY_BACKEND_VM_RESOURCE_TYPES_H
-#define LIMITLY_BACKEND_VM_RESOURCE_TYPES_H
+#ifndef LYMAR_BACKEND_VM_RESOURCE_TYPES_H
+#define LYMAR_BACKEND_VM_RESOURCE_TYPES_H
 
 #include <cstdint>
 
@@ -84,4 +84,4 @@ enum class ResourceOperation : uint32_t {
 } // namespace Backend
 } // namespace LM
 
-#endif // LIMITLY_BACKEND_VM_RESOURCE_TYPES_H
+#endif // LYMAR_BACKEND_VM_RESOURCE_TYPES_H

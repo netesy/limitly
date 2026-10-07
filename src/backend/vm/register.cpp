@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cstdio>
 #include <stdexcept>
+#include <unordered_set>
 #include "../fiber.hh"
 #include "../../lir/functions.hh"
 #include "../../lir/function_registry.hh"
@@ -50,6 +51,7 @@ RegisterVM::RegisterVM() : type_system(std::make_unique<TypeSystem>()) {
 RegisterVM::~RegisterVM() {}
 
 void RegisterVM::reset() {
+    spare_register_files_.clear();
     registers.assign(registers.size(), VAL_NIL);
     argument_stack.clear();
     task_contexts.clear();
@@ -201,6 +203,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::StringIndex: case LIR::LIR_Op::ToString: case LIR::LIR_Op::STR_CONCAT:
             case LIR::LIR_Op::STR_FORMAT: execute_strings(pc); break;
             case LIR::LIR_Op::Cast: execute_cast(pc); break;
+            case LIR::LIR_Op::Param: argument_stack.push_back(registers[pc->dst]); break;
             case LIR::LIR_Op::Call: case LIR::LIR_Op::CallIndirect: case LIR::LIR_Op::CallBuiltin: execute_calls(pc); break;
             case LIR::LIR_Op::MemoryLoad: case LIR::LIR_Op::MemoryStore: case LIR::LIR_Op::MemoryAlloc:
             case LIR::LIR_Op::MemoryFree: case LIR::LIR_Op::MemoryResize: case LIR::LIR_Op::MemoryCopy:
@@ -251,6 +254,25 @@ void RegisterVM::auto_register_output(const LIR::LIR_Inst* pc) {
             }
         }
     }
+}
+
+void RegisterVM::register_native_allocation(RegisterValue value) {
+    if (!IS_PTR(value)) return;
+    auto* header = static_cast<ObjHeader*>(UNBOX_PTR(value));
+    const auto ptr = reinterpret_cast<uintptr_t>(header);
+    if (header && !vm_allocation_regions.count(ptr)) {
+        vm_allocation_regions[ptr] = active_region_id;
+        vm_allocation_types[ptr] = header->type_id;
+    }
+}
+
+RegisterValue RegisterVM::get_global(const std::string& name) const {
+    auto it = globals_.find(name);
+    return it == globals_.end() ? VAL_NIL : it->second;
+}
+
+void RegisterVM::set_global(const std::string& name, RegisterValue value) {
+    globals_[name] = value;
 }
 
 void RegisterVM::reclaim_value(RegisterValue val) {
@@ -343,6 +365,7 @@ void RegisterVM::execute_regions(const LIR::LIR_Inst* pc) {
                         
                         // Recursively move ownership of nested child allocations to target region
                         std::vector<RegisterValue> child_worklist;
+                        std::unordered_set<uintptr_t> visited;
                         child_worklist.push_back(val);
                         while (!child_worklist.empty()) {
                             RegisterValue curr = child_worklist.back();
@@ -351,6 +374,7 @@ void RegisterVM::execute_regions(const LIR::LIR_Inst* pc) {
                                 ObjHeader* header = (ObjHeader*)UNBOX_PTR(curr);
                                 if (header) {
                                     uintptr_t child_ptr = reinterpret_cast<uintptr_t>(header);
+                                    if (!visited.insert(child_ptr).second) continue;
                                     vm_allocation_regions[child_ptr] = pc->imm;
                                     if (header->type_id == TYPE_LIST) {
                                         auto* list = reinterpret_cast<LmList*>(header);
@@ -397,6 +421,7 @@ void RegisterVM::transfer_ownership(RegisterValue child, RegisterValue container
     uint32_t target_region = vm_allocation_regions[container_ptr];
     
     std::vector<RegisterValue> child_worklist;
+    std::unordered_set<uintptr_t> visited;
     child_worklist.push_back(child);
     while (!child_worklist.empty()) {
         RegisterValue curr = child_worklist.back();
@@ -405,6 +430,7 @@ void RegisterVM::transfer_ownership(RegisterValue child, RegisterValue container
             ObjHeader* header = (ObjHeader*)UNBOX_PTR(curr);
             if (header) {
                 uintptr_t child_ptr = reinterpret_cast<uintptr_t>(header);
+                if (!visited.insert(child_ptr).second) continue;
                 if (child_ptr % 8 == 0 && vm_allocation_regions.find(child_ptr) != vm_allocation_regions.end()) {
                     vm_allocation_regions[child_ptr] = target_region;
                     if (header->type_id == TYPE_LIST) {

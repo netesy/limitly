@@ -314,7 +314,7 @@ private:
     // Worker counter for generating unique worker function names
     size_t worker_counter_ = 0;
     // Lambda counter for generating unique lambda function names
-    static size_t lambda_counter_;
+    size_t lambda_counter_ = 0;
     uint32_t next_register_ = 0;
     uint32_t next_label_ = 0;
     struct LinearLabelState {

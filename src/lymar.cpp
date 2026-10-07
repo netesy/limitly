@@ -23,6 +23,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <filesystem>
 
 namespace LM {
 
@@ -39,6 +40,20 @@ static std::string readFile(const std::string& filename) {
 int Compiler::executeFile(const std::string& filename, const CompileOptions& options) {
     try {
         std::string source = readFile(filename);
+        std::string exported_module;
+        // A module library must be lowered in its module namespace, not as an
+        // application root (whose uncalled functions are otherwise unreachable).
+        if (options.use_aot && (options.artifact_type == ArtifactType::SharedLibrary ||
+                                options.artifact_type == ArtifactType::StaticLibrary)) {
+            std::filesystem::path module_path(filename);
+            module_path.replace_extension();
+            std::string name = module_path.generic_string();
+            if (name.starts_with("./")) name.erase(0, 2);
+            std::replace(name.begin(), name.end(), '/', '.');
+            if (name.ends_with(".index")) name.resize(name.size() - 6);
+            exported_module = name;
+            source = "import " + name + ";";
+        }
         LM::Frontend::Scanner scanner(source, filename);
         scanner.scanTokens();
 
@@ -60,7 +75,6 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
         }
 
         LM::Frontend::ModuleManager::getInstance().set_include_dirs(options.include_dirs);
-        LM::Frontend::ModuleManager::getInstance().resolve_all(ast, "root");
 
         const auto verification_policy = options.strict_verification
             ? LM::Frontend::VerificationPolicy::Strict
@@ -140,6 +154,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                 fyra.set_debug_mode(options.debug);
 
                 LM::Backend::Fyra::FyraCompileOptions fyra_options;
+                fyra_options.exported_module = exported_module;
                 fyra_options.platform = (options.target == "windows" ? LM::Backend::Fyra::Platform::Windows :
                                          (options.target == "macos" ? LM::Backend::Fyra::Platform::MacOS :
                                           (options.target == "wasm" ? LM::Backend::Fyra::Platform::WASM : LM::Backend::Fyra::Platform::Linux)));
@@ -173,7 +188,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                 if (options.print_fyra_ir) {
                     auto ir_context = std::make_shared<ir::IRContext>();
                     LM::Backend::Fyra::LIRToFyraIRBuilder builder(ir_context);
-                    auto fyra_ir_module = builder.build(*lir_function);
+                    auto fyra_ir_module = builder.build(*lir_function, exported_module);
                     if (!fyra_ir_module || builder.has_errors()) {
                         std::cerr << "[ERROR] LIR to Fyra IR lowering failed" << std::endl;
                         for (const auto& err : builder.get_errors()) {
