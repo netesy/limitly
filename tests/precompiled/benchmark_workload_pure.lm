@@ -1,7 +1,16 @@
 import std.font as font;
+import std.image as img;
 
-// Use Windows-specific font path for benchmark
-var font_path = "C:\\Windows\\Fonts\\arial.ttf";
+var font_path = img.detect_system_font("Arial");
+if (font_path == "") {
+    font_path = img.detect_system_font("DejaVu");
+}
+if (font_path == "") {
+    font_path = img.detect_system_font("");
+}
+if (font_path == "") {
+    font_path = "C:\\Windows\\Fonts\\arial.ttf";
+}
 
 match (font.load_font(font_path)) {
     val f => {

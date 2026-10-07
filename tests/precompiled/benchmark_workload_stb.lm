@@ -1,6 +1,12 @@
 import std.image.font as font;
 
-var font_path = font.detect_system_font("DejaVu");
+var font_path = font.detect_system_font("Arial");
+if (font_path == "") {
+    font_path = font.detect_system_font("DejaVu");
+}
+if (font_path == "") {
+    font_path = font.detect_system_font("");
+}
 if (font_path == "") {
     font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";
 }
