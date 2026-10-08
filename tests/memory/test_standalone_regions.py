@@ -92,5 +92,43 @@ class StandaloneRegionTests(unittest.TestCase):
             self.assertIn("FINALIZE_ON_EXIT", result.stdout)
             self.assertNotIn("UNREACHABLE", result.stdout)
 
+    def test_staged_error_payload_survives_return(self):
+        with tempfile.TemporaryDirectory(prefix="lymar-aot-param-") as tmp:
+            source = Path(tmp) / "errors.lm"
+            source.write_text('frame Failure { pub var message: str; }\n'
+                              'fn fail(text: str): int?Failure { return err(Failure(text)); }\n'
+                              'for (var i=0; i<3; i=i+1) {\n'
+                              'match (fail("escaped" + " payload")) {\n'
+                              'val value => { assert(false); },\n'
+                              'err problem => { var message = problem as str; assert(message == "escaped payload"); print(message); }\n'
+                              '} }\n')
+            expected = self.run_command([str(COMPILER), "run", str(source)])
+            self.assertEqual(expected.splitlines(), ["escaped payload"] * 3)
+            for level in (0, 1, 2):
+                executable = Path(tmp) / f"errors-o{level}"
+                self.run_command([str(COMPILER), "build", "-O", str(level), str(source), "-o", str(executable)])
+                self.assertEqual(self.run_command([str(executable)]), expected)
+
+    def test_std_file_open_and_binary_read(self):
+        with tempfile.TemporaryDirectory(prefix="lymar-aot-files-") as tmp:
+            directory = Path(tmp)
+            fixture = directory / "bytes.bin"
+            fixture.write_bytes(b"A\0\xffZ")
+            source = directory / "files.lm"
+            source.write_text('import std.io.file as file;\n'
+                              f'match(file.open("{directory.as_posix()}/missing", "r")) {{\n'
+                              'val value => { assert(false); }, err problem => { print("MISSING"); } }\n'
+                              f'match(file.open("{fixture.as_posix()}", "rb")) {{\n'
+                              'val value => { var f = value as file.File;\n'
+                              'var bytes = f.read_bytes()?;\n'
+                              'assert(len(bytes)==4 and bytes[0]==65 and bytes[1]==0 and bytes[2]==255 and bytes[3]==90);\n'
+                              'f.close(); print("BINARY_READ"); }, err problem => { assert(false); } }\n')
+            expected = self.run_command([str(COMPILER), "run", str(source)])
+            self.assertEqual(expected.splitlines(), ["MISSING", "BINARY_READ"])
+            for level in (0, 1, 2):
+                executable = directory / f"files-o{level}"
+                self.run_command([str(COMPILER), "build", "-O", str(level), str(source), "-o", str(executable)])
+                self.assertEqual(self.run_command([str(executable)]), expected)
+
 if __name__ == "__main__":
     unittest.main()

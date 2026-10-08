@@ -30,6 +30,8 @@ void lower_region_ownership(ir::Module& module) {
     declare("lymar_aot_arg_set", 2, void_type);
     declare("lymar_aot_arg_get", 1, i64);
     declare("lymar_aot_return_pointer", 0, i64);
+    declare("lymar_aot_param_push", 2, void_type);
+    declare("lymar_aot_param_pop", 2, i64);
     declare("lymar_aot_slot_pointer", 1, i64);
     declare("lymar_aot_edge", 3, void_type);
     declare("lymar_aot_global_edge", 3, void_type);
@@ -44,6 +46,9 @@ void lower_region_ownership(ir::Module& module) {
     declare("lymar_aot_finalize", 1, void_type);
     declare("lymar_aot_set_finalizer", 2, void_type);
     declare("lymar_aot_exit", 1, void_type);
+    declare("lymar_aot_resource_create", 2, i64);
+    declare("lymar_aot_resource_call", 4, i64);
+    declare("lymar_aot_resource_destroy", 1, void_type);
     const std::unordered_map<std::string, std::string> memory_helpers{
         {"memory.alloc", "lymar_aot_alloc"}, {"memory.free", "lymar_aot_free"},
         {"memory.resize", "lymar_aot_resize"}, {"memory.copy", "lymar_aot_copy"},
@@ -105,6 +110,12 @@ void lower_region_ownership(ir::Module& module) {
                     auto* callee = dynamic_cast<ir::Function*>(current_operands[0]->get());
                     if (callee && callee->getName() == "lymar_aot_region_move") {
                         current_operands[4]->set(flag(current_operands[1]->get()));
+                    } else if (callee && (callee->getName() == "lymar_aot_param_push" || callee->getName() == "lymar_aot_param_pop")) {
+                        current_operands[2]->set(flag(current_operands[1]->get()));
+                        if (callee->getName() == "lymar_aot_param_pop")
+                            flags[inst] = emit(block, after, "lymar_aot_return_pointer", {});
+                    } else if (callee && callee->getName() == "lymar_aot_resource_call") {
+                        flags[inst] = emit(block, after, "lymar_aot_return_pointer", {});
                     } else if (!callee || (!callee->getName().starts_with("lymar_aot_") && !callee->getBasicBlocks().empty())) {
                         for (size_t arg = 1; arg < current_operands.size(); ++arg)
                             emit(block, it, "lymar_aot_arg_set", {ctx->getConstantInt(i64, arg - 1), flag(current_operands[arg]->get())});

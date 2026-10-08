@@ -1795,8 +1795,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 store_reg(inst.dst, builder_->createCall(fn, {fmt_arg, value_arg}, lir_type_to_fyra_type(res_t)), res_t);
                 break;
             }
+            case LIR::LIR_Op::Param:
+                builder_->createExternCall("lymar_aot_param_push", {load_reg(inst.dst, inst.result_type),
+                    context_->getConstantInt(context_->getIntegerType(64), 0)}, nullptr);
+                break;
             case LIR::LIR_Op::ConstructError: {
                 ir::Value* payload = (inst.a != UINT32_MAX) ? load_reg(inst.a, inst.type_a) : context_->getConstantInt(context_->getIntegerType(64), VAL_NIL);
+                payload = builder_->createExternCall("lymar_aot_param_pop", {payload,
+                    context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
                 ir::Value* err_box = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), 16)}, context_->getIntegerType(64));
                 builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 1), err_box);
                 ir::Value* payload_addr = builder_->createAdd(err_box, context_->getConstantInt(context_->getIntegerType(64), 8));
@@ -2375,16 +2381,27 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::ParallelSync: break;
             case LIR::LIR_Op::ResourceCreate: {
-                if (inst.imm == (uint32_t)LIR::ResourceType::CHANNEL || inst.imm == (uint32_t)LIR::ResourceType::MEMORY) {
-                    used_builtins_.insert("lm_list_new");
-                    ir::Function* fn = current_module_->getFunction("lm_list_new");
-                    if (!fn) fn = builder_->createFunction("lm_list_new", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                    store_reg(inst.dst, builder_->createCall(fn, {context_->getConstantInt(context_->getIntegerType(64), 16)}, context_->getIntegerType(64)), inst.result_type);
-                } else {
-                    store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
-                }
+                auto* i64 = context_->getIntegerType(64);
+                auto* args = inst.b == UINT32_MAX ? static_cast<ir::Value*>(context_->getConstantInt(i64, VAL_NIL)) : load_reg(inst.b, inst.type_b);
+                store_reg(inst.dst, builder_->createExternCall("lymar_aot_resource_create",
+                    {load_reg(inst.a, inst.type_a), args}, i64), inst.result_type);
                 break;
             }
+            case LIR::LIR_Op::ResourceCall: {
+                auto* i64 = context_->getIntegerType(64);
+                const size_t count = inst.call_args.size() > 2 ? inst.call_args.size() - 2 : 0;
+                auto* args = builder_->createAlloc(context_->getConstantInt(i64, std::max(size_t(1), count) * 8), i64);
+                for (size_t n = 0; n < count; ++n)
+                    builder_->createStore(load_reg(inst.call_args[n + 2], LIR::Type::Ptr),
+                        builder_->createAdd(args, context_->getConstantInt(i64, n * 8)));
+                auto* operation = inst.b == UINT32_MAX ? static_cast<ir::Value*>(context_->getConstantInt(i64, inst.imm)) : load_reg(inst.b, inst.type_b);
+                store_reg(inst.dst, builder_->createExternCall("lymar_aot_resource_call",
+                    {load_reg(inst.a, inst.type_a), operation, context_->getConstantInt(i64, count), args}, i64), inst.result_type);
+                break;
+            }
+            case LIR::LIR_Op::ResourceDestroy:
+                builder_->createExternCall("lymar_aot_resource_destroy", {load_reg(inst.a, inst.type_a)}, nullptr);
+                break;
             case LIR::LIR_Op::ChannelAlloc: {
                 used_builtins_.insert("lm_list_new");
                 ir::Function* fn = current_module_->getFunction("lm_list_new");

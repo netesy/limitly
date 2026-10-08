@@ -23,6 +23,7 @@ void printUsage(const char* programName) {
     std::cout << "      Options:\n";
     std::cout << "        -I <include_dir>      Add directory to module search path\n";
     std::cout << "        -target <target>      Target platform (windows, linux, macos, wasm)\n";
+    std::cout << "        -arch <arch>          Architecture (x86_64, aarch64, riscv64, wasm32)\n";
     std::cout << "        -o <output>           Output file name\n";
     std::cout << "        -O <level>            Optimization level (0, 1, 2, 3)\n";
     std::cout << "        -c, --obj             Emit object file (.o/.obj)\n";
@@ -126,11 +127,17 @@ int main(int argc, char* argv[]) {
                 else if (type_val == "exe" || type_val == "bin" || type_val == "executable") options.artifact_type = LM::ArtifactType::Executable;
             }
             else if (arg == "windows" || arg == "linux" || arg == "macos" || arg == "wasm") options.target = arg;
-            else if (arg == "x86_64" || arg == "aarch64" || arg == "wasm32") options.arch = arg;
+            else if ((arg == "-arch" || arg == "--arch") && i + 1 < argc) options.arch = argv[++i];
+            else if (arg == "x86_64" || arg == "aarch64" || arg == "riscv64" || arg == "wasm32") options.arch = arg;
             else if (arg == "0" || arg == "1" || arg == "2" || arg == "3") options.opt_level = std::stoi(arg);
             else if (arg[0] != '-') source_file = arg;
         }
         if (source_file.empty()) return 1;
+        if (options.arch != "x86_64" && options.arch != "aarch64" &&
+            options.arch != "riscv64" && options.arch != "wasm32") {
+            std::cerr << "Unsupported architecture: " << options.arch << '\n';
+            return 1;
+        }
         if (options.output_file.empty()) {
             options.output_file = source_file;
             size_t dot = options.output_file.rfind(".lm");

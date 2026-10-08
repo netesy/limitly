@@ -17,6 +17,9 @@ void lymar_aot_set_finalizer(uint64_t, void (*)(uint64_t));
 void lymar_aot_finalize(uint64_t);
 uint64_t lymar_aot_live_allocations();
 uint64_t lymar_aot_slot_pointer(uint64_t);
+void lymar_aot_param_push(uint64_t, uint64_t);
+uint64_t lymar_aot_param_pop(uint64_t, uint64_t);
+uint64_t lymar_aot_return_pointer();
 void lymar_aot_reset();
 }
 static int finalized = 0;
@@ -27,6 +30,16 @@ static void store(uint64_t address, uint64_t value, bool pointer) {
 }
 int main() {
     auto caller = lymar_aot_call_enter();
+    lymar_aot_param_push(42, 1);
+    lymar_aot_call_enter();
+    assert(lymar_aot_param_pop(7, 0) == 7);
+    assert(lymar_aot_return_pointer() == 0);
+    lymar_aot_param_push(99, 0);
+    assert(lymar_aot_param_pop(7, 1) == 99);
+    assert(lymar_aot_return_pointer() == 0);
+    lymar_aot_call_leave(0);
+    assert(lymar_aot_param_pop(7, 0) == 42);
+    assert(lymar_aot_return_pointer() == 1);
     lymar_aot_region_enter(1);
     auto outer_region = lymar_aot_region_current();
     auto outer = lymar_aot_alloc(16);

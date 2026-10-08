@@ -2128,8 +2128,11 @@ void FyraBuiltinFunctions::emit_enum_ir(ir::Module* module, ir::IRBuilder* build
         ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_tag);
         builder->setInsertPoint(b_entry);
         ir::Value* enum_ptr = fn_tag->getParameters().front().get();
-        ir::Value* tag_ptr = builder->createAdd(enum_ptr, ctx->getConstantInt(i64, 8));
-        ir::Value* tag = builder->createLoad(tag_ptr);
+        ir::Value* header = builder->createLoadl(enum_ptr);
+        ir::Value* is_enum = builder->createCeq(header, ctx->getConstantInt(i64, 0x454E554D));
+        ir::Value* offset = builder->createMul(builder->createCast(is_enum, i64), ctx->getConstantInt(i64, 8));
+        ir::Value* tag_ptr = builder->createAdd(enum_ptr, offset);
+        ir::Value* tag = builder->createLoadl(tag_ptr);
         builder->createRet(tag);
     }
 
@@ -2140,8 +2143,12 @@ void FyraBuiltinFunctions::emit_enum_ir(ir::Module* module, ir::IRBuilder* build
         ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_payload);
         builder->setInsertPoint(b_entry);
         ir::Value* enum_ptr = fn_payload->getParameters().front().get();
-        ir::Value* pay_ptr = builder->createAdd(enum_ptr, ctx->getConstantInt(i64, 16));
-        ir::Value* payload = builder->createLoad(pay_ptr);
+        ir::Value* header = builder->createLoadl(enum_ptr);
+        ir::Value* is_enum = builder->createCeq(header, ctx->getConstantInt(i64, 0x454E554D));
+        ir::Value* extra = builder->createMul(builder->createCast(is_enum, i64), ctx->getConstantInt(i64, 8));
+        ir::Value* offset = builder->createAdd(extra, ctx->getConstantInt(i64, 8));
+        ir::Value* pay_ptr = builder->createAdd(enum_ptr, offset);
+        ir::Value* payload = builder->createLoadl(pay_ptr);
         builder->createRet(payload);
     }
 

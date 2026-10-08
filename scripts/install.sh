@@ -61,6 +61,7 @@ mkdir -p "$prefix/bin" "$prefix/share/lymar/bin"
 prefix=$(cd "$prefix" && pwd)
 cp "bin/$exe" "$prefix/share/lymar/bin/$exe"
 [[ ! -f bin/liblymar_aot.a ]] || cp bin/liblymar_aot.a "$prefix/share/lymar/bin/"
+[[ ! -d bin/runtimes ]] || cp -R bin/runtimes "$prefix/share/lymar/bin/"
 cp -R std "$prefix/share/lymar/"
 for name in lymar_ssl stb_image collections font; do
     for extension in .so .dll .dylib; do

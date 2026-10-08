@@ -29,9 +29,9 @@ native API versions are unchanged.
 
 ## Standalone Fyra regions
 
-Linux x86_64 executables now lower `RegionEnter`, `RegionExit`, `RegionMove`
+Executables lower `RegionEnter`, `RegionExit`, `RegionMove`
 and `FrameCallDeinit` to a private standalone ownership runtime. Fyra emits the
-machine code; the host linker adds `liblymar_aot.a` and normal process teardown.
+machine code; a target linker adds `liblymar_aot.a` and normal process teardown.
 The executable does not contain a VM executor. The installer copies this archive
 beside the compiler. Object/static-library consumers must link the archive too.
 `LYMAR_AOT_CXX` selects the linker driver and `LYMAR_AOT_RUNTIME` selects an
@@ -53,12 +53,38 @@ retain their source sections. Optimizations retain external side effects and
 capability metadata, and only promote stack addresses that do not escape. SSA
 renaming observes loads and stores in program order.
 
-Automatic standalone runtime linking is currently supported on Linux x86_64.
-Other executable targets fail explicitly rather than producing an image without
-ownership support. The complete font AOT benchmark remains blocked by the
-separate unimplemented `Param` LIR operation in `std.io.file.open`; region lowering
-is no longer its blocker. Native shared modules continue to use the C++ emitter
-and VM host ownership machinery.
+Runtime selection and driver linking use the target architecture/OS rather than
+a Linux/x86_64 host gate. `scripts/build_aot_runtime.py --target ARCH-OS --cxx
+TARGET_CXX --ar TARGET_AR` builds `bin/runtimes/ARCH-OS/liblymar_aot.a`; repeated
+`--cxx-arg` options supply SDK/sysroot flags. The native archive beside the compiler
+is used only for a matching host target. Cross targets require their own archive.
+`LYMAR_AOT_RUNTIME` and `LYMAR_AOT_CXX` override the archive and driver/wrapper.
+Windows builds now also build the private archive, and the installer copies
+target runtime directories when present.
+
+`LYMAR_AOT_LINKER=auto` tries Fyra's internal linker and records its failure before
+using a target compiler driver. `fyra` requires the internal linker; `driver`
+selects the compiler driver directly. The internal linker currently rejects the
+C++ runtime's TLS relocations, including x64 `R_X86_64_TPOFF32` and ARM64 TLSDESC;
+its archive support alone does not supply the missing TLS/CRT semantics.
+
+`Param` staging and `ConstructError` payload consumption now preserve ownership
+and invocation isolation. Error-union tag/payload access uses the correct offsets.
+Standalone file resources implement open/close, text and binary reads, writes,
+poll/flush and basic filesystem operations; other resource types/operations fail
+explicitly. Font static compilation now completes at optimization levels 0 and 2.
+This is not an executed full-font standalone benchmark result.
+
+Generated executable parity is verified on Linux x86_64. The private runtime
+ownership tests also execute under ARM64 and RISC-V64 Linux QEMU; the Windows x64
+runtime archive cross-compiles. A complete ARM64 Lymar program still exposes a
+separate Fyra global-string stack-slot failure. Other generated executable targets
+and standalone WASM ownership are not established by these runtime-only checks.
+Native shared modules continue to use the C++ emitter and VM host ownership machinery.
+
+For the missing linear/generational safety contracts and the unused `src/memory`
+implementations, see [the memory safety audit](memory-safety-audit.md). Region
+cleanup alone does not establish the full advertised memory model.
 
 ## Validation
 

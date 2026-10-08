@@ -97,6 +97,7 @@ set(FYRA_BACKEND_SOURCES
     src/backend/fyra/builder.cpp
     src/backend/fyra/fyra_builtin_functions.cpp
     src/backend/fyra/region_lowering.cpp
+    src/backend/fyra/runtime_linker.cpp
     src/backend/fyra/capability_mapper.cpp
 )
 

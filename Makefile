@@ -101,7 +101,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
 # Recursive wildcard function for pure GNU Make file discovery
 rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
-BACK_SRCS := $(if $(wildcard vendor/fyra/include/ir/Module.h),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp src/backend/fyra/capability_mapper.cpp src/backend/fyra/region_lowering.cpp,)
+BACK_SRCS := $(if $(wildcard vendor/fyra/include/ir/Module.h),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp src/backend/fyra/capability_mapper.cpp src/backend/fyra/region_lowering.cpp src/backend/fyra/runtime_linker.cpp,)
 
 FYRA_DIR := vendor/fyra
 FYRA_SRCS := $(if $(wildcard $(FYRA_DIR)/include/ir/Module.h),\
@@ -256,7 +256,7 @@ $(OBJ_DIR)/liblymar.a: $(LIB_LYMAR_OBJS) $(FYRA_LIB)
 	@mkdir -p $(dir $@)
 	$(AR) rcs $@ $(LIB_LYMAR_OBJS)
 
-windows: $(BIN_DIR) $(MAIN_RSP) liblymar $(LYRA_BIN)
+windows: $(BIN_DIR) $(MAIN_RSP) liblymar $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a
 	@echo "[BUILD] Linking lymar.exe ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS)
 	@echo "[OK] lymar.exe built."
@@ -543,3 +543,4 @@ $(BIN_DIR)/test_aot_regions$(EXE_EXT): tests/memory/test_aot_regions.cpp $(BIN_D
 aot-region-tests: $(PLATFORM) $(BIN_DIR)/test_aot_regions$(EXE_EXT)
 	$(BIN_DIR)/test_aot_regions$(EXE_EXT)
 	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_CXX=$(abspath tests/memory/aot_linker.py) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_standalone_regions.py
+	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_target_runtime.py

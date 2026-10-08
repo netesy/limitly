@@ -201,6 +201,8 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
                 }
 
                 auto result = fyra.compile(*lir_function, fyra_options);
+                for (const auto& warning : result.warnings)
+                    std::cerr << "[WARN] " << warning << '\n';
                 if (!result.success) {
                     std::cerr << "[ERROR] AOT Compilation Failed" << std::endl;
                     std::cerr << "  Message: " << result.error_message << std::endl;
