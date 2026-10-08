@@ -1,0 +1,26 @@
+import std.collections.hashmap as maps;
+var map = maps.HashMap(1);
+assert(not map.contains_key("missing"));
+map.put("a", nil);
+assert(map.contains_key("a"), "Stored nil must remain a present key");
+assert(not map.contains_key("b"));
+var i = 0;
+while (i < 256) {
+    map.put("key" + (i as str), i);
+    i = i + 1;
+}
+assert(map.size() == 257);
+assert(map.capacity >= 512);
+i = 0;
+while (i < 256) {
+    match (map.get("key" + (i as str))) {
+        val value => { assert(value == i); },
+        err error => { assert(false, "Rehash lost a key"); }
+    }
+    i = i + 1;
+}
+map.put("key0", 500);
+assert(map.size() == 257);
+map.remove("key0");
+assert(not map.contains_key("key0"));
+print("HashMap resizing and result matching passed");

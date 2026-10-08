@@ -30,6 +30,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             auto channel = std::make_unique<LM::Backend::Channel>(capacity);
             channels.push_back(std::move(channel));
             registers[pc->dst] = BOX_PTR(channels.back().get());
+            opaque_runtime_pointers.insert(reinterpret_cast<uintptr_t>(channels.back().get()));
             break;
         }
         case LIR::LIR_Op::ResourceCreate: {
@@ -47,6 +48,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 }
             }
             int64_t id = rm.create(type, create_args);
+            track_resource(id);
             registers[pc->dst] = (id != -1) ? BOX_INT(id) : VAL_NIL;
             break;
         }
@@ -76,12 +78,15 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 }
             }
 
+            if (op == ResourceOperation::SEND || op == ResourceOperation::PUSH)
+                for (auto value : args) export_graph(value);
             registers[pc->dst] = rm.call(id, op, args, get_current_fiber());
             break;
         }
         case LIR::LIR_Op::ResourceDestroy: {
             int64_t id = to_int(registers[pc->a]);
             rm.destroy(id);
+            untrack_resource(id);
             break;
         }
         case LIR::LIR_Op::ChannelSend:
@@ -89,6 +94,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             RegisterValue value = (pc->b != UINT32_MAX) ? registers[pc->b] : VAL_NIL;
             if (IS_PTR(registers[pc->a])) {
                 auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
+                export_graph(value);
                 channel->send(value, get_current_fiber());
             }
             break;
@@ -97,6 +103,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             if (IS_PTR(registers[pc->a])) {
                 auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
                 RegisterValue value = (pc->b != UINT32_MAX) ? registers[pc->b] : VAL_NIL;
+                export_graph(value);
                 registers[pc->dst] = channel->offer(value) ? VAL_TRUE : VAL_FALSE;
             } else {
                 registers[pc->dst] = VAL_FALSE;
@@ -191,6 +198,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             auto* raw = context.get();
             task_contexts.push_back(std::move(context));
             registers[pc->dst] = BOX_PTR(raw);
+            opaque_runtime_pointers.insert(reinterpret_cast<uintptr_t>(raw));
             break;
         }
         case LIR::LIR_Op::TaskContextInit:
@@ -294,6 +302,12 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 for (uint32_t c = 0; c < num_cores; ++c) {
                     workers.emplace_back([&]() {
                         RegisterVM worker_vm;
+                        worker_vm.heap_parent_ = this;
+                        worker_vm.opaque_runtime_pointers = opaque_runtime_pointers;
+                        {
+                            std::lock_guard<std::recursive_mutex> lock(heap_mutex_);
+                            for (const auto& [ptr, kind] : vm_allocation_types) worker_vm.borrowed_constants.insert(ptr);
+                        }
                         while (true) {
                             TaskContext* context = nullptr;
                             {
@@ -326,7 +340,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                                 if (ch != context->fields.end()) worker_vm.registers[2] = ch->second;
                                 worker_vm.current_function_ = func;
                                 try {
-                                    worker_vm.execute_instructions(*func, 0, func->instructions.size());
+                                    worker_vm.execute_function(*func);
                                 } catch (...) {}
                             };
 
@@ -392,7 +406,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                     if (ch != context->fields.end()) registers[2] = ch->second;
                     current_function_ = func;
                     try {
-                        execute_instructions(*func, 0, func->instructions.size());
+                        execute_function(*func);
                     } catch (...) {
                         if (scheduler_config.error_policy == LIR::Metadata::ErrorPolicy::Stop) throw;
                         if (scheduler_config.error_policy == LIR::Metadata::ErrorPolicy::Partial)

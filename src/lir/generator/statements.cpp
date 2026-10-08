@@ -850,26 +850,11 @@ void Generator::emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt) {
         if (stmt.value) {
             Reg value = emit_expr(*stmt.value);
             
-            // Move ownership of returned value to region 0 (parent/caller region)
-            // TEMPORARY: Disable automatic region operations
-            // emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, value, 0, 0));
-            
-            // Emit RegionExit for all active scopes
-            // TEMPORARY: Disable automatic region operations
-            // for (auto it = generator_region_stack_.rbegin(); it != generator_region_stack_.rend(); ++it) {
-            //     emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, *it, 0));
-            // }
-            
             LIR_Inst ret_inst(LIR_Op::Return);
             ret_inst.a = value;
             emit_instruction(ret_inst);
         } else {
-            // Emit RegionExit for all active scopes
-            // TEMPORARY: Disable automatic region operations
-            // for (auto it = generator_region_stack_.rbegin(); it != generator_region_stack_.rend(); ++it) {
-            //     emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, *it, 0));
-            // }
-            emit_instruction(LIR_Inst(LIR_Op::Return));
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, UINT32_MAX, 0));
         }
     }
 }
@@ -1795,6 +1780,15 @@ void Generator::emit_tuple_var_iter_stmt(LM::Frontend::AST::IterStatement& stmt,
 void Generator::emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt) {
     uint32_t break_label = get_break_label();
     if (break_label != INVALID_LOOP_LABEL) {
+        if (!loop_stack_.empty()) {
+            size_t depth = loop_stack_.back().region_depth;
+            uint32_t parent = depth ? generator_region_stack_[depth - 1] : 0;
+            for (size_t i = 0; i < depth && i < scope_stack_.size(); ++i)
+                for (const auto& [name, reg] : scope_stack_[i].vars)
+                    emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, 0, reg, 0, parent));
+            for (size_t i = generator_region_stack_.size(); i > depth; --i)
+                emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, generator_region_stack_[i - 1]));
+        }
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, break_label));
         // Add edge to break target block
         LIR_BasicBlock* break_target = current_function_->cfg->get_block(break_label);
@@ -1812,6 +1806,15 @@ void Generator::emit_break_stmt(LM::Frontend::AST::BreakStatement& stmt) {
 void Generator::emit_continue_stmt(LM::Frontend::AST::ContinueStatement& stmt) {
     uint32_t continue_label = get_continue_label();
     if (continue_label != INVALID_LOOP_LABEL) {
+        if (!loop_stack_.empty()) {
+            size_t depth = loop_stack_.back().region_depth;
+            uint32_t parent = depth ? generator_region_stack_[depth - 1] : 0;
+            for (size_t i = 0; i < depth && i < scope_stack_.size(); ++i)
+                for (const auto& [name, reg] : scope_stack_[i].vars)
+                    emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, 0, reg, 0, parent));
+            for (size_t i = generator_region_stack_.size(); i > depth; --i)
+                emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, generator_region_stack_[i - 1]));
+        }
         emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, continue_label));
         // Add edge to continue target block
         LIR_BasicBlock* continue_target = current_function_->cfg->get_block(continue_label);
@@ -1867,19 +1870,21 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
             LIR_BasicBlock* body_block = body_blocks[i];
             LIR_BasicBlock* next_pattern = (i + 1 < stmt.cases.size()) ? pattern_blocks[i + 1] : match_exit;
 
+            auto* failed = create_basic_block("match_failed_" + std::to_string(i));
             set_current_block(pattern_block);
             enter_scope();
+            uint32_t case_region = generator_region_stack_.back();
 
             // 1. Pattern Matching Logic
-            emit_pattern_match(match_case.pattern, value_reg, next_pattern, 0);
+            emit_pattern_match(match_case.pattern, value_reg, failed, 0);
 
             // 2. Guard Logic
             if (match_case.guard) {
                 if (get_current_block() && !get_current_block()->has_terminator()) {
                     Reg guard_res = emit_expr(*match_case.guard);
-                    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, guard_res, 0, next_pattern->id));
+                    emit_instruction(LIR_Inst(LIR_Op::JumpIfFalse, 0, guard_res, 0, failed->id));
                     add_block_edge(get_current_block(), body_block);  // Fall-through if guard true (add first)
-                    add_block_edge(get_current_block(), next_pattern);  // Jump if false (add second)
+                    add_block_edge(get_current_block(), failed);  // Jump if false (add second)
                 }
             } else {
                 if (get_current_block() && !get_current_block()->has_terminator()) {
@@ -1895,12 +1900,20 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
                 emit_stmt(*match_case.body);
             }
             
+            exit_scope();
             if (get_current_block() && !get_current_block()->has_terminator()) {
                 emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, match_exit->id));
                 add_block_edge(get_current_block(), match_exit);
             }
             
-            exit_scope();
+            set_current_block(failed);
+            uint32_t parent = generator_region_stack_.empty() ? 0 : generator_region_stack_.back();
+            for (const auto& scope : scope_stack_)
+                for (const auto& [name, reg] : scope.vars)
+                    emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, 0, reg, 0, parent));
+            emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, case_region));
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0, 0, 0, next_pattern->id));
+            add_block_edge(get_current_block(), next_pattern);
         }
 
         set_current_block(match_exit);
@@ -1925,16 +1938,18 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
             uint32_t body_label = body_labels[i];
             uint32_t next_pattern_label = (i + 1 < stmt.cases.size()) ? pattern_labels[i + 1] : exit_label;
             
+            uint32_t failed_label = generate_label();
             place_label(pattern_label);
             enter_scope();
+            uint32_t case_region = generator_region_stack_.back();
             
             // 1. Pattern Matching Logic
-            emit_pattern_match(match_case.pattern, value_reg, nullptr, next_pattern_label);
+            emit_pattern_match(match_case.pattern, value_reg, nullptr, failed_label);
             
             // 2. Guard Logic
             if (match_case.guard) {
                 Reg guard_res = emit_expr(*match_case.guard);
-                emit_label_jump(LIR_Op::JumpIfFalse, guard_res, next_pattern_label);
+                emit_label_jump(LIR_Op::JumpIfFalse, guard_res, failed_label);
             }
             
             // Fall-through (or jump) to body
@@ -1947,8 +1962,15 @@ void Generator::emit_match_stmt(LM::Frontend::AST::MatchStatement& stmt) {
                 emit_stmt(*match_case.body);
             }
             
-            emit_label_jump(LIR_Op::Jump, 0, exit_label);
             exit_scope();
+            emit_label_jump(LIR_Op::Jump, 0, exit_label);
+            place_label(failed_label);
+            uint32_t parent = generator_region_stack_.empty() ? 0 : generator_region_stack_.back();
+            for (const auto& scope : scope_stack_)
+                for (const auto& [name, reg] : scope.vars)
+                    emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, 0, reg, 0, parent));
+            emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, case_region));
+            emit_label_jump(LIR_Op::Jump, 0, next_pattern_label);
         }
         
         place_label(exit_label);

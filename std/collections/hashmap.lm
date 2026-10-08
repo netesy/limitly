@@ -18,6 +18,7 @@ frame HashMap {
 
     pub init(initial_cap: int = 16) {
         self.capacity = initial_cap;
+        if (self.capacity < 1) self.capacity = 1;
         self.count = 0;
         self.buckets = [] as [[HashEntry]];
         var i = 0;
@@ -28,15 +29,28 @@ frame HashMap {
     }
 
     fn _hash(key: str): int {
-        var h = 5381;
+        return _builtin_string_hash_bytes(key) % self.capacity;
+    }
+
+    fn _grow() {
+        var old_buckets = self.buckets;
+        self.capacity = self.capacity * 2;
+        self.buckets = [] as [[HashEntry]];
         var i = 0;
-        while (i < len(key)) {
-            var ch = substring(key, i, i + 1);
-            h = ((h * 33) + (ch as int)) % 2147483647;
+        while (i < self.capacity) {
+            self.buckets.append([] as [HashEntry]);
             i = i + 1;
         }
-        if (h < 0) h = 0 - h;
-        return h % self.capacity;
+        i = 0;
+        while (i < len(old_buckets)) {
+            var j = 0;
+            while (j < len(old_buckets[i])) {
+                var entry = old_buckets[i][j];
+                self.buckets[self._hash(entry.key)].append(entry);
+                j = j + 1;
+            }
+            i = i + 1;
+        }
     }
 
     pub fn put(key: str, value: any): HashMap {
@@ -48,6 +62,10 @@ frame HashMap {
                 return self;
             }
             i = i + 1;
+        }
+        if ((self.count + 1) * 4 > self.capacity * 3) {
+            self._grow();
+            idx = self._hash(key);
         }
         self.buckets[idx].append(HashEntry(key, value));
         self.count = self.count + 1;
@@ -68,7 +86,11 @@ frame HashMap {
 
     pub fn contains_key(key: str): bool {
         var res = self.get(key);
-        return (res != nil);
+        match (res) {
+            val value => { return true; },
+            err error => { return false; }
+        }
+        return false;
     }
 
     pub fn size(): int {

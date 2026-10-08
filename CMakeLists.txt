@@ -96,6 +96,8 @@ set(FYRA_BACKEND_SOURCES
     src/backend/fyra/fyra_ir_generator.cpp
     src/backend/fyra/builder.cpp
     src/backend/fyra/fyra_builtin_functions.cpp
+    src/backend/fyra/region_lowering.cpp
+    src/backend/fyra/capability_mapper.cpp
 )
 
 set(ERROR_SOURCES
@@ -140,6 +142,8 @@ add_library(lymar_runtime STATIC ${RUNTIME_SOURCES})
 target_include_directories(lymar_runtime PUBLIC src)
 
 add_executable(lymar ${MAIN_SOURCES})
+add_library(lymar_aot STATIC src/backend/fyra/region_runtime.cpp)
+add_dependencies(lymar lymar_aot)
 target_link_libraries(lymar 
     PRIVATE 
     lymar_runtime

@@ -430,6 +430,7 @@ LIR_Function Serializer::deserialize(const std::vector<uint8_t>& buffer) {
         inst.imm = static_cast<Imm>(r.u64());
 
         inst.const_val = read_const_val(r);
+        if (inst.op == LIR_Op::LoadConst) lm_keep_constant(inst.const_val);
 
         if (r.flag()) inst.func_name = r.str();
         if (r.flag()) inst.type_name = r.str();

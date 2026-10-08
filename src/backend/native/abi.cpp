@@ -6,6 +6,7 @@
 #include "backend/vm/vm_list.hh"
 #include "backend/vm/vm_tuple.hh"
 #include "lir/builtin_functions.hh"
+#include "lir/function_registry.hh"
 #include <cmath>
 #include <cstring>
 #include <stdexcept>
@@ -67,13 +68,13 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
   };
   switch (static_cast<Helper>(operation)) {
   case Helper::Add:
-    return lm_add(a, b);
+    return own(lm_add(a, b));
   case Helper::Sub:
-    return lm_sub(a, b);
+    return own(lm_sub(a, b));
   case Helper::Mul:
-    return lm_mul(a, b);
+    return own(lm_mul(a, b));
   case Helper::Div:
-    return lm_div(a, b);
+    return own(lm_div(a, b));
   case Helper::Neg:
     return lm_sub(make_i64(0), a);
   case Helper::Mod:
@@ -89,11 +90,11 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
     if (type == LIR::Type::F64 || type == LIR::Type::F32) {
       if (str) {
         try {
-          return make_float(std::stod(std::string(str->data, str->len)));
+          return own(make_float(std::stod(std::string(str->data, str->len))));
         } catch (...) {
         }
       }
-      return make_float(as_float(a));
+      return own(make_float(as_float(a)));
     }
     if (type == LIR::Type::I64) {
       if (str) {
@@ -287,10 +288,12 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
     auto arguments = sequence(b);
     auto id = VM::ResourceManager::getInstance().create(
         static_cast<VM::ResourceType>(as_i64(a)), arguments);
+    vm.track_resource(id);
     return id == -1 ? VAL_NIL : make_i64(id);
   }
   case Helper::ResourceDestroy:
     VM::ResourceManager::getInstance().destroy(as_i64(a));
+    vm.untrack_resource(as_i64(a));
     return VAL_NIL;
   case Helper::ResourceCall: {
     std::vector<LmValue> arguments;
@@ -298,6 +301,9 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
       auto values = sequence(args[i]);
       arguments.insert(arguments.end(), values.begin(), values.end());
     }
+    if (static_cast<VM::ResourceOperation>(as_i64(b)) == VM::ResourceOperation::SEND ||
+        static_cast<VM::ResourceOperation>(as_i64(b)) == VM::ResourceOperation::PUSH)
+      for (auto value : arguments) vm.publish_value(value);
     auto result = VM::ResourceManager::getInstance().call(
         as_i64(a), static_cast<VM::ResourceOperation>(as_i64(b)), arguments,
         vm.get_current_fiber());
@@ -317,6 +323,19 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
     auto string = [&](size_t i) {
       return object<LmStringHeader>(arg(i), TYPE_STRING);
     };
+    if (name == "_builtin_track") return own(arg(0));
+    if (name == "_builtin_frame_deinit") { vm.finalize_frame(arg(0)); return VAL_NIL; }
+    if (name == "_builtin_region_call_enter") return make_i64(vm.begin_native_call());
+    if (name == "_builtin_region_call_leave") {
+      vm.end_native_call(as_i64(arg(0)), arg(1)); return VAL_NIL;
+    }
+    if (name == "_builtin_region_enter" || name == "_builtin_region_exit") {
+      vm.native_region(name == "_builtin_region_enter" ? LIR::LIR_Op::RegionEnter : LIR::LIR_Op::RegionExit,
+                       static_cast<uint32_t>(as_i64(arg(0)))); return VAL_NIL;
+    }
+    if (name == "_builtin_region_move") {
+      vm.native_region(LIR::LIR_Op::RegionMove, static_cast<uint32_t>(as_i64(arg(1))), arg(0)); return VAL_NIL;
+    }
     // Avoid converting entire object graphs to frontend values just to
     // inspect a collection's length inside native loops.
     if (name == "len") {
@@ -334,6 +353,14 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
         return VM::compiler_value_to_backend_value(
             LIR::BuiltinUtils::callBuiltinFunction(name, values));
       }
+    }
+    if (name == "_builtin_string_hash_bytes") {
+      auto* value = string(0);
+      if (!value) throw std::runtime_error("Byte hash expects a string");
+      uint64_t hash = 5381;
+      for (uint64_t i = 0; i < value->len; ++i)
+        hash = (hash * 33 + static_cast<unsigned char>(value->data[i])) % 2147483647;
+      return make_i64(hash);
     }
     if (name == "_builtin_list_slice") {
       auto *list = object<LmList>(arg(0), TYPE_LIST);

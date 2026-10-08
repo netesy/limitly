@@ -236,7 +236,48 @@ CompileResult FyraCompiler::compile_module(std::shared_ptr<ir::Module> module,
                     break;
                 case ArtifactKind::Executable:
                 default:
-                    build_res = backend.emitExecutable(options.output_file);
+#if defined(__linux__) && defined(__x86_64__)
+                    if (options.arch == Architecture::X86_64 && options.platform == Platform::Linux) {
+                        // Fyra emits the program's machine code; the host linker
+                        // supplies the private ownership runtime and normal C++
+                        // process teardown, rather than embedding a VM executor.
+                        const auto temporary = options.output_file + ".lymar-" +
+                            std::to_string(std::chrono::steady_clock::now().time_since_epoch().count()) + ".o";
+                        build_res = backend.emitObject(temporary);
+                        if (build_res.success) {
+                            auto quote = [](const std::string& value) {
+                                std::string result = "'";
+                                for (char c : value) result += c == '\'' ? "'\\''" : std::string(1, c);
+                                return result + "'";
+                            };
+                            auto binary = std::filesystem::read_symlink("/proc/self/exe");
+                            const char* runtime_override = std::getenv("LYMAR_AOT_RUNTIME");
+                            auto runtime = runtime_override && *runtime_override
+                                ? std::filesystem::path(runtime_override)
+                                : binary.parent_path() / "liblymar_aot.a";
+                            const char* configured = std::getenv("LYMAR_AOT_CXX");
+                            std::string command = quote(configured && *configured ? configured : "g++") +
+                                " -no-pie -Wl,-z,noexecstack " + quote(temporary);
+                            for (const auto& [name, imported] : all_mods) {
+                                LM::Frontend::CompiledModuleMeta meta;
+                                if (LM::Frontend::ModuleManager::getInstance().find_compiled_module(name, "", "static", meta)
+                                    && std::filesystem::exists(meta.artifact_path)) command += " " + quote(meta.artifact_path);
+                            }
+                            command += " " + quote(runtime.string()) + " -o " + quote(options.output_file);
+                            if (!std::filesystem::exists(runtime) || std::system(command.c_str()) != 0) {
+                                build_res.success = false;
+                                build_res.errors.push_back("Host linker failed to link the standalone AOT ownership runtime: " + runtime.string());
+                            }
+                        }
+                        std::filesystem::remove(temporary);
+                    } else
+#endif
+                    {
+                        if (module->getFunction("lymar_aot_call_enter")) {
+                            build_res.success = false;
+                            build_res.errors.push_back("Standalone region runtime linking is supported on Linux x86_64; emit an object/static library and link a target-built liblymar_aot.a for other targets");
+                        } else build_res = backend.emitExecutable(options.output_file);
+                    }
                     break;
             }
         }

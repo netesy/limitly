@@ -99,27 +99,7 @@ void RegisterVM::execute_buffer_create(const LIR::LIR_Inst* pc) {
 }
 
 // Buffer resize - resize existing buffer
-void RegisterVM::execute_buffer_resize(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    void* ptr = UNBOX_PTR(registers[pc->a]);
-    int64_t new_size = to_int(registers[pc->b]);
-    
-    if (new_size < 0) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    void* new_ptr = std::realloc(ptr, new_size);
-    if (new_ptr) {
-        registers[pc->dst] = BOX_PTR(new_ptr);
-    } else {
-        registers[pc->dst] = VAL_NIL;
-    }
-}
+void RegisterVM::execute_buffer_resize(const LIR::LIR_Inst* pc) { execute_memory_realloc(pc); }
 
 // Library, Foreign Call, and Callback operations are handled in ffi.cpp
 

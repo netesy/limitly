@@ -464,6 +464,10 @@ void Generator::create_parallel_work_item(const std::string& work_item_name, std
     
     // Save current context
     auto saved_function = std::move(current_function_);
+    auto saved_regions = std::move(generator_region_stack_);
+    uint32_t saved_region_counter = generator_region_counter_;
+    generator_region_stack_.clear();
+    generator_region_counter_ = 0;
     auto saved_cfg_context = cfg_context_;
     auto saved_current_block = cfg_context_.current_block;
     
@@ -479,7 +483,7 @@ void Generator::create_parallel_work_item(const std::string& work_item_name, std
     emit_stmt(*stmt);
     
     // Add return to work item function
-    emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0));
+    emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, UINT32_MAX, 0));
     
     // Restore context
     exit_scope();
@@ -491,6 +495,8 @@ void Generator::create_parallel_work_item(const std::string& work_item_name, std
     
     // Restore previous context
     current_function_ = std::move(saved_function);
+    generator_region_stack_ = std::move(saved_regions);
+    generator_region_counter_ = saved_region_counter;
     cfg_context_ = saved_cfg_context;
     cfg_context_.current_block = saved_current_block;
     
@@ -528,6 +534,10 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     
     // Save current context
     auto saved_function = std::move(current_function_);
+    auto saved_regions = std::move(generator_region_stack_);
+    uint32_t saved_region_counter = generator_region_counter_;
+    generator_region_stack_.clear();
+    generator_region_counter_ = 0;
     auto saved_cfg_context = cfg_context_;
     auto saved_current_block = cfg_context_.current_block;
     
@@ -566,7 +576,7 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     }
     
     // Add return to task function
-    emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0));
+    emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, UINT32_MAX, 0));
     
     // Restore context
     exit_scope();
@@ -578,6 +588,8 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     
     // Restore previous context
     current_function_ = std::move(saved_function);
+    generator_region_stack_ = std::move(saved_regions);
+    generator_region_counter_ = saved_region_counter;
     cfg_context_ = saved_cfg_context;
     cfg_context_.current_block = saved_current_block;
     
@@ -593,6 +605,10 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
     
     // Save current context
     auto saved_function = std::move(current_function_);
+    auto saved_regions = std::move(generator_region_stack_);
+    uint32_t saved_region_counter = generator_region_counter_;
+    generator_region_stack_.clear();
+    generator_region_counter_ = 0;
     auto saved_cfg_context = cfg_context_;
     auto saved_current_block = cfg_context_.current_block;
     
@@ -643,7 +659,7 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
     }
     
     // Add return to worker function
-    emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0));
+    emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, UINT32_MAX, 0));
     
     // Restore context
     exit_scope();
@@ -655,6 +671,8 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
     
     // Restore previous context
     current_function_ = std::move(saved_function);
+    generator_region_stack_ = std::move(saved_regions);
+    generator_region_counter_ = saved_region_counter;
     cfg_context_ = saved_cfg_context;
     cfg_context_.current_block = saved_current_block;
     
@@ -770,6 +788,10 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
     
     // Save current context
     auto saved_function = std::move(current_function_);
+    auto saved_regions = std::move(generator_region_stack_);
+    uint32_t saved_region_counter = generator_region_counter_;
+    generator_region_stack_.clear();
+    generator_region_counter_ = 0;
     auto saved_next_register = next_register_;
     auto saved_scope_stack = std::move(scope_stack_);
     auto saved_register_types = std::move(register_types_);
@@ -835,6 +857,8 @@ void Generator::lower_task_body(LM::Frontend::AST::TaskStatement& stmt) {
 
     // Restore context
     current_function_ = std::move(saved_function);
+    generator_region_stack_ = std::move(saved_regions);
+    generator_region_counter_ = saved_region_counter;
     next_register_ = saved_next_register;
     scope_stack_ = std::move(saved_scope_stack);
     register_types_ = std::move(saved_register_types);
@@ -851,6 +875,10 @@ void Generator::lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt) {
     
     // Save current context
     auto saved_function = std::move(current_function_);
+    auto saved_regions = std::move(generator_region_stack_);
+    uint32_t saved_region_counter = generator_region_counter_;
+    generator_region_stack_.clear();
+    generator_region_counter_ = 0;
     auto saved_next_register = next_register_;
     auto saved_scope_stack = std::move(scope_stack_);
     auto saved_register_types = std::move(register_types_);
@@ -930,6 +958,8 @@ void Generator::lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt) {
     
     // Restore context
     current_function_ = std::move(saved_function);
+    generator_region_stack_ = std::move(saved_regions);
+    generator_region_counter_ = saved_region_counter;
     next_register_ = saved_next_register;
     scope_stack_ = std::move(saved_scope_stack);
     register_types_ = std::move(saved_register_types);

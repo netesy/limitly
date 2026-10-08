@@ -259,14 +259,14 @@ frame FontInfo {
                 var pos = self.hmtx_offset + (i * 4);
                 var advance = reader.peek_u16(pos);
                 var lsb = reader.peek_i16(pos + 2);
-                cache = cache + [CachedGlyphMetrics(advance, lsb)];
+                cache.append(CachedGlyphMetrics(advance, lsb));
             } else {
                 // Monospace or shared advance width from last hmetric
                 var last_pos = self.hmtx_offset + ((self.num_h_metrics - 1) * 4);
                 var advance = reader.peek_u16(last_pos);
                 var lsb_pos = self.hmtx_offset + (self.num_h_metrics * 4) + ((i - self.num_h_metrics) * 2);
                 var lsb = reader.peek_i16(lsb_pos);
-                cache = cache + [CachedGlyphMetrics(advance, lsb)];
+                cache.append(CachedGlyphMetrics(advance, lsb));
             }
         }
         self.glyph_metrics_cache = cache;
@@ -537,7 +537,7 @@ pub fn parse_tables(reader: r.ByteReader): FontInfo? {
                         var left = reader.read_u16();
                         var right = reader.read_u16();
                         var value = reader.read_i16();
-                        kerning_pairs = kerning_pairs + [KerningEntry(left, right, value)];
+                        kerning_pairs.append(KerningEntry(left, right, value));
                     }
 
                     info.kerning_pairs = kerning_pairs;

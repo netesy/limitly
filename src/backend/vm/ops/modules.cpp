@@ -17,7 +17,7 @@ void RegisterVM::execute_modules(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::StoreGlobal:
-            globals_[pc->func_name] = registers[pc->a];
+            set_global(pc->func_name, registers[pc->a]);
             break;
         default:
             break;

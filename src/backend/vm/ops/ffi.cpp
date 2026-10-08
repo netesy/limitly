@@ -176,58 +176,24 @@ RegisterValue RegisterVM::invoke_for_callback(
     const std::string& func_name,
     const std::vector<RegisterValue>& args, bool propagate_errors)
 {
-    auto& func_manager = LIR::LIRFunctionManager::getInstance();
-    if (!func_manager.hasFunction(func_name)) {
+    auto& manager = LIR::LIRFunctionManager::getInstance();
+    if (!manager.hasFunction(func_name)) {
         if (propagate_errors) throw std::runtime_error("Native callback function not found: " + func_name);
-        std::cerr << "[trampoline] function '" << func_name << "' not found in registry\n";
         return VAL_NIL;
     }
-    auto func = func_manager.getFunction(func_name);
-
-    std::vector<RegisterValue> arg_vals = args;
-    size_t expected = func->getParameters().size();
+    auto arg_vals = args;
+    size_t expected = manager.getFunction(func_name)->getParameters().size();
     while (arg_vals.size() < expected) arg_vals.push_back(VAL_NIL);
-
-    auto saved_registers              = registers;
-    const LIR::LIR_Function* saved_func = current_function_;
-
-    registers.assign(registers.size(), VAL_NIL);
-    for (size_t i = 0; i < arg_vals.size() && i < registers.size(); ++i)
-        registers[i] = arg_vals[i];
-
-    LIR::LIR_Function temp_wrapper(func->getName(),
-                                    static_cast<uint32_t>(arg_vals.size()));
-    temp_wrapper.instructions            = func->getInstructions();
-    temp_wrapper.register_language_types = func->getRegisterLanguageTypes();
-    temp_wrapper.register_types          = func->getRegisterTypes();
-    current_function_ = &temp_wrapper;
-
     try {
-        execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
+        return call_interpreted(func_name, arg_vals);
     } catch (const std::exception& e) {
-        if (propagate_errors) {
-            registers = saved_registers;
-            current_function_ = saved_func;
-            throw;
-        }
-        std::cerr << "[trampoline] Lymar callback '" << func_name
-                  << "' threw: " << e.what() << '\n';
+        if (propagate_errors) throw;
+        std::cerr << "[trampoline] Lymar callback '" << func_name << "' threw: " << e.what() << '\n';
     } catch (...) {
-        if (propagate_errors) {
-            registers = saved_registers;
-            current_function_ = saved_func;
-            throw;
-        }
-        std::cerr << "[trampoline] Lymar callback '" << func_name
-                  << "' threw unknown exception\n";
+        if (propagate_errors) throw;
+        std::cerr << "[trampoline] Lymar callback threw an unknown exception\n";
     }
-
-    RegisterValue return_value = registers[0];
-
-    registers        = saved_registers;
-    current_function_ = saved_func;
-
-    return return_value;
+    return VAL_NIL;
 }
 
 void RegisterVM::execute_extern_library_load(const LIR::LIR_Inst* pc) {
@@ -238,10 +204,7 @@ void RegisterVM::execute_extern_library_load(const LIR::LIR_Inst* pc) {
     if (!handle) { registers[pc->dst] = VAL_NIL; return; }
     RegisterValue val = lm_alloc_foreign_ptr(handle);
     registers[pc->dst] = val;
-    if (IS_PTR(val) && !vm_region_stack.empty()) {
-        uintptr_t ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-        vm_allocation_regions[ptr] = active_region_id;
-    }
+    register_native_allocation(registers[pc->dst]);
 }
 
 void RegisterVM::execute_extern_library_unload(const LIR::LIR_Inst* pc) {
@@ -261,10 +224,7 @@ void RegisterVM::execute_extern_library_get_symbol(const LIR::LIR_Inst* pc) {
     void* ptr = lymarrt_symbol_lookup(handle, symbol);
     RegisterValue val = ptr ? lm_alloc_foreign_ptr(ptr) : VAL_NIL;
     registers[pc->dst] = val;
-    if (IS_PTR(val) && !vm_region_stack.empty()) {
-        uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-        vm_allocation_regions[ptr_val] = active_region_id;
-    }
+    register_native_allocation(registers[pc->dst]);
 }
 
 void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
@@ -340,10 +300,7 @@ void RegisterVM::execute_extern_call_function(const LIR::LIR_Inst* pc) {
     if (lymarrt_ffi_call(func_ptr, ret_type, resolved_arg_types.data(), lymarrt_args.data(), num_args, &out_res)) {
         RegisterValue val = lymarrt_val_to_vm_val(out_res, ret_type);
         registers[pc->dst] = val;
-        if (IS_PTR(val) && !vm_region_stack.empty()) {
-            uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-            vm_allocation_regions[ptr_val] = active_region_id;
-        }
+        register_native_allocation(registers[pc->dst]);
     } else {
         registers[pc->dst] = VAL_NIL;
     }
@@ -448,11 +405,23 @@ void RegisterVM::execute_extern_register_callback(const LIR::LIR_Inst* pc) {
         registers[pc->dst] = VAL_NIL;
         return;
     }
+    owned_callbacks.insert(id);
     registers[pc->dst] = BOX_INT(id);
+}
+
+void RegisterVM::revoke_callbacks() {
+    while (!owned_callbacks.empty()) {
+        int64_t id = *owned_callbacks.begin();
+        owned_callbacks.erase(id);
+        auto* data = static_cast<VmCallbackUserData*>(lymarrt_callback_get_userdata(id));
+        lymarrt_callback_destroy(id);
+        delete data;
+    }
 }
 
 void RegisterVM::execute_extern_unregister_callback(const LIR::LIR_Inst* pc) {
     int64_t id = as_i64(registers[pc->a]);
+    if (!owned_callbacks.erase(id)) return;
     void* udata = lymarrt_callback_get_userdata(id);
     if (udata) {
         delete static_cast<VmCallbackUserData*>(udata);
@@ -466,10 +435,7 @@ void RegisterVM::execute_extern_get_callback_ptr(const LIR::LIR_Inst* pc) {
     if (code_ptr) {
         RegisterValue val = lm_alloc_foreign_ptr(code_ptr);
         registers[pc->dst] = val;
-        if (IS_PTR(val) && !vm_region_stack.empty()) {
-            uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-            vm_allocation_regions[ptr_val] = active_region_id;
-        }
+        register_native_allocation(registers[pc->dst]);
     } else {
         registers[pc->dst] = VAL_NIL;
     }

@@ -22,6 +22,12 @@ RegisterValue RegisterVM::call_interpreted(const std::string& name,
     auto* function = LIR::FunctionRegistry::getInstance().getFunction(name);
     if (!function) throw std::runtime_error("Missing interpreted function: " + name);
 
+    for (auto value : args) register_native_allocation(value);
+    size_t caller_depth = vm_region_stack.size();
+    uint64_t caller_region = active_region_id;
+    invocation_parents.push_back(caller_region);
+    auto caller_arguments = std::move(argument_stack);
+    argument_stack.clear();
     auto caller_registers = std::move(registers);
     const auto* caller_function = current_function_;
     if (!spare_register_files_.empty()) {
@@ -35,11 +41,19 @@ RegisterValue RegisterVM::call_interpreted(const std::string& name,
         // The registry already owns the immutable instructions and type maps.
         execute_instructions(*function, 0, function->instructions.size());
         auto result = registers[0];
+        register_native_allocation(result);
+        promote_graph(result, caller_region);
+        while (vm_region_stack.size() > caller_depth) exit_region();
+        invocation_parents.pop_back();
+        argument_stack = std::move(caller_arguments);
         spare_register_files_.push_back(std::move(registers));
         registers = std::move(caller_registers);
         current_function_ = caller_function;
         return result;
     } catch (...) {
+        while (vm_region_stack.size() > caller_depth) exit_region();
+        invocation_parents.pop_back();
+        argument_stack = std::move(caller_arguments);
         spare_register_files_.push_back(std::move(registers));
         registers = std::move(caller_registers);
         current_function_ = caller_function;
@@ -100,7 +114,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
 
                 const std::string& fname = pc->func_name;
                 bool handled = false;
-                if (fname == "_builtin_string_join" || fname == "_builtin_list_slice") {
+                if (fname == "_builtin_string_join" || fname == "_builtin_list_slice" || fname == "_builtin_string_hash_bytes") {
                     std::vector<LmValue> args;
                     for (auto reg : pc->call_args) args.push_back(registers[reg]);
                     registers[pc->dst] = Backend::Native::host_api().helper(this,
@@ -113,11 +127,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     int64_t end = as_i64(registers[pc->call_args[2]]);
                     LmStringHeader* res = lm_str_substring(str, start, end);
                     registers[pc->dst] = BOX_PTR(res);
-                    if (res && !vm_region_stack.empty()) {
-                        uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
-                        vm_allocation_regions[ptr] = active_region_id;
-                        vm_allocation_types[ptr] = TYPE_STRING;
-                    }
+                    register_native_allocation(registers[pc->dst]);
                     handled = true;
                 } else if (fname == "_builtin_string_byte_at" && pc->call_args.size() >= 2) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
@@ -148,31 +158,19 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     LmStringHeader* res = lm_str_trim(str);
                     registers[pc->dst] = BOX_PTR(res);
-                    if (res && !vm_region_stack.empty()) {
-                        uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
-                        vm_allocation_regions[ptr] = active_region_id;
-                        vm_allocation_types[ptr] = TYPE_STRING;
-                    }
+                    register_native_allocation(registers[pc->dst]);
                     handled = true;
                 } else if (fname == "_builtin_string_to_lower" && pc->call_args.size() >= 1) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     LmStringHeader* res = lm_str_to_lower(str);
                     registers[pc->dst] = BOX_PTR(res);
-                    if (res && !vm_region_stack.empty()) {
-                        uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
-                        vm_allocation_regions[ptr] = active_region_id;
-                        vm_allocation_types[ptr] = TYPE_STRING;
-                    }
+                    register_native_allocation(registers[pc->dst]);
                     handled = true;
                 } else if (fname == "_builtin_string_to_upper" && pc->call_args.size() >= 1) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     LmStringHeader* res = lm_str_to_upper(str);
                     registers[pc->dst] = BOX_PTR(res);
-                    if (res && !vm_region_stack.empty()) {
-                        uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
-                        vm_allocation_regions[ptr] = active_region_id;
-                        vm_allocation_types[ptr] = TYPE_STRING;
-                    }
+                    register_native_allocation(registers[pc->dst]);
                     handled = true;
                 } else if (fname == "_builtin_string_replace" && pc->call_args.size() >= 3) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
@@ -180,11 +178,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     LmStringHeader* new_sub = get_hdr(pc->call_args[2]);
                     LmStringHeader* res = lm_str_replace(str, old_sub, new_sub);
                     registers[pc->dst] = BOX_PTR(res);
-                    if (res && !vm_region_stack.empty()) {
-                        uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
-                        vm_allocation_regions[ptr] = active_region_id;
-                        vm_allocation_types[ptr] = TYPE_STRING;
-                    }
+                    register_native_allocation(registers[pc->dst]);
                     handled = true;
                 } else if (fname == "_builtin_string_decode_next" && pc->call_args.size() >= 2) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
@@ -238,6 +232,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 auto channel = std::make_unique<LM::Backend::Channel>(1024);
                 channels.push_back(std::move(channel));
                 registers[pc->dst] = BOX_PTR(channels.back().get());
+                opaque_runtime_pointers.insert(reinterpret_cast<uintptr_t>(channels.back().get()));
             } else if (LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
                 // Handle builtin functions (print, input, etc.)
                 std::vector<ValuePtr> args;

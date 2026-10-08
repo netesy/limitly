@@ -129,6 +129,7 @@ struct Emitter {
         << "]; std::vector<V> staged_params; for(auto& v:r) v=2ULL; for(size_t "
            "i=0;i<count && i<"
         << registers << ";++i) r[i]=args[i];\n";
+    out << "NativeScope scope(api,ctx);\n";
     using Op = LIR::LIR_Op;
     for (size_t i = 0; i < function.instructions.size(); ++i) {
       const auto &inst = function.instructions[i];
@@ -208,7 +209,7 @@ struct Emitter {
         break;
       case Op::Return:
       case Op::Ret:
-        out << "return " << a << ";";
+        out << "scope.result=" << a << ";return " << a << ";";
         break;
       case Op::Cast:
         expr = helper(Helper::Cast, a,
@@ -366,10 +367,23 @@ struct Emitter {
       // Allocations remain in the caller's region, retaining all aliases
       // until control returns to the VM's scope-exit ownership machinery.
       case Op::RegionEnter:
-      case Op::RegionExit:
+      case Op::RegionExit: {
+        out << "V argv[]={" << integer(inst.imm) << "};";
+        out << helper(Helper::Builtin, "2ULL", "2ULL", "2ULL",
+            inst.op == Op::RegionEnter ? "\"_builtin_region_enter\"" : "\"_builtin_region_exit\"", "argv", 1) << ";";
+        break;
+      }
       case Op::RegionMove:
+        out << "V argv[]={" << a << "," << integer(inst.imm) << "};";
+        out << helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_move\"", "argv", 2) << ";";
+        break;
+      case Op::FrameCallDeinit:
+        out << "V argv[]={" << a << "};";
+        out << helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_frame_deinit\"", "argv", 1) << ";";
+        break;
       case Op::Nop:
       case Op::Label:
+        break;
       case Op::Param:
         out << "staged_params.push_back(" << d << ");";
         break;
@@ -395,8 +409,8 @@ struct Emitter {
             inst.op == Op::ResourceDestroy || inst.op == Op::CallVoid ||
             inst.op == Op::RegionMove;
         if (inst.dst != UINT32_MAX && !mutation)
-          out << d << "=";
-        out << expr << ";";
+          out << d << "=scope.track(" << expr << ");";
+        else out << expr << ";";
       }
       out << " }\n";
     }
@@ -423,6 +437,14 @@ V(*integer)(int64_t); V(*floating)(double); int64_t(*read_int)(V); double(*read_
 int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data)(V); };
 extern "C" __attribute__((visibility("default"))) uint32_t lymar_module_abi_version() { return 2; }
 )CPP";
+    emitter.out << "struct NativeScope { const Api* api; void* ctx; V depth; V result=2ULL; "
+        "NativeScope(const Api* a,void* c):api(a),ctx(c),depth("
+        << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_call_enter\"")
+        << "){} V track(V value){ if((value&7ULL)!=0 || !value) return value; V argv[]={value}; return "
+        << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_track\"", "argv", 1)
+        << "; } ~NativeScope(){ V argv[]={depth,result}; "
+        << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_call_leave\"", "argv", 2)
+        << ";} };\n";
     emitter.out << "static V indirect(const Api*,void*,V,const V*,size_t);\n";
     for (size_t i = 0; i < emitter.functions.size(); ++i)
       emitter.out << "static V f" << i

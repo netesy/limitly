@@ -17,10 +17,7 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             LmList* list = lm_list_new();
             registers[pc->dst] = BOX_PTR(list);
             // Register allocation with current active region
-            if (list && !vm_region_stack.empty()) {
-                uintptr_t ptr = reinterpret_cast<uintptr_t>(list);
-                vm_allocation_regions[ptr] = active_region_id;
-            }
+            register_native_allocation(registers[pc->dst]);
             break;
         }
         case LIR::LIR_Op::ListAppend:
@@ -55,10 +52,7 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             LmDict* dict = lm_dict_new(hash_boxed_value, cmp_boxed_value);
             registers[pc->dst] = BOX_PTR(dict);
             // Register allocation with current active region
-            if (dict && !vm_region_stack.empty()) {
-                uintptr_t ptr = reinterpret_cast<uintptr_t>(dict);
-                vm_allocation_regions[ptr] = active_region_id;
-            }
+            register_native_allocation(registers[pc->dst]);
             break;
         }
         case LIR::LIR_Op::ListSet:
@@ -133,10 +127,7 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             LmTuple* tuple = lm_tuple_new(pc->imm);
             registers[pc->dst] = BOX_PTR(tuple);
             // Register allocation with current active region
-            if (tuple && !vm_region_stack.empty()) {
-                uintptr_t ptr = reinterpret_cast<uintptr_t>(tuple);
-                vm_allocation_regions[ptr] = active_region_id;
-            }
+            register_native_allocation(registers[pc->dst]);
             break;
         }
         case LIR::LIR_Op::TupleSet:

@@ -270,7 +270,7 @@ print("FONT_NATIVE_OK");
 
     @staticmethod
     def compiler():
-        return str(ROOT / "bin" / ("lymar.exe" if os.name == "nt" else "lymar"))
+        return os.environ.get("LYMAR_EXECUTABLE", str(ROOT / "bin" / ("lymar.exe" if os.name == "nt" else "lymar")))
 
 
 if __name__ == "__main__":

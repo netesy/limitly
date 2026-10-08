@@ -10,6 +10,9 @@ extern "C" {
 
 // Canonical runtime execution value
 typedef uint64_t LmValue;
+// Compiler constants are shared across instruction copies and VM invocations.
+void lm_keep_constant(LmValue value);
+bool lm_is_constant(LmValue value);
 // For backward compatibility or if the name 'Value' is strictly required by the prompt instructions in some contexts,
 // but we must avoid clash with Backend::Value.
 // The prompt said: using Value = uint64_t;
@@ -61,7 +64,7 @@ static inline bool fits_smi_u64(uint64_t v) {
 }
 
 // Boxing/Unboxing Macros
-#define BOX_INT(i)   ((LmValue)(((int64_t)(i)) << 3) | TAG_INT)
+#define BOX_INT(i)   ((LmValue)(((uint64_t)(i)) << 3) | TAG_INT)
 #define UNBOX_INT(v) ((int64_t)(((int64_t)(v)) >> 3))
 #define IS_INT(v)    (((v) & TAG_MASK) == TAG_INT)
 

@@ -169,6 +169,7 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
 
 void register_builtin_functions(TypeChecker& checker) {
     auto& ts = checker.get_type_system();
+    checker.register_builtin_function("_builtin_string_hash_bytes", {ts.STRING_TYPE}, ts.INT_TYPE);
     checker.register_builtin_function("_builtin_string_join", {ts.createTypedListType(ts.STRING_TYPE), ts.STRING_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("_builtin_list_slice", {ts.createTypedListType(ts.ANY_TYPE), ts.INT_TYPE, ts.INT_TYPE}, ts.createTypedListType(ts.ANY_TYPE));
     // String functions

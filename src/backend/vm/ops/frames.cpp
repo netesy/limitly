@@ -19,10 +19,7 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             LmFrame* frame = reinterpret_cast<LmFrame*>(lm_frame_alloc(pc->type_name.c_str(), pc->imm));
             registers[pc->dst] = BOX_PTR(frame);
             // Register allocation with current active region
-            if (frame && !vm_region_stack.empty()) {
-                uintptr_t ptr = reinterpret_cast<uintptr_t>(frame);
-                vm_allocation_regions[ptr] = active_region_id;
-            }
+            register_native_allocation(registers[pc->dst]);
             break;
         }
         case LIR::LIR_Op::FrameGetField:
@@ -95,21 +92,9 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::FrameCallInit:
             // Init dispatch is handled at LIR-generation time; no-op here.
             break;
-        case LIR::LIR_Op::FrameCallDeinit: {
-            if (IS_PTR(registers[pc->a])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && f->header.type_id == TYPE_FRAME && f->name) {
-                    std::string frame_name = f->name;
-                    std::string deinit_func_name = frame_name + ".deinit";
-                    auto& func_manager = LIR::LIRFunctionManager::getInstance();
-                    if (func_manager.hasFunction(deinit_func_name)) {
-                        // Execute deinitializer with 'this' (registers[pc->a]) as argument 0
-                        call_interpreted(deinit_func_name, {registers[pc->a]});
-                    }
-                }
-            }
+        case LIR::LIR_Op::FrameCallDeinit:
+            finalize_frame(registers[pc->a]);
             break;
-        }
         case LIR::LIR_Op::MakeTraitObject:
             // Minimal placeholder: produce a 2-field frame [instance_ptr, trait_id].
             // Full trait vtable is deferred.
@@ -154,27 +139,7 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
                 arg_vals.reserve(pc->call_args.size());
                 for (auto arg_reg : pc->call_args) arg_vals.push_back(registers[arg_reg]);
 
-                auto saved_registers = registers;
-                const LIR::LIR_Function* saved_func = current_function_;
-
-                registers.assign(registers.size(), VAL_NIL);
-                for (size_t i = 0; i < arg_vals.size() && i < registers.size(); ++i) {
-                    registers[i] = arg_vals[i];
-                }
-
-                LIR::LIR_Function temp_wrapper(func->getName(), static_cast<uint32_t>(arg_vals.size()));
-                temp_wrapper.instructions = func->getInstructions();
-                temp_wrapper.register_language_types = func->getRegisterLanguageTypes();
-                temp_wrapper.register_types = func->getRegisterTypes();
-                current_function_ = &temp_wrapper;
-
-                execute_instructions(temp_wrapper, 0, temp_wrapper.instructions.size());
-
-                RegisterValue return_value = registers[0];
-
-                registers = saved_registers;
-                current_function_ = saved_func;
-                registers[pc->dst] = return_value;
+                registers[pc->dst] = call_interpreted(final_func_name, arg_vals);
             } else {
                 throw std::runtime_error("VM: TraitCallMethod: unresolved function " + resolved_func_name);
             }

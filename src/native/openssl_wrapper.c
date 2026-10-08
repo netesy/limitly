@@ -1001,7 +1001,11 @@ EXPORT void* load_font_file(const char* filepath) {
 }
 
 EXPORT void free_font(void* font_handle) {
-    if (font_handle) free(font_handle);
+    if (!font_handle) return;
+    // load_font_file owns the backing bytes retained by stbtt_fontinfo.
+    stbtt_fontinfo* info = (stbtt_fontinfo*)font_handle;
+    free(info->data);
+    free(info);
 }
 
 EXPORT int measure_text_width_int(void* font_handle, int font_size, const char* text) {

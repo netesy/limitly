@@ -629,6 +629,10 @@ TypePtr TypeChecker::check_binary_expr(std::shared_ptr<LM::Frontend::AST::Binary
 
     TypePtr right_type = check_expression(expr->right, right_expected);
 
+    // Failed operand checks already emitted a diagnostic; do not inspect a
+    // missing type while recovering from that error.
+    if (!left_type || !right_type) return nullptr;
+
     // Mandate 7: Automatically unwrap refined types for operations
     TypePtr left_base = type_system.unwrapRefined(left_type);
     TypePtr right_base = type_system.unwrapRefined(right_type);

@@ -49,6 +49,22 @@ RUNTIME_API void lm_dict_set(LmDict* dict, LmValue key, LmValue value) {
         entry = entry->next;
     }
     
+    // Rehash without touching the insertion-order chain or the public layout.
+    if (dict->size + 1 > dict->bucket_count * 3 / 4) {
+        uint64_t capacity = dict->bucket_count * 2;
+        auto** buckets = (LmDictEntry**)calloc(capacity, sizeof(LmDictEntry*));
+        if (!buckets) return;
+        for (auto* item = dict->head; item; item = item->order_next) {
+            uint64_t index = item->hash % capacity;
+            item->next = buckets[index];
+            buckets[index] = item;
+        }
+        free(dict->buckets);
+        dict->buckets = buckets;
+        dict->bucket_count = capacity;
+        bucket = hash % capacity;
+    }
+
     // Create new entry
     LmDictEntry* new_entry = (LmDictEntry*)malloc(sizeof(LmDictEntry));
     if (!new_entry) return;
@@ -88,7 +104,11 @@ RUNTIME_API LmValue lm_dict_get(LmDict* dict, LmValue key) {
 }
 
 RUNTIME_API int lm_dict_contains(LmDict* dict, LmValue key) {
-    return lm_dict_get(dict, key) != VAL_NIL;
+    if (!dict) return 0;
+    uint64_t hash = dict->hash_fn(key);
+    for (auto* entry = dict->buckets[hash % dict->bucket_count]; entry; entry = entry->next)
+        if (entry->hash == hash && dict->cmp_fn(entry->key, key) == 0) return 1;
+    return 0;
 }
 
 RUNTIME_API void lm_dict_free(LmDict* dict) {

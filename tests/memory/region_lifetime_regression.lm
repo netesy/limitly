@@ -1,0 +1,18 @@
+fn make_values(): [int] {
+    var values = [1, 2, 3];
+    return values;
+}
+var outer = make_values();
+{ var inner = [4, 5]; assert(inner[0] == 4); }
+assert(outer[1] == 2, "Outer list must survive inner scope");
+var assigned = [] as [int];
+{ assigned = make_values(); }
+assert(assigned[2] == 3, "Assignment must promote into surviving binding");
+fn recurse(n: int): [int] {
+    if (n == 0) { return [8, 9]; }
+    var result = recurse(n - 1);
+    { var scratch = [n]; assert(scratch[0] == n); }
+    return result;
+}
+assert(recurse(6)[1] == 9, "Recursive region instances must remain distinct");
+print("Region lifetime regression passed");

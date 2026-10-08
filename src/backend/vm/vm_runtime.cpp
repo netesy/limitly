@@ -237,3 +237,68 @@ RUNTIME_API void lm_frame_field_atomic_sub(void* frame, int offset, LmValue valu
 RUNTIME_API void* lm_trait_dispatch(void* trait_obj, const char* trait_name, const char* method_name) {
     return NULL;
 }
+
+// Constants outlive individual VMs and instruction copies. Own each object once;
+// children are separate entries so aliases and cyclic constant graphs are safe.
+#include "vm_list.hh"
+#include "vm_tuple.hh"
+#include "vm_dict.hh"
+#include <unordered_map>
+#include <vector>
+#include <mutex>
+namespace {
+struct ConstantPool {
+    std::unordered_map<uintptr_t, uint32_t> objects;
+    std::mutex mutex;
+    ~ConstantPool() {
+        for (auto [ptr, kind] : objects) {
+            auto* h = reinterpret_cast<ObjHeader*>(ptr);
+            switch (kind) {
+                case TYPE_STRING: lm_str_free(reinterpret_cast<LmStringHeader*>(h)); break;
+                case TYPE_LIST: lm_list_free(reinterpret_cast<LmList*>(h)); break;
+                case TYPE_DICT: lm_dict_free(reinterpret_cast<LmDict*>(h)); break;
+                case TYPE_TUPLE: lm_tuple_free(reinterpret_cast<LmTuple*>(h)); break;
+                case TYPE_BOX: lm_box_free(reinterpret_cast<LmBox*>(h)); break;
+                case TYPE_FRAME: {
+                    auto* f = reinterpret_cast<LmFrame*>(h);
+                    free(f->name); free(f->fields); free(f); break;
+                }
+                default: free(h); break;
+            }
+        }
+    }
+};
+ConstantPool& constants() { static ConstantPool pool; return pool; }
+}
+void lm_keep_constant(LmValue value) {
+    auto& pool = constants();
+    std::lock_guard<std::mutex> lock(pool.mutex);
+    std::vector<LmValue> work{value};
+    while (!work.empty()) {
+        auto v = work.back(); work.pop_back();
+        if (!IS_PTR(v)) continue;
+        auto ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(v));
+        auto* h = reinterpret_cast<ObjHeader*>(ptr);
+        if (!pool.objects.emplace(ptr, h->type_id).second) continue;
+        if (h->type_id == TYPE_LIST) {
+            auto* list = reinterpret_cast<LmList*>(h);
+            for (uint64_t i = 0; i < list->size; ++i) work.push_back(list->data[i]);
+        } else if (h->type_id == TYPE_TUPLE) {
+            auto* tuple = reinterpret_cast<LmTuple*>(h);
+            for (uint64_t i = 0; i < tuple->size; ++i) work.push_back(tuple->elements[i]);
+        } else if (h->type_id == TYPE_DICT) {
+            for (auto* e = reinterpret_cast<LmDict*>(h)->head; e; e = e->order_next) {
+                work.push_back(e->key); work.push_back(e->value);
+            }
+        } else if (h->type_id == TYPE_FRAME) {
+            auto* f = reinterpret_cast<LmFrame*>(h);
+            for (int i = 0; i < f->field_count; ++i) work.push_back(f->fields[i]);
+        } else if (h->type_id == TYPE_CLOSURE) work.push_back(reinterpret_cast<LmClosure*>(h)->captured_env);
+    }
+}
+bool lm_is_constant(LmValue value) {
+    if (!IS_PTR(value)) return false;
+    auto& pool = constants();
+    std::lock_guard<std::mutex> lock(pool.mutex);
+    return pool.objects.count(reinterpret_cast<uintptr_t>(UNBOX_PTR(value))) != 0;
+}

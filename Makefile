@@ -67,6 +67,11 @@ endif
 
 # Keep incremental installations correct when C++ headers change.
 CXXFLAGS += -MMD -MP
+ifneq ($(SANITIZERS),)
+CXXFLAGS += -O1 -g -fno-omit-frame-pointer -fsanitize=$(SANITIZERS)
+CFLAGS += -O1 -g -fno-omit-frame-pointer -fsanitize=$(SANITIZERS)
+LDFLAGS += -fsanitize=$(SANITIZERS)
+endif
 
 # =============================
 # Directories
@@ -96,7 +101,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
 # Recursive wildcard function for pure GNU Make file discovery
 rwildcard = $(foreach d,$(wildcard $(1:=/*)),$(call rwildcard,$d,$2) $(filter $(subst *,%,$2),$d))
 
-BACK_SRCS := $(if $(wildcard vendor/fyra/include/ir/Module.h),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp src/backend/fyra/capability_mapper.cpp,)
+BACK_SRCS := $(if $(wildcard vendor/fyra/include/ir/Module.h),src/backend/fyra/fyra.cpp src/backend/fyra/fyra_ir_generator.cpp src/backend/fyra/builder.cpp src/backend/fyra/fyra_builtin_functions.cpp src/backend/fyra/capability_mapper.cpp src/backend/fyra/region_lowering.cpp,)
 
 FYRA_DIR := vendor/fyra
 FYRA_SRCS := $(if $(wildcard $(FYRA_DIR)/include/ir/Module.h),\
@@ -256,10 +261,13 @@ windows: $(BIN_DIR) $(MAIN_RSP) liblymar $(LYRA_BIN)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS)
 	@echo "[OK] lymar.exe built."
 
-linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib
+linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(BIN_DIR)/liblymar_aot.a
 	@echo "[BUILD] Linking lymar ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lpthread
 	@echo "[OK] lymar built."
+
+$(BIN_DIR)/liblymar_aot.a: $(OBJ_DIR)/src/backend/fyra/region_runtime.o | $(BIN_DIR)
+	$(AR) rcs $@ $<
 
 # =============================
 # Precompilation targets
@@ -517,3 +525,21 @@ aot-tests: $(PLATFORM)
 
 # Dependency files are optional on the first build.
 -include $(LIB_LYMAR_OBJS:.o=.d) $(MAIN_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(LYRA_OBJS:.o=.d) $(LIR_TEST_OBJS:.o=.d)
+
+# Runtime lifetime tests also support SANITIZERS=address,undefined and an
+# isolated BIN_DIR/OBJ_DIR/RSP_DIR, just like the compiler build.
+$(BIN_DIR)/test_runtime_lifetimes$(EXE_EXT): tests/memory/test_runtime_lifetimes.cpp $(OBJ_DIR)/liblymar.a $(FYRA_LIB) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $@ $(LIBS) -lpthread
+
+.PHONY: memory-tests
+memory-tests: $(BIN_DIR)/test_runtime_lifetimes$(EXE_EXT)
+	$(BIN_DIR)/test_runtime_lifetimes$(EXE_EXT)
+
+# Private standalone AOT runtime tests; no VM or public ABI additions.
+$(BIN_DIR)/test_aot_regions$(EXE_EXT): tests/memory/test_aot_regions.cpp $(BIN_DIR)/liblymar_aot.a | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(BIN_DIR)/liblymar_aot.a -o $@ $(LIBS)
+
+.PHONY: aot-region-tests
+aot-region-tests: $(PLATFORM) $(BIN_DIR)/test_aot_regions$(EXE_EXT)
+	$(BIN_DIR)/test_aot_regions$(EXE_EXT)
+	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_CXX=$(abspath tests/memory/aot_linker.py) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_standalone_regions.py

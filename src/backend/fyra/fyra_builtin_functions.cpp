@@ -999,7 +999,7 @@ void FyraBuiltinFunctions::emit_assert(ir::Module* module, ir::IRBuilder* builde
     }, i64);
     builder->createExternCall("process.exit", {
         ctx->getConstantInt(i64, 1)
-    }, i64);
+    }, nullptr);
     builder->createRet(nullptr);
 
     builder->setInsertPoint(a_pass);
@@ -1065,19 +1065,20 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
 
         builder->setInsertPoint(b_alloc);
         ir::Value* cap = builder->createLoad(cap_slot);
-        // Header: 24 bytes (len: i64, cap: i64, data_ptr: i64)
-        ir::Instruction* header = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 24)}, i64);
+        // Canonical LmList: header at 0, data at 8, size at 16, capacity at 24.
+        ir::Instruction* header = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 32)}, i64);
         // Data buffer: cap * 8 bytes
         ir::Value* data_bytes = builder->createMul(cap, ctx->getConstantInt(i64, 8));
         ir::Instruction* data = builder->createExternCall("memory.alloc", {data_bytes}, i64);
 
-        // header[0] = len (0)
-        builder->createStore(ctx->getConstantInt(i64, 0), header);
-        // header[1] = cap
-        ir::Value* cap_ptr = builder->createAdd(header, ctx->getConstantInt(i64, 8));
+        // ObjHeader: TYPE_LIST, metadata zero.
+        builder->createStore(ctx->getConstantInt(i64, 1), header);
+        builder->createStore(ctx->getConstantInt(i64, 0), builder->createAdd(header, ctx->getConstantInt(i64, 16)));
+        // Capacity at canonical offset 24.
+        ir::Value* cap_ptr = builder->createAdd(header, ctx->getConstantInt(i64, 24));
         builder->createStore(cap, cap_ptr);
-        // header[2] = data
-        ir::Value* data_ptr_slot = builder->createAdd(header, ctx->getConstantInt(i64, 16));
+        // Data pointer at canonical offset 8.
+        ir::Value* data_ptr_slot = builder->createAdd(header, ctx->getConstantInt(i64, 8));
         builder->createStore(data, data_ptr_slot);
 
         builder->createRet(header);
@@ -1103,7 +1104,7 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->createRet(str_len);
 
         builder->setInsertPoint(b_obj);
-        ir::Value* obj_len = builder->createLoad(list_ptr);
+        ir::Value* obj_len = builder->createLoad(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
         builder->createRet(obj_len);
     }
 
@@ -1118,9 +1119,10 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         it++;
         ir::Value* index = it->get();
 
-        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
         ir::Value* data = builder->createLoad(data_ptr_slot);
-        ir::Value* is_tuple = builder->createCult(data, ctx->getConstantInt(i64, 65536));
+        ir::Value* kind = builder->createAnd(builder->createLoad(list_ptr), ctx->getConstantInt(i64, 0xFFFFFFFF));
+        ir::Value* is_tuple = builder->createCeq(kind, ctx->getConstantInt(i64, 3));
 
         ir::BasicBlock* b_list = builder->createBasicBlock("get_list", fn_get);
         ir::BasicBlock* b_tuple = builder->createBasicBlock("get_tuple", fn_get);
@@ -1133,9 +1135,8 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->createRet(val);
 
         builder->setInsertPoint(b_tuple);
-        ir::Value* slot_idx = builder->createAdd(index, ctx->getConstantInt(i64, 1));
-        ir::Value* t_offset = builder->createMul(slot_idx, ctx->getConstantInt(i64, 8));
-        ir::Value* t_elem_ptr = builder->createAdd(list_ptr, t_offset);
+        ir::Value* t_offset = builder->createMul(index, ctx->getConstantInt(i64, 8));
+        ir::Value* t_elem_ptr = builder->createAdd(data, t_offset);
         ir::Value* t_val = builder->createLoad(t_elem_ptr);
         builder->createRet(t_val);
     }
@@ -1158,8 +1159,8 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* index = it->get(); it++;
         ir::Value* val = it->get();
 
-        ir::Value* len = builder->createLoad(list_ptr);
-        ir::Value* cap_ptr = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
+        ir::Value* len = builder->createLoad(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
+        ir::Value* cap_ptr = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 24));
         ir::Value* cap = builder->createLoad(cap_ptr);
 
         ir::Value* need_grow = builder->createCsge(index, cap);
@@ -1190,7 +1191,7 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* new_bytes = builder->createMul(new_cap, ctx->getConstantInt(i64, 8));
         ir::Instruction* new_data = builder->createExternCall("memory.alloc", {new_bytes}, i64);
 
-        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
         ir::Value* old_data = builder->createLoad(data_ptr_slot);
 
         ir::Instruction* k_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
@@ -1219,7 +1220,7 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
 
         // Update len
         builder->setInsertPoint(b_update_len);
-        ir::Value* cur_len = builder->createLoad(list_ptr);
+        ir::Value* cur_len = builder->createLoad(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
         ir::Value* len_needed = builder->createAdd(index, ctx->getConstantInt(i64, 1));
         ir::Value* need_len_update = builder->createCsge(index, cur_len);
 
@@ -1227,11 +1228,11 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->createBr(need_len_update, b_do_update_len, b_store_elem);
 
         builder->setInsertPoint(b_do_update_len);
-        builder->createStore(len_needed, list_ptr);
+        builder->createStore(len_needed, builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
         builder->createJmp(b_store_elem);
 
         builder->setInsertPoint(b_store_elem);
-        ir::Value* cur_data_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* cur_data_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
         ir::Value* cur_data = builder->createLoad(cur_data_slot);
         ir::Value* ins_off = builder->createMul(index, ctx->getConstantInt(i64, 8));
         ir::Value* ins_ptr = builder->createAdd(cur_data, ins_off);
@@ -1256,8 +1257,8 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         it++;
         ir::Value* val = it->get();
 
-        ir::Value* len = builder->createLoad(list_ptr);
-        ir::Value* cap_ptr = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
+        ir::Value* len = builder->createLoad(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
+        ir::Value* cap_ptr = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 24));
         ir::Value* cap = builder->createLoad(cap_ptr);
 
         ir::Value* need_grow = builder->createCsge(len, cap);
@@ -1269,7 +1270,7 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::Value* new_bytes = builder->createMul(new_cap, ctx->getConstantInt(i64, 8));
         ir::Instruction* new_data = builder->createExternCall("memory.alloc", {new_bytes}, i64);
 
-        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
         ir::Value* old_data = builder->createLoad(data_ptr_slot);
 
         ir::Instruction* k_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
@@ -1297,14 +1298,14 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->createJmp(b_insert);
 
         builder->setInsertPoint(b_insert);
-        ir::Value* cur_len = builder->createLoad(list_ptr);
-        ir::Value* cur_data_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* cur_len = builder->createLoad(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
+        ir::Value* cur_data_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
         ir::Value* cur_data = builder->createLoad(cur_data_slot);
         ir::Value* ins_off = builder->createMul(cur_len, ctx->getConstantInt(i64, 8));
         ir::Value* ins_ptr = builder->createAdd(cur_data, ins_off);
         builder->createStore(val, ins_ptr);
         ir::Value* next_len = builder->createAdd(cur_len, ctx->getConstantInt(i64, 1));
-        builder->createStore(next_len, list_ptr);
+        builder->createStore(next_len, builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
         builder->createRet(nullptr);
     }
 
@@ -1322,7 +1323,7 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->setInsertPoint(b_entry);
         ir::Value* list_ptr = fn_pop->getParameters().front().get();
 
-        ir::Value* len = builder->createLoad(list_ptr);
+        ir::Value* len = builder->createLoad(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
         ir::Value* is_empty = builder->createCsle(len, ctx->getConstantInt(i64, 0));
         builder->createBr(is_empty, b_empty, b_pop);
 
@@ -1331,12 +1332,12 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         builder->createRet(ctx->getConstantInt(i64, 0x7FFFFFFFFFFFFFFF));
 
         builder->setInsertPoint(b_pop);
-        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
         ir::Value* data = builder->createLoad(data_ptr_slot);
         ir::Value* ret_val = builder->createLoad(data);
 
         ir::Value* new_len = builder->createSub(len, ctx->getConstantInt(i64, 1));
-        builder->createStore(new_len, list_ptr);
+        builder->createStore(new_len, builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
 
         ir::Instruction* k_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
         builder->createStore(ctx->getConstantInt(i64, 0), k_slot);
@@ -1385,8 +1386,8 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::Instruction* i_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
         ir::Instruction* elem_str_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
 
-        ir::Value* count = builder->createLoad(list_ptr);
-        ir::Value* data_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16));
+        ir::Value* count = builder->createLoad(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
+        ir::Value* data_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
         ir::Value* data = builder->createLoad(data_slot);
 
         ir::GlobalVariable* gv_lbracket = get_or_create_global_str(module, builder, "list_lbracket", "[");
@@ -1491,10 +1492,13 @@ void FyraBuiltinFunctions::emit_tuple_ir(ir::Module* module, ir::IRBuilder* buil
         ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_new);
         builder->setInsertPoint(b_entry);
         ir::Value* size = fn_new->getParameters().front().get();
-        ir::Value* total_slots = builder->createAdd(size, ctx->getConstantInt(i64, 1));
-        ir::Value* total_bytes = builder->createMul(total_slots, ctx->getConstantInt(i64, 8));
-        ir::Instruction* ptr = builder->createExternCall("memory.alloc", {total_bytes}, i64);
-        builder->createStore(size, ptr);
+        ir::Instruction* ptr = builder->createExternCall("memory.alloc", {ctx->getConstantInt(i64, 32)}, i64);
+        ir::Value* bytes = builder->createMul(size, ctx->getConstantInt(i64, 8));
+        ir::Value* elements = builder->createExternCall("memory.alloc", {bytes}, i64);
+        builder->createStore(ctx->getConstantInt(i64, 3), ptr);
+        builder->createStore(elements, builder->createAdd(ptr, ctx->getConstantInt(i64, 8)));
+        builder->createStore(size, builder->createAdd(ptr, ctx->getConstantInt(i64, 16)));
+        builder->createStore(size, builder->createAdd(ptr, ctx->getConstantInt(i64, 24)));
         builder->createRet(ptr);
     }
 
@@ -1508,9 +1512,10 @@ void FyraBuiltinFunctions::emit_tuple_ir(ir::Module* module, ir::IRBuilder* buil
         ir::Value* tuple_ptr = it->get();
         it++;
         ir::Value* index = it->get();
-        ir::Value* slot_idx = builder->createAdd(index, ctx->getConstantInt(i64, 1));
+        ir::Value* slot_idx = index;
         ir::Value* offset = builder->createMul(slot_idx, ctx->getConstantInt(i64, 8));
-        ir::Value* elem_ptr = builder->createAdd(tuple_ptr, offset);
+        ir::Value* elements = builder->createLoad(builder->createAdd(tuple_ptr, ctx->getConstantInt(i64, 8)));
+        ir::Value* elem_ptr = builder->createAdd(elements, offset);
         ir::Value* val = builder->createLoad(elem_ptr);
         builder->createRet(val);
     }
@@ -1527,9 +1532,10 @@ void FyraBuiltinFunctions::emit_tuple_ir(ir::Module* module, ir::IRBuilder* buil
         ir::Value* index = it->get();
         it++;
         ir::Value* val = it->get();
-        ir::Value* slot_idx = builder->createAdd(index, ctx->getConstantInt(i64, 1));
+        ir::Value* slot_idx = index;
         ir::Value* offset = builder->createMul(slot_idx, ctx->getConstantInt(i64, 8));
-        ir::Value* elem_ptr = builder->createAdd(tuple_ptr, offset);
+        ir::Value* elements = builder->createLoad(builder->createAdd(tuple_ptr, ctx->getConstantInt(i64, 8)));
+        ir::Value* elem_ptr = builder->createAdd(elements, offset);
         builder->createStore(val, elem_ptr);
         builder->createRet(nullptr);
     }

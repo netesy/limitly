@@ -848,6 +848,7 @@ TypePtr TypeChecker::check_return_statement(std::shared_ptr<LM::Frontend::AST::R
     TypePtr return_type = nullptr;
     if (return_stmt->value) {
         return_type = check_expression(return_stmt->value);
+        if (!return_type) return nullptr;
         
         // Auto-wrap in ok() if function returns error union type and value is not already wrapped
         if (current_return_type && type_system.isFallibleType(current_return_type)) {

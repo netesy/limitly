@@ -8,9 +8,11 @@ import os
 import glob
 import time
 
-lymar_path = os.path.abspath("bin/lymar.exe" if os.name == "nt" else "bin/lymar")
+lymar_path = os.path.abspath(os.environ.get("LYMAR_EXECUTABLE", "bin/lymar.exe" if os.name == "nt" else "bin/lymar"))
 
 tests = [
+ "tests/memory/region_lifetime_regression.lm",
+ "tests/memory/hashmap_regression.lm",
  # Basic
  "tests/basic/variables.lm",
  "tests/basic/literals.lm",
@@ -211,7 +213,7 @@ if __name__ == "__main__":
             print(f"Skipping {test_path} (does not exist)")
             continue
 
-        timeout = 25.0 if test in slow_tests else 3.0
+        timeout = (25.0 if test in slow_tests else 3.0) * float(os.environ.get("LYMAR_TEST_TIMEOUT_SCALE", "1"))
         start_time = time.time()
         try:
             res = subprocess.run(

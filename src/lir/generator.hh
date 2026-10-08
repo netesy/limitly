@@ -294,6 +294,7 @@ private:
         uint32_t start_label;
         uint32_t end_label;
         uint32_t continue_label;
+        size_t region_depth;
     };
 
     struct CFGContext {

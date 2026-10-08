@@ -37,6 +37,8 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     next_register_ = total_params;
     next_label_ = 0;
     scope_stack_.clear();
+    generator_region_stack_.clear();
+    generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
     enter_scope();
@@ -147,6 +149,8 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     next_register_ = total_params;
     next_label_ = 0;
     scope_stack_.clear();
+    generator_region_stack_.clear();
+    generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
     enter_scope();
@@ -277,6 +281,8 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     next_register_ = total_params;
     next_label_ = 0;
     scope_stack_.clear();
+    generator_region_stack_.clear();
+    generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
     enter_scope();
@@ -401,6 +407,8 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     next_register_ = total_params;
     next_label_ = 0;
     scope_stack_.clear();
+    generator_region_stack_.clear();
+    generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
     enter_scope();
@@ -427,7 +435,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
             if (frame_it->second.fields[i].second->tag == TypeTag::Frame) {
                 Reg field_reg = allocate_register();
                 emit_instruction(LIR_Inst(LIR_Op::FrameGetField, Type::Ptr, field_reg, 0, static_cast<uint32_t>(i)));
-                emit_instruction(LIR_Inst(LIR_Op::FrameCallDeinit, Type::Void, field_reg, 0, 0));
+                emit_instruction(LIR_Inst(LIR_Op::FrameCallDeinit, Type::Void, UINT32_MAX, field_reg, 0));
             }
         }
     }
@@ -442,7 +450,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
         // Linear mode - add implicit return if function doesn't end with return
         if (current_function_->instructions.empty() || 
             !current_function_->instructions.back().isReturn()) {
-            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, UINT32_MAX, 0));
         }
     }
     

@@ -1,6 +1,7 @@
 #include "../register.hh"
 #include "../vm_runtime.hh"
 #include "../vm_value.hh"
+#include <cstring>
 
 namespace LM {
 namespace Backend {
@@ -17,7 +18,8 @@ void RegisterVM::execute_construct_string_from_cstr(const LIR::LIR_Inst* pc) {
         return;
     }
     
-    const char* cstr = static_cast<const char*>(UNBOX_PTR(registers[pc->a]));
+    auto* input = static_cast<ObjHeader*>(UNBOX_PTR(registers[pc->a]));
+    const char* cstr = input->type_id == TYPE_FOREIGN_PTR ? static_cast<const char*>(reinterpret_cast<ObjForeignPtr*>(input)->ptr) : nullptr;
     if (!cstr) {
         registers[pc->dst] = VAL_NIL;
         return;
@@ -27,64 +29,34 @@ void RegisterVM::execute_construct_string_from_cstr(const LIR::LIR_Inst* pc) {
     LmBox* box = lm_box_string(cstr);
     registers[pc->dst] = BOX_PTR(box);
     
-    if (box && !vm_region_stack.empty()) {
-        uintptr_t ptr = reinterpret_cast<uintptr_t>(box);
-        vm_allocation_regions[ptr] = active_region_id;
-    }
+    register_native_allocation(registers[pc->dst]);
 }
 
 // String conversion - construct C pointer view from Lymar string
 void RegisterVM::execute_construct_cstr_from_string(const LIR::LIR_Inst* pc) {
-    RegisterValue str_val = registers[pc->a];
-    
-    // Check if it's a Lymar string (heap-allocated)
-    if (!IS_PTR(str_val)) {
-        registers[pc->dst] = VAL_NIL;
-        return;
+    auto value = registers[pc->a];
+    if (!IS_PTR(value)) { registers[pc->dst] = VAL_NIL; return; }
+    auto* header = static_cast<ObjHeader*>(UNBOX_PTR(value));
+    const char* data = nullptr;
+    size_t size = 0;
+    if (header->type_id == TYPE_STRING) {
+        auto* str = reinterpret_cast<LmStringHeader*>(header); data = str->data; size = str->len;
+    } else if (header->type_id == TYPE_BOX && reinterpret_cast<LmBox*>(header)->type == LM_BOX_STRING) {
+        data = static_cast<const char*>(reinterpret_cast<LmBox*>(header)->value.as_ptr);
+        size = data ? std::strlen(data) : 0;
+    } else { registers[pc->dst] = VAL_NIL; return; }
+    auto result = allocate_raw_memory(size + 1);
+    if (IS_PTR(result)) {
+        auto* raw = static_cast<ObjForeignPtr*>(UNBOX_PTR(result));
+        if (size) std::memcpy(raw->ptr, data, size);
+        static_cast<char*>(raw->ptr)[size] = '\0';
     }
-    
-    auto* header = static_cast<ObjHeader*>(UNBOX_PTR(str_val));
-    if (header->type_id != TYPE_BOX || reinterpret_cast<LmBox*>(header)->type != LM_BOX_STRING) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    // Get the string data pointer
-    LmBox* box = reinterpret_cast<LmBox*>(header);
-    const char* cstr = (const char*)box->value.as_ptr;
-    registers[pc->dst] = BOX_PTR((void*)cstr);
+    registers[pc->dst] = result;
 }
 
-// Free C string - helper for freeing allocated strings
-void RegisterVM::execute_construct_free_cstr(const LIR::LIR_Inst* pc) {
-    if (!IS_PTR(registers[pc->a])) {
-        return;
-    }
-    
-    void* ptr = UNBOX_PTR(registers[pc->a]);
-    if (ptr) {
-        std::free(ptr);
-    }
-}
+void RegisterVM::execute_construct_free_cstr(const LIR::LIR_Inst* pc) { execute_memory_free(pc); }
 
-// Buffer construction - allocate buffer of given size
-void RegisterVM::execute_construct_buffer_alloc(const LIR::LIR_Inst* pc) {
-    int64_t size = to_int(registers[pc->a]);
-    if (size < 0) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    void* ptr = std::malloc(size);
-    if (!ptr) {
-        registers[pc->dst] = VAL_NIL;
-        return;
-    }
-    
-    // TODO: Wrap in Buffer frame structure when available
-    // For now, just return raw pointer
-    registers[pc->dst] = BOX_PTR(ptr);
-}
+void RegisterVM::execute_construct_buffer_alloc(const LIR::LIR_Inst* pc) { execute_memory_alloc(pc); }
 
 // Buffer construction - create buffer from existing pointer
 void RegisterVM::execute_construct_buffer_from_ptr(const LIR::LIR_Inst* pc) {
@@ -112,7 +84,7 @@ void RegisterVM::execute_construct_buffer_capacity(const LIR::LIR_Inst* pc) {
     
     // TODO: Extract capacity from buffer frame
     // For now, return 0
-    registers[pc->dst] = BOX_INT(0);
+    registers[pc->dst] = make_i64(raw_memory_size(buf));
 }
 
 // Buffer operations - get size of buffer
@@ -121,7 +93,7 @@ void RegisterVM::execute_construct_buffer_size(const LIR::LIR_Inst* pc) {
     
     // TODO: Extract size from buffer frame
     // For now, return 0
-    registers[pc->dst] = BOX_INT(0);
+    registers[pc->dst] = make_i64(raw_memory_size(buf));
 }
 
 // Buffer operations - get pointer from buffer

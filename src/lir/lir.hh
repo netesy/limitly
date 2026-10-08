@@ -302,11 +302,11 @@ struct LIR_Inst {
           
     LIR_Inst(LIR_Op op, Type result_type, Reg dst, Backend::Value constant)
         : op(op), result_type(result_type), type_a(Type::Void), type_b(Type::Void),
-          dst(dst), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(constant) {}
+          dst(dst), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(constant) { if (op == LIR_Op::LoadConst) lm_keep_constant(constant); }
 
     LIR_Inst(LIR_Op op, Reg dst, Backend::Value constant)
         : op(op), result_type(Type::I64), type_a(Type::Void), type_b(Type::Void),
-          dst(dst), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(constant) {}
+          dst(dst), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(constant) { if (op == LIR_Op::LoadConst) lm_keep_constant(constant); }
 
     LIR_Inst(LIR_Op op, Reg dst, const std::string& func, const std::vector<Reg>& args,
              const std::vector<Type>& arg_types = {})

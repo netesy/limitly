@@ -90,9 +90,9 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
     if (get_current_block() && !get_current_block()->has_terminator()) {
         // For main function, use halt instead of return for proper termination
         if (current_function_->name == "__top_level_wrapper__") {
-            emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, 0, 0)); // Use Ret for main termination
+            emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, UINT32_MAX, 0)); // Use Ret for main termination
         } else {
-            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, UINT32_MAX, 0));
         }
     }
 
@@ -214,7 +214,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
 
     // Add implicit return if none exists
     if (get_current_block() && !get_current_block()->has_terminator()) {
-        emit_instruction(LIR_Inst(LIR_Op::Return));
+        emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, UINT32_MAX, 0));
     }
     
     finish_cfg_build();
@@ -298,39 +298,30 @@ Reg Generator::allocate_register() {
 void Generator::enter_scope() {
     scope_stack_.push_back({});
     
-    // Don't automatically create regions - rely on memory_info from memory checker
-    // This unified approach prevents premature region exits
-    // generator_region_counter_++;
-    // generator_region_stack_.push_back(generator_region_counter_);
+    uint32_t region = ++generator_region_counter_;
+    generator_region_stack_.push_back(region);
+    emit_instruction(LIR_Inst(LIR_Op::RegionEnter, Type::Void, 0, 0, 0, region));
 }
 
 
 void Generator::exit_scope() {
     if (!scope_stack_.empty()) {
-        // Emit deinit calls for all frame instances in this scope (in reverse order)
-        const auto& scope = scope_stack_.back();
-        for (auto it = scope.frame_instances.rbegin(); it != scope.frame_instances.rend(); ++it) {
-            const auto& [frame_name, frame_reg] = *it;
-
-            // Generate FrameCallDeinit instruction
-            LIR_Inst deinit_inst(LIR_Op::FrameCallDeinit, Type::Void, frame_reg, 0, 0);
-            deinit_inst.comment = "Auto-deinit for " + frame_name;
-            emit_instruction(deinit_inst);
-        }
-
+        // Region exit finalizes frames at their actual ownership lifetime.
+        // A lexical constructor register may refer to an escaping/shared frame.
         scope_stack_.pop_back();
     }
     
-    // Unified region management: don't automatically exit regions
-    // RegionExit is emitted based on memory_info from statements
-    // if (!generator_region_stack_.empty()) {
-    //     uint32_t active_region = generator_region_stack_.back();
-    //     generator_region_stack_.pop_back();
-    //     
-    //     if (!cfg_context_.in_control_flow) {
-    //         emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, active_region, 0));
-    //     }
-    // }
+    if (!generator_region_stack_.empty()) {
+        uint32_t region = generator_region_stack_.back();
+        generator_region_stack_.pop_back();
+        uint32_t parent = generator_region_stack_.empty() ? 0 : generator_region_stack_.back();
+        // Surviving bindings can receive newly allocated values by assignment.
+        for (const auto& scope : scope_stack_) {
+            for (const auto& [name, reg] : scope.vars)
+                emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, 0, reg, 0, parent));
+        }
+        emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, region));
+    }
 }
 
 
@@ -345,20 +336,11 @@ std::optional<LM::Frontend::AST::MemoryInfo> Generator::get_memory_info_from_exp
 }
 
 // Emit RegionEnter based on memory_info from statement
-void Generator::emit_region_enter_from_memory_info(const LM::Frontend::AST::Statement& stmt) {
-    auto mem_info = get_memory_info_from_statement(stmt);
-    if (mem_info && mem_info->region_id > 0) {
-        emit_instruction(LIR_Inst(LIR_Op::RegionEnter, Type::Void, 0, mem_info->region_id, 0));
-    }
-}
+// Lexical generator scopes own region emission; checker annotations do not
+// create a second, potentially mismatched set of runtime scopes.
+void Generator::emit_region_enter_from_memory_info(const LM::Frontend::AST::Statement&) {}
+void Generator::emit_region_exit_from_memory_info(const LM::Frontend::AST::Statement&) {}
 
-// Emit RegionExit based on memory_info from statement
-void Generator::emit_region_exit_from_memory_info(const LM::Frontend::AST::Statement& stmt) {
-    auto mem_info = get_memory_info_from_statement(stmt);
-    if (mem_info && mem_info->region_id > 0) {
-        emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, mem_info->region_id, 0));
-    }
-}
 
 void Generator::bind_variable(const std::string& name, Reg reg) {
     //// std::cout << "[DEBUG] Binding variable '" << name << "' to register " << reg << std::endl;
@@ -517,6 +499,14 @@ ValuePtr Generator::get_register_value(Reg reg) {
 
 
 void Generator::emit_instruction(const LIR_Inst& inst) {
+    if (current_function_ && inst.isReturn() && !generator_region_stack_.empty()) {
+        // All explicit and implicit returns use the same lifetime cleanup,
+        // including frame methods and synthesized work-item functions.
+        if (inst.a != UINT32_MAX)
+            emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, 0, inst.a, 0, 0));
+        for (auto it = generator_region_stack_.rbegin(); it != generator_region_stack_.rend(); ++it)
+            emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, *it));
+    }
     if (current_function_) {
         if (cfg_context_.building_cfg && cfg_context_.current_block) {
             if (cfg_context_.current_block->has_terminator()) {
@@ -570,7 +560,7 @@ uint32_t Generator::generate_label() {
 
 
 void Generator::enter_loop() {
-    loop_stack_.push_back({INVALID_LOOP_LABEL, INVALID_LOOP_LABEL, INVALID_LOOP_LABEL}); // Placeholder, will be set by set_loop_labels
+    loop_stack_.push_back({INVALID_LOOP_LABEL, INVALID_LOOP_LABEL, INVALID_LOOP_LABEL, generator_region_stack_.size()}); // Placeholder, will be set by set_loop_labels
 }
 
 
@@ -668,7 +658,7 @@ void Generator::ensure_all_blocks_terminated() {
                 auto saved_current = cfg_context_.current_block;
                 cfg_context_.current_block = block.get();
                 
-                emit_instruction(LIR_Inst(LIR_Op::Ret, 0, 0, 0));
+                emit_instruction(LIR_Inst(LIR_Op::Ret, Type::Void, 0, UINT32_MAX, 0));
                 
                 // Restore current block
                 cfg_context_.current_block = saved_current;

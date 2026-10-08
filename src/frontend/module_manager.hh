@@ -16,6 +16,7 @@ namespace Frontend {
 struct CompiledModuleMeta {
     std::string module_name;
     std::string abi_version = "1.0.0"; // Lymar/lymarrt ABI version
+    std::string runtime_semantics; // Artifact freshness, independent of the object ABI.
     std::string target_triple; // e.g. x86_64-linux-gnu
     std::string architecture; // e.g. x86_64
     std::string os; // e.g. linux

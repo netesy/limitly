@@ -63,6 +63,19 @@ frame Regex {
         }
     }
 
+    pub deinit() {
+        if (self.preg != nil and self.preg != 0) {
+            unsafe {
+                var lib = hash._open_lib();
+                var fn_free = ffi.library_get_symbol(lib, "lymar_regex_free");
+                if (fn_free != nil and fn_free != 0) {
+                    ffi.foreign_call(fn_free, [self.preg], ffi.TYPE_VOID, [ffi.TYPE_PTR]);
+                }
+            }
+            self.preg = nil;
+        }
+    }
+
     // Pattern matching test
     pub fn is_match(text: str): bool {
         var m = self.find_match(text, 0);

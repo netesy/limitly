@@ -47,11 +47,7 @@ void RegisterVM::execute_strings(const LIR::LIR_Inst* pc) {
             }
             LmStringHeader* res = lm_str_from_bytes(str_val.data(), str_val.length());
             registers[pc->dst] = BOX_PTR(res);
-            if (res && !vm_region_stack.empty()) {
-                uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
-                vm_allocation_regions[ptr] = active_region_id;
-                vm_allocation_types[ptr] = TYPE_STRING;
-            }
+            register_native_allocation(registers[pc->dst]);
             break;
         }
         case LIR::LIR_Op::STR_CONCAT: {
@@ -106,11 +102,7 @@ void RegisterVM::execute_strings(const LIR::LIR_Inst* pc) {
             if (free_b) lm_str_free(str_b);
 
             registers[pc->dst] = BOX_PTR(res);
-            if (res && !vm_region_stack.empty()) {
-                uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
-                vm_allocation_regions[ptr] = active_region_id;
-                vm_allocation_types[ptr] = TYPE_STRING;
-            }
+            register_native_allocation(registers[pc->dst]);
             break;
         }
         case LIR::LIR_Op::STR_FORMAT: {
@@ -141,11 +133,7 @@ void RegisterVM::execute_strings(const LIR::LIR_Inst* pc) {
             if (free_arg) lm_str_free(arg_hdr);
 
             registers[pc->dst] = BOX_PTR(res);
-            if (res && !vm_region_stack.empty()) {
-                uintptr_t ptr = reinterpret_cast<uintptr_t>(res);
-                vm_allocation_regions[ptr] = active_region_id;
-                vm_allocation_types[ptr] = TYPE_STRING;
-            }
+            register_native_allocation(registers[pc->dst]);
             break;
         }
         default:

@@ -16,6 +16,7 @@
 #include "vm_dict.hh"
 #include "vm_tuple.hh"
 #include "vm_value.hh"
+#include "resource_manager.hh"
 
 namespace LM {
 namespace Backend {
@@ -48,9 +49,67 @@ RegisterVM::RegisterVM() : type_system(std::make_unique<TypeSystem>()) {
     LIR::BuiltinUtils::initializeBuiltins();
 }
 
-RegisterVM::~RegisterVM() {}
+void RegisterVM::release_resources() {
+    auto& manager = ResourceManager::getInstance();
+    for (auto id : owned_resources) manager.destroy(id);
+    owned_resources.clear();
+}
+
+void RegisterVM::finalize_frame(RegisterValue value) {
+    if (!IS_PTR(value)) return;
+    auto ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
+    auto type = vm_allocation_types.find(ptr);
+    if (type == vm_allocation_types.end() || type->second != TYPE_FRAME) return;
+    auto* frame = reinterpret_cast<LmFrame*>(ptr);
+    constexpr uint32_t finalized = 1u << 31;
+    if (frame->header.metadata & finalized) return;
+    frame->header.metadata |= finalized;
+    if (!frame->name) return;
+    std::string target = std::string(frame->name) + ".deinit";
+    if (LIR::FunctionRegistry::getInstance().hasFunction(target)) call_interpreted(target, {value});
+}
+
+void RegisterVM::finalize_owned_frames(uint64_t region, bool all) {
+    // Keep all fields alive while destructors run; physical reclamation follows.
+    std::vector<uintptr_t> frames;
+    if (all) {
+        for (const auto& [ptr, kind] : vm_allocation_types)
+            if (kind == TYPE_FRAME) frames.push_back(ptr);
+    } else if (auto members = region_allocations.find(region); members != region_allocations.end()) {
+        for (auto ptr : members->second)
+            if (vm_allocation_types.at(ptr) == TYPE_FRAME) frames.push_back(ptr);
+    }
+    for (auto ptr : frames) finalize_frame(BOX_PTR(ptr));
+}
+
+RegisterVM::~RegisterVM() {
+    try { finalize_owned_frames(0, true); } catch (const std::exception& error) {
+        std::cerr << "VM destructor: " << error.what() << '\n';
+    }
+    revoke_callbacks();
+    release_resources();
+    release_raw_memory();
+    while (!vm_allocation_types.empty()) reclaim_value(BOX_PTR(vm_allocation_types.begin()->first));
+}
 
 void RegisterVM::reset() {
+    finalize_owned_frames(0, true);
+    revoke_callbacks();
+    release_resources();
+    release_raw_memory();
+    while (!vm_allocation_types.empty()) reclaim_value(BOX_PTR(vm_allocation_types.begin()->first));
+    vm_region_stack.clear();
+    region_instances.clear();
+    region_allocations.clear();
+    invocation_parents.clear();
+    borrowed_constants.clear();
+    opaque_runtime_pointers.clear();
+    constant_copies.clear();
+    active_region_id = 0;
+    next_region_id = 1;
+    globals_.clear();
+    error_table.clear();
+    frame_instances.clear();
     spare_register_files_.clear();
     registers.assign(registers.size(), VAL_NIL);
     argument_stack.clear();
@@ -129,9 +188,21 @@ RegisterValue unbox_register_value(void* boxed_value) {
     }
 }
 
+void RegisterVM::execute(const LIR::LIR_Function& function) { execute_function(function); }
+
 void RegisterVM::execute_function(const LIR::LIR_Function& function) {
     current_function_ = &function;
-    execute_instructions(function, 0, function.instructions.size());
+    size_t depth = vm_region_stack.size();
+    invocation_parents.push_back(active_region_id);
+    try {
+        execute_instructions(function, 0, function.instructions.size());
+        while (vm_region_stack.size() > depth) exit_region();
+        invocation_parents.pop_back();
+    } catch (...) {
+        while (vm_region_stack.size() > depth) exit_region();
+        invocation_parents.pop_back();
+        throw;
+    }
 }
 
 void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_t start_pc, uint64_t end_pc) {
@@ -162,7 +233,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
         }
 
                 switch (pc->op) {
-            case LIR::LIR_Op::LoadConst: registers[pc->dst] = pc->const_val; break;
+            case LIR::LIR_Op::LoadConst:
+                registers[pc->dst] = load_constant(pc->const_val);
+                break;
             case LIR::LIR_Op::Add: case LIR::LIR_Op::Sub: case LIR::LIR_Op::Mul: case LIR::LIR_Op::Div:
             case LIR::LIR_Op::Mod: case LIR::LIR_Op::Neg: case LIR::LIR_Op::DecAdd: case LIR::LIR_Op::DecSub:
             case LIR::LIR_Op::DecMul: case LIR::LIR_Op::DecDiv: case LIR::LIR_Op::DecMod: case LIR::LIR_Op::DecNeg:
@@ -221,7 +294,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                 execute_regions(pc); break;
             case LIR::LIR_Op::Mov: registers[pc->dst] = registers[pc->a]; break;
             case LIR::LIR_Op::Label: case LIR::LIR_Op::Nop: break;
-            case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret: if (pc->a != UINT32_MAX) registers[0] = registers[pc->a]; return;
+            case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret: registers[0] = pc->a != UINT32_MAX ? registers[pc->a] : VAL_NIL; return;
             default:
                 // H36: previously this printed a debug message and silently
                 // continued, which corrupted VM state. Throw so the caller
@@ -236,33 +309,112 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
     }
 }
 
-void RegisterVM::auto_register_output(const LIR::LIR_Inst* pc) {
-    if (pc && pc->op == LIR::LIR_Op::LoadConst) return; // Constants are statically allocated, do not reclaim
-    if (pc && pc->dst != UINT32_MAX && pc->dst < registers.size()) {
-        RegisterValue val = registers[pc->dst];
-        if (IS_PTR(val)) {
-            ObjHeader* header = (ObjHeader*)UNBOX_PTR(val);
-            if (header) {
-                uint32_t type_id = header->type_id;
-                if (type_id == TYPE_LIST || type_id == TYPE_DICT || type_id == TYPE_TUPLE || type_id == TYPE_FRAME || type_id == TYPE_BOX || type_id == TYPE_STRING) {
-                    uintptr_t ptr = reinterpret_cast<uintptr_t>(header);
-                    if (vm_allocation_regions.find(ptr) == vm_allocation_regions.end()) {
-                        vm_allocation_regions[ptr] = active_region_id;
-                        vm_allocation_types[ptr] = type_id;
-                    }
-                }
-            }
+RegisterValue RegisterVM::load_constant(RegisterValue value) {
+    if (!IS_PTR(value)) return value;
+    auto key = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
+    auto found = constant_copies.find(key);
+    if (found != constant_copies.end()) return found->second;
+    auto* h = reinterpret_cast<ObjHeader*>(key);
+    RegisterValue copy = VAL_NIL;
+    switch (h->type_id) {
+        case TYPE_FLOAT: copy = make_float(reinterpret_cast<ObjFloat*>(h)->value); break;
+        case TYPE_I64: copy = make_i64(reinterpret_cast<ObjI64*>(h)->value); break;
+        case TYPE_U64: copy = make_u64(reinterpret_cast<ObjU64*>(h)->value); break;
+        case TYPE_I128: copy = make_i128(reinterpret_cast<ObjI128*>(h)->value); break;
+        case TYPE_U128: copy = make_u128(reinterpret_cast<ObjU128*>(h)->value); break;
+        case TYPE_STRING: {
+            auto* str = reinterpret_cast<LmStringHeader*>(h);
+            copy = BOX_PTR(lm_str_from_bytes(str->data, str->len)); break;
         }
+        case TYPE_LIST: {
+            auto* source = reinterpret_cast<LmList*>(h); auto* list = lm_list_new();
+            copy = BOX_PTR(list); constant_copies[key] = copy;
+            for (uint64_t i = 0; i < source->size; ++i) lm_list_append(list, load_constant(source->data[i]));
+            break;
+        }
+        case TYPE_TUPLE: {
+            auto* source = reinterpret_cast<LmTuple*>(h); auto* tuple = lm_tuple_new(source->size);
+            copy = BOX_PTR(tuple); constant_copies[key] = copy;
+            for (uint64_t i = 0; i < source->size; ++i) lm_tuple_set(tuple, i, load_constant(source->elements[i]));
+            break;
+        }
+        case TYPE_BOX: {
+            auto* source = reinterpret_cast<LmBox*>(h);
+            auto* box = static_cast<LmBox*>(std::malloc(sizeof(LmBox)));
+            *box = *source;
+            if (source->type == LM_BOX_STRING && source->value.as_ptr)
+                box->value.as_ptr = strdup(static_cast<const char*>(source->value.as_ptr));
+            copy = BOX_PTR(box); break;
+        }
+        default: throw std::runtime_error("Unsupported heap constant kind: " + std::to_string(h->type_id));
     }
+    constant_copies[key] = copy;
+    // Keep constants valid across loops, recursive calls and repeated execution.
+    auto saved = active_region_id; active_region_id = 0;
+    register_native_allocation(copy); active_region_id = saved;
+    return copy;
+}
+
+void RegisterVM::auto_register_output(const LIR::LIR_Inst* pc) {
+    // Region/control instructions have no result, even when dst defaults to zero.
+    switch (pc->op) {
+        case LIR::LIR_Op::LoadConst: case LIR::LIR_Op::RegionEnter:
+        case LIR::LIR_Op::RegionExit: case LIR::LIR_Op::RegionMove:
+        case LIR::LIR_Op::Jump: case LIR::LIR_Op::JumpIf: case LIR::LIR_Op::JumpIfFalse:
+        case LIR::LIR_Op::Nop: case LIR::LIR_Op::Label: case LIR::LIR_Op::Param:
+        case LIR::LIR_Op::MemoryFree: case LIR::LIR_Op::StoreGlobal: return;
+        default: break;
+    }
+    if (pc->dst != UINT32_MAX && pc->dst < registers.size()) register_native_allocation(registers[pc->dst]);
 }
 
 void RegisterVM::register_native_allocation(RegisterValue value) {
     if (!IS_PTR(value)) return;
-    auto* header = static_cast<ObjHeader*>(UNBOX_PTR(value));
-    const auto ptr = reinterpret_cast<uintptr_t>(header);
-    if (header && !vm_allocation_regions.count(ptr)) {
-        vm_allocation_regions[ptr] = active_region_id;
-        vm_allocation_types[ptr] = header->type_id;
+    auto root = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
+    if (vm_allocation_types.count(root) || borrowed_constants.count(root) || opaque_runtime_pointers.count(root) || lm_is_constant(value)) return;
+    if (heap_parent_) {
+        std::lock_guard<std::recursive_mutex> lock(heap_parent_->heap_mutex_);
+        if (heap_parent_->vm_allocation_types.count(root)) return;
+    }
+    auto kind = reinterpret_cast<ObjHeader*>(root)->type_id;
+    if (kind > TYPE_FOREIGN_PTR) throw std::runtime_error("Invalid heap object kind");
+    if (kind != TYPE_LIST && kind != TYPE_DICT && kind != TYPE_TUPLE && kind != TYPE_FRAME && kind != TYPE_CLOSURE) {
+        vm_allocation_regions[root] = active_region_id;
+        vm_allocation_types[root] = kind;
+        region_allocations[active_region_id].insert(root);
+        return;
+    }
+    std::vector<RegisterValue> work{value};
+    std::unordered_set<uintptr_t> visited;
+    while (!work.empty()) {
+        auto current = work.back(); work.pop_back();
+        if (!IS_PTR(current)) continue;
+        auto ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(current));
+        if (!visited.insert(ptr).second || borrowed_constants.count(ptr) || opaque_runtime_pointers.count(ptr) || lm_is_constant(current)) continue;
+        auto* header = reinterpret_cast<ObjHeader*>(ptr);
+        if (!header || header->type_id > TYPE_FOREIGN_PTR) continue;
+        if (vm_allocation_types.count(ptr)) continue;
+        if (!vm_allocation_regions.count(ptr)) {
+            vm_allocation_regions[ptr] = active_region_id;
+            vm_allocation_types[ptr] = header->type_id;
+            region_allocations[active_region_id].insert(ptr);
+        }
+        if (header->type_id == TYPE_LIST) {
+            auto* list = reinterpret_cast<LmList*>(header);
+            for (uint64_t i = 0; i < list->size; ++i) work.push_back(list->data[i]);
+        } else if (header->type_id == TYPE_DICT) {
+            for (auto* entry = reinterpret_cast<LmDict*>(header)->head; entry; entry = entry->order_next) {
+                work.push_back(entry->key); work.push_back(entry->value);
+            }
+        } else if (header->type_id == TYPE_TUPLE) {
+            auto* tuple = reinterpret_cast<LmTuple*>(header);
+            for (uint64_t i = 0; i < tuple->size; ++i) work.push_back(tuple->elements[i]);
+        } else if (header->type_id == TYPE_FRAME) {
+            auto* frame = reinterpret_cast<LmFrame*>(header);
+            for (int i = 0; i < frame->field_count; ++i) work.push_back(frame->fields[i]);
+        } else if (header->type_id == TYPE_CLOSURE) {
+            work.push_back(reinterpret_cast<LmClosure*>(header)->captured_env);
+        }
     }
 }
 
@@ -272,191 +424,195 @@ RegisterValue RegisterVM::get_global(const std::string& name) const {
 }
 
 void RegisterVM::set_global(const std::string& name, RegisterValue value) {
+    register_native_allocation(value);
+    promote_graph(value, 0);
     globals_[name] = value;
 }
 
 void RegisterVM::reclaim_value(RegisterValue val) {
     if (!IS_PTR(val)) return;
-    auto* header = static_cast<ObjHeader*>(UNBOX_PTR(val));
-    if (!header) return;
-    
-    uintptr_t ptr = reinterpret_cast<uintptr_t>(header);
-    
-    // Check if already freed to prevent double-free
-    if (vm_allocation_types.find(ptr) == vm_allocation_types.end()) {
-        return; // Already reclaimed or not tracked
-    }
-    vm_allocation_types.erase(ptr);
+    auto ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
+    auto type = vm_allocation_types.find(ptr);
+    if (type == vm_allocation_types.end()) return;
+    uint32_t kind = type->second;
+    region_allocations[vm_allocation_regions.at(ptr)].erase(ptr);
+    vm_allocation_types.erase(type);
     vm_allocation_regions.erase(ptr);
+    auto* header = reinterpret_cast<ObjHeader*>(ptr);
+    // Children have independent region membership. Never recursively free an
+    // older/shared child merely because this container is being reclaimed.
+    switch (kind) {
+        case TYPE_LIST: lm_list_free(reinterpret_cast<LmList*>(header)); break;
+        case TYPE_DICT: lm_dict_free(reinterpret_cast<LmDict*>(header)); break;
+        case TYPE_TUPLE: lm_tuple_free(reinterpret_cast<LmTuple*>(header)); break;
+        case TYPE_STRING: lm_str_free(reinterpret_cast<LmStringHeader*>(header)); break;
+        case TYPE_BOX: lm_box_free(reinterpret_cast<LmBox*>(header)); break;
+        case TYPE_FRAME: {
+            auto* frame = reinterpret_cast<LmFrame*>(header);
+            std::free(frame->name); std::free(frame->fields);
+            delete static_cast<std::mutex*>(frame->mutex);
+            std::free(frame); break;
+        }
+        default: std::free(header); break;
+    }
+}
 
-    if (header->type_id == TYPE_LIST) {
-        auto* list = reinterpret_cast<LmList*>(header);
-        for (uint64_t i = 0; i < list->size; ++i) {
-            reclaim_value(list->data[i]);
+void RegisterVM::promote_graph(RegisterValue value, uint64_t target) {
+    if (!IS_PTR(value)) return;
+    auto initial = vm_allocation_regions.find(reinterpret_cast<uintptr_t>(UNBOX_PTR(value)));
+    if (initial == vm_allocation_regions.end()) return;
+    size_t initial_depth = initial->second ? region_instances.at(initial->second).depth : 0;
+    size_t destination_depth = target ? region_instances.at(target).depth : 0;
+    if (initial_depth <= destination_depth) return;
+    std::vector<RegisterValue> work{value};
+    std::unordered_set<uintptr_t> visited;
+    size_t target_depth = target ? region_instances.at(target).depth : 0;
+    while (!work.empty()) {
+        auto current = work.back(); work.pop_back();
+        if (!IS_PTR(current)) continue;
+        auto ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(current));
+        if (!visited.insert(ptr).second) continue;
+        auto owner = vm_allocation_regions.find(ptr);
+        if (owner == vm_allocation_regions.end()) continue;
+        uint64_t source = owner->second;
+        size_t source_depth = source ? region_instances.at(source).depth : 0;
+        // Stores preserve the invariant that children outlive their container.
+        // An older graph therefore needs no traversal or scratch allocations.
+        if (source_depth <= target_depth) continue;
+        // Promotion can extend a lifetime, never shorten it.
+        if (source_depth > target_depth) {
+            region_allocations[source].erase(ptr);
+            region_allocations[target].insert(ptr);
+            owner->second = target;
         }
-        lm_list_free(list);
-    } else if (header->type_id == TYPE_DICT) {
-        auto* dict = reinterpret_cast<LmDict*>(header);
-        uint64_t count = 0;
-        LmValue* items = lm_dict_items(dict, &count);
-        for (uint64_t i = 0; items && i < count; ++i) {
-            reclaim_value(items[i * 2]);     // Key
-            reclaim_value(items[i * 2 + 1]); // Value
+        auto* header = reinterpret_cast<ObjHeader*>(ptr);
+        switch (header->type_id) {
+            case TYPE_LIST: {
+                auto* list = reinterpret_cast<LmList*>(header);
+                for (uint64_t i = 0; i < list->size; ++i) work.push_back(list->data[i]); break;
+            }
+            case TYPE_DICT:
+                for (auto* entry = reinterpret_cast<LmDict*>(header)->head; entry; entry = entry->order_next) {
+                    work.push_back(entry->key); work.push_back(entry->value);
+                } break;
+            case TYPE_TUPLE: {
+                auto* tuple = reinterpret_cast<LmTuple*>(header);
+                for (uint64_t i = 0; i < tuple->size; ++i) work.push_back(tuple->elements[i]); break;
+            }
+            case TYPE_FRAME: {
+                auto* frame = reinterpret_cast<LmFrame*>(header);
+                for (int i = 0; i < frame->field_count; ++i) work.push_back(frame->fields[i]); break;
+            }
+            case TYPE_CLOSURE: work.push_back(reinterpret_cast<LmClosure*>(header)->captured_env); break;
+            case TYPE_FOREIGN_PTR: promote_raw_memory(reinterpret_cast<ObjForeignPtr*>(header)->ptr, target); break;
+            default: break;
         }
-        if (items) std::free(items);
-        lm_dict_free(dict);
-    } else if (header->type_id == TYPE_TUPLE) {
-        auto* tuple = reinterpret_cast<LmTuple*>(header);
-        for (uint64_t i = 0; i < tuple->size; ++i) {
-            reclaim_value(tuple->elements[i]);
+    }
+}
+
+void RegisterVM::exit_region() {
+    if (vm_region_stack.empty()) throw std::runtime_error("Unbalanced RegionExit");
+    auto id = vm_region_stack.back();
+    finalize_owned_frames(id);
+    vm_region_stack.pop_back();
+    active_region_id = region_instances.at(id).parent;
+    auto& objects = region_allocations[id];
+    while (!objects.empty()) {
+        auto ptr = *objects.begin();
+        reclaim_value(BOX_PTR(ptr));
+        objects.erase(ptr);
+    }
+    release_region_raw_memory(id);
+    region_allocations.erase(id);
+    region_instances.erase(id);
+}
+
+uint64_t RegisterVM::begin_native_call() {
+    invocation_parents.push_back(active_region_id);
+    return vm_region_stack.size();
+}
+
+void RegisterVM::end_native_call(uint64_t depth, RegisterValue result) {
+    uint64_t parent = invocation_parents.empty() ? 0 : invocation_parents.back();
+    register_native_allocation(result);
+    promote_graph(result, parent);
+    while (vm_region_stack.size() > depth) exit_region();
+    if (!invocation_parents.empty()) invocation_parents.pop_back();
+}
+
+void RegisterVM::native_region(LIR::LIR_Op op, uint32_t lexical, RegisterValue value) {
+    if (op == LIR::LIR_Op::RegionMove) {
+        uint64_t target = invocation_parents.empty() ? 0 : invocation_parents.back();
+        if (lexical) {
+            bool found = false;
+            for (auto it = vm_region_stack.rbegin(); it != vm_region_stack.rend(); ++it)
+                if (region_instances.at(*it).lexical_id == lexical) { target = *it; found = true; break; }
+            if (!found) throw std::runtime_error("Native RegionMove target is not active");
         }
-        lm_tuple_free(tuple);
-    } else if (header->type_id == TYPE_STRING) {
-        lm_str_free(reinterpret_cast<LmStringHeader*>(header));
-    } else if (header->type_id == TYPE_BOX) {
-        lm_box_free(reinterpret_cast<LmBox*>(header));
-    } else if (header->type_id == TYPE_FRAME) {
-        auto* frame = reinterpret_cast<LmFrame*>(header);
-        for (int i = 0; i < frame->field_count; ++i) {
-            reclaim_value(frame->fields[i]);
-        }
-        if (frame->name) std::free((void*)frame->name);
-        if (frame->fields) std::free(frame->fields);
-        std::free(frame);
+        register_native_allocation(value);
+        promote_graph(value, target);
+    } else {
+        LIR::LIR_Inst inst(op, LIR::Type::Void, 0, 0, 0, lexical);
+        execute_regions(&inst);
     }
 }
 
 void RegisterVM::execute_regions(const LIR::LIR_Inst* pc) {
-    switch (pc->op) {
-        case LIR::LIR_Op::RegionEnter: {
-            active_region_id = pc->imm;
-            vm_region_stack.push_back(active_region_id);
-            break;
+    if (pc->op == LIR::LIR_Op::RegionEnter) {
+        uint64_t id = next_region_id++;
+        size_t depth = active_region_id ? region_instances.at(active_region_id).depth + 1 : 1;
+        region_instances.emplace(id, RegionInstance{static_cast<uint32_t>(pc->imm), active_region_id, depth});
+        active_region_id = id;
+        vm_region_stack.push_back(id);
+    } else if (pc->op == LIR::LIR_Op::RegionExit) {
+        if (vm_region_stack.empty() || region_instances.at(vm_region_stack.back()).lexical_id != pc->imm)
+            throw std::runtime_error("RegionExit mismatch in " + (current_function_ ? current_function_->name : std::string("native")) + ": expected " + std::to_string(pc->imm) + ", active " + (vm_region_stack.empty() ? std::string("none") : std::to_string(region_instances.at(vm_region_stack.back()).lexical_id)));
+        exit_region();
+    } else if (pc->op == LIR::LIR_Op::RegionMove && pc->a < registers.size()) {
+        uint64_t target = invocation_parents.empty() ? 0 : invocation_parents.back();
+        if (pc->imm != 0) {
+            bool found = false;
+            for (auto it = vm_region_stack.rbegin(); it != vm_region_stack.rend(); ++it) {
+                if (region_instances.at(*it).lexical_id == pc->imm) { target = *it; found = true; break; }
+            }
+            if (!found) throw std::runtime_error("RegionMove target is not an active ancestor");
         }
-        case LIR::LIR_Op::RegionExit: {
-            uint32_t region_to_exit = pc->imm;
-            
-            // Remove region from vm_region_stack
-            auto it = std::find(vm_region_stack.begin(), vm_region_stack.end(), region_to_exit);
-            if (it != vm_region_stack.end()) {
-                vm_region_stack.erase(it);
-            }
-            active_region_id = vm_region_stack.empty() ? 0 : vm_region_stack.back();
-            
-            // Reclaim all allocations owned by this region
-            std::vector<uintptr_t> ptrs_to_reclaim;
-            for (const auto& [ptr, reg_id] : vm_allocation_regions) {
-                if (reg_id == region_to_exit) {
-                    ptrs_to_reclaim.push_back(ptr);
-                }
-            }
-            for (uintptr_t ptr : ptrs_to_reclaim) {
-                reclaim_value(reinterpret_cast<RegisterValue>(BOX_PTR(ptr)));
-            }
-            break;
-        }
-        case LIR::LIR_Op::RegionMove: {
-            if (pc->a < registers.size()) {
-                RegisterValue val = registers[pc->a];
-                if (IS_PTR(val)) {
-                    uintptr_t ptr = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-                    if (ptr) {
-                        vm_allocation_regions[ptr] = pc->imm; // Move ownership to target region (pc->imm)
-                        
-                        // Recursively move ownership of nested child allocations to target region
-                        std::vector<RegisterValue> child_worklist;
-                        std::unordered_set<uintptr_t> visited;
-                        child_worklist.push_back(val);
-                        while (!child_worklist.empty()) {
-                            RegisterValue curr = child_worklist.back();
-                            child_worklist.pop_back();
-                            if (IS_PTR(curr)) {
-                                ObjHeader* header = (ObjHeader*)UNBOX_PTR(curr);
-                                if (header) {
-                                    uintptr_t child_ptr = reinterpret_cast<uintptr_t>(header);
-                                    if (!visited.insert(child_ptr).second) continue;
-                                    vm_allocation_regions[child_ptr] = pc->imm;
-                                    if (header->type_id == TYPE_LIST) {
-                                        auto* list = reinterpret_cast<LmList*>(header);
-                                        for (uint64_t i = 0; i < list->size; ++i) child_worklist.push_back(list->data[i]);
-                                    } else if (header->type_id == TYPE_DICT) {
-                                        auto* dict = reinterpret_cast<LmDict*>(header);
-                                        uint64_t count = 0;
-                                        LmValue* items = lm_dict_items(dict, &count);
-                                        for (uint64_t i = 0; items && i < count; ++i) {
-                                            child_worklist.push_back(items[i * 2]);
-                                            child_worklist.push_back(items[i * 2 + 1]);
-                                        }
-                                        if (items) std::free(items);
-                                    } else if (header->type_id == TYPE_TUPLE) {
-                                        auto* tuple = reinterpret_cast<LmTuple*>(header);
-                                        for (uint64_t i = 0; i < tuple->size; ++i) child_worklist.push_back(tuple->elements[i]);
-                                    } else if (header->type_id == TYPE_FRAME) {
-                                        auto* frame = reinterpret_cast<LmFrame*>(header);
-                                        for (int i = 0; i < frame->field_count; ++i) child_worklist.push_back(frame->fields[i]);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            break;
-        }
-        default:
-            break;
+        promote_graph(registers[pc->a], target);
+    }
+}
+
+void RegisterVM::export_graph(RegisterValue value) {
+    if (!heap_parent_) { promote_graph(value, 0); return; }
+    promote_graph(value, 0);
+    std::lock_guard<std::recursive_mutex> lock(heap_parent_->heap_mutex_);
+    // Export the worker's promoted graph before publishing it in a shared
+    // container/channel. The parent owns its lifetime through the join.
+    for (auto it = owned_raw_memory.begin(); it != owned_raw_memory.end();) {
+        if (it->second == 0) { heap_parent_->owned_raw_memory[it->first] = 0; it = owned_raw_memory.erase(it); }
+        else ++it;
+    }
+    auto& exported = region_allocations[0];
+    while (!exported.empty()) {
+        auto ptr = *exported.begin(); exported.erase(ptr);
+        heap_parent_->vm_allocation_regions[ptr] = 0;
+        heap_parent_->vm_allocation_types[ptr] = vm_allocation_types.at(ptr);
+        heap_parent_->region_allocations[0].insert(ptr);
+        vm_allocation_types.erase(ptr); vm_allocation_regions.erase(ptr);
+        borrowed_constants.insert(ptr);
     }
 }
 
 void RegisterVM::transfer_ownership(RegisterValue child, RegisterValue container) {
-    if (!IS_PTR(container) || !IS_PTR(child)) return;
-    auto* container_header = static_cast<ObjHeader*>(UNBOX_PTR(container));
-    auto* child_header = static_cast<ObjHeader*>(UNBOX_PTR(child));
-    if (!container_header || !child_header) return;
-    
-    uintptr_t container_ptr = reinterpret_cast<uintptr_t>(container_header);
-    if (vm_allocation_regions.find(container_ptr) == vm_allocation_regions.end()) {
-        return; // Container is not tracked or has been reclaimed
-    }
-    uint32_t target_region = vm_allocation_regions[container_ptr];
-    
-    std::vector<RegisterValue> child_worklist;
-    std::unordered_set<uintptr_t> visited;
-    child_worklist.push_back(child);
-    while (!child_worklist.empty()) {
-        RegisterValue curr = child_worklist.back();
-        child_worklist.pop_back();
-        if (IS_PTR(curr)) {
-            ObjHeader* header = (ObjHeader*)UNBOX_PTR(curr);
-            if (header) {
-                uintptr_t child_ptr = reinterpret_cast<uintptr_t>(header);
-                if (!visited.insert(child_ptr).second) continue;
-                if (child_ptr % 8 == 0 && vm_allocation_regions.find(child_ptr) != vm_allocation_regions.end()) {
-                    vm_allocation_regions[child_ptr] = target_region;
-                    if (header->type_id == TYPE_LIST) {
-                        auto* list = reinterpret_cast<LmList*>(header);
-                        for (uint64_t i = 0; i < list->size; ++i) child_worklist.push_back(list->data[i]);
-                    } else if (header->type_id == TYPE_DICT) {
-                        auto* dict = reinterpret_cast<LmDict*>(header);
-                        uint64_t count = 0;
-                        LmValue* items = lm_dict_items(dict, &count);
-                        for (uint64_t i = 0; items && i < count; ++i) {
-                            child_worklist.push_back(items[i * 2]);
-                            child_worklist.push_back(items[i * 2 + 1]);
-                        }
-                        if (items) std::free(items);
-                    } else if (header->type_id == TYPE_TUPLE) {
-                        auto* tuple = reinterpret_cast<LmTuple*>(header);
-                        for (uint64_t i = 0; i < tuple->size; ++i) child_worklist.push_back(tuple->elements[i]);
-                    } else if (header->type_id == TYPE_FRAME) {
-                        auto* frame = reinterpret_cast<LmFrame*>(header);
-                        for (int i = 0; i < frame->field_count; ++i) child_worklist.push_back(frame->fields[i]);
-                    }
-                }
-            }
-        }
+    if (!IS_PTR(container)) return;
+    auto found = vm_allocation_regions.find(reinterpret_cast<uintptr_t>(UNBOX_PTR(container)));
+    if (found != vm_allocation_regions.end()) promote_graph(child, found->second);
+    else if (heap_parent_) {
+        std::lock_guard<std::recursive_mutex> lock(heap_parent_->heap_mutex_);
+        if (heap_parent_->vm_allocation_types.count(reinterpret_cast<uintptr_t>(UNBOX_PTR(container))))
+            export_graph(child);
     }
 }
+
 
 ValuePtr register_to_value_ptr(RegisterValue rv, TypePtr lang_type) {
     if (IS_PTR(rv)) {

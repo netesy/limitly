@@ -10,6 +10,7 @@
 #include "ir/Value.h"
 #include "ir/Constant.h"
 #include "fyra_builtin_functions.hh"
+#include "region_lowering.hh"
 #include "backend/vm/vm_value.hh"
 #include "backend/vm/vm_value_base.hh"
 #include "backend/vm/vm_runtime.hh"
@@ -131,6 +132,12 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
 
     auto inspect_instructions = [&](const LIR::LIR_Function& f) {
         for (const auto& inst : f.instructions) {
+            if (inst.op == LIR::LIR_Op::NewFrame) {
+                auto name = !inst.type_name.empty() ? inst.type_name : inst.func_name;
+                auto finalizer = name + ".deinit";
+                if (registry.getFunction(finalizer) && reachable_funcs.insert(finalizer).second)
+                    worklist.push_back(finalizer);
+            }
             std::string callee = inst.func_name;
             if (callee.empty() && inst.const_val && IS_PTR(inst.const_val)) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(inst.const_val);
@@ -301,12 +308,14 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     build_function_body(main_fn, lir_func);
 
     FyraBuiltinFunctions::emit_used_builtins(current_module_.get(), builder_.get(), used_builtins_);
+    lower_region_ownership(*current_module_);
     return current_module_;
 }
 
 void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::LIR_Function& lir_func) {
     ir::BasicBlock* entry_bb = builder_->createBasicBlock("entry", main_fn);
     builder_->setInsertPoint(entry_bb);
+    auto caller_region = builder_->createExternCall("lymar_aot_region_current", {}, context_->getIntegerType(64));
 
     std::unordered_map<uint32_t, size_t> label_to_index;
     for (size_t i = 0; i < lir_func.instructions.size(); ++i) {
@@ -552,6 +561,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         if (terminated) continue;
 
         switch (inst.op) {
+            case LIR::LIR_Op::RegionEnter:
+            case LIR::LIR_Op::RegionExit:
+                builder_->createExternCall(inst.op == LIR::LIR_Op::RegionEnter ? "lymar_aot_region_enter" : "lymar_aot_region_exit",
+                    {context_->getConstantInt(context_->getIntegerType(64), inst.imm)}, nullptr);
+                break;
+            case LIR::LIR_Op::RegionMove:
+                builder_->createExternCall("lymar_aot_region_move", {load_reg(inst.a, inst.type_a),
+                    context_->getConstantInt(context_->getIntegerType(64), inst.imm), caller_region,
+                    context_->getConstantInt(context_->getIntegerType(64), 0)}, nullptr);
+                break;
+            case LIR::LIR_Op::FrameCallDeinit:
+                builder_->createExternCall("lymar_aot_finalize", {load_reg(inst.a, inst.type_a)}, nullptr);
+                break;
             case LIR::LIR_Op::Mov:
                 if (reg_decimal_scales.count(inst.a)) reg_decimal_scales[inst.dst] = reg_decimal_scales[inst.a];
                 if (reg_int_values.count(inst.a)) reg_int_values[inst.dst] = reg_int_values[inst.a];
@@ -1608,7 +1630,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         }, context_->getIntegerType(64));
                         builder_->createExternCall("process.exit", {
                             context_->getConstantInt(context_->getIntegerType(64), 1)
-                        }, context_->getIntegerType(64));
+                        }, nullptr);
 
                         builder_->setInsertPoint(b_msg_d);
                         ir::GlobalVariable* gv_fail = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "assert_msg", "Assertion failed\n");
@@ -1627,7 +1649,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                     builder_->createExternCall("process.exit", {
                         context_->getConstantInt(context_->getIntegerType(64), 1)
-                    }, context_->getIntegerType(64));
+                    }, nullptr);
                     builder_->createJmp(b_pass);
 
                     builder_->setInsertPoint(b_pass);
@@ -2014,6 +2036,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), fields), cnt_addr);
 
                 store_reg(inst.dst, frame_ptr, inst.result_type);
+                if (auto* finalizer = current_module_->getFunction(name + ".deinit"))
+                    builder_->createExternCall("lymar_aot_set_finalizer", {frame_ptr, finalizer}, nullptr);
                 break;
             }
             case LIR::LIR_Op::FrameGetField:
@@ -2022,7 +2046,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* frame_ptr = load_reg(inst.a, LIR::Type::Ptr);
                 // Load fields array pointer from offset 16
                 ir::Value* fields_ptr_addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), 16));
-                ir::Value* fields_array = builder_->createLoad(fields_ptr_addr);
+                ir::Value* fields_array = builder_->createLoadl(fields_ptr_addr);
                 ir::Value* addr = builder_->createAdd(fields_array, context_->getConstantInt(context_->getIntegerType(64), field_idx * 8));
                 LIR::Type res_t = inst.result_type;
                 if (res_t == LIR::Type::F64 || res_t == LIR::Type::F32 || is_float_op(inst)) {
@@ -2039,7 +2063,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 uint32_t field_idx = inst.a;
                 // Load fields array pointer from offset 16
                 ir::Value* fields_ptr_addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), 16));
-                ir::Value* fields_array = builder_->createLoad(fields_ptr_addr);
+                ir::Value* fields_array = builder_->createLoadl(fields_ptr_addr);
                 ir::Value* addr = builder_->createAdd(fields_array, context_->getConstantInt(context_->getIntegerType(64), field_idx * 8));
                 LIR::Type b_type = reg_types.count(inst.b) ? reg_types[inst.b] : inst.type_b;
                 if (b_type == LIR::Type::F64 || b_type == LIR::Type::F32 || is_float_op(inst)) {
@@ -2556,8 +2580,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             default:
-                if (inst.dst != UINT32_MAX) store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
-                break;
+                throw std::runtime_error("Fyra lowering does not implement LIR opcode " +
+                    LIR::lir_op_to_string(inst.op) + " in " + lir_func.name);
         }
     }
     if (!terminated && builder_->getInsertPoint()) builder_->createRet(context_->getConstantInt(context_->getIntegerType(64), 0));

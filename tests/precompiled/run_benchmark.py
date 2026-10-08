@@ -17,6 +17,7 @@ MARKER = re.compile(r"WORKLOAD_DONE: ([+\-0-9.eE]+)")
 
 def measure_run(cmd, env=None, timeout=120):
     start = time.perf_counter()
+    timeout *= float(os.environ.get("LYMAR_TEST_TIMEOUT_SCALE", "1"))
     result = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, env=env, timeout=timeout)
     elapsed = (time.perf_counter() - start) * 1000
     if result.returncode:

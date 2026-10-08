@@ -647,6 +647,15 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
     ));
 
     registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_hash_bytes", std::vector<TypeTag>{TypeTag::String}, TypeTag::Int,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            const auto& text = args.at(0)->data;
+            uint64_t hash = 5381;
+            for (unsigned char byte : text) hash = (hash * 33 + byte) % 2147483647;
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Int), static_cast<int64_t>(hash));
+        }
+    ));
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
         "_builtin_string_join", std::vector<TypeTag>{TypeTag::List, TypeTag::String}, TypeTag::String,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
             std::string result;

@@ -150,6 +150,7 @@ std::string CompiledModuleMeta::serialize() const {
     std::stringstream ss;
     ss << "module_name=" << module_name << "\n";
     ss << "abi_version=" << abi_version << "\n";
+    ss << "runtime_semantics=" << runtime_semantics << "\n";
     ss << "target_triple=" << target_triple << "\n";
     ss << "architecture=" << architecture << "\n";
     ss << "os=" << os << "\n";
@@ -196,6 +197,7 @@ bool CompiledModuleMeta::deserialize(const std::string& input, CompiledModuleMet
 
         if (key == "module_name") out_meta.module_name = val;
         else if (key == "abi_version") out_meta.abi_version = val;
+        else if (key == "runtime_semantics") out_meta.runtime_semantics = val;
         else if (key == "target_triple") out_meta.target_triple = val;
         else if (key == "architecture") out_meta.architecture = val;
         else if (key == "os") out_meta.os = val;
@@ -257,7 +259,7 @@ bool ModuleManager::find_compiled_module(const std::string& module_name, const s
 
 bool ModuleManager::is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) {
     if (!fs::exists(meta.artifact_path)) return false;
-    if (meta.abi_version != "1.0.0") return false;
+    if (meta.abi_version != "1.0.0" || meta.runtime_semantics != "regions-v2") return false;
     for (const auto& [name, hash] : meta.dependency_hashes) {
         std::ifstream dependency(find_module_file(name));
         if (!dependency) return false;
@@ -301,6 +303,7 @@ CompiledModuleMeta ModuleManager::generate_metadata(
         meta.module_name = meta.module_name.substr(0, meta.module_name.length() - 6);
     }
     meta.abi_version = "1.0.0";
+    meta.runtime_semantics = "regions-v2";
     meta.target_triple = arch + "-" + target;
     meta.architecture = arch;
     meta.os = target;

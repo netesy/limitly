@@ -144,21 +144,81 @@ void RegisterVM::execute_memory_compare(const LIR::LIR_Inst* pc) {
     } else registers[pc->dst] = BOX_INT(0);
 }
 
+void RegisterVM::invalidate_raw_aliases(uintptr_t address, size_t size) {
+    for (const auto& [ptr, kind] : vm_allocation_types) {
+        if (kind != TYPE_FOREIGN_PTR) continue;
+        auto* wrapper = reinterpret_cast<ObjForeignPtr*>(ptr);
+        auto value = reinterpret_cast<uintptr_t>(wrapper->ptr);
+        if (value >= address && value - address <= size) wrapper->ptr = nullptr;
+    }
+}
+
+void RegisterVM::promote_raw_memory(void* address, uint64_t target) {
+    if (!address) return;
+    std::lock_guard<std::mutex> lock(g_memory_mutex);
+    auto value = reinterpret_cast<uintptr_t>(address);
+    size_t target_depth = target ? region_instances.at(target).depth : 0;
+    for (auto& [base, region] : owned_raw_memory) {
+        auto size = g_memory_allocations.find(base);
+        if (size == g_memory_allocations.end() || value < base || value - base > size->second) continue;
+        size_t source_depth = region ? region_instances.at(region).depth : 0;
+        if (source_depth > target_depth) region = target;
+        return;
+    }
+}
+
+void RegisterVM::release_region_raw_memory(uint64_t region) {
+    std::lock_guard<std::mutex> lock(g_memory_mutex);
+    for (auto it = owned_raw_memory.begin(); it != owned_raw_memory.end();) {
+        if (it->second != region) { ++it; continue; }
+        auto allocation = g_memory_allocations.find(it->first);
+        if (allocation != g_memory_allocations.end()) {
+            invalidate_raw_aliases(it->first, allocation->second);
+            std::free(reinterpret_cast<void*>(it->first));
+            g_memory_allocations.erase(allocation);
+        }
+        it = owned_raw_memory.erase(it);
+    }
+}
+
+void RegisterVM::release_raw_memory() {
+    std::lock_guard<std::mutex> lock(g_memory_mutex);
+    for (auto [ptr, region] : owned_raw_memory) {
+        auto allocation = g_memory_allocations.find(ptr);
+        if (allocation != g_memory_allocations.end()) {
+            invalidate_raw_aliases(ptr, allocation->second);
+            std::free(reinterpret_cast<void*>(ptr));
+            g_memory_allocations.erase(allocation);
+        }
+    }
+    owned_raw_memory.clear();
+}
+
+RegisterValue RegisterVM::allocate_raw_memory(size_t size) {
+    void* ptr = std::malloc(size);
+    if (!ptr) return VAL_NIL;
+    auto value = lm_alloc_foreign_ptr(ptr);
+    if (!IS_PTR(value)) { std::free(ptr); return VAL_NIL; }
+    {
+        std::lock_guard<std::mutex> lock(g_memory_mutex);
+        auto address = reinterpret_cast<uintptr_t>(ptr);
+        g_memory_allocations[address] = size;
+        owned_raw_memory[address] = active_region_id;
+    }
+    register_native_allocation(value);
+    return value;
+}
+
+size_t RegisterVM::raw_memory_size(RegisterValue value) {
+    auto address = reinterpret_cast<uintptr_t>(value_to_ptr(value));
+    std::lock_guard<std::mutex> lock(g_memory_mutex);
+    auto found = g_memory_allocations.find(address);
+    return found == g_memory_allocations.end() ? 0 : found->second;
+}
+
 void RegisterVM::execute_memory_alloc(const LIR::LIR_Inst* pc) {
     int64_t size = to_int(registers[pc->a]);
-    if (size < 0) { registers[pc->dst] = VAL_NIL; return; }
-    void* ptr = std::malloc(size);
-    if (ptr) {
-        std::lock_guard<std::mutex> lock(g_memory_mutex);
-        g_memory_allocations[reinterpret_cast<uintptr_t>(ptr)] = size;
-        RegisterValue val = lm_alloc_foreign_ptr(ptr);
-        registers[pc->dst] = val;
-        // Register allocation with current active region
-        if (IS_PTR(val) && !vm_region_stack.empty()) {
-            uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-            vm_allocation_regions[ptr_val] = active_region_id;
-        }
-    } else registers[pc->dst] = VAL_NIL;
+    registers[pc->dst] = size < 0 ? VAL_NIL : allocate_raw_memory(static_cast<size_t>(size));
 }
 
 void RegisterVM::execute_memory_free(const LIR::LIR_Inst* pc) {
@@ -166,8 +226,10 @@ void RegisterVM::execute_memory_free(const LIR::LIR_Inst* pc) {
     if (ptr) {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         auto it = g_memory_allocations.find(reinterpret_cast<uintptr_t>(ptr));
-        if (it == g_memory_allocations.end()) return;
+        if (it == g_memory_allocations.end() || !owned_raw_memory.count(reinterpret_cast<uintptr_t>(ptr))) return;
+        invalidate_raw_aliases(reinterpret_cast<uintptr_t>(ptr), it->second);
         g_memory_allocations.erase(it);
+        owned_raw_memory.erase(reinterpret_cast<uintptr_t>(ptr));
         std::free(ptr);
     }
 }
@@ -178,26 +240,28 @@ void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
     const uintptr_t old_address = reinterpret_cast<uintptr_t>(ptr);
     int64_t size = to_int(registers[pc->b]);
     if (size < 0) { registers[pc->dst] = VAL_NIL; return; }
+    if (size == 0) { execute_memory_free(pc); registers[pc->dst] = VAL_NIL; return; }
     {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         auto it = g_memory_allocations.find(old_address);
-        if (it == g_memory_allocations.end()) {
+        if (it == g_memory_allocations.end() || !owned_raw_memory.count(old_address)) {
             registers[pc->dst] = VAL_NIL;
             return;
         }
     }
+    uint64_t original_region = owned_raw_memory.at(old_address);
     void* new_ptr = std::realloc(ptr, size);
     if (new_ptr) {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
+        invalidate_raw_aliases(old_address, g_memory_allocations.at(old_address));
         g_memory_allocations.erase(old_address);
+        owned_raw_memory.erase(old_address);
+        owned_raw_memory[reinterpret_cast<uintptr_t>(new_ptr)] = original_region;
         g_memory_allocations[reinterpret_cast<uintptr_t>(new_ptr)] = size;
         RegisterValue val = lm_alloc_foreign_ptr(new_ptr);
         registers[pc->dst] = val;
         // Register allocation with current active region
-        if (IS_PTR(val) && !vm_region_stack.empty()) {
-            uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-            vm_allocation_regions[ptr_val] = active_region_id;
-        }
+        register_native_allocation(registers[pc->dst]);
     } else registers[pc->dst] = VAL_NIL;
 }
 
@@ -208,11 +272,7 @@ void RegisterVM::execute_ptr_add(const LIR::LIR_Inst* pc) {
     int64_t offset = to_int(registers[pc->b]);
     RegisterValue val = lm_alloc_foreign_ptr(p + offset);
     registers[pc->dst] = val;
-    // Register allocation with current active region
-    if (IS_PTR(val) && !vm_region_stack.empty()) {
-        uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-        vm_allocation_regions[ptr_val] = active_region_id;
-    }
+    register_native_allocation(val);
 }
 
 void RegisterVM::execute_ptr_sub(const LIR::LIR_Inst* pc) {
@@ -222,11 +282,7 @@ void RegisterVM::execute_ptr_sub(const LIR::LIR_Inst* pc) {
     int64_t offset = to_int(registers[pc->b]);
     RegisterValue val = lm_alloc_foreign_ptr(p - offset);
     registers[pc->dst] = val;
-    // Register allocation with current active region
-    if (IS_PTR(val) && !vm_region_stack.empty()) {
-        uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-        vm_allocation_regions[ptr_val] = active_region_id;
-    }
+    register_native_allocation(val);
 }
 
 void RegisterVM::execute_ptr_diff(const LIR::LIR_Inst* pc) {
@@ -248,11 +304,7 @@ void RegisterVM::execute_ptr_align(const LIR::LIR_Inst* pc) {
     uintptr_t aligned = (addr + (alignment - 1)) & ~(alignment - 1);
     RegisterValue val = lm_alloc_foreign_ptr(reinterpret_cast<void*>(aligned));
     registers[pc->dst] = val;
-    // Register allocation with current active region
-    if (IS_PTR(val) && !vm_region_stack.empty()) {
-        uintptr_t ptr_val = reinterpret_cast<uintptr_t>(UNBOX_PTR(val));
-        vm_allocation_regions[ptr_val] = active_region_id;
-    }
+    register_native_allocation(val);
 }
 
 void RegisterVM::execute_ptr_is_aligned(const LIR::LIR_Inst* pc) {
