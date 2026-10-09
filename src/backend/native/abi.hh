@@ -56,7 +56,7 @@ enum class Helper : uint32_t {
   CallableName,
   ClosureBound,
   Callback,
-  RefCreate, RefResolve, RefRelease, OwnershipConsume, RefMove
+  RefCreate, RefResolve, RefRelease, OwnershipConsume, RefMove, DirectOperations
 };
 struct Api {
   uint32_t version;

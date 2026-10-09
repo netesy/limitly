@@ -1,6 +1,7 @@
 #include "emitter.hh"
 #include "abi.hh"
 #include "scalar_lowering.hh"
+#include "direct_operations.hh"
 #include "backend/vm/vm_list.hh"
 #include "backend/vm/vm_runtime.hh"
 #include "backend/vm/vm_string.hh"
@@ -48,6 +49,25 @@ struct Emitter {
   }
   std::string reg(uint32_t r) {
     return r == UINT32_MAX ? "2ULL" : raw(r) + ".boxed(api,ctx)";
+  }
+  std::string index(uint32_t r) {
+    return "(" + raw(r) + ".small()?" + raw(r) + ".integer():api->read_int(" + reg(r) + "))";
+  }
+  std::string direct_builtin(const LIR::LIR_Inst& inst) {
+    const auto& name = inst.func_name;
+    std::string field;
+    size_t count = 2;
+    if (name == "_builtin_string_contains") field = "string_contains";
+    else if (name == "_builtin_string_starts_with") field = "string_starts_with";
+    else if (name == "_builtin_string_ends_with") field = "string_ends_with";
+    else if (name == "_builtin_string_index_of") field = "string_index_of";
+    else if (name == "_builtin_string_byte_at") field = "string_byte_at";
+    else if (name == "_builtin_string_byte_len") { field = "string_byte_length"; count = 1; }
+    else return {};
+    if (inst.call_args.size() != count) return {};
+    auto result = "ops->" + field + "(" + reg(inst.call_args[0]);
+    if (count == 2) result += "," + (field == "string_byte_at" ? index(inst.call_args[1]) : reg(inst.call_args[1]));
+    return result + ")";
   }
   std::string integer(int64_t i) {
     if (fits_smi_i64(i)) return std::to_string(BOX_INT(i)) + "ULL";
@@ -140,6 +160,20 @@ struct Emitter {
            "i=0;i<count && i<"
         << registers << ";++i) r[i]=args[i];\n";
     out << "NativeScope scope(api,ctx);\n";
+    const bool direct = std::any_of(function.instructions.begin(), function.instructions.end(), [&](const auto& in) {
+      using Op = LIR::LIR_Op;
+      switch (in.op) {
+      case Op::StringIndex: case Op::FrameGetField: case Op::FrameSetField:
+      case Op::FrameGetFieldAtomic: case Op::FrameSetFieldAtomic:
+      case Op::ListAppend: case Op::ListIndex: case Op::ListSet: case Op::ListLen:
+      case Op::DictGet: case Op::DictSet: case Op::DictHas: case Op::DictLen:
+      case Op::TupleGet: case Op::TupleSet: return true;
+      case Op::Call: case Op::CallVoid: case Op::CallBuiltin: case Op::CallVariadic: return !direct_builtin(in).empty();
+      default: return false;
+      }
+    });
+    if (direct) out << "const auto* ops=direct_operations(api,ctx);\n";
+
     using Op = LIR::LIR_Op;
     const bool references = std::any_of(function.instructions.begin(), function.instructions.end(), [](const auto& in) {
       return in.op == Op::RefCreate || in.op == Op::RefResolve || in.op == Op::RefMove ||
@@ -265,7 +299,7 @@ struct Emitter {
         expr = h(Helper::Format);
         break;
       case Op::StringIndex:
-        expr = h(Helper::StringIndex);
+        expr = "ops->string_index(" + a + "," + index(inst.b) + ")";
         break;
       case Op::NewFrame:
         expr = helper(Helper::FrameNew, integer(inst.imm), "2ULL", "2ULL",
@@ -273,41 +307,41 @@ struct Emitter {
         break;
       case Op::FrameGetField:
       case Op::FrameGetFieldAtomic:
-        expr = helper(Helper::FrameGet, a, integer(inst.b));
+        expr = "ops->frame_get(ctx," + a + "," + std::to_string(inst.b) + "," + (inst.op == Op::FrameGetFieldAtomic ? "true" : "false") + ")";
         break;
       case Op::FrameSetField:
       case Op::FrameSetFieldAtomic:
-        expr = helper(Helper::FrameSet, d, integer(inst.a), b);
+        expr = "ops->frame_set(ctx," + d + "," + std::to_string(inst.a) + "," + b + "," + (inst.op == Op::FrameSetFieldAtomic ? "true" : "false") + ")";
         break;
       case Op::ListCreate:
         expr = helper(Helper::ListNew);
         break;
       case Op::ListAppend:
-        expr = h(Helper::ListAppend);
+        expr = "ops->list_append(ctx," + a + "," + b + ")";
         break;
       case Op::ListIndex:
-        expr = h(Helper::ListGet);
+        expr = "ops->sequence_get(" + a + "," + index(inst.b) + ")";
         break;
       case Op::ListSet:
-        expr = helper(Helper::ListSet, d, a, b);
+        expr = "ops->sequence_set(ctx," + d + "," + a + "," + b + ")";
         break;
       case Op::ListLen:
-        expr = h(Helper::ListLen);
+        expr = "ops->list_length(" + a + ")";
         break;
       case Op::DictCreate:
         expr = helper(Helper::DictNew);
         break;
       case Op::DictGet:
-        expr = h(Helper::DictGet);
+        expr = "ops->dict_get(" + a + "," + b + ")";
         break;
       case Op::DictSet:
-        expr = helper(Helper::DictSet, d, a, b);
+        expr = "ops->sequence_set(ctx," + d + "," + a + "," + b + ")";
         break;
       case Op::DictHas:
-        expr = h(Helper::DictHas);
+        expr = "ops->dict_has(" + a + "," + b + ")";
         break;
       case Op::DictLen:
-        expr = h(Helper::DictLen);
+        expr = "ops->dict_length(" + a + ")";
         break;
       case Op::DictItems:
         expr = h(Helper::DictItems);
@@ -316,10 +350,10 @@ struct Emitter {
         expr = helper(Helper::TupleNew, integer(inst.imm));
         break;
       case Op::TupleGet:
-        expr = h(Helper::TupleGet);
+        expr = "ops->sequence_get(" + a + "," + index(inst.b) + ")";
         break;
       case Op::TupleSet:
-        expr = helper(Helper::TupleSet, d, a, b);
+        expr = "ops->sequence_set(ctx," + d + "," + a + "," + b + ")";
         break;
       case Op::TupleLen:
         expr = h(Helper::TupleLen);
@@ -365,6 +399,10 @@ struct Emitter {
       case Op::CallVoid:
       case Op::CallBuiltin:
       case Op::CallVariadic: {
+        if (auto direct = direct_builtin(inst); !direct.empty()) {
+          expr = direct;
+          break;
+        }
         auto target = names.find(inst.func_name);
         const bool internal = target != names.end() && inst.op != Op::CallBuiltin;
         if (internal) {
@@ -517,6 +555,8 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
         << ", HMul=" << static_cast<unsigned>(Helper::Mul) << ", HDiv=" << static_cast<unsigned>(Helper::Div)
         << ", HMod=" << static_cast<unsigned>(Helper::Mod)
         << ", HFloat=" << TYPE_FLOAT << ";\n" << scalar_lowering_source;
+    emitter.out << "constexpr uint32_t HDirectOperations=" << static_cast<unsigned>(Helper::DirectOperations) << ";\n";
+    emitter.out << direct_operations_source;
     emitter.out << "struct NativeScope { const Api* api; void* ctx; V depth; V result=2ULL; "
         "NativeScope(const Api* a,void* c):api(a),ctx(c),depth("
         << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_call_enter\"")

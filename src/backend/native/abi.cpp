@@ -1,4 +1,5 @@
 #include "abi.hh"
+#include "direct_operations.hh"
 #include "backend/vm/reference_ops.hh"
 #include "backend/vm/constant_utils.hh"
 #include "backend/vm/register.hh"
@@ -38,6 +39,86 @@ const char *string_data(LmValue value) {
     return static_cast<const char *>(box->value.as_ptr);
   throw std::runtime_error("Native callable name is not a string");
 }
+LmValue direct_frame_get(void* context, LmValue value, uint32_t index, bool atomic) {
+  auto* frame = static_cast<Machine*>(context)->checked_frame(value, index);
+  return atomic ? lm_frame_get_field_atomic(frame, index) : frame->fields[index];
+}
+LmValue direct_frame_set(void* context, LmValue value, uint32_t index, LmValue child, bool atomic) {
+  auto& vm = *static_cast<Machine*>(context);
+  auto* frame = vm.checked_frame(value, index);
+  if (atomic) lm_frame_set_field_atomic(frame, index, child);
+  else frame->fields[index] = child;
+  vm.transfer_native_ownership(child, value);
+  return VAL_NIL;
+}
+LmValue direct_sequence_get(LmValue value, int64_t index) {
+  if (auto* list = object<LmList>(value, TYPE_LIST)) return lm_list_get(list, index);
+  if (auto* tuple = object<LmTuple>(value, TYPE_TUPLE)) return lm_tuple_get(tuple, index);
+  return VAL_NIL;
+}
+LmValue direct_sequence_set(void* context, LmValue value, LmValue key, LmValue child) {
+  auto& vm = *static_cast<Machine*>(context);
+  if (auto* list = object<LmList>(value, TYPE_LIST)) lm_list_set(list, as_i64(key), child);
+  else if (auto* tuple = object<LmTuple>(value, TYPE_TUPLE)) lm_tuple_set(tuple, as_i64(key), child);
+  else if (auto* dict = object<LmDict>(value, TYPE_DICT)) {
+    lm_dict_set(dict, key, child);
+    vm.transfer_native_ownership(key, value);
+  } else return VAL_NIL;
+  vm.transfer_native_ownership(child, value);
+  return VAL_NIL;
+}
+LmValue direct_list_append(void* context, LmValue value, LmValue child) {
+  if (auto* list = object<LmList>(value, TYPE_LIST)) {
+    lm_list_append(list, child);
+    static_cast<Machine*>(context)->transfer_native_ownership(child, value);
+  }
+  return VAL_NIL;
+}
+LmValue direct_list_length(LmValue value) {
+  auto* list = object<LmList>(value, TYPE_LIST);
+  return make_i64(list ? list->size : 0);
+}
+LmValue direct_dict_get(LmValue value, LmValue key) {
+  auto* dict = object<LmDict>(value, TYPE_DICT);
+  return dict ? lm_dict_get(dict, key) : VAL_NIL;
+}
+LmValue direct_dict_has(LmValue value, LmValue key) {
+  auto* dict = object<LmDict>(value, TYPE_DICT);
+  return dict && lm_dict_contains(dict, key) ? VAL_TRUE : VAL_FALSE;
+}
+LmValue direct_dict_length(LmValue value) {
+  auto* dict = object<LmDict>(value, TYPE_DICT);
+  return make_i64(dict ? dict->size : 0);
+}
+LmValue direct_string_index(LmValue value, int64_t index) {
+  auto* str = object<LmStringHeader>(value, TYPE_STRING);
+  if (!str || index < 0 || static_cast<uint64_t>(index) >= str->len) return VAL_NIL;
+  return make_i64(static_cast<unsigned char>(str->data[index]));
+}
+LmValue direct_string_contains(LmValue a, LmValue b) {
+  return lm_str_contains(object<LmStringHeader>(a, TYPE_STRING), object<LmStringHeader>(b, TYPE_STRING)) ? VAL_TRUE : VAL_FALSE;
+}
+LmValue direct_string_starts_with(LmValue a, LmValue b) {
+  return lm_str_starts_with(object<LmStringHeader>(a, TYPE_STRING), object<LmStringHeader>(b, TYPE_STRING)) ? VAL_TRUE : VAL_FALSE;
+}
+LmValue direct_string_ends_with(LmValue a, LmValue b) {
+  return lm_str_ends_with(object<LmStringHeader>(a, TYPE_STRING), object<LmStringHeader>(b, TYPE_STRING)) ? VAL_TRUE : VAL_FALSE;
+}
+LmValue direct_string_index_of(LmValue a, LmValue b) {
+  return make_i64(lm_str_index_of(object<LmStringHeader>(a, TYPE_STRING), object<LmStringHeader>(b, TYPE_STRING)));
+}
+LmValue direct_string_byte_length(LmValue value) {
+  auto* str = object<LmStringHeader>(value, TYPE_STRING);
+  return make_i64(str ? str->len : 0);
+}
+LmValue direct_string_byte_at(LmValue value, int64_t index) {
+  return make_i64(lm_str_byte_at(object<LmStringHeader>(value, TYPE_STRING), index));
+}
+const DirectOperations direct_ops{1, sizeof(DirectOperations),
+#define LM_NATIVE_OP(result, name, parameters) direct_##name,
+#include "direct_operations_fields.hh"
+#undef LM_NATIVE_OP
+};
 LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
                LmValue c, const char *text, const LmValue *args, size_t count) {
   auto &vm = *static_cast<Machine *>(context);
@@ -68,6 +149,9 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
     return result;
   };
   switch (static_cast<Helper>(operation)) {
+  case Helper::DirectOperations:
+    if (a != 1) throw std::runtime_error("Unsupported native direct operations version");
+    return reinterpret_cast<uintptr_t>(&direct_ops);
   case Helper::RefCreate: return make_u64(Backend::VM::Register::ReferenceOperations::create(vm, a, as_u64(b)));
   case Helper::RefResolve: return Backend::VM::Register::ReferenceOperations::resolve(vm, as_u64(a), as_u64(b));
   case Helper::RefMove: return make_u64(Backend::VM::Register::ReferenceOperations::move(vm, as_u64(a), as_u64(b)));
@@ -119,13 +203,7 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
   }
   case Helper::ToString:
     return own(BOX_PTR(lm_value_to_string(a)));
-  case Helper::StringIndex: {
-    auto *str = object<LmStringHeader>(a, TYPE_STRING);
-    int64_t index = as_i64(b);
-    if (!str || index < 0 || static_cast<uint64_t>(index) >= str->len)
-      return VAL_NIL;
-    return make_i64(static_cast<unsigned char>(str->data[index]));
-  }
+  case Helper::StringIndex: return direct_string_index(a, as_i64(b));
   case Helper::Concat:
   case Helper::Format: {
     auto *x = object<LmStringHeader>(a, TYPE_STRING);
@@ -155,47 +233,22 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
   case Helper::FrameGet: {
     auto index = as_i64(b);
     if (index < 0 || static_cast<uint64_t>(index) > UINT32_MAX) throw std::runtime_error("Invalid frame field index");
-    return vm.checked_frame(a, static_cast<uint32_t>(index))->fields[index];
+    return direct_frame_get(context, a, static_cast<uint32_t>(index), false);
   }
   case Helper::FrameSet: {
     auto index = as_i64(b);
     if (index < 0 || static_cast<uint64_t>(index) > UINT32_MAX) throw std::runtime_error("Invalid frame field index");
-    vm.checked_frame(a, static_cast<uint32_t>(index))->fields[index] = c;
-    transfer(c, a);
-    return VAL_NIL;
+    return direct_frame_set(context, a, static_cast<uint32_t>(index), c, false);
   }
   case Helper::ListNew:
     return own(BOX_PTR(lm_list_new()));
-  case Helper::ListAppend:
-    if (auto *list = object<LmList>(a, TYPE_LIST)) {
-      lm_list_append(list, b);
-      transfer(b, a);
-    }
-    return VAL_NIL;
+  case Helper::ListAppend: return direct_list_append(context, a, b);
   case Helper::ListGet:
-  case Helper::TupleGet:
-    if (auto *list = object<LmList>(a, TYPE_LIST))
-      return lm_list_get(list, as_i64(b));
-    if (auto *tuple = object<LmTuple>(a, TYPE_TUPLE))
-      return lm_tuple_get(tuple, as_i64(b));
-    return VAL_NIL;
+  case Helper::TupleGet: return direct_sequence_get(a, as_i64(b));
   case Helper::ListSet:
   case Helper::TupleSet:
-  case Helper::DictSet:
-    if (auto *list = object<LmList>(a, TYPE_LIST))
-      lm_list_set(list, as_i64(b), c);
-    else if (auto *tuple = object<LmTuple>(a, TYPE_TUPLE))
-      lm_tuple_set(tuple, as_i64(b), c);
-    else if (auto *dict = object<LmDict>(a, TYPE_DICT)) {
-      lm_dict_set(dict, b, c);
-      transfer(b, a);
-    }
-    transfer(c, a);
-    return VAL_NIL;
-  case Helper::ListLen:
-    if (auto *list = object<LmList>(a, TYPE_LIST))
-      return make_i64(list->size);
-    return make_i64(0);
+  case Helper::DictSet: return direct_sequence_set(context, a, b, c);
+  case Helper::ListLen: return direct_list_length(a);
   case Helper::TupleNew:
     return own(BOX_PTR(lm_tuple_new(as_i64(a))));
   case Helper::TupleLen:
@@ -204,18 +257,9 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
     return make_i64(0);
   case Helper::DictNew:
     return own(BOX_PTR(lm_dict_new(hash_boxed_value, cmp_boxed_value)));
-  case Helper::DictGet:
-    if (auto *dict = object<LmDict>(a, TYPE_DICT))
-      return lm_dict_get(dict, b);
-    return VAL_NIL;
-  case Helper::DictHas:
-    if (auto *dict = object<LmDict>(a, TYPE_DICT))
-      return lm_dict_contains(dict, b) ? VAL_TRUE : VAL_FALSE;
-    return VAL_FALSE;
-  case Helper::DictLen:
-    if (auto *dict = object<LmDict>(a, TYPE_DICT))
-      return make_i64(dict->size);
-    return make_i64(0);
+  case Helper::DictGet: return direct_dict_get(a, b);
+  case Helper::DictHas: return direct_dict_has(a, b);
+  case Helper::DictLen: return direct_dict_length(a);
   case Helper::DictItems: {
     auto result = own(BOX_PTR(lm_list_new()));
     if (auto *dict = object<LmDict>(a, TYPE_DICT)) {
@@ -425,22 +469,22 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
       return own(BOX_PTR(result));
     }
     if (name == "_builtin_string_byte_len")
-      return make_i64(string(0) ? string(0)->len : 0);
+      return direct_string_byte_length(arg(0));
     if (name == "_builtin_string_decode_next")
       return make_i64(lm_str_decode_next(string(0), as_i64(arg(1))));
     if (name == "_builtin_string_byte_at")
-      return make_i64(lm_str_byte_at(string(0), as_i64(arg(1))));
+      return direct_string_byte_at(arg(0), as_i64(arg(1)));
     if (name == "_builtin_substring")
       return own(
           BOX_PTR(lm_str_substring(string(0), as_i64(arg(1)), as_i64(arg(2)))));
     if (name == "_builtin_string_index_of")
-      return make_i64(lm_str_index_of(string(0), string(1)));
+      return direct_string_index_of(arg(0), arg(1));
     if (name == "_builtin_string_contains")
-      return lm_str_contains(string(0), string(1)) ? VAL_TRUE : VAL_FALSE;
+      return direct_string_contains(arg(0), arg(1));
     if (name == "_builtin_string_starts_with")
-      return lm_str_starts_with(string(0), string(1)) ? VAL_TRUE : VAL_FALSE;
+      return direct_string_starts_with(arg(0), arg(1));
     if (name == "_builtin_string_ends_with")
-      return lm_str_ends_with(string(0), string(1)) ? VAL_TRUE : VAL_FALSE;
+      return direct_string_ends_with(arg(0), arg(1));
     if (name == "_builtin_string_trim")
       return own(BOX_PTR(lm_str_trim(string(0))));
     if (name == "_builtin_string_to_lower")

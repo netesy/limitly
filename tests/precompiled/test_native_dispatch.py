@@ -40,6 +40,19 @@ extern "C" uint64_t answer(const void*,void*,const uint64_t*,size_t) {{ return (
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn('Dispatch cache invalidation and ABI rejection passed', result.stdout)
 
+    def test_direct_operation_permissions_bounds_and_promotion(self):
+        with tempfile.TemporaryDirectory(prefix='lymar-direct-operations-') as tmp:
+            executable = Path(tmp) / 'check'
+            cxx = shlex.split(os.environ.get('CXX', 'g++'))
+            object_dir = Path(os.environ.get('LYMAR_TEST_OBJECT_DIR', ROOT / 'build/obj/release'))
+            subprocess.run([*cxx, '-std=c++20', '-O2', '-Isrc',
+                            'tests/precompiled/test_direct_operations.cpp',
+                            str(object_dir / 'liblymar.a'), str(object_dir / 'libfyra.a'),
+                            '-lffi', '-ldl', '-pthread', '-o', str(executable)], cwd=ROOT, check=True)
+            result = subprocess.run([str(executable)], text=True, capture_output=True, timeout=30)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn('Direct operation bounds, frame validation, atomic access and promotion passed', result.stdout)
+
     def test_zero_large_arity_and_reentrant_callbacks(self):
         with tempfile.TemporaryDirectory(dir=ROOT / 'build', prefix='dispatch_') as tmp:
             directory = Path(tmp)
@@ -50,7 +63,13 @@ extern "C" uint64_t answer(const void*,void*,const uint64_t*,size_t) {{ return (
             module.write_text('pub fn zero(): int { return 42; }\n'
                               f'pub fn wide({parameters}): int {{ return a0 + a63 + a69; }}\n'
                               'pub fn invoke(callback: fn(int): int, value: int): int {\n'
-                              '    return callback(value) + value;\n}\n')
+                              '    return callback(value) + value;\n}\n'
+                              'pub fn boundaries(): [any] { var xs=[7]; xs[0]=9; append(xs,11); '
+                              'var d={"k":12}; d["k"]=13; return [xs[0],xs[1],xs[-1],xs[99],d["k"],d["missing"]]; }\n'
+                              'pub fn strings(): [any] { return [_builtin_string_contains("abc", "b"), '
+                              '_builtin_string_starts_with("abc", "a"), _builtin_string_ends_with("abc", "c"), '
+                              '_builtin_string_index_of("abc", "b"), _builtin_string_byte_len("abc"), '
+                              '_builtin_string_byte_at("abc", 2)]; }\n')
             check = directory / 'check.lm'
             check.write_text(f'''import build.{name}.{name} as native;
 fn callback(value: int): int {{ return native.zero() + value; }}
@@ -59,6 +78,8 @@ for (var i = 0; i < 20; i = i + 1) {{
     assert(native.wide({arguments}) == 132);
     assert(native.invoke(callback, i) == 42 + i * 2);
 }}
+print(native.boundaries());
+print(native.strings());
 print("DISPATCH_OK");
 ''')
             extension = '.dll' if os.name == 'nt' else ('.dylib' if os.sys.platform == 'darwin' else '.so')
