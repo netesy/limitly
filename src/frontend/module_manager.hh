@@ -8,6 +8,7 @@
 #include <set>
 #include <map>
 #include <mutex>
+#include <atomic>
 #include "ast.hh"
 
 namespace LM {
@@ -83,6 +84,8 @@ public:
     const std::unordered_map<std::string, std::vector<CompiledModuleMeta>>& get_compiled_modules() const {
         return compiled_modules_;
     }
+    // Dispatch facts are valid only for this metadata registration epoch.
+    uint64_t compiled_modules_revision() const { return compiled_modules_revision_counter().load(std::memory_order_acquire); }
     bool register_compiled_module(const CompiledModuleMeta& meta);
     bool find_compiled_module(const std::string& module_name, const std::string& target_triple, const std::string& required_kind, CompiledModuleMeta& out_meta);
     bool is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path);
@@ -98,6 +101,7 @@ public:
         std::lock_guard<std::mutex> lock(modules_mutex_);
         modules_.clear();
         compiled_modules_.clear();
+        compiled_modules_revision_counter().fetch_add(1, std::memory_order_release);
         // Type checking reloads modules after resolution; keep the configured
         // search paths so -I and installed LYMAR_HOME modules remain available.
     }
@@ -108,6 +112,10 @@ private:
     std::unordered_map<std::string, std::shared_ptr<Module>> modules_;
     std::vector<std::string> include_dirs_;
     std::unordered_map<std::string, std::vector<CompiledModuleMeta>> compiled_modules_;
+    static std::atomic<uint64_t>& compiled_modules_revision_counter() {
+        static std::atomic<uint64_t> revision{0};
+        return revision;
+    }
     mutable std::mutex modules_mutex_;
 
     std::shared_ptr<Module> get_module_unlocked(const std::string& name) const;

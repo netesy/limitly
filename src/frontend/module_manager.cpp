@@ -239,6 +239,7 @@ bool ModuleManager::register_compiled_module(const CompiledModuleMeta& meta) {
     auto& variants = compiled_modules_[meta.module_name];
     for (const auto& existing : variants) if (existing.artifact_path == meta.artifact_path) return true;
     variants.push_back(meta);
+    compiled_modules_revision_counter().fetch_add(1, std::memory_order_release);
     return true;
 }
 

@@ -499,6 +499,7 @@ bool emit_shared_module(const LIR::LIR_Function &root,
     emitter.discover(root, module);
     emitter.out << R"CPP(#include <cstdint>
 #include <cstddef>
+#include <array>
 #include <stdexcept>
 #include <vector>
 #include <string_view>
@@ -561,7 +562,9 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
              "if(count!="
           << function.param_count
           << ") throw std::runtime_error(\"Lymar native argument count "
-             "mismatch\"); std::vector<N> native;for(size_t i=0;i<count;i++)native.emplace_back(args[i]);return f"
+             "mismatch\"); std::array<N,"
+          << function.param_count
+          << "> native;for(size_t i=0;i<count;i++)native[i]=N(args[i]);return f"
           << i << "(api,ctx,native.data(),count).boxed(api,ctx); }\n";
     }
     temporary =
