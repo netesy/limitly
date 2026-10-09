@@ -155,12 +155,16 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
   case Helper::FrameGet: {
     auto index = as_i64(b);
     if (index < 0 || static_cast<uint64_t>(index) > UINT32_MAX) throw std::runtime_error("Invalid frame field index");
-    return vm.checked_frame(a, static_cast<uint32_t>(index))->fields[index];
+    return c == 1 ? lm_frame_get_field_atomic(vm.checked_frame(a, static_cast<uint32_t>(index)), static_cast<int>(index))
+                  : vm.checked_frame(a, static_cast<uint32_t>(index))->fields[index];
   }
   case Helper::FrameSet: {
     auto index = as_i64(b);
     if (index < 0 || static_cast<uint64_t>(index) > UINT32_MAX) throw std::runtime_error("Invalid frame field index");
-    vm.checked_frame(a, static_cast<uint32_t>(index))->fields[index] = c;
+    if (text && std::strcmp(text, "atomic") == 0)
+      lm_frame_set_field_atomic(vm.checked_frame(a, static_cast<uint32_t>(index)), static_cast<int>(index), c);
+    else
+      vm.checked_frame(a, static_cast<uint32_t>(index))->fields[index] = c;
     transfer(c, a);
     return VAL_NIL;
   }
@@ -459,10 +463,196 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
   throw std::runtime_error("Unknown native runtime helper");
 }
 } // namespace
+// Direct typed helper implementations for Api struct
+static LmValue rt_list_new(void *ctx) {
+  auto &vm = *static_cast<Machine *>(ctx);
+  auto *list = lm_list_new();
+  LmValue val = BOX_PTR(list);
+  vm.register_native_allocation(val);
+  return val;
+}
+static LmValue rt_list_append(void *ctx, LmValue list, LmValue val) {
+  if (auto *l = object<LmList>(list, TYPE_LIST)) {
+    lm_list_append(l, val);
+    auto &vm = *static_cast<Machine *>(ctx);
+    vm.transfer_native_ownership(val, list);
+    return VAL_NIL;
+  }
+  return helper(ctx, static_cast<uint32_t>(Helper::ListAppend), list, val, 0, nullptr, nullptr, 0);
+}
+static LmValue rt_list_get(void *ctx, LmValue list, LmValue idx) {
+  if (auto *l = object<LmList>(list, TYPE_LIST)) {
+    if (is_integer(idx)) {
+      int64_t i = as_i64(idx);
+      if (i >= 0 && static_cast<uint64_t>(i) < l->size)
+        return l->data[i];
+    }
+  }
+  return helper(ctx, static_cast<uint32_t>(Helper::ListGet), list, idx, 0, nullptr, nullptr, 0);
+}
+static LmValue rt_list_set(void *ctx, LmValue list, LmValue idx, LmValue val) {
+  if (auto *l = object<LmList>(list, TYPE_LIST)) {
+    if (is_integer(idx)) {
+      int64_t i = as_i64(idx);
+      if (i >= 0 && static_cast<uint64_t>(i) < l->size) {
+        l->data[i] = val;
+        auto &vm = *static_cast<Machine *>(ctx);
+        vm.transfer_native_ownership(val, list);
+        return VAL_NIL;
+      }
+    }
+  }
+  return helper(ctx, static_cast<uint32_t>(Helper::ListSet), list, idx, val, nullptr, nullptr, 0);
+}
+static LmValue rt_list_len(void *ctx, LmValue list) {
+  if (auto *l = object<LmList>(list, TYPE_LIST))
+    return make_i64(l->size);
+  return helper(ctx, static_cast<uint32_t>(Helper::ListLen), list, 0, 0, nullptr, nullptr, 0);
+}
+
+static LmValue rt_string_new(void *ctx, const char *text, int64_t len) {
+  auto &vm = *static_cast<Machine *>(ctx);
+  auto *str = lm_str_from_bytes(text, len);
+  LmValue val = BOX_PTR(str);
+  vm.register_native_allocation(val);
+  return val;
+}
+static LmValue rt_string_index(void *ctx, LmValue str, LmValue idx) {
+  if (auto *s = object<LmStringHeader>(str, TYPE_STRING)) {
+    if (is_integer(idx)) {
+      int64_t i = as_i64(idx);
+      if (i >= 0 && static_cast<uint64_t>(i) < s->len)
+        return make_i64(static_cast<unsigned char>(s->data[i]));
+    }
+  }
+  return helper(ctx, static_cast<uint32_t>(Helper::StringIndex), str, idx, 0, nullptr, nullptr, 0);
+}
+static LmValue rt_string_concat(void *ctx, LmValue a, LmValue b) {
+  auto *sa = object<LmStringHeader>(a, TYPE_STRING);
+  auto *sb = object<LmStringHeader>(b, TYPE_STRING);
+  if (sa && sb) {
+    uint64_t len = sa->len + sb->len;
+    auto *res = lm_str_alloc(len);
+    if (res) {
+      if (sa->len) std::memcpy(res->data, sa->data, sa->len);
+      if (sb->len) std::memcpy(res->data + sa->len, sb->data, sb->len);
+      res->len = len;
+      res->data[len] = '\0';
+      auto &vm = *static_cast<Machine *>(ctx);
+      LmValue val = BOX_PTR(res);
+      vm.register_native_allocation(val);
+      return val;
+    }
+  }
+  return helper(ctx, static_cast<uint32_t>(Helper::Concat), a, b, 0, nullptr, nullptr, 0);
+}
+static LmValue rt_string_format(void *ctx, LmValue a, LmValue b) {
+  return helper(ctx, static_cast<uint32_t>(Helper::Format), a, b, 0, nullptr, nullptr, 0);
+}
+
+static LmValue rt_dict_new(void *ctx) {
+  auto &vm = *static_cast<Machine *>(ctx);
+  auto *dict = lm_dict_new(hash_boxed_value, cmp_boxed_value);
+  LmValue val = BOX_PTR(dict);
+  vm.register_native_allocation(val);
+  return val;
+}
+static LmValue rt_dict_get(void *ctx, LmValue dict, LmValue key) {
+  if (auto *d = object<LmDict>(dict, TYPE_DICT))
+    return lm_dict_get(d, key);
+  return helper(ctx, static_cast<uint32_t>(Helper::DictGet), dict, key, 0, nullptr, nullptr, 0);
+}
+static LmValue rt_dict_set(void *ctx, LmValue dict, LmValue key, LmValue val) {
+  if (auto *d = object<LmDict>(dict, TYPE_DICT)) {
+    lm_dict_set(d, key, val);
+    auto &vm = *static_cast<Machine *>(ctx);
+    vm.transfer_native_ownership(key, dict);
+    vm.transfer_native_ownership(val, dict);
+    return VAL_NIL;
+  }
+  return helper(ctx, static_cast<uint32_t>(Helper::DictSet), dict, key, val, nullptr, nullptr, 0);
+}
+static LmValue rt_dict_has(void *ctx, LmValue dict, LmValue key) {
+  if (auto *d = object<LmDict>(dict, TYPE_DICT))
+    return lm_dict_contains(d, key) ? VAL_TRUE : VAL_FALSE;
+  return helper(ctx, static_cast<uint32_t>(Helper::DictHas), dict, key, 0, nullptr, nullptr, 0);
+}
+static LmValue rt_dict_len(void *ctx, LmValue dict) {
+  if (auto *d = object<LmDict>(dict, TYPE_DICT))
+    return make_i64(d->size);
+  return helper(ctx, static_cast<uint32_t>(Helper::DictLen), dict, 0, 0, nullptr, nullptr, 0);
+}
+
+static LmValue rt_tuple_new(void *ctx, int64_t len) {
+  auto &vm = *static_cast<Machine *>(ctx);
+  auto *tuple = lm_tuple_new(len);
+  LmValue val = BOX_PTR(tuple);
+  vm.register_native_allocation(val);
+  return val;
+}
+static LmValue rt_tuple_get(void *ctx, LmValue tuple, LmValue idx) {
+  if (auto *t = object<LmTuple>(tuple, TYPE_TUPLE)) {
+    if (is_integer(idx)) {
+      int64_t i = as_i64(idx);
+      if (i >= 0 && static_cast<uint64_t>(i) < t->size)
+        return lm_tuple_get(t, i);
+    }
+  }
+  return helper(ctx, static_cast<uint32_t>(Helper::TupleGet), tuple, idx, 0, nullptr, nullptr, 0);
+}
+static LmValue rt_tuple_set(void *ctx, LmValue tuple, LmValue idx, LmValue val) {
+  if (auto *t = object<LmTuple>(tuple, TYPE_TUPLE)) {
+    if (is_integer(idx)) {
+      int64_t i = as_i64(idx);
+      if (i >= 0 && static_cast<uint64_t>(i) < t->size) {
+        lm_tuple_set(t, i, val);
+        auto &vm = *static_cast<Machine *>(ctx);
+        vm.transfer_native_ownership(val, tuple);
+        return VAL_NIL;
+      }
+    }
+  }
+  return helper(ctx, static_cast<uint32_t>(Helper::TupleSet), tuple, idx, val, nullptr, nullptr, 0);
+}
+static LmValue rt_tuple_len(void *ctx, LmValue tuple) {
+  if (auto *t = object<LmTuple>(tuple, TYPE_TUPLE))
+    return make_i64(t->size);
+  return helper(ctx, static_cast<uint32_t>(Helper::TupleLen), tuple, 0, 0, nullptr, nullptr, 0);
+}
+
+static LmValue rt_frame_new(void *ctx, const char *name, int64_t fields) {
+  auto &vm = *static_cast<Machine *>(ctx);
+  auto *f = lm_frame_alloc(name, static_cast<int>(fields));
+  LmValue val = BOX_PTR(f);
+  vm.register_native_allocation(val);
+  return val;
+}
+static LmValue rt_frame_get(void *ctx, LmValue frame, int64_t idx) {
+  auto &vm = *static_cast<Machine *>(ctx);
+  if (idx >= 0 && static_cast<uint64_t>(idx) <= UINT32_MAX) {
+    return vm.checked_frame(frame, static_cast<uint32_t>(idx))->fields[idx];
+  }
+  return helper(ctx, static_cast<uint32_t>(Helper::FrameGet), frame, make_i64(idx), 0, nullptr, nullptr, 0);
+}
+static LmValue rt_frame_set(void *ctx, LmValue frame, int64_t idx, LmValue val) {
+  auto &vm = *static_cast<Machine *>(ctx);
+  if (idx >= 0 && static_cast<uint64_t>(idx) <= UINT32_MAX) {
+    vm.checked_frame(frame, static_cast<uint32_t>(idx))->fields[idx] = val;
+    vm.transfer_native_ownership(val, frame);
+    return VAL_NIL;
+  }
+  return helper(ctx, static_cast<uint32_t>(Helper::FrameSet), frame, make_i64(idx), val, nullptr, nullptr, 0);
+}
+
 const Api &host_api() {
-  static const Api api{ABI_VERSION,     sizeof(Api), helper,     make_i64,
-                       make_float,      as_i64,      as_float,   lm_value_eq,
-                       numeric_compare, truthy,      string_data};
+  static const Api api{
+      ABI_VERSION, sizeof(Api), helper, make_i64, make_float, as_i64, as_float,
+      lm_value_eq, numeric_compare, truthy, string_data,
+      rt_list_new, rt_list_append, rt_list_get, rt_list_set, rt_list_len,
+      rt_string_new, rt_string_index, rt_string_concat, rt_string_format,
+      rt_dict_new, rt_dict_get, rt_dict_set, rt_dict_has, rt_dict_len,
+      rt_tuple_new, rt_tuple_get, rt_tuple_set, rt_tuple_len,
+      rt_frame_new, rt_frame_get, rt_frame_set};
   return api;
 }
 } // namespace LM::Backend::Native

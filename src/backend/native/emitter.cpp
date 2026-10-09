@@ -259,70 +259,73 @@ struct Emitter {
         expr = h(Helper::ToString);
         break;
       case Op::STR_CONCAT:
-        expr = h(Helper::Concat);
+        expr = "api->string_concat(ctx," + a + "," + b + ")";
         break;
       case Op::STR_FORMAT:
-        expr = h(Helper::Format);
+        expr = "api->string_format(ctx," + a + "," + b + ")";
         break;
       case Op::StringIndex:
-        expr = h(Helper::StringIndex);
+        expr = "api->string_index(ctx," + a + "," + b + ")";
         break;
       case Op::NewFrame:
-        expr = helper(Helper::FrameNew, integer(inst.imm), "2ULL", "2ULL",
-                      quote(inst.type_name));
+        expr = "api->frame_new(ctx," + quote(inst.type_name) + "," + std::to_string(inst.imm) + "LL)";
         break;
       case Op::FrameGetField:
+        expr = "api->frame_get(ctx," + a + "," + std::to_string(inst.b) + "LL)";
+        break;
       case Op::FrameGetFieldAtomic:
-        expr = helper(Helper::FrameGet, a, integer(inst.b));
+        expr = helper(Helper::FrameGet, a, integer(inst.b), "1ULL");
         break;
       case Op::FrameSetField:
+        expr = "api->frame_set(ctx," + d + "," + std::to_string(inst.a) + "LL," + b + ")";
+        break;
       case Op::FrameSetFieldAtomic:
-        expr = helper(Helper::FrameSet, d, integer(inst.a), b);
+        expr = helper(Helper::FrameSet, d, integer(inst.a), b, "\"atomic\"");
         break;
       case Op::ListCreate:
-        expr = helper(Helper::ListNew);
+        expr = "api->list_new(ctx)";
         break;
       case Op::ListAppend:
-        expr = h(Helper::ListAppend);
+        expr = "api->list_append(ctx," + a + "," + b + ")";
         break;
       case Op::ListIndex:
-        expr = h(Helper::ListGet);
+        expr = "api->list_get(ctx," + a + "," + b + ")";
         break;
       case Op::ListSet:
-        expr = helper(Helper::ListSet, d, a, b);
+        expr = "api->list_set(ctx," + d + "," + a + "," + b + ")";
         break;
       case Op::ListLen:
-        expr = h(Helper::ListLen);
+        expr = "api->list_len(ctx," + a + ")";
         break;
       case Op::DictCreate:
-        expr = helper(Helper::DictNew);
+        expr = "api->dict_new(ctx)";
         break;
       case Op::DictGet:
-        expr = h(Helper::DictGet);
+        expr = "api->dict_get(ctx," + a + "," + b + ")";
         break;
       case Op::DictSet:
-        expr = helper(Helper::DictSet, d, a, b);
+        expr = "api->dict_set(ctx," + d + "," + a + "," + b + ")";
         break;
       case Op::DictHas:
-        expr = h(Helper::DictHas);
+        expr = "api->dict_has(ctx," + a + "," + b + ")";
         break;
       case Op::DictLen:
-        expr = h(Helper::DictLen);
+        expr = "api->dict_len(ctx," + a + ")";
         break;
       case Op::DictItems:
         expr = h(Helper::DictItems);
         break;
       case Op::TupleCreate:
-        expr = helper(Helper::TupleNew, integer(inst.imm));
+        expr = "api->tuple_new(ctx," + std::to_string(inst.imm) + "LL)";
         break;
       case Op::TupleGet:
-        expr = h(Helper::TupleGet);
+        expr = "api->tuple_get(ctx," + a + "," + b + ")";
         break;
       case Op::TupleSet:
-        expr = helper(Helper::TupleSet, d, a, b);
+        expr = "api->tuple_set(ctx," + d + "," + a + "," + b + ")";
         break;
       case Op::TupleLen:
-        expr = h(Helper::TupleLen);
+        expr = "api->tuple_len(ctx," + a + ")";
         break;
       case Op::ConstructOk:
         expr = h(Helper::Ok);
@@ -509,7 +512,12 @@ using V=uint64_t;
 struct Api { uint32_t version; uint32_t size;
 V(*helper)(void*,uint32_t,V,V,V,const char*,const V*,size_t);
 V(*integer)(int64_t); V(*floating)(double); int64_t(*read_int)(V); double(*read_float)(V);
-int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data)(V); };
+int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data)(V);
+V(*list_new)(void*); V(*list_append)(void*,V,V); V(*list_get)(void*,V,V); V(*list_set)(void*,V,V,V); V(*list_len)(void*,V);
+V(*string_new)(void*,const char*,int64_t); V(*string_index)(void*,V,V); V(*string_concat)(void*,V,V); V(*string_format)(void*,V,V);
+V(*dict_new)(void*); V(*dict_get)(void*,V,V); V(*dict_set)(void*,V,V,V); V(*dict_has)(void*,V,V); V(*dict_len)(void*,V);
+V(*tuple_new)(void*,int64_t); V(*tuple_get)(void*,V,V); V(*tuple_set)(void*,V,V,V); V(*tuple_len)(void*,V);
+V(*frame_new)(void*,const char*,int64_t); V(*frame_get)(void*,V,int64_t); V(*frame_set)(void*,V,int64_t,V); };
 )CPP";
     emitter.out << "extern \"C\" __attribute__((visibility(\"default\"))) uint32_t lymar_module_abi_version() { return " << ABI_VERSION << "; }\n";
     emitter.out << "constexpr uint32_t HBuiltin=" << static_cast<unsigned>(Helper::Builtin)
