@@ -1,5 +1,6 @@
 #include "emitter.hh"
 #include "abi.hh"
+#include "scalar_lowering.hh"
 #include "backend/vm/vm_list.hh"
 #include "backend/vm/vm_runtime.hh"
 #include "backend/vm/vm_string.hh"
@@ -41,10 +42,15 @@ struct Emitter {
   std::ostringstream out;
   std::unordered_map<std::string, size_t> names;
   std::vector<const LIR::LIR_Function *> functions;
+  std::unordered_set<size_t> reference_functions;
+  std::string raw(uint32_t r) {
+    return r == UINT32_MAX ? "N(2ULL)" : "r[" + std::to_string(r) + "]";
+  }
   std::string reg(uint32_t r) {
-    return r == UINT32_MAX ? "2ULL" : "r[" + std::to_string(r) + "]";
+    return r == UINT32_MAX ? "2ULL" : raw(r) + ".boxed(api,ctx)";
   }
   std::string integer(int64_t i) {
+    if (fits_smi_i64(i)) return std::to_string(BOX_INT(i)) + "ULL";
     return "api->integer(" + std::to_string(i) + "LL)";
   }
   std::string helper(Helper h, const std::string &a = "2ULL",
@@ -95,6 +101,10 @@ struct Emitter {
         continue;
       names[function->name] = functions.size();
       functions.push_back(function);
+      for (const auto& inst : function->instructions)
+        if (inst.op == LIR::LIR_Op::RefCreate || inst.op == LIR::LIR_Op::RefResolve || inst.op == LIR::LIR_Op::RefMove ||
+            inst.op == LIR::LIR_Op::RefRelease || inst.op == LIR::LIR_Op::OwnershipConsume)
+          reference_functions.insert(functions.size() - 1);
       for (const auto &inst : function->instructions) {
         if (inst.op == LIR::LIR_Op::LoadConst && IS_PTR(inst.const_val)) {
           auto *header = static_cast<ObjHeader *>(UNBOX_PTR(inst.const_val));
@@ -115,8 +125,8 @@ struct Emitter {
   }
   void emit_function(const LIR::LIR_Function &function, size_t id) {
     out << "// " << function.name << "\n";
-    out << "static V f" << id
-        << "(const Api* api,void* ctx,const V* args,size_t count) {\n";
+    out << "static N f" << id
+        << "(const Api* api,void* ctx,const N* args,size_t count) {\n";
     size_t registers = function.register_count + 1;
     for (const auto &inst : function.instructions) {
       for (auto r : {inst.a, inst.b, inst.dst})
@@ -125,43 +135,70 @@ struct Emitter {
       for (auto r : inst.call_args)
         registers = std::max(registers, static_cast<size_t>(r) + 1);
     }
-    out << "V r[" << registers
-        << "]; std::vector<V> staged_params; for(auto& v:r) v=2ULL; for(size_t "
+    out << "N r[" << registers
+        << "]; std::vector<V> staged_params; for(auto& v:r) v=N(2ULL); for(size_t "
            "i=0;i<count && i<"
         << registers << ";++i) r[i]=args[i];\n";
     out << "NativeScope scope(api,ctx);\n";
     using Op = LIR::LIR_Op;
+    const bool references = std::any_of(function.instructions.begin(), function.instructions.end(), [](const auto& in) {
+      return in.op == Op::RefCreate || in.op == Op::RefResolve || in.op == Op::RefMove ||
+             in.op == Op::RefRelease || in.op == Op::OwnershipConsume;
+    });
+    auto numeric_type = [](LIR::Type t) { return t == LIR::Type::F64 || t == LIR::Type::F32 || t == LIR::Type::I64; };
+    auto known_numeric = [&](uint32_t r, LIR::Type hint) {
+      if (numeric_type(hint)) return true;
+      auto it = function.register_types.find(r);
+      return it != function.register_types.end() && numeric_type(it->second);
+    };
+    if (!references) {
+      for (uint32_t param = 0; param < function.param_count; ++param) {
+        auto type = function.register_types.find(param);
+        if (type != function.register_types.end() &&
+            (type->second == LIR::Type::F64 || type->second == LIR::Type::F32))
+          out << raw(param) << ".cache_float(api);\n";
+      }
+    }
     for (size_t i = 0; i < function.instructions.size(); ++i) {
       const auto &inst = function.instructions[i];
       out << "L" << i << ": { ";
       std::string a = reg(inst.a), b = reg(inst.b), d = reg(inst.dst), expr;
       auto h = [&](Helper type) { return helper(type, a, b); };
+      const bool typed = !references && known_numeric(inst.a, inst.type_a) && known_numeric(inst.b, inst.type_b);
+      auto arith = [&](Helper type) {
+        return "arithmetic(api,ctx," + std::to_string(static_cast<unsigned>(type)) + "," + raw(inst.a) + "," + raw(inst.b) + "," + (typed ? "true" : "false") + ")";
+      };
       switch (inst.op) {
       case Op::LoadConst:
-        expr = constant(inst.const_val);
+        if (!references && is_float(inst.const_val)) {
+          std::ostringstream number; number << std::hexfloat << as_float(inst.const_val);
+          expr = "real(api,ctx," + number.str() + ")";
+        } else expr = constant(inst.const_val);
         break;
       case Op::Mov:
       case Op::Copy:
+        expr = raw(inst.a);
+        break;
       case Op::MakeTraitObject:
         expr = a;
         break;
       case Op::Add:
-        expr = h(Helper::Add);
+        expr = arith(Helper::Add);
         break;
       case Op::Sub:
-        expr = h(Helper::Sub);
+        expr = arith(Helper::Sub);
         break;
       case Op::Mul:
-        expr = h(Helper::Mul);
+        expr = arith(Helper::Mul);
         break;
       case Op::Div:
-        expr = h(Helper::Div);
+        expr = arith(Helper::Div);
         break;
       case Op::Mod:
-        expr = h(Helper::Mod);
+        expr = arith(Helper::Mod);
         break;
       case Op::Neg:
-        expr = h(Helper::Neg);
+        expr = "arithmetic(api,ctx," + std::to_string(static_cast<unsigned>(Helper::Sub)) + ",N(1ULL)," + raw(inst.a) + "," + (!references && known_numeric(inst.a, inst.type_a) ? "true" : "false") + ")";
         break;
       case Op::And:
       case Op::Or:
@@ -183,10 +220,10 @@ struct Emitter {
                ")&63))";
         break;
       case Op::CmpEQ:
-        expr = "(api->equal(" + a + "," + b + ")?18ULL:10ULL)";
+        expr = "(equal(api,ctx," + raw(inst.a) + "," + raw(inst.b) + "," + (typed ? "true" : "false") + ")?18ULL:10ULL)";
         break;
       case Op::CmpNEQ:
-        expr = "(!api->equal(" + a + "," + b + ")?18ULL:10ULL)";
+        expr = "(!equal(api,ctx," + raw(inst.a) + "," + raw(inst.b) + "," + (typed ? "true" : "false") + ")?18ULL:10ULL)";
         break;
       case Op::CmpLT:
       case Op::CmpLE:
@@ -196,7 +233,7 @@ struct Emitter {
                          : inst.op == Op::CmpLE ? "<="
                          : inst.op == Op::CmpGT ? ">"
                                                 : ">=";
-        expr = "(api->compare(" + a + "," + b + ")" + op + "0?18ULL:10ULL)";
+        expr = "(compare(api,ctx," + raw(inst.a) + "," + raw(inst.b) + "," + (typed ? "true" : "false") + ")" + op + "0?18ULL:10ULL)";
         break;
       }
       case Op::Jump:
@@ -209,11 +246,14 @@ struct Emitter {
         break;
       case Op::Return:
       case Op::Ret:
-        out << "scope.result=" << a << ";return " << a << ";";
+        out << "scope.result=" << raw(inst.a) << ".value?" << raw(inst.a) << ".value:2ULL;return " << raw(inst.a) << ";";
         break;
       case Op::Cast:
-        expr = helper(Helper::Cast, a,
-                      integer(static_cast<unsigned>(inst.result_type)));
+        expr = helper(Helper::Cast, a, integer(static_cast<unsigned>(inst.result_type)));
+        if (!references && inst.result_type == LIR::Type::I64)
+          expr = "(" + raw(inst.a) + ".floating() && std::isfinite(" + raw(inst.a) + ".number(api)) && " + raw(inst.a) + ".number(api)>=-0x1p60 && " + raw(inst.a) + ".number(api)<0x1p60 ? N((static_cast<V>(static_cast<int64_t>(" + raw(inst.a) + ".number(api)))<<3)|1ULL):N(" + expr + "))";
+        if (!references && (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32))
+          expr = "(" + raw(inst.a) + ".numeric()?real(api,ctx," + raw(inst.a) + ".number(api)):N(" + expr + "))";
         break;
       case Op::ToString:
         expr = h(Helper::ToString);
@@ -325,24 +365,37 @@ struct Emitter {
       case Op::CallVoid:
       case Op::CallBuiltin:
       case Op::CallVariadic: {
-        out << "V argv[] = {";
-        for (auto arg : inst.call_args)
-          out << reg(arg) << ",";
-        out << "2ULL}; ";
         auto target = names.find(inst.func_name);
-        if (target != names.end() && inst.op != Op::CallBuiltin)
-          expr = "f" + std::to_string(target->second) + "(api,ctx,argv," +
-                 std::to_string(inst.call_args.size()) + ")";
-        else
-          expr = helper(Helper::Builtin, "2ULL", "2ULL", "2ULL",
-                        quote(inst.func_name), "argv", inst.call_args.size());
+        const bool internal = target != names.end() && inst.op != Op::CallBuiltin;
+        if (internal) {
+          std::unordered_set<uint32_t> materialized;
+          const auto& callee = *functions[target->second];
+          for (size_t index = 0; index < inst.call_args.size(); ++index) {
+            auto param_type = callee.register_types.find(index);
+            const bool numeric_parameter = param_type != callee.register_types.end() && numeric_type(param_type->second);
+            auto arg = inst.call_args[index];
+            if ((!numeric_parameter || reference_functions.count(target->second)) && materialized.insert(arg).second)
+              out << raw(arg) << "=N(" << reg(arg) << ");";
+          }
+        }
+        out << (internal ? "N" : "V") << " argv[] = {";
+        for (auto arg : inst.call_args) out << (internal ? raw(arg) : reg(arg)) << ",";
+        out << (internal ? "N(2ULL)" : "2ULL") << "}; ";
+        if (internal) {
+          expr = "f" + std::to_string(target->second) + "(api,ctx,argv," + std::to_string(inst.call_args.size()) + ")";
+          if (inst.op != Op::CallVoid && inst.dst != UINT32_MAX && !known_numeric(inst.dst, inst.result_type))
+            expr = "N(" + expr + ".boxed(api,ctx))";
+        } else expr = helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", quote(inst.func_name), "argv", inst.call_args.size());
         break;
       }
       case Op::CallIndirect: {
-        out << "V argv[] = {";
-        for (auto arg : inst.call_args)
-          out << reg(arg) << ",";
-        out << "2ULL}; ";
+        std::unordered_set<uint32_t> materialized;
+        for (auto arg : inst.call_args) if (materialized.insert(arg).second)
+          out << raw(arg) << "=N(" << reg(arg) << ");";
+        out << "N argv[] = {";
+        // Unknown callable effects form an erased boundary.
+        for (auto arg : inst.call_args) out << "N(" << reg(arg) << "),";
+        out << "N(2ULL)}; ";
         expr = "indirect(api,ctx," + a + ",argv," +
                std::to_string(inst.call_args.size()) + ")";
         break;
@@ -384,7 +437,10 @@ struct Emitter {
         break;
       }
       case Op::RegionMove:
-        out << "V argv[]={" << a << "," << integer(inst.imm) << "};";
+        // A virtual scalar has no allocation graph to promote. Boxing it
+        // solely for promotion would allocate an unused object in the parent
+        // region. Keep target validation, passing nil for the absent graph.
+        out << "V argv[]={" << raw(inst.a) << ".value?" << a << ":2ULL," << integer(inst.imm) << "};";
         out << helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_move\"", "argv", 2) << ";";
         break;
       case Op::FrameCallDeinit:
@@ -419,7 +475,13 @@ struct Emitter {
             inst.op == Op::ResourceDestroy || inst.op == Op::CallVoid ||
             inst.op == Op::RegionMove;
         if (inst.dst != UINT32_MAX && !mutation)
-          out << d << "=scope.track(" << expr << ");";
+          {
+            out << raw(inst.dst) << "=scope.track(" << expr << ");";
+            auto type = function.register_types.find(inst.dst);
+            if (!references && (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32 ||
+                (type != function.register_types.end() && (type->second == LIR::Type::F64 || type->second == LIR::Type::F32))))
+              out << raw(inst.dst) << ".cache_float(api);";
+          }
         else out << expr << ";";
       }
       out << " }\n";
@@ -440,6 +502,8 @@ bool emit_shared_module(const LIR::LIR_Function &root,
 #include <stdexcept>
 #include <vector>
 #include <string_view>
+#include <cstring>
+#include <cmath>
 using V=uint64_t;
 struct Api { uint32_t version; uint32_t size;
 V(*helper)(void*,uint32_t,V,V,V,const char*,const V*,size_t);
@@ -447,25 +511,30 @@ V(*integer)(int64_t); V(*floating)(double); int64_t(*read_int)(V); double(*read_
 int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data)(V); };
 )CPP";
     emitter.out << "extern \"C\" __attribute__((visibility(\"default\"))) uint32_t lymar_module_abi_version() { return " << ABI_VERSION << "; }\n";
+    emitter.out << "constexpr uint32_t HBuiltin=" << static_cast<unsigned>(Helper::Builtin)
+        << ", HAdd=" << static_cast<unsigned>(Helper::Add) << ", HSub=" << static_cast<unsigned>(Helper::Sub)
+        << ", HMul=" << static_cast<unsigned>(Helper::Mul) << ", HDiv=" << static_cast<unsigned>(Helper::Div)
+        << ", HMod=" << static_cast<unsigned>(Helper::Mod)
+        << ", HFloat=" << TYPE_FLOAT << ";\n" << scalar_lowering_source;
     emitter.out << "struct NativeScope { const Api* api; void* ctx; V depth; V result=2ULL; "
         "NativeScope(const Api* a,void* c):api(a),ctx(c),depth("
         << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_call_enter\"")
         << "){} V track(V value){ if((value&7ULL)!=0 || !value) return value; V argv[]={value}; return "
         << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_track\"", "argv", 1)
-        << "; } ~NativeScope(){ V argv[]={depth,result}; "
+        << "; } N track(N n){if(n.value)track(n.value);return n;} ~NativeScope(){ V argv[]={depth,result}; "
         << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_call_leave\"", "argv", 2)
         << ";} };\n";
-    emitter.out << "static V indirect(const Api*,void*,V,const V*,size_t);\n";
+    emitter.out << "static N indirect(const Api*,void*,V,const N*,size_t);\n";
     for (size_t i = 0; i < emitter.functions.size(); ++i)
-      emitter.out << "static V f" << i
-                  << "(const Api*,void*,const V*,size_t);\n";
+      emitter.out << "static N f" << i
+                  << "(const Api*,void*,const N*,size_t);\n";
     for (size_t i = 0; i < emitter.functions.size(); ++i)
       emitter.emit_function(*emitter.functions[i], i);
     emitter.out
-        << "static V indirect(const Api* api,void* ctx,V target,const V* "
+        << "static N indirect(const Api* api,void* ctx,V target,const N* "
            "args,size_t count) { std::string_view name=api->string_data("
         << emitter.helper(Helper::CallableName, "target")
-        << "); std::vector<V> bound(args,args+count); if(api->truthy("
+        << "); std::vector<N> bound(args,args+count); if(api->truthy("
         << emitter.helper(Helper::ClosureBound, "target")
         << ")) bound.push_back(target);\n";
     for (size_t i = 0; i < emitter.functions.size(); ++i)
@@ -473,8 +542,8 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
                   << ") return f" << i
                   << "(api,ctx,bound.data(),bound.size());\n";
     emitter.out
-        << "return api->helper(ctx," << static_cast<unsigned>(Helper::Callback)
-        << ",target,2ULL,2ULL,name.data(),bound.data(),bound.size()); }\n";
+        << "std::vector<V> boxed; for(const auto& arg:bound)boxed.push_back(arg.boxed(api,ctx)); return api->helper(ctx," << static_cast<unsigned>(Helper::Callback)
+        << ",target,2ULL,2ULL,name.data(),boxed.data(),boxed.size()); }\n";
     for (size_t i = 0; i < emitter.functions.size(); ++i) {
       const auto &function = *emitter.functions[i];
       if (!function.name.starts_with(module + "."))
@@ -492,8 +561,8 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
              "if(count!="
           << function.param_count
           << ") throw std::runtime_error(\"Lymar native argument count "
-             "mismatch\"); return f"
-          << i << "(api,ctx,args,count); }\n";
+             "mismatch\"); std::vector<N> native;for(size_t i=0;i<count;i++)native.emplace_back(args[i]);return f"
+          << i << "(api,ctx,native.data(),count).boxed(api,ctx); }\n";
     }
     temporary =
         output + ".lymar-" +

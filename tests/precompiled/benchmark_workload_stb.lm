@@ -21,14 +21,17 @@ unsafe {
     assert(handle != nil and handle != 0, "STB failed to load benchmark font");
     var text = ffi.string_to_cstring("The quick brown fox jumps over the lazy dog 1234567890");
     var total_w = 0.0;
+    var workload_start = clock();
     for (var i = 0; i < 50; i = i + 1) {
         total_w = total_w + (ffi.foreign_call(measure,
             [handle, 16.0, ffi.cstring_as_ptr(text)], ffi.TYPE_F32,
             [ffi.TYPE_PTR, ffi.TYPE_F32, ffi.TYPE_PTR]) as float);
     }
+    var workload_ms = (clock() - workload_start) * 1000.0;
     ffi.cstring_free(text);
     ffi.call_void_1(release, handle);
     ffi.library_unload(lib);
     assert(total_w > 0.0, "STB workload did not run");
+    print("WORKLOAD_CPU_MS: {workload_ms}");
     print("WORKLOAD_DONE: {total_w}");
 }

@@ -60,9 +60,9 @@ frame GlyphOutline {
                 var raw_y: [float] = [];
                 var raw_on: [bool] = [];
                 for (var k = 0; k < count; k = k + 1) {
-                    raw_x = raw_x + [pts[k].x];
-                    raw_y = raw_y + [pts[k].y];
-                    raw_on = raw_on + [pts[k].on_curve];
+                    raw_x.append(pts[k].x);
+                    raw_y.append(pts[k].y);
+                    raw_on.append(pts[k].on_curve);
                 }
 
                 var fx: [float] = [];
@@ -75,9 +75,9 @@ frame GlyphOutline {
                         fy = [raw_y[count - 1]];
                         fon = [true];
                         for (var i = 0; i < count - 1; i = i + 1) {
-                            fx = fx + [raw_x[i]];
-                            fy = fy + [raw_y[i]];
-                            fon = fon + [raw_on[i]];
+                            fx.append(raw_x[i]);
+                            fy.append(raw_y[i]);
+                            fon.append(raw_on[i]);
                         }
                     } else {
                         var mid_x = (raw_x[0] + raw_x[count - 1]) * 0.5;
@@ -86,9 +86,9 @@ frame GlyphOutline {
                         fy = [mid_y];
                         fon = [true];
                         for (var i = 0; i < count; i = i + 1) {
-                            fx = fx + [raw_x[i]];
-                            fy = fy + [raw_y[i]];
-                            fon = fon + [raw_on[i]];
+                            fx.append(raw_x[i]);
+                            fy.append(raw_y[i]);
+                            fon.append(raw_on[i]);
                         }
                     }
                 } else {
@@ -109,7 +109,7 @@ frame GlyphOutline {
                     var p1_on = fon[next_idx];
 
                     if (p1_on) {
-                        segments = segments + [LineSegment(curr_x * scale_x, curr_y * scale_y, p1_x * scale_x, p1_y * scale_y)];
+                        segments.append(LineSegment(curr_x * scale_x, curr_y * scale_y, p1_x * scale_x, p1_y * scale_y));
                         curr_x = p1_x;
                         curr_y = p1_y;
                         i = i + 1;
@@ -139,7 +139,7 @@ frame GlyphOutline {
                             var bx = (omt * omt * curr_x) + (2.0 * omt * t_val * p1_x) + (t_val * t_val * end_x);
                             var by = (omt * omt * curr_y) + (2.0 * omt * t_val * p1_y) + (t_val * t_val * end_y);
 
-                            segments = segments + [LineSegment(prev_bx * scale_x, prev_by * scale_y, bx * scale_x, by * scale_y)];
+                            segments.append(LineSegment(prev_bx * scale_x, prev_by * scale_y, bx * scale_x, by * scale_y));
                             prev_bx = bx;
                             prev_by = by;
                         }
@@ -180,7 +180,7 @@ pub fn parse_glyph(reader: r.ByteReader, info: t.FontInfo, glyph_idx: int): Glyp
         // Simple Glyph
         var end_pts: [int] = [];
         for (var i = 0; i < num_contours; i = i + 1) {
-            end_pts = end_pts + [reader.read_u16()];
+            end_pts.append(reader.read_u16());
         }
 
         var num_points = end_pts[num_contours - 1] + 1;
@@ -192,12 +192,12 @@ pub fn parse_glyph(reader: r.ByteReader, info: t.FontInfo, glyph_idx: int): Glyp
         var p = 0;
         while (p < num_points) {
             var flag = reader.read_u8();
-            flags = flags + [flag];
+            flags.append(flag);
             p = p + 1;
             if ((flag & 8) != 0) { // REPEAT flag
                 var repeat_count = reader.read_u8();
                 for (var r_idx = 0; r_idx < repeat_count; r_idx = r_idx + 1) {
-                    flags = flags + [flag];
+                    flags.append(flag);
                     p = p + 1;
                 }
             }
@@ -222,7 +222,7 @@ pub fn parse_glyph(reader: r.ByteReader, info: t.FontInfo, glyph_idx: int): Glyp
                 // If bit 4 is set, dx is 0 (same as previous)
             }
             curr_x = curr_x + dx;
-            x_coords = x_coords + [curr_x];
+            x_coords.append(curr_x);
         }
 
         // Read Y coordinates (delta decoded)
@@ -244,7 +244,7 @@ pub fn parse_glyph(reader: r.ByteReader, info: t.FontInfo, glyph_idx: int): Glyp
                 // If bit 5 is set, dy is 0 (same as previous)
             }
             curr_y = curr_y + dy;
-            y_coords = y_coords + [curr_y];
+            y_coords.append(curr_y);
         }
 
         // Assemble contours
@@ -255,10 +255,10 @@ pub fn parse_glyph(reader: r.ByteReader, info: t.FontInfo, glyph_idx: int): Glyp
             var contour_pts: [Point] = [];
             while (pt_idx <= end_idx) {
                 var on_c = ((flags[pt_idx] & 1) != 0);
-                contour_pts = contour_pts + [Point(x_coords[pt_idx], y_coords[pt_idx], on_c)];
+                contour_pts.append(Point(x_coords[pt_idx], y_coords[pt_idx], on_c));
                 pt_idx = pt_idx + 1;
             }
-            contours = contours + [contour_pts];
+            contours.append(contour_pts);
         }
 
         outline.contours = contours;
@@ -316,9 +316,9 @@ pub fn parse_glyph(reader: r.ByteReader, info: t.FontInfo, glyph_idx: int): Glyp
                     var pt = sub_pts[p_i];
                     var tx = (scale_a * pt.x + scale_c * pt.y) + dx;
                     var ty = (scale_b * pt.x + scale_d * pt.y) + dy;
-                    transformed = transformed + [Point(tx, ty, pt.on_curve)];
+                    transformed.append(Point(tx, ty, pt.on_curve));
                 }
-                composite_contours = composite_contours + [transformed];
+                composite_contours.append(transformed);
             }
 
             more_components = ((comp_flags & 32) != 0); // MORE_COMPONENTS

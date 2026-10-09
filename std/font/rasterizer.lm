@@ -69,7 +69,7 @@ pub fn rasterize_glyph_subpixel(outline: g.GlyphOutline, scale: float, oversampl
         if (sy0 > max_y) max_y = sy0;
         if (sy1 > max_y) max_y = sy1;
 
-        segments = segments + [g.LineSegment(sx0, sy0, sx1, sy1)];
+        segments.append(g.LineSegment(sx0, sy0, sx1, sy1));
     }
 
     var i_min_x = min_x as int;
@@ -94,7 +94,7 @@ pub fn rasterize_glyph_subpixel(outline: g.GlyphOutline, scale: float, oversampl
     var total_pixels = width * height;
     var pixels: [int] = [];
     for (var idx = 0; idx < total_pixels; idx = idx + 1) {
-        pixels = pixels + [0];
+        pixels.append(0);
     }
 
     // Supersampling based on oversample parameters
@@ -106,7 +106,7 @@ pub fn rasterize_glyph_subpixel(outline: g.GlyphOutline, scale: float, oversampl
     var sub_weight = 256 / (sub_y_count * oversample_x);
 
     for (var idx = 0; idx < sub_y_count; idx = idx + 1) {
-        sub_offsets = sub_offsets + [((idx as float) + 0.5) / (sub_y_count as float)];
+        sub_offsets.append(((idx as float) + 0.5) / (sub_y_count as float));
     }
 
     for (var py = 0; py < height; py = py + 1) {
@@ -128,19 +128,32 @@ pub fn rasterize_glyph_subpixel(outline: g.GlyphOutline, scale: float, oversampl
                         if (s.y1 < s.y0) {
                             dir = -1;
                         }
-                        intersections = intersections + [Intersection(ix, dir)];
+                        intersections.append(Intersection(ix, dir));
                     }
                 }
             }
 
-            // Simple bubble sort intersections by X
+            // Ordered scanlines need only a linear check. Preserve the
+            // exchange order for ties: winding spans observe that order.
             var num_inter = len(intersections);
-            for (var a = 0; a < num_inter; a = a + 1) {
-                for (var b = a + 1; b < num_inter; b = b + 1) {
-                    if (intersections[b].x < intersections[a].x) {
-                        var tmp = intersections[a];
-                        intersections[a] = intersections[b];
-                        intersections[b] = tmp;
+            var ordered = true;
+            for (var a = 1; a < num_inter; a = a + 1) {
+                if (intersections[a].x < intersections[a - 1].x) {
+                    ordered = false;
+                    break;
+                }
+            }
+            if (!ordered) {
+                for (var a = 0; a < num_inter; a = a + 1) {
+                    var smallest_x = intersections[a].x;
+                    for (var b = a + 1; b < num_inter; b = b + 1) {
+                        var candidate_x = intersections[b].x;
+                        if (candidate_x < smallest_x) {
+                            var tmp = intersections[a];
+                            intersections[a] = intersections[b];
+                            intersections[b] = tmp;
+                            smallest_x = candidate_x;
+                        }
                     }
                 }
             }
@@ -273,7 +286,7 @@ pub fn rasterize_glyph_sdf(outline: g.GlyphOutline, scale: float, padding: int =
         if (sy0 > max_y) max_y = sy0;
         if (sy1 > max_y) max_y = sy1;
 
-        segments = segments + [g.LineSegment(sx0, sy0, sx1, sy1)];
+        segments.append(g.LineSegment(sx0, sy0, sx1, sy1));
     }
 
     var padding_f = padding as float;
@@ -292,7 +305,7 @@ pub fn rasterize_glyph_sdf(outline: g.GlyphOutline, scale: float, padding: int =
     var total_pixels = width * height;
     var pixels: [int] = [];
     for (var j = 0; j < total_pixels; j = j + 1) {
-        pixels = pixels + [0];
+        pixels.append(0);
     }
 
     for (var py = 0; py < height; py = py + 1) {

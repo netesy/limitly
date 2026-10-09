@@ -324,10 +324,10 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
     return own(result);
   }
   case Helper::Builtin: {
-    const std::string name = text ? text : "";
+    const std::string_view name = text ? text : "";
     auto arg = [&](size_t i) {
       if (i >= count)
-        throw std::runtime_error("Missing native builtin argument: " + name);
+        throw std::runtime_error("Missing native builtin argument: " + std::string(name));
       return args[i];
     };
     auto string = [&](size_t i) {
@@ -361,7 +361,7 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
         std::vector<ValuePtr> values{
             VM::Register::register_to_value_ptr(value)};
         return VM::compiler_value_to_backend_value(
-            LIR::BuiltinUtils::callBuiltinFunction(name, values));
+            LIR::BuiltinUtils::callBuiltinFunction(std::string(name), values));
       }
     }
     if (name == "_builtin_string_hash_bytes") {
@@ -453,7 +453,7 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
     for (size_t i = 0; i < count; ++i)
       values.push_back(VM::Register::register_to_value_ptr(args[i]));
     return own(VM::compiler_value_to_backend_value(
-        LIR::BuiltinUtils::callBuiltinFunction(name, values)));
+        LIR::BuiltinUtils::callBuiltinFunction(std::string(name), values)));
   }
   }
   throw std::runtime_error("Unknown native runtime helper");

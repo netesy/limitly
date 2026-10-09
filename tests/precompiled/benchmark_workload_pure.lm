@@ -16,10 +16,12 @@ match (font.load_font(font_path)) {
     val f => {
         assert(f.is_valid, "Pure Lymar font is invalid");
         var total_w = 0.0;
+        var workload_start = clock();
         for (var i = 0; i < 50; i = i + 1) {
             total_w = total_w + f.text_width("The quick brown fox jumps over the lazy dog 1234567890", 16.0);
         }
         assert(total_w > 0.0, "Pure Lymar workload did not measure any width");
+        print("WORKLOAD_CPU_MS: {(clock() - workload_start) * 1000.0}");
         print("WORKLOAD_DONE: {total_w}");
     },
     err e => {

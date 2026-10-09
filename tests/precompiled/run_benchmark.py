@@ -35,15 +35,20 @@ def workload_result(output):
     return value
 
 
-def run_average(cmd, runs=5, env=None, native=False):
+def run_average(cmd, runs=5, env=None, native=False, iterations=50, workload_times=None):
     times, values = [], []
     for _ in range(runs):
         ms, out, err = measure_run(cmd, env)
         value = workload_result(out)
         if native:
             width_calls = re.findall(r"^PRECOMPILED_CALL: std\.font\.Font\.text_width$", err, re.MULTILINE)
-            if len(width_calls) != 50 or "PRECOMPILED_CALL: std.font.load_font" not in err:
-                raise RuntimeError("Mode B must load the font and execute all 50 text_width calls natively")
+            if len(width_calls) != iterations or "PRECOMPILED_CALL: std.font.load_font" not in err:
+                raise RuntimeError(f"Mode B must load the font and execute all {iterations} text_width calls natively")
+        if workload_times is not None:
+            matches = re.findall(r"^WORKLOAD_CPU_MS: ([+\-0-9.eE]+)$", out, re.MULTILINE)
+            if len(matches) != 1 or not math.isfinite(float(matches[0])) or float(matches[0]) <= 0:
+                raise RuntimeError(f"Missing or invalid timed workload: {out}")
+            workload_times.append(float(matches[0]))
         times.append(ms)
         values.append(value)
     if any(not math.isclose(values[0], v, rel_tol=1e-5, abs_tol=0.01) for v in values):
@@ -91,12 +96,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--font")
     parser.add_argument("--runs", type=int, default=5)
+    parser.add_argument("--iterations", type=int, default=50)
     parser.add_argument("--skip-aot", action="store_true", help="Validate A/B/D only")
     parser.add_argument("--oracle-only", action="store_true", help="Validate A/D without native compilation")
     parser.add_argument("--opt-level", choices=("0", "1", "2", "3"), default="2")
     args = parser.parse_args()
-    if args.runs < 1:
-        parser.error("--runs must be positive")
+    if args.runs < 1 or args.iterations < 1:
+        parser.error("--runs and --iterations must be positive")
     font = resolve_font(args.font)
     windows = os.name == "nt"
     shared_ext = ".dll" if windows else (".dylib" if os.sys.platform == "darwin" else ".so")
@@ -115,13 +121,18 @@ def main():
             start = source.index("var font_path =")
             end = source.index("assert(font_path !=", start)
             source = source[:start] + f'var font_path = "{literal}";\n' + source[end:]
+            source = source.replace('i < 50;', f'i < {args.iterations};')
             path = tmp / f"{kind}.lm"
             path.write_text(source)
             sources.append(str(path))
         rows = {}
-        rows["A. Interpreted Lymar"] = run_average([compiler, "run", sources[0]], args.runs)
+        workload_times = {}
+        def measured(mode, cmd, env=None, native=False):
+            workload_times[mode] = []
+            rows[mode] = run_average(cmd, args.runs, env, native, args.iterations, workload_times[mode])
+        measured("A. Interpreted Lymar", [compiler, "run", sources[0]])
         # D is an em-sized floating-point C oracle, matching std.font semantics.
-        rows["D. STB C oracle"] = run_average([compiler, "run", sources[1]], args.runs)
+        measured("D. STB C oracle", [compiler, "run", sources[1]])
         reference = rows["D. STB C oracle"][1]
         if not math.isclose(rows["A. Interpreted Lymar"][1], reference, rel_tol=1e-5, abs_tol=0.01):
             raise RuntimeError(f"Interpreted width {rows['A. Interpreted Lymar'][1]} differs from oracle {reference}")
@@ -131,7 +142,7 @@ def main():
         shared = ROOT / "bin" / ("libfont" + shared_ext)
         measure_run([compiler, "build", "-O", args.opt_level, "-shared", "std/font/index.lm", "-o", str(shared)], timeout=600)
         native_env = dict(os.environ, LYMAR_DISABLE_INTERPRETER_FALLBACK="1", LYMAR_TRACE_PRECOMPILED="1")
-        rows["B. VM + native font"] = run_average([compiler, "run", sources[0]], args.runs, native_env, native=True)
+        measured("B. VM + native font", [compiler, "run", sources[0]], native_env, native=True)
         native_ms, native_value = rows["B. VM + native font"]
         if not math.isclose(native_value, reference, rel_tol=1e-5, abs_tol=0.01):
             raise RuntimeError(f"Native width {native_value} differs from oracle {reference}")
@@ -142,17 +153,17 @@ def main():
             measure_run([compiler, "build", "-O", args.opt_level, "-static", "std/font/index.lm", "-o", str(static)], timeout=600)
             exe = tmp / ("benchmark.exe" if windows else "benchmark")
             measure_run([compiler, "build", "-O", args.opt_level, sources[0], "-o", str(exe)], timeout=600)
-            rows["C. Native AOT"] = run_average([str(exe)], args.runs)
+            measured("C. Native AOT", [str(exe)])
         reference = rows["D. STB C oracle"][1]
         for mode, (_, value) in rows.items():
             if not math.isclose(value, reference, rel_tol=1e-5, abs_tol=0.01):
                 raise RuntimeError(f"{mode}: result {value} differs from oracle {reference}")
-        print(f"Font: {font}\nCompleted iterations per run: 50")
-        print(f"{'Mode':<28} | {'End-to-end mean (ms)':>20} | {'Total width':>14}")
+        print(f"Font: {font}\nCompleted iterations per run: {args.iterations}")
+        print(f"{'Mode':<28} | {'End-to-end mean (ms)':>20} | {'Workload CPU mean (ms)':>22} | {'Total width':>14}")
         for mode in sorted(rows):
             ms, value = rows[mode]
-            print(f"{mode:<28} | {ms:20.2f} | {value:14.6f}")
-        print("Timings include process startup, font loading, and the workload. No unmeasured phase estimates.")
+            print(f"{mode:<28} | {ms:20.2f} | {statistics.mean(workload_times[mode]):22.2f} | {value:14.6f}")
+        print("End-to-end includes startup and font loading; workload CPU excludes both. Native fallback is disabled.")
 
 
 if __name__ == "__main__":
