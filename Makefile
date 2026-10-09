@@ -54,10 +54,10 @@ endif
 MODE ?= release
 
 ifeq ($(MODE),debug)
-	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol -Ivendor/stb $(if $(wildcard vendor/fyra/include/ir/Module.h),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -g -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol -Ivendor/stb -Ivendor/lyra/include $(if $(wildcard vendor/fyra/include/ir/Module.h),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -g -fPIC -I. -Isrc -Ivendor/sokol -Ivendor/stb
 else
-	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol -Ivendor/stb $(if $(wildcard vendor/fyra/include/ir/Module.h),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
+	CXXFLAGS := -std=c++20 -O2 -Wall -Wextra -Wno-unused-parameter -Wno-unused-variable -I. -Isrc -Ivendor/sokol -Ivendor/stb -Ivendor/lyra/include $(if $(wildcard vendor/fyra/include/ir/Module.h),-DFYRA_AVAILABLE -Ivendor/fyra/include -Ivendor/fyra/src) $(if $(filter windows,$(PLATFORM)),-static-libgcc -static-libstdc++)
 	CFLAGS := -std=c99 -O2 -fPIC -I. -Isrc -Ivendor/sokol -Ivendor/stb
 endif
 
@@ -111,12 +111,14 @@ FYRA_OBJS := $(patsubst $(FYRA_DIR)/src/%.cpp,$(OBJ_DIR)/fyra/%.o,$(FYRA_SRCS))
 FYRA_LIB := $(OBJ_DIR)/libfyra.a
 
 # =============================
-# Lyra Package Manager
+# Lyra Package Manager Library
 # =============================
 LYRA_DIR := vendor/lyra
-LYRA_SRCS := $(if $(wildcard $(LYRA_DIR)/src),\
-             $(call rwildcard,$(LYRA_DIR)/src,*.cpp),)
-LYRA_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_SRCS))
+LYRA_ALL_SRCS := $(if $(wildcard $(LYRA_DIR)/src),\
+                 $(call rwildcard,$(LYRA_DIR)/src,*.cpp),)
+LYRA_LIB_SRCS := $(filter-out $(LYRA_DIR)/src/main.cpp,$(LYRA_ALL_SRCS))
+LYRA_LIB_OBJS := $(patsubst $(LYRA_DIR)/src/%.cpp,$(OBJ_DIR)/lyra/%.o,$(LYRA_LIB_SRCS))
+LYRA_LIB := $(OBJ_DIR)/liblyra.a
 LYRA_BIN := $(BIN_DIR)/lyra$(EXE_EXT)
 
 REGISTER_SRCS := src/backend/native/abi.cpp src/backend/native/emitter.cpp src/backend/vm/resource_manager.cpp src/runtime/sokol/sokol_app_runtime.cpp src/runtime/lymarrt/lymarrt.cpp src/backend/vm/register.cpp src/backend/vm/ops/arithmetic.cpp src/backend/vm/ops/comparison.cpp src/backend/vm/ops/collections.cpp src/backend/vm/ops/frames.cpp src/backend/vm/ops/control_flow.cpp src/backend/vm/ops/io.cpp src/backend/vm/ops/bitwise.cpp src/backend/vm/ops/concurrency.cpp src/backend/vm/ops/modules.cpp src/backend/vm/ops/objects.cpp src/backend/vm/ops/vm_strings.cpp src/backend/vm/ops/vm_calls.cpp src/backend/vm/ops/vm_cast.cpp src/backend/vm/ops/memory.cpp src/backend/vm/ops/construction.cpp src/backend/vm/ops/marshal.cpp src/backend/vm/ops/ffi.cpp src/backend/vm/vm_dict.cpp src/backend/vm/vm_image.cpp src/backend/vm/vm_list.cpp src/backend/vm/vm_runtime.cpp src/backend/vm/vm_string.cpp src/backend/vm/vm_tuple.cpp src/backend/vm/vm_value.cpp
@@ -224,16 +226,23 @@ $(FYRA_LIB):
 endif
 
 # =============================
-# Lyra Package Manager
+# Lyra Package Manager Library & CLI
 # =============================
-$(LYRA_BIN): $(LYRA_OBJS) | $(BIN_DIR)
-	@echo "[BUILD] Building Lyra package manager..."
-	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include $(LYRA_OBJS) -o $@ -lssl -lcrypto
-	@echo "[OK] Lyra built: $@"
+$(LYRA_LIB): $(LYRA_LIB_OBJS)
+	@echo "[BUILD] Building Lyra static library ($@)..."
+	@mkdir -p $(dir $@)
+	@rm -f $@
+	$(AR) rcs $@ $^
+	@echo "[OK] Lyra library built: $@"
+
+$(LYRA_BIN): $(OBJ_DIR)/lyra/main.o $(LYRA_LIB) | $(BIN_DIR)
+	@echo "[BUILD] Building thin Lyra CLI binary..."
+	$(CXX) $(CXXFLAGS) $< $(LYRA_LIB) -o $@ -lssl -lcrypto -lpthread
+	@echo "[OK] Lyra binary built: $@"
 
 $(OBJ_DIR)/lyra/%.o: $(LYRA_DIR)/src/%.cpp | $(OBJ_DIR)
 	@mkdir -p $(dir $@)
-	$(CXX) -std=c++17 -Wall -Wextra -I$(LYRA_DIR)/include -c $< -o $@
+	$(CXX) $(CXXFLAGS) -I$(LYRA_DIR)/include -c $< -o $@
 
 # =============================
 # Response files generation
@@ -249,22 +258,22 @@ $(TEST_RSP): $(TEST_OBJS) | $(RSP_DIR)
 # =============================
 # Build targets
 # =============================
-liblymar: $(OBJ_DIR)/liblymar.a
+liblymar: $(OBJ_DIR)/liblymar.a $(LYRA_LIB)
 
-$(OBJ_DIR)/liblymar.a: $(LIB_LYMAR_OBJS) $(FYRA_LIB)
+$(OBJ_DIR)/liblymar.a: $(LIB_LYMAR_OBJS) $(FYRA_LIB) $(LYRA_LIB)
 	@echo "[BUILD] Building liblymar.a ..."
 	@mkdir -p $(dir $@)
 	@rm -f $@
-	$(AR) rcs $@ $(LIB_LYMAR_OBJS)
+	$(AR) rcs $@ $(LIB_LYMAR_OBJS) $(LYRA_LIB_OBJS)
 
 windows: $(BIN_DIR) $(MAIN_RSP) liblymar $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a
 	@echo "[BUILD] Linking lymar.exe ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto
 	@echo "[OK] lymar.exe built."
 
-linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(BIN_DIR)/liblymar_aot.a
+linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a
 	@echo "[BUILD] Linking lymar ..."
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lpthread
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto -lpthread
 	@echo "[OK] lymar built."
 
 $(BIN_DIR)/liblymar_aot.a: $(OBJ_DIR)/src/memory/aot_runtime.o Makefile | $(BIN_DIR)

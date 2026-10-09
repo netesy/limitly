@@ -1,5 +1,6 @@
 #include "lymar.hh"
 #include "frontend/module_manager.hh"
+#include "lyra_api.hh"
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -35,6 +36,15 @@ void printUsage(const char* programName) {
 #else
     std::cout << "    (AOT/WASM compilation disabled - Fyra backend not available)\n";
 #endif
+    std::cout << "\n  Package Management (Lyra):\n";
+    std::cout << "    " << programName << " init                 Initialize a new package\n";
+    std::cout << "    " << programName << " update               Update package dependencies and lockfile\n";
+    std::cout << "    " << programName << " add <pkg>            Add a package dependency\n";
+    std::cout << "    " << programName << " publish              Publish package to index\n";
+    std::cout << "    " << programName << " pack                 Package project into tarball\n";
+    std::cout << "    " << programName << " install <tarball>    Install package tarball\n";
+    std::cout << "    " << programName << " deps / tree / why   Display dependency analysis\n";
+    std::cout << "    " << programName << " doctor / env / audit Diagnostics and audit\n";
     std::cout << "\n  Tooling:\n";
     std::cout << "    " << programName << " -lsp                 Start LSP server\n";
     std::cout << "    " << programName << " -format <file>       Format a source file\n";
@@ -86,6 +96,23 @@ int main(int argc, char* argv[]) {
     if (command == "-fyra-ir" && argc >= 3) { options.print_fyra_ir = true; return LM::Compiler::executeFile(argv[2], options); }
 #endif
 
+    // Package management subcommands forwarded in-process to Lyra
+    if (command == "init") return Lyra::handle_init();
+    if (command == "update") return Lyra::handle_update(argc, argv);
+    if (command == "add") return Lyra::handle_add(argc, argv);
+    if (command == "publish") return Lyra::handle_publish(argc, argv);
+    if (command == "pack") return Lyra::handle_pack(argc, argv);
+    if (command == "install") return Lyra::handle_install(argc, argv);
+    if (command == "search") return Lyra::handle_search(argc, argv);
+    if (command == "info") return Lyra::handle_info(argc, argv);
+    if (command == "deps") return Lyra::handle_deps(argc, argv);
+    if (command == "tree") return Lyra::handle_tree(argc, argv);
+    if (command == "why") return Lyra::handle_why(argc, argv);
+    if (command == "doctor") return Lyra::handle_doctor();
+    if (command == "env") return Lyra::handle_env();
+    if (command == "audit") return Lyra::handle_audit(argc, argv);
+    if (command == "clean") return Lyra::handle_clean();
+
     if (command == "run") {
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
@@ -98,6 +125,10 @@ int main(int argc, char* argv[]) {
         if (source_file.empty()) {
             return 1;
         }
+        // In-process Lyra dependency resolution
+        auto pkg_dirs = Lyra::resolve_package_include_dirs(".");
+        options.include_dirs.insert(options.include_dirs.end(), pkg_dirs.begin(), pkg_dirs.end());
+
         return LM::Compiler::executeFile(source_file, options);
     }
 
@@ -138,6 +169,9 @@ int main(int argc, char* argv[]) {
             std::cerr << "Unsupported architecture: " << options.arch << '\n';
             return 1;
         }
+        // In-process Lyra dependency resolution
+        auto pkg_dirs = Lyra::resolve_package_include_dirs(".");
+        options.include_dirs.insert(options.include_dirs.end(), pkg_dirs.begin(), pkg_dirs.end());
         if (options.output_file.empty()) {
             options.output_file = source_file;
             size_t dot = options.output_file.rfind(".lm");
