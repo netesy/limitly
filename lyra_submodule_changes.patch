@@ -1,0 +1,240 @@
+diff --git a/include/lyra_api.hh b/include/lyra_api.hh
+new file mode 100644
+index 0000000..830c468
+--- /dev/null
++++ b/include/lyra_api.hh
+@@ -0,0 +1,39 @@
++#ifndef LYRA_API_HH
++#define LYRA_API_HH
++
++#include <string>
++#include <vector>
++#include "handlers.hh"
++
++namespace Lyra {
++
++// In-process package dependency resolution API
++std::vector<std::string> resolve_package_include_dirs(const std::string& project_dir = ".",
++                                                       const std::vector<std::string>& enabled_features = {});
++
++// Lyra command handlers for CLI forwarding
++inline int handle_init() { return ::handle_init(); }
++inline int handle_run(int argc, char** argv) { return ::handle_run(argc, argv); }
++inline int handle_build(int argc, char** argv) { return ::handle_build(argc, argv); }
++inline int handle_update(int argc, char** argv) { return ::handle_update(argc, argv); }
++inline int handle_add(int argc, char** argv) { return ::handle_add(argc, argv); }
++inline int handle_link(int argc, char** argv) { return ::handle_link(argc, argv); }
++inline int handle_publish(int argc, char** argv) { return ::handle_publish(argc, argv); }
++inline int handle_pack(int argc, char** argv) { return ::handle_pack(argc, argv); }
++inline int handle_install(int argc, char** argv) { return ::handle_install(argc, argv); }
++inline int handle_search(int argc, char** argv) { return ::handle_search(argc, argv); }
++inline int handle_info(int argc, char** argv) { return ::handle_info(argc, argv); }
++inline int handle_test(int argc, char** argv) { return ::handle_test(argc, argv); }
++inline int handle_deps(int argc, char** argv) { return ::handle_deps(argc, argv); }
++inline int handle_tree(int argc, char** argv) { return ::handle_tree(argc, argv); }
++inline int handle_why(int argc, char** argv) { return ::handle_why(argc, argv); }
++inline int handle_clean() { return ::handle_clean(); }
++inline int handle_cache_clear() { return ::handle_cache_clear(); }
++inline int handle_doctor() { return ::handle_doctor(); }
++inline int handle_env() { return ::handle_env(); }
++inline int handle_audit(int argc, char** argv) { return ::handle_audit(argc, argv); }
++inline int handle_bench(int argc, char** argv) { return ::handle_bench(argc, argv); }
++
++} // namespace Lyra
++
++#endif
+diff --git a/include/lyra_common.hh b/include/lyra_common.hh
+index 7d9e910..c275d90 100644
+--- a/include/lyra_common.hh
++++ b/include/lyra_common.hh
+@@ -63,13 +63,15 @@ inline std::string get_default_index_url() {
+ }
+ 
+ inline std::string find_compiler_path() {
++    if (const char* configured = std::getenv("LYMAR_EXECUTABLE"); configured && *configured)
++        return configured;
+     // 1. Check directory where lyra binary itself is located
+ #ifdef _WIN32
+     char exe_buf[MAX_PATH];
+     if (GetModuleFileNameA(NULL, exe_buf, MAX_PATH)) {
+         fs::path self_dir = fs::path(exe_buf).parent_path();
+-        if (fs::exists(self_dir / "limitly.exe")) {
+-            return (self_dir / "limitly.exe").string();
++        if (fs::exists(self_dir / "lymar.exe")) {
++            return (self_dir / "lymar.exe").string();
+         }
+     }
+ #endif
+@@ -77,17 +79,17 @@ inline std::string find_compiler_path() {
+     // 2. Check REPOROOT environment variable
+     char* root_dir = getenv("REPOROOT");
+     if (root_dir) {
+-        fs::path p = fs::path(root_dir) / "bin" / ("limitly" LYRA_EXE_SUFFIX);
++        fs::path p = fs::path(root_dir) / "bin" / ("lymar" LYRA_EXE_SUFFIX);
+         if (fs::exists(p)) {
+             return p.string();
+         }
+     }
+ 
+-    // 3. Search upwards from current directory for bin/limitly
++    // 3. Search upwards from current directory for bin/lymar
+     try {
+         fs::path cur = fs::current_path();
+         while (true) {
+-            fs::path candidate = cur / "bin" / ("limitly" LYRA_EXE_SUFFIX);
++            fs::path candidate = cur / "bin" / ("lymar" LYRA_EXE_SUFFIX);
+             if (fs::exists(candidate)) {
+                 return candidate.string();
+             }
+@@ -97,9 +99,9 @@ inline std::string find_compiler_path() {
+     } catch (...) {}
+ 
+ #ifdef _WIN32
+-    return "limitly.exe";
++    return "lymar.exe";
+ #else
+-    return "limitly";
++    return "lymar";
+ #endif
+ }
+ 
+diff --git a/include/resolver.hh b/include/resolver.hh
+index ead2aed..eb95440 100644
+--- a/include/resolver.hh
++++ b/include/resolver.hh
+@@ -13,6 +13,7 @@
+ #include <filesystem>
+ #include <iostream>
+ #include <algorithm>
++#include <stdexcept>
+ 
+ namespace fs = std::filesystem;
+ 
+@@ -41,11 +42,13 @@ private:
+                                 std::set<std::string>& visited,
+                                 const std::vector<std::string>& enabled_features) {
+         
+-        std::string abs_path = fs::absolute(current_path).string();
++        std::string abs_path = fs::weakly_canonical(current_path).string();
++        if (!fs::is_regular_file(fs::path(abs_path) / "lymar.nol"))
++            throw std::runtime_error("Missing dependency manifest: " + abs_path);
+         
+         if (visiting.count(abs_path)) {
+             std::cerr << "error: circular dependency detected involving '" << abs_path << "'\n";
+-            exit(1);
++            throw std::runtime_error("Dependency resolution failed");
+         }
+         
+         if (visited.count(abs_path)) return;
+@@ -54,9 +57,7 @@ private:
+         
+         PackageMetadata meta = ConfigParser::parse(current_path + "/lymar.nol");
+         if (meta.name.empty()) {
+-            visiting.erase(abs_path);
+-            visited.insert(abs_path);
+-            return;
++            throw std::runtime_error("Invalid package manifest: " + abs_path);
+         }
+ 
+         for (auto const& [name, dep] : meta.dependencies) {
+@@ -79,7 +80,7 @@ private:
+                 dep_path = FetchSystem::fetch_git(name, dep.git, dep.tag);
+                 if (dep_path.empty()) {
+                     std::cerr << "error: failed to fetch git dependency '" << name << "'\n";
+-                    exit(1);
++                    throw std::runtime_error("Dependency resolution failed");
+                 }
+             } else if (!dep.version.empty()) {
+                 dep_path = IndexClient::fetch(name, dep.version);
+@@ -92,7 +93,7 @@ private:
+                 }
+                 if (dep_path.empty()) {
+                     std::cerr << "error: failed to resolve and fetch dependency '" << name << "@" << dep.version << "'\n";
+-                    exit(1);
++                    throw std::runtime_error("Dependency resolution failed");
+                 }
+             }
+ 
+@@ -104,7 +105,7 @@ private:
+                     if (!Semver::satisfies(dep_meta.version, dep.version)) {
+                         std::cerr << "error: dependency version mismatch for '" << name << "'. "
+                                   << "Required " << dep.version << ", found " << dep_meta.version << "\n";
+-                        exit(1);
++                        throw std::runtime_error("Dependency resolution failed");
+                     }
+                 }
+ 
+diff --git a/src/api.cpp b/src/api.cpp
+new file mode 100644
+index 0000000..63c8ea8
+--- /dev/null
++++ b/src/api.cpp
+@@ -0,0 +1,43 @@
++#include "lyra_api.hh"
++#include "config_parser.hh"
++#include "resolver.hh"
++#include "lock_system.hh"
++#include <filesystem>
++#include <stdexcept>
++
++namespace fs = std::filesystem;
++
++namespace Lyra {
++
++std::vector<std::string> resolve_package_include_dirs(const std::string& project_dir,
++                                                       const std::vector<std::string>& enabled_features) {
++    std::vector<std::string> include_dirs;
++    fs::path dir(project_dir);
++    if (!fs::exists(dir / "lymar.nol")) {
++        return include_dirs;
++    }
++
++        PackageMetadata meta = ConfigParser::parse((dir / "lymar.nol").string());
++        if (meta.name.empty()) {
++            throw std::runtime_error("Invalid package manifest: " + (dir / "lymar.nol").string());
++        }
++
++        std::vector<ResolvedDependency> deps = DependencyResolver::resolve(project_dir, enabled_features);
++        LockSystem::generate_lockfile(project_dir, deps);
++
++        for (const auto& dep : deps) {
++            if (!fs::is_regular_file(fs::path(dep.path) / "lymar.nol"))
++                throw std::runtime_error("Missing dependency manifest: " + dep.path);
++            if (fs::exists(dep.path)) {
++                include_dirs.push_back(dep.path);
++                fs::path src_path = fs::path(dep.path) / "src";
++                if (fs::exists(src_path)) {
++                    include_dirs.push_back(src_path.string());
++                }
++            }
++        }
++
++    return include_dirs;
++}
++
++} // namespace Lyra
+diff --git a/src/main.cpp b/src/main.cpp
+index 05355c0..cf5ad55 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -30,7 +30,7 @@ void print_help() {
+     std::cout << "  help    Show this help message\n";
+ }
+ 
+-int main(int argc, char** argv) {
++static int dispatch(int argc, char** argv) {
+     if (argc < 2) {
+         print_help();
+         return 0;
+@@ -87,3 +87,11 @@ int main(int argc, char** argv) {
+     print_help();
+     return 1;
+ }
++
++int main(int argc, char** argv) {
++    try { return dispatch(argc, argv); }
++    catch (const std::exception& error) {
++        std::cerr << "Package command failed: " << error.what() << "\n";
++        return 1;
++    }
++}
