@@ -64,7 +64,7 @@ extern "C" uint64_t answer(const void*,void*,const uint64_t*,size_t) {{ return (
                               f'pub fn wide({parameters}): int {{ return a0 + a63 + a69; }}\n'
                               'pub fn invoke(callback: fn(int): int, value: int): int {\n'
                               '    return callback(value) + value;\n}\n'
-                              'pub fn boundaries(): [any] { var xs=[7]; xs[0]=9; append(xs,11); '
+                              'pub fn boundaries(): [any] { var xs=[7]; xs[0]=9; xs.append(11); '
                               'var d={"k":12}; d["k"]=13; return [xs[0],xs[1],xs[-1],xs[99],d["k"],d["missing"]]; }\n'
                               'pub fn strings(): [any] { return [_builtin_string_contains("abc", "b"), '
                               '_builtin_string_starts_with("abc", "a"), _builtin_string_ends_with("abc", "c"), '

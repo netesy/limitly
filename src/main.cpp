@@ -1,5 +1,7 @@
 #include "lymar.hh"
 #include "frontend/module_manager.hh"
+#include "lyra_api.hh"
+#include <filesystem>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -35,6 +37,15 @@ void printUsage(const char* programName) {
 #else
     std::cout << "    (AOT/WASM compilation disabled - Fyra backend not available)\n";
 #endif
+    std::cout << "\n  Package Management (Lyra):\n";
+    std::cout << "    " << programName << " init                 Initialize a new package\n";
+    std::cout << "    " << programName << " update               Update package dependencies and lockfile\n";
+    std::cout << "    " << programName << " add <pkg>            Add a package dependency\n";
+    std::cout << "    " << programName << " publish              Publish package to index\n";
+    std::cout << "    " << programName << " pack                 Package project into tarball\n";
+    std::cout << "    " << programName << " install <tarball>    Install package tarball\n";
+    std::cout << "    " << programName << " deps / tree / why   Display dependency analysis\n";
+    std::cout << "    " << programName << " doctor / env / audit Diagnostics and audit\n";
     std::cout << "\n  Tooling:\n";
     std::cout << "    " << programName << " -lsp                 Start LSP server\n";
     std::cout << "    " << programName << " -format <file>       Format a source file\n";
@@ -58,6 +69,7 @@ int main(int argc, char* argv[]) {
     std::string command = argv[1];
     LM::CompileOptions options;
     std::string source_file;
+    std::vector<std::string> package_features;
 
     if (command == "-lsp") {
         LM::LSP::run();
@@ -86,18 +98,55 @@ int main(int argc, char* argv[]) {
     if (command == "-fyra-ir" && argc >= 3) { options.print_fyra_ir = true; return LM::Compiler::executeFile(argv[2], options); }
 #endif
 
+    try {
+    // Package management subcommands forwarded in-process to Lyra
+    if (command == "init") return Lyra::handle_init();
+    if (command == "update") return Lyra::handle_update(argc, argv);
+    if (command == "add") return Lyra::handle_add(argc, argv);
+    if (command == "link") return Lyra::handle_link(argc, argv);
+    if (command == "publish") return Lyra::handle_publish(argc, argv);
+    if (command == "pack") return Lyra::handle_pack(argc, argv);
+    if (command == "install") return Lyra::handle_install(argc, argv);
+    if (command == "search") return Lyra::handle_search(argc, argv);
+    if (command == "info") return Lyra::handle_info(argc, argv);
+    if (command == "deps") return Lyra::handle_deps(argc, argv);
+    if (command == "tree") return Lyra::handle_tree(argc, argv);
+    if (command == "why") return Lyra::handle_why(argc, argv);
+    if (command == "doctor") return Lyra::handle_doctor();
+    if (command == "env") return Lyra::handle_env();
+    if (command == "audit") return Lyra::handle_audit(argc, argv);
+    if (command == "clean") return Lyra::handle_clean();
+
+    } catch (const std::exception& error) {
+        std::cerr << "Package command failed: " << error.what() << '\n';
+        return 1;
+    }
+
     if (command == "run") {
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
             if (arg == "-I" && i + 1 < argc) options.include_dirs.push_back(argv[++i]);
+            else if (arg == "--features" && i + 1 < argc) {
+                std::stringstream input(argv[++i]);
+                std::string feature;
+                while (std::getline(input, feature, ',')) package_features.push_back(feature);
+            }
             else if (arg == "-debug") options.debug = true;
             else if (arg == "--verify=strict") options.strict_verification = true;
             else if (arg == "--verify=hybrid") options.strict_verification = false;
             else if (arg[0] != '-') source_file = arg;
         }
-        if (source_file.empty()) {
+        if (source_file.empty() && std::filesystem::exists("lymar.nol")) source_file = "src/main.lm";
+        if (source_file.empty()) return 1;
+        // In-process Lyra dependency resolution
+        try {
+            auto pkg_dirs = Lyra::resolve_package_include_dirs(".", package_features);
+            options.include_dirs.insert(options.include_dirs.end(), pkg_dirs.begin(), pkg_dirs.end());
+        } catch (const std::exception& error) {
+            std::cerr << "Package resolution failed: " << error.what() << '\n';
             return 1;
         }
+
         return LM::Compiler::executeFile(source_file, options);
     }
 
@@ -107,6 +156,11 @@ int main(int argc, char* argv[]) {
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
             if (arg == "-I" && i + 1 < argc) options.include_dirs.push_back(argv[++i]);
+            else if (arg == "--features" && i + 1 < argc) {
+                std::stringstream input(argv[++i]);
+                std::string feature;
+                while (std::getline(input, feature, ',')) package_features.push_back(feature);
+            }
             else if (arg == "-target" && i + 1 < argc) options.target = argv[++i];
             else if (arg == "--verify=strict") options.strict_verification = true;
             else if (arg == "--verify=hybrid") options.strict_verification = false;
@@ -132,10 +186,19 @@ int main(int argc, char* argv[]) {
             else if (arg == "0" || arg == "1" || arg == "2" || arg == "3") options.opt_level = std::stoi(arg);
             else if (arg[0] != '-') source_file = arg;
         }
+        if (source_file.empty() && std::filesystem::exists("lymar.nol")) source_file = "src/main.lm";
         if (source_file.empty()) return 1;
         if (options.arch != "x86_64" && options.arch != "aarch64" &&
             options.arch != "riscv64" && options.arch != "wasm32") {
             std::cerr << "Unsupported architecture: " << options.arch << '\n';
+            return 1;
+        }
+        // In-process Lyra dependency resolution
+        try {
+            auto pkg_dirs = Lyra::resolve_package_include_dirs(".", package_features);
+            options.include_dirs.insert(options.include_dirs.end(), pkg_dirs.begin(), pkg_dirs.end());
+        } catch (const std::exception& error) {
+            std::cerr << "Package resolution failed: " << error.what() << '\n';
             return 1;
         }
         if (options.output_file.empty()) {
