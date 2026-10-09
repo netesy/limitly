@@ -22,43 +22,36 @@ MemoryCheckResult MemoryChecker::check_program(std::shared_ptr<LM::Frontend::AST
         return result;
     }
     
+    if (!program->ownership_facts || !program->ownership_facts->verified) {
+        MemoryCheckResult result; result.success = false; result.program = program;
+        result.errors.push_back("Missing or invalid authoritative ownership facts from semantic analysis");
+        return result;
+    }
+
     // Initialize state
+    ownership_facts = program->ownership_facts;
     current_source = source;
     current_file_path = filename;
     errors.clear();
     warnings.clear();
-    variable_regions.clear();
-    moved_variables.clear();
-    initialized_variables.clear();
-    variable_generations.clear();
-    variable_generation_info.clear();
-    reference_chain.clear();
-    generation_history.clear();
+    constant_variables.clear();
     atomic_variables.clear();
+    active_parallel_slices.clear();
     current_region_id = 0;
     current_generation = 0;
-    current_scope_depth = 0;
-    region_stack.clear();
-    generation_stack_history.clear();
     
     // Don't reset Debugger error state to avoid clearing type checker errors
     
     // Enter initial memory region
     enter_memory_region();
     
-    // Mark imported symbols and function declarations as initialized
-    for (const auto& [name, stmt] : program->imported_symbols) { 
-        initialized_variables.insert(name); 
-    }
-    for (auto& stmt : program->statements) {
-        if (auto func = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) { 
-            initialized_variables.insert(func->name); 
-        }
-    }
-    
     // Check all statements for memory safety
     for (auto& stmt : program->statements) {
-        check_statement(stmt);
+        // Declarations are not executions: inspect their bodies after global
+        // bindings have been collected, in the isolated invocation context.
+        if (!std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt) &&
+            !std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt))
+            check_statement(stmt);
         // Only attach memory_info to statements that represent actual region boundaries
         // Block statements, function declarations, etc.
         if (auto block = std::dynamic_pointer_cast<LM::Frontend::AST::BlockStatement>(stmt)) {
@@ -69,8 +62,13 @@ MemoryCheckResult MemoryChecker::check_program(std::shared_ptr<LM::Frontend::AST
         // TODO: Add other statement types that represent region boundaries
     }
     
+    for (const auto& stmt : program->statements) {
+        if (std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt) ||
+            std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt))
+            check_statement(stmt);
+    }
+
     // Exit initial region
-    exit_memory_region();
     
     // Create result
     MemoryCheckResult result;
@@ -89,7 +87,43 @@ MemoryCheckResult MemoryChecker::check_program(std::shared_ptr<LM::Frontend::AST
 void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
     if (!stmt) return;
     
-    if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
+    // Analyze callable bodies in an isolated invocation context. Checking a
+    // declaration must not execute its ownership effects on enclosing bindings.
+    auto check_body = [&](const std::shared_ptr<AST::BlockStatement>& body,
+                          const auto& parameters) {
+        if (!body) return;
+        MemoryChecker invocation = *this;
+        const size_t old_errors = invocation.errors.size();
+        const size_t old_warnings = invocation.warnings.size();
+        invocation.active_parallel_slices.clear();
+        invocation.enter_memory_region();
+        for (const auto& parameter : parameters) {
+            invocation.constant_variables.erase(parameter.first);
+            invocation.atomic_variables.erase(parameter.first);
+        }
+        invocation.check_statement(body);
+        errors.insert(errors.end(), invocation.errors.begin() + old_errors, invocation.errors.end());
+        warnings.insert(warnings.end(), invocation.warnings.begin() + old_warnings, invocation.warnings.end());
+    };
+    if (auto function = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) {
+        auto parameters = function->params;
+        for (const auto& optional : function->optionalParams)
+            parameters.emplace_back(optional.first, optional.second.first);
+        check_body(function->body, parameters);
+    } else if (auto frame = std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt)) {
+        auto check_method = [&](const std::shared_ptr<AST::FrameMethod>& method) {
+            if (!method) return;
+            auto parameters = method->parameters;
+            for (const auto& optional : method->optionalParams)
+                parameters.emplace_back(optional.first, optional.second.first);
+            check_body(method->body, parameters);
+        };
+        check_method(frame->init);
+        check_method(frame->deinit);
+        for (const auto& method : frame->methods) check_method(method);
+    } else if (auto unsafe = std::dynamic_pointer_cast<AST::UnsafeStatement>(stmt)) {
+        check_statement(unsafe->body);
+    } else if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
         check_var_declaration(var_decl);
     } else if (auto assignment = std::dynamic_pointer_cast<LM::Frontend::AST::AssignExpr>(stmt)) {
         check_assignment(assignment);
@@ -120,34 +154,10 @@ void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement
             check_expression(return_stmt->value);
             
             // If returning a variable, mark it as escaped
-            // The ownership transfers to the caller, so the callee's region cannot reclaim it
-            if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(return_stmt->value)) {
-                mark_variable_escaped(var_expr->name);
-            }
         }
     } else if (auto iter_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::IterStatement>(stmt)) {
         // Handle iter statement - check the iterable and body
         check_expression(iter_stmt->iterable);
-        
-        // Mark loop variables as initialized (they are implicitly initialized by the loop)
-        for (const auto& loop_var : iter_stmt->loopVars) {
-            mark_variable_initialized(loop_var);
-            
-            // Create generation info for loop variable if it doesn't exist
-            if (variable_generation_info.find(loop_var) == variable_generation_info.end()) {
-                GenerationInfo gen_info;
-                gen_info.region_id = current_region_id;
-                gen_info.generation = current_generation;
-                gen_info.is_linear = false;  // Loop variables are typically not linear
-                gen_info.ownership_state = OwnershipState::Valid;
-                gen_info.scope_depth = current_scope_depth;
-                variable_generation_info[loop_var] = gen_info;
-                variable_regions[loop_var] = current_region_id;
-                variable_generations[loop_var] = current_generation;
-            } else {
-                variable_generation_info[loop_var].ownership_state = OwnershipState::Valid;
-            }
-        }
         
         check_statement(iter_stmt->body);
     } else if (auto staged_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::StagedStatement>(stmt)) {
@@ -166,24 +176,12 @@ void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement
         if (parallel_stmt->body) check_statement(parallel_stmt->body);
         active_parallel_slices.clear();
     } else if (auto task_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::TaskStatement>(stmt)) {
-        if (!task_stmt->loopVar.empty()) {
-            mark_variable_initialized(task_stmt->loopVar);
-            variable_regions[task_stmt->loopVar] = current_region_id;
-            variable_generations[task_stmt->loopVar] = current_generation;
-            variable_generation_info[task_stmt->loopVar].ownership_state = OwnershipState::Valid;
-        }
         if (task_stmt->iterable) {
             check_expression(task_stmt->iterable);
 
         }
         if (task_stmt->body) check_statement(task_stmt->body);
     } else if (auto concurrent_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ConcurrentStatement>(stmt)) {
-        if (!concurrent_stmt->channel.empty()) {
-            mark_variable_borrowed(concurrent_stmt->channel, false);
-            if (variable_generation_info.count(concurrent_stmt->channel)) {
-                variable_generation_info[concurrent_stmt->channel].is_linear = true;
-            }
-        }
         validate_concurrent_isolation(concurrent_stmt->body);
         if (concurrent_stmt->body) check_statement(concurrent_stmt->body);
     } else if (auto worker_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::WorkerStatement>(stmt)) {
@@ -195,78 +193,25 @@ void MemoryChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statement
     }
 }
 
-void MemoryChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::VarDeclaration> var_decl) {
-    if (!var_decl) return;
-    if (var_decl->type && var_decl->type.value() &&
-        var_decl->type.value()->typeName == "atomic") {
-        atomic_variables.insert(var_decl->name);
-    }
-    
-    // Track generation history
-    generation_history[var_decl->name].push_back(current_generation);
-    
-    // Check initializer
-    if (var_decl->initializer) {
-        check_expression(var_decl->initializer);
-        mark_variable_initialized(var_decl->name);
-        variable_generation_info[var_decl->name].ownership_state = OwnershipState::Valid;
-        
-        // Track constant variable values for arithmetic safety
-        if (is_constant_expression(var_decl->initializer)) {
-            constant_variables[var_decl->name] = evaluate_constant_int(var_decl->initializer);
-        }
-        
-        // Check if initializing from another variable
-        // For Lymar, we use COPY semantics by default, not MOVE semantics
-        // The source variable remains valid unless this is an explicit move operation
-        if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(var_decl->initializer)) {
-            if (is_variable_moved(var_expr->name)) {
-                add_memory_error("Use-after-move", var_expr->name,
-                               "Variable '" + var_expr->name + "' used after being moved",
-                               var_expr->line);
-            }
-            // NOTE: We do NOT mark source as moved here
-            // In Lymar, assignment is COPY by default, not MOVE
-            // Only explicit move operations should transfer ownership
-        }
-    } else {
-        // Variable declared without initializer remains uninitialized
-        variable_generation_info[var_decl->name].ownership_state = OwnershipState::Uninitialized;
+void MemoryChecker::check_var_declaration(std::shared_ptr<AST::VarDeclaration> declaration) {
+    if (!declaration) return;
+    if (declaration->type && declaration->type.value() && declaration->type.value()->typeName == "atomic")
+        atomic_variables.insert(declaration->name);
+    if (declaration->initializer) {
+        check_expression(declaration->initializer);
+        if (is_constant_expression(declaration->initializer))
+            constant_variables[declaration->name] = evaluate_constant_int(declaration->initializer);
     }
 }
 
-void MemoryChecker::check_assignment(std::shared_ptr<LM::Frontend::AST::AssignExpr> assignment) {
-    if (!assignment) return;
-    
-    // Check the value being assigned
-    check_expression(assignment->value);
-    
-    // Check if assigning from a moved variable
-    if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(assignment->value)) {
-        if (is_variable_moved(var_expr->name)) {
-            add_memory_error("Use-after-move", var_expr->name,
-                           "Variable '" + var_expr->name + "' used after being moved",
-                           var_expr->line);
-        }
-        // NOTE: We do NOT mark source as moved here
-        // In Lymar, assignment is COPY by default for primitive types
-        // For linear types, we need explicit move semantics
-        // This is a mutation/rebinding operation, not ownership transfer
-    }
-    
-    // Mark target variable as initialized and update its state
-    mark_variable_initialized(assignment->name);
-    if (variable_generation_info.find(assignment->name) != variable_generation_info.end()) {
-        variable_generation_info[assignment->name].ownership_state = OwnershipState::Valid;
-    }
+void MemoryChecker::check_assignment(std::shared_ptr<AST::AssignExpr> assignment) {
+    if (assignment) check_expression(assignment->value);
 }
 
 void MemoryChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
     if (!expr) return;
     
-    if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr)) {
-        check_variable_access(var_expr);
-    } else if (auto call_expr = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
+    if (auto call_expr = std::dynamic_pointer_cast<LM::Frontend::AST::CallExpr>(expr)) {
         check_function_call(call_expr);
     } else if (auto binary_expr = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr)) {
         check_binary_expression(binary_expr);
@@ -282,73 +227,11 @@ void MemoryChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Expressi
     }
 }
 
-void MemoryChecker::check_variable_access(std::shared_ptr<LM::Frontend::AST::VariableExpr> var_expr) {
-    if (!var_expr) return;
-    
-    const std::string& name = var_expr->name;
-    
-    // Check if variable was moved
-    if (is_variable_moved(name)) {
-        add_memory_error("Use-after-move", name,
-                        "Variable '" + name + "' used after being moved",
-                        var_expr->line);
-        return;
-    }
-    
-    // Check if variable is initialized
-    if (!is_variable_initialized(name)) {
-        add_memory_error("Use-before-init", name,
-                        "Variable '" + name + "' used before initialization",
-                        var_expr->line);
-        return;
-    }
-    
-    // Check ownership state
-    auto gen_iter = variable_generation_info.find(name);
-    if (gen_iter != variable_generation_info.end()) {
-        const GenerationInfo& gen_info = gen_iter->second;
-        
-        // Only check generation lifetime for references or escaped values
-        // Ordinary variable reads should NOT advance generation or cause generation mismatches
-        if (gen_info.ownership_state == OwnershipState::Escaped) {
-            check_reference_lifetime(name, gen_info.generation, current_generation);
-        }
-        
-        // Prevent access to invalid states
-        if (gen_info.ownership_state == OwnershipState::Invalid ||
-            gen_info.ownership_state == OwnershipState::Consumed) {
-            add_memory_error("Invalid access", name,
-                            "Variable '" + name + "' is in invalid state",
-                            var_expr->line);
-        }
-    }
-    
-    // NOTE: We do NOT advance generation on ordinary reads
-    // Generation transition only occurs on actual ownership changes (move, escape, etc.)
-}
 
-void MemoryChecker::check_function_call(std::shared_ptr<LM::Frontend::AST::CallExpr> call) {
+
+void MemoryChecker::check_function_call(std::shared_ptr<AST::CallExpr> call) {
     if (!call) return;
-    
-    // Check all arguments
-    for (auto& arg : call->arguments) {
-        check_expression(arg);
-        
-        // If argument is a variable, check for moved state
-        // But do NOT automatically mark as moved - this depends on function semantics
-        if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(arg)) {
-            if (is_variable_moved(var_expr->name)) {
-                add_memory_error("Use-after-move", var_expr->name,
-                               "Variable '" + var_expr->name + "' used after being moved",
-                               var_expr->line);
-            }
-            // NOTE: We do NOT mark the variable as moved here
-            // Function calls may borrow, copy, or consume based on signature
-            // This requires analysis of function parameter ownership semantics
-            // For now, we conservatively assume parameters are borrowed (not moved)
-            // unless the function is explicitly marked as consuming/linear
-        }
-    }
+    for (const auto& argument : call->arguments) check_expression(argument);
 }
 
 void MemoryChecker::check_binary_expression(std::shared_ptr<LM::Frontend::AST::BinaryExpr> binary) {
@@ -594,49 +477,10 @@ void MemoryChecker::check_tuple_bounds(std::shared_ptr<LM::Frontend::AST::IndexE
     }
 }
 
-void MemoryChecker::check_block_statement(std::shared_ptr<LM::Frontend::AST::BlockStatement> block) {
+void MemoryChecker::check_block_statement(std::shared_ptr<AST::BlockStatement> block) {
     if (!block) return;
-    
-    // Enter new scope
-    enter_scope();
-    
-    // Save current variable state to track which variables are newly created
-    auto saved_moved = moved_variables;
-    auto saved_initialized = initialized_variables;
-    auto saved_gen_info = variable_generation_info;
-    
-    // Track which variables are newly created in this scope
-    std::unordered_set<std::string> new_variables;
-    
-    // Check all statements in block
-    for (auto& stmt : block->statements) {
-        check_statement(stmt);
-        
-        // Track variable declarations in this scope
-        if (auto var_decl = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
-            new_variables.insert(var_decl->name);
-        }
-    }
-    
-    // Invalidate scope references
-    invalidate_scope_references();
-    
-    // Exit scope
-    exit_scope();
-    
-    // Restore outer scope state for existing variables, but keep new variables removed
-    moved_variables = saved_moved;
-    initialized_variables = saved_initialized;
-    
-    // Only restore generation info for variables that existed before this scope
-    for (const auto& [name, info] : saved_gen_info) {
-        if (new_variables.find(name) == new_variables.end()) {
-            variable_generation_info[name] = info;
-        } else {
-            // Remove generation info for variables that were created in this scope
-            variable_generation_info.erase(name);
-        }
-    }
+    enter_memory_region();
+    for (const auto& statement : block->statements) check_statement(statement);
 }
 
 bool MemoryChecker::verify_slice_disjointness(const AST::ParallelSliceCapability& slice, int line) {
@@ -733,12 +577,6 @@ void MemoryChecker::infer_parallel_capabilities(
             formal_type.begin = capability.begin;
             formal_type.end = capability.end;
             formal_type.mutableAccess = true;
-            if (auto info = variable_generation_info.find(collection);
-                info != variable_generation_info.end()) {
-                // Collection element precision is retained by the typed AST;
-                // the capability owns the collection value when unavailable.
-                formal_type.valueType = nullptr;
-            }
             capability.capability_type = std::make_shared<::Type>(TypeTag::Capability, formal_type);
             if (verify_slice_disjointness(capability, statement->line)) {
                 parallel_stmt->slice_capabilities.push_back(capability);
@@ -769,7 +607,15 @@ void MemoryChecker::validate_concurrent_isolation(
                 target = object->name;
             }
         }
-        if (!target.empty() && initialized_variables.count(target) &&
+        // The authoritative binding identity distinguishes an implicit task-local
+        // declaration from a write to an existing outer binding. Unknown facts
+        // cannot grant an isolation proof.
+        const auto semantic_id = assignment->memory_info.semantic_id;
+        const auto fact = ownership_facts->nodes.find(semantic_id);
+        const bool task_local_declaration = !assignment->object && !assignment->index &&
+            !assignment->member && fact != ownership_facts->nodes.end() &&
+            fact->second.binding == semantic_id;
+        if (!target.empty() && !task_local_declaration &&
             !locals.count(target) && !atomic_variables.count(target)) {
             add_memory_error("Data race", target,
                              "Concurrent task mutates outer variable '" + target +
@@ -810,243 +656,16 @@ void MemoryChecker::validate_concurrent_isolation(
 
 void MemoryChecker::insert_memory_operations(std::shared_ptr<LM::Frontend::AST::Statement> stmt) {
     if (stmt) {
+        const auto binding_identity = stmt->memory_info.semantic_id;
         stmt->memory_info = LM::Frontend::AST::MemoryInfo(current_region_id, current_generation);
+        stmt->memory_info.semantic_id = binding_identity;
     }
 }
 
-void MemoryChecker::insert_make_linear(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
-    if (expr) {
-        expr->memory_info = LM::Frontend::AST::MemoryInfo(current_region_id, current_generation, true);
-    }
-}
-
-void MemoryChecker::insert_make_ref(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
-    if (expr) {
-        auto info = LM::Frontend::AST::MemoryInfo(current_region_id, current_generation);
-        info.is_reference = true;
-        expr->memory_info = info;
-    }
-}
-
-void MemoryChecker::insert_move(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
-    if (expr) {
-        auto info = LM::Frontend::AST::MemoryInfo(current_region_id, current_generation);
-        info.is_moved = true;
-        expr->memory_info = info;
-    }
-}
-
-void MemoryChecker::insert_drop(std::shared_ptr<LM::Frontend::AST::Expression> expr) {
-    if (expr) {
-        auto info = LM::Frontend::AST::MemoryInfo(current_region_id, current_generation);
-        info.needs_drop = true;
-        expr->memory_info = info;
-    }
-}
-
-// =============================================================================
-// VARIABLE TRACKING
-// =============================================================================
-
-void MemoryChecker::mark_variable_initialized(const std::string& name) {
-    initialized_variables.insert(name);
-}
-
-void MemoryChecker::mark_variable_moved(const std::string& name) {
-    moved_variables.insert(name);
-    if (variable_generation_info.find(name) != variable_generation_info.end()) {
-        variable_generation_info[name].ownership_state = OwnershipState::Moved;
-        // Only advance generation on actual move
-        track_generation_transition(name, current_generation, current_generation + 1);
-        current_generation++;
-    }
-}
-
-void MemoryChecker::mark_variable_copied(const std::string& name) {
-    // Copy does not change ownership state
-    // Source remains valid
-    // No generation transition
-}
-
-void MemoryChecker::mark_variable_borrowed(const std::string& name, bool is_mutable) {
-    if (variable_generation_info.find(name) != variable_generation_info.end()) {
-        variable_generation_info[name].ownership_state = is_mutable ? 
-            OwnershipState::MutablyBorrowed : OwnershipState::Borrowed;
-    }
-}
-
-void MemoryChecker::mark_variable_escaped(const std::string& name) {
-    if (variable_generation_info.find(name) != variable_generation_info.end()) {
-        variable_generation_info[name].ownership_state = OwnershipState::Escaped;
-        // Generation transition on escape
-        track_generation_transition(name, current_generation, current_generation + 1);
-        current_generation++;
-    }
-}
-
-void MemoryChecker::mark_variable_consumed(const std::string& name) {
-    moved_variables.insert(name);
-    if (variable_generation_info.find(name) != variable_generation_info.end()) {
-        variable_generation_info[name].ownership_state = OwnershipState::Consumed;
-        track_generation_transition(name, current_generation, current_generation + 1);
-        current_generation++;
-    }
-}
-
-bool MemoryChecker::is_variable_initialized(const std::string& name) const {
-    return initialized_variables.find(name) != initialized_variables.end();
-}
-
-bool MemoryChecker::is_variable_moved(const std::string& name) const {
-    return moved_variables.find(name) != moved_variables.end();
-}
-
-OwnershipState MemoryChecker::get_ownership_state(const std::string& name) const {
-    auto iter = variable_generation_info.find(name);
-    if (iter != variable_generation_info.end()) {
-        return iter->second.ownership_state;
-    }
-    return OwnershipState::Uninitialized;
-}
-
-// =============================================================================
-// GENERATIONAL REFERENCE TRACKING
-// =============================================================================
-
-std::shared_ptr<GenerationalRef> MemoryChecker::create_reference(const std::string& var_name, bool is_mutable) {
-    auto ref = std::make_shared<GenerationalRef>(
-        var_name + "_ref_" + std::to_string(current_generation),
-        current_generation,
-        current_region_id,
-        current_scope_depth,
-        is_mutable
-    );
-    
-    // Track reference in generation stack
-    if (generation_stack.empty()) {
-        generation_stack.push_back({});
-    }
-    generation_stack.back().push_back(ref);
-    
-    // Track reference chain
-    reference_chain[var_name].push_back(ref);
-    
-    return ref;
-}
-
-void MemoryChecker::invalidate_generation(int generation) {
-    // Invalidate all references from this generation
-    for (auto& [var_name, refs] : reference_chain) {
-        for (auto& ref : refs) {
-            if (ref->created_generation == generation) {
-                ref->is_valid = false;
-            }
-        }
-    }
-}
-
-void MemoryChecker::invalidate_references_at_scope(int scope_depth) {
-    // Invalidate all references created at or within this scope
-    for (auto& [var_name, refs] : reference_chain) {
-        for (auto& ref : refs) {
-            if (ref->created_scope >= scope_depth) {
-                ref->is_valid = false;
-            }
-        }
-    }
-}
-
-bool MemoryChecker::is_reference_valid(const std::shared_ptr<GenerationalRef>& ref) const {
-    if (!ref) return false;
-    return ref->is_valid && ref->created_generation == current_generation;
-}
-
-void MemoryChecker::check_reference_lifetime(const std::string& var_name, int ref_generation, int current_gen) {
-    // Only flag stale references if there was an actual ownership transition
-    // Generation mismatch alone is not an error - it must correspond to a move/escape
-    auto gen_iter = variable_generation_info.find(var_name);
-    if (gen_iter != variable_generation_info.end()) {
-        const GenerationInfo& gen_info = gen_iter->second;
-        // Only report error if the variable's ownership state actually changed
-        if (ref_generation < current_gen && 
-            (gen_info.ownership_state == OwnershipState::Moved ||
-             gen_info.ownership_state == OwnershipState::Escaped ||
-             gen_info.ownership_state == OwnershipState::Consumed)) {
-            add_error("Reference to variable '" + var_name + "' is stale (generation mismatch)", 0);
-        }
-    }
-}
-
-void MemoryChecker::check_mutable_aliasing(const std::string& var_name, bool is_mutable) {
-    if (!is_mutable) return;
-    
-    auto iter = reference_chain.find(var_name);
-    if (iter != reference_chain.end()) {
-        int mutable_count = 0;
-        for (const auto& ref : iter->second) {
-            if (ref->is_mutable && ref->is_valid) {
-                mutable_count++;
-            }
-        }
-        
-        if (mutable_count > 1) {
-            add_error("Multiple mutable references to '" + var_name + "' violate aliasing rules", 0);
-        }
-    }
-}
-
-void MemoryChecker::track_generation_transition(const std::string& var_name, int old_gen, int new_gen) {
-    invalidate_generation(old_gen);
-    
-    if (generation_history.find(var_name) == generation_history.end()) {
-        generation_history[var_name] = {};
-    }
-    generation_history[var_name].push_back(new_gen);
-}
-
-// =============================================================================
-// SCOPE MANAGEMENT
-// =============================================================================
-
-void MemoryChecker::enter_scope() {
-    current_scope_depth++;
-    enter_memory_region();
-    generation_stack.push_back({});
-}
-
-void MemoryChecker::exit_scope() {
-    invalidate_scope_references();
-    exit_memory_region();
-    
-    if (!generation_stack.empty()) {
-        generation_stack.pop_back();
-    }
-    
-    current_scope_depth--;
-}
-
-void MemoryChecker::invalidate_scope_references() {
-    invalidate_references_at_scope(current_scope_depth);
-}
-
-// =============================================================================
-// MEMORY REGION MANAGEMENT
-// =============================================================================
-
+// Lexical region annotations only; ownership generations belong to SemanticFacts.
 void MemoryChecker::enter_memory_region() {
-    region_stack.push_back(current_region_id);
-    generation_stack_history.push_back(current_generation);
-    current_region_id++;
-    current_generation++;
-}
-
-void MemoryChecker::exit_memory_region() {
-    if (!region_stack.empty()) {
-        region_stack.pop_back();
-    }
-    if (!generation_stack_history.empty()) {
-        generation_stack_history.pop_back();
-    }
+    ++current_region_id;
+    ++current_generation;
 }
 
 // =============================================================================
@@ -1056,28 +675,8 @@ void MemoryChecker::exit_memory_region() {
 void MemoryChecker::add_memory_error(const std::string& error_type, const std::string& variable_name, 
                                     const std::string& description, int line) {
     std::string message = error_type + ": " + description;
-    std::string hint;
-    
-    if (error_type == "Use-after-move") {
-        hint = "Memory Model: Linear types can only be used once. After a move, the original variable becomes invalid. "
-               "Type Checking: Use references (&var) for borrowing instead of moving, or clone the value if copying is needed.";
-    } else if (error_type == "Use-after-free") {
-        hint = "Memory Model: Accessing freed memory is undefined behavior. "
-               "Type Checking: Linear types and region-based allocation prevent use-after-free at compile-time.";
-    } else if (error_type == "Use-before-init") {
-        hint = "Memory Model: Variables must be initialized before use. "
-               "Type Checking: The compiler tracks initialization state to prevent undefined behavior.";
-    } else if (error_type == "Double move") {
-        hint = "Memory Model: Linear types have single ownership - they can only be moved once. "
-               "Type Checking: The compiler tracks ownership to prevent double moves.";
-    } else if (error_type == "Memory leak") {
-        hint = "Memory Model: All allocated memory must be freed before going out of scope. "
-               "Type Checking: Use linear types with automatic cleanup or explicit drop operations.";
-    } else {
-        hint = "Memory Model: Use linear types and region-based allocation for memory safety. "
-               "Type Checking: Compile-time analysis prevents memory safety violations.";
-    }
-    
+    const std::string hint = "Check bounds and task isolation; ownership is inferred from source and verified in canonical LIR.";
+
     if (line > 0 && !current_source.empty()) {
         Debugger::error(message, line, 0, InterpretationStage::MEMORY, current_source, current_file_path, hint, "");
     } else {
@@ -1100,81 +699,6 @@ void MemoryChecker::add_warning(const std::string& message, int line) {
         oss << " (line " << line << ")";
     }
     warnings.push_back(oss.str());
-}
-
-// =============================================================================
-// DIAGNOSTIC METHODS
-// =============================================================================
-
-std::string MemoryChecker::get_generation_info(const std::string& var_name) const {
-    std::ostringstream oss;
-    
-    auto iter = variable_generation_info.find(var_name);
-    if (iter != variable_generation_info.end()) {
-        const GenerationInfo& info = iter->second;
-        oss << "Variable: " << var_name << "\n";
-        oss << "  Region: " << info.region_id << "\n";
-        oss << "  Generation: " << info.generation << "\n";
-        oss << "  Is Linear: " << (info.is_linear ? "yes" : "no") << "\n";
-        oss << "  Ownership State: ";
-        switch (info.ownership_state) {
-            case OwnershipState::Uninitialized: oss << "Uninitialized"; break;
-            case OwnershipState::Valid: oss << "Valid"; break;
-            case OwnershipState::Moved: oss << "Moved"; break;
-            case OwnershipState::Borrowed: oss << "Borrowed"; break;
-            case OwnershipState::MutablyBorrowed: oss << "MutablyBorrowed"; break;
-            case OwnershipState::Escaped: oss << "Escaped"; break;
-            case OwnershipState::Consumed: oss << "Consumed"; break;
-            case OwnershipState::Invalid: oss << "Invalid"; break;
-        }
-        oss << "\n";
-        oss << "  Scope Depth: " << info.scope_depth << "\n";
-        
-        auto hist_iter = generation_history.find(var_name);
-        if (hist_iter != generation_history.end()) {
-            oss << "  Generation History: ";
-            for (int gen : hist_iter->second) {
-                oss << gen << " ";
-            }
-            oss << "\n";
-        }
-    }
-    
-    return oss.str();
-}
-
-std::string MemoryChecker::get_reference_info(const std::string& var_name) const {
-    std::ostringstream oss;
-    
-    auto iter = reference_chain.find(var_name);
-    if (iter != reference_chain.end()) {
-        oss << "References to '" << var_name << "':\n";
-        for (const auto& ref : iter->second) {
-            oss << "  Ref ID: " << ref->ref_id << "\n";
-            oss << "    Created Generation: " << ref->created_generation << "\n";
-            oss << "    Created Region: " << ref->created_region << "\n";
-            oss << "    Created Scope: " << ref->created_scope << "\n";
-            oss << "    Is Mutable: " << (ref->is_mutable ? "yes" : "no") << "\n";
-            oss << "    Is Valid: " << (ref->is_valid ? "yes" : "no") << "\n";
-        }
-    }
-    
-    return oss.str();
-}
-
-void MemoryChecker::dump_memory_state() const {
-    std::cout << "=== MEMORY CHECKER STATE ===\n";
-    std::cout << "Current Region ID: " << current_region_id << "\n";
-    std::cout << "Current Generation: " << current_generation << "\n";
-    std::cout << "Current Scope Depth: " << current_scope_depth << "\n";
-    std::cout << "\nVariable Generation Info:\n";
-    for (const auto& [name, info] : variable_generation_info) {
-        std::cout << get_generation_info(name);
-    }
-    std::cout << "\nReference Chains:\n";
-    for (const auto& [name, refs] : reference_chain) {
-        std::cout << get_reference_info(name);
-    }
 }
 
 // =============================================================================

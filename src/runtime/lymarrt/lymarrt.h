@@ -9,8 +9,8 @@
 extern "C" {
 #endif
 
-// Lymar Runtime ABI Versioning (1.0.0)
-#define LYMARRT_ABI_VERSION 0x00010000U
+// Lymar Runtime ABI Versioning (0.0.1)
+#define LYMARRT_ABI_VERSION 0x00000001U
 
 typedef enum lymarrt_type {
     LYMARRT_TYPE_I8 = 0,

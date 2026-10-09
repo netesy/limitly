@@ -1,4 +1,7 @@
 #include "optimizer.hh"
+#include "verifier.hh"
+#include <stdexcept>
+#include "../memory/lir_analysis.hh"
 #include "algebraic_simplifier.hh"
 #include "functions.hh"
 #include "analysis.hh"
@@ -12,6 +15,15 @@ namespace LM {
 namespace LIR {
 
 bool Optimizer::optimize() {
+    auto verify_memory_contract = [&]() {
+        std::vector<std::string> errors;
+        if (!Verifier::verify_memory_regions(func_, errors) || !Verifier::verify_ownership(func_, errors)) {
+            std::string diagnostic = "Invalid canonical memory contract during optimization of " + func_.name;
+            for (const auto& error : errors) diagnostic += "\n" + error;
+            throw std::runtime_error(diagnostic);
+        }
+    };
+    verify_memory_contract();
     bool changed = false;
     bool pass_changed;
     int pass_count = 0;
@@ -36,6 +48,7 @@ bool Optimizer::optimize() {
         rec.blocks_before = MetricsCollector::count_blocks(func_);
 
         bool res = pass_fn();
+        if (res) verify_memory_contract();
 
         rec.instructions_after = func_.instructions.size();
         rec.memory_ops_after = MetricsCollector::count_memory_ops(func_);
@@ -56,7 +69,8 @@ bool Optimizer::optimize() {
     };
 
     do {
-        pass_changed = false;
+        pass_changed = Memory::eliminate_proven_local_borrows(func_);
+        if (pass_changed) am.invalidate_all();
 
         bool ur = run_pass("Unreachable code elimination", [&]() { return remove_unreachable_code(); });
         if (ur) am.invalidate_all();
@@ -191,6 +205,9 @@ bool Optimizer::dead_code_elimination_simple() {
 }
 
 bool Optimizer::redundant_memory_elimination() {
+    // Quarantined: pointer-register equality does not establish non-aliasing.
+    // Keep the implementation below for the subsequent optimization gate.
+    return false;
     if (func_.instructions.empty()) return false;
     bool changed = false;
 
@@ -892,6 +909,8 @@ bool Optimizer::tail_call_optimization() {
 }
 
 bool Optimizer::loop_invariant_code_motion() {
+    // Quarantined: invariant addresses do not imply invariant memory contents.
+    return false;
     if (func_.instructions.empty()) return false;
     bool changed = false;
 

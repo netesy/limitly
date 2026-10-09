@@ -71,6 +71,11 @@ public:
     const std::vector<LIR::LIR_Inst>& getInstructions() const { return instructions_; }
     void setInstructions(const std::vector<LIR::LIR_Inst>& instructions) { instructions_ = instructions; }
 
+    Memory::FunctionEffects memory_effects_;
+    Memory::SemanticEffects inferred_effects_;
+    std::vector<Memory::Identity> ownership_parameters_, ownership_captures_;
+    std::unordered_map<Reg, Memory::NodeOwnership> ownership_provenance_;
+    uint32_t register_count_ = 0;
     std::unordered_map<Reg, TypePtr> register_language_types_;
     std::unordered_map<Reg, Type> register_types_;
 

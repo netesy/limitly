@@ -2,7 +2,7 @@
 // Capturing already moved variable
 
 fn consume(x: [int]) {
-    // x is consumed
+    var transferred = x;
 }
 
 fn test() {

@@ -12,6 +12,8 @@ namespace LIR {
 class Verifier {
 public:
     static bool verify(const LIR_Function& func, std::vector<std::string>& errors);
+    static bool verify_ownership(const LIR_Function& func, std::vector<std::string>& errors);
+    static bool verify_memory_regions(const LIR_Function& func, std::vector<std::string>& errors);
 
 private:
     static bool verify_instruction(const LIR_Inst& inst, const LIR_Function& func, std::vector<std::string>& errors);

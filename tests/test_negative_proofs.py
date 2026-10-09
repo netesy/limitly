@@ -45,7 +45,8 @@ def test_4_wrong_lymarrt_abi():
     setup_base()
     with open("bin/libfont.so.meta", "r") as f:
         meta = f.read()
-    meta = meta.replace("abi_version=1.0.0", "abi_version=9.9.9")
+    assert "abi_version=0.0.1" in meta, "Expected the current ABI baseline before corrupting it"
+    meta = meta.replace("abi_version=0.0.1", "abi_version=9.9.9")
     with open("bin/libfont.so.meta", "w") as f:
         f.write(meta)
     code, out, err = run_cmd("./bin/lymar run tests/precompiled/benchmark_workload_pure.lm")

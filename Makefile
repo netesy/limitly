@@ -95,7 +95,7 @@ FRONT_SRCS := src/frontend/scanner.cpp src/frontend/parser.cpp \
               src/frontend/parser/statements.cpp src/frontend/parser/expressions.cpp \
               src/frontend/parser/types.cpp src/frontend/parser/patterns.cpp \
               src/frontend/cst.cpp src/frontend/cst/printer.cpp src/frontend/cst/utils.cpp \
-              src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/memory.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp src/frontend/constraint_engine.cpp src/frontend/module_graph.cpp src/frontend/declaration_resolver.cpp \
+              src/frontend/ast/printer.cpp src/frontend/type_checker/core.cpp src/frontend/type_checker/expressions.cpp src/frontend/type_checker/statements.cpp src/frontend/type_checker/declarations.cpp src/frontend/type_checker/types.cpp src/frontend/type_checker/patterns.cpp src/frontend/type_checker/utils.cpp src/frontend/type_checker_factory.cpp src/frontend/memory_checker.cpp src/memory/ownership.cpp src/frontend/constraint_engine.cpp src/frontend/module_graph.cpp src/frontend/declaration_resolver.cpp \
               src/frontend/ast/optimizer.cpp src/frontend/module_manager.cpp
 
 # Recursive wildcard function for pure GNU Make file discovery
@@ -254,6 +254,7 @@ liblymar: $(OBJ_DIR)/liblymar.a
 $(OBJ_DIR)/liblymar.a: $(LIB_LYMAR_OBJS) $(FYRA_LIB)
 	@echo "[BUILD] Building liblymar.a ..."
 	@mkdir -p $(dir $@)
+	@rm -f $@
 	$(AR) rcs $@ $(LIB_LYMAR_OBJS)
 
 windows: $(BIN_DIR) $(MAIN_RSP) liblymar $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a
@@ -266,8 +267,10 @@ linux: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(BIN_DIR)/liblymar_aot.a
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lpthread
 	@echo "[OK] lymar built."
 
-$(BIN_DIR)/liblymar_aot.a: $(OBJ_DIR)/src/backend/fyra/region_runtime.o | $(BIN_DIR)
-	$(AR) rcs $@ $<
+$(BIN_DIR)/liblymar_aot.a: $(OBJ_DIR)/src/memory/aot_runtime.o Makefile | $(BIN_DIR)
+	$(RM) $@.tmp
+	$(AR) rcs $@.tmp $<
+	mv $@.tmp $@
 
 # =============================
 # Precompilation targets
@@ -358,7 +361,7 @@ lir-test: $(BIN_DIR) $(OBJ_DIR)/liblymar.a $(LIR_TEST_OBJS)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $(LIR_TEST_OBJS) $(OBJ_DIR)/liblymar.a -o $(BIN_DIR)/lir_test $(LIBS) -lpthread
 	@echo "[OK] lir_test built."
 	@echo "[RUN] Running lir_test ..."
-	./bin/lir_test
+	$(BIN_DIR)/lir_test$(EXE_EXT)
 
 # =============================
 # Test Target
@@ -524,6 +527,7 @@ aot-tests: $(PLATFORM)
 	fi
 
 # Dependency files are optional on the first build.
+-include $(OBJ_DIR)/src/memory/aot_runtime.d $(BIN_DIR)/test_memory_contracts.d $(BIN_DIR)/test_reference_lowering.d
 -include $(LIB_LYMAR_OBJS:.o=.d) $(MAIN_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(LYRA_OBJS:.o=.d) $(LIR_TEST_OBJS:.o=.d)
 
 # Runtime lifetime tests also support SANITIZERS=address,undefined and an
@@ -532,8 +536,13 @@ $(BIN_DIR)/test_runtime_lifetimes$(EXE_EXT): tests/memory/test_runtime_lifetimes
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $@ $(LIBS) -lpthread
 
 .PHONY: memory-tests
-memory-tests: $(BIN_DIR)/test_runtime_lifetimes$(EXE_EXT)
+memory-tests: $(PLATFORM) $(BIN_DIR)/test_source_ownership$(EXE_EXT) $(BIN_DIR)/test_runtime_lifetimes$(EXE_EXT) $(BIN_DIR)/test_memory_contracts$(EXE_EXT) $(BIN_DIR)/test_reference_lowering$(EXE_EXT) $(BIN_DIR)/liblymar_aot.a
 	$(BIN_DIR)/test_runtime_lifetimes$(EXE_EXT)
+	$(BIN_DIR)/test_memory_contracts$(EXE_EXT)
+	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) python3 tests/memory/test_frontend_ownership.py
+	LYMAR_SOURCE_OWNERSHIP_EXECUTABLE=$(abspath $(BIN_DIR)/test_source_ownership$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" python3 tests/memory/test_source_ownership.py
+	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_CXX=$(abspath tests/memory/aot_linker.py) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_unified_ownership.py
+	LYMAR_REFERENCE_TEST_EXECUTABLE=$(abspath $(BIN_DIR)/test_reference_lowering$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_reference_lowering.py
 
 # Private standalone AOT runtime tests; no VM or public ABI additions.
 $(BIN_DIR)/test_aot_regions$(EXE_EXT): tests/memory/test_aot_regions.cpp $(BIN_DIR)/liblymar_aot.a | $(BIN_DIR)
@@ -544,3 +553,12 @@ aot-region-tests: $(PLATFORM) $(BIN_DIR)/test_aot_regions$(EXE_EXT)
 	$(BIN_DIR)/test_aot_regions$(EXE_EXT)
 	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_CXX=$(abspath tests/memory/aot_linker.py) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_standalone_regions.py
 	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_target_runtime.py
+
+$(BIN_DIR)/test_memory_contracts$(EXE_EXT): tests/memory/test_memory_contracts.cpp src/memory/memory.hh src/memory/contracts.hh src/memory/model.hh | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< -o $@ $(LIBS)
+
+$(BIN_DIR)/test_reference_lowering$(EXE_EXT): tests/memory/test_reference_lowering.cpp $(OBJ_DIR)/liblymar.a $(FYRA_LIB) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $@ $(LIBS) -lpthread
+
+$(BIN_DIR)/test_source_ownership$(EXE_EXT): tests/memory/test_source_ownership.cpp $(OBJ_DIR)/liblymar.a $(FYRA_LIB) | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $@ $(LIBS) -lpthread

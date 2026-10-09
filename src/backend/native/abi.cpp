@@ -1,4 +1,5 @@
 #include "abi.hh"
+#include "backend/vm/reference_ops.hh"
 #include "backend/vm/constant_utils.hh"
 #include "backend/vm/register.hh"
 #include "backend/vm/resource_manager.hh"
@@ -67,6 +68,11 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
     return result;
   };
   switch (static_cast<Helper>(operation)) {
+  case Helper::RefCreate: return make_u64(Backend::VM::Register::ReferenceOperations::create(vm, a, as_u64(b)));
+  case Helper::RefResolve: return Backend::VM::Register::ReferenceOperations::resolve(vm, as_u64(a), as_u64(b));
+  case Helper::RefMove: return make_u64(Backend::VM::Register::ReferenceOperations::move(vm, as_u64(a), as_u64(b)));
+  case Helper::RefRelease: Backend::VM::Register::ReferenceOperations::release(vm, as_u64(a), as_u64(b)); return VAL_NIL;
+  case Helper::OwnershipConsume: vm.consume_memory(a); return VAL_NIL;
   case Helper::Add:
     return own(lm_add(a, b));
   case Helper::Sub:
@@ -146,14 +152,18 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
   }
   case Helper::FrameNew:
     return frame(text, as_i64(a));
-  case Helper::FrameGet:
-    return field(a, as_i64(b));
-  case Helper::FrameSet:
-    if (object<LmFrame>(a, TYPE_FRAME)) {
-      lm_frame_set_field(UNBOX_PTR(a), as_i64(b), c);
-      transfer(c, a);
-    }
+  case Helper::FrameGet: {
+    auto index = as_i64(b);
+    if (index < 0 || static_cast<uint64_t>(index) > UINT32_MAX) throw std::runtime_error("Invalid frame field index");
+    return vm.checked_frame(a, static_cast<uint32_t>(index))->fields[index];
+  }
+  case Helper::FrameSet: {
+    auto index = as_i64(b);
+    if (index < 0 || static_cast<uint64_t>(index) > UINT32_MAX) throw std::runtime_error("Invalid frame field index");
+    vm.checked_frame(a, static_cast<uint32_t>(index))->fields[index] = c;
+    transfer(c, a);
     return VAL_NIL;
+  }
   case Helper::ListNew:
     return own(BOX_PTR(lm_list_new()));
   case Helper::ListAppend:

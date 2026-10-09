@@ -1,6 +1,8 @@
 #include "function_registry.hh"
+#include "verifier.hh"
 #include <stdexcept>
 #include <iostream>
+#include <cstdlib>
 
 namespace LM {
 namespace LIR {
@@ -17,6 +19,13 @@ void FunctionRegistry::registerFunction(const std::string& name, std::unique_ptr
         throw std::runtime_error("Cannot register null function: " + name);
     }
     
+    std::vector<std::string> errors;
+    if (!Verifier::verify_memory_regions(*function, errors) || !Verifier::verify_ownership(*function, errors)) {
+        if (std::getenv("LYMAR_DUMP_INVALID_LIR")) std::cerr << Disassembler(*function).disassemble();
+        std::string message = "Invalid canonical memory contract in function " + name;
+        for (const auto& error : errors) message += "\n" + error;
+        throw std::runtime_error(message);
+    }
     lir_functions_[name] = std::move(function);
     // Debug output removed for cleaner execution
 }

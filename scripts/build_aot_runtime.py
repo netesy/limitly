@@ -32,10 +32,10 @@ def main():
     output = (args.output or ROOT / "bin" / "runtimes" / target / "liblymar_aot.a").resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="lymar-aot-runtime-", dir=output.parent) as temporary:
-        obj = Path(temporary) / "region_runtime.o"
+        obj = Path(temporary) / "aot_runtime.o"
         archive = Path(temporary) / "liblymar_aot.a"
         subprocess.run([args.cxx, *args.cxx_arg, "-std=c++20", "-O2", "-fPIC", "-c",
-                        str(ROOT / "src/backend/fyra/region_runtime.cpp"), "-o", str(obj)], check=True)
+                        str(ROOT / "src/memory/aot_runtime.cpp"), "-o", str(obj)], check=True)
         subprocess.run([args.ar, "rcs", str(archive), str(obj)], check=True)
         os.replace(archive, output)
     print(f"Built {target} runtime: {output}")

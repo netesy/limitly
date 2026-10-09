@@ -2,7 +2,7 @@
 // Using variable after it's been moved
 
 fn consume(x: [int]) {
-    // x is consumed (moved)
+    var transferred = x;
 }
 
 var data = [1, 2, 3];

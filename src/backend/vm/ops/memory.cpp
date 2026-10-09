@@ -1,4 +1,5 @@
 #include "../register.hh"
+#include "../../../memory/memory.hh"
 #include "../vm_runtime.hh"
 #include "../vm_value.hh"
 #include <cstdlib>
@@ -174,7 +175,7 @@ void RegisterVM::release_region_raw_memory(uint64_t region) {
         auto allocation = g_memory_allocations.find(it->first);
         if (allocation != g_memory_allocations.end()) {
             invalidate_raw_aliases(it->first, allocation->second);
-            std::free(reinterpret_cast<void*>(it->first));
+            Memory::MemoryManager<>::Unsafe::deallocate(reinterpret_cast<void*>(it->first));
             g_memory_allocations.erase(allocation);
         }
         it = owned_raw_memory.erase(it);
@@ -187,7 +188,7 @@ void RegisterVM::release_raw_memory() {
         auto allocation = g_memory_allocations.find(ptr);
         if (allocation != g_memory_allocations.end()) {
             invalidate_raw_aliases(ptr, allocation->second);
-            std::free(reinterpret_cast<void*>(ptr));
+            Memory::MemoryManager<>::Unsafe::deallocate(reinterpret_cast<void*>(ptr));
             g_memory_allocations.erase(allocation);
         }
     }
@@ -195,10 +196,10 @@ void RegisterVM::release_raw_memory() {
 }
 
 RegisterValue RegisterVM::allocate_raw_memory(size_t size) {
-    void* ptr = std::malloc(size);
+    void* ptr = Memory::MemoryManager<>::Unsafe::allocate(size);
     if (!ptr) return VAL_NIL;
     auto value = lm_alloc_foreign_ptr(ptr);
-    if (!IS_PTR(value)) { std::free(ptr); return VAL_NIL; }
+    if (!IS_PTR(value)) { Memory::MemoryManager<>::Unsafe::deallocate(ptr); return VAL_NIL; }
     {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         auto address = reinterpret_cast<uintptr_t>(ptr);
@@ -230,7 +231,7 @@ void RegisterVM::execute_memory_free(const LIR::LIR_Inst* pc) {
         invalidate_raw_aliases(reinterpret_cast<uintptr_t>(ptr), it->second);
         g_memory_allocations.erase(it);
         owned_raw_memory.erase(reinterpret_cast<uintptr_t>(ptr));
-        std::free(ptr);
+        Memory::MemoryManager<>::Unsafe::deallocate(ptr);
     }
 }
 
@@ -250,7 +251,7 @@ void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
         }
     }
     uint64_t original_region = owned_raw_memory.at(old_address);
-    void* new_ptr = std::realloc(ptr, size);
+    void* new_ptr = Memory::MemoryManager<>::Unsafe::resize(ptr, size);
     if (new_ptr) {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         invalidate_raw_aliases(old_address, g_memory_allocations.at(old_address));

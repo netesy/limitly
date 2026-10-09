@@ -8,6 +8,7 @@ fn test() {
         var x = data;  // Move
     };
     
+    f1(); // Execute the first transfer before capturing again.
     var f2 = fn() {
         var y = data;  // ERROR: data already moved
     };

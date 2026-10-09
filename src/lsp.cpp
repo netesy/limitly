@@ -3344,7 +3344,7 @@ void LSP::run() {
 
                 Json::Value server_info = Json::Value::object();
                 server_info["name"] = "lymar-lsp";
-                server_info["version"] = "1.0.0";
+                server_info["version"] = "0.0.1";
 
                 result["capabilities"] = caps;
                 result["serverInfo"] = server_info;

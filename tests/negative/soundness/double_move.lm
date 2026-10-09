@@ -2,7 +2,7 @@
 // Moving same value twice
 
 fn consume(x: [int]) {
-    // x is consumed (moved)
+    var transferred = x;
 }
 
 var data = [1, 2, 3];

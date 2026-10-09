@@ -6,7 +6,7 @@
 namespace LM::Backend::Native {
 // Bump this version whenever the function table or tagged object layout
 // changes.
-constexpr uint32_t ABI_VERSION = 2;
+constexpr uint32_t ABI_VERSION = 1;
 enum class Helper : uint32_t {
   Add,
   Sub,
@@ -55,7 +55,8 @@ enum class Helper : uint32_t {
   Transfer,
   CallableName,
   ClosureBound,
-  Callback
+  Callback,
+  RefCreate, RefResolve, RefRelease, OwnershipConsume, RefMove
 };
 struct Api {
   uint32_t version;

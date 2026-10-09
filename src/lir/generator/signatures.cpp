@@ -157,12 +157,27 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         exit_scope();
         finish_cfg_build();
 
+        if (ownership_facts_) {
+            const auto& own_globals = ownership_facts_->module_initializations[path];
+            std::set<Memory::Identity> required;
+            for (const auto& instruction : current_function_->instructions) for (auto id : instruction.ownership.reads)
+                if (ownership_facts_->global_bindings.count(id) && !own_globals.count(id)) required.insert(id);
+            current_function_->ownership_captures.assign(required.begin(), required.end());
+        }
         auto result = std::move(current_function_);
         current_function_ = nullptr;
 
         // Register with LIRFunctionManager and FunctionRegistry
         std::vector<LIRParameter> params;
         auto lir_func = LIRFunctionManager::getInstance().createFunction(init_func_name, params, Type::Void, nullptr);
+        lir_func->memory_effects_ = result->memory_effects;
+        lir_func->inferred_effects_ = result->inferred_effects;
+        lir_func->ownership_parameters_ = result->ownership_parameters;
+        lir_func->ownership_captures_ = result->ownership_captures;
+        lir_func->ownership_provenance_ = result->ownership_provenance;
+        lir_func->register_count_ = result->register_count;
+        lir_func->setRegisterLanguageTypes(result->register_language_types);
+        lir_func->setRegisterTypes(result->register_types);
         lir_func->setInstructions(result->instructions);
         LIR::FunctionRegistry::getInstance().registerFunction(init_func_name, std::move(result));
 

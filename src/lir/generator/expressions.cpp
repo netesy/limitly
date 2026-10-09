@@ -1,4 +1,5 @@
 #include "../generator.hh"
+#include "../../memory/reference_flags.hh"
 #include "../functions.hh"
 #include "../intrinsic_registry.hh"
 #include "../../backend/vm/constant_utils.hh"
@@ -87,6 +88,67 @@ std::string get_expr_qualified_path(const LM::Frontend::AST::Expression* e) {
 }
 
 Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
+    auto result = emit_expr_impl(expr);
+    if (ownership_facts_ && current_function_) {
+        auto found = ownership_facts_->nodes.find(expr.memory_info.semantic_id);
+        if (found != ownership_facts_->nodes.end()) {
+            const auto& fact = found->second;
+            current_function_->ownership_provenance[result] = fact;
+            auto annotate_call = [&](std::vector<LIR_Inst>& instructions) {
+                for (auto it = instructions.rbegin(); it != instructions.rend(); ++it) {
+                    if (it->dst == result && (it->op == LIR_Op::Call || it->op == LIR_Op::CallIndirect || it->op == LIR_Op::CallBuiltin)) {
+                        if (fact.arguments.size() == it->call_args.size()) it->call_arg_ownership = fact.arguments;
+                        break;
+                    }
+                }
+            };
+            if (dynamic_cast<LM::Frontend::AST::CallExpr*>(&expr)) {
+                if (cfg_context_.building_cfg && cfg_context_.current_block) annotate_call(cfg_context_.current_block->instructions);
+                else annotate_call(current_function_->instructions);
+            }
+            emit_ownership_event(fact.event);
+            if (auto assignment = dynamic_cast<LM::Frontend::AST::AssignExpr*>(&expr);
+                assignment && !assignment->object && !assignment->member && !assignment->index) {
+                auto old = checked_references_.find(fact.binding);
+                const auto existing_handle = old == checked_references_.end() ? UINT32_MAX : old->second;
+                if (old != checked_references_.end()) {
+                    emit_instruction(LIR_Inst(LIR_Op::RefRelease, Type::Void, UINT32_MAX, old->second, UINT32_MAX, Memory::ReferenceNullable));
+                    checked_references_.erase(old);
+                }
+                const bool assigned_nil = assignment->value && assignment->value->inferred_type && assignment->value->inferred_type->tag == TypeTag::Nil;
+                if ((fact.managed && fact.unknown_origin) || (existing_handle != UINT32_MAX && (fact.managed || assigned_nil))) {
+                    auto handle = existing_handle == UINT32_MAX ? allocate_register() : existing_handle;
+                    emit_instruction(LIR_Inst(LIR_Op::RefCreate, Type::U64, handle, result, UINT32_MAX, Memory::ReferenceNullable));
+                    uint32_t target_region = 0;
+                    for (size_t scope = scope_stack_.size(); scope > 0; --scope) {
+                        if (scope_stack_[scope - 1].vars.count(assignment->name)) {
+                            if (scope <= generator_region_stack_.size()) target_region = generator_region_stack_[scope - 1];
+                            break;
+                        }
+                    }
+                    if (!generator_region_stack_.empty() && generator_region_stack_.back() != target_region) {
+                        emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, UINT32_MAX, result, UINT32_MAX, target_region));
+                        auto promoted_handle = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::RefMove, Type::U64, promoted_handle, handle, UINT32_MAX, target_region | Memory::ReferenceMoveNullable));
+                        emit_instruction(LIR_Inst(LIR_Op::Mov, Type::U64, handle, promoted_handle, UINT32_MAX));
+                    }
+                    checked_references_[fact.binding] = handle;
+                }
+            }
+            if (auto variable = dynamic_cast<LM::Frontend::AST::VariableExpr*>(&expr)) {
+                auto checked = checked_references_.find(fact.binding);
+                if (checked != checked_references_.end()) {
+                    auto resolved = allocate_register();
+                    emit_instruction(LIR_Inst(LIR_Op::RefResolve, Type::Ptr, resolved, checked->second, UINT32_MAX, Memory::ReferenceNullable));
+                    return resolved;
+                }
+            }
+        }
+    }
+    return result;
+}
+
+Reg Generator::emit_expr_impl(LM::Frontend::AST::Expression& expr) {
     if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(&expr)) {
         return emit_literal_expr(*literal, nullptr);
     } else if (auto variable = dynamic_cast<LM::Frontend::AST::VariableExpr*>(&expr)) {
@@ -1685,7 +1747,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
         }
 
-        Reg object_reg = emit_expr(*member_expr->object);
+        Reg object_reg = emit_checked_dereference(*member_expr->object, emit_expr(*member_expr->object));
         std::vector<Reg> arg_regs;
         arg_regs.reserve(expr.arguments.size() + 1);
         arg_regs.push_back(object_reg);
@@ -1964,7 +2026,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
         // For member or index assignment
         if (expr.member.has_value()) {
             // Field assignment: obj.field = value
-            Reg object_reg = emit_expr(*expr.object);
+            Reg object_reg = emit_checked_dereference(*expr.object, emit_expr(*expr.object));
             std::string field_name = expr.member.value();
             
             // Get the type of the object to find the correct frame
@@ -2021,7 +2083,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
             return 0;
         } else {
             // Index assignment - handle dict/list/tuple element assignment
-            Reg object_reg = emit_expr(*expr.object);
+            Reg object_reg = emit_checked_dereference(*expr.object, emit_expr(*expr.object));
             Reg index_reg = emit_expr(*expr.index);
             
             TypePtr object_type = get_register_language_type(object_reg);
@@ -2118,9 +2180,23 @@ Reg Generator::emit_grouping_expr(LM::Frontend::AST::GroupingExpr& expr) {
 }
 
 
+// Nullable references may be compared or copied, but dereferencing one must
+// execute the strict validity obligation. Proven-local objects have no handle.
+Reg Generator::emit_checked_dereference(LM::Frontend::AST::Expression& object, Reg value) {
+    if (!ownership_facts_) return value;
+    auto fact = ownership_facts_->nodes.find(object.memory_info.semantic_id);
+    if (fact == ownership_facts_->nodes.end()) return value;
+    auto handle = checked_references_.find(fact->second.binding);
+    if (handle == checked_references_.end()) return value;
+    auto resolved = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::RefResolve, Type::Ptr, resolved, handle->second, UINT32_MAX, 0));
+    if (object.inferred_type) set_register_language_type(resolved, object.inferred_type);
+    return resolved;
+}
+
 Reg Generator::emit_index_expr(LM::Frontend::AST::IndexExpr& expr) {
     // Evaluate the object (list/dict/tuple/string)
-    Reg object_reg = emit_expr(*expr.object);
+    Reg object_reg = emit_checked_dereference(*expr.object, emit_expr(*expr.object));
     
     // Evaluate the index
     Reg index_reg = emit_expr(*expr.index);
@@ -2295,7 +2371,7 @@ Reg Generator::emit_member_expr(LM::Frontend::AST::MemberExpr& expr) {
         }
     }
 
-    Reg object_reg = emit_expr(*expr.object);
+    Reg object_reg = emit_checked_dereference(*expr.object, emit_expr(*expr.object));
     return emit_member_access_with_obj(expr, object_reg);
 }
 
@@ -2583,6 +2659,7 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
     
     auto fn_decl = std::make_shared<LM::Frontend::AST::FunctionDeclaration>();
     fn_decl->name = lambda_name;
+    fn_decl->memory_info.semantic_id = expr.memory_info.semantic_id;
     fn_decl->params = expr.params;
     fn_decl->returnType = expr.returnType;
     fn_decl->body = expr.body;

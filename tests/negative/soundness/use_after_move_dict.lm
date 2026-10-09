@@ -2,7 +2,7 @@
 // Using dict after consuming it
 
 fn consume_dict(map: {str: int}) {
-    // map is consumed
+    var transferred = map;
 }
 
 var data = {"a": 1, "b": 2, "c": 3};

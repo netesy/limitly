@@ -121,6 +121,12 @@ void LIRFunctionManager::registerFunction(std::shared_ptr<LIRFunction> function)
     lir_func->name = name;
     lir_func->param_count = function->getParameters().size();
     
+    lir_func->memory_effects = function->memory_effects_;
+    lir_func->inferred_effects = function->inferred_effects_;
+    lir_func->ownership_parameters = function->ownership_parameters_;
+    lir_func->ownership_captures = function->ownership_captures_;
+    lir_func->ownership_provenance = function->ownership_provenance_;
+    lir_func->register_count = function->register_count_;
     lir_func->register_types = function->getRegisterTypes();
     // Fill parameter types without discarding metadata for temporary registers.
     for (size_t i = 0; i < function->getParameters().size(); ++i) {

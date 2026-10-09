@@ -432,6 +432,12 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
     }
     
 
+    if (is_root && !Debugger::hasError()) {
+        std::set<std::string> intrinsics;
+        for (const auto& [name, signature] : function_signatures) if (!signature.declaration) intrinsics.insert(name);
+        auto facts = Memory::analyze_ownership(program, intrinsics);
+        for (const auto& error : facts->errors) add_error(error);
+    }
     program->inferred_type = type_system.NIL_TYPE;
     return !Debugger::hasError();
 }
@@ -541,26 +547,20 @@ void TypeChecker::add_type_error(const std::string& expected, const std::string&
 // =============================================================================
 
 void TypeChecker::enter_scope() {
-    current_scope_level++;
     current_scope = std::make_unique<Scope>(std::move(current_scope), current_function);
     type_system.pushScope();
 }
 
 void TypeChecker::exit_scope() {
-    current_scope_level--;
     if (current_scope && current_scope->parent) {
         current_scope = std::move(current_scope->parent);
     }
     type_system.popScope();
 }
 
-void TypeChecker::declare_variable(const std::string& name, TypePtr type) {
-    if (type && type->tag == TypeTag::Function) {
-        declare_variable_memory(name, type);
-        mark_variable_initialized(name);
-    }
+void TypeChecker::declare_variable(const std::string& name, TypePtr type, bool immutable) {
     if (current_scope) {
-        current_scope->declare(name, type);
+        current_scope->declare(name, type, immutable);
     }
 }
 

@@ -259,7 +259,7 @@ bool ModuleManager::find_compiled_module(const std::string& module_name, const s
 
 bool ModuleManager::is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) {
     if (!fs::exists(meta.artifact_path)) return false;
-    if (meta.abi_version != "1.0.0" || meta.runtime_semantics != "regions-v2") return false;
+    if (meta.abi_version != "0.0.1" || meta.runtime_semantics != "lymar-0.0.1-abi1-lir1-ownership-nullable") return false;
     for (const auto& [name, hash] : meta.dependency_hashes) {
         std::ifstream dependency(find_module_file(name));
         if (!dependency) return false;
@@ -302,8 +302,8 @@ CompiledModuleMeta ModuleManager::generate_metadata(
     if (meta.module_name.length() > 6 && meta.module_name.substr(meta.module_name.length() - 6) == ".index") {
         meta.module_name = meta.module_name.substr(0, meta.module_name.length() - 6);
     }
-    meta.abi_version = "1.0.0";
-    meta.runtime_semantics = "regions-v2";
+    meta.abi_version = "0.0.1";
+    meta.runtime_semantics = "lymar-0.0.1-abi1-lir1-ownership-nullable";
     meta.target_triple = arch + "-" + target;
     meta.architecture = arch;
     meta.os = target;

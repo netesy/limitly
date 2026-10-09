@@ -41,10 +41,8 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
     } else if (auto worker_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::WorkerStatement>(stmt)) {
         return check_worker_statement(worker_stmt);
     } else if (auto break_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::BreakStatement>(stmt)) {
-        validate_break_cleanup(break_stmt->line);
         return type_system.NIL_TYPE;
     } else if (auto continue_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ContinueStatement>(stmt)) {
-        validate_continue_cleanup(continue_stmt->line);
         return type_system.NIL_TYPE;
     } else if (auto return_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ReturnStatement>(stmt)) {
         return check_return_statement(return_stmt);
@@ -85,8 +83,6 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
         }
     }
     
-    // Enter new memory region for this function
-    enter_memory_region();
     
     // Resolve return type
     TypePtr return_type = type_system.ANY_TYPE; // Default for unannotated functions
@@ -139,7 +135,6 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     
     TypePtr function_type = type_system.createFunctionType(param_names, signature.param_types, return_type, signature.has_default_values);
     declare_variable(func->name, function_type);
-    mark_variable_initialized(func->name);
     
     // Check function body
     current_function = func;
@@ -149,18 +144,14 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     // Declare parameters with memory tracking
     for (size_t i = 0; i < func->params.size(); ++i) {
         declare_variable(func->params[i].first, signature.param_types[i]);
-        declare_variable_memory(func->params[i].first, signature.param_types[i]);
         // Function parameters are initialized when the function is called
-        mark_variable_initialized(func->params[i].first);
     }
     
     // Declare optional parameters with memory tracking
     for (size_t i = 0; i < func->optionalParams.size(); ++i) {
         size_t param_index = func->params.size() + i;
         declare_variable(func->optionalParams[i].first, signature.param_types[param_index]);
-        declare_variable_memory(func->optionalParams[i].first, signature.param_types[param_index]);
         // Function parameters are initialized when the function is called
-        mark_variable_initialized(func->optionalParams[i].first);
     }
     
     // Check body
@@ -178,7 +169,6 @@ TypePtr TypeChecker::check_function_declaration(std::shared_ptr<LM::Frontend::AS
     
     // Exit scope and memory region
     exit_scope();
-    exit_memory_region();
     
     current_function = nullptr;
     current_return_type = nullptr;
@@ -208,8 +198,6 @@ TypePtr TypeChecker::check_destructuring_declaration(std::shared_ptr<LM::Fronten
             
             for (size_t i = 0; i < std::min(dest_decl->names.size(), tuple_type->elementTypes.size()); ++i) {
                 declare_variable(dest_decl->names[i], tuple_type->elementTypes[i]);
-                declare_variable_memory(dest_decl->names[i], tuple_type->elementTypes[i]);
-                mark_variable_initialized(dest_decl->names[i]);
             }
         }
     } else if (init_type->tag == TypeTag::List) {
@@ -217,8 +205,6 @@ TypePtr TypeChecker::check_destructuring_declaration(std::shared_ptr<LM::Fronten
         if (list_type) {
             for (const auto& name : dest_decl->names) {
                 declare_variable(name, list_type->elementType);
-                declare_variable_memory(name, list_type->elementType);
-                mark_variable_initialized(name);
             }
         }
     } else {
@@ -267,19 +253,6 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
                 return mod_frame;
             }
 
-            TypePtr rhs_type = lookup_variable(var_expr->name);
-            bool is_copyable = (rhs_type &&
-                (rhs_type->tag == TypeTag::Function ||
-                 rhs_type->tag == TypeTag::Int || rhs_type->tag == TypeTag::Int64 ||
-                 rhs_type->tag == TypeTag::Float32 || rhs_type->tag == TypeTag::Float64 ||
-                 rhs_type->tag == TypeTag::Bool || rhs_type->tag == TypeTag::String ||
-                 rhs_type->tag == TypeTag::Nil || rhs_type->tag == TypeTag::Any));
-            
-            if (!is_copyable) {
-                // For complex types, this would be a move
-                // For now, we'll implement basic move semantics for all types
-                check_variable_move(var_expr->name);
-            }
         }
     }
     
@@ -329,35 +302,8 @@ TypePtr TypeChecker::check_var_declaration(std::shared_ptr<LM::Frontend::AST::Va
         final_type = type_system.STRING_TYPE; // Default
     }
     
-    declare_variable(var_decl->name, final_type);
-    declare_variable_memory(var_decl->name, final_type);  // Track memory safety
-    if (var_decl->isConst) {
-        auto it = variable_memory_info.find(var_decl->name);
-        if (it != variable_memory_info.end()) {
-            it->second.is_const = true;
-        }
-    }
-    
-    // New variables are linear types by default if they are complex/linear types
-    bool is_linear_type = (final_type &&
-                          (final_type->tag == TypeTag::List ||
-                           final_type->tag == TypeTag::Dict ||
-                           final_type->tag == TypeTag::UserDefined ||
-                           final_type->tag == TypeTag::Frame ||
-                           final_type->tag == TypeTag::Tuple ||
-                           final_type->tag == TypeTag::Structural));
-    if (is_linear_type) {
-        LinearTypeInfo linear_info;
-        linear_info.is_moved = false;
-        linear_info.access_count = 0;
-        linear_types[var_decl->name] = linear_info;
-    }
+    declare_variable(var_decl->name, final_type, var_decl->isConst);
 
-    // Mark as initialized if there's an initializer
-    if (var_decl->initializer) {
-        mark_variable_initialized(var_decl->name);
-    }
-    
     // Set the inferred type on the variable declaration statement
     var_decl->inferred_type = final_type;
     
@@ -509,7 +455,6 @@ TypePtr TypeChecker::check_block_statement(std::shared_ptr<LM::Frontend::AST::Bl
     if (!block) return nullptr;
     
     enter_scope();
-    enter_memory_region();  // New memory region for block
     
     TypePtr last_type = nullptr;
     for (const auto& stmt : block->statements) {
@@ -517,7 +462,6 @@ TypePtr TypeChecker::check_block_statement(std::shared_ptr<LM::Frontend::AST::Bl
     }
     
     exit_scope();
-    exit_memory_region();  // Clean up memory region
     
     // Set the inferred type on the block statement
     block->inferred_type = last_type;
@@ -534,14 +478,9 @@ TypePtr TypeChecker::check_if_statement(std::shared_ptr<LM::Frontend::AST::IfSta
         add_type_error("bool", condition_type->toString(), if_stmt->condition->line);
     }
     
-    // Check then branch
     check_statement(if_stmt->thenBranch);
-    
-    // Check else branch if present
-    if (if_stmt->elseBranch) {
-        check_statement(if_stmt->elseBranch);
-    }
-    
+    if (if_stmt->elseBranch) check_statement(if_stmt->elseBranch);
+
     // Set the inferred type on the if statement
     TypePtr result_type = type_system.NIL_TYPE; // if statements don't produce a value
     if_stmt->inferred_type = result_type;
@@ -564,13 +503,11 @@ TypePtr TypeChecker::check_while_statement(std::shared_ptr<LM::Frontend::AST::Wh
     
     // NEW: Phase 2 - Control flow safety
     // Validate scope cleanup on loop entry
-    validate_scope_cleanup_on_control_flow("while_loop", while_stmt->line);
     
     check_statement(while_stmt->body);
     
     // NEW: Phase 2 - Control flow safety
     // Validate cleanup on loop exit
-    validate_scope_cleanup_on_control_flow("while_loop_exit", while_stmt->line);
     
     in_loop = was_in_loop;
     
@@ -610,13 +547,11 @@ TypePtr TypeChecker::check_for_statement(std::shared_ptr<LM::Frontend::AST::ForS
     
     // NEW: Phase 2 - Control flow safety
     // Validate scope cleanup on loop entry
-    validate_scope_cleanup_on_control_flow("for_loop", for_stmt->line);
     
     check_statement(for_stmt->body);
     
     // NEW: Phase 2 - Control flow safety
     // Validate cleanup on loop exit
-    validate_scope_cleanup_on_control_flow("for_loop_exit", for_stmt->line);
     
     in_loop = was_in_loop;
     
@@ -713,19 +648,14 @@ TypePtr TypeChecker::check_iter_statement(std::shared_ptr<LM::Frontend::AST::Ite
     in_loop = true;
     
     // NEW: Phase 2 - Control flow safety
-    // Check for linear type reuse in loop
     if (iter_stmt->loopVars.size() > 0) {
-        check_linear_type_in_loop_body(iter_stmt->loopVars[0], 
-                                       {iter_stmt->body}, iter_stmt->line);
     }
     
     // Validate scope cleanup on loop entry
-    validate_scope_cleanup_on_control_flow("iter_loop", iter_stmt->line);
     
     check_statement(iter_stmt->body);
     
     // Validate cleanup on loop exit
-    validate_scope_cleanup_on_control_flow("iter_loop_exit", iter_stmt->line);
     
     in_loop = was_in_loop;
 

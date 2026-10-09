@@ -33,6 +33,7 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     
     // Create function with parameters (including 'this' as first parameter)
     size_t total_params = method.params.size() + 1; // +1 for 'this'
+    checked_references_.clear();
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
     next_register_ = total_params;
     next_label_ = 0;
@@ -104,6 +105,12 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     }
     
     auto lir_func = std::make_shared<LIRFunction>(full_method_name, params, return_abi_type, nullptr);
+    lir_func->memory_effects_ = result->memory_effects;
+    lir_func->inferred_effects_ = result->inferred_effects;
+    lir_func->ownership_parameters_ = result->ownership_parameters;
+    lir_func->ownership_captures_ = result->ownership_captures;
+    lir_func->ownership_provenance_ = result->ownership_provenance;
+    lir_func->register_count_ = result->register_count;
     lir_func->setInstructions(result->instructions);
     lir_func->setRegisterLanguageTypes(result->register_language_types);
     lir_func->setRegisterTypes(result->register_types);
@@ -145,6 +152,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     
     // Create function with parameters (including 'this' as first parameter)
     size_t total_params = method.parameters.size() + method.optionalParams.size() + 1; // +1 for 'this'
+    checked_references_.clear();
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
     next_register_ = total_params;
     next_label_ = 0;
@@ -216,6 +224,12 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     this_register_ = UINT32_MAX;  // Clear this_register_
     
     resolve_linear_labels(current_function_.get());
+    if (ownership_facts_) {
+        const auto id = method.memory_info.semantic_id;
+        current_function_->inferred_effects = ownership_facts_->functions[id];
+        current_function_->ownership_parameters = ownership_facts_->parameters[id];
+        for (auto capture : current_function_->inferred_effects.captures_read) current_function_->ownership_captures.push_back(capture);
+    }
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
     current_function_ = nullptr;
@@ -252,6 +266,12 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     }
     
     auto lir_func = std::make_shared<LIRFunction>(full_method_name, params, return_abi_type, nullptr);
+    lir_func->memory_effects_ = result->memory_effects;
+    lir_func->inferred_effects_ = result->inferred_effects;
+    lir_func->ownership_parameters_ = result->ownership_parameters;
+    lir_func->ownership_captures_ = result->ownership_captures;
+    lir_func->ownership_provenance_ = result->ownership_provenance;
+    lir_func->register_count_ = result->register_count;
     lir_func->setInstructions(result->instructions);
     lir_func->setRegisterLanguageTypes(result->register_language_types);
     lir_func->setRegisterTypes(result->register_types);
@@ -277,6 +297,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     
     // Create function with parameters (including 'this' as first parameter)
     size_t total_params = init_method.parameters.size() + init_method.optionalParams.size() + 1; // +1 for 'this'
+    checked_references_.clear();
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
     next_register_ = total_params;
     next_label_ = 0;
@@ -348,6 +369,12 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     this_register_ = UINT32_MAX;  // Clear this_register_
     
     resolve_linear_labels(current_function_.get());
+    if (ownership_facts_) {
+        const auto id = init_method.memory_info.semantic_id;
+        current_function_->inferred_effects = ownership_facts_->functions[id];
+        current_function_->ownership_parameters = ownership_facts_->parameters[id];
+        for (auto capture : current_function_->inferred_effects.captures_read) current_function_->ownership_captures.push_back(capture);
+    }
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
     current_function_ = nullptr;
@@ -378,6 +405,12 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     }
     
     auto lir_func = std::make_shared<LIRFunction>(full_method_name, params, Type::Void, nullptr);
+    lir_func->memory_effects_ = result->memory_effects;
+    lir_func->inferred_effects_ = result->inferred_effects;
+    lir_func->ownership_parameters_ = result->ownership_parameters;
+    lir_func->ownership_captures_ = result->ownership_captures;
+    lir_func->ownership_provenance_ = result->ownership_provenance;
+    lir_func->register_count_ = result->register_count;
     lir_func->setInstructions(result->instructions);
     lir_func->setRegisterLanguageTypes(result->register_language_types);
     lir_func->setRegisterTypes(result->register_types);
@@ -403,6 +436,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     
     // Create function with only 'this' parameter (deinit takes no other parameters)
     size_t total_params = 1; // Only 'this'
+    checked_references_.clear();
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
     next_register_ = total_params;
     next_label_ = 0;
@@ -466,6 +500,12 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     this_register_ = UINT32_MAX;  // Clear this_register_
     
     resolve_linear_labels(current_function_.get());
+    if (ownership_facts_) {
+        const auto id = deinit_method.memory_info.semantic_id;
+        current_function_->inferred_effects = ownership_facts_->functions[id];
+        current_function_->ownership_parameters = ownership_facts_->parameters[id];
+        for (auto capture : current_function_->inferred_effects.captures_read) current_function_->ownership_captures.push_back(capture);
+    }
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
     current_function_ = nullptr;
@@ -483,6 +523,12 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     auto lir_func = func_manager.createFunction(full_method_name, params, Type::I64, nullptr);
     
     // Copy the instructions from our LIR_Function
+    lir_func->memory_effects_ = result->memory_effects;
+    lir_func->inferred_effects_ = result->inferred_effects;
+    lir_func->ownership_parameters_ = result->ownership_parameters;
+    lir_func->ownership_captures_ = result->ownership_captures;
+    lir_func->ownership_provenance_ = result->ownership_provenance;
+    lir_func->register_count_ = result->register_count;
     lir_func->setInstructions(result->instructions);
     func_manager.registerFunction(lir_func);
 

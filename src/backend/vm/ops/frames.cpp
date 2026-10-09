@@ -12,6 +12,22 @@ namespace Backend {
 namespace VM {
 namespace Register {
 
+LmFrame* RegisterVM::checked_frame(RegisterValue value, uint32_t index) {
+        if (!IS_PTR(value)) throw std::runtime_error("Invalid frame receiver");
+        auto pointer = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
+        bool live = false;
+        for (auto* owner = this; owner && !live; owner = owner->heap_parent_) {
+            std::lock_guard<std::recursive_mutex> lock(owner->heap_mutex_);
+            auto found = owner->vm_allocation_types.find(pointer);
+            live = found != owner->vm_allocation_types.end() && found->second == TYPE_FRAME;
+        }
+        if (!live) throw std::runtime_error("Invalid or expired frame receiver");
+        auto* frame = reinterpret_cast<LmFrame*>(pointer);
+        if (!frame->fields || index >= static_cast<uint32_t>(frame->field_count))
+            throw std::runtime_error("Invalid frame field index");
+        return frame;
+}
+
 void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
         case LIR::LIR_Op::NewFrame: {
@@ -23,64 +39,24 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::FrameGetField:
-            if (IS_PTR(registers[pc->a])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && f->header.type_id == TYPE_FRAME && pc->b < static_cast<uint32_t>(f->field_count)) {
-                    registers[pc->dst] = f->fields[pc->b];
-                } else {
-                    registers[pc->dst] = 0;
-                }
-            }
+            registers[pc->dst] = checked_frame(registers[pc->a], pc->b)->fields[pc->b];
             break;
         case LIR::LIR_Op::FrameSetField:
-            // pc->dst holds the frame pointer (container), pc->b holds the value.
-            if (IS_PTR(registers[pc->dst])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->dst]);
-                if (f && f->header.type_id == TYPE_FRAME && pc->a < static_cast<uint32_t>(f->field_count)) {
-                    f->fields[pc->a] = registers[pc->b];
-                    transfer_ownership(registers[pc->b], registers[pc->dst]);
-                }
-            }
+            checked_frame(registers[pc->dst], pc->a)->fields[pc->a] = registers[pc->b];
+            transfer_ownership(registers[pc->b], registers[pc->dst]);
             break;
         case LIR::LIR_Op::FrameGetFieldAtomic:
-            // Atomic variant: same semantics as the regular getter for now
-            // (the runtime helpers are also non-atomic underneath; the
-            // distinction exists for future memory-model work).
-            if (IS_PTR(registers[pc->a])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && f->header.type_id == TYPE_FRAME && pc->b < static_cast<uint32_t>(f->field_count)) {
-                    registers[pc->dst] = lm_frame_get_field_atomic(f, (int)pc->b);
-                } else {
-                    registers[pc->dst] = VAL_NIL;
-                }
-            } else {
-                registers[pc->dst] = VAL_NIL;
-            }
+            registers[pc->dst] = lm_frame_get_field_atomic(checked_frame(registers[pc->a], pc->b), static_cast<int>(pc->b));
             break;
         case LIR::LIR_Op::FrameSetFieldAtomic:
-            if (IS_PTR(registers[pc->dst])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->dst]);
-                if (f && f->header.type_id == TYPE_FRAME && pc->a < static_cast<uint32_t>(f->field_count)) {
-                    lm_frame_set_field_atomic(f, (int)pc->a, registers[pc->b]);
-                    transfer_ownership(registers[pc->b], registers[pc->dst]);
-                }
-            }
+            lm_frame_set_field_atomic(checked_frame(registers[pc->dst], pc->a), static_cast<int>(pc->a), registers[pc->b]);
+            transfer_ownership(registers[pc->b], registers[pc->dst]);
             break;
         case LIR::LIR_Op::FrameFieldAtomicAdd:
-            if (IS_PTR(registers[pc->a])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && pc->b < static_cast<uint32_t>(f->field_count)) {
-                    lm_frame_field_atomic_add(f, (int)pc->b, registers[pc->dst]);
-                }
-            }
+            lm_frame_field_atomic_add(checked_frame(registers[pc->a], pc->b), static_cast<int>(pc->b), registers[pc->dst]);
             break;
         case LIR::LIR_Op::FrameFieldAtomicSub:
-            if (IS_PTR(registers[pc->a])) {
-                LmFrame* f = (LmFrame*)UNBOX_PTR(registers[pc->a]);
-                if (f && pc->b < static_cast<uint32_t>(f->field_count)) {
-                    lm_frame_field_atomic_sub(f, (int)pc->b, registers[pc->dst]);
-                }
-            }
+            lm_frame_field_atomic_sub(checked_frame(registers[pc->a], pc->b), static_cast<int>(pc->b), registers[pc->dst]);
             break;
         case LIR::LIR_Op::FrameCallMethod:
             // Method dispatch on frames is performed through the regular

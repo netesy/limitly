@@ -1,4 +1,5 @@
 #include "region_lowering.hh"
+#include "memory/aot_value_kind.hh"
 #include "ir/Module.h"
 #include "ir/Instruction.h"
 #include "ir/Use.h"
@@ -12,23 +13,47 @@ void lower_region_ownership(ir::Module& module) {
     auto i64 = ctx->getIntegerType(64);
     auto void_type = ctx->getVoidType();
     auto zero = ctx->getConstantInt(i64, 0);
-    auto one = ctx->getConstantInt(i64, 1);
+    auto one = ctx->getConstantInt(i64, static_cast<uint64_t>(Memory::AOTValueKind::Object));
+    auto boolean = ctx->getConstantInt(i64, static_cast<uint64_t>(Memory::AOTValueKind::Boolean));
     std::unordered_map<std::string, ir::Function*> helpers;
-    auto declare = [&](const std::string& name, size_t argc, ir::Type* result) {
+    auto declare = [&](const std::string& name, size_t argc, ir::Type* result, ir::Type* argument_type = nullptr) {
         auto* fn = module.getFunction(name);
         if (!fn) {
             auto created = std::make_unique<ir::Function>(result, name, &module);
             fn = created.get();
             for (size_t i = 0; i < argc; ++i)
-                fn->addParameter(std::make_unique<ir::Parameter>(i64, "a" + std::to_string(i)));
+                fn->addParameter(std::make_unique<ir::Parameter>(argument_type ? argument_type : i64, "a" + std::to_string(i)));
             module.addFunction(std::move(created));
         }
         helpers[name] = fn;
     };
+    declare("lymar_aot_frame_field_address", 2, i64);
+    declare("lymar_aot_ref_create", 2, i64);
+    declare("lymar_aot_ref_create_checked", 3, i64);
+    declare("lymar_aot_nil", 0, i64);
+    declare("lymar_aot_boolean", 1, i64);
+    declare("lymar_aot_print_float", 1, void_type, ctx->getDoubleType());
+    declare("lymar_aot_scalar_to_string", 2, i64);
+    declare("lymar_aot_box_float", 1, i64, ctx->getDoubleType());
+    declare("lymar_aot_to_float", 2, ctx->getDoubleType());
+    declare("lymar_aot_to_integer", 2, i64);
+    declare("lymar_aot_to_boolean", 2, i64);
+    declare("lymar_aot_value_equal", 4, i64);
+    declare("lymar_aot_is_print_object", 2, i64);
+    declare("lymar_aot_is_nil", 2, i64);
+    declare("lymar_aot_is_object", 2, i64);
+    declare("lymar_aot_print_integer", 2, void_type);
+    declare("lymar_aot_copy_constant", 2, i64);
+    declare("lymar_aot_ref_resolve", 2, i64);
+    declare("lymar_aot_ref_move", 3, i64);
+    declare("lymar_aot_ref_release", 1, void_type);
+    declare("lymar_aot_ref_release_nullable", 1, void_type);
+    declare("lymar_aot_consume", 1, void_type);
     declare("lymar_aot_call_enter", 0, i64);
     declare("lymar_aot_call_leave", 1, void_type);
     declare("lymar_aot_arg_set", 2, void_type);
     declare("lymar_aot_arg_get", 1, i64);
+    declare("lymar_aot_arg_kind", 2, i64);
     declare("lymar_aot_return_pointer", 0, i64);
     declare("lymar_aot_param_push", 2, void_type);
     declare("lymar_aot_param_pop", 2, i64);
@@ -77,8 +102,8 @@ void lower_region_ownership(ir::Module& module) {
         emit(entry, beginning, "lymar_aot_call_enter", {});
         size_t parameter_index = 0;
         for (auto& param : fn->getParameters()) {
-            flags[param.get()] = param->getType()->isPointerTy() ? static_cast<ir::Value*>(one)
-                : emit(entry, beginning, "lymar_aot_arg_get", {ctx->getConstantInt(i64, parameter_index)});
+            flags[param.get()] = emit(entry, beginning, "lymar_aot_arg_kind",
+                {ctx->getConstantInt(i64, parameter_index), param->getType()->isPointerTy() ? static_cast<ir::Value*>(one) : zero});
             ++parameter_index;
         }
         for (auto& block_owner : fn->getBasicBlocks()) {
@@ -102,13 +127,45 @@ void lower_region_ownership(ir::Module& module) {
                         inst->replaceAllUsesWith(call.get());
                         inst = call.get();
                         *it = std::move(call);
-                        if (name == "lymar_aot_alloc" || name == "lymar_aot_resize") flags[inst] = one;
+                        if (name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_scalar_to_string") flags[inst] = one;
+                        if (name == "lymar_aot_boolean") flags[inst] = boolean;
                     }
                 }
                 auto& current_operands = inst->getOperands();
                 if (inst->getOpcode() == ir::Instruction::Call && !current_operands.empty()) {
                     auto* callee = dynamic_cast<ir::Function*>(current_operands[0]->get());
-                    if (callee && callee->getName() == "lymar_aot_region_move") {
+                    // Normalize erased arguments at the call boundary, using the
+                    // declared IR signature, before publishing their value kinds.
+                    if (callee) {
+                        size_t index = 1;
+                        for (auto& parameter : callee->getParameters()) {
+                            if (index >= current_operands.size()) break;
+                            auto* argument = current_operands[index]->get();
+                            if (argument->getType()->isFloatingPoint() && !parameter->getType()->isFloatingPoint()) {
+                                auto* boxed = emit(block, it, "lymar_aot_box_float", {argument});
+                                flags[boxed] = one;
+                                current_operands[index]->set(boxed);
+                            } else if (!argument->getType()->isFloatingPoint() && parameter->getType()->isFloatingPoint()) {
+                                auto* number = emit(block, it, "lymar_aot_to_float", {argument, flag(argument)});
+                                flags[number] = zero;
+                                current_operands[index]->set(number);
+                            }
+                            ++index;
+                        }
+                    }
+                    if (callee && callee->getName() == "lymar_aot_ref_create") {
+                        std::vector<ir::Value*> args{helpers.at("lymar_aot_ref_create_checked"), current_operands[1]->get(),
+                            current_operands[2]->get(), flag(current_operands[1]->get())};
+                        auto checked = std::make_unique<ir::Instruction>(inst->getType(), ir::Instruction::Call, args, block);
+                        checked->setName(inst->getName());
+                        inst->replaceAllUsesWith(checked.get());
+                        *it = std::move(checked);
+                    } else if (callee && (callee->getName() == "lymar_aot_is_nil" || callee->getName() == "lymar_aot_is_object" || callee->getName() == "lymar_aot_is_print_object" || callee->getName() == "lymar_aot_to_float" || callee->getName() == "lymar_aot_to_integer" || callee->getName() == "lymar_aot_to_boolean" || callee->getName() == "lymar_aot_print_integer" || callee->getName() == "lymar_aot_scalar_to_string")) {
+                        current_operands[2]->set(flag(current_operands[1]->get()));
+                    } else if (callee && callee->getName() == "lymar_aot_value_equal") {
+                        current_operands[3]->set(flag(current_operands[1]->get()));
+                        current_operands[4]->set(flag(current_operands[2]->get()));
+                    } else if (callee && callee->getName() == "lymar_aot_region_move") {
                         current_operands[4]->set(flag(current_operands[1]->get()));
                     } else if (callee && (callee->getName() == "lymar_aot_param_push" || callee->getName() == "lymar_aot_param_pop")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));
@@ -130,6 +187,18 @@ void lower_region_ownership(ir::Module& module) {
                          {address, value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : value,
                           value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : flag(value)});
                 } else if (inst->getOpcode() == ir::Instruction::Ret) {
+                    if (!current_operands.empty()) {
+                        auto* value = current_operands[0]->get();
+                        if (value->getType()->isFloatingPoint() && !fn->getType()->isFloatingPoint()) {
+                            auto* boxed = emit(block, it, "lymar_aot_box_float", {value});
+                            flags[boxed] = one;
+                            current_operands[0]->set(boxed);
+                        } else if (!value->getType()->isFloatingPoint() && fn->getType()->isFloatingPoint()) {
+                            auto* number = emit(block, it, "lymar_aot_to_float", {value, flag(value)});
+                            flags[number] = zero;
+                            current_operands[0]->set(number);
+                        }
+                    }
                     emit(block, it, "lymar_aot_call_leave", {current_operands.empty() ? static_cast<ir::Value*>(zero) : flag(current_operands[0]->get())});
                 } else if ((inst->getOpcode() == ir::Instruction::Copy || inst->getOpcode() == ir::Instruction::Cast) && !current_operands.empty()) {
                     flags[inst] = flag(current_operands[0]->get());

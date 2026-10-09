@@ -1,11 +1,11 @@
-// @error:memory_leak
-// Linear type may leak on break
-
+// @error:use_after_free
+// Breaking a loop does not restore ownership transferred inside it.
 fn test_loop() {
     var data = [1, 2, 3];
     while (true) {
-        break;  // ERROR: data may leak on break
+        var owner = data;
+        break;
     }
+    print(data[0]); // Invalid: the loop transferred data, then exited.
 }
-
 test_loop();

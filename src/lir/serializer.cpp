@@ -1,6 +1,10 @@
 #include "serializer.hh"
+#include "verifier.hh"
+#include "../memory/lir_analysis.hh"
 #include "backend/vm/vm_runtime.hh"
 #include "backend/vm/vm_value.hh"
+#include "backend/vm/vm_string.hh"
+#include <limits>
 #include <cstring>
 #include <cstdint>
 #include <stdexcept>
@@ -64,7 +68,8 @@ namespace LIR {
 //  12   BoxedFloat     — 8 bytes double   (lm_box_float(v))
 //  13   BoxedBool      — 1 byte           (lm_box_bool(v))
 //  14   BoxedNullPtr   — no payload       (lm_box_nullptr())
-//  255  Unknown        — no payload (restored as VAL_NIL; loses info)
+//  15   NativeString   — 4 bytes byte length + payload (including embedded NUL)
+//  Unsupported constants and unknown tags are rejected.
 // ============================================================================
 
 namespace {
@@ -88,7 +93,7 @@ enum class ConstTag : uint8_t {
     BoxedFloat   = 12,
     BoxedBool    = 13,
     BoxedNullPtr = 14,
-    Unknown      = 255,
+    NativeString = 15,
 };
 
 // ---- Byte writer (serialize side) ---------------------------------------
@@ -206,6 +211,13 @@ void write_const_val(Writer& w, Backend::Value v) {
         }
         ObjHeader* h = static_cast<ObjHeader*>(raw);
         switch (h->type_id) {
+            case TYPE_STRING: {
+                auto* string = reinterpret_cast<LmStringHeader*>(h);
+                if (string->len > std::numeric_limits<uint32_t>::max()) throw std::runtime_error("LIR serialize: string constant is too large");
+                w.u8(static_cast<uint8_t>(ConstTag::NativeString));
+                w.u32(static_cast<uint32_t>(string->len)); w.bytes(string->data, string->len);
+                return;
+            }
             case TYPE_I64: {
                 w.u8(static_cast<uint8_t>(ConstTag::HeapI64));
                 int64_t val = reinterpret_cast<ObjI64*>(h)->value;
@@ -274,8 +286,7 @@ void write_const_val(Writer& w, Backend::Value v) {
             // fall through
         }
     }
-    // Unknown representation — drop and round-trip as NIL.
-    w.u8(static_cast<uint8_t>(ConstTag::Unknown));
+    throw std::runtime_error("LIR serialize: unsupported constant representation");
 }
 
 // Read a ConstTag + payload from `r` and reconstruct a Backend::Value.
@@ -301,6 +312,10 @@ Backend::Value read_const_val(Reader& r) {
             return lm_alloc_u128(r.u128());
         case ConstTag::HeapFloat:
             return lm_alloc_float(r.f64());
+        case ConstTag::NativeString: {
+            auto bytes = r.str();
+            return BOX_PTR(lm_str_from_bytes(bytes.data(), bytes.size()));
+        }
         case ConstTag::BoxedString: {
             uint32_t len = r.u32();
             std::string s;
@@ -316,9 +331,8 @@ Backend::Value read_const_val(Reader& r) {
             return BOX_PTR(lm_box_bool(r.u8()));
         case ConstTag::BoxedNullPtr:
             return BOX_PTR(lm_box_nullptr());
-        case ConstTag::Unknown:
         default:
-            return VAL_NIL;
+            throw std::runtime_error("LIR deserialize: unknown constant tag");
     }
 }
 
@@ -339,6 +353,10 @@ std::vector<uint8_t> Serializer::serialize(const LIR_Function& func) {
     w.str(func.name);
     w.u32(func.param_count);
     w.u32(func.register_count);
+    w.u32(static_cast<uint32_t>(func.memory_effects.parameters.size()));
+    for (auto effect : func.memory_effects.parameters) w.u8(static_cast<uint8_t>(effect));
+    w.u8(static_cast<uint8_t>(func.memory_effects.result));
+    w.u32(func.memory_effects.borrowed_parameter);
     w.u32(static_cast<uint32_t>(func.instructions.size()));
 
     for (const auto& inst : func.instructions) {
@@ -371,6 +389,9 @@ std::vector<uint8_t> Serializer::serialize(const LIR_Function& func) {
         w.u32(static_cast<uint32_t>(inst.call_arg_types.size()));
         for (Type t : inst.call_arg_types) w.u32(static_cast<uint32_t>(t));
 
+        w.u32(static_cast<uint32_t>(inst.call_arg_ownership.size()));
+        for (auto effect : inst.call_arg_ownership) w.u8(static_cast<uint8_t>(effect));
+
         // loc (optional)
         bool has_loc = !inst.loc.file.empty();
         w.flag(has_loc);
@@ -385,6 +406,31 @@ std::vector<uint8_t> Serializer::serialize(const LIR_Function& func) {
         if (!inst.comment.empty()) w.str(inst.comment);
     }
 
+    // Baseline version 1: semantic ownership facts are part of canonical LIR.
+    auto identities = [&](const auto& ids) {
+        w.u32(static_cast<uint32_t>(ids.size())); for (auto id : ids) w.u64(id);
+    };
+    identities(func.ownership_parameters); identities(func.ownership_captures);
+    w.u32(static_cast<uint32_t>(func.inferred_effects.parameters.size()));
+    for (auto flags : func.inferred_effects.parameters) w.u8(flags);
+    identities(func.inferred_effects.return_aliases); identities(func.inferred_effects.return_projections);
+    identities(func.inferred_effects.captures_read); identities(func.inferred_effects.captures_consumed);
+    w.flag(func.inferred_effects.unknown_result);
+    identities(func.inferred_effects.returned_callables); identities(func.inferred_effects.returned_globals);
+    w.u32(static_cast<uint32_t>(func.inferred_effects.returned_capture_parameters.size()));
+    for (auto [capture, p] : func.inferred_effects.returned_capture_parameters) {w.u64(capture); w.u32(p);}
+    identities(func.inferred_effects.captures_opaque);
+    for (const auto& inst : func.instructions) {
+        identities(inst.ownership.reads); identities(inst.ownership.consumes); identities(inst.ownership.defines); identities(inst.ownership.initializes);
+        w.u32(static_cast<uint32_t>(inst.ownership.aliases.size()));
+        for (auto [binding, origin] : inst.ownership.aliases) { w.u64(binding); w.u64(origin); }
+    }
+    w.u32(static_cast<uint32_t>(func.ownership_provenance.size()));
+    std::map<Reg, Memory::NodeOwnership> ordered(func.ownership_provenance.begin(), func.ownership_provenance.end());
+    for (const auto& [reg, fact] : ordered) {
+        w.u32(reg); w.u64(fact.binding); w.u64(fact.allocation); w.u64(fact.region);
+        w.flag(fact.managed); w.flag(fact.unknown_origin); identities(fact.origins);
+    }
     return w.buf;
 }
 
@@ -407,10 +453,26 @@ LIR_Function Serializer::deserialize(const std::vector<uint8_t>& buffer) {
     std::string name = r.str();
     uint32_t param_count = r.u32();
     uint32_t register_count = r.u32();
+    Memory::FunctionEffects effects;
+    auto read_effect = [&]() {
+        auto value = r.u8();
+        if (value > static_cast<uint8_t>(Memory::Ownership::WriteBorrow))
+            throw std::runtime_error("LIR deserialize: invalid ownership effect");
+        return static_cast<Memory::Ownership>(value);
+    };
+    auto effect_count = r.u32();
+    if (effect_count && effect_count != param_count)
+        throw std::runtime_error("LIR deserialize: parameter effect count mismatch");
+    for (uint32_t i = 0; i < effect_count; ++i) effects.parameters.push_back(read_effect());
+    effects.result = read_effect();
+    effects.borrowed_parameter = r.u32();
+    if (effects.borrowed_parameter != UINT32_MAX && effects.borrowed_parameter >= param_count)
+        throw std::runtime_error("LIR deserialize: invalid borrow origin");
     uint32_t inst_count = r.u32();
 
     LIR_Function func(name, param_count);
     func.register_count = register_count;
+    func.memory_effects = std::move(effects);
     func.instructions.reserve(inst_count);
 
     for (uint32_t i = 0; i < inst_count; ++i) {
@@ -420,10 +482,18 @@ LIR_Function Serializer::deserialize(const std::vector<uint8_t>& buffer) {
         // that an instruction with no loc on the wire round-trips to a
         // deterministic loc{} rather than uninitialized memory.
         inst.loc = LIR_SourceLoc{"", 0, 0};
-        inst.op = static_cast<LIR_Op>(r.u32());
-        inst.result_type = static_cast<Type>(r.u32());
-        inst.type_a = static_cast<Type>(r.u32());
-        inst.type_b = static_cast<Type>(r.u32());
+        auto opcode = r.u32();
+        if (opcode > static_cast<uint32_t>(LIR_Op::RefMove))
+            throw std::runtime_error("LIR deserialize: invalid opcode");
+        inst.op = static_cast<LIR_Op>(opcode);
+        auto read_type = [&]() {
+            auto type = r.u32();
+            if (type > static_cast<uint32_t>(Type::Void)) throw std::runtime_error("LIR deserialize: invalid type");
+            return static_cast<Type>(type);
+        };
+        inst.result_type = read_type();
+        inst.type_a = read_type();
+        inst.type_b = read_type();
         inst.dst = r.u32();
         inst.a = r.u32();
         inst.b = r.u32();
@@ -442,8 +512,13 @@ LIR_Function Serializer::deserialize(const std::vector<uint8_t>& buffer) {
         uint32_t arg_t_n = r.u32();
         inst.call_arg_types.reserve(arg_t_n);
         for (uint32_t k = 0; k < arg_t_n; ++k) {
-            inst.call_arg_types.push_back(static_cast<Type>(r.u32()));
+            inst.call_arg_types.push_back(read_type());
         }
+
+        auto ownership_count = r.u32();
+        if (ownership_count && ownership_count != inst.call_args.size())
+            throw std::runtime_error("LIR deserialize: argument effect count mismatch");
+        for (uint32_t k = 0; k < ownership_count; ++k) inst.call_arg_ownership.push_back(read_effect());
 
         if (r.flag()) {
             inst.loc.file = r.str();
@@ -453,9 +528,59 @@ LIR_Function Serializer::deserialize(const std::vector<uint8_t>& buffer) {
 
         if (r.flag()) inst.comment = r.str();
 
+        if (!Memory::valid_reference_instruction(inst))
+            throw std::runtime_error("LIR deserialize: malformed memory capability instruction");
         func.instructions.push_back(std::move(inst));
     }
 
+    auto read_ids = [&](auto& ids) {
+        auto count = r.u32(); r.need(static_cast<size_t>(count) * 8);
+        for (uint32_t i = 0; i < count; ++i) {
+            const auto id = r.u64();
+            if constexpr (requires { ids.push_back(id); }) ids.push_back(id);
+            else ids.insert(static_cast<typename std::decay_t<decltype(ids)>::value_type>(id));
+        }
+    };
+    read_ids(func.ownership_parameters); read_ids(func.ownership_captures);
+    auto flags_count = r.u32();
+    if (flags_count > func.param_count) throw std::runtime_error("LIR deserialize: semantic parameter count mismatch");
+    for (uint32_t i = 0; i < flags_count; ++i) {
+        auto flags = r.u8();
+        if (flags & ~31u) throw std::runtime_error("LIR deserialize: invalid semantic effects");
+        func.inferred_effects.parameters.push_back(flags);
+    }
+    read_ids(func.inferred_effects.return_aliases); read_ids(func.inferred_effects.return_projections);
+    for (auto p : func.inferred_effects.return_projections) if (p >= func.param_count) throw std::runtime_error("LIR deserialize: invalid return projection");
+    for (auto p : func.inferred_effects.return_aliases)
+        if (p >= func.param_count) throw std::runtime_error("LIR deserialize: invalid semantic return alias");
+    read_ids(func.inferred_effects.captures_read); read_ids(func.inferred_effects.captures_consumed);
+    func.inferred_effects.unknown_result = r.flag();
+    read_ids(func.inferred_effects.returned_callables); read_ids(func.inferred_effects.returned_globals);
+    auto capture_count = r.u32(); r.need(static_cast<size_t>(capture_count) * 12);
+    for (uint32_t i = 0; i < capture_count; ++i) {
+        auto capture = r.u64(); auto p = r.u32();
+        if (!capture || p >= func.param_count || !func.inferred_effects.returned_capture_parameters.emplace(capture, p).second)
+            throw std::runtime_error("LIR deserialize: invalid returned closure capture");
+    }
+    read_ids(func.inferred_effects.captures_opaque);
+    for (auto& inst : func.instructions) {
+        read_ids(inst.ownership.reads); read_ids(inst.ownership.consumes); read_ids(inst.ownership.defines); read_ids(inst.ownership.initializes);
+        auto count = r.u32(); r.need(static_cast<size_t>(count) * 16);
+        for (uint32_t i = 0; i < count; ++i) {auto binding = r.u64(); auto origin = r.u64(); inst.ownership.aliases.emplace_back(binding, origin);}
+    }
+    auto provenance_count = r.u32();
+    for (uint32_t i = 0; i < provenance_count; ++i) {
+        auto reg = r.u32();
+        if (reg >= func.register_count) throw std::runtime_error("LIR deserialize: invalid provenance register");
+        Memory::NodeOwnership fact;
+        fact.binding = r.u64(); fact.allocation = r.u64(); fact.region = r.u64();
+        fact.managed = r.flag(); fact.unknown_origin = r.flag(); read_ids(fact.origins);
+        if (!func.ownership_provenance.emplace(reg, std::move(fact)).second)
+            throw std::runtime_error("LIR deserialize: duplicate provenance register");
+    }
+    if (r.pos != buffer.size()) throw std::runtime_error("LIR deserialize: trailing data");
+    std::vector<std::string> ownership_errors;
+    if (!Verifier::verify_memory_regions(func, ownership_errors) || !Verifier::verify_ownership(func, ownership_errors)) throw std::runtime_error("LIR deserialize: invalid ownership dataflow");
     return func;
 }
 

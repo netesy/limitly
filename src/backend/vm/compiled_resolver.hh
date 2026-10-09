@@ -44,7 +44,7 @@ public:
                         void* sym = findSymbolInHandle(handle, symbol);
                         if (sym) {
                             auto version = reinterpret_cast<uint32_t (*)()>(findSymbolInHandle(handle, "lymar_module_abi_version"));
-                            symbol_abi_[symbol] = version ? version() : 1;
+                            symbol_abi_[symbol] = version ? version() : 0;
                             resolved_symbols_[symbol] = sym;
                             return sym;
                         }
@@ -58,7 +58,7 @@ public:
     bool dispatch(const std::string& symbol, const LIR::LIR_Inst& call,
                   std::vector<LmValue>& registers, void* vm_context,
                   const std::vector<LmValue>& closure_args = {}) {
-        // ABI 2 shares canonical VM values; ABI 1 retains its typed scalar bridge.
+        // Baseline ABI 1 shares canonical VM values; legacy scalar artifacts must rebuild.
         auto* function = LIR::FunctionRegistry::getInstance().getFunction(symbol);
         if (!function) return false;
         bool exported = false;
@@ -81,51 +81,13 @@ public:
             if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "PRECOMPILED_CALL: " << symbol << "\n";
             return true;
         }
-        if (native_symbol && symbol_abi_[symbol] != 1) {
-            throw std::runtime_error("Unsupported precompiled module ABI for '" + symbol + "'");
+        if (native_symbol) {
+            throw std::runtime_error("Unsupported precompiled module ABI for '" + symbol + "'; rebuild the module");
         }
-        auto unsupported = [&](const std::string& reason = "native symbol or scalar ABI bridge unavailable") {
-            if (std::getenv("LYMAR_DISABLE_INTERPRETER_FALLBACK")) {
-                throw std::runtime_error("Precompiled dispatch unavailable for '" + symbol +
-                                         "': " + reason);
-            }
-            return false;
-        };
-        if (!closure_args.empty() || function->param_count != call.call_args.size()) return unsupported();
-        std::vector<lymarrt_type> types;
-        std::vector<lymarrt_value> values;
-        for (size_t i = 0; i < call.call_args.size(); ++i) {
-            auto it = function->register_types.find(i);
-            if (it == function->register_types.end()) return unsupported("missing argument type metadata");
-            auto value = registers.at(call.call_args[i]);
-            lymarrt_value native{};
-            if (it->second == LIR::Type::F64 || it->second == LIR::Type::F32) {
-                native.type = LYMARRT_TYPE_F64;
-                native.val.f64 = as_float(value);
-            } else if (it->second == LIR::Type::I64 || it->second == LIR::Type::Bool) {
-                native.type = LYMARRT_TYPE_I64;
-                native.val.i64 = IS_BOOL(value) ? UNBOX_BOOL(value) : as_i64(value);
-            } else return unsupported("unsupported argument type " + std::to_string(static_cast<int>(it->second)));
-            types.push_back(static_cast<lymarrt_type>(native.type));
-            values.push_back(native);
+        if (std::getenv("LYMAR_DISABLE_INTERPRETER_FALLBACK")) {
+            throw std::runtime_error("Precompiled dispatch unavailable for '" + symbol + "': native symbol unavailable");
         }
-        bool float_return = false;
-        for (const auto& inst : function->instructions) {
-            if (inst.op != LIR::LIR_Op::Return && inst.op != LIR::LIR_Op::Ret) continue;
-            auto it = function->register_types.find(inst.a);
-            if (it == function->register_types.end()) return unsupported("missing return type metadata");
-            if (it->second == LIR::Type::F64 || it->second == LIR::Type::F32) float_return = true;
-            else if (it->second != LIR::Type::I64 && it->second != LIR::Type::Bool) return unsupported();
-        }
-        void* sym = getSymbol(symbol);
-        if (!sym) return unsupported();
-        lymarrt_value result{};
-        if (!lymarrt_ffi_call(sym, float_return ? LYMARRT_TYPE_F64 : LYMARRT_TYPE_I64,
-                            types.data(), values.data(), values.size(), &result)) return unsupported();
-        registers.at(call.dst) = float_return ? make_float(result.val.f64) :
-            (call.result_type == LIR::Type::Bool ? (result.val.i64 ? VAL_TRUE : VAL_FALSE) : make_i64(result.val.i64));
-        if (std::getenv("LYMAR_TRACE_PRECOMPILED")) std::cerr << "PRECOMPILED_CALL: " << symbol << "\n";
-        return true;
+        return false;
     }
 
 private:

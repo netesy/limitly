@@ -24,6 +24,16 @@ void CFGAnalysis::analyze() {
     // Identify basic block boundaries
     std::unordered_set<size_t> block_starts;
     block_starts.insert(0);
+    // Generated canonical LIR uses instruction offsets for CFG jumps and
+    // need not emit Label pseudo-ops. Preserve symbolic-label support for
+    // existing construction clients, but never silently lose numeric edges.
+    std::unordered_set<uint32_t> explicit_labels;
+    for (const auto& inst : insts)
+        if (inst.op == LIR_Op::Label) explicit_labels.insert(static_cast<uint32_t>(inst.imm));
+    for (const auto& inst : insts)
+        if ((inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) &&
+            !explicit_labels.count(static_cast<uint32_t>(inst.imm)) && inst.imm < insts.size())
+            block_starts.insert(static_cast<size_t>(inst.imm));
 
     for (size_t i = 0; i < insts.size(); ++i) {
         const auto& inst = insts[i];
@@ -71,6 +81,9 @@ void CFGAnalysis::analyze() {
             label_imm_to_block_[static_cast<uint32_t>(insts[i].imm)] = inst_to_block_[i];
         }
     }
+
+    for (size_t i = 0; i < insts.size(); ++i)
+        label_imm_to_block_.try_emplace(static_cast<uint32_t>(i), inst_to_block_[i]);
 
     // Compute successors & predecessors
     for (auto& block : blocks_) {
@@ -395,7 +408,18 @@ size_t DefUseAnalysis::get_use_count(Reg reg) const {
 }
 
 bool DefUseAnalysis::has_side_effects(const LIR_Inst& inst) {
+    if (!inst.ownership.empty()) return true;
     return (
+        inst.op == LIR_Op::MemoryAlloc || inst.op == LIR_Op::MemoryFree ||
+        inst.op == LIR_Op::MemoryResize || inst.op == LIR_Op::MemoryCopy || inst.op == LIR_Op::MemoryFill ||
+        inst.op == LIR_Op::StoreGlobal || inst.op == LIR_Op::FrameCallDeinit ||
+        inst.op == LIR_Op::FrameSetField || inst.op == LIR_Op::FrameSetFieldAtomic ||
+        inst.op == LIR_Op::ListAppend || inst.op == LIR_Op::ListSet || inst.op == LIR_Op::DictSet || inst.op == LIR_Op::TupleSet ||
+        inst.op == LIR_Op::ResourceCreate || inst.op == LIR_Op::ResourceCall || inst.op == LIR_Op::ResourceDestroy ||
+        inst.op == LIR_Op::CallbackCreate || inst.op == LIR_Op::CallbackDestroy ||
+        inst.op == LIR_Op::RefCreate || inst.op == LIR_Op::RefResolve ||
+        inst.op == LIR_Op::RefMove || inst.op == LIR_Op::RefRelease || inst.op == LIR_Op::OwnershipConsume ||
+        inst.op == LIR_Op::RegionEnter || inst.op == LIR_Op::RegionExit || inst.op == LIR_Op::RegionMove ||
         inst.op == LIR_Op::Call || inst.op == LIR_Op::CallVoid ||
         inst.op == LIR_Op::CallIndirect || inst.op == LIR_Op::CallBuiltin ||
         inst.op == LIR_Op::CallVariadic ||

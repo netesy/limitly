@@ -1,4 +1,5 @@
 #include "../generator.hh"
+#include "../../memory/reference_flags.hh"
 #include "../functions.hh"
 #include "../intrinsic_registry.hh"
 #include "../../backend/vm/constant_utils.hh"
@@ -78,6 +79,13 @@ bool resolve_match_variant_info(TypeSystem* type_system,
 
 void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression> pattern, Reg val_reg) {
     if (!pattern) return;
+    if (auto facts = gen->ownership_facts()) {
+        auto found = facts->nodes.find(pattern->memory_info.semantic_id);
+        if (found != facts->nodes.end() && !found->second.event.empty()) {
+            LIR_Inst event(LIR_Op::Nop, Type::Void, UINT32_MAX, UINT32_MAX, UINT32_MAX);
+            event.ownership = found->second.event; gen->emit_instruction(event);
+        }
+    }
     if (auto var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(pattern)) {
         if (var->name != "_") gen->bind_variable(var->name, val_reg);
     } else if (auto val_p = std::dynamic_pointer_cast<LM::Frontend::AST::ValPatternExpr>(pattern)) {
@@ -210,6 +218,29 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
 }
 
 void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
+    emit_stmt_impl(stmt);
+    if (ownership_facts_ && current_function_) {
+        auto found = ownership_facts_->nodes.find(stmt.memory_info.semantic_id);
+        if (found != ownership_facts_->nodes.end()) {
+            const auto& fact = found->second;
+            emit_ownership_event(fact.event);
+            if (auto variable = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(&stmt)) {
+                auto value = resolve_variable(variable->name);
+                current_function_->ownership_provenance[value] = fact;
+                // Unknown nested/opaque alias provenance needs a live reference
+                // capability. Proven local transfers do not allocate handles.
+                const bool initially_nil = !variable->initializer || (variable->initializer->inferred_type && variable->initializer->inferred_type->tag == TypeTag::Nil);
+                if ((fact.managed || initially_nil) && (fact.unknown_origin || ownership_facts_->reference_bindings.count(fact.binding)) && value != UINT32_MAX) {
+                    auto handle = allocate_register();
+                    emit_instruction(LIR_Inst(LIR_Op::RefCreate, Type::U64, handle, value, UINT32_MAX, Memory::ReferenceNullable));
+                    checked_references_[fact.binding] = handle;
+                }
+            }
+        }
+    }
+}
+
+void Generator::emit_stmt_impl(LM::Frontend::AST::Statement& stmt) {
    // Unified region management: emit RegionEnter based on memory_info
    emit_region_enter_from_memory_info(stmt);
     

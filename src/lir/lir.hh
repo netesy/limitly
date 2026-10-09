@@ -2,6 +2,8 @@
 #ifndef LIR_H
 #define LIR_H
 
+#include "../memory/model.hh"
+#include "../memory/ownership.hh"
 #include <vector>
 #include <string>
 #include <cstdint>
@@ -191,6 +193,11 @@ enum class LIR_Op : uint8_t {
     EffectPerform,      // Perform algebraic effect (tag in a, payload in b)
     EffectHandle,       // Register effect handler
     EffectResume,       // Resume effect handler continuation
+    RefCreate,          // dst = checked capability for a; imm 0 read, 1 write
+    RefResolve,         // dst = checked pointer from token a; imm 0 read, 1 write
+    RefRelease,         // End capability a; a second release is an error
+    OwnershipConsume,   // Invalidate old capabilities for a; refuse live borrows
+    RefMove,            // dst = moved capability a in ancestor lexical region imm (0 caller)
 };
 
 // ============================================================================
@@ -264,6 +271,7 @@ enum class LIR_Op : uint8_t {
     X(RegionEnter) X(RegionExit) X(RegionMove) \
     /* === Algebraic Effects === */ \
     X(EffectPerform) X(EffectHandle) X(EffectResume) \
+    X(RefCreate) X(RefResolve) X(RefRelease) X(OwnershipConsume) X(RefMove) \
 
 struct LIR_SourceLoc {
     std::string file;
@@ -272,6 +280,7 @@ struct LIR_SourceLoc {
 };
 
 struct LIR_Inst {
+    Memory::OwnershipEvent ownership;
     LIR_Op op;
     Type result_type;
     Type type_a;
@@ -285,6 +294,7 @@ struct LIR_Inst {
     std::string type_name;
     std::vector<Reg> call_args;
     std::vector<Type> call_arg_types;
+    std::vector<Memory::Ownership> call_arg_ownership;
     std::string comment;
     LIR_SourceLoc loc;
     
@@ -400,6 +410,10 @@ public:
     uint32_t param_count;
     uint32_t register_count;
     LIR_DebugInfo debug_info;
+    Memory::FunctionEffects memory_effects;
+    Memory::SemanticEffects inferred_effects;
+    std::vector<Memory::Identity> ownership_parameters, ownership_captures;
+    std::unordered_map<Reg, Memory::NodeOwnership> ownership_provenance;
     OptimizationFlags optimizations;
     std::unordered_map<std::string, Reg> variable_to_reg;
     std::unordered_map<Reg, Type> register_types;
@@ -411,7 +425,9 @@ public:
     LIR_Function(const LIR_Function& other) 
         : name(other.name), instructions(other.instructions), cfg(std::make_unique<LIR_CFG>()),
           param_count(other.param_count), register_count(other.register_count),
-          debug_info(other.debug_info), optimizations(other.optimizations),
+          debug_info(other.debug_info), memory_effects(other.memory_effects), inferred_effects(other.inferred_effects),
+          ownership_parameters(other.ownership_parameters), ownership_captures(other.ownership_captures),
+          ownership_provenance(other.ownership_provenance), optimizations(other.optimizations),
           variable_to_reg(other.variable_to_reg), register_types(other.register_types),
           register_language_types(other.register_language_types) {}
           
@@ -419,7 +435,9 @@ public:
         if (this != &other) {
             name = other.name; instructions = other.instructions; cfg = std::make_unique<LIR_CFG>();
             param_count = other.param_count; register_count = other.register_count;
-            debug_info = other.debug_info; optimizations = other.optimizations;
+            debug_info = other.debug_info; memory_effects = other.memory_effects; inferred_effects = other.inferred_effects;
+            ownership_parameters = other.ownership_parameters; ownership_captures = other.ownership_captures;
+            ownership_provenance = other.ownership_provenance; optimizations = other.optimizations;
             variable_to_reg = other.variable_to_reg; register_types = other.register_types;
             register_language_types = other.register_language_types;
         }

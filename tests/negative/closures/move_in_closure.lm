@@ -8,6 +8,7 @@ fn test() {
         var x = data;  // Move into closure
     };
     
+    f(); // The transfer happens when the closure body executes.
     var y = data[0];  // ERROR: data already moved
 }
 

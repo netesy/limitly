@@ -62,6 +62,24 @@ RegisterValue RegisterVM::call_interpreted(const std::string& name,
 }
 
 void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
+    if (pc->op == LIR::LIR_Op::CallBuiltin && pc->dst == UINT32_MAX) {
+        // Builtins may return boxed values even when the caller discards them.
+        // Use a real temporary destination, then retain ownership for cleanup.
+        auto temporary = *pc;
+        const auto original_size = registers.size();
+        temporary.dst = static_cast<LIR::Reg>(original_size);
+        registers.push_back(VAL_NIL);
+        try {
+            execute_calls(&temporary);
+            register_native_allocation(registers[temporary.dst]);
+            registers.resize(original_size);
+        } catch (...) {
+            registers.resize(original_size);
+            throw;
+        }
+        return;
+    }
+
     ResourceManager::getInstance().setCurrentFiber(get_current_fiber());
     switch (pc->op) {
         case LIR::LIR_Op::CallBuiltin:

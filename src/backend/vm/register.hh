@@ -2,6 +2,7 @@
 #define REGISTER_H
 
 #include "../../lir/lir.hh"
+#include "../../memory/contracts.hh"
 #include "../../frontend/type_checker.hh"
 #include "../register_value.hh"
 #include "../task.hh"
@@ -48,10 +49,16 @@ public:
     void set_global(const std::string& name, RegisterValue value);
     // Native modules share tagged heap objects and the caller's ownership region.
     void register_native_allocation(RegisterValue value);
+    LmFrame* checked_frame(RegisterValue value, uint32_t index);
     void transfer_native_ownership(RegisterValue child, RegisterValue container) {
         transfer_ownership(child, container);
     }
 
+    uint64_t borrow_memory(RegisterValue value, bool writable);
+    RegisterValue resolve_memory(uint64_t token, bool writable);
+    void release_memory_borrow(uint64_t token) { memory_lifetimes_.end_borrow(token); }
+    void consume_memory(RegisterValue value);
+    uint64_t move_memory_reference(uint64_t token, uint32_t lexical);
     size_t live_allocation_count() const { return vm_allocation_types.size(); }
     size_t live_raw_allocation_count() const { return owned_raw_memory.size(); }
     size_t live_callback_count() const { return owned_callbacks.size(); }
@@ -185,6 +192,7 @@ private:
 
     std::vector<RegisterValue> registers;
     
+    Memory::LifetimeRegistry memory_lifetimes_;
     // Region and memory model tracking
     struct RegionInstance {
         uint32_t lexical_id;

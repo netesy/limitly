@@ -4,7 +4,7 @@
 #include "lir.hh"
 #include "optimizer.hh"
 #include "metrics.hh"
-#include "../memory/memory.hh"
+#include "../memory/model.hh"
 #include "../frontend/ast.hh"
 #include "../frontend/type_checker.hh"
 #include <memory>
@@ -22,6 +22,7 @@ class Generator {
 public:
     static constexpr uint32_t INVALID_LOOP_LABEL = UINT32_MAX;
     explicit Generator();
+    const Memory::SemanticFacts* ownership_facts() const { return ownership_facts_.get(); }
     
     // Main entry point - now takes TypeCheckResult instead of raw LM::Frontend::AST
     std::unique_ptr<LIR_Function> generate_program(const LM::Frontend::TypeCheckResult& type_check_result);
@@ -186,7 +187,12 @@ private:
     
     // LM::Frontend::AST node visitors
     void emit_stmt(LM::Frontend::AST::Statement& stmt);
+    void emit_stmt_impl(LM::Frontend::AST::Statement& stmt);
+    std::shared_ptr<Memory::SemanticFacts> ownership_facts_;
+    std::unordered_map<Memory::Identity, Reg> checked_references_;
+    void emit_ownership_event(const Memory::OwnershipEvent& event);
     Reg emit_expr(LM::Frontend::AST::Expression& expr);
+    Reg emit_expr_impl(LM::Frontend::AST::Expression& expr);
     
     // Specific expression handlers
     Reg emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr expected_type = nullptr);
@@ -203,6 +209,7 @@ private:
     
     // Loop helper methods
     void emit_traditional_for_loop(LM::Frontend::AST::ForStatement& stmt);
+    Reg emit_checked_dereference(LM::Frontend::AST::Expression& object, Reg value);
     Reg emit_index_expr(LM::Frontend::AST::IndexExpr& expr);
     Reg emit_member_expr(LM::Frontend::AST::MemberExpr& expr);
     Reg emit_member_access_with_obj(LM::Frontend::AST::MemberExpr& expr, Reg object_reg);

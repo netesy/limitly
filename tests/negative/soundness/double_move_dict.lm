@@ -2,7 +2,7 @@
 // Moving same dict twice
 
 fn consume_dict(map: {str: int}) {
-    // map is consumed
+    var transferred = map;
 }
 
 var data = {"x": 10, "y": 20};

@@ -1,4 +1,7 @@
 // Private standalone-AOT ownership helpers. No public object/header fields.
+#include "memory.hh"
+#include "reference_flags.hh"
+#include "aot_value_kind.hh"
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
@@ -14,6 +17,8 @@
 
 namespace {
 using Word = uint64_t;
+constexpr Word object_kind = static_cast<Word>(LM::Memory::AOTValueKind::Object);
+constexpr Word boolean_kind = static_cast<Word>(LM::Memory::AOTValueKind::Boolean);
 struct Allocation {
     size_t size;
     Word owner;
@@ -33,6 +38,8 @@ struct Files {
     ~Files() { for (auto [id, file] : handles) if (file) std::fclose(file); }
 };
 struct Heap {
+    LM::Memory::DefaultAllocator allocator;
+    LM::Memory::LifetimeRegistry lifetimes;
     struct Invocation {
         std::vector<Word> args;
         std::unordered_set<Word> slots;
@@ -41,7 +48,7 @@ struct Heap {
     Word active = 0, next = 1;
     std::map<Word, Allocation> allocations;
     std::unordered_map<Word, Region> regions{{0, {0, 0, 0, {}}}};
-    std::unordered_map<Word, bool> shadow;
+    std::unordered_map<Word, Word> shadow;
     std::vector<Invocation> invocations;
     std::vector<Word> pending_args;
     Word return_pointer = 0;
@@ -79,9 +86,10 @@ struct Heap {
         auto found = allocations.find(pointer);
         if (found == allocations.end()) throw std::runtime_error("AOT free of unowned allocation");
         regions.at(found->second.owner).members.erase(pointer);
-        for (auto [offset, child] : found->second.edges) shadow.erase(pointer + offset);
+        std::erase_if(shadow, [&](auto entry) { return entry.first >= pointer && entry.first - pointer < found->second.size; });
+        lifetimes.revoke(pointer);
         allocations.erase(found);
-        std::free(reinterpret_cast<void*>(pointer));
+        allocator.deallocate(reinterpret_cast<void*>(pointer));
     }
     void cleanup(Word region) {
         // Fields and children remain alive throughout destructor execution.
@@ -92,6 +100,7 @@ struct Heap {
             if (objects.empty()) break;
             for (auto object : objects) finalize(object);
         }
+        lifetimes.end_region(region);
         while (!regions.at(region).members.empty()) release(*regions.at(region).members.begin());
     }
     ~Heap() {
@@ -120,6 +129,155 @@ const char* string_data(Word value) {
 }
 
 extern "C" {
+// Frame operations require a live, correctly shaped receiver before addressing
+// its fields. This is backend-private layout validation, not frontend inference.
+uint64_t lymar_aot_frame_field_address(uint64_t pointer, uint64_t index) {
+    auto& h = heap();
+    auto frame = h.allocations.find(pointer);
+    if (frame == h.allocations.end() || frame->second.size < 40 || (read_word(pointer) & 0xffffffff) != 15)
+        throw std::runtime_error("Invalid or expired frame receiver");
+    auto count = read_word(pointer, 24);
+    if (index >= count) throw std::runtime_error("Invalid frame field index");
+    auto fields = read_word(pointer, 16);
+    auto array = h.allocations.find(fields);
+    if (array == h.allocations.end() || count > array->second.size / sizeof(Word))
+        throw std::runtime_error("Invalid frame fields allocation");
+    h.return_pointer = 1;
+    return fields + index * sizeof(Word);
+}
+uint64_t lymar_aot_ref_create(uint64_t pointer, uint64_t writable) {
+    auto& h = heap();
+    if (writable & ~(LM::Memory::ReferenceWritable | LM::Memory::ReferenceNullable)) throw std::runtime_error("Invalid AOT reference mode");
+    h.return_pointer = 0;
+    if ((pointer == 0 || pointer == 2) && (writable & LM::Memory::ReferenceNullable)) return 0;
+    if (!h.allocations.count(pointer)) throw std::runtime_error("AOT borrow of unowned object");
+    h.lifetimes.adopt(pointer);
+    h.return_pointer = 0;
+    return h.lifetimes.borrow(pointer, (writable & LM::Memory::ReferenceWritable) != 0, h.active);
+}
+// Provenance distinguishes actual nil/pointers from raw scalar words that
+// happen to equal the nil representation (notably integers zero and two).
+uint64_t lymar_aot_nil() { return 2; }
+uint64_t lymar_aot_is_nil(uint64_t value, uint64_t is_pointer) {
+    return is_pointer == object_kind && (value == 0 || value == 2);
+}
+uint64_t lymar_aot_is_object(uint64_t value, uint64_t is_pointer) {
+    return is_pointer == object_kind && value != 0 && value != 2;
+}
+uint64_t lymar_aot_boolean(uint64_t value) { return value; }
+uint64_t lymar_aot_is_print_object(uint64_t value, uint64_t kind) {
+    return lymar_aot_is_object(value, kind) && (read_word(value) & 0xffffffff) != 9;
+}
+double lymar_aot_to_float(uint64_t value, uint64_t kind) {
+    if (!kind) return static_cast<double>(static_cast<int64_t>(value));
+    if (kind == boolean_kind || lymar_aot_is_nil(value, kind)) return 0.0;
+    if ((read_word(value) & 0xffffffff) == 9) {
+        double number;
+        std::memcpy(&number, reinterpret_cast<void*>(value + 8), sizeof(number));
+        return number;
+    }
+    if (auto* text = string_data(value)) { try { return std::stod(text); } catch (...) {} }
+    return 0.0;
+}
+uint64_t lymar_aot_to_integer(uint64_t value, uint64_t kind) {
+    if (!kind) return value;
+    if (kind == boolean_kind || lymar_aot_is_nil(value, kind)) return 0;
+    if (auto* text = string_data(value)) {
+        try { return static_cast<uint64_t>(std::stoll(text)); }
+        catch (...) { return static_cast<unsigned char>(text[0]); }
+    }
+    return static_cast<uint64_t>(static_cast<int64_t>(lymar_aot_to_float(value, kind)));
+}
+uint64_t lymar_aot_to_boolean(uint64_t value, uint64_t kind) {
+    if (lymar_aot_is_nil(value, kind)) return 0;
+    if (kind != object_kind) return value != 0;
+    if ((read_word(value) & 0xffffffff) == 9) return lymar_aot_to_float(value, kind) != 0.0;
+    return 1;
+}
+void lymar_aot_print_integer(uint64_t value, uint64_t kind) {
+    char text[64];
+    const char* output = text;
+    size_t length;
+    if (lymar_aot_is_nil(value, kind)) { output = "nil"; length = 3; }
+    else if (kind == boolean_kind) { output = value ? "true" : "false"; length = value ? 4 : 5; }
+    else if (kind == object_kind && (read_word(value) & 0xffffffff) == 9)
+        length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%.6g", lymar_aot_to_float(value, kind)));
+    else length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%lld", static_cast<long long>(value)));
+    std::fwrite(output, 1, length, stdout);
+    std::fflush(stdout);
+}
+void lymar_aot_print_float(double value) {
+    char text[64];
+    const auto length = std::snprintf(text, sizeof(text), "%.6g", value);
+    std::fwrite(text, 1, static_cast<size_t>(length), stdout);
+    std::fflush(stdout);
+}
+uint64_t lymar_aot_value_equal(uint64_t left, uint64_t right, uint64_t left_kind, uint64_t right_kind) {
+    const bool left_nil = lymar_aot_is_nil(left, left_kind), right_nil = lymar_aot_is_nil(right, right_kind);
+    if (left_nil || right_nil) return left_nil && right_nil;
+    if (left_kind == boolean_kind || right_kind == boolean_kind)
+        return left_kind == right_kind && left == right;
+    if (left == right && left_kind == right_kind) return 1;
+    const Word left_type = left_kind == object_kind ? read_word(left) & 0xffffffff : UINT64_MAX;
+    const Word right_type = right_kind == object_kind ? read_word(right) & 0xffffffff : UINT64_MAX;
+    if ((!left_kind || left_type == 9) && (!right_kind || right_type == 9))
+        return left_type == 9 || right_type == 9
+            ? lymar_aot_to_float(left, left_kind) == lymar_aot_to_float(right, right_kind) : left == right;
+    if (left_type == 11 && right_type == 11) {
+        auto size = read_word(left, 8);
+        return size == read_word(right, 8) && std::memcmp(reinterpret_cast<void*>(left + 24), reinterpret_cast<void*>(right + 24), size) == 0;
+    }
+    if (!left_kind && right_type == 11)
+        return read_word(right, 8) == 1 && static_cast<uint8_t>(left) == *reinterpret_cast<uint8_t*>(right + 24);
+    if (!right_kind && left_type == 11)
+        return read_word(left, 8) == 1 && static_cast<uint8_t>(right) == *reinterpret_cast<uint8_t*>(left + 24);
+    // Preserve the existing native enum representation and payload equality.
+    if (left_type == 0x454e554d && right_type == 0x454e554d)
+        return read_word(left, 8) == read_word(right, 8) && read_word(left, 16) == read_word(right, 16);
+    return 0;
+}
+uint64_t lymar_aot_ref_create_checked(uint64_t pointer, uint64_t mode, uint64_t is_pointer) {
+    if (is_pointer != object_kind) throw std::runtime_error("Borrow requires a managed object");
+    return lymar_aot_ref_create(pointer, mode);
+}
+uint64_t lymar_aot_ref_resolve(uint64_t token, uint64_t writable) {
+    auto& h = heap();
+    if (writable & ~(LM::Memory::ReferenceWritable | LM::Memory::ReferenceNullable)) throw std::runtime_error("Invalid AOT reference mode");
+    h.return_pointer = 1;
+    if (!token && (writable & LM::Memory::ReferenceNullable)) return 2;
+    return h.lifetimes.resolve(token, (writable & LM::Memory::ReferenceWritable) != 0);
+}
+uint64_t lymar_aot_ref_move(uint64_t token, uint64_t lexical, uint64_t caller) {
+    if (lexical & ~LM::Memory::ReferenceMoveMask) throw std::runtime_error("Invalid AOT reference move mode");
+    auto& h = heap();
+    h.return_pointer = 0;
+    if (!token && (lexical & LM::Memory::ReferenceMoveNullable)) return 0;
+    lexical = static_cast<uint32_t>(lexical & LM::Memory::ReferenceRegionMask);
+    auto pointer = h.lifetimes.resolve(token);
+    auto target = caller;
+    if (lexical) {
+        target = h.active;
+        while (target && h.regions.at(target).lexical != lexical) target = h.regions.at(target).parent;
+        if (!target) throw std::runtime_error("AOT reference move target is not active");
+    }
+    if (h.regions.at(h.allocations.at(pointer).owner).depth > h.regions.at(target).depth)
+        throw std::runtime_error("AOT reference promotion requires owner promotion");
+    auto origin = h.lifetimes.reference_region(token);
+    if (h.regions.at(origin).depth < h.regions.at(target).depth) target = origin;
+    h.return_pointer = 0;
+    return h.lifetimes.move_reference(token, target);
+}
+void lymar_aot_ref_release(uint64_t token) { heap().lifetimes.end_borrow(token); }
+void lymar_aot_ref_release_nullable(uint64_t token) {
+    if (token) lymar_aot_ref_release(token);
+}
+void lymar_aot_consume(uint64_t pointer) {
+    auto& h = heap();
+    if (!h.allocations.count(pointer)) throw std::runtime_error("AOT consume of unowned object");
+    h.lifetimes.adopt(pointer);
+    h.lifetimes.consume(pointer);
+}
+
 uint64_t lymar_aot_call_enter() {
     auto& h = heap();
     h.invocations.push_back({std::move(h.pending_args), {}, {}});
@@ -130,6 +288,10 @@ void lymar_aot_arg_set(uint64_t index, uint64_t pointer) {
     auto& args = heap().pending_args;
     if (args.size() <= index) args.resize(index + 1);
     args[index] = pointer;
+}
+uint64_t lymar_aot_arg_kind(uint64_t index, uint64_t fallback) {
+    auto& h = heap();
+    return h.invocations.empty() || index >= h.invocations.back().args.size() ? fallback : h.invocations.back().args[index];
 }
 uint64_t lymar_aot_arg_get(uint64_t index) {
     auto& h = heap();
@@ -162,11 +324,12 @@ uint64_t lymar_aot_param_pop(uint64_t fallback, uint64_t is_pointer) {
 uint64_t lymar_aot_slot_pointer(uint64_t address) {
     auto& flags = heap().shadow;
     auto found = flags.find(address);
-    return found != flags.end() && found->second;
+    return found != flags.end() ? found->second : 0;
 }
 uint64_t lymar_aot_region_current() { return heap().active; }
 void lymar_aot_region_enter(uint64_t lexical) {
     auto& h = heap();
+    if (h.next == UINT64_MAX) throw std::overflow_error("AOT region identity exhausted");
     auto id = h.next++;
     h.regions.emplace(id, Region{h.active, lexical, h.regions.at(h.active).depth + 1, {}});
     h.active = id;
@@ -191,15 +354,51 @@ void lymar_aot_region_move(uint64_t value, uint64_t lexical, uint64_t caller, ui
     }
     // Validate the target even for an immediate value.
     h.regions.at(target);
-    if (is_pointer) h.promote(value, target);
+    if (is_pointer == object_kind) h.promote(value, target);
 }
 uint64_t lymar_aot_alloc(uint64_t size) {
     if (size > SIZE_MAX) throw std::bad_alloc();
-    auto pointer = reinterpret_cast<Word>(std::calloc(1, std::max(size, Word(1))));
+    auto pointer = reinterpret_cast<Word>(heap().allocator.allocate(std::max(size, Word(1))));
     if (!pointer) throw std::bad_alloc();
+    std::memset(reinterpret_cast<void*>(pointer), 0, std::max(size, Word(1)));
     auto& h = heap();
-    h.allocations.emplace(pointer, Allocation{static_cast<size_t>(std::max(size, Word(1))), h.active, {}});
-    h.regions.at(h.active).members.insert(pointer);
+    try {
+        h.allocations.emplace(pointer, Allocation{static_cast<size_t>(std::max(size, Word(1))), h.active, {}});
+        h.regions.at(h.active).members.insert(pointer);
+    } catch (...) {
+        h.allocations.erase(pointer);
+        h.allocator.deallocate(reinterpret_cast<void*>(pointer));
+        throw;
+    }
+    return pointer;
+}
+uint64_t lymar_aot_box_float(double number) {
+    auto pointer = lymar_aot_alloc(16);
+    const Word header = 9; // Existing TYPE_FLOAT header and payload offsets.
+    std::memcpy(reinterpret_cast<void*>(pointer), &header, sizeof(header));
+    std::memcpy(reinterpret_cast<void*>(pointer + 8), &number, sizeof(number));
+    return pointer;
+}
+uint64_t lymar_aot_scalar_to_string(uint64_t value, uint64_t kind) {
+    char text[64];
+    const char* output = text;
+    size_t length;
+    if (lymar_aot_is_nil(value, kind)) { output = "nil"; length = 3; }
+    else if (kind == boolean_kind) { output = value ? "true" : "false"; length = value ? 4 : 5; }
+    else if (kind == object_kind && (read_word(value) & 0xffffffff) == 9)
+        length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%.6g", lymar_aot_to_float(value, kind)));
+    else length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%lld", static_cast<long long>(value)));
+    auto pointer = lymar_aot_alloc(24 + length + 1);
+    Word header[] = {11, length, length};
+    std::memcpy(reinterpret_cast<void*>(pointer), header, sizeof(header));
+    std::memcpy(reinterpret_cast<void*>(pointer + 24), output, length);
+    return pointer;
+}
+// LoadConst strings are copied into the current region, just as the VM copies
+// managed constants into its tracked heap. Static linker storage is never freed.
+uint64_t lymar_aot_copy_constant(uint64_t source, uint64_t size) {
+    auto pointer = lymar_aot_alloc(size);
+    std::memcpy(reinterpret_cast<void*>(pointer), reinterpret_cast<const void*>(source), size);
     return pointer;
 }
 void lymar_aot_free(uint64_t pointer) { if (pointer) heap().release(pointer); }
@@ -207,7 +406,7 @@ void lymar_aot_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
     auto& h = heap();
     if (!is_pointer && !h.shadow.erase(address)) return;
     auto container = h.containing(address);
-    if (is_pointer) h.shadow[address] = true;
+    if (is_pointer) h.shadow[address] = is_pointer;
     else h.shadow.erase(address);
     if (container == h.allocations.end()) {
         if (!h.invocations.empty()) h.invocations.back().slots.insert(address);
@@ -215,38 +414,30 @@ void lymar_aot_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
     }
     auto offset = address - container->first;
     container->second.edges.erase(offset);
-    if (is_pointer && h.containing(child) != h.allocations.end()) {
+    if (is_pointer == object_kind && h.containing(child) != h.allocations.end()) {
         container->second.edges[offset] = child;
         h.promote(child, container->second.owner);
     }
 }
 void lymar_aot_global_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
     auto& h = heap();
-    if (is_pointer) { h.shadow[address] = true; h.promote(child, 0); }
+    if (is_pointer) { h.shadow[address] = is_pointer; if (is_pointer == object_kind) h.promote(child, 0); }
     else h.shadow.erase(address);
 }
 void lymar_aot_copy(uint64_t destination, uint64_t source, uint64_t size) {
     auto& h = heap();
-    std::vector<std::pair<Word, Word>> edges;
-    auto src = h.containing(source);
-    if (src != h.allocations.end()) {
-        auto start = source - src->first;
-        for (auto [offset, child] : src->second.edges)
-            if (offset >= start && offset - start < size) edges.emplace_back(destination + offset - start, child);
-    }
+    // Snapshot every value kind before memmove, including overlapping ranges.
+    std::vector<std::pair<Word, Word>> kinds;
+    for (auto [address, kind] : h.shadow)
+        if (address >= source && address - source < size) kinds.emplace_back(destination + address - source, kind);
     std::memmove(reinterpret_cast<void*>(destination), reinterpret_cast<void*>(source), size);
+    std::erase_if(h.shadow, [&](auto entry) { return entry.first >= destination && entry.first - destination < size; });
     auto dst = h.containing(destination);
     if (dst != h.allocations.end()) {
         auto start = destination - dst->first;
-        std::erase_if(dst->second.edges, [&](auto edge) {
-            if (edge.first >= start && edge.first - start < size) {
-                h.shadow.erase(dst->first + edge.first);
-                return true;
-            }
-            return false;
-        });
+        std::erase_if(dst->second.edges, [&](auto edge) { return edge.first >= start && edge.first - start < size; });
     }
-    for (auto [address, child] : edges) lymar_aot_edge(address, child, 1);
+    for (auto [address, kind] : kinds) lymar_aot_edge(address, read_word(address), kind);
 }
 uint64_t lymar_aot_resize(uint64_t pointer, uint64_t size) {
     if (!pointer) return lymar_aot_alloc(size);
@@ -286,25 +477,27 @@ void lymar_aot_resource_destroy(uint64_t id) {
 uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count, uint64_t arguments) {
     constexpr Word nil = 2;
     auto& h = heap();
-    h.return_pointer = 0;
+    h.return_pointer = object_kind; // Default failure is nil.
     std::vector<Word> args;
-    std::vector<bool> pointers;
+    std::vector<Word> pointers;
     for (Word n = 0; n < count; ++n) {
         auto value = read_word(arguments, n * 8);
-        bool pointer = h.shadow.count(arguments + n * 8);
-        if (pointer && value > 4096 && (read_word(value) & 0xffffffff) == 1) {
+        Word pointer = lymar_aot_slot_pointer(arguments + n * 8);
+        if (pointer == object_kind && value > 4096 && (read_word(value) & 0xffffffff) == 1) {
             auto data = read_word(value, 8), size = read_word(value, 16);
             for (Word i = 0; i < size; ++i) {
                 args.push_back(read_word(data, i * 8));
-                pointers.push_back(h.shadow.count(data + i * 8));
+                pointers.push_back(lymar_aot_slot_pointer(data + i * 8));
             }
-        } else if (value != nil) { args.push_back(value); pointers.push_back(pointer); }
+        } else if (!lymar_aot_is_nil(value, pointer)) { args.push_back(value); pointers.push_back(pointer); }
     }
-    auto arg_string = [&](size_t n) { return n < args.size() && pointers[n] ? string_data(args[n]) : nullptr; };
+    auto arg_string = [&](size_t n) { return n < args.size() && pointers[n] == object_kind ? string_data(args[n]) : nullptr; };
     auto& f = files();
     auto found = f.handles.find(id);
     if (id > 1 && found == f.handles.end()) return nil;
     FILE* stream = id == 0 ? stdout : id == 1 ? stderr : found->second;
+    // These operations return booleans in the VM, even through the any API.
+    h.return_pointer = (operation == 2 || operation == 47) ? object_kind : boolean_kind;
     if (operation == 0) {
         if (id <= 1) return 0;
         if (stream) std::fclose(stream);
@@ -370,6 +563,7 @@ void lymar_aot_reset() {
     if (h.active || !h.invocations.empty()) throw std::runtime_error("AOT reset with active invocation");
     h.cleanup(0);
     h.shadow.clear();
+    h.lifetimes.reset();
     while (!h.files.handles.empty()) lymar_aot_resource_destroy(h.files.handles.begin()->first);
     h.pending_args.clear();
     h.return_pointer = 0;

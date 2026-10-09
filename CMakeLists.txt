@@ -33,7 +33,6 @@ set(FRONTEND_SOURCES
     src/frontend/cst/utils.cpp
     src/frontend/ast/printer.cpp
     src/frontend/type_checker/core.cpp
-    src/frontend/type_checker/memory.cpp
     src/frontend/type_checker/utils.cpp
     src/frontend/type_checker/statements.cpp
     src/frontend/type_checker/patterns.cpp
@@ -42,6 +41,7 @@ set(FRONTEND_SOURCES
     src/frontend/type_checker/types.cpp
     src/frontend/type_checker_factory.cpp
     src/frontend/memory_checker.cpp
+    src/memory/ownership.cpp
     src/frontend/ast/optimizer.cpp
     src/frontend/module_manager.cpp
 )
@@ -143,7 +143,7 @@ add_library(lymar_runtime STATIC ${RUNTIME_SOURCES})
 target_include_directories(lymar_runtime PUBLIC src)
 
 add_executable(lymar ${MAIN_SOURCES})
-add_library(lymar_aot STATIC src/backend/fyra/region_runtime.cpp)
+add_library(lymar_aot STATIC src/memory/aot_runtime.cpp)
 add_dependencies(lymar lymar_aot)
 target_link_libraries(lymar 
     PRIVATE 

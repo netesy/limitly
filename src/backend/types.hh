@@ -1,7 +1,7 @@
 //types.hh
 #pragma once
 
-#include "../memory/memory.hh"
+#include "../memory/model.hh"
 #include "../frontend/value.hh"
 #include "../backend/value.hh"
 #include <algorithm>
@@ -637,8 +637,8 @@ public:
             if (name == "u64" || name == "uint") return UINT64_TYPE;
             if (name == "i128" || name == "bigint") return INT128_TYPE;
             if (name == "u128") return UINT128_TYPE;
-            if (name == "f32" || name == "float") return FLOAT32_TYPE;
-            if (name == "f64") return FLOAT64_TYPE;
+            if (name == "f32") return FLOAT32_TYPE;
+            if (name == "f64" || name == "float") return FLOAT64_TYPE;
             if (name == "d2") return D2_TYPE;
             if (name == "d4" || name == "decimal") return D4_TYPE;
             if (name == "d6") return D6_TYPE;

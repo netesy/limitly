@@ -1,4 +1,5 @@
 #include "lir.hh"
+#include "../memory/reference_flags.hh"
 #include "../backend/vm/vm_string.hh"
 #include <iostream>
 #include <sstream>
@@ -16,6 +17,10 @@ std::string LIR_Inst::to_string() const {
     
     // Format based on operation type
     switch (op) {
+        case LIR_Op::RefMove:
+            oss << " r" << dst << ", r" << a << ", region=" << static_cast<uint32_t>(imm & Memory::ReferenceRegionMask);
+            if (imm & Memory::ReferenceMoveNullable) oss << " nullable";
+            break;
         case LIR_Op::Mov:
             oss << " r" << dst << ", r" << a;
             break;
@@ -214,6 +219,14 @@ std::string LIR_Inst::to_string() const {
             break;
     }
     
+    if (!ownership.empty()) {
+        oss << " ; ownership";
+        for (auto id : ownership.reads) oss << " read=" << id;
+        for (auto id : ownership.consumes) oss << " consume=" << id;
+        for (auto id : ownership.defines) oss << " define=" << id;
+        for (auto id : ownership.initializes) oss << " initialize=" << id;
+        for (auto [alias, owner] : ownership.aliases) oss << " alias=" << alias << ":" << owner;
+    }
     if (!comment.empty()) {
         oss << " ; " << comment;
     }
@@ -252,7 +265,7 @@ constexpr size_t lir_op_list_size() {
 // Last entry of LIR_Op (used to derive the enum's cardinality, since no
 // explicit values are assigned and entries are sequential).  Keep this name
 // in sync with the enum.
-constexpr size_t kLirOpCount_Enum = static_cast<size_t>(LIR_Op::EffectResume) + 1;
+constexpr size_t kLirOpCount_Enum = static_cast<size_t>(LIR_Op::RefMove) + 1;
 static_assert(lir_op_list_size() == kLirOpCount_Enum,
               "LIR_OP_LIST is out of sync with LIR_Op enum — update both in lir.hh");
 } // namespace

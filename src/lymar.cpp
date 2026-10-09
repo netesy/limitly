@@ -6,6 +6,7 @@
 #include "frontend/type_checker.hh"
 #include "frontend/memory_checker.hh"
 #include "frontend/module_manager.hh"
+#include "memory/ownership.hh"
 #include "lir/generator.hh"
 #include "lir/functions.hh"
 #include "backend/vm/register.hh"
@@ -97,15 +98,6 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
         }
         ast = memory_check_result.program;
 
-        auto post_opt_type_check = LM::Frontend::TypeCheckerFactory::check_program(ast, source, filename, verification_policy);
-        if (!post_opt_type_check.success || !post_opt_type_check.errors.empty()) {
-            std::cerr << "Post-opt Type Check Failed!" << std::endl;
-            for (const auto& err : post_opt_type_check.errors) {
-                std::cerr << "  Post-opt Type Error: " << err << std::endl;
-            }
-            return 1;
-        }
-
         if (options.print_cst) {
             std::cout << "=== CST ===\n";
             const auto* cstRoot = parser.getCST();
@@ -122,10 +114,10 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
         }
 
         LIR::Generator lir_generator;
-        lir_generator.set_import_aliases(post_opt_type_check.import_aliases);
-        lir_generator.set_registered_modules(post_opt_type_check.registered_modules);
+        lir_generator.set_import_aliases(type_check_result.import_aliases);
+        lir_generator.set_registered_modules(type_check_result.registered_modules);
 
-        auto lir_function = lir_generator.generate_program(post_opt_type_check);
+        auto lir_function = lir_generator.generate_program(type_check_result);
         if (lir_generator.has_errors()) {
             std::cerr << "[ERROR] LIR generation had errors:" << std::endl;
             for (const auto& err : lir_generator.get_errors()) {

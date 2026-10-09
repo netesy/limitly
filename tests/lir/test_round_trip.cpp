@@ -14,13 +14,19 @@
 // =============================================================================
 #include "../../src/lir/lir.hh"
 #include "../../src/lir/optimizer.hh"
+#include "../../src/lir/functions.hh"
+#include "../../src/lir/function_registry.hh"
+#include "../../src/lir/verifier.hh"
 #include "../../src/lir/metrics.hh"
 #include "../../src/lir/serializer.hh"
 #include "../../src/backend/vm/vm_value.hh"
+#include "../../src/backend/vm/vm_runtime.hh"
+#include "../../src/backend/vm/register.hh"
 
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include "backend/vm/vm_string.hh"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -65,6 +71,10 @@ static bool values_equal(LM::Backend::Value a, LM::Backend::Value b) {
  if (ha->type_id != hb->type_id) return false;
 
  switch (ha->type_id) {
+ case TYPE_STRING: {
+ auto* sa = reinterpret_cast<LmStringHeader*>(ha); auto* sb = reinterpret_cast<LmStringHeader*>(hb);
+ return sa->len == sb->len && std::memcmp(sa->data, sb->data, sa->len) == 0;
+ }
  case TYPE_I64:
  return reinterpret_cast<ObjI64*>(ha)->value ==
  reinterpret_cast<ObjI64*>(hb)->value;
@@ -224,6 +234,7 @@ static LIR_Function build_const_val_function() {
  add(LIR_Op::LoadConst, BOX_PTR(lm_box_float(2.718281828459045)));
  add(LIR_Op::LoadConst, BOX_PTR(lm_box_bool(1)));
  add(LIR_Op::LoadConst, BOX_PTR(lm_box_bool(0)));
+ add(LIR_Op::LoadConst, BOX_PTR(lm_str_from_bytes("closure\0target",14)));
  add(LIR_Op::LoadConst, BOX_PTR(lm_box_string("hello, lir!")));
  add(LIR_Op::LoadConst, BOX_PTR(lm_box_string(""))); // empty string
  add(LIR_Op::LoadConst, BOX_PTR(lm_box_string("multi\1\2\3byte")));
@@ -273,14 +284,14 @@ static LIR_Function build_metadata_function() {
  // Jump with imm = label id and no func_name.
  {
  LIR_Inst inst(LIR_Op::Jump, /*dst=*/UINT32_MAX, /*a=*/UINT32_MAX,
- /*b=*/UINT32_MAX, /*imm=*/42);
+ /*b=*/UINT32_MAX, /*imm=*/static_cast<int64_t>(f.instructions.size()+1));
  f.instructions.push_back(inst);
  }
 
  // Label marker (imm = label id).
  {
  LIR_Inst inst(LIR_Op::Label, /*dst=*/UINT32_MAX, /*a=*/UINT32_MAX,
- /*b=*/UINT32_MAX, /*imm=*/42);
+ /*b=*/UINT32_MAX, /*imm=*/static_cast<int64_t>(f.instructions.size()));
  f.instructions.push_back(inst);
  }
 
@@ -335,6 +346,140 @@ static LIR_Function build_mixed_function() {
 int main() {
  std::cout << "=== LIR serializer round-trip test (C17) ===\n";
 
+ {
+ auto fn = std::make_shared<LIRFunction>("registration_memory_contract",
+     std::vector<LIRParameter>{{"owner", LM::LIR::Type::Ptr}}, LM::LIR::Type::Ptr, nullptr);
+ fn->register_count_ = 7;
+ fn->memory_effects_.parameters = {LM::Memory::Ownership::ReadBorrow};
+ fn->memory_effects_.result = LM::Memory::Ownership::ReadBorrow;
+ fn->memory_effects_.borrowed_parameter = 0;
+ LIRFunctionManager::getInstance().registerFunction(fn);
+ auto* registered = FunctionRegistry::getInstance().getFunction(fn->getName());
+ CHECK(registered != nullptr, "function registration missing");
+ if (registered) {
+ CHECK(registered->register_count == 7, "registration lost register count");
+ CHECK(registered->memory_effects.parameters == fn->memory_effects_.parameters, "registration lost parameter effects");
+ CHECK(registered->memory_effects.borrowed_parameter == 0, "registration lost alias provenance");
+ }
+
+ }
+ {
+ int64_t memory=0;
+ LIR_Function f("alias_probe",0); f.register_count=5;
+ f.instructions.emplace_back(LIR_Op::LoadConst,LM::LIR::Type::I64,0,make_i64(reinterpret_cast<uintptr_t>(&memory)));
+ f.instructions.emplace_back(LIR_Op::Mov,LM::LIR::Type::I64,1,0,UINT32_MAX);
+ f.instructions.emplace_back(LIR_Op::LoadConst,LM::LIR::Type::I64,2,make_i64(1));
+ f.instructions.emplace_back(LIR_Op::LoadConst,LM::LIR::Type::I64,3,make_i64(2));
+ f.instructions.emplace_back(LIR_Op::MemoryStore,LM::LIR::Type::Void,UINT32_MAX,0,2,6);
+ f.instructions.emplace_back(LIR_Op::MemoryStore,LM::LIR::Type::Void,UINT32_MAX,1,3,6);
+ f.instructions.emplace_back(LIR_Op::MemoryLoad,LM::LIR::Type::I64,4,0,UINT32_MAX,6);
+ LIR_Inst store(LIR_Op::StoreGlobal,LM::LIR::Type::Void,UINT32_MAX,4,UINT32_MAX); store.func_name="result";f.instructions.push_back(store);
+ f.instructions.emplace_back(LIR_Op::Return,LM::LIR::Type::I64,UINT32_MAX,4,UINT32_MAX);
+ LM::Backend::VM::Register::RegisterVM vm;
+ vm.execute(f);
+ CHECK(as_i64(vm.get_global("result")) == 2, "optimizer_alias baseline result");
+ vm.reset();
+ Optimizer optimizer(f);
+ CHECK(!optimizer.redundant_memory_elimination(), "unsafe pass remains quarantined");
+ vm.execute(f);
+ CHECK(as_i64(vm.get_global("result")) == 2, "optimizer_alias changed observable output");
+ }
+ {
+ int64_t memory=0;
+ LIR_Function f("alias_probe",0); f.register_count=5;
+ f.instructions.emplace_back(LIR_Op::LoadConst,LM::LIR::Type::I64,0,make_i64(reinterpret_cast<uintptr_t>(&memory)));
+ f.register_count=6;
+ f.instructions.emplace_back(LIR_Op::LoadConst,LM::LIR::Type::I64,1,make_i64(0));
+ f.instructions.emplace_back(LIR_Op::LoadConst,LM::LIR::Type::I64,2,make_i64(2));
+ f.instructions.emplace_back(LIR_Op::LoadConst,LM::LIR::Type::I64,3,make_i64(1));
+ f.instructions.emplace_back(LIR_Op::Label,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,4);
+ f.instructions.emplace_back(LIR_Op::CmpLT,LM::LIR::Type::Bool,4,1,2);
+ f.instructions.emplace_back(LIR_Op::JumpIfFalse,LM::LIR::Type::Void,UINT32_MAX,4,UINT32_MAX,12);
+ f.instructions.emplace_back(LIR_Op::MemoryStore,LM::LIR::Type::Void,UINT32_MAX,0,1,6);
+ f.instructions.emplace_back(LIR_Op::MemoryLoad,LM::LIR::Type::I64,5,0,UINT32_MAX,6);
+ LIR_Inst store(LIR_Op::StoreGlobal,LM::LIR::Type::Void,UINT32_MAX,5,UINT32_MAX);store.func_name="result";f.instructions.push_back(store);
+ f.instructions.emplace_back(LIR_Op::Add,LM::LIR::Type::I64,1,1,3);
+ f.instructions.emplace_back(LIR_Op::Jump,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,4);
+ f.instructions.emplace_back(LIR_Op::Label,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,12);
+ f.instructions.emplace_back(LIR_Op::Return,LM::LIR::Type::I64,UINT32_MAX,5,UINT32_MAX);
+ LM::Backend::VM::Register::RegisterVM vm;
+ vm.execute(f);
+ CHECK(as_i64(vm.get_global("result")) == 1, "optimizer_licm baseline result");
+ vm.reset();
+ Optimizer optimizer(f);
+ CHECK(!optimizer.loop_invariant_code_motion(), "unsafe pass remains quarantined");
+ vm.execute(f);
+ CHECK(as_i64(vm.get_global("result")) == 1, "optimizer_licm changed observable output");
+ }
+ {
+ for (int failure = 0; failure < 3; ++failure) {
+ LIR_Function region("invalid_region_exit", 0);
+ region.register_count = 1;
+ if (failure != 0) region.instructions.emplace_back(LIR_Op::RegionEnter, 0, 0, 0, 17);
+ if (failure != 1) region.instructions.emplace_back(LIR_Op::RegionExit, 0, 0, 0, failure == 2 ? 18 : 17);
+ region.instructions.emplace_back(LIR_Op::Ret, LM::LIR::Type::Void, UINT32_MAX, UINT32_MAX, UINT32_MAX);
+ std::vector<std::string> errors;
+ CHECK(!Verifier::verify_memory_regions(region, errors), "invalid region cleanup accepted");
+ }
+ LIR_Function balanced("balanced_regions", 0);
+ balanced.instructions.emplace_back(LIR_Op::RegionEnter, 0, 0, 0, 17);
+ balanced.instructions.emplace_back(LIR_Op::RegionExit, 0, 0, 0, 17);
+ balanced.instructions.emplace_back(LIR_Op::Ret, LM::LIR::Type::Void, UINT32_MAX, UINT32_MAX, UINT32_MAX);
+ std::vector<std::string> errors;
+ CHECK(Verifier::verify_memory_regions(balanced, errors), "balanced regions rejected");
+ LIR_Function branching("numeric_branch_regions", 0);
+ branching.register_count = 1;
+ branching.instructions.emplace_back(LIR_Op::LoadConst, LM::LIR::Type::Bool, 0, VAL_TRUE);
+ branching.instructions.emplace_back(LIR_Op::RegionEnter, 0, 0, 0, 17);
+ branching.instructions.emplace_back(LIR_Op::JumpIfFalse, LM::LIR::Type::Void, UINT32_MAX, 0, UINT32_MAX, 5);
+ branching.instructions.emplace_back(LIR_Op::RegionExit, 0, 0, 0, 17);
+ branching.instructions.emplace_back(LIR_Op::Jump, LM::LIR::Type::Void, UINT32_MAX, UINT32_MAX, UINT32_MAX, 6);
+ branching.instructions.emplace_back(LIR_Op::RegionExit, 0, 0, 0, 17);
+ branching.instructions.emplace_back(LIR_Op::Ret, LM::LIR::Type::Void, UINT32_MAX, UINT32_MAX, UINT32_MAX);
+ errors.clear();
+ CHECK(Verifier::verify_memory_regions(branching, errors), "numeric CFG successors lost");
+ branching.instructions[5] = LIR_Inst(LIR_Op::Nop);
+ errors.clear();
+ CHECK(!Verifier::verify_memory_regions(branching, errors), "cleanup bypass at CFG join accepted");
+ bool registration_rejected = false;
+ try { FunctionRegistry::getInstance().registerFunction(branching.name, std::make_unique<LIR_Function>(branching)); }
+ catch (const std::exception&) { registration_rejected = true; }
+ CHECK(registration_rejected, "registration bypassed region verification");
+ }
+ {
+ LIR_Function contract("memory_contract", 1);
+ contract.register_count = 3;
+ contract.memory_effects.parameters = {LM::Memory::Ownership::ReadBorrow};
+ contract.memory_effects.result = LM::Memory::Ownership::ReadBorrow;
+ contract.memory_effects.borrowed_parameter = 0;
+ LIR_Inst call(LIR_Op::Call, 1, "borrowed", std::vector<Reg>{0});
+ call.call_arg_ownership = {LM::Memory::Ownership::ReadBorrow};
+ contract.instructions.push_back(call);
+ auto encoded = Serializer::serialize(contract);
+ auto decoded = Serializer::deserialize(encoded);
+ CHECK(decoded.memory_effects.parameters == contract.memory_effects.parameters, "parameter effects lost");
+ CHECK(decoded.memory_effects.result == contract.memory_effects.result, "return effect lost");
+ CHECK(decoded.memory_effects.borrowed_parameter == 0, "borrow origin lost");
+ CHECK(decoded.instructions[0].call_arg_ownership == call.call_arg_ownership, "call effects lost");
+ encoded.push_back(0);
+ bool threw = false;
+ try { (void)Serializer::deserialize(encoded); } catch (const std::exception&) { threw = true; }
+ CHECK(threw, "trailing bytes accepted");
+ }
+ {
+ for (int malformed = 0; malformed < 3; ++malformed) {
+ LIR_Function invalid("invalid_capability", 0); invalid.register_count = 2;
+ LIR_Inst ref(LIR_Op::RefCreate, LM::LIR::Type::U64, 1, 0, UINT32_MAX);
+ if (malformed == 0) ref.imm = 4; // Bits 0/1 encode writable/nullable; all others are invalid.
+ if (malformed == 1) ref.result_type = LM::LIR::Type::F64;
+ if (malformed == 2) ref.dst = UINT32_MAX;
+ invalid.instructions.push_back(ref);
+ bool rejected = false;
+ try { (void)Serializer::deserialize(Serializer::serialize(invalid)); }
+ catch (const std::exception&) { rejected = true; }
+ CHECK(rejected, "malformed capability accepted from precompiled LIR");
+ }
+ }
  // --- Test 1: empty function round-trips -------------------------------
  {
  LIR_Function empty("empty", 0);
@@ -478,6 +623,84 @@ int main() {
  CHECK(report.passes.size() > 0, "Report should contain recorded pass records");
  }
 
+ {
+ // Gate B facts must survive serialization and manager registration.
+ LIR_Function facts("ownership_metadata", 1); facts.register_count = 2;
+ facts.ownership_parameters = {100}; facts.inferred_effects.parameters = {LM::Memory::Read | LM::Memory::Retain};
+ facts.inferred_effects.return_projections = {0};
+ LIR_Inst marker(LIR_Op::Nop); marker.ownership.reads = {100}; marker.ownership.defines = {101}; marker.ownership.aliases = {{101,100}};
+ facts.instructions.push_back(marker);
+ facts.instructions.emplace_back(LIR_Op::Ret, LM::LIR::Type::Void, UINT32_MAX, UINT32_MAX, UINT32_MAX);
+ LM::Memory::NodeOwnership provenance; provenance.binding = 101; provenance.managed = true; provenance.origins = {200};
+ facts.ownership_provenance[1] = provenance;
+ auto decoded = Serializer::deserialize(Serializer::serialize(facts));
+ CHECK(decoded.inferred_effects == facts.inferred_effects, "semantic effects lost in serialization");
+ CHECK(decoded.ownership_parameters == facts.ownership_parameters, "binding identities lost in serialization");
+ CHECK(decoded.instructions[0].ownership == marker.ownership, "ownership events lost in serialization");
+ CHECK(decoded.ownership_provenance.at(1).origins == provenance.origins, "allocation provenance lost in serialization");
+ FunctionRegistry::getInstance().registerFunction(decoded.name, std::make_unique<LIR_Function>(decoded));
+ CHECK(FunctionRegistry::getInstance().getFunction(decoded.name)->inferred_effects == facts.inferred_effects, "registration lost inferred effects");
+ }
+ {
+ // A released, moved, expired, or read-only reference cannot satisfy a
+ // statically contradicted validity obligation, including after deserialization.
+ for (int failure = 0; failure < 6; ++failure) {
+ LIR_Function invalid("invalid_reference_flow",0); invalid.register_count = 4;
+ invalid.instructions.emplace_back(LIR_Op::RegionEnter,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,1);
+ invalid.instructions.emplace_back(LIR_Op::ListCreate,LM::LIR::Type::Ptr,0,UINT32_MAX,UINT32_MAX);
+ invalid.instructions.emplace_back(LIR_Op::RefCreate,LM::LIR::Type::U64,1,0,UINT32_MAX,failure==5 ? 2 : 0);
+ if (failure == 0) invalid.instructions.emplace_back(LIR_Op::RefRelease,LM::LIR::Type::Void,UINT32_MAX,1,UINT32_MAX);
+ if (failure == 1 || failure == 4) invalid.instructions.emplace_back(LIR_Op::RefMove,LM::LIR::Type::U64,2,1,UINT32_MAX,0);
+ if (failure == 2) invalid.instructions.emplace_back(LIR_Op::RegionExit,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,1);
+ invalid.instructions.emplace_back(LIR_Op::RefResolve,LM::LIR::Type::Ptr,3,failure==4 ? 2 : 1,UINT32_MAX,failure==5 ? 3 : failure>=3 ? 1 : 0);
+ if (failure != 2) invalid.instructions.emplace_back(LIR_Op::RegionExit,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,1);
+ invalid.instructions.emplace_back(LIR_Op::Ret,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX);
+ std::vector<std::string> errors;
+ CHECK(!Verifier::verify_ownership(invalid,errors),"invalid reference dataflow accepted");
+ bool rejected = false;
+ try { (void)Serializer::deserialize(Serializer::serialize(invalid)); } catch(const std::exception&) {rejected=true;}
+ CHECK(rejected,"deserialization bypassed reference/lifetime verification");
+ }
+ }
+ // Sparse reference facts must retain all future reads, including stores and
+ // reads whose results are unused. Only overwritten/dead facts may disappear.
+ for (int variant = 0; variant < 5; ++variant) {
+ LIR_Function joined("reference_live_join", 1); joined.register_count = 6;
+ auto emit = [&](LIR_Op op, LM::LIR::Type type, Reg dst, Reg a, Reg b, int64_t imm=0) {
+     joined.instructions.emplace_back(op,type,dst,a,b,imm);
+ };
+ emit(LIR_Op::RegionEnter,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,1);
+ emit(LIR_Op::ListCreate,LM::LIR::Type::Ptr,1,UINT32_MAX,UINT32_MAX);
+ emit(LIR_Op::RefCreate,LM::LIR::Type::U64,2,1,UINT32_MAX);
+ if (variant==2) {
+     emit(LIR_Op::RefResolve,LM::LIR::Type::Ptr,4,2,UINT32_MAX);
+     emit(LIR_Op::Mov,LM::LIR::Type::Ptr,5,4,UINT32_MAX);
+ }
+ emit(LIR_Op::JumpIfFalse,LM::LIR::Type::Void,UINT32_MAX,0,UINT32_MAX,11);
+ if (variant==1 || variant==2 || variant==4)
+     emit(LIR_Op::RefRelease,LM::LIR::Type::Void,UINT32_MAX,2,UINT32_MAX);
+ emit(LIR_Op::Jump,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,12);
+ emit(LIR_Op::Label,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,11);
+ emit(LIR_Op::Nop,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX);
+ emit(LIR_Op::Label,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,12);
+ if (variant==4) emit(LIR_Op::RefCreate,LM::LIR::Type::U64,2,1,UINT32_MAX,1);
+ if (variant==2) emit(LIR_Op::FrameSetField,LM::LIR::Type::Void,5,UINT32_MAX,0);
+ else emit(LIR_Op::RefResolve,LM::LIR::Type::Ptr,4,2,UINT32_MAX,variant>=3 ? 1 : 0);
+ emit(LIR_Op::RegionExit,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX,1);
+ emit(LIR_Op::Ret,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX);
+ std::map<int64_t,size_t> labels;
+ for (size_t index=0; index<joined.instructions.size(); ++index)
+     if (joined.instructions[index].op==LIR_Op::Label) labels[joined.instructions[index].imm]=index;
+ for (auto& inst : joined.instructions)
+     if (inst.op==LIR_Op::Label || inst.op==LIR_Op::Jump || inst.op==LIR_Op::JumpIfFalse) inst.imm=labels.at(inst.imm);
+ std::vector<std::string> errors;
+ CHECK(Verifier::verify_memory_regions(joined,errors),"reference liveness fixture has invalid region/CFG structure");
+ errors.clear();
+ CHECK(Verifier::verify_ownership(joined,errors)==(variant==0 || variant==4),"sparse reference join lost a validity or permission obligation");
+ bool restored = true;
+ try { (void)Serializer::deserialize(Serializer::serialize(joined)); } catch(const std::exception& e) {restored=false; if(variant==0 || variant==4) std::cerr << e.what() << "\n";}
+ CHECK(restored==(variant==0 || variant==4),"restored reference join changed verification");
+ }
  if (g_failures == 0) {
  std::cout << "\nALL CHECKS PASSED [x]\n";
  return 0;

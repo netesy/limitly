@@ -260,18 +260,6 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     }
     
     // Check if this is a reference
-    if (references.find(expr->name) != references.end()) {
-        check_reference_validity(expr->name, expr->line);
-        
-        // Get the type from the target linear type
-        const auto& ref_info = references[expr->name];
-        TypePtr target_type = lookup_variable(ref_info.target_linear_var);
-        if (target_type) {
-            expr->inferred_type = target_type;
-            return target_type;
-        }
-    }
-
     // Check if variable is defined in an outer function scope
     Scope* outer_scope = current_scope.get();
     while (outer_scope) {
@@ -288,8 +276,6 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
         outer_scope = outer_scope->parent.get();
     }
     
-    // Check linear type access
-    check_linear_type_access(expr->name, expr->line);
     
     TypePtr type = nullptr;
     // 1. Context-based disambiguation for Enum variants
@@ -372,7 +358,6 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     }
     
     // Check memory safety before using the variable
-    check_variable_use(expr->name, expr->line);
 
     // Track captures for lambda lowering: only variables resolved from outer scopes
     if (!lambda_captures_stack.empty() && should_capture_variable(expr->name)) {
@@ -914,16 +899,6 @@ TypePtr TypeChecker::check_unary_expr(std::shared_ptr<LM::Frontend::AST::UnaryEx
     }
 }
 
-bool is_consuming_callee(const std::string& name) {
-    // Only functions starting with "consume" are considered consuming (move) operations
-    std::string base_name = name;
-    size_t last_dot = name.find_last_of('.');
-    if (last_dot != std::string::npos) {
-        base_name = name.substr(last_dot + 1);
-    }
-    return base_name.rfind("consume", 0) == 0;
-}
-
 TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
 
@@ -1070,29 +1045,6 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
         TypePtr arg_type = check_expression(expr->arguments[i], arg_expected);
         arg_types.push_back(arg_type);
         
-        // Explicit Move semantics for linear types passed to consuming callees
-        if (auto arg_var = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->arguments[i])) {
-            std::string callee_name = "";
-            if (auto var_callee = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->callee)) {
-                callee_name = var_callee->name;
-            } else if (auto member_callee = std::dynamic_pointer_cast<LM::Frontend::AST::MemberExpr>(expr->callee)) {
-                callee_name = member_callee->name;
-            }
-
-            if (is_consuming_callee(callee_name)) {
-                TypePtr arg_t = lookup_variable(arg_var->name);
-                bool is_copyable = (arg_t &&
-                    (arg_t->tag == TypeTag::Function ||
-                     arg_t->tag == TypeTag::Int || arg_t->tag == TypeTag::Int64 ||
-                     arg_t->tag == TypeTag::Float32 || arg_t->tag == TypeTag::Float64 ||
-                     arg_t->tag == TypeTag::Bool || arg_t->tag == TypeTag::String ||
-                     arg_t->tag == TypeTag::Nil || arg_t->tag == TypeTag::Any));
-
-                if (!is_copyable) {
-                    check_variable_move(arg_var->name);
-                }
-            }
-        }
     }
     
     // Check if callee is a variable (could be function or frame name)
@@ -1797,7 +1749,6 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             
             // Now check value expression with expected type
             TypePtr value_type = check_expression(expr->value, expected_type);
-            
             if (!is_type_compatible(field_type, value_type)) {
                 add_type_error(field_type->toString(), value_type->toString(), expr->line);
             }
@@ -1840,12 +1791,8 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
     if (!expr->object && !expr->member && !expr->index) {
         TypePtr var_type = lookup_variable(expr->name);
         if (var_type) {
-            auto it_mem = variable_memory_info.find(expr->name);
-            if (it_mem != variable_memory_info.end() && it_mem->second.is_const) {
+            if (current_scope && current_scope->is_immutable(expr->name)) {
                 add_error("Cannot reassign to immutable variable '" + expr->name + "' declared with 'val' or 'const'", expr->line);
-            }
-            if (it_mem != variable_memory_info.end() && it_mem->second.memory_state == "moved") {
-                add_error("Use after move: Cannot assign to moved variable '" + expr->name + "'", expr->line);
             }
 
             // Mutation of captured variables inside closures is fully supported.
@@ -1853,33 +1800,11 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             // Use variable's type as expected type
             expected_type = var_type;
             TypePtr value_type = check_expression(expr->value, expected_type);
-            
             if (!is_type_compatible(var_type, value_type) && 
                 !(is_string_type(var_type) && is_string_type(value_type))) {
                 add_type_error(var_type->toString(), value_type->toString(), expr->line);
             }
             
-            // Check if we're assigning from another variable (create reference or move)
-            if (auto var_expr = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(expr->value)) {
-                TypePtr rhs_type = lookup_variable(var_expr->name);
-                bool is_copyable = (rhs_type && rhs_type->tag == TypeTag::Function);
-                
-                if (!is_copyable && linear_types.find(var_expr->name) != linear_types.end()) {
-                    // This is a linear type - move it and increment generation
-                    move_linear_type(var_expr->name, var_expr->line);
-                    
-                    // The target becomes the new owner with updated generation
-                    LinearTypeInfo new_linear_info;
-                    new_linear_info.is_moved = false;
-                    new_linear_info.access_count = 1;
-                    new_linear_info.current_generation = linear_types[var_expr->name].current_generation;
-                    linear_types[expr->name] = new_linear_info;
-                } else {
-                    // Regular variable - create reference
-                    create_reference(var_expr->name, expr->name, expr->line);
-                }
-            }
-
             // Assigned variable is mutable, so it cannot be a compile-time constant. Erase it.
             constant_ints.erase(expr->name);
             constant_doubles.erase(expr->name);
@@ -1889,26 +1814,11 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             // Implicit variable declaration - check value without expected type
             TypePtr value_type = check_expression(expr->value);
             declare_variable(expr->name, value_type);
-            declare_variable_memory(expr->name, value_type);  // Track memory for new variable
             
             // Implicitly declared variable is mutable, so do not store as compile-time constant.
             constant_ints.erase(expr->name);
             constant_doubles.erase(expr->name);
 
-            // New variables are linear types by default if they are complex/linear types
-            bool is_linear_type = (value_type &&
-                                  (value_type->tag == TypeTag::List ||
-                                   value_type->tag == TypeTag::Dict ||
-                                   value_type->tag == TypeTag::UserDefined ||
-                                   value_type->tag == TypeTag::Frame ||
-                                   value_type->tag == TypeTag::Tuple ||
-                                   value_type->tag == TypeTag::Structural));
-            if (is_linear_type) {
-                LinearTypeInfo linear_info;
-                linear_info.is_moved = false;
-                linear_info.access_count = 0;
-                linear_types[expr->name] = linear_info;
-            }
             return value_type;
         }
     }

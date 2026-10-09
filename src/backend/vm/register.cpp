@@ -1,4 +1,5 @@
 #include "register.hh"
+#include "reference_ops.hh"
 #include <iostream>
 #include <cmath>
 #include <cstring>
@@ -100,6 +101,7 @@ void RegisterVM::reset() {
     while (!vm_allocation_types.empty()) reclaim_value(BOX_PTR(vm_allocation_types.begin()->first));
     vm_region_stack.clear();
     region_instances.clear();
+    memory_lifetimes_.reset();
     region_allocations.clear();
     invocation_parents.clear();
     borrowed_constants.clear();
@@ -290,6 +292,21 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::ForeignCall: case LIR::LIR_Op::ForeignCallDirect: case LIR::LIR_Op::CallbackCreate:
             case LIR::LIR_Op::CallbackDestroy:
                 execute_ffi(pc); break;
+            case LIR::LIR_Op::RefCreate:
+                try { registers[pc->dst] = make_u64(ReferenceOperations::create(*this, registers[pc->a], pc->imm)); }
+                catch (const std::exception& error) {
+                    throw std::runtime_error(std::string(error.what()) + " at RefCreate " +
+                        (current_function_ ? current_function_->name : "<unknown>") + " r" + std::to_string(pc->a));
+                }
+                break;
+            case LIR::LIR_Op::RefResolve:
+                registers[pc->dst] = ReferenceOperations::resolve(*this, as_u64(registers[pc->a]), pc->imm); break;
+            case LIR::LIR_Op::RefMove:
+                registers[pc->dst] = make_u64(ReferenceOperations::move(*this, as_u64(registers[pc->a]), pc->imm)); break;
+            case LIR::LIR_Op::RefRelease:
+                ReferenceOperations::release(*this, as_u64(registers[pc->a]), pc->imm); break;
+            case LIR::LIR_Op::OwnershipConsume:
+                consume_memory(registers[pc->a]); break;
             case LIR::LIR_Op::RegionEnter: case LIR::LIR_Op::RegionExit: case LIR::LIR_Op::RegionMove:
                 execute_regions(pc); break;
             case LIR::LIR_Op::Mov: registers[pc->dst] = registers[pc->a]; break;
@@ -368,6 +385,39 @@ void RegisterVM::auto_register_output(const LIR::LIR_Inst* pc) {
     if (pc->dst != UINT32_MAX && pc->dst < registers.size()) register_native_allocation(registers[pc->dst]);
 }
 
+uint64_t RegisterVM::borrow_memory(RegisterValue value, bool writable) {
+    if (!IS_PTR(value)) throw std::runtime_error("Borrow requires a managed object");
+    auto address = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
+    if (!vm_allocation_types.count(address)) throw std::runtime_error("Borrow requires locally owned object");
+    memory_lifetimes_.adopt(address);
+    return memory_lifetimes_.borrow(address, writable, active_region_id);
+}
+RegisterValue RegisterVM::resolve_memory(uint64_t token, bool writable) {
+    return BOX_PTR(memory_lifetimes_.resolve(token, writable));
+}
+uint64_t RegisterVM::move_memory_reference(uint64_t token, uint32_t lexical) {
+    auto pointer = memory_lifetimes_.resolve(token);
+    uint64_t target = invocation_parents.empty() ? 0 : invocation_parents.back();
+    if (lexical) {
+        bool found = false;
+        for (auto it = vm_region_stack.rbegin(); it != vm_region_stack.rend(); ++it)
+            if (region_instances.at(*it).lexical_id == lexical) { target = *it; found = true; break; }
+        if (!found) throw std::runtime_error("Reference move target is not active");
+    }
+    auto depth = [&](uint64_t region) { return region ? region_instances.at(region).depth : size_t(0); };
+    if (depth(vm_allocation_regions.at(pointer)) > depth(target))
+        throw std::runtime_error("Reference promotion requires owner promotion");
+    auto origin = memory_lifetimes_.reference_region(token);
+    if (depth(origin) < depth(target)) target = origin;
+    return memory_lifetimes_.move_reference(token, target);
+}
+void RegisterVM::consume_memory(RegisterValue value) {
+    if (!IS_PTR(value)) return;
+    auto address = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
+    if (!vm_allocation_types.count(address)) throw std::runtime_error("Consume requires locally owned object");
+    memory_lifetimes_.adopt(address);
+    memory_lifetimes_.consume(address);
+}
 void RegisterVM::register_native_allocation(RegisterValue value) {
     if (!IS_PTR(value)) return;
     auto root = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
@@ -436,6 +486,7 @@ void RegisterVM::reclaim_value(RegisterValue val) {
     if (type == vm_allocation_types.end()) return;
     uint32_t kind = type->second;
     region_allocations[vm_allocation_regions.at(ptr)].erase(ptr);
+    memory_lifetimes_.revoke(ptr);
     vm_allocation_types.erase(type);
     vm_allocation_regions.erase(ptr);
     auto* header = reinterpret_cast<ObjHeader*>(ptr);
@@ -514,6 +565,7 @@ void RegisterVM::exit_region() {
     if (vm_region_stack.empty()) throw std::runtime_error("Unbalanced RegionExit");
     auto id = vm_region_stack.back();
     finalize_owned_frames(id);
+    memory_lifetimes_.end_region(id);
     vm_region_stack.pop_back();
     active_region_id = region_instances.at(id).parent;
     auto& objects = region_allocations[id];
@@ -559,6 +611,7 @@ void RegisterVM::native_region(LIR::LIR_Op op, uint32_t lexical, RegisterValue v
 
 void RegisterVM::execute_regions(const LIR::LIR_Inst* pc) {
     if (pc->op == LIR::LIR_Op::RegionEnter) {
+        if (next_region_id == UINT64_MAX) throw std::overflow_error("VM region identity exhausted");
         uint64_t id = next_region_id++;
         size_t depth = active_region_id ? region_instances.at(active_region_id).depth + 1 : 1;
         region_instances.emplace(id, RegionInstance{static_cast<uint32_t>(pc->imm), active_region_id, depth});
@@ -597,6 +650,7 @@ void RegisterVM::export_graph(RegisterValue value) {
         heap_parent_->vm_allocation_regions[ptr] = 0;
         heap_parent_->vm_allocation_types[ptr] = vm_allocation_types.at(ptr);
         heap_parent_->region_allocations[0].insert(ptr);
+        memory_lifetimes_.revoke(ptr);
         vm_allocation_types.erase(ptr); vm_allocation_regions.erase(ptr);
         borrowed_constants.insert(ptr);
     }

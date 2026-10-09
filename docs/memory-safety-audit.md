@@ -1,5 +1,8 @@
 # Memory model implementation audit
 
+Historical baseline: commit `b4909d6`. Subsequent implementation and remaining
+limits are documented in [shared-memory-contracts.md](shared-memory-contracts.md).
+
 Audit date: 2026-10-08. Repository: Lymar `dev`, including the pending Param/file
 lowering and target runtime-linking fixes. The audit does not change the memory
 model, LIR format, reference representation, or public object ABI.

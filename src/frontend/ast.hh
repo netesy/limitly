@@ -15,6 +15,7 @@
 #include <queue>
 #include "scanner.hh"
 #include "../backend/types.hh"
+#include "../memory/ownership.hh"
 
 namespace LM {
 namespace Frontend {
@@ -133,6 +134,7 @@ namespace AST {
 
     // Memory ownership and lifetime information
     struct MemoryInfo {
+        mutable Memory::Identity semantic_id = 0;
         std::size_t region_id = 0;           // Which memory region owns this value
         std::size_t generation = 0;          // Generation for reference validity
         bool is_linear = false;              // Is this a linear (move-only) type
@@ -283,6 +285,7 @@ namespace AST {
 
     // Program - the root of our AST
     struct Program : public Node {
+        std::shared_ptr<Memory::SemanticFacts> ownership_facts;
         std::vector<std::shared_ptr<Statement>> statements;
         
         // Map of imported symbols: "alias.name" or "name" -> original function/frame declaration

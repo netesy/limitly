@@ -79,6 +79,39 @@ class StandaloneRegionTests(unittest.TestCase):
                         self.run_command([str(COMPILER), "build", "-O", str(level), str(source), "-o", str(executable)])
                         self.assertEqual(self.run_command([str(executable)]), expected)
 
+    def test_branch_return_and_loop_cleanup_from_source(self):
+        source_text = r'''
+fn select(flag:bool):[int] {
+    var outer=[1];
+    if(flag) { {var shadow=[2]; return shadow;} }
+    else { {var shadow=[3]; return shadow;} }
+    return outer;
+}
+fn loop_value():int {
+    var sum=0;
+    for(var i=0; i<4; i=i+1) {
+        if(i==1) {continue;}
+        {var items=[i]; sum=sum+items[0];}
+        if(i==2) {break;}
+    }
+    return sum;
+}
+var first=select(true); var second=select(false);
+print(first[0]); print(second[0]); print(loop_value());
+'''
+        with tempfile.TemporaryDirectory(prefix="lymar-cfg-memory-") as tmp:
+            source = Path(tmp) / "cleanup.lm"
+            source.write_text(source_text)
+            lir = self.run_command([str(COMPILER), "-lir", str(source)])
+            self.assertIn("RegionEnter", lir)
+            self.assertIn("RegionExit", lir)
+            expected = self.run_command([str(COMPILER), "run", str(source)])
+            self.assertEqual(expected.splitlines(), ["2", "3", "2"])
+            for level in (0, 1, 2):
+                executable = Path(tmp) / f"cleanup-o{level}"
+                self.run_command([str(COMPILER), "build", "-O", str(level), str(source), "-o", str(executable)])
+                self.assertEqual(self.run_command([str(executable)]), expected)
+
     def test_optimized_external_side_effects_and_failures_are_preserved(self):
         with tempfile.TemporaryDirectory(prefix="lymar-aot-assert-") as tmp:
             source, executable = Path(tmp) / "fail.lm", Path(tmp) / "fail"

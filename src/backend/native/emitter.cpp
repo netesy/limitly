@@ -366,6 +366,16 @@ struct Emitter {
       }
       // Allocations remain in the caller's region, retaining all aliases
       // until control returns to the VM's scope-exit ownership machinery.
+      case Op::RefCreate:
+        expr = helper(Helper::RefCreate, a, integer(inst.imm)); break;
+      case Op::RefResolve:
+        expr = helper(Helper::RefResolve, a, integer(inst.imm)); break;
+      case Op::RefMove:
+        expr = helper(Helper::RefMove, a, integer(inst.imm)); break;
+      case Op::RefRelease:
+        out << helper(Helper::RefRelease, a, integer(inst.imm)) << ";"; break;
+      case Op::OwnershipConsume:
+        out << helper(Helper::OwnershipConsume, a) << ";"; break;
       case Op::RegionEnter:
       case Op::RegionExit: {
         out << "V argv[]={" << integer(inst.imm) << "};";
@@ -435,8 +445,8 @@ struct Api { uint32_t version; uint32_t size;
 V(*helper)(void*,uint32_t,V,V,V,const char*,const V*,size_t);
 V(*integer)(int64_t); V(*floating)(double); int64_t(*read_int)(V); double(*read_float)(V);
 int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data)(V); };
-extern "C" __attribute__((visibility("default"))) uint32_t lymar_module_abi_version() { return 2; }
 )CPP";
+    emitter.out << "extern \"C\" __attribute__((visibility(\"default\"))) uint32_t lymar_module_abi_version() { return " << ABI_VERSION << "; }\n";
     emitter.out << "struct NativeScope { const Api* api; void* ctx; V depth; V result=2ULL; "
         "NativeScope(const Api* a,void* c):api(a),ctx(c),depth("
         << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_call_enter\"")
@@ -477,7 +487,7 @@ extern "C" __attribute__((visibility("default"))) uint32_t lymar_module_abi_vers
           << "extern \"C\" __attribute__((visibility(\"default\"))) V export"
           << i
           << "(const Api* api,void* ctx,const V* args,size_t count) { if(!api "
-             "|| api->version!=2 || api->size!=sizeof(Api)) throw "
+             "|| api->version!=" << ABI_VERSION << " || api->size!=sizeof(Api)) throw "
              "std::runtime_error(\"Lymar native module ABI mismatch\"); "
              "if(count!="
           << function.param_count

@@ -575,15 +575,11 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
     // This ensures module frames use their full qualified name (e.g., test_module_frame.Counter)
     std::string frame_qualified_name = frame_info.name;
     
-    // ===== NEW: MEMORY SAFETY INTEGRATION =====
     
-    // Enter memory region for frame instantiation
-    enter_memory_region();
     
     // Track which fields are initialized
     std::vector<std::string> initialized_fields;
     
-    // ===== END NEW =====
     
     // Check that all required fields are provided
     std::set<std::string> provided_fields;
@@ -621,21 +617,6 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
             add_type_error(expected_type->toString(), actual_type->toString(), expr->line);
         }
         
-        // NEW: Check if field is linear type
-        // Linear types are tracked in the linear_types map, not through TypeTag
-        if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(field_value.get())) {
-            if (linear_types.find(var_expr->name) != linear_types.end()) {
-                // This is a linear type - mark as moved into field
-                move_linear_type(var_expr->name, expr->line);
-            }
-        }
-        
-        // NEW: Check mutable aliasing for frame fields
-        check_frame_field_mutable_aliasing(expr->frameName, field_name, 
-                                          false, expr->line);  // Fields assigned, not borrowed
-        
-        // ===== END NEW =====
-        
         provided_fields.insert(field_name);
         initialized_fields.push_back(field_name);
     }
@@ -650,21 +631,10 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
         }
     }
     
-    // ===== NEW: COMPLETE MEMORY SAFETY SETUP =====
     
     // Verify all non-optional fields initialized
     verify_frame_full_initialization(expr->frameName, initialized_fields, expr->line);
     
-    // Register frame for automatic deinit at scope exit
-    register_frame_for_deinit(expr->frameName, current_scope_level);
-    
-    // Check for linear type fields
-    check_frame_field_linear_types(expr->frameName, frame_info.fields);
-    
-    // Exit memory region
-    exit_memory_region();
-    
-    // ===== END NEW =====
     
     // Return the frame type using the qualified name
     TypePtr frame_type = type_system.createFrameType(frame_qualified_name);
@@ -1209,6 +1179,36 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
 
     import_stmt->inferred_type = type_system.NIL_TYPE;
     return type_system.NIL_TYPE;
+}
+
+void TypeChecker::verify_frame_full_initialization(
+    const std::string& frame_name,
+    const std::vector<std::string>& initialized_fields,
+    int line) {
+
+    auto frame_it = frame_declarations.find(frame_name);
+    if (frame_it == frame_declarations.end()) {
+        return;
+    }
+
+    const FrameInfo& frame_info = frame_it->second;
+    for (size_t i = 0; i < frame_info.fields.size(); ++i) {
+        const std::string& field_name = frame_info.fields[i].first;
+        bool has_default = frame_info.field_has_default[i].second;
+
+        bool is_initialized = false;
+        for (const auto& init_field : initialized_fields) {
+            if (init_field == field_name) {
+                is_initialized = true;
+                break;
+            }
+        }
+
+        if (!is_initialized && !has_default) {
+            add_error("Frame '" + frame_name + "' field '" + field_name +
+                     "' must be initialized (no default value)", line);
+        }
+    }
 }
 
 } // namespace Frontend

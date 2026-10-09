@@ -159,3 +159,6 @@ its historical numbers cannot establish a valid performance regression.
 The `regions-v2` metadata marker deliberately invalidates older precompiled
 artifacts whose ownership behavior is incompatible. Rebuild those modules against
 the current runtime; reusing old binaries would bypass the memory corrections.
+
+The shared memory contracts, LIR serialization version 1 and native ABI version 1
+are documented in [shared-memory-contracts.md](shared-memory-contracts.md).

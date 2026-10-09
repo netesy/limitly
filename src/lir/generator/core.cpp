@@ -1,4 +1,5 @@
 #include "../generator.hh"
+#include "../../memory/lir_analysis.hh"
 #include "../functions.hh"
 #include "../verifier.hh"
 #include "../../frontend/module_manager.hh"
@@ -27,6 +28,7 @@ Generator::Generator() : current_function_(nullptr), next_register_(0), next_lab
 
 std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::TypeCheckResult& type_check_result) {
     try {
+        ownership_facts_ = type_check_result.program->ownership_facts;
         // Set type system reference BEFORE Pass 0
         type_system_ = type_check_result.type_system;
 
@@ -101,6 +103,14 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
 
     
 
+    if (ownership_facts_) {
+        std::vector<std::string> errors;
+        if (!Verifier::verify_ownership(*current_function_, errors)) {
+            for (const auto& error : errors) report_error(error);
+            return nullptr;
+        }
+    }
+
     // Optimize the generated LIR (but NOT for top-level wrapper)
     Optimizer optimizer(*current_function_);
     if (current_function_->name != "__top_level_wrapper__") {
@@ -109,6 +119,12 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         optimizer.remove_redundant_entry_calls();
     }
 
+
+    if (ownership_facts_) {
+        std::vector<std::string> ownership_errors;
+        if (!Verifier::verify_ownership(*current_function_, ownership_errors))
+            for (const auto& error : ownership_errors) report_error(error);
+    }
 
     // Collect metrics
     auto metrics = MetricsCollector::collect(*current_function_);
@@ -137,6 +153,8 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     auto& func_manager = LIRFunctionManager::getInstance();
     
     // Save current function state to allow recursive calls (e.g. lambdas)
+    auto saved_references = std::move(checked_references_);
+    checked_references_.clear();
     auto saved_function = std::move(current_function_);
     size_t saved_lambda_counter = lambda_counter_;
     lambda_counter_ = 0;
@@ -219,6 +237,21 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     
     finish_cfg_build();
     
+    if (ownership_facts_) {
+        const auto id = fn.memory_info.semantic_id;
+        current_function_->inferred_effects = ownership_facts_->functions[id];
+        current_function_->ownership_parameters = ownership_facts_->parameters[id];
+        for (auto capture : current_function_->inferred_effects.captures_read)
+            current_function_->ownership_captures.push_back(capture);
+        current_function_->memory_effects.parameters.clear();
+        for (auto flags : current_function_->inferred_effects.parameters)
+            current_function_->memory_effects.parameters.push_back(flags & Memory::Consume ? Memory::Ownership::Owned : flags & Memory::Opaque ? Memory::Ownership::Unspecified : flags & Memory::Mutate ? Memory::Ownership::WriteBorrow : Memory::Ownership::ReadBorrow);
+        current_function_->memory_effects.parameters.resize(current_function_->param_count, Memory::Ownership::ReadBorrow);
+        if (current_function_->inferred_effects.return_aliases.size() == 1) {
+            current_function_->memory_effects.borrowed_parameter = *current_function_->inferred_effects.return_aliases.begin();
+            current_function_->memory_effects.result = Memory::Ownership::ReadBorrow;
+        }
+    }
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
     current_function_ = nullptr;
@@ -253,6 +286,12 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     }
 
     auto lir_func = std::make_shared<LIRFunction>(fn.name, params, return_abi_type, nullptr);
+    lir_func->memory_effects_ = result->memory_effects;
+    lir_func->inferred_effects_ = result->inferred_effects;
+    lir_func->ownership_parameters_ = result->ownership_parameters;
+    lir_func->ownership_captures_ = result->ownership_captures;
+    lir_func->ownership_provenance_ = result->ownership_provenance;
+    lir_func->register_count_ = result->register_count;
     lir_func->setInstructions(result->instructions);
     lir_func->setRegisterLanguageTypes(result->register_language_types);
     lir_func->setRegisterTypes(result->register_types);
@@ -268,6 +307,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     func_manager.registerFunction(lir_func);
 
     // Restore previous state
+    checked_references_ = std::move(saved_references);
     current_function_ = std::move(saved_function);
     lambda_counter_ = saved_lambda_counter;
     next_register_ = saved_next_reg;
@@ -498,6 +538,13 @@ ValuePtr Generator::get_register_value(Reg reg) {
 }
 
 
+void Generator::emit_ownership_event(const Memory::OwnershipEvent& event) {
+    if (event.empty()) return;
+    LIR_Inst marker(LIR_Op::Nop, Type::Void, UINT32_MAX, UINT32_MAX, UINT32_MAX);
+    marker.ownership = event;
+    emit_instruction(marker);
+}
+
 void Generator::emit_instruction(const LIR_Inst& inst) {
     if (current_function_ && inst.isReturn() && !generator_region_stack_.empty()) {
         // All explicit and implicit returns use the same lifetime cleanup,
@@ -507,6 +554,13 @@ void Generator::emit_instruction(const LIR_Inst& inst) {
         for (auto it = generator_region_stack_.rbegin(); it != generator_region_stack_.rend(); ++it)
             emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, *it));
     }
+    LIR_Inst contracted = inst;
+    if (ownership_facts_ && inst.op == LIR_Op::Call && inst.func_name.ends_with(".__init__")) {
+        const auto module = inst.func_name.substr(0, inst.func_name.size() - 9);
+        auto found = ownership_facts_->module_initializations.find(module);
+        if (found != ownership_facts_->module_initializations.end())
+            contracted.ownership.initializes.assign(found->second.begin(), found->second.end());
+    }
     if (current_function_) {
         if (cfg_context_.building_cfg && cfg_context_.current_block) {
             if (cfg_context_.current_block->has_terminator()) {
@@ -514,9 +568,9 @@ void Generator::emit_instruction(const LIR_Inst& inst) {
                 LIR_BasicBlock* new_block = create_basic_block("unreachable");
                 set_current_block(new_block);
             }
-            cfg_context_.current_block->add_instruction(inst);
+            cfg_context_.current_block->add_instruction(contracted);
         } else {
-            current_function_->instructions.push_back(inst);
+            current_function_->instructions.push_back(contracted);
         }
         
         current_function_->register_count = std::max(current_function_->register_count, next_register_);
@@ -687,6 +741,11 @@ void Generator::finish_cfg_build() {
     
     // Flatten CFG blocks into linear instruction stream for JIT consumption
     flatten_cfg_to_instructions();
+    Memory::infer_lir_effects(*current_function_);
+    std::vector<std::string> memory_errors;
+    if (!Verifier::verify_memory_regions(*current_function_, memory_errors)) {
+        for (const auto& error : memory_errors) report_error(error);
+    }
     
     cfg_context_.current_block = nullptr;
     cfg_context_.entry_block = nullptr;
