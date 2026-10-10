@@ -261,6 +261,31 @@ bool ModuleManager::find_compiled_module(const std::string& module_name, const s
 bool ModuleManager::is_artifact_valid(const CompiledModuleMeta& meta, const std::string& current_source_path) {
     if (!fs::exists(meta.artifact_path)) return false;
     if (meta.abi_version != "0.0.1" || meta.runtime_semantics != "lymar-0.0.1-abi1-lir1-ownership-nullable") return false;
+    if (meta.artifact_kind == "shared") {
+        // Shared artifacts execute in this process, not on the requested AOT target.
+        const char* host_arch = nullptr;
+        const char* host_os = nullptr;
+#if defined(__x86_64__) || defined(_M_X64)
+        host_arch = "x86_64";
+#elif defined(__aarch64__) || defined(_M_ARM64)
+        host_arch = "aarch64";
+#elif defined(__riscv) && __riscv_xlen == 64
+        host_arch = "riscv64";
+#endif
+#if defined(_WIN32)
+        host_os = "windows";
+#elif defined(__APPLE__)
+        host_os = "macos";
+#elif defined(__linux__)
+        host_os = "linux";
+#endif
+        if (!host_arch || !host_os || meta.architecture != host_arch || meta.os != host_os ||
+            meta.target_triple != meta.architecture + "-" + meta.os) return false;
+    }
+    for (const auto& name : meta.dependencies) {
+        const auto dependency = find_module_file(name);
+        if (dependency.empty() || !fs::exists(dependency)) return false;
+    }
     for (const auto& [name, hash] : meta.dependency_hashes) {
         std::ifstream dependency(find_module_file(name));
         if (!dependency) return false;
@@ -580,7 +605,47 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
                     if (canonical.ends_with(".index")) canonical.resize(canonical.size() - 6);
                     if ((canonical == meta.module_name || canonical.starts_with(meta.module_name + ".")) &&
                         is_artifact_valid(meta, find_module_file(meta.module_name))) {
-                        register_compiled_module(meta);
+                        // Child imports can discover their facade's artifact.
+                        // Validate against that facade, not only the child AST.
+                        std::shared_ptr<Module> contract_module;
+                        for (const auto& [name, candidate] : get_all_modules()) {
+                            std::string identity = name;
+                            if (identity.ends_with(".index")) identity.resize(identity.size() - 6);
+                            if (identity == meta.module_name) { contract_module = candidate; break; }
+                        }
+                        if (!contract_module) {
+                            const auto contract_path = find_module_file(meta.module_name);
+                            std::ifstream contract_file(contract_path);
+                            if (!contract_file) continue;
+                            std::stringstream contract_source;
+                            contract_source << contract_file.rdbuf();
+                            Scanner contract_scanner(contract_source.str(), contract_path);
+                            contract_scanner.scanTokens();
+                            Parser contract_parser(contract_scanner, false);
+                            auto contract_ast = contract_parser.parse();
+                            if (!contract_ast || LM::Error::Debugger::hasError()) continue;
+                            contract_module = std::make_shared<Module>();
+                            contract_module->name = meta.module_name;
+                            contract_module->path = contract_path;
+                            contract_module->source = contract_source.str();
+                            contract_module->ast = contract_ast;
+                        }
+                        const auto expected = generate_metadata(contract_module, meta.os,
+                            meta.architecture, meta.artifact_kind, meta.artifact_path);
+                        bool signatures_match = true;
+                        for (const auto& [symbol, signature] : expected.export_signatures) {
+                            if (std::find(meta.exports.begin(), meta.exports.end(), symbol) == meta.exports.end()) continue;
+                            const auto declared = meta.export_signatures.find(symbol);
+                            if (declared == meta.export_signatures.end() || declared->second != signature) {
+                                if (std::getenv("LYMAR_TRACE_PRECOMPILED"))
+                                    std::cerr << "PRECOMPILED_CONTRACT_MISMATCH: " << symbol
+                                              << " expected=" << signature << " declared="
+                                              << (declared == meta.export_signatures.end() ? "<missing>" : declared->second) << '\n';
+                                signatures_match = false;
+                                break;
+                            }
+                        }
+                        if (signatures_match) register_compiled_module(meta);
                     }
                 }
             }

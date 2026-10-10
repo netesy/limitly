@@ -396,17 +396,12 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
       auto value = arg(0);
       if (auto *list = object<LmList>(value, TYPE_LIST))
         return make_i64(list->size);
-      if (auto *tuple = object<LmTuple>(value, TYPE_TUPLE))
-        return make_i64(tuple->size);
       if (auto *dict = object<LmDict>(value, TYPE_DICT))
         return make_i64(dict->size);
-      if (auto *str = object<LmStringHeader>(value, TYPE_STRING)) {
-        // The language's len(str) counts decoded UTF-8 codepoints.
-        std::vector<ValuePtr> values{
-            VM::Register::register_to_value_ptr(value)};
-        return VM::compiler_value_to_backend_value(
-            LIR::BuiltinUtils::callBuiltinFunction(std::string(name), values));
-      }
+      // Match the VM and the canonical builtin: length is UTF-8 bytes,
+      // including embedded NULs, not decoded codepoints or strlen().
+      if (auto *str = object<LmStringHeader>(value, TYPE_STRING))
+        return make_i64(str->len);
     }
     if (name == "_builtin_string_hash_bytes") {
       auto* value = string(0);

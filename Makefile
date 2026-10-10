@@ -84,6 +84,9 @@ RSP_DIR := build/rsp
 # Precompilation configuration
 # =============================
 PRECOMPILE_MODULES ?= std.font std.ui
+PRECOMPILE_ARTIFACTS ?= shared static
+PYTHON ?= python3
+PRECOMPILE_PLATFORM := $(if $(filter Windows_NT,$(OS)),windows,$(if $(filter .dylib,$(SO_EXT)),macos,linux))
 
 # Helper to find all precompilable modules (directories in std/ containing index.lm)
 ALL_PRECOMPILE_MODULES := $(patsubst std/%/,std.%,$(dir $(wildcard std/*/index.lm)))
@@ -288,25 +291,7 @@ $(BIN_DIR)/liblymar_aot.a: $(OBJ_DIR)/src/memory/aot_runtime.o Makefile | $(BIN_
 # Precompilation targets
 # =============================
 precompile: $(PLATFORM)
-	@for mod in $(PRECOMPILE_MODULES); do \
-		mod_path="std/$$(echo $$mod | sed 's/std\.//')/index.lm"; \
-		lib_name="lib$$(echo $$mod | sed 's/std\.//')"; \
-		sh_out="bin/$${lib_name}$(SO_EXT)"; \
-		st_out="bin/$${lib_name}$(A_EXT)"; \
-		rebuild=0; \
-		if [ ! -f "$$sh_out" ] || [ ! -f "$$st_out" ] || [ ! -f "$$sh_out.meta" ]; then rebuild=1; \
-		else \
-			src_dir="std/$$(echo $$mod | sed 's/std\.//')"; \
-			if [ -n "$$(find $$src_dir -type f -newer $$sh_out 2>/dev/null)" ]; then rebuild=1; fi; \
-		fi; \
-		if [ $$rebuild -eq 1 ]; then \
-			echo "[PRECOMPILE] Building precompiled module $$mod -> $$sh_out and $$st_out ..."; \
-			./bin/lymar$(EXE_EXT) build -shared $$mod_path -o $$sh_out || exit 1; \
-			./bin/lymar$(EXE_EXT) build -static $$mod_path -o $$st_out || exit 1; \
-		else \
-			echo "[PRECOMPILE] Module $$mod is up-to-date."; \
-		fi \
-	done
+	@$(PYTHON) scripts/precompile.py --compiler "$(BIN_DIR)/lymar$(EXE_EXT)" --output-dir "$(BIN_DIR)" --platform $(PRECOMPILE_PLATFORM) --artifacts $(PRECOMPILE_ARTIFACTS) --modules $(PRECOMPILE_MODULES)
 
 precompile-all: $(PLATFORM)
 	@$(MAKE) precompile PRECOMPILE_MODULES="$(ALL_PRECOMPILE_MODULES)"

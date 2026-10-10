@@ -37,13 +37,24 @@ def workload_result(output):
 
 def run_average(cmd, runs=5, env=None, native=False, iterations=50, workload_times=None):
     times, values = [], []
+    validated_value = None
+    if native:
+        # Assert dispatch in a separate run: printing every exported call is
+        # significant overhead for small native functions.
+        validation_env = dict(os.environ if env is None else env, LYMAR_TRACE_PRECOMPILED="1")
+        _, out, err = measure_run(cmd, validation_env)
+        width_calls = re.findall(r"^PRECOMPILED_CALL: std\.font\.Font\.text_width$", err, re.MULTILINE)
+        if len(width_calls) != iterations or "PRECOMPILED_CALL: std.font.load_font" not in err:
+            raise RuntimeError(f"Mode B must load the font and execute all {iterations} text_width calls natively")
+        validated_value = workload_result(out)
+        env = dict(validation_env)
+        env.pop("LYMAR_TRACE_PRECOMPILED", None)
     for _ in range(runs):
         ms, out, err = measure_run(cmd, env)
         value = workload_result(out)
         if native:
-            width_calls = re.findall(r"^PRECOMPILED_CALL: std\.font\.Font\.text_width$", err, re.MULTILINE)
-            if len(width_calls) != iterations or "PRECOMPILED_CALL: std.font.load_font" not in err:
-                raise RuntimeError(f"Mode B must load the font and execute all {iterations} text_width calls natively")
+            if not math.isclose(value, validated_value, rel_tol=1e-5, abs_tol=0.01):
+                raise RuntimeError("Timed native workload differs from dispatch-validated workload")
         if workload_times is not None:
             matches = re.findall(r"^WORKLOAD_CPU_MS: ([+\-0-9.eE]+)$", out, re.MULTILINE)
             if len(matches) != 1 or not math.isfinite(float(matches[0])) or float(matches[0]) <= 0:

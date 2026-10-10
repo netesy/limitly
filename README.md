@@ -69,12 +69,23 @@ The runner checks results before comparing measured end-to-end times, restores
 existing precompiled artifacts even on failure, and requires actual native
 dispatch in mode B. It fails instead of timing an invalid or skipped workload.
 
-On Linux x86-64, shared modules compile their LIR through the host C++ compiler
+On Linux and Windows x86-64, shared modules compile their LIR through the host C++ compiler
 (`c++`, or `LYMAR_NATIVE_CXX`). This compiles module control flow to native code
 while using a versioned ABI with the VM's tagged values, object layouts, runtime
 helpers, globals, resources, and ownership regions. Frames and collections keep
 their identity across calls, including mutations and returned object graphs.
 Other targets continue to use Fyra's target-specific lowering.
+
+On Windows, run `make precompile` in the documented MSYS2 MinGW64 environment
+with Python 3 available (`PYTHON=python` may be used if needed). The portable
+driver respects `BIN_DIR` and produces `.dll`/`.lib` artifacts and metadata.
+For modules loaded by the VM, request only shared artifacts with
+`make precompile PRECOMPILE_ARTIFACTS=shared`; standalone Fyra archives are a
+separate product and are included by default (`shared static`).
+Explicit precompile requests rebuild the requested artifacts so changes in imported
+dependencies cannot be missed by an index-file timestamp check. Dispatch is
+validated separately from benchmark timing, with fallback disabled and trace
+logging excluded from timed native runs.
 
 Full `std.font` precompilation is covered by strict native tests for loading,
 metrics, kerning, normal/subpixel/SDF rendering, and in-memory loading. The

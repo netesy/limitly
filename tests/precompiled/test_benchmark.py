@@ -4,11 +4,23 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from run_benchmark import ROOT, measure_run, preserve_artifacts, resolve_font, workload_result
+from run_benchmark import ROOT, measure_run, preserve_artifacts, resolve_font, workload_result, run_average
 
 
 class BenchmarkValidationTests(unittest.TestCase):
+    def test_native_dispatch_logging_is_not_timed(self):
+        trace = 'PRECOMPILED_CALL: std.font.load_font\nPRECOMPILED_CALL: std.font.Font.text_width\n'
+        with patch('run_benchmark.measure_run', side_effect=[
+                (999, 'WORKLOAD_DONE: 42', trace), (5, 'WORKLOAD_DONE: 42', '')]) as run:
+            measured, result = run_average(['compiler'], runs=1, native=True, iterations=1,
+                env={'LYMAR_DISABLE_INTERPRETER_FALLBACK': '1'})
+            self.assertEqual((measured, result), (5, 42))
+            self.assertEqual(run.call_args_list[0].args[1]['LYMAR_TRACE_PRECOMPILED'], '1')
+            self.assertNotIn('LYMAR_TRACE_PRECOMPILED', run.call_args_list[1].args[1])
+            self.assertEqual(run.call_args_list[1].args[1]['LYMAR_DISABLE_INTERPRETER_FALLBACK'], '1')
+
     def test_rejects_missing_zero_duplicate_and_nonfinite_results(self):
         for output in ("Failed to load font", "WORKLOAD_DONE: 0", "WORKLOAD_DONE: 1e999",
                        "WORKLOAD_DONE: 1\nWORKLOAD_DONE: 1"):

@@ -1,9 +1,14 @@
 #include "emitter.hh"
 #include "abi.hh"
 #include "scalar_lowering.hh"
+#include "aggregate_lowering.hh"
 #include "direct_operations.hh"
+#include "process_arguments.hh"
 #include "memory/region_analysis.hh"
 #include "backend/vm/vm_list.hh"
+#include "backend/vm/vm_dict.hh"
+#include "backend/vm/vm_tuple.hh"
+#include <cstddef>
 #include "backend/vm/vm_runtime.hh"
 #include "backend/vm/vm_string.hh"
 #include "backend/vm/vm_value.hh"
@@ -19,6 +24,9 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
+#ifdef _WIN32
+#include <process.h>
+#endif
 
 namespace LM::Backend::Native {
 namespace {
@@ -45,6 +53,7 @@ struct Emitter {
   std::unordered_map<std::string, size_t> names;
   std::vector<const LIR::LIR_Function *> functions;
   std::unordered_set<size_t> reference_functions;
+  std::unordered_map<size_t, std::unordered_set<LIR::Reg>> pair_factories;
   std::string raw(uint32_t r) {
     return r == UINT32_MAX ? "N(2ULL)" : "r[" + std::to_string(r) + "]";
   }
@@ -58,6 +67,8 @@ struct Emitter {
     const auto& name = inst.func_name;
     std::string field;
     size_t count = 2;
+    if (name == "len" && inst.call_args.size() == 1)
+      return "native_length(api,ctx," + reg(inst.call_args[0]) + ")";
     if (name == "_builtin_string_contains") field = "string_contains";
     else if (name == "_builtin_string_starts_with") field = "string_starts_with";
     else if (name == "_builtin_string_ends_with") field = "string_ends_with";
@@ -144,9 +155,9 @@ struct Emitter {
       }
     }
   }
-  void emit_function(const LIR::LIR_Function &function, size_t id) {
+  void emit_function(const LIR::LIR_Function &function, size_t id, bool pair_factory=false) {
     out << "// " << function.name << "\n";
-    out << "static N f" << id
+    out << "static N f" << id << (pair_factory ? "_pair" : "")
         << "(const Api* api,void* ctx,const N* args,size_t count) {\n";
     size_t registers = function.register_count + 1;
     for (const auto &inst : function.instructions) {
@@ -201,7 +212,7 @@ struct Emitter {
       auto h = [&](Helper type) { return helper(type, a, b); };
       const bool typed = !references && known_numeric(inst.a, inst.type_a) && known_numeric(inst.b, inst.type_b);
       auto arith = [&](Helper type) {
-        return "arithmetic(api,ctx," + std::to_string(static_cast<unsigned>(type)) + "," + raw(inst.a) + "," + raw(inst.b) + "," + (typed ? "true" : "false") + ")";
+        return "arithmetic(api,ctx," + std::to_string(static_cast<unsigned>(type)) + "," + raw(inst.a) + "," + raw(inst.b) + "," + (references ? "false" : "true") + ")";
       };
       switch (inst.op) {
       case Op::LoadConst:
@@ -348,12 +359,16 @@ struct Emitter {
         expr = h(Helper::DictItems);
         break;
       case Op::TupleCreate:
-        expr = helper(Helper::TupleNew, integer(inst.imm));
+        expr = pair_factory ? "native_pair()" : helper(Helper::TupleNew, integer(inst.imm));
         break;
       case Op::TupleGet:
-        expr = "ops->sequence_get(" + a + "," + index(inst.b) + ")";
+        expr = "(" + raw(inst.a) + ".pair ? N((" + index(inst.b) + ">=0 && " + index(inst.b) + "<2)?" + raw(inst.a) + ".fields[" + index(inst.b) + "]:2ULL) : N(ops->sequence_get(" + a + "," + index(inst.b) + ")))";
         break;
       case Op::TupleSet:
+        if (pair_factory) {
+          out << "native_pair_set(api,ctx," << raw(inst.dst) << "," << index(inst.a) << "," << raw(inst.b) << ");";
+          break;
+        }
         expr = "ops->sequence_set(ctx," + d + "," + a + "," + b + ")";
         break;
       case Op::TupleLen:
@@ -421,8 +436,10 @@ struct Emitter {
         for (auto arg : inst.call_args) out << (internal ? raw(arg) : reg(arg)) << ",";
         out << (internal ? "N(2ULL)" : "2ULL") << "}; ";
         if (internal) {
-          expr = "f" + std::to_string(target->second) + "(api,ctx,argv," + std::to_string(inst.call_args.size()) + ")";
-          if (inst.op != Op::CallVoid && inst.dst != UINT32_MAX && !known_numeric(inst.dst, inst.result_type))
+          const bool projected_pair = pair_factories.count(target->second) &&
+              pair_result_is_projected(function, inst.dst);
+          expr = "f" + std::to_string(target->second) + (projected_pair ? "_pair" : "") + "(api,ctx,argv," + std::to_string(inst.call_args.size()) + ")";
+          if (!projected_pair && inst.op != Op::CallVoid && inst.dst != UINT32_MAX && !known_numeric(inst.dst, inst.result_type))
             expr = "N(" + expr + ".boxed(api,ctx))";
         } else expr = helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", quote(inst.func_name), "argv", inst.call_args.size());
         break;
@@ -545,19 +562,41 @@ bool emit_shared_module(const LIR::LIR_Function &root,
 #include <cstring>
 #include <cmath>
 using V=uint64_t;
+#ifdef _WIN32
+#define LM_EXPORT __declspec(dllexport)
+#else
+#define LM_EXPORT __attribute__((visibility("default")))
+#endif
 struct Api { uint32_t version; uint32_t size;
 V(*helper)(void*,uint32_t,V,V,V,const char*,const V*,size_t);
 V(*integer)(int64_t); V(*floating)(double); int64_t(*read_int)(V); double(*read_float)(V);
 int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data)(V); };
 )CPP";
-    emitter.out << "extern \"C\" __attribute__((visibility(\"default\"))) uint32_t lymar_module_abi_version() { return " << ABI_VERSION << "; }\n";
+    emitter.out << "extern \"C\" LM_EXPORT uint32_t lymar_module_abi_version() { return " << ABI_VERSION << "; }\n";
     emitter.out << "constexpr uint32_t HBuiltin=" << static_cast<unsigned>(Helper::Builtin)
         << ", HAdd=" << static_cast<unsigned>(Helper::Add) << ", HSub=" << static_cast<unsigned>(Helper::Sub)
         << ", HMul=" << static_cast<unsigned>(Helper::Mul) << ", HDiv=" << static_cast<unsigned>(Helper::Div)
         << ", HMod=" << static_cast<unsigned>(Helper::Mod)
-        << ", HFloat=" << TYPE_FLOAT << ";\n" << scalar_lowering_source;
+        << ", HFloat=" << TYPE_FLOAT
+        << ", HPairNew=" << static_cast<unsigned>(Helper::TupleNew)
+        << ", HPairSet=" << static_cast<unsigned>(Helper::TupleSet)
+        << ", HPairGet=" << static_cast<unsigned>(Helper::TupleGet)
+        << ";\n" << scalar_lowering_source;
     emitter.out << "constexpr uint32_t HDirectOperations=" << static_cast<unsigned>(Helper::DirectOperations) << ";\n";
     emitter.out << direct_operations_source;
+    // Layout constants come from the canonical runtime structs, not a second
+    // ABI definition. memcpy avoids aliasing assumptions in generated code.
+    emitter.out << "static V native_length(const Api* api,void* ctx,V value) {\n"
+        "if(value==2ULL) return 1ULL; if(value && !(value&7ULL)) {\n"
+        "const auto* data=reinterpret_cast<const unsigned char*>(value); uint32_t type; "
+        "std::memcpy(&type,data+" << offsetof(ObjHeader, type_id) << ",sizeof(type)); size_t offset;\n"
+        "switch(type) {\n"
+        "case " << TYPE_STRING << ": offset=" << offsetof(LmStringHeader, len) << "; break;\n"
+        "case " << TYPE_LIST << ": offset=" << offsetof(LmList, size) << "; break;\n"
+        "case " << TYPE_DICT << ": offset=" << offsetof(LmDict, size) << "; break;\n"
+        "default: goto generic; } uint64_t length; std::memcpy(&length,data+offset,sizeof(length));\n"
+        "if(length<=(uint64_t(1)<<60)-1) return (length<<3)|1ULL; }\n"
+        "generic: V args[]={value}; return api->helper(ctx,HBuiltin,2ULL,2ULL,2ULL,\"len\",args,1); }\n";
     emitter.out << "struct NativeScope { const Api* api; void* ctx; V depth=0; V result=2ULL; bool managed; "
         "NativeScope(const Api* a,void* c,bool m=true):api(a),ctx(c),managed(m){if(managed)depth="
         << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_call_enter\"")
@@ -570,8 +609,24 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
     for (size_t i = 0; i < emitter.functions.size(); ++i)
       emitter.out << "static N f" << i
                   << "(const Api*,void*,const N*,size_t);\n";
-    for (size_t i = 0; i < emitter.functions.size(); ++i)
+    // Emit specializations only for proven projected call sites, avoiding
+    // duplicate bodies for every exported tuple-returning function.
+    for (const auto* caller : emitter.functions) {
+      for (const auto& call : caller->instructions) {
+        if (call.op != LIR::LIR_Op::Call) continue;
+        auto target = emitter.names.find(call.func_name);
+        if (target == emitter.names.end() || emitter.pair_factories.count(target->second) ||
+            !pair_result_is_projected(*caller, call.dst)) continue;
+        if (auto proof = immediate_pair_factory(*emitter.functions[target->second]))
+          emitter.pair_factories.emplace(target->second, *proof);
+      }
+    }
+    for (const auto& [id, proof] : emitter.pair_factories)
+      emitter.out << "static N f" << id << "_pair(const Api*,void*,const N*,size_t);\n";
+    for (size_t i = 0; i < emitter.functions.size(); ++i) {
       emitter.emit_function(*emitter.functions[i], i);
+      if (emitter.pair_factories.count(i)) emitter.emit_function(*emitter.functions[i], i, true);
+    }
     emitter.out
         << "static N indirect(const Api* api,void* ctx,V target,const N* "
            "args,size_t count) { std::string_view name=api->string_data("
@@ -591,11 +646,11 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
       if (!function.name.starts_with(module + "."))
         continue;
       emitter.out
-          << "extern \"C\" __attribute__((visibility(\"default\"))) V export"
+          << "extern \"C\" LM_EXPORT V export"
           << i << "(const Api*,void*,const V*,size_t) asm("
           << quote(function.name) << ");\n";
       emitter.out
-          << "extern \"C\" __attribute__((visibility(\"default\"))) V export"
+          << "extern \"C\" LM_EXPORT V export"
           << i
           << "(const Api* api,void* ctx,const V* args,size_t count) { if(!api "
              "|| api->version!=" << ABI_VERSION << " || api->size!=sizeof(Api)) throw "
@@ -621,13 +676,29 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
     }
     const char *configured = std::getenv("LYMAR_NATIVE_CXX");
     const std::string compiler = configured ? configured : "c++";
+#ifdef _WIN32
+    // system() uses cmd.exe even when Lymar was launched from MSYS2. Pass
+    // arguments directly, preserving spaces and avoiding POSIX shell quoting.
+    const std::string level = "-O" + std::to_string(std::clamp(optimization, 0, 3));
+    const std::vector<std::string> unquoted = {compiler, "-std=c++20", "-shared",
+        level, "-fvisibility=hidden", temporary, "-o", output};
+    std::vector<std::string> quoted;
+    for (const auto& argument : unquoted)
+      quoted.push_back(quote_windows_argument(argument));
+    std::vector<const char*> arguments;
+    for (const auto& argument : quoted) arguments.push_back(argument.c_str());
+    arguments.push_back(nullptr);
+    const auto compilation_status = _spawnvp(_P_WAIT, compiler.c_str(), arguments.data());
+#else
     const std::string command =
         shell_quote(compiler) + " -std=c++20 -shared -fPIC -O" +
         std::to_string(std::clamp(optimization, 0, 3)) +
         " -fvisibility=hidden " + shell_quote(temporary) + " -o " +
         shell_quote(output);
     // Explicit exported visibility is required despite hidden internal helpers.
-    if (std::system(command.c_str()) != 0)
+    const auto compilation_status = std::system(command.c_str());
+#endif
+    if (compilation_status != 0)
       throw std::runtime_error(
           "Host native C++ compilation failed; generated source retained at " +
           temporary);

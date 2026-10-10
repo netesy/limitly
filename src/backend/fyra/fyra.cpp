@@ -99,12 +99,17 @@ CompileResult FyraCompiler::compile_ast(std::shared_ptr<Frontend::AST::Program> 
 
 CompileResult FyraCompiler::compile(const LIR::LIR_Function& lir_func,
                                    const FyraCompileOptions& options) {
-#if defined(__linux__) && defined(__x86_64__)
+#if (defined(__linux__) || defined(_WIN32)) && (defined(__x86_64__) || defined(_M_X64))
     // Shared VM modules use the canonical tagged object ABI. Lower their LIR
     // directly through the host compiler, keeping control flow native while
     // sharing the VM runtime rather than maintaining a second heap layout.
     if (options.artifact_kind == ArtifactKind::SharedLibrary &&
-        options.platform == Platform::Linux && options.arch == Architecture::X86_64 &&
+#ifdef _WIN32
+        options.platform == Platform::Windows &&
+#else
+        options.platform == Platform::Linux &&
+#endif
+        options.arch == Architecture::X86_64 &&
         !options.exported_module.empty() && options.triple.empty()) {
         CompileResult result;
         result.success = Native::emit_shared_module(lir_func, options.exported_module,

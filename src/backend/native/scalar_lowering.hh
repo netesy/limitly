@@ -5,8 +5,11 @@ namespace LM::Backend::Native {
 inline constexpr const char *scalar_lowering_source = R"CPP(
 struct N {
   V value=2ULL;
-  double scalar=0;
+  union { double scalar=0; V fields[2]; };
   bool unboxed=false;
+  // Only specialized, read-only internal pair returns use this storage.
+  // Heap/escaped tuples retain their original tagged representation.
+  bool pair=false;
   N()=default;
   N(V v):value(v){}
   bool small() const {return !unboxed && (value&7ULL)==1ULL;}
@@ -35,6 +38,20 @@ struct N {
     return value;
   }
 };
+static inline N native_pair() {N n; n.value=0; n.pair=true; n.fields[0]=2ULL; n.fields[1]=2ULL; return n;}
+static inline void native_pair_set(const Api* api,void* ctx,N& pair,int64_t index,const N& child) {
+  if(pair.pair && index>=0 && index<2 && child.small()) {
+    pair.fields[index]=child.value; return;
+  }
+  if(pair.pair) {
+    // An unknown/non-immediate field requires the real ownership graph.
+    pair.value=api->helper(ctx,HPairNew,17ULL,2ULL,2ULL,nullptr,nullptr,0);
+    for(int64_t i=0;i<2;++i)
+      api->helper(ctx,HPairSet,pair.value,(static_cast<V>(i)<<3)|1ULL,pair.fields[i],nullptr,nullptr,0);
+    pair.pair=false;
+  }
+  api->helper(ctx,HPairSet,pair.value,(static_cast<V>(index)<<3)|1ULL,child.boxed(api,ctx),nullptr,nullptr,0);
+}
 static inline __attribute__((always_inline)) N real(const Api* api,void* ctx,double x) {
   // Materialize NaNs so pointer-equality behavior of existing boxed values
   // remains observable through copies, erasure and equality.
@@ -45,8 +62,13 @@ static inline __attribute__((always_inline)) N real(const Api* api,void* ctx,dou
   }
   N n; n.value=0; n.scalar=x; n.unboxed=true; return n;
 }
-static inline __attribute__((always_inline)) N arithmetic(const Api* api,void* ctx,uint32_t op,const N& a,const N& b,bool typed) {
-  if(typed && a.small() && b.small()) {
+static inline __attribute__((always_inline)) N arithmetic(const Api* api,void* ctx,uint32_t op,const N& a,const N& b,bool allow_fast) {
+  // These guards establish the actual runtime kinds even when canonical
+  // LIR has erased/incomplete numeric annotations. Unknown kinds still use
+  // the helper; no ownership or lifetime check is elided here. Functions
+  // with reference operations disable virtual float results to retain box
+  // identity. Immediate integer results have no allocation/reference identity.
+  if(a.small() && b.small()) {
     int64_t x=a.integer(), y=b.integer(), z=0; bool overflow=false;
     switch(op) {
     case HAdd: overflow=__builtin_add_overflow(x,y,&z); break;
@@ -59,7 +81,7 @@ static inline __attribute__((always_inline)) N arithmetic(const Api* api,void* c
     if(!overflow && z>=-(int64_t(1)<<60) && z<=(int64_t(1)<<60)-1)
       return N((static_cast<V>(z)<<3)|1ULL);
   }
-  if(typed && op!=HMod && a.numeric() && b.numeric() && (a.floating() || b.floating())) {
+  if(allow_fast && op!=HMod && a.numeric() && b.numeric() && (a.floating() || b.floating())) {
     double x=a.number(api),y=b.number(api);
     switch(op) {
     case HAdd:return real(api,ctx,x+y);
