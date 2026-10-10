@@ -5,6 +5,8 @@
 #include "lir/function_registry.hh"
 #include "lir/serializer.hh"
 #include "lir/verifier.hh"
+#include "memory/region_analysis.hh"
+#include "memory/lir_analysis.hh"
 #include "backend/vm/register.hh"
 #include "backend/fyra/fyra.hh"
 #include <cassert>
@@ -14,7 +16,52 @@
 using namespace LM;
 int main(int argc, char** argv) {
     assert(argc == 2);
+    {
+        LIR::LIR_Function invalid_raw("invalid_raw_kind", 0);
+        invalid_raw.instructions.emplace_back(LIR::LIR_Op::MemoryLoad, LIR::Type::I64, 1, 0, UINT32_MAX, 11);
+        std::vector<std::string> errors;
+        assert(!LIR::Verifier::verify_memory_regions(invalid_raw, errors));
+        assert(!errors.empty());
+        LIR::LIR_Function erased("erased_scalar_parameter", 1);
+        erased.register_types[0] = LIR::Type::Bool;
+        Memory::infer_lir_effects(erased);
+        assert(erased.memory_effects.parameters[0] == Memory::Ownership::Unspecified);
+        erased.inferred_effects.parameters = {Memory::Consume};
+        Memory::infer_lir_effects(erased);
+        assert(erased.memory_effects.parameters[0] == Memory::Ownership::Owned);
+        erased.memory_effects.borrowed_parameter = 0;
+        erased.memory_effects.result = Memory::Ownership::ReadBorrow;
+        erased.inferred_effects.parameters.clear();
+        Memory::infer_lir_effects(erased);
+        assert(erased.memory_effects.borrowed_parameter == 0);
+    }
+
+    {
+        LIR::LIR_Function partial("partial_boolean", 0);
+        partial.register_count = 1;
+        partial.register_types[0] = LIR::Type::Bool;
+        partial.instructions.emplace_back(LIR::LIR_Op::LoadConst, LIR::Type::Bool, 0, VAL_TRUE);
+        partial.instructions.emplace_back(LIR::LIR_Op::JumpIf, LIR::Type::Void, UINT32_MAX, 0, UINT32_MAX, 3);
+        partial.instructions.emplace_back(LIR::LIR_Op::Return, LIR::Type::Bool, UINT32_MAX, 0, UINT32_MAX);
+        partial.instructions.emplace_back(LIR::LIR_Op::Nop, LIR::Type::Void, UINT32_MAX);
+        assert(!Memory::proven_scalar_leaf(partial)); // A reachable exit falls off as nil.
+    }
     const std::string source = R"(
+fn scalar(flag:bool):bool { if(flag){return true;}else{return false;} }
+fn closed_scalar():bool { return false; }
+fn closed_integer():int {return 2;}
+fn closed_assign():bool {var answer=true;answer=false;return answer;}
+fn closed_loop():bool {var running=true;while(running){running=false;}return running;}
+fn closed_branch():bool {if(true){return false;}else{return true;}}
+fn equals(flag:bool):bool { return flag==true; }
+fn reassigned(flag:bool):bool {var answer=flag;if(flag){answer=false;}else{answer=true;}return answer;}
+fn opaque(flag:bool):bool { print(flag); return flag; }
+assert(scalar(true)); assert(scalar(false)==false);
+assert(closed_scalar()==false);assert(closed_branch()==false);assert(closed_integer()==2);assert(closed_assign()==false);assert(closed_loop()==false);
+var closed_alias=closed_scalar;assert(closed_alias()==false);
+assert(equals(true));assert(equals(false)==false);
+assert(reassigned(true)==false);assert(reassigned(false));
+var scalar_alias=scalar; assert(scalar_alias(false)==false);
 type Hook=fn([int]):nil;
 frame Box {pub var cb:Hook; pub var data:[int]; pub fn invoke(){self.cb(self.data);}}
 fn pending(box:Box):fn():nil {return fn():nil {box.invoke();};}
@@ -54,6 +101,23 @@ var erased=identity(2); print(erased==nil); print(identity(true)); print(identit
         return nullptr;
     };
     auto* element = lookup("element"); assert(element);
+    auto* scalar = lookup("scalar"); assert(scalar);
+    assert(!Memory::proven_scalar_leaf(*scalar));
+    auto* closed_scalar = lookup("closed_scalar"); assert(closed_scalar);
+    assert(Memory::runtime_regions_proven_unnecessary(*closed_scalar));
+    auto* closed_integer = lookup("closed_integer"); assert(closed_integer);
+    assert(Memory::runtime_regions_proven_unnecessary(*closed_integer));
+    assert(Memory::scalar_return_kind(*closed_integer) == Memory::AOTValueKind::Integer);
+    auto* closed_assign = lookup("closed_assign"); assert(closed_assign);
+    assert(Memory::runtime_regions_proven_unnecessary(*closed_assign));
+    assert(!Memory::proven_scalar_leaf(*closed_assign)); // Memory proof does not imply SSA placement.
+    auto* closed_loop = lookup("closed_loop"); assert(closed_loop);
+    assert(Memory::runtime_regions_proven_unnecessary(*closed_loop));
+    auto* opaque = lookup("opaque"); assert(opaque);
+    assert(!Memory::proven_scalar_leaf(*opaque));
+    auto* reassigned = lookup("reassigned"); assert(reassigned);
+    assert(!Memory::proven_scalar_leaf(*reassigned));
+    assert(!Memory::proven_scalar_leaf(*element));
     assert(element->inferred_effects.return_projections == std::set<uint32_t>{0});
     auto* factory = lookup("factory"); assert(factory);
     assert(!factory->inferred_effects.returned_callables.empty());

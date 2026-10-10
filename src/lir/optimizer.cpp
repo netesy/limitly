@@ -2,6 +2,7 @@
 #include "verifier.hh"
 #include <stdexcept>
 #include "../memory/lir_analysis.hh"
+#include "../memory/region_analysis.hh"
 #include "algebraic_simplifier.hh"
 #include "functions.hh"
 #include "analysis.hh"
@@ -69,7 +70,14 @@ bool Optimizer::optimize() {
     };
 
     do {
+        bool regions = run_pass("Proven scalar leaf regions", [&]() {
+            std::vector<std::string> errors;
+            if (!Verifier::verify(func_, errors)) return false;
+            return Memory::eliminate_scalar_leaf_regions(func_);
+        });
+        if (regions) am.invalidate_all();
         pass_changed = Memory::eliminate_proven_local_borrows(func_);
+        pass_changed |= regions;
         if (pass_changed) am.invalidate_all();
 
         bool ur = run_pass("Unreachable code elimination", [&]() { return remove_unreachable_code(); });

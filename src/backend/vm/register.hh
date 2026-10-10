@@ -3,6 +3,7 @@
 
 #include "../../lir/lir.hh"
 #include "../../memory/contracts.hh"
+#include "../../memory/region_instances.hh"
 #include "../../frontend/type_checker.hh"
 #include "../register_value.hh"
 #include "../task.hh"
@@ -15,12 +16,15 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <map>
 #include <unordered_set>
 #include <memory>
 #include <mutex>
 #include <atomic>
 #include <queue>
 #include <chrono>
+#include <algorithm>
+#include <stdexcept>
 
 namespace LM {
 namespace Backend {
@@ -198,18 +202,28 @@ private:
         uint32_t lexical_id;
         uint64_t parent;
         size_t depth;
+        uintptr_t raw_head = 0;
     };
     uint64_t active_region_id = 0;
     uint64_t next_region_id = 1;
     std::vector<uint64_t> vm_region_stack;
-    std::unordered_map<uint64_t, RegionInstance> region_instances;
+    Memory::RegionInstances<RegionInstance> region_instances;
     std::unordered_map<uint64_t, std::unordered_set<uintptr_t>> region_allocations;
     std::unordered_map<uintptr_t, uint64_t> vm_allocation_regions;
     std::vector<uint64_t> invocation_parents;
     std::unordered_set<int64_t> owned_callbacks;
     std::unordered_set<int64_t> owned_resources;
     void release_resources();
-    std::unordered_map<uintptr_t, uint64_t> owned_raw_memory;
+    struct RawOwnership { uint64_t region; uintptr_t previous = 0, next = 0; };
+    std::map<uintptr_t, RawOwnership> owned_raw_memory;
+    std::multimap<uintptr_t, uintptr_t> raw_aliases;
+    void index_raw_alias(uintptr_t wrapper);
+    void unindex_raw_alias(uintptr_t wrapper);
+    uintptr_t root_raw_head = 0;
+    uintptr_t& raw_head(uint64_t region);
+    void attach_raw_memory(uintptr_t address, uint64_t region);
+    void detach_raw_memory(uintptr_t address);
+    void export_raw_memory(RegisterVM& parent);
     std::unordered_set<uintptr_t> borrowed_constants;
     std::unordered_set<uintptr_t> opaque_runtime_pointers;
     RegisterVM* heap_parent_ = nullptr;

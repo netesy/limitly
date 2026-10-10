@@ -302,6 +302,10 @@ bool Verifier::verify_memory_regions(const LIR_Function& func, std::vector<std::
         const auto& block = blocks[id];
         for (size_t i = block.start_inst_idx; i < block.end_inst_idx; ++i) {
             const auto& inst = func.instructions[i];
+            if ((inst.op == LIR_Op::MemoryLoad || inst.op == LIR_Op::MemoryStore) &&
+                (inst.imm > 10 || inst.a == UINT32_MAX || (inst.op == LIR_Op::MemoryStore && inst.b == UINT32_MAX))) {
+                fail(i, "Invalid raw-memory element kind or operands"); return false;
+            }
             const auto region = static_cast<uint32_t>(inst.imm & Memory::ReferenceRegionMask);
             if ((inst.op == LIR_Op::RegionEnter || inst.op == LIR_Op::RegionExit || inst.op == LIR_Op::RegionMove) && (inst.imm & Memory::ReferenceMoveNullable))
                 { fail(i, "Region identity exceeds canonical 31-bit range"); return false; }
@@ -440,6 +444,15 @@ bool Verifier::verify_use_before_def(const LIR_Function& func, std::vector<std::
     bool ok = true;
     for (size_t i = 0; i < func.instructions.size(); ++i) {
         const auto& inst = func.instructions[i];
+        if (inst.op == LIR_Op::Nop || inst.op == LIR_Op::RegionEnter ||
+            inst.op == LIR_Op::RegionExit || inst.op == LIR_Op::Jump) continue;
+        if (inst.op == LIR_Op::RegionMove) {
+            if (inst.a != UINT32_MAX && inst.a < func.register_count && !defined.count(inst.a)) {
+                errors.push_back("Function " + func.name + " promotes undefined register r" + std::to_string(inst.a));
+                ok = false;
+            }
+            continue;
+        }
 
         // Skip the check entirely for pseudo-ops that don't read registers.
         // Label/Jump/FuncDef/BeginModule/EndModule/ImportModule/ExportSymbol

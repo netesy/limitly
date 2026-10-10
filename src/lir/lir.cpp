@@ -1,6 +1,7 @@
 #include "lir.hh"
 #include "../memory/reference_flags.hh"
 #include "../backend/vm/vm_string.hh"
+#include "../backend/vm/vm_runtime.hh"
 #include <iostream>
 #include <sstream>
 #include <iomanip>
@@ -32,9 +33,16 @@ std::string LIR_Inst::to_string() const {
             } else if (IS_BOOL(const_val)) {
                 oss << " r" << dst << ", " << (UNBOX_BOOL(const_val) ? "true" : "false");
             } else if (IS_PTR(const_val)) {
-                auto* str_hdr = reinterpret_cast<LmStringHeader*>(UNBOX_PTR(const_val));
-                if (str_hdr) {
-                    oss << " r" << dst << ", \"" << str_hdr->data << "\"";
+                auto* header = reinterpret_cast<ObjHeader*>(UNBOX_PTR(const_val));
+                if (header && header->type_id == TYPE_STRING) {
+                    auto* string = reinterpret_cast<LmStringHeader*>(header);
+                    oss << " r" << dst << ", \"";
+                    oss.write(string->data, string->len);
+                    oss << "\"";
+                } else if (header && header->type_id == TYPE_BOX &&
+                           reinterpret_cast<LmBox*>(header)->type == LM_BOX_STRING) {
+                    auto* string = static_cast<const char*>(reinterpret_cast<LmBox*>(header)->value.as_ptr);
+                    oss << " r" << dst << ", \"" << (string ? string : "") << "\"";
                 } else {
                     oss << " r" << dst << ", ptr:" << std::hex << const_val << std::dec;
                 }

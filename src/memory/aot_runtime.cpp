@@ -1,5 +1,6 @@
 // Private standalone-AOT ownership helpers. No public object/header fields.
 #include "memory.hh"
+#include "region_instances.hh"
 #include "reference_flags.hh"
 #include "aot_value_kind.hh"
 #include <algorithm>
@@ -25,6 +26,8 @@ struct Allocation {
     std::unordered_map<size_t, Word> edges;
     void (*finalizer)(Word) = nullptr;
     bool finalized = false;
+    bool float_box = false;
+    bool raw_memory = false;
 };
 struct Region {
     Word parent;
@@ -47,13 +50,19 @@ struct Heap {
     };
     Word active = 0, next = 1;
     std::map<Word, Allocation> allocations;
-    std::unordered_map<Word, Region> regions{{0, {0, 0, 0, {}}}};
-    std::unordered_map<Word, Word> shadow;
+    LM::Memory::RegionInstances<Region> regions{Region{0, 0, 0, {}}};
+    std::map<Word, Word> shadow;
     std::vector<Invocation> invocations;
     std::vector<Word> pending_args;
     Word return_pointer = 0;
     Files files;
 
+    void forget_kinds(Word address, Word size, bool overlapping = false) {
+        if (!size) return;
+        auto first = shadow.lower_bound(overlapping && address >= sizeof(Word) - 1 ? address - (sizeof(Word) - 1) : address);
+        while (first != shadow.end() && (first->first < address || first->first - address < size))
+            first = shadow.erase(first);
+    }
     auto containing(Word address) {
         auto found = allocations.upper_bound(address);
         if (found == allocations.begin()) return allocations.end();
@@ -86,7 +95,7 @@ struct Heap {
         auto found = allocations.find(pointer);
         if (found == allocations.end()) throw std::runtime_error("AOT free of unowned allocation");
         regions.at(found->second.owner).members.erase(pointer);
-        std::erase_if(shadow, [&](auto entry) { return entry.first >= pointer && entry.first - pointer < found->second.size; });
+        forget_kinds(pointer, found->second.size);
         lifetimes.revoke(pointer);
         allocations.erase(found);
         allocator.deallocate(reinterpret_cast<void*>(pointer));
@@ -374,6 +383,7 @@ uint64_t lymar_aot_alloc(uint64_t size) {
 }
 uint64_t lymar_aot_box_float(double number) {
     auto pointer = lymar_aot_alloc(16);
+    heap().allocations.at(pointer).float_box = true;
     const Word header = 9; // Existing TYPE_FLOAT header and payload offsets.
     std::memcpy(reinterpret_cast<void*>(pointer), &header, sizeof(header));
     std::memcpy(reinterpret_cast<void*>(pointer + 8), &number, sizeof(number));
@@ -419,6 +429,106 @@ void lymar_aot_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
         h.promote(child, container->second.owner);
     }
 }
+// Raw access is explicitly unsafe in source. Preserve external/FFI addresses;
+// use memcpy so valid byte-addressed unaligned accesses do not acquire C++ UB.
+// Raw bytes do not transfer pointee ownership; managed stores publish edges separately.
+uint64_t lymar_aot_channel_length(uint64_t value, uint64_t kind) {
+    if (kind != object_kind || lymar_aot_is_nil(value, kind)) return 0;
+    auto& h = heap();
+    auto found = h.allocations.find(value);
+    if (found == h.allocations.end() || found->second.size < 32 || (read_word(value) & 0xffffffff) != 1)
+        return 0; // A non-queue task value is a single invocation, not an iterator.
+    return read_word(value, 16);
+}
+static uint64_t raw_address(uint64_t value, uint64_t kind) {
+    if (kind == boolean_kind || lymar_aot_is_nil(value, kind)) return 0;
+    if (kind != 0 && kind != object_kind) throw std::runtime_error("Invalid raw pointer kind");
+    return value;
+}
+uint64_t lymar_aot_memory_load_kind(uint64_t pointer, uint64_t element, uint64_t pointer_kind) {
+    pointer = raw_address(pointer, pointer_kind);
+    if (!pointer || element >= 8) return object_kind;
+    return 0;
+}
+uint64_t lymar_aot_memory_load(uint64_t pointer, uint64_t element, uint64_t pointer_kind) {
+    pointer = raw_address(pointer, pointer_kind);
+    if (element > 10) throw std::runtime_error("Invalid raw memory element kind");
+    if (!pointer) return lymar_aot_nil();
+    const auto* address = reinterpret_cast<const void*>(pointer);
+    switch (element) {
+#define LM_RAW_LOAD(ID, TYPE) case ID: { TYPE value; std::memcpy(&value, address, sizeof(value)); return static_cast<Word>(value); }
+        LM_RAW_LOAD(0, int8_t) LM_RAW_LOAD(1, uint8_t)
+        LM_RAW_LOAD(2, int16_t) LM_RAW_LOAD(3, uint16_t)
+        LM_RAW_LOAD(4, int32_t) LM_RAW_LOAD(5, uint32_t)
+        LM_RAW_LOAD(6, int64_t) LM_RAW_LOAD(7, uint64_t)
+#undef LM_RAW_LOAD
+        case 8: { float value; std::memcpy(&value, address, sizeof(value)); return lymar_aot_box_float(value); }
+        case 9: { double value; std::memcpy(&value, address, sizeof(value)); return lymar_aot_box_float(value); }
+        case 10: { Word value; std::memcpy(&value, address, sizeof(value)); return value; }
+    }
+    throw std::runtime_error("Invalid raw memory element kind");
+}
+// Raw stores use the VM's physical numeric conversion, not string parsing or
+// arbitrary object-header heuristics. Raw buffers may themselves begin with 9.
+static double raw_numeric_value(uint64_t value, uint64_t kind) {
+    if (kind == 0) return static_cast<double>(static_cast<int64_t>(value));
+    if (kind != object_kind) return 0.0;
+    auto found = heap().allocations.find(value);
+    if (found == heap().allocations.end() || !found->second.float_box || found->second.size < 16 ||
+        (read_word(value) & 0xffffffff) != 9) return 0.0;
+    double result; std::memcpy(&result, reinterpret_cast<void*>(value + 8), sizeof(result));
+    return result;
+}
+static uint64_t raw_integer_value(uint64_t value, uint64_t kind) {
+    return kind == 0 ? value : static_cast<Word>(static_cast<int64_t>(raw_numeric_value(value, kind)));
+}
+uint64_t lymar_aot_raw_alloc(uint64_t size, uint64_t kind) {
+    size = raw_integer_value(size, kind);
+    if (static_cast<int64_t>(size) < 0) return lymar_aot_nil();
+    auto pointer = lymar_aot_alloc(size);
+    heap().allocations.at(pointer).raw_memory = true;
+    return pointer;
+}
+void lymar_aot_raw_free(uint64_t pointer, uint64_t kind) {
+    pointer = raw_address(pointer, kind);
+    auto found = heap().allocations.find(pointer);
+    if (found != heap().allocations.end() && found->second.raw_memory) heap().release(pointer);
+}
+void lymar_aot_memory_store(uint64_t pointer, uint64_t value, uint64_t element, uint64_t kind, uint64_t pointer_kind) {
+    pointer = raw_address(pointer, pointer_kind);
+    if (element > 10) throw std::runtime_error("Invalid raw memory element kind");
+    if (!pointer) return;
+    auto* address = reinterpret_cast<void*>(pointer);
+    const Word integer = element < 8 ? raw_integer_value(value, kind) : value;
+    size_t width = 0;
+    switch (element) {
+#define LM_RAW_STORE(ID, TYPE, VALUE) case ID: { TYPE stored = static_cast<TYPE>(VALUE); width = sizeof(stored); std::memcpy(address, &stored, width); break; }
+        LM_RAW_STORE(0, int8_t, integer) LM_RAW_STORE(1, uint8_t, integer)
+        LM_RAW_STORE(2, int16_t, integer) LM_RAW_STORE(3, uint16_t, integer)
+        LM_RAW_STORE(4, int32_t, integer) LM_RAW_STORE(5, uint32_t, integer)
+        LM_RAW_STORE(6, int64_t, integer) LM_RAW_STORE(7, uint64_t, integer)
+        LM_RAW_STORE(8, float, raw_numeric_value(value, kind))
+        LM_RAW_STORE(9, double, raw_numeric_value(value, kind))
+        LM_RAW_STORE(10, Word, (kind == 0 || (kind == object_kind && !lymar_aot_is_nil(value, kind))) ? value : 0)
+#undef LM_RAW_STORE
+    }
+    auto& h = heap();
+    // At most fifteen byte-addressed word slots overlap an eight-byte write;
+    // do not scan unrelated stack/object kind metadata on every raw store.
+    h.forget_kinds(pointer, width, true);
+    auto owner = h.containing(pointer);
+    if (owner != h.allocations.end()) {
+        auto start = pointer - owner->first;
+        for (size_t offset = start >= sizeof(Word) - 1 ? start - (sizeof(Word) - 1) : 0;
+             offset <= start || offset - start < width; ++offset) {
+            owner->second.edges.erase(offset);
+            if (offset == SIZE_MAX) break;
+        }
+    }
+    // Physical raw-pointer bytes do not acquire ownership. The VM does not
+    // promote pointees on MemoryStore; canonical managed stores publish edges
+    // separately through lymar_aot_edge. Preserve destructor scope/order.
+}
 void lymar_aot_global_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
     auto& h = heap();
     if (is_pointer) { h.shadow[address] = is_pointer; if (is_pointer == object_kind) h.promote(child, 0); }
@@ -428,16 +538,51 @@ void lymar_aot_copy(uint64_t destination, uint64_t source, uint64_t size) {
     auto& h = heap();
     // Snapshot every value kind before memmove, including overlapping ranges.
     std::vector<std::pair<Word, Word>> kinds;
-    for (auto [address, kind] : h.shadow)
-        if (address >= source && address - source < size) kinds.emplace_back(destination + address - source, kind);
+    for (auto entry = h.shadow.lower_bound(source); entry != h.shadow.end() && entry->first - source < size; ++entry)
+        if (size - (entry->first - source) >= sizeof(Word))
+            kinds.emplace_back(destination + entry->first - source, entry->second);
     std::memmove(reinterpret_cast<void*>(destination), reinterpret_cast<void*>(source), size);
-    std::erase_if(h.shadow, [&](auto entry) { return entry.first >= destination && entry.first - destination < size; });
+    h.forget_kinds(destination, size, true);
     auto dst = h.containing(destination);
     if (dst != h.allocations.end()) {
         auto start = destination - dst->first;
-        std::erase_if(dst->second.edges, [&](auto edge) { return edge.first >= start && edge.first - start < size; });
+        std::erase_if(dst->second.edges, [&](auto edge) { return edge.first >= start ? edge.first - start < size : start - edge.first < sizeof(Word); });
     }
     for (auto [address, kind] : kinds) lymar_aot_edge(address, read_word(address), kind);
+}
+void lymar_aot_raw_copy(uint64_t destination, uint64_t source, uint64_t size) {
+    if (!destination || !source || static_cast<int64_t>(size) <= 0) return;
+    auto& h = heap();
+    // Raw byte copies carry no ownership contract. Managed aggregate copies
+    // use lymar_aot_copy and explicitly preserve their edges/kinds instead.
+    h.forget_kinds(destination, size, true);
+    auto owner = h.containing(destination);
+    if (owner != h.allocations.end()) {
+        auto start = destination - owner->first;
+        std::erase_if(owner->second.edges, [&](auto entry) {
+            return entry.first >= start ? entry.first - start < size : start - entry.first < sizeof(Word);
+        });
+    }
+    std::memmove(reinterpret_cast<void*>(destination), reinterpret_cast<void*>(source), size);
+}
+void lymar_aot_raw_fill(uint64_t destination, uint64_t value, uint64_t size) {
+    if (!destination || static_cast<int64_t>(size) <= 0) return;
+    auto& h = heap();
+    // Invalidate overlapping kinds/edges; byte filling must not retain a
+    // pointer edge whose bytes have been replaced by unrelated data.
+    h.forget_kinds(destination, size, true);
+    auto owner = h.containing(destination);
+    if (owner != h.allocations.end()) {
+        auto start = destination - owner->first;
+        std::erase_if(owner->second.edges, [&](auto entry) {
+            return entry.first >= start ? entry.first - start < size : start - entry.first < sizeof(Word);
+        });
+    }
+    std::memset(reinterpret_cast<void*>(destination), static_cast<unsigned char>(value), size);
+}
+uint64_t lymar_aot_raw_compare(uint64_t left, uint64_t right, uint64_t size) {
+    if (!left || !right || static_cast<int64_t>(size) <= 0) return 0;
+    return static_cast<int64_t>(std::memcmp(reinterpret_cast<void*>(left), reinterpret_cast<void*>(right), size));
 }
 uint64_t lymar_aot_resize(uint64_t pointer, uint64_t size) {
     if (!pointer) return lymar_aot_alloc(size);
@@ -450,9 +595,33 @@ uint64_t lymar_aot_resize(uint64_t pointer, uint64_t size) {
     allocation.owner = original.owner;
     h.regions.at(allocation.owner).members.insert(replacement);
     allocation.finalizer = original.finalizer;
+    allocation.float_box = original.float_box;
+    allocation.raw_memory = original.raw_memory;
     lymar_aot_copy(replacement, pointer, std::min(size, Word(original.size)));
     lymar_aot_free(pointer);
     return replacement;
+}
+uint64_t lymar_aot_raw_resize(uint64_t pointer, uint64_t size, uint64_t pointer_kind, uint64_t size_kind) {
+    pointer = raw_address(pointer, pointer_kind);
+    size = raw_integer_value(size, size_kind);
+    if (static_cast<int64_t>(size) < 0) return lymar_aot_nil();
+    if (!pointer) return lymar_aot_raw_alloc(size, 0);
+    auto found = heap().allocations.find(pointer);
+    if (found == heap().allocations.end() || !found->second.raw_memory) return lymar_aot_nil();
+    if (!size) { heap().release(pointer); return lymar_aot_nil(); }
+    return lymar_aot_resize(pointer, size);
+}
+void lymar_aot_raw_copy_checked(uint64_t destination, uint64_t source, uint64_t size,
+                               uint64_t destination_kind, uint64_t source_kind, uint64_t size_kind) {
+    lymar_aot_raw_copy(raw_address(destination, destination_kind), raw_address(source, source_kind), raw_integer_value(size, size_kind));
+}
+void lymar_aot_raw_fill_checked(uint64_t destination, uint64_t value, uint64_t size,
+                               uint64_t destination_kind, uint64_t value_kind, uint64_t size_kind) {
+    lymar_aot_raw_fill(raw_address(destination, destination_kind), raw_integer_value(value, value_kind), raw_integer_value(size, size_kind));
+}
+uint64_t lymar_aot_raw_compare_checked(uint64_t left, uint64_t right, uint64_t size,
+                                     uint64_t left_kind, uint64_t right_kind, uint64_t size_kind) {
+    return lymar_aot_raw_compare(raw_address(left, left_kind), raw_address(right, right_kind), raw_integer_value(size, size_kind));
 }
 void lymar_aot_set_finalizer(uint64_t pointer, void (*callback)(uint64_t)) {
     heap().allocations.at(pointer).finalizer = callback;

@@ -543,6 +543,24 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     
     // Create new task function
     current_function_ = std::make_unique<LIR_Function>(task_name, 0);
+    // Tasks inherit the enclosing register frame in the VM. Make that existing
+    // callable contract explicit for independent backends and serialization.
+    // Registers 1/2 are scheduler inputs; all other prefix slots are captures.
+    current_function_->param_count = 3;
+    for (const auto& scope : scope_stack_)
+        for (const auto& [name, reg] : scope.vars)
+            current_function_->param_count = std::max(current_function_->param_count, reg + 1);
+    current_function_->memory_effects.parameters.assign(current_function_->param_count, Memory::Ownership::Unspecified);
+    for (Reg reg = 0; reg < current_function_->param_count; ++reg) {
+        current_function_->register_types[reg] = Type::Ptr; // Actual kinds travel with the invocation.
+        if (saved_function) {
+            if (auto origin = saved_function->ownership_provenance.find(reg); origin != saved_function->ownership_provenance.end()) {
+                current_function_->ownership_provenance[reg] = origin->second;
+                if (origin->second.binding) current_function_->ownership_captures.push_back(origin->second.binding);
+            }
+        }
+    }
+
     cfg_context_.building_cfg = false;
     cfg_context_.current_block = nullptr;
     
@@ -614,6 +632,21 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
     
     // Create new worker function
     current_function_ = std::make_unique<LIR_Function>(worker_name, 0);
+    current_function_->param_count = 3;
+    for (const auto& scope : scope_stack_)
+        for (const auto& [name, reg] : scope.vars)
+            current_function_->param_count = std::max(current_function_->param_count, reg + 1);
+    current_function_->memory_effects.parameters.assign(current_function_->param_count, Memory::Ownership::Unspecified);
+    for (Reg reg = 0; reg < current_function_->param_count; ++reg) {
+        current_function_->register_types[reg] = Type::Ptr;
+        if (saved_function) {
+            if (auto origin = saved_function->ownership_provenance.find(reg); origin != saved_function->ownership_provenance.end()) {
+                current_function_->ownership_provenance[reg] = origin->second;
+                if (origin->second.binding) current_function_->ownership_captures.push_back(origin->second.binding);
+            }
+        }
+    }
+
     cfg_context_.building_cfg = false;
     cfg_context_.current_block = nullptr;
     

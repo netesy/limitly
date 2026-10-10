@@ -140,6 +140,8 @@ void LIRFunctionManager::registerFunction(std::shared_ptr<LIRFunction> function)
     lir_func->register_language_types = function->getRegisterLanguageTypes();
     
     registry.registerFunction(name, std::move(lir_func));
+    // Both registered representations must expose the same verified contract.
+    function->setInstructions(registry.getFunction(name)->instructions);
 }
 
 std::shared_ptr<LIRFunction> LIRFunctionManager::getFunction(const std::string& name) {

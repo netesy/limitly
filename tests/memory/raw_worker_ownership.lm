@@ -1,0 +1,18 @@
+import std.ffi as ffi;
+var output=channel();
+concurrent(cores=4) {
+    task(i in 1..8) {
+        unsafe {
+            var pointer=ffi.alloc(8);
+            pointer=ffi.realloc(pointer,16);
+            ffi.store_u8(pointer,i);
+            output.send(pointer);
+        }
+    }
+}
+var sum=0;
+iter(pointer in output) {
+    unsafe {sum=sum+ffi.load_u8(pointer);ffi.free(pointer);}
+}
+assert(sum==36);
+print("RAW_WORKERS_OK");

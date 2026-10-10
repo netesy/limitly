@@ -4,6 +4,8 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+import re
+import platform
 
 ROOT = Path(__file__).resolve().parents[2]
 COMPILER = Path(os.environ.get("LYMAR_EXECUTABLE", ROOT / "bin/lymar")).resolve()
@@ -57,6 +59,119 @@ print("Standalone graph/finalizer/resize/ABI regression passed");
 '''
 
 class StandaloneRegionTests(unittest.TestCase):
+    def test_raw_worker_ownership_from_source(self):
+        source = ROOT / "tests/memory/raw_worker_ownership.lm"
+        lir = self.run_command([str(COMPILER), "-lir", str(source)])
+        for operation in ("MemoryAlloc", "MemoryResize", "MemoryLoad", "MemoryStore"):
+            self.assertIn(operation, lir)
+        for level in (0, 1, 2):
+            self.assertEqual(self.run_command([str(COMPILER), "run", "-O", str(level), str(source)]),
+                             "RAW_WORKERS_OK\n")
+            with tempfile.TemporaryDirectory(prefix="lymar-raw-workers-") as tmp:
+                executable = Path(tmp) / "workers"
+                self.run_command([str(COMPILER), "build", "-O", str(level), str(source), "-o", str(executable)])
+                self.assertEqual(self.run_command([str(executable)]), "RAW_WORKERS_OK\n")
+
+
+    def test_scalar_cfg_kinds_and_reassignment(self):
+        with tempfile.TemporaryDirectory(prefix="lymar-scalar-kinds-") as tmp:
+            directory = Path(tmp)
+            source = directory / "scalars.lm"
+            source.write_text("fn two():int{return 2;}fn zero():int{return 0;}"
+                "fn assign():bool{var answer=true;answer=false;return answer;}"
+                "fn looped():bool{var running=true;while(running){running=false;}return running;}"
+                "fn cmp():bool{return 4<5;}"
+                "print(two());print(zero());print(assign());print(looped());print(cmp());"
+                "var erased:any=two();print(erased==nil);var indirect=two;print(indirect());")
+            expected = "2\n0\nfalse\nfalse\ntrue\nfalse\n2\n"
+            for level in (0, 1, 2):
+                self.assertEqual(self.run_command([str(COMPILER), "run", "-O", str(level), str(source)]), expected)
+                executable = directory / f"scalars-o{level}"
+                self.run_command([str(COMPILER), "build", "-O", str(level), str(source), "-o", str(executable)])
+                self.assertEqual(self.run_command([str(executable)]), expected)
+                if os.sys.platform == "linux" and platform.machine() == "x86_64":
+                    assembly = directory / f"scalars-o{level}.s"
+                    self.run_command([str(COMPILER), "build", "-O", str(level), "-S", str(source), "-o", str(assembly)])
+                    text = assembly.read_text()
+                    for name in ("zero", "assign", "looped", "cmp"):
+                        body = re.search(rf"^{name}:\n(.*?)^\.size {name},", text, re.M | re.S)
+                        self.assertIsNotNone(body)
+                        self.assertNotRegex(body.group(1), r"lymar_aot_(?:region_|call_|arg_|slot_|edge)")
+
+    def test_raw_pointer_bytes_do_not_transfer_managed_ownership(self):
+        source_text = r'''import std.ffi as ffi;
+frame RawVictim {pub init(){} pub deinit(){print("DROP");}}
+unsafe {
+    var buffer=ffi.alloc(8);
+    var copied=ffi.alloc(8);
+    {var victim=RawVictim();var erased:any=victim;ffi.store_ptr(buffer,erased);ffi.memcpy(copied,buffer,8);}
+    print("AFTER");ffi.free(buffer);ffi.free(copied);
+}'''
+        with tempfile.TemporaryDirectory(prefix="lymar-raw-no-ownership-") as tmp:
+            directory = Path(tmp)
+            source = directory / "raw.lm"
+            source.write_text(source_text)
+            for level in (0, 1, 2):
+                self.assertEqual(self.run_command([str(COMPILER), "run", "-O", str(level), str(source)]), "DROP\nAFTER\n")
+                executable = directory / f"raw-o{level}"
+                self.run_command([str(COMPILER), "build", "-O", str(level), str(source), "-o", str(executable)])
+                self.assertEqual(self.run_command([str(executable)]), "DROP\nAFTER\n")
+
+    def test_raw_element_kinds_from_source(self):
+        with tempfile.TemporaryDirectory(prefix="lymar-raw-kinds-") as tmp:
+            directory = Path(tmp)
+            source = directory / "kinds.lm"
+            statements = ["import std.ffi as ffi; unsafe { var pointer=ffi.alloc(32);"]
+            for name, value in (("i8", -42), ("u8", 250), ("i16", -12345), ("u16", 60000),
+                                ("i32", -123456), ("u32", 3000000000), ("i64", -123456789), ("u64", 123456789)):
+                statements.append(f"ffi.store_{name}(pointer,{value});assert(ffi.load_{name}(pointer)=={value});")
+            statements.extend([
+                "assert(ffi.load_i8(0)==nil);assert(ffi.load_f32(0)==nil);assert(ffi.load_f64(0)==nil);",
+                "var text:any=\"3.5\";ffi.store_f64(pointer,text);assert(ffi.load_f64(pointer)==0.0);ffi.store_i32(pointer,text);assert(ffi.load_i32(pointer)==0);",
+                "var flag:any=true;ffi.store_u8(pointer,flag);assert(ffi.load_u8(pointer)==0);ffi.store_f32(pointer,flag);assert(ffi.load_f32(pointer)==0.0);",
+                "assert(ffi.load_u8(flag)==nil);ffi.store_u8(flag,99);",
+                "ffi.memset(flag,99,8);ffi.memcpy(flag,pointer,8);assert(ffi.memcmp(flag,pointer,8)==0);ffi.free(flag);",
+                "assert(ffi.alloc(-1)==nil);assert(ffi.realloc(pointer,-1)==nil);var from_null=ffi.realloc(0,16);ffi.store_u8(ffi.ptr_add(from_null,15),42);assert(ffi.load_u8(ffi.ptr_add(from_null,15))==42);ffi.free(from_null);",
+                "ffi.free(text);print(text);",
+                "var disguised=ffi.alloc(16);ffi.store_i64(disguised,9);ffi.store_f64(ffi.ptr_add(disguised,8),999.0);ffi.store_f64(pointer,disguised);assert(ffi.load_f64(pointer)==0.0);ffi.free(disguised);",
+                "var erased:any=3.5;ffi.store_f32(pointer,erased);assert(ffi.load_f32(pointer)==3.5);",
+                "ffi.store_f64(pointer,erased);assert(ffi.load_f64(pointer)==3.5);",
+                "var copied=ffi.alloc(32);ffi.memset(pointer,17,32);ffi.memcpy(copied,pointer,32);assert(ffi.memcmp(copied,pointer,32)==0);",
+                "ffi.store_u8(copied,19);assert(ffi.memcmp(copied,pointer,1)>0);",
+                "ffi.memset(pointer,99,-1);assert(ffi.load_u8(pointer)==17);ffi.memcpy(0,pointer,8);assert(ffi.memcmp(0,pointer,8)==0);ffi.free(copied);",
+                "var child=ffi.alloc(8);ffi.store_u8(child,42);ffi.store_ptr(pointer,child);",
+                "var alias=ffi.load_ptr(pointer);assert(ffi.load_u8(alias)==42);",
+                "ffi.free(child);ffi.free(pointer); } print(\"RAW_KINDS_OK\");"])
+            source.write_text("\n".join(statements))
+            for level in (0, 1, 2):
+                self.assertEqual(self.run_command([str(COMPILER), "run", "-O", str(level), str(source)]), "3.5\nRAW_KINDS_OK\n")
+                executable = directory / f"kinds-o{level}"
+                self.run_command([str(COMPILER), "build", "-O", str(level), str(source), "-o", str(executable)])
+                self.assertEqual(self.run_command([str(executable)]), "3.5\nRAW_KINDS_OK\n")
+
+    def test_scalar_leaf_has_no_region_runtime_calls(self):
+        with tempfile.TemporaryDirectory(prefix="lymar-scalar-regions-") as tmp:
+            directory = Path(tmp)
+            source = directory / "scalar.lm"
+            source.write_text('fn choose():bool { return false; }\n'
+                              'fn yes():bool { return true; }\n'
+                              'fn identity(flag:bool):bool { return flag; }\n'
+                              'fn dynamic(flag:bool):[int] { var xs=[7]; if(flag){xs.append(9);} return xs; }\n'
+                              'var erased:any=[7];print(yes());print(choose());print(dynamic(true));print(identity(erased));\n')
+            expected = "true\nfalse\n[7, 9]\n[7]\n"
+            for level in (0, 1, 2):
+                self.assertEqual(self.run_command([str(COMPILER), "run", "-O", str(level), str(source)]), expected)
+                executable = directory / f"scalar-o{level}"
+                self.run_command([str(COMPILER), "build", "-O", str(level), str(source), "-o", str(executable)])
+                self.assertEqual(self.run_command([str(executable)]), expected)
+                if os.sys.platform == "linux" and platform.machine() == "x86_64":
+                    assembly = directory / f"scalar-o{level}.s"
+                    self.run_command([str(COMPILER), "build", "-O", str(level), "-S", str(source), "-o", str(assembly)])
+                    text = assembly.read_text()
+                    body = re.search(r"^choose:\n(.*?)^\.size choose,", text, re.M | re.S)
+                    self.assertIsNotNone(body)
+                    self.assertNotRegex(body.group(1), r"lymar_aot_(?:region_|call_|arg_|slot_|edge)")
+
     def run_command(self, arguments):
         result = subprocess.run(arguments, cwd=ROOT, text=True, capture_output=True, timeout=120)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

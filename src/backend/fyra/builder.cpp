@@ -1,4 +1,5 @@
 #include "../../memory/reference_flags.hh"
+#include "../../memory/region_analysis.hh"
 #include <cstring>
 // builder.cpp - LIR to Fyra IR Conversion Implementation
 #include "builder.hh"
@@ -144,6 +145,8 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             if (callee.empty() && inst.const_val && IS_PTR(inst.const_val)) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(inst.const_val);
                 if (h->type_id == TYPE_STRING) callee = ((LmStringHeader*)h)->data;
+                else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING)
+                    callee = static_cast<const char*>(((LmBox*)h)->value.as_ptr);
             }
             if (inst.op == LIR::LIR_Op::TraitCallMethod && !inst.func_name.empty()) {
                 std::string method_suffix = "." + inst.func_name;
@@ -310,14 +313,25 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     build_function_body(main_fn, lir_func);
 
     FyraBuiltinFunctions::emit_used_builtins(current_module_.get(), builder_.get(), used_builtins_);
-    lower_region_ownership(*current_module_);
+    std::unordered_map<std::string, uint64_t> region_free;
+    if (Memory::runtime_regions_proven_unnecessary(lir_func))
+        region_free[main_fn->getName()] = static_cast<uint64_t>(*Memory::scalar_return_kind(lir_func));
+    for (const auto& name : registry.getFunctionNames()) {
+        auto* function = registry.getFunction(name);
+        if (function && Memory::runtime_regions_proven_unnecessary(*function))
+            region_free[name == "main" && lir_func.name == "__top_level_wrapper__" ? "__user_main" : name] =
+                static_cast<uint64_t>(*Memory::scalar_return_kind(*function));
+    }
+    lower_region_ownership(*current_module_, region_free);
     return current_module_;
 }
 
 void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::LIR_Function& lir_func) {
     ir::BasicBlock* entry_bb = builder_->createBasicBlock("entry", main_fn);
     builder_->setInsertPoint(entry_bb);
-    auto caller_region = builder_->createExternCall("lymar_aot_region_current", {}, context_->getIntegerType(64));
+    ir::Value* caller_region = Memory::runtime_regions_proven_unnecessary(lir_func)
+        ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0))
+        : builder_->createExternCall("lymar_aot_region_current", {}, context_->getIntegerType(64));
 
     std::unordered_map<uint32_t, size_t> label_to_index;
     for (size_t i = 0; i < lir_func.instructions.size(); ++i) {
@@ -449,7 +463,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         for (auto arg : inst.call_args) max_reg = std::max(max_reg, (size_t)arg);
     }
     std::unordered_map<uint32_t, ir::Instruction*> reg_slots;
-    for (size_t r = 0; r <= max_reg + 10; ++r) {
+    const bool scalar_registers = Memory::runtime_regions_proven_unnecessary(lir_func) && Memory::proven_scalar_leaf(lir_func);
+    for (size_t r = 0; !scalar_registers && r <= max_reg + 10; ++r) {
         reg_slots[r] = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
         reg_slots[r]->setName("slot_r" + std::to_string(r));
         builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), reg_slots[r]);
@@ -458,7 +473,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     // Initialize registers from function parameters
     size_t param_idx = 0;
     for (const auto& param : main_fn->getParameters()) {
-        builder_->createStore(param.get(), reg_slots[param_idx]);
+        if (!scalar_registers) builder_->createStore(param.get(), reg_slots[param_idx]);
         regs[param_idx] = param.get();
         register_definitions[param_idx] = nullptr;
         if (param->getType() && (param->getType()->isDoubleTy() || param->getType()->isFloatTy())) {
@@ -520,11 +535,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         return value;
     };
 
-    auto store_reg = [&](uint32_t r, ir::Value* v, LIR::Type t) {
+    auto store_reg = [&](uint32_t r, ir::Value* v, LIR::Type t, bool preserve_kind = false) {
         if (v && t == LIR::Type::Ptr) v = erased_word(v);
         if (v && (t == LIR::Type::F64 || t == LIR::Type::F32) && !v->getType()->isFloatingPoint())
             v = builder_->createExternCall("lymar_aot_to_float", {v, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getDoubleType());
-        if (v && t == LIR::Type::Bool) {
+        if (v && t == LIR::Type::Bool && !preserve_kind) {
             if (v->getType() != context_->getIntegerType(64)) v = builder_->createCast(v, context_->getIntegerType(64));
             v = builder_->createExternCall("lymar_aot_boolean", {v}, context_->getIntegerType(64));
         }
@@ -1063,6 +1078,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                 }
 
+                if (name == "channel") {
+                    // The standalone scheduler uses the same queue representation
+                    // as ChannelAlloc/Send/Recv; source constructors must agree.
+                    used_builtins_.insert("lm_list_new");
+                    auto* queue = current_module_->getFunction("lm_list_new");
+                    if (!queue) queue = builder_->createFunction("lm_list_new", context_->getIntegerType(64),
+                        {context_->getIntegerType(64)});
+                    store_reg(inst.dst, builder_->createCall(queue,
+                        {context_->getConstantInt(context_->getIntegerType(64), 16)}, context_->getIntegerType(64)), LIR::Type::Ptr);
+                    break;
+                }
+
                 std::vector<ir::Value*> args;
                 for (size_t ai = 0; ai < inst.call_args.size(); ++ai) {
                     LIR::Type at = (ai < inst.call_arg_types.size()) ? inst.call_arg_types[ai] : LIR::Type::I64;
@@ -1251,7 +1278,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     if (res_t == LIR::Type::F64 || res_t == LIR::Type::F32) {
                         store_float_reg(inst.dst, res);
                     } else {
-                        store_reg(inst.dst, res, res_t);
+                        const bool user_result = LIR::FunctionRegistry::getInstance().hasFunction(inst.func_name) &&
+                            !LIR::BuiltinUtils::isBuiltinFunction(inst.func_name);
+                        auto* contract = LIR::FunctionRegistry::getInstance().getFunction(inst.func_name);
+                        const bool erased_boolean = user_result && res_t == LIR::Type::Bool &&
+                            !Memory::proven_closed_boolean_boundary(*contract);
+                        // A nominal boolean return can carry an erased alias.
+                        // Preserve its dynamic kind rather than asserting Bool.
+                        store_reg(inst.dst, res, erased_boolean ? LIR::Type::Ptr : res_t, user_result);
                     }
                 }
                 break;
@@ -2237,7 +2271,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* f3 = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 24)));
                 ir::Value* fn_name_ptr = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 32)));
 
-                ir::Value* f1_len = builder_->createCall(fn_len, {f1_raw}, context_->getIntegerType(64));
+                // Task field 1 is either a scalar iteration value or a queue.
+                // Its runtime kind, not its numeric address range, distinguishes them.
+                auto* field_kind = builder_->createExternCall("lymar_aot_slot_pointer",
+                    {builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 8))},
+                    context_->getIntegerType(64));
+                ir::Value* f1_len = builder_->createExternCall("lymar_aot_channel_length",
+                    {f1_raw, field_kind}, context_->getIntegerType(64));
                 ir::Value* is_chan_iter = builder_->createCsgt(f1_len, context_->getConstantInt(context_->getIntegerType(64), 0));
 
                 ir::BasicBlock* b_w_loop = builder_->createBasicBlock("sc_w_loop_" + sid, cur_fn);
@@ -2308,9 +2348,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         builder_->createBr(is_match, b_match, b_next_check);
 
                         builder_->setInsertPoint(b_match);
-                        std::vector<ir::Value*> call_args_matching = {f0, arg_f1, f2, f3};
-                        while (call_args_matching.size() < target_f->getParameters().size()) {
-                            call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
+                        std::vector<ir::Value*> call_args_matching;
+                        for (size_t input = 0; input < target_f->getParameters().size(); ++input) {
+                            if (input == 1) call_args_matching.push_back(arg_f1);
+                            else if (input == 2) call_args_matching.push_back(f2);
+                            else if (input == 0) call_args_matching.push_back(old0);
+                            else if (input == 3) call_args_matching.push_back(old3);
+                            else call_args_matching.push_back(load_reg(input, LIR::Type::Ptr));
                         }
                         if (target_f) builder_->createCall(target_f, call_args_matching, context_->getIntegerType(64));
                         builder_->createJmp(b_done_call);
@@ -2357,6 +2401,17 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::ParallelSync: break;
             case LIR::LIR_Op::ResourceCreate: {
+                // Concurrency lowering encodes a channel constructor in imm,
+                // unlike the generic resource_create intrinsic's register args.
+                if (inst.imm == 5 && inst.a == 0 && inst.b == 0) {
+                    used_builtins_.insert("lm_list_new");
+                    auto* queue = current_module_->getFunction("lm_list_new");
+                    if (!queue) queue = builder_->createFunction("lm_list_new", context_->getIntegerType(64),
+                        {context_->getIntegerType(64)});
+                    store_reg(inst.dst, builder_->createCall(queue,
+                        {context_->getConstantInt(context_->getIntegerType(64), 16)}, context_->getIntegerType(64)), LIR::Type::Ptr);
+                    break;
+                }
                 auto* i64 = context_->getIntegerType(64);
                 auto* args = inst.b == UINT32_MAX ? static_cast<ir::Value*>(context_->getConstantInt(i64, VAL_NIL)) : load_reg(inst.b, inst.type_b);
                 store_reg(inst.dst, builder_->createExternCall("lymar_aot_resource_create",
@@ -2418,64 +2473,58 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::ChannelClose: break;
             // Memory Operations
-            case LIR::LIR_Op::MemoryAlloc: {
-                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryAlloc);
-                if (cap) {
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a)};
-                    ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
-                    store_reg(inst.dst, res, inst.result_type);
-                }
+            case LIR::LIR_Op::MemoryLoad: {
+                if (inst.imm > 10)
+                    throw std::runtime_error("Invalid MemoryLoad element kind");
+                auto* value = builder_->createExternCall("lymar_aot_memory_load",
+                    {load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), inst.imm),
+                     context_->getConstantInt(context_->getIntegerType(64), 0)},
+                    context_->getIntegerType(64));
+                // Float loads use an erased word at the runtime boundary. Kind
+                // propagation supplies the conversion and ownership facts.
+                // A nullable float load must retain nil until an operation
+                // actually requests a numeric conversion (as in the VM).
+                store_reg(inst.dst, value, inst.imm >= 8 ? LIR::Type::Ptr : inst.result_type);
                 break;
             }
-            case LIR::LIR_Op::MemoryFree: {
-                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryFree);
-                if (cap) {
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a)};
-                    builder_->createExternCall(cap->name, args, nullptr);
-                }
+            case LIR::LIR_Op::MemoryStore: {
+                if (inst.imm > 10)
+                    throw std::runtime_error("Invalid MemoryStore element kind");
+                builder_->createExternCall("lymar_aot_memory_store",
+                    {load_reg(inst.a, inst.type_a), erased_word(load_reg(inst.b, inst.type_b)),
+                     context_->getConstantInt(context_->getIntegerType(64), inst.imm),
+                     context_->getConstantInt(context_->getIntegerType(64), 0),
+                     context_->getConstantInt(context_->getIntegerType(64), 0)}, nullptr);
                 break;
             }
-            case LIR::LIR_Op::MemoryResize: {
-                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryResize);
-                if (cap) {
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)};
-                    ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
-                    store_reg(inst.dst, res, inst.result_type);
-                }
+            case LIR::LIR_Op::MemoryAlloc:
+                store_reg(inst.dst, builder_->createExternCall("lymar_aot_raw_alloc",
+                    {erased_word(load_reg(inst.a, inst.type_a)), context_->getConstantInt(context_->getIntegerType(64), 0)},
+                    context_->getIntegerType(64)), LIR::Type::Ptr);
                 break;
-            }
-            case LIR::LIR_Op::MemoryCopy: {
-                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryCopy);
-                if (cap) {
-                    ir::Value* size = inst.call_args.empty()
-                        ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0))
-                        : load_reg(inst.call_args[0], LIR::Type::I64);
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), size};
-                    builder_->createExternCall(cap->name, args, nullptr);
-                }
+            case LIR::LIR_Op::MemoryFree:
+                builder_->createExternCall("lymar_aot_raw_free",
+                    {erased_word(load_reg(inst.a, inst.type_a)), context_->getConstantInt(context_->getIntegerType(64), 0)}, nullptr);
                 break;
-            }
-            case LIR::LIR_Op::MemoryFill: {
-                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryFill);
-                if (cap) {
-                    ir::Value* size = inst.call_args.empty()
-                        ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0))
-                        : load_reg(inst.call_args[0], LIR::Type::I64);
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), size};
-                    builder_->createExternCall(cap->name, args, nullptr);
-                }
+            case LIR::LIR_Op::MemoryResize:
+                store_reg(inst.dst, builder_->createExternCall("lymar_aot_raw_resize",
+                    {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
+                     context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)},
+                    context_->getIntegerType(64)), LIR::Type::Ptr);
                 break;
-            }
+            case LIR::LIR_Op::MemoryCopy:
+            case LIR::LIR_Op::MemoryFill:
             case LIR::LIR_Op::MemoryCompare: {
-                auto cap = CapabilityMapper::map(LIR::LIR_Op::MemoryCompare);
-                if (cap) {
-                    ir::Value* size = inst.call_args.empty()
-                        ? static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0))
-                        : load_reg(inst.call_args[0], LIR::Type::I64);
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b), size};
-                    ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
-                    store_reg(inst.dst, res, inst.result_type);
-                }
+                auto* i64 = context_->getIntegerType(64);
+                auto* size = inst.call_args.empty() ? static_cast<ir::Value*>(context_->getConstantInt(i64, 0)) :
+                    erased_word(load_reg(inst.call_args[inst.call_args.size() >= 3 ? 2 : 0], LIR::Type::I64));
+                const char* name = inst.op == LIR::LIR_Op::MemoryCopy ? "lymar_aot_raw_copy_checked" :
+                    inst.op == LIR::LIR_Op::MemoryFill ? "lymar_aot_raw_fill_checked" : "lymar_aot_raw_compare_checked";
+                auto* result = builder_->createExternCall(name,
+                    {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)), size,
+                     context_->getConstantInt(i64, 0), context_->getConstantInt(i64, 0), context_->getConstantInt(i64, 0)},
+                    inst.op == LIR::LIR_Op::MemoryCompare ? i64 : nullptr);
+                if (inst.op == LIR::LIR_Op::MemoryCompare) store_reg(inst.dst, result, LIR::Type::I64);
                 break;
             }
             // Pointer Operations - use Fyra IR arithmetic directly

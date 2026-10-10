@@ -20,32 +20,22 @@ inline bool valid_reference_instruction(const LIR::LIR_Inst& inst) {
     return inst.dst == UINT32_MAX && (release ? !(inst.imm & ~ReferenceNullable) : inst.imm == 0) && inst.result_type == LIR::Type::Void;
 }
 
-// Conservative effect inference: opaque calls/branches erase knowledge, rather
-// than treating missing facts as a proof. This is separate from capability checks.
+// The frontend's semantic facts remain authoritative. A native ABI type is
+// not an ownership proof: an annotated scalar can receive an erased alias.
+// Unknown synthesized/opaque callable parameters therefore stay unspecified.
 inline void infer_lir_effects(LIR::LIR_Function& function) {
-    using Op = LIR::LIR_Op;
-    function.memory_effects.parameters.assign(function.param_count, Ownership::ReadBorrow);
-    for (uint32_t i = 0; i < function.param_count; ++i) {
-        auto type = function.get_register_abi_type(i);
-        if (type != LIR::Type::Ptr && function.register_types.count(i))
-            function.memory_effects.parameters[i] = Ownership::Value;
-    }
-    bool opaque = false;
-    for (const auto& inst : function.instructions) {
-        switch (inst.op) {
-            case Op::Nop: case Op::Label: case Op::LoadConst:
-            case Op::Mov: case Op::RegionEnter: case Op::RegionExit:
-            case Op::RegionMove: case Op::Return: case Op::Ret:
-            case Op::ListIndex: case Op::ListLen: case Op::DictGet:
-            case Op::DictHas: case Op::DictLen: case Op::TupleGet:
-            case Op::TupleLen: case Op::FrameGetField: break;
-            default: opaque = true; break;
+    if (function.memory_effects.parameters.empty())
+        function.memory_effects.parameters.assign(function.param_count, Ownership::Unspecified);
+    if (function.param_count && function.inferred_effects.parameters.size() == function.param_count) {
+        function.memory_effects.parameters.clear();
+        for (auto effects : function.inferred_effects.parameters)
+            function.memory_effects.parameters.push_back(effects & Consume ? Ownership::Owned :
+                effects & Opaque ? Ownership::Unspecified : effects & Mutate ? Ownership::WriteBorrow : Ownership::ReadBorrow);
+        if (function.inferred_effects.return_aliases.size() == 1) {
+            function.memory_effects.result = Ownership::ReadBorrow;
+            function.memory_effects.borrowed_parameter = *function.inferred_effects.return_aliases.begin();
         }
     }
-    if (opaque) for (auto& effect : function.memory_effects.parameters)
-        if (effect != Ownership::Value) effect = Ownership::Unspecified;
-    function.memory_effects.result = Ownership::Unspecified;
-    function.memory_effects.borrowed_parameter = UINT32_MAX;
 }
 // Erase only a closed borrow of a freshly allocated list, with no intervening
 // instructions and no other token uses. An unknown call or alias defeats proof.

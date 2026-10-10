@@ -145,12 +145,54 @@ void RegisterVM::execute_memory_compare(const LIR::LIR_Inst* pc) {
     } else registers[pc->dst] = BOX_INT(0);
 }
 
+void RegisterVM::index_raw_alias(uintptr_t pointer) {
+    auto* wrapper = reinterpret_cast<ObjForeignPtr*>(pointer);
+    if (wrapper->ptr) raw_aliases.emplace(reinterpret_cast<uintptr_t>(wrapper->ptr), pointer);
+}
+void RegisterVM::unindex_raw_alias(uintptr_t pointer) {
+    auto* wrapper = reinterpret_cast<ObjForeignPtr*>(pointer);
+    if (!wrapper->ptr) return; // Invalidated aliases were already removed.
+    auto [begin, end] = raw_aliases.equal_range(reinterpret_cast<uintptr_t>(wrapper->ptr));
+    for (auto it = begin; it != end; ++it) {
+        if (it->second == pointer) { raw_aliases.erase(it); return; }
+    }
+}
 void RegisterVM::invalidate_raw_aliases(uintptr_t address, size_t size) {
-    for (const auto& [ptr, kind] : vm_allocation_types) {
-        if (kind != TYPE_FOREIGN_PTR) continue;
-        auto* wrapper = reinterpret_cast<ObjForeignPtr*>(ptr);
-        auto value = reinterpret_cast<uintptr_t>(wrapper->ptr);
-        if (value >= address && value - address <= size) wrapper->ptr = nullptr;
+    auto it = raw_aliases.lower_bound(address);
+    while (it != raw_aliases.end() && it->first - address <= size) {
+        reinterpret_cast<ObjForeignPtr*>(it->second)->ptr = nullptr;
+        it = raw_aliases.erase(it);
+    }
+}
+
+// Links live in the existing ownership records; region heads need no allocation.
+uintptr_t& RegisterVM::raw_head(uint64_t region) {
+    return region ? region_instances.at(region).raw_head : root_raw_head;
+}
+void RegisterVM::attach_raw_memory(uintptr_t address, uint64_t region) {
+    auto& head = raw_head(region);
+    auto& record = owned_raw_memory.at(address);
+    record = {region, 0, head};
+    if (head) owned_raw_memory.at(head).previous = address;
+    head = address;
+}
+void RegisterVM::detach_raw_memory(uintptr_t address) {
+    const auto record = owned_raw_memory.at(address);
+    if (record.previous) owned_raw_memory.at(record.previous).next = record.next;
+    else raw_head(record.region) = record.next;
+    if (record.next) owned_raw_memory.at(record.next).previous = record.previous;
+}
+
+void RegisterVM::export_raw_memory(RegisterVM& parent) {
+    // Parent graph publication holds its heap lock. Raw ownership mutations
+    // share the allocation-registry lock with alloc/free/resize/promotion.
+    std::lock_guard<std::mutex> lock(g_memory_mutex);
+    while (root_raw_head) {
+        auto address = root_raw_head;
+        detach_raw_memory(address);
+        auto node = owned_raw_memory.extract(address);
+        parent.owned_raw_memory.insert(std::move(node));
+        parent.attach_raw_memory(address, 0);
     }
 }
 
@@ -159,30 +201,42 @@ void RegisterVM::promote_raw_memory(void* address, uint64_t target) {
     std::lock_guard<std::mutex> lock(g_memory_mutex);
     auto value = reinterpret_cast<uintptr_t>(address);
     size_t target_depth = target ? region_instances.at(target).depth : 0;
-    for (auto& [base, region] : owned_raw_memory) {
-        auto size = g_memory_allocations.find(base);
-        if (size == g_memory_allocations.end() || value < base || value - base > size->second) continue;
-        size_t source_depth = region ? region_instances.at(region).depth : 0;
-        if (source_depth > target_depth) region = target;
-        return;
+    // Ordered base addresses locate an interior pointer without a heap scan.
+    // Preserve the existing one-past alias contract (offset == size).
+    auto found = owned_raw_memory.upper_bound(value);
+    if (found == owned_raw_memory.begin()) return;
+    --found;
+    auto base = found->first;
+    auto region = found->second.region;
+    auto size = g_memory_allocations.find(base);
+    if (size == g_memory_allocations.end() || value - base > size->second) return;
+    size_t source_depth = region ? region_instances.at(region).depth : 0;
+    if (source_depth > target_depth) {
+        detach_raw_memory(base);
+        attach_raw_memory(base, target);
     }
 }
 
 void RegisterVM::release_region_raw_memory(uint64_t region) {
+    auto& head = raw_head(region);
+    if (!head) return;
     std::lock_guard<std::mutex> lock(g_memory_mutex);
-    for (auto it = owned_raw_memory.begin(); it != owned_raw_memory.end();) {
-        if (it->second != region) { ++it; continue; }
-        auto allocation = g_memory_allocations.find(it->first);
+    while (head) {
+        auto address = head;
+        head = owned_raw_memory.at(address).next;
+        auto allocation = g_memory_allocations.find(address);
         if (allocation != g_memory_allocations.end()) {
-            invalidate_raw_aliases(it->first, allocation->second);
-            Memory::MemoryManager<>::Unsafe::deallocate(reinterpret_cast<void*>(it->first));
+            invalidate_raw_aliases(address, allocation->second);
+            Memory::MemoryManager<>::Unsafe::deallocate(reinterpret_cast<void*>(address));
             g_memory_allocations.erase(allocation);
         }
-        it = owned_raw_memory.erase(it);
+        // The entire list is retiring; no surviving links need repair.
+        owned_raw_memory.erase(address);
     }
 }
 
 void RegisterVM::release_raw_memory() {
+    if (owned_raw_memory.empty()) return;
     std::lock_guard<std::mutex> lock(g_memory_mutex);
     for (auto [ptr, region] : owned_raw_memory) {
         auto allocation = g_memory_allocations.find(ptr);
@@ -193,6 +247,8 @@ void RegisterVM::release_raw_memory() {
         }
     }
     owned_raw_memory.clear();
+    root_raw_head = 0;
+    for (auto& entry : region_instances.entries) entry.second.raw_head = 0;
 }
 
 RegisterValue RegisterVM::allocate_raw_memory(size_t size) {
@@ -204,7 +260,8 @@ RegisterValue RegisterVM::allocate_raw_memory(size_t size) {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         auto address = reinterpret_cast<uintptr_t>(ptr);
         g_memory_allocations[address] = size;
-        owned_raw_memory[address] = active_region_id;
+        owned_raw_memory.emplace(address, RawOwnership{active_region_id});
+        attach_raw_memory(address, active_region_id);
     }
     register_native_allocation(value);
     return value;
@@ -230,18 +287,21 @@ void RegisterVM::execute_memory_free(const LIR::LIR_Inst* pc) {
         if (it == g_memory_allocations.end() || !owned_raw_memory.count(reinterpret_cast<uintptr_t>(ptr))) return;
         invalidate_raw_aliases(reinterpret_cast<uintptr_t>(ptr), it->second);
         g_memory_allocations.erase(it);
-        owned_raw_memory.erase(reinterpret_cast<uintptr_t>(ptr));
+        auto address = reinterpret_cast<uintptr_t>(ptr);
+        detach_raw_memory(address);
+        owned_raw_memory.erase(address);
         Memory::MemoryManager<>::Unsafe::deallocate(ptr);
     }
 }
 
 void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
     void* ptr = value_to_ptr(registers[pc->a]);
-    if (!ptr) { execute_memory_alloc(pc); return; }
-    const uintptr_t old_address = reinterpret_cast<uintptr_t>(ptr);
     int64_t size = to_int(registers[pc->b]);
     if (size < 0) { registers[pc->dst] = VAL_NIL; return; }
+    if (!ptr) { registers[pc->dst] = allocate_raw_memory(static_cast<size_t>(size)); return; }
+    const uintptr_t old_address = reinterpret_cast<uintptr_t>(ptr);
     if (size == 0) { execute_memory_free(pc); registers[pc->dst] = VAL_NIL; return; }
+    uint64_t original_region;
     {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         auto it = g_memory_allocations.find(old_address);
@@ -249,16 +309,23 @@ void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = VAL_NIL;
             return;
         }
+        original_region = owned_raw_memory.at(old_address).region;
     }
-    uint64_t original_region = owned_raw_memory.at(old_address);
     void* new_ptr = Memory::MemoryManager<>::Unsafe::resize(ptr, size);
     if (new_ptr) {
+        {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         invalidate_raw_aliases(old_address, g_memory_allocations.at(old_address));
         g_memory_allocations.erase(old_address);
-        owned_raw_memory.erase(old_address);
-        owned_raw_memory[reinterpret_cast<uintptr_t>(new_ptr)] = original_region;
+        detach_raw_memory(old_address);
+        // Reuse the existing map node even when realloc changes the address.
+        auto node = owned_raw_memory.extract(old_address);
+        node.key() = reinterpret_cast<uintptr_t>(new_ptr);
+        owned_raw_memory.insert(std::move(node));
+        attach_raw_memory(reinterpret_cast<uintptr_t>(new_ptr), original_region);
         g_memory_allocations[reinterpret_cast<uintptr_t>(new_ptr)] = size;
+        }
+        // Never acquire a parent heap lock while holding the raw registry lock.
         RegisterValue val = lm_alloc_foreign_ptr(new_ptr);
         registers[pc->dst] = val;
         // Register allocation with current active region

@@ -61,6 +61,8 @@ extern "C" uint64_t answer(const void*,void*,const uint64_t*,size_t) {{ return (
             arguments = ', '.join(str(i) for i in range(70))
             module = directory / (name + '.lm')
             module.write_text('pub fn zero(): int { return 42; }\n'
+                              'pub fn predicate(flag:bool):bool { if(flag){return true;}else{return false;} }\n'
+                              'pub fn constant():bool { return false; }\n'
                               f'pub fn wide({parameters}): int {{ return a0 + a63 + a69; }}\n'
                               'pub fn invoke(callback: fn(int): int, value: int): int {\n'
                               '    return callback(value) + value;\n}\n'
@@ -75,6 +77,8 @@ extern "C" uint64_t answer(const void*,void*,const uint64_t*,size_t) {{ return (
 fn callback(value: int): int {{ return native.zero() + value; }}
 for (var i = 0; i < 20; i = i + 1) {{
     assert(native.zero() == 42);
+    assert(native.predicate(false) == false);
+    assert(native.constant() == false);
     assert(native.wide({arguments}) == 132);
     assert(native.invoke(callback, i) == 42 + i * 2);
 }}
@@ -99,6 +103,8 @@ print("DISPATCH_OK");
                         self.assertEqual(trace.count(prefix + 'wide\n'), 20)
                         self.assertEqual(trace.count(prefix + 'invoke\n'), 20)
                         self.assertEqual(trace.count(prefix + 'zero\n'), 40)
+                        self.assertEqual(trace.count(prefix + 'predicate\n'), 20)
+                        self.assertEqual(trace.count(prefix + 'constant\n'), 20)
 
 
 if __name__ == '__main__':

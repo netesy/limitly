@@ -1,5 +1,6 @@
 #include "function_registry.hh"
 #include "verifier.hh"
+#include "../memory/region_analysis.hh"
 #include <stdexcept>
 #include <iostream>
 #include <cstdlib>
@@ -25,6 +26,16 @@ void FunctionRegistry::registerFunction(const std::string& name, std::unique_ptr
         std::string message = "Invalid canonical memory contract in function " + name;
         for (const auto& error : errors) message += "\n" + error;
         throw std::runtime_error(message);
+    }
+    if (Memory::scalar_return_kind(*function)) {
+        // This stronger verifier is an optimization prerequisite. Unproved
+        // candidates keep their already-verified dynamic memory contract.
+        std::vector<std::string> proof_errors;
+        if (Verifier::verify(*function, proof_errors)) {
+            Memory::eliminate_scalar_leaf_regions(*function);
+            if (!Verifier::verify(*function, proof_errors))
+                throw std::runtime_error("Invalid scalar region proof result: " + name);
+        }
     }
     lir_functions_[name] = std::move(function);
     // Debug output removed for cleaner execution

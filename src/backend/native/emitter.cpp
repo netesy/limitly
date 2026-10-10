@@ -2,6 +2,7 @@
 #include "abi.hh"
 #include "scalar_lowering.hh"
 #include "direct_operations.hh"
+#include "memory/region_analysis.hh"
 #include "backend/vm/vm_list.hh"
 #include "backend/vm/vm_runtime.hh"
 #include "backend/vm/vm_string.hh"
@@ -159,7 +160,7 @@ struct Emitter {
         << "]; std::vector<V> staged_params; for(auto& v:r) v=N(2ULL); for(size_t "
            "i=0;i<count && i<"
         << registers << ";++i) r[i]=args[i];\n";
-    out << "NativeScope scope(api,ctx);\n";
+    out << "NativeScope scope(api,ctx," << (Memory::runtime_regions_proven_unnecessary(function) ? "false" : "true") << ");\n";
     const bool direct = std::any_of(function.instructions.begin(), function.instructions.end(), [&](const auto& in) {
       using Op = LIR::LIR_Op;
       switch (in.op) {
@@ -557,12 +558,12 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
         << ", HFloat=" << TYPE_FLOAT << ";\n" << scalar_lowering_source;
     emitter.out << "constexpr uint32_t HDirectOperations=" << static_cast<unsigned>(Helper::DirectOperations) << ";\n";
     emitter.out << direct_operations_source;
-    emitter.out << "struct NativeScope { const Api* api; void* ctx; V depth; V result=2ULL; "
-        "NativeScope(const Api* a,void* c):api(a),ctx(c),depth("
+    emitter.out << "struct NativeScope { const Api* api; void* ctx; V depth=0; V result=2ULL; bool managed; "
+        "NativeScope(const Api* a,void* c,bool m=true):api(a),ctx(c),managed(m){if(managed)depth="
         << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_call_enter\"")
-        << "){} V track(V value){ if((value&7ULL)!=0 || !value) return value; V argv[]={value}; return "
+        << ";} V track(V value){ if(!managed || (value&7ULL)!=0 || !value) return value; V argv[]={value}; return "
         << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_track\"", "argv", 1)
-        << "; } N track(N n){if(n.value)track(n.value);return n;} ~NativeScope(){ V argv[]={depth,result}; "
+        << "; } N track(N n){if(n.value)track(n.value);return n;} ~NativeScope(){ if(!managed)return; V argv[]={depth,result}; "
         << emitter.helper(Helper::Builtin, "2ULL", "2ULL", "2ULL", "\"_builtin_region_call_leave\"", "argv", 2)
         << ";} };\n";
     emitter.out << "static N indirect(const Api*,void*,V,const N*,size_t);\n";

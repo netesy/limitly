@@ -8,7 +8,23 @@
 #include <vector>
 
 namespace LM::Backend::Fyra {
-void lower_region_ownership(ir::Module& module) {
+void lower_region_ownership(ir::Module& module, const std::unordered_map<std::string, uint64_t>& candidates) {
+    auto region_free = candidates;
+    // Indirect callers use the dynamic value-kind side channel. Keep their
+    // callable boundary even when the callee itself allocates nothing.
+    for (auto& function : module.getFunctions()) {
+        for (auto& block : function->getBasicBlocks()) {
+            for (auto& instruction : block->getInstructions()) {
+                size_t index = 0;
+                for (auto& operand : instruction->getOperands()) {
+                    auto* target = dynamic_cast<ir::Function*>(operand->get());
+                    if (target && (instruction->getOpcode() != ir::Instruction::Call || index != 0))
+                        region_free.erase(target->getName());
+                    ++index;
+                }
+            }
+        }
+    }
     auto ctx = module.getContextShared();
     auto i64 = ctx->getIntegerType(64);
     auto void_type = ctx->getVoidType();
@@ -62,8 +78,21 @@ void lower_region_ownership(ir::Module& module) {
     declare("lymar_aot_global_edge", 3, void_type);
     declare("lymar_aot_alloc", 1, i64);
     declare("lymar_aot_free", 1, void_type);
+    declare("lymar_aot_memory_load", 3, i64);
+    declare("lymar_aot_memory_load_kind", 3, i64);
+    declare("lymar_aot_memory_store", 5, void_type);
+    declare("lymar_aot_raw_alloc", 2, i64);
+    declare("lymar_aot_raw_free", 2, void_type);
+    declare("lymar_aot_raw_resize", 4, i64);
+    declare("lymar_aot_raw_copy_checked", 6, void_type);
+    declare("lymar_aot_raw_fill_checked", 6, void_type);
+    declare("lymar_aot_raw_compare_checked", 6, i64);
+    declare("lymar_aot_channel_length", 2, i64);
     declare("lymar_aot_resize", 2, i64);
     declare("lymar_aot_copy", 3, void_type);
+    declare("lymar_aot_raw_copy", 3, void_type);
+    declare("lymar_aot_raw_fill", 3, void_type);
+    declare("lymar_aot_raw_compare", 3, i64);
     declare("lymar_aot_region_current", 0, i64);
     declare("lymar_aot_region_enter", 1, void_type);
     declare("lymar_aot_region_exit", 1, void_type);
@@ -77,10 +106,41 @@ void lower_region_ownership(ir::Module& module) {
     const std::unordered_map<std::string, std::string> memory_helpers{
         {"memory.alloc", "lymar_aot_alloc"}, {"memory.free", "lymar_aot_free"},
         {"memory.resize", "lymar_aot_resize"}, {"memory.copy", "lymar_aot_copy"},
+        {"memory.fill", "lymar_aot_raw_fill"}, {"memory.compare", "lymar_aot_raw_compare"},
         {"process.exit", "lymar_aot_exit"}};
 
     for (auto& fn : module.getFunctions()) {
         if (fn->getBasicBlocks().empty()) continue;
+        if (region_free.count(fn->getName())) {
+            // External capability normalization is executable lowering, not
+            // memory bookkeeping. Boolean markers are identities here.
+            for (auto& owner : fn->getBasicBlocks()) {
+                auto* block = owner.get();
+                for (auto it = block->getInstructions().begin(); it != block->getInstructions().end();) {
+                    auto* inst = it->get();
+                    auto* external = dynamic_cast<ir::ExternCallInstruction*>(inst);
+                    if (!external) { ++it; continue; }
+                    auto name = external->getCapability();
+                    if (name.starts_with("lymar.aot."))
+                        for (auto& c : name) if (c == '.') c = '_';
+                    if (name == "lymar_aot_boolean") {
+                        inst->replaceAllUsesWith(inst->getOperands().at(0)->get());
+                        it = block->getInstructions().erase(it);
+                        continue;
+                    }
+                    auto helper = helpers.find(name);
+                    if (helper == helpers.end()) throw std::runtime_error("Unlowered scalar capability: " + name);
+                    std::vector<ir::Value*> args{helper->second};
+                    for (auto& operand : inst->getOperands()) args.push_back(operand->get());
+                    auto call = std::make_unique<ir::Instruction>(inst->getType(), ir::Instruction::Call, args, block);
+                    call->setName(inst->getName());
+                    inst->replaceAllUsesWith(call.get());
+                    *it = std::move(call);
+                    ++it;
+                }
+            }
+            continue;
+        }
         std::unordered_map<ir::Value*, ir::Value*> flags;
         auto flag = [&](ir::Value* value) -> ir::Value* {
             if (auto found = flags.find(value); found != flags.end()) return found->second;
@@ -127,7 +187,7 @@ void lower_region_ownership(ir::Module& module) {
                         inst->replaceAllUsesWith(call.get());
                         inst = call.get();
                         *it = std::move(call);
-                        if (name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_scalar_to_string") flags[inst] = one;
+                        if (name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_scalar_to_string") flags[inst] = one;
                         if (name == "lymar_aot_boolean") flags[inst] = boolean;
                     }
                 }
@@ -162,6 +222,21 @@ void lower_region_ownership(ir::Module& module) {
                         *it = std::move(checked);
                     } else if (callee && (callee->getName() == "lymar_aot_is_nil" || callee->getName() == "lymar_aot_is_object" || callee->getName() == "lymar_aot_is_print_object" || callee->getName() == "lymar_aot_to_float" || callee->getName() == "lymar_aot_to_integer" || callee->getName() == "lymar_aot_to_boolean" || callee->getName() == "lymar_aot_print_integer" || callee->getName() == "lymar_aot_scalar_to_string")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));
+                    } else if (callee && (callee->getName() == "lymar_aot_raw_alloc" || callee->getName() == "lymar_aot_raw_free")) {
+                        current_operands[2]->set(flag(current_operands[1]->get()));
+                    } else if (callee && callee->getName() == "lymar_aot_raw_resize") {
+                        current_operands[3]->set(flag(current_operands[1]->get()));
+                        current_operands[4]->set(flag(current_operands[2]->get()));
+                    } else if (callee && (callee->getName() == "lymar_aot_raw_copy_checked" || callee->getName() == "lymar_aot_raw_fill_checked" || callee->getName() == "lymar_aot_raw_compare_checked")) {
+                        for (size_t argument = 1; argument <= 3; ++argument)
+                            current_operands[argument + 3]->set(flag(current_operands[argument]->get()));
+                    } else if (callee && callee->getName() == "lymar_aot_memory_store") {
+                        current_operands[4]->set(flag(current_operands[2]->get()));
+                        current_operands[5]->set(flag(current_operands[1]->get()));
+                    } else if (callee && callee->getName() == "lymar_aot_memory_load") {
+                        current_operands[3]->set(flag(current_operands[1]->get()));
+                        flags[inst] = emit(block, after, "lymar_aot_memory_load_kind",
+                            {current_operands[1]->get(), current_operands[2]->get(), current_operands[3]->get()});
                     } else if (callee && callee->getName() == "lymar_aot_value_equal") {
                         current_operands[3]->set(flag(current_operands[1]->get()));
                         current_operands[4]->set(flag(current_operands[2]->get()));
@@ -174,6 +249,12 @@ void lower_region_ownership(ir::Module& module) {
                     } else if (callee && callee->getName() == "lymar_aot_resource_call") {
                         flags[inst] = emit(block, after, "lymar_aot_return_pointer", {});
                     } else if (!callee || (!callee->getName().starts_with("lymar_aot_") && !callee->getBasicBlocks().empty())) {
+                        if (callee && region_free.count(callee->getName())) {
+                            // Closed boolean leaves need neither argument-kind
+                            // staging nor a dynamic return-kind side channel.
+                            flags[inst] = ctx->getConstantInt(i64, region_free.at(callee->getName()));
+                            continue;
+                        }
                         for (size_t arg = 1; arg < current_operands.size(); ++arg)
                             emit(block, it, "lymar_aot_arg_set", {ctx->getConstantInt(i64, arg - 1), flag(current_operands[arg]->get())});
                         if (!inst->getType()->isVoidTy()) flags[inst] = emit(block, after, "lymar_aot_return_pointer", {});

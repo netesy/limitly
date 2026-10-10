@@ -2,6 +2,7 @@
 #include <cstdint>
 #include <cstring>
 #include <iostream>
+#include <vector>
 extern "C" {
 uint64_t lymar_aot_call_enter();
 void lymar_aot_call_leave(uint64_t);
@@ -44,6 +45,41 @@ static void store(uint64_t address, uint64_t value, bool pointer) {
     lymar_aot_edge(address, value, pointer);
 }
 int main() {
+    lymar_aot_region_enter(7);
+    auto outer_object = lymar_aot_alloc(64);
+    auto outer_reference = lymar_aot_ref_create(outer_object, 0);
+    std::vector<uint64_t> nested_references;
+    for (int depth = 0; depth < 64; ++depth) {
+        lymar_aot_region_enter(7);
+        nested_references.push_back(lymar_aot_ref_create(outer_object, 0));
+    }
+    while (!nested_references.empty()) {
+        auto token = nested_references.back();
+        nested_references.pop_back();
+        lymar_aot_region_exit(7);
+        bool expired = false;
+        try { (void)lymar_aot_ref_resolve(token, 0); }
+        catch (const std::runtime_error&) { expired = true; }
+        assert(expired);
+        if (!nested_references.empty())
+            assert(lymar_aot_ref_resolve(nested_references.back(), 0) == outer_object);
+    }
+    uint64_t previous_identity = lymar_aot_region_current();
+    for (int iteration = 0; iteration < 1024; ++iteration) {
+        lymar_aot_region_enter(7);
+        assert(lymar_aot_region_current() > previous_identity);
+        previous_identity = lymar_aot_region_current();
+        auto temporary_reference = lymar_aot_ref_create(outer_object, 0);
+        assert(lymar_aot_ref_resolve(temporary_reference, 0) == outer_object);
+        lymar_aot_region_exit(7);
+        bool expired = false;
+        try { (void)lymar_aot_ref_resolve(temporary_reference, 0); }
+        catch (const std::runtime_error&) { expired = true; }
+        assert(expired);
+        assert(lymar_aot_ref_resolve(outer_reference, 0) == outer_object);
+    }
+    lymar_aot_region_exit(7);
+    assert(lymar_aot_live_allocations() == 0);
     assert(lymar_aot_ref_create(0, 2) == 0);
     assert(lymar_aot_ref_create_checked(lymar_aot_nil(), 2, 1) == 0);
     assert(lymar_aot_is_nil(2, 1));

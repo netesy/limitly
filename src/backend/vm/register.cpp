@@ -431,6 +431,7 @@ void RegisterVM::register_native_allocation(RegisterValue value) {
     if (kind != TYPE_LIST && kind != TYPE_DICT && kind != TYPE_TUPLE && kind != TYPE_FRAME && kind != TYPE_CLOSURE) {
         vm_allocation_regions[root] = active_region_id;
         vm_allocation_types[root] = kind;
+        if (kind == TYPE_FOREIGN_PTR) index_raw_alias(root);
         region_allocations[active_region_id].insert(root);
         return;
     }
@@ -447,6 +448,7 @@ void RegisterVM::register_native_allocation(RegisterValue value) {
         if (!vm_allocation_regions.count(ptr)) {
             vm_allocation_regions[ptr] = active_region_id;
             vm_allocation_types[ptr] = header->type_id;
+            if (header->type_id == TYPE_FOREIGN_PTR) index_raw_alias(ptr);
             region_allocations[active_region_id].insert(ptr);
         }
         if (header->type_id == TYPE_LIST) {
@@ -485,6 +487,7 @@ void RegisterVM::reclaim_value(RegisterValue val) {
     auto type = vm_allocation_types.find(ptr);
     if (type == vm_allocation_types.end()) return;
     uint32_t kind = type->second;
+    if (kind == TYPE_FOREIGN_PTR) unindex_raw_alias(ptr);
     region_allocations[vm_allocation_regions.at(ptr)].erase(ptr);
     memory_lifetimes_.revoke(ptr);
     vm_allocation_types.erase(type);
@@ -568,11 +571,13 @@ void RegisterVM::exit_region() {
     memory_lifetimes_.end_region(id);
     vm_region_stack.pop_back();
     active_region_id = region_instances.at(id).parent;
-    auto& objects = region_allocations[id];
-    while (!objects.empty()) {
-        auto ptr = *objects.begin();
-        reclaim_value(BOX_PTR(ptr));
-        objects.erase(ptr);
+    if (auto members = region_allocations.find(id); members != region_allocations.end()) {
+        auto& objects = members->second;
+        while (!objects.empty()) {
+            auto ptr = *objects.begin();
+            reclaim_value(BOX_PTR(ptr));
+            objects.erase(ptr);
+        }
     }
     release_region_raw_memory(id);
     region_allocations.erase(id);
@@ -640,15 +645,16 @@ void RegisterVM::export_graph(RegisterValue value) {
     std::lock_guard<std::recursive_mutex> lock(heap_parent_->heap_mutex_);
     // Export the worker's promoted graph before publishing it in a shared
     // container/channel. The parent owns its lifetime through the join.
-    for (auto it = owned_raw_memory.begin(); it != owned_raw_memory.end();) {
-        if (it->second == 0) { heap_parent_->owned_raw_memory[it->first] = 0; it = owned_raw_memory.erase(it); }
-        else ++it;
-    }
+    export_raw_memory(*heap_parent_);
     auto& exported = region_allocations[0];
     while (!exported.empty()) {
         auto ptr = *exported.begin(); exported.erase(ptr);
         heap_parent_->vm_allocation_regions[ptr] = 0;
         heap_parent_->vm_allocation_types[ptr] = vm_allocation_types.at(ptr);
+        if (vm_allocation_types.at(ptr) == TYPE_FOREIGN_PTR) {
+            unindex_raw_alias(ptr);
+            heap_parent_->index_raw_alias(ptr);
+        }
         heap_parent_->region_allocations[0].insert(ptr);
         memory_lifetimes_.revoke(ptr);
         vm_allocation_types.erase(ptr); vm_allocation_regions.erase(ptr);

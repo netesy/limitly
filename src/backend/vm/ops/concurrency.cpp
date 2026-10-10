@@ -34,6 +34,12 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             break;
         }
         case LIR::LIR_Op::ResourceCreate: {
+            if (pc->imm == static_cast<uint32_t>(ResourceType::CHANNEL) && pc->a == 0 && pc->b == 0) {
+                channels.push_back(std::make_unique<LM::Backend::Channel>(1024));
+                registers[pc->dst] = BOX_PTR(channels.back().get());
+                opaque_runtime_pointers.insert(reinterpret_cast<uintptr_t>(channels.back().get()));
+                break;
+            }
             ResourceType type = static_cast<ResourceType>(to_int(registers[pc->a]));
             std::vector<RegisterValue> create_args;
             if (pc->b != UINT32_MAX) {
