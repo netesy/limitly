@@ -3,6 +3,7 @@
 #include "region_instances.hh"
 #include "reference_flags.hh"
 #include "aot_value_kind.hh"
+#include "numeric_conversion.hh"
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
@@ -173,6 +174,40 @@ uint64_t lymar_aot_is_nil(uint64_t value, uint64_t is_pointer) {
 uint64_t lymar_aot_is_object(uint64_t value, uint64_t is_pointer) {
     return is_pointer == object_kind && value != 0 && value != 2;
 }
+// Erased native integers are untagged, so pointer shape cannot validate a
+// string receiver. The existing kind sidecar is authoritative at this boundary.
+uint64_t lymar_aot_string_receiver(uint64_t value, uint64_t kind) {
+    if (!lymar_aot_is_object(value, kind)) return 0;
+    return (read_word(value) & 0xffffffff) == 11 ? value : 0;
+}
+uint64_t lymar_aot_callable_receiver(uint64_t value, uint64_t kind) {
+    if (!lymar_aot_is_object(value, kind)) return 0;
+    auto type = read_word(value) & 0xffffffff;
+    if (type == 11) return value; // canonical function-name string
+    auto& h = heap();
+    auto tuple = h.allocations.find(value);
+    if (type != 3 || tuple == h.allocations.end() || tuple->second.size < 32 || !read_word(value,16)) return 0;
+    auto elements = read_word(value,8);
+    auto array = h.allocations.find(elements);
+    if (array == h.allocations.end() || array->second.size < 8) return 0;
+    auto origin = h.shadow.find(elements);
+    auto name = read_word(elements);
+    if (origin == h.shadow.end() || !lymar_aot_is_object(name,origin->second) ||
+        (read_word(name) & 0xffffffff) != 11) return 0;
+    return value;
+}
+uint64_t lymar_aot_string_index(uint64_t value, uint64_t kind) {
+    if (kind == 0) return value;
+    if (!lymar_aot_is_object(value, kind)) return 0;
+    auto type = read_word(value) & 0xffffffff;
+    if (type >= 5 && type <= 8) return read_word(value + 8);
+    if (type == 9) {
+        double number;
+        std::memcpy(&number, reinterpret_cast<void*>(value + 8), sizeof(number));
+        return static_cast<uint64_t>(LM::Memory::truncate_i64(number));
+    }
+    return 0; // as_i64 does not parse strings or convert booleans.
+}
 uint64_t lymar_aot_boolean(uint64_t value) { return value; }
 uint64_t lymar_aot_is_print_object(uint64_t value, uint64_t kind) {
     return lymar_aot_is_object(value, kind) && (read_word(value) & 0xffffffff) != 9;
@@ -195,7 +230,10 @@ uint64_t lymar_aot_to_integer(uint64_t value, uint64_t kind) {
         try { return static_cast<uint64_t>(std::stoll(text)); }
         catch (...) { return static_cast<unsigned char>(text[0]); }
     }
-    return static_cast<uint64_t>(static_cast<int64_t>(lymar_aot_to_float(value, kind)));
+    return static_cast<uint64_t>(LM::Memory::truncate_i64(lymar_aot_to_float(value, kind)));
+}
+uint64_t lymar_aot_float_to_integer(double number) {
+    return static_cast<uint64_t>(LM::Memory::truncate_i64(number));
 }
 uint64_t lymar_aot_to_boolean(uint64_t value, uint64_t kind) {
     if (lymar_aot_is_nil(value, kind)) return 0;

@@ -2,6 +2,10 @@
 
 ## Overview
 
+For native artifact calling/validation rules see [ABI](abi.md). Precompilation
+reuses native module definitions; runtime speed depends on their generated
+computation and representation, not merely whether imports hit a cache.
+
 The Lymar programming language includes a comprehensive module system that allows you to organize code into reusable modules and import functionality from other files.
 
 ## Basic Module Import

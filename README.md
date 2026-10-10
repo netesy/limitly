@@ -41,6 +41,12 @@ bash scripts/install.sh --prefix "$HOME/.local" --precompile-stdlib
 lymar run path/to/script.lm
 ```
 
+Update a complete installed distribution from GitHub releases with `lymar up`
+(`lymar up --check` checks availability). This requires Python 3.9+, a compatible
+release archive and verified SHA-256 metadata; it does not update a Git checkout.
+See [installation and release packaging](docs/installation.md),
+[ABI contracts](docs/abi.md), and [native optimization plan](docs/native-optimization.md).
+
 Install GCC/G++, GNU Make, Git, Python 3, and the libffi, OpenSSL, and zlib
 development packages first. Debian/Ubuntu package names are `build-essential`,
 `git`, `python3`, `libffi-dev`, `libssl-dev`, and `zlib1g-dev`. On Windows, use

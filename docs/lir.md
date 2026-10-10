@@ -1,6 +1,14 @@
 # Lymar Intermediate Representation (LIR)
 
-The **Lymar Intermediate Representation (LIR)** is a register-based intermediate representation for the Lymar programming language compiler. It is designed to be **simple, efficient, and directly executable** by the Lymar virtual machine and JIT compiler.
+The **Lymar Intermediate Representation (LIR)** is the canonical register-based
+contract consumed by the VM, hosted native emitter, and standalone Fyra backend.
+The implemented native paths are AOT; this document does not establish a working JIT.
+
+Serialized LIR is version **1** (`LIR1`, version byte 1). Ownership effects and
+provenance must survive generation, registration and serialization. Verification
+is mandatory before execution/optimization and after deserialization. Unknown
+effects are not safety proofs. See [ABI](abi.md) and
+[the optimization gate](native-optimization.md#revised-surgical-sequence).
 
 LIR uses a **register-based design** with explicit typing and includes Lymar-specific features like string operations, concurrency primitives, and builtin function calls.
 
@@ -41,7 +49,8 @@ LIR uses a simplified ABI-level type system:
 | `Ptr`| Pointer/reference            | 8 B  | Memory address            |
 | `Void`| No value                    | 0 B  | Used for void functions   |
 
-These types correspond directly to the underlying machine types and are used by the JIT compiler for efficient code generation.
+These are lowering types, not ownership proofs or guarantees about actual erased
+value kinds. Native backends must preserve tagged/erased semantics where required.
 
 ---
 
@@ -303,12 +312,12 @@ The LIR system includes several categories of builtin functions:
 1. **Frontend**: Lymar source -> AST
 2. **Type Checker**: AST -> Typed AST
 3. **LIR Generator**: Typed AST -> LIR
-4. **JIT Compiler**: LIR -> Native Code
+4. **Native backends**: LIR -> hosted native code or independent Fyra IR/AOT code
 
 ### 8.2 Register Allocation
 - The LIR generator performs register allocation during code generation
 - Each function maintains its own register space
-- Type information is preserved for JIT compilation
+- Type and ownership information support native lowering; incomplete facts retain checked paths
 
 ### 8.3 Function Management
 - Functions are registered in a global function registry
@@ -342,7 +351,7 @@ LIR supports both linear instruction sequences and Control Flow Graphs:
 
 ### 10.2 Value Representation
 - Constants are stored as `ValuePtr` objects
-- Runtime values are managed by the VM/JIT
+- Dynamic values retain deterministic VM/native lifetime management where required
 - Memory allocation is handled by the runtime system
 
 ### 10.3 Enum/Tagged Value Representation (Current VM Path)

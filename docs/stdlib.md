@@ -2,6 +2,9 @@
 
 This document describes the built-in functions and core modules available in the Lymar standard library.
 
+Builtin recognition does not imply inlining or allocation-free execution. See
+[native operation paths and stdlib inventory](native-optimization.md#what-a-builtin-means).
+
 See the [standard-library FFI delegation architecture](ffi.md#6-standard-library-delegation-architecture) for the
 policy, validation rules, and migration order for native-backed system modules.
 

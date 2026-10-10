@@ -1,6 +1,7 @@
 #include "lymar.hh"
 #include "frontend/module_manager.hh"
 #include "lyra_api.hh"
+#include "cli_update.hh"
 #include <filesystem>
 #include <iostream>
 #include <fstream>
@@ -47,6 +48,7 @@ void printUsage(const char* programName) {
     std::cout << "    " << programName << " deps / tree / why   Display dependency analysis\n";
     std::cout << "    " << programName << " doctor / env / audit Diagnostics and audit\n";
     std::cout << "\n  Tooling:\n";
+    std::cout << "    " << programName << " up [--check] [--version TAG] [--prefix DIR] Update compiler from GitHub releases\n";
     std::cout << "    " << programName << " -lsp                 Start LSP server\n";
     std::cout << "    " << programName << " -format <file>       Format a source file\n";
     std::cout << "\n  Debugging:\n";
@@ -67,6 +69,10 @@ int main(int argc, char* argv[]) {
     }
     
     std::string command = argv[1];
+    if (command == "up") {
+        try { return update_lymar(argc, argv); }
+        catch (const std::exception& error) { std::cerr << "Update failed: " << error.what() << '\n'; return 1; }
+    }
     LM::CompileOptions options;
     std::string source_file;
     std::vector<std::string> package_features;

@@ -53,11 +53,15 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_box_float", 1, i64, ctx->getDoubleType());
     declare("lymar_aot_to_float", 2, ctx->getDoubleType());
     declare("lymar_aot_to_integer", 2, i64);
+    declare("lymar_aot_float_to_integer", 1, i64, ctx->getDoubleType());
     declare("lymar_aot_to_boolean", 2, i64);
     declare("lymar_aot_value_equal", 4, i64);
     declare("lymar_aot_is_print_object", 2, i64);
     declare("lymar_aot_is_nil", 2, i64);
     declare("lymar_aot_is_object", 2, i64);
+    declare("lymar_aot_string_receiver", 2, i64);
+    declare("lymar_aot_callable_receiver", 2, i64);
+    declare("lymar_aot_string_index", 2, i64);
     declare("lymar_aot_print_integer", 2, void_type);
     declare("lymar_aot_copy_constant", 2, i64);
     declare("lymar_aot_ref_resolve", 2, i64);
@@ -189,11 +193,32 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         *it = std::move(call);
                         if (name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_scalar_to_string") flags[inst] = one;
                         if (name == "lymar_aot_boolean") flags[inst] = boolean;
+                        if (name == "lymar_aot_callable_receiver") flags[inst] = one;
                     }
                 }
                 auto& current_operands = inst->getOperands();
                 if (inst->getOpcode() == ir::Instruction::Call && !current_operands.empty()) {
                     auto* callee = dynamic_cast<ir::Function*>(current_operands[0]->get());
+                    if (callee && current_operands.size() > 1 &&
+                        (callee->getName() == "_builtin_string_byte_at" ||
+                         callee->getName() == "_builtin_substring" || callee->getName() == "substring")) {
+                        auto* receiver = current_operands[1]->get();
+                        auto* checked = emit(block, it, "lymar_aot_string_receiver", {receiver, flag(receiver)});
+                        flags[checked] = one;
+                        current_operands[1]->set(checked);
+                        for (size_t index = 2; index < current_operands.size(); ++index) {
+                            auto* argument = current_operands[index]->get();
+                            // Native floats are boxed before integer conversion;
+                            // pointer/nil/boolean kinds must not become raw indices.
+                            if (argument->getType()->isFloatingPoint()) {
+                                argument = emit(block, it, "lymar_aot_box_float", {argument});
+                                flags[argument] = one;
+                            }
+                            auto* converted = emit(block, it, "lymar_aot_string_index", {argument, flag(argument)});
+                            flags[converted] = zero;
+                            current_operands[index]->set(converted);
+                        }
+                    }
                     // Normalize erased arguments at the call boundary, using the
                     // declared IR signature, before publishing their value kinds.
                     if (callee) {
@@ -220,7 +245,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         checked->setName(inst->getName());
                         inst->replaceAllUsesWith(checked.get());
                         *it = std::move(checked);
-                    } else if (callee && (callee->getName() == "lymar_aot_is_nil" || callee->getName() == "lymar_aot_is_object" || callee->getName() == "lymar_aot_is_print_object" || callee->getName() == "lymar_aot_to_float" || callee->getName() == "lymar_aot_to_integer" || callee->getName() == "lymar_aot_to_boolean" || callee->getName() == "lymar_aot_print_integer" || callee->getName() == "lymar_aot_scalar_to_string")) {
+                    } else if (callee && (callee->getName() == "lymar_aot_string_index" || callee->getName() == "lymar_aot_callable_receiver" || callee->getName() == "lymar_aot_is_nil" || callee->getName() == "lymar_aot_is_object" || callee->getName() == "lymar_aot_is_print_object" || callee->getName() == "lymar_aot_to_float" || callee->getName() == "lymar_aot_to_integer" || callee->getName() == "lymar_aot_to_boolean" || callee->getName() == "lymar_aot_print_integer" || callee->getName() == "lymar_aot_scalar_to_string")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));
                     } else if (callee && (callee->getName() == "lymar_aot_raw_alloc" || callee->getName() == "lymar_aot_raw_free")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));

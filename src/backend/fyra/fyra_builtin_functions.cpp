@@ -1509,6 +1509,24 @@ void FyraBuiltinFunctions::emit_tuple_ir(ir::Module* module, ir::IRBuilder* buil
         ir::Value* tuple_ptr = it->get();
         it++;
         ir::Value* index = it->get();
+        auto* invalid = builder->createBasicBlock("tuple_invalid", fn_get);
+        auto* typed = builder->createBasicBlock("tuple_typed", fn_get);
+        auto* bounds = builder->createBasicBlock("tuple_bounds", fn_get);
+        auto* access = builder->createBasicBlock("tuple_access", fn_get);
+        auto zero = ctx->getConstantInt(i64, 0);
+        auto valid_object = builder->createExternCall("lymar_aot_is_object", {tuple_ptr, zero}, i64);
+        builder->createBr(valid_object, typed, invalid);
+        builder->setInsertPoint(typed);
+        auto type = builder->createAnd(builder->createLoad(tuple_ptr), ctx->getConstantInt(i64, 0xffffffff));
+        builder->createBr(builder->createCeq(type, ctx->getConstantInt(i64, 3)), bounds, invalid);
+        builder->setInsertPoint(bounds);
+        index = builder->createExternCall("lymar_aot_string_index", {index, zero}, i64);
+        auto count = builder->createLoad(builder->createAdd(tuple_ptr, ctx->getConstantInt(i64, 16)));
+        // Unsigned comparison rejects negative indices as well as indices >= size.
+        builder->createBr(builder->createCult(index, count), access, invalid);
+        builder->setInsertPoint(invalid);
+        builder->createRet(builder->createExternCall("lymar_aot_nil", {}, i64));
+        builder->setInsertPoint(access);
         ir::Value* slot_idx = index;
         ir::Value* offset = builder->createMul(slot_idx, ctx->getConstantInt(i64, 8));
         ir::Value* elements = builder->createLoad(builder->createAdd(tuple_ptr, ctx->getConstantInt(i64, 8)));
@@ -2473,22 +2491,39 @@ void FyraBuiltinFunctions::emit_substring_ir(ir::Module* module, ir::IRBuilder* 
         ir::Value* end   = unbox_i64(builder, ctx, raw_end);
 
         ir::Instruction* len_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
-        ir::Value* diff = builder->createSub(end, start);
+        ir::Instruction* end_slot = builder->createAlloc(ctx->getConstantInt(i64, 8), i64);
         ir::Value* zero = ctx->getConstantInt(i64, 0);
-
-        ir::BasicBlock* b_neg_len = builder->createBasicBlock("sub_neg_len", fn);
-        ir::BasicBlock* b_pos_len = builder->createBasicBlock("sub_pos_len", fn);
-        ir::BasicBlock* b_alloc_sub = builder->createBasicBlock("sub_alloc", fn);
-
-        ir::Value* is_neg = builder->createCslt(diff, zero);
-        builder->createBr(is_neg, b_neg_len, b_pos_len);
-
-        builder->setInsertPoint(b_neg_len);
-        builder->createStore(zero, len_slot);
+        auto* empty = builder->createBasicBlock("sub_empty", fn);
+        auto* receiver = builder->createBasicBlock("sub_receiver", fn);
+        auto* nonnull = builder->createBasicBlock("sub_nonnull", fn);
+        auto* bounds = builder->createBasicBlock("sub_bounds", fn);
+        auto* clamp = builder->createBasicBlock("sub_clamp", fn);
+        auto* keep_end = builder->createBasicBlock("sub_keep_end", fn);
+        auto* range = builder->createBasicBlock("sub_range", fn);
+        auto* valid = builder->createBasicBlock("sub_valid", fn);
+        auto* b_alloc_sub = builder->createBasicBlock("sub_alloc", fn);
+        builder->createBr(builder->createCslt(start, zero), empty, receiver);
+        builder->setInsertPoint(receiver);
+        builder->createBr(builder->createCeq(str_ptr, zero), empty, nonnull);
+        builder->setInsertPoint(nonnull);
+        builder->createBr(builder->createCeq(str_ptr, ctx->getConstantInt(i64, 2)), empty, bounds);
+        builder->setInsertPoint(bounds);
+        auto length = builder->createLoad(builder->createAdd(str_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET)));
+        builder->createBr(builder->createCslt(length, end), clamp, keep_end);
+        builder->setInsertPoint(clamp);
+        builder->createStore(length, end_slot);
+        builder->createJmp(range);
+        builder->setInsertPoint(keep_end);
+        builder->createStore(end, end_slot);
+        builder->createJmp(range);
+        builder->setInsertPoint(range);
+        auto bounded_end = builder->createLoad(end_slot);
+        builder->createBr(builder->createCslt(start, bounded_end), valid, empty);
+        builder->setInsertPoint(valid);
+        builder->createStore(builder->createSub(bounded_end, start), len_slot);
         builder->createJmp(b_alloc_sub);
-
-        builder->setInsertPoint(b_pos_len);
-        builder->createStore(diff, len_slot);
+        builder->setInsertPoint(empty);
+        builder->createStore(zero, len_slot);
         builder->createJmp(b_alloc_sub);
 
         builder->setInsertPoint(b_alloc_sub);
@@ -2567,6 +2602,23 @@ void FyraBuiltinFunctions::emit_string_byte_at_ir(ir::Module* module, ir::IRBuil
     ir::Value* raw_idx = it->get();
 
     ir::Value* idx = unbox_i64(builder, ctx, raw_idx);
+    auto* invalid = builder->createBasicBlock("byte_invalid", fn);
+    auto* receiver = builder->createBasicBlock("byte_receiver", fn);
+    auto* bounds = builder->createBasicBlock("byte_bounds", fn);
+    auto* access = builder->createBasicBlock("byte_access", fn);
+    auto zero = ctx->getConstantInt(i64, 0);
+    builder->createBr(builder->createCslt(idx, zero), invalid, receiver);
+    builder->setInsertPoint(receiver);
+    auto* nonnull = builder->createBasicBlock("byte_nonnull", fn);
+    builder->createBr(builder->createCeq(str_ptr, zero), invalid, nonnull);
+    builder->setInsertPoint(nonnull);
+    builder->createBr(builder->createCeq(str_ptr, ctx->getConstantInt(i64, 2)), invalid, bounds);
+    builder->setInsertPoint(bounds);
+    auto length = builder->createLoad(builder->createAdd(str_ptr, ctx->getConstantInt(i64, StringABI::LEN_OFFSET)));
+    builder->createBr(builder->createCslt(idx, length), access, invalid);
+    builder->setInsertPoint(invalid);
+    builder->createRet(zero);
+    builder->setInsertPoint(access);
     ir::Value* data_ptr = builder->createAdd(str_ptr, ctx->getConstantInt(i64, StringABI::DATA_OFFSET));
     ir::Value* ch = builder->createLoadub(builder->createAdd(data_ptr, idx));
     ir::Value* raw_ch = builder->createCast(ch, i64);

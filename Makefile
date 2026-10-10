@@ -540,6 +540,7 @@ memory-tests: $(PLATFORM) $(BIN_DIR)/test_source_ownership$(EXE_EXT) $(BIN_DIR)/
 	LYMAR_SOURCE_OWNERSHIP_EXECUTABLE=$(abspath $(BIN_DIR)/test_source_ownership$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" python3 tests/memory/test_source_ownership.py
 	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_CXX=$(abspath tests/memory/aot_linker.py) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_unified_ownership.py
 	LYMAR_REFERENCE_TEST_EXECUTABLE=$(abspath $(BIN_DIR)/test_reference_lowering$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_reference_lowering.py
+	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_builtin_proofs.py
 
 # Private standalone AOT runtime tests; no VM or public ABI additions.
 $(BIN_DIR)/test_aot_regions$(EXE_EXT): tests/memory/test_aot_regions.cpp $(BIN_DIR)/liblymar_aot.a | $(BIN_DIR)

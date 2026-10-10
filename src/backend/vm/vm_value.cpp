@@ -1,4 +1,5 @@
 #define BUILDING_RUNTIME
+#include "memory/numeric_conversion.hh"
 #define _POSIX_C_SOURCE 200809L
 #include "vm_value.hh"
 #include "vm_value_base.hh"
@@ -80,11 +81,11 @@ RUNTIME_API int64_t as_i64(LmValue v) {
         if (h->type_id == TYPE_U64) return (int64_t)((ObjU64*)h)->value;
         if (h->type_id == TYPE_I128) return (int64_t)((ObjI128*)h)->value;
         if (h->type_id == TYPE_U128) return (int64_t)((ObjU128*)h)->value;
-        if (h->type_id == TYPE_FLOAT) return (int64_t)((ObjFloat*)h)->value;
+        if (h->type_id == TYPE_FLOAT) return LM::Memory::truncate_i64(((ObjFloat*)h)->value);
         if (h->type_id == TYPE_BOX) {
             LmBox* box = (LmBox*)h;
             if (box->type == LM_BOX_INT) return box->value.as_int;
-            if (box->type == LM_BOX_FLOAT) return (int64_t)box->value.as_float;
+            if (box->type == LM_BOX_FLOAT) return LM::Memory::truncate_i64(box->value.as_float);
         }
     }
     return 0;

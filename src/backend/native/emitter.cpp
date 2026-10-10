@@ -2,6 +2,8 @@
 #include "abi.hh"
 #include "scalar_lowering.hh"
 #include "aggregate_lowering.hh"
+#include "frame_lowering.hh"
+#include "string_lowering.hh"
 #include "direct_operations.hh"
 #include "process_arguments.hh"
 #include "memory/region_analysis.hh"
@@ -54,6 +56,7 @@ struct Emitter {
   std::vector<const LIR::LIR_Function *> functions;
   std::unordered_set<size_t> reference_functions;
   std::unordered_map<size_t, std::unordered_set<LIR::Reg>> pair_factories;
+  std::unique_ptr<Memory::RuntimeEffectAnalysis> runtime_effects;
   std::string raw(uint32_t r) {
     return r == UINT32_MAX ? "N(2ULL)" : "r[" + std::to_string(r) + "]";
   }
@@ -172,6 +175,11 @@ struct Emitter {
            "i=0;i<count && i<"
         << registers << ";++i) r[i]=args[i];\n";
     out << "NativeScope scope(api,ctx," << (Memory::runtime_regions_proven_unnecessary(function) ? "false" : "true") << ");\n";
+    auto frame_proof = prove_frame_views(function, functions, *runtime_effects);
+    auto substring_proof = prove_substring_comparisons(function);
+    std::unordered_map<size_t, size_t> fused_comparisons;
+    for (const auto& [call, proof] : substring_proof) fused_comparisons[proof.comparison] = call;
+    for (auto receiver : frame_proof.views) out << "const V* frame_view_" << receiver << "=nullptr;\n";
     const bool direct = std::any_of(function.instructions.begin(), function.instructions.end(), [&](const auto& in) {
       using Op = LIR::LIR_Op;
       switch (in.op) {
@@ -266,10 +274,12 @@ struct Emitter {
                ")&63))";
         break;
       case Op::CmpEQ:
-        expr = "(equal(api,ctx," + raw(inst.a) + "," + raw(inst.b) + "," + (typed ? "true" : "false") + ")?18ULL:10ULL)";
+        if (fused_comparisons.count(i)) expr = raw(function.instructions[fused_comparisons[i]].dst);
+        else expr = "(equal(api,ctx," + raw(inst.a) + "," + raw(inst.b) + "," + (typed ? "true" : "false") + ")?18ULL:10ULL)";
         break;
       case Op::CmpNEQ:
-        expr = "(!equal(api,ctx," + raw(inst.a) + "," + raw(inst.b) + "," + (typed ? "true" : "false") + ")?18ULL:10ULL)";
+        if (fused_comparisons.count(i)) expr = "(api->truthy(" + reg(function.instructions[fused_comparisons[i]].dst) + ")?10ULL:18ULL)";
+        else expr = "(!equal(api,ctx," + raw(inst.a) + "," + raw(inst.b) + "," + (typed ? "true" : "false") + ")?18ULL:10ULL)";
         break;
       case Op::CmpLT:
       case Op::CmpLE:
@@ -319,7 +329,14 @@ struct Emitter {
         break;
       case Op::FrameGetField:
       case Op::FrameGetFieldAtomic:
-        expr = "ops->frame_get(ctx," + a + "," + std::to_string(inst.b) + "," + (inst.op == Op::FrameGetFieldAtomic ? "true" : "false") + ")";
+        if (frame_proof.cached.count(i)) expr = "frame_view_" + std::to_string(inst.a) + "[" + std::to_string(inst.b) + "]";
+        else expr = "ops->frame_get(ctx," + a + "," + std::to_string(inst.b) + "," + (inst.op == Op::FrameGetFieldAtomic ? "true" : "false") + ")";
+        if (frame_proof.establish.count(i)) {
+          out << "V checked_field=" << expr << "; std::memcpy(&frame_view_" << inst.a
+              << ",reinterpret_cast<const unsigned char*>(" << a << ")+" << offsetof(LmFrame, fields)
+              << ",sizeof(frame_view_" << inst.a << ")); ";
+          expr = "checked_field";
+        }
         break;
       case Op::FrameSetField:
       case Op::FrameSetFieldAtomic:
@@ -415,6 +432,11 @@ struct Emitter {
       case Op::CallVoid:
       case Op::CallBuiltin:
       case Op::CallVariadic: {
+        if (auto fused = substring_proof.find(i); fused != substring_proof.end()) {
+          expr = "substring_equal(api,ctx," + reg(inst.call_args[0]) + "," + reg(inst.call_args[1]) + "," +
+              reg(inst.call_args[2]) + "," + reg(fused->second.needle) + ")";
+          break;
+        }
         if (auto direct = direct_builtin(inst); !direct.empty()) {
           expr = direct;
           break;
@@ -553,9 +575,11 @@ bool emit_shared_module(const LIR::LIR_Function &root,
   try {
     Emitter emitter;
     emitter.discover(root, module);
+    emitter.runtime_effects = std::make_unique<Memory::RuntimeEffectAnalysis>(emitter.functions);
     emitter.out << R"CPP(#include <cstdint>
 #include <cstddef>
 #include <array>
+#include <algorithm>
 #include <stdexcept>
 #include <vector>
 #include <string_view>
@@ -584,6 +608,20 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
         << ";\n" << scalar_lowering_source;
     emitter.out << "constexpr uint32_t HDirectOperations=" << static_cast<unsigned>(Helper::DirectOperations) << ";\n";
     emitter.out << direct_operations_source;
+    emitter.out << "static V substring_equal(const Api* api,void* ctx,V source,V begin,V end,V needle) {\n"
+        "if(source && !(source&7ULL) && needle && !(needle&7ULL)) { uint32_t a,b; "
+        "std::memcpy(&a,reinterpret_cast<const void*>(source),sizeof(a)); std::memcpy(&b,reinterpret_cast<const void*>(needle),sizeof(b));\n"
+        "if(a==" << TYPE_STRING << " && b==" << TYPE_STRING << ") { uint64_t length,expected; const char* data; const char* wanted;\n"
+        "std::memcpy(&length,reinterpret_cast<const unsigned char*>(source)+" << offsetof(LmStringHeader, len) << ",sizeof(length));\n"
+        "std::memcpy(&expected,reinterpret_cast<const unsigned char*>(needle)+" << offsetof(LmStringHeader, len) << ",sizeof(expected));\n"
+        "data=reinterpret_cast<const char*>(source)+" << offsetof(LmStringHeader, data) << ";\n"
+        "wanted=reinterpret_cast<const char*>(needle)+" << offsetof(LmStringHeader, data) << ";\n"
+        "int64_t first=api->read_int(begin),last=api->read_int(end); uint64_t count=0,offset=0;\n"
+        "if(first>=0) { uint64_t finish=last<0?0:std::min(length,static_cast<uint64_t>(last)); "
+        "offset=static_cast<uint64_t>(first); if(offset<finish) count=finish-offset; }\n"
+        "return expected==count && (!count || std::memcmp(data+offset,wanted,count)==0)?18ULL:10ULL; } }\n"
+        "V args[]={source,begin,end}; V part=api->helper(ctx,HBuiltin,2ULL,2ULL,2ULL,\"_builtin_substring\",args,3); "
+        "return api->equal(part,needle)?18ULL:10ULL; }\n";
     // Layout constants come from the canonical runtime structs, not a second
     // ABI definition. memcpy avoids aliasing assumptions in generated code.
     emitter.out << "static V native_length(const Api* api,void* ctx,V value) {\n"

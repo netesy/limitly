@@ -1305,6 +1305,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                 }
                 ir::Value* raw_callee = load_reg(inst.a, inst.type_a);
+                raw_callee = builder_->createExternCall("lymar_aot_callable_receiver",
+                    {erased_word(raw_callee), context_->getConstantInt(context_->getIntegerType(64), 0)},
+                    context_->getIntegerType(64));
 
                 std::string cid = std::to_string(label_counter_++);
                 ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
@@ -1313,10 +1316,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::BasicBlock* b_done = builder_->createBasicBlock("ind_done_" + cid, cur_fn);
 
                 ir::Instruction* res_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
-                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), res_slot);
+                builder_->createStore(builder_->createExternCall("lymar_aot_nil", {}, context_->getIntegerType(64)), res_slot);
 
                 ir::Value* is_non_null = builder_->createCne(raw_callee, context_->getConstantInt(context_->getIntegerType(64), 0));
-                builder_->createBr(is_non_null, b_dispatch, b_raw_call);
+                builder_->createBr(is_non_null, b_dispatch, b_done);
 
                 builder_->setInsertPoint(b_dispatch);
                 ir::Instruction* callee_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
@@ -1362,7 +1365,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                 std::vector<ir::Function*> cand_funcs;
                 for (const auto& f : current_module_->getFunctions()) {
-                    if (f->getName() != "main" && !f->getName().starts_with("lm_") && !f->getName().starts_with("_builtin_")) {
+                    // A source callable name cannot grant access to linker or
+                    // private runtime symbols that have no canonical contract.
+                    if (LIR::FunctionRegistry::getInstance().hasFunction(f->getName()) &&
+                        f->getName() != "main" && !f->getName().starts_with("lm_") && !f->getName().starts_with("_builtin_")) {
                         cand_funcs.push_back(f.get());
                     }
                 }
@@ -1411,7 +1417,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
                     }
                     ir::Value* call_res = builder_->createCall(target_f, call_args_matching);
-                    builder_->createStore(call_res, res_slot);
+                    builder_->createStore(erased_word(call_res), res_slot);
                     builder_->createJmp(b_done);
 
                     cur_cls_chk = b_next_check;
@@ -1465,7 +1471,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         call_args_matching.push_back(context_->getConstantInt(context_->getIntegerType(64), 0));
                     }
                     ir::Value* call_res = builder_->createCall(target_f, call_args_matching);
-                    builder_->createStore(call_res, res_slot);
+                    builder_->createStore(erased_word(call_res), res_slot);
                     builder_->createJmp(b_done);
 
                     cur_check_bb = b_next_check;
@@ -1475,15 +1481,15 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 builder_->createJmp(b_raw_call);
 
                 builder_->setInsertPoint(b_raw_call);
-                ir::Value* raw_res = builder_->createCall(callee, args, lir_type_to_fyra_type(inst.result_type));
-                builder_->createStore(raw_res, res_slot);
+                // Unresolved names and malformed callables return nil in VM.
+                // They are not permission to execute an arbitrary data address.
                 builder_->createJmp(b_done);
 
                 builder_->setInsertPoint(b_done);
                 ir::Value* final_res = builder_->createLoad(res_slot);
                 if (inst.dst != UINT32_MAX) {
                     reg_types[inst.dst] = inst.result_type;
-                    store_reg(inst.dst, final_res, inst.result_type);
+                    store_reg(inst.dst, final_res, inst.result_type, true);
                 }
                 break;
             }
@@ -1725,7 +1731,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         {value, zero_kind}, context_->getDoubleType()));
                 } else if (inst.result_type == LIR::Type::I64) {
                     if (value->getType()->isFloatingPoint())
-                        store_reg(inst.dst, builder_->createDToSI(value, context_->getIntegerType(64)), LIR::Type::I64);
+                        store_reg(inst.dst, builder_->createExternCall("lymar_aot_float_to_integer",
+                            {value}, context_->getIntegerType(64)), LIR::Type::I64);
                     else store_reg(inst.dst, builder_->createExternCall("lymar_aot_to_integer",
                         {value, zero_kind}, context_->getIntegerType(64)), LIR::Type::I64);
                 } else store_reg(inst.dst, builder_->createCast(value, lir_type_to_fyra_type(inst.result_type)), inst.result_type);

@@ -2,6 +2,11 @@
 
 Lymar combines an expressive frontend pipeline with a low-level intermediate representation (LIR) and dual execution backends.
 
+Current execution contracts are documented in [ABI](abi.md),
+[memory runtime](memory-runtime.md), and [native optimization](native-optimization.md).
+Hosted precompiled modules and standalone Fyra execution have distinct private
+representations; native compilation does not imply runtime-free computation.
+
 ```
 Source Code (.lm)
        │

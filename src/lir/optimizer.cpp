@@ -70,6 +70,12 @@ bool Optimizer::optimize() {
     };
 
     do {
+        bool promotions = run_pass("Proven scalar promotions", [&]() {
+            std::vector<std::string> errors;
+            if (!Verifier::verify(func_, errors)) return false;
+            return Memory::eliminate_proven_scalar_promotions(func_);
+        });
+        if (promotions) am.invalidate_all();
         bool regions = run_pass("Proven scalar leaf regions", [&]() {
             std::vector<std::string> errors;
             if (!Verifier::verify(func_, errors)) return false;
@@ -77,7 +83,7 @@ bool Optimizer::optimize() {
         });
         if (regions) am.invalidate_all();
         pass_changed = Memory::eliminate_proven_local_borrows(func_);
-        pass_changed |= regions;
+        pass_changed |= regions || promotions;
         if (pass_changed) am.invalidate_all();
 
         bool ur = run_pass("Unreachable code elimination", [&]() { return remove_unreachable_code(); });

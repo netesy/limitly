@@ -1,5 +1,8 @@
 # Lymar Compiler & Standard Library Architecture
 
+For current hosted/standalone boundaries, see [ABI](abi.md),
+[native optimization](native-optimization.md), and [compiler updates](installation.md).
+
 ## 1. Compiler Driver & CLI Interface
 
 The compiler entry point is implemented in `src/main.cpp` and `src/lymar.cpp`.

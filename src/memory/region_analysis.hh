@@ -5,15 +5,85 @@
 #include "aot_value_kind.hh"
 #include <optional>
 #include <deque>
+#include <unordered_set>
 
 namespace LM::Memory {
+// Actual scalar provenance, not an ABI annotation. Unknown/undefined joins
+// retain graph promotion. The caller must verify active region targets first.
+struct ScalarOperationProof {
+    std::unordered_set<size_t> promotions, stores;
+};
+inline ScalarOperationProof prove_scalar_operations(const LIR::LIR_Function& function) {
+    using Op = LIR::LIR_Op;
+    constexpr unsigned scalar = 1, unknown = 2, undefined = 4;
+    using State = std::unordered_map<LIR::Reg, unsigned>;
+    auto kind = [](const State& state, LIR::Reg reg) {
+        auto found = state.find(reg); return found == state.end() ? undefined : found->second;
+    };
+    auto transfer = [&](State& state, const LIR::LIR_Inst& in) {
+        if (in.op == Op::LoadConst)
+            state[in.dst] = IS_INT(in.const_val) || IS_BOOL(in.const_val) || IS_NIL(in.const_val) ? scalar : unknown;
+        else if (in.op == Op::Mov || in.op == Op::Copy) state[in.dst] = kind(state, in.a);
+        else if (in.op >= Op::CmpEQ && in.op <= Op::CmpGE) state[in.dst] = scalar;
+        else switch (in.op) {
+        case Op::Nop: case Op::Label: case Op::Param: case Op::Jump: case Op::JumpIf:
+        case Op::JumpIfFalse: case Op::Return: case Op::Ret: case Op::RegionEnter:
+        case Op::RegionExit: case Op::RegionMove: case Op::FrameSetField:
+        case Op::FrameSetFieldAtomic: case Op::ListSet: case Op::TupleSet:
+        case Op::DictSet: case Op::ListAppend: case Op::StoreGlobal: break;
+        default: if (in.dst != UINT32_MAX) state[in.dst] = unknown; break;
+        }
+    };
+    LIR::CFGAnalysis cfg(function); cfg.analyze();
+    const auto& blocks = cfg.get_blocks();
+    if (blocks.empty()) return {};
+    std::vector<std::optional<State>> inputs(blocks.size());
+    inputs[0] = State{};
+    for (LIR::Reg p = 0; p < function.param_count; ++p) (*inputs[0])[p] = unknown;
+    std::deque<uint32_t> pending{0};
+    std::vector<bool> queued(blocks.size()); queued[0] = true;
+    while (!pending.empty()) {
+        auto index = pending.front(); pending.pop_front(); queued[index] = false;
+        auto state = *inputs[index];
+        const auto& block = blocks[index];
+        for (size_t i = block.start_inst_idx; i < block.end_inst_idx; ++i) transfer(state, function.instructions[i]);
+        for (auto next : block.successors) {
+            bool changed = false;
+            if (!inputs[next]) { inputs[next] = state; changed = true; }
+            else {
+                auto joined = *inputs[next];
+                for (auto [reg, value] : state) joined[reg] = kind(*inputs[next], reg) | value;
+                for (auto [reg, value] : *inputs[next]) joined[reg] = value | kind(state, reg);
+                if (joined != *inputs[next]) { inputs[next] = std::move(joined); changed = true; }
+            }
+            if (changed && !queued[next]) { pending.push_back(next); queued[next] = true; }
+        }
+    }
+    ScalarOperationProof proof;
+    for (size_t index = 0; index < blocks.size(); ++index) {
+        if (!inputs[index]) continue;
+        auto state = *inputs[index];
+        for (size_t i = blocks[index].start_inst_idx; i < blocks[index].end_inst_idx; ++i) {
+            const auto& in = function.instructions[i];
+            if (in.op == Op::RegionMove && kind(state, in.a) == scalar) proof.promotions.insert(i);
+            if (in.op == Op::FrameSetField && kind(state, in.b) == scalar) proof.stores.insert(i);
+            transfer(state, in);
+        }
+    }
+    return proof;
+}
+inline bool eliminate_proven_scalar_promotions(LIR::LIR_Function& function) {
+    auto proof = prove_scalar_operations(function);
+    for (auto index : proof.promotions) function.instructions[index].op = LIR::LIR_Op::Nop;
+    return !proof.promotions.empty();
+}
 // Flow-sensitive actual kinds, derived from instructions rather than source
 // annotations. Union joins and finite bit sets make loops converge. Undef is a
 // real obligation; a definition on only one branch never proves a safe use.
 inline std::optional<AOTValueKind> scalar_return_kind(const LIR::LIR_Function& function) {
     using Op = LIR::LIR_Op;
     constexpr unsigned integer = 1, boolean = 2, undefined = 4;
-    if (function.instructions.empty() || function.param_count || !function.ownership_captures.empty()) return {};
+    if (function.instructions.empty() || !function.ownership_captures.empty()) return {};
     for (const auto& inst : function.instructions) {
         if (!inst.ownership.consumes.empty()) return {};
         switch (inst.op) {

@@ -22,6 +22,11 @@
 #include "../../src/backend/vm/vm_value.hh"
 #include "../../src/backend/vm/vm_runtime.hh"
 #include "../../src/backend/vm/register.hh"
+#include "memory/effect_analysis.hh"
+#include "memory/region_analysis.hh"
+#include "memory/numeric_conversion.hh"
+#include "backend/native/frame_lowering.hh"
+#include "backend/native/string_lowering.hh"
 
 #include <cassert>
 #include <cstdint>
@@ -30,6 +35,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <limits>
 
 using namespace LM::LIR;
 
@@ -345,6 +351,89 @@ static LIR_Function build_mixed_function() {
 // =============================================================================
 int main() {
  std::cout << "=== LIR serializer round-trip test (C17) ===\n";
+
+ {
+ using namespace LM::Memory;
+ using namespace LM::Backend::Native;
+ CHECK(truncate_i64(std::numeric_limits<double>::quiet_NaN())==0,"NaN integer conversion unsafe");
+ CHECK(truncate_i64(std::numeric_limits<double>::infinity())==0,"infinite integer conversion unsafe");
+ CHECK(truncate_i64(0x1p63)==0,"out-of-range integer conversion unsafe");
+ CHECK(truncate_i64(-0x1p63)==INT64_MIN,"minimum integer conversion changed");
+ auto inst = [](LIR_Op op, Reg dst = UINT32_MAX, Reg a = UINT32_MAX, Reg b = UINT32_MAX) {
+     return LIR_Inst(op, LM::LIR::Type::I64, dst, a, b);
+ };
+ LIR_Function a("effect_a",0), b("effect_b",0);
+ auto call = inst(LIR_Op::Call,0); call.func_name="effect_b"; a.instructions={call};
+ call.func_name="effect_a"; b.instructions={call};
+ RuntimeEffectAnalysis pure({&a,&b});
+ CHECK(pure.effects(a.name)==0,"recursive pure effect inference failed to converge");
+ LIR_Function external("external_signature_only",0);
+ RuntimeEffectAnalysis opaque_body({&external});
+ CHECK(!opaque_body.cannot_invalidate_or_publish(external.name),"signature-only function assumed pure");
+ b.instructions.push_back(inst(LIR_Op::MemoryAlloc,1));
+ RuntimeEffectAnalysis allocating({&a,&b});
+ CHECK(allocating.effects(a.name)==AllRuntimeEffects,"recursive allocation effects lost");
+ b.instructions.back()=inst(LIR_Op::CallIndirect,1);
+ RuntimeEffectAnalysis indirect({&a,&b});
+ CHECK(!indirect.cannot_invalidate_or_publish(a.name),"opaque call proven safe");
+ b.instructions={}; b.inferred_effects.parameters={Retain};
+ RuntimeEffectAnalysis retained({&a,&b});
+ CHECK(!retained.cannot_invalidate_or_publish(a.name),"retention effect lost");
+ LIR_Function storing("storing_alias",2);
+ storing.instructions={inst(LIR_Op::FrameSetField,0,0,1)};
+ RuntimeEffectAnalysis stored_alias({&storing});
+ CHECK(!stored_alias.cannot_invalidate_or_publish(storing.name),"field storage assumed nonescaping without value proof");
+ auto scalar_value=inst(LIR_Op::LoadConst,1); scalar_value.const_val=BOX_INT(3);
+ storing.instructions.insert(storing.instructions.begin(),scalar_value);
+ RuntimeEffectAnalysis stored_scalar({&storing});
+ CHECK(stored_scalar.cannot_invalidate_or_publish(storing.name),"proven scalar field store treated as alias publication");
+
+ LIR_Function scalar("scalar_promotion",1); scalar.register_count=2;
+ auto constant=inst(LIR_Op::LoadConst,1); constant.const_val=BOX_INT(7);
+ auto promote=inst(LIR_Op::RegionMove,UINT32_MAX,1); promote.imm=0;
+ scalar.instructions={constant,promote,inst(LIR_Op::Return,UINT32_MAX,1)};
+ CHECK(eliminate_proven_scalar_promotions(scalar),"proven scalar promotion retained");
+ CHECK(scalar.instructions[1].op==LIR_Op::Nop,"scalar promotion not erased");
+ scalar.instructions={promote,inst(LIR_Op::Return,UINT32_MAX,1)};
+ CHECK(!eliminate_proven_scalar_promotions(scalar),"undefined scalar promotion erased");
+ promote.a=0; scalar.instructions={promote,inst(LIR_Op::Return,UINT32_MAX,0)};
+ CHECK(!eliminate_proven_scalar_promotions(scalar),"erased parameter promotion erased");
+ auto conditional=inst(LIR_Op::JumpIf,UINT32_MAX,0); conditional.imm=1;
+ auto jump=inst(LIR_Op::Jump); jump.imm=2;
+ auto left=inst(LIR_Op::Label); left.imm=1;
+ auto join=inst(LIR_Op::Label); join.imm=2;
+ promote.a=1;
+ scalar.instructions={conditional,constant,jump,left,inst(LIR_Op::Mov,1,0),join,promote,inst(LIR_Op::Return,UINT32_MAX,1)};
+ CHECK(!eliminate_proven_scalar_promotions(scalar),"mixed CFG scalar/unknown promotion erased");
+ promote.imm=999;
+ scalar.instructions={constant,promote,inst(LIR_Op::Return,UINT32_MAX,1)};
+ bool invalid_target_rejected=false;
+ try { Optimizer optimizer(scalar); optimizer.optimize(); }
+ catch (const std::exception&) { invalid_target_rejected=true; }
+ CHECK(invalid_target_rejected,"scalar promotion hid an invalid region target");
+
+ LIR_Function frame("frame_view",0); frame.register_count=3;
+ frame.instructions={inst(LIR_Op::NewFrame,0),inst(LIR_Op::FrameGetField,1,0,1),inst(LIR_Op::FrameGetField,2,0,0)};
+ RuntimeEffectAnalysis frame_effects({&frame});
+ CHECK(prove_frame_views(frame,{&frame},frame_effects).cached.count(2),"fresh frame view not reused");
+ frame.instructions.insert(frame.instructions.begin()+2,inst(LIR_Op::FrameSetField,0,0,1));
+ CHECK(prove_frame_views(frame,{&frame},frame_effects).cached.empty(),"frame mutation barrier ignored");
+ frame.instructions.erase(frame.instructions.begin()+2);
+ frame.instructions.erase(frame.instructions.begin()); frame.param_count=1;
+ CHECK(prove_frame_views(frame,{&frame},frame_effects).cached.empty(),"borrowed frame assumed unpublished");
+
+ LIR_Function slice("slice_proof",4); slice.register_count=6;
+ auto substring=inst(LIR_Op::CallBuiltin,4); substring.func_name="_builtin_substring"; substring.call_args={0,1,2};
+ slice.instructions={substring,inst(LIR_Op::CmpEQ,5,4,3),inst(LIR_Op::Return,UINT32_MAX,5)};
+ CHECK(prove_substring_comparisons(slice).count(0),"substring comparison not fused");
+ slice.instructions[0].ownership.consumes={1};
+ CHECK(prove_substring_comparisons(slice).empty(),"substring ownership transition eliminated");
+ slice.instructions[0].ownership.consumes.clear();
+ slice.instructions.push_back(inst(LIR_Op::Return,UINT32_MAX,4));
+ CHECK(prove_substring_comparisons(slice).empty(),"escaped substring eliminated");
+ slice.instructions.pop_back(); slice.instructions.insert(slice.instructions.begin()+1,inst(LIR_Op::CallIndirect,5));
+ CHECK(prove_substring_comparisons(slice).empty(),"substring call barrier ignored");
+ }
 
  {
  auto fn = std::make_shared<LIRFunction>("registration_memory_contract",

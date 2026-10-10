@@ -1,5 +1,10 @@
 # Runtime memory ownership
 
+Current ABI/version rules are in [abi.md](abi.md); measured costs, builtin paths,
+proof conditions and unfinished optimizations are in
+[native-optimization.md](native-optimization.md). The dated results below are
+historical observations, not proof of current full memory safety or performance.
+
 The VM identifies each region entry by a fresh invocation ID. Lexical IDs remain
 in the existing LIR `imm` operand: recursion cannot reuse an active region's
 allocation bucket. `RegionMove` promotes a reachable object graph to an active
@@ -23,7 +28,7 @@ objects and publish escaping graphs to parent ownership. Published objects
 remain alive until parent teardown; this is deliberately conservative.
 
 Native modules use the existing host helper table for allocation registration
-and region operations. A `runtime_semantics=regions-v2` metadata marker prevents
+and region operations. The `runtime_semantics=lymar-0.0.1-abi1-lir1-ownership-nullable` metadata marker prevents
 reuse of modules emitted with the old region convention. Object layout and
 native API versions are unchanged.
 
@@ -156,7 +161,7 @@ loading and bridge costs. Earlier benchmark code ignored process failures,
 did not validate results or native dispatch, and estimated timing phases, so
 its historical numbers cannot establish a valid performance regression.
 
-The `regions-v2` metadata marker deliberately invalidates older precompiled
+The runtime-semantics metadata marker deliberately invalidates older precompiled
 artifacts whose ownership behavior is incompatible. Rebuild those modules against
 the current runtime; reusing old binaries would bypass the memory corrections.
 
