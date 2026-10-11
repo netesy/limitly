@@ -1221,8 +1221,15 @@ std::shared_ptr<::Type> Generator::convert_ast_type_to_lir_type(const std::share
         return std::make_shared<::Type>(::TypeTag::Tuple, tt);
     }
     
-    // Convert AST type to LIR type
+    // Use the type checker's resolved aliases rather than treating an alias
+    // spelling as an opaque pointer in parameter and arithmetic lowering.
     std::string typeName = ast_type->typeName;
+    if (type_system_) {
+        auto resolved = type_system_->getType(typeName);
+        if (resolved && resolved->tag != ::TypeTag::Nil) return resolved;
+        if (auto alias = type_system_->resolveTypeAlias(typeName)) return alias;
+    }
+    // Convert AST type to LIR type
     if (ast_type->isPrimitive || typeName == "int" || typeName == "uint" ||
         typeName == "float" || typeName == "bool" || typeName == "str" ||
         typeName == "string" || typeName == "void") {

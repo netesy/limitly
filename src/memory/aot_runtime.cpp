@@ -996,6 +996,116 @@ uint64_t lymar_aot_scalar_to_string(uint64_t value, uint64_t kind) {
         return 0;
     }
 }
+// Erased scalar arguments must become strings before the generated formatter
+// inspects object layouts. A float box is not a list, and a Boolean is not an
+// integer. Compound objects retain their existing formatting path.
+uint64_t lymar_aot_format_argument(uint64_t value, uint64_t kind) {
+    try {
+        RuntimeGuard guard;
+        if (!lymar_aot_is_object(value, kind) || lymar_aot_is_nil(value, kind))
+            return lymar_aot_scalar_to_string(value, kind);
+        auto type = read_word(value) & 0xffffffff;
+        if ((type >= 5 && type <= 9) || integer_number(value, kind))
+            return lymar_aot_scalar_to_string(value, kind);
+        return value;
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth || !heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+uint64_t lymar_aot_float_to_string(double value) {
+    try {
+        RuntimeGuard guard;
+        char text[64];
+        auto length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%.6g", value));
+        auto pointer = lymar_aot_alloc(24 + length + 1);
+        Word header[] = {11, length, length};
+        std::memcpy(reinterpret_cast<void*>(pointer), header, sizeof(header));
+        std::memcpy(reinterpret_cast<void*>(pointer + 24), text, length + 1);
+        return pointer;
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth || !heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+uint64_t lymar_aot_float_bits_to_string(uint64_t bits) {
+    double number;
+    std::memcpy(&number, &bits, sizeof(number));
+    return lymar_aot_float_to_string(number);
+}
+uint64_t lymar_aot_tuple_length(uint64_t pointer, uint64_t kind) {
+    try {
+        RuntimeGuard guard;
+        if (!lymar_aot_is_object(pointer, kind)) return 0;
+        auto record = heap().allocations.find(pointer);
+        if (record == heap().allocations.end() || record->second.size < 32)
+            throw std::runtime_error("Invalid or expired tuple receiver");
+        return (read_word(pointer) & 0xffffffff) == 3 ? read_word(pointer, 16) : 0;
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth || !heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+uint64_t lymar_aot_string_hash(uint64_t value, uint64_t kind) {
+    try {
+        RuntimeGuard guard;
+        if (!lymar_aot_string_receiver(value, kind))
+            throw std::runtime_error("_builtin_string_hash_bytes expects str");
+        Word hash = 5381, length = read_word(value, 8);
+        auto* bytes = reinterpret_cast<const unsigned char*>(value + 24);
+        for (Word index = 0; index < length; ++index) hash = (hash * 33 + bytes[index]) % 2147483647;
+        return hash;
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth || !heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
+uint64_t lymar_aot_list_slice(uint64_t value, uint64_t start, uint64_t end,
+                              uint64_t kind, uint64_t start_kind, uint64_t end_kind) {
+    try {
+        RuntimeGuard guard;
+        auto& h = heap();
+        Word source = 0, count = 0;
+        if (!lymar_aot_is_nil(value, kind)) {
+            auto record = h.allocations.find(value);
+            if (kind != object_kind || record == h.allocations.end() ||
+                record->second.size < 32 || (read_word(value) & 0xffffffff) != 1)
+                throw std::runtime_error("_builtin_list_slice expects list");
+            source = read_word(value, 8); count = read_word(value, 16);
+            auto data = h.allocations.find(source);
+            if (data == h.allocations.end() || count > data->second.size / sizeof(Word))
+                throw std::runtime_error("Invalid list elements allocation");
+        }
+        auto first = static_cast<int64_t>(lymar_aot_string_index(start, start_kind));
+        auto last = static_cast<int64_t>(lymar_aot_string_index(end, end_kind));
+        Word begin = std::min(count, static_cast<Word>(std::max<int64_t>(0, first)));
+        Word limit = std::min(count, static_cast<Word>(std::max<int64_t>(0, last)));
+        Word length = limit > begin ? limit - begin : 0;
+        auto pointer = lymar_aot_alloc(32);
+        auto elements = lymar_aot_alloc(std::max<Word>(1, length) * sizeof(Word));
+        Word header[] = {1, elements, length, std::max<Word>(1, length)};
+        std::memcpy(reinterpret_cast<void*>(pointer), header, sizeof(header));
+        lymar_aot_edge(pointer + 8, elements, object_kind);
+        for (Word index = 0; index < length; ++index) {
+            auto address = source + (begin + index) * sizeof(Word);
+            auto copied = read_word(address);
+            auto found = h.shadow.find(address);
+            Word mode = found == h.shadow.end() ? 0 : found->second;
+            std::memcpy(reinterpret_cast<void*>(elements + index * sizeof(Word)), &copied, sizeof(copied));
+            lymar_aot_edge(elements + index * sizeof(Word), copied, mode);
+        }
+        h.return_pointer = object_kind;
+        return pointer;
+    } catch (const std::exception& failure) {
+        if (runtime_lock_depth || !heap().worker) throw;
+        if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
+        return 0;
+    }
+}
 // LoadConst strings are copied into the current region, just as the VM copies
 // managed constants into its tracked heap. Static linker storage is never freed.
 uint64_t lymar_aot_copy_constant(uint64_t source, uint64_t size) {

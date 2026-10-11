@@ -59,6 +59,12 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_boolean", 1, i64);
     declare("lymar_aot_print_float", 1, void_type, ctx->getDoubleType());
     declare("lymar_aot_scalar_to_string", 2, i64);
+    declare("lymar_aot_format_argument", 2, i64);
+    declare("lymar_aot_float_to_string", 1, i64, ctx->getDoubleType());
+    declare("lymar_aot_float_bits_to_string", 1, i64);
+    declare("lymar_aot_tuple_length", 2, i64);
+    declare("lymar_aot_string_hash", 2, i64);
+    declare("lymar_aot_list_slice", 6, i64);
     declare("lymar_aot_box_float", 1, i64, ctx->getDoubleType());
     declare("lymar_aot_to_float", 2, ctx->getDoubleType());
     declare("lymar_aot_to_integer", 2, i64);
@@ -209,7 +215,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         inst->replaceAllUsesWith(call.get());
                         inst = call.get();
                         *it = std::move(call);
-                        if (name == "lymar_aot_channel_new" || name == "lymar_aot_scheduler_new" || name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_scalar_to_string") flags[inst] = one;
+                        if (name == "lymar_aot_channel_new" || name == "lymar_aot_scheduler_new" || name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_list_slice" || name == "lymar_aot_format_argument" || name == "lymar_aot_scalar_to_string" || name == "lymar_aot_float_to_string" || name == "lymar_aot_float_bits_to_string") flags[inst] = one;
                         if (name == "lymar_aot_boolean") flags[inst] = boolean;
                         if (name == "lymar_aot_callable_receiver") flags[inst] = one;
                     }
@@ -263,7 +269,10 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         checked->setName(inst->getName());
                         inst->replaceAllUsesWith(checked.get());
                         *it = std::move(checked);
-                    } else if (callee && (callee->getName() == "lymar_aot_string_index" || callee->getName() == "lymar_aot_callable_receiver" || callee->getName() == "lymar_aot_is_nil" || callee->getName() == "lymar_aot_is_object" || callee->getName() == "lymar_aot_is_print_object" || callee->getName() == "lymar_aot_to_float" || callee->getName() == "lymar_aot_to_integer" || callee->getName() == "lymar_aot_to_boolean" || callee->getName() == "lymar_aot_print_integer" || callee->getName() == "lymar_aot_scalar_to_string")) {
+                    } else if (callee && callee->getName() == "lymar_aot_list_slice") {
+                        for (size_t argument = 1; argument <= 3; ++argument)
+                            current_operands[argument + 3]->set(flag(current_operands[argument]->get()));
+                    } else if (callee && (callee->getName() == "lymar_aot_string_hash" || callee->getName() == "lymar_aot_tuple_length" || callee->getName() == "lymar_aot_string_index" || callee->getName() == "lymar_aot_callable_receiver" || callee->getName() == "lymar_aot_is_nil" || callee->getName() == "lymar_aot_is_object" || callee->getName() == "lymar_aot_is_print_object" || callee->getName() == "lymar_aot_to_float" || callee->getName() == "lymar_aot_to_integer" || callee->getName() == "lymar_aot_to_boolean" || callee->getName() == "lymar_aot_print_integer" || callee->getName() == "lymar_aot_scalar_to_string" || callee->getName() == "lymar_aot_format_argument")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));
                     } else if (callee && (callee->getName() == "lymar_aot_raw_alloc" || callee->getName() == "lymar_aot_raw_free")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));

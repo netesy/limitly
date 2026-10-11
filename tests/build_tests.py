@@ -1,277 +1,88 @@
 #!/usr/bin/env python3
-import sys
-import os
-import subprocess
-import time
-import difflib
+"""Run every canonical language test through real VM and Fyra execution.
+
+No VM failures are silently skipped. Artifacts are isolated from source files,
+and an optional JSON report preserves each stage's output for diagnosis.
+"""
 import argparse
+from collections import Counter
+import difflib
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
+import time
 
-# Add project root and script directory to sys.path to allow imports
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.dirname(script_dir)
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
-if script_dir not in sys.path:
-    sys.path.insert(0, script_dir)
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tests"))
+from run_tests import tests, lymar_path
 
-try:
-    from tests.run_tests import tests, slow_tests, lymar_path
-except ImportError:
-    # Fallback/Direct import if run_tests is in the current directory
-    from run_tests import tests, slow_tests, lymar_path
 
-parser = argparse.ArgumentParser(description="Run Lymar AOT Validation Tests")
-parser.add_argument(
-    "-target", "--target",
-    default=None,
-    choices=["windows", "linux", "macos"],
-    help="Target platform to build and validate for (windows, linux, macos)"
-)
-args = parser.parse_args()
-
-# Target platform detection
-if args.target:
-    target_platform = args.target.lower()
-elif os.name == 'nt':
-    target_platform = "windows"
-elif sys.platform == 'darwin':
-    target_platform = "macos"
-else:
-    target_platform = "linux"
-
-total = 0
-passed = 0
-failed = 0
-build_failures = 0
-runtime_failures = 0
-output_mismatches = 0
-timeouts = 0
-
-print("====================================================")
-print(f"Running Lymar AOT Validation Tests ({target_platform.upper()})")
-print("====================================================")
-
-for test in tests:
-    test_path = os.path.normpath(test)
-    if not os.path.exists(test_path):
-        print(f"Skipping {test_path} (does not exist)")
-        continue
-
-    total += 1
-    print(f"Testing {test_path}...")
-
-    # 1. Run the test with the interpreter to get the expected output
+def execute(command, env):
+    started = time.monotonic()
     try:
-        interpreter_res = subprocess.run(
-            [lymar_path, "run", test_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=30.0
-        )
-        expected_stdout = interpreter_res.stdout
-        expected_stderr = interpreter_res.stderr
-        expected_exit_code = interpreter_res.returncode
-    except subprocess.TimeoutExpired:
-        # If the interpreter itself times out, we cannot validate.
-        print(f"  [SKIPPED] Interpreter timed out on {test_path}")
-        total -= 1
-        continue
-    except Exception as e:
-        print(f"  [SKIPPED] Interpreter failed to run {test_path}: {e}")
-        total -= 1
-        continue
+        result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True,
+                                text=True, timeout=30)
+        return dict(code=result.returncode, out=result.stdout, err=result.stderr,
+                    seconds=time.monotonic() - started)
+    except subprocess.TimeoutExpired as error:
+        def decode(value):
+            return value.decode(errors="replace") if isinstance(value, bytes) else value or ""
+        return dict(code=None, out=decode(error.stdout), err=decode(error.stderr),
+                    seconds=time.monotonic() - started)
+    except OSError as error:
+        return dict(code=None, out="", err=str(error), seconds=time.monotonic() - started)
 
-    # 2. Determine platform-specific executable name
-    output_bin = test_path[:-3] # remove '.lm'
-    if target_platform == 'windows' or os.name == 'nt':
-        output_bin += ".exe"
-    output_bin = os.path.abspath(output_bin)
 
-    # 3. Build using Fyra backend
-    build_cmd = [
-        lymar_path, "build",
-        "-target", target_platform,
-        "-O", "2",
-        "-o", output_bin,
-        test_path
-    ]
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("-target", "--target", choices=("windows", "linux", "macos"),
+                        default="windows" if os.name == "nt" else "macos" if sys.platform == "darwin" else "linux")
+    parser.add_argument("--levels", nargs="+", type=int, choices=(0, 1, 2), default=(0, 1, 2))
+    parser.add_argument("--tests", nargs="+", help="Explicit source paths; defaults to the entire canonical suite")
+    parser.add_argument("--report", type=Path, help="Write stage results to this JSON path after every case")
+    args = parser.parse_args()
+    env = dict(os.environ)
+    records = []
+    with tempfile.TemporaryDirectory(prefix="lymar-fyra-parity-") as directory:
+        for number, source in enumerate(args.tests or tests):
+            vm = execute([lymar_path, "run", source], env)
+            for level in args.levels:
+                record = dict(source=source, level=level, vm=vm)
+                if vm["code"] != 0:
+                    record["status"] = "vm_failure"
+                else:
+                    output = str(Path(directory) / (f"program-{number}-{level}" + (".exe" if args.target == "windows" else "")))
+                    build = execute([lymar_path, "build", "-target", args.target,
+                                     "-O", str(level), "-o", output, source], env)
+                    record["build"] = build
+                    if build["code"] != 0 or not Path(output).is_file():
+                        record["status"] = "build_failure"
+                    else:
+                        native = execute([output], env)
+                        record["native"] = native
+                        expected = (vm["code"], vm["out"], vm["err"])
+                        actual = (native["code"], native["out"], native["err"])
+                        record["status"] = "pass" if actual == expected else "execution_difference"
+                records.append(record)
+                print(f"{source} O{level}: {record['status']}", flush=True)
+                if record["status"] != "pass":
+                    result = record.get("native", record.get("build", vm))
+                    print(f"  exit={result['code']} ({result['seconds']:.3f}s)", flush=True)
+                    if result["err"]:
+                        print(result["err"], flush=True)
+                    if "native" in record:
+                        print("".join(difflib.unified_diff(vm["out"].splitlines(True),
+                                                         result["out"].splitlines(True),
+                                                         fromfile="VM", tofile=f"Fyra O{level}")), flush=True)
+                if args.report:
+                    args.report.write_text(json.dumps(records, indent=2) + "\n")
+    counts = Counter(record["status"] for record in records)
+    print(f"{len(records)} executions: {dict(counts)}")
+    return 0 if counts["pass"] == len(records) and records else 1
 
-    build_success = False
-    try:
-        build_res = subprocess.run(
-            build_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=30.0
-        )
-        if build_res.returncode == 0 and os.path.exists(output_bin):
-            build_success = True
-        else:
-            build_reason = f"lymar build exited with code {build_res.returncode}"
-            build_stdout = build_res.stdout
-            build_stderr = build_res.stderr
-    except subprocess.TimeoutExpired:
-        build_reason = "lymar build timed out (30s limit)"
-        build_stdout = ""
-        build_stderr = ""
-    except Exception as e:
-        build_reason = f"lymar build failed to execute: {e}"
-        build_stdout = ""
-        build_stderr = ""
 
-    if not build_success:
-        print(f"  [FAIL] Build Failed: {test_path}")
-        print(f"  Reason: {build_reason}")
-        if build_stdout:
-            print("  --- Build STDOUT ---")
-            print(build_stdout)
-        if build_stderr:
-            print("  --- Build STDERR ---")
-            print(build_stderr)
-        build_failures += 1
-        failed += 1
-        continue
-
-    # 4. Execute the generated binary
-    actual_stdout = ""
-    actual_stderr = ""
-    actual_exit_code = -1
-    run_timeout = False
-    run_exception = None
-
-    # Setup execution environment and command
-    run_env = os.environ.copy()
-    if target_platform == "windows" and os.name != "nt":
-        run_cmd = ["wine", output_bin]
-        run_env["WINEDEBUG"] = "-all"
-    else:
-        run_cmd = [output_bin]
-
-    try:
-        # Enforce maximum runtime of 30 seconds
-        run_res = subprocess.run(
-            run_cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            timeout=30.0,
-            env=run_env
-        )
-        actual_stdout = run_res.stdout
-        actual_stderr = run_res.stderr
-        actual_exit_code = run_res.returncode
-
-        # Measure binary size metrics for AOT size tracking
-        bin_size = os.path.getsize(output_bin)
-        print(f"  [METRICS] Binary size: {bin_size} B (~{bin_size / 1024:.1f} KB)")
-    except subprocess.TimeoutExpired:
-        run_timeout = True
-    except Exception as e:
-        run_exception = e
-
-    # Clean up generated executable
-    if os.path.exists(output_bin):
-        try:
-            os.remove(output_bin)
-        except Exception:
-            pass
-
-    # 5. Validation and Reporting
-    if run_timeout:
-        print(f"  [FAIL] Timeout: {test_path}")
-        print("  Reason: Executable exceeded maximum runtime of 30 seconds")
-        timeouts += 1
-        failed += 1
-        continue
-
-    if run_exception:
-        print(f"  [FAIL] Runtime Failure: {test_path}")
-        print(f"  Reason: Failed to execute binary: {run_exception}")
-        runtime_failures += 1
-        failed += 1
-        continue
-
-    if actual_exit_code != 0:
-        print(f"  [FAIL] Runtime Failure: {test_path}")
-        print(f"  Reason: Executable exited with non-zero status code: {actual_exit_code}")
-        print("  Expected Output:")
-        print(expected_stdout)
-        print("  Actual Output:")
-        print(actual_stdout)
-        if actual_stderr:
-            print("  Actual STDERR:")
-            print(actual_stderr)
-        runtime_failures += 1
-        failed += 1
-        continue
-
-    # Check exact match for stdout and stderr
-    stdout_match = (actual_stdout == expected_stdout)
-    stderr_match = (actual_stderr == expected_stderr)
-
-    if stdout_match and stderr_match:
-        print(f"  [PASS] {test_path}")
-        passed += 1
-    else:
-        print(f"  [FAIL] Output Mismatch: {test_path}")
-        print(f"  Exit code: {actual_exit_code}")
-
-        # Determine specific failure reason
-        if not stdout_match and not stderr_match:
-            print("  Reason: Standard output and standard error mismatches")
-        elif not stdout_match:
-            print("  Reason: Standard output mismatch")
-        else:
-            print("  Reason: Standard error mismatch")
-
-        print("  Expected Output:")
-        print(expected_stdout)
-        print("  Actual Output:")
-        print(actual_stdout)
-
-        # Show unified diffs
-        if not stdout_match:
-            print("  --- STDOUT Diff (Expected vs Actual) ---")
-            expected_lines = expected_stdout.splitlines(keepends=True)
-            actual_lines = actual_stdout.splitlines(keepends=True)
-            diff = difflib.unified_diff(
-                expected_lines,
-                actual_lines,
-                fromfile="expected_stdout",
-                tofile="actual_stdout"
-            )
-            print("".join(diff))
-
-        if not stderr_match:
-            print("  --- STDERR Diff (Expected vs Actual) ---")
-            expected_lines = expected_stderr.splitlines(keepends=True)
-            actual_lines = actual_stderr.splitlines(keepends=True)
-            diff = difflib.unified_diff(
-                expected_lines,
-                actual_lines,
-                fromfile="expected_stderr",
-                tofile="actual_stderr"
-            )
-            print("".join(diff))
-
-        output_mismatches += 1
-        failed += 1
-
-print("\n====================================================")
-print(f"AOT Validation Summary ({target_platform.upper()}):")
-print("====================================================")
-print(f"Total tests:       {total}")
-print(f"Passed:            {passed}")
-print(f"Failed:            {failed}")
-print(f"  Build failures:  {build_failures}")
-print(f"  Runtime failures:{runtime_failures}")
-print(f"  Output mismatches:{output_mismatches}")
-print(f"  Timeouts:        {timeouts}")
-print("====================================================")
-
-if failed > 0:
-    sys.exit(1)
-else:
-    sys.exit(0)
+if __name__ == "__main__":
+    sys.exit(main())

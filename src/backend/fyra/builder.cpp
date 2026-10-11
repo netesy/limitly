@@ -210,7 +210,8 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         auto it = lir_func.register_language_types.find(i);
         if (it != lir_func.register_language_types.end() && it->second) {
             if (it->second->tag == ::TypeTag::Float64 || it->second->tag == ::TypeTag::Float32) pty = context_->getDoubleType();
-        } else {
+        }
+        {
             auto it2 = lir_func.register_types.find(i);
             if (it2 != lir_func.register_types.end() && (it2->second == LIR::Type::F64 || it2->second == LIR::Type::F32)) {
                 pty = context_->getDoubleType();
@@ -243,7 +244,8 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
             auto it = f->register_language_types.find(i);
             if (it != f->register_language_types.end() && it->second) {
                 if (it->second->tag == ::TypeTag::Float64 || it->second->tag == ::TypeTag::Float32) pty = context_->getDoubleType();
-            } else {
+            }
+            {
                 auto it2 = f->register_types.find(i);
                 if (it2 != f->register_types.end() && (it2->second == LIR::Type::F64 || it2->second == LIR::Type::F32)) {
                     pty = context_->getDoubleType();
@@ -464,8 +466,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         return false;
     };
 
+    std::unordered_set<uint32_t> reassigned_parameters;
     size_t max_reg = lir_func.register_count;
     for (const auto& inst : lir_func.instructions) {
+        if (inst.dst < lir_func.param_count) reassigned_parameters.insert(inst.dst);
         if (inst.dst != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.dst);
         // Scheduler cores and deadline are immediate configuration, not
         // register operands. A duration must never size the register frame.
@@ -519,9 +523,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
     auto load_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
         // Use a dominating SSA value within its defining block. This also avoids
-        // redundant store/load pairs for parameters and straight-line expressions.
+        // redundant store/load pairs for immutable parameters and straight-line
+        // expressions. Mutable parameters need their slot at CFG joins/loops;
+        // the original SSA argument does not reflect later assignments.
         if (regs.count(r) && register_definitions.count(r) &&
-            (!register_definitions[r] || register_definitions[r] == builder_->getInsertPoint())) {
+            ((!register_definitions[r] && !reassigned_parameters.count(r)) ||
+             register_definitions[r] == builder_->getInsertPoint())) {
             return regs[r];
         }
         if (reg_slots.count(r)) {
@@ -570,10 +577,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     };
 
     auto load_float_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
-        LIR::Type actual_t = (reg_types.count(r) ? reg_types[r] : t);
-        if (actual_t == LIR::Type::F64 || actual_t == LIR::Type::F32) {
-            return load_reg(r, LIR::Type::F64);
-        }
+        // Cached SSA values may be erased even when the source register is
+        // numerically typed. Convert the actual value, not just its annotation.
         ir::Value* v = load_reg(r, t);
         if (v && v->getType()->isIntegerTy()) {
             return builder_->createExternCall("lymar_aot_to_float", {v, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getDoubleType());
@@ -583,6 +588,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
     auto store_float_reg = [&](uint32_t r, ir::Value* fval) {
         store_reg(r, fval, LIR::Type::F64);
+    };
+
+    auto lower_runtime_builtin = [&](const std::string& name, const std::vector<ir::Value*>& args) -> ir::Value* {
+        auto* zero = context_->getConstantInt(context_->getIntegerType(64), 0);
+        if (name == "_builtin_string_hash_bytes" && args.size() == 1)
+            return builder_->createExternCall("lymar_aot_string_hash", {erased_word(args[0]), zero},
+                context_->getIntegerType(64));
+        if (name == "_builtin_list_slice" && args.size() == 3)
+            return builder_->createExternCall("lymar_aot_list_slice",
+                {erased_word(args[0]), erased_word(args[1]), erased_word(args[2]), zero, zero, zero},
+                context_->getIntegerType(64));
+        return nullptr;
     };
 
     bool terminated = false;
@@ -1133,6 +1150,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                 }
 
+                if (auto* value = lower_runtime_builtin(name, args)) {
+                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, value, inst.result_type);
+                    break;
+                }
                 if (name == "print") {
                     for (size_t ai = 0; ai < args.size(); ++ai) {
                         if (ai > 0) {
@@ -1558,6 +1579,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 std::vector<ir::Value*> args;
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
 
+                if (auto* value = lower_runtime_builtin(name, args)) {
+                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, value, inst.result_type);
+                    break;
+                }
                 if (name == "print") {
                     for (size_t ai = 0; ai < args.size(); ++ai) {
                         if (ai > 0) {
@@ -1819,11 +1844,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     value_arg = FyraBuiltinFunctions::emit_decimal_to_str_inline(current_module_.get(), builder_.get(), value_arg, reg_decimal_scales[inst.b]);
                 } else if (b_type == LIR::Type::Bool) {
                     value_arg = FyraBuiltinFunctions::emit_bool_to_str_inline(current_module_.get(), builder_.get(), value_arg);
-                } else if (b_type != LIR::Type::Ptr) {
-                    used_builtins_.insert("lm_to_string");
-                    ir::Function* fn_to_str = current_module_->getFunction("lm_to_string");
-                    if (!fn_to_str) fn_to_str = builder_->createFunction("lm_to_string", context_->getPointerType(context_->getIntegerType(8)), {context_->getIntegerType(64)});
-                    value_arg = builder_->createCall(fn_to_str, {value_arg});
+                } else {
+                    value_arg = builder_->createExternCall("lymar_aot_format_argument",
+                        {erased_word(value_arg), context_->getConstantInt(context_->getIntegerType(64), 0)},
+                        context_->getIntegerType(64));
                 }
                 LIR::Type res_t = (inst.result_type != LIR::Type::Void) ? inst.result_type : LIR::Type::Ptr;
                 store_reg(inst.dst, builder_->createCall(fn, {fmt_arg, value_arg}, lir_type_to_fyra_type(res_t)), res_t);
@@ -1968,8 +1992,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             }
             case LIR::LIR_Op::TupleLen: {
-                // tuple length is stored at offset 0
-                ir::Value* len = builder_->createLoad(load_reg(inst.a, inst.type_a));
+                // Canonical tuple header: kind, elements, size, capacity.
+                ir::Value* len = builder_->createExternCall("lymar_aot_tuple_length",
+                    {load_reg(inst.a, inst.type_a), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
                 store_reg(inst.dst, len, inst.result_type);
                 break;
             }

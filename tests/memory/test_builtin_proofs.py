@@ -49,6 +49,18 @@ assert(tuple_at(1073741824)==nil);
 fn decimal_return():float { return 2.5; }
 var decimal_alias=decimal_return;
 assert(decimal_alias()==2.5);
+fn sliced(source:any, first:any, last:any):[any] { return _builtin_list_slice(source,first,last); }
+assert(len(sliced(nil,0,2))==0);
+assert(len(sliced([1,2,3],-1,2))==2);
+assert(len(sliced([1,2,3],2,1))==0);
+assert(len(sliced([1,2,3],100,101))==0);
+assert(sliced([1,2,3],1.75,3)[0]==2);
+assert(sliced([1,2,3],true,2)[0]==1);
+fn escaped_slice():[any] { var values=["A","B"];return sliced(values,0,2); }
+var kept=escaped_slice(); assert(kept[0]=="A" and kept[1]=="B");
+assert(_builtin_string_hash_bytes("")==5381);
+assert(_builtin_string_hash_bytes("A")==177638);
+assert(_builtin_string_hash_bytes("A\0B")==193447848);
 print("BUILTIN_BOUNDS_OK");
 '''
 MODULE = r'''
