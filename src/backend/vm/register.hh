@@ -54,13 +54,17 @@ public:
     // Native modules share tagged heap objects and the caller's ownership region.
     void register_native_allocation(RegisterValue value);
     LmFrame* checked_frame(RegisterValue value, uint32_t index);
+    void update_atomic_frame(RegisterValue receiver, uint32_t index, RegisterValue value, bool subtract);
     void transfer_native_ownership(RegisterValue child, RegisterValue container) {
         transfer_ownership(child, container);
     }
 
     uint64_t borrow_memory(RegisterValue value, bool writable);
     RegisterValue resolve_memory(uint64_t token, bool writable);
-    void release_memory_borrow(uint64_t token) { memory_lifetimes_.end_borrow(token); }
+    void release_memory_borrow(uint64_t token) {
+        std::lock_guard<std::recursive_mutex> lock(heap_mutex_);
+        memory_lifetimes_.end_borrow(token);
+    }
     void consume_memory(RegisterValue value);
     uint64_t move_memory_reference(uint64_t token, uint32_t lexical);
     size_t live_allocation_count() const { return vm_allocation_types.size(); }

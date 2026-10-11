@@ -209,7 +209,7 @@ private:
     
     // Loop helper methods
     void emit_traditional_for_loop(LM::Frontend::AST::ForStatement& stmt);
-    Reg emit_checked_dereference(LM::Frontend::AST::Expression& object, Reg value);
+    Reg emit_checked_dereference(LM::Frontend::AST::Expression& object, Reg value, bool writable = false, bool nullable = false);
     Reg emit_index_expr(LM::Frontend::AST::IndexExpr& expr);
     Reg emit_member_expr(LM::Frontend::AST::MemberExpr& expr);
     Reg emit_member_access_with_obj(LM::Frontend::AST::MemberExpr& expr, Reg object_reg);
@@ -289,6 +289,9 @@ private:
     uint64_t parse_grace_period(const std::string& grace_str);
     
     // Error reporting
+    bool is_atomic_binding(const LM::Frontend::AST::Node& node) const;
+    Reg atomic_cell(const std::string& name);
+    Reg atomic_read(Reg cell);
     void report_error(const std::string& message);
     
     // Member variables
@@ -401,6 +404,7 @@ private:
     void enter_concurrency_context() { concurrency_nesting_level_++; }
     void exit_concurrency_context() { concurrency_nesting_level_--; }
     bool is_in_concurrency_context() const { return concurrency_nesting_level_ > 0; }
+    void remap_task_captures();
 
     // Frame system support (modern OOP)
     struct FrameInfo {

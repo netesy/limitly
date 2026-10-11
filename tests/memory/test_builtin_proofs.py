@@ -54,12 +54,17 @@ print("BUILTIN_BOUNDS_OK");
 MODULE = r'''
 frame Pair { pub var a:int; pub var b:int; pub init(){self.a=3;self.b=4;} }
 frame Holder { pub var item:Pair?; pub init(){self.item=nil;} }
+frame PairSource { pub var item:Pair; pub init(){self.item=Pair();} pub fn get():Pair{return self.item;} }
 fn retain(holder:Holder, value:Pair) { holder.item=value; }
 pub fn published_reads():int { var p=Pair(); var holder=Holder(); retain(holder,p); var z=p.b; return z+p.b; }
 pub fn fresh_reads():int { var p=Pair(); var z=p.b; return z+p.b; }
 fn change(p:Pair) { p.b=9; }
 pub fn mutation_barrier():int { var p=Pair(); var z=p.b; change(p); return z+p.b; }
 pub fn borrowed(p:Pair):int { var z=p.b; return z+p.b; }
+pub fn borrowed_mutation(p:Pair):int { var z=p.b; change(p); return z+p.b; }
+pub fn resolved_reads(source:PairSource):int {var p=source.get();var z=p.b;return z+p.a;}
+pub fn resolved_mutation(source:PairSource):int {var p=source.get();var z=p.b;p.b=9;return z+p.b;}
+pub fn branch_reads(p:Pair, flag:bool):int {var z=p.b;if(flag){z=z+1;}return z+p.b;}
 pub fn ignored(argument:any):int { return 2; }
 pub fn byte(text:any,index:any):int { return _builtin_string_byte_at(text,index); }
 pub fn same_slice(text:any, start:any, end:any, needle:any):bool {
@@ -99,7 +104,9 @@ class BuiltinProofTests(unittest.TestCase):
             check.write_text(f'''import build.{name}.{name} as p;
 assert(p.fresh_reads()==8); assert(p.mutation_barrier()==13);
 assert(p.published_reads()==8);
-assert(p.borrowed(p.Pair())==8); assert(p.ignored([1,2])==2);
+assert(p.borrowed(p.Pair())==8); assert(p.borrowed_mutation(p.Pair())==13); assert(p.ignored([1,2])==2);
+assert(p.resolved_reads(p.PairSource())==7);assert(p.resolved_mutation(p.PairSource())==13);
+assert(p.branch_reads(p.Pair(),true)==9);
 assert(p.byte("A",1073741824)==0); assert(p.byte("A",-1)==0);
 assert(p.byte(8,0)==0); assert(p.byte(nil,0)==0); assert(p.byte([65],0)==0);
 assert(p.byte("ABC",1.75)==66); assert(p.byte("ABC","1")==65); assert(p.byte("ABC",1e100)==65);
@@ -127,7 +134,11 @@ print("HOSTED_PROOFS_OK");''')
                         def body(function):
                             return text.split('// build.'+name+'.'+name+'.'+function+'\n',1)[1].split('\n// ',1)[0]
                         self.assertRegex(body('fresh_reads'), r'=scope.track\(frame_view_\d+\[1\]\)')
-                        self.assertNotRegex(body('borrowed'), r'=scope.track\(frame_view_')
+                        self.assertRegex(body('borrowed'), r'=scope.track\(frame_view_')
+                        self.assertNotRegex(body('borrowed_mutation'), r'=scope.track\(frame_view_')
+                        self.assertRegex(body('resolved_reads'), r'=scope.track\(frame_view_')
+                        self.assertNotRegex(body('resolved_mutation'), r'=scope.track\(frame_view_')
+                        self.assertNotRegex(body('branch_reads'), r'=scope.track\(frame_view_')
                         self.assertNotRegex(body('mutation_barrier'), r'=scope.track\(frame_view_')
                         self.assertNotRegex(body('published_reads'), r'=scope.track\(frame_view_')
                         self.assertIn('substring_equal(api,ctx,',body('same_slice'))

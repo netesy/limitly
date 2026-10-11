@@ -1,5 +1,7 @@
 #define BUILDING_RUNTIME
 #include "memory/numeric_conversion.hh"
+#include "memory/numeric_semantics.hh"
+#include <cstring>
 #define _POSIX_C_SOURCE 200809L
 #include "vm_value.hh"
 #include "vm_value_base.hh"
@@ -184,6 +186,17 @@ RUNTIME_API int lm_value_eq(LmValue v1, LmValue v2) {
         ObjHeader* h1 = (ObjHeader*)UNBOX_PTR(v1);
         ObjHeader* h2 = (ObjHeader*)UNBOX_PTR(v2);
         if (h1 && h2) {
+            // Erased casts can return a boxed string while literals use the
+            // length-bearing string header. Representation is not identity.
+            if ((h1->type_id == TYPE_STRING && h2->type_id == TYPE_BOX &&
+                 reinterpret_cast<LmBox*>(h2)->type == LM_BOX_STRING) ||
+                (h2->type_id == TYPE_STRING && h1->type_id == TYPE_BOX &&
+                 reinterpret_cast<LmBox*>(h1)->type == LM_BOX_STRING)) {
+                auto* string = reinterpret_cast<LmStringHeader*>(h1->type_id == TYPE_STRING ? h1 : h2);
+                auto* box = reinterpret_cast<LmBox*>(h1->type_id == TYPE_BOX ? h1 : h2);
+                auto* data = static_cast<const char*>(box->value.as_ptr);
+                return data && string->len == std::strlen(data) && std::memcmp(string->data, data, string->len) == 0;
+            }
             if (h1->type_id == TYPE_STRING && h2->type_id == TYPE_STRING) {
                 LmStringHeader* s1 = (LmStringHeader*)h1;
                 LmStringHeader* s2 = (LmStringHeader*)h2;
@@ -516,7 +529,7 @@ RUNTIME_API LmValue lm_add(LmValue a, LmValue b) {
         __int128 i1 = as_i128(a);
         __int128 i2 = as_i128(b);
         __int128 res;
-        if (__builtin_add_overflow(i1, i2, &res)) return VAL_NIL;
+        if (!LM::Memory::add_integer(i1, i2, res)) return VAL_NIL;
         return make_i128(res);
     }
     if (is_numeric_internal(a) && is_numeric_internal(b)) {
@@ -539,7 +552,7 @@ RUNTIME_API LmValue lm_sub(LmValue a, LmValue b) {
         __int128 i1 = as_i128(a);
         __int128 i2 = as_i128(b);
         __int128 res;
-        if (__builtin_sub_overflow(i1, i2, &res)) return VAL_NIL;
+        if (!LM::Memory::add_integer(i1, i2, res, true)) return VAL_NIL;
         return make_i128(res);
     }
     if (is_numeric_internal(a) && is_numeric_internal(b)) {

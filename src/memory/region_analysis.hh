@@ -30,6 +30,7 @@ inline ScalarOperationProof prove_scalar_operations(const LIR::LIR_Function& fun
         case Op::JumpIfFalse: case Op::Return: case Op::Ret: case Op::RegionEnter:
         case Op::RegionExit: case Op::RegionMove: case Op::FrameSetField:
         case Op::FrameSetFieldAtomic: case Op::ListSet: case Op::TupleSet:
+        case Op::FrameFieldAtomicAdd: case Op::FrameFieldAtomicSub:
         case Op::DictSet: case Op::ListAppend: case Op::StoreGlobal: break;
         default: if (in.dst != UINT32_MAX) state[in.dst] = unknown; break;
         }

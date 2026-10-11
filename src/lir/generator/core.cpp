@@ -5,6 +5,7 @@
 #include "../../frontend/module_manager.hh"
 #include "../function_registry.hh"
 #include "../builtin_functions.hh"
+#include "../builtin_callable.hh"
 #include "../../frontend/ast.hh"
 #include "../../frontend/scanner.hh"
 #include <algorithm>
@@ -133,6 +134,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         // metrics.print();
     }
 
+    materialize_builtin_callables(*current_function_);
     auto result = std::move(current_function_);
     current_function_ = nullptr;
     scope_stack_.clear();
@@ -243,6 +245,8 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         current_function_->ownership_parameters = ownership_facts_->parameters[id];
         for (auto capture : current_function_->inferred_effects.captures_read)
             current_function_->ownership_captures.push_back(capture);
+        for (auto capture : current_function_->inferred_effects.captures_mutated)
+            if (std::find(current_function_->ownership_captures.begin(), current_function_->ownership_captures.end(), capture) == current_function_->ownership_captures.end()) current_function_->ownership_captures.push_back(capture);
         current_function_->memory_effects.parameters.clear();
         for (auto flags : current_function_->inferred_effects.parameters)
             current_function_->memory_effects.parameters.push_back(flags & Memory::Consume ? Memory::Ownership::Owned : flags & Memory::Opaque ? Memory::Ownership::Unspecified : flags & Memory::Mutate ? Memory::Ownership::WriteBorrow : Memory::Ownership::ReadBorrow);
@@ -555,6 +559,17 @@ void Generator::emit_instruction(const LIR_Inst& inst) {
             emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, *it));
     }
     LIR_Inst contracted = inst;
+    std::set<Reg> task_captures;
+    if (inst.op == LIR_Op::TaskContextAlloc) {
+        for (const auto& scope : scope_stack_)
+            for (const auto& [name, reg] : scope.vars) task_captures.insert(reg);
+        for (const auto& [binding, handle] : checked_references_) task_captures.insert(handle);
+        if (env_register_ != UINT32_MAX) task_captures.insert(env_register_);
+        if (this_register_ != UINT32_MAX) task_captures.insert(this_register_);
+        contracted.imm = 8;
+        for (auto reg : task_captures) contracted.imm = std::max(contracted.imm, 9 + reg);
+    }
+
     if (ownership_facts_ && inst.op == LIR_Op::Call && inst.func_name.ends_with(".__init__")) {
         const auto module = inst.func_name.substr(0, inst.func_name.size() - 9);
         auto found = ownership_facts_->module_initializations.find(module);
@@ -574,13 +589,17 @@ void Generator::emit_instruction(const LIR_Inst& inst) {
         }
         
         current_function_->register_count = std::max(current_function_->register_count, next_register_);
-        if (inst.dst != UINT32_MAX) {
+        if (inst.dst != UINT32_MAX && inst.result_type != Type::Void && !inst.isReturn()) {
             auto type = get_register_type(inst.dst);
             if (type) {
                 // Use the ABI type conversion instead of legacy method
                 Type abi_type = language_type_to_abi_type(type);
                 current_function_->set_register_abi_type(inst.dst, abi_type);
             }
+        }
+        if (inst.op == LIR_Op::TaskContextAlloc) {
+            for (auto reg : task_captures)
+                emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, reg, inst.dst, 0, reg < 3 ? 5 + reg : 8 + reg));
         }
     }
 }

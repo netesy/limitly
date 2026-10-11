@@ -5,4 +5,5 @@
 namespace ir { class Module; }
 namespace LM::Backend::Fyra {
 void lower_region_ownership(ir::Module& module, const std::unordered_map<std::string, uint64_t>& region_free = {});
+void lower_worker_failures(ir::Module& module);
 }

@@ -35,6 +35,9 @@ class LifetimeRegistry {
     }
 
 public:
+    // The owning VM supplies synchronization. This query selects the registry;
+    // resolve still checks generation and permission and must not be bypassed.
+    bool has_reference(uint64_t token) const { return references_.count(token) != 0; }
     void adopt(uintptr_t address) {
         if (!address || allocations_.count(address)) return;
         allocations_.emplace(address, Allocation{fresh()});

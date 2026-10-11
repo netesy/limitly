@@ -7,6 +7,7 @@
 #include "direct_operations.hh"
 #include "process_arguments.hh"
 #include "memory/region_analysis.hh"
+#include "lir/builtin_callable.hh"
 #include "backend/vm/vm_list.hh"
 #include "backend/vm/vm_dict.hh"
 #include "backend/vm/vm_tuple.hh"
@@ -148,6 +149,11 @@ struct Emitter {
             if (auto *target =
                     registry.getFunction(std::string(text->data, text->len)))
               pending.push_back(target);
+            const std::string name(text->data, text->len);
+            if (LIR::BuiltinUtils::isBuiltinFunction(name))
+              for (const auto& candidate : registry.getFunctionNames())
+                if (LIR::builtin_callable_target(candidate) == name)
+                  pending.push_back(registry.getFunction(candidate));
           }
         }
         if (inst.op == LIR::LIR_Op::Call || inst.op == LIR::LIR_Op::CallVoid ||
@@ -179,7 +185,7 @@ struct Emitter {
     auto substring_proof = prove_substring_comparisons(function);
     std::unordered_map<size_t, size_t> fused_comparisons;
     for (const auto& [call, proof] : substring_proof) fused_comparisons[proof.comparison] = call;
-    for (auto receiver : frame_proof.views) out << "const V* frame_view_" << receiver << "=nullptr;\n";
+    for (auto site : frame_proof.establish) out << "const V* frame_view_" << site << "=nullptr;\n";
     const bool direct = std::any_of(function.instructions.begin(), function.instructions.end(), [&](const auto& in) {
       using Op = LIR::LIR_Op;
       switch (in.op) {
@@ -329,18 +335,23 @@ struct Emitter {
         break;
       case Op::FrameGetField:
       case Op::FrameGetFieldAtomic:
-        if (frame_proof.cached.count(i)) expr = "frame_view_" + std::to_string(inst.a) + "[" + std::to_string(inst.b) + "]";
+        if (frame_proof.cached.count(i)) expr = "frame_view_" + std::to_string(frame_proof.cached_sources.at(i)) + "[" + std::to_string(inst.b) + "]";
         else expr = "ops->frame_get(ctx," + a + "," + std::to_string(inst.b) + "," + (inst.op == Op::FrameGetFieldAtomic ? "true" : "false") + ")";
         if (frame_proof.establish.count(i)) {
-          out << "V checked_field=" << expr << "; std::memcpy(&frame_view_" << inst.a
+          out << "V checked_field=" << expr << "; std::memcpy(&frame_view_" << i
               << ",reinterpret_cast<const unsigned char*>(" << a << ")+" << offsetof(LmFrame, fields)
-              << ",sizeof(frame_view_" << inst.a << ")); ";
+              << ",sizeof(frame_view_" << i << ")); ";
           expr = "checked_field";
         }
         break;
       case Op::FrameSetField:
       case Op::FrameSetFieldAtomic:
         expr = "ops->frame_set(ctx," + d + "," + std::to_string(inst.a) + "," + b + "," + (inst.op == Op::FrameSetFieldAtomic ? "true" : "false") + ")";
+        break;
+      case Op::FrameFieldAtomicAdd: case Op::FrameFieldAtomicSub:
+        out << "V argv[]={" << d << "," << integer(inst.a) << "," << b << "};";
+        out << helper(Helper::Builtin, "2ULL", "2ULL", "2ULL",
+            inst.op == Op::FrameFieldAtomicAdd ? "\"_builtin_frame_atomic_add\"" : "\"_builtin_frame_atomic_sub\"", "argv", 3) << ";";
         break;
       case Op::ListCreate:
         expr = helper(Helper::ListNew);
@@ -672,10 +683,14 @@ int(*equal)(V,V); int(*compare)(V,V); bool(*truthy)(V); const char*(*string_data
         << "); std::vector<N> bound(args,args+count); if(api->truthy("
         << emitter.helper(Helper::ClosureBound, "target")
         << ")) bound.push_back(target);\n";
-    for (size_t i = 0; i < emitter.functions.size(); ++i)
-      emitter.out << "if(name==" << quote(emitter.functions[i]->name)
+    for (size_t i = 0; i < emitter.functions.size(); ++i) {
+      auto builtin = LIR::builtin_callable_target(emitter.functions[i]->name);
+      emitter.out << "if(name==" << quote(emitter.functions[i]->name);
+      if (!builtin.empty()) emitter.out << " || (name==" << quote(builtin) << " && count==" << emitter.functions[i]->param_count << ")";
+      emitter.out
                   << ") return f" << i
                   << "(api,ctx,bound.data(),bound.size());\n";
+    }
     emitter.out
         << "std::vector<V> boxed; for(const auto& arg:bound)boxed.push_back(arg.boxed(api,ctx)); return api->helper(ctx," << static_cast<unsigned>(Helper::Callback)
         << ",target,2ULL,2ULL,name.data(),boxed.data(),boxed.size()); }\n";

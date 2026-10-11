@@ -81,6 +81,11 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
     }
 
     ResourceManager::getInstance().setCurrentFiber(get_current_fiber());
+    if (pc->op == LIR::LIR_Op::Call || pc->op == LIR::LIR_Op::CallBuiltin) {
+        auto builtin = LIR::LIRBuiltinFunctions::getInstance().getFunction(pc->func_name);
+        if (builtin && !builtin->acceptsArgumentCount(pc->call_args.size()))
+            throw std::runtime_error("Builtin argument count mismatch: " + pc->func_name);
+    }
     switch (pc->op) {
         case LIR::LIR_Op::CallBuiltin:
         case LIR::LIR_Op::Call: {
@@ -278,6 +283,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::CallIndirect: {
             // Register a contains the function object (which currently is just the function pointer/name in our simplified model)
             RegisterValue func_obj = registers[pc->a];
+            if (pc->dst != UINT32_MAX) registers[pc->dst] = VAL_NIL;
             std::string func_name = "";
             
             std::vector<RegisterValue> closure_extra_args;
@@ -304,6 +310,13 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
             }
             
             if (!func_name.empty()) {
+                if (LIR::BuiltinUtils::isBuiltinFunction(func_name)) {
+                    auto call = *pc;
+                    call.op = LIR::LIR_Op::CallBuiltin;
+                    call.func_name = func_name;
+                    execute_calls(&call);
+                    break;
+                }
                 if (CompiledResolver::getInstance().dispatch(func_name, *pc, registers, this, closure_extra_args)) {
                     break;
                 }

@@ -386,6 +386,7 @@ void RegisterVM::auto_register_output(const LIR::LIR_Inst* pc) {
 }
 
 uint64_t RegisterVM::borrow_memory(RegisterValue value, bool writable) {
+    std::lock_guard<std::recursive_mutex> lock(heap_mutex_);
     if (!IS_PTR(value)) throw std::runtime_error("Borrow requires a managed object");
     auto address = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
     if (!vm_allocation_types.count(address)) throw std::runtime_error("Borrow requires locally owned object");
@@ -393,9 +394,19 @@ uint64_t RegisterVM::borrow_memory(RegisterValue value, bool writable) {
     return memory_lifetimes_.borrow(address, writable, active_region_id);
 }
 RegisterValue RegisterVM::resolve_memory(uint64_t token, bool writable) {
-    return BOX_PTR(memory_lifetimes_.resolve(token, writable));
+    for (auto* owner = this; owner; owner = owner->heap_parent_) {
+        std::lock_guard<std::recursive_mutex> lock(owner->heap_mutex_);
+        if (!owner->memory_lifetimes_.has_reference(token)) continue;
+        // Structured workers can read a captured parent lease while the join
+        // keeps its owner alive. They cannot upgrade, move or release it.
+        if (owner != this && writable)
+            throw std::runtime_error("Write through captured parent reference");
+        return BOX_PTR(owner->memory_lifetimes_.resolve(token, writable));
+    }
+    throw std::runtime_error("Invalid memory reference");
 }
 uint64_t RegisterVM::move_memory_reference(uint64_t token, uint32_t lexical) {
+    std::lock_guard<std::recursive_mutex> lock(heap_mutex_);
     auto pointer = memory_lifetimes_.resolve(token);
     uint64_t target = invocation_parents.empty() ? 0 : invocation_parents.back();
     if (lexical) {
@@ -412,6 +423,7 @@ uint64_t RegisterVM::move_memory_reference(uint64_t token, uint32_t lexical) {
     return memory_lifetimes_.move_reference(token, target);
 }
 void RegisterVM::consume_memory(RegisterValue value) {
+    std::lock_guard<std::recursive_mutex> lock(heap_mutex_);
     if (!IS_PTR(value)) return;
     auto address = reinterpret_cast<uintptr_t>(UNBOX_PTR(value));
     if (!vm_allocation_types.count(address)) throw std::runtime_error("Consume requires locally owned object");

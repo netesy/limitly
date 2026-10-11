@@ -49,6 +49,7 @@ struct Flow {
     std::vector<std::map<std::string, Identity>> scopes{{}};
     std::map<Identity, State> states;
     bool reachable = true;
+    std::set<Identity> concurrent_origins;
     std::shared_ptr<const std::map<std::string, Identity>> module_bindings;
 };
 struct Callable {
@@ -81,6 +82,17 @@ class Analyzer {
     std::set<Identity> specializing, locals;
     std::map<Identity, SemanticEffects>* inference_inputs = nullptr;
     std::vector<Flow> breaks, continues;
+    std::vector<std::set<Identity>*> statement_uses;
+    std::map<Identity, std::set<Identity>> uses;
+    std::map<Identity, std::vector<std::pair<Identity, Identity>>> block_leases;
+    std::set<Identity> retained_leases;
+
+    void retain_lease(const Value& value) {
+        if (!recording) return;
+        if (value.source) retained_leases.insert(value.source);
+        for (auto [id, generation] : value.references) retained_leases.insert(id);
+        for (auto [id, generation] : value.captures) retained_leases.insert(id);
+    }
 
     NodeOwnership& node(A::Node& n) { return facts->nodes[identity(n)]; }
     void error(A::Node& n, const std::string& text) {
@@ -97,6 +109,7 @@ class Analyzer {
     }
     void read(Flow& flow, Identity id, A::Node& where) {
         if (!id) return;
+        if (recording) for (auto* used : statement_uses) used->insert(id);
         if (!flow.states.count(id) && initialized_globals.count(id)) flow.states[id] = initialized_globals.at(id);
         auto found = flow.states.find(id); if (found == flow.states.end()) return;
         auto& state = found->second;
@@ -112,6 +125,21 @@ class Analyzer {
             if ((state.value.managed || !state.value.references.empty() || !state.value.captures.empty()) && state.value.parameters.empty() && !locals.count(id)) effect->captures_read.insert(id);
         }
         if (recording && (state.value.managed || !state.value.references.empty() || !state.value.captures.empty())) node(where).event.reads.push_back(id);
+    }
+    void mutate(Flow& flow, Identity id, A::Node& where) {
+        if (!id) return;
+        if (effect && !locals.count(id)) effect->captures_mutated.insert(id);
+        if (recording && flow.concurrent_origins.count(id) && !facts->atomic_bindings.count(id))
+            error(where, "concurrent callable mutates captured binding '" + facts->names[id] + "'");
+        auto found = flow.states.find(id);
+        if (found == flow.states.end()) return;
+        if (found->second.value.managed || found->second.value.unknown || !found->second.value.references.empty())
+            for (auto parameter : found->second.value.parameters) if (effect) effect->parameters[parameter] |= Mutate;
+        for (auto [origin, generation] : found->second.value.references) {
+            if (effect && !locals.count(origin)) effect->captures_mutated.insert(origin);
+            if (recording && flow.concurrent_origins.count(origin) && !facts->atomic_bindings.count(origin))
+                error(where, "concurrent callable mutates captured owner '" + facts->names[origin] + "'");
+        }
     }
     void invalidate_aliases(Flow& flow, Identity id) {
         for (auto& [binding, state] : flow.states)
@@ -133,6 +161,13 @@ class Analyzer {
         if (recording) node(where).event.consumes.push_back(id);
     }
     void define(Flow& flow, const std::string& name, Identity id, Value value, A::Node& where) {
+        if (recording) {
+            for (auto* used : statement_uses) used->insert(id);
+            // A separate alias or closure can outlive the source binding's
+            // last textual read. Keep its lease until lexical cleanup.
+            for (auto [origin, generation] : value.references) retained_leases.insert(origin);
+            for (auto [origin, generation] : value.captures) retained_leases.insert(origin);
+        }
         flow.scopes.back()[name] = id;
         facts->names[id] = name;
         if (current_function) locals.insert(id);
@@ -281,6 +316,21 @@ class Analyzer {
         std::vector<Value> args; for (auto& a : c.arguments) args.push_back(expression(a, flow));
         std::map<std::string,Value> named; for (auto& [name, arg] : c.namedArgs) named[name] = expression(arg, flow);
         auto name = qualified(c.callee);
+        bool mutating_container_receiver = false;
+        if (auto member = std::dynamic_pointer_cast<A::MemberExpr>(c.callee)) {
+            auto type = member->object ? member->object->inferred_type : nullptr;
+            if (type && (type->tag == TypeTag::List || type->tag == TypeTag::Dict || type->tag == TypeTag::Tuple || type->tag == TypeTag::String)) {
+                // The callee expression already evaluated the receiver. Reuse
+                // its abstract origin rather than evaluating side effects twice.
+                auto receiver = callee;
+                if (auto variable = std::dynamic_pointer_cast<A::VariableExpr>(member->object)) {
+                    auto binding = resolve(flow, variable->name);
+                    if (binding) { receiver = flow.states[binding].value; receiver.source = binding; }
+                }
+                args.insert(args.begin(), receiver);
+                mutating_container_receiver = type->tag == TypeTag::List && member->name == "append";
+            }
+        }
         if (auto id = resolve(flow, name)) {
             if (constructors.count(id)) callee.constructor = id;
             else if (!flow.states.count(id) && functions.count(id)) callee.callables.insert(id);
@@ -320,6 +370,7 @@ class Analyzer {
             combined.return_projections.insert(summary.return_projections.begin(), summary.return_projections.end());
             combined.captures_read.insert(summary.captures_read.begin(), summary.captures_read.end());
             combined.captures_consumed.insert(summary.captures_consumed.begin(), summary.captures_consumed.end());
+            combined.captures_mutated.insert(summary.captures_mutated.begin(), summary.captures_mutated.end());
             combined.captures_opaque.insert(summary.captures_opaque.begin(), summary.captures_opaque.end());
             combined.unknown_result |= summary.unknown_result;
             combined.returned_callables.insert(summary.returned_callables.begin(), summary.returned_callables.end());
@@ -336,6 +387,7 @@ class Analyzer {
                 intrinsic |= type && (type->tag == TypeTag::List || type->tag == TypeTag::Dict || type->tag == TypeTag::Tuple || type->tag == TypeTag::String);
             }
             for (size_t p = 0; p < args.size(); ++p) combined.parameters[p] = intrinsic ? Read | Retain : Read | Mutate | Retain | Opaque;
+            if (intrinsic && mutating_container_receiver && !combined.parameters.empty()) combined.parameters[0] |= Mutate;
             combined.unknown_result = true;
         }
         Value result; result.managed = managed(c.inferred_type); result.unknown = combined.unknown_result;
@@ -362,6 +414,10 @@ class Analyzer {
         for (auto captured : combined.captures_read) {
             if (callee.capture_origins.count(captured)) for (auto origin : callee.capture_origins.at(captured)) read(flow, origin, c);
             else read(flow, captured, c);
+        }
+        for (auto captured : combined.captures_mutated) {
+            if (callee.capture_origins.count(captured)) for (auto origin : callee.capture_origins.at(captured)) mutate(flow, origin, c);
+            else mutate(flow, captured, c);
         }
         // Captured parameter indices are not the nested function's formal
         // indices. Keep their binding identity until a caller can discharge
@@ -394,10 +450,18 @@ class Analyzer {
         if (recording) node(c).arguments.clear();
         for (size_t p = 0; p < args.size(); ++p) {
             auto flags = combined.parameters[p];
+            if (flags & (Retain | Opaque | Consume)) retain_lease(args[p]);
+            if (recording && (flags & Mutate) && args[p].source) facts->writable_bindings.insert(args[p].source);
             if (effect) {
                 for (auto formal : args[p].parameters)
                     effect->parameters[formal] |= !args[p].projected ? flags : static_cast<uint8_t>(flags & (Read | Mutate | Retain | (args[p].managed ? Opaque : 0)));
                 if ((flags & Opaque) && args[p].managed) effect->captures_opaque.insert(args[p].symbolic_captures.begin(), args[p].symbolic_captures.end());
+            }
+            // Scalar arguments are copied values. A callee mutating its
+            // parameter cannot mutate the caller's scalar binding.
+            if ((flags & Mutate) && (args[p].managed || args[p].unknown || !args[p].references.empty())) {
+                mutate(flow, args[p].source, c);
+                for (auto [origin,generation] : args[p].references) if(origin!=args[p].source) mutate(flow,origin,c);
             }
             if (flags & Consume) {
                 consume(flow, args[p].source, c);
@@ -446,12 +510,12 @@ class Analyzer {
             if (recording) node(*e).binding = id;
         } else if (auto c = std::dynamic_pointer_cast<A::CallExpr>(e)) return call(*c, flow);
         else if (auto a = std::dynamic_pointer_cast<A::AssignExpr>(e)) {
-            expression(a->object, flow); expression(a->index, flow); value = expression(a->value, flow);
+            auto target = expression(a->object, flow); expression(a->index, flow); value = expression(a->value, flow);
             if (!a->object && !a->index && !a->member) {
-                auto id = resolve(flow, a->name); const bool existing = id != 0; if (!id) id = identity(*a);
+                auto id = resolve(flow, a->name); mutate(flow, id, *a); const bool existing = id != 0; if (!id) id = identity(*a);
                 if (flow.states.count(id) && flow.states[id].consumed) error(*a, "cannot reassign a moved binding");
                 if (value.managed && value.source && value.source != id) consume(flow, value.source, *a);
-                const bool same_owner = (value.source == id || value.references.count(id)) && !value.projected && value.allocations == flow.states[id].value.allocations;
+                const bool same_owner = facts->atomic_bindings.count(id) || ((value.source == id || value.references.count(id)) && !value.projected && value.allocations == flow.states[id].value.allocations);
                 if (same_owner) value.references.erase(id);
                 if (!same_owner && flow.states.count(id)) {
                     invalidate_aliases(flow, id); flow.states[id].generation = std::min(2u, flow.states[id].generation + 1);
@@ -460,10 +524,14 @@ class Analyzer {
                 define(flow, a->name, id, value, *a);
                 if (existing) flow.scopes.back() = saved_scope;
                 if (same_owner && recording) node(*a).event.defines.clear();
-            } else if (effect) {
-                auto receiver = std::dynamic_pointer_cast<A::VariableExpr>(a->object);
-                if (receiver) for (auto p : flow.states[resolve(flow, receiver->name)].value.parameters) effect->parameters[p] |= Mutate;
-                for (auto p : value.parameters) effect->parameters[p] |= Retain;
+            } else {
+                retain_lease(value);
+                mutate(flow, target.source, *a);
+                if (recording && target.source) facts->writable_bindings.insert(target.source);
+                if (effect) {
+                    for (auto p : target.parameters) effect->parameters[p] |= Mutate;
+                    for (auto p : value.parameters) effect->parameters[p] |= Retain;
+                }
             }
         } else if (auto cast = std::dynamic_pointer_cast<A::CastExpr>(e)) {
             value = expression(cast->expression, flow);
@@ -495,16 +563,16 @@ class Analyzer {
             if (object.source && value.managed) value.references[object.source] = flow.states[object.source].generation;
             }
         } else if (auto list = std::dynamic_pointer_cast<A::ListExpr>(e)) {
-            for (auto& child : list->elements) { auto v = expression(child, flow); if (effect) for (auto p : v.parameters) effect->parameters[p] |= Retain; }
+            for (auto& child : list->elements) { auto v = expression(child, flow); retain_lease(v); if (effect) for (auto p : v.parameters) effect->parameters[p] |= Retain; }
             value.managed = true; value.allocations.insert(identity(*list));
         } else if (auto tuple = std::dynamic_pointer_cast<A::TupleExpr>(e)) {
-            for (auto& child : tuple->elements) expression(child, flow);
+            for (auto& child : tuple->elements) retain_lease(expression(child, flow));
             value.managed = true; value.allocations.insert(identity(*tuple));
         } else if (auto dict = std::dynamic_pointer_cast<A::DictExpr>(e)) {
-            for (auto& [key, child] : dict->entries) { expression(key, flow); expression(child, flow); }
+            for (auto& [key, child] : dict->entries) { expression(key, flow); retain_lease(expression(child, flow)); }
             value.managed = true; value.allocations.insert(identity(*dict));
         } else if (auto literal = std::dynamic_pointer_cast<A::ObjectLiteralExpr>(e)) {
-            for (auto& [key, child] : literal->properties) expression(child, flow);
+            for (auto& [key, child] : literal->properties) retain_lease(expression(child, flow));
             value.managed = true; value.allocations.insert(identity(*literal));
         } else if (auto lambda = std::dynamic_pointer_cast<A::LambdaExpr>(e)) {
             auto id = identity(*lambda);
@@ -589,6 +657,12 @@ class Analyzer {
     }
     void statement(const std::shared_ptr<A::Statement>& s, Flow& flow) {
         if (!s || !flow.reachable) return;
+        const bool collecting = recording;
+        if (collecting) statement_uses.push_back(&uses[identity(*s)]);
+        statement_impl(s, flow);
+        if (collecting) statement_uses.pop_back();
+    }
+    void statement_impl(const std::shared_ptr<A::Statement>& s, Flow& flow) {
         if (recording) node(*s).event = {};
         if (auto b = std::dynamic_pointer_cast<A::BlockStatement>(s)) {
             flow.scopes.push_back({});
@@ -597,8 +671,23 @@ class Analyzer {
                 closure_environments[identity(*f)] = flow;
             }
             for (const auto& child : b->statements) statement(child, flow);
+            if (recording) {
+                auto& leases = block_leases[identity(*b)];
+                leases.clear();
+                // Only declarations owned by this block are candidates. An
+                // enclosing binding may be read on a loop backedge or another
+                // branch, so a nested block must never end its lease.
+                for (const auto& child : b->statements) if (auto v = std::dynamic_pointer_cast<A::VarDeclaration>(child)) {
+                    const auto binding = identity(*v);
+                    auto last = identity(*child);
+                    for (const auto& next : b->statements)
+                        if (uses[identity(*next)].count(binding)) last = identity(*next);
+                    leases.emplace_back(binding, last);
+                }
+            }
             flow.scopes.pop_back();
         } else if (auto v = std::dynamic_pointer_cast<A::VarDeclaration>(s)) {
+            if (v->type && v->type.value()->typeName == "atomic") facts->atomic_bindings.insert(identity(*v));
             auto value = expression(v->initializer, flow);
             if (value.managed && value.source) consume(flow, value.source, *v);
             define(flow, v->name, identity(*v), value, *v);
@@ -652,13 +741,21 @@ class Analyzer {
         else if (auto parallel = std::dynamic_pointer_cast<A::ParallelStatement>(s)) statement(parallel->body, flow);
         else if (auto concurrent = std::dynamic_pointer_cast<A::ConcurrentStatement>(s)) statement(concurrent->body, flow);
         else if (auto task = std::dynamic_pointer_cast<A::TaskStatement>(s)) {
-            expression(task->iterable, flow); flow.scopes.push_back({});
+            expression(task->iterable, flow);
+            auto previous_isolation = flow.concurrent_origins;
+            for (auto& [id, state] : flow.states) flow.concurrent_origins.insert(id);
+            flow.scopes.push_back({});
             define(flow, task->loopVar, identity(*task), {}, *task);
             loop(task->body, nullptr, nullptr, flow, *task); flow.scopes.pop_back();
+            flow.concurrent_origins = std::move(previous_isolation);
         } else if (auto worker = std::dynamic_pointer_cast<A::WorkerStatement>(s)) {
-            expression(worker->iterable, flow); flow.scopes.push_back({});
+            expression(worker->iterable, flow);
+            auto previous_isolation = flow.concurrent_origins;
+            for (auto& [id, state] : flow.states) flow.concurrent_origins.insert(id);
+            flow.scopes.push_back({});
             define(flow, worker->paramName, identity(*worker), {}, *worker);
             loop(worker->body, nullptr, nullptr, flow, *worker); flow.scopes.pop_back();
+            flow.concurrent_origins = std::move(previous_isolation);
         } else if (auto staged = std::dynamic_pointer_cast<A::StagedBlockStatement>(s)) statement(staged->body, flow);
         else if (auto staged = std::dynamic_pointer_cast<A::StagedStatement>(s)) {
             statement(staged->declaration, flow); statement(staged->block, flow); expression(staged->expression, flow);
@@ -760,6 +857,7 @@ public:
                 inferred.unknown_result |= old.unknown_result;
                 inferred.captures_read.insert(old.captures_read.begin(), old.captures_read.end());
                 inferred.captures_consumed.insert(old.captures_consumed.begin(), old.captures_consumed.end());
+                inferred.captures_mutated.insert(old.captures_mutated.begin(), old.captures_mutated.end());
                 inferred.captures_opaque.insert(old.captures_opaque.begin(), old.captures_opaque.end());
                 inferred.returned_callables.insert(old.returned_callables.begin(), old.returned_callables.end());
                 inferred.returned_globals.insert(old.returned_globals.begin(), old.returned_globals.end());
@@ -790,6 +888,16 @@ public:
             ast->ownership_facts = facts;
         }
         for (const auto& [id, info] : facts->nodes) if (info.binding && info.managed && info.unknown_origin) facts->reference_bindings.insert(info.binding);
+        for (const auto& [function, summary] : facts->functions) {
+            retained_leases.insert(summary.captures_read.begin(), summary.captures_read.end());
+            retained_leases.insert(summary.captures_mutated.begin(), summary.captures_mutated.end());
+            retained_leases.insert(summary.captures_consumed.begin(), summary.captures_consumed.end());
+            retained_leases.insert(summary.captures_opaque.begin(), summary.captures_opaque.end());
+        }
+        for (const auto& [block, leases] : block_leases)
+            for (auto [binding, last] : leases)
+                if (!retained_leases.count(binding) && !facts->global_bindings.count(binding))
+                    facts->borrow_ends[last].insert(binding);
         facts->verified = facts->errors.empty();
         program->ownership_facts = facts;
         return facts;

@@ -301,7 +301,7 @@ void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
     if (!ptr) { registers[pc->dst] = allocate_raw_memory(static_cast<size_t>(size)); return; }
     const uintptr_t old_address = reinterpret_cast<uintptr_t>(ptr);
     if (size == 0) { execute_memory_free(pc); registers[pc->dst] = VAL_NIL; return; }
-    uint64_t original_region;
+    void* new_ptr = nullptr;
     {
         std::lock_guard<std::mutex> lock(g_memory_mutex);
         auto it = g_memory_allocations.find(old_address);
@@ -309,12 +309,12 @@ void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = VAL_NIL;
             return;
         }
-        original_region = owned_raw_memory.at(old_address).region;
-    }
-    void* new_ptr = Memory::MemoryManager<>::Unsafe::resize(ptr, size);
-    if (new_ptr) {
-        {
-        std::lock_guard<std::mutex> lock(g_memory_mutex);
+        const auto original_region = owned_raw_memory.at(old_address).region;
+        // realloc may free the old address. Keep registry retirement atomic
+        // with that operation: another worker can immediately allocate the
+        // freed address and must not have its new record erased by this resize.
+        new_ptr = Memory::MemoryManager<>::Unsafe::resize(ptr, size);
+        if (!new_ptr) { registers[pc->dst] = VAL_NIL; return; }
         invalidate_raw_aliases(old_address, g_memory_allocations.at(old_address));
         g_memory_allocations.erase(old_address);
         detach_raw_memory(old_address);
@@ -324,7 +324,8 @@ void RegisterVM::execute_memory_realloc(const LIR::LIR_Inst* pc) {
         owned_raw_memory.insert(std::move(node));
         attach_raw_memory(reinterpret_cast<uintptr_t>(new_ptr), original_region);
         g_memory_allocations[reinterpret_cast<uintptr_t>(new_ptr)] = size;
-        }
+    }
+    if (new_ptr) {
         // Never acquire a parent heap lock while holding the raw registry lock.
         RegisterValue val = lm_alloc_foreign_ptr(new_ptr);
         registers[pc->dst] = val;

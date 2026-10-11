@@ -118,7 +118,8 @@ Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
                 const bool assigned_nil = assignment->value && assignment->value->inferred_type && assignment->value->inferred_type->tag == TypeTag::Nil;
                 if ((fact.managed && fact.unknown_origin) || (existing_handle != UINT32_MAX && (fact.managed || assigned_nil))) {
                     auto handle = existing_handle == UINT32_MAX ? allocate_register() : existing_handle;
-                    emit_instruction(LIR_Inst(LIR_Op::RefCreate, Type::U64, handle, result, UINT32_MAX, Memory::ReferenceNullable));
+                    auto permission = Memory::ReferenceNullable | (ownership_facts_->writable_bindings.count(fact.binding) ? Memory::ReferenceWritable : 0);
+                    emit_instruction(LIR_Inst(LIR_Op::RefCreate, Type::U64, handle, result, UINT32_MAX, permission));
                     uint32_t target_region = 0;
                     for (size_t scope = scope_stack_.size(); scope > 0; --scope) {
                         if (scope_stack_[scope - 1].vars.count(assignment->name)) {
@@ -656,7 +657,37 @@ Reg Generator::emit_literal_expr(LM::Frontend::AST::LiteralExpr& expr, TypePtr e
 }
 
 
+bool Generator::is_atomic_binding(const LM::Frontend::AST::Node& node) const {
+    if (!ownership_facts_) return false;
+    auto found = ownership_facts_->nodes.find(node.memory_info.semantic_id);
+    return found != ownership_facts_->nodes.end() && ownership_facts_->atomic_bindings.count(found->second.binding);
+}
+Reg Generator::atomic_cell(const std::string& name) {
+    if (env_register_ != UINT32_MAX) {
+        auto capture = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), name);
+        if (capture != current_lambda_captures_.end()) {
+            Reg index = allocate_register(), cell = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, index, make_i64(1 + std::distance(current_lambda_captures_.begin(), capture))));
+            emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, cell, env_register_, index));
+            return cell;
+        }
+    }
+    Reg cell = resolve_variable(name);
+    if (cell != UINT32_MAX) return cell;
+    cell = allocate_register();
+    LIR_Inst load(LIR_Op::LoadGlobal, Type::Ptr, cell, 0, 0);
+    load.func_name = (!current_module_.empty() && current_module_ != "root") ? current_module_ + "." + name : name;
+    emit_instruction(load);
+    return cell;
+}
+Reg Generator::atomic_read(Reg cell) {
+    Reg result = allocate_register();
+    emit_instruction(LIR_Inst(LIR_Op::FrameGetFieldAtomic, Type::I64, result, cell, 0));
+    set_register_language_type(result, std::make_shared<::Type>(::TypeTag::Int64));
+    return result;
+}
 Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
+    if (is_atomic_binding(expr)) return atomic_read(atomic_cell(expr.name));
     // Check if this is a captured variable in a lambda
     if (env_register_ != UINT32_MAX) {
         auto it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), expr.name);
@@ -689,7 +720,8 @@ Reg Generator::emit_variable_expr(LM::Frontend::AST::VariableExpr& expr) {
 
     // Check if it's a function name used as a value (first-class functions)
     if (function_table_.find(expr.name) != function_table_.end() || 
-        LIRFunctionManager::getInstance().hasFunction(expr.name)) {
+        LIRFunctionManager::getInstance().hasFunction(expr.name) ||
+        BuiltinUtils::isBuiltinFunction(expr.name)) {
         
         Reg func_reg = allocate_register();
         auto func_type = std::make_shared<::Type>(::TypeTag::Function);
@@ -1324,6 +1356,19 @@ Reg Generator::emit_unary_expr(LM::Frontend::AST::UnaryExpr& expr) {
 
 
 Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
+    auto argument_effect = [&](size_t index) {
+        if (ownership_facts_) {
+            auto fact = ownership_facts_->nodes.find(expr.memory_info.semantic_id);
+            if (fact != ownership_facts_->nodes.end() && index < fact->second.arguments.size())
+                return fact->second.arguments[index];
+        }
+        return Memory::Ownership::Unspecified;
+    };
+    auto emit_argument = [&](LM::Frontend::AST::Expression& argument, size_t index) {
+        auto value = emit_expr(argument);
+        return argument_effect(index) == Memory::Ownership::WriteBorrow
+            ? emit_checked_dereference(argument, value, true, true) : value;
+    };
     if (auto var_expr = dynamic_cast<LM::Frontend::AST::VariableExpr*>(expr.callee.get())) {
         std::string func_name = var_expr->name;
         
@@ -1338,7 +1383,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             Reg closure_reg = emit_variable_expr(*var_expr);
             std::vector<Reg> arg_regs;
             arg_regs.reserve(expr.arguments.size());
-            for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+            for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));
             Reg result = allocate_register();
             Type abi_type = Type::Void;
             if (expr.inferred_type) abi_type = language_type_to_abi_type(expr.inferred_type);
@@ -1368,7 +1413,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         if (auto intrinsic = IntrinsicRegistry::getInstance().getIntrinsic(registry_lookup_name)) {
             std::vector<Reg> arg_regs;
             arg_regs.reserve(expr.arguments.size());
-            for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+            for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));
             Reg result = allocate_register();
             Type abi_res_type = (expr.inferred_type) ? language_type_to_abi_type(expr.inferred_type) : Type::Void;
             if (expr.inferred_type) set_register_language_type(result, expr.inferred_type);
@@ -1386,7 +1431,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         // --- 2. Builtin Check ---
         std::vector<Reg> arg_regs;
         arg_regs.reserve(expr.arguments.size());
-        for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+        for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));
         Reg result = allocate_register();
         
         std::string vm_name = func_name;
@@ -1599,7 +1644,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 // This is an enum variant construction
                 std::vector<Reg> arg_regs;
                 arg_regs.reserve(expr.arguments.size());
-                for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+                for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));
                 Reg result = allocate_register();
 
                 if (expected_arity == 0) {
@@ -1649,7 +1694,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 if (frame_it != frame_table_.end()) {
                     std::vector<Reg> arg_regs;
                     arg_regs.reserve(expr.arguments.size());
-                    for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+                    for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));
                     Reg result = allocate_register();
                     
                     const std::string canonical_name = frame_it->second.name.empty() ? qualified_name : frame_it->second.name;
@@ -1700,7 +1745,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
                 std::vector<Reg> arg_regs;
                 arg_regs.reserve(expr.arguments.size());
-                for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+                for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));
                 Reg result = allocate_register();
 
                 // ── Intrinsic check (mirrors the VariableExpr path at line 1323) ──
@@ -1747,11 +1792,11 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
         }
 
-        Reg object_reg = emit_checked_dereference(*member_expr->object, emit_expr(*member_expr->object));
+        Reg object_reg = emit_checked_dereference(*member_expr->object, emit_expr(*member_expr->object), argument_effect(0) == Memory::Ownership::WriteBorrow);
         std::vector<Reg> arg_regs;
         arg_regs.reserve(expr.arguments.size() + 1);
         arg_regs.push_back(object_reg);
-        for (const auto& arg : expr.arguments) arg_regs.push_back(emit_expr(*arg));
+        for (const auto& arg : expr.arguments) arg_regs.push_back(emit_argument(*arg, arg_regs.size()));
         
         Reg result = allocate_register();
         TypePtr object_type = member_expr->object->inferred_type;
@@ -1854,7 +1899,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                             std::vector<Reg> indirect_args;
                             indirect_args.reserve(expr.arguments.size());
                             for (const auto& arg : expr.arguments) {
-                                indirect_args.push_back(emit_expr(*arg));
+                                indirect_args.push_back(emit_argument(*arg, indirect_args.size()));
                             }
                             
                             Type abi_type = Type::Void;
@@ -1906,13 +1951,37 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         return 0;
     }
 
-    report_error("Complex function calls not yet supported in LIR");
-    return 0;
+    // A callable expression (including a returned callable) uses the same
+    // evaluated target and ownership events as a callable variable.
+    Reg callable = emit_expr(*expr.callee);
+    std::vector<Reg> arguments;
+    for (const auto& argument : expr.arguments) arguments.push_back(emit_argument(*argument, arguments.size()));
+    Reg result = allocate_register();
+    Type result_type = expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::Ptr;
+    LIR_Inst call(LIR_Op::CallIndirect, result_type, result, callable, UINT32_MAX);
+    call.call_args = arguments;
+    emit_instruction(call);
+    if (expr.inferred_type) {
+        set_register_type(result, expr.inferred_type);
+        set_register_language_type(result, expr.inferred_type);
+    }
+    return result;
 }
 
 
 Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
     Reg value = emit_expr(*expr.value);
+    if (!expr.name.empty() && !expr.object && is_atomic_binding(expr)) {
+        Reg cell = atomic_cell(expr.name);
+        LIR_Op operation;
+        if (expr.op == LM::Frontend::TokenType::EQUAL) operation = LIR_Op::FrameSetFieldAtomic;
+        else if (expr.op == LM::Frontend::TokenType::PLUS_EQUAL) operation = LIR_Op::FrameFieldAtomicAdd;
+        else if (expr.op == LM::Frontend::TokenType::MINUS_EQUAL) operation = LIR_Op::FrameFieldAtomicSub;
+        else { report_error("Unsupported atomic compound assignment operator"); return value; }
+        emit_instruction(LIR_Inst(operation, Type::Void, cell, 0, value));
+        return atomic_read(cell);
+    }
+
 
     // Ownership transfer: If we assign a frame instance to a field, 
     // it's no longer managed by the current scope.
@@ -2026,7 +2095,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
         // For member or index assignment
         if (expr.member.has_value()) {
             // Field assignment: obj.field = value
-            Reg object_reg = emit_checked_dereference(*expr.object, emit_expr(*expr.object));
+            Reg object_reg = emit_checked_dereference(*expr.object, emit_expr(*expr.object), true);
             std::string field_name = expr.member.value();
             
             // Get the type of the object to find the correct frame
@@ -2083,7 +2152,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
             return 0;
         } else {
             // Index assignment - handle dict/list/tuple element assignment
-            Reg object_reg = emit_checked_dereference(*expr.object, emit_expr(*expr.object));
+            Reg object_reg = emit_checked_dereference(*expr.object, emit_expr(*expr.object), true);
             Reg index_reg = emit_expr(*expr.index);
             
             TypePtr object_type = get_register_language_type(object_reg);
@@ -2182,14 +2251,15 @@ Reg Generator::emit_grouping_expr(LM::Frontend::AST::GroupingExpr& expr) {
 
 // Nullable references may be compared or copied, but dereferencing one must
 // execute the strict validity obligation. Proven-local objects have no handle.
-Reg Generator::emit_checked_dereference(LM::Frontend::AST::Expression& object, Reg value) {
+Reg Generator::emit_checked_dereference(LM::Frontend::AST::Expression& object, Reg value, bool writable, bool nullable) {
     if (!ownership_facts_) return value;
     auto fact = ownership_facts_->nodes.find(object.memory_info.semantic_id);
     if (fact == ownership_facts_->nodes.end()) return value;
     auto handle = checked_references_.find(fact->second.binding);
     if (handle == checked_references_.end()) return value;
     auto resolved = allocate_register();
-    emit_instruction(LIR_Inst(LIR_Op::RefResolve, Type::Ptr, resolved, handle->second, UINT32_MAX, 0));
+    emit_instruction(LIR_Inst(LIR_Op::RefResolve, Type::Ptr, resolved, handle->second, UINT32_MAX,
+                             (writable ? Memory::ReferenceWritable : 0) | (nullable ? Memory::ReferenceNullable : 0)));
     if (object.inferred_type) set_register_language_type(resolved, object.inferred_type);
     return resolved;
 }

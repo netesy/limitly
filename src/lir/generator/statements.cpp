@@ -232,9 +232,24 @@ void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
                 const bool initially_nil = !variable->initializer || (variable->initializer->inferred_type && variable->initializer->inferred_type->tag == TypeTag::Nil);
                 if ((fact.managed || initially_nil) && (fact.unknown_origin || ownership_facts_->reference_bindings.count(fact.binding)) && value != UINT32_MAX) {
                     auto handle = allocate_register();
-                    emit_instruction(LIR_Inst(LIR_Op::RefCreate, Type::U64, handle, value, UINT32_MAX, Memory::ReferenceNullable));
+                    auto permission = Memory::ReferenceNullable | (ownership_facts_->writable_bindings.count(fact.binding) ? Memory::ReferenceWritable : 0);
+                    emit_instruction(LIR_Inst(LIR_Op::RefCreate, Type::U64, handle, value, UINT32_MAX, permission));
                     checked_references_[fact.binding] = handle;
                 }
+            }
+        }
+        // End a proven nonescaping block-local lease at its last source use.
+        // Objects retain their normal region ownership/destruction. Keep a
+        // nullable zero in the handle register for later reassignment cleanup.
+        if (!dynamic_cast<LM::Frontend::AST::ReturnStatement*>(&stmt) &&
+            !dynamic_cast<LM::Frontend::AST::BreakStatement*>(&stmt) &&
+            !dynamic_cast<LM::Frontend::AST::ContinueStatement*>(&stmt)) {
+            auto ends = ownership_facts_->borrow_ends.find(stmt.memory_info.semantic_id);
+            if (ends != ownership_facts_->borrow_ends.end()) for (auto binding : ends->second) {
+                auto handle = checked_references_.find(binding);
+                if (handle == checked_references_.end()) continue;
+                emit_instruction(LIR_Inst(LIR_Op::RefRelease, Type::Void, UINT32_MAX, handle->second, UINT32_MAX, Memory::ReferenceNullable));
+                emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::U64, handle->second, make_u64(0)));
             }
         }
     }
@@ -318,6 +333,23 @@ void Generator::emit_expr_stmt(LM::Frontend::AST::ExprStatement& stmt) {
 
 
 void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
+    if (stmt.type && stmt.type.value()->typeName == "atomic") {
+        Reg initial = stmt.initializer ? emit_expr(*stmt.initializer) : allocate_register();
+        if (!stmt.initializer) emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, initial, make_i64(0)));
+        Reg cell = allocate_register();
+        LIR_Inst create(LIR_Op::NewFrame, Type::Ptr, cell, 0, 0, 1);
+        create.type_name = "__atomic_scalar";
+        emit_instruction(create);
+        emit_instruction(LIR_Inst(LIR_Op::FrameSetFieldAtomic, Type::Void, cell, 0, initial));
+        set_register_abi_type(cell, Type::Ptr);
+        if (current_function_ && current_function_->name == current_module_ + ".__init__") {
+            LIR_Inst store(LIR_Op::StoreGlobal, Type::Void, 0, cell, 0);
+            store.func_name = current_module_ + "." + stmt.name;
+            emit_instruction(store);
+        } else bind_variable(stmt.name, cell);
+        return;
+    }
+
     // Determine the declared type first, before processing the initializer
     TypePtr declared_type = nullptr;
     if (stmt.type.has_value()) {

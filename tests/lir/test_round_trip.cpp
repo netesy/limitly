@@ -751,6 +751,28 @@ int main() {
  CHECK(rejected,"deserialization bypassed reference/lifetime verification");
  }
  }
+ // Read resolution must never authorize subsequent writes, even for a
+ // writable token and after a pointer copy or serialization.
+ for (auto operation : {LIR_Op::FrameSetField, LIR_Op::FrameSetFieldAtomic,
+                         LIR_Op::FrameFieldAtomicAdd, LIR_Op::ListSet, LIR_Op::ListAppend, LIR_Op::Call}) {
+ for (bool writable : {false, true}) {
+ LIR_Function permissions("resolved_pointer_permissions",0); permissions.register_count=5;
+ permissions.instructions.emplace_back(LIR_Op::ListCreate,LM::LIR::Type::Ptr,0,UINT32_MAX,UINT32_MAX);
+ permissions.instructions.emplace_back(LIR_Op::LoadConst,LM::LIR::Type::I64,4,make_i64(1));
+ permissions.instructions.emplace_back(LIR_Op::RefCreate,LM::LIR::Type::U64,1,0,UINT32_MAX,1);
+ permissions.instructions.emplace_back(LIR_Op::RefResolve,LM::LIR::Type::Ptr,2,1,UINT32_MAX,writable?1:0);
+ permissions.instructions.emplace_back(LIR_Op::Mov,LM::LIR::Type::Ptr,3,2,UINT32_MAX);
+ if(operation==LIR_Op::ListAppend) permissions.instructions.emplace_back(operation,LM::LIR::Type::Void,UINT32_MAX,3,4);
+ else if(operation==LIR_Op::Call){
+     LIR_Inst mutation(LIR_Op::Call,"mutable_callee",std::vector<Reg>{3});
+     mutation.call_arg_ownership={LM::Memory::Ownership::WriteBorrow};permissions.instructions.push_back(mutation);
+ } else permissions.instructions.emplace_back(operation,LM::LIR::Type::Void,3,0,4);
+ permissions.instructions.emplace_back(LIR_Op::Ret,LM::LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX);
+ std::vector<std::string> errors;
+ CHECK(Verifier::verify_ownership(permissions,errors)==writable,"resolved pointer write permission lost");
+ bool accepted=true;try{(void)Serializer::deserialize(Serializer::serialize(permissions));}catch(const std::exception&){accepted=false;}
+ CHECK(accepted==writable,"serialized pointer write permission lost");
+ }}
  // Sparse reference facts must retain all future reads, including stores and
  // reads whose results are unused. Only overwritten/dead facts may disappear.
  for (int variant = 0; variant < 5; ++variant) {

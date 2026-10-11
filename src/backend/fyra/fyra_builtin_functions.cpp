@@ -978,31 +978,10 @@ void FyraBuiltinFunctions::emit_assert(ir::Module* module, ir::IRBuilder* builde
                                      {i64, i64});
     if (!fn->getBasicBlocks().empty()) return;
 
-    ir::BasicBlock* a_entry = builder->createBasicBlock("entry", fn);
-    ir::BasicBlock* a_fail  = builder->createBasicBlock("fail",  fn);
-    ir::BasicBlock* a_pass  = builder->createBasicBlock("pass",  fn);
-
-    builder->setInsertPoint(a_entry);
-    ir::Value* cond = fn->getParameters().front().get();
-    ir::Value* is_true = builder->createCeq(cond, ctx->getConstantInt(i64, 18)); // VAL_TRUE
-    ir::Value* is_one  = builder->createCeq(cond, ctx->getConstantInt(i64, 1));  // raw bool 1
-    ir::Value* is_pass = builder->createOr(is_true, is_one);
-    builder->createBr(is_pass, a_pass, a_fail);
-
-    builder->setInsertPoint(a_fail);
-    const std::string fail_msg = "Assertion failed\n";
-    ir::GlobalVariable* gv = get_or_create_global_str(module, builder, "assert_fail", fail_msg);
-    builder->createExternCall("io.write", {
-        ctx->getConstantInt(i64, 1),
-        builder->createAdd(gv, ctx->getConstantInt(i64, StringABI::DATA_OFFSET)),
-        ctx->getConstantInt(i64, (int64_t)fail_msg.length())
-    }, i64);
-    builder->createExternCall("process.exit", {
-        ctx->getConstantInt(i64, 1)
-    }, nullptr);
-    builder->createRet(nullptr);
-
-    builder->setInsertPoint(a_pass);
+    builder->setInsertPoint(builder->createBasicBlock("entry",fn));
+    auto parameters=fn->getParameters().begin();
+    auto* condition=parameters->get();++parameters;
+    builder->createExternCall("lymar_aot_assert",{condition,parameters->get()},nullptr);
     builder->createRet(nullptr);
 }
 

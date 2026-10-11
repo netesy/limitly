@@ -420,6 +420,7 @@ std::vector<uint8_t> Serializer::serialize(const LIR_Function& func) {
     w.u32(static_cast<uint32_t>(func.inferred_effects.returned_capture_parameters.size()));
     for (auto [capture, p] : func.inferred_effects.returned_capture_parameters) {w.u64(capture); w.u32(p);}
     identities(func.inferred_effects.captures_opaque);
+    identities(func.inferred_effects.captures_mutated);
     for (const auto& inst : func.instructions) {
         identities(inst.ownership.reads); identities(inst.ownership.consumes); identities(inst.ownership.defines); identities(inst.ownership.initializes);
         w.u32(static_cast<uint32_t>(inst.ownership.aliases.size()));
@@ -563,6 +564,7 @@ LIR_Function Serializer::deserialize(const std::vector<uint8_t>& buffer) {
             throw std::runtime_error("LIR deserialize: invalid returned closure capture");
     }
     read_ids(func.inferred_effects.captures_opaque);
+    read_ids(func.inferred_effects.captures_mutated);
     for (auto& inst : func.instructions) {
         read_ids(inst.ownership.reads); read_ids(inst.ownership.consumes); read_ids(inst.ownership.defines); read_ids(inst.ownership.initializes);
         auto count = r.u32(); r.need(static_cast<size_t>(count) * 16);

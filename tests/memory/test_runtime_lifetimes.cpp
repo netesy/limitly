@@ -3,11 +3,14 @@
 #include "backend/vm/vm_list.hh"
 #include "backend/vm/vm_tuple.hh"
 #include "backend/native/abi.hh"
+#include "backend/native/frame_lowering.hh"
 #include "runtime/lymarrt/lymarrt.h"
 #include "lir/functions.hh"
 #include <cassert>
 #include <cstddef>
 #include <iostream>
+#include <thread>
+#include "backend/vm/vm_runtime.hh"
 
 using LM::Backend::VM::Register::RegisterVM;
 using namespace LM::LIR;
@@ -18,11 +21,65 @@ static_assert(sizeof(LmTuple) == 32);
 
 int main() {
     {
+        // Registers are mutable in canonical LIR. Cached addresses belong to
+        // establishing instructions, not to a register that can be rebound.
+        LIR_Function aliases("frame_view_rebinding",0);
+        aliases.instructions = {
+            LIR_Inst(LIR_Op::NewFrame,LM::LIR::Type::Ptr,0,0,0,2),
+            LIR_Inst(LIR_Op::FrameGetField,LM::LIR::Type::I64,1,0,1),
+            LIR_Inst(LIR_Op::Mov,LM::LIR::Type::Ptr,2,0,0),
+            LIR_Inst(LIR_Op::NewFrame,LM::LIR::Type::Ptr,0,0,0,2),
+            LIR_Inst(LIR_Op::FrameGetField,LM::LIR::Type::I64,3,0,1),
+            LIR_Inst(LIR_Op::FrameGetField,LM::LIR::Type::I64,4,0,1),
+            LIR_Inst(LIR_Op::FrameGetField,LM::LIR::Type::I64,5,2,1)};
+        std::vector<const LIR_Function*> functions{&aliases};
+        LM::Memory::RuntimeEffectAnalysis effects(functions);
+        auto proof=LM::Backend::Native::prove_frame_views(aliases,functions,effects);
+        assert(proof.cached_sources.at(5)==4 && proof.cached_sources.at(6)==1);
+        LIR_Function resolved("resolved_view_rebinding",0);
+        resolved.instructions = {
+            LIR_Inst(LIR_Op::NewFrame,LM::LIR::Type::Ptr,0,0,0,2),
+            LIR_Inst(LIR_Op::RefCreate,LM::LIR::Type::U64,6,0,0),
+            LIR_Inst(LIR_Op::RefResolve,LM::LIR::Type::Ptr,1,6,0),
+            LIR_Inst(LIR_Op::FrameGetField,LM::LIR::Type::I64,2,1,1),
+            LIR_Inst(LIR_Op::NewFrame,LM::LIR::Type::Ptr,1,0,0,2),
+            LIR_Inst(LIR_Op::FrameGetField,LM::LIR::Type::I64,3,1,1),
+            LIR_Inst(LIR_Op::RefResolve,LM::LIR::Type::Ptr,4,6,0),
+            LIR_Inst(LIR_Op::FrameGetField,LM::LIR::Type::I64,5,4,1)};
+        functions={&resolved};
+        LM::Memory::RuntimeEffectAnalysis resolved_effects(functions);
+        proof=LM::Backend::Native::prove_frame_views(resolved,functions,resolved_effects);
+        assert(!proof.cached.count(7));
+    }
+    {
+        RegisterVM owner;
+        auto value=BOX_PTR(lm_frame_alloc("AtomicCounter",1));
+        owner.register_native_allocation(value);
+        auto* frame=static_cast<LmFrame*>(UNBOX_PTR(value));
+        lm_frame_set_field_atomic(frame,0,make_i64(0));
+        std::vector<std::thread> workers;
+        for(int worker=0;worker<8;++worker) workers.emplace_back([&]{
+            for(int step=0;step<10000;++step){
+                lm_frame_field_atomic_add(frame,0,make_i64(2));
+                lm_frame_field_atomic_sub(frame,0,make_i64(1));
+                (void)lm_frame_get_field_atomic(frame,0);
+            }
+        });
+        for(auto& worker:workers)worker.join();
+        assert(as_i64(lm_frame_get_field_atomic(frame,0))==80000);
+    }
+
+    {
         RegisterVM vm;
         vm.native_region(LIR_Op::RegionEnter, 7);
         auto outer = BOX_PTR(lm_list_new());
         vm.register_native_allocation(outer);
         auto outer_reference = vm.borrow_memory(outer, false);
+        RegisterVM unrelated;
+        bool foreign_token_rejected = false;
+        try { (void)unrelated.resolve_memory(outer_reference, false); }
+        catch (const std::runtime_error&) { foreign_token_rejected = true; }
+        assert(foreign_token_rejected);
         std::vector<uint64_t> nested_references;
         for (int depth = 0; depth < 64; ++depth) {
             vm.native_region(LIR_Op::RegionEnter, 7);

@@ -267,6 +267,7 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
         set_register_type(channel_reg, int_type);
     }
     // Set current concurrent block ID for this statement
+    enter_concurrency_context();
     current_concurrent_block_id_ = std::to_string(reinterpret_cast<uintptr_t>(&stmt));
     
     // Initialize scheduler for concurrent execution
@@ -398,6 +399,10 @@ void Generator::emit_concurrent_stmt(LM::Frontend::AST::ConcurrentStatement& stm
                         emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, channel_copy_reg, context_id_reg, 0, 2));
                        // std::cout << "[DEBUG] Channel field set" << std::endl;
                         
+                        Reg mode_reg = allocate_register();
+                        emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, mode_reg, make_i64(1)));
+                        emit_instruction(LIR_Inst(LIR_Op::TaskSetField, Type::Void, mode_reg, context_id_reg, 0, 3));
+
                         // Set worker function name in field 4
                         Reg worker_name_reg = allocate_register();
                         auto string_type = std::make_shared<::Type>(::TypeTag::String);
@@ -540,6 +545,9 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     generator_region_counter_ = 0;
     auto saved_cfg_context = cfg_context_;
     auto saved_current_block = cfg_context_.current_block;
+    auto saved_scopes = scope_stack_;
+    auto saved_references = checked_references_;
+    auto saved_this = this_register_, saved_env = env_register_;
     
     // Create new task function
     current_function_ = std::make_unique<LIR_Function>(task_name, 0);
@@ -550,6 +558,8 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     for (const auto& scope : scope_stack_)
         for (const auto& [name, reg] : scope.vars)
             current_function_->param_count = std::max(current_function_->param_count, reg + 1);
+    for (const auto& [binding, handle] : checked_references_)
+        current_function_->param_count = std::max(current_function_->param_count, handle + 1);
     current_function_->memory_effects.parameters.assign(current_function_->param_count, Memory::Ownership::Unspecified);
     for (Reg reg = 0; reg < current_function_->param_count; ++reg) {
         current_function_->register_types[reg] = Type::Ptr; // Actual kinds travel with the invocation.
@@ -563,6 +573,7 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
 
     cfg_context_.building_cfg = false;
     cfg_context_.current_block = nullptr;
+    remap_task_captures();
     
     // Initialize task function
     enter_scope();
@@ -606,6 +617,9 @@ void Generator::create_and_register_task_function(const std::string& task_name, 
     
     // Restore previous context
     current_function_ = std::move(saved_function);
+    scope_stack_ = std::move(saved_scopes);
+    checked_references_ = std::move(saved_references);
+    this_register_ = saved_this; env_register_ = saved_env;
     generator_region_stack_ = std::move(saved_regions);
     generator_region_counter_ = saved_region_counter;
     cfg_context_ = saved_cfg_context;
@@ -629,6 +643,9 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
     generator_region_counter_ = 0;
     auto saved_cfg_context = cfg_context_;
     auto saved_current_block = cfg_context_.current_block;
+    auto saved_scopes = scope_stack_;
+    auto saved_references = checked_references_;
+    auto saved_this = this_register_, saved_env = env_register_;
     
     // Create new worker function
     current_function_ = std::make_unique<LIR_Function>(worker_name, 0);
@@ -636,6 +653,8 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
     for (const auto& scope : scope_stack_)
         for (const auto& [name, reg] : scope.vars)
             current_function_->param_count = std::max(current_function_->param_count, reg + 1);
+    for (const auto& [binding, handle] : checked_references_)
+        current_function_->param_count = std::max(current_function_->param_count, handle + 1);
     current_function_->memory_effects.parameters.assign(current_function_->param_count, Memory::Ownership::Unspecified);
     for (Reg reg = 0; reg < current_function_->param_count; ++reg) {
         current_function_->register_types[reg] = Type::Ptr;
@@ -649,6 +668,7 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
 
     cfg_context_.building_cfg = false;
     cfg_context_.current_block = nullptr;
+    remap_task_captures();
     
     // Initialize worker function
     enter_scope();
@@ -704,12 +724,38 @@ void Generator::create_and_register_worker_function(const std::string& worker_na
     
     // Restore previous context
     current_function_ = std::move(saved_function);
+    scope_stack_ = std::move(saved_scopes);
+    checked_references_ = std::move(saved_references);
+    this_register_ = saved_this; env_register_ = saved_env;
     generator_region_stack_ = std::move(saved_regions);
     generator_region_counter_ = saved_region_counter;
     cfg_context_ = saved_cfg_context;
     cfg_context_.current_block = saved_current_block;
     
    // std::cout << "[DEBUG] Worker function " << worker_name << " registered" << std::endl;
+}
+
+void Generator::remap_task_captures() {
+    std::map<Reg, Reg> copies;
+    auto copy = [&](Reg reg, bool capability = false) {
+        if (reg >= 3) return reg;
+        if (copies.count(reg)) return copies.at(reg);
+        Reg destination = allocate_register();
+        auto type = capability ? std::make_shared<::Type>(::TypeTag::UInt64) : get_register_type(reg);
+        emit_instruction(LIR_Inst(LIR_Op::TaskGetField, capability ? Type::U64 : type ? language_type_to_abi_type(type) : Type::Ptr,
+                                 destination, 0, UINT32_MAX, 5 + reg));
+        copies[reg] = destination;
+        if (type) set_register_type(destination, type);
+        if (current_function_->ownership_provenance.count(reg))
+            current_function_->ownership_provenance[destination] = current_function_->ownership_provenance.at(reg);
+        return destination;
+    };
+    for (auto& scope : scope_stack_)
+        for (auto& [name, reg] : scope.vars) reg = copy(reg);
+    for (auto& [binding, handle] : checked_references_) handle = copy(handle, true);
+    this_register_ = copy(this_register_); env_register_ = copy(env_register_);
+    // Scheduler slots no longer denote the source bindings copied above.
+    for (Reg reg = 0; reg < 3; ++reg) current_function_->ownership_provenance.erase(reg);
 }
 
 

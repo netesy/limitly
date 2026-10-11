@@ -4,6 +4,11 @@
 #include "ir/Instruction.h"
 #include "ir/Use.h"
 #include "ir/Constant.h"
+#include "ir/PhiNode.h"
+#include "transforms/CFGBuilder.h"
+#include <algorithm>
+#include <unordered_set>
+#include <iostream>
 #include <unordered_map>
 #include <vector>
 
@@ -44,6 +49,10 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
         helpers[name] = fn;
     };
     declare("lymar_aot_frame_field_address", 2, i64);
+    declare("lymar_aot_atomic_load", 2, i64);
+    declare("lymar_aot_atomic_store", 4, void_type);
+    declare("lymar_aot_atomic_update", 5, void_type);
+    declare("lymar_aot_builtin_arity_error", 0, void_type);
     declare("lymar_aot_ref_create", 2, i64);
     declare("lymar_aot_ref_create_checked", 3, i64);
     declare("lymar_aot_nil", 0, i64);
@@ -92,6 +101,14 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_raw_fill_checked", 6, void_type);
     declare("lymar_aot_raw_compare_checked", 6, i64);
     declare("lymar_aot_channel_length", 2, i64);
+    declare("lymar_aot_assert",2,void_type);
+    declare("lymar_aot_channel_new",0,i64);
+    declare("lymar_aot_channel_push",3,void_type);
+    declare("lymar_aot_channel_pop",1,i64);
+    declare("lymar_aot_channel_has_data",1,i64);
+    declare("lymar_aot_channel_close",1,void_type);
+    declare("lymar_aot_scheduler_new",3,i64);
+    declare("lymar_aot_scheduler_run",1,void_type);
     declare("lymar_aot_resize", 2, i64);
     declare("lymar_aot_copy", 3, void_type);
     declare("lymar_aot_raw_copy", 3, void_type);
@@ -173,6 +190,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
         for (auto& block_owner : fn->getBasicBlocks()) {
             auto* block = block_owner.get();
             for (auto it = block->getInstructions().begin(); it != block->getInstructions().end(); ++it) {
+
                 auto* inst = it->get();
                 auto after = std::next(it);
                 auto& operands = inst->getOperands();
@@ -191,7 +209,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         inst->replaceAllUsesWith(call.get());
                         inst = call.get();
                         *it = std::move(call);
-                        if (name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_scalar_to_string") flags[inst] = one;
+                        if (name == "lymar_aot_channel_new" || name == "lymar_aot_scheduler_new" || name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_scalar_to_string") flags[inst] = one;
                         if (name == "lymar_aot_boolean") flags[inst] = boolean;
                         if (name == "lymar_aot_callable_receiver") flags[inst] = one;
                     }
@@ -255,6 +273,14 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                     } else if (callee && (callee->getName() == "lymar_aot_raw_copy_checked" || callee->getName() == "lymar_aot_raw_fill_checked" || callee->getName() == "lymar_aot_raw_compare_checked")) {
                         for (size_t argument = 1; argument <= 3; ++argument)
                             current_operands[argument + 3]->set(flag(current_operands[argument]->get()));
+                    } else if (callee && callee->getName() == "lymar_aot_channel_push") {
+                        current_operands[3]->set(flag(current_operands[2]->get()));
+                    } else if (callee && callee->getName() == "lymar_aot_channel_pop") {
+                        flags[inst] = emit(block, after, "lymar_aot_return_pointer", {});
+                    } else if (callee && (callee->getName() == "lymar_aot_atomic_store" || callee->getName() == "lymar_aot_atomic_update")) {
+                        current_operands[4]->set(flag(current_operands[3]->get()));
+                    } else if (callee && callee->getName() == "lymar_aot_atomic_load") {
+                        flags[inst] = emit(block, after, "lymar_aot_return_pointer", {});
                     } else if (callee && callee->getName() == "lymar_aot_memory_store") {
                         current_operands[4]->set(flag(current_operands[2]->get()));
                         current_operands[5]->set(flag(current_operands[1]->get()));
@@ -319,4 +345,102 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
         }
     }
 }
+
+// AOT workers propagate failures explicitly: no C++ unwinding across machine
+// code generated without portable exception-unwind metadata is required.
+void lower_worker_failures(ir::Module& module) {
+    auto ctx=module.getContextShared();auto* word=ctx->getIntegerType(64);
+    auto declare=[&](const char* name,ir::Type* type) {
+        auto* function=module.getFunction(name);
+        if(!function) {auto value=std::make_unique<ir::Function>(type,name,&module);function=value.get();module.addFunction(std::move(value));}
+        return function;
+    };
+    auto* failed=declare("lymar_aot_worker_failed",word);
+    auto* abort=declare("lymar_aot_call_abort",ctx->getVoidType());
+    std::unordered_set<ir::Function*> reachable;
+    std::vector<ir::Function*> pending;
+    auto root = [&](ir::Function* function) {
+        if (function && !function->getBasicBlocks().empty() && reachable.insert(function).second)
+            pending.push_back(function);
+    };
+    for (auto& owner : module.getFunctions()) {
+        if (owner->getName().starts_with("__lymar_task_entry_")) root(owner.get());
+        for (auto& block : owner->getBasicBlocks()) for (auto& instruction : block->getInstructions()) {
+            const auto& operands = instruction->getOperands();
+            for (size_t index = 0; index < operands.size(); ++index) {
+                // Every address-taken definition is a conservative indirect
+                // worker target, including closures and finalizer callbacks.
+                // A direct callee alone is reached by the worklist below.
+                if (instruction->getOpcode() == ir::Instruction::Call && index == 0) continue;
+                root(dynamic_cast<ir::Function*>(operands[index]->get()));
+            }
+        }
+    }
+    for(size_t index=0;index<pending.size();++index)
+        for(auto& block:pending[index]->getBasicBlocks()) for(auto& instruction:block->getInstructions())
+            for(auto& operand:instruction->getOperands())
+                if(auto* target=dynamic_cast<ir::Function*>(operand->get());target && !target->getBasicBlocks().empty() && reachable.insert(target).second) pending.push_back(target);
+    for(auto& owner:module.getFunctions()) {
+        auto& function=*owner;
+        if(!reachable.count(&function)) continue;
+        bool invocation=false;
+        std::vector<ir::Instruction*> checks;
+        for(auto& block:function.getBasicBlocks()) for(auto& instruction:block->getInstructions()) {
+            auto op=instruction->getOpcode();
+            if(op==ir::Instruction::Call) {
+                auto* target=dynamic_cast<ir::Function*>(instruction->getOperands()[0]->get());
+                const auto name=target?target->getName():"";
+                if(name=="lymar_aot_call_enter") invocation=true;
+                if(name=="lymar_aot_call_enter" || name=="lymar_aot_call_leave" || name=="lymar_aot_worker_failed" || name=="lymar_aot_call_abort") continue;
+                // Value-kind reads and constant markers cannot report a modeled
+                // worker failure. Do not split CFG after pure metadata queries.
+                if (name=="lymar_aot_slot_pointer" || name=="lymar_aot_return_pointer" || name=="lymar_aot_arg_get" || name=="lymar_aot_arg_kind" || name=="lymar_aot_nil" || name=="lymar_aot_boolean" || name=="lymar_aot_region_current") continue;
+                if (name=="lymar_aot_arg_set") continue; // Staging is discharged by the following call boundary.
+                if (name=="lymar_aot_edge" && instruction->getOperands().size()>1) {
+                    auto* address=dynamic_cast<ir::Instruction*>(instruction->getOperands()[1]->get());
+                    if(address && address->getOpcode()==ir::Instruction::Alloc) continue; // Compiler stack slots carry no region edge.
+                }
+
+
+                checks.push_back(instruction.get());
+            } else if(op==ir::Instruction::ExternCall || op==ir::Instruction::Jmp || op==ir::Instruction::Jnz || op==ir::Instruction::Jz) checks.push_back(instruction.get());
+        }
+        if(checks.empty()) continue;
+        auto exit=std::make_unique<ir::BasicBlock>(&function,"worker_failure");auto* failure=exit.get();
+        if(invocation) failure->addInstruction(std::make_unique<ir::Instruction>(ctx->getVoidType(),ir::Instruction::Call,std::vector<ir::Value*>{abort},failure));
+        std::vector<ir::Value*> returned;
+        if(!function.getType()->isVoidTy()) returned.push_back(function.getType()->isFloatingPoint()?static_cast<ir::Value*>(ctx->getConstantFP(ctx->getDoubleType(),0.0)):static_cast<ir::Value*>(ctx->getConstantInt(word,0)));
+        failure->addInstruction(std::make_unique<ir::Instruction>(ctx->getVoidType(),ir::Instruction::Ret,returned,failure));
+        function.addBasicBlock(std::move(exit));
+        unsigned sequence=0;
+        for(auto* instruction:checks) {
+            auto* block=instruction->getParent();auto& list=block->getInstructions();
+            auto where=std::find_if(list.begin(),list.end(),[&](auto& item){return item.get()==instruction;});
+            const auto op=instruction->getOpcode();
+            if(op==ir::Instruction::Call || op==ir::Instruction::ExternCall) ++where;
+            auto continuation=std::make_unique<ir::BasicBlock>(&function,"worker_continue_"+std::to_string(sequence++));
+            auto* next=continuation.get();
+            next->getInstructions().splice(next->getInstructions().end(),list,where,list.end());
+            for(auto& moved:next->getInstructions()) moved->setParent(next);
+            // The transferred terminator now contributes incoming Phi values
+            // from the continuation rather than its original predecessor.
+            if (!next->getInstructions().empty()) {
+                auto* terminator = next->getInstructions().back().get();
+                std::unordered_set<ir::BasicBlock*> successors;
+                for (auto& operand : terminator->getOperands())
+                    if (auto* successor = dynamic_cast<ir::BasicBlock*>(operand->get())) successors.insert(successor);
+                for (auto* successor : successors) for (auto& phi : successor->getInstructions()) {
+                    if (!dynamic_cast<ir::PhiNode*>(phi.get())) continue;
+                    for (auto& operand : phi->getOperands()) if (operand->get() == block) operand->set(next);
+                }
+            }
+            auto call=std::make_unique<ir::Instruction>(word,ir::Instruction::Call,std::vector<ir::Value*>{failed},block);
+            auto* condition=call.get();list.push_back(std::move(call));
+            list.push_back(std::make_unique<ir::Instruction>(ctx->getVoidType(),ir::Instruction::Jnz,std::vector<ir::Value*>{condition,failure,next},block));
+            function.addBasicBlock(std::move(continuation));
+        }
+        transforms::CFGBuilder::run(function);
+    }
+}
+
 }

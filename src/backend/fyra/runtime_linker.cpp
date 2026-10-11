@@ -133,6 +133,8 @@ int run_driver(const std::vector<std::string>& arguments) {
         command.push_back("-no-pie");
         command.push_back("-Wl,-z,noexecstack");
     } else if (target.os == target::OS::MacOS) command.push_back("-Wl,-no_pie");
+    if (target.os == target::OS::Linux || target.os == target::OS::FreeBSD || target.os == target::OS::Android || target.os == target::OS::MacOS)
+        command.push_back("-pthread");
     command.push_back(temporary);
     command.insert(command.end(), libraries.begin(), libraries.end());
     command.insert(command.end(), {runtime.string(), "-o", options.output_file});

@@ -59,7 +59,13 @@ void RegisterVM::execute_cast(const LIR::LIR_Inst* pc) {
             } else if (pc->result_type == LIR::Type::Bool) {
                 registers[pc->dst] = to_bool(val) ? VAL_TRUE : VAL_FALSE;
             } else {
-                registers[pc->dst] = val;
+                auto language_type = get_register_language_type(pc->dst);
+                if (language_type && language_type->tag == TypeTag::String &&
+                    !(IS_PTR(val) && static_cast<ObjHeader*>(UNBOX_PTR(val))->type_id == TYPE_STRING)) {
+                    auto text = to_string(val);
+                    registers[pc->dst] = BOX_PTR(lm_str_from_bytes(text.data(), text.size()));
+                    register_native_allocation(registers[pc->dst]);
+                } else registers[pc->dst] = val;
             }
             break;
         }

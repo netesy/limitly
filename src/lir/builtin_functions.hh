@@ -42,6 +42,12 @@ public:
     const std::string& getName() const { return name_; }
     const std::vector<TypeTag>& getParameterTypes() const { return paramTypes_; }
     TypeTag getReturnType() const { return returnType_; }
+    bool acceptsArgumentCount(size_t count) const {
+        // These are builtin API contracts, not inferred ownership effects.
+        if (name_ == "print") return true;
+        if (name_ == "input") return count <= 1;
+        return count == paramTypes_.size();
+    }
 };
 
 // Manager for LIR-specific builtin functions (VM Intrinsics)

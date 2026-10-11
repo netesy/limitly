@@ -13,6 +13,10 @@ namespace LIR {
 bool Verifier::verify(const LIR_Function& func, std::vector<std::string>& errors) {
     bool success = verify_memory_regions(func, errors);
     if (!verify_ownership(func, errors)) success = false;
+    for(auto capture:func.inferred_effects.captures_mutated)
+        if(!capture || std::find(func.ownership_captures.begin(),func.ownership_captures.end(),capture)==func.ownership_captures.end()) {
+            errors.push_back("Undeclared mutated capture in function memory effects: "+func.name);success=false;
+        }
     if ((!func.memory_effects.parameters.empty() && func.memory_effects.parameters.size() != func.param_count) ||
         (func.memory_effects.borrowed_parameter != UINT32_MAX && func.memory_effects.borrowed_parameter >= func.param_count)) {
         errors.push_back("Invalid function memory effects: " + func.name);
@@ -137,6 +141,7 @@ bool Verifier::verify_ownership(const LIR_Function& func, std::vector<std::strin
         std::map<Reg, std::map<size_t, unsigned>> handles, pointers;
         std::vector<uint32_t> regions;
         std::map<size_t, unsigned> permissions; // 1: read-only, 2: writable, 4: dynamic
+        std::map<Reg, unsigned> pointer_permissions;
         std::set<Reg> return_promotions;
         bool operator==(const References&) const = default;
     };
@@ -149,11 +154,13 @@ bool Verifier::verify_ownership(const LIR_Function& func, std::vector<std::strin
         switch (inst.op) {
             case LIR_Op::Nop: case LIR_Op::Label: case LIR_Op::Jump:
             case LIR_Op::RegionEnter: case LIR_Op::RegionExit: case LIR_Op::LoadConst: break;
-            case LIR_Op::FrameGetField: case LIR_Op::Cast:
+            case LIR_Op::FrameGetField: case LIR_Op::FrameGetFieldAtomic: case LIR_Op::Cast:
             case LIR_Op::RegionMove: case LIR_Op::RefCreate: case LIR_Op::RefResolve:
             case LIR_Op::RefRelease: case LIR_Op::RefMove: case LIR_Op::OwnershipConsume:
                 operands = {inst.a}; break;
-            case LIR_Op::FrameSetField: operands = {inst.dst, inst.b}; break;
+            case LIR_Op::FrameSetField: case LIR_Op::FrameSetFieldAtomic:
+            case LIR_Op::FrameFieldAtomicAdd: case LIR_Op::FrameFieldAtomicSub:
+                operands = {inst.dst, inst.b}; break;
             case LIR_Op::ListSet: case LIR_Op::DictSet: case LIR_Op::TupleSet:
                 operands = {inst.dst, inst.a, inst.b}; break;
             default: operands = {inst.a, inst.b}; break;
@@ -175,9 +182,27 @@ bool Verifier::verify_ownership(const LIR_Function& func, std::vector<std::strin
             // register uses. Store operations use dst as an input object.
             auto operands = reference_operands(inst);
             for (auto r : operands) if (state.pointers.count(r) && !(inst.isReturn() && state.return_promotions.count(r))) valid(state.pointers[r], i);
+            Reg written = UINT32_MAX;
+            switch (inst.op) {
+                case LIR_Op::FrameSetField: case LIR_Op::FrameSetFieldAtomic:
+                case LIR_Op::FrameFieldAtomicAdd: case LIR_Op::FrameFieldAtomicSub:
+                case LIR_Op::ListSet: case LIR_Op::DictSet: case LIR_Op::TupleSet:
+                    written = inst.dst; break;
+                case LIR_Op::MemoryStore: written = inst.a; break;
+                case LIR_Op::ListAppend: case LIR_Op::Store: written = inst.a; break;
+                default: break;
+            }
+            if (state.pointers.count(written) && state.pointer_permissions[written] != 2)
+                fail(i, "mutation through a reference without write resolution");
+            for (size_t argument = 0; argument < inst.call_arg_ownership.size(); ++argument)
+                if (inst.call_arg_ownership[argument] == Memory::Ownership::WriteBorrow &&
+                    argument < inst.call_args.size() && state.pointers.count(inst.call_args[argument]) &&
+                    state.pointer_permissions[inst.call_args[argument]] != 2)
+                    fail(i, "mutable call argument without write resolution");
             auto source = state.handles.count(inst.a) ? state.handles.at(inst.a) : std::map<size_t,unsigned>{};
             auto source_pointers = state.pointers.count(inst.a) ? state.pointers.at(inst.a) : std::map<size_t,unsigned>{};
-            if (inst.dst != UINT32_MAX && inst.result_type != Type::Void && !inst.isReturn()) {state.handles.erase(inst.dst); state.pointers.erase(inst.dst); state.return_promotions.erase(inst.dst);}
+            auto source_permission = state.pointer_permissions.count(inst.a) ? state.pointer_permissions.at(inst.a) : 0;
+            if (inst.dst != UINT32_MAX && inst.result_type != Type::Void && !inst.isReturn()) {state.handles.erase(inst.dst); state.pointers.erase(inst.dst); state.pointer_permissions.erase(inst.dst); state.return_promotions.erase(inst.dst);}
             if (inst.op == LIR_Op::RegionMove && inst.imm == 0) state.return_promotions.insert(inst.a);
             else if (inst.op == LIR_Op::RegionEnter) state.regions.push_back(static_cast<uint32_t>(inst.imm));
             else if (inst.op == LIR_Op::RegionExit) {
@@ -196,6 +221,7 @@ bool Verifier::verify_ownership(const LIR_Function& func, std::vector<std::strin
                     for (auto [token, live] : source) if (token && (inst.imm & Memory::ReferenceWritable) && (state.permissions[token] & 1))
                         fail(i, "write resolution of a read-only reference");
                     state.pointers[inst.dst] = source;
+                    state.pointer_permissions[inst.dst] = (inst.imm & Memory::ReferenceWritable) ? 2 : 1;
                 } else {
                     for (auto [token, live] : source) for (auto* values : {&state.handles, &state.pointers})
                         for (auto& [reg, tokens] : *values) if (tokens.count(token)) tokens[token] = 4;
@@ -207,10 +233,14 @@ bool Verifier::verify_ownership(const LIR_Function& func, std::vector<std::strin
                         state.permissions[token] = permission;
                     }
                 }
-            } else if (inst.op == LIR_Op::Mov) {
+            } else if (inst.op == LIR_Op::Mov || inst.op == LIR_Op::Copy) {
                 if (!source.empty()) state.handles[inst.dst] = source;
                 if (!source_pointers.empty()) state.pointers[inst.dst] = source_pointers;
-            } else if (inst.op == LIR_Op::Call || inst.op == LIR_Op::CallIndirect || inst.op == LIR_Op::CallBuiltin || inst.op == LIR_Op::LoadGlobal) {
+                if (!source_pointers.empty()) state.pointer_permissions[inst.dst] = source_permission;
+            } else if (inst.op == LIR_Op::Call || inst.op == LIR_Op::CallIndirect || inst.op == LIR_Op::CallBuiltin || inst.op == LIR_Op::LoadGlobal ||
+                       (inst.op == LIR_Op::TaskGetField && inst.result_type == Type::U64)) {
+                // Captured capability words retain dynamic validity/permission
+                // obligations. Task context loads establish no static proof.
                 if (inst.dst != UINT32_MAX) state.handles[inst.dst] = {{0, 2}};
             }
         }
@@ -244,6 +274,7 @@ bool Verifier::verify_ownership(const LIR_Function& func, std::vector<std::strin
             }
         };
         retain(result.handles, state.handles); retain(result.pointers, state.pointers);
+        for (auto [reg, permission] : state.pointer_permissions) if (live.count(reg)) result.pointer_permissions[reg] = permission;
         for (auto token : tokens) if (auto permission = state.permissions.find(token); permission != state.permissions.end())
             result.permissions.emplace(*permission);
         for (auto reg : state.return_promotions) if (live.count(reg)) result.return_promotions.insert(reg);
@@ -269,6 +300,7 @@ bool Verifier::verify_ownership(const LIR_Function& func, std::vector<std::strin
             };
             merge_values(merged.handles, edge.handles); merge_values(merged.pointers, edge.pointers);
             for (auto [token, permission] : edge.permissions) merged.permissions[token] |= permission;
+            for (auto [reg, permission] : edge.pointer_permissions) merged.pointer_permissions[reg] |= permission;
             for (auto it = merged.return_promotions.begin(); it != merged.return_promotions.end();) {
                 if (!edge.return_promotions.count(*it)) it = merged.return_promotions.erase(it); else ++it;
             }

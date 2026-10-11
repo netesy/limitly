@@ -229,6 +229,8 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
         current_function_->inferred_effects = ownership_facts_->functions[id];
         current_function_->ownership_parameters = ownership_facts_->parameters[id];
         for (auto capture : current_function_->inferred_effects.captures_read) current_function_->ownership_captures.push_back(capture);
+        for (auto capture : current_function_->inferred_effects.captures_mutated)
+            if (std::find(current_function_->ownership_captures.begin(), current_function_->ownership_captures.end(), capture) == current_function_->ownership_captures.end()) current_function_->ownership_captures.push_back(capture);
     }
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
@@ -374,6 +376,8 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
         current_function_->inferred_effects = ownership_facts_->functions[id];
         current_function_->ownership_parameters = ownership_facts_->parameters[id];
         for (auto capture : current_function_->inferred_effects.captures_read) current_function_->ownership_captures.push_back(capture);
+        for (auto capture : current_function_->inferred_effects.captures_mutated)
+            if (std::find(current_function_->ownership_captures.begin(), current_function_->ownership_captures.end(), capture) == current_function_->ownership_captures.end()) current_function_->ownership_captures.push_back(capture);
     }
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);
@@ -505,6 +509,8 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
         current_function_->inferred_effects = ownership_facts_->functions[id];
         current_function_->ownership_parameters = ownership_facts_->parameters[id];
         for (auto capture : current_function_->inferred_effects.captures_read) current_function_->ownership_captures.push_back(capture);
+        for (auto capture : current_function_->inferred_effects.captures_mutated)
+            if (std::find(current_function_->ownership_captures.begin(), current_function_->ownership_captures.end(), capture) == current_function_->ownership_captures.end()) current_function_->ownership_captures.push_back(capture);
     }
     // Convert LIR_Function to LIRFunction and update the registration
     auto result = std::move(current_function_);

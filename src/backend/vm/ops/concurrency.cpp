@@ -14,6 +14,7 @@
 #include <stdexcept>
 #include <thread>
 #include <chrono>
+#include <exception>
 
 namespace LM {
 namespace Backend {
@@ -304,6 +305,8 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 std::mutex task_mutex;
                 size_t task_index = 0;
                 std::vector<std::thread> workers;
+                std::exception_ptr task_failure;
+                std::atomic<bool> stop_tasks{false};
 
                 for (uint32_t c = 0; c < num_cores; ++c) {
                     workers.emplace_back([&]() {
@@ -318,7 +321,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                             TaskContext* context = nullptr;
                             {
                                 std::lock_guard<std::mutex> lock(task_mutex);
-                                if (task_index >= task_contexts.size()) break;
+                                if (stop_tasks.load() || task_index >= task_contexts.size()) break;
                                 context = task_contexts[task_index++].get();
                             }
                             if (!context || context->state == TaskState::COMPLETED || context->cancelled.load()) continue;
@@ -336,18 +339,28 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                             if (!func) continue;
 
                             auto run_once = [&](RegisterValue field1) {
-                                if (context->cancelled.load()) return;
+                                if (context->cancelled.load() || stop_tasks.load()) return;
                                 worker_vm.registers = saved_registers;
                                 if (worker_vm.registers.size() < saved_registers.size()) {
                                     worker_vm.registers.resize(saved_registers.size(), VAL_NIL);
                                 }
+                                for (const auto& [field,value] : context->fields)
+                                    if(field >= 11 && static_cast<size_t>(field-8) < worker_vm.registers.size()) worker_vm.registers[field-8]=value;
                                 worker_vm.registers[1] = field1;
+                                worker_vm.registers[0] = BOX_PTR(context);
                                 auto ch = context->fields.find(2);
                                 if (ch != context->fields.end()) worker_vm.registers[2] = ch->second;
                                 worker_vm.current_function_ = func;
                                 try {
                                     worker_vm.execute_function(*func);
-                                } catch (...) {}
+                                } catch (...) {
+                                    std::lock_guard<std::mutex> lock(task_mutex);
+                                    if (scheduler_config.error_policy != LIR::Metadata::ErrorPolicy::Partial && !task_failure)
+                                        task_failure = std::current_exception();
+                                    if (scheduler_config.error_policy != LIR::Metadata::ErrorPolicy::Continue)
+                                        stop_tasks.store(true);
+                                    context->cancelled.store(true);
+                                }
                             };
 
                             auto data_it = context->fields.find(1);
@@ -355,11 +368,11 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                                 if (data_it != context->fields.end() && IS_PTR(data_it->second)) {
                                     auto* channel = (LM::Backend::Channel*)UNBOX_PTR(data_it->second);
                                     RegisterValue item = VAL_NIL;
-                                    while (!context->cancelled.load() && channel->poll(item)) run_once(item);
+                                    while (!context->cancelled.load() && !stop_tasks.load() && channel->poll(item)) run_once(item);
                                 } else if (data_it != context->fields.end() && IS_INT(data_it->second)) {
                                     RegisterValue item = VAL_NIL;
                                     do {
-                                        if (context->cancelled.load()) break;
+                                        if (context->cancelled.load() || stop_tasks.load()) break;
                                         item = rm.call(to_int(data_it->second), ResourceOperation::POLL,
                                                        {}, nullptr);
                                         if (!IS_NIL(item)) run_once(item);
@@ -375,8 +388,15 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 for (auto& w : workers) {
                     if (w.joinable()) w.join();
                 }
+                if (task_failure) {
+                    current_function_ = saved_func;
+                    std::rethrow_exception(task_failure);
+                }
             } else {
+                std::exception_ptr task_failure;
+                bool stop_tasks = false;
                 for (auto& context_ptr : task_contexts) {
+                if (stop_tasks) break;
                 if (scheduler_config.timeout_ms != 0) {
                     const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::steady_clock::now() - scheduler_config.started).count();
@@ -403,20 +423,25 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 if (!func) continue;
 
                 auto run_once = [&](RegisterValue field1) {
-                    if (context->cancelled.load()) return;
+                    if (context->cancelled.load() || stop_tasks) return;
                     if (registers.size() < saved_registers.size()) {
                         registers.resize(saved_registers.size(), VAL_NIL);
                     }
+                    for (const auto& [field,value] : context->fields)
+                        if(field >= 11 && static_cast<size_t>(field-8) < registers.size()) registers[field-8]=value;
                     registers[1] = field1;
+                    registers[0] = BOX_PTR(context);
                     auto ch = context->fields.find(2);
                     if (ch != context->fields.end()) registers[2] = ch->second;
                     current_function_ = func;
                     try {
                         execute_function(*func);
                     } catch (...) {
-                        if (scheduler_config.error_policy == LIR::Metadata::ErrorPolicy::Stop) throw;
-                        if (scheduler_config.error_policy == LIR::Metadata::ErrorPolicy::Partial)
-                            context->state = TaskState::COMPLETED;
+                        if (scheduler_config.error_policy != LIR::Metadata::ErrorPolicy::Partial && !task_failure)
+                            task_failure = std::current_exception();
+                        if (scheduler_config.error_policy != LIR::Metadata::ErrorPolicy::Continue)
+                            stop_tasks = true;
+                        context->cancelled.store(true);
                     }
                 };
 
@@ -440,6 +465,10 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 }
                 context->state = TaskState::COMPLETED;
             }
+                if (task_failure) {
+                    current_function_ = saved_func;
+                    std::rethrow_exception(task_failure);
+                }
             }
             // Captured registers are the structured task environment. Keep
             // mutations made by completed tasks; restoring saved_registers

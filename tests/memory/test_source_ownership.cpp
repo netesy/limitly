@@ -13,9 +13,17 @@
 #include <filesystem>
 #include <iostream>
 #include <set>
+#include <chrono>
+#include <cstdlib>
 using namespace LM;
 int main(int argc, char** argv) {
     assert(argc == 2);
+    const auto started = std::chrono::steady_clock::now();
+    auto stage = [&](const char* name) {
+        if (std::getenv("LYMAR_TEST_TRACE_STAGES"))
+            std::cerr << name << ": " << std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now()-started).count() << "ms\n";
+    };
     {
         LIR::LIR_Function invalid_raw("invalid_raw_kind", 0);
         invalid_raw.instructions.emplace_back(LIR::LIR_Op::MemoryLoad, LIR::Type::I64, 1, 0, UINT32_MAX, 11);
@@ -46,6 +54,13 @@ int main(int argc, char** argv) {
         partial.instructions.emplace_back(LIR::LIR_Op::Nop, LIR::Type::Void, UINT32_MAX);
         assert(!Memory::proven_scalar_leaf(partial)); // A reachable exit falls off as nil.
     }
+    {
+        LIR::LIR_Function invalid_capture("invalid_capture_contract",0);
+        invalid_capture.inferred_effects.captures_mutated.insert(123);
+        invalid_capture.instructions.emplace_back(LIR::LIR_Op::Return,LIR::Type::Void,UINT32_MAX,UINT32_MAX,UINT32_MAX);
+        std::vector<std::string> errors;assert(!LIR::Verifier::verify(invalid_capture,errors));
+        assert(std::any_of(errors.begin(),errors.end(),[](const auto& error){return error.find("Undeclared mutated capture")!=std::string::npos;}));
+    }
     const std::string source = R"(
 fn scalar(flag:bool):bool { if(flag){return true;}else{return false;} }
 fn closed_scalar():bool { return false; }
@@ -66,19 +81,49 @@ type Hook=fn([int]):nil;
 frame Box {pub var cb:Hook; pub var data:[int]; pub fn invoke(){self.cb(self.data);}}
 fn pending(box:Box):fn():nil {return fn():nil {box.invoke();};}
 fn element(xs:[[int]]):[int] {return xs[0];}
+fn lease_reuse(xs:[[int]]):int {
+    var first=element(xs);first[0]=7;var prior=first[0];
+    var second=element(xs);second[0]=7;return prior+second[0];
+}
+assert(lease_reuse([[7]])==14);
+fn captured_lease_workers():int {
+    var child:[int];var values=[[7]];child=element(values);var output=channel();
+    concurrent(cores=4){task(i in 1..2){output.send(child[0]);}}
+    var total=0;iter(value in output){total=total+value;}return total;
+}
+assert(captured_lease_workers()==14);
+fn shared_scalar_workers():int {
+    var count:atomic=0;var increment=fn(){count+=1;};
+    concurrent(cores=2){task(i in 1..2){increment();}}
+    return count;
+}
+assert(shared_scalar_workers()==2);
+fn mutate_local_capture() {
+    var values=[1];var change=fn(){values[0]=2;};change();assert(values[0]==2);
+}
+mutate_local_capture();
+
 fn factory(x:[int]):fn():int {return fn():int {return x[0];};}
 var xs=[[7]]; var child=element(xs); print(child[0]);
 {var ys=[[9]]; child=element(ys);} print(child[0]);
+child[0]=9;assert(child[0]==9);
 var observer=factory(child); print(observer());
 var absent={} as {str:[int]}; var maybe=absent["x"] as [int];
 {maybe=absent["y"] as [int];} if(maybe==nil){maybe=[11];} print(maybe[0]);
 fn identity(x:any):any {return x;}
+var builtin_byte=_builtin_string_byte_at;
+assert(builtin_byte("ABC",1)==66);
+var builtin_slice=_builtin_substring;
+assert(builtin_slice("ABC",1,3)=="BC");
+fn invoke_builtin(action:any):int {return action("ABC",2);}
+assert(invoke_builtin(builtin_byte)==67);
 var erased=identity(2); print(erased==nil); print(identity(true)); print(identity(2.5));
 )";
     Frontend::Scanner scanner(source); scanner.scanTokens();
     Frontend::Parser parser(scanner, false);
     auto ast = parser.parse(); assert(ast);
     auto typed = Frontend::TypeCheckerFactory::check_program(ast,source,"source_ownership.lm");
+    stage("typechecking");
     assert(typed.success && typed.errors.empty());
     auto facts = ast->ownership_facts; assert(facts && facts->verified);
     std::map<const Frontend::AST::Node*, Memory::Identity> declaration_identities;
@@ -88,12 +133,14 @@ var erased=identity(2); print(erased==nil); print(identity(true)); print(identit
             declaration_identities[function->body.get()] = function->body->memory_info.semantic_id;
         }
     auto checked = Frontend::MemoryCheckerFactory::check_program(ast,source,"source_ownership.lm");
+    stage("memory checking");
     for (const auto& [declaration, identity] : declaration_identities)
         assert(identity && declaration->memory_info.semantic_id == identity);
     assert(checked.success && ast->ownership_facts == facts);
     LIR::Generator generator; generator.set_import_aliases(typed.import_aliases);
     generator.set_registered_modules(typed.registered_modules);
     auto wrapper = generator.generate_program(typed); assert(wrapper && !generator.has_errors());
+    stage("LIR generation");
     auto& registry = LIR::FunctionRegistry::getInstance();
     auto lookup = [&](const std::string& suffix) -> LIR::LIR_Function* {
         for (const auto& name : registry.getFunctionNames())
@@ -101,6 +148,17 @@ var erased=identity(2); print(erased==nil); print(identity(true)); print(identit
         return nullptr;
     };
     auto* element = lookup("element"); assert(element);
+    auto* lease_reuse = lookup("lease_reuse"); assert(lease_reuse);
+    bool first_created = false, first_released = false, reused = false;
+    LIR::Reg first_handle = UINT32_MAX;
+    for (const auto& instruction : lease_reuse->instructions) {
+        if (instruction.op == LIR::LIR_Op::RefCreate) {
+            if (!first_created) {first_created=true;first_handle=instruction.dst;}
+            else reused |= first_released;
+        }
+        if (instruction.op == LIR::LIR_Op::RefRelease && instruction.a == first_handle) first_released = true;
+    }
+    assert(first_created && first_released && reused);
     auto* scalar = lookup("scalar"); assert(scalar);
     assert(!Memory::proven_scalar_leaf(*scalar));
     auto* closed_scalar = lookup("closed_scalar"); assert(closed_scalar);
@@ -122,25 +180,28 @@ var erased=identity(2); print(erased==nil); print(identity(true)); print(identit
     auto* factory = lookup("factory"); assert(factory);
     assert(!factory->inferred_effects.returned_callables.empty());
     assert(!factory->inferred_effects.returned_capture_parameters.empty());
-    bool captured_obligation = false;
+    bool captured_obligation = false, captured_mutation = false;
     for (const auto& name : registry.getFunctionNames()) {
         auto* function = registry.getFunction(name);
         if (!function || function->instructions.empty()) continue;
         captured_obligation |= !function->inferred_effects.captures_opaque.empty();
+        captured_mutation |= !function->inferred_effects.captures_mutated.empty();
         auto restored = LIR::Serializer::deserialize(LIR::Serializer::serialize(*function));
         assert(restored.inferred_effects == function->inferred_effects);
         assert(restored.ownership_parameters == function->ownership_parameters);
         assert(restored.ownership_captures == function->ownership_captures);
         assert(restored.instructions.size() == function->instructions.size());
-        for (size_t i=0;i<restored.instructions.size();++i) { assert(restored.instructions[i].ownership == function->instructions[i].ownership); assert(restored.instructions[i].imm == function->instructions[i].imm); }
+        for (size_t i=0;i<restored.instructions.size();++i) { assert(restored.instructions[i].op == function->instructions[i].op); assert(restored.instructions[i].ownership == function->instructions[i].ownership); assert(restored.instructions[i].imm == function->instructions[i].imm); }
         registry.registerFunction(name,std::make_unique<LIR::LIR_Function>(std::move(restored)));
     }
     assert(captured_obligation);
+    assert(captured_mutation);
     auto restored = LIR::Serializer::deserialize(LIR::Serializer::serialize(*wrapper));
     std::set<LIR::LIR_Op> operations;
     for (const auto& instruction : restored.instructions) operations.insert(instruction.op);
     for (auto op : {LIR::LIR_Op::RefCreate,LIR::LIR_Op::RefResolve,LIR::LIR_Op::RefRelease,LIR::LIR_Op::RefMove}) assert(operations.count(op));
     Backend::VM::Register::RegisterVM vm; vm.execute(restored); vm.reset();
+    stage("serialized VM execution");
 #if defined(FYRA_AVAILABLE) && defined(__linux__) && defined(__x86_64__)
     for (int level=0;level<3;++level) {
         Backend::Fyra::FyraCompiler compiler;
@@ -148,6 +209,7 @@ var erased=identity(2); print(erased==nil); print(identity(true)); print(identit
         auto result = compiler.compile_aot(restored,output,Backend::Fyra::Platform::Linux,
             Backend::Fyra::Architecture::X86_64,static_cast<Backend::Fyra::OptimizationLevel>(level));
         if (!result.success) throw std::runtime_error(result.error_message);
+        stage(("Fyra O"+std::to_string(level)).c_str());
     }
 #endif
     std::cout << "Source ownership serialization and execution passed\n";

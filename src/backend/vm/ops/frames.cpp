@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <stdexcept>
 #include <string>
+#include "memory/atomic_field.hh"
 
 namespace LM {
 namespace Backend {
@@ -48,15 +49,17 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::FrameGetFieldAtomic:
             registers[pc->dst] = lm_frame_get_field_atomic(checked_frame(registers[pc->a], pc->b), static_cast<int>(pc->b));
             break;
-        case LIR::LIR_Op::FrameSetFieldAtomic:
-            lm_frame_set_field_atomic(checked_frame(registers[pc->dst], pc->a), static_cast<int>(pc->a), registers[pc->b]);
+        case LIR::LIR_Op::FrameSetFieldAtomic: {
+            auto* frame = checked_frame(registers[pc->dst], pc->a);
             transfer_ownership(registers[pc->b], registers[pc->dst]);
+            lm_frame_set_field_atomic(frame, static_cast<int>(pc->a), registers[pc->b]);
             break;
+        }
         case LIR::LIR_Op::FrameFieldAtomicAdd:
-            lm_frame_field_atomic_add(checked_frame(registers[pc->a], pc->b), static_cast<int>(pc->b), registers[pc->dst]);
+            update_atomic_frame(registers[pc->dst], pc->a, registers[pc->b], false);
             break;
         case LIR::LIR_Op::FrameFieldAtomicSub:
-            lm_frame_field_atomic_sub(checked_frame(registers[pc->a], pc->b), static_cast<int>(pc->b), registers[pc->dst]);
+            update_atomic_frame(registers[pc->dst], pc->a, registers[pc->b], true);
             break;
         case LIR::LIR_Op::FrameCallMethod:
             // Method dispatch on frames is performed through the regular
@@ -130,6 +133,16 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
                 "VM: execute_frames: unsupported opcode " +
                 std::to_string(static_cast<int>(pc->op)));
     }
+}
+
+void RegisterVM::update_atomic_frame(RegisterValue receiver, uint32_t index, RegisterValue value, bool subtract) {
+    auto* frame = checked_frame(receiver, index);
+    Memory::atomic_field_update(&frame->fields[index], [&](LmValue old) {
+        auto result = subtract ? lm_sub(old, value) : lm_add(old, value);
+        register_native_allocation(result);
+        transfer_ownership(result, receiver);
+        return result;
+    });
 }
 
 } // namespace Register

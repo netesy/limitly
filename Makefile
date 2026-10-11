@@ -525,6 +525,14 @@ aot-tests: $(PLATFORM)
 
 # Dependency files are optional on the first build.
 -include $(OBJ_DIR)/src/memory/aot_runtime.d $(BIN_DIR)/test_memory_contracts.d $(BIN_DIR)/test_reference_lowering.d
+# Objects from builds predating dependency files must not silently retain old
+# AST/LIR layouts. Refresh each such object once; subsequent builds use its .d.
+DEPENDENCY_OBJECTS := $(LIB_LYMAR_OBJS) $(MAIN_OBJS) $(TEST_OBJS) $(LYRA_LIB_OBJS) $(OBJ_DIR)/lyra/main.o $(LIR_TEST_OBJS)
+MISSING_DEPENDENCY_OBJECTS := $(foreach object,$(DEPENDENCY_OBJECTS),$(if $(wildcard $(object)),$(if $(wildcard $(object:.o=.d)),,$(object))))
+ifneq ($(strip $(MISSING_DEPENDENCY_OBJECTS)),)
+.PHONY: refresh-missing-dependencies
+$(MISSING_DEPENDENCY_OBJECTS): refresh-missing-dependencies
+endif
 -include $(LIB_LYMAR_OBJS:.o=.d) $(MAIN_OBJS:.o=.d) $(TEST_OBJS:.o=.d) $(LYRA_LIB_OBJS:.o=.d) $(OBJ_DIR)/lyra/main.d $(LIR_TEST_OBJS:.o=.d)
 
 # Runtime lifetime tests also support SANITIZERS=address,undefined and an
@@ -541,6 +549,8 @@ memory-tests: $(PLATFORM) $(BIN_DIR)/test_source_ownership$(EXE_EXT) $(BIN_DIR)/
 	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_CXX=$(abspath tests/memory/aot_linker.py) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_unified_ownership.py
 	LYMAR_REFERENCE_TEST_EXECUTABLE=$(abspath $(BIN_DIR)/test_reference_lowering$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_reference_lowering.py
 	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_builtin_proofs.py
+	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_remaining_blockers.py
+	LYMAR_EXECUTABLE=$(abspath $(BIN_DIR)/lymar$(EXE_EXT)) LYMAR_AOT_SANITIZERS="$(SANITIZERS)" CXX="$(CXX)" python3 tests/memory/test_concurrent_contracts.py
 
 # Private standalone AOT runtime tests; no VM or public ABI additions.
 $(BIN_DIR)/test_aot_regions$(EXE_EXT): tests/memory/test_aot_regions.cpp $(BIN_DIR)/liblymar_aot.a | $(BIN_DIR)

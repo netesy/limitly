@@ -46,9 +46,10 @@ LmValue direct_frame_get(void* context, LmValue value, uint32_t index, bool atom
 LmValue direct_frame_set(void* context, LmValue value, uint32_t index, LmValue child, bool atomic) {
   auto& vm = *static_cast<Machine*>(context);
   auto* frame = vm.checked_frame(value, index);
+  if (atomic) vm.transfer_native_ownership(child, value);
   if (atomic) lm_frame_set_field_atomic(frame, index, child);
   else frame->fields[index] = child;
-  vm.transfer_native_ownership(child, value);
+  if (!atomic) vm.transfer_native_ownership(child, value);
   return VAL_NIL;
 }
 LmValue direct_sequence_get(LmValue value, int64_t index) {
@@ -333,6 +334,9 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
   case Helper::Callback: {
     std::vector<LmValue> arguments(args, args + count);
     if (LIR::BuiltinUtils::isBuiltinFunction(text)) {
+      auto builtin = LIR::LIRBuiltinFunctions::getInstance().getFunction(text);
+      if (!builtin->acceptsArgumentCount(count))
+        throw std::runtime_error("Builtin argument count mismatch: " + std::string(text));
       return helper(context, static_cast<uint32_t>(Helper::Builtin), a, b, c,
                     text, args, count);
     }
@@ -378,6 +382,11 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
       return object<LmStringHeader>(arg(i), TYPE_STRING);
     };
     if (name == "_builtin_track") return own(arg(0));
+    if (name == "_builtin_frame_atomic_add" || name == "_builtin_frame_atomic_sub") {
+      vm.update_atomic_frame(arg(0), static_cast<uint32_t>(as_i64(arg(1))), arg(2),
+                             name == "_builtin_frame_atomic_sub");
+      return VAL_NIL;
+    }
     if (name == "_builtin_frame_deinit") { vm.finalize_frame(arg(0)); return VAL_NIL; }
     if (name == "_builtin_region_call_enter") return make_i64(vm.begin_native_call());
     if (name == "_builtin_region_call_leave") {

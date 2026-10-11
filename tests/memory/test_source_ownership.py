@@ -1,6 +1,7 @@
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 ROOT = Path(__file__).resolve().parents[2]
@@ -11,7 +12,14 @@ class SourceOwnershipTests(unittest.TestCase):
             env = dict(os.environ, LYMAR_UNIFIED_OWNERSHIP="1", LYMAR_AOT_LINKER="driver",
                 LYMAR_AOT_RUNTIME=str(EXECUTABLE.parent / "liblymar_aot.a"),
                 LYMAR_AOT_CXX=str(ROOT / "tests/memory/aot_linker.py"))
-            result = subprocess.run([str(EXECUTABLE),tmp],cwd=ROOT,env=env,text=True,capture_output=True,timeout=120)
+            try:
+                result = subprocess.run([str(EXECUTABLE),tmp],cwd=ROOT,env=env,text=True,capture_output=True,timeout=120)
+            except subprocess.TimeoutExpired as error:
+                if env.get('LYMAR_TEST_TRACE_STAGES') and error.stderr:
+                    print(error.stderr.decode() if isinstance(error.stderr,bytes) else error.stderr,file=sys.stderr)
+                raise
+            if env.get('LYMAR_TEST_TRACE_STAGES'):
+                print(result.stderr,file=sys.stderr,end='')
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             self.assertEqual(result.stdout.splitlines(),["7","9","9","11","false","true","2.5","Source ownership serialization and execution passed"])
             self.assertNotIn("Sanitizer",result.stderr)

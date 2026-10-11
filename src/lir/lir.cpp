@@ -185,9 +185,12 @@ std::string LIR_Inst::to_string() const {
             oss << " r" << dst << ", " << func_name << ", fields=" << imm;
             break;
         case LIR_Op::FrameGetField:
+        case LIR_Op::FrameGetFieldAtomic:
             oss << " r" << dst << ", r" << a << ", offset=" << b;
             break;
         case LIR_Op::FrameSetField:
+        case LIR_Op::FrameSetFieldAtomic:
+        case LIR_Op::FrameFieldAtomicAdd: case LIR_Op::FrameFieldAtomicSub:
             oss << " r" << dst << ", offset=" << a << ", r" << b;
             break;
         case LIR_Op::FrameCallMethod:

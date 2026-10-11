@@ -25,6 +25,7 @@
 #include <cmath>
 #include "../../lir/function_registry.hh"
 #include "../../lir/builtin_functions.hh"
+#include "../../lir/builtin_callable.hh"
 #include "../../frontend/module_manager.hh"
 
 namespace LM::Backend::Fyra {
@@ -166,6 +167,10 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                     worklist.push_back(callee);
                 }
             }
+            if (inst.op == LIR::LIR_Op::LoadConst && LIR::BuiltinUtils::isBuiltinFunction(callee))
+                for (const auto& candidate : registry.getFunctionNames())
+                    if (LIR::builtin_callable_target(candidate) == callee && reachable_funcs.insert(candidate).second)
+                        worklist.push_back(candidate);
         }
     };
 
@@ -323,6 +328,10 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
                 static_cast<uint64_t>(*Memory::scalar_return_kind(*function));
     }
     lower_region_ownership(*current_module_, region_free);
+    bool has_scheduler=false;
+    for (const auto& function : current_module_->getFunctions())
+        if (function->getName().starts_with("__lymar_task_entry_")) has_scheduler=true;
+    if (has_scheduler) lower_worker_failures(*current_module_);
     return current_module_;
 }
 
@@ -458,8 +467,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     size_t max_reg = lir_func.register_count;
     for (const auto& inst : lir_func.instructions) {
         if (inst.dst != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.dst);
-        if (inst.a != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.a);
-        if (inst.b != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.b);
+        // Scheduler cores and deadline are immediate configuration, not
+        // register operands. A duration must never size the register frame.
+        if (inst.op != LIR::LIR_Op::SchedulerInit && inst.op != LIR::LIR_Op::ParallelInit) {
+            if (inst.a != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.a);
+            if (inst.b != UINT32_MAX) max_reg = std::max(max_reg, (size_t)inst.b);
+        }
         for (auto arg : inst.call_args) max_reg = std::max(max_reg, (size_t)arg);
     }
     std::unordered_map<uint32_t, ir::Instruction*> reg_slots;
@@ -674,7 +687,23 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, c, LIR::Type::Bool);
                 } else if (IS_PTR(val)) {
                     ObjHeader* h = (ObjHeader*)UNBOX_PTR(val);
-                    if (h->type_id == TYPE_STRING) {
+                    if (h->type_id == TYPE_I64 || (h->type_id == TYPE_U64 && as_u128(val) <= INT64_MAX)) {
+                        auto number = as_i64(val);
+                        reg_int_values[inst.dst] = number;
+                        store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), number), LIR::Type::I64);
+                    } else if (h->type_id == TYPE_I128 || h->type_id == TYPE_U128 || h->type_id == TYPE_U64) {
+                        auto size = h->type_id == TYPE_U64 ? 16 : 32;
+                        auto offset = h->type_id == TYPE_U64 ? 8 : 16;
+                        auto* object = builder_->createExternCall("lymar_aot_alloc",
+                            {context_->getConstantInt(context_->getIntegerType(64), size)}, context_->getIntegerType(64));
+                        builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), h->type_id), object);
+                        auto number = as_u128(val);
+                        builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), static_cast<uint64_t>(number)),
+                            builder_->createAdd(object, context_->getConstantInt(context_->getIntegerType(64), offset)));
+                        if (size == 32) builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), static_cast<uint64_t>(number >> 64)),
+                            builder_->createAdd(object, context_->getConstantInt(context_->getIntegerType(64), offset + 8)));
+                        store_reg(inst.dst, object, LIR::Type::Ptr);
+                    } else if (h->type_id == TYPE_STRING) {
                         const char* s = ((LmStringHeader*)h)->data;
                         uint64_t s_len = ((LmStringHeader*)h)->len;
                         reg_string_literals[inst.dst] = s;
@@ -1104,7 +1133,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     }
                 }
 
-                if (name == "print" && !args.empty()) {
+                if (name == "print") {
                     for (size_t ai = 0; ai < args.size(); ++ai) {
                         if (ai > 0) {
                             ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
@@ -1369,6 +1398,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     // private runtime symbols that have no canonical contract.
                     if (LIR::FunctionRegistry::getInstance().hasFunction(f->getName()) &&
                         f->getName() != "main" && !f->getName().starts_with("lm_") && !f->getName().starts_with("_builtin_")) {
+                        auto builtin = LIR::builtin_callable_target(f->getName());
+                        if (!builtin.empty() && LIR::LIRBuiltinFunctions::getInstance().getFunction(builtin)->acceptsArgumentCount(args.size()) &&
+                            f->getParameters().size() != args.size()) continue;
                         cand_funcs.push_back(f.get());
                     }
                 }
@@ -1398,6 +1430,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     builder_->createBr(is_match, b_match, b_next_check);
 
                     builder_->setInsertPoint(b_match);
+                    if (!LIR::builtin_callable_target(f_name).empty() && target_f->getParameters().size() != args.size()) {
+                        builder_->createExternCall("lymar_aot_builtin_arity_error", {}, context_->getVoidType());
+                        builder_->createJmp(b_done);
+                        cur_cls_chk = b_next_check;
+                        continue;
+                    }
                     std::vector<ir::Value*> call_args_matching;
                     size_t target_param_cnt = target_f->getParameters().size();
 
@@ -1453,6 +1491,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     builder_->createBr(is_match, b_match, b_next_check);
 
                     builder_->setInsertPoint(b_match);
+                    if (!LIR::builtin_callable_target(f_name).empty() && target_f->getParameters().size() != args.size()) {
+                        builder_->createExternCall("lymar_aot_builtin_arity_error", {}, context_->getVoidType());
+                        builder_->createJmp(b_done);
+                        cur_check_bb = b_next_check;
+                        continue;
+                    }
                     std::vector<ir::Value*> call_args_matching;
                     size_t target_param_cnt = target_f->getParameters().size();
                     if (target_param_cnt == args.size() + 1) {
@@ -1514,7 +1558,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 std::vector<ir::Value*> args;
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
 
-                if (name == "print" && !args.empty()) {
+                if (name == "print") {
                     for (size_t ai = 0; ai < args.size(); ++ai) {
                         if (ai > 0) {
                             ir::GlobalVariable* gv_sp = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "str_space", " ");
@@ -1644,55 +1688,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     if (inst.dst != UINT32_MAX) store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
                     break;
                 } else if (name == "assert" && !args.empty()) {
-                    std::string aid = std::to_string(label_counter_++);
-                    ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
-                    ir::BasicBlock* b_pass = builder_->createBasicBlock("assert_pass_" + aid, cur_fn);
-                    ir::BasicBlock* b_fail = builder_->createBasicBlock("assert_fail_" + aid, cur_fn);
-
-                    builder_->createBr(args[0], b_pass, b_fail);
-
-                    builder_->setInsertPoint(b_fail);
-                    if (args.size() > 1) {
-                        ir::Value* msg_ptr = args[1];
-                        ir::Value* is_valid_msg = builder_->createCuge(msg_ptr, context_->getConstantInt(context_->getIntegerType(64), 65536));
-                        ir::BasicBlock* b_msg_v = builder_->createBasicBlock("assert_msg_v_" + aid, cur_fn);
-                        ir::BasicBlock* b_msg_d = builder_->createBasicBlock("assert_msg_d_" + aid, cur_fn);
-                        builder_->createBr(is_valid_msg, b_msg_v, b_msg_d);
-
-                        builder_->setInsertPoint(b_msg_v);
-                        FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), msg_ptr);
-                        ir::GlobalVariable* gv_nl = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "nl", "\n");
-                        builder_->createExternCall("io.write", {
-                            context_->getConstantInt(context_->getIntegerType(64), 1),
-                            builder_->createAdd(gv_nl, context_->getConstantInt(context_->getIntegerType(64), 24)),
-                            context_->getConstantInt(context_->getIntegerType(64), 1)
-                        }, context_->getIntegerType(64));
-                        builder_->createExternCall("process.exit", {
-                            context_->getConstantInt(context_->getIntegerType(64), 1)
-                        }, nullptr);
-
-                        builder_->setInsertPoint(b_msg_d);
-                        ir::GlobalVariable* gv_fail = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "assert_msg", "Assertion failed\n");
-                        builder_->createExternCall("io.write", {
-                            context_->getConstantInt(context_->getIntegerType(64), 1),
-                            builder_->createAdd(gv_fail, context_->getConstantInt(context_->getIntegerType(64), 24)),
-                            context_->getConstantInt(context_->getIntegerType(64), 17)
-                        }, context_->getIntegerType(64));
-                    } else {
-                        ir::GlobalVariable* gv_fail = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "assert_msg", "Assertion failed\n");
-                        builder_->createExternCall("io.write", {
-                            context_->getConstantInt(context_->getIntegerType(64), 1),
-                            builder_->createAdd(gv_fail, context_->getConstantInt(context_->getIntegerType(64), 24)),
-                            context_->getConstantInt(context_->getIntegerType(64), 17)
-                        }, context_->getIntegerType(64));
-                    }
-                    builder_->createExternCall("process.exit", {
-                        context_->getConstantInt(context_->getIntegerType(64), 1)
-                    }, nullptr);
-                    builder_->createJmp(b_pass);
-
-                    builder_->setInsertPoint(b_pass);
-                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 0), inst.result_type);
+                    auto* message=args.size()>1?erased_word(args[1]):static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64),2));
+                    builder_->createExternCall("lymar_aot_assert",{args[0],message},nullptr);
+                    if(inst.dst!=UINT32_MAX) store_reg(inst.dst,context_->getConstantInt(context_->getIntegerType(64),0),inst.result_type);
                     break;
                 } else if (FyraBuiltinFunctions::is_builtin(name)) {
                     name = FyraBuiltinFunctions::get_internal_name(name);
@@ -1719,9 +1717,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 auto actual = reg_types.count(inst.a) ? reg_types[inst.a] : inst.type_a;
                 auto* zero_kind = context_->getConstantInt(context_->getIntegerType(64), 0);
                 if (inst.result_type == LIR::Type::Ptr) {
-                    // VM pointer casts preserve identity; only native raw floats
-                    // require materialization when entering the erased word domain.
-                    store_reg(inst.dst, erased_word(value), LIR::Type::Ptr);
+                    auto destination = lir_func.get_register_language_type(inst.dst);
+                    if (destination && destination->tag == TypeTag::String)
+                        store_reg(inst.dst, builder_->createExternCall("lymar_aot_scalar_to_string",
+                            {erased_word(value), zero_kind}, context_->getIntegerType(64)), LIR::Type::Ptr);
+                    else store_reg(inst.dst, erased_word(value), LIR::Type::Ptr);
                 } else if (inst.result_type == LIR::Type::Bool) {
                     store_reg(inst.dst, builder_->createExternCall("lymar_aot_to_boolean",
                         {erased_word(value), zero_kind}, context_->getIntegerType(64)), LIR::Type::Bool);
@@ -2080,8 +2080,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     builder_->createExternCall("lymar_aot_set_finalizer", {frame_ptr, finalizer}, nullptr);
                 break;
             }
-            case LIR::LIR_Op::FrameGetField:
             case LIR::LIR_Op::FrameGetFieldAtomic: {
+                auto value = builder_->createExternCall("lymar_aot_atomic_load", {
+                    load_reg(inst.a, LIR::Type::Ptr), context_->getConstantInt(context_->getIntegerType(64), inst.b)},
+                    context_->getIntegerType(64));
+                store_reg(inst.dst, value, inst.result_type, true);
+                break;
+            }
+            case LIR::LIR_Op::FrameGetField: {
                 uint32_t field_idx = (inst.b != UINT32_MAX) ? inst.b : static_cast<uint32_t>(inst.imm);
                 ir::Value* frame_ptr = load_reg(inst.a, LIR::Type::Ptr);
                 ir::Value* addr = builder_->createExternCall("lymar_aot_frame_field_address",
@@ -2089,8 +2095,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 store_reg(inst.dst, builder_->createLoad(addr), inst.result_type);
                 break;
             }
-            case LIR::LIR_Op::FrameSetField:
-            case LIR::LIR_Op::FrameSetFieldAtomic: {
+            case LIR::LIR_Op::FrameSetFieldAtomic:
+            case LIR::LIR_Op::FrameFieldAtomicAdd:
+            case LIR::LIR_Op::FrameFieldAtomicSub: {
+                std::vector<ir::Value*> arguments{load_reg(inst.dst, LIR::Type::Ptr),
+                    context_->getConstantInt(context_->getIntegerType(64), inst.a), erased_word(load_reg(inst.b, inst.type_b)),
+                    context_->getConstantInt(context_->getIntegerType(64), 0)};
+                if (inst.op != LIR::LIR_Op::FrameSetFieldAtomic)
+                    arguments.push_back(context_->getConstantInt(context_->getIntegerType(64), inst.op == LIR::LIR_Op::FrameFieldAtomicSub));
+                builder_->createExternCall(inst.op == LIR::LIR_Op::FrameSetFieldAtomic ? "lymar_aot_atomic_store" : "lymar_aot_atomic_update", arguments, context_->getVoidType());
+                break;
+            }
+            case LIR::LIR_Op::FrameSetField: {
                 ir::Value* frame_ptr = load_reg(inst.dst, LIR::Type::Ptr);
                 uint32_t field_idx = inst.a;
                 ir::Value* addr = builder_->createExternCall("lymar_aot_frame_field_address",
@@ -2182,8 +2198,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Nop: break;
             // Structured concurrency operations
             case LIR::LIR_Op::TaskContextAlloc: {
-                ir::Value* ctx_ptr = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), 64)}, lir_type_to_fyra_type(inst.result_type));
-                for (uint32_t f_idx = 0; f_idx < 8; ++f_idx) {
+                ir::Value* ctx_ptr = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), std::max(uint32_t(8),inst.imm) * 8)}, lir_type_to_fyra_type(inst.result_type));
+                for (uint32_t f_idx = 0; f_idx < std::max(uint32_t(8),inst.imm); ++f_idx) {
                     ir::Value* addr = builder_->createAdd(ctx_ptr, context_->getConstantInt(context_->getIntegerType(64), f_idx * 8));
                     builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), addr);
                 }
@@ -2198,8 +2214,44 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 uint32_t ctx_reg = (inst.b != UINT32_MAX && inst.b != 0) ? inst.b : inst.a;
                 uint32_t val_reg = (inst.a != UINT32_MAX && inst.a != ctx_reg) ? inst.a : (inst.dst != UINT32_MAX && inst.dst != ctx_reg ? inst.dst : inst.b);
                 ir::Value* ctx_ptr = load_reg(ctx_reg, LIR::Type::Ptr);
-                ir::Value* val = load_reg(val_reg, LIR::Type::I64);
+                ir::Value* val = erased_word(load_reg(val_reg, LIR::Type::I64));
                 uint32_t field_idx = inst.imm;
+                if (field_idx == 4) {
+                    auto literal = reg_string_literals.find(val_reg);
+                    if (literal == reg_string_literals.end()) throw std::runtime_error("Native task requires a canonical call target");
+                    auto* target = current_module_->getFunction(literal->second);
+                    if (!target) throw std::runtime_error("Missing native task target: " + literal->second);
+                    auto thunk_name = "__lymar_task_entry_" + target->getName();
+                    auto* thunk = current_module_->getFunction(thunk_name);
+                    if (!thunk) {
+                        auto* saved_block = builder_->getInsertPoint();
+                        auto* word = context_->getIntegerType(64);
+                        thunk = builder_->createFunction(thunk_name,word,{word,word});
+                        builder_->setInsertPoint(builder_->createBasicBlock("entry",thunk));
+                        auto parameters=thunk->getParameters().begin();
+                        ir::Value* context=parameters->get(); ++parameters;
+                        ir::Value* item=parameters->get();
+                        std::vector<ir::Value*> arguments;
+                        size_t index=0;
+                        for (auto& parameter : target->getParameters()) {
+                            ir::Value* value;
+                            if (index==0) value=context;
+                            else if(index==1) value=item;
+                            else {
+                                auto field=index==2?2:8+index;
+                                auto* address=builder_->createAdd(context,context_->getConstantInt(word,field*8));
+                                value=builder_->createLoad(address);
+                                if (parameter->getType()->isFloatingPoint())
+                                    value=builder_->createExternCall("lymar_aot_to_float",{value,builder_->createExternCall("lymar_aot_slot_pointer",{address},word)},context_->getDoubleType());
+                            }
+                            arguments.push_back(value); ++index;
+                        }
+                        builder_->createCall(target,arguments);
+                        builder_->createRet(context_->getConstantInt(word,0));
+                        builder_->setInsertPoint(saved_block);
+                    }
+                    val=thunk;
+                }
                 ir::Value* addr = builder_->createAdd(ctx_ptr, context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
                 builder_->createStore(val, addr);
                 break;
@@ -2208,7 +2260,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* ctx_ptr = load_reg(inst.a, LIR::Type::Ptr);
                 uint32_t field_idx = inst.imm;
                 ir::Value* addr = builder_->createAdd(ctx_ptr, context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
-                store_reg(inst.dst, builder_->createLoad(addr), inst.result_type);
+                store_reg(inst.dst, builder_->createLoad(addr), inst.result_type, true);
                 break;
             }
             case LIR::LIR_Op::CapabilityAcquire: {
@@ -2222,188 +2274,22 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             case LIR::LIR_Op::ParallelInit:
             case LIR::LIR_Op::SchedulerInit: {
-                used_builtins_.insert("lm_list_new");
-                ir::Function* fn = current_module_->getFunction("lm_list_new");
-                if (!fn) fn = builder_->createFunction("lm_list_new", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                store_reg(inst.dst, builder_->createCall(fn, {context_->getConstantInt(context_->getIntegerType(64), 16)}), inst.result_type);
+                auto* word=context_->getIntegerType(64);
+                store_reg(inst.dst,builder_->createExternCall("lymar_aot_scheduler_new",{
+                    context_->getConstantInt(word,inst.a),context_->getConstantInt(word,inst.b),
+                    context_->getConstantInt(word,inst.imm)},word),inst.result_type);
                 break;
             }
             case LIR::LIR_Op::SchedulerAddTask: {
-                used_builtins_.insert("lm_list_append");
-                ir::Function* fn = current_module_->getFunction("lm_list_append");
-                if (!fn) fn = builder_->createFunction("lm_list_append", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                uint32_t s_reg = (inst.dst != UINT32_MAX && inst.dst != 0) ? inst.dst : inst.a;
-                uint32_t t_reg = (inst.a != UINT32_MAX && inst.a != s_reg) ? inst.a : inst.b;
-                ir::Value* sched_ptr = load_reg(s_reg, LIR::Type::Ptr);
-                ir::Value* task_ptr = load_reg(t_reg, LIR::Type::Ptr);
-                if (fn) builder_->createCall(fn, {sched_ptr, task_ptr}, context_->getIntegerType(64));
+                auto* word=context_->getIntegerType(64);
+                uint32_t scheduler = (inst.dst != UINT32_MAX && inst.dst != 0) ? inst.dst : inst.a;
+                uint32_t task = (inst.a != UINT32_MAX && inst.a != scheduler) ? inst.a : inst.b;
+                builder_->createExternCall("lymar_aot_channel_push",{load_reg(scheduler,LIR::Type::Ptr),load_reg(task,LIR::Type::Ptr),context_->getConstantInt(word,1)},nullptr);
                 break;
             }
             case LIR::LIR_Op::SchedulerRun: {
-                used_builtins_.insert("lm_list_len");
-                used_builtins_.insert("lm_list_get");
-                used_builtins_.insert("lm_channel_pop");
-                ir::Function* fn_len = current_module_->getFunction("lm_list_len");
-                if (!fn_len) fn_len = builder_->createFunction("lm_list_len", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                ir::Function* fn_get = current_module_->getFunction("lm_list_get");
-                if (!fn_get) fn_get = builder_->createFunction("lm_list_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                ir::Function* fn_pop = current_module_->getFunction("lm_channel_pop");
-                if (!fn_pop) fn_pop = builder_->createFunction("lm_channel_pop", context_->getIntegerType(64), {context_->getIntegerType(64)});
-
-                uint32_t s_reg = (inst.a != UINT32_MAX && inst.a != 0) ? inst.a : inst.dst;
-                ir::Value* sched_ptr = load_reg(s_reg, LIR::Type::Ptr);
-                ir::Value* count = builder_->createCall(fn_len, {sched_ptr}, context_->getIntegerType(64));
-
-                std::string sid = std::to_string(label_counter_++);
-                ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
-                ir::BasicBlock* b_loop = builder_->createBasicBlock("sc_loop_" + sid, cur_fn);
-                ir::BasicBlock* b_body = builder_->createBasicBlock("sc_body_" + sid, cur_fn);
-                ir::BasicBlock* b_done = builder_->createBasicBlock("sc_done_" + sid, cur_fn);
-
-                ir::Instruction* i_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
-                builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), i_slot);
-                builder_->createJmp(b_loop);
-
-                builder_->setInsertPoint(b_loop);
-                ir::Value* i_val = builder_->createLoad(i_slot);
-                ir::Value* cond = builder_->createCslt(i_val, count);
-                builder_->createBr(cond, b_body, b_done);
-
-                builder_->setInsertPoint(b_body);
-                ir::Value* task_ctx = builder_->createCall(fn_get, {sched_ptr, i_val}, context_->getIntegerType(64));
-
-                ir::Value* f0 = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 0)));
-                ir::Value* f1_raw = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 8)));
-                ir::Value* f2 = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 16)));
-                ir::Value* f3 = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 24)));
-                ir::Value* fn_name_ptr = builder_->createLoad(builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 32)));
-
-                // Task field 1 is either a scalar iteration value or a queue.
-                // Its runtime kind, not its numeric address range, distinguishes them.
-                auto* field_kind = builder_->createExternCall("lymar_aot_slot_pointer",
-                    {builder_->createAdd(task_ctx, context_->getConstantInt(context_->getIntegerType(64), 8))},
-                    context_->getIntegerType(64));
-                ir::Value* f1_len = builder_->createExternCall("lymar_aot_channel_length",
-                    {f1_raw, field_kind}, context_->getIntegerType(64));
-                ir::Value* is_chan_iter = builder_->createCsgt(f1_len, context_->getConstantInt(context_->getIntegerType(64), 0));
-
-                ir::BasicBlock* b_w_loop = builder_->createBasicBlock("sc_w_loop_" + sid, cur_fn);
-                ir::BasicBlock* b_w_body = builder_->createBasicBlock("sc_w_body_" + sid, cur_fn);
-                ir::BasicBlock* b_single = builder_->createBasicBlock("sc_single_" + sid, cur_fn);
-                ir::BasicBlock* b_next_task = builder_->createBasicBlock("sc_next_t_" + sid, cur_fn);
-
-                builder_->createBr(is_chan_iter, b_w_loop, b_single);
-
-                auto emit_dispatch = [&](ir::Value* arg_f1) {
-                    ir::Value* old0 = builder_->createLoad(reg_slots[0]);
-                    ir::Value* old1 = builder_->createLoad(reg_slots[1]);
-                    ir::Value* old2 = builder_->createLoad(reg_slots[2]);
-                    ir::Value* old3 = builder_->createLoad(reg_slots[3]);
-
-                    builder_->createStore(f0, reg_slots[0]);
-                    builder_->createStore(arg_f1, reg_slots[1]);
-                    builder_->createStore(f2, reg_slots[2]);
-                    builder_->createStore(f3, reg_slots[3]);
-                    store_reg(max_reg + 1, fn_name_ptr, LIR::Type::Ptr);
-
-                    std::string cid = std::to_string(label_counter_++);
-                    ir::BasicBlock* b_dispatch = builder_->createBasicBlock("sched_disp_" + cid, cur_fn);
-                    ir::BasicBlock* b_raw_call = builder_->createBasicBlock("sched_raw_" + cid, cur_fn);
-                    ir::BasicBlock* b_done_call = builder_->createBasicBlock("sched_done_" + cid, cur_fn);
-
-                    ir::Value* is_ge_ptr = builder_->createCuge(fn_name_ptr, context_->getConstantInt(context_->getIntegerType(64), 65536));
-                    ir::Value* high_bits = builder_->createShr(fn_name_ptr, context_->getConstantInt(context_->getIntegerType(64), 48));
-                    ir::Value* high_zero = builder_->createCeq(high_bits, context_->getConstantInt(context_->getIntegerType(64), 0));
-                    ir::Value* is_valid_ptr = builder_->createAnd(is_ge_ptr, high_zero);
-
-                    builder_->createBr(is_valid_ptr, b_dispatch, b_raw_call);
-
-                    builder_->setInsertPoint(b_dispatch);
-                    used_builtins_.insert("lm_key_eq");
-                    ir::Function* fn_eq = current_module_->getFunction("lm_key_eq");
-                    if (!fn_eq) fn_eq = builder_->createFunction("lm_key_eq", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-
-                    std::vector<ir::Function*> cand_funcs;
-                    for (const auto& f : current_module_->getFunctions()) {
-                        if (f->getName() != "main" && !f->getName().starts_with("lm_") && !f->getName().starts_with("_builtin_")) {
-                            cand_funcs.push_back(f.get());
-                        }
-                    }
-
-                    ir::BasicBlock* cur_check_bb = b_dispatch;
-                    for (size_t fi = 0; fi < cand_funcs.size(); ++fi) {
-                        ir::Function* target_f = cand_funcs[fi];
-                        std::string f_name = target_f->getName();
-
-                        builder_->setInsertPoint(cur_check_bb);
-                        ir::GlobalVariable* gv_fname = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "fn_s_str_" + f_name + "_" + cid, f_name);
-                        ir::Value* eq_res = fn_eq ? static_cast<ir::Value*>(builder_->createCall(fn_eq, {fn_name_ptr, gv_fname}, context_->getIntegerType(64))) : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
-                        ir::Value* is_match = builder_->createCne(eq_res, context_->getConstantInt(context_->getIntegerType(64), 0));
-
-                        size_t dot_p = f_name.rfind('.');
-                        if (dot_p != std::string::npos) {
-                            std::string unq_name = f_name.substr(dot_p + 1);
-                            ir::GlobalVariable* gv_unq = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "fn_s_unq_" + unq_name + "_" + cid + "_" + std::to_string(fi), unq_name);
-                            ir::Value* unq_eq = fn_eq ? static_cast<ir::Value*>(builder_->createCall(fn_eq, {fn_name_ptr, gv_unq}, context_->getIntegerType(64))) : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
-                            ir::Value* unq_match = builder_->createCne(unq_eq, context_->getConstantInt(context_->getIntegerType(64), 0));
-                            is_match = builder_->createOr(is_match, unq_match);
-                        }
-
-                        ir::BasicBlock* b_match = builder_->createBasicBlock("sched_m_" + std::to_string(fi) + "_" + cid, cur_fn);
-                        ir::BasicBlock* b_next_check = builder_->createBasicBlock("sched_next_chk_" + std::to_string(fi) + "_" + cid, cur_fn);
-
-                        builder_->createBr(is_match, b_match, b_next_check);
-
-                        builder_->setInsertPoint(b_match);
-                        std::vector<ir::Value*> call_args_matching;
-                        for (size_t input = 0; input < target_f->getParameters().size(); ++input) {
-                            if (input == 1) call_args_matching.push_back(arg_f1);
-                            else if (input == 2) call_args_matching.push_back(f2);
-                            else if (input == 0) call_args_matching.push_back(old0);
-                            else if (input == 3) call_args_matching.push_back(old3);
-                            else call_args_matching.push_back(load_reg(input, LIR::Type::Ptr));
-                        }
-                        if (target_f) builder_->createCall(target_f, call_args_matching, context_->getIntegerType(64));
-                        builder_->createJmp(b_done_call);
-
-                        cur_check_bb = b_next_check;
-                    }
-
-                    builder_->setInsertPoint(cur_check_bb);
-                    builder_->createJmp(b_raw_call);
-
-                    builder_->setInsertPoint(b_raw_call);
-                    builder_->createJmp(b_done_call);
-
-                    builder_->setInsertPoint(b_done_call);
-                    builder_->createStore(old0, reg_slots[0]);
-                    builder_->createStore(old1, reg_slots[1]);
-                    builder_->createStore(old2, reg_slots[2]);
-                    builder_->createStore(old3, reg_slots[3]);
-                };
-
-                // Stream worker loop branch
-                builder_->setInsertPoint(b_w_loop);
-                ir::Value* rem_cnt = builder_->createCall(fn_len, {f1_raw}, context_->getIntegerType(64));
-                ir::Value* has_rem = builder_->createCsgt(rem_cnt, context_->getConstantInt(context_->getIntegerType(64), 0));
-                builder_->createBr(has_rem, b_w_body, b_next_task);
-
-                builder_->setInsertPoint(b_w_body);
-                ir::Value* popped_item = builder_->createCall(fn_pop, {f1_raw}, context_->getIntegerType(64));
-                emit_dispatch(popped_item);
-                builder_->createJmp(b_w_loop);
-
-                // Single task execution branch
-                builder_->setInsertPoint(b_single);
-                emit_dispatch(f1_raw);
-                builder_->createJmp(b_next_task);
-
-                builder_->setInsertPoint(b_next_task);
-                ir::Value* next_i_val = builder_->createAdd(i_val, context_->getConstantInt(context_->getIntegerType(64), 1));
-                builder_->createStore(next_i_val, i_slot);
-                builder_->createJmp(b_loop);
-
-                builder_->setInsertPoint(b_done);
+                uint32_t scheduler = (inst.a != UINT32_MAX && inst.a != 0) ? inst.a : inst.dst;
+                builder_->createExternCall("lymar_aot_scheduler_run",{load_reg(scheduler,LIR::Type::Ptr)},nullptr);
                 break;
             }
             case LIR::LIR_Op::ParallelSync: break;
@@ -2411,12 +2297,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // Concurrency lowering encodes a channel constructor in imm,
                 // unlike the generic resource_create intrinsic's register args.
                 if (inst.imm == 5 && inst.a == 0 && inst.b == 0) {
-                    used_builtins_.insert("lm_list_new");
-                    auto* queue = current_module_->getFunction("lm_list_new");
-                    if (!queue) queue = builder_->createFunction("lm_list_new", context_->getIntegerType(64),
-                        {context_->getIntegerType(64)});
-                    store_reg(inst.dst, builder_->createCall(queue,
-                        {context_->getConstantInt(context_->getIntegerType(64), 16)}, context_->getIntegerType(64)), LIR::Type::Ptr);
+                    store_reg(inst.dst,builder_->createExternCall("lymar_aot_channel_new",{},context_->getIntegerType(64)),LIR::Type::Ptr);
                     break;
                 }
                 auto* i64 = context_->getIntegerType(64);
@@ -2440,45 +2321,33 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::ResourceDestroy:
                 builder_->createExternCall("lymar_aot_resource_destroy", {load_reg(inst.a, inst.type_a)}, nullptr);
                 break;
-            case LIR::LIR_Op::ChannelAlloc: {
-                used_builtins_.insert("lm_list_new");
-                ir::Function* fn = current_module_->getFunction("lm_list_new");
-                if (!fn) fn = builder_->createFunction("lm_list_new", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                store_reg(inst.dst, builder_->createCall(fn, {context_->getConstantInt(context_->getIntegerType(64), 16)}, context_->getIntegerType(64)), inst.result_type);
+            case LIR::LIR_Op::ChannelAlloc:
+                store_reg(inst.dst,builder_->createExternCall("lymar_aot_channel_new",{},context_->getIntegerType(64)),inst.result_type);
                 break;
-            }
             case LIR::LIR_Op::ChannelSend:
             case LIR::LIR_Op::ChannelOffer:
             case LIR::LIR_Op::ChannelPush: {
-                used_builtins_.insert("lm_list_append");
-                ir::Function* fn = current_module_->getFunction("lm_list_append");
-                if (!fn) fn = builder_->createFunction("lm_list_append", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                ir::Value* ch_ptr = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a, LIR::Type::Ptr) : load_reg(inst.dst, LIR::Type::Ptr);
-                ir::Value* val = (inst.b != UINT32_MAX) ? load_reg(inst.b, LIR::Type::I64) : load_reg(inst.a, LIR::Type::I64);
-                if (fn) builder_->createCall(fn, {ch_ptr, val}, context_->getIntegerType(64));
-                if (inst.dst != UINT32_MAX && inst.dst != inst.a) store_reg(inst.dst, context_->getConstantInt(context_->getIntegerType(64), 1), inst.result_type);
+                auto* channel = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a,LIR::Type::Ptr) : load_reg(inst.dst,LIR::Type::Ptr);
+                auto* value = (inst.b != UINT32_MAX) ? erased_word(load_reg(inst.b,inst.type_b)) : erased_word(load_reg(inst.a,inst.type_a));
+                builder_->createExternCall("lymar_aot_channel_push",{channel,value,context_->getConstantInt(context_->getIntegerType(64),0)},nullptr);
+                if(inst.dst != UINT32_MAX && inst.dst != inst.a) store_reg(inst.dst,context_->getConstantInt(context_->getIntegerType(64),1),inst.result_type);
                 break;
             }
             case LIR::LIR_Op::ChannelRecv:
             case LIR::LIR_Op::ChannelPop:
             case LIR::LIR_Op::ChannelPoll: {
-                used_builtins_.insert("lm_channel_pop");
-                used_builtins_.insert("lm_list_new");
-                ir::Function* fn = current_module_->getFunction("lm_channel_pop");
-                ir::Value* ch_ptr = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a, LIR::Type::Ptr) : load_reg(inst.dst, LIR::Type::Ptr);
-                if (fn) store_reg(inst.dst, builder_->createCall(fn, {ch_ptr}, context_->getIntegerType(64)), inst.result_type);
+                auto* channel = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a,LIR::Type::Ptr) : load_reg(inst.dst,LIR::Type::Ptr);
+                store_reg(inst.dst,builder_->createExternCall("lymar_aot_channel_pop",{channel},context_->getIntegerType(64)),inst.result_type,true);
                 break;
             }
             case LIR::LIR_Op::ChannelHasData: {
-                used_builtins_.insert("lm_list_len");
-                ir::Function* fn = current_module_->getFunction("lm_list_len");
-                if (!fn) fn = builder_->createFunction("lm_list_len", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                ir::Value* ch_ptr = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a, LIR::Type::Ptr) : load_reg(inst.dst, LIR::Type::Ptr);
-                ir::Value* count = fn ? static_cast<ir::Value*>(builder_->createCall(fn, {ch_ptr}, context_->getIntegerType(64))) : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
-                store_reg(inst.dst, builder_->createCsgt(count, context_->getConstantInt(context_->getIntegerType(64), 0)), inst.result_type);
+                auto* channel = (inst.a != UINT32_MAX && inst.a != 0) ? load_reg(inst.a,LIR::Type::Ptr) : load_reg(inst.dst,LIR::Type::Ptr);
+                store_reg(inst.dst,builder_->createExternCall("lymar_aot_channel_has_data",{channel},context_->getIntegerType(64)),inst.result_type);
                 break;
             }
-            case LIR::LIR_Op::ChannelClose: break;
+            case LIR::LIR_Op::ChannelClose:
+                builder_->createExternCall("lymar_aot_channel_close",{load_reg(inst.a,LIR::Type::Ptr)},nullptr);
+                break;
             // Memory Operations
             case LIR::LIR_Op::MemoryLoad: {
                 if (inst.imm > 10)

@@ -5,6 +5,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <pthread.h>
+#include "memory/atomic_field.hh"
+#include "vm_value.hh"
 
 RUNTIME_API void lm_print_int(int64_t val) {
     printf("%ld\n", val);
@@ -211,18 +213,22 @@ RUNTIME_API void lm_frame_set_field(void* frame, int offset, LmValue value) {
 }
 
 RUNTIME_API LmValue lm_frame_get_field_atomic(void* frame, int offset) {
-    return lm_frame_get_field(frame, offset);
+    auto* f = static_cast<LmFrame*>(frame);
+    if (!f || offset < 0 || offset >= f->field_count) return VAL_NIL;
+    return LM::Memory::atomic_field_load(&f->fields[offset]);
 }
 
 RUNTIME_API void lm_frame_set_field_atomic(void* frame, int offset, LmValue value) {
-    lm_frame_set_field(frame, offset, value);
+    auto* f = static_cast<LmFrame*>(frame);
+    if (f && offset >= 0 && offset < f->field_count)
+        LM::Memory::atomic_field_store(&f->fields[offset], value);
 }
 
 RUNTIME_API void lm_frame_field_atomic_add(void* frame, int offset, LmValue value) {
     if (!frame) return;
     LmFrame* f = (LmFrame*)frame;
     if (offset >= 0 && offset < f->field_count) {
-        f->fields[offset] += value;
+        LM::Memory::atomic_field_update(&f->fields[offset], [&](LmValue old) { return lm_add(old, value); });
     }
 }
 
@@ -230,7 +236,7 @@ RUNTIME_API void lm_frame_field_atomic_sub(void* frame, int offset, LmValue valu
     if (!frame) return;
     LmFrame* f = (LmFrame*)frame;
     if (offset >= 0 && offset < f->field_count) {
-        f->fields[offset] -= value;
+        LM::Memory::atomic_field_update(&f->fields[offset], [&](LmValue old) { return lm_sub(old, value); });
     }
 }
 

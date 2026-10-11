@@ -414,6 +414,7 @@ bool DefUseAnalysis::has_side_effects(const LIR_Inst& inst) {
         inst.op == LIR_Op::MemoryResize || inst.op == LIR_Op::MemoryCopy || inst.op == LIR_Op::MemoryFill ||
         inst.op == LIR_Op::StoreGlobal || inst.op == LIR_Op::FrameCallDeinit ||
         inst.op == LIR_Op::FrameSetField || inst.op == LIR_Op::FrameSetFieldAtomic ||
+        inst.op == LIR_Op::FrameFieldAtomicAdd || inst.op == LIR_Op::FrameFieldAtomicSub ||
         inst.op == LIR_Op::ListAppend || inst.op == LIR_Op::ListSet || inst.op == LIR_Op::DictSet || inst.op == LIR_Op::TupleSet ||
         inst.op == LIR_Op::ResourceCreate || inst.op == LIR_Op::ResourceCall || inst.op == LIR_Op::ResourceDestroy ||
         inst.op == LIR_Op::CallbackCreate || inst.op == LIR_Op::CallbackDestroy ||

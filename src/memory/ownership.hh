@@ -19,7 +19,7 @@ struct SemanticEffects {
     std::set<Identity> returned_callables, returned_globals;
     std::map<Identity, uint32_t> returned_capture_parameters;
     // Ownership obligations depending on captured formals, discharged by callers.
-    std::set<Identity> captures_opaque;
+    std::set<Identity> captures_opaque, captures_mutated;
     bool operator==(const SemanticEffects&) const = default;
 };
 struct OwnershipEvent {
@@ -41,6 +41,10 @@ struct SemanticFacts {
     std::map<Identity, std::vector<Identity>> parameters;
     std::map<Identity, std::string> names;
     std::set<Identity> reference_bindings, global_bindings;
+    std::set<Identity> writable_bindings, atomic_bindings;
+    // Compile-time lease ends for nonescaping block-local bindings. The
+    // generator emits existing RefRelease operations; this is not an ABI fact.
+    std::map<Identity, std::set<Identity>> borrow_ends;
     std::map<std::string, std::set<Identity>> module_initializations;
     std::vector<std::string> errors;
     bool verified = false;
