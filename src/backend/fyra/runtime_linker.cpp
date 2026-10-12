@@ -137,7 +137,12 @@ int run_driver(const std::vector<std::string>& arguments) {
         command.push_back("-pthread");
     command.push_back(temporary);
     command.insert(command.end(), libraries.begin(), libraries.end());
-    command.insert(command.end(), {runtime.string(), "-o", options.output_file});
+    command.push_back(runtime.string());
+    if(target.os!=target::OS::WASI) {
+        command.push_back("-lffi");
+        if(target.os!=target::OS::Windows && target.os!=target::OS::MacOS) command.push_back("-ldl");
+    }
+    command.insert(command.end(), {"-o", options.output_file});
     auto status = run_driver(command);
     result.success = status == 0;
     if (!result.success) result.errors.push_back("Target driver failed (status " + std::to_string(status) +

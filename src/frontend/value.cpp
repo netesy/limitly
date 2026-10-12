@@ -5,6 +5,7 @@
 #include <sstream>
 #include <iomanip>
 #include <cmath>
+#include <algorithm>
 
 // Helper function to check if a type is an integer type
 static bool isIntegerType(TypePtr type) {
@@ -395,11 +396,15 @@ std::string Value::toString() const {
                    },
                    [&](const DictValue& dv) {
                        oss << "{";
-                       bool first = true;
-                       for (const auto& [key, value] : dv.elements) {
-                           if (!first) oss << ", ";
-                           first = false;
-                           oss << key->toString() << ": " << value->toString();
+                       // ValuePtr map order depends on allocator addresses. Formatting
+                       // must have a stable order across execution backends and runs.
+                       std::vector<std::pair<std::string, std::string>> entries;
+                       for (const auto& [key, value] : dv.elements)
+                           entries.emplace_back(key->toString(), value->toString());
+                       std::sort(entries.begin(), entries.end());
+                       for (size_t index = 0; index < entries.size(); ++index) {
+                           if (index) oss << ", ";
+                           oss << entries[index].first << ": " << entries[index].second;
                        }
                        oss << "}";
                    },

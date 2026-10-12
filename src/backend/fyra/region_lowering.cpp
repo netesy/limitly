@@ -48,7 +48,22 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
         }
         helpers[name] = fn;
     };
+    declare("lymar_aot_library_open",1,i64);
+    declare("lymar_aot_library_symbol",2,i64);
+    declare("lymar_aot_library_close",1,void_type);
+    declare("lymar_aot_foreign_call",7,i64);
+    declare("lymar_aot_foreign_call_list",5,i64);
+    declare("lymar_aot_callback_create",3,i64);
+    declare("lymar_aot_callback_pointer",1,i64);
+    declare("lymar_aot_callback_destroy",1,void_type);
+    declare("lymar_aot_ffi_register",5,void_type);
+    declare("lymar_aot_ffi_list_size",1,i64);
+    declare("lymar_aot_ffi_list_integer",2,i64);
+    declare("lymar_aot_ffi_kind",2,i64);
+    declare("lymar_aot_ffi_infer_type",2,i64);
+    declare("lymar_aot_time",0,i64);
     declare("lymar_aot_frame_field_address", 2, i64);
+    declare("lymar_aot_frame_matches", 3, i64);
     declare("lymar_aot_atomic_load", 2, i64);
     declare("lymar_aot_atomic_store", 4, void_type);
     declare("lymar_aot_atomic_update", 5, void_type);
@@ -60,6 +75,8 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_print_float", 1, void_type, ctx->getDoubleType());
     declare("lymar_aot_scalar_to_string", 2, i64);
     declare("lymar_aot_format_argument", 2, i64);
+    declare("lymar_aot_print_value", 2, void_type);
+    declare("lymar_aot_mark_dictionary", 1, i64);
     declare("lymar_aot_float_to_string", 1, i64, ctx->getDoubleType());
     declare("lymar_aot_float_bits_to_string", 1, i64);
     declare("lymar_aot_tuple_length", 2, i64);
@@ -71,6 +88,9 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_float_to_integer", 1, i64, ctx->getDoubleType());
     declare("lymar_aot_to_boolean", 2, i64);
     declare("lymar_aot_value_equal", 4, i64);
+    declare("lymar_aot_numeric_compare", 4, i64);
+    declare("lymar_aot_length", 2, i64);
+    declare("lymar_aot_numeric_binary", 5, i64);
     declare("lymar_aot_is_print_object", 2, i64);
     declare("lymar_aot_is_nil", 2, i64);
     declare("lymar_aot_is_object", 2, i64);
@@ -178,7 +198,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         const std::string& name, const std::vector<ir::Value*>& args) {
             std::vector<ir::Value*> operands{helpers.at(name)};
             operands.insert(operands.end(), args.begin(), args.end());
-            auto call = std::make_unique<ir::Instruction>(helpers.at(name)->getType(), ir::Instruction::Call, operands, block);
+            auto call = std::make_unique<ir::Instruction>(helpers.at(name)->getReturnType(), ir::Instruction::Call, operands, block);
             auto* result = call.get();
             result->setName("region_meta_" + std::to_string(flags.size()) + "_" + std::to_string(block->getInstructions().size()));
             block->getInstructions().insert(where, std::move(call));
@@ -215,7 +235,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         inst->replaceAllUsesWith(call.get());
                         inst = call.get();
                         *it = std::move(call);
-                        if (name == "lymar_aot_channel_new" || name == "lymar_aot_scheduler_new" || name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_list_slice" || name == "lymar_aot_format_argument" || name == "lymar_aot_scalar_to_string" || name == "lymar_aot_float_to_string" || name == "lymar_aot_float_bits_to_string") flags[inst] = one;
+                        if (name == "lymar_aot_channel_new" || name == "lymar_aot_scheduler_new" || name == "lymar_aot_alloc" || name == "lymar_aot_resize" || name == "lymar_aot_raw_alloc" || name == "lymar_aot_raw_resize" || name == "lymar_aot_ref_resolve" || name == "lymar_aot_nil" || name == "lymar_aot_copy_constant" || name == "lymar_aot_box_float" || name == "lymar_aot_list_slice" || name == "lymar_aot_format_argument" || name == "lymar_aot_mark_dictionary" || name == "lymar_aot_scalar_to_string" || name == "lymar_aot_float_to_string" || name == "lymar_aot_float_bits_to_string") flags[inst] = one;
                         if (name == "lymar_aot_boolean") flags[inst] = boolean;
                         if (name == "lymar_aot_callable_receiver") flags[inst] = one;
                     }
@@ -272,7 +292,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                     } else if (callee && callee->getName() == "lymar_aot_list_slice") {
                         for (size_t argument = 1; argument <= 3; ++argument)
                             current_operands[argument + 3]->set(flag(current_operands[argument]->get()));
-                    } else if (callee && (callee->getName() == "lymar_aot_string_hash" || callee->getName() == "lymar_aot_tuple_length" || callee->getName() == "lymar_aot_string_index" || callee->getName() == "lymar_aot_callable_receiver" || callee->getName() == "lymar_aot_is_nil" || callee->getName() == "lymar_aot_is_object" || callee->getName() == "lymar_aot_is_print_object" || callee->getName() == "lymar_aot_to_float" || callee->getName() == "lymar_aot_to_integer" || callee->getName() == "lymar_aot_to_boolean" || callee->getName() == "lymar_aot_print_integer" || callee->getName() == "lymar_aot_scalar_to_string" || callee->getName() == "lymar_aot_format_argument")) {
+                    } else if (callee && (callee->getName() == "lymar_aot_string_hash" || callee->getName() == "lymar_aot_tuple_length" || callee->getName() == "lymar_aot_length" || callee->getName() == "lymar_aot_string_index" || callee->getName() == "lymar_aot_callable_receiver" || callee->getName() == "lymar_aot_is_nil" || callee->getName() == "lymar_aot_is_object" || callee->getName() == "lymar_aot_is_print_object" || callee->getName() == "lymar_aot_to_float" || callee->getName() == "lymar_aot_to_integer" || callee->getName() == "lymar_aot_to_boolean" || callee->getName() == "lymar_aot_print_integer" || callee->getName() == "lymar_aot_scalar_to_string" || callee->getName() == "lymar_aot_format_argument" || callee->getName() == "lymar_aot_print_value")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));
                     } else if (callee && (callee->getName() == "lymar_aot_raw_alloc" || callee->getName() == "lymar_aot_raw_free")) {
                         current_operands[2]->set(flag(current_operands[1]->get()));
@@ -288,6 +308,12 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         flags[inst] = emit(block, after, "lymar_aot_return_pointer", {});
                     } else if (callee && (callee->getName() == "lymar_aot_atomic_store" || callee->getName() == "lymar_aot_atomic_update")) {
                         current_operands[4]->set(flag(current_operands[3]->get()));
+                    } else if(callee && (callee->getName()=="lymar_aot_ffi_kind" || callee->getName()=="lymar_aot_ffi_infer_type")) {
+                        current_operands[2]->set(flag(current_operands[1]->get()));
+                    } else if(callee && (callee->getName()=="lymar_aot_library_open" || callee->getName()=="lymar_aot_library_symbol" || callee->getName()=="lymar_aot_callback_pointer" || callee->getName()=="lymar_aot_callback_create" || callee->getName()=="lymar_aot_foreign_call" || callee->getName()=="lymar_aot_foreign_call_list")) {
+                        if(callee->getName()=="lymar_aot_foreign_call") current_operands[7]->set(flag(current_operands[1]->get()));
+                        if(callee->getName()=="lymar_aot_foreign_call_list") current_operands[5]->set(flag(current_operands[1]->get()));
+                        flags[inst]=emit(block,after,"lymar_aot_return_pointer",{});
                     } else if (callee && callee->getName() == "lymar_aot_atomic_load") {
                         flags[inst] = emit(block, after, "lymar_aot_return_pointer", {});
                     } else if (callee && callee->getName() == "lymar_aot_memory_store") {
@@ -297,9 +323,13 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         current_operands[3]->set(flag(current_operands[1]->get()));
                         flags[inst] = emit(block, after, "lymar_aot_memory_load_kind",
                             {current_operands[1]->get(), current_operands[2]->get(), current_operands[3]->get()});
-                    } else if (callee && callee->getName() == "lymar_aot_value_equal") {
+                    } else if (callee && (callee->getName() == "lymar_aot_value_equal" || callee->getName() == "lymar_aot_numeric_compare")) {
                         current_operands[3]->set(flag(current_operands[1]->get()));
                         current_operands[4]->set(flag(current_operands[2]->get()));
+                    } else if(callee && callee->getName()=="lymar_aot_numeric_binary") {
+                        current_operands[4]->set(flag(current_operands[1]->get()));
+                        current_operands[5]->set(flag(current_operands[2]->get()));
+                        flags[inst]=emit(block,after,"lymar_aot_return_pointer",{});
                     } else if (callee && callee->getName() == "lymar_aot_region_move") {
                         current_operands[4]->set(flag(current_operands[1]->get()));
                     } else if (callee && (callee->getName() == "lymar_aot_param_push" || callee->getName() == "lymar_aot_param_pop")) {
@@ -330,11 +360,11 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                 } else if (inst->getOpcode() == ir::Instruction::Ret) {
                     if (!current_operands.empty()) {
                         auto* value = current_operands[0]->get();
-                        if (value->getType()->isFloatingPoint() && !fn->getType()->isFloatingPoint()) {
+                        if (value->getType()->isFloatingPoint() && !fn->getReturnType()->isFloatingPoint()) {
                             auto* boxed = emit(block, it, "lymar_aot_box_float", {value});
                             flags[boxed] = one;
                             current_operands[0]->set(boxed);
-                        } else if (!value->getType()->isFloatingPoint() && fn->getType()->isFloatingPoint()) {
+                        } else if (!value->getType()->isFloatingPoint() && fn->getReturnType()->isFloatingPoint()) {
                             auto* number = emit(block, it, "lymar_aot_to_float", {value, flag(value)});
                             flags[number] = zero;
                             current_operands[0]->set(number);
@@ -418,7 +448,7 @@ void lower_worker_failures(ir::Module& module) {
         auto exit=std::make_unique<ir::BasicBlock>(&function,"worker_failure");auto* failure=exit.get();
         if(invocation) failure->addInstruction(std::make_unique<ir::Instruction>(ctx->getVoidType(),ir::Instruction::Call,std::vector<ir::Value*>{abort},failure));
         std::vector<ir::Value*> returned;
-        if(!function.getType()->isVoidTy()) returned.push_back(function.getType()->isFloatingPoint()?static_cast<ir::Value*>(ctx->getConstantFP(ctx->getDoubleType(),0.0)):static_cast<ir::Value*>(ctx->getConstantInt(word,0)));
+        if(!function.getReturnType()->isVoidTy()) returned.push_back(function.getReturnType()->isFloatingPoint()?static_cast<ir::Value*>(ctx->getConstantFP(ctx->getDoubleType(),0.0)):static_cast<ir::Value*>(ctx->getConstantInt(word,0)));
         failure->addInstruction(std::make_unique<ir::Instruction>(ctx->getVoidType(),ir::Instruction::Ret,returned,failure));
         function.addBasicBlock(std::move(exit));
         unsigned sequence=0;

@@ -144,12 +144,14 @@ void LIRBuiltinFunctions::registerIOFunctions() {
                         case TypeTag::Int:
                         case TypeTag::Int32:
                         case TypeTag::Int64:
-                        case TypeTag::Int128:
                         case TypeTag::UInt:
                         case TypeTag::UInt32:
                         case TypeTag::UInt64:
-                        case TypeTag::UInt128:
                             std::cout << value->as<int64_t>();
+                            break;
+                        case TypeTag::Int128:
+                        case TypeTag::UInt128:
+                            std::cout << value->toString();
                             break;
                         case TypeTag::Float32:
                         case TypeTag::Float64:

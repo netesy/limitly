@@ -789,20 +789,27 @@ public:
                 if (!functions.count(identity(*declaration))) collect(declaration);
             }
             auto& env = environments[ast.get()];
+            // Declaration states are reconstructed lazily by expression().
+            // Previously define() allocated them for every module, only for
+            // the loop below to erase all of them before any body analysis.
+            auto bind_declaration = [&](const std::string& name, Identity id) {
+                env.scopes.back()[name] = id;
+                facts->names[id] = name;
+            };
             for (const auto& [name, id] : function_names) {
-                Value value; value.callables.insert(id); define(env, name, id, value, *ast);
+                bind_declaration(name, id);
                 const auto& prefix = namespaces[ast.get()];
-                if (!prefix.empty() && name.starts_with(prefix)) define(env, name.substr(prefix.size()), id, value, *ast);
+                if (!prefix.empty() && name.starts_with(prefix)) bind_declaration(name.substr(prefix.size()), id);
             }
             for (const auto& [name, id] : constructor_names) {
-                Value value; value.constructor = id; define(env, name, id, value, *ast);
+                bind_declaration(name, id);
                 const auto& prefix = namespaces[ast.get()];
-                if (!prefix.empty() && name.starts_with(prefix)) define(env, name.substr(prefix.size()), id, value, *ast);
+                if (!prefix.empty() && name.starts_with(prefix)) bind_declaration(name.substr(prefix.size()), id);
             }
             for (const auto& [name, declaration] : ast->imported_symbols) {
                 const auto id = identity(*declaration);
-                if (functions.count(id)) {Value value; value.callables.insert(id); define(env, name, id, value, *ast);}
-                if (constructors.count(id)) {Value value; value.constructor = id; define(env, name, id, value, *ast);}
+                if (functions.count(id)) bind_declaration(name, id);
+                if (constructors.count(id)) bind_declaration(name, id);
                 if (auto var = std::dynamic_pointer_cast<A::VarDeclaration>(declaration)) {Value value; value.managed = managed(var->inferred_type); define(env, name, id, value, *ast);}
             }
             for (const auto& declaration : ast->statements) if (auto var = std::dynamic_pointer_cast<A::VarDeclaration>(declaration)) {

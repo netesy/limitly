@@ -1,6 +1,8 @@
 #include "../../memory/reference_flags.hh"
 #include "../../memory/region_analysis.hh"
 #include <cstring>
+#include <cstdlib>
+#include <iostream>
 // builder.cpp - LIR to Fyra IR Conversion Implementation
 #include "builder.hh"
 #include "../../lir/lir.hh"
@@ -29,6 +31,21 @@
 #include "../../frontend/module_manager.hh"
 
 namespace LM::Backend::Fyra {
+
+// Private assembler symbols must be injective in the canonical LIR identity.
+// Replacing dots with underscores also merges a.b_c with a_b.c.
+static std::string global_symbol(const std::string& canonical) {
+    std::string symbol="__lymar_global_";
+    const char* hex="0123456789abcdef";
+    for(unsigned char character:canonical) {
+        if((character>='a' && character<='z') || (character>='A' && character<='Z') ||
+           (character>='0' && character<='9')) symbol+=character;
+        else if(character=='_') symbol+="_u";
+        else if(character=='.') symbol+="_d";
+        else {symbol+="_x";symbol+=hex[character>>4];symbol+=hex[character&15];}
+    }
+    return symbol;
+}
 
 static inline uint32_t get_frame_field_offset(uint32_t field_index) {
     constexpr uint32_t header_size = 8;
@@ -289,7 +306,7 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
         for (const auto& inst : f->instructions) {
             if (inst.op == LIR::LIR_Op::StoreGlobal) {
                 std::string gname = inst.func_name.empty() ? ("global_" + std::to_string(inst.dst)) : inst.func_name;
-                for (char& c : gname) { if (c == '.') c = '_'; }
+                gname = global_symbol(gname);
                 if (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32 || is_instruction_float(f, inst.a)) {
                     global_types_[gname] = LIR::Type::F64;
                 }
@@ -319,6 +336,30 @@ std::shared_ptr<ir::Module> LIRToFyraIRBuilder::build(const LIR::LIR_Function& l
     // 3. Build the top-level main function body
     build_function_body(main_fn, lir_func);
 
+    bool callbacks_needed=false;
+    for(const auto& name:reachable_funcs) {
+        auto* function=registry.getFunction(name);
+        if(function) for(const auto& instruction:function->instructions)
+            if(instruction.op==LIR::LIR_Op::CallbackCreate && instruction.imm!=1) callbacks_needed=true;
+    }
+    for(const auto& instruction:lir_func.instructions)
+        if(instruction.op==LIR::LIR_Op::CallbackCreate && instruction.imm!=1) callbacks_needed=true;
+    if(callbacks_needed) {
+        auto* entry=main_fn->getBasicBlocks().front().get();
+        auto first_new=entry->getInstructions().size();
+        builder_->setInsertPoint(entry);
+        for(const auto& name:reachable_funcs) {
+            auto* target=current_module_->getFunction(name=="main" && lir_func.name=="__top_level_wrapper__"?"__user_main":name);
+            if(!target || target==main_fn || target->getBasicBlocks().empty() || target->getParameters().size()>64) continue;
+            uint64_t floating=0;size_t index=0;
+            for(const auto& parameter:target->getParameters()) {if(parameter->getType()->isFloatingPoint()) floating|=uint64_t(1)<<index;++index;}
+            auto* text=FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(),builder_.get(),"ffi_name_"+std::to_string(label_counter_++),name);
+            auto* copy=builder_->createExternCall("lymar_aot_copy_constant",{text,context_->getConstantInt(context_->getIntegerType(64),25+name.size())},context_->getIntegerType(64));
+            builder_->createExternCall("lymar_aot_ffi_register",{copy,target,context_->getConstantInt(context_->getIntegerType(64),index),context_->getConstantInt(context_->getIntegerType(64),floating),context_->getConstantInt(context_->getIntegerType(64),target->getReturnType()->isFloatingPoint())},context_->getVoidType());
+        }
+        auto begin=entry->getInstructions().begin();std::advance(begin,first_new);
+        entry->getInstructions().splice(entry->getInstructions().begin(),entry->getInstructions(),begin,entry->getInstructions().end());
+    }
     FyraBuiltinFunctions::emit_used_builtins(current_module_.get(), builder_.get(), used_builtins_);
     std::unordered_map<std::string, uint64_t> region_free;
     if (Memory::runtime_regions_proven_unnecessary(lir_func))
@@ -534,7 +575,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         if (reg_slots.count(r)) {
             const auto actual = reg_types.count(r) ? reg_types[r] : t;
             auto* load = (actual == LIR::Type::F64 || actual == LIR::Type::F32)
-                ? builder_->createLoadd(reg_slots[r]) : builder_->createLoad(reg_slots[r]);
+                ? builder_->createLoadd(reg_slots[r]) : builder_->createLoadl(reg_slots[r]);
             load->setName("load_r" + std::to_string(r) + "_" + std::to_string(label_counter_++));
             return load;
         }
@@ -580,18 +621,27 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         // Cached SSA values may be erased even when the source register is
         // numerically typed. Convert the actual value, not just its annotation.
         ir::Value* v = load_reg(r, t);
-        if (v && v->getType()->isIntegerTy()) {
+        if (v && !v->getType()->isFloatingPoint()) {
             return builder_->createExternCall("lymar_aot_to_float", {v, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getDoubleType());
         }
         return v;
     };
 
+    auto erased_arithmetic = [&](const LIR::LIR_Inst& instruction) {
+        auto erased=[&](uint32_t reg,LIR::Type type) {
+            if(reg_types.count(reg)) type=reg_types.at(reg);
+            return type==LIR::Type::Ptr || type==LIR::Type::U64;
+        };
+        return erased(instruction.a,instruction.type_a) || erased(instruction.b,instruction.type_b);
+    };
     auto store_float_reg = [&](uint32_t r, ir::Value* fval) {
         store_reg(r, fval, LIR::Type::F64);
     };
 
     auto lower_runtime_builtin = [&](const std::string& name, const std::vector<ir::Value*>& args) -> ir::Value* {
         auto* zero = context_->getConstantInt(context_->getIntegerType(64), 0);
+        if(name=="time" && args.empty())
+            return builder_->createExternCall("lymar_aot_time",{},context_->getIntegerType(64));
         if (name == "_builtin_string_hash_bytes" && args.size() == 1)
             return builder_->createExternCall("lymar_aot_string_hash", {erased_word(args[0]), zero},
                 context_->getIntegerType(64));
@@ -661,7 +711,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 auto destination_type = reg_types.count(inst.dst) ? reg_types[inst.dst] : inst.result_type;
                 if (auto info = lir_func.register_language_types.find(inst.dst); info != lir_func.register_language_types.end() && info->second && info->second->tag == ::TypeTag::Any)
                     destination_type = LIR::Type::Ptr;
-                store_reg(inst.dst, load_reg(inst.a, inst.type_a), destination_type);
+                // A move copies the value and its dynamic kind. In particular,
+                // a missing typed-container lookup remains nil through aliases.
+                store_reg(inst.dst, load_reg(inst.a, inst.type_a), destination_type, true);
                 break;
             }
             case LIR::LIR_Op::LoadConst: {
@@ -820,16 +872,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::StoreGlobal: {
                 std::string gname = inst.func_name.empty() ? ("global_" + std::to_string(inst.dst)) : inst.func_name;
-                for (char& c : gname) { if (c == '.') c = '_'; }
+                gname = global_symbol(gname);
                 ir::GlobalVariable* gv = nullptr;
                 for (const auto& item : current_module_->getGlobalVariables()) {
                     if (item->getName() == gname) { gv = item.get(); break; }
-                }
-                if (!gv && gname.find('_') != std::string::npos) {
-                    std::string sym_suffix = gname.substr(gname.find_last_of('_'));
-                    for (const auto& item : current_module_->getGlobalVariables()) {
-                        if (item->getName().ends_with(sym_suffix)) { gv = item.get(); gname = item->getName(); break; }
-                    }
                 }
                 bool is_float_g = (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32 ||
                                   (reg_types.count(inst.a) && (reg_types[inst.a] == LIR::Type::F64 || reg_types[inst.a] == LIR::Type::F32)) ||
@@ -862,16 +908,10 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::LoadGlobal: {
                 std::string gname = inst.func_name.empty() ? ("global_" + std::to_string(inst.a)) : inst.func_name;
-                for (char& c : gname) { if (c == '.') c = '_'; }
+                gname = global_symbol(gname);
                 ir::GlobalVariable* gv = nullptr;
                 for (const auto& item : current_module_->getGlobalVariables()) {
                     if (item->getName() == gname) { gv = item.get(); break; }
-                }
-                if (!gv && gname.find('_') != std::string::npos) {
-                    std::string sym_suffix = gname.substr(gname.find_last_of('_'));
-                    for (const auto& item : current_module_->getGlobalVariables()) {
-                        if (item->getName().ends_with(sym_suffix)) { gv = item.get(); gname = item->getName(); break; }
-                    }
                 }
                 bool is_float_g = ((global_types_.count(gname) && (global_types_[gname] == LIR::Type::F64 || global_types_[gname] == LIR::Type::F32)) ||
                                   inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32);
@@ -885,7 +925,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     current_module_->addGlobalVariable(std::move(new_gv));
                     gv = raw_gv;
                 }
-                ir::Value* loaded = is_float_g ? static_cast<ir::Value*>(builder_->createLoadd(gv)) : builder_->createLoad(gv);
+                ir::Value* loaded = is_float_g ? static_cast<ir::Value*>(builder_->createLoadd(gv)) : builder_->createLoadl(gv);
                 LIR::Type loaded_type = inst.result_type;
                 if (global_types_.count(gname)) {
                     loaded_type = global_types_[gname];
@@ -903,6 +943,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Add:
                 if (is_float_op(inst)) {
                     store_float_reg(inst.dst, builder_->createFAdd(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
+                } else if(erased_arithmetic(inst)) {
+                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{erased_word(load_reg(inst.a,inst.type_a)),erased_word(load_reg(inst.b,inst.type_b)),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0)},context_->getIntegerType(64));
+                    store_reg(inst.dst,result,inst.result_type,true);
                 } else {
                     store_reg(inst.dst, builder_->createAdd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
                 }
@@ -910,6 +953,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Sub:
                 if (is_float_op(inst)) {
                     store_float_reg(inst.dst, builder_->createFSub(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
+                } else if(erased_arithmetic(inst)) {
+                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{erased_word(load_reg(inst.a,inst.type_a)),erased_word(load_reg(inst.b,inst.type_b)),context_->getConstantInt(context_->getIntegerType(64),1),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0)},context_->getIntegerType(64));
+                    store_reg(inst.dst,result,inst.result_type,true);
                 } else {
                     store_reg(inst.dst, builder_->createSub(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
                 }
@@ -917,6 +963,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Mul:
                 if (is_float_op(inst)) {
                     store_float_reg(inst.dst, builder_->createFMul(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
+                } else if(erased_arithmetic(inst)) {
+                    auto* result=builder_->createExternCall("lymar_aot_numeric_binary",{erased_word(load_reg(inst.a,inst.type_a)),erased_word(load_reg(inst.b,inst.type_b)),context_->getConstantInt(context_->getIntegerType(64),2),context_->getConstantInt(context_->getIntegerType(64),0),context_->getConstantInt(context_->getIntegerType(64),0)},context_->getIntegerType(64));
+                    store_reg(inst.dst,result,inst.result_type,true);
                 } else {
                     store_reg(inst.dst, builder_->createMul(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type);
                 }
@@ -947,7 +996,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     builder_->createJmp(b_done);
 
                     builder_->setInsertPoint(b_done);
-                    store_reg(inst.dst, builder_->createLoad(res_slot), inst.result_type);
+                    store_reg(inst.dst, builder_->createLoadl(res_slot), inst.result_type);
                 }
                 break;
             case LIR::LIR_Op::Mod: {
@@ -973,7 +1022,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 builder_->createJmp(b_done);
 
                 builder_->setInsertPoint(b_done);
-                store_reg(inst.dst, builder_->createLoad(res_slot), inst.result_type);
+                store_reg(inst.dst, builder_->createLoadl(res_slot), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::Neg:
@@ -1040,6 +1089,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     ir::Value* c = builder_->createClt(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else if ((reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
+                           (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
+                           inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr) {
+                    auto* compared = builder_->createExternCall("lymar_aot_numeric_compare",
+                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
+                         context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                    store_reg(inst.dst, builder_->createCslt(compared, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
                 } else {
                     ir::Value* c = builder_->createCslt(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
@@ -1049,6 +1105,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     ir::Value* c = builder_->createCle(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else if ((reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
+                           (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
+                           inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr) {
+                    auto* compared = builder_->createExternCall("lymar_aot_numeric_compare",
+                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
+                         context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                    store_reg(inst.dst, builder_->createCsle(compared, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
                 } else {
                     ir::Value* c = builder_->createCsle(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
@@ -1058,6 +1121,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     ir::Value* c = builder_->createCgt(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else if ((reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
+                           (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
+                           inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr) {
+                    auto* compared = builder_->createExternCall("lymar_aot_numeric_compare",
+                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
+                         context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                    store_reg(inst.dst, builder_->createCsgt(compared, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
                 } else {
                     ir::Value* c = builder_->createCsgt(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
@@ -1067,6 +1137,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (is_float_op(inst)) {
                     ir::Value* c = builder_->createCge(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else if ((reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
+                           (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
+                           inst.type_a == LIR::Type::Ptr || inst.type_b == LIR::Type::Ptr) {
+                    auto* compared = builder_->createExternCall("lymar_aot_numeric_compare",
+                        {erased_word(load_reg(inst.a, inst.type_a)), erased_word(load_reg(inst.b, inst.type_b)),
+                         context_->getConstantInt(context_->getIntegerType(64), 0), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
+                    store_reg(inst.dst, builder_->createCsge(compared, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
                 } else {
                     ir::Value* c = builder_->createCsge(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
@@ -1189,97 +1266,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         if (arg_type == LIR::Type::I64 || is_known_i64) {
                             builder_->createExternCall("lymar_aot_print_integer", {args[ai], context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
                         } else if (arg_type == LIR::Type::Ptr) {
-                            ir::BasicBlock* b_pr_ptr = builder_->createBasicBlock("pr_ptr_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_int = builder_->createBasicBlock("pr_int_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_nil = builder_->createBasicBlock("pr_nil_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_obj = builder_->createBasicBlock("pr_obj_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_next = builder_->createBasicBlock("pr_next_" + prid, cur_fn);
-
-                            ir::Value* arg_val = args[ai];
-                            ir::Value* is_valid_ptr = builder_->createExternCall("lymar_aot_is_print_object", {arg_val, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
-
-                            builder_->createBr(is_valid_ptr, b_pr_ptr, b_pr_int);
-
-                            // Branch: scalar int
-                            builder_->setInsertPoint(b_pr_int);
-                            ir::BasicBlock* b_pr_int_nil = builder_->createBasicBlock("pr_int_nil_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_int_real = builder_->createBasicBlock("pr_int_real_" + prid, cur_fn);
-                            ir::Value* is_nil_scalar = builder_->createExternCall("lymar_aot_is_nil", {arg_val, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
-
-                            builder_->createBr(is_nil_scalar, b_pr_int_nil, b_pr_int_real);
-
-                            builder_->setInsertPoint(b_pr_int_nil);
-                            FyraBuiltinFunctions::emit_print_nil_inline(current_module_.get(), builder_.get());
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_int_real);
-                            builder_->createExternCall("lymar_aot_print_integer", {arg_val, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
-                            builder_->createJmp(b_pr_next);
-
-                            // Branch: pointer candidate
-                            builder_->setInsertPoint(b_pr_ptr);
-                            ir::Value* is_zero_nil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), 0));
-                            ir::Value* is_val_nil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
-                            ir::Value* is_nil = builder_->createOr(is_zero_nil, is_val_nil);
-                            builder_->createBr(is_nil, b_pr_nil, b_pr_obj);
-
-                            builder_->setInsertPoint(b_pr_nil);
-                            FyraBuiltinFunctions::emit_print_nil_inline(current_module_.get(), builder_.get());
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_obj);
-                            ir::Value* magic = builder_->createLoad(arg_val);
-                            ir::Value* type_id = builder_->createAnd(magic, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
-
-                            ir::BasicBlock* b_pr_str = builder_->createBasicBlock("pr_str_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_enum = builder_->createBasicBlock("pr_enum_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_list = builder_->createBasicBlock("pr_list_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_dict = builder_->createBasicBlock("pr_dict_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_fallback = builder_->createBasicBlock("pr_fallback_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_non_str = builder_->createBasicBlock("pr_nonstr_" + prid, cur_fn);
-
-                            ir::Value* is_str11 = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), 11));
-                            ir::Value* is_str0 = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), 0));
-                            ir::Value* is_str = builder_->createOr(is_str11, is_str0);
-                            builder_->createBr(is_str, b_pr_str, b_pr_non_str);
-
-                            builder_->setInsertPoint(b_pr_str);
-                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), arg_val);
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_non_str);
-                            ir::Value* is_enum = builder_->createCeq(magic, context_->getConstantInt(context_->getIntegerType(64), 0x454E554D));
-                            builder_->createBr(is_enum, b_pr_enum, b_pr_list);
-
-                            builder_->setInsertPoint(b_pr_enum);
-                            ir::Function* fn_enum_str = current_module_->getFunction("lm_enum_to_str");
-                            if (fn_enum_str) {
-                                ir::Value* enum_s = builder_->createCall(fn_enum_str, {arg_val});
-                                FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), enum_s);
-                            } else {
-                                builder_->createExternCall("lymar_aot_print_integer", {arg_val, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
-                            }
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_list);
-                            ir::Value* is_list = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), 12));
-                            builder_->createBr(is_list, b_pr_dict, b_pr_fallback);
-
-                            builder_->setInsertPoint(b_pr_dict);
-                            ir::Function* fn_list_str = current_module_->getFunction("lm_list_to_str");
-                            if (fn_list_str) {
-                                ir::Value* list_s = builder_->createCall(fn_list_str, {arg_val});
-                                FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), list_s);
-                            } else {
-                                builder_->createExternCall("lymar_aot_print_integer", {arg_val, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
-                            }
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_fallback);
-                            builder_->createExternCall("lymar_aot_print_integer", {arg_val, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_next);
+                            builder_->createExternCall("lymar_aot_print_value", {erased_word(args[ai]), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
                         } else if (arg_type == LIR::Type::Bool) {
                             FyraBuiltinFunctions::emit_print_bool_inline(current_module_.get(), builder_.get(), args[ai]);
                         } else if (arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
@@ -1319,7 +1306,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     func = builder_->createFunction(name, lir_type_to_fyra_type(inst.result_type), pts);
                 }
                 LIR::Type res_t = inst.result_type;
-                if (func && func->getType() && (func->getType()->isDoubleTy() || func->getType()->isFloatTy())) {
+                if (func && func->getType() && (func->getReturnType()->isDoubleTy() || func->getReturnType()->isFloatTy())) {
                     res_t = LIR::Type::F64;
                 }
                 ir::Value* res = func ? static_cast<ir::Value*>(builder_->createCall(func, args)) : static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64), 0));
@@ -1354,7 +1341,28 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         args.push_back(load_reg(inst.call_args[ai], at));
                     }
                 }
-                ir::Value* raw_callee = load_reg(inst.a, inst.type_a);
+                // Share the dispatch CFG by native argument signature. Repeating
+                // every reachable target at each call site creates quadratic IR
+                // in imported higher-order/UI programs. The helper retains the
+                // same checked receiver and dynamic kind/cleanup protocol.
+                std::vector<ir::Value*> site_args{erased_word(load_reg(inst.a, inst.type_a))};
+                site_args.insert(site_args.end(), args.begin(), args.end());
+                std::string dispatch_name = "__lymar_indirect_dispatch_w";
+                std::vector<ir::Type*> dispatch_types{context_->getIntegerType(64)};
+                for (auto* argument : args) {
+                    bool floating = argument->getType()->isFloatingPoint();
+                    dispatch_name += floating ? "f" : "w";
+                    dispatch_types.push_back(floating ? static_cast<ir::Type*>(context_->getDoubleType()) : static_cast<ir::Type*>(context_->getIntegerType(64)));
+                }
+                auto* dispatch = current_module_->getFunction(dispatch_name);
+                if (!dispatch) {
+                    auto* site_block = builder_->getInsertPoint();
+                    dispatch = builder_->createFunction(dispatch_name, context_->getIntegerType(64), dispatch_types);
+                    builder_->setInsertPoint(builder_->createBasicBlock("entry", dispatch));
+                    auto parameter = dispatch->getParameters().begin();
+                    ir::Value* raw_callee = parameter->get(); ++parameter;
+                    args.clear();
+                    for (; parameter != dispatch->getParameters().end(); ++parameter) args.push_back(parameter->get());
                 raw_callee = builder_->createExternCall("lymar_aot_callable_receiver",
                     {erased_word(raw_callee), context_->getConstantInt(context_->getIntegerType(64), 0)},
                     context_->getIntegerType(64));
@@ -1378,7 +1386,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::BasicBlock* b_is_box = builder_->createBasicBlock("ind_box_" + cid, cur_fn);
                 ir::BasicBlock* b_read_callee = builder_->createBasicBlock("ind_rd_callee_" + cid, cur_fn);
 
-                ir::Value* first_word = builder_->createLoad(raw_callee);
+                ir::Value* first_word = builder_->createLoadl(raw_callee);
                 ir::Value* first_u32 = builder_->createAnd(first_word, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
                 ir::Value* is_box_type = builder_->createCeq(first_u32, context_->getConstantInt(context_->getIntegerType(64), 0)); // TYPE_BOX = 0
                 ir::Value* is_foreign_box = builder_->createCeq(first_u32, context_->getConstantInt(context_->getIntegerType(64), 13)); // TYPE_FOREIGN_PTR = 13
@@ -1387,14 +1395,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 builder_->createBr(is_any_box, b_is_box, b_read_callee);
 
                 builder_->setInsertPoint(b_is_box);
-                ir::Value* unboxed_ptr = builder_->createLoad(builder_->createAdd(raw_callee, context_->getConstantInt(context_->getIntegerType(64), 8)));
+                ir::Value* unboxed_ptr = builder_->createLoadl(builder_->createAdd(raw_callee, context_->getConstantInt(context_->getIntegerType(64), 8)));
                 builder_->createStore(unboxed_ptr, callee_slot);
                 builder_->createJmp(b_read_callee);
 
                 builder_->setInsertPoint(b_read_callee);
-                ir::Value* callee = builder_->createLoad(callee_slot);
+                ir::Value* callee = builder_->createLoadl(callee_slot);
 
-                ir::Value* magic = builder_->createLoad(callee);
+                ir::Value* magic = builder_->createLoadl(callee);
                 ir::Value* type_id = builder_->createAnd(magic, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
                 ir::Value* is_str = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), 11)); // TYPE_STRING = 11
 
@@ -1551,10 +1559,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 builder_->createJmp(b_done);
 
                 builder_->setInsertPoint(b_done);
-                ir::Value* final_res = builder_->createLoad(res_slot);
+                ir::Value* final_res = builder_->createLoadl(res_slot);
+                builder_->createRet(final_res);
+                    builder_->setInsertPoint(site_block);
+                }
+                auto* dispatched_result = builder_->createCall(dispatch, site_args);
                 if (inst.dst != UINT32_MAX) {
                     reg_types[inst.dst] = inst.result_type;
-                    store_reg(inst.dst, final_res, inst.result_type, true);
+                    store_reg(inst.dst, dispatched_result, inst.result_type, true);
                 }
                 break;
             }
@@ -1618,81 +1630,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                         if (arg_type == LIR::Type::I64 || is_known_i64) {
                             builder_->createExternCall("lymar_aot_print_integer", {args[ai], context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
                         } else if (arg_type == LIR::Type::Ptr) {
-                            ir::BasicBlock* b_pr_ptr = builder_->createBasicBlock("pr_ptr_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_int = builder_->createBasicBlock("pr_int_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_nil = builder_->createBasicBlock("pr_nil_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_obj = builder_->createBasicBlock("pr_obj_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_next = builder_->createBasicBlock("pr_next_" + prid, cur_fn);
-
-                            ir::Value* arg_val = args[ai];
-                            ir::Value* is_valid_ptr = builder_->createExternCall("lymar_aot_is_print_object", {arg_val, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
-
-                            builder_->createBr(is_valid_ptr, b_pr_ptr, b_pr_int);
-
-                            // Branch: scalar int
-                            builder_->setInsertPoint(b_pr_int);
-                            ir::BasicBlock* b_pr_int_nil = builder_->createBasicBlock("pr_int_nil_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_int_real = builder_->createBasicBlock("pr_int_real_" + prid, cur_fn);
-                            ir::Value* is_nil_scalar = builder_->createExternCall("lymar_aot_is_nil", {arg_val, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getIntegerType(64));
-
-                            builder_->createBr(is_nil_scalar, b_pr_int_nil, b_pr_int_real);
-
-                            builder_->setInsertPoint(b_pr_int_nil);
-                            FyraBuiltinFunctions::emit_print_nil_inline(current_module_.get(), builder_.get());
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_int_real);
-                            builder_->createExternCall("lymar_aot_print_integer", {arg_val, context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
-                            builder_->createJmp(b_pr_next);
-
-                            // Branch: pointer candidate
-                            builder_->setInsertPoint(b_pr_ptr);
-                            ir::Value* is_zero_nil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), 0));
-                            ir::Value* is_val_nil = builder_->createCeq(arg_val, context_->getConstantInt(context_->getIntegerType(64), VAL_NIL));
-                            ir::Value* is_nil = builder_->createOr(is_zero_nil, is_val_nil);
-                            builder_->createBr(is_nil, b_pr_nil, b_pr_obj);
-
-                            builder_->setInsertPoint(b_pr_nil);
-                            FyraBuiltinFunctions::emit_print_nil_inline(current_module_.get(), builder_.get());
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_obj);
-                            ir::Value* magic = builder_->createLoad(arg_val);
-                            ir::Value* type_id = builder_->createAnd(magic, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
-
-                            ir::BasicBlock* b_pr_str = builder_->createBasicBlock("pr_str_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_enum = builder_->createBasicBlock("pr_enum_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_list = builder_->createBasicBlock("pr_list_" + prid, cur_fn);
-                            ir::BasicBlock* b_pr_non_str = builder_->createBasicBlock("pr_nonstr_" + prid, cur_fn);
-
-                            ir::Value* is_str = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), 11));
-                            builder_->createBr(is_str, b_pr_str, b_pr_non_str);
-
-                            builder_->setInsertPoint(b_pr_str);
-                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), arg_val);
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_non_str);
-                            ir::Value* is_enum = builder_->createCeq(magic, context_->getConstantInt(context_->getIntegerType(64), 0x454E554D));
-                            builder_->createBr(is_enum, b_pr_enum, b_pr_list);
-
-                            builder_->setInsertPoint(b_pr_enum);
-                            used_builtins_.insert("lm_enum_to_str");
-                            ir::Function* fn_enum_str = current_module_->getFunction("lm_enum_to_str");
-                            if (!fn_enum_str) fn_enum_str = builder_->createFunction("lm_enum_to_str", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                            ir::Value* enum_s = builder_->createCall(fn_enum_str, {arg_val});
-                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), enum_s);
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_list);
-                            used_builtins_.insert("lm_list_to_str");
-                            ir::Function* fn_list_str = current_module_->getFunction("lm_list_to_str");
-                            if (!fn_list_str) fn_list_str = builder_->createFunction("lm_list_to_str", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                            ir::Value* list_s = builder_->createCall(fn_list_str, {arg_val});
-                            FyraBuiltinFunctions::emit_print_str_inline(current_module_.get(), builder_.get(), list_s);
-                            builder_->createJmp(b_pr_next);
-
-                            builder_->setInsertPoint(b_pr_next);
+                            builder_->createExternCall("lymar_aot_print_value", {erased_word(args[ai]), context_->getConstantInt(context_->getIntegerType(64), 0)}, context_->getVoidType());
                         } else if (arg_type == LIR::Type::Bool) {
                             FyraBuiltinFunctions::emit_print_bool_inline(current_module_.get(), builder_.get(), args[ai]);
                         } else if (arg_type == LIR::Type::F64 || arg_type == LIR::Type::F32) {
@@ -1735,7 +1673,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (func) store_reg(inst.dst, builder_->createCall(func, args), inst.result_type);
                 break;
             }
-            case LIR::LIR_Op::Load: store_reg(inst.dst, builder_->createLoad(load_reg(inst.a, inst.type_a)), inst.result_type); break;
+            case LIR::LIR_Op::Load: store_reg(inst.dst, builder_->createLoadl(load_reg(inst.a, inst.type_a)), inst.result_type); break;
             case LIR::LIR_Op::Store: builder_->createStore(load_reg(inst.b, inst.type_b), load_reg(inst.a, inst.type_a)); break;
             case LIR::LIR_Op::Cast: {
                 auto* value = load_reg(inst.a, inst.type_a);
@@ -1797,10 +1735,9 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 if (a_type == LIR::Type::F64 || a_type == LIR::Type::F32) {
                     store_reg(inst.dst, FyraBuiltinFunctions::emit_float_to_str_inline(current_module_.get(), builder_.get(), load_float_reg(inst.a, inst.type_a)), LIR::Type::Ptr);
                 } else {
-                    used_builtins_.insert("lm_to_string");
-                    ir::Function* fn = current_module_->getFunction("lm_to_string");
-                    if (!fn) fn = builder_->createFunction("lm_to_string", context_->getIntegerType(64), {context_->getIntegerType(64)});
-                    store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
+                    store_reg(inst.dst, builder_->createExternCall("lymar_aot_format_argument",
+                        {erased_word(load_reg(inst.a, inst.type_a)), context_->getConstantInt(context_->getIntegerType(64), 0)},
+                        context_->getIntegerType(64)), inst.result_type);
                 }
                 break;
             }
@@ -1879,7 +1816,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::IsError: {
                 ir::Value* container = load_reg(inst.a, LIR::Type::Ptr);
-                ir::Value* is_err_flag = builder_->createLoad(container);
+                ir::Value* is_err_flag = builder_->createLoadl(container);
                 ir::Value* is_err_bool = builder_->createCne(is_err_flag, context_->getConstantInt(context_->getIntegerType(64), 0));
                 store_reg(inst.dst, builder_->createCast(is_err_bool, context_->getIntegerType(64)), inst.result_type);
                 break;
@@ -1887,13 +1824,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::Unwrap: {
                 ir::Value* container = load_reg(inst.a, LIR::Type::Ptr);
                 ir::Value* payload_addr = builder_->createAdd(container, context_->getConstantInt(context_->getIntegerType(64), 8));
-                ir::Value* payload = builder_->createLoad(payload_addr);
+                ir::Value* payload = builder_->createLoadl(payload_addr);
                 store_reg(inst.dst, payload, inst.result_type);
                 break;
             }
             case LIR::LIR_Op::UnwrapOr: {
                 ir::Value* container = load_reg(inst.a, LIR::Type::Ptr);
-                ir::Value* is_err_flag = builder_->createLoad(container);
+                ir::Value* is_err_flag = builder_->createLoadl(container);
                 ir::Value* is_err = builder_->createCne(is_err_flag, context_->getConstantInt(context_->getIntegerType(64), 0));
                 
                 ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
@@ -1912,12 +1849,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
                 builder_->setInsertPoint(b_ok);
                 ir::Value* payload_addr = builder_->createAdd(container, context_->getConstantInt(context_->getIntegerType(64), 8));
-                ir::Value* payload = builder_->createLoad(payload_addr);
+                ir::Value* payload = builder_->createLoadl(payload_addr);
                 builder_->createStore(payload, res_slot);
                 builder_->createJmp(b_done);
 
                 builder_->setInsertPoint(b_done);
-                store_reg(inst.dst, builder_->createLoad(res_slot), inst.result_type);
+                store_reg(inst.dst, builder_->createLoadl(res_slot), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::ListCreate: {
@@ -2002,7 +1939,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 used_builtins_.insert("lm_dict_new");
                 ir::Function* fn = current_module_->getFunction("lm_dict_new");
                 if (!fn) fn = builder_->createFunction("lm_dict_new", context_->getIntegerType(64), {});
-                store_reg(inst.dst, builder_->createCall(fn, {}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
+                auto* dictionary = builder_->createCall(fn, {}, lir_type_to_fyra_type(inst.result_type));
+                store_reg(inst.dst, builder_->createExternCall("lymar_aot_mark_dictionary", {dictionary}, context_->getIntegerType(64)), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::DictSet: {
@@ -2016,11 +1954,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 used_builtins_.insert("lm_dict_get");
                 ir::Function* fn = current_module_->getFunction("lm_dict_get");
                 if (!fn) fn = builder_->createFunction("lm_dict_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type);
+                // A typed dictionary lookup can still return nil for a missing
+                // key. Preserve the returned slot kind instead of asserting
+                // the dictionary's nominal Boolean element type.
+                store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}, lir_type_to_fyra_type(inst.result_type)), inst.result_type, true);
                 break;
             }
             case LIR::LIR_Op::DictLen: {
-                ir::Value* count = builder_->createLoad(load_reg(inst.a, inst.type_a));
+                ir::Value* count = builder_->createLoadl(load_reg(inst.a, inst.type_a));
                 store_reg(inst.dst, count, inst.result_type);
                 break;
             }
@@ -2044,12 +1985,14 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Function* fn = current_module_->getFunction("lm_enum_new");
                 if (!fn) fn = builder_->createFunction("lm_enum_new", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
                 ir::Value* tag_val = context_->getConstantInt(context_->getIntegerType(64), static_cast<long long>(inst.imm));
-                ir::Value* payload_val = (inst.a != UINT32_MAX) ? load_reg(inst.a, inst.type_a) : context_->getConstantInt(context_->getIntegerType(64), 0);
+                ir::Value* payload_val = (inst.a != UINT32_MAX) ? load_reg(inst.a, inst.type_a) : builder_->createExternCall("lymar_aot_nil", {}, context_->getIntegerType(64));
                 if (inst.a != UINT32_MAX && (inst.type_a == LIR::Type::F64 || inst.type_a == LIR::Type::F32)) {
                     payload_val = builder_->createCast(payload_val, context_->getIntegerType(64));
                 }
                 ir::GlobalVariable* vname_gv = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "vname_" + inst.func_name, inst.func_name);
-                store_reg(inst.dst, builder_->createCall(fn, {tag_val, payload_val, vname_gv}), inst.result_type);
+                auto* variant_name = builder_->createExternCall("lymar_aot_copy_constant", {vname_gv,
+                    context_->getConstantInt(context_->getIntegerType(64), 24 + inst.func_name.size() + 1)}, context_->getIntegerType(64));
+                store_reg(inst.dst, builder_->createCall(fn, {tag_val, payload_val, variant_name}), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::GetTag: {
@@ -2082,14 +2025,17 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 // Set name
                 ir::GlobalVariable* gv_name = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(), "fr_name_" + name + "_" + std::to_string(label_counter_++), name);
                 ir::Value* name_addr = builder_->createAdd(frame_ptr, context_->getConstantInt(context_->getIntegerType(64), 8));
-                builder_->createStore(gv_name, name_addr);
+                auto* name_copy = builder_->createExternCall("lymar_aot_copy_constant", {gv_name,
+                    context_->getConstantInt(context_->getIntegerType(64), 24 + name.size() + 1)}, context_->getIntegerType(64));
+                builder_->createStore(name_copy, name_addr);
 
                 // Allocate fields array: fields * 8 bytes
                 uint32_t field_bytes = (fields > 0 ? fields : 2) * 8;
                 ir::Value* fields_array = builder_->createExternCall("memory.alloc", {context_->getConstantInt(context_->getIntegerType(64), field_bytes)}, lir_type_to_fyra_type(inst.result_type));
+                auto* initial_nil = builder_->createExternCall("lymar_aot_nil", {}, context_->getIntegerType(64));
                 for (uint32_t f_idx = 0; f_idx < (fields > 0 ? fields : 2); ++f_idx) {
                     ir::Value* f_addr = builder_->createAdd(fields_array, context_->getConstantInt(context_->getIntegerType(64), f_idx * 8));
-                    builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), f_addr);
+                    builder_->createStore(initial_nil, f_addr);
                 }
 
                 // Store fields array pointer at offset 16
@@ -2117,7 +2063,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* frame_ptr = load_reg(inst.a, LIR::Type::Ptr);
                 ir::Value* addr = builder_->createExternCall("lymar_aot_frame_field_address",
                     {frame_ptr, context_->getConstantInt(context_->getIntegerType(64), field_idx)}, context_->getIntegerType(64));
-                store_reg(inst.dst, builder_->createLoad(addr), inst.result_type);
+                store_reg(inst.dst, builder_->createLoadl(addr), inst.result_type, true);
                 break;
             }
             case LIR::LIR_Op::FrameSetFieldAtomic:
@@ -2141,29 +2087,26 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             }
             case LIR::LIR_Op::TraitCallMethod: {
                 ir::Value* receiver = load_reg(inst.call_args[0], LIR::Type::Ptr);
-                ir::Value* frame_id = builder_->createLoad(receiver);
                 
                 std::string method_name = inst.func_name;
                 auto& registry = LIR::FunctionRegistry::getInstance();
                 std::string method_suffix = "." + method_name;
                 
-                std::vector<std::pair<uint64_t, ir::Function*>> candidates;
+                std::vector<std::pair<std::string, ir::Function*>> candidates;
                 for (const auto& fname : registry.getFunctionNames()) {
                     if (fname.size() > method_suffix.size() &&
                         fname.compare(fname.size() - method_suffix.size(), method_suffix.size(), method_suffix) == 0) {
                         std::string fr_name = fname.substr(0, fname.size() - method_suffix.size());
-                        uint64_t fid = std::hash<std::string>{}(fr_name);
-                        if (fid == 0) fid = 1;
                         ir::Function* target_fn = current_module_->getFunction(fname);
                         if (target_fn) {
-                            candidates.push_back({fid, target_fn});
+                            candidates.push_back({fr_name, target_fn});
                         }
                     }
                 }
                 
                 LIR::Type res_t = inst.result_type;
                 if (res_t == LIR::Type::Void && !candidates.empty()) {
-                    if (candidates[0].second->getType()->isPointerTy()) {
+                    if (candidates[0].second->getReturnType()->isPointerTy()) {
                         res_t = LIR::Type::Ptr;
                     }
                 }
@@ -2191,12 +2134,15 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::BasicBlock* b_match = builder_->createBasicBlock("trait_match_" + std::to_string(label_counter_++), main_fn);
                     ir::BasicBlock* b_next = (ci + 1 < candidates.size()) ? builder_->createBasicBlock("trait_next_" + std::to_string(label_counter_++), main_fn) : b_join;
                     
-                    ir::Value* is_cand = builder_->createCeq(frame_id, context_->getConstantInt(context_->getIntegerType(64), candidates[ci].first));
+                    auto* expected_name = FyraBuiltinFunctions::get_or_create_global_str(current_module_.get(), builder_.get(),
+                        "trait_receiver_" + candidates[ci].first, candidates[ci].first);
+                    ir::Value* is_cand = builder_->createExternCall("lymar_aot_frame_matches", {receiver, expected_name,
+                        context_->getConstantInt(context_->getIntegerType(64), candidates[ci].first.size())}, context_->getIntegerType(64));
                     builder_->createBr(is_cand, b_match, b_next);
                     
                     builder_->setInsertPoint(b_match);
                     ir::Value* call_res = builder_->createCall(candidates[ci].second, call_args);
-                    builder_->createStore(call_res, res_slot);
+                    builder_->createStore(erased_word(call_res), res_slot);
                     builder_->createJmp(b_join);
                     
                     if (ci + 1 < candidates.size()) {
@@ -2205,7 +2151,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 }
                 
                 builder_->setInsertPoint(b_join);
-                store_reg(inst.dst, builder_->createLoad(res_slot), res_t);
+                store_reg(inst.dst, builder_->createLoadl(res_slot), res_t, true);
                 break;
             }
             case LIR::LIR_Op::Return:
@@ -2265,7 +2211,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                             else {
                                 auto field=index==2?2:8+index;
                                 auto* address=builder_->createAdd(context,context_->getConstantInt(word,field*8));
-                                value=builder_->createLoad(address);
+                                value=builder_->createLoadl(address);
                                 if (parameter->getType()->isFloatingPoint())
                                     value=builder_->createExternCall("lymar_aot_to_float",{value,builder_->createExternCall("lymar_aot_slot_pointer",{address},word)},context_->getDoubleType());
                             }
@@ -2285,7 +2231,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::Value* ctx_ptr = load_reg(inst.a, LIR::Type::Ptr);
                 uint32_t field_idx = inst.imm;
                 ir::Value* addr = builder_->createAdd(ctx_ptr, context_->getConstantInt(context_->getIntegerType(64), (long long)field_idx * 8));
-                store_reg(inst.dst, builder_->createLoad(addr), inst.result_type, true);
+                store_reg(inst.dst, builder_->createLoadl(addr), inst.result_type, true);
                 break;
             }
             case LIR::LIR_Op::CapabilityAcquire: {
@@ -2453,61 +2399,58 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 store_reg(inst.dst, builder_->createCeq(masked, context_->getConstantInt(context_->getIntegerType(64), 0)), inst.result_type);
                 break;
             }
-            // Dynamic Linking Operations
-            case LIR::LIR_Op::LibraryLoad: {
-                auto cap = CapabilityMapper::map(LIR::LIR_Op::LibraryLoad);
-                if (cap) {
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a)};
-                    ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
-                    store_reg(inst.dst, res, inst.result_type);
-                }
-                break;
-            }
-            case LIR::LIR_Op::LibraryUnload: {
-                auto cap = CapabilityMapper::map(LIR::LIR_Op::LibraryUnload);
-                if (cap) {
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a)};
-                    builder_->createExternCall(cap->name, args, nullptr);
-                }
-                break;
-            }
-            case LIR::LIR_Op::LibrarySymbol: {
-                auto cap = CapabilityMapper::map(LIR::LIR_Op::LibrarySymbol);
-                if (cap) {
-                    std::vector<ir::Value*> args = {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)};
-                    ir::Value* res = builder_->createExternCall(cap->name, args, lir_type_to_fyra_type(inst.result_type));
-                    store_reg(inst.dst, res, inst.result_type);
-                }
-                break;
-            }
-            // Foreign Call Operations
+            // Native FFI uses the shared platform ABI engine, not capability no-ops.
+            case LIR::LIR_Op::LibraryLoad:
+                store_reg(inst.dst,builder_->createExternCall("lymar_aot_library_open",{load_reg(inst.a,inst.type_a)},context_->getIntegerType(64)),inst.result_type,true);break;
+            case LIR::LIR_Op::LibraryUnload:
+                builder_->createExternCall("lymar_aot_library_close",{load_reg(inst.a,inst.type_a)},context_->getVoidType());break;
+            case LIR::LIR_Op::LibrarySymbol:
+                store_reg(inst.dst,builder_->createExternCall("lymar_aot_library_symbol",{load_reg(inst.a,inst.type_a),load_reg(inst.b,inst.type_b)},context_->getIntegerType(64)),inst.result_type,true);break;
             case LIR::LIR_Op::ForeignCall: {
-                std::vector<ir::Value*> args;
-                for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
-                ir::Value* callee = load_reg(inst.a, inst.type_a);
-                ir::Value* res = builder_->createCall(callee, args, lir_type_to_fyra_type(inst.result_type));
-                if (inst.dst != UINT32_MAX) store_reg(inst.dst, res, inst.result_type);
+                auto* zero=context_->getConstantInt(context_->getIntegerType(64),0);
+                ir::Value* result=nullptr;
+                if(inst.func_name=="std.ffi.foreign_call" || inst.func_name=="ffi.foreign_call") {
+                    if(inst.call_args.size()!=4) throw std::runtime_error("Malformed canonical foreign_call arguments");
+                    result=builder_->createExternCall("lymar_aot_foreign_call_list",{load_reg(inst.call_args[0],LIR::Type::Ptr),load_reg(inst.call_args[1],LIR::Type::Ptr),load_reg(inst.call_args[2],LIR::Type::I64),load_reg(inst.call_args[3],LIR::Type::Ptr),zero},context_->getIntegerType(64));
+                } else {
+                    if(inst.call_args.empty()) throw std::runtime_error("Foreign call missing target");
+                    size_t count=inst.call_args.size()-1;
+                    auto* size=context_->getConstantInt(context_->getIntegerType(64),std::max<size_t>(8,count*8));
+                    auto* values=builder_->createAlloc(size,context_->getPointerType(context_->getIntegerType(64)));auto* kinds=builder_->createAlloc(size,context_->getPointerType(context_->getIntegerType(64)));auto* types=builder_->createAlloc(size,context_->getPointerType(context_->getIntegerType(64)));
+                    auto ffi_type=[](LIR::Type type)->uint64_t {switch(type) {
+                        case LIR::Type::I8:return 0;case LIR::Type::U8:case LIR::Type::Bool:return 1;case LIR::Type::I16:return 2;case LIR::Type::U16:return 3;
+                        case LIR::Type::I32:return 4;case LIR::Type::U32:return 5;case LIR::Type::I64:return 6;case LIR::Type::U64:return 7;
+                        case LIR::Type::F32:return 8;case LIR::Type::F64:return 9;case LIR::Type::Ptr:return 10;case LIR::Type::Void:return 12;
+                        default:throw std::runtime_error("Unsupported canonical FFI scalar type");}};
+                    for(size_t index=0;index<count;++index) {
+                        auto type=index+1<inst.call_arg_types.size()?inst.call_arg_types[index+1]:LIR::Type::Void;
+                        auto* original=load_reg(inst.call_args[index+1],type);
+                        bool inferred=type==LIR::Type::Void;
+                        if(inferred) type=original->getType()->isFloatingPoint()?LIR::Type::F64:LIR::Type::I64;
+                        auto* value=erased_word(original);auto* offset=context_->getConstantInt(context_->getIntegerType(64),index*8);
+                        builder_->createStore(value,builder_->createAdd(values,offset));
+                        auto* kind=builder_->createExternCall("lymar_aot_ffi_kind",{value,zero},context_->getIntegerType(64));
+                        builder_->createStore(kind,builder_->createAdd(kinds,offset));
+                        auto* type_id=inferred?builder_->createExternCall("lymar_aot_ffi_infer_type",{value,zero},context_->getIntegerType(64)):static_cast<ir::Value*>(context_->getConstantInt(context_->getIntegerType(64),ffi_type(type)));
+                        builder_->createStore(type_id,builder_->createAdd(types,offset));
+                    }
+                    result=builder_->createExternCall("lymar_aot_foreign_call",{load_reg(inst.call_args[0],LIR::Type::Ptr),values,kinds,types,context_->getConstantInt(context_->getIntegerType(64),count),context_->getConstantInt(context_->getIntegerType(64),ffi_type(inst.result_type)),zero},context_->getIntegerType(64));
+                }
+                if(inst.dst!=UINT32_MAX) store_reg(inst.dst,result,inst.result_type,true);
                 break;
             }
             case LIR::LIR_Op::CallbackCreate: {
-                if (inst.imm == 1) {
-                    ir::Value* handle = load_reg(inst.a, LIR::Type::I64);
-                    ir::Value* res = builder_->createExternCall("lymarrt_callback_get_ptr", {handle}, lir_type_to_fyra_type(inst.result_type));
-                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, res, inst.result_type);
-                } else {
-                    ir::Value* name_str = (!inst.call_args.empty()) ? load_reg(inst.call_args[0], LIR::Type::Ptr) : context_->getConstantInt(context_->getIntegerType(64), 0);
-                    ir::Value* arg_types = (inst.call_args.size() >= 2) ? load_reg(inst.call_args[1], LIR::Type::Ptr) : context_->getConstantInt(context_->getIntegerType(64), 0);
-                    ir::Value* ret_type = (inst.call_args.size() >= 3) ? load_reg(inst.call_args[2], LIR::Type::I64) : context_->getConstantInt(context_->getIntegerType(64), 0);
-                    ir::Value* res = builder_->createExternCall("lymarrt_callback_create", {name_str, arg_types, ret_type}, lir_type_to_fyra_type(inst.result_type));
-                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, res, inst.result_type);
+                ir::Value* result=nullptr;
+                if(inst.imm==1) result=builder_->createExternCall("lymar_aot_callback_pointer",{load_reg(inst.a,LIR::Type::I64)},context_->getIntegerType(64));
+                else {
+                    if(inst.call_args.size()!=3) throw std::runtime_error("Malformed callback_create arguments");
+                    result=builder_->createExternCall("lymar_aot_callback_create",{load_reg(inst.call_args[0],LIR::Type::Ptr),load_reg(inst.call_args[1],LIR::Type::Ptr),load_reg(inst.call_args[2],LIR::Type::I64)},context_->getIntegerType(64));
                 }
+                if(inst.dst!=UINT32_MAX) store_reg(inst.dst,result,inst.result_type,true);
                 break;
             }
-            case LIR::LIR_Op::CallbackDestroy: {
-                ir::Value* handle = load_reg(inst.a, LIR::Type::I64);
-                builder_->createExternCall("lymarrt_callback_destroy", {handle}, nullptr);
-                break;
-            }
+            case LIR::LIR_Op::CallbackDestroy:
+                builder_->createExternCall("lymar_aot_callback_destroy",{load_reg(inst.a,LIR::Type::I64)},context_->getVoidType());break;
             case LIR::LIR_Op::EffectPerform:
             case LIR::LIR_Op::EffectHandle:
             case LIR::LIR_Op::EffectResume: {

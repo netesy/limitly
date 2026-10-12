@@ -124,7 +124,11 @@ void RegisterVM::execute_strings(const LIR::LIR_Inst* pc) {
                 free_fmt = true;
             }
             if (!arg_hdr) {
-                arg_hdr = lm_value_to_string(registers[pc->b]);
+                auto language_type=get_register_language_type(pc->b);
+                if(language_type && is_decimal_type(language_type)) {
+                    auto text=register_to_value_ptr(registers[pc->b],language_type)->toString();
+                    arg_hdr=lm_str_from_bytes(text.data(),text.size());
+                } else arg_hdr = lm_value_to_string(registers[pc->b]);
                 free_arg = true;
             }
 
