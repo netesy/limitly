@@ -206,7 +206,7 @@ class Analyzer {
             if (i == left.states.end()) { left.states[id] = state; continue; }
             i->second.unavailable |= state.unavailable; i->second.consumed |= state.consumed;
             i->second.generation = std::max(i->second.generation, state.generation);
-            i->second.value = join_value(i->second.value, state.value);
+            i->second.value = join_value(std::move(i->second.value), state.value);
         }
         return left;
     }
@@ -393,7 +393,7 @@ class Analyzer {
         Value result; result.managed = managed(c.inferred_type); result.unknown = combined.unknown_result;
         if (callee.constructor) {result.managed = true; result.unknown = false; result.allocations.insert(identity(c));}
         for (auto p : combined.return_aliases) if (p < args.size()) {
-            result = join_value(result, args[p]);
+            result = join_value(std::move(result), args[p]);
             if (args[p].source) result.references[args[p].source] = flow.states[args[p].source].generation;
             result.source = 0;
         }
@@ -598,7 +598,7 @@ class Analyzer {
         else if (auto some = std::dynamic_pointer_cast<A::SomeConstructExpr>(e)) value = expression(some->value, flow);
         else if (auto fallible = std::dynamic_pointer_cast<A::FallibleExpr>(e)) {
             value = expression(fallible->expression, flow);
-            if (fallible->elseHandler) {auto handled = flow; statement(fallible->elseHandler, handled); flow = join(flow, handled);}
+            if (fallible->elseHandler) {auto handled = flow; statement(fallible->elseHandler, handled); flow = join(std::move(flow), handled);}
         } else if (auto text = std::dynamic_pointer_cast<A::InterpolatedStringExpr>(e)) {
             for (auto& part : text->parts) if (auto child = std::get_if<std::shared_ptr<A::Expression>>(&part)) expression(*child, flow);
         } else if (auto range = std::dynamic_pointer_cast<A::RangeExpr>(e)) {
@@ -625,7 +625,7 @@ class Analyzer {
             consume(flow, sent.source, *send);
         } else if (auto send = std::dynamic_pointer_cast<A::ChannelOfferExpr>(e)) {
             expression(send->channel, flow); auto sent = expression(send->value, flow);
-            auto delivered = flow; consume(delivered, sent.source, *send); flow = join(flow, delivered);
+            auto delivered = flow; consume(delivered, sent.source, *send); flow = join(std::move(flow), delivered);
         } else if (auto recv = std::dynamic_pointer_cast<A::ChannelRecvExpr>(e)) expression(recv->channel, flow);
         else if (auto recv = std::dynamic_pointer_cast<A::ChannelPollExpr>(e)) expression(recv->channel, flow);
         if (recording) {
@@ -644,15 +644,15 @@ class Analyzer {
         for (;;) {
             auto iteration = header; expression(condition, iteration);
             statement(body, iteration);
-            for (const auto& continued : continues) iteration = join(iteration, continued);
+            for (const auto& continued : continues) iteration = join(std::move(iteration), continued);
             continues.clear();
             expression(increment, iteration);
             auto next = join(initial, iteration);
-            if (next.states == header.states) { header = next; break; }
+            if (next.states == header.states) { header = std::move(next); break; }
             header = std::move(next);
         }
-        flow = header; expression(condition, flow);
-        for (const auto& stopped : breaks) flow = join(flow, stopped);
+        flow = std::move(header); expression(condition, flow);
+        for (const auto& stopped : breaks) flow = join(std::move(flow), stopped);
         breaks = std::move(outer_breaks); continues = std::move(outer_continues);
     }
     void statement(const std::shared_ptr<A::Statement>& s, Flow& flow) {
@@ -696,7 +696,7 @@ class Analyzer {
         else if (auto a = std::dynamic_pointer_cast<A::AssignExpr>(s)) expression(a, flow);
         else if (auto i = std::dynamic_pointer_cast<A::IfStatement>(s)) {
             expression(i->condition, flow); auto left = flow, right = flow;
-            statement(i->thenBranch, left); statement(i->elseBranch, right); flow = join(left, right);
+            statement(i->thenBranch, left); statement(i->elseBranch, right); flow = join(std::move(left), right);
         } else if (auto w = std::dynamic_pointer_cast<A::WhileStatement>(s)) loop(w->body, w->condition, nullptr, flow, *w);
         else if (auto f = std::dynamic_pointer_cast<A::ForStatement>(s)) {
             flow.scopes.push_back({}); statement(f->initializer, flow); loop(f->body, f->condition, f->increment, flow, *f); flow.scopes.pop_back();
@@ -734,7 +734,7 @@ class Analyzer {
                 }
                 if (auto pattern = std::dynamic_pointer_cast<A::ValPatternExpr>(arm.pattern)) define(branch, pattern->variableName, identity(*pattern), value, *pattern);
                 if (auto pattern = std::dynamic_pointer_cast<A::ErrPatternExpr>(arm.pattern)) define(branch, pattern->variableName, identity(*pattern), {}, *pattern);
-                expression(arm.guard, branch); statement(arm.body, branch); branch.scopes.pop_back(); result = join(result, branch);
+                expression(arm.guard, branch); statement(arm.body, branch); branch.scopes.pop_back(); result = join(std::move(result), branch);
             }
             flow = join(initial, result); // Unless exhaustiveness is proven, retain the unmatched path.
         } else if (auto c = std::dynamic_pointer_cast<A::ContractStatement>(s)) { expression(c->condition, flow); expression(c->message, flow); }

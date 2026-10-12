@@ -1,5 +1,6 @@
 #include "verifier.hh"
 #include "analysis.hh"
+#include "ownership_dataflow.hh"
 #include <deque>
 #include <optional>
 #include "../memory/lir_analysis.hh"
@@ -64,16 +65,22 @@ bool Verifier::verify_ownership(const LIR_Function& func, std::vector<std::strin
     CFGAnalysis cfg(func); cfg.analyze();
     const auto& blocks = cfg.get_blocks();
     if (blocks.empty()) return true;
-    struct Binding {
-        unsigned availability = 1; // Uninitialized / live / consumed path bits.
-        bool stale = false;
-        std::set<Memory::Identity> aliases;
-        bool operator==(const Binding&) const = default;
-    };
-    using State = std::map<Memory::Identity, Binding>;
-    State initial;
-    for (auto id : func.ownership_parameters) initial[id].availability = 2;
-    for (auto id : func.ownership_captures) initial[id].availability = 2;
+    // Serialized identities remain unchanged. Only this function's solver uses
+    // compact indices, including identities mentioned solely as alias origins.
+    std::map<Memory::Identity, size_t> indices;
+    auto index = [&](Memory::Identity id) { return indices.try_emplace(id, indices.size()).first->second; };
+    for (auto id : func.ownership_parameters) index(id);
+    for (auto id : func.ownership_captures) index(id);
+    for (const auto& inst : func.instructions) {
+        const auto& event = inst.ownership;
+        for (const auto* ids : {&event.reads, &event.consumes, &event.initializes, &event.defines})
+            for (auto id : *ids) index(id);
+        for (auto [alias, origin] : event.aliases) { index(alias); index(origin); }
+    }
+    using State = Detail::IndexedOwnershipState;
+    State initial(indices.size());
+    for (auto id : func.ownership_parameters) initial.live(index(id));
+    for (auto id : func.ownership_captures) initial.live(index(id));
     std::vector<std::optional<State>> inputs(blocks.size()); inputs[0] = initial;
     std::deque<uint32_t> queue{0};
     std::vector<bool> queued(blocks.size(), false); queued[0] = true;
@@ -88,23 +95,16 @@ bool Verifier::verify_ownership(const LIR_Function& func, std::vector<std::strin
         };
         for (size_t i = block.start_inst_idx; i < block.end_inst_idx; ++i) {
             const auto& event = func.instructions[i].ownership;
-            for (auto id : event.reads) if (diagnose && (state[id].availability != 2 || state[id].stale))
+            for (auto id : event.reads) if (diagnose && !state.valid(index(id)))
                 fail(i, "ownership read is unavailable or has stale alias provenance");
             for (auto id : event.consumes) {
-                if (diagnose && (state[id].availability != 2 || state[id].stale)) fail(i, "ownership consumption is invalid on a reachable path");
-                state[id].availability = 4;
-                for (auto& [alias, value] : state) if (value.aliases.count(id)) value.stale = true;
+                const auto local = index(id);
+                if (diagnose && !state.valid(local)) fail(i, "ownership consumption is invalid on a reachable path");
+                state.consume(local);
             }
-            for (auto id : event.initializes) if (state[id].availability == 1) state[id].availability = 2;
-            for (auto id : event.defines) {
-                for (auto& [alias, value] : state) if (value.aliases.count(id)) value.stale = true;
-                state[id] = Binding{2, false, {}};
-            }
-            for (auto [alias, origin] : event.aliases) {
-                state[alias].aliases.insert(origin);
-                state[alias].aliases.insert(state[origin].aliases.begin(), state[origin].aliases.end());
-                state[alias].stale |= state[origin].availability != 2 || state[origin].stale;
-            }
+            for (auto id : event.initializes) state.initialize(index(id));
+            for (auto id : event.defines) state.define(index(id));
+            for (auto [alias, origin] : event.aliases) state.alias(index(alias), index(origin));
         }
         return state;
     };
@@ -113,16 +113,7 @@ bool Verifier::verify_ownership(const LIR_Function& func, std::vector<std::strin
         auto out = transfer(*inputs[id], blocks[id], false);
         for (auto successor : blocks[id].successors) {
             if (!inputs[successor]) {inputs[successor] = out; enqueue(successor); continue;}
-            auto merged = *inputs[successor];
-            std::set<Memory::Identity> ids;
-            for (auto& [binding, state] : merged) ids.insert(binding);
-            for (auto& [binding, state] : out) ids.insert(binding);
-            for (auto binding : ids) {
-                auto& a = merged[binding]; auto b = out.count(binding) ? out.at(binding) : Binding{};
-                a.availability |= b.availability; a.stale |= b.stale;
-                a.aliases.insert(b.aliases.begin(), b.aliases.end());
-            }
-            if (merged != *inputs[successor]) {inputs[successor] = std::move(merged); enqueue(successor);}
+            if (inputs[successor]->join(out)) enqueue(successor);
         }
     }
     const auto before = errors.size();

@@ -5,6 +5,7 @@
 #include "lir/function_registry.hh"
 #include "lir/serializer.hh"
 #include "lir/verifier.hh"
+#include "lir/ownership_dataflow.hh"
 #include "memory/region_analysis.hh"
 #include "memory/lir_analysis.hh"
 #include "backend/vm/register.hh"
@@ -16,8 +17,115 @@
 #include <chrono>
 #include <cstdlib>
 using namespace LM;
+static void test_ownership_join() {
+    using LIR::Detail::OwnershipBinding;
+    using LIR::Detail::OwnershipState;
+    // Independent oracle: the previous verifier's copy/union/compare join.
+    auto reference = [](OwnershipState left, const OwnershipState& right) {
+        std::set<Memory::Identity> identities;
+        for (const auto& [id, value] : left) identities.insert(id);
+        for (const auto& [id, value] : right) identities.insert(id);
+        for (auto id : identities) {
+            auto& a = left[id];
+            const auto b = right.count(id) ? right.at(id) : OwnershipBinding{};
+            a.availability |= b.availability;
+            a.stale |= b.stale;
+            a.aliases.insert(b.aliases.begin(), b.aliases.end());
+        }
+        return left;
+    };
+    auto compare = [&](OwnershipState input, const OwnershipState& incoming) {
+        const auto expected = reference(input, incoming);
+        const bool changes = expected != input;
+        std::map<Memory::Identity, size_t> indices;
+        for (const auto* state : {static_cast<const OwnershipState*>(&input), &incoming}) for (const auto& [id, value] : *state) {
+            indices.try_emplace(id, indices.size());
+            for (auto origin : value.aliases) indices.try_emplace(origin, indices.size());
+        }
+        auto compact = [&](const OwnershipState& state) {
+            LIR::Detail::IndexedOwnershipState result(indices.size());
+            for (const auto& [id, value] : state) {
+                OwnershipBinding local = value;
+                local.aliases.clear();
+                for (auto origin : value.aliases) local.aliases.insert(indices.at(origin));
+                result.set_binding(indices.at(id), local);
+            }
+            return result;
+        };
+        auto dense = compact(input);
+        const auto other = compact(incoming);
+        assert(dense.join(other) == changes);
+        for (auto [id, local] : indices) {
+            assert(dense.contains(local) == expected.contains(id));
+            if (!expected.contains(id)) continue;
+            auto actual = dense.binding(local);
+            std::set<Memory::Identity> origins;
+            for (auto [global, index] : indices) if (actual.aliases.contains(index)) origins.insert(global);
+            actual.aliases = std::move(origins);
+            assert(actual == expected.at(id));
+        }
+        assert(!dense.join(other));
+        assert(!dense.join(dense));
+        assert(LIR::Detail::join_ownership_state(input, incoming) == changes);
+        assert(input == expected);
+        assert(!LIR::Detail::join_ownership_state(input, incoming));
+        assert(!LIR::Detail::join_ownership_state(input, input));
+    };
+    const OwnershipState live{{17, {2, false, {}}}};
+    auto conditional = live;
+    assert(LIR::Detail::join_ownership_state(conditional, {}));
+    assert(conditional.at(17).availability == 3); // live on only one path
+    conditional.clear();
+    assert(LIR::Detail::join_ownership_state(conditional, live));
+    assert(conditional.at(17).availability == 3); // same rule, opposite order
+    compare(live, {{17, {4, true, {17, 99}}}});
+    compare({{17, {2, false, {99}}}}, {{17, {2, true, {17}}}});
+    compare({}, {});
+    compare({{0, {2, false, {0}}}}, {{~Memory::Identity{0}, {4, true, {17}}}});
+    // Sparse 64-bit identities, absent bindings, path-bit combinations, and
+    // disjoint/transitive alias sets exercise both sorted insertion directions.
+    uint64_t random = 0x38a732fab912ULL;
+    auto next = [&] { random ^= random << 13; random ^= random >> 7; random ^= random << 17; return random; };
+    for (size_t trial = 0; trial < 512; ++trial) {
+        OwnershipState left, right;
+        for (Memory::Identity index = 0; index < 40; ++index) {
+            const auto id = (index + 1) * 0x100000001ULL;
+            for (auto* state : {&left, &right}) if (next() % 3) {
+                OwnershipBinding value{static_cast<unsigned>(1 + next() % 7), bool(next() & 1), {}};
+                for (size_t alias = 0; alias < 4; ++alias)
+                    if (next() & 1) value.aliases.insert((next() % 40 + 1) * 0x100000001ULL);
+                state->emplace(id, std::move(value));
+            }
+        }
+        compare(left, right);
+        compare(right, left);
+        // Repeated loop/backedge joins must converge to the oracle's state.
+        for (const auto* incoming : {&right, &left, &right}) {
+            const auto expected = reference(left, *incoming);
+            const bool changed = expected != left;
+            assert(LIR::Detail::join_ownership_state(left, *incoming) == changed);
+            assert(left == expected);
+        }
+    }
+    LIR::Detail::IndexedOwnershipState aliases(3);
+    aliases.live(0); aliases.live(1); aliases.live(2);
+    aliases.alias(1, 0); aliases.alias(2, 1);
+    assert(aliases.valid(0) && aliases.valid(1) && aliases.valid(2));
+    aliases.consume(0);
+    assert(!aliases.valid(0) && !aliases.valid(1) && !aliases.valid(2));
+    aliases.define(0);
+    assert(aliases.valid(0) && !aliases.valid(1) && !aliases.valid(2));
+    aliases.define(1); aliases.alias(1, 0);
+    assert(aliases.valid(1) && !aliases.valid(2));
+    aliases.define(2); aliases.alias(2, 2); // self provenance survives consumption
+    assert(aliases.valid(2)); aliases.consume(2); assert(!aliases.valid(2));
+    aliases.define(2); assert(aliases.valid(2));
+
+}
+
 int main(int argc, char** argv) {
     assert(argc == 2);
+    test_ownership_join();
     const auto started = std::chrono::steady_clock::now();
     auto stage = [&](const char* name) {
         if (std::getenv("LYMAR_TEST_TRACE_STAGES"))
