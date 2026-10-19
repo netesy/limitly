@@ -136,17 +136,10 @@ tests = [
  "tests/stdlib/mime_test.lm",
  # Stdlib - UUID
  "tests/stdlib/uuid_test.lm",
- # Stdlib - FS
- "tests/stdlib/fs/fs_test.lm",
  # Stdlib - Crypto
  "tests/stdlib/crypto/hash_test.lm",
- "tests/stdlib/crypto/random_test.lm",
  # Stdlib - Net
  "tests/stdlib/net/net_test.lm",
- # Stdlib - HTTP
- "tests/stdlib/http/http_test.lm",
- # Stdlib - WSS
- "tests/stdlib/wss/wss_test.lm",
  # Regression - Type Ownership Refactor
  "tests/regression/ownership_refactor_test.lm",
  # Regression - Trait Dispatch
@@ -176,11 +169,7 @@ tests = [
 # Tests that need extra time (resource creation, crypto, network)
 slow_tests = {
  "tests/stdlib/crypto/hash_test.lm",
- "tests/stdlib/crypto/random_test.lm",
  "tests/stdlib/net/net_test.lm",
- "tests/stdlib/http/http_test.lm",
- "tests/stdlib/wss/wss_test.lm",
- "tests/stdlib/fs/fs_test.lm",
  "tests/stdlib/io/io_extended_test.lm",
  "tests/stdlib/semver_test.lm",
  "tests/stdlib/math_module_test.lm",

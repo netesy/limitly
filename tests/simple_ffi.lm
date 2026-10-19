@@ -1,5 +1,0 @@
-import std.ffi as ffi
-print("FFI Import OK");
-var size: int = 1024;
-var ptr: int = ffi.alloc(size);
-print("Alloc OK: {ptr}");

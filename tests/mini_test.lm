@@ -1,3 +1,0 @@
-import std.ui as ui;
-
-var w = ui.text("LIMIT STUDIO").font_size(20.0);

@@ -235,9 +235,21 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::statement() {
         return emptyStmt;
     }
     
-    if (isAtEnd() || check(TokenType::RIGHT_BRACE) || check(TokenType::EOF_TOKEN)) {
+    if (isAtEnd() || check(TokenType::EOF_TOKEN)) {
         auto emptyStmt = std::make_shared<LM::Frontend::AST::ExprStatement>();
-        emptyStmt->line = peek().line;
+        emptyStmt->line = previous().line;
+        emptyStmt->expression = nullptr;
+        return emptyStmt;
+    }
+
+    if (check(TokenType::RIGHT_BRACE)) {
+        if (blockStack.empty()) {
+            error("Unexpected '}' outside of block.");
+            advance();
+            return nullptr;
+        }
+        auto emptyStmt = std::make_shared<LM::Frontend::AST::ExprStatement>();
+        emptyStmt->line = previous().line;
         emptyStmt->expression = nullptr;
         return emptyStmt;
     }

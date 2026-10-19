@@ -1,3 +1,0 @@
-val pair = (42, 99);
-print(pair[0]);
-print(pair[1]);
