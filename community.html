@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lymar Community & RFC Process</title>
+  <meta name="description" content="Join the Lymar language community, participate in RFC proposals, contribute to compiler development, and connect on Discord & GitHub.">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff', 100: '#e0effe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a',
+              accent: '#06b6d4', emerald: '#10b981', violet: '#8b5cf6'
+            },
+            dark: { bg: '#0b0f19', card: '#111827', border: '#1f2937', muted: '#374151' }
+          },
+          fontFamily: { mono: ['Fira Code', 'JetBrains Mono', 'ui-monospace', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+
+<body class="bg-dark-bg text-gray-100 font-sans antialiased selection:bg-brand-500 selection:text-white" x-data="{ mobileMenu: false }">
+
+  <!-- Header Navigation -->
+  <header class="sticky top-0 z-50 backdrop-blur-md bg-dark-bg/80 border-b border-dark-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <a href="index.html" class="flex items-center space-x-3 group">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-brand-accent to-brand-violet flex items-center justify-center text-white font-mono font-bold text-xl shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform">
+            L
+          </div>
+          <span class="font-bold text-xl tracking-tight text-white group-hover:text-brand-500 transition-colors">Lymar</span>
+        </a>
+
+        <nav class="hidden md:flex items-center space-x-8 text-sm font-medium">
+          <a href="learn.html" class="text-gray-300 hover:text-white transition-colors">Learn</a>
+          <a href="docs.html" class="text-gray-300 hover:text-white transition-colors">Documentation</a>
+          <a href="examples.html" class="text-gray-300 hover:text-white transition-colors">Examples</a>
+          <a href="community.html" class="text-white font-semibold border-b-2 border-brand-accent pb-1">Community</a>
+          <a href="index.html#install" class="text-gray-300 hover:text-white transition-colors">Install</a>
+        </nav>
+
+        <div class="hidden md:flex items-center space-x-4">
+          <a href="https://github.com/lymarlang/lymar" target="_blank" rel="noopener" class="flex items-center space-x-2 text-sm font-medium text-gray-300 hover:text-white px-3 py-2 rounded-lg bg-dark-card border border-dark-border hover:border-gray-600 transition-all">
+            <i class="fab fa-github text-lg"></i>
+            <span>GitHub</span>
+          </a>
+        </div>
+
+        <div class="md:hidden">
+          <button @click="mobileMenu = !mobileMenu" class="text-gray-300 hover:text-white p-2 rounded-lg bg-dark-card border border-dark-border focus:outline-none">
+            <i class="fas" :class="mobileMenu ? 'fa-times' : 'fa-bars'"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+
+    <div>
+      <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-emerald/10 border border-brand-emerald/20 text-brand-emerald text-xs font-mono mb-4">
+        <span>Global Developer Ecosystem</span>
+      </div>
+      <h1 class="text-4xl font-extrabold text-white mb-4">Lymar Language Community</h1>
+      <p class="text-lg text-gray-300 leading-relaxed max-w-3xl">
+        Help shape the future of Lymar. Connect with language designers, standard library authors, and systems engineers across our open governance channels.
+      </p>
+    </div>
+
+    <!-- Community Cards -->
+    <div class="grid md:grid-cols-3 gap-8">
+
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-colors">
+        <div class="w-12 h-12 rounded-xl bg-brand-500/10 text-brand-accent flex items-center justify-center text-xl mb-4">
+          <i class="fab fa-discord"></i>
+        </div>
+        <h3 class="text-xl font-bold text-white mb-2">Discord Server</h3>
+        <p class="text-gray-400 text-sm mb-4">Chat in real-time about language design, show off your projects, and ask questions.</p>
+        <a href="https://discord.gg/lymar" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold text-brand-accent hover:underline">
+          Join Discord Server <i class="fas fa-arrow-right ml-2 text-xs"></i>
+        </a>
+      </div>
+
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-colors">
+        <div class="w-12 h-12 rounded-xl bg-brand-violet/10 text-brand-violet flex items-center justify-center text-xl mb-4">
+          <i class="fab fa-github"></i>
+        </div>
+        <h3 class="text-xl font-bold text-white mb-2">GitHub Discussions</h3>
+        <p class="text-gray-400 text-sm mb-4">Participate in technical RFC proposals, bug reports, and compiler architecture discussions.</p>
+        <a href="https://github.com/lymarlang/lymar/discussions" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold text-brand-violet hover:underline">
+          Open Discussions <i class="fas fa-arrow-right ml-2 text-xs"></i>
+        </a>
+      </div>
+
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-colors">
+        <div class="w-12 h-12 rounded-xl bg-brand-emerald/10 text-brand-emerald flex items-center justify-center text-xl mb-4">
+          <i class="fas fa-code-branch"></i>
+        </div>
+        <h3 class="text-xl font-bold text-white mb-2">RFC Process</h3>
+        <p class="text-gray-400 text-sm mb-4">Propose language feature additions, standard library extensions, or breaking changes.</p>
+        <a href="https://github.com/lymarlang/rfcs" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold text-brand-emerald hover:underline">
+          Browse RFC Repo <i class="fas fa-arrow-right ml-2 text-xs"></i>
+        </a>
+      </div>
+
+    </div>
+
+    <!-- Governance & Code of Conduct -->
+    <div class="bg-dark-card border border-dark-border rounded-2xl p-8 space-y-4">
+      <h2 class="text-2xl font-bold text-white">Community Code of Conduct</h2>
+      <p class="text-gray-300 text-sm leading-relaxed">
+        The Lymar community is committed to providing a welcoming, respectful, and harassment-free environment for everyone, regardless of experience level, background, or identity. We follow open governance guidelines to ensure fair and constructive peer review.
+      </p>
+    </div>
+
+  </div>
+
+  <footer class="border-t border-dark-border py-8 bg-black/60 mt-16 text-center text-xs text-gray-500 font-mono">
+    © 2025 Lymar Contributors. Released under MIT License.
+  </footer>
+
+</body>
+</html>

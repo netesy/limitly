@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lymar Documentation — Language Reference & Standard Library</title>
+  <meta name="description" content="Official technical reference manual for Lymar: formal grammar, standard library modules, ABI specification, and compiler tooling options.">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff', 100: '#e0effe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a',
+              accent: '#06b6d4', emerald: '#10b981', violet: '#8b5cf6'
+            },
+            dark: { bg: '#0b0f19', card: '#111827', border: '#1f2937', muted: '#374151' }
+          },
+          fontFamily: { mono: ['Fira Code', 'JetBrains Mono', 'ui-monospace', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+    .code-keyword { color: #f472b6; font-weight: 600; }
+    .code-type { color: #38bdf8; font-weight: 600; }
+    .code-string { color: #34d399; }
+    .code-number { color: #fbbf24; }
+    .code-comment { color: #6b7280; font-style: italic; }
+    .code-function { color: #60a5fa; font-weight: 600; }
+  </style>
+</head>
+
+<body class="bg-dark-bg text-gray-100 font-sans antialiased selection:bg-brand-500 selection:text-white" x-data="{ mobileMenu: false }">
+
+  <!-- Navigation Header -->
+  <header class="sticky top-0 z-50 backdrop-blur-md bg-dark-bg/80 border-b border-dark-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <a href="index.html" class="flex items-center space-x-3 group">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-brand-accent to-brand-violet flex items-center justify-center text-white font-mono font-bold text-xl shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform">
+            L
+          </div>
+          <span class="font-bold text-xl tracking-tight text-white group-hover:text-brand-500 transition-colors">Lymar</span>
+        </a>
+
+        <nav class="hidden md:flex items-center space-x-8 text-sm font-medium">
+          <a href="learn.html" class="text-gray-300 hover:text-white transition-colors">Learn</a>
+          <a href="docs.html" class="text-white font-semibold border-b-2 border-brand-accent pb-1">Documentation</a>
+          <a href="examples.html" class="text-gray-300 hover:text-white transition-colors">Examples</a>
+          <a href="community.html" class="text-gray-300 hover:text-white transition-colors">Community</a>
+          <a href="index.html#install" class="text-gray-300 hover:text-white transition-colors">Install</a>
+        </nav>
+
+        <div class="hidden md:flex items-center space-x-4">
+          <a href="https://github.com/lymarlang/lymar" target="_blank" rel="noopener" class="flex items-center space-x-2 text-sm font-medium text-gray-300 hover:text-white px-3 py-2 rounded-lg bg-dark-card border border-dark-border hover:border-gray-600 transition-all">
+            <i class="fab fa-github text-lg"></i>
+            <span>GitHub</span>
+          </a>
+        </div>
+
+        <div class="md:hidden">
+          <button @click="mobileMenu = !mobileMenu" class="text-gray-300 hover:text-white p-2 rounded-lg bg-dark-card border border-dark-border focus:outline-none">
+            <i class="fas" :class="mobileMenu ? 'fa-times' : 'fa-bars'"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="grid lg:grid-cols-12 gap-12">
+
+      <!-- Sidebar Navigation -->
+      <aside class="hidden lg:block lg:col-span-3 sticky top-24 h-[calc(100vh-8rem)] overflow-y-auto pr-4">
+        <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-accent mb-4">Documentation Index</h3>
+        <nav class="space-y-2 text-sm border-l border-dark-border pl-4">
+          <a href="#grammar" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">1. Syntax & Lexical Grammar</a>
+          <a href="#type-system" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">2. Type System & Error Unions</a>
+          <a href="#oop" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">3. Frames, Traits & Visibility</a>
+          <a href="#stdlib-ref" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">4. Standard Library Reference</a>
+          <a href="#compiler-cli" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">5. Compiler Commands & Tooling</a>
+        </nav>
+      </aside>
+
+      <!-- Main Docs Content -->
+      <main class="lg:col-span-9 space-y-16">
+
+        <div>
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-accent/10 border border-brand-accent/20 text-brand-accent text-xs font-mono mb-4">
+            <span>Reference Manual v0.2.0</span>
+          </div>
+          <h1 class="text-4xl font-extrabold text-white mb-4">Lymar Language & Tooling Reference</h1>
+          <p class="text-lg text-gray-300 leading-relaxed">
+            Complete technical specification for the Lymar language, compiler semantics, standard library modules, and CLI flags.
+          </p>
+        </div>
+
+        <!-- Section 1: Lexical Grammar -->
+        <section id="grammar" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">1. Syntax & Formal Grammar Summary</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Lymar features a unified EBNF-like grammar parsed cleanly without ambiguous operator conflicts:
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-xs text-gray-300 space-y-2 overflow-x-auto">
+            <div><span class="text-brand-accent">Declaration</span> ::= FrameDecl | TraitDecl | FnDecl | VarDecl | ImportDecl</div>
+            <div><span class="text-brand-accent">FrameDecl</span>   ::= "frame" Identifier [ ":" TraitList ] "{" FrameMember* "}"</div>
+            <div><span class="text-brand-accent">TraitDecl</span>   ::= "trait" Identifier [ ":" TraitList ] "{" MethodSignature* "}"</div>
+            <div><span class="text-brand-accent">FnDecl</span>      ::= ["pub" | "prot"] "fn" Identifier "(" ParamList ")" [ ":" TypeAnnotation ] Block</div>
+            <div><span class="text-brand-accent">Visibility</span>  ::= "pub" | "prot" | /* default private for vars/fns */</div>
+          </div>
+        </section>
+
+        <!-- Section 2: Type System -->
+        <section id="type-system" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">2. Type System & Zero-Cost Error Unions</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Primitive types include <code class="text-brand-accent font-mono">int</code>, <code class="text-brand-accent font-mono">float</code>, <code class="text-brand-accent font-mono">bool</code>, <code class="text-brand-accent font-mono">str</code>, and <code class="text-brand-accent font-mono">nil</code>. Dynamic collections are typed as lists <code class="text-brand-accent font-mono">[T]</code> and dictionaries <code class="text-brand-accent font-mono">{K: V}</code>.
+          </p>
+          <p class="text-gray-300 leading-relaxed">
+            Error handling uses <code class="text-brand-accent font-mono">T?</code> unions representing either a valid value of type <code class="text-brand-accent font-mono">T</code> or an error condition. Propagation is zero-overhead at machine level.
+          </p>
+        </section>
+
+        <!-- Section 3: OOP -->
+        <section id="oop" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">3. Frames, Traits & Module Export Rules</h2>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-6 space-y-4">
+            <h3 class="text-lg font-bold text-white">Module Visibility Semantics</h3>
+            <ul class="list-disc list-inside space-y-2 text-sm text-gray-300 leading-relaxed">
+              <li><strong class="text-white">Frames & Traits:</strong> Natively exported at module scope by default without needing a <code class="text-brand-accent font-mono">pub</code> prefix.</li>
+              <li><strong class="text-white">Variables & Functions:</strong> Private by default unless explicitly declared with <code class="text-brand-accent font-mono">pub</code> or <code class="text-brand-accent font-mono">prot</code>.</li>
+              <li><strong class="text-white">Frame Members:</strong> Fields and methods within a frame use explicit <code class="text-brand-accent font-mono">pub</code> (public) or <code class="text-brand-accent font-mono">prot</code> (protected to frame and subframes) modifiers.</li>
+            </ul>
+          </div>
+        </section>
+
+        <!-- Section 4: Stdlib Reference -->
+        <section id="stdlib-ref" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">4. Standard Library Module Breakdown</h2>
+          <div class="grid sm:grid-cols-2 gap-4">
+            <div class="bg-dark-card border border-dark-border rounded-xl p-4">
+              <div class="text-brand-accent font-mono font-bold text-sm mb-1">std.collections</div>
+              <p class="text-xs text-gray-400">High-performance Vector, ArrayList, HashMap, BTree, PriorityQueue, and BitSet types.</p>
+            </div>
+            <div class="bg-dark-card border border-dark-border rounded-xl p-4">
+              <div class="text-brand-accent font-mono font-bold text-sm mb-1">std.net & crypto</div>
+              <p class="text-xs text-gray-400">HTTP/TLS client & server, WSS websockets, AES-GCM encryption, SHA-256 digests.</p>
+            </div>
+            <div class="bg-dark-card border border-dark-border rounded-xl p-4">
+              <div class="text-brand-accent font-mono font-bold text-sm mb-1">std.ui & game</div>
+              <p class="text-xs text-gray-400">Retained UI tree, Immediate Mode GUI, Sokol accelerated graphics, Truetype rendering.</p>
+            </div>
+            <div class="bg-dark-card border border-dark-border rounded-xl p-4">
+              <div class="text-brand-accent font-mono font-bold text-sm mb-1">std.algorithm</div>
+              <p class="text-xs text-gray-400">Timsort, quicksort, binary search, range adapters, and high-speed regular expressions.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- Section 5: Compiler CLI -->
+        <section id="compiler-cli" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">5. Compiler Commands & Tooling</h2>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-xs text-gray-300 space-y-3">
+            <div><span class="text-brand-accent">lymar run &lt;file.lm&gt;</span> — Execute source file instantly via the Register VM</div>
+            <div><span class="text-brand-accent">lymar build &lt;file.lm&gt; -o &lt;binary&gt;</span> — Compile to native executable via Fyra AOT backend</div>
+            <div><span class="text-brand-accent">lymar check &lt;file.lm&gt;</span> — Perform semantic, type, and ownership analysis without code emission</div>
+            <div><span class="text-brand-accent">lymar fmt &lt;file.lm&gt;</span> — Auto-format source code following canonical style</div>
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+  </div>
+
+  <footer class="border-t border-dark-border py-8 bg-black/60 mt-16 text-center text-xs text-gray-500 font-mono">
+    © 2025 Lymar Contributors. Released under MIT License.
+  </footer>
+
+</body>
+</html>

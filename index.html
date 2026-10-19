@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lymar Programming Language — Fast, Safe & Expressive Systems Programming</title>
+  <meta name="description" content="Lymar is a modern systems programming language featuring static typing, zero-cost error unions, deterministic region memory, and lexically structured concurrency.">
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff',
+              100: '#e0effe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              900: '#1e3a8a',
+              accent: '#06b6d4',
+              emerald: '#10b981',
+              violet: '#8b5cf6'
+            },
+            dark: {
+              bg: '#0b0f19',
+              card: '#111827',
+              border: '#1f2937',
+              muted: '#374151'
+            }
+          },
+          fontFamily: {
+            mono: ['Fira Code', 'JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Alpine.js -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #374151; }
+
+    .code-keyword { color: #f472b6; font-weight: 600; }
+    .code-type { color: #38bdf8; font-weight: 600; }
+    .code-string { color: #34d399; }
+    .code-number { color: #fbbf24; }
+    .code-comment { color: #6b7280; font-style: italic; }
+    .code-function { color: #60a5fa; font-weight: 600; }
+    .code-operator { color: #c084fc; }
+
+    .glow-effect {
+      box-shadow: 0 0 40px -10px rgba(59, 130, 246, 0.25);
+    }
+  </style>
+</head>
+
+<body class="bg-dark-bg text-gray-100 font-sans antialiased selection:bg-brand-500 selection:text-white" x-data="{ mobileMenu: false, activeTab: 'hello', copied: false }">
+
+  <!-- Navigation Bar -->
+  <header class="sticky top-0 z-50 backdrop-blur-md bg-dark-bg/80 border-b border-dark-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+
+        <!-- Logo -->
+        <a href="index.html" class="flex items-center space-x-3 group">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-brand-accent to-brand-violet flex items-center justify-center text-white font-mono font-bold text-xl shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform duration-200">
+            L
+          </div>
+          <span class="font-bold text-xl tracking-tight text-white group-hover:text-brand-500 transition-colors">Lymar</span>
+          <span class="text-xs font-mono px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-accent border border-brand-500/20">v0.2.0</span>
+        </a>
+
+        <!-- Desktop Navigation Links -->
+        <nav class="hidden md:flex items-center space-x-8 text-sm font-medium">
+          <a href="learn.html" class="text-gray-300 hover:text-white transition-colors">Learn</a>
+          <a href="docs.html" class="text-gray-300 hover:text-white transition-colors">Documentation</a>
+          <a href="examples.html" class="text-gray-300 hover:text-white transition-colors">Examples</a>
+          <a href="community.html" class="text-gray-300 hover:text-white transition-colors">Community</a>
+          <a href="index.html#install" class="text-gray-300 hover:text-white transition-colors">Install</a>
+        </nav>
+
+        <!-- Right Action Buttons -->
+        <div class="hidden md:flex items-center space-x-4">
+          <a href="https://github.com/lymarlang/lymar" target="_blank" rel="noopener" class="flex items-center space-x-2 text-sm font-medium text-gray-300 hover:text-white px-3 py-2 rounded-lg bg-dark-card border border-dark-border hover:border-gray-600 transition-all">
+            <i class="fab fa-github text-lg"></i>
+            <span>GitHub</span>
+          </a>
+          <a href="learn.html" class="text-sm font-semibold text-white bg-gradient-to-r from-brand-600 to-brand-accent hover:from-brand-500 hover:to-brand-500 px-4 py-2 rounded-lg shadow-md shadow-brand-500/20 transition-all duration-200">
+            Get Started
+          </a>
+        </div>
+
+        <!-- Mobile menu button -->
+        <div class="md:hidden">
+          <button @click="mobileMenu = !mobileMenu" class="text-gray-300 hover:text-white p-2 rounded-lg bg-dark-card border border-dark-border focus:outline-none">
+            <i class="fas" :class="mobileMenu ? 'fa-times' : 'fa-bars'"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Mobile Dropdown Navigation -->
+    <div x-show="mobileMenu" x-transition class="md:hidden bg-dark-card border-b border-dark-border px-4 pt-2 pb-4 space-y-2">
+      <a href="learn.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-border">Learn</a>
+      <a href="docs.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-border">Documentation</a>
+      <a href="examples.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-border">Examples</a>
+      <a href="community.html" class="block px-3 py-2 rounded-md text-base font-medium text-gray-300 hover:text-white hover:bg-dark-border">Community</a>
+      <a href="index.html#install" class="block px-3 py-2 rounded-md text-base font-medium text-brand-accent hover:bg-dark-border">Install</a>
+    </div>
+  </header>
+
+  <!-- Hero Section -->
+  <section class="relative overflow-hidden pt-16 pb-20 lg:pt-24 lg:pb-28">
+
+    <div class="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-tr from-brand-600/20 via-brand-accent/20 to-brand-violet/20 blur-[120px] rounded-full pointer-events-none"></div>
+
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+      <div class="grid lg:grid-cols-12 gap-12 items-center">
+
+        <!-- Left Hero Column -->
+        <div class="lg:col-span-6 text-center lg:text-left space-y-6">
+
+          <div class="inline-flex items-center space-x-2 px-3 py-1.5 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-accent text-xs font-semibold tracking-wide">
+            <span class="w-2 h-2 rounded-full bg-brand-accent animate-pulse"></span>
+            <span>Next-Generation Language Engine</span>
+          </div>
+
+          <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight text-white leading-tight">
+            Fast, Safe, and Expressive <span class="bg-gradient-to-r from-brand-500 via-brand-accent to-brand-violet bg-clip-text text-transparent">Systems Programming</span>
+          </h1>
+
+          <p class="text-lg text-gray-300 max-w-2xl mx-auto lg:mx-0 font-normal leading-relaxed">
+            Lymar combines the performance of native systems execution with zero-cost error unions (<code class="text-brand-accent font-mono">Type?</code>), deterministic region-scoped memory, and lexically structured concurrency.
+          </p>
+
+          <!-- Action Buttons -->
+          <div class="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4 pt-2">
+            <a href="#install" class="w-full sm:w-auto px-6 py-3.5 rounded-xl text-white font-semibold bg-gradient-to-r from-brand-600 to-brand-accent hover:from-brand-500 hover:to-brand-500 shadow-lg shadow-brand-500/25 transition-all text-center flex items-center justify-center space-x-2">
+              <i class="fas fa-download"></i>
+              <span>Install Lymar v0.2</span>
+            </a>
+
+            <a href="learn.html" class="w-full sm:w-auto px-6 py-3.5 rounded-xl text-gray-200 font-semibold bg-dark-card border border-dark-border hover:border-gray-500 transition-all text-center flex items-center justify-center space-x-2">
+              <i class="fas fa-book-open"></i>
+              <span>Read Tutorial</span>
+            </a>
+          </div>
+
+          <!-- Shell Command Quick Copy -->
+          <div class="pt-4">
+            <div class="inline-flex items-center bg-dark-card border border-dark-border rounded-xl px-4 py-2 text-xs font-mono text-gray-300 shadow-inner max-w-full overflow-x-auto">
+              <span class="text-brand-accent mr-2">$</span>
+              <span class="text-gray-200 select-all">bash scripts/install.sh --prefix "$HOME/.local"</span>
+              <button @click="navigator.clipboard.writeText('bash scripts/install.sh --prefix &quot;$HOME/.local&quot;'); copied = true; setTimeout(() => copied = false, 2000)" class="ml-4 text-gray-400 hover:text-white transition-colors focus:outline-none">
+                <i class="fas" :class="copied ? 'fa-check text-green-400' : 'fa-copy'"></i>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Hero Column: Interactive Live Code Card -->
+        <div class="lg:col-span-6">
+          <div class="bg-dark-card rounded-2xl border border-dark-border shadow-2xl overflow-hidden glow-effect">
+
+            <div class="bg-gray-900/90 px-4 py-3 border-b border-dark-border flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="w-3 h-3 rounded-full bg-red-500 inline-block"></span>
+                <span class="w-3 h-3 rounded-full bg-yellow-500 inline-block"></span>
+                <span class="w-3 h-3 rounded-full bg-green-500 inline-block"></span>
+                <span class="text-xs font-mono text-gray-400 ml-2">hello_world.lm — Lymar Studio</span>
+              </div>
+              <div class="text-xs font-mono text-gray-500">Register VM & Fyra AOT</div>
+            </div>
+
+            <div class="p-6 font-mono text-sm overflow-x-auto leading-relaxed text-gray-200">
+              <pre><code><span class="code-comment">// Lymar: Zero-Cost Error Unions & Concurrency</span>
+<span class="code-keyword">import</span> std.game <span class="code-keyword">as</span> game;
+<span class="code-keyword">import</span> std.net <span class="code-keyword">as</span> net;
+
+<span class="code-keyword">fn</span> <span class="code-function">fetch_data</span>(url: <span class="code-type">str</span>): <span class="code-type">str?</span> {
+    <span class="code-keyword">if</span> (len(url) == 0) {
+        <span class="code-keyword">return</span> err();
+    }
+    <span class="code-keyword">return</span> ok(<span class="code-string">"HTTP 200 OK: Data Payload"</span>);
+}
+
+<span class="code-keyword">fn</span> <span class="code-function">main</span>(): <span class="code-type">int</span> {
+    <span class="code-keyword">var</span> res: <span class="code-type">str</span> = fetch_data(<span class="code-string">"https://lymar.org"</span>)<span class="code-operator">?</span> <span class="code-keyword">else</span> {
+        print(<span class="code-string">"Failed to fetch resource"</span>);
+        <span class="code-keyword">return</span> <span class="code-number">1</span>;
+    };
+
+    print(<span class="code-string">"Fetched: {res}"</span>);
+    <span class="code-keyword">return</span> <span class="code-number">0</span>;
+}
+
+main();</code></pre>
+            </div>
+
+            <div class="bg-black/80 px-6 py-3 border-t border-dark-border font-mono text-xs text-green-400 flex items-center justify-between">
+              <div class="flex items-center space-x-2">
+                <span class="text-brand-accent">$</span>
+                <span>lymar run hello_world.lm</span>
+              </div>
+              <span class="text-gray-500">Execution time: 0.01s</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Key Language Pillars Section -->
+  <section id="features" class="py-20 border-t border-dark-border bg-dark-card/40 relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <h2 class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-accent mb-2">Designed For Excellence</h2>
+        <p class="text-3xl sm:text-4xl font-extrabold text-white">Why Software Engineers Choose Lymar</p>
+        <p class="text-gray-400 mt-4 leading-relaxed">Built from the ground up to solve memory management complexity, runtime error bloat, and thread synchronization hazards.</p>
+      </div>
+
+      <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+
+        <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-all duration-300 hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-brand-500/10 text-brand-accent flex items-center justify-center text-xl font-bold mb-5 border border-brand-500/20">
+            <i class="fas fa-shield-halved"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Zero-Cost Error Unions (<code class="text-brand-accent font-mono">Type?</code>)</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Native error handling combining optionals and fallible results without generic wrapper bloat. Use <code class="text-brand-accent">ok(val)</code>, <code class="text-brand-accent">err()</code>, <code class="text-brand-accent">?</code> propagation, and inline <code class="text-brand-accent">? else</code> fallbacks.
+          </p>
+        </div>
+
+        <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-all duration-300 hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-brand-emerald/10 text-brand-emerald flex items-center justify-center text-xl font-bold mb-5 border border-brand-emerald/20">
+            <i class="fas fa-memory"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Deterministic Region Memory</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Scope-bound automatic memory management with zero tracing garbage collection overhead. Compiler-inferred lifetimes guarantee predictable performance.
+          </p>
+        </div>
+
+        <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-all duration-300 hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-brand-violet/10 text-brand-violet flex items-center justify-center text-xl font-bold mb-5 border border-brand-violet/20">
+            <i class="fas fa-network-wired"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Structured Concurrency</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Lexically scoped <code class="text-brand-accent">parallel</code> CPU blocks and <code class="text-brand-accent">concurrent</code> I/O task blocks with typed <code class="text-brand-accent">channel</code> primitives eliminate thread leaks and race conditions.
+          </p>
+        </div>
+
+        <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-all duration-300 hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-brand-500/10 text-brand-500 flex items-center justify-center text-xl font-bold mb-5 border border-brand-500/20">
+            <i class="fas fa-cubes"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Frames & Traits OOP</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            Clean data encapsulation with class-like <code class="text-brand-accent">frame</code> constructs, canonical <code class="text-brand-accent">self</code> receivers, explicit <code class="text-brand-accent">pub</code>/<code class="text-brand-accent">prot</code> visibility, and trait composition.
+          </p>
+        </div>
+
+        <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-all duration-300 hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-yellow-500/10 text-yellow-400 flex items-center justify-center text-xl font-bold mb-5 border border-yellow-500/20">
+            <i class="fas fa-bolt"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Dual Execution Backends</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            High-performance Register VM for instant execution and debugging (<code class="text-brand-accent">lymar run</code>) plus Fyra AOT native compilation (<code class="text-brand-accent">lymar build</code>).
+          </p>
+        </div>
+
+        <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-all duration-300 hover:-translate-y-1">
+          <div class="w-12 h-12 rounded-xl bg-pink-500/10 text-pink-400 flex items-center justify-center text-xl font-bold mb-5 border border-pink-500/20">
+            <i class="fas fa-desktop"></i>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">Built-in IMGUI & Graphics</h3>
+          <p class="text-gray-400 text-sm leading-relaxed">
+            First-class Retained & Immediate-mode GUI frameworks (<code class="text-brand-accent">std.ui</code> & <code class="text-brand-accent">std.game</code>) with zero external DOM dependencies for game and desktop applications.
+          </p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Code Showcase Section -->
+  <section id="code" class="py-20 border-t border-dark-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+      <div class="text-center max-w-3xl mx-auto mb-12">
+        <h2 class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-accent mb-2">Explore Lymar Code</h2>
+        <p class="text-3xl sm:text-4xl font-extrabold text-white">Clean, Intuitive Syntax</p>
+      </div>
+
+      <div class="flex flex-wrap justify-center gap-2 mb-8">
+        <button @click="activeTab = 'hello'" :class="activeTab === 'hello' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20' : 'bg-dark-card text-gray-400 hover:text-white border border-dark-border'" class="px-5 py-2.5 rounded-xl font-medium text-sm transition-all">
+          <i class="fas fa-code mr-2"></i> Basics & Strings
+        </button>
+        <button @click="activeTab = 'errors'" :class="activeTab === 'errors' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20' : 'bg-dark-card text-gray-400 hover:text-white border border-dark-border'" class="px-5 py-2.5 rounded-xl font-medium text-sm transition-all">
+          <i class="fas fa-exclamation-triangle mr-2"></i> Error Handling (<code class="text-xs">Type?</code>)
+        </button>
+        <button @click="activeTab = 'concurrency'" :class="activeTab === 'concurrency' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20' : 'bg-dark-card text-gray-400 hover:text-white border border-dark-border'" class="px-5 py-2.5 rounded-xl font-medium text-sm transition-all">
+          <i class="fas fa-layer-group mr-2"></i> Concurrency
+        </button>
+        <button @click="activeTab = 'frames'" :class="activeTab === 'frames' ? 'bg-brand-600 text-white shadow-lg shadow-brand-500/20' : 'bg-dark-card text-gray-400 hover:text-white border border-dark-border'" class="px-5 py-2.5 rounded-xl font-medium text-sm transition-all">
+          <i class="fas fa-cube mr-2"></i> Frames & Traits
+        </button>
+      </div>
+
+      <div class="bg-dark-card border border-dark-border rounded-2xl shadow-2xl overflow-hidden max-w-4xl mx-auto">
+
+        <div x-show="activeTab === 'hello'" class="p-6 font-mono text-sm overflow-x-auto leading-relaxed text-gray-200">
+          <pre><code><span class="code-comment">// 1. Variables, Constants, and String Interpolation</span>
+<span class="code-keyword">var</span> name: <span class="code-type">str</span> = <span class="code-string">"Alice"</span>;
+<span class="code-keyword">val</span> age: <span class="code-type">int</span> = <span class="code-number">30</span>;
+
+print(<span class="code-string">"User {name} is {age} years old."</span>);
+
+<span class="code-comment">// 2. Dynamic Collections</span>
+<span class="code-keyword">var</span> fruits: [<span class="code-type">str</span>] = [<span class="code-string">"apple"</span>, <span class="code-string">"banana"</span>, <span class="code-string">"orange"</span>];
+fruits.append(<span class="code-string">"mango"</span>);
+
+<span class="code-keyword">iter</span> (item <span class="code-keyword">in</span> fruits) {
+    print(<span class="code-string">"Fruit: {item}"</span>);
+}</code></pre>
+        </div>
+
+        <div x-show="activeTab === 'errors'" class="p-6 font-mono text-sm overflow-x-auto leading-relaxed text-gray-200">
+          <pre><code><span class="code-comment">// Fallible functions return zero-cost Type? error unions</span>
+<span class="code-keyword">fn</span> <span class="code-function">divide</span>(a: <span class="code-type">int</span>, b: <span class="code-type">int</span>): <span class="code-type">int?</span> {
+    <span class="code-keyword">if</span> (b == <span class="code-number">0</span>) {
+        <span class="code-keyword">return</span> err();
+    }
+    <span class="code-keyword">return</span> ok(a / b);
+}
+
+<span class="code-keyword">fn</span> <span class="code-function">calculate</span>(): <span class="code-type">int</span> {
+    <span class="code-keyword">var</span> safe_val: <span class="code-type">int</span> = divide(<span class="code-number">10</span>, <span class="code-number">0</span>)<span class="code-operator">?</span> <span class="code-keyword">else</span> {
+        print(<span class="code-string">"Division failed! Using default fallback."</span>);
+        <span class="code-keyword">return</span> <span class="code-number">0</span>;
+    };
+    <span class="code-keyword">return</span> safe_val;
+}</code></pre>
+        </div>
+
+        <div x-show="activeTab === 'concurrency'" class="p-6 font-mono text-sm overflow-x-auto leading-relaxed text-gray-200">
+          <pre><code><span class="code-comment">// Lexically scoped structured concurrency</span>
+<span class="code-keyword">var</span> ch = channel();
+
+<span class="code-keyword">concurrent</span>(ch = ch) {
+    task(i <span class="code-keyword">in</span> <span class="code-number">1</span>..<span class="code-number">3</span>) {
+        ch.send(<span class="code-string">"Worker task {i} completed"</span>);
+    }
+}
+
+<span class="code-keyword">iter</span> (msg <span class="code-keyword">in</span> ch) {
+    print(<span class="code-string">"Received: {msg}"</span>);
+}</code></pre>
+        </div>
+
+        <div x-show="activeTab === 'frames'" class="p-6 font-mono text-sm overflow-x-auto leading-relaxed text-gray-200">
+          <pre><code><span class="code-comment">// Native Frame and Trait declarations (exported by default without pub)</span>
+<span class="code-keyword">trait</span> <span class="code-type">Speaker</span> {
+    <span class="code-keyword">fn</span> <span class="code-function">speak</span>();
+}
+
+<span class="code-keyword">frame</span> <span class="code-type">Robot</span>: <span class="code-type">Speaker</span> {
+    <span class="code-keyword">pub</span> <span class="code-keyword">var</span> model: <span class="code-type">str</span>;
+
+    <span class="code-keyword">pub</span> <span class="code-keyword">init</span>(m: <span class="code-type">str</span>) {
+        self.model = m;
+    }
+
+    <span class="code-keyword">pub</span> <span class="code-keyword">fn</span> <span class="code-function">speak</span>() {
+        print(<span class="code-string">"Beep boop! Model {self.model} online."</span>);
+    }
+}
+
+<span class="code-keyword">var</span> bot = Robot(<span class="code-string">"RX-78"</span>);
+bot.speak();</code></pre>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Standard Library Overview Section -->
+  <section id="stdlib" class="py-20 border-t border-dark-border bg-dark-card/30">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+      <div class="text-center max-w-3xl mx-auto mb-16">
+        <h2 class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-accent mb-2">Batteries Included</h2>
+        <p class="text-3xl sm:text-4xl font-extrabold text-white">Comprehensive Standard Library</p>
+        <p class="text-gray-400 mt-4 leading-relaxed">Everything you need to build desktop apps, web services, algorithms, and games out of the box.</p>
+      </div>
+
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5 hover:border-gray-600 transition-colors">
+          <div class="text-brand-accent font-mono font-bold text-lg mb-2">std.collections</div>
+          <p class="text-xs text-gray-400">Vector, ArrayList, LinkedList, Queue, Stack, PriorityQueue, BitSet, BTree, HashMap.</p>
+        </div>
+
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5 hover:border-gray-600 transition-colors">
+          <div class="text-brand-accent font-mono font-bold text-lg mb-2">std.crypto & net</div>
+          <p class="text-xs text-gray-400">AES-256-GCM, SHA-256, HMAC, TLS/SSL, HTTP Client/Server, WSS, TCP/UDP sockets.</p>
+        </div>
+
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5 hover:border-gray-600 transition-colors">
+          <div class="text-brand-accent font-mono font-bold text-lg mb-2">std.ui & game</div>
+          <p class="text-xs text-gray-400">Retained UI & IMGUI framework, Sokol Graphics, Truetype text, Shadow drop effects.</p>
+        </div>
+
+        <div class="bg-dark-card border border-dark-border rounded-xl p-5 hover:border-gray-600 transition-colors">
+          <div class="text-brand-accent font-mono font-bold text-lg mb-2">std.algorithm & math</div>
+          <p class="text-xs text-gray-400">Timsort, Quicksort, Binary search, Iterators, Linear Algebra, Range, Regex engine.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Installation Section -->
+  <section id="install" class="py-20 border-t border-dark-border">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-8 lg:p-12 shadow-2xl relative overflow-hidden">
+
+        <div class="text-center max-w-2xl mx-auto mb-8">
+          <h2 class="text-3xl font-extrabold text-white">Install Lymar Today</h2>
+          <p class="text-gray-400 mt-2 text-sm">Supports Linux x86-64, macOS (GCC/Clang), and Windows (MSYS2 MinGW64).</p>
+        </div>
+
+        <div class="space-y-6">
+
+          <div>
+            <div class="text-xs font-mono text-gray-400 mb-2 flex items-center justify-between">
+              <span>Quick One-Line Installation (Linux / macOS / MSYS2):</span>
+            </div>
+            <div class="bg-black/90 border border-dark-border rounded-xl p-4 font-mono text-sm text-green-400 flex items-center justify-between overflow-x-auto">
+              <span>bash scripts/install.sh --prefix "$HOME/.local" --jobs 4</span>
+              <button @click="navigator.clipboard.writeText('bash scripts/install.sh --prefix &quot;$HOME/.local&quot; --jobs 4'); copied = true; setTimeout(() => copied = false, 2000)" class="ml-4 text-gray-400 hover:text-white transition-colors">
+                <i class="fas" :class="copied ? 'fa-check text-green-400' : 'fa-copy'"></i>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <div class="text-xs font-mono text-gray-400 mb-2">Build from Source (Git Repository):</div>
+            <div class="bg-black/90 border border-dark-border rounded-xl p-4 font-mono text-xs text-gray-300 space-y-1">
+              <div><span class="text-brand-accent">$</span> git clone https://github.com/lymarlang/lymar.git</div>
+              <div><span class="text-brand-accent">$</span> cd lymar && make -j4</div>
+              <div><span class="text-brand-accent">$</span> ./bin/lymar run examples/text_editor.lm</div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <footer class="border-t border-dark-border py-12 bg-black/60">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
+
+      <div class="flex items-center space-x-3">
+        <div class="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center font-mono font-bold text-white text-sm">L</div>
+        <span class="font-bold text-gray-200">Lymar Programming Language</span>
+      </div>
+
+      <div class="flex flex-wrap justify-center gap-6 text-sm text-gray-400">
+        <a href="learn.html" class="hover:text-white transition-colors">Tutorial</a>
+        <a href="docs.html" class="hover:text-white transition-colors">Language Specification</a>
+        <a href="examples.html" class="hover:text-white transition-colors">Examples Showcase</a>
+        <a href="community.html" class="hover:text-white transition-colors">Community & RFCs</a>
+        <a href="https://github.com/lymarlang/lymar" target="_blank" rel="noopener" class="hover:text-white transition-colors">GitHub</a>
+      </div>
+
+      <div class="text-xs text-gray-500 font-mono">
+        © 2025 Lymar Contributors. Released under MIT License.
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

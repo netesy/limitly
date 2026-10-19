@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lymar Examples — Code Showcase & Applications</title>
+  <meta name="description" content="Explore real-world Lymar code examples including desktop text editors, retained GUIs, game showcases, and high-performance networking services.">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff', 100: '#e0effe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a',
+              accent: '#06b6d4', emerald: '#10b981', violet: '#8b5cf6'
+            },
+            dark: { bg: '#0b0f19', card: '#111827', border: '#1f2937', muted: '#374151' }
+          },
+          fontFamily: { mono: ['Fira Code', 'JetBrains Mono', 'ui-monospace', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+    .code-keyword { color: #f472b6; font-weight: 600; }
+    .code-type { color: #38bdf8; font-weight: 600; }
+    .code-string { color: #34d399; }
+    .code-number { color: #fbbf24; }
+    .code-comment { color: #6b7280; font-style: italic; }
+    .code-function { color: #60a5fa; font-weight: 600; }
+  </style>
+</head>
+
+<body class="bg-dark-bg text-gray-100 font-sans antialiased selection:bg-brand-500 selection:text-white" x-data="{ mobileMenu: false }">
+
+  <!-- Header Navigation -->
+  <header class="sticky top-0 z-50 backdrop-blur-md bg-dark-bg/80 border-b border-dark-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <a href="index.html" class="flex items-center space-x-3 group">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-brand-accent to-brand-violet flex items-center justify-center text-white font-mono font-bold text-xl shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform">
+            L
+          </div>
+          <span class="font-bold text-xl tracking-tight text-white group-hover:text-brand-500 transition-colors">Lymar</span>
+        </a>
+
+        <nav class="hidden md:flex items-center space-x-8 text-sm font-medium">
+          <a href="learn.html" class="text-gray-300 hover:text-white transition-colors">Learn</a>
+          <a href="docs.html" class="text-gray-300 hover:text-white transition-colors">Documentation</a>
+          <a href="examples.html" class="text-white font-semibold border-b-2 border-brand-accent pb-1">Examples</a>
+          <a href="community.html" class="text-gray-300 hover:text-white transition-colors">Community</a>
+          <a href="index.html#install" class="text-gray-300 hover:text-white transition-colors">Install</a>
+        </nav>
+
+        <div class="hidden md:flex items-center space-x-4">
+          <a href="https://github.com/lymarlang/lymar" target="_blank" rel="noopener" class="flex items-center space-x-2 text-sm font-medium text-gray-300 hover:text-white px-3 py-2 rounded-lg bg-dark-card border border-dark-border hover:border-gray-600 transition-all">
+            <i class="fab fa-github text-lg"></i>
+            <span>GitHub</span>
+          </a>
+        </div>
+
+        <div class="md:hidden">
+          <button @click="mobileMenu = !mobileMenu" class="text-gray-300 hover:text-white p-2 rounded-lg bg-dark-card border border-dark-border focus:outline-none">
+            <i class="fas" :class="mobileMenu ? 'fa-times' : 'fa-bars'"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
+
+    <div>
+      <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-violet/10 border border-brand-violet/20 text-brand-violet text-xs font-mono mb-4">
+        <span>Application Showcase</span>
+      </div>
+      <h1 class="text-4xl font-extrabold text-white mb-4">Lymar Application Examples</h1>
+      <p class="text-lg text-gray-300 leading-relaxed max-w-3xl">
+        Discover native applications built entirely in Lymar. From desktop text editors to full immediate-mode games and SSL networking tools.
+      </p>
+    </div>
+
+    <!-- Example 1: Text Editor -->
+    <div class="bg-dark-card border border-dark-border rounded-2xl p-8 space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+            <i class="fas fa-edit text-brand-accent"></i>
+            <span>Desktop Text Editor (<code class="text-brand-accent text-sm font-mono">examples/text_editor.lm</code>)</span>
+          </h2>
+          <p class="text-gray-400 text-sm mt-1">Full-featured GUI text editor featuring multi-line cursor editing, undo/redo buffers, file I/O, and line numbering.</p>
+        </div>
+        <div class="font-mono text-xs text-gray-400 bg-black/60 px-3 py-1.5 rounded-lg border border-dark-border">
+          lymar run examples/text_editor.lm
+        </div>
+      </div>
+
+      <div class="bg-black/90 border border-dark-border rounded-xl p-5 font-mono text-xs overflow-x-auto text-gray-200">
+        <pre><code><span class="code-keyword">import</span> std.ui <span class="code-keyword">as</span> ui;
+<span class="code-keyword">import</span> std.text.controller <span class="code-keyword">as</span> text_ctrl;
+
+<span class="code-keyword">frame</span> TextEditorApp {
+    <span class="code-keyword">pub</span> <span class="code-keyword">var</span> buffer: <span class="code-type">str</span>;
+    <span class="code-keyword">pub</span> <span class="code-keyword">var</span> cursor_line: <span class="code-type">int</span>;
+
+    <span class="code-keyword">pub</span> <span class="code-keyword">init</span>() {
+        self.buffer = <span class="code-string">"// Lymar Text Editor\nfn main() {\n    print(\"Hello!\");\n}"</span>;
+        self.cursor_line = <span class="code-number">1</span>;
+    }
+
+    <span class="code-keyword">pub</span> <span class="code-keyword">fn</span> <span class="code-function">render</span>() {
+        ui.window(<span class="code-string">"Lymar Editor"</span>, <span class="code-number">800</span>, <span class="code-number">600</span>);
+        ui.text_area(self.buffer);
+    }
+}
+
+<span class="code-keyword">fn</span> <span class="code-function">main</span>(): <span class="code-type">int</span> {
+    <span class="code-keyword">var</span> app = TextEditorApp();
+    app.render();
+    <span class="code-keyword">return</span> <span class="code-number">0</span>;
+}
+
+main();</code></pre>
+      </div>
+    </div>
+
+    <!-- Example 2: GUI Showcase -->
+    <div class="bg-dark-card border border-dark-border rounded-2xl p-8 space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+            <i class="fas fa-desktop text-brand-emerald"></i>
+            <span>Retained & IMGUI Widget Suite (<code class="text-brand-accent text-sm font-mono">tests/gui_showcase.lm</code>)</span>
+          </h2>
+          <p class="text-gray-400 text-sm mt-1">Showcases buttons, sliders, tab navigation, drop shadows, and responsive layout containers.</p>
+        </div>
+        <div class="font-mono text-xs text-gray-400 bg-black/60 px-3 py-1.5 rounded-lg border border-dark-border">
+          lymar build tests/gui_showcase.lm
+        </div>
+      </div>
+
+      <div class="bg-black/90 border border-dark-border rounded-xl p-5 font-mono text-xs overflow-x-auto text-gray-200">
+        <pre><code><span class="code-keyword">import</span> std.ui <span class="code-keyword">as</span> ui;
+
+<span class="code-keyword">fn</span> <span class="code-function">main</span>(): <span class="code-type">int</span> {
+    ui.init_window(<span class="code-string">"UI Showcase"</span>, <span class="code-number">1024</span>, <span class="code-number">768</span>);
+
+    <span class="code-keyword">var</span> volume: <span class="code-type">float</span> = <span class="code-number">0.75</span>;
+    <span class="code-keyword">if</span> (ui.slider(<span class="code-string">"Volume"</span>, volume, <span class="code-number">0.0</span>, <span class="code-number">1.0</span>)) {
+        print(<span class="code-string">"New volume setting: {volume}"</span>);
+    }
+    <span class="code-keyword">return</span> <span class="code-number">0</span>;
+}
+
+main();</code></pre>
+      </div>
+    </div>
+
+    <!-- Example 3: Game Engine & Sokol Graphics -->
+    <div class="bg-dark-card border border-dark-border rounded-2xl p-8 space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+            <i class="fas fa-gamepad text-brand-violet"></i>
+            <span>Sokol 2D/3D Game Engine (<code class="text-brand-accent text-sm font-mono">tests/game_showcase.lm</code>)</span>
+          </h2>
+          <p class="text-gray-400 text-sm mt-1">Accelerated graphics rendering with Truetype font compilation and instant sprite batching.</p>
+        </div>
+        <div class="font-mono text-xs text-gray-400 bg-black/60 px-3 py-1.5 rounded-lg border border-dark-border">
+          lymar run tests/game_showcase.lm
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <footer class="border-t border-dark-border py-8 bg-black/60 mt-16 text-center text-xs text-gray-500 font-mono">
+    © 2025 Lymar Contributors. Released under MIT License.
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Learn Lymar — Interactive Language Tutorial & Guide</title>
+  <meta name="description" content="Step-by-step tutorial for learning Lymar: variables, control flow, zero-cost error unions, frame & trait object orientation, and structured concurrency.">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#f0f7ff', 100: '#e0effe', 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#1e3a8a',
+              accent: '#06b6d4', emerald: '#10b981', violet: '#8b5cf6'
+            },
+            dark: { bg: '#0b0f19', card: '#111827', border: '#1f2937', muted: '#374151' }
+          },
+          fontFamily: { mono: ['Fira Code', 'JetBrains Mono', 'ui-monospace', 'monospace'] }
+        }
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #1f2937; border-radius: 4px; }
+    .code-keyword { color: #f472b6; font-weight: 600; }
+    .code-type { color: #38bdf8; font-weight: 600; }
+    .code-string { color: #34d399; }
+    .code-number { color: #fbbf24; }
+    .code-comment { color: #6b7280; font-style: italic; }
+    .code-function { color: #60a5fa; font-weight: 600; }
+    .code-operator { color: #c084fc; }
+  </style>
+</head>
+
+<body class="bg-dark-bg text-gray-100 font-sans antialiased selection:bg-brand-500 selection:text-white" x-data="{ mobileMenu: false }">
+
+  <!-- Header Navigation -->
+  <header class="sticky top-0 z-50 backdrop-blur-md bg-dark-bg/80 border-b border-dark-border">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        <a href="index.html" class="flex items-center space-x-3 group">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 via-brand-accent to-brand-violet flex items-center justify-center text-white font-mono font-bold text-xl shadow-lg shadow-brand-500/20 group-hover:scale-105 transition-transform">
+            L
+          </div>
+          <span class="font-bold text-xl tracking-tight text-white group-hover:text-brand-500 transition-colors">Lymar</span>
+        </a>
+
+        <nav class="hidden md:flex items-center space-x-8 text-sm font-medium">
+          <a href="learn.html" class="text-white font-semibold border-b-2 border-brand-accent pb-1">Learn</a>
+          <a href="docs.html" class="text-gray-300 hover:text-white transition-colors">Documentation</a>
+          <a href="examples.html" class="text-gray-300 hover:text-white transition-colors">Examples</a>
+          <a href="community.html" class="text-gray-300 hover:text-white transition-colors">Community</a>
+          <a href="index.html#install" class="text-gray-300 hover:text-white transition-colors">Install</a>
+        </nav>
+
+        <div class="hidden md:flex items-center space-x-4">
+          <a href="https://github.com/lymarlang/lymar" target="_blank" rel="noopener" class="flex items-center space-x-2 text-sm font-medium text-gray-300 hover:text-white px-3 py-2 rounded-lg bg-dark-card border border-dark-border hover:border-gray-600 transition-all">
+            <i class="fab fa-github text-lg"></i>
+            <span>GitHub</span>
+          </a>
+        </div>
+
+        <div class="md:hidden">
+          <button @click="mobileMenu = !mobileMenu" class="text-gray-300 hover:text-white p-2 rounded-lg bg-dark-card border border-dark-border focus:outline-none">
+            <i class="fas" :class="mobileMenu ? 'fa-times' : 'fa-bars'"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div class="grid lg:grid-cols-12 gap-12">
+
+      <!-- Table of Contents Sidebar -->
+      <aside class="hidden lg:block lg:col-span-3 sticky top-24 h-[calc(100vh-8rem)] overflow-y-auto pr-4">
+        <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-accent mb-4">Tutorial Sections</h3>
+        <nav class="space-y-2 text-sm border-l border-dark-border pl-4">
+          <a href="#getting-started" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">1. Getting Started</a>
+          <a href="#variables-types" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">2. Variables & Types</a>
+          <a href="#control-flow" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">3. Control Flow & Match</a>
+          <a href="#functions-errors" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">4. Functions & Zero-Cost Errors</a>
+          <a href="#frames-traits" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">5. Frames & Traits OOP</a>
+          <a href="#structured-concurrency" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">6. Structured Concurrency</a>
+        </nav>
+      </aside>
+
+      <!-- Main Tutorial Content -->
+      <main class="lg:col-span-9 space-y-16">
+
+        <div>
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-accent text-xs font-mono mb-4">
+            <span>Learn Lymar v0.2.0</span>
+          </div>
+          <h1 class="text-4xl font-extrabold text-white mb-4">Learn the Lymar Programming Language</h1>
+          <p class="text-lg text-gray-300 leading-relaxed">
+            Welcome! This guide takes you from zero to building fast, safe systems and GUI applications with Lymar.
+          </p>
+        </div>
+
+        <!-- Section 1 -->
+        <section id="getting-started" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">1. Getting Started</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Create a file named <code class="text-brand-accent font-mono">hello.lm</code> with your favorite text editor:
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">fn</span> <span class="code-function">main</span>(): <span class="code-type">int</span> {
+    print(<span class="code-string">"Hello, Lymar!"</span>);
+    <span class="code-keyword">return</span> <span class="code-number">0</span>;
+}
+
+main();</code></pre>
+          </div>
+          <p class="text-gray-300 text-sm">Run it directly with the Register VM or build a native executable:</p>
+          <div class="bg-black/90 border border-dark-border rounded-xl p-4 font-mono text-xs text-gray-300 space-y-1">
+            <div><span class="text-brand-accent">$</span> lymar run hello.lm</div>
+            <div><span class="text-brand-accent">$</span> lymar build hello.lm -o hello</div>
+            <div><span class="text-brand-accent">$</span> ./hello</div>
+          </div>
+        </section>
+
+        <!-- Section 2 -->
+        <section id="variables-types" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">2. Variables, Constants & Collections</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Lymar uses <code class="text-brand-accent font-mono">var</code> for mutable variables and <code class="text-brand-accent font-mono">val</code> / <code class="text-brand-accent font-mono">const</code> for immutable constants. Dynamic string interpolation uses braces <code class="text-brand-accent font-mono">"{var}"</code>.
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">var</span> name: <span class="code-type">str</span> = <span class="code-string">"Lymar"</span>;
+<span class="code-keyword">val</span> year: <span class="code-type">int</span> = <span class="code-number">2025</span>;
+
+print(<span class="code-string">"Welcome to {name} in {year}!"</span>);
+
+<span class="code-comment">// Dynamic collections</span>
+<span class="code-keyword">var</span> items: [<span class="code-type">str</span>] = [<span class="code-string">"Core"</span>, <span class="code-string">"Collections"</span>, <span class="code-string">"Graphics"</span>];
+items.append(<span class="code-string">"Concurrency"</span>);
+
+print(<span class="code-string">"Total items: {len(items)}"</span>);</code></pre>
+          </div>
+        </section>
+
+        <!-- Section 3 -->
+        <section id="control-flow" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">3. Control Flow & Exhaustive Match</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Iterate over collections using <code class="text-brand-accent font-mono">iter (item in collection)</code> and match patterns cleanly:
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">var</span> status: <span class="code-type">int</span> = <span class="code-number">200</span>;
+
+<span class="code-keyword">match</span> (status) {
+    <span class="code-number">200</span> => print(<span class="code-string">"OK"</span>),
+    <span class="code-number">404</span> => print(<span class="code-string">"Not Found"</span>),
+    <span class="code-number">500</span> => print(<span class="code-string">"Server Error"</span>),
+    _   => print(<span class="code-string">"Unknown Status"</span>)
+}</code></pre>
+          </div>
+        </section>
+
+        <!-- Section 4 -->
+        <section id="functions-errors" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">4. Functions & Zero-Cost Error Unions (<code class="text-brand-accent font-mono">Type?</code>)</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Fallible functions append <code class="text-brand-accent font-mono">?</code> to their return type. Propagate errors inline with <code class="text-brand-accent font-mono">? else</code> fallbacks:
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">fn</span> <span class="code-function">parse_port</span>(input: <span class="code-type">str</span>): <span class="code-type">int?</span> {
+    <span class="code-keyword">if</span> (len(input) == <span class="code-number">0</span>) {
+        <span class="code-keyword">return</span> err();
+    }
+    <span class="code-keyword">return</span> ok(<span class="code-number">8080</span>);
+}
+
+<span class="code-keyword">fn</span> <span class="code-function">run_server</span>() {
+    <span class="code-keyword">var</span> port: <span class="code-type">int</span> = parse_port(<span class="code-string">"8080"</span>)<span class="code-operator">?</span> <span class="code-keyword">else</span> {
+        print(<span class="code-string">"Invalid port configuration"</span>);
+        <span class="code-keyword">return</span>;
+    };
+    print(<span class="code-string">"Server listening on port {port}"</span>);
+}</code></pre>
+          </div>
+        </section>
+
+        <!-- Section 5 -->
+        <section id="frames-traits" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">5. Frames & Traits (Exported Natively)</h2>
+          <p class="text-gray-300 leading-relaxed">
+            In Lymar, declarations (variables, functions, frames, traits) are private by default at module scope unless explicitly marked with <code class="text-brand-accent font-mono">pub</code> or <code class="text-brand-accent font-mono">prot</code> visibility.
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">trait</span> <span class="code-type">Renderable</span> {
+    <span class="code-keyword">fn</span> <span class="code-function">draw</span>();
+}
+
+<span class="code-keyword">frame</span> <span class="code-type">Button</span>: <span class="code-type">Renderable</span> {
+    <span class="code-keyword">pub</span> <span class="code-keyword">var</span> label: <span class="code-type">str</span>;
+    <span class="code-keyword">pub</span> <span class="code-keyword">var</span> width: <span class="code-type">int</span>;
+
+    <span class="code-keyword">pub</span> <span class="code-keyword">init</span>(lbl: <span class="code-type">str</span>, w: <span class="code-type">int</span>) {
+        self.label = lbl;
+        self.width = w;
+    }
+
+    <span class="code-keyword">pub</span> <span class="code-keyword">fn</span> <span class="code-function">draw</span>() {
+        print(<span class="code-string">"Drawing button '{self.label}' ({self.width}px)"</span>);
+    }
+}
+
+<span class="code-keyword">var</span> btn = Button(<span class="code-string">"Submit"</span>, <span class="code-number">120</span>);
+btn.draw();</code></pre>
+          </div>
+        </section>
+
+        <!-- Section 6 -->
+        <section id="structured-concurrency" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">6. Structured Concurrency & Channels</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Structured blocks ensure parallel or concurrent tasks complete before the enclosing scope exits:
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">var</span> ch = channel();
+
+<span class="code-keyword">concurrent</span>(ch = ch) {
+    task(i <span class="code-keyword">in</span> <span class="code-number">1</span>..<span class="code-number">5</span>) {
+        ch.send(<span class="code-string">"Task {i} complete"</span>);
+    }
+}
+
+<span class="code-keyword">iter</span> (result <span class="code-keyword">in</span> ch) {
+    print(<span class="code-string">"Result: {result}"</span>);
+}</code></pre>
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+  </div>
+
+  <footer class="border-t border-dark-border py-8 bg-black/60 mt-16 text-center text-xs text-gray-500 font-mono">
+    © 2025 Lymar Contributors. Released under MIT License.
+  </footer>
+
+</body>
+</html>
