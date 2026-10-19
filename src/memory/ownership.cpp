@@ -343,11 +343,32 @@ class Analyzer {
             if (member->object && member->object->inferred_type) {
                 std::string receiver_type;
                 if (auto ft = std::get_if<FrameType>(&member->object->inferred_type->extra)) receiver_type = ft->name;
-                auto method = function_names.find(namespaces[active_program] + receiver_type + "." + member->name);
-                if (method == function_names.end()) method = function_names.find(receiver_type + "." + member->name);
-                if (method != function_names.end()) {
-                    callee.callables.insert(method->second);
-                    args.insert(args.begin(), expression(member->object, flow));
+                else if (auto ut = std::get_if<UserDefinedType>(&member->object->inferred_type->extra)) receiver_type = ut->name;
+                else if (auto tt = std::get_if<TraitType>(&member->object->inferred_type->extra)) receiver_type = tt->name;
+                if (!receiver_type.empty()) {
+                    std::string suffix = receiver_type + "." + member->name;
+                    auto method = function_names.find(namespaces[active_program] + suffix);
+                    if (method == function_names.end()) method = function_names.find(suffix);
+                    if (method == function_names.end()) {
+                        for (const auto& [fname, fid] : function_names) {
+                            if (fname == suffix || fname.ends_with("." + suffix)) {
+                                method = function_names.find(fname);
+                                break;
+                            }
+                        }
+                    }
+                    if (method != function_names.end()) {
+                        callee.callables.insert(method->second);
+                        args.insert(args.begin(), expression(member->object, flow));
+                    }
+                }
+            }
+            if (callee.callables.empty() && !name.empty()) {
+                for (const auto& [fname, fid] : function_names) {
+                    if (fname.ends_with("." + name)) {
+                        callee.callables.insert(fid);
+                        break;
+                    }
                 }
             }
         }
@@ -540,6 +561,11 @@ class Analyzer {
             } else if (managed(cast->inferred_type)) {
                 if (value.source) value.references[value.source] = flow.states[value.source].generation;
                 value.unknown |= !value.managed; value.managed = true; value.source = 0;
+            } else {
+                value.managed = false;
+                value.unknown = false;
+                value.symbolic_captures.clear();
+                value.parameters.clear();
             }
         } else if (auto group = std::dynamic_pointer_cast<A::GroupingExpr>(e)) value = expression(group->expression, flow);
         else if (auto b = std::dynamic_pointer_cast<A::BinaryExpr>(e)) { expression(b->left, flow); expression(b->right, flow); }
@@ -549,7 +575,8 @@ class Analyzer {
             value.parameters = object.parameters; value.symbolic_captures = object.symbolic_captures; value.projected = true; value.unknown = value.managed;
             if (object.source && value.managed) value.references[object.source] = flow.states[object.source].generation;
         } else if (auto m = std::dynamic_pointer_cast<A::MemberExpr>(e)) {
-            const auto imported_binding = resolve(flow, qualified(e));
+            auto qname = qualified(e);
+            const auto imported_binding = resolve(flow, qname);
             if (imported_binding && constructors.count(imported_binding)) {
                 value = {}; value.constructor = imported_binding;
             } else if (imported_binding && functions.count(imported_binding)) {

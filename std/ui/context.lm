@@ -31,8 +31,8 @@ frame UIContextState {
     pub var current_widget: ui.Widget;
     pub var focus_manager: focus_mod.FocusManager;
     pub var modifiers: int;
-    pub var get_clipboard_cb: any;
-    pub var set_clipboard_cb: any;
+    pub var get_clipboard_cb: (fn(): str)?;
+    pub var set_clipboard_cb: (fn(str): nil)?;
     pub var has_widget: int;
     pub var viewport_w: float;
     pub var viewport_h: float;

@@ -50,8 +50,8 @@ frame GUI {
     pub var keys_pressed: [int];
     pub var typed_chars: [int];
     pub var active_modifiers: int;
-    pub var get_clipboard_cb: any;
-    pub var set_clipboard_cb: any;
+    pub var get_clipboard_cb: (fn(): str)?;
+    pub var set_clipboard_cb: (fn(str): nil)?;
 
     // Interaction tracking
     pub var hot_id: str;

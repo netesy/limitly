@@ -132,7 +132,18 @@ pub var LIFECYCLE_REMOVED: int = ui_types.LIFECYCLE_REMOVED;
 
 // ── Application & Window ──────────────────────────────────────────────────────
 pub var Shadow = shadow_mod.Shadow;
-pub var shadow = shadow_mod.shadow;
+pub fn shadow(
+    r: float = 0.0,
+    g: float = 0.0,
+    b: float = 0.0,
+    a: float = 0.25,
+    off_x: float = 0.0,
+    off_y: float = 4.0,
+    blur: float = 8.0,
+    spread: float = 0.0
+): Shadow {
+    return shadow_mod.shadow(r=r, g=g, b=b, a=a, off_x=off_x, off_y=off_y, blur=blur, spread=spread);
+}
 
 // ── State Management ───────────────────────────────────────────────────────────
 pub fn signal(init_val: any): Signal { return state_mod.signal(init_val); }

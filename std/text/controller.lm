@@ -5,8 +5,8 @@ frame EditorController {
     pub var document: doc.TextDocument;
     pub var cursor: cursor.Cursor;
     pub var selection: cursor.Selection;
-    pub var get_clipboard: any;
-    pub var set_clipboard: any;
+    pub var get_clipboard: (fn(): str)?;
+    pub var set_clipboard: (fn(str): nil)?;
     pub var history: [str];
     pub var history_idx: int;
 
