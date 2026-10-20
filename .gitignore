@@ -37,6 +37,8 @@ qrc_*.cpp
 # Build artifacts
 build/
 bin/
+test_io_temp.txt
+*.tmp
 *.exe
 *.s
 node_modules/

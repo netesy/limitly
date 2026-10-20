@@ -680,12 +680,6 @@ std::string Generator::find_frame_or_trait_method(const std::string& frame_name,
             if (searched.count(trait_name)) continue;
             searched.insert(trait_name);
             
-            // Statically devirtualize trait calls to the concrete frame implementation if present
-            std::string concrete_impl = frame_name + "." + method_name;
-            if (function_table_.count(concrete_impl)) {
-                return concrete_impl;
-            }
-
             auto trait_it = trait_table_.find(trait_name);
             if (trait_it != trait_table_.end()) {
                 // Check if this trait has a default implementation
