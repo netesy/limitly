@@ -1,4 +1,7 @@
 // Standard Library Map Iterator
+// Architectural Note: Per AGENTS.md, Lymar currently lacks generic frame/template parameters (e.g. MapIterator<T>).
+// Until generic monomorphization is added to the Lymar frontend type checker, MapIterator relies on duck-typed field access
+// or dynamic trait bounds for its source iterator.
 
 import std.iterator.iterator as it;
 
