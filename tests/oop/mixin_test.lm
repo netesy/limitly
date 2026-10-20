@@ -1,0 +1,19 @@
+mixin Timestamped {
+    pub created_at: int = 100;
+}
+
+frame Event {
+    mixin Timestamped;
+    pub id: int;
+
+    pub init(id_val: int) {
+        self.id = id_val;
+    }
+}
+
+fn main(): int {
+    var ev = Event(42);
+    print(ev.id);
+    print(ev.created_at);
+    return 0;
+}

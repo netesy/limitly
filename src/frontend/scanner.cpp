@@ -740,6 +740,7 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "type") return TokenType::TYPE;
     if (rest == "trait") return TokenType::TRAIT;
     if (rest == "mixin") return TokenType::MIXIN;
+    if (rest == "embed") return TokenType::EMBED;
     if (rest == "implements") return TokenType::IMPLEMENTS;
     if (rest == "module") return TokenType::MODULE;
     if (rest == "contract") return TokenType::CONTRACT;
@@ -1037,6 +1038,8 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "INTERPOLATION_END";
     case TokenType::MIXIN:
         return "MIXIN";
+    case TokenType::EMBED:
+        return "EMBED";
     case TokenType::IMPLEMENTS:
         return "IMPLEMENTS";
     case TokenType::MODULE:

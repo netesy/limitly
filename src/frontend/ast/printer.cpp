@@ -365,14 +365,20 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
             }
         }
     }
+    else if (auto mixinDecl = std::dynamic_pointer_cast<LM::Frontend::AST::MixinDeclaration>(node)) {
+        std::cout << indentation << "MixinDeclaration: " << mixinDecl->name << std::endl;
+        if (!mixinDecl->fields.empty()) {
+            std::cout << indentation << "  Fields:" << std::endl;
+            for (const auto& field : mixinDecl->fields) {
+                std::cout << indentation << "    " << field->name << std::endl;
+            }
+        }
+    }
+    else if (auto embedStmt = std::dynamic_pointer_cast<LM::Frontend::AST::EmbedStatement>(node)) {
+        std::cout << indentation << "EmbedStatement: " << embedStmt->typeName << std::endl;
+    }
     else if (auto frameDecl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(node)) {
-        std::cout << indentation << "FrameDeclaration: " << frameDecl->name;
-        
-        // Show frame modifiers
-        if (frameDecl->isAbstract) std::cout << " (abstract)";
-        if (frameDecl->isFinal) std::cout << " (final)";
-        
-        std::cout << std::endl;
+        std::cout << indentation << "FrameDeclaration: " << frameDecl->name << std::endl;
         
         // Show implemented traits
         if (!frameDecl->implements.empty()) {

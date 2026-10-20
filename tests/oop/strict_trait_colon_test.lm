@@ -1,0 +1,15 @@
+trait Printable {
+    fn print_info();
+}
+
+frame Book : Printable {
+    pub fn print_info() {
+        print("Book info");
+    }
+}
+
+fn main(): int {
+    var b = Book();
+    b.print_info();
+    return 0;
+}

@@ -14,6 +14,8 @@ TypePtr TypeChecker::check_statement(std::shared_ptr<LM::Frontend::AST::Statemen
         return check_function_declaration(func_decl);
     } else if (auto frame_decl = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
         return check_frame_declaration(frame_decl);
+    } else if (auto mixin_decl = std::dynamic_pointer_cast<LM::Frontend::AST::MixinDeclaration>(stmt)) {
+        return check_mixin_declaration(mixin_decl);
     } else if (auto trait_decl = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
         return check_trait_declaration(trait_decl);
     } else if (auto dest_decl = std::dynamic_pointer_cast<LM::Frontend::AST::DestructuringDeclaration>(stmt)) {

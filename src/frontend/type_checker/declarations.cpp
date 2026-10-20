@@ -328,6 +328,13 @@ TypePtr TypeChecker::check_trait_declaration(std::shared_ptr<LM::Frontend::AST::
     return trait_type;
 }
 
+TypePtr TypeChecker::check_mixin_declaration(std::shared_ptr<LM::Frontend::AST::MixinDeclaration> mixin) {
+    if (!mixin) return nullptr;
+    mixin_declarations[mixin->name] = mixin;
+    mixin->inferred_type = type_system.NIL_TYPE;
+    return type_system.NIL_TYPE;
+}
+
 TypePtr TypeChecker::check_frame_declaration(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame) {
     return check_frame_declaration_with_name(frame->name, frame);
 }
@@ -339,9 +346,26 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
         add_error("`frame` declarations cannot have a visibility modifier (`frame` is already public by default)", frame->line);
     }
 
-    for (const auto& method : frame->methods) {
-        if (frame->isAbstract && method->isAbstract && method->body) {
-            add_error("Abstract method '" + method->name + "' in abstract frame '" + name + "' cannot have a body", method->line);
+    // Inject mixins into frame fields and methods
+    for (const auto& mixin_name : frame->mixins) {
+        auto mixin_it = mixin_declarations.find(mixin_name);
+        if (mixin_it != mixin_declarations.end()) {
+            const auto& mixin_decl = mixin_it->second;
+            for (const auto& field : mixin_decl->fields) {
+                frame->fields.push_back(field);
+            }
+            for (const auto& method : mixin_decl->methods) {
+                frame->methods.push_back(method);
+            }
+        } else {
+            add_error("Unknown mixin '" + mixin_name + "' included in frame '" + frame->name + "'", frame->line);
+        }
+    }
+
+    // Strict `:` trait validation (reject frame inheritance)
+    for (const auto& trait_name : frame->implements) {
+        if (frame_declarations.count(trait_name) && trait_declarations.count(trait_name) == 0) {
+            add_error("Cannot extend frame '" + trait_name + "'. Lymar is a pure composition language; frame inheritance has been eliminated. Use traits, mixins, or embedding instead.", frame->line);
         }
     }
     
@@ -369,15 +393,7 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
 
         auto it = trait_declarations.find(trait_name);
         if (it == trait_declarations.end()) {
-            auto parent_frame_it = frame_declarations.find(trait_name);
-            if (parent_frame_it != frame_declarations.end()) {
-                // Extended parent frame (e.g. abstract frame)
-                if (parent_frame_it->second.declaration && parent_frame_it->second.declaration->isFinal) {
-                    add_error("Cannot extend final frame '" + trait_name + "'", frame->line);
-                }
-                continue;
-            }
-            add_error("Frame '" + frame->name + "' implements unknown trait or parent frame: " + trait_name, frame->line);
+            add_error("Frame '" + frame->name + "' implements unknown trait: " + trait_name, frame->line);
             continue;
         }
 
@@ -406,6 +422,20 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
         trait_worklist.reserve(trait_worklist.size() + trait_info.extends.size());
         for (const auto& parent : trait_info.extends) {
             trait_worklist.push_back(parent);
+        }
+    }
+
+    // Process anonymous field embedding (`embed TypeName;`)
+    for (const auto& embed_stmt : frame->embeds) {
+        auto embedded_it = frame_declarations.find(embed_stmt->typeName);
+        if (embedded_it != frame_declarations.end()) {
+            const auto& embedded_info = embedded_it->second;
+            for (const auto& [efield_name, efield_type] : embedded_info.fields) {
+                frame_info.fields.push_back({efield_name, efield_type});
+                frame_info.field_has_default.push_back({efield_name, true});
+            }
+        } else {
+            add_error("Unknown type '" + embed_stmt->typeName + "' in embed statement", frame->line);
         }
     }
 
@@ -567,9 +597,6 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
     
     const FrameInfo& frame_info = frame_it->second;
     
-    if (frame_info.declaration && frame_info.declaration->isAbstract) {
-        add_error("Cannot instantiate abstract frame '" + expr->frameName + "'", expr->line);
-    }
 
     // Use the qualified name from frame_declarations (which is the actual registered name)
     // This ensures module frames use their full qualified name (e.g., test_module_frame.Counter)

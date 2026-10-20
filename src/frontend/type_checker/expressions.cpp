@@ -1063,9 +1063,6 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
 
         if (frame_it != frame_declarations.end()) {
             const FrameInfo& frame_info = frame_it->second;
-            if (frame_info.declaration && frame_info.declaration->isAbstract) {
-                add_error("Cannot instantiate abstract frame '" + var_expr->name + "'", expr->line);
-            }
             std::string init_name = var_expr->name + ".init";
             auto sig_it = function_signatures.find(init_name);
 
@@ -1409,6 +1406,22 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             }
             if (!method && method_name == "deinit") {
                 method = frame_info.declaration->deinit;
+            }
+
+            // Check promoted methods from embedded components
+            if (!method && frame_info.declaration) {
+                for (const auto& embed_stmt : frame_info.declaration->embeds) {
+                    auto embedded_it = frame_declarations.find(embed_stmt->typeName);
+                    if (embedded_it != frame_declarations.end() && embedded_it->second.declaration) {
+                        for (const auto& em : embedded_it->second.declaration->methods) {
+                            if (em->name == method_name) {
+                                method = em;
+                                break;
+                            }
+                        }
+                    }
+                    if (method) break;
+                }
             }
             
             if (!method) {
@@ -2058,6 +2071,22 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
                 TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
                 TypePtr func_type = type_system.createFunctionType(param_types, return_type);
                 return wrap_result(func_type);
+            }
+        }
+
+        // Check promoted methods from embedded components
+        for (const auto& embed_stmt : frame_info.declaration->embeds) {
+            auto embedded_it = frame_declarations.find(embed_stmt->typeName);
+            if (embedded_it != frame_declarations.end() && embedded_it->second.declaration) {
+                for (const auto& method : embedded_it->second.declaration->methods) {
+                    if (method->name == member_name) {
+                        std::vector<TypePtr> param_types;
+                        for (const auto& p : method->parameters) param_types.push_back(resolve_type_annotation(p.second));
+                        TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
+                        TypePtr func_type = type_system.createFunctionType(param_types, return_type);
+                        return wrap_result(func_type);
+                    }
+                }
             }
         }
         

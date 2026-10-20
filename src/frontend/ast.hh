@@ -87,6 +87,8 @@ namespace AST {
     struct TypeDeclaration;
     struct TraitDeclaration;
     struct InterfaceDeclaration;
+    struct MixinDeclaration;
+    struct EmbedStatement;
     struct FrameDeclaration;
     struct FrameField;
     struct FrameMethod;
@@ -743,21 +745,30 @@ namespace AST {
                         isStatic(false), isAbstract(false), isFinal(false) {}
     };
 
+    // Mixin declaration - reusable blocks of state fields & default methods
+    struct MixinDeclaration : public Statement {
+        std::string name;
+        std::vector<std::shared_ptr<FrameField>> fields;
+        std::vector<std::shared_ptr<FrameMethod>> methods;
+    };
+
+    // Anonymous field embedding statement
+    struct EmbedStatement : public Statement {
+        std::string typeName;
+    };
+
     // Frame declaration - modern OOP construct.
-    // Note: 'data' modifier was removed — traits cover the same ground.
     struct FrameDeclaration : public Statement {
         std::string name;
         std::vector<std::shared_ptr<FrameField>> fields;
         std::vector<std::shared_ptr<FrameMethod>> methods;
         std::vector<std::string> implements;  // Trait names this frame implements
+        std::vector<std::shared_ptr<EmbedStatement>> embeds; // Embedded components
+        std::vector<std::string> mixins;       // Mixins injected into frame
         std::shared_ptr<FrameMethod> init;    // Optional init() method
         std::shared_ptr<FrameMethod> deinit;  // Optional deinit() method
 
-        // Visibility and modifiers
-        bool isAbstract = false;
-        bool isFinal = false;
-
-        FrameDeclaration() : init(nullptr), deinit(nullptr), isAbstract(false), isFinal(false) {}
+        FrameDeclaration() : init(nullptr), deinit(nullptr) {}
     };
     
     // Interface declaration

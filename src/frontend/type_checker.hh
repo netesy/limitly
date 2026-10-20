@@ -82,6 +82,7 @@ private:
     std::unordered_map<std::string, FunctionSignature> function_signatures;
     std::unordered_map<std::string, FrameInfo> frame_declarations;
     std::unordered_map<std::string, TraitInfo> trait_declarations;
+    std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::MixinDeclaration>> mixin_declarations;
 
     std::unordered_map<std::string, ModuleInfo> registered_modules;
     std::unordered_map<std::string, std::string> import_aliases;
@@ -150,6 +151,7 @@ public:
     const std::unordered_map<std::string, FunctionSignature>& get_function_signatures() const { return function_signatures; }
     const std::unordered_map<std::string, FrameInfo>& get_frame_declarations() const { return frame_declarations; }
     const std::unordered_map<std::string, TraitInfo>& get_trait_declarations() const { return trait_declarations; }
+    const std::unordered_map<std::string, std::shared_ptr<LM::Frontend::AST::MixinDeclaration>>& get_mixin_declarations() const { return mixin_declarations; }
     const std::unordered_map<std::string, TypePtr>& get_variable_types() const { return variable_types; }
     
 public:
@@ -232,6 +234,7 @@ private:
     TypePtr check_frame_instantiation_expr(std::shared_ptr<LM::Frontend::AST::FrameInstantiationExpr> expr);
     TypePtr check_frame_declaration(std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame);
     TypePtr check_frame_declaration_with_name(const std::string& name, std::shared_ptr<LM::Frontend::AST::FrameDeclaration> frame);
+    TypePtr check_mixin_declaration(std::shared_ptr<LM::Frontend::AST::MixinDeclaration> mixin);
     TypePtr check_enum_declaration(std::shared_ptr<LM::Frontend::AST::EnumDeclaration> enum_decl);
     TypePtr check_trait_declaration(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait);
     TypePtr check_module_declaration(std::shared_ptr<LM::Frontend::AST::ModuleDeclaration> module_decl);

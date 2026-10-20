@@ -146,6 +146,7 @@ enum class TokenType {
     TRAIT,      // trait
     INTERFACE,  // interface
     MIXIN,      // mixin
+    EMBED,      // embed
     IMPLEMENTS, // implements
     MODULE,     // module
 

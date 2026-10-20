@@ -689,43 +689,43 @@ Counter.increment();
 print(Counter.count); // Output: 1
 ```
 
-#### Abstract Frames and Methods
+#### Pure Composition: Mixins (`mixin`) & Field Embedding (`embed`)
 
-An `abstract` frame cannot be instantiated directly and is meant to be subframed. It can contain `abstract` methods, which are declared without a body and must be implemented by subframes.
+Lymar is a **pure composition** language. Frame inheritance (`frame A : B` where B is a frame) is eliminated. The colon `:` is reserved **exclusively** for trait conformance.
 
-```lymar
-abstract frame Shape {
- pub abstract fn area(): float;
-}
-
-frame Circle : Shape {
- pub radius: float;
-
- pub init(r: float) {
- self.radius = r;
- }
-
- pub fn area(): float {
- return 3.14 * self.radius * self.radius;
- }
-}
-```
-
-#### Final Frames and Methods
-
-A `final` frame cannot be subframed. A `final` method cannot be overridden by a subframe.
+* **Data Mixins (`mixin`)**: Define reusable blocks of state fields that inject directly into a host frame.
+* **Anonymous Field Embedding (`embed`)**: Embeds another component frame inside a host frame with automatic field and method promotion.
 
 ```lymar
-final frame Uninheritable {}
-
-frame Parent {
- final fn cannot_override() {}
+mixin Timestamped {
+    pub created_at: int = 100;
 }
+
+frame Engine {
+    pub fn start() {
+        print("Engine started");
+    }
+}
+
+frame Car {
+    mixin Timestamped;
+    embed Engine;
+    pub model: str;
+
+    pub init(m: str) {
+        self.model = m;
+    }
+}
+
+var my_car = Car("Sedan");
+print(my_car.model);      // Sedan
+print(my_car.created_at); // 100 (from mixin)
+my_car.start();           // Engine started (promoted from embedded Engine)
 ```
 
-#### Frame Modifiers & Traits
+#### Strict Trait Conformance (`:`)
 
-Frame modifiers in Lymar include `abstract` and `final`. `abstract` frames cannot be instantiated directly and can declare abstract methods that subframes must implement. `final` frames cannot be extended, and `final` methods cannot be overridden. Traits provide interface contracts and structural guarantees for frames.
+The colon `:` is used strictly to declare that a frame conforms to a `trait`.
 
 ```lymar
 trait Identifiable {

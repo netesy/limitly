@@ -132,13 +132,13 @@
 
         <!-- Section 3: OOP -->
         <section id="oop" class="space-y-4 border-t border-dark-border pt-8">
-          <h2 class="text-2xl font-bold text-white">3. Frames, Traits & Module Export Rules</h2>
+          <h2 class="text-2xl font-bold text-white">3. Pure Composition, Mixins & Embedding</h2>
           <div class="bg-dark-card border border-dark-border rounded-xl p-6 space-y-4">
-            <h3 class="text-lg font-bold text-white">Module Visibility Semantics</h3>
+            <h3 class="text-lg font-bold text-white">Composition & Visibility Semantics</h3>
             <ul class="list-disc list-inside space-y-2 text-sm text-gray-300 leading-relaxed">
-              <li><strong class="text-white">Frames & Traits:</strong> Natively exported at module scope by default without needing a <code class="text-brand-accent font-mono">pub</code> prefix.</li>
-              <li><strong class="text-white">Variables & Functions:</strong> Private by default unless explicitly declared with <code class="text-brand-accent font-mono">pub</code> or <code class="text-brand-accent font-mono">prot</code>.</li>
-              <li><strong class="text-white">Frame Members:</strong> Fields and methods within a frame use explicit <code class="text-brand-accent font-mono">pub</code> (public) or <code class="text-brand-accent font-mono">prot</code> (protected to frame and subframes) modifiers.</li>
+              <li><strong class="text-white">Pure Composition:</strong> Frame inheritance is eliminated. Frames use <code class="text-brand-accent font-mono">mixin</code> for state injection and <code class="text-brand-accent font-mono">embed</code> for promotion.</li>
+              <li><strong class="text-white">Strict Trait Implementation (<code class="text-brand-accent font-mono">:</code>):</strong> Colon is reserved exclusively for trait conformance.</li>
+              <li><strong class="text-white">Protected Visibility (<code class="text-brand-accent font-mono">prot</code>):</strong> Accessible within defining frames, embedded components, and module/file scopes.</li>
             </ul>
           </div>
         </section>

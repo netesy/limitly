@@ -43,13 +43,23 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
         }
 
         if (match({TokenType::FRAME})) {
+            if (isAbstract || isFinal) {
+                error("Frames cannot be abstract or final. Inheritance has been removed in favor of pure composition using traits, mixins, and embedding.");
+            }
             auto decl = frameDeclaration();
             if (decl) {
                 decl->annotations = annotations;
                 decl->visibility = visibility;
                 decl->hasExplicitVisibility = hasExplicitVisibility;
-                decl->isAbstract = isAbstract;
-                decl->isFinal = isFinal;
+            }
+            return decl;
+        }
+        if (match({TokenType::MIXIN})) {
+            auto decl = mixinDeclaration();
+            if (decl) {
+                decl->annotations = annotations;
+                decl->visibility = visibility;
+                decl->hasExplicitVisibility = hasExplicitVisibility;
             }
             return decl;
         }
@@ -760,6 +770,24 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             consume(TokenType::LEFT_BRACE, "Expected '{' before deinit body.");
             deinitMethod->body = block();
             frameDecl->deinit = deinitMethod;
+        } else if (check(TokenType::IDENTIFIER)) {
+            Token fieldName = advance();
+            if (check(TokenType::COLON)) {
+                advance();
+                auto field = std::make_shared<LM::Frontend::AST::FrameField>();
+                field->line = fieldName.line;
+                field->name = fieldName.lexeme;
+                field->type = parseTypeAnnotation();
+                field->visibility = visibility;
+                if (match({TokenType::EQUAL})) field->defaultValue = expression();
+                consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
+                frameDecl->fields.push_back(field);
+            } else {
+                error("Expected ':' after field name in frame member declaration.");
+                while (!isAtEnd() && peek().type != TokenType::RIGHT_BRACE && peek().type != TokenType::SEMICOLON) advance();
+                if (check(TokenType::SEMICOLON)) advance();
+                break;
+            }
         } else if (match({TokenType::FN})) {
             Token fnTok = previous();
             auto frameMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
@@ -795,6 +823,17 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             if (frameMethod->name == "init") { frameMethod->isInit = true; frameDecl->init = frameMethod; }
             else if (frameMethod->name == "deinit") { frameMethod->isDeinit = true; frameDecl->deinit = frameMethod; }
             else frameDecl->methods.push_back(frameMethod);
+        } else if (match({TokenType::EMBED})) {
+            Token embedTypeTok = consume(TokenType::IDENTIFIER, "Expected type name after 'embed'.");
+            consume(TokenType::SEMICOLON, "Expected ';' after embed statement.");
+            auto embedStmt = std::make_shared<LM::Frontend::AST::EmbedStatement>();
+            embedStmt->line = embedTypeTok.line;
+            embedStmt->typeName = embedTypeTok.lexeme;
+            frameDecl->embeds.push_back(embedStmt);
+        } else if (match({TokenType::MIXIN})) {
+            Token mixinTok = consume(TokenType::IDENTIFIER, "Expected mixin name after 'mixin'.");
+            consume(TokenType::SEMICOLON, "Expected ';' after mixin inclusion.");
+            frameDecl->mixins.push_back(mixinTok.lexeme);
         } else if (match({TokenType::VAR}) || match({TokenType::CONST}) || match({TokenType::VAL})) {
             Token varTok = previous();
             bool fieldConst = (varTok.type == TokenType::CONST || varTok.type == TokenType::VAL);
@@ -850,6 +889,90 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
     popBlockContext();
     if (cstMode && !cstContextStack.empty()) popCSTContext();
     return frameDecl;
+}
+
+std::shared_ptr<LM::Frontend::AST::MixinDeclaration> Parser::mixinDeclaration() {
+    auto mixinDecl = createNodeWithContext<LM::Frontend::AST::MixinDeclaration>();
+    mixinDecl->line = previous().line;
+    Token name = consume(TokenType::IDENTIFIER, "Expected mixin name.");
+    mixinDecl->name = name.lexeme;
+    Token leftBrace = consume(TokenType::LEFT_BRACE, "Expected '{' before mixin body.");
+    pushBlockContext("mixin", leftBrace);
+    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
+        LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private;
+        while (check(TokenType::PUB) || check(TokenType::PROT)) {
+            if (match({TokenType::PUB})) visibility = LM::Frontend::AST::VisibilityLevel::Public;
+            else if (match({TokenType::PROT})) visibility = LM::Frontend::AST::VisibilityLevel::Protected;
+        }
+        if (match({TokenType::VAR}) || match({TokenType::CONST}) || match({TokenType::VAL})) {
+            Token varTok = previous();
+            bool fieldConst = (varTok.type == TokenType::CONST || varTok.type == TokenType::VAL);
+            Token fieldNameTok = consume(TokenType::IDENTIFIER, "Expected field name.");
+            consume(TokenType::COLON, "Expected ':' after field name.");
+            auto fieldType = parseTypeAnnotation();
+            auto field = std::make_shared<LM::Frontend::AST::FrameField>();
+            field->line = fieldNameTok.line > 0 ? fieldNameTok.line : varTok.line;
+            field->name = fieldNameTok.lexeme;
+            field->type = fieldType;
+            field->visibility = visibility;
+            field->isConst = fieldConst;
+            if (match({TokenType::EQUAL})) field->defaultValue = expression();
+            consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
+            mixinDecl->fields.push_back(field);
+        } else if (check(TokenType::IDENTIFIER)) {
+            Token fieldName = advance();
+            if (check(TokenType::COLON)) {
+                advance();
+                auto field = std::make_shared<LM::Frontend::AST::FrameField>();
+                field->line = fieldName.line;
+                field->name = fieldName.lexeme;
+                field->type = parseTypeAnnotation();
+                field->visibility = visibility;
+                if (match({TokenType::EQUAL})) field->defaultValue = expression();
+                consume(TokenType::SEMICOLON, "Expected ';' after field declaration.");
+                mixinDecl->fields.push_back(field);
+            } else {
+                error("Expected ':' after field name in mixin member declaration.");
+                while (!isAtEnd() && peek().type != TokenType::RIGHT_BRACE && peek().type != TokenType::SEMICOLON) advance();
+                if (check(TokenType::SEMICOLON)) advance();
+                break;
+            }
+        } else if (match({TokenType::FN})) {
+            Token fnTok = previous();
+            auto frameMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
+            frameMethod->visibility = visibility;
+            Token methodName = consume(TokenType::IDENTIFIER, "Expected method name.");
+            frameMethod->line = methodName.line > 0 ? methodName.line : fnTok.line;
+            frameMethod->name = methodName.lexeme;
+            consume(TokenType::LEFT_PAREN, "Expected '(' after method name.");
+            if (!check(TokenType::RIGHT_PAREN)) {
+                do {
+                    auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
+                    consume(TokenType::COLON, "Expected ':' after parameter name.");
+                    auto paramType = parseTypeAnnotation();
+                    if (match({TokenType::EQUAL})) {
+                        std::shared_ptr<LM::Frontend::AST::Expression> defaultValue = expression();
+                        frameMethod->optionalParams.push_back({paramName, {paramType, defaultValue}});
+                    } else if (paramType && paramType->isOptional) frameMethod->optionalParams.push_back({paramName, {paramType, nullptr}});
+                    else frameMethod->parameters.push_back({paramName, paramType});
+                } while (match({TokenType::COMMA}));
+            }
+            consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
+            if (match({TokenType::COLON})) frameMethod->returnType = parseTypeAnnotation();
+            consume(TokenType::LEFT_BRACE, "Expected '{' before method body.");
+            frameMethod->body = block();
+            mixinDecl->methods.push_back(frameMethod);
+        } else {
+            error("Expected field or method declaration in mixin body.");
+            while (!isAtEnd() && peek().type != TokenType::RIGHT_BRACE && peek().type != TokenType::SEMICOLON) advance();
+            if (check(TokenType::SEMICOLON)) advance();
+            break;
+        }
+    }
+    consume(TokenType::RIGHT_BRACE, "Expected '}' after mixin body.");
+    popBlockContext();
+    if (cstMode && !cstContextStack.empty()) popCSTContext();
+    return mixinDecl;
 }
 
 std::shared_ptr<LM::Frontend::AST::Statement> Parser::parallelStatement() {

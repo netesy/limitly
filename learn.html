@@ -193,9 +193,9 @@ print(<span class="code-string">"Total items: {len(items)}"</span>);</code></pre
 
         <!-- Section 5 -->
         <section id="frames-traits" class="space-y-4 border-t border-dark-border pt-8">
-          <h2 class="text-2xl font-bold text-white">5. Frames & Traits (Exported Natively)</h2>
+          <h2 class="text-2xl font-bold text-white">5. Pure Composition: Mixins & Embedding</h2>
           <p class="text-gray-300 leading-relaxed">
-            In Lymar, declarations (variables, functions, frames, traits) are private by default at module scope unless explicitly marked with <code class="text-brand-accent font-mono">pub</code> or <code class="text-brand-accent font-mono">prot</code> visibility.
+            Lymar is a pure composition language without frame inheritance. Use <code class="text-brand-accent font-mono">mixin</code> to inject reusable state fields, <code class="text-brand-accent font-mono">embed Component;</code> for field and method promotion, and <code class="text-brand-accent font-mono">:</code> strictly for trait conformance.
           </p>
           <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
             <pre><code><span class="code-keyword">trait</span> <span class="code-type">Renderable</span> {

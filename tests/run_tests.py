@@ -62,6 +62,10 @@ tests = [
  "tests/oop/traits_inheritance.lm",
  "tests/oop/visibility_test.lm",
  "tests/oop/composition_test.lm",
+ "tests/oop/mixin_test.lm",
+ "tests/oop/embed_test.lm",
+ "tests/oop/strict_trait_colon_test.lm",
+ "tests/oop/prot_visibility_test.lm",
  # Concurrency
  "tests/concurrency/parallel_blocks.lm",
  "tests/concurrency/concurrent_blocks.lm",

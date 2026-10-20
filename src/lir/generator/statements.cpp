@@ -309,6 +309,10 @@ void Generator::emit_stmt_impl(LM::Frontend::AST::Statement& stmt) {
         emit_trait_stmt(*trait_stmt);
     } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(&stmt)) {
         emit_frame_stmt(*frame_stmt);
+    } else if (auto mixin_stmt = dynamic_cast<LM::Frontend::AST::MixinDeclaration*>(&stmt)) {
+        // Mixin declarations are flattened at compile time
+    } else if (auto embed_stmt = dynamic_cast<LM::Frontend::AST::EmbedStatement*>(&stmt)) {
+        // Embed statements are promoted at compile time
     } else if (auto module_stmt = dynamic_cast<LM::Frontend::AST::ModuleDeclaration*>(&stmt)) {
         emit_module_stmt(*module_stmt);
     } else if (auto type_decl = dynamic_cast<LM::Frontend::AST::TypeDeclaration*>(&stmt)) {

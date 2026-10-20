@@ -630,6 +630,8 @@ template auto Parser::createNodeWithContext<LM::Frontend::AST::SuperExpr>() -> s
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ThisExpr>() -> std::shared_ptr<LM::Frontend::AST::ThisExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ObjectLiteralExpr>() -> std::shared_ptr<LM::Frontend::AST::ObjectLiteralExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::FrameDeclaration>() -> std::shared_ptr<LM::Frontend::AST::FrameDeclaration>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::MixinDeclaration>() -> std::shared_ptr<LM::Frontend::AST::MixinDeclaration>;
+template auto Parser::createNodeWithContext<LM::Frontend::AST::EmbedStatement>() -> std::shared_ptr<LM::Frontend::AST::EmbedStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::TraitDeclaration>() -> std::shared_ptr<LM::Frontend::AST::TraitDeclaration>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::EnumDeclaration>() -> std::shared_ptr<LM::Frontend::AST::EnumDeclaration>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ModuleDeclaration>() -> std::shared_ptr<LM::Frontend::AST::ModuleDeclaration>;

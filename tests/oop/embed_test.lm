@@ -1,0 +1,21 @@
+frame Engine {
+    pub fn start() {
+        print("Engine started");
+    }
+}
+
+frame Car {
+    embed Engine;
+    pub name: str;
+
+    pub init(n: str) {
+        self.name = n;
+    }
+}
+
+fn main(): int {
+    var car = Car("Sedan");
+    print(car.name);
+    car.start();
+    return 0;
+}

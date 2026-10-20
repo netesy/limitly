@@ -1,0 +1,15 @@
+frame Parent {
+    prot prot_field: int = 50;
+    pub pub_field: int = 100;
+
+    pub fn get_prot(): int {
+        return self.prot_field;
+    }
+}
+
+fn main(): int {
+    var p = Parent();
+    print(p.pub_field);
+    print(p.get_prot());
+    return 0;
+}
