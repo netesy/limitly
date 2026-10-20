@@ -1,24 +1,30 @@
-// Regression test to verify LIR devirtualization (direct Call instructions instead of TraitCallMethod)
+// Regression test asserting devirtualization for chained iterator method calls
 
-frame Counter {
-    pub count: int;
+frame ListWrapper {
+    pub items: [int];
+    pub pos: int;
 
-    pub init(start: int) {
-        self.count = start;
+    pub init(arr: [int]) {
+        self.items = arr;
+        self.pos = 0;
     }
 
-    pub fn increment(): int {
-        self.count = self.count + 1;
-        return self.count;
+    pub fn next(): any {
+        if (self.pos >= len(self.items)) {
+            return nil;
+        }
+        var item = self.items[self.pos];
+        self.pos = self.pos + 1;
+        return item;
     }
 }
 
 fn main(): int {
-    var c = Counter(5);
-    var v1 = c.increment();
-    var v2 = c.increment();
-    assert(v1 == 6, "v1 should be 6");
-    assert(v2 == 7, "v2 should be 7");
-    print("Devirtualization LIR test passed.");
+    var wrapper = ListWrapper([10, 20, 30]);
+    var item1 = wrapper.next();
+    var item2 = wrapper.next();
+    assert(item1 == 10, "item1 should equal 10");
+    assert(item2 == 20, "item2 should equal 20");
+    print("LIR Devirtualization Test Passed.");
     return 0;
 }
