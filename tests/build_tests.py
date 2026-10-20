@@ -17,7 +17,10 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
-from run_tests import tests, lymar_path
+from run_tests import lymar_path, load_tests_from_file
+
+TEST_TXT = ROOT / "tests" / "test.txt"
+tests = load_tests_from_file(TEST_TXT)
 
 
 def execute(command, env):

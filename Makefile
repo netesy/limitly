@@ -364,7 +364,7 @@ lir-test: $(BIN_DIR) $(OBJ_DIR)/liblymar.a $(LIR_TEST_OBJS)
 # Test Target
 # =============================
 tests: $(PLATFORM) stb-image
-	@python3 tests/run_tests.py || python tests/run_tests.py
+	@python3 tests/run_all_tests.py || python tests/run_all_tests.py
 
 # =============================
 # STB Image shared library
