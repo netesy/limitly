@@ -434,8 +434,39 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
                 frame_info.fields.push_back({efield_name, efield_type});
                 frame_info.field_has_default.push_back({efield_name, true});
             }
+            if (embedded_info.declaration) {
+                for (const auto& efield : embedded_info.declaration->fields) {
+                    bool exists = false;
+                    for (const auto& existing : frame->fields) {
+                        if (existing->name == efield->name) { exists = true; break; }
+                    }
+                    if (!exists) frame->fields.push_back(efield);
+                }
+            }
         } else {
-            add_error("Unknown type '" + embed_stmt->typeName + "' in embed statement", frame->line);
+            auto mixin_it = mixin_declarations.find(embed_stmt->typeName);
+            if (mixin_it != mixin_declarations.end()) {
+                const auto& mixin_decl = mixin_it->second;
+                for (const auto& field : mixin_decl->fields) {
+                    TypePtr ftype = resolve_type_annotation(field->type);
+                    frame_info.fields.push_back({field->name, ftype});
+                    frame_info.field_has_default.push_back({field->name, field->defaultValue != nullptr});
+                    bool exists = false;
+                    for (const auto& existing : frame->fields) {
+                        if (existing->name == field->name) { exists = true; break; }
+                    }
+                    if (!exists) frame->fields.push_back(field);
+                }
+                for (const auto& method : mixin_decl->methods) {
+                    bool exists = false;
+                    for (const auto& existing : frame->methods) {
+                        if (existing->name == method->name) { exists = true; break; }
+                    }
+                    if (!exists) frame->methods.push_back(method);
+                }
+            } else {
+                add_error("Unknown type '" + embed_stmt->typeName + "' in embed statement", frame->line);
+            }
         }
     }
 

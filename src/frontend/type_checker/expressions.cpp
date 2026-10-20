@@ -1408,7 +1408,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                 method = frame_info.declaration->deinit;
             }
 
-            // Check promoted methods from embedded components
+            // Check promoted methods from embedded components (frames and mixins)
             if (!method && frame_info.declaration) {
                 for (const auto& embed_stmt : frame_info.declaration->embeds) {
                     auto embedded_it = frame_declarations.find(embed_stmt->typeName);
@@ -1417,6 +1417,16 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
                             if (em->name == method_name) {
                                 method = em;
                                 break;
+                            }
+                        }
+                    } else {
+                        auto mixin_it = mixin_declarations.find(embed_stmt->typeName);
+                        if (mixin_it != mixin_declarations.end()) {
+                            for (const auto& mm : mixin_it->second->methods) {
+                                if (mm->name == method_name) {
+                                    method = mm;
+                                    break;
+                                }
                             }
                         }
                     }
@@ -2033,17 +2043,18 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         // Check if member is a field
         for (const auto& [field_name, field_type] : frame_info.fields) {
             if (field_name == member_name) {
-                // Check visibility
-                // Find the field in the frame declaration to get visibility
-                for (const auto& field : frame_info.declaration->fields) {
-                    if (field->name == member_name) {
-                        if (!is_visible(frame_name, field->visibility, expr->line)) {
-                            add_error("Cannot access " + LM::Frontend::AST::visibilityToString(field->visibility) +
-                                     " field '" + member_name + "' of frame '" + frame_name + "'", expr->line);
+                if (frame_info.declaration) {
+                    for (const auto& field : frame_info.declaration->fields) {
+                        if (field->name == member_name) {
+                            if (!is_visible(frame_name, field->visibility, expr->line)) {
+                                add_error("Cannot access " + LM::Frontend::AST::visibilityToString(field->visibility) +
+                                         " field '" + member_name + "' of frame '" + frame_name + "'", expr->line);
+                            }
+                            break;
                         }
-                        return wrap_result(field_type);
                     }
                 }
+                return wrap_result(field_type);
             }
         }
 
@@ -2074,7 +2085,7 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
             }
         }
 
-        // Check promoted methods from embedded components
+        // Check promoted methods from embedded components (frames and mixins)
         for (const auto& embed_stmt : frame_info.declaration->embeds) {
             auto embedded_it = frame_declarations.find(embed_stmt->typeName);
             if (embedded_it != frame_declarations.end() && embedded_it->second.declaration) {
@@ -2085,6 +2096,19 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
                         TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
                         TypePtr func_type = type_system.createFunctionType(param_types, return_type);
                         return wrap_result(func_type);
+                    }
+                }
+            } else {
+                auto mixin_it = mixin_declarations.find(embed_stmt->typeName);
+                if (mixin_it != mixin_declarations.end()) {
+                    for (const auto& method : mixin_it->second->methods) {
+                        if (method->name == member_name) {
+                            std::vector<TypePtr> param_types;
+                            for (const auto& p : method->parameters) param_types.push_back(resolve_type_annotation(p.second));
+                            TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
+                            TypePtr func_type = type_system.createFunctionType(param_types, return_type);
+                            return wrap_result(func_type);
+                        }
                     }
                 }
             }

@@ -1,19 +1,41 @@
-mixin Timestamped {
-    pub created_at: int = 100;
+// 1. Data Mixin for shared fields
+mixin Identifiable {
+    pub id: int;
 }
 
-frame Event {
-    mixin Timestamped;
-    pub id: int;
+// 2. Trait for behavioral contract (using `:` for implementation)
+trait Printable {
+    fn print_info();
+}
 
-    pub init(id_val: int) {
-        self.id = id_val;
+// 3. Component frame
+frame Logger {
+    pub fn log(msg: str) {
+        print("[LOG]: {msg}");
+    }
+}
+
+// 4. Main Frame: Combining mixins, embedding, and traits with `:`
+frame User : Printable {
+    embed Identifiable; // Injects `pub id: int` flattened into memory
+    embed Logger;       // Promotes `.log()` methods directly to User
+
+    pub username: str;
+
+    pub init(id: int, username: str) {
+        self.id = id;
+        self.username = username;
+    }
+
+    // Satisfies the Printable trait contract
+    pub fn print_info() {
+        print("User #{self.id}: {self.username}");
     }
 }
 
 fn main(): int {
-    var ev = Event(42);
-    print(ev.id);
-    print(ev.created_at);
+    var u = User(101, "alex_dev");
+    u.print_info(); // Output: User #101: alex_dev
+    u.log("Action performed successfully."); // Output: [LOG]: Action performed successfully.
     return 0;
 }
