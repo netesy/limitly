@@ -1845,8 +1845,37 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
         }
 
-        // Trait or TraitObject method call
         TypePtr resolved_object_type = resolve_underlying_type(object_type);
+
+        // Devirtualization: If receiver has a concrete frame type, call frame method directly
+        if (resolved_object_type && resolved_object_type->tag == TypeTag::Frame) {
+            auto ft = std::get_if<FrameType>(&resolved_object_type->extra);
+            if (ft) {
+                std::string resolved_frame_name = resolve_qualified_frame_name(ft->name);
+                std::string concrete_method = find_frame_or_trait_method(resolved_frame_name, method_name);
+                if (!concrete_method.empty()) {
+                    if (expr.inferred_type) {
+                        set_register_language_type(result, expr.inferred_type);
+                        set_register_abi_type(result, language_type_to_abi_type(expr.inferred_type));
+                    }
+                    LIR_Inst inst(LIR_Op::Call, result, concrete_method, arg_regs);
+                    inst.func_name = concrete_method;
+                    for (size_t i = 0; i < arg_regs.size(); ++i) {
+                        Type arg_abi = Type::I64;
+                        if (i < expr.arguments.size() + 1) {
+                            TypePtr arg_lang = (i == 0) ? object_type : expr.arguments[i - 1]->inferred_type;
+                            if (arg_lang) arg_abi = language_type_to_abi_type(arg_lang);
+                        }
+                        inst.call_arg_types.push_back(arg_abi);
+                    }
+                    inst.result_type = (expr.inferred_type ? language_type_to_abi_type(expr.inferred_type) : Type::I64);
+                    emit_instruction(inst);
+                    return result;
+                }
+            }
+        }
+
+        // Trait or TraitObject method call (fallback for existential boxed trait objects)
         if (resolved_object_type && (resolved_object_type->tag == TypeTag::Trait || resolved_object_type->tag == TypeTag::TraitObject)) {
             std::string trait_name;
             if (resolved_object_type->tag == TypeTag::Trait) {

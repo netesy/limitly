@@ -1,0 +1,24 @@
+// Regression test to verify LIR devirtualization (direct Call instructions instead of TraitCallMethod)
+
+frame Counter {
+    pub count: int;
+
+    pub init(start: int) {
+        self.count = start;
+    }
+
+    pub fn increment(): int {
+        self.count = self.count + 1;
+        return self.count;
+    }
+}
+
+fn main(): int {
+    var c = Counter(5);
+    var v1 = c.increment();
+    var v2 = c.increment();
+    assert(v1 == 6, "v1 should be 6");
+    assert(v2 == 7, "v2 should be 7");
+    print("Devirtualization LIR test passed.");
+    return 0;
+}
