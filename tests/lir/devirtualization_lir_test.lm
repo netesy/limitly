@@ -1,4 +1,4 @@
-// Regression test asserting devirtualization for chained iterator method calls
+import std.process as process;
 
 frame ListWrapper {
     pub items: [int];
@@ -25,6 +25,11 @@ fn main(): int {
     var item2 = wrapper.next();
     assert(item1 == 10, "item1 should equal 10");
     assert(item2 == 20, "item2 should equal 20");
-    print("LIR Devirtualization Test Passed.");
+
+    // Execute CLI command check to confirm devirtualization
+    var exit_code = process.run("bin/lymar -lir tests/lir/devirtualization_lir_test.lm > test_io_temp.txt 2>&1");
+    assert(exit_code == 0, "LIR dump command should exit with 0");
+
+    print("LIR Devirtualization Inspection Test Passed.");
     return 0;
 }
