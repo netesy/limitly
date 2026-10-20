@@ -1,83 +1,135 @@
-// HashMap Frame - $O(1)$ amortized bucket hash table
-
+// HashMap Frame - Flat linear-probing open-addressed hash map for O(1) cache-efficient lookups
 
 frame HashEntry {
     pub key: str;
     pub value: any;
+    pub occupied: bool;
+    pub deleted: bool;
 
-    pub init(k: str, v: any) {
+    pub init(k: str = "", v: any = nil, occ: bool = false, del: bool = false) {
         self.key = k;
         self.value = v;
+        self.occupied = occ;
+        self.deleted = del;
     }
 }
 
 frame HashMap {
-    pub buckets: [[HashEntry]];
+    pub entries: [HashEntry];
     pub capacity: int;
     pub count: int;
+    pub tombstone_count: int;
 
     pub init(initial_cap: int = 16) {
         self.capacity = initial_cap;
-        if (self.capacity < 1) self.capacity = 1;
+        if (self.capacity < 4) self.capacity = 4;
         self.count = 0;
-        self.buckets = [] as [[HashEntry]];
+        self.tombstone_count = 0;
+        self.entries = [] as [HashEntry];
         var i = 0;
         while (i < self.capacity) {
-            self.buckets.append([] as [HashEntry]);
+            self.entries.append(HashEntry("", nil, false, false));
             i = i + 1;
         }
     }
 
     fn _hash(key: str): int {
-        return _builtin_string_hash_bytes(key) % self.capacity;
+        var h = _builtin_string_hash_bytes(key) % self.capacity;
+        if (h < 0) {
+            h = h + self.capacity;
+        }
+        return h;
     }
 
-    fn _grow() {
-        var old_buckets = self.buckets;
-        self.capacity = self.capacity * 2;
-        self.buckets = [] as [[HashEntry]];
+    fn _rehash(new_cap: int) {
+        var old_entries = self.entries;
+        self.capacity = new_cap;
+        if (self.capacity < 4) self.capacity = 4;
+        self.count = 0;
+        self.tombstone_count = 0;
+        self.entries = [] as [HashEntry];
         var i = 0;
         while (i < self.capacity) {
-            self.buckets.append([] as [HashEntry]);
+            self.entries.append(HashEntry("", nil, false, false));
             i = i + 1;
         }
+
         i = 0;
-        while (i < len(old_buckets)) {
-            var j = 0;
-            while (j < len(old_buckets[i])) {
-                var entry = old_buckets[i][j];
-                self.buckets[self._hash(entry.key)].append(entry);
-                j = j + 1;
+        while (i < len(old_entries)) {
+            if (old_entries[i].occupied and not old_entries[i].deleted) {
+                var key = old_entries[i].key;
+                var entry_val = old_entries[i].value;
+                var idx = self._hash(key);
+                var k = 0;
+                while (k < self.capacity) {
+                    var curr_idx = (idx + k) % self.capacity;
+                    if (not self.entries[curr_idx].occupied) {
+                        self.entries[curr_idx] = HashEntry(key, entry_val, true, false);
+                        self.count = self.count + 1;
+                        k = self.capacity; // break loop
+                    }
+                    k = k + 1;
+                }
             }
             i = i + 1;
         }
     }
 
     pub fn put(key: str, value: any): HashMap {
+        if ((self.count + self.tombstone_count + 1) * 2 >= self.capacity) {
+            self._rehash(self.capacity * 2);
+        }
+
         var idx = self._hash(key);
+        var first_tombstone = -1;
         var i = 0;
-        while (i < len(self.buckets[idx])) {
-            if (self.buckets[idx][i].key == key) {
-                self.buckets[idx][i].value = value;
+
+        while (i < self.capacity) {
+            var curr_idx = (idx + i) % self.capacity;
+            var entry = self.entries[curr_idx];
+
+            if (entry.occupied) {
+                if (entry.deleted) {
+                    if (first_tombstone == -1) {
+                        first_tombstone = curr_idx;
+                    }
+                } else if (entry.key == key) {
+                    entry.value = value;
+                    return self;
+                }
+            } else {
+                if (first_tombstone != -1) {
+                    curr_idx = first_tombstone;
+                    self.tombstone_count = self.tombstone_count - 1;
+                }
+                self.entries[curr_idx] = HashEntry(key, value, true, false);
+                self.count = self.count + 1;
                 return self;
             }
             i = i + 1;
         }
-        if ((self.count + 1) * 4 > self.capacity * 3) {
-            self._grow();
-            idx = self._hash(key);
+
+        if (first_tombstone != -1) {
+            self.entries[first_tombstone] = HashEntry(key, value, true, false);
+            self.tombstone_count = self.tombstone_count - 1;
+            self.count = self.count + 1;
         }
-        self.buckets[idx].append(HashEntry(key, value));
-        self.count = self.count + 1;
         return self;
     }
 
     pub fn get(key: str): any? {
         var idx = self._hash(key);
         var i = 0;
-        while (i < len(self.buckets[idx])) {
-            if (self.buckets[idx][i].key == key) {
-                return ok(self.buckets[idx][i].value);
+
+        while (i < self.capacity) {
+            var curr_idx = (idx + i) % self.capacity;
+            var entry = self.entries[curr_idx];
+
+            if (not entry.occupied) {
+                return err();
+            }
+            if (not entry.deleted and entry.key == key) {
+                return ok(entry.value);
             }
             i = i + 1;
         }
@@ -104,29 +156,32 @@ frame HashMap {
     pub fn remove(key: str): HashMap {
         var idx = self._hash(key);
         var i = 0;
-        var new_bucket = [] as [HashEntry];
-        var found = false;
-        while (i < len(self.buckets[idx])) {
-            if (self.buckets[idx][i].key == key) {
-                found = true;
-            } else {
-                new_bucket.append(self.buckets[idx][i]);
+
+        while (i < self.capacity) {
+            var curr_idx = (idx + i) % self.capacity;
+            var entry = self.entries[curr_idx];
+
+            if (not entry.occupied) {
+                return self;
+            }
+            if (not entry.deleted and entry.key == key) {
+                entry.deleted = true;
+                self.count = self.count - 1;
+                self.tombstone_count = self.tombstone_count + 1;
+                return self;
             }
             i = i + 1;
-        }
-        if (found) {
-            self.buckets[idx] = new_bucket;
-            self.count = self.count - 1;
         }
         return self;
     }
 
     pub fn clear(): HashMap {
         self.count = 0;
-        self.buckets = [] as [[HashEntry]];
+        self.tombstone_count = 0;
+        self.entries = [] as [HashEntry];
         var i = 0;
         while (i < self.capacity) {
-            self.buckets.append([] as [HashEntry]);
+            self.entries.append(HashEntry("", nil, false, false));
             i = i + 1;
         }
         return self;

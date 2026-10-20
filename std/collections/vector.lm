@@ -17,20 +17,6 @@ frame Vector {
         }
     }
 
-    fn _copy_without(index_to_skip: int): [any] {
-        var out: [any] = [];
-        var i = 0;
-        var j = 0;
-        while (i < self.size) {
-            if (i != index_to_skip) {
-                out[j] = self.data[i];
-                j = j + 1;
-            }
-            i = i + 1;
-        }
-        return out;
-    }
-
     fn _grow_for(count: int) {
         if (self.capacity < 1) {
             self.capacity = 1;
@@ -72,7 +58,11 @@ frame Vector {
             return nil;
         }
         var item = self.data[index];
-        self.data = self._copy_without(index);
+        var i = index;
+        while (i < self.size - 1) {
+            self.data[i] = self.data[i + 1];
+            i = i + 1;
+        }
         self.size = self.size - 1;
         return item;
     }
@@ -131,8 +121,8 @@ frame Vector {
             self.data[self.size] = fill;
             self.size = self.size + 1;
         }
-        while (self.size > new_size) {
-            self.pop();
+        if (self.size > new_size) {
+            self.size = new_size;
         }
     }
 
