@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lymar Community & RFC Process</title>
+  <title>Lymar Community & RFC Governance Process</title>
   <meta name="description" content="Join the Lymar language community, participate in RFC proposals, contribute to compiler development, and connect on Discord & GitHub.">
 
   <script src="https://cdn.tailwindcss.com"></script>
@@ -65,54 +65,102 @@
     </div>
   </header>
 
+  <!-- Mobile Menu Dropdown -->
+  <div x-show="mobileMenu" class="md:hidden bg-dark-card border-b border-dark-border px-4 pt-2 pb-4 space-y-2">
+    <a href="learn.html" class="block py-2 text-gray-300 hover:text-white">Learn</a>
+    <a href="docs.html" class="block py-2 text-gray-300 hover:text-white">Documentation</a>
+    <a href="examples.html" class="block py-2 text-gray-300 hover:text-white">Examples</a>
+    <a href="community.html" class="block py-2 text-white font-semibold">Community</a>
+  </div>
+
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
 
     <div>
       <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-emerald/10 border border-brand-emerald/20 text-brand-emerald text-xs font-mono mb-4">
-        <span>Global Developer Ecosystem</span>
+        <span>Global Open Source Ecosystem</span>
       </div>
-      <h1 class="text-4xl font-extrabold text-white mb-4">Lymar Language Community</h1>
+      <h1 class="text-4xl font-extrabold text-white mb-4">Lymar Developer Community</h1>
       <p class="text-lg text-gray-300 leading-relaxed max-w-3xl">
-        Help shape the future of Lymar. Connect with language designers, standard library authors, and systems engineers across our open governance channels.
+        Help shape the future of Lymar. Connect with language designers, standard library maintainers, and systems engineers across our open governance channels.
       </p>
     </div>
 
-    <!-- Community Cards -->
+    <!-- Community Channels -->
     <div class="grid md:grid-cols-3 gap-8">
 
-      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-colors">
-        <div class="w-12 h-12 rounded-xl bg-brand-500/10 text-brand-accent flex items-center justify-center text-xl mb-4">
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-colors space-y-3">
+        <div class="w-12 h-12 rounded-xl bg-brand-500/10 text-brand-accent flex items-center justify-center text-xl">
           <i class="fab fa-discord"></i>
         </div>
-        <h3 class="text-xl font-bold text-white mb-2">Discord Server</h3>
-        <p class="text-gray-400 text-sm mb-4">Chat in real-time about language design, show off your projects, and ask questions.</p>
+        <h3 class="text-xl font-bold text-white">Discord Community</h3>
+        <p class="text-gray-400 text-sm">Real-time developer chat for questions, project showcases, and live compiler hacking sessions.</p>
         <a href="https://discord.gg/lymar" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold text-brand-accent hover:underline">
           Join Discord Server <i class="fas fa-arrow-right ml-2 text-xs"></i>
         </a>
       </div>
 
-      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-colors">
-        <div class="w-12 h-12 rounded-xl bg-brand-violet/10 text-brand-violet flex items-center justify-center text-xl mb-4">
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-colors space-y-3">
+        <div class="w-12 h-12 rounded-xl bg-brand-violet/10 text-brand-violet flex items-center justify-center text-xl">
           <i class="fab fa-github"></i>
         </div>
-        <h3 class="text-xl font-bold text-white mb-2">GitHub Discussions</h3>
-        <p class="text-gray-400 text-sm mb-4">Participate in technical RFC proposals, bug reports, and compiler architecture discussions.</p>
+        <h3 class="text-xl font-bold text-white">GitHub Discussions</h3>
+        <p class="text-gray-400 text-sm">Participate in technical RFC proposals, compiler architecture feedback, and bug reports.</p>
         <a href="https://github.com/lymarlang/lymar/discussions" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold text-brand-violet hover:underline">
           Open Discussions <i class="fas fa-arrow-right ml-2 text-xs"></i>
         </a>
       </div>
 
-      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-colors">
-        <div class="w-12 h-12 rounded-xl bg-brand-emerald/10 text-brand-emerald flex items-center justify-center text-xl mb-4">
+      <div class="bg-dark-card border border-dark-border rounded-2xl p-6 hover:border-brand-500/50 transition-colors space-y-3">
+        <div class="w-12 h-12 rounded-xl bg-brand-emerald/10 text-brand-emerald flex items-center justify-center text-xl">
           <i class="fas fa-code-branch"></i>
         </div>
-        <h3 class="text-xl font-bold text-white mb-2">RFC Process</h3>
-        <p class="text-gray-400 text-sm mb-4">Propose language feature additions, standard library extensions, or breaking changes.</p>
+        <h3 class="text-xl font-bold text-white">RFC Governance</h3>
+        <p class="text-gray-400 text-sm">Submit formal proposals for new language features, standard library modules, or syntax changes.</p>
         <a href="https://github.com/lymarlang/rfcs" target="_blank" rel="noopener" class="inline-flex items-center text-sm font-semibold text-brand-emerald hover:underline">
-          Browse RFC Repo <i class="fas fa-arrow-right ml-2 text-xs"></i>
+          Browse RFC Repository <i class="fas fa-arrow-right ml-2 text-xs"></i>
         </a>
       </div>
 
+    </div>
+
+    <!-- RFC Process Lifecycle -->
+    <div class="bg-dark-card border border-dark-border rounded-2xl p-8 space-y-6">
+      <h2 class="text-2xl font-bold text-white">Language RFC Process Lifecycle</h2>
+      <p class="text-gray-300 text-sm leading-relaxed">
+        Major language features or breaking syntax proposals undergo open community peer review:
+      </p>
+
+      <div class="grid sm:grid-cols-4 gap-4 text-xs font-mono">
+        <div class="bg-black/60 border border-dark-border p-4 rounded-xl space-y-1">
+          <div class="text-brand-accent font-bold">Stage 0: Draft</div>
+          <p class="text-gray-400 text-[11px]">Initial discussion on GitHub or Discord.</p>
+        </div>
+        <div class="bg-black/60 border border-dark-border p-4 rounded-xl space-y-1">
+          <div class="text-brand-emerald font-bold">Stage 1: Proposal</div>
+          <p class="text-gray-400 text-[11px]">Formal markdown RFC pull request submitted.</p>
+        </div>
+        <div class="bg-black/60 border border-dark-border p-4 rounded-xl space-y-1">
+          <div class="text-brand-violet font-bold">Stage 2: Implementation</div>
+          <p class="text-gray-400 text-[11px]">Compiler prototype created and tested.</p>
+        </div>
+        <div class="bg-black/60 border border-dark-border p-4 rounded-xl space-y-1">
+          <div class="text-white font-bold">Stage 3: Standard</div>
+          <p class="text-gray-400 text-[11px]">Stabilized and included in official release.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Compiler Contribution Guide -->
+    <div class="bg-dark-card border border-dark-border rounded-2xl p-8 space-y-4">
+      <h2 class="text-2xl font-bold text-white">Contributing to Lymar</h2>
+      <p class="text-gray-300 text-sm leading-relaxed">
+        The Lymar compiler (<code class="text-brand-accent font-mono">src/</code>), standard library (<code class="text-brand-accent font-mono">std/</code>), and Fyra native code generator backend are written in C++20 and Lymar itself. We welcome pull requests for bug fixes, performance optimizations, LSP features, and documentation improvements!
+      </p>
+      <div class="bg-black/90 border border-dark-border rounded-xl p-4 font-mono text-xs text-gray-300 space-y-1">
+        <div><span class="text-brand-accent">$</span> git clone https://github.com/lymarlang/lymar.git</div>
+        <div><span class="text-brand-accent">$</span> cd lymar && make -j4</div>
+        <div><span class="text-brand-accent">$</span> python3 tests/run_tests.py</div>
+      </div>
     </div>
 
     <!-- Governance & Code of Conduct -->

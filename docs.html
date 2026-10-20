@@ -76,6 +76,14 @@
     </div>
   </header>
 
+  <!-- Mobile Menu Dropdown -->
+  <div x-show="mobileMenu" class="md:hidden bg-dark-card border-b border-dark-border px-4 pt-2 pb-4 space-y-2">
+    <a href="learn.html" class="block py-2 text-gray-300 hover:text-white">Learn</a>
+    <a href="docs.html" class="block py-2 text-white font-semibold">Documentation</a>
+    <a href="examples.html" class="block py-2 text-gray-300 hover:text-white">Examples</a>
+    <a href="community.html" class="block py-2 text-gray-300 hover:text-white">Community</a>
+  </div>
+
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
     <div class="grid lg:grid-cols-12 gap-12">
 
@@ -85,8 +93,8 @@
         <nav class="space-y-2 text-sm border-l border-dark-border pl-4">
           <a href="#grammar" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">1. Syntax & Lexical Grammar</a>
           <a href="#type-system" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">2. Type System & Error Unions</a>
-          <a href="#oop" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">3. Frames, Traits & Visibility</a>
-          <a href="#stdlib-ref" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">4. Standard Library Reference</a>
+          <a href="#oop" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">3. Frames, Mixins & Embed OOP</a>
+          <a href="#stdlib-ref" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">4. Standard Library Modules</a>
           <a href="#compiler-cli" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">5. Compiler Commands & Tooling</a>
         </nav>
       </aside>
@@ -96,11 +104,11 @@
 
         <div>
           <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-accent/10 border border-brand-accent/20 text-brand-accent text-xs font-mono mb-4">
-            <span>Reference Manual v0.2.0</span>
+            <span>Technical Specification v0.2.0</span>
           </div>
           <h1 class="text-4xl font-extrabold text-white mb-4">Lymar Language & Tooling Reference</h1>
           <p class="text-lg text-gray-300 leading-relaxed">
-            Complete technical specification for the Lymar language, compiler semantics, standard library modules, and CLI flags.
+            Official technical specification for the Lymar language grammar, static type system rules, standard library API modules, and compiler tooling.
           </p>
         </div>
 
@@ -108,25 +116,30 @@
         <section id="grammar" class="space-y-4 border-t border-dark-border pt-8">
           <h2 class="text-2xl font-bold text-white">1. Syntax & Formal Grammar Summary</h2>
           <p class="text-gray-300 leading-relaxed">
-            Lymar features a unified EBNF-like grammar parsed cleanly without ambiguous operator conflicts:
+            Lymar features an unambiguous EBNF grammar parsed without operator conflicts. The grammar completely eliminates class/frame inheritance in favor of pure component mixins, embedding, and strict trait contracts.
           </p>
           <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-xs text-gray-300 space-y-2 overflow-x-auto">
-            <div><span class="text-brand-accent">Declaration</span> ::= FrameDecl | TraitDecl | FnDecl | VarDecl | ImportDecl</div>
+            <div><span class="text-brand-accent">Declaration</span> ::= FrameDecl | TraitDecl | MixinDecl | FnDecl | VarDecl | ImportDecl</div>
             <div><span class="text-brand-accent">FrameDecl</span>   ::= "frame" Identifier [ ":" TraitList ] "{" FrameMember* "}"</div>
+            <div><span class="text-brand-accent">FrameMember</span> ::= [ Visibility ] ( VarDecl | FnDecl | "embed" Identifier ";" | "mixin" Identifier ";" )</div>
             <div><span class="text-brand-accent">TraitDecl</span>   ::= "trait" Identifier [ ":" TraitList ] "{" MethodSignature* "}"</div>
-            <div><span class="text-brand-accent">FnDecl</span>      ::= ["pub" | "prot"] "fn" Identifier "(" ParamList ")" [ ":" TypeAnnotation ] Block</div>
+            <div><span class="text-brand-accent">MixinDecl</span>   ::= "mixin" Identifier "{" ( VarDecl | FnDecl )* "}"</div>
+            <div><span class="text-brand-accent">FnDecl</span>      ::= [ Visibility ] "fn" Identifier "(" ParamList ")" [ ":" TypeAnnotation ] Block</div>
             <div><span class="text-brand-accent">Visibility</span>  ::= "pub" | "prot" | /* default private for vars/fns */</div>
           </div>
         </section>
 
         <!-- Section 2: Type System -->
         <section id="type-system" class="space-y-4 border-t border-dark-border pt-8">
-          <h2 class="text-2xl font-bold text-white">2. Type System & Zero-Cost Error Unions</h2>
+          <h2 class="text-2xl font-bold text-white">2. Static Type System, Fixed Widths & Zero-Cost Errors</h2>
           <p class="text-gray-300 leading-relaxed">
-            Primitive types include <code class="text-brand-accent font-mono">int</code>, <code class="text-brand-accent font-mono">float</code>, <code class="text-brand-accent font-mono">bool</code>, <code class="text-brand-accent font-mono">str</code>, and <code class="text-brand-accent font-mono">nil</code>. Dynamic collections are typed as lists <code class="text-brand-accent font-mono">[T]</code> and dictionaries <code class="text-brand-accent font-mono">{K: V}</code>.
+            Primitive types include platform-native <code class="text-brand-accent font-mono">int</code> / <code class="text-brand-accent font-mono">uint</code>, explicit widths <code class="text-brand-accent font-mono">i8</code>–<code class="text-brand-accent font-mono">u128</code>, single/double floats <code class="text-brand-accent font-mono">f32</code>/<code class="text-brand-accent font-mono">f64</code>, exact decimals <code class="text-brand-accent font-mono">d2</code>–<code class="text-brand-accent font-mono">d6</code>, <code class="text-brand-accent font-mono">bool</code>, <code class="text-brand-accent font-mono">str</code>, and <code class="text-brand-accent font-mono">nil</code>.
           </p>
           <p class="text-gray-300 leading-relaxed">
-            Error handling uses <code class="text-brand-accent font-mono">T?</code> unions representing either a valid value of type <code class="text-brand-accent font-mono">T</code> or an error condition. Propagation is zero-overhead at machine level.
+            Collection types are shorthand: lists <code class="text-brand-accent font-mono">[T]</code>, maps <code class="text-brand-accent font-mono">{K: V}</code>, and tuples <code class="text-brand-accent font-mono">(A, B)</code>. Refined types attach SMT-verifiable predicates (<code class="text-brand-accent font-mono">type PositiveInt = int where value > 0;</code>).
+          </p>
+          <p class="text-gray-300 leading-relaxed">
+            Fallible operations use zero-cost compiler error unions <code class="text-brand-accent font-mono">T?</code> constructed via <code class="text-brand-accent font-mono">ok(val)</code> or <code class="text-brand-accent font-mono">err()</code>, and unwrapped/propagated via <code class="text-brand-accent font-mono">?</code> or <code class="text-brand-accent font-mono">? else { ... }</code>.
           </p>
         </section>
 
@@ -134,46 +147,83 @@
         <section id="oop" class="space-y-4 border-t border-dark-border pt-8">
           <h2 class="text-2xl font-bold text-white">3. Pure Composition, Mixins & Embedding</h2>
           <div class="bg-dark-card border border-dark-border rounded-xl p-6 space-y-4">
-            <h3 class="text-lg font-bold text-white">Composition & Visibility Semantics</h3>
+            <h3 class="text-lg font-bold text-white">Composition & Visibility Rules</h3>
             <ul class="list-disc list-inside space-y-2 text-sm text-gray-300 leading-relaxed">
-              <li><strong class="text-white">Pure Composition:</strong> Frame inheritance is eliminated. Frames use <code class="text-brand-accent font-mono">mixin</code> for state injection and <code class="text-brand-accent font-mono">embed</code> for promotion.</li>
-              <li><strong class="text-white">Strict Trait Implementation (<code class="text-brand-accent font-mono">:</code>):</strong> Colon is reserved exclusively for trait conformance.</li>
-              <li><strong class="text-white">Protected Visibility (<code class="text-brand-accent font-mono">prot</code>):</strong> Accessible within defining frames, embedded components, and module/file scopes.</li>
+              <li><strong class="text-white">Pure Composition:</strong> Frame inheritance is eliminated. Frames use <code class="text-brand-accent font-mono">mixin</code> for state injection and <code class="text-brand-accent font-mono">embed</code> for component method/field promotion.</li>
+              <li><strong class="text-white">Strict Trait Implementation (<code class="text-brand-accent font-mono">:</code>):</strong> Colon is reserved exclusively for trait conformance contracts.</li>
+              <li><strong class="text-white">Protected Visibility (<code class="text-brand-accent font-mono">prot</code>):</strong> Accessible within defining frames, embedded components, and module scopes.</li>
+              <li><strong class="text-white">Private Default:</strong> Declarations without explicit <code class="text-brand-accent font-mono">pub</code> or <code class="text-brand-accent font-mono">prot</code> default to private encapsulation.</li>
             </ul>
           </div>
         </section>
 
         <!-- Section 4: Stdlib Reference -->
-        <section id="stdlib-ref" class="space-y-4 border-t border-dark-border pt-8">
+        <section id="stdlib-ref" class="space-y-6 border-t border-dark-border pt-8">
           <h2 class="text-2xl font-bold text-white">4. Standard Library Module Breakdown</h2>
+          <p class="text-gray-300 text-sm">Comprehensive breakdown of built-in standard library packages:</p>
+
           <div class="grid sm:grid-cols-2 gap-4">
-            <div class="bg-dark-card border border-dark-border rounded-xl p-4">
-              <div class="text-brand-accent font-mono font-bold text-sm mb-1">std.collections</div>
-              <p class="text-xs text-gray-400">High-performance Vector, ArrayList, HashMap, BTree, PriorityQueue, and BitSet types.</p>
+
+            <div class="bg-dark-card border border-dark-border rounded-xl p-5 space-y-2">
+              <div class="text-brand-accent font-mono font-bold text-sm">std.collections</div>
+              <p class="text-xs text-gray-300">High-performance data structures: <code class="text-white font-mono">Vector</code>, <code class="text-white font-mono">ArrayList</code>, <code class="text-white font-mono">Queue</code>, <code class="text-white font-mono">Stack</code>, <code class="text-white font-mono">PriorityQueue</code>, <code class="text-white font-mono">BitSet</code>, and <code class="text-white font-mono">HashMap</code>.</p>
+              <div class="font-mono text-[11px] text-brand-emerald">pub fn push(val: T): nil | pub fn pop(): T?</div>
             </div>
-            <div class="bg-dark-card border border-dark-border rounded-xl p-4">
-              <div class="text-brand-accent font-mono font-bold text-sm mb-1">std.net & crypto</div>
-              <p class="text-xs text-gray-400">HTTP/TLS client & server, WSS websockets, AES-GCM encryption, SHA-256 digests.</p>
+
+            <div class="bg-dark-card border border-dark-border rounded-xl p-5 space-y-2">
+              <div class="text-brand-accent font-mono font-bold text-sm">std.string & std.unicode</div>
+              <p class="text-xs text-gray-300">UTF-8 string manipulation, <code class="text-white font-mono">StringBuilder</code>, <code class="text-white font-mono">Rune</code>, regex pattern matching, and string formatting.</p>
+              <div class="font-mono text-[11px] text-brand-emerald">pub fn matches(val: str, pat: str): bool</div>
             </div>
-            <div class="bg-dark-card border border-dark-border rounded-xl p-4">
-              <div class="text-brand-accent font-mono font-bold text-sm mb-1">std.ui & game</div>
-              <p class="text-xs text-gray-400">Retained UI tree, Immediate Mode GUI, Sokol accelerated graphics, Truetype rendering.</p>
+
+            <div class="bg-dark-card border border-dark-border rounded-xl p-5 space-y-2">
+              <div class="text-brand-accent font-mono font-bold text-sm">std.math & std.linear_algebra</div>
+              <p class="text-xs text-gray-300">2D/3D/4D vectors (<code class="text-white font-mono">Vec2</code>, <code class="text-white font-mono">Vec3</code>, <code class="text-white font-mono">Vec4</code>), transformation matrices (<code class="text-white font-mono">Mat4</code>), and quaternions.</p>
+              <div class="font-mono text-[11px] text-brand-emerald">pub fn rotate(angle: float, axis: Vec3): Mat4</div>
             </div>
-            <div class="bg-dark-card border border-dark-border rounded-xl p-4">
-              <div class="text-brand-accent font-mono font-bold text-sm mb-1">std.algorithm</div>
-              <p class="text-xs text-gray-400">Timsort, quicksort, binary search, range adapters, and high-speed regular expressions.</p>
+
+            <div class="bg-dark-card border border-dark-border rounded-xl p-5 space-y-2">
+              <div class="text-brand-accent font-mono font-bold text-sm">std.io & std.path</div>
+              <p class="text-xs text-gray-300">System file streams (<code class="text-white font-mono">File</code>, <code class="text-white font-mono">FileSystem</code>, <code class="text-white font-mono">Reader</code>, <code class="text-white font-mono">Writer</code>) and cross-platform path resolution.</p>
+              <div class="font-mono text-[11px] text-brand-emerald">pub fn read_to_string(path: str): str?</div>
             </div>
+
+            <div class="bg-dark-card border border-dark-border rounded-xl p-5 space-y-2">
+              <div class="text-brand-accent font-mono font-bold text-sm">std.net & std.wss</div>
+              <p class="text-xs text-gray-300">Asynchronous TCP/UDP networking, HTTP routing, HTTPS SSL/TLS sockets, and WebSocket client/server streaming.</p>
+              <div class="font-mono text-[11px] text-brand-emerald">pub fn connect(addr: str): TCPClient?</div>
+            </div>
+
+            <div class="bg-dark-card border border-dark-border rounded-xl p-5 space-y-2">
+              <div class="text-brand-accent font-mono font-bold text-sm">std.crypto & std.compress</div>
+              <p class="text-xs text-gray-300">SHA-256 / SHA-512 digest engine (<code class="text-white font-mono">HashEngine</code>), OpenSSL crypto wrappers, and zlib/gzip compression.</p>
+              <div class="font-mono text-[11px] text-brand-emerald">pub fn create_hash_engine(): Resource?</div>
+            </div>
+
+            <div class="bg-dark-card border border-dark-border rounded-xl p-5 space-y-2">
+              <div class="text-brand-accent font-mono font-bold text-sm">std.ui & std.game</div>
+              <p class="text-xs text-gray-300">Retained UI widget tree, IMGUI engine, Sokol GLES/Metal hardware graphics, and Truetype font rendering.</p>
+              <div class="font-mono text-[11px] text-brand-emerald">pub fn window(title: str, w: float, h: float)</div>
+            </div>
+
+            <div class="bg-dark-card border border-dark-border rounded-xl p-5 space-y-2">
+              <div class="text-brand-accent font-mono font-bold text-sm">std.time & std.process</div>
+              <p class="text-xs text-gray-300">Monotonic clocks (<code class="text-white font-mono">Instant</code>), <code class="text-white font-mono">TimeDuration</code>, <code class="text-white font-mono">DateTime</code>, process execution (<code class="text-white font-mono">Command</code>), and IPC pipes.</p>
+              <div class="font-mono text-[11px] text-brand-emerald">pub fn now(): Instant | pub fn spawn(): Process?</div>
+            </div>
+
           </div>
         </section>
 
         <!-- Section 5: Compiler CLI -->
         <section id="compiler-cli" class="space-y-4 border-t border-dark-border pt-8">
-          <h2 class="text-2xl font-bold text-white">5. Compiler Commands & Tooling</h2>
+          <h2 class="text-2xl font-bold text-white">5. Compiler Commands & Tooling CLI</h2>
           <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-xs text-gray-300 space-y-3">
-            <div><span class="text-brand-accent">lymar run &lt;file.lm&gt;</span> — Execute source file instantly via the Register VM</div>
-            <div><span class="text-brand-accent">lymar build &lt;file.lm&gt; -o &lt;binary&gt;</span> — Compile to native executable via Fyra AOT backend</div>
-            <div><span class="text-brand-accent">lymar check &lt;file.lm&gt;</span> — Perform semantic, type, and ownership analysis without code emission</div>
-            <div><span class="text-brand-accent">lymar fmt &lt;file.lm&gt;</span> — Auto-format source code following canonical style</div>
+            <div><span class="text-brand-accent">lymar run &lt;file.lm&gt;</span> — Execute source file instantly via the Register VM driver</div>
+            <div><span class="text-brand-accent">lymar build &lt;file.lm&gt; -o &lt;binary&gt;</span> — Compile to native binary via Fyra AOT backend</div>
+            <div><span class="text-brand-accent">lymar check &lt;file.lm&gt;</span> — Perform semantic, type, and scope region analysis without emitting code</div>
+            <div><span class="text-brand-accent">lymar fmt &lt;file.lm&gt;</span> — Auto-format source code according to official style guidelines</div>
+            <div><span class="text-brand-accent">lymar lsp</span> — Start JSON-RPC 2.0 Language Server for VS Code / Neovim auto-completion & diagnostics</div>
           </div>
         </section>
 

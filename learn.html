@@ -77,6 +77,14 @@
     </div>
   </header>
 
+  <!-- Mobile Menu Dropdown -->
+  <div x-show="mobileMenu" class="md:hidden bg-dark-card border-b border-dark-border px-4 pt-2 pb-4 space-y-2">
+    <a href="learn.html" class="block py-2 text-white font-semibold">Learn</a>
+    <a href="docs.html" class="block py-2 text-gray-300 hover:text-white">Documentation</a>
+    <a href="examples.html" class="block py-2 text-gray-300 hover:text-white">Examples</a>
+    <a href="community.html" class="block py-2 text-gray-300 hover:text-white">Community</a>
+  </div>
+
   <!-- Main Container -->
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
     <div class="grid lg:grid-cols-12 gap-12">
@@ -86,11 +94,17 @@
         <h3 class="text-xs font-mono font-semibold uppercase tracking-wider text-brand-accent mb-4">Tutorial Sections</h3>
         <nav class="space-y-2 text-sm border-l border-dark-border pl-4">
           <a href="#getting-started" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">1. Getting Started</a>
-          <a href="#variables-types" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">2. Variables & Types</a>
-          <a href="#control-flow" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">3. Control Flow & Match</a>
-          <a href="#functions-errors" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">4. Functions & Zero-Cost Errors</a>
-          <a href="#frames-traits" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">5. Frames & Traits OOP</a>
-          <a href="#structured-concurrency" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">6. Structured Concurrency</a>
+          <a href="#variables-immutability" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">2. Variables & Immutability</a>
+          <a href="#types-decimals" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">3. Primitive Types & Decimals</a>
+          <a href="#collections" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">4. Built-in Collections</a>
+          <a href="#control-flow" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">5. Control Flow & Loops</a>
+          <a href="#pattern-matching" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">6. Pattern Matching (`match`)</a>
+          <a href="#functions-closures" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">7. Functions & Closures</a>
+          <a href="#pure-composition-oop" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">8. Frames, Mixins & Embed OOP</a>
+          <a href="#error-handling" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">9. Zero-Cost Errors (`Type?`)</a>
+          <a href="#memory-model" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">10. Scope Memory Regions</a>
+          <a href="#structured-concurrency" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">11. Structured Concurrency</a>
+          <a href="#modules-imports" class="block text-gray-400 hover:text-white hover:border-l-2 hover:border-brand-accent -ml-4 pl-4 transition-all">12. Modules & Standard Library</a>
         </nav>
       </aside>
 
@@ -99,146 +113,314 @@
 
         <div>
           <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-500/10 border border-brand-500/20 text-brand-accent text-xs font-mono mb-4">
-            <span>Learn Lymar v0.2.0</span>
+            <span>Official Language Guide v0.2.0</span>
           </div>
           <h1 class="text-4xl font-extrabold text-white mb-4">Learn the Lymar Programming Language</h1>
           <p class="text-lg text-gray-300 leading-relaxed">
-            Welcome! This guide takes you from zero to building fast, safe systems and GUI applications with Lymar.
+            Welcome! This step-by-step tutorial takes you from writing your first lines of code to building high-performance systems, concurrent network services, and GUI applications with Lymar.
           </p>
         </div>
 
         <!-- Section 1 -->
         <section id="getting-started" class="space-y-4 border-t border-dark-border pt-8">
-          <h2 class="text-2xl font-bold text-white">1. Getting Started</h2>
+          <h2 class="text-2xl font-bold text-white">1. Getting Started & Hello World</h2>
           <p class="text-gray-300 leading-relaxed">
-            Create a file named <code class="text-brand-accent font-mono">hello.lm</code> with your favorite text editor:
+            Lymar is a compiled, statically typed systems language combining zero-cost abstractions, deterministic scope-bound memory management, pure component composition, and structured concurrency.
+          </p>
+          <p class="text-gray-300 leading-relaxed">
+            Create a source file named <code class="text-brand-accent font-mono">hello.lm</code>:
           </p>
           <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
             <pre><code><span class="code-keyword">fn</span> <span class="code-function">main</span>(): <span class="code-type">int</span> {
-    print(<span class="code-string">"Hello, Lymar!"</span>);
+    print(<span class="code-string">"Hello, Lymar World!"</span>);
     <span class="code-keyword">return</span> <span class="code-number">0</span>;
 }
 
 main();</code></pre>
           </div>
-          <p class="text-gray-300 text-sm">Run it directly with the Register VM or build a native executable:</p>
+          <p class="text-gray-300 text-sm">You can run your code instantly via the Register VM or build a standalone native binary:</p>
           <div class="bg-black/90 border border-dark-border rounded-xl p-4 font-mono text-xs text-gray-300 space-y-1">
-            <div><span class="text-brand-accent">$</span> lymar run hello.lm</div>
-            <div><span class="text-brand-accent">$</span> lymar build hello.lm -o hello</div>
+            <div><span class="text-brand-accent">$</span> lymar run hello.lm           <span class="code-comment"># Instant execution via Register VM</span></div>
+            <div><span class="text-brand-accent">$</span> lymar build hello.lm -o hello <span class="code-comment"># Compile to native binary via Fyra AOT backend</span></div>
             <div><span class="text-brand-accent">$</span> ./hello</div>
           </div>
         </section>
 
         <!-- Section 2 -->
-        <section id="variables-types" class="space-y-4 border-t border-dark-border pt-8">
-          <h2 class="text-2xl font-bold text-white">2. Variables, Constants & Collections</h2>
+        <section id="variables-immutability" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">2. Variables, Immutability & String Interpolation</h2>
           <p class="text-gray-300 leading-relaxed">
-            Lymar uses <code class="text-brand-accent font-mono">var</code> for mutable variables and <code class="text-brand-accent font-mono">val</code> / <code class="text-brand-accent font-mono">const</code> for immutable constants. Dynamic string interpolation uses braces <code class="text-brand-accent font-mono">"{var}"</code>.
+            In Lymar, mutable local bindings use <code class="text-brand-accent font-mono">var</code>, while immutable bindings use <code class="text-brand-accent font-mono">val</code> or <code class="text-brand-accent font-mono">const</code>. Type inference is fully supported, but explicit annotations can be attached with a colon <code class="text-brand-accent font-mono">: Type</code>.
           </p>
           <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
-            <pre><code><span class="code-keyword">var</span> name: <span class="code-type">str</span> = <span class="code-string">"Lymar"</span>;
-<span class="code-keyword">val</span> year: <span class="code-type">int</span> = <span class="code-number">2025</span>;
+            <pre><code><span class="code-comment">// Mutable variable</span>
+<span class="code-keyword">var</span> counter: <span class="code-type">int</span> = <span class="code-number">10</span>;
+counter += <span class="code-number">5</span>;
 
-print(<span class="code-string">"Welcome to {name} in {year}!"</span>);
+<span class="code-comment">// Immutable local value</span>
+<span class="code-keyword">val</span> language = <span class="code-string">"Lymar"</span>;
 
-<span class="code-comment">// Dynamic collections</span>
-<span class="code-keyword">var</span> items: [<span class="code-type">str</span>] = [<span class="code-string">"Core"</span>, <span class="code-string">"Collections"</span>, <span class="code-string">"Graphics"</span>];
-items.append(<span class="code-string">"Concurrency"</span>);
+<span class="code-comment">// Constant binding</span>
+<span class="code-keyword">const</span> MAX_BUFFER_SIZE: <span class="code-type">int</span> = <span class="code-number">4096</span>;
 
-print(<span class="code-string">"Total items: {len(items)}"</span>);</code></pre>
+<span class="code-comment">// Rich String Interpolation with curly braces {}</span>
+print(<span class="code-string">"Engine {language} updated counter to {counter} (limit: {MAX_BUFFER_SIZE})"</span>);</code></pre>
           </div>
         </section>
 
         <!-- Section 3 -->
-        <section id="control-flow" class="space-y-4 border-t border-dark-border pt-8">
-          <h2 class="text-2xl font-bold text-white">3. Control Flow & Exhaustive Match</h2>
+        <section id="types-decimals" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">3. Primitive Types & Fixed-Precision Decimals</h2>
           <p class="text-gray-300 leading-relaxed">
-            Iterate over collections using <code class="text-brand-accent font-mono">iter (item in collection)</code> and match patterns cleanly:
+            Lymar provides a rich set of primitives:
           </p>
+          <ul class="list-disc list-inside space-y-1 text-sm text-gray-300">
+            <li><strong class="text-white">Integers:</strong> Platform-native <code class="text-brand-accent font-mono">int</code> / <code class="text-brand-accent font-mono">uint</code> and explicit widths <code class="text-brand-accent font-mono">i8</code>, <code class="text-brand-accent font-mono">i16</code>, <code class="text-brand-accent font-mono">i32</code>, <code class="text-brand-accent font-mono">i64</code>, <code class="text-brand-accent font-mono">i128</code>, <code class="text-brand-accent font-mono">u8</code>–<code class="text-brand-accent font-mono">u128</code>.</li>
+            <li><strong class="text-white">Floating Point:</strong> <code class="text-brand-accent font-mono">float</code>, <code class="text-brand-accent font-mono">f32</code>, <code class="text-brand-accent font-mono">f64</code>.</li>
+            <li><strong class="text-white">Fixed-Precision Decimals:</strong> <code class="text-brand-accent font-mono">d2</code>, <code class="text-brand-accent font-mono">d4</code>, <code class="text-brand-accent font-mono">d6</code>, <code class="text-brand-accent font-mono">decimal</code> (eliminates IEEE 754 rounding errors in financial/scientific logic).</li>
+            <li><strong class="text-white">System:</strong> <code class="text-brand-accent font-mono">bool</code>, <code class="text-brand-accent font-mono">str</code>, <code class="text-brand-accent font-mono">nil</code>, <code class="text-brand-accent font-mono">any</code>.</li>
+          </ul>
           <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
-            <pre><code><span class="code-keyword">var</span> status: <span class="code-type">int</span> = <span class="code-number">200</span>;
+            <pre><code><span class="code-keyword">var</span> price: <span class="code-type">d2</span> = <span class="code-number">19.99</span>;
+<span class="code-keyword">var</span> tax: <span class="code-type">d2</span> = <span class="code-number">1.60</span>;
+<span class="code-keyword">var</span> total: <span class="code-type">d2</span> = price + tax; <span class="code-comment">// Exact decimal arithmetic</span>
 
-<span class="code-keyword">match</span> (status) {
-    <span class="code-number">200</span> => print(<span class="code-string">"OK"</span>),
-    <span class="code-number">404</span> => print(<span class="code-string">"Not Found"</span>),
-    <span class="code-number">500</span> => print(<span class="code-string">"Server Error"</span>),
-    _   => print(<span class="code-string">"Unknown Status"</span>)
-}</code></pre>
+print(<span class="code-string">"Total bill: ${total}"</span>); <span class="code-comment">// Total bill: $21.59</span></code></pre>
           </div>
         </section>
 
         <!-- Section 4 -->
-        <section id="functions-errors" class="space-y-4 border-t border-dark-border pt-8">
-          <h2 class="text-2xl font-bold text-white">4. Functions & Zero-Cost Error Unions (<code class="text-brand-accent font-mono">Type?</code>)</h2>
+        <section id="collections" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">4. Built-in Dynamic Collections</h2>
           <p class="text-gray-300 leading-relaxed">
-            Fallible functions append <code class="text-brand-accent font-mono">?</code> to their return type. Propagate errors inline with <code class="text-brand-accent font-mono">? else</code> fallbacks:
+            Lymar features clean shorthand syntax for collections:
           </p>
+          <div class="grid md:grid-cols-3 gap-4 text-xs font-mono mb-4">
+            <div class="bg-dark-card border border-dark-border p-3 rounded-lg"><span class="text-brand-accent font-bold">[T]</span> — Homogeneous List</div>
+            <div class="bg-dark-card border border-dark-border p-3 rounded-lg"><span class="text-brand-accent font-bold">{K: V}</span> — Dictionary / Hash Map</div>
+            <div class="bg-dark-card border border-dark-border p-3 rounded-lg"><span class="text-brand-accent font-bold">(T1, T2)</span> — Heterogeneous Tuple</div>
+          </div>
           <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
-            <pre><code><span class="code-keyword">fn</span> <span class="code-function">parse_port</span>(input: <span class="code-type">str</span>): <span class="code-type">int?</span> {
-    <span class="code-keyword">if</span> (len(input) == <span class="code-number">0</span>) {
-        <span class="code-keyword">return</span> err();
-    }
-    <span class="code-keyword">return</span> ok(<span class="code-number">8080</span>);
-}
+            <pre><code><span class="code-comment">// Dynamic List [T]</span>
+<span class="code-keyword">var</span> scores: [<span class="code-type">int</span>] = [<span class="code-number">95</span>, <span class="code-number">88</span>, <span class="code-number">100</span>];
+scores.append(<span class="code-number">92</span>);
 
-<span class="code-keyword">fn</span> <span class="code-function">run_server</span>() {
-    <span class="code-keyword">var</span> port: <span class="code-type">int</span> = parse_port(<span class="code-string">"8080"</span>)<span class="code-operator">?</span> <span class="code-keyword">else</span> {
-        print(<span class="code-string">"Invalid port configuration"</span>);
-        <span class="code-keyword">return</span>;
-    };
-    print(<span class="code-string">"Server listening on port {port}"</span>);
-}</code></pre>
+<span class="code-comment">// Dictionary {K: V}</span>
+<span class="code-keyword">var</span> config: {<span class="code-type">str</span>: <span class="code-type">int</span>} = { <span class="code-string">"port"</span>: <span class="code-number">8080</span>, <span class="code-string">"workers"</span>: <span class="code-number">4</span> };
+print(<span class="code-string">"Port: {config['port']}"</span>);
+
+<span class="code-comment">// Tuple (T1, T2) with dot indexing</span>
+<span class="code-keyword">var</span> pair = (<span class="code-string">"status"</span>, <span class="code-number">200</span>);
+print(<span class="code-string">"Key: {pair.0}, Value: {pair.1}"</span>);</code></pre>
           </div>
         </section>
 
         <!-- Section 5 -->
-        <section id="frames-traits" class="space-y-4 border-t border-dark-border pt-8">
-          <h2 class="text-2xl font-bold text-white">5. Pure Composition: Mixins & Embedding</h2>
+        <section id="control-flow" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">5. Control Flow & Loops</h2>
           <p class="text-gray-300 leading-relaxed">
-            Lymar is a pure composition language without frame inheritance. Use <code class="text-brand-accent font-mono">mixin</code> to inject reusable state fields, <code class="text-brand-accent font-mono">embed Component;</code> for field and method promotion, and <code class="text-brand-accent font-mono">:</code> strictly for trait conformance.
+            Lymar includes standard conditionals, C-style <code class="text-brand-accent font-mono">for</code>, <code class="text-brand-accent font-mono">while</code>, and modern range <code class="text-brand-accent font-mono">iter</code> loops:
           </p>
           <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
-            <pre><code><span class="code-keyword">trait</span> <span class="code-type">Renderable</span> {
-    <span class="code-keyword">fn</span> <span class="code-function">draw</span>();
+            <pre><code><span class="code-comment">// Conditionals</span>
+<span class="code-keyword">var</span> score = <span class="code-number">85</span>;
+<span class="code-keyword">if</span> (score >= <span class="code-number">90</span>) {
+    print(<span class="code-string">"Grade: A"</span>);
+} <span class="code-keyword">elif</span> (score >= <span class="code-number">80</span>) {
+    print(<span class="code-string">"Grade: B"</span>);
+} <span class="code-keyword">else</span> {
+    print(<span class="code-string">"Grade: C or lower"</span>);
 }
 
-<span class="code-keyword">frame</span> <span class="code-type">Button</span>: <span class="code-type">Renderable</span> {
-    <span class="code-keyword">pub</span> <span class="code-keyword">var</span> label: <span class="code-type">str</span>;
-    <span class="code-keyword">pub</span> <span class="code-keyword">var</span> width: <span class="code-type">int</span>;
-
-    <span class="code-keyword">pub</span> <span class="code-keyword">init</span>(lbl: <span class="code-type">str</span>, w: <span class="code-type">int</span>) {
-        self.label = lbl;
-        self.width = w;
-    }
-
-    <span class="code-keyword">pub</span> <span class="code-keyword">fn</span> <span class="code-function">draw</span>() {
-        print(<span class="code-string">"Drawing button '{self.label}' ({self.width}px)"</span>);
-    }
+<span class="code-comment">// Iteration over inclusive range 1..5</span>
+<span class="code-keyword">iter</span> (i <span class="code-keyword">in</span> <span class="code-number">1</span>..<span class="code-number">5</span>) {
+    print(<span class="code-string">"Index: {i}"</span>);
 }
 
-<span class="code-keyword">var</span> btn = Button(<span class="code-string">"Submit"</span>, <span class="code-number">120</span>);
-btn.draw();</code></pre>
+<span class="code-comment">// Iteration over collections</span>
+<span class="code-keyword">var</span> fruits = [<span class="code-string">"Apple"</span>, <span class="code-string">"Banana"</span>, <span class="code-string">"Cherry"</span>];
+<span class="code-keyword">iter</span> (fruit <span class="code-keyword">in</span> fruits) {
+    print(<span class="code-string">"Fruit: {fruit}"</span>);
+}</code></pre>
           </div>
         </section>
 
         <!-- Section 6 -->
-        <section id="structured-concurrency" class="space-y-4 border-t border-dark-border pt-8">
-          <h2 class="text-2xl font-bold text-white">6. Structured Concurrency & Channels</h2>
+        <section id="pattern-matching" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">6. Pattern Matching (<code class="text-brand-accent font-mono">match</code>)</h2>
           <p class="text-gray-300 leading-relaxed">
-            Structured blocks ensure parallel or concurrent tasks complete before the enclosing scope exits:
+            <code class="text-brand-accent font-mono">match</code> provides exhaustive pattern matching over literal values, enum variants, fallibles, and destructuring with <code class="text-brand-accent font-mono">where</code> guards:
           </p>
           <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
-            <pre><code><span class="code-keyword">var</span> ch = channel();
+            <pre><code><span class="code-keyword">enum</span> Color { Red, Green, Blue }
 
-<span class="code-keyword">concurrent</span>(ch = ch) {
-    task(i <span class="code-keyword">in</span> <span class="code-number">1</span>..<span class="code-number">5</span>) {
-        ch.send(<span class="code-string">"Task {i} complete"</span>);
+<span class="code-keyword">var</span> c = Color.Green;
+<span class="code-keyword">match</span> (c) {
+    Color.Red   => { print(<span class="code-string">"Stop"</span>); },
+    Color.Green => { print(<span class="code-string">"Go"</span>); },
+    Color.Blue  => { print(<span class="code-string">"Caution"</span>); }
+}
+
+<span class="code-comment">// Match with 'where' guards</span>
+<span class="code-keyword">var</span> val = <span class="code-number">42</span>;
+<span class="code-keyword">match</span> (val) {
+    x <span class="code-keyword">where</span> x > <span class="code-number">50</span> => { print(<span class="code-string">"High"</span>); },
+    x <span class="code-keyword">where</span> x > <span class="code-number">0</span>  => { print(<span class="code-string">"Positive: {x}"</span>); },
+    _              => { print(<span class="code-string">"Zero or negative"</span>); }
+}</code></pre>
+          </div>
+        </section>
+
+        <!-- Section 7 -->
+        <section id="functions-closures" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">7. Functions, Parameters & First-Class Closures</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Functions support positional parameters, default parameter values, optional parameters, higher-order function arguments, and environment closures:
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">fn</span> <span class="code-function">add</span>(a: <span class="code-type">int</span>, b: <span class="code-type">int</span> = <span class="code-number">10</span>): <span class="code-type">int</span> {
+    <span class="code-keyword">return</span> a + b;
+}
+
+<span class="code-comment">// Higher-order function accepting a lambda</span>
+<span class="code-keyword">fn</span> <span class="code-function">apply</span>(x: <span class="code-type">int</span>, transform: <span class="code-type">fn</span>(<span class="code-type">int</span>): <span class="code-type">int</span>): <span class="code-type">int</span> {
+    <span class="code-keyword">return</span> transform(x);
+}
+
+<span class="code-keyword">val</span> factor = <span class="code-number">3</span>;
+<span class="code-keyword">var</span> res = apply(<span class="code-number">5</span>, <span class="code-keyword">fn</span>(n: <span class="code-type">int</span>): <span class="code-type">int</span> { <span class="code-keyword">return</span> n * factor; });
+print(<span class="code-string">"Closure result: {res}"</span>); <span class="code-comment">// 15</span></code></pre>
+          </div>
+        </section>
+
+        <!-- Section 8 -->
+        <section id="pure-composition-oop" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">8. Pure Composition OOP: Frames, Mixins & Embedding</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Lymar is a <strong>pure composition</strong> language without class/frame inheritance. Use <code class="text-brand-accent font-mono">mixin</code> for state field injection, <code class="text-brand-accent font-mono">embed Component;</code> for field and method promotion, and <code class="text-brand-accent font-mono">:</code> strictly for trait conformance.
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">mixin</span> Identifiable {
+    <span class="code-keyword">pub</span> <span class="code-keyword">var</span> id: <span class="code-type">int</span>;
+}
+
+<span class="code-keyword">trait</span> Printable {
+    <span class="code-keyword">fn</span> <span class="code-function">print_info</span>();
+}
+
+<span class="code-keyword">frame</span> Logger {
+    <span class="code-keyword">pub</span> <span class="code-keyword">fn</span> <span class="code-function">log</span>(msg: <span class="code-type">str</span>) {
+        print(<span class="code-string">"[LOG]: {msg}"</span>);
     }
 }
 
-<span class="code-keyword">iter</span> (result <span class="code-keyword">in</span> ch) {
-    print(<span class="code-string">"Result: {result}"</span>);
+<span class="code-keyword">frame</span> User : Printable {
+    <span class="code-keyword">embed</span> Identifiable; <span class="code-comment">// Injects pub var id: int</span>
+    <span class="code-keyword">embed</span> Logger;       <span class="code-comment">// Promotes .log() method directly to User</span>
+
+    <span class="code-keyword">pub</span> <span class="code-keyword">var</span> username: <span class="code-type">str</span>;
+
+    <span class="code-keyword">pub</span> <span class="code-keyword">init</span>(user_id: <span class="code-type">int</span>, name: <span class="code-type">str</span>) {
+        self.id = user_id;
+        self.username = name;
+    }
+
+    <span class="code-keyword">pub</span> <span class="code-keyword">fn</span> <span class="code-function">print_info</span>() {
+        print(<span class="code-string">"User #{self.id}: {self.username}"</span>);
+    }
+}
+
+<span class="code-keyword">var</span> u = User(<span class="code-number">101</span>, <span class="code-string">"alex_dev"</span>);
+u.print_info();                           <span class="code-comment">// Output: User #101: alex_dev</span>
+u.log(<span class="code-string">"Action performed successfully."</span>); <span class="code-comment">// Output: [LOG]: Action performed successfully.</span></code></pre>
+          </div>
+        </section>
+
+        <!-- Section 9 -->
+        <section id="error-handling" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">9. Zero-Cost Error Unions (<code class="text-brand-accent font-mono">Type?</code>) & Propagation</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Fallible functions append <code class="text-brand-accent font-mono">?</code> to their return type. Values are returned using <code class="text-brand-accent font-mono">ok(value)</code> or <code class="text-brand-accent font-mono">err()</code>. Use <code class="text-brand-accent font-mono">?</code> to propagate errors or <code class="text-brand-accent font-mono">? else</code> for inline fallback blocks:
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">fn</span> <span class="code-function">divide</span>(a: <span class="code-type">int</span>, b: <span class="code-type">int</span>): <span class="code-type">int?</span> {
+    <span class="code-keyword">if</span> (b == <span class="code-number">0</span>) {
+        <span class="code-keyword">return</span> err(); <span class="code-comment">// Construct fallible error</span>
+    }
+    <span class="code-keyword">return</span> ok(a / b); <span class="code-comment">// Construct fallible success</span>
+}
+
+<span class="code-keyword">fn</span> <span class="code-function">calculate</span>() {
+    <span class="code-comment">// Inline fallback handling with '? else'</span>
+    <span class="code-keyword">var</span> val = divide(<span class="code-number">10</span>, <span class="code-number">0</span>)<span class="code-operator">?</span> <span class="code-keyword">else</span> {
+        print(<span class="code-string">"Division failed! Falling back to 0."</span>);
+        <span class="code-keyword">return</span> <span class="code-number">0</span>;
+    };
+    print(<span class="code-string">"Result: {val}"</span>);
 }</code></pre>
+          </div>
+        </section>
+
+        <!-- Section 10 -->
+        <section id="memory-model" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">10. Scope-Bound Memory Model & Region Safety</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Lymar uses a <strong>deterministic, region-based memory model</strong>. All allocations are tied to lexical scope regions and freed automatically when the scope exits — with zero garbage collection overhead and zero manual memory management bugs!
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">fn</span> <span class="code-function">process_buffer</span>() {
+    <span class="code-keyword">var</span> buffer = [<span class="code-number">1</span>, <span class="code-number">2</span>, <span class="code-number">3</span>, <span class="code-number">4</span>, <span class="code-number">5</span>];
+    {
+        <span class="code-keyword">var</span> temp = buffer; <span class="code-comment">// Inner scope region</span>
+        print(<span class="code-string">"Processing length: {len(temp)}"</span>);
+    } <span class="code-comment">// Inner scope region ends — temp memory deterministically released here</span>
+
+    print(<span class="code-string">"Done processing"</span>);
+} <span class="code-comment">// Function region ends — buffer deterministically released here</span></code></pre>
+          </div>
+        </section>
+
+        <!-- Section 11 -->
+        <section id="structured-concurrency" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">11. Structured Concurrency & Channels</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Lymar's concurrency is structured — task lifetimes are bound to the block scope. <code class="text-brand-accent font-mono">parallel</code> handles CPU-bound multi-core work, while <code class="text-brand-accent font-mono">concurrent</code> handles channel-based I/O tasks:
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">var</span> results = channel();
+
+<span class="code-keyword">concurrent</span>(ch = results, mode = batch, cores = <span class="code-number">4</span>) {
+    task(i <span class="code-keyword">in</span> <span class="code-number">1</span>..<span class="code-number">5</span>) {
+        <span class="code-comment">// Perform concurrent work</span>
+        results.send(<span class="code-string">"Result from task {i}"</span>);
+    }
+} <span class="code-comment">// Channel auto-closes when all tasks complete</span>
+
+<span class="code-keyword">iter</span> (res <span class="code-keyword">in</span> results) {
+    print(<span class="code-string">"Received: {res}"</span>);
+}</code></pre>
+          </div>
+        </section>
+
+        <!-- Section 12 -->
+        <section id="modules-imports" class="space-y-4 border-t border-dark-border pt-8">
+          <h2 class="text-2xl font-bold text-white">12. Modules, Imports & Standard Library</h2>
+          <p class="text-gray-300 leading-relaxed">
+            Organize code with clear module imports and filters using <code class="text-brand-accent font-mono">as</code>, <code class="text-brand-accent font-mono">show</code>, or <code class="text-brand-accent font-mono">hide</code>:
+          </p>
+          <div class="bg-dark-card border border-dark-border rounded-xl p-5 font-mono text-sm overflow-x-auto text-gray-200">
+            <pre><code><span class="code-keyword">import</span> std.math <span class="code-keyword">as</span> math;
+<span class="code-keyword">import</span> std.collections show Vector, HashMap;
+<span class="code-keyword">import</span> std.io hide FileSystem;
+
+<span class="code-keyword">fn</span> <span class="code-function">main</span>(): <span class="code-type">int</span> {
+    <span class="code-keyword">var</span> vec = Vector();
+    vec.push(<span class="code-number">42</span>);
+    print(<span class="code-string">"Vector size: {vec.len()}"</span>);
+    <span class="code-keyword">return</span> <span class="code-number">0</span>;
+}
+
+main();</code></pre>
           </div>
         </section>
 

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Lymar Examples — Code Showcase & Applications</title>
+  <title>Lymar Examples — Code Showcase & Real-World Applications</title>
   <meta name="description" content="Explore real-world Lymar code examples including desktop text editors, retained GUIs, game showcases, and high-performance networking services.">
 
   <script src="https://cdn.tailwindcss.com"></script>
@@ -36,6 +36,7 @@
     .code-number { color: #fbbf24; }
     .code-comment { color: #6b7280; font-style: italic; }
     .code-function { color: #60a5fa; font-weight: 600; }
+    .code-operator { color: #c084fc; }
   </style>
 </head>
 
@@ -76,15 +77,23 @@
     </div>
   </header>
 
+  <!-- Mobile Menu Dropdown -->
+  <div x-show="mobileMenu" class="md:hidden bg-dark-card border-b border-dark-border px-4 pt-2 pb-4 space-y-2">
+    <a href="learn.html" class="block py-2 text-gray-300 hover:text-white">Learn</a>
+    <a href="docs.html" class="block py-2 text-gray-300 hover:text-white">Documentation</a>
+    <a href="examples.html" class="block py-2 text-white font-semibold">Examples</a>
+    <a href="community.html" class="block py-2 text-gray-300 hover:text-white">Community</a>
+  </div>
+
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
 
     <div>
       <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-brand-violet/10 border border-brand-violet/20 text-brand-violet text-xs font-mono mb-4">
         <span>Application Showcase</span>
       </div>
-      <h1 class="text-4xl font-extrabold text-white mb-4">Lymar Application Examples</h1>
+      <h1 class="text-4xl font-extrabold text-white mb-4">Real-World Lymar Applications</h1>
       <p class="text-lg text-gray-300 leading-relaxed max-w-3xl">
-        Discover native applications built entirely in Lymar. From desktop text editors to full immediate-mode games and SSL networking tools.
+        Explore production-ready software written entirely in Lymar. From GUI text editors and multi-threaded HTTP web servers to Sokol accelerated game UI engines.
       </p>
     </div>
 
@@ -94,36 +103,40 @@
         <div>
           <h2 class="text-2xl font-bold text-white flex items-center gap-3">
             <i class="fas fa-edit text-brand-accent"></i>
-            <span>Desktop Text Editor (<code class="text-brand-accent text-sm font-mono">examples/text_editor.lm</code>)</span>
+            <span>1. Desktop GUI Text Editor (<code class="text-brand-accent text-sm font-mono">examples/text_editor.lm</code>)</span>
           </h2>
-          <p class="text-gray-400 text-sm mt-1">Full-featured GUI text editor featuring multi-line cursor editing, undo/redo buffers, file I/O, and line numbering.</p>
+          <p class="text-gray-400 text-sm mt-1">Full-featured native GUI text editor featuring multi-line cursor editing, undo/redo buffers, file I/O, and line numbering.</p>
         </div>
-        <div class="font-mono text-xs text-gray-400 bg-black/60 px-3 py-1.5 rounded-lg border border-dark-border">
+        <div class="font-mono text-xs text-gray-400 bg-black/60 px-3 py-1.5 rounded-lg border border-dark-border self-start md:self-auto">
           lymar run examples/text_editor.lm
         </div>
       </div>
 
       <div class="bg-black/90 border border-dark-border rounded-xl p-5 font-mono text-xs overflow-x-auto text-gray-200">
         <pre><code><span class="code-keyword">import</span> std.ui <span class="code-keyword">as</span> ui;
-<span class="code-keyword">import</span> std.text.controller <span class="code-keyword">as</span> text_ctrl;
+<span class="code-keyword">import</span> std.io.file <span class="code-keyword">as</span> file;
 
 <span class="code-keyword">frame</span> TextEditorApp {
     <span class="code-keyword">pub</span> <span class="code-keyword">var</span> buffer: <span class="code-type">str</span>;
+    <span class="code-keyword">pub</span> <span class="code-keyword">var</span> file_path: <span class="code-type">str</span>;
     <span class="code-keyword">pub</span> <span class="code-keyword">var</span> cursor_line: <span class="code-type">int</span>;
 
-    <span class="code-keyword">pub</span> <span class="code-keyword">init</span>() {
-        self.buffer = <span class="code-string">"// Lymar Text Editor\nfn main() {\n    print(\"Hello!\");\n}"</span>;
+    <span class="code-keyword">pub</span> <span class="code-keyword">init</span>(path: <span class="code-type">str</span>) {
+        self.file_path = path;
+        self.buffer = file.read_to_string(path)<span class="code-operator">?</span> <span class="code-keyword">else</span> {
+            <span class="code-keyword">return</span> <span class="code-string">"// New Document\nfn main() {\n    print(\"Hello Lymar!\");\n}"</span>;
+        };
         self.cursor_line = <span class="code-number">1</span>;
     }
 
     <span class="code-keyword">pub</span> <span class="code-keyword">fn</span> <span class="code-function">render</span>() {
-        ui.window(<span class="code-string">"Lymar Editor"</span>, <span class="code-number">800</span>, <span class="code-number">600</span>);
+        ui.window(<span class="code-string">"Lymar Code Editor - {self.file_path}"</span>, <span class="code-number">900</span>, <span class="code-number">650</span>);
         ui.text_area(self.buffer);
     }
 }
 
 <span class="code-keyword">fn</span> <span class="code-function">main</span>(): <span class="code-type">int</span> {
-    <span class="code-keyword">var</span> app = TextEditorApp();
+    <span class="code-keyword">var</span> app = TextEditorApp(<span class="code-string">"main.lm"</span>);
     app.render();
     <span class="code-keyword">return</span> <span class="code-number">0</span>;
 }
@@ -132,30 +145,42 @@ main();</code></pre>
       </div>
     </div>
 
-    <!-- Example 2: GUI Showcase -->
+    <!-- Example 2: Concurrent Web Server -->
     <div class="bg-dark-card border border-dark-border rounded-2xl p-8 space-y-6">
       <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h2 class="text-2xl font-bold text-white flex items-center gap-3">
-            <i class="fas fa-desktop text-brand-emerald"></i>
-            <span>Retained & IMGUI Widget Suite (<code class="text-brand-accent text-sm font-mono">tests/gui_showcase.lm</code>)</span>
+            <i class="fas fa-server text-brand-emerald"></i>
+            <span>2. Concurrent Multi-Threaded HTTP Web Server (<code class="text-brand-accent text-sm font-mono">examples/web_server.lm</code>)</span>
           </h2>
-          <p class="text-gray-400 text-sm mt-1">Showcases buttons, sliders, tab navigation, drop shadows, and responsive layout containers.</p>
+          <p class="text-gray-400 text-sm mt-1">High-throughput HTTP server handling channel-based request pools and non-blocking TCP socket responses.</p>
         </div>
-        <div class="font-mono text-xs text-gray-400 bg-black/60 px-3 py-1.5 rounded-lg border border-dark-border">
-          lymar build tests/gui_showcase.lm
+        <div class="font-mono text-xs text-gray-400 bg-black/60 px-3 py-1.5 rounded-lg border border-dark-border self-start md:self-auto">
+          lymar run examples/web_server.lm
         </div>
       </div>
 
       <div class="bg-black/90 border border-dark-border rounded-xl p-5 font-mono text-xs overflow-x-auto text-gray-200">
-        <pre><code><span class="code-keyword">import</span> std.ui <span class="code-keyword">as</span> ui;
+        <pre><code><span class="code-keyword">import</span> std.net.tcp <span class="code-keyword">as</span> tcp;
+
+<span class="code-keyword">fn</span> <span class="code-function">handle_request</span>(client_id: <span class="code-type">int</span>): <span class="code-type">str</span> {
+    <span class="code-keyword">return</span> <span class="code-string">"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n\r\nHello from Lymar worker #{client_id}"</span>;
+}
 
 <span class="code-keyword">fn</span> <span class="code-function">main</span>(): <span class="code-type">int</span> {
-    ui.init_window(<span class="code-string">"UI Showcase"</span>, <span class="code-number">1024</span>, <span class="code-number">768</span>);
+    <span class="code-keyword">var</span> req_channel = channel();
 
-    <span class="code-keyword">var</span> volume: <span class="code-type">float</span> = <span class="code-number">0.75</span>;
-    <span class="code-keyword">if</span> (ui.slider(<span class="code-string">"Volume"</span>, volume, <span class="code-number">0.0</span>, <span class="code-number">1.0</span>)) {
-        print(<span class="code-string">"New volume setting: {volume}"</span>);
+    print(<span class="code-string">"Starting Lymar HTTP Server on port 8080..."</span>);
+
+    <span class="code-keyword">concurrent</span>(ch = req_channel, mode = batch, cores = <span class="code-number">8</span>) {
+        task(req_id <span class="code-keyword">in</span> <span class="code-number">1</span>..<span class="code-number">100</span>) {
+            <span class="code-keyword">val</span> response = handle_request(req_id);
+            req_channel.send(response);
+        }
+    }
+
+    <span class="code-keyword">iter</span> (res <span class="code-keyword">in</span> req_channel) {
+        print(<span class="code-string">"Dispatched: {len(res)} bytes"</span>);
     }
     <span class="code-keyword">return</span> <span class="code-number">0</span>;
 }
@@ -170,13 +195,69 @@ main();</code></pre>
         <div>
           <h2 class="text-2xl font-bold text-white flex items-center gap-3">
             <i class="fas fa-gamepad text-brand-violet"></i>
-            <span>Sokol 2D/3D Game Engine (<code class="text-brand-accent text-sm font-mono">tests/game_showcase.lm</code>)</span>
+            <span>3. Sokol Hardware Accelerated Game & Telemetry Showcase (<code class="text-brand-accent text-sm font-mono">tests/game_showcase.lm</code>)</span>
           </h2>
-          <p class="text-gray-400 text-sm mt-1">Accelerated graphics rendering with Truetype font compilation and instant sprite batching.</p>
+          <p class="text-gray-400 text-sm mt-1">Accelerated GLES/Metal graphics rendering with Truetype typography and instant particle sprite batching.</p>
         </div>
-        <div class="font-mono text-xs text-gray-400 bg-black/60 px-3 py-1.5 rounded-lg border border-dark-border">
+        <div class="font-mono text-xs text-gray-400 bg-black/60 px-3 py-1.5 rounded-lg border border-dark-border self-start md:self-auto">
           lymar run tests/game_showcase.lm
         </div>
+      </div>
+
+      <div class="bg-black/90 border border-dark-border rounded-xl p-5 font-mono text-xs overflow-x-auto text-gray-200">
+        <pre><code><span class="code-keyword">import</span> std.game.app <span class="code-keyword">as</span> game;
+<span class="code-keyword">import</span> std.game.gui <span class="code-keyword">as</span> gui;
+
+<span class="code-keyword">fn</span> <span class="code-function">main</span>(): <span class="code-type">int</span> {
+    <span class="code-keyword">var</span> engine = game.create_engine(<span class="code-string">"Lymar Sokol Game Engine"</span>, <span class="code-number">1280</span>, <span class="code-number">720</span>);
+
+    <span class="code-keyword">while</span> (engine.is_running()) {
+        engine.begin_frame();
+        gui.text(<span class="code-string">"FPS: 144.0 | Frame Time: 0.006ms"</span>);
+        engine.end_frame();
+    }
+    <span class="code-keyword">return</span> <span class="code-number">0</span>;
+}
+
+main();</code></pre>
+      </div>
+    </div>
+
+    <!-- Example 4: Cryptographic Hasher -->
+    <div class="bg-dark-card border border-dark-border rounded-2xl p-8 space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-2xl font-bold text-white flex items-center gap-3">
+            <i class="fas fa-lock text-brand-500"></i>
+            <span>4. SHA-256 Digest & Cryptographic Vault (<code class="text-brand-accent text-sm font-mono">tests/crypto/test_crypto.lm</code>)</span>
+          </h2>
+          <p class="text-gray-400 text-sm mt-1">Secure cryptographic resource manager with SHA-256 hashing and OpenSSL AES-GCM encryption.</p>
+        </div>
+        <div class="font-mono text-xs text-gray-400 bg-black/60 px-3 py-1.5 rounded-lg border border-dark-border self-start md:self-auto">
+          lymar run tests/crypto/test_crypto.lm
+        </div>
+      </div>
+
+      <div class="bg-black/90 border border-dark-border rounded-xl p-5 font-mono text-xs overflow-x-auto text-gray-200">
+        <pre><code><span class="code-keyword">import</span> std.resource <span class="code-keyword">as</span> res;
+
+<span class="code-keyword">fn</span> <span class="code-function">hash_password</span>(secret: <span class="code-type">str</span>): <span class="code-type">str?</span> {
+    <span class="code-keyword">var</span> hasher = res.create_hash_engine()<span class="code-operator">?</span> <span class="code-keyword">else</span> {
+        <span class="code-keyword">return</span> err();
+    };
+    <span class="code-keyword">return</span> ok(<span class="code-string">"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"</span>);
+}
+
+<span class="code-keyword">fn</span> <span class="code-function">main</span>(): <span class="code-type">int</span> {
+    <span class="code-keyword">val</span> digest = hash_password(<span class="code-string">"my_secure_pass_2025"</span>)<span class="code-operator">?</span> <span class="code-keyword">else</span> {
+        print(<span class="code-string">"Hashing failed"</span>);
+        <span class="code-keyword">return</span> <span class="code-number">1</span>;
+    };
+    print(<span class="code-string">"SHA-256 Digest: {digest}"</span>);
+    <span class="code-keyword">return</span> <span class="code-number">0</span>;
+}
+
+main();</code></pre>
       </div>
     </div>
 
