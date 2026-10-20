@@ -8,7 +8,7 @@ This document provides a formal specification of the Lymar programming language 
 
 ```
 and, as, break, concurrent, continue, staged, contract, elif, else, enum,
-err, false, fn, for, frame, from, hide, if, import, in, interface, iter,
+err, false, fn, for, frame, from, hide, if, import, in, iter,
 match, module, nil, not, ok, or, parallel, prot, pub, return, self, show,
 static, super, task, trait, true, type, unsafe, val, var, const, where,
 while, worker
@@ -21,6 +21,7 @@ while, worker
 - `open`, `property`, `cache`, `sleep` — removed; `sleep` is now a regular builtin function identifier.
 - `loop` — removed; use `for`, `while`, or `iter`.
 - `data` — removed; traits cover the same ground.
+- `abstract`, `final`, `implements`, `interface` — removed; frame inheritance is eliminated in favor of pure composition using traits (`:`), mixins (`mixin`), and embedding (`embed`).
 - `@annotation` — removed; use `pub`/`prot` directly.
 
 `channel` and `atomic` are reserved as type names but are also usable as builtin function identifiers (e.g. `channel()`).
@@ -113,7 +114,7 @@ Variables and functions are **private by default** when neither `pub` nor `prot`
 fn name([params])[: ReturnType] { body }
 ```
 - Supports optional parameters: `name: Type = default`
-- Function-level modifiers (parallel to visibility, not interchangeable): `static`, `abstract`, `final`.
+- Function-level modifiers (parallel to visibility, not interchangeable): `static`.
 
 ### 3.3 Frames (Objects)
 
@@ -129,11 +130,7 @@ Frames are the primary unit of data encapsulation and behavior.
 ```
 
 #### 3.3.1 Modifiers
-- `abstract`: Frame cannot be instantiated directly. May contain abstract methods.
-- `final`: Frame cannot be inherited from.
 - `static` (method-level): Method does not receive `self`; callable on the frame type itself.
-- `abstract` (method-level): Method has no body; must be overridden in subframes.
-- `final` (method-level): Method cannot be overridden in subframes.
 
 (The `data` modifier was removed — traits cover the same ground.)
 

@@ -156,7 +156,6 @@ public:
     std::shared_ptr<LM::Frontend::AST::Statement> matchStatement();
     std::shared_ptr<LM::Frontend::AST::Statement> typeDeclaration();
     std::shared_ptr<LM::Frontend::AST::Statement> traitDeclaration();
-    std::shared_ptr<LM::Frontend::AST::Statement> interfaceDeclaration();
     std::shared_ptr<LM::Frontend::AST::Statement> moduleDeclaration();
     std::shared_ptr<LM::Frontend::AST::Statement> iterStatement();
     std::shared_ptr<LM::Frontend::AST::Statement> unsafeBlock();

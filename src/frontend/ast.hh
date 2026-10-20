@@ -86,7 +86,6 @@ namespace AST {
     struct StructuralTypeField;
     struct TypeDeclaration;
     struct TraitDeclaration;
-    struct InterfaceDeclaration;
     struct MixinDeclaration;
     struct EmbedStatement;
     struct FrameDeclaration;
@@ -472,8 +471,6 @@ namespace AST {
         // Module-level visibility (for module-level functions)
         VisibilityLevel visibility = VisibilityLevel::Private;  // Default to private
         bool isStatic = false;                                  // For static functions
-        bool isAbstract = false;                                // For abstract functions
-        bool isFinal = false;                                   // For final functions
         bool isStaged = false;                                  // For staged functions
         std::vector<bool> stagedParams;                         // For staged parameters
     };
@@ -738,11 +735,9 @@ namespace AST {
         bool isInit = false;  // Special marker for init() method
         bool isDeinit = false;  // Special marker for deinit() method
         bool isStatic = false;   // Static method (no self binding)
-        bool isAbstract = false; // Abstract method (no body, must be overridden)
-        bool isFinal = false;    // Final method (cannot be overridden)
 
         FrameMethod() : visibility(VisibilityLevel::Private), body(nullptr), isInit(false), isDeinit(false),
-                        isStatic(false), isAbstract(false), isFinal(false) {}
+                        isStatic(false) {}
     };
 
     // Mixin declaration - reusable blocks of state fields & default methods
@@ -769,13 +764,6 @@ namespace AST {
         std::shared_ptr<FrameMethod> deinit;  // Optional deinit() method
 
         FrameDeclaration() : init(nullptr), deinit(nullptr) {}
-    };
-    
-    // Interface declaration
-    struct InterfaceDeclaration : public Statement {
-        std::string name;
-        std::vector<std::shared_ptr<FunctionDeclaration>> methods;
-        bool isOpen = false;
     };
     
     // Module declaration

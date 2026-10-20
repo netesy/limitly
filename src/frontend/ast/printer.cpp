@@ -156,12 +156,6 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
         if (funcDecl->isStatic) {
             std::cout << "[static] ";
         }
-        if (funcDecl->isAbstract) {
-            std::cout << "[abstract] ";
-        }
-        if (funcDecl->isFinal) {
-            std::cout << "[final] ";
-        }
         
         std::cout << funcDecl->name << std::endl;
         
@@ -349,18 +343,6 @@ void ASTPrinter::printNode(const std::shared_ptr<LM::Frontend::AST::Node>& node,
         if (!traitDecl->methods.empty()) {
             std::cout << indentation << "  Methods:" << std::endl;
             for (const auto& method : traitDecl->methods) {
-                printNode(method, indent + 2);
-            }
-        }
-    }
-    else if (auto interfaceDecl = std::dynamic_pointer_cast<LM::Frontend::AST::InterfaceDeclaration>(node)) {
-        std::cout << indentation << "InterfaceDeclaration: " << interfaceDecl->name;
-        if (interfaceDecl->isOpen) std::cout << " (open)";
-        std::cout << std::endl;
-        
-        if (!interfaceDecl->methods.empty()) {
-            std::cout << indentation << "  Methods:" << std::endl;
-            for (const auto& method : interfaceDecl->methods) {
                 printNode(method, indent + 2);
             }
         }

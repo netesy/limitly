@@ -144,10 +144,8 @@ enum class TokenType {
     IMPORT,     // import
     TYPE,       // type
     TRAIT,      // trait
-    INTERFACE,  // interface
     MIXIN,      // mixin
     EMBED,      // embed
-    IMPLEMENTS, // implements
     MODULE,     // module
 
     CONTRACT,   // contract
@@ -169,8 +167,6 @@ enum class TokenType {
     // Method / frame modifiers (not visibility).
     // 'data' was removed — traits cover the same ground.
     STATIC,     // static
-    ABSTRACT,   // abstract
-    FINAL,      // final
 
     // CST Support - Trivia tokens
     WHITESPACE,     // spaces, tabs

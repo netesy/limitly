@@ -704,7 +704,6 @@ void Scanner::identifier() {
 
 TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::string& rest, TokenType /*type*/) const {
     // Check if the identifier matches a reserved keyword.
-    if (rest == "interface") return TokenType::INTERFACE;
     if (rest == "and") return TokenType::AND;
     if (rest == "as") return TokenType::AS;
     if (rest == "frame") return TokenType::FRAME;
@@ -741,7 +740,6 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     if (rest == "trait") return TokenType::TRAIT;
     if (rest == "mixin") return TokenType::MIXIN;
     if (rest == "embed") return TokenType::EMBED;
-    if (rest == "implements") return TokenType::IMPLEMENTS;
     if (rest == "module") return TokenType::MODULE;
     if (rest == "contract") return TokenType::CONTRACT;
     if (rest == "staged") return TokenType::STAGED;
@@ -760,8 +758,6 @@ TokenType Scanner::checkKeyword(size_t /*start*/, size_t /*length*/, const std::
     // Method / frame modifiers (not visibility). 'data' was removed (traits
     // cover the same ground); 'loop' was removed (for/while/iter suffice).
     if (rest == "static") return TokenType::STATIC;
-    if (rest == "abstract") return TokenType::ABSTRACT;
-    if (rest == "final") return TokenType::FINAL;
 
     // Check if the identifier matches a type keyword
     if (rest == "int") return TokenType::INT_TYPE;
@@ -1032,16 +1028,12 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "INTERPOLATION_START";
     case TokenType::INTERPOLATION:
         return "INTERPOLATION";
-    case TokenType::INTERFACE:
-        return "INTERFACE";
     case TokenType::INTERPOLATION_END:
         return "INTERPOLATION_END";
     case TokenType::MIXIN:
         return "MIXIN";
     case TokenType::EMBED:
         return "EMBED";
-    case TokenType::IMPLEMENTS:
-        return "IMPLEMENTS";
     case TokenType::MODULE:
         return "MODULE";
     case TokenType::STAGED:
@@ -1122,10 +1114,6 @@ std::string Scanner::tokenTypeToString(TokenType type) const {
         return "PROT";
     case TokenType::STATIC:
         return "STATIC";
-    case TokenType::ABSTRACT:
-        return "ABSTRACT";
-    case TokenType::FINAL:
-        return "FINAL";
     case TokenType::CONST:
         return "CONST";
     case TokenType::AMPERSAND_AMPERSAND:

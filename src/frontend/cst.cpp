@@ -419,7 +419,6 @@ namespace CST {
             case NodeKind::ENUM_DECLARATION: return "ENUM_DECLARATION";
             case NodeKind::TYPE_DECLARATION: return "TYPE_DECLARATION";
             case NodeKind::TRAIT_DECLARATION: return "TRAIT_DECLARATION";
-            case NodeKind::INTERFACE_DECLARATION: return "INTERFACE_DECLARATION";
             case NodeKind::MODULE_DECLARATION: return "MODULE_DECLARATION";
             case NodeKind::IMPORT_DECLARATION: return "IMPORT_DECLARATION";
             
@@ -558,7 +557,6 @@ namespace CST {
             case NodeKind::ENUM_DECLARATION:
             case NodeKind::TYPE_DECLARATION:
             case NodeKind::TRAIT_DECLARATION:
-            case NodeKind::INTERFACE_DECLARATION:
             case NodeKind::MODULE_DECLARATION:
             case NodeKind::IMPORT_DECLARATION:
                 return true;

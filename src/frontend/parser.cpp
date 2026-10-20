@@ -441,7 +441,6 @@ CST::NodeKind Parser::mapASTNodeKind(const std::string& astNodeType) {
     if (className.find("EnumDeclaration") != std::string::npos) return CST::NodeKind::ENUM_DECLARATION;
     if (className.find("TypeDeclaration") != std::string::npos) return CST::NodeKind::TYPE_DECLARATION;
     if (className.find("TraitDeclaration") != std::string::npos) return CST::NodeKind::TRAIT_DECLARATION;
-    if (className.find("InterfaceDeclaration") != std::string::npos) return CST::NodeKind::INTERFACE_DECLARATION;
     if (className.find("ModuleDeclaration") != std::string::npos) return CST::NodeKind::MODULE_DECLARATION;
     if (className.find("ImportStatement") != std::string::npos) return CST::NodeKind::IMPORT_DECLARATION;
     
@@ -637,7 +636,6 @@ template auto Parser::createNodeWithContext<LM::Frontend::AST::EnumDeclaration>(
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ModuleDeclaration>() -> std::shared_ptr<LM::Frontend::AST::ModuleDeclaration>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::ImportStatement>() -> std::shared_ptr<LM::Frontend::AST::ImportStatement>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::TypeDeclaration>() -> std::shared_ptr<LM::Frontend::AST::TypeDeclaration>;
-template auto Parser::createNodeWithContext<LM::Frontend::AST::InterfaceDeclaration>() -> std::shared_ptr<LM::Frontend::AST::InterfaceDeclaration>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::TypedHoleExpr>() -> std::shared_ptr<LM::Frontend::AST::TypedHoleExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::StagedExpr>() -> std::shared_ptr<LM::Frontend::AST::StagedExpr>;
 template auto Parser::createNodeWithContext<LM::Frontend::AST::StagedBlockStatement>() -> std::shared_ptr<LM::Frontend::AST::StagedBlockStatement>;
@@ -804,9 +802,7 @@ bool Parser::isReservedKeyword(TokenType type) {
         case TokenType::IMPORT:
         case TokenType::TYPE:
         case TokenType::TRAIT:
-        case TokenType::INTERFACE:
         case TokenType::MIXIN:
-        case TokenType::IMPLEMENTS:
         case TokenType::MODULE:
         case TokenType::CONTRACT:
         case TokenType::STAGED:
@@ -821,8 +817,6 @@ bool Parser::isReservedKeyword(TokenType type) {
         case TokenType::PUB:
         case TokenType::PROT:
         case TokenType::STATIC:
-        case TokenType::ABSTRACT:
-        case TokenType::FINAL:
             return true;
         default:
             return false;

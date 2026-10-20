@@ -330,19 +330,18 @@ frame Transmission {
 
 frame Car {
  // Composition: embed frames directly
- pub var engine: Engine = Engine()
- pub var transmission: Transmission = Transmission()
+ embed Engine;
+ embed Transmission;
  pub var speed: int = 0
  
  pub fn drive() {
- engine.start() // delegate to composed frame
- transmission.shift_up()
- speed = engine.rpm / 100
+ self.start() // promoted method from embedded Engine
+ self.shift_up() // promoted method from embedded Transmission
+ self.speed = self.rpm / 100
  }
  
  pub deinit() {
  print("Car destroyed")
- // engine.deinit() and transmission.deinit() called automatically
  }
 }
 ```

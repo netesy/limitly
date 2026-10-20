@@ -707,9 +707,16 @@ frame Engine {
     }
 }
 
+frame Transmission {
+    pub fn shift_up() {
+        print("Shifted gear up");
+    }
+}
+
 frame Car {
     mixin Timestamped;
     embed Engine;
+    embed Transmission;
     pub model: str;
 
     pub init(m: str) {
@@ -721,6 +728,7 @@ var my_car = Car("Sedan");
 print(my_car.model);      // Sedan
 print(my_car.created_at); // 100 (from mixin)
 my_car.start();           // Engine started (promoted from embedded Engine)
+my_car.shift_up();        // Shifted gear up (promoted from embedded Transmission)
 ```
 
 #### Strict Trait Conformance (`:`)

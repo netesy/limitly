@@ -41,9 +41,8 @@ RESERVED_KEYWORDS = [
     "frame", "trait", "import", "match", "in", "type", "enum", "err", "ok",
     "and", "or", "not", "as", "where", "self", "super", "true", "false",
     "nil", "break", "continue", "parallel", "concurrent", "task", "worker",
-    "contract", "staged", "unsafe", "module", "interface", "mixin",
-    "implements", "show", "hide", "from", "elif", "else", "static", "abstract",
-    "final", "pub", "prot"
+    "contract", "staged", "unsafe", "module", "mixin",
+    "show", "hide", "from", "elif", "else", "static", "pub", "prot"
 ]
 
 def print_color(text: str, color_code: str):

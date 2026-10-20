@@ -1114,9 +1114,7 @@ static const std::vector<KeywordDoc> kKeywords = {
     { "frame", "Class-like OOP frame declaration", "frame Name { pub field: int; pub init(...) { ... } }", "Lymar's canonical object-oriented structure supporting public/protected fields, methods, constructors, and trait conformance." },
     { "class", "Class declaration (OOP frame alias)", "class Name { ... }", "Class-like structure declaration, interoperable with frame semantics." },
     { "trait", "Interface contract declaration", "trait Shape { fn area(): int; }", "Defines an abstract interface of method requirements that frames can implement." },
-    { "interface", "Interface definition", "interface Printable { fn to_str(): str; }", "Defines a contract of methods implemented by types." },
     { "mixin", "Reusable method mixin", "mixin Loggable { ... }", "Declares a reusable set of methods composable into frames." },
-    { "implements", "Trait or interface conformance", "frame Square: Shape { ... }", "Specifies the traits implemented by a frame." },
     { "impl", "Trait implementation block", "impl Trait for Frame { ... }", "Implements methods of a trait for a given frame or type." },
     { "enum", "Enumeration declaration", "enum Color { Red, Green, Blue }", "Defines a type with a fixed set of named variants, optionally holding associated values." },
     { "module", "Module declaration", "module Math { ... }", "Defines a modular namespace encapsulating types, functions, and constants." },
@@ -1133,8 +1131,6 @@ static const std::vector<KeywordDoc> kKeywords = {
     { "pub", "Public visibility modifier", "pub fn process(): void { ... }", "Makes a field, method, or symbol accessible outside its containing frame or module." },
     { "prot", "Protected visibility modifier", "prot field: int;", "Makes a field or method accessible only within its frame and inheriting frames." },
     { "static", "Static member modifier", "static fn create(): Frame { ... }", "Associates a method or field with the frame type rather than instances." },
-    { "abstract", "Abstract method or frame modifier", "abstract fn render(): void;", "Declares a method requirement without an implementation body." },
-    { "final", "Final modifier", "final fn compute(): int { ... }", "Prevents a frame from being inherited or a method from being overridden." },
     { "show", "Selective import filter", "import std.collections show Iterator;", "Whitelists specific symbols to import from a module." },
     { "hide", "Hiding import filter", "import std.io hide raw_read;", "Blacklists specific symbols from being imported from a module." },
 

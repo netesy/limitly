@@ -17,16 +17,13 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
         // Visibility: pub / prot only. Vars/fns are private by default when
         // neither is specified (no explicit 'private' keyword).
         // Method/frame modifiers (parallel to visibility, not interchangeable):
-        //   static, abstract, final. 
+        //   static.
         LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private;
         bool hasExplicitVisibility = false;
         bool isStatic = false;
-        bool isAbstract = false;
-        bool isFinal = false;
 
         while (check(TokenType::PUB) || check(TokenType::PROT) ||
-               check(TokenType::STATIC) ||
-               check(TokenType::ABSTRACT) || check(TokenType::FINAL)) {
+               check(TokenType::STATIC)) {
             if (match({TokenType::PUB})) {
                 visibility = LM::Frontend::AST::VisibilityLevel::Public;
                 hasExplicitVisibility = true;
@@ -35,17 +32,10 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
                 hasExplicitVisibility = true;
             } else if (match({TokenType::STATIC})) {
                 isStatic = true;
-            } else if (match({TokenType::ABSTRACT})) {
-                isAbstract = true;
-            } else if (match({TokenType::FINAL})) {
-                isFinal = true;
             }
         }
 
         if (match({TokenType::FRAME})) {
-            if (isAbstract || isFinal) {
-                error("Frames cannot be abstract or final. Inheritance has been removed in favor of pure composition using traits, mixins, and embedding.");
-            }
             auto decl = frameDeclaration();
             if (decl) {
                 decl->annotations = annotations;
@@ -70,8 +60,6 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
                     decl->annotations = annotations;
                     decl->visibility = visibility;
                     decl->isStatic = isStatic;
-                    decl->isAbstract = isAbstract;
-                    decl->isFinal = isFinal;
                     decl->isStaged = true;
                 }
                 return decl;
@@ -109,8 +97,6 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
                 decl->annotations = annotations;
                 decl->visibility = visibility;
                 decl->isStatic = isStatic;
-                decl->isAbstract = isAbstract;
-                decl->isFinal = isFinal;
             }
             return decl;
         }
@@ -161,11 +147,6 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::declaration() {
                 decl->visibility = visibility;
                 decl->hasExplicitVisibility = hasExplicitVisibility;
             }
-            return decl;
-        }
-        if (match({TokenType::INTERFACE})) {
-            auto decl = interfaceDeclaration();
-            if (decl) decl->annotations = annotations;
             return decl;
         }
         if (match({TokenType::MODULE})) {
@@ -727,21 +708,19 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
     pushBlockContext("frame", leftBrace);
     while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
         LM::Frontend::AST::VisibilityLevel visibility = LM::Frontend::AST::VisibilityLevel::Private;
-        bool memberStatic = false, memberAbstract = false, memberFinal = false;
+        bool memberStatic = false;
         while (check(TokenType::PUB) || check(TokenType::PROT) ||
-               check(TokenType::STATIC) || check(TokenType::ABSTRACT) || check(TokenType::FINAL)) {
+               check(TokenType::STATIC)) {
             if (match({TokenType::PUB})) visibility = LM::Frontend::AST::VisibilityLevel::Public;
             else if (match({TokenType::PROT})) visibility = LM::Frontend::AST::VisibilityLevel::Protected;
             else if (match({TokenType::STATIC})) memberStatic = true;
-            else if (match({TokenType::ABSTRACT})) memberAbstract = true;
-            else if (match({TokenType::FINAL})) memberFinal = true;
         }
         if (check(TokenType::IDENTIFIER) && peek().lexeme == "init") {
             Token initTok = advance(); consume(TokenType::LEFT_PAREN, "Expected '(' after 'init'.");
             auto initMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
             initMethod->line = initTok.line;
             initMethod->name = "init"; initMethod->visibility = visibility; initMethod->isInit = true;
-            initMethod->isStatic = memberStatic; initMethod->isAbstract = memberAbstract; initMethod->isFinal = memberFinal;
+            initMethod->isStatic = memberStatic;
             if (!check(TokenType::RIGHT_PAREN)) {
                 do {
                     auto paramName = consume(TokenType::IDENTIFIER, "Expected parameter name.").lexeme;
@@ -764,7 +743,7 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             auto deinitMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
             deinitMethod->line = deinitTok.line;
             deinitMethod->name = "deinit"; deinitMethod->visibility = visibility; deinitMethod->isDeinit = true;
-            deinitMethod->isStatic = memberStatic; deinitMethod->isAbstract = memberAbstract; deinitMethod->isFinal = memberFinal;
+            deinitMethod->isStatic = memberStatic;
             if (!check(TokenType::RIGHT_PAREN)) error("deinit() method cannot have parameters.");
             consume(TokenType::RIGHT_PAREN, "Expected ')' after deinit.");
             consume(TokenType::LEFT_BRACE, "Expected '{' before deinit body.");
@@ -793,8 +772,6 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             auto frameMethod = std::make_shared<LM::Frontend::AST::FrameMethod>();
             frameMethod->visibility = visibility;
             frameMethod->isStatic = memberStatic;
-            frameMethod->isAbstract = memberAbstract;
-            frameMethod->isFinal = memberFinal;
             Token methodName = consume(TokenType::IDENTIFIER, "Expected method name.");
             frameMethod->line = methodName.line > 0 ? methodName.line : fnTok.line;
             frameMethod->name = methodName.lexeme;
@@ -814,7 +791,6 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             consume(TokenType::RIGHT_PAREN, "Expected ')' after parameters.");
             if (match({TokenType::COLON})) frameMethod->returnType = parseTypeAnnotation();
             if (match({TokenType::SEMICOLON})) {
-                frameMethod->isAbstract = true;
                 frameMethod->body = nullptr;
             } else {
                 consume(TokenType::LEFT_BRACE, "Expected '{' or ';' after method declaration.");
@@ -1226,27 +1202,6 @@ std::shared_ptr<LM::Frontend::AST::Statement> Parser::traitDeclaration() {
     }
     consume(TokenType::RIGHT_BRACE, "Expected '}' after trait body.");
     return traitDecl;
-}
-
-std::shared_ptr<LM::Frontend::AST::Statement> Parser::interfaceDeclaration() {
-    auto interfaceDecl = std::make_shared<LM::Frontend::AST::InterfaceDeclaration>();
-    interfaceDecl->line = previous().line;
-    // @-annotations removed; check for bare 'open' identifier for backward compat.
-    if (check(TokenType::IDENTIFIER) && peek().lexeme == "open") {
-        advance();
-        interfaceDecl->isOpen = true;
-    }
-    Token name = consume(TokenType::IDENTIFIER, "Expected interface name.");
-    interfaceDecl->name = name.lexeme;
-    consume(TokenType::LEFT_BRACE, "Expected '{' before interface body.");
-    while (!check(TokenType::RIGHT_BRACE) && !isAtEnd()) {
-        if (match({TokenType::FN})) {
-            auto method = function("method");
-            interfaceDecl->methods.push_back(method);
-        } else { error("Expected method declaration in interface."); break; }
-    }
-    consume(TokenType::RIGHT_BRACE, "Expected '}' after interface body.");
-    return interfaceDecl;
 }
 
 std::shared_ptr<LM::Frontend::AST::Statement> Parser::moduleDeclaration() {
