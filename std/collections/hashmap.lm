@@ -1,21 +1,9 @@
-// HashMap Frame - Flat linear-probing open-addressed hash map for O(1) cache-efficient lookups
-
-frame HashEntry {
-    pub key: str;
-    pub value: any;
-    pub occupied: bool;
-    pub deleted: bool;
-
-    pub init(k: str = "", v: any = nil, occ: bool = false, del: bool = false) {
-        self.key = k;
-        self.value = v;
-        self.occupied = occ;
-        self.deleted = del;
-    }
-}
+// HashMap Frame - Parallel-array open-addressed hash table for cache-efficient O(1) operations
 
 frame HashMap {
-    pub entries: [HashEntry];
+    pub ctrl: [int];      // 0 = EMPTY, 1 = DELETED, 2 = OCCUPIED
+    pub keys: [str];
+    pub values: [any];
     pub capacity: int;
     pub count: int;
     pub tombstone_count: int;
@@ -25,10 +13,14 @@ frame HashMap {
         if (self.capacity < 4) self.capacity = 4;
         self.count = 0;
         self.tombstone_count = 0;
-        self.entries = [] as [HashEntry];
+        self.ctrl = [] as [int];
+        self.keys = [] as [str];
+        self.values = [] as [any];
         var i = 0;
         while (i < self.capacity) {
-            self.entries.append(HashEntry("", nil, false, false));
+            self.ctrl.append(0);
+            self.keys.append("");
+            self.values.append(nil);
             i = i + 1;
         }
     }
@@ -42,33 +34,43 @@ frame HashMap {
     }
 
     fn _rehash(new_cap: int) {
-        var old_entries = self.entries;
+        var old_ctrl = self.ctrl;
+        var old_keys = self.keys;
+        var old_values = self.values;
+
         self.capacity = new_cap;
         if (self.capacity < 4) self.capacity = 4;
         self.count = 0;
         self.tombstone_count = 0;
-        self.entries = [] as [HashEntry];
+        self.ctrl = [] as [int];
+        self.keys = [] as [str];
+        self.values = [] as [any];
+
         var i = 0;
         while (i < self.capacity) {
-            self.entries.append(HashEntry("", nil, false, false));
+            self.ctrl.append(0);
+            self.keys.append("");
+            self.values.append(nil);
             i = i + 1;
         }
 
         i = 0;
-        while (i < len(old_entries)) {
-            if (old_entries[i].occupied and not old_entries[i].deleted) {
-                var key = old_entries[i].key;
-                var entry_val = old_entries[i].value;
-                var idx = self._hash(key);
-                var k = 0;
-                while (k < self.capacity) {
-                    var curr_idx = (idx + k) % self.capacity;
-                    if (not self.entries[curr_idx].occupied) {
-                        self.entries[curr_idx] = HashEntry(key, entry_val, true, false);
+        while (i < len(old_ctrl)) {
+            if (old_ctrl[i] == 2) {
+                var k = old_keys[i];
+                var v = old_values[i];
+                var idx = self._hash(k);
+                var j = 0;
+                while (j < self.capacity) {
+                    var curr_idx = (idx + j) % self.capacity;
+                    if (self.ctrl[curr_idx] == 0) {
+                        self.ctrl[curr_idx] = 2;
+                        self.keys[curr_idx] = k;
+                        self.values[curr_idx] = v;
                         self.count = self.count + 1;
-                        k = self.capacity; // break loop
+                        j = self.capacity; // break
                     }
-                    k = k + 1;
+                    j = j + 1;
                 }
             }
             i = i + 1;
@@ -86,23 +88,25 @@ frame HashMap {
 
         while (i < self.capacity) {
             var curr_idx = (idx + i) % self.capacity;
-            var entry = self.entries[curr_idx];
+            var c = self.ctrl[curr_idx];
 
-            if (entry.occupied) {
-                if (entry.deleted) {
-                    if (first_tombstone == -1) {
-                        first_tombstone = curr_idx;
-                    }
-                } else if (entry.key == key) {
-                    entry.value = value;
+            if (c == 2) {
+                if (self.keys[curr_idx] == key) {
+                    self.values[curr_idx] = value;
                     return self;
                 }
-            } else {
+            } else if (c == 1) {
+                if (first_tombstone == -1) {
+                    first_tombstone = curr_idx;
+                }
+            } else { // c == 0 (EMPTY)
                 if (first_tombstone != -1) {
                     curr_idx = first_tombstone;
                     self.tombstone_count = self.tombstone_count - 1;
                 }
-                self.entries[curr_idx] = HashEntry(key, value, true, false);
+                self.ctrl[curr_idx] = 2;
+                self.keys[curr_idx] = key;
+                self.values[curr_idx] = value;
                 self.count = self.count + 1;
                 return self;
             }
@@ -110,7 +114,9 @@ frame HashMap {
         }
 
         if (first_tombstone != -1) {
-            self.entries[first_tombstone] = HashEntry(key, value, true, false);
+            self.ctrl[first_tombstone] = 2;
+            self.keys[first_tombstone] = key;
+            self.values[first_tombstone] = value;
             self.tombstone_count = self.tombstone_count - 1;
             self.count = self.count + 1;
         }
@@ -123,13 +129,13 @@ frame HashMap {
 
         while (i < self.capacity) {
             var curr_idx = (idx + i) % self.capacity;
-            var entry = self.entries[curr_idx];
+            var c = self.ctrl[curr_idx];
 
-            if (not entry.occupied) {
+            if (c == 0) {
                 return err();
             }
-            if (not entry.deleted and entry.key == key) {
-                return ok(entry.value);
+            if (c == 2 and self.keys[curr_idx] == key) {
+                return ok(self.values[curr_idx]);
             }
             i = i + 1;
         }
@@ -159,13 +165,15 @@ frame HashMap {
 
         while (i < self.capacity) {
             var curr_idx = (idx + i) % self.capacity;
-            var entry = self.entries[curr_idx];
+            var c = self.ctrl[curr_idx];
 
-            if (not entry.occupied) {
+            if (c == 0) {
                 return self;
             }
-            if (not entry.deleted and entry.key == key) {
-                entry.deleted = true;
+            if (c == 2 and self.keys[curr_idx] == key) {
+                self.ctrl[curr_idx] = 1; // DELETED
+                self.keys[curr_idx] = "";
+                self.values[curr_idx] = nil;
                 self.count = self.count - 1;
                 self.tombstone_count = self.tombstone_count + 1;
                 return self;
@@ -178,10 +186,14 @@ frame HashMap {
     pub fn clear(): HashMap {
         self.count = 0;
         self.tombstone_count = 0;
-        self.entries = [] as [HashEntry];
+        self.ctrl = [] as [int];
+        self.keys = [] as [str];
+        self.values = [] as [any];
         var i = 0;
         while (i < self.capacity) {
-            self.entries.append(HashEntry("", nil, false, false));
+            self.ctrl.append(0);
+            self.keys.append("");
+            self.values.append(nil);
             i = i + 1;
         }
         return self;

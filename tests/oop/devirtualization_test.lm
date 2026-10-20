@@ -1,0 +1,23 @@
+// Regression test for concrete frame method dispatch
+
+frame Calculator {
+    pub value: int;
+
+    pub init(v: int) {
+        self.value = v;
+    }
+
+    pub fn add(x: int): int {
+        self.value = self.value + x;
+        return self.value;
+    }
+}
+
+fn main(): int {
+    var calc = Calculator(10);
+    var res = calc.add(5);
+    assert(res == 15, "calc.add(5) should equal 15");
+    assert(calc.value == 15, "calc.value should equal 15");
+    print("Devirtualization regression test passed.");
+    return 0;
+}

@@ -1,0 +1,26 @@
+// Regression test for decoupled parallel-array HashMap
+
+import std.collections.hashmap as hm;
+
+fn main(): int {
+    var map = hm.hashmap(16);
+    assert(map.capacity == 16, "HashMap initial capacity should be 16");
+    assert(map.size() == 0, "HashMap initial size should be 0");
+    assert(len(map.ctrl) == 16, "HashMap ctrl array length should match capacity");
+    assert(len(map.keys) == 16, "HashMap keys array length should match capacity");
+    assert(len(map.values) == 16, "HashMap values array length should match capacity");
+
+    map.put("alpha", 100);
+    map.put("beta", 200);
+    assert(map.size() == 2, "HashMap size after put should be 2");
+
+    var val1 = map.get("alpha")? else { return -1; };
+    assert(val1 == 100, "HashMap get alpha should return 100");
+
+    map.remove("alpha");
+    assert(map.size() == 1, "HashMap size after remove should be 1");
+    assert(not map.contains_key("alpha"), "HashMap should not contain removed key alpha");
+
+    print("HashMap decoupled test passed.");
+    return 0;
+}
