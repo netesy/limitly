@@ -394,5 +394,3 @@ fn service_row(name: str, status: str, version: str, region: str, is_healthy: in
         app.shutdown();
         print("Lymar Studio shutdown successfully.");
     }
-
-    main();

@@ -11,5 +11,3 @@ fn main() {
     print(upper);
     assert(upper == "LYMAR", "Upper failure");
 }
-
-main();

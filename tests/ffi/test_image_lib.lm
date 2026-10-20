@@ -444,5 +444,3 @@ fn main(): nil {
     print("  All 15 std.image tests PASSED (all >= 150x150)");
     print("=======================================================");
 }
-
-main();

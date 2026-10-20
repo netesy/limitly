@@ -44,5 +44,3 @@ fn main() {
     test_scroll_flex_height();
     print("All responsive resize tests passed!");
 }
-
-main();

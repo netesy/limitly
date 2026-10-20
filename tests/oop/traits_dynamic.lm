@@ -47,5 +47,3 @@ fn main() {
     assert(s.name() == "Square", "Trait method should work for Square");
     assert(s.area() == 100, "Square area should be 10*10 = 100");
 }
-
-main();

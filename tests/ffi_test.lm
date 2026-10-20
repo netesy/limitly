@@ -9,5 +9,3 @@ fn main() {
         print("[FAIL] ffi.alloc should return non-zero pointer - Got: {ptr}");
     }
 }
-
-main();

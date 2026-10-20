@@ -53,5 +53,3 @@ fn main() {
  print("All regex match tests passed successfully!");
  print("========================================");
 }
-
-main();

@@ -77,5 +77,3 @@ fn main() {
  print("All std.compress tests passed successfully!");
  print("========================================");
 }
-
-main();

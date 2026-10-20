@@ -6,5 +6,3 @@ fn main() {
     assert(color != 0, "std.gg rgba should pack a non-zero color");
     print("std.gg smoke passed");
 }
-
-main();

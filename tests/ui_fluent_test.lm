@@ -190,5 +190,3 @@ fn main() {
     test_retained_lifecycle_and_callback();
     print("=== All Fluent UI Tests Passed Successfully ===");
 }
-
-main();

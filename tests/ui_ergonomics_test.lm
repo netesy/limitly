@@ -175,5 +175,3 @@ fn main() {
     gg.shutdown();
     print("=== All 5 Ergonomics Forms Successfully Rendered and Verified ===");
 }
-
-main();

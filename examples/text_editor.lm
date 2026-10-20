@@ -692,5 +692,3 @@ pub fn main(): int {
     print("Lymar Studio Text Editor closed cleanly.");
     return 0;
 }
-
-main();

@@ -21,4 +21,3 @@ fn main() {
 
     print("--- Promotion Test Complete ---");
 }
-main();

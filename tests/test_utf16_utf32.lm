@@ -46,5 +46,3 @@ fn main() {
 
  print("=== ALL UTF-16 AND UTF-32 TESTS PASSED ===");
 }
-
-main();

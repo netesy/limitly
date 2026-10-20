@@ -7,5 +7,3 @@ fn main() {
     print(replaced);
     assert(replaced == "Hello, Lymar Language!", "Replace failure");
 }
-
-main();

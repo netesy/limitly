@@ -11,4 +11,3 @@ fn main() {
     ffi.ffi_free(p);
     print("Done.");
 }
-main();

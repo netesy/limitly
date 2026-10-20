@@ -39,5 +39,3 @@ fn main() {
     app.run();
     print("Done");
 }
-
-main();

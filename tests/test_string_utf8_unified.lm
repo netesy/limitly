@@ -56,5 +56,3 @@ fn main() {
 
     print("=== ALL UNIFIED STRING ARCHITECTURE TESTS PASSED ===");
 }
-
-main();

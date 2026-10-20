@@ -26,5 +26,3 @@ fn main() {
     gg.shutdown();
     print("Pixel verification passed successfully.");
 }
-
-main();

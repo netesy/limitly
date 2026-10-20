@@ -112,5 +112,3 @@ fn main() {
  print("All std.crypto tests passed successfully!");
  print("========================================");
 }
-
-main();

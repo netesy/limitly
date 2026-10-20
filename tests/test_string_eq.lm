@@ -11,5 +11,3 @@ fn main() {
     assert(replaced == "Hello, Lymar Language!", "Replace failure");
     print("Assert passed!");
 }
-
-main();

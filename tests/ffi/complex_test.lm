@@ -50,5 +50,3 @@ fn main() {
     }
     print("FFI Complex Test Finished!");
 }
-
-main();

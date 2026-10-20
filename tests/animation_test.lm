@@ -219,5 +219,3 @@ fn main(): int {
     print("=== All Unified Animation System Tests Passed Successfully ===");
     return 0;
 }
-
-main();

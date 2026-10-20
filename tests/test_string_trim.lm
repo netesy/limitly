@@ -5,5 +5,3 @@ fn main() {
     var trimmed = string.trim(text);
     print(trimmed);
 }
-
-main();

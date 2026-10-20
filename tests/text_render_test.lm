@@ -29,5 +29,3 @@ fn main() {
     gg.shutdown();
     print("Text Glyph Rendering Verification Passed.");
 }
-
-main();

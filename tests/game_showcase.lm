@@ -306,5 +306,3 @@ fn main(): int {
                                                                                                                                 print("Lymar Game Showcase closed successfully.");
                                                                                                                                 return 0;
                                                                                                                                 }
-
-                                                                                                                                main();

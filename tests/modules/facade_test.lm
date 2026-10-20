@@ -81,5 +81,3 @@ fn main() {
 
     print("All standard library package facades successfully resolved.");
 }
-
-main();

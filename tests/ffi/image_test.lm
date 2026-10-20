@@ -17,4 +17,3 @@ fn main() {
     ffi.free(pixels);
     ffi.library_unload(lib);
 }
-main();

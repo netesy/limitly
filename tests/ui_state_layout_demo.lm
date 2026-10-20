@@ -126,5 +126,3 @@ fn main() {
     // Cleanup effects
     ui.dispose_all_effects();
 }
-
-main();

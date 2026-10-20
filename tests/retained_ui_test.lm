@@ -48,5 +48,3 @@ fn main() {
     gg.shutdown();
     print("Retained UI Interactive Test Passed.");
 }
-
-main();
