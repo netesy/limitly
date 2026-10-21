@@ -16,7 +16,27 @@ namespace LM {
 namespace LIR {
 
 bool Optimizer::optimize() {
+    auto reindex_labels = [](LIR_Function& func) {
+        std::unordered_map<Imm, Imm> label_remap;
+        for (size_t i = 0; i < func.instructions.size(); ++i) {
+            auto& inst = func.instructions[i];
+            if (inst.op == LIR_Op::Label) {
+                label_remap[inst.imm] = static_cast<Imm>(i);
+                inst.imm = static_cast<Imm>(i);
+            }
+        }
+        for (auto& inst : func.instructions) {
+            if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
+                auto it = label_remap.find(inst.imm);
+                if (it != label_remap.end()) {
+                    inst.imm = it->second;
+                }
+            }
+        }
+    };
+
     auto verify_memory_contract = [&]() {
+        reindex_labels(func_);
         std::vector<std::string> errors;
         if (!Verifier::verify_memory_regions(func_, errors) || !Verifier::verify_ownership(func_, errors)) {
             std::string diagnostic = "Invalid canonical memory contract during optimization of " + func_.name;
@@ -1009,7 +1029,7 @@ bool Optimizer::remove_redundant_entry_calls() {
                 // Linearized branches contain instruction indices, not labels.
                 for (auto& instruction : func_.instructions) {
                     if ((instruction.op == LIR_Op::Jump || instruction.op == LIR_Op::JumpIf ||
-                         instruction.op == LIR_Op::JumpIfFalse) && instruction.imm > removed) {
+                         instruction.op == LIR_Op::JumpIfFalse || instruction.op == LIR_Op::Label) && instruction.imm > removed) {
                         --instruction.imm;
                     }
                 }

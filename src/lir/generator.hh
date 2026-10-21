@@ -431,6 +431,9 @@ private:
     Reg frame_this_register_ = UINT32_MAX;  // Register holding 'this' pointer in frame methods
     
     
+    // Basic block termination tracking flag
+    bool m_is_terminated = false;
+
     // Channel context for concurrent blocks
     Reg channel_context_ = UINT32_MAX;
     

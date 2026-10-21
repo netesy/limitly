@@ -1,4 +1,8 @@
-// Regression test asserting LIR devirtualization
+// Regression test asserting LIR devirtualization and basic block termination tracking
+
+import std.ffi as ffi;
+import std.io.index as io;
+import std.io.file as file_mod;
 
 frame ListWrapper {
     pub items: [int];
@@ -19,12 +23,128 @@ frame ListWrapper {
     }
 }
 
+fn execute_sys_cmd(cmd: str): int {
+    unsafe {
+        var h = ffi.library_load("libc.so.6");
+        if (h == nil) {
+            h = ffi.library_load("libc.so");
+        }
+        if (h != nil) {
+            var sys_ptr = ffi.library_get_symbol(h, "system");
+            if (sys_ptr != nil and sys_ptr != 0) {
+                var cs = ffi.string_to_cstring(cmd);
+                var res = ffi.call_i64_1(sys_ptr, cs.ptr);
+                ffi.cstring_free(cs);
+                ffi.library_unload(h);
+                return res;
+            }
+        }
+    }
+    return -1;
+}
+
 fn main(): int {
     var wrapper = ListWrapper([10, 20, 30]);
     var item1 = wrapper.next();
     var item2 = wrapper.next();
     assert(item1 == 10, "item1 should equal 10");
     assert(item2 == 20, "item2 should equal 20");
+
+    // LIR Output Inspection
+    var tmp_file = "devirt_test.tmp";
+    var cmd = "./bin/lymar -lir tests/lir/devirtualization_lir_test.lm > " + tmp_file + " 2>&1";
+    var res = execute_sys_cmd(cmd);
+    assert(res == 0, "LIR compilation execution failed");
+    assert(io.exists(tmp_file), "LIR temporary output file should exist");
+
+    var file_res = file_mod.open(tmp_file, "r");
+    var content = "";
+    match (file_res) {
+        val f_obj => {
+            var f_concrete = f_obj as file_mod.File;
+            var content_res = f_concrete.read();
+            match (content_res) {
+                val text => {
+                    content = text;
+                    nil;
+                },
+                err e => {
+                    assert(false, "Failed to read LIR output file");
+                    nil;
+                }
+            }
+            f_concrete.close();
+            nil;
+        },
+        err e => {
+            assert(false, "Failed to open LIR output file");
+            nil;
+        }
+    }
+
+    // Clean up temporary test artifacts
+    io.delete(tmp_file);
+    if (io.exists("test_io_temp.txt")) {
+        io.delete("test_io_temp.txt");
+    }
+
+    // Assert 1: TraitCallMethod count is 0 on devirtualized method paths
+    var main_pos = _builtin_string_index_of(content, "fn main");
+    assert(main_pos >= 0, "Could not locate 'fn main' in emitted LIR");
+
+    var user_code_section = substring(content, main_pos, len(content));
+    var subsequent_fn_pos = _builtin_string_index_of(substring(user_code_section, 7, len(user_code_section)), "fn ");
+    if (subsequent_fn_pos > 0) {
+        user_code_section = substring(user_code_section, 0, subsequent_fn_pos + 7);
+    }
+
+    assert(_builtin_string_contains(user_code_section, "TraitCallMethod") == false, "TraitCallMethod found on devirtualized path in main()");
+
+    // Assert 2: Direct frame call symbols are present
+    assert(_builtin_string_contains(content, "ListWrapper.init") == true, "ListWrapper.init call symbol missing");
+    assert(_builtin_string_contains(content, "ListWrapper.next") == true, "ListWrapper.next call symbol missing");
+
+    // Assert 3: No instructions follow an explicit Return opcode in the same linear block
+    var lines: [str] = [];
+    var current_line = "";
+    for (var i = 0; i < len(user_code_section); i = i + 1) {
+        var ch = substring(user_code_section, i, i + 1);
+        if (ch == "\n") {
+            lines.append(current_line);
+            current_line = "";
+        } else {
+            current_line = current_line + ch;
+        }
+    }
+    if (len(current_line) > 0) {
+        lines.append(current_line);
+    }
+
+    var seen_return = false;
+    for (var j = 0; j < len(lines); j = j + 1) {
+        var line = lines[j];
+
+        var is_block_boundary = _builtin_string_contains(line, "fn ") or
+                                _builtin_string_contains(line, "===") or
+                                _builtin_string_contains(line, "bb_") or
+                                _builtin_string_contains(line, "label_") or
+                                (_builtin_string_contains(line, "L") and _builtin_string_contains(line, ":"));
+
+        if (is_block_boundary) {
+            seen_return = false;
+        } else if (_builtin_string_contains(line, "Return") or _builtin_string_contains(line, "Ret ")) {
+            seen_return = true;
+        } else if (seen_return) {
+            var is_instruction = _builtin_string_contains(line, "=") or
+                                 _builtin_string_contains(line, "Region") or
+                                 _builtin_string_contains(line, "Call") or
+                                 _builtin_string_contains(line, "Jump");
+            if (is_instruction) {
+                assert(false, "Unreachable instruction following Return opcode: " + line);
+            }
+        }
+    }
+
     print("LIR Devirtualization Inspection Test Passed.");
     return 0;
 }

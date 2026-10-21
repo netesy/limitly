@@ -43,6 +43,7 @@ std::unique_ptr<LIR_Function> Generator::generate_program(const LM::Frontend::Ty
         lower_function_bodies(type_check_result);
     
     // PASS 2: Generate main function with top-level code only
+    m_is_terminated = false;
     current_module_ = "root";
     current_function_ = std::make_unique<LIR_Function>("__top_level_wrapper__", 0);
     next_register_ = 0;
@@ -172,6 +173,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     Reg saved_this_register = this_register_;
     uint32_t saved_region_counter = generator_region_counter_;
     auto saved_region_stack = std::move(generator_region_stack_);
+    bool saved_is_terminated = m_is_terminated;
     
     generator_region_counter_ = 0;
     generator_region_stack_.clear();
@@ -185,6 +187,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
         total_params++;
     }
 
+    m_is_terminated = false;
     current_function_ = std::make_unique<LIR_Function>(fn.name, total_params);
     next_register_ = total_params;
 
@@ -326,6 +329,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     this_register_ = saved_this_register;
     generator_region_counter_ = saved_region_counter;
     generator_region_stack_ = std::move(saved_region_stack);
+    m_is_terminated = saved_is_terminated;
 }
 
 
@@ -550,6 +554,9 @@ void Generator::emit_ownership_event(const Memory::OwnershipEvent& event) {
 }
 
 void Generator::emit_instruction(const LIR_Inst& inst) {
+    if (m_is_terminated) {
+        return;
+    }
     if (current_function_ && inst.isReturn() && !generator_region_stack_.empty()) {
         // All explicit and implicit returns use the same lifetime cleanup,
         // including frame methods and synthesized work-item functions.
@@ -897,6 +904,8 @@ void Generator::flatten_cfg_to_instructions() {
                     // Block not found - this might be an error
                     std::cerr << "Warning: Jump target block " << inst.imm << " not found in block_positions" << std::endl;
                 }
+            } else if (inst.op == LIR_Op::Label) {
+                modified_inst.imm = static_cast<Imm>(current_function_->instructions.size());
             }
             
             current_function_->instructions.push_back(modified_inst);
@@ -907,6 +916,7 @@ void Generator::flatten_cfg_to_instructions() {
 
 void Generator::emit_label_jump(LIR_Op op, Reg cond, uint32_t label) {
     if (!current_function_) return;
+    if (m_is_terminated) return;
     if (cfg_context_.building_cfg) {
         report_error("Internal error: symbolic label jump emitted while building CFG");
         return;
@@ -923,6 +933,7 @@ void Generator::emit_label_jump(LIR_Op op, Reg cond, uint32_t label) {
 
 
 void Generator::place_label(uint32_t label) {
+    m_is_terminated = false;
     if (!current_function_) return;
     auto& state = linear_label_states_[current_function_.get()];
     state.positions[label] = current_function_->instructions.size();
@@ -969,6 +980,7 @@ LIR_BasicBlock* Generator::create_basic_block(const std::string& label) {
 
 void Generator::set_current_block(LIR_BasicBlock* block) {
     cfg_context_.current_block = block;
+    m_is_terminated = false;
 }
 
 

@@ -43,6 +43,8 @@ tests/modules/module_caching_test.lm
 tests/modules/function_params_test.lm
 tests/modules/alias_import_test.lm
 tests/modules/multiple_imports_test.lm
+# LIR
+tests/lir/devirtualization_lir_test.lm
 # OOP
 tests/oop/frame_declaration.lm
 tests/oop/traits_dynamic.lm

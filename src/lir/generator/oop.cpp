@@ -34,6 +34,7 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     // Create function with parameters (including 'this' as first parameter)
     size_t total_params = method.params.size() + 1; // +1 for 'this'
     checked_references_.clear();
+    m_is_terminated = false;
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
     next_register_ = total_params;
     next_label_ = 0;
@@ -71,10 +72,12 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     }
     
     // Add implicit return
-    if (!current_function_->instructions.empty() && !current_function_->instructions.back().isReturn()) {
-        emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
-    } else if (current_function_->instructions.empty()) {
-        emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+    if (!m_is_terminated) {
+        if (!current_function_->instructions.empty() && !current_function_->instructions.back().isReturn()) {
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+        } else if (current_function_->instructions.empty()) {
+            emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, 0, 0));
+        }
     }
 
     exit_scope();
@@ -153,6 +156,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     // Create function with parameters (including 'this' as first parameter)
     size_t total_params = method.parameters.size() + method.optionalParams.size() + 1; // +1 for 'this'
     checked_references_.clear();
+    m_is_terminated = false;
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
     next_register_ = total_params;
     next_label_ = 0;
@@ -204,7 +208,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     }
     
     // Add implicit return if none exists
-    if (!cfg_context_.building_cfg) {
+    if (!m_is_terminated && !cfg_context_.building_cfg) {
         // Linear mode - add implicit return if function doesn't end with return
         if (current_function_->instructions.empty() || 
             !current_function_->instructions.back().isReturn()) {
@@ -300,6 +304,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     // Create function with parameters (including 'this' as first parameter)
     size_t total_params = init_method.parameters.size() + init_method.optionalParams.size() + 1; // +1 for 'this'
     checked_references_.clear();
+    m_is_terminated = false;
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
     next_register_ = total_params;
     next_label_ = 0;
@@ -351,7 +356,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     }
     
     // Add implicit return if none exists
-    if (!cfg_context_.building_cfg) {
+    if (!m_is_terminated && !cfg_context_.building_cfg) {
         // Linear mode - add implicit return if function doesn't end with return
         if (current_function_->instructions.empty() || 
             !current_function_->instructions.back().isReturn()) {
@@ -441,6 +446,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     // Create function with only 'this' parameter (deinit takes no other parameters)
     size_t total_params = 1; // Only 'this'
     checked_references_.clear();
+    m_is_terminated = false;
     current_function_ = std::make_unique<LIR_Function>(full_method_name, total_params);
     next_register_ = total_params;
     next_label_ = 0;
@@ -484,7 +490,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     }
     
     // Add implicit return if none exists
-    if (!cfg_context_.building_cfg) {
+    if (!m_is_terminated && !cfg_context_.building_cfg) {
         // Linear mode - add implicit return if function doesn't end with return
         if (current_function_->instructions.empty() || 
             !current_function_->instructions.back().isReturn()) {

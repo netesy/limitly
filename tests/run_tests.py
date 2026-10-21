@@ -26,6 +26,7 @@ tests = load_tests_from_file(test_manifest_path)
 
 # Tests that need extra time (resource creation, crypto, network)
 slow_tests = {
+ "tests/lir/devirtualization_lir_test.lm",
  "tests/stdlib/crypto/hash_test.lm",
  "tests/stdlib/net/net_test.lm",
  "tests/stdlib/io/io_extended_test.lm",

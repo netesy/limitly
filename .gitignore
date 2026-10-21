@@ -96,3 +96,7 @@ Thumbs.db
 /.qmake.cache
 /.qmake.stash
 .cache
+
+# Test artifacts
+test_io_temp.txt
+*.tmp

@@ -1800,6 +1800,12 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         
         Reg result = allocate_register();
         TypePtr object_type = member_expr->object->inferred_type;
+        if (!object_type) {
+            object_type = get_register_language_type(object_reg);
+        }
+        if (!object_type) {
+            object_type = get_register_type(object_reg);
+        }
 
         // Built-in methods
         if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::String)) {

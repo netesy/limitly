@@ -527,6 +527,7 @@ void Generator::emit_destructuring_var_stmt(LM::Frontend::AST::DestructuringDecl
 void Generator::emit_block_stmt(LM::Frontend::AST::BlockStatement& stmt) {
     enter_scope();
     for (const auto& block_stmt : stmt.statements) {
+        if (m_is_terminated) break;
         emit_stmt(*block_stmt);
     }
     exit_scope();
@@ -626,27 +627,39 @@ void Generator::emit_if_stmt_linear(LM::Frontend::AST::IfStatement& stmt) {
     
     // Emit then branch
     emit_stmt(*stmt.thenBranch);
+    bool then_terminated = m_is_terminated;
     
     if (stmt.elseBranch) {
         // Reserve space for jump to end
-        size_t end_jump_pc = current_function_->instructions.size();
-        emit_instruction(LIR_Inst(LIR_Op::Jump, 0)); // Placeholder target
+        size_t end_jump_pc = 0;
+        if (!then_terminated) {
+            end_jump_pc = current_function_->instructions.size();
+            emit_instruction(LIR_Inst(LIR_Op::Jump, 0)); // Placeholder target
+        }
         
         // Update false jump to point to else branch
         size_t else_start_pc = current_function_->instructions.size();
         current_function_->instructions[false_jump_pc].imm = else_start_pc;
         
+        m_is_terminated = false;
+
         // Emit else branch
         emit_stmt(*stmt.elseBranch);
+        bool else_terminated = m_is_terminated;
         
         // Update end jump to point after else branch
         size_t end_pc = current_function_->instructions.size();
-        current_function_->instructions[end_jump_pc].imm = end_pc;
+        if (!then_terminated) {
+            current_function_->instructions[end_jump_pc].imm = end_pc;
+        }
+
+        m_is_terminated = then_terminated && else_terminated;
     } else {
         // No else branch - the false jump should skip the then branch
-        // The target should be the next instruction after the then branch
         size_t end_pc = current_function_->instructions.size();
         current_function_->instructions[false_jump_pc].imm = end_pc;
+
+        m_is_terminated = false;
     }
 }
 
@@ -923,6 +936,7 @@ void Generator::emit_return_stmt(LM::Frontend::AST::ReturnStatement& stmt) {
         } else {
             emit_instruction(LIR_Inst(LIR_Op::Return, Type::Void, 0, UINT32_MAX, 0));
         }
+        m_is_terminated = true;
     }
 }
 
