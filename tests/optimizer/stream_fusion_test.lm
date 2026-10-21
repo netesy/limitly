@@ -1,0 +1,89 @@
+// Regression test for AST Stream Fusion optimization pass
+
+import std.ffi as ffi;
+import std.io.index as io;
+import std.io.file as file_mod;
+
+fn execute_sys_cmd(cmd: str): int {
+    unsafe {
+        var h = ffi.library_load("libc.so.6");
+        if (h == nil) {
+            h = ffi.library_load("libc.so");
+        }
+        if (h != nil) {
+            var sys_ptr = ffi.library_get_symbol(h, "system");
+            if (sys_ptr != nil and sys_ptr != 0) {
+                var cs = ffi.string_to_cstring(cmd);
+                var res = ffi.call_i64_1(sys_ptr, cs.ptr);
+                ffi.cstring_free(cs);
+                ffi.library_unload(h);
+                return res;
+            }
+        }
+    }
+    return -1;
+}
+
+fn main(): int {
+    // Pipeline 1: Fused map / filter / fold
+    var list1 = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    var sum1 = list1.iter().map(fn(x) { x * 2 }).filter(fn(x) { x > 10 }).fold(0, fn(acc, x) { acc + x });
+    assert(sum1 == 80, "Fused map/filter/fold sum should equal 80");
+
+    // Pipeline 2: Fused range / map / take / collect
+    var collected = (1..20).map(fn(x) { x * x }).take(4).collect();
+    assert(len(collected) == 4, "Collected length should equal 4");
+    assert(collected[0] == 1, "collected[0] should be 1");
+    assert(collected[1] == 4, "collected[1] should be 4");
+    assert(collected[2] == 9, "collected[2] should be 9");
+    assert(collected[3] == 16, "collected[3] should be 16");
+
+    // Pipeline 3: Fused range / filter / skip / count
+    var count1 = (1..100).filter(fn(x) { x % 2 == 0 }).skip(10).count();
+    assert(count1 == 39, "Fused count should equal 39");
+
+    // LIR Output Inspection
+    var tmp_file = "stream_fusion_lir.tmp";
+    var cmd = "./bin/lymar -lir tests/optimizer/stream_fusion_test.lm > " + tmp_file + " 2>&1";
+    var res = execute_sys_cmd(cmd);
+    assert(res == 0, "LIR compilation execution failed");
+    assert(io.exists(tmp_file), "LIR temporary output file should exist");
+
+    var file_res = file_mod.open(tmp_file, "r");
+    var content = "";
+    match (file_res) {
+        val f_obj => {
+            var f_concrete = f_obj as file_mod.File;
+            var content_res = f_concrete.read();
+            match (content_res) {
+                val text => {
+                    content = text;
+                    nil;
+                },
+                err e => {
+                    assert(false, "Failed to read LIR output file");
+                    nil;
+                }
+            }
+            f_concrete.close();
+            nil;
+        },
+        err e => {
+            assert(false, "Failed to open LIR output file");
+            nil;
+        }
+    }
+
+    // Clean up temporary test artifacts
+    io.delete(tmp_file);
+
+    // Verify zero intermediate iterator allocations or trait dispatches in LIR
+    var map_iter_str = "Map" + "Iterator";
+    var filter_iter_str = "Filter" + "Iterator";
+
+    assert(_builtin_string_contains(content, map_iter_str) == false, "Unexpected map iterator allocation");
+    assert(_builtin_string_contains(content, filter_iter_str) == false, "Unexpected filter iterator allocation");
+
+    print("Stream Fusion Test Passed.");
+    return 0;
+}

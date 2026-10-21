@@ -1877,7 +1877,7 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
 
     std::string member_name = expr->name;
     
-    if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::String)) {
+    if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::Range || object_type->tag == TypeTag::String)) {
         if (member_name == "len" || member_name == "length") {
             return wrap_result(type_system.createFunctionType({}, type_system.INT64_TYPE));
         }

@@ -5,6 +5,7 @@
 #include "frontend/ast/printer.hh"
 #include "frontend/type_checker.hh"
 #include "frontend/memory_checker.hh"
+#include "frontend/optimizer/stream_fusion.hh"
 #include "frontend/module_manager.hh"
 #include "memory/ownership.hh"
 #include "lir/generator.hh"
@@ -76,6 +77,8 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
         }
 
         LM::Frontend::ModuleManager::getInstance().set_include_dirs(options.include_dirs);
+
+        ast = LM::Frontend::AST::StreamFusionVisitor::optimizeProgram(ast);
 
         const auto verification_policy = options.strict_verification
             ? LM::Frontend::VerificationPolicy::Strict
