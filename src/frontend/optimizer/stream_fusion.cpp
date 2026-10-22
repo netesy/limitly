@@ -61,7 +61,7 @@ static std::shared_ptr<LiteralExpr> makeLiteralInt(int64_t val, int line) {
 
 static std::shared_ptr<LiteralExpr> makeLiteralNil(int line) {
     auto lit = std::make_shared<LiteralExpr>();
-    lit->value = nullptr;
+    lit->value = std::string("nil");
     lit->literalType = TokenType::NIL;
     lit->inferred_type = std::make_shared<::Type>(::TypeTag::Nil);
     lit->line = line;
@@ -140,50 +140,69 @@ static std::shared_ptr<ExprStatement> makeExprStmt(std::shared_ptr<Expression> e
     return stmt;
 }
 
-// Check for unsupported control flow inside lambda closures
+// Check for unsupported control flow (e.g. returns, loops, breaks) inside closure AST
+static bool containsControlFlowOrReturn(std::shared_ptr<Node> node) {
+    if (!node) return false;
+
+    if (std::dynamic_pointer_cast<ReturnStatement>(node) ||
+        std::dynamic_pointer_cast<BreakStatement>(node) ||
+        std::dynamic_pointer_cast<ContinueStatement>(node) ||
+        std::dynamic_pointer_cast<WhileStatement>(node) ||
+        std::dynamic_pointer_cast<ForStatement>(node)) {
+        return true;
+    }
+
+    if (auto block = std::dynamic_pointer_cast<BlockStatement>(node)) {
+        for (auto& s : block->statements) {
+            if (containsControlFlowOrReturn(s)) return true;
+        }
+    } else if (auto ifStmt = std::dynamic_pointer_cast<IfStatement>(node)) {
+        if (containsControlFlowOrReturn(ifStmt->condition)) return true;
+        if (containsControlFlowOrReturn(ifStmt->thenBranch)) return true;
+        if (containsControlFlowOrReturn(ifStmt->elseBranch)) return true;
+    } else if (auto exprStmt = std::dynamic_pointer_cast<ExprStatement>(node)) {
+        return containsControlFlowOrReturn(exprStmt->expression);
+    } else if (auto bin = std::dynamic_pointer_cast<BinaryExpr>(node)) {
+        return containsControlFlowOrReturn(bin->left) || containsControlFlowOrReturn(bin->right);
+    } else if (auto un = std::dynamic_pointer_cast<UnaryExpr>(node)) {
+        return containsControlFlowOrReturn(un->right);
+    } else if (auto call = std::dynamic_pointer_cast<CallExpr>(node)) {
+        if (containsControlFlowOrReturn(call->callee)) return true;
+        for (auto& arg : call->arguments) {
+            if (containsControlFlowOrReturn(arg)) return true;
+        }
+    } else if (auto varDecl = std::dynamic_pointer_cast<VarDeclaration>(node)) {
+        if (containsControlFlowOrReturn(varDecl->initializer)) return true;
+    }
+
+    return false;
+}
+
 static bool hasUnsupportedControlFlow(std::shared_ptr<Node> node) {
     if (!node) return false;
 
     if (auto lambda = std::dynamic_pointer_cast<LambdaExpr>(node)) {
-        return hasUnsupportedControlFlow(lambda->body);
-    } else if (auto block = std::dynamic_pointer_cast<BlockStatement>(node)) {
-        for (size_t i = 0; i < block->statements.size(); ++i) {
-            auto s = block->statements[i];
-            if (auto ret = std::dynamic_pointer_cast<ReturnStatement>(s)) {
-                // Return statement is only allowed as the last statement in top lambda block
-                if (i != block->statements.size() - 1) return true;
-                if (hasUnsupportedControlFlow(ret->value)) return true;
+        if (!lambda->body) return false;
+        const auto& stmts = lambda->body->statements;
+        for (size_t i = 0; i < stmts.size(); ++i) {
+            if (i == stmts.size() - 1) {
+                // Trailing statement may be a return statement or expression
+                if (auto ret = std::dynamic_pointer_cast<ReturnStatement>(stmts[i])) {
+                    if (containsControlFlowOrReturn(ret->value)) return true;
+                } else {
+                    if (containsControlFlowOrReturn(stmts[i])) return true;
+                }
             } else {
-                if (hasUnsupportedControlFlow(s)) return true;
+                if (containsControlFlowOrReturn(stmts[i])) return true;
             }
         }
         return false;
-    } else if (std::dynamic_pointer_cast<BreakStatement>(node) || std::dynamic_pointer_cast<ContinueStatement>(node)) {
-        return true;
-    } else if (auto ifStmt = std::dynamic_pointer_cast<IfStatement>(node)) {
-        if (hasUnsupportedControlFlow(ifStmt->condition)) return true;
-        if (hasUnsupportedControlFlow(ifStmt->thenBranch)) return true;
-        if (hasUnsupportedControlFlow(ifStmt->elseBranch)) return true;
-    } else if (auto whileStmt = std::dynamic_pointer_cast<WhileStatement>(node)) {
-        return true; // loops inside lambda not supported for simple stream inlining
-    } else if (auto forStmt = std::dynamic_pointer_cast<ForStatement>(node)) {
-        return true;
-    } else if (auto exprStmt = std::dynamic_pointer_cast<ExprStatement>(node)) {
-        return hasUnsupportedControlFlow(exprStmt->expression);
-    } else if (auto bin = std::dynamic_pointer_cast<BinaryExpr>(node)) {
-        return hasUnsupportedControlFlow(bin->left) || hasUnsupportedControlFlow(bin->right);
-    } else if (auto un = std::dynamic_pointer_cast<UnaryExpr>(node)) {
-        return hasUnsupportedControlFlow(un->right);
-    } else if (auto call = std::dynamic_pointer_cast<CallExpr>(node)) {
-        if (hasUnsupportedControlFlow(call->callee)) return true;
-        for (auto& arg : call->arguments) {
-            if (hasUnsupportedControlFlow(arg)) return true;
-        }
     }
-    return false;
+
+    return containsControlFlowOrReturn(node);
 }
 
-// Substitute variable names in AST
+// Substitute variable names in AST recursively across all expression/statement types
 static std::shared_ptr<Expression> substituteExpr(std::shared_ptr<Expression> expr, const std::unordered_map<std::string, std::shared_ptr<Expression>>& subMap);
 static std::shared_ptr<Statement> substituteStmt(std::shared_ptr<Statement> stmt, const std::unordered_map<std::string, std::shared_ptr<Expression>>& subMap);
 
@@ -219,6 +238,13 @@ static std::shared_ptr<Expression> substituteExpr(std::shared_ptr<Expression> ex
         for (auto& a : call->arguments) copy->arguments.push_back(substituteExpr(a, subMap));
         copy->line = call->line;
         copy->inferred_type = call->inferred_type;
+        return copy;
+    } else if (auto closureCall = std::dynamic_pointer_cast<CallClosureExpr>(expr)) {
+        auto copy = std::make_shared<CallClosureExpr>();
+        copy->closure = substituteExpr(closureCall->closure, subMap);
+        for (auto& a : closureCall->arguments) copy->arguments.push_back(substituteExpr(a, subMap));
+        copy->line = closureCall->line;
+        copy->inferred_type = closureCall->inferred_type;
         return copy;
     } else if (auto mem = std::dynamic_pointer_cast<MemberExpr>(expr)) {
         auto copy = std::make_shared<MemberExpr>();
@@ -257,6 +283,98 @@ static std::shared_ptr<Expression> substituteExpr(std::shared_ptr<Expression> ex
         copy->line = grp->line;
         copy->inferred_type = grp->inferred_type;
         return copy;
+    } else if (auto listExpr = std::dynamic_pointer_cast<ListExpr>(expr)) {
+        auto copy = std::make_shared<ListExpr>();
+        for (auto& elem : listExpr->elements) copy->elements.push_back(substituteExpr(elem, subMap));
+        copy->line = listExpr->line;
+        copy->inferred_type = listExpr->inferred_type;
+        return copy;
+    } else if (auto tupleExpr = std::dynamic_pointer_cast<TupleExpr>(expr)) {
+        auto copy = std::make_shared<TupleExpr>();
+        for (auto& elem : tupleExpr->elements) copy->elements.push_back(substituteExpr(elem, subMap));
+        copy->line = tupleExpr->line;
+        copy->inferred_type = tupleExpr->inferred_type;
+        return copy;
+    } else if (auto dictExpr = std::dynamic_pointer_cast<DictExpr>(expr)) {
+        auto copy = std::make_shared<DictExpr>();
+        for (auto& entry : dictExpr->entries) {
+            copy->entries.push_back({substituteExpr(entry.first, subMap), substituteExpr(entry.second, subMap)});
+        }
+        copy->line = dictExpr->line;
+        copy->inferred_type = dictExpr->inferred_type;
+        return copy;
+    } else if (auto objLit = std::dynamic_pointer_cast<ObjectLiteralExpr>(expr)) {
+        auto copy = std::make_shared<ObjectLiteralExpr>();
+        copy->constructorName = objLit->constructorName;
+        for (auto& kv : objLit->properties) {
+            copy->properties[kv.first] = substituteExpr(kv.second, subMap);
+        }
+        copy->line = objLit->line;
+        copy->inferred_type = objLit->inferred_type;
+        return copy;
+    } else if (auto frameInst = std::dynamic_pointer_cast<FrameInstantiationExpr>(expr)) {
+        auto copy = std::make_shared<FrameInstantiationExpr>();
+        copy->frameName = frameInst->frameName;
+        for (auto& arg : frameInst->positionalArgs) copy->positionalArgs.push_back(substituteExpr(arg, subMap));
+        for (auto& kv : frameInst->namedArgs) copy->namedArgs[kv.first] = substituteExpr(kv.second, subMap);
+        copy->line = frameInst->line;
+        copy->inferred_type = frameInst->inferred_type;
+        return copy;
+    } else if (auto rng = std::dynamic_pointer_cast<RangeExpr>(expr)) {
+        auto copy = std::make_shared<RangeExpr>();
+        copy->start = substituteExpr(rng->start, subMap);
+        copy->end = substituteExpr(rng->end, subMap);
+        copy->step = substituteExpr(rng->step, subMap);
+        copy->inclusive = rng->inclusive;
+        copy->line = rng->line;
+        copy->inferred_type = rng->inferred_type;
+        return copy;
+    } else if (auto interp = std::dynamic_pointer_cast<InterpolatedStringExpr>(expr)) {
+        auto copy = std::make_shared<InterpolatedStringExpr>();
+        for (auto& part : interp->parts) {
+            if (std::holds_alternative<std::string>(part)) {
+                copy->parts.push_back(part);
+            } else {
+                copy->parts.push_back(substituteExpr(std::get<std::shared_ptr<Expression>>(part), subMap));
+            }
+        }
+        copy->line = interp->line;
+        copy->inferred_type = interp->inferred_type;
+        return copy;
+    } else if (auto cast = std::dynamic_pointer_cast<CastExpr>(expr)) {
+        auto copy = std::make_shared<CastExpr>();
+        copy->expression = substituteExpr(cast->expression, subMap);
+        copy->targetType = cast->targetType;
+        copy->line = cast->line;
+        copy->inferred_type = cast->inferred_type;
+        return copy;
+    } else if (auto fallible = std::dynamic_pointer_cast<FallibleExpr>(expr)) {
+        auto copy = std::make_shared<FallibleExpr>();
+        copy->expression = substituteExpr(fallible->expression, subMap);
+        copy->elseHandler = substituteStmt(fallible->elseHandler, subMap);
+        copy->elseVariable = fallible->elseVariable;
+        copy->line = fallible->line;
+        copy->inferred_type = fallible->inferred_type;
+        return copy;
+    } else if (auto ok = std::dynamic_pointer_cast<OkConstructExpr>(expr)) {
+        auto copy = std::make_shared<OkConstructExpr>();
+        copy->value = substituteExpr(ok->value, subMap);
+        copy->line = ok->line;
+        copy->inferred_type = ok->inferred_type;
+        return copy;
+    } else if (auto errCons = std::dynamic_pointer_cast<ErrorConstructExpr>(expr)) {
+        auto copy = std::make_shared<ErrorConstructExpr>();
+        copy->errorType = errCons->errorType;
+        for (auto& arg : errCons->arguments) copy->arguments.push_back(substituteExpr(arg, subMap));
+        copy->line = errCons->line;
+        copy->inferred_type = errCons->inferred_type;
+        return copy;
+    } else if (auto some = std::dynamic_pointer_cast<SomeConstructExpr>(expr)) {
+        auto copy = std::make_shared<SomeConstructExpr>();
+        copy->value = substituteExpr(some->value, subMap);
+        copy->line = some->line;
+        copy->inferred_type = some->inferred_type;
+        return copy;
     } else if (auto lit = std::dynamic_pointer_cast<LiteralExpr>(expr)) {
         return lit;
     }
@@ -281,6 +399,18 @@ static std::shared_ptr<Statement> substituteStmt(std::shared_ptr<Statement> stmt
         auto copy = std::make_shared<ReturnStatement>();
         copy->value = substituteExpr(ret->value, subMap);
         copy->line = ret->line;
+        return copy;
+    } else if (auto ifStmt = std::dynamic_pointer_cast<IfStatement>(stmt)) {
+        auto copy = std::make_shared<IfStatement>();
+        copy->condition = substituteExpr(ifStmt->condition, subMap);
+        copy->thenBranch = substituteStmt(ifStmt->thenBranch, subMap);
+        copy->elseBranch = substituteStmt(ifStmt->elseBranch, subMap);
+        copy->line = ifStmt->line;
+        return copy;
+    } else if (auto block = std::dynamic_pointer_cast<BlockStatement>(stmt)) {
+        auto copy = std::make_shared<BlockStatement>();
+        for (auto& s : block->statements) copy->statements.push_back(substituteStmt(s, subMap));
+        copy->line = block->line;
         return copy;
     }
     return stmt;
@@ -582,7 +712,6 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
                 filter_eval = makeCall(t.arg, {makeVarExpr(curr_item_name, line)}, line);
             }
 
-            // if (!filter_eval) continue;
             auto not_filter = makeUnary(TokenType::BANG, filter_eval, line);
             auto cont_stmt = std::make_shared<ContinueStatement>();
             cont_stmt->line = line;

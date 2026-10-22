@@ -528,6 +528,15 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), reg_slots[r]);
     }
 
+    auto entry_alloc = [&](ir::Type* type = nullptr, ir::Value* size = nullptr) -> ir::Instruction* {
+        auto saved_ip = builder_->getInsertPoint();
+        builder_->setInsertPoint(entry_bb);
+        if (!size) size = context_->getConstantInt(context_->getIntegerType(64), 8);
+        auto* inst = builder_->createAlloc(size, type ? type : context_->getIntegerType(64));
+        if (saved_ip) builder_->setInsertPoint(saved_ip);
+        return inst;
+    };
+
     // Initialize registers from function parameters
     size_t param_idx = 0;
     for (const auto& param : main_fn->getParameters()) {
@@ -983,7 +992,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     ir::BasicBlock* b_safe = builder_->createBasicBlock("div_safe_" + div_id, cur_fn);
                     ir::BasicBlock* b_zero = builder_->createBasicBlock("div_zero_" + div_id, cur_fn);
                     ir::BasicBlock* b_done = builder_->createBasicBlock("div_done_" + div_id, cur_fn);
-                    ir::Instruction* res_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+                    ir::Instruction* res_slot = entry_alloc();
 
                     builder_->createBr(is_zero, b_zero, b_safe);
 
@@ -1009,7 +1018,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 ir::BasicBlock* b_safe = builder_->createBasicBlock("mod_safe_" + mod_id, cur_fn);
                 ir::BasicBlock* b_zero = builder_->createBasicBlock("mod_zero_" + mod_id, cur_fn);
                 ir::BasicBlock* b_done = builder_->createBasicBlock("mod_done_" + mod_id, cur_fn);
-                ir::Instruction* res_slot = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
+                ir::Instruction* res_slot = entry_alloc();
 
                 builder_->createBr(is_zero, b_zero, b_safe);
 
@@ -1085,9 +1094,18 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     : builder_->createCeq(equal, context_->getConstantInt(context_->getIntegerType(64), 0)), LIR::Type::Bool);
                 break;
             }
-            case LIR::LIR_Op::CmpLT:
+            case LIR::LIR_Op::CmpLT: {
+                auto is_known_int = [&](uint32_t r, LIR::Type t) {
+                    if (t == LIR::Type::I64 || t == LIR::Type::I32 || t == LIR::Type::U64) return true;
+                    auto it = lir_func.register_language_types.find(r);
+                    return it != lir_func.register_language_types.end() && it->second &&
+                        (it->second->tag == ::TypeTag::Int || it->second->tag == ::TypeTag::Int64 || it->second->tag == ::TypeTag::Int32);
+                };
                 if (is_float_op(inst)) {
                     ir::Value* c = builder_->createClt(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else if (is_known_int(inst.a, inst.type_a) && is_known_int(inst.b, inst.type_b)) {
+                    ir::Value* c = builder_->createCslt(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else if ((reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
                            (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
@@ -1101,9 +1119,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 }
                 break;
-            case LIR::LIR_Op::CmpLE:
+            }
+            case LIR::LIR_Op::CmpLE: {
+                auto is_known_int = [&](uint32_t r, LIR::Type t) {
+                    if (t == LIR::Type::I64 || t == LIR::Type::I32 || t == LIR::Type::U64) return true;
+                    auto it = lir_func.register_language_types.find(r);
+                    return it != lir_func.register_language_types.end() && it->second &&
+                        (it->second->tag == ::TypeTag::Int || it->second->tag == ::TypeTag::Int64 || it->second->tag == ::TypeTag::Int32);
+                };
                 if (is_float_op(inst)) {
                     ir::Value* c = builder_->createCle(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else if (is_known_int(inst.a, inst.type_a) && is_known_int(inst.b, inst.type_b)) {
+                    ir::Value* c = builder_->createCsle(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else if ((reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
                            (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
@@ -1117,9 +1145,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 }
                 break;
-            case LIR::LIR_Op::CmpGT:
+            }
+            case LIR::LIR_Op::CmpGT: {
+                auto is_known_int = [&](uint32_t r, LIR::Type t) {
+                    if (t == LIR::Type::I64 || t == LIR::Type::I32 || t == LIR::Type::U64) return true;
+                    auto it = lir_func.register_language_types.find(r);
+                    return it != lir_func.register_language_types.end() && it->second &&
+                        (it->second->tag == ::TypeTag::Int || it->second->tag == ::TypeTag::Int64 || it->second->tag == ::TypeTag::Int32);
+                };
                 if (is_float_op(inst)) {
                     ir::Value* c = builder_->createCgt(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else if (is_known_int(inst.a, inst.type_a) && is_known_int(inst.b, inst.type_b)) {
+                    ir::Value* c = builder_->createCsgt(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else if ((reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
                            (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
@@ -1133,9 +1171,19 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 }
                 break;
-            case LIR::LIR_Op::CmpGE:
+            }
+            case LIR::LIR_Op::CmpGE: {
+                auto is_known_int = [&](uint32_t r, LIR::Type t) {
+                    if (t == LIR::Type::I64 || t == LIR::Type::I32 || t == LIR::Type::U64) return true;
+                    auto it = lir_func.register_language_types.find(r);
+                    return it != lir_func.register_language_types.end() && it->second &&
+                        (it->second->tag == ::TypeTag::Int || it->second->tag == ::TypeTag::Int64 || it->second->tag == ::TypeTag::Int32);
+                };
                 if (is_float_op(inst)) {
                     ir::Value* c = builder_->createCge(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b));
+                    store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
+                } else if (is_known_int(inst.a, inst.type_a) && is_known_int(inst.b, inst.type_b)) {
+                    ir::Value* c = builder_->createCsge(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b));
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 } else if ((reg_types.count(inst.a) && reg_types[inst.a] == LIR::Type::Ptr) ||
                            (reg_types.count(inst.b) && reg_types[inst.b] == LIR::Type::Ptr) ||
@@ -1149,6 +1197,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     store_reg(inst.dst, builder_->createCast(c, context_->getIntegerType(64)), LIR::Type::Bool);
                 }
                 break;
+            }
             case LIR::LIR_Op::Jump: {
                 ir::BasicBlock* target = get_target_block(inst.imm, i);
                 if (target) {
@@ -2280,7 +2329,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             case LIR::LIR_Op::ResourceCall: {
                 auto* i64 = context_->getIntegerType(64);
                 const size_t count = inst.call_args.size() > 2 ? inst.call_args.size() - 2 : 0;
-                auto* args = builder_->createAlloc(context_->getConstantInt(i64, std::max(size_t(1), count) * 8), i64);
+                auto* args = entry_alloc(i64, context_->getConstantInt(i64, std::max(size_t(1), count) * 8));
                 for (size_t n = 0; n < count; ++n)
                     builder_->createStore(load_reg(inst.call_args[n + 2], LIR::Type::Ptr),
                         builder_->createAdd(args, context_->getConstantInt(i64, n * 8)));
@@ -2416,7 +2465,7 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                     if(inst.call_args.empty()) throw std::runtime_error("Foreign call missing target");
                     size_t count=inst.call_args.size()-1;
                     auto* size=context_->getConstantInt(context_->getIntegerType(64),std::max<size_t>(8,count*8));
-                    auto* values=builder_->createAlloc(size,context_->getPointerType(context_->getIntegerType(64)));auto* kinds=builder_->createAlloc(size,context_->getPointerType(context_->getIntegerType(64)));auto* types=builder_->createAlloc(size,context_->getPointerType(context_->getIntegerType(64)));
+                    auto* values=entry_alloc(context_->getPointerType(context_->getIntegerType(64)), size);auto* kinds=entry_alloc(context_->getPointerType(context_->getIntegerType(64)), size);auto* types=entry_alloc(context_->getPointerType(context_->getIntegerType(64)), size);
                     auto ffi_type=[](LIR::Type type)->uint64_t {switch(type) {
                         case LIR::Type::I8:return 0;case LIR::Type::U8:case LIR::Type::Bool:return 1;case LIR::Type::I16:return 2;case LIR::Type::U16:return 3;
                         case LIR::Type::I32:return 4;case LIR::Type::U32:return 5;case LIR::Type::I64:return 6;case LIR::Type::U64:return 7;

@@ -100,3 +100,4 @@ Thumbs.db
 # Test artifacts
 test_io_temp.txt
 *.tmp
+benchmarks/app_bench

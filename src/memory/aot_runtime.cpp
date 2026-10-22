@@ -107,7 +107,8 @@ struct SharedHeap {
     LM::Memory::DefaultAllocator allocator;
     LM::Memory::LifetimeRegistry lifetimes;
     Word next = 1;
-    std::map<Word, Allocation> allocations;
+    std::unordered_map<Word, Allocation> allocations;
+    std::unordered_map<Word, std::vector<Word>> page_map;
     ConcurrentRegions regions;
     std::map<Word,Word> shadow;
     std::map<Word,ReferenceOwner> reference_owners;
@@ -143,7 +144,8 @@ struct Heap {
     std::atomic<bool>* cancellation = nullptr;
     std::chrono::steady_clock::time_point deadline;
     bool timed = false, timed_out = false;
-    std::map<Word, Allocation>& allocations = shared_heap().allocations;
+    std::unordered_map<Word, Allocation>& allocations = shared_heap().allocations;
+    std::unordered_map<Word, std::vector<Word>>& page_map = shared_heap().page_map;
     ConcurrentRegions& regions = shared_heap().regions;
     std::map<Word, Word>& shadow = shared_heap().shadow;
     std::vector<Invocation> invocations;
@@ -158,10 +160,19 @@ struct Heap {
             first = shadow.erase(first);
     }
     auto containing(Word address) {
-        auto found = allocations.upper_bound(address);
-        if (found == allocations.begin()) return allocations.end();
-        --found;
-        return address - found->first < found->second.size ? found : allocations.end();
+        auto exact = allocations.find(address);
+        if (exact != allocations.end()) return exact;
+        Word page = address >> 12;
+        auto page_it = page_map.find(page);
+        if (page_it != page_map.end()) {
+            for (Word start : page_it->second) {
+                auto alloc_it = allocations.find(start);
+                if (alloc_it != allocations.end() && address >= start && address - start < alloc_it->second.size) {
+                    return alloc_it;
+                }
+            }
+        }
+        return allocations.end();
     }
     void promote(Word value, Word target) {
         std::vector<Word> pending{value};
@@ -205,6 +216,16 @@ struct Heap {
         lifetimes.revoke(pointer);
         shared_heap().schedulers.erase(pointer);
         shared_heap().closed_channels.erase(pointer);
+        Word size = found->second.size;
+        Word start_page = pointer >> 12;
+        Word end_page = (pointer + std::max<Word>(1, size) - 1) >> 12;
+        for (Word page = start_page; page <= end_page; ++page) {
+            auto page_it = page_map.find(page);
+            if (page_it != page_map.end()) {
+                std::erase(page_it->second, pointer);
+                if (page_it->second.empty()) page_map.erase(page_it);
+            }
+        }
         allocations.erase(found);
         allocator.deallocate(reinterpret_cast<void*>(pointer));
     }
@@ -608,6 +629,10 @@ uint64_t lymar_aot_to_boolean(uint64_t value, uint64_t kind) {
     }
 }
 int64_t lymar_aot_numeric_compare(uint64_t left, uint64_t right, uint64_t left_kind, uint64_t right_kind) {
+    if (!left_kind && !right_kind) {
+        int64_t a = static_cast<int64_t>(left), b = static_cast<int64_t>(right);
+        return a < b ? -1 : a > b ? 1 : 0;
+    }
     RuntimeGuard guard;
     auto classify = [&](Word value, Word kind) -> Word {
         if (kind != object_kind || lymar_aot_is_nil(value, kind)) return 0;
@@ -1028,7 +1053,13 @@ uint64_t lymar_aot_alloc(uint64_t size) {
     std::memset(reinterpret_cast<void*>(pointer), 0, std::max(size, Word(1)));
     auto& h = heap();
     try {
-        h.allocations.emplace(pointer, Allocation{static_cast<size_t>(std::max(size, Word(1))), h.active, {}});
+        Word alloc_size = std::max(size, Word(1));
+        h.allocations.emplace(pointer, Allocation{static_cast<size_t>(alloc_size), h.active, {}});
+        Word start_page = pointer >> 12;
+        Word end_page = (pointer + alloc_size - 1) >> 12;
+        for (Word page = start_page; page <= end_page; ++page) {
+            h.page_map[page].push_back(pointer);
+        }
         h.regions.at(h.active).members.insert(pointer);
     } catch (...) {
         h.allocations.erase(pointer);
