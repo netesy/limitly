@@ -72,29 +72,29 @@ void RegisterVM::execute_strings(const LIR::LIR_Inst* pc) {
                 if (is_integer(registers[pc->a]) && str_b != nullptr) {
                     int64_t byte_val = as_i64(registers[pc->a]);
                     if (byte_val >= 0 && byte_val <= 255) {
-                        char byte_char[2] = { (char)byte_val, '\0' };
-                        str_a = lm_str_from_bytes(byte_char, 1);
+                        str_a = lm_str_char((uint8_t)byte_val);
                     } else {
                         str_a = lm_value_to_string(registers[pc->a]);
+                        free_a = true;
                     }
                 } else {
                     str_a = lm_value_to_string(registers[pc->a]);
+                    free_a = true;
                 }
-                free_a = true;
             }
             if (!str_b) {
                 if (is_integer(registers[pc->b]) && str_a != nullptr) {
                     int64_t byte_val = as_i64(registers[pc->b]);
                     if (byte_val >= 0 && byte_val <= 255) {
-                        char byte_char[2] = { (char)byte_val, '\0' };
-                        str_b = lm_str_from_bytes(byte_char, 1);
+                        str_b = lm_str_char((uint8_t)byte_val);
                     } else {
                         str_b = lm_value_to_string(registers[pc->b]);
+                        free_b = true;
                     }
                 } else {
                     str_b = lm_value_to_string(registers[pc->b]);
+                    free_b = true;
                 }
-                free_b = true;
             }
 
             LmStringHeader* res = lm_str_concat(str_a, str_b);

@@ -10,7 +10,7 @@
   "stdlib_benchmarks": [
     {
       "workload": "String Concatenation (100k)",
-      "lymar_register_vm_ms": 4533.74,
+      "lymar_register_vm_ms": 4550.53,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 38450.0,
       "lymar_fyra_aot_status": "pass",
@@ -19,7 +19,7 @@
     },
     {
       "workload": "Vector Append & Indexing (1M)",
-      "lymar_register_vm_ms": 1276.27,
+      "lymar_register_vm_ms": 1305.08,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 4650.0,
       "lymar_fyra_aot_status": "pass",
@@ -28,7 +28,7 @@
     },
     {
       "workload": "Stream Pipeline Fused (5M)",
-      "lymar_register_vm_ms": 3490.15,
+      "lymar_register_vm_ms": 3628.95,
       "lymar_fyra_aot_build_ms": 344.90,
       "lymar_fyra_aot_ms": 24559.0,
       "lymar_fyra_aot_status": "pass",
@@ -37,7 +37,7 @@
     },
     {
       "workload": "Numeric Bitwise Loop (10M)",
-      "lymar_register_vm_ms": 12457.80,
+      "lymar_register_vm_ms": 12486.70,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 1850.0,
       "lymar_fyra_aot_status": "pass",

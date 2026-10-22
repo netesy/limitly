@@ -25,7 +25,37 @@ RUNTIME_API LmStringHeader* lm_str_alloc(uint64_t cap) {
     return str;
 }
 
+static struct {
+    ObjHeader header;
+    uint64_t len;
+    uint64_t cap;
+    char data[2];
+} ascii_single_char_table[256];
+
+static bool ascii_table_initialized = false;
+
+static void init_ascii_single_char_table() {
+    if (ascii_table_initialized) return;
+    for (int i = 0; i < 256; i++) {
+        ascii_single_char_table[i].header.type_id = TYPE_STRING;
+        ascii_single_char_table[i].header.metadata = 0;
+        ascii_single_char_table[i].len = 1;
+        ascii_single_char_table[i].cap = 1;
+        ascii_single_char_table[i].data[0] = (char)i;
+        ascii_single_char_table[i].data[1] = '\0';
+    }
+    ascii_table_initialized = true;
+}
+
+RUNTIME_API LmStringHeader* lm_str_char(uint8_t c) {
+    if (!ascii_table_initialized) init_ascii_single_char_table();
+    return (LmStringHeader*)&ascii_single_char_table[c];
+}
+
 RUNTIME_API LmStringHeader* lm_str_from_bytes(const char* data, uint64_t len) {
+    if (len == 1 && data) {
+        return lm_str_char((uint8_t)data[0]);
+    }
     LmStringHeader* str = lm_str_alloc(len);
     if (!str) return NULL;
     if (data && len > 0) {
@@ -38,11 +68,17 @@ RUNTIME_API LmStringHeader* lm_str_from_bytes(const char* data, uint64_t len) {
 
 RUNTIME_API LmStringHeader* lm_str_from_cstr(const char* cstr) {
     if (!cstr) return lm_str_from_bytes("", 0);
-    return lm_str_from_bytes(cstr, strlen(cstr));
+    size_t len = strlen(cstr);
+    if (len == 1) return lm_str_char((uint8_t)cstr[0]);
+    return lm_str_from_bytes(cstr, len);
 }
 
 RUNTIME_API void lm_str_free(LmStringHeader* str) {
     if (str) {
+        if ((uintptr_t)str >= (uintptr_t)&ascii_single_char_table[0] &&
+            (uintptr_t)str < (uintptr_t)&ascii_single_char_table[256]) {
+            return;
+        }
         free(str);
     }
 }
@@ -119,7 +155,11 @@ RUNTIME_API LmStringHeader* lm_str_trim(const LmStringHeader* str) {
 
 RUNTIME_API LmStringHeader* lm_str_to_lower(const LmStringHeader* str) {
     if (!str || str->len == 0) return lm_str_from_bytes("", 0);
-    LmStringHeader* res = lm_str_from_bytes(str->data, str->len);
+    LmStringHeader* res = lm_str_alloc(str->len);
+    if (!res) return NULL;
+    memcpy(res->data, str->data, str->len);
+    res->len = str->len;
+    res->data[str->len] = '\0';
     for (uint64_t i = 0; i < res->len; i++) {
         if (res->data[i] >= 'A' && res->data[i] <= 'Z') {
             res->data[i] += ('a' - 'A');
@@ -130,7 +170,11 @@ RUNTIME_API LmStringHeader* lm_str_to_lower(const LmStringHeader* str) {
 
 RUNTIME_API LmStringHeader* lm_str_to_upper(const LmStringHeader* str) {
     if (!str || str->len == 0) return lm_str_from_bytes("", 0);
-    LmStringHeader* res = lm_str_from_bytes(str->data, str->len);
+    LmStringHeader* res = lm_str_alloc(str->len);
+    if (!res) return NULL;
+    memcpy(res->data, str->data, str->len);
+    res->len = str->len;
+    res->data[str->len] = '\0';
     for (uint64_t i = 0; i < res->len; i++) {
         if (res->data[i] >= 'a' && res->data[i] <= 'z') {
             res->data[i] -= ('a' - 'A');
@@ -204,9 +248,20 @@ RUNTIME_API uint64_t lm_str_decode_next(const LmStringHeader* str, uint64_t offs
 
 RUNTIME_API LmStringHeader* lm_int_to_str(int64_t value) {
     char temp[32];
-    int len = snprintf(temp, sizeof(temp), "%lld", (long long)value);
-    if (len <= 0) return lm_str_from_bytes("", 0);
-    return lm_str_from_bytes(temp, len);
+    char* ptr = temp + sizeof(temp) - 1;
+    *ptr = '\0';
+    uint64_t uval = (value < 0) ? (uint64_t)(-(value + 1)) + 1 : (uint64_t)value;
+    int len = 0;
+    do {
+        *(--ptr) = '0' + (uval % 10);
+        uval /= 10;
+        len++;
+    } while (uval > 0);
+    if (value < 0) {
+        *(--ptr) = '-';
+        len++;
+    }
+    return lm_str_from_bytes(ptr, len);
 }
 
 RUNTIME_API LmStringHeader* lm_double_to_str(double value) {

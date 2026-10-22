@@ -1,0 +1,68 @@
+// Test collection fast-paths, arithmetic edge cases, and stream fusion correctness on Register VM
+
+fn main(): int {
+    // 1. Vector append, len, index
+    var list: [int] = [];
+    for (var i = 0; i < 1000; i = i + 1) {
+        list.append(i * 2);
+    }
+    assert(len(list) == 1000, "List length mismatch");
+    assert(list[0] == 0, "List index 0 mismatch");
+    assert(list[500] == 1000, "List index 500 mismatch");
+    assert(list[999] == 1998, "List index 999 mismatch");
+
+    // 2. Out of bounds index
+    assert(list[-1] == nil, "Negative list index should be nil");
+    assert(list[10000] == nil, "Out of bounds list index should be nil");
+
+    // 3. List set
+    for (var i = 0; i < 1000; i = i + 1) {
+        list[i] = list[i] + 1;
+    }
+    assert(list[0] == 1, "List set 0 mismatch");
+    assert(list[500] == 1001, "List set 500 mismatch");
+    assert(list[999] == 1999, "List set 999 mismatch");
+
+    // 4. Negative integer arithmetic & comparison fast paths
+    var neg_a = -50;
+    var neg_b = 20;
+    assert(neg_a + neg_b == -30, "Add mismatch");
+    assert(neg_a - neg_b == -70, "Sub mismatch");
+    assert(neg_a * neg_b == -1000, "Mul mismatch");
+    assert(neg_a / neg_b == -2, "Div mismatch");
+    assert(neg_a % neg_b == -10, "Mod mismatch");
+    assert(-neg_a == 50, "Neg mismatch");
+    assert(neg_a < neg_b, "CmpLT mismatch");
+    assert(neg_b > neg_a, "CmpGT mismatch");
+    assert(neg_a != neg_b, "CmpNEQ mismatch");
+
+    // 5. Division and Modulo edge cases
+    var zero = 0;
+    assert(10 / zero == nil, "Div by zero should return nil");
+    assert(10 % zero == nil, "Mod by zero should return nil");
+
+    // 6. Fused Stream Pipeline Correctness
+    var data_a: [int] = [];
+    var data_b: [int] = [];
+    for (var i = 0; i < 10000; i = i + 1) {
+        data_a.append(i);
+        data_b.append(i);
+    }
+    var fused_res = data_a.iter()
+                          .map(fn(x) { x * 3 + 1 })
+                          .filter(fn(x) { x % 2 == 0 })
+                          .map(fn(x) { x / 2 })
+                          .fold(0, fn(acc, x) { acc + x });
+
+    var unfused_res = 0;
+    for (var i = 0; i < len(data_b); i = i + 1) {
+        var v = data_b[i] * 3 + 1;
+        if (v % 2 == 0) {
+            unfused_res = unfused_res + (v / 2);
+        }
+    }
+
+    assert(fused_res == unfused_res, "Stream pipeline result mismatch");
+    print("VM collections optimization test passed successfully!");
+    return 0;
+}

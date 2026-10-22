@@ -24,6 +24,7 @@ typedef struct {
 
 // Native String Allocation & Management Primitives
 RUNTIME_API LmStringHeader* lm_str_alloc(uint64_t cap);
+RUNTIME_API LmStringHeader* lm_str_char(uint8_t c);
 RUNTIME_API LmStringHeader* lm_str_from_bytes(const char* data, uint64_t len);
 RUNTIME_API LmStringHeader* lm_str_from_cstr(const char* cstr);
 RUNTIME_API void lm_str_free(LmStringHeader* str);

@@ -46,8 +46,13 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
                     auto* list = (LmList*)h;
                     RegisterValue idx_val = registers[pc->b];
                     if (IS_INT(idx_val)) {
-                        uint64_t idx = static_cast<uint64_t>(UNBOX_INT(idx_val));
-                        registers[pc->dst] = (idx < list->size) ? list->data[idx] : VAL_NIL;
+                        int64_t idx_smi = UNBOX_INT(idx_val);
+                        if (idx_smi >= 0) {
+                            uint64_t idx = static_cast<uint64_t>(idx_smi);
+                            registers[pc->dst] = (idx < list->size) ? list->data[idx] : VAL_NIL;
+                        } else {
+                            registers[pc->dst] = VAL_NIL;
+                        }
                     } else {
                         uint64_t idx = static_cast<uint64_t>(as_i64(idx_val));
                         registers[pc->dst] = lm_list_get(list, idx);
@@ -55,8 +60,18 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
                 } else if (h->type_id == TYPE_TUPLE) {
                     auto* tuple = (LmTuple*)h;
                     RegisterValue idx_val = registers[pc->b];
-                    uint64_t idx = IS_INT(idx_val) ? static_cast<uint64_t>(UNBOX_INT(idx_val)) : static_cast<uint64_t>(as_i64(idx_val));
-                    registers[pc->dst] = (idx < tuple->size) ? tuple->elements[idx] : VAL_NIL;
+                    if (IS_INT(idx_val)) {
+                        int64_t idx_smi = UNBOX_INT(idx_val);
+                        if (idx_smi >= 0) {
+                            uint64_t idx = static_cast<uint64_t>(idx_smi);
+                            registers[pc->dst] = (idx < tuple->size) ? tuple->elements[idx] : VAL_NIL;
+                        } else {
+                            registers[pc->dst] = VAL_NIL;
+                        }
+                    } else {
+                        uint64_t idx = static_cast<uint64_t>(as_i64(idx_val));
+                        registers[pc->dst] = (idx < tuple->size) ? tuple->elements[idx] : VAL_NIL;
+                    }
                 } else {
                     registers[pc->dst] = VAL_NIL;
                 }

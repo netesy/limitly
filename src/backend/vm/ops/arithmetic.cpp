@@ -99,10 +99,10 @@ void RegisterVM::execute_arithmetic(const LIR::LIR_Inst* pc) {
             if (IS_INT(va) && IS_INT(vb)) {
                 int64_t ia = UNBOX_INT(va);
                 int64_t ib = UNBOX_INT(vb);
-                if (ib != 0) {
+                if (ib != 0 && (ia != INT64_MIN || ib != -1)) {
                     registers[pc->dst] = BOX_INT(ia % ib);
                     break;
-                } else {
+                } else if (ib == 0) {
                     registers[pc->dst] = VAL_NIL;
                     break;
                 }
