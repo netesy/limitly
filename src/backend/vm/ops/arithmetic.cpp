@@ -31,32 +31,106 @@ int64_t pow10_i64(int n) {
 
 void RegisterVM::execute_arithmetic(const LIR::LIR_Inst* pc) {
     switch (pc->op) {
-        case LIR::LIR_Op::Add:
-            registers[pc->dst] = lm_add(registers[pc->a], registers[pc->b]);
+        case LIR::LIR_Op::Add: {
+            RegisterValue va = registers[pc->a];
+            RegisterValue vb = registers[pc->b];
+            if (IS_INT(va) && IS_INT(vb)) {
+                int64_t ia = UNBOX_INT(va);
+                int64_t ib = UNBOX_INT(vb);
+                int64_t res;
+                if (!__builtin_add_overflow(ia, ib, &res) && fits_smi_i64(res)) {
+                    registers[pc->dst] = BOX_INT(res);
+                    break;
+                }
+            }
+            registers[pc->dst] = lm_add(va, vb);
             break;
-        case LIR::LIR_Op::Sub:
-            registers[pc->dst] = lm_sub(registers[pc->a], registers[pc->b]);
+        }
+        case LIR::LIR_Op::Sub: {
+            RegisterValue va = registers[pc->a];
+            RegisterValue vb = registers[pc->b];
+            if (IS_INT(va) && IS_INT(vb)) {
+                int64_t ia = UNBOX_INT(va);
+                int64_t ib = UNBOX_INT(vb);
+                int64_t res;
+                if (!__builtin_sub_overflow(ia, ib, &res) && fits_smi_i64(res)) {
+                    registers[pc->dst] = BOX_INT(res);
+                    break;
+                }
+            }
+            registers[pc->dst] = lm_sub(va, vb);
             break;
-        case LIR::LIR_Op::Mul:
-            registers[pc->dst] = lm_mul(registers[pc->a], registers[pc->b]);
+        }
+        case LIR::LIR_Op::Mul: {
+            RegisterValue va = registers[pc->a];
+            RegisterValue vb = registers[pc->b];
+            if (IS_INT(va) && IS_INT(vb)) {
+                int64_t ia = UNBOX_INT(va);
+                int64_t ib = UNBOX_INT(vb);
+                int64_t res;
+                if (!__builtin_mul_overflow(ia, ib, &res) && fits_smi_i64(res)) {
+                    registers[pc->dst] = BOX_INT(res);
+                    break;
+                }
+            }
+            registers[pc->dst] = lm_mul(va, vb);
             break;
-        case LIR::LIR_Op::Div:
-            registers[pc->dst] = lm_div(registers[pc->a], registers[pc->b]);
+        }
+        case LIR::LIR_Op::Div: {
+            RegisterValue va = registers[pc->a];
+            RegisterValue vb = registers[pc->b];
+            if (IS_INT(va) && IS_INT(vb)) {
+                int64_t ia = UNBOX_INT(va);
+                int64_t ib = UNBOX_INT(vb);
+                if (ib != 0 && (ia != INT64_MIN || ib != -1)) {
+                    int64_t res = ia / ib;
+                    if (fits_smi_i64(res)) {
+                        registers[pc->dst] = BOX_INT(res);
+                        break;
+                    }
+                }
+            }
+            registers[pc->dst] = lm_div(va, vb);
             break;
-        case LIR::LIR_Op::Mod:
-            if (is_integer(registers[pc->a]) && is_integer(registers[pc->b])) {
-                __int128 divisor = as_i128(registers[pc->b]);
-                registers[pc->dst] = divisor == 0 ? VAL_NIL : make_i128(as_i128(registers[pc->a]) % divisor);
-            } else if (is_numeric(registers[pc->a]) && is_numeric(registers[pc->b])) {
-                double divisor = as_float(registers[pc->b]);
-                registers[pc->dst] = divisor == 0.0 ? VAL_NIL : make_float(std::fmod(as_float(registers[pc->a]), divisor));
+        }
+        case LIR::LIR_Op::Mod: {
+            RegisterValue va = registers[pc->a];
+            RegisterValue vb = registers[pc->b];
+            if (IS_INT(va) && IS_INT(vb)) {
+                int64_t ia = UNBOX_INT(va);
+                int64_t ib = UNBOX_INT(vb);
+                if (ib != 0) {
+                    registers[pc->dst] = BOX_INT(ia % ib);
+                    break;
+                } else {
+                    registers[pc->dst] = VAL_NIL;
+                    break;
+                }
+            }
+            if (is_integer(va) && is_integer(vb)) {
+                __int128 divisor = as_i128(vb);
+                registers[pc->dst] = divisor == 0 ? VAL_NIL : make_i128(as_i128(va) % divisor);
+            } else if (is_numeric(va) && is_numeric(vb)) {
+                double divisor = as_float(vb);
+                registers[pc->dst] = divisor == 0.0 ? VAL_NIL : make_float(std::fmod(as_float(va), divisor));
             } else {
                 registers[pc->dst] = VAL_NIL;
             }
             break;
-        case LIR::LIR_Op::Neg:
-            registers[pc->dst] = lm_sub(make_i64(0), registers[pc->a]);
+        }
+        case LIR::LIR_Op::Neg: {
+            RegisterValue va = registers[pc->a];
+            if (IS_INT(va)) {
+                int64_t ia = UNBOX_INT(va);
+                int64_t res;
+                if (!__builtin_sub_overflow(0, ia, &res) && fits_smi_i64(res)) {
+                    registers[pc->dst] = BOX_INT(res);
+                    break;
+                }
+            }
+            registers[pc->dst] = lm_sub(make_i64(0), va);
             break;
+        }
         case LIR::LIR_Op::DecAdd:
             registers[pc->dst] = lm_add(registers[pc->a], registers[pc->b]);
             break;

@@ -216,25 +216,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
     const LIR::LIR_Inst* end_ptr = instructions_ptr + (end_pc < function.instructions.size() ? end_pc : function.instructions.size());
 
     while (pc < end_ptr) {
-        // Bounds check for register indices
-        auto safe_reg_access = [this](uint32_t reg) -> bool {
-            return reg < registers.size();
-        };
-
-        if (!safe_reg_access(pc->dst) && pc->dst != UINT32_MAX) {
-            std::cerr << "Register bounds error: dst=" << pc->dst << " size=" << registers.size() << std::endl;
-            return;
-        }
-        if (!safe_reg_access(pc->a) && pc->a != UINT32_MAX) {
-            std::cerr << "Register bounds error: a=" << pc->a << " size=" << registers.size() << std::endl;
-            return;
-        }
-        if (!safe_reg_access(pc->b) && pc->b != UINT32_MAX) {
-            std::cerr << "Register bounds error: b=" << pc->b << " size=" << registers.size() << std::endl;
-            return;
-        }
-
-                switch (pc->op) {
+        switch (pc->op) {
             case LIR::LIR_Op::LoadConst:
                 registers[pc->dst] = load_constant(pc->const_val);
                 break;
@@ -374,6 +356,10 @@ RegisterValue RegisterVM::load_constant(RegisterValue value) {
 
 void RegisterVM::auto_register_output(const LIR::LIR_Inst* pc) {
     // Region/control instructions have no result, even when dst defaults to zero.
+    if (pc->dst == UINT32_MAX || pc->dst >= registers.size()) return;
+    RegisterValue val = registers[pc->dst];
+    if (!IS_PTR(val)) return;
+
     switch (pc->op) {
         case LIR::LIR_Op::LoadConst: case LIR::LIR_Op::RegionEnter:
         case LIR::LIR_Op::RegionExit: case LIR::LIR_Op::RegionMove:
@@ -382,7 +368,7 @@ void RegisterVM::auto_register_output(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::MemoryFree: case LIR::LIR_Op::StoreGlobal: return;
         default: break;
     }
-    if (pc->dst != UINT32_MAX && pc->dst < registers.size()) register_native_allocation(registers[pc->dst]);
+    register_native_allocation(val);
 }
 
 uint64_t RegisterVM::borrow_memory(RegisterValue value, bool writable) {
@@ -555,22 +541,31 @@ void RegisterVM::promote_graph(RegisterValue value, uint64_t target) {
         switch (header->type_id) {
             case TYPE_LIST: {
                 auto* list = reinterpret_cast<LmList*>(header);
-                for (uint64_t i = 0; i < list->size; ++i) work.push_back(list->data[i]); break;
+                for (uint64_t i = 0; i < list->size; ++i) work.push_back(list->data[i]);
+                break;
             }
-            case TYPE_DICT:
+            case TYPE_DICT: {
                 for (auto* entry = reinterpret_cast<LmDict*>(header)->head; entry; entry = entry->order_next) {
                     work.push_back(entry->key); work.push_back(entry->value);
-                } break;
+                }
+                break;
+            }
             case TYPE_TUPLE: {
                 auto* tuple = reinterpret_cast<LmTuple*>(header);
-                for (uint64_t i = 0; i < tuple->size; ++i) work.push_back(tuple->elements[i]); break;
+                for (uint64_t i = 0; i < tuple->size; ++i) work.push_back(tuple->elements[i]);
+                break;
             }
             case TYPE_FRAME: {
                 auto* frame = reinterpret_cast<LmFrame*>(header);
-                for (int i = 0; i < frame->field_count; ++i) work.push_back(frame->fields[i]); break;
+                for (int i = 0; i < frame->field_count; ++i) work.push_back(frame->fields[i]);
+                break;
             }
-            case TYPE_CLOSURE: work.push_back(reinterpret_cast<LmClosure*>(header)->captured_env); break;
-            case TYPE_FOREIGN_PTR: promote_raw_memory(reinterpret_cast<ObjForeignPtr*>(header)->ptr, target); break;
+            case TYPE_CLOSURE:
+                work.push_back(reinterpret_cast<LmClosure*>(header)->captured_env);
+                break;
+            case TYPE_FOREIGN_PTR:
+                promote_raw_memory(reinterpret_cast<ObjForeignPtr*>(header)->ptr, target);
+                break;
             default: break;
         }
     }
@@ -675,7 +670,7 @@ void RegisterVM::export_graph(RegisterValue value) {
 }
 
 void RegisterVM::transfer_ownership(RegisterValue child, RegisterValue container) {
-    if (!IS_PTR(container)) return;
+    if (!IS_PTR(child) || !IS_PTR(container)) return;
     auto found = vm_allocation_regions.find(reinterpret_cast<uintptr_t>(UNBOX_PTR(container)));
     if (found != vm_allocation_regions.end()) promote_graph(child, found->second);
     else if (heap_parent_) {

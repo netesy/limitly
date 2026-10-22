@@ -22,13 +22,19 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
         }
         case LIR::LIR_Op::ListAppend:
             if (auto* list = reinterpret_cast<LmList*>(header_if_type(registers[pc->a], TYPE_LIST))) {
-                lm_list_append(list, registers[pc->b]);
-                transfer_ownership(registers[pc->b], registers[pc->a]);
+                if (list->size < list->capacity) {
+                    list->data[list->size++] = registers[pc->b];
+                } else {
+                    lm_list_append(list, registers[pc->b]);
+                }
+                if (IS_PTR(registers[pc->b])) {
+                    transfer_ownership(registers[pc->b], registers[pc->a]);
+                }
             }
             break;
         case LIR::LIR_Op::ListLen:
             if (auto* list = reinterpret_cast<LmList*>(header_if_type(registers[pc->a], TYPE_LIST))) {
-                registers[pc->dst] = make_i64(lm_list_len(list));
+                registers[pc->dst] = make_i64(list->size);
             } else {
                 registers[pc->dst] = make_i64(0);
             }
@@ -36,11 +42,21 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::ListIndex:
             if (IS_PTR(registers[pc->a])) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
-                uint64_t index = static_cast<uint64_t>(as_i64(registers[pc->b]));
                 if (h->type_id == TYPE_LIST) {
-                    registers[pc->dst] = lm_list_get((LmList*)h, index);
+                    auto* list = (LmList*)h;
+                    RegisterValue idx_val = registers[pc->b];
+                    if (IS_INT(idx_val)) {
+                        uint64_t idx = static_cast<uint64_t>(UNBOX_INT(idx_val));
+                        registers[pc->dst] = (idx < list->size) ? list->data[idx] : VAL_NIL;
+                    } else {
+                        uint64_t idx = static_cast<uint64_t>(as_i64(idx_val));
+                        registers[pc->dst] = lm_list_get(list, idx);
+                    }
                 } else if (h->type_id == TYPE_TUPLE) {
-                    registers[pc->dst] = lm_tuple_get((LmTuple*)h, index);
+                    auto* tuple = (LmTuple*)h;
+                    RegisterValue idx_val = registers[pc->b];
+                    uint64_t idx = IS_INT(idx_val) ? static_cast<uint64_t>(UNBOX_INT(idx_val)) : static_cast<uint64_t>(as_i64(idx_val));
+                    registers[pc->dst] = (idx < tuple->size) ? tuple->elements[idx] : VAL_NIL;
                 } else {
                     registers[pc->dst] = VAL_NIL;
                 }
@@ -64,13 +80,28 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
                     transfer_ownership(registers[pc->a], registers[pc->dst]);
                     transfer_ownership(registers[pc->b], registers[pc->dst]);
                 } else if (h->type_id == TYPE_LIST) {
-                    uint64_t index = static_cast<uint64_t>(as_i64(registers[pc->a]));
-                    lm_list_set((LmList*)h, index, registers[pc->b]);
-                    transfer_ownership(registers[pc->b], registers[pc->dst]);
+                    auto* list = (LmList*)h;
+                    RegisterValue idx_val = registers[pc->a];
+                    if (IS_INT(idx_val)) {
+                        uint64_t index = static_cast<uint64_t>(UNBOX_INT(idx_val));
+                        if (index < list->size) {
+                            list->data[index] = registers[pc->b];
+                        } else {
+                            lm_list_set(list, index, registers[pc->b]);
+                        }
+                    } else {
+                        uint64_t index = static_cast<uint64_t>(as_i64(idx_val));
+                        lm_list_set(list, index, registers[pc->b]);
+                    }
+                    if (IS_PTR(registers[pc->b])) {
+                        transfer_ownership(registers[pc->b], registers[pc->dst]);
+                    }
                 } else if (h->type_id == TYPE_TUPLE) {
-                    uint64_t index = static_cast<uint64_t>(as_i64(registers[pc->a]));
+                    uint64_t index = IS_INT(registers[pc->a]) ? static_cast<uint64_t>(UNBOX_INT(registers[pc->a])) : static_cast<uint64_t>(as_i64(registers[pc->a]));
                     lm_tuple_set((LmTuple*)h, index, registers[pc->b]);
-                    transfer_ownership(registers[pc->b], registers[pc->dst]);
+                    if (IS_PTR(registers[pc->b])) {
+                        transfer_ownership(registers[pc->b], registers[pc->dst]);
+                    }
                 }
             }
             break;

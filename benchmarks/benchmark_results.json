@@ -1,5 +1,5 @@
 {
-  "revision": "ff1a7bdfd4fdc4651627ef15e5b8ebb75c87cb81",
+  "revision": "1b4f30d38bb1818f1287ab3f85daf8f158b4e309",
   "system": {
     "os": "Linux 6.8.0 x86_64",
     "cpu": "Intel Xeon 2.30GHz (4 cores)",
@@ -10,7 +10,7 @@
   "stdlib_benchmarks": [
     {
       "workload": "String Concatenation (100k)",
-      "lymar_register_vm_ms": 25789.70,
+      "lymar_register_vm_ms": 4533.74,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 38450.0,
       "lymar_fyra_aot_status": "pass",
@@ -19,7 +19,7 @@
     },
     {
       "workload": "Vector Append & Indexing (1M)",
-      "lymar_register_vm_ms": 1385.71,
+      "lymar_register_vm_ms": 1276.27,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 4650.0,
       "lymar_fyra_aot_status": "pass",
@@ -28,7 +28,7 @@
     },
     {
       "workload": "Stream Pipeline Fused (5M)",
-      "lymar_register_vm_ms": 1205.22,
+      "lymar_register_vm_ms": 3490.15,
       "lymar_fyra_aot_build_ms": 344.90,
       "lymar_fyra_aot_ms": 24559.0,
       "lymar_fyra_aot_status": "pass",
@@ -37,7 +37,7 @@
     },
     {
       "workload": "Numeric Bitwise Loop (10M)",
-      "lymar_register_vm_ms": 12345.40,
+      "lymar_register_vm_ms": 12457.80,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 1850.0,
       "lymar_fyra_aot_status": "pass",
@@ -70,7 +70,7 @@
         "compiler": "Register VM",
         "flags": "-O2",
         "build_time_ms": 0.0,
-        "runtime_ms": 23606.10,
+        "runtime_ms": 20868.80,
         "rss_kb": 164336
       },
       {
