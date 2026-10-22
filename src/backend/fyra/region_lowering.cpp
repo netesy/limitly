@@ -61,6 +61,7 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
     declare("lymar_aot_ffi_list_integer",2,i64);
     declare("lymar_aot_ffi_kind",2,i64);
     declare("lymar_aot_ffi_infer_type",2,i64);
+    declare("lymar_aot_clock",0,ctx->getDoubleType());
     declare("lymar_aot_time",0,i64);
     declare("lymar_aot_frame_field_address", 2, i64);
     declare("lymar_aot_frame_matches", 3, i64);

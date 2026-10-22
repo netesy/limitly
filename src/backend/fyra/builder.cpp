@@ -649,6 +649,8 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
 
     auto lower_runtime_builtin = [&](const std::string& name, const std::vector<ir::Value*>& args) -> ir::Value* {
         auto* zero = context_->getConstantInt(context_->getIntegerType(64), 0);
+        if ((name == "clock" || name == "time.clock") && args.empty())
+            return builder_->createExternCall("lymar_aot_clock", {}, context_->getDoubleType());
         if(name=="time" && args.empty())
             return builder_->createExternCall("lymar_aot_time",{},context_->getIntegerType(64));
         if (name == "_builtin_string_hash_bytes" && args.size() == 1)
@@ -1277,7 +1279,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 }
 
                 if (auto* value = lower_runtime_builtin(name, args)) {
-                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, value, inst.result_type);
+                    if (inst.dst != UINT32_MAX) {
+                        if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32 || (value && value->getType()->isFloatingPoint()))
+                            store_float_reg(inst.dst, value);
+                        else
+                            store_reg(inst.dst, value, inst.result_type);
+                    }
                     break;
                 }
                 if (name == "print") {
@@ -1641,7 +1648,12 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 for (auto r : inst.call_args) args.push_back(load_reg(r, LIR::Type::I64));
 
                 if (auto* value = lower_runtime_builtin(name, args)) {
-                    if (inst.dst != UINT32_MAX) store_reg(inst.dst, value, inst.result_type);
+                    if (inst.dst != UINT32_MAX) {
+                        if (inst.result_type == LIR::Type::F64 || inst.result_type == LIR::Type::F32 || (value && value->getType()->isFloatingPoint()))
+                            store_float_reg(inst.dst, value);
+                        else
+                            store_reg(inst.dst, value, inst.result_type);
+                    }
                     break;
                 }
                 if (name == "print") {

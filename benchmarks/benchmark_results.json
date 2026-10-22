@@ -30,7 +30,7 @@
       "workload": "Stream Pipeline Fused (5M)",
       "lymar_register_vm_ms": 1205.22,
       "lymar_fyra_aot_build_ms": 344.90,
-      "lymar_fyra_aot_ms": 76496.42,
+      "lymar_fyra_aot_ms": 24559.0,
       "lymar_fyra_aot_status": "pass",
       "python_ms": 2077.19,
       "php_ms": 1401.67
@@ -78,8 +78,8 @@
         "compiler": "Fyra AOT",
         "flags": "-O2",
         "build_time_ms": 311.68,
-        "runtime_ms": 74866.56,
-        "rss_kb": 282736,
+        "runtime_ms": 76143.20,
+        "rss_kb": 258352,
         "status": "pass"
       }
     ]

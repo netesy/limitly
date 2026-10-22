@@ -1396,7 +1396,7 @@ uint64_t lymar_aot_copy_constant(uint64_t source, uint64_t size) {
 void lymar_aot_free(uint64_t pointer) {
     try {
     RuntimeGuard runtime_guard;
- if (pointer) heap().release(pointer);
+    if (pointer && pointer != 2 && heap().allocations.count(pointer)) heap().release(pointer);
     } catch (const std::exception& failure) {
         if (runtime_lock_depth || !heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
@@ -2328,6 +2328,13 @@ uint64_t lymar_aot_ffi_infer_type(uint64_t value,uint64_t kind) {
 uint64_t lymar_aot_ffi_list_integer(uint64_t value,uint64_t index) {
     RuntimeGuard guard;
     return lymar_aot_to_integer(lymar_aot_ffi_list_item(value,index),lymar_aot_ffi_list_kind(value,index));
+}
+
+double lymar_aot_clock() {
+    static const auto start_time = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    std::chrono::duration<double> diff = now - start_time;
+    return diff.count();
 }
 
 uint64_t lymar_aot_time() {

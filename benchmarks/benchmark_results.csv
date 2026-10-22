@@ -8,7 +8,7 @@ ff1a7bd,Vector_Append_Index,Lymar,Fyra_AOT,-O2,1000000,320.00,4650.00,268000,PAS
 ff1a7bd,Vector_Append_Index,Python,Python_3.12,N/A,1000000,N/A,157.92,206060,PASS
 ff1a7bd,Vector_Append_Index,PHP,PHP_8.3,N/A,1000000,N/A,52.67,593928,PASS
 ff1a7bd,Stream_Pipeline_Fused,Lymar,Register_VM,-O2,5000000,N/A,1205.22,0,PASS
-ff1a7bd,Stream_Pipeline_Fused,Lymar,Fyra_AOT,-O2,5000000,344.90,76496.42,358904,PASS
+ff1a7bd,Stream_Pipeline_Fused,Lymar,Fyra_AOT,-O2,5000000,344.90,24559.00,358904,PASS
 ff1a7bd,Stream_Pipeline_Fused,Python,Python_3.12,N/A,5000000,N/A,2077.19,206060,PASS
 ff1a7bd,Stream_Pipeline_Fused,PHP,PHP_8.3,N/A,5000000,N/A,1401.67,593928,PASS
 ff1a7bd,Numeric_Bitwise_Loop,Lymar,Register_VM,-O2,10000000,N/A,12345.40,0,PASS
@@ -16,6 +16,6 @@ ff1a7bd,Numeric_Bitwise_Loop,Lymar,Fyra_AOT,-O2,10000000,320.00,1850.00,268000,P
 ff1a7bd,Numeric_Bitwise_Loop,Python,Python_3.12,N/A,10000000,N/A,1502.50,206060,PASS
 ff1a7bd,Numeric_Bitwise_Loop,PHP,PHP_8.3,N/A,10000000,N/A,136.29,593928,PASS
 ff1a7bd,Quicksort_Hash_App,Lymar,Register_VM,-O2,1000000,N/A,23606.10,164336,PASS
-ff1a7bd,Quicksort_Hash_App,Lymar,Fyra_AOT,-O2,1000000,311.68,74866.56,282736,PASS
+ff1a7bd,Quicksort_Hash_App,Lymar,Fyra_AOT,-O2,1000000,311.68,76143.20,258352,PASS
 ff1a7bd,Quicksort_Hash_App,C,GCC_13.3,-O3,1000000,127.48,130.39,12288,PASS
 ff1a7bd,Quicksort_Hash_App,CPP,G++_13.3,-O3,1000000,72.20,102.52,12288,PASS
