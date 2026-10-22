@@ -512,7 +512,7 @@ void RegisterVM::reclaim_value(RegisterValue val) {
 void RegisterVM::promote_graph(RegisterValue value, uint64_t target) {
     if (!IS_PTR(value)) return;
     auto initial = vm_allocation_regions.find(reinterpret_cast<uintptr_t>(UNBOX_PTR(value)));
-    if (initial == vm_allocation_regions.end()) return;
+    if (initial == vm_allocation_regions.end() || initial->second == target) return;
     size_t initial_depth = initial->second ? region_instances.at(initial->second).depth : 0;
     size_t destination_depth = target ? region_instances.at(target).depth : 0;
     if (initial_depth <= destination_depth) return;
