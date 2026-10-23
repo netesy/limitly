@@ -11,9 +11,14 @@
 #include <cassert>
 #include <filesystem>
 #include <iostream>
+#include <thread>
 #if defined(__linux__) && defined(__x86_64__)
 #include <dlfcn.h>
 #endif
+extern "C" void lymar_aot_global_edge(uint64_t address, uint64_t child, uint64_t is_pointer);
+extern "C" uint64_t lymar_aot_slot_pointer(uint64_t address);
+extern "C" void lymar_aot_reset();
+
 using namespace LM::LIR;
 using Machine = LM::Backend::VM::Register::RegisterVM;
 LIR_Function probe() {
@@ -163,5 +168,23 @@ int main(int argc, char** argv) {
     assert(!LM::Memory::eliminate_proven_local_borrows(escaped));
     assert(LM::Memory::eliminate_proven_local_borrows(closed));
     assert(closed.instructions[2].op == LIR_Op::Mov);
+
+    // Multi-threaded shadow tracking regression test
+    {
+        std::atomic<bool> done{false};
+        std::thread worker([&]() {
+            for (int i = 0; i < 1000; ++i) {
+                lymar_aot_global_edge(0x1000 + i * 8, 0x5000, 1);
+                assert(lymar_aot_slot_pointer(0x1000 + i * 8) == 1);
+                lymar_aot_global_edge(0x1000 + i * 8, 0, 0);
+                assert(lymar_aot_slot_pointer(0x1000 + i * 8) == 0);
+            }
+            done.store(true);
+        });
+
+        worker.join();
+        lymar_aot_reset();
+    }
+
     std::cout << "Reference VM/native/AOT lowering, ABI rejection and local proof passed\n";
 }

@@ -78,8 +78,8 @@
         "compiler": "Fyra AOT",
         "flags": "-O2",
         "build_time_ms": 311.68,
-        "runtime_ms": 69018.2,
-        "rss_kb": 258676,
+        "runtime_ms": 67984.7,
+        "rss_kb": 258548,
         "status": "pass"
       }
     ]
