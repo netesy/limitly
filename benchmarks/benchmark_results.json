@@ -1,5 +1,5 @@
 {
-  "revision": "1b4f30d38bb1818f1287ab3f85daf8f158b4e309",
+  "revision": "0709d9ecb9987fc2e40d7263f0deb31e7af263e9",
   "system": {
     "os": "Linux 6.8.0 x86_64",
     "cpu": "Intel Xeon 2.30GHz (4 cores)",
@@ -10,38 +10,38 @@
   "stdlib_benchmarks": [
     {
       "workload": "String Concatenation (100k)",
-      "lymar_register_vm_ms": 4595.42,
+      "lymar_register_vm_ms": 4737.75,
       "lymar_fyra_aot_build_ms": 320.0,
-      "lymar_fyra_aot_ms": 38450.0,
+      "lymar_fyra_aot_ms": 6109.61,
       "lymar_fyra_aot_status": "pass",
       "python_ms": 9.85,
       "php_ms": 3.14
     },
     {
       "workload": "Vector Append & Indexing (1M)",
-      "lymar_register_vm_ms": 1006.52,
+      "lymar_register_vm_ms": 1000.3,
       "lymar_fyra_aot_build_ms": 320.0,
-      "lymar_fyra_aot_ms": 4650.0,
+      "lymar_fyra_aot_ms": 2447.0,
       "lymar_fyra_aot_status": "pass",
       "python_ms": 157.92,
       "php_ms": 52.67
     },
     {
       "workload": "Stream Pipeline Fused (5M)",
-      "lymar_register_vm_ms": 877.92,
-      "lymar_fyra_aot_build_ms": 344.90,
-      "lymar_fyra_aot_ms": 24559.0,
+      "lymar_register_vm_ms": 884.18,
+      "lymar_fyra_aot_build_ms": 344.9,
+      "lymar_fyra_aot_ms": 2838.71,
       "lymar_fyra_aot_status": "pass",
       "python_ms": 2077.19,
       "php_ms": 1401.67
     },
     {
       "workload": "Numeric Bitwise Loop (10M)",
-      "lymar_register_vm_ms": 9253.53,
+      "lymar_register_vm_ms": 9257.83,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 1850.0,
       "lymar_fyra_aot_status": "pass",
-      "python_ms": 1502.50,
+      "python_ms": 1502.5,
       "php_ms": 136.29
     }
   ],
@@ -61,7 +61,7 @@
         "language": "C++",
         "compiler": "G++ 13.3",
         "flags": "-O3",
-        "build_time_ms": 72.20,
+        "build_time_ms": 72.2,
         "runtime_ms": 102.52,
         "rss_kb": 12288
       },
@@ -70,7 +70,7 @@
         "compiler": "Register VM",
         "flags": "-O2",
         "build_time_ms": 0.0,
-        "runtime_ms": 16927.70,
+        "runtime_ms": 21626.6,
         "rss_kb": 164336
       },
       {
@@ -78,8 +78,8 @@
         "compiler": "Fyra AOT",
         "flags": "-O2",
         "build_time_ms": 311.68,
-        "runtime_ms": 76143.20,
-        "rss_kb": 258352,
+        "runtime_ms": 77391.0,
+        "rss_kb": 258480,
         "status": "pass"
       }
     ]

@@ -40,38 +40,21 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             }
             break;
         case LIR::LIR_Op::ListIndex:
-            if (IS_PTR(registers[pc->a])) {
-                ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
-                if (h->type_id == TYPE_LIST) {
-                    auto* list = (LmList*)h;
-                    RegisterValue idx_val = registers[pc->b];
-                    if (IS_INT(idx_val)) {
-                        int64_t idx_smi = UNBOX_INT(idx_val);
-                        if (idx_smi >= 0) {
-                            uint64_t idx = static_cast<uint64_t>(idx_smi);
-                            registers[pc->dst] = (idx < list->size) ? list->data[idx] : VAL_NIL;
-                        } else {
-                            registers[pc->dst] = VAL_NIL;
-                        }
-                    } else {
-                        uint64_t idx = static_cast<uint64_t>(as_i64(idx_val));
-                        registers[pc->dst] = lm_list_get(list, idx);
-                    }
-                } else if (h->type_id == TYPE_TUPLE) {
-                    auto* tuple = (LmTuple*)h;
-                    RegisterValue idx_val = registers[pc->b];
-                    if (IS_INT(idx_val)) {
-                        int64_t idx_smi = UNBOX_INT(idx_val);
-                        if (idx_smi >= 0) {
-                            uint64_t idx = static_cast<uint64_t>(idx_smi);
-                            registers[pc->dst] = (idx < tuple->size) ? tuple->elements[idx] : VAL_NIL;
-                        } else {
-                            registers[pc->dst] = VAL_NIL;
-                        }
-                    } else {
-                        uint64_t idx = static_cast<uint64_t>(as_i64(idx_val));
-                        registers[pc->dst] = (idx < tuple->size) ? tuple->elements[idx] : VAL_NIL;
-                    }
+            if (auto* list = reinterpret_cast<LmList*>(header_if_type(registers[pc->a], TYPE_LIST))) {
+                RegisterValue idx_val = registers[pc->b];
+                int64_t idx_smi = IS_INT(idx_val) ? UNBOX_INT(idx_val) : as_i64(idx_val);
+                if (idx_smi >= 0) {
+                    uint64_t idx = static_cast<uint64_t>(idx_smi);
+                    registers[pc->dst] = (idx < list->size) ? list->data[idx] : VAL_NIL;
+                } else {
+                    registers[pc->dst] = VAL_NIL;
+                }
+            } else if (auto* tuple = reinterpret_cast<LmTuple*>(header_if_type(registers[pc->a], TYPE_TUPLE))) {
+                RegisterValue idx_val = registers[pc->b];
+                int64_t idx_smi = IS_INT(idx_val) ? UNBOX_INT(idx_val) : as_i64(idx_val);
+                if (idx_smi >= 0) {
+                    uint64_t idx = static_cast<uint64_t>(idx_smi);
+                    registers[pc->dst] = (idx < tuple->size) ? tuple->elements[idx] : VAL_NIL;
                 } else {
                     registers[pc->dst] = VAL_NIL;
                 }
