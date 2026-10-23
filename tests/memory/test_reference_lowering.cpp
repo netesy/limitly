@@ -47,6 +47,29 @@ int main(int argc, char** argv) {
     vm.execute(f);
     assert(as_i64(vm.get_global("reference_result")) == 41);
     vm.reset();
+
+    // Regression Test: Non-pointer ListIndex stale-destination reset
+    {
+        LIR_Function f_stale("stale_dest_probe", 0);
+        f_stale.register_count = 3;
+        // r0 = 123 (non-pointer / non-list)
+        f_stale.instructions.emplace_back(LIR_Op::LoadConst, LM::LIR::Type::I64, 0, make_i64(123));
+        // r1 = 0 (index)
+        f_stale.instructions.emplace_back(LIR_Op::LoadConst, LM::LIR::Type::I64, 1, make_i64(0));
+        // Seed r2 = 999 (non-nil destination)
+        f_stale.instructions.emplace_back(LIR_Op::LoadConst, LM::LIR::Type::I64, 2, make_i64(999));
+        // ListIndex r2 = r0[r1]
+        f_stale.instructions.emplace_back(LIR_Op::ListIndex, LM::LIR::Type::Ptr, 2, 0, 1);
+        LIR_Inst store(LIR_Op::StoreGlobal, LM::LIR::Type::Void, UINT32_MAX, 2, UINT32_MAX);
+        store.func_name = "stale_result";
+        f_stale.instructions.push_back(store);
+        f_stale.instructions.emplace_back(LIR_Op::Return, LM::LIR::Type::I64, UINT32_MAX, 2, UINT32_MAX);
+
+        Machine vm_stale;
+        vm_stale.execute(f_stale);
+        // Destination r2 MUST be reset to VAL_NIL when receiver is not a list or tuple
+        assert(IS_NIL(vm_stale.get_global("stale_result")));
+    }
     using ReferenceOps = LM::Backend::VM::Register::ReferenceOperations;
     auto nil_token = ReferenceOps::create(vm, VAL_NIL, LM::Memory::ReferenceNullable);
     assert(nil_token == 0);

@@ -1936,14 +1936,117 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 used_builtins_.insert("lm_list_get");
                 ir::Function* fn = current_module_->getFunction("lm_list_get");
                 if (!fn) fn = builder_->createFunction("lm_list_get", context_->getIntegerType(64), {context_->getIntegerType(64), context_->getIntegerType(64)});
-                store_reg(inst.dst, builder_->createCall(fn, {load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)}), inst.result_type);
+
+                ir::Value* list_val = load_reg(inst.a, inst.type_a);
+                ir::Value* idx_val = load_reg(inst.b, inst.type_b);
+
+                std::string lidx_id = std::to_string(label_counter_++);
+                ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                ir::BasicBlock* b_chk_hdr = builder_->createBasicBlock("lidx_chk_hdr_" + lidx_id, cur_fn);
+                ir::BasicBlock* b_fast = builder_->createBasicBlock("lidx_fast_" + lidx_id, cur_fn);
+                ir::BasicBlock* b_slow = builder_->createBasicBlock("lidx_slow_" + lidx_id, cur_fn);
+                ir::BasicBlock* b_done = builder_->createBasicBlock("lidx_done_" + lidx_id, cur_fn);
+                ir::Instruction* res_slot = entry_alloc();
+
+                // Step 1: Check pointer tag and non-null before any pointer dereference
+                ir::Value* tag_mask = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), 7));
+                ir::Value* is_ptr_tag = builder_->createCeq(tag_mask, context_->getConstantInt(context_->getIntegerType(64), TAG_PTR));
+                ir::Value* is_not_null = builder_->createCne(list_val, context_->getConstantInt(context_->getIntegerType(64), 0));
+                ir::Value* is_valid_ptr = builder_->createAnd(is_ptr_tag, is_not_null);
+
+                builder_->createBr(is_valid_ptr, b_chk_hdr, b_slow);
+
+                // Step 2: In b_chk_hdr, safely unbox pointer, load header type_id and size
+                builder_->setInsertPoint(b_chk_hdr);
+                ir::Value* unboxed_ptr = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
+                ir::Value* hdr_val = builder_->createLoadl(unboxed_ptr);
+                ir::Value* type_id = builder_->createAnd(hdr_val, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
+                ir::Value* is_list_type = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), TYPE_LIST));
+
+                ir::Value* size_addr = builder_->createAdd(unboxed_ptr, context_->getConstantInt(context_->getIntegerType(64), 16));
+                ir::Value* list_size = builder_->createLoadl(size_addr);
+                ir::Value* non_neg = builder_->createCsge(idx_val, context_->getConstantInt(context_->getIntegerType(64), 0));
+                ir::Value* in_upper = builder_->createCslt(idx_val, list_size);
+                ir::Value* valid_idx = builder_->createAnd(non_neg, in_upper);
+
+                ir::Value* is_fast = builder_->createAnd(is_list_type, valid_idx);
+                builder_->createBr(is_fast, b_fast, b_slow);
+
+                // Step 3: Fast path array access
+                builder_->setInsertPoint(b_fast);
+                ir::Value* data_addr = builder_->createAdd(unboxed_ptr, context_->getConstantInt(context_->getIntegerType(64), 8));
+                ir::Value* data_ptr = builder_->createLoadl(data_addr);
+                ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
+                ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
+                ir::Value* elem = builder_->createLoadl(elem_addr);
+                builder_->createStore(elem, res_slot);
+                builder_->createJmp(b_done);
+
+                // Step 4: Slow path fallback
+                builder_->setInsertPoint(b_slow);
+                ir::Value* slow_res = builder_->createCall(fn, {list_val, idx_val});
+                builder_->createStore(slow_res, res_slot);
+                builder_->createJmp(b_done);
+
+                builder_->setInsertPoint(b_done);
+                store_reg(inst.dst, builder_->createLoadl(res_slot), inst.result_type);
                 break;
             }
             case LIR::LIR_Op::ListSet: {
                 used_builtins_.insert("lm_list_set");
                 ir::Function* fn = current_module_->getFunction("lm_list_set");
                 if (!fn) fn = builder_->createFunction("lm_list_set", context_->getVoidType(), {context_->getIntegerType(64), context_->getIntegerType(64), context_->getIntegerType(64)});
-                builder_->createCall(fn, {load_reg(inst.dst, inst.result_type), load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)});
+
+                ir::Value* list_val = load_reg(inst.dst, inst.result_type);
+                ir::Value* idx_val = load_reg(inst.a, inst.type_a);
+                ir::Value* elem_val = load_reg(inst.b, inst.type_b);
+
+                std::string lset_id = std::to_string(label_counter_++);
+                ir::Function* cur_fn = builder_->getInsertPoint()->getParent();
+                ir::BasicBlock* b_chk_hdr = builder_->createBasicBlock("lset_chk_hdr_" + lset_id, cur_fn);
+                ir::BasicBlock* b_fast = builder_->createBasicBlock("lset_fast_" + lset_id, cur_fn);
+                ir::BasicBlock* b_slow = builder_->createBasicBlock("lset_slow_" + lset_id, cur_fn);
+                ir::BasicBlock* b_done = builder_->createBasicBlock("lset_done_" + lset_id, cur_fn);
+
+                // Step 1: Check pointer tag and non-null before dereferencing
+                ir::Value* tag_mask = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), 7));
+                ir::Value* is_ptr_tag = builder_->createCeq(tag_mask, context_->getConstantInt(context_->getIntegerType(64), TAG_PTR));
+                ir::Value* is_not_null = builder_->createCne(list_val, context_->getConstantInt(context_->getIntegerType(64), 0));
+                ir::Value* is_valid_ptr = builder_->createAnd(is_ptr_tag, is_not_null);
+
+                builder_->createBr(is_valid_ptr, b_chk_hdr, b_slow);
+
+                // Step 2: Unbox ptr & inspect header / size safely
+                builder_->setInsertPoint(b_chk_hdr);
+                ir::Value* unboxed_ptr = builder_->createAnd(list_val, context_->getConstantInt(context_->getIntegerType(64), ~7ULL));
+                ir::Value* hdr_val = builder_->createLoadl(unboxed_ptr);
+                ir::Value* type_id = builder_->createAnd(hdr_val, context_->getConstantInt(context_->getIntegerType(64), 0xFFFFFFFF));
+                ir::Value* is_list_type = builder_->createCeq(type_id, context_->getConstantInt(context_->getIntegerType(64), TYPE_LIST));
+
+                ir::Value* size_addr = builder_->createAdd(unboxed_ptr, context_->getConstantInt(context_->getIntegerType(64), 16));
+                ir::Value* list_size = builder_->createLoadl(size_addr);
+                ir::Value* non_neg = builder_->createCsge(idx_val, context_->getConstantInt(context_->getIntegerType(64), 0));
+                ir::Value* in_upper = builder_->createCslt(idx_val, list_size);
+                ir::Value* valid_idx = builder_->createAnd(non_neg, in_upper);
+
+                ir::Value* is_fast = builder_->createAnd(is_list_type, valid_idx);
+                builder_->createBr(is_fast, b_fast, b_slow);
+
+                // Step 3: Fast path array store
+                builder_->setInsertPoint(b_fast);
+                ir::Value* data_addr = builder_->createAdd(unboxed_ptr, context_->getConstantInt(context_->getIntegerType(64), 8));
+                ir::Value* data_ptr = builder_->createLoadl(data_addr);
+                ir::Value* offset = builder_->createMul(idx_val, context_->getConstantInt(context_->getIntegerType(64), 8));
+                ir::Value* elem_addr = builder_->createAdd(data_ptr, offset);
+                builder_->createStore(erased_word(elem_val), elem_addr);
+                builder_->createJmp(b_done);
+
+                // Step 4: Slow path
+                builder_->setInsertPoint(b_slow);
+                builder_->createCall(fn, {list_val, idx_val, elem_val});
+                builder_->createJmp(b_done);
+
+                builder_->setInsertPoint(b_done);
                 break;
             }
             case LIR::LIR_Op::StringIndex: {

@@ -12,7 +12,7 @@
       "workload": "String Concatenation (100k)",
       "lymar_register_vm_ms": 4737.75,
       "lymar_fyra_aot_build_ms": 320.0,
-      "lymar_fyra_aot_ms": 6109.61,
+      "lymar_fyra_aot_ms": 38450.0,
       "lymar_fyra_aot_status": "pass",
       "python_ms": 9.85,
       "php_ms": 3.14
@@ -70,7 +70,7 @@
         "compiler": "Register VM",
         "flags": "-O2",
         "build_time_ms": 0.0,
-        "runtime_ms": 21626.6,
+        "runtime_ms": 16929.8,
         "rss_kb": 164336
       },
       {
@@ -78,8 +78,8 @@
         "compiler": "Fyra AOT",
         "flags": "-O2",
         "build_time_ms": 311.68,
-        "runtime_ms": 77391.0,
-        "rss_kb": 258480,
+        "runtime_ms": 76659.5,
+        "rss_kb": 258352,
         "status": "pass"
       }
     ]
