@@ -105,8 +105,6 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
                         } else {
                             lm_list_set(list, index, registers[pc->b]);
                         }
-                    } else {
-                        lm_list_set(list, static_cast<uint64_t>(idx_smi), registers[pc->b]);
                     }
                     if (IS_PTR(registers[pc->b])) {
                         transfer_ownership(registers[pc->b], registers[pc->dst]);

@@ -80,14 +80,20 @@ fn main(): int {
     assert(recursive_list[0] == 100, "Deep region recursion base element mismatch");
     assert(recursive_list[100] == 100, "Deep region recursion top element mismatch");
 
-    // 8. Destination register overwrite check and boundary indexing
+    // 8. Pre-seeded destination register overwrite check and boundary indexing
     var empty_list: [int] = [];
-    var pre_seeded = 12345;
+    var pre_seeded = 99999;
     pre_seeded = empty_list[0];
-    assert(pre_seeded == nil, "Pre-seeded destination register must be overwritten with nil on out-of-bounds list index");
+    assert(pre_seeded == nil, "Pre-seeded destination register must be overwritten with nil on empty list index 0");
 
-    var neg_res = empty_list[-1];
-    assert(neg_res == nil, "Negative list index should produce nil");
+    var pre_seeded_oob = 88888;
+    pre_seeded_oob = empty_list[100];
+    assert(pre_seeded_oob == nil, "Pre-seeded destination register must be overwritten with nil on out-of-bounds list index 100");
+
+    var pre_seeded_neg = 77777;
+    pre_seeded_neg = empty_list[-1];
+    assert(pre_seeded_neg == nil, "Pre-seeded destination register must be overwritten with nil on negative list index -1");
+
 
     print("VM collections optimization test passed successfully!");
     return 0;
