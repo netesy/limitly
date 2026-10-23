@@ -585,9 +585,9 @@ void RegisterVM::exit_region() {
             reclaim_value(BOX_PTR(ptr));
             objects.erase(ptr);
         }
+        region_allocations.erase(members);
     }
     release_region_raw_memory(id);
-    region_allocations.erase(id);
     region_instances.erase(id);
 }
 
