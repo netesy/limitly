@@ -111,6 +111,7 @@ struct SharedHeap {
     std::unordered_map<Word, std::vector<Word>> page_map;
     ConcurrentRegions regions;
     std::map<Word,Word> shadow;
+    std::atomic<size_t> shadow_entries{0};
     std::map<Word,ReferenceOwner> reference_owners;
     Files files;
     std::map<Word,SchedulerConfiguration> schedulers;
@@ -156,8 +157,10 @@ struct Heap {
     void forget_kinds(Word address, Word size, bool overlapping = false) {
         if (!size) return;
         auto first = shadow.lower_bound(overlapping && address >= sizeof(Word) - 1 ? address - (sizeof(Word) - 1) : address);
-        while (first != shadow.end() && (first->first < address || first->first - address < size))
+        while (first != shadow.end() && (first->first < address || first->first - address < size)) {
             first = shadow.erase(first);
+            shared_heap().shadow_entries.fetch_sub(1, std::memory_order_relaxed);
+        }
     }
     auto containing(Word address) {
         auto exact = allocations.find(address);
@@ -909,7 +912,7 @@ void lymar_aot_call_leave(uint64_t pointer) {
 
     auto& h = heap();
     if (h.invocations.empty()) throw std::runtime_error("AOT invocation stack underflow");
-    for (auto slot : h.invocations.back().slots) h.shadow.erase(slot);
+    for (auto slot : h.invocations.back().slots) { if (h.shadow.erase(slot)) shared_heap().shadow_entries.fetch_sub(1, std::memory_order_relaxed); }
     h.invocations.pop_back();
     h.return_pointer = pointer;
 
@@ -964,6 +967,7 @@ uint64_t lymar_aot_param_pop(uint64_t fallback, uint64_t is_pointer) {
     }
 }
 uint64_t lymar_aot_slot_pointer(uint64_t address) {
+    if (shared_heap().shadow_entries.load(std::memory_order_relaxed) == 0) return 0;
     try {
     RuntimeGuard runtime_guard;
 
@@ -1404,14 +1408,18 @@ void lymar_aot_free(uint64_t pointer) {
     }
 }
 void lymar_aot_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
+    if (!is_pointer && shared_heap().shadow_entries.load(std::memory_order_relaxed) == 0) return;
     try {
     RuntimeGuard runtime_guard;
 
     auto& h = heap();
-    if (!is_pointer && !h.shadow.erase(address)) return;
+    if (!is_pointer) {
+        if (h.shadow.erase(address)) shared_heap().shadow_entries.fetch_sub(1, std::memory_order_relaxed);
+        return;
+    }
     auto container = h.containing(address);
-    if (is_pointer) h.shadow[address] = is_pointer;
-    else h.shadow.erase(address);
+    if (h.shadow.find(address) == h.shadow.end()) shared_heap().shadow_entries.fetch_add(1, std::memory_order_relaxed);
+    h.shadow[address] = is_pointer;
     if (container == h.allocations.end()) {
         if (!h.invocations.empty()) h.invocations.back().slots.insert(address);
         return;
@@ -1588,8 +1596,13 @@ void lymar_aot_global_edge(uint64_t address, uint64_t child, uint64_t is_pointer
     RuntimeGuard runtime_guard;
 
     auto& h = heap();
-    if (is_pointer) { h.shadow[address] = is_pointer; if (is_pointer == object_kind) h.promote(child, 0); }
-    else h.shadow.erase(address);
+    if (is_pointer) {
+        if (h.shadow.find(address) == h.shadow.end()) shared_heap().shadow_entries.fetch_add(1, std::memory_order_relaxed);
+        h.shadow[address] = is_pointer;
+        if (is_pointer == object_kind) h.promote(child, 0);
+    } else {
+        if (h.shadow.erase(address)) shared_heap().shadow_entries.fetch_sub(1, std::memory_order_relaxed);
+    }
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth || !heap().worker) throw;
@@ -1996,7 +2009,7 @@ void lymar_aot_reset() {
     auto& h = heap();
     if (h.active || !h.invocations.empty()) throw std::runtime_error("AOT reset with active invocation");
     h.cleanup(0);
-    h.shadow.clear();
+    h.shadow.clear(); shared_heap().shadow_entries.store(h.shadow.size(), std::memory_order_relaxed);
     h.lifetimes.reset();
     while (!h.files.handles.empty()) lymar_aot_resource_destroy(h.files.handles.begin()->first);
     h.pending_args.clear();
@@ -2032,7 +2045,7 @@ void lymar_aot_call_abort() {
         auto current = h.active, parent = h.regions.at(current).parent;
         h.cleanup(current); h.regions.erase(current); h.active = parent;
     }
-    for (auto slot : h.invocations.back().slots) h.shadow.erase(slot);
+    for (auto slot : h.invocations.back().slots) { if (h.shadow.erase(slot)) shared_heap().shadow_entries.fetch_sub(1, std::memory_order_relaxed); }
     h.invocations.pop_back(); h.pending_args.clear(); h.return_pointer = 0;
 }
 void lymar_aot_assert(uint64_t condition, uint64_t message) {
