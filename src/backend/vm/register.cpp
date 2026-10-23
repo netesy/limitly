@@ -216,6 +216,10 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
     const LIR::LIR_Inst* end_ptr = instructions_ptr + (end_pc < function.instructions.size() ? end_pc : function.instructions.size());
 
     while (pc < end_ptr) {
+        if (pc->op == LIR::LIR_Op::Nop || pc->op == LIR::LIR_Op::Label) {
+            pc++;
+            continue;
+        }
         switch (pc->op) {
             case LIR::LIR_Op::LoadConst:
                 registers[pc->dst] = load_constant(pc->const_val);
