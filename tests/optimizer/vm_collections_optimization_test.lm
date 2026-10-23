@@ -71,6 +71,24 @@ fn main(): int {
     }
 
     assert(fused_res == unfused_res, "Stream pipeline result mismatch");
+
+    // 7. Deep Recursive Region Promotion and Ancestor Lookup Test
+    var recursive_list = deep_region_recurse(100);
+    assert(len(recursive_list) == 101, "Deep region recursion length mismatch");
+    assert(recursive_list[0] == 100, "Deep region recursion base element mismatch");
+    assert(recursive_list[100] == 100, "Deep region recursion top element mismatch");
+
     print("VM collections optimization test passed successfully!");
     return 0;
+}
+
+fn deep_region_recurse(depth: int): [int] {
+    if (depth <= 0) {
+        var base: [int] = [];
+        base.append(100);
+        return base;
+    }
+    var child = deep_region_recurse(depth - 1);
+    child.append(depth);
+    return child;
 }

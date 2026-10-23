@@ -34,7 +34,8 @@ RegisterValue RegisterVM::call_interpreted(const std::string& name,
         registers = std::move(spare_register_files_.back());
         spare_register_files_.pop_back();
     }
-    registers.assign(std::max(size_t(256), args.size()), VAL_NIL);
+    size_t reg_count = std::max({(size_t)function->register_count, args.size(), (size_t)1});
+    registers.assign(reg_count, VAL_NIL);
     std::copy(args.begin(), args.end(), registers.begin());
     current_function_ = function;
     try {

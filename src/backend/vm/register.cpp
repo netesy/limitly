@@ -513,10 +513,8 @@ void RegisterVM::promote_graph(RegisterValue value, uint64_t target) {
     if (!IS_PTR(value)) return;
     auto initial = vm_allocation_regions.find(reinterpret_cast<uintptr_t>(UNBOX_PTR(value)));
     if (initial == vm_allocation_regions.end() || initial->second == target) return;
-    size_t initial_depth = (initial->second == active_region_id) ? vm_region_stack.size() :
-                           (initial->second ? region_instances.at(initial->second).depth : 0);
-    size_t destination_depth = (target == active_region_id) ? vm_region_stack.size() :
-                             (target ? region_instances.at(target).depth : 0);
+    size_t initial_depth = get_region_depth(initial->second);
+    size_t destination_depth = get_region_depth(target);
     if (initial_depth <= destination_depth) return;
     std::vector<RegisterValue> work{value};
     std::unordered_set<uintptr_t> visited;
@@ -529,9 +527,7 @@ void RegisterVM::promote_graph(RegisterValue value, uint64_t target) {
         auto owner = vm_allocation_regions.find(ptr);
         if (owner == vm_allocation_regions.end()) continue;
         uint64_t source = owner->second;
-        size_t source_depth = (source == active_region_id) ? vm_region_stack.size() :
-                              (source == target) ? target_depth :
-                              (source ? region_instances.at(source).depth : 0);
+        size_t source_depth = get_region_depth(source);
         // Stores preserve the invariant that children outlive their container.
         // An older graph therefore needs no traversal or scratch allocations.
         if (source_depth <= target_depth) continue;
@@ -631,6 +627,8 @@ void RegisterVM::execute_regions(const LIR::LIR_Inst* pc) {
         uint64_t id = next_region_id++;
         size_t depth = active_region_id ? region_instances.at(active_region_id).depth + 1 : 1;
         region_instances.emplace(id, RegionInstance{static_cast<uint32_t>(pc->imm), active_region_id, depth});
+        if (id >= region_depth_table.size()) region_depth_table.resize(id + 1024, 0);
+        region_depth_table[id] = depth;
         active_region_id = id;
         vm_region_stack.push_back(id);
     } else if (pc->op == LIR::LIR_Op::RegionExit) {
@@ -638,6 +636,8 @@ void RegisterVM::execute_regions(const LIR::LIR_Inst* pc) {
             throw std::runtime_error("RegionExit mismatch in " + (current_function_ ? current_function_->name : std::string("native")) + ": expected " + std::to_string(pc->imm) + ", active " + (vm_region_stack.empty() ? std::string("none") : std::to_string(region_instances.at(vm_region_stack.back()).lexical_id)));
         exit_region();
     } else if (pc->op == LIR::LIR_Op::RegionMove && pc->a < registers.size()) {
+        RegisterValue val = registers[pc->a];
+        if (!IS_PTR(val)) return;
         uint64_t target = invocation_parents.empty() ? 0 : invocation_parents.back();
         if (pc->imm != 0) {
             bool found = false;
@@ -646,7 +646,7 @@ void RegisterVM::execute_regions(const LIR::LIR_Inst* pc) {
             }
             if (!found) throw std::runtime_error("RegionMove target is not an active ancestor");
         }
-        promote_graph(registers[pc->a], target);
+        promote_graph(val, target);
     }
 }
 

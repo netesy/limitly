@@ -211,6 +211,10 @@ private:
     uint64_t active_region_id = 0;
     uint64_t next_region_id = 1;
     std::vector<uint64_t> vm_region_stack;
+    std::vector<size_t> region_depth_table;
+    inline size_t get_region_depth(uint64_t id) const {
+        return (id < region_depth_table.size()) ? region_depth_table[id] : 0;
+    }
     Memory::RegionInstances<RegionInstance> region_instances;
     std::unordered_map<uint64_t, std::unordered_set<uintptr_t>> region_allocations;
     std::unordered_map<uintptr_t, uint64_t> vm_allocation_regions;

@@ -97,16 +97,16 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
                 } else if (h->type_id == TYPE_LIST) {
                     auto* list = (LmList*)h;
                     RegisterValue idx_val = registers[pc->a];
-                    if (IS_INT(idx_val)) {
-                        uint64_t index = static_cast<uint64_t>(UNBOX_INT(idx_val));
+                    int64_t idx_smi = IS_INT(idx_val) ? UNBOX_INT(idx_val) : as_i64(idx_val);
+                    if (idx_smi >= 0) {
+                        uint64_t index = static_cast<uint64_t>(idx_smi);
                         if (index < list->size) {
                             list->data[index] = registers[pc->b];
                         } else {
                             lm_list_set(list, index, registers[pc->b]);
                         }
                     } else {
-                        uint64_t index = static_cast<uint64_t>(as_i64(idx_val));
-                        lm_list_set(list, index, registers[pc->b]);
+                        lm_list_set(list, static_cast<uint64_t>(idx_smi), registers[pc->b]);
                     }
                     if (IS_PTR(registers[pc->b])) {
                         transfer_ownership(registers[pc->b], registers[pc->dst]);
