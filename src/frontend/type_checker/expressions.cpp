@@ -1887,6 +1887,9 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         if (object_type->tag == TypeTag::List && member_name == "pop") {
             return wrap_result(type_system.createFunctionType({}, type_system.ANY_TYPE));
         }
+        if ((object_type->tag == TypeTag::List || object_type->tag == TypeTag::Range) && member_name == "iter") {
+            return wrap_result(type_system.createFunctionType({}, type_system.ANY_TYPE));
+        }
     }
     
     // Check for module alias access

@@ -19,7 +19,7 @@
     },
     {
       "workload": "Vector Append & Indexing (1M)",
-      "lymar_register_vm_ms": 975.38,
+      "lymar_register_vm_ms": 1006.52,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 4650.0,
       "lymar_fyra_aot_status": "pass",
@@ -28,7 +28,7 @@
     },
     {
       "workload": "Stream Pipeline Fused (5M)",
-      "lymar_register_vm_ms": 853.95,
+      "lymar_register_vm_ms": 877.92,
       "lymar_fyra_aot_build_ms": 344.90,
       "lymar_fyra_aot_ms": 24559.0,
       "lymar_fyra_aot_status": "pass",
@@ -37,7 +37,7 @@
     },
     {
       "workload": "Numeric Bitwise Loop (10M)",
-      "lymar_register_vm_ms": 8827.19,
+      "lymar_register_vm_ms": 9253.53,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 1850.0,
       "lymar_fyra_aot_status": "pass",

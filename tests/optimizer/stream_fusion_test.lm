@@ -42,6 +42,26 @@ fn main(): int {
     var count1 = (1..100).filter(fn(x) { x % 2 == 0 }).skip(10).count();
     assert(count1 == 39, "Fused count should equal 39");
 
+    // Pipeline 4: Empty list pipeline
+    var empty_list: [int] = [];
+    var empty_res = empty_list.iter().map(fn(x) { x * 2 }).filter(fn(x) { x > 0 }).collect();
+    assert(len(empty_res) == 0, "Empty list fusion should produce empty list");
+
+    // Pipeline 5: Singleton list pipeline
+    var single_list = [42];
+    var single_res = single_list.iter().map(fn(x) { x + 1 }).collect();
+    assert(len(single_res) == 1 and single_res[0] == 43, "Singleton list fusion mismatch");
+
+    // Pipeline 6: Filter-all (matches no elements)
+    var list_none = [1, 2, 3, 4, 5];
+    var filter_none = list_none.iter().filter(fn(x) { x > 1000 }).collect();
+    assert(len(filter_none) == 0, "Filter-none should produce empty list");
+
+    // Pipeline 7: Filter-all (matches all elements)
+    var list_all = [1, 2, 3, 4, 5];
+    var filter_all = list_all.iter().filter(fn(x) { x > 0 }).collect();
+    assert(len(filter_all) == 5, "Filter-all should match all 5 elements");
+
     // LIR Output Inspection
     var tmp_file = "stream_fusion_lir.tmp";
     var cmd = "./bin/lymar -lir tests/optimizer/stream_fusion_test.lm > " + tmp_file + " 2>&1";

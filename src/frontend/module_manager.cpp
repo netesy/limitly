@@ -2,6 +2,7 @@
 #include "scanner.hh"
 #include "parser.hh"
 #include "type_checker.hh"
+#include "optimizer/stream_fusion.hh"
 #include "../error/debugger.hh"
 #include "../lir/function_registry.hh"
 #include <fstream>
@@ -519,6 +520,9 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
     // Imported modules need semantic ASTs; their concrete syntax trees are never displayed.
     Parser parser(scanner, false);
     auto ast = parser.parse();
+    if (ast) {
+        ast = AST::StreamFusionVisitor::optimizeProgram(ast);
+    }
 
     if (!ast || LM::Error::Debugger::hasError()) {
         TypeChecker::failed_modules.insert(module_path);
