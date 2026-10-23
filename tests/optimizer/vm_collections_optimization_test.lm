@@ -1,5 +1,7 @@
 // Test collection fast-paths, arithmetic edge cases, and stream fusion correctness on Register VM
 
+type ListOrInt = int | [int];
+
 fn main(): int {
     // 1. Vector append, len, index
     var list: [int] = [];
@@ -78,9 +80,19 @@ fn main(): int {
     assert(recursive_list[0] == 100, "Deep region recursion base element mismatch");
     assert(recursive_list[100] == 100, "Deep region recursion top element mismatch");
 
+    // 8. Destination register overwrite check and boundary indexing
+    var empty_list: [int] = [];
+    var pre_seeded = 12345;
+    pre_seeded = empty_list[0];
+    assert(pre_seeded == nil, "Pre-seeded destination register must be overwritten with nil on out-of-bounds list index");
+
+    var neg_res = empty_list[-1];
+    assert(neg_res == nil, "Negative list index should produce nil");
+
     print("VM collections optimization test passed successfully!");
     return 0;
 }
+
 
 fn deep_region_recurse(depth: int): [int] {
     if (depth <= 0) {
