@@ -10,7 +10,7 @@
   "stdlib_benchmarks": [
     {
       "workload": "String Concatenation (100k)",
-      "lymar_register_vm_ms": 4621.82,
+      "lymar_register_vm_ms": 4595.42,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 38450.0,
       "lymar_fyra_aot_status": "pass",
@@ -19,7 +19,7 @@
     },
     {
       "workload": "Vector Append & Indexing (1M)",
-      "lymar_register_vm_ms": 1237.78,
+      "lymar_register_vm_ms": 1218.74,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 4650.0,
       "lymar_fyra_aot_status": "pass",
@@ -28,7 +28,7 @@
     },
     {
       "workload": "Stream Pipeline Fused (5M)",
-      "lymar_register_vm_ms": 3260.21,
+      "lymar_register_vm_ms": 3316.07,
       "lymar_fyra_aot_build_ms": 344.90,
       "lymar_fyra_aot_ms": 24559.0,
       "lymar_fyra_aot_status": "pass",
@@ -37,7 +37,7 @@
     },
     {
       "workload": "Numeric Bitwise Loop (10M)",
-      "lymar_register_vm_ms": 11896.00,
+      "lymar_register_vm_ms": 11778.90,
       "lymar_fyra_aot_build_ms": 320.0,
       "lymar_fyra_aot_ms": 1850.0,
       "lymar_fyra_aot_status": "pass",
@@ -70,7 +70,7 @@
         "compiler": "Register VM",
         "flags": "-O2",
         "build_time_ms": 0.0,
-        "runtime_ms": 19438.50,
+        "runtime_ms": 19485.70,
         "rss_kb": 164336
       },
       {

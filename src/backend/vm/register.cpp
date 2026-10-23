@@ -513,12 +513,14 @@ void RegisterVM::promote_graph(RegisterValue value, uint64_t target) {
     if (!IS_PTR(value)) return;
     auto initial = vm_allocation_regions.find(reinterpret_cast<uintptr_t>(UNBOX_PTR(value)));
     if (initial == vm_allocation_regions.end() || initial->second == target) return;
-    size_t initial_depth = initial->second ? region_instances.at(initial->second).depth : 0;
-    size_t destination_depth = target ? region_instances.at(target).depth : 0;
+    size_t initial_depth = (initial->second == active_region_id) ? vm_region_stack.size() :
+                           (initial->second ? region_instances.at(initial->second).depth : 0);
+    size_t destination_depth = (target == active_region_id) ? vm_region_stack.size() :
+                             (target ? region_instances.at(target).depth : 0);
     if (initial_depth <= destination_depth) return;
     std::vector<RegisterValue> work{value};
     std::unordered_set<uintptr_t> visited;
-    size_t target_depth = target ? region_instances.at(target).depth : 0;
+    size_t target_depth = destination_depth;
     while (!work.empty()) {
         auto current = work.back(); work.pop_back();
         if (!IS_PTR(current)) continue;
@@ -527,7 +529,9 @@ void RegisterVM::promote_graph(RegisterValue value, uint64_t target) {
         auto owner = vm_allocation_regions.find(ptr);
         if (owner == vm_allocation_regions.end()) continue;
         uint64_t source = owner->second;
-        size_t source_depth = source ? region_instances.at(source).depth : 0;
+        size_t source_depth = (source == active_region_id) ? vm_region_stack.size() :
+                              (source == target) ? target_depth :
+                              (source ? region_instances.at(source).depth : 0);
         // Stores preserve the invariant that children outlive their container.
         // An older graph therefore needs no traversal or scratch allocations.
         if (source_depth <= target_depth) continue;

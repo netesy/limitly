@@ -41,6 +41,14 @@ fn main(): int {
     assert(10 / zero == nil, "Div by zero should return nil");
     assert(10 % zero == nil, "Mod by zero should return nil");
 
+    // 5b. Region Lifecycle, Nested Scopes, and Recursive Promotion Tests
+    var outer_accum: [int] = [];
+    for (var r = 0; r < 50; r = r + 1) {
+        outer_accum.append(r);
+    }
+    assert(len(outer_accum) == 50, "Outer region accumulation length mismatch");
+    assert(outer_accum[49] == 49, "Outer region element value mismatch");
+
     // 6. Fused Stream Pipeline Correctness
     var data_a: [int] = [];
     var data_b: [int] = [];
