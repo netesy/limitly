@@ -16,6 +16,6 @@ Revision,Workload,Language,Compiler_Runtime,Build_Flags,Input_Size,Build_Time_MS
 0709d9e,Numeric_Bitwise_Loop,Python,Python_3.12,N/A,10000000,N/A,1502.50,206060,PASS
 0709d9e,Numeric_Bitwise_Loop,PHP,PHP_8.3,N/A,10000000,N/A,136.29,593928,PASS
 0709d9e,Quicksort_Hash_App,Lymar,Register_VM,-O2,1000000,N/A,19050.50,164336,PASS
-0709d9e,Quicksort_Hash_App,Lymar,Fyra_AOT,-O2,1000000,311.68,68348.40,258676,PASS
+0709d9e,Quicksort_Hash_App,Lymar,Fyra_AOT,-O2,1000000,311.68,68236.30,258676,PASS
 0709d9e,Quicksort_Hash_App,C,GCC_13.3,-O3,1000000,127.48,130.39,12288,PASS
 0709d9e,Quicksort_Hash_App,CPP,G++_13.3,-O3,1000000,72.20,102.52,12288,PASS
