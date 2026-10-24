@@ -195,11 +195,15 @@ std::vector<std::string> windows_runtime_libraries() {
     } else if (target.os == target::OS::MacOS) command.push_back("-Wl,-no_pie");
     if (target.os == target::OS::Linux || target.os == target::OS::FreeBSD || target.os == target::OS::Android || target.os == target::OS::MacOS)
         command.push_back("-pthread");
+    if (target.os == target::OS::Windows) {
+        command.push_back("-static-libgcc");
+        command.push_back("-static-libstdc++");
+    }
     command.push_back(temporary);
     command.insert(command.end(), libraries.begin(), libraries.end());
     command.push_back(runtime.string());
     if(target.os!=target::OS::WASI) {
-        command.push_back("-lffi");
+        if(target.os!=target::OS::Windows) command.push_back("-lffi");
         if(target.os!=target::OS::Windows && target.os!=target::OS::MacOS) command.push_back("-ldl");
     }
     // The standalone runtime archive bundles the sokol application member on

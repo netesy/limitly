@@ -5,8 +5,14 @@
 #include <unordered_map>
 #include <mutex>
 #include <vector>
-#include <ffi.h>
 #include <filesystem>
+
+#if __has_include(<ffi.h>)
+#include <ffi.h>
+#define LYMAR_HAS_LIBFFI 1
+#else
+#define LYMAR_HAS_LIBFFI 0
+#endif
 
 #ifdef _WIN32
 #include <windows.h>
@@ -22,6 +28,7 @@ std::unordered_map<uintptr_t, std::string> g_lymarrt_libraries;
 std::mutex g_lymarrt_cb_mutex;
 int64_t g_lymarrt_next_cb_id = 1;
 
+#if LYMAR_HAS_LIBFFI
 struct LymarrtTrampolineContext {
     lymarrt_callback_handler handler;
     void*                    userdata;
@@ -118,6 +125,7 @@ static void lymarrt_trampoline_dispatcher(
         lymarrt_val_to_ffi_ret(&res, ctx->ret_type, ret);
     }
 }
+#endif
 
 } // namespace
 
@@ -186,6 +194,10 @@ bool lymarrt_ffi_call(
     size_t num_args,
     lymarrt_value* out_result)
 {
+#if !LYMAR_HAS_LIBFFI
+    (void)func_ptr; (void)ret_type; (void)arg_types; (void)arg_values; (void)num_args; (void)out_result;
+    return false;
+#else
     if (!func_ptr) return false;
     std::vector<ffi_type*> ffi_arg_types(num_args);
     std::vector<void*> ffi_arg_values(num_args);
@@ -243,6 +255,7 @@ bool lymarrt_ffi_call(
         }
     }
     return true;
+#endif
 }
 
 int64_t lymarrt_callback_create(
@@ -252,6 +265,10 @@ int64_t lymarrt_callback_create(
     size_t num_args,
     lymarrt_type ret_type)
 {
+#if !LYMAR_HAS_LIBFFI
+    (void)handler; (void)userdata; (void)arg_types; (void)num_args; (void)ret_type;
+    return 0;
+#else
     if (!handler) return 0;
     int64_t id;
     {
@@ -295,30 +312,40 @@ int64_t lymarrt_callback_create(
         g_lymarrt_callbacks[id] = ctx;
     }
     return id;
+#endif
 }
 
 void* lymarrt_callback_get_ptr(int64_t handle) {
     if (handle <= 0) return NULL;
+#if !LYMAR_HAS_LIBFFI
+    return NULL;
+#else
     std::lock_guard<std::mutex> lock(g_lymarrt_cb_mutex);
     auto it = g_lymarrt_callbacks.find(handle);
     if (it != g_lymarrt_callbacks.end()) {
         return it->second->code_ptr;
     }
     return NULL;
+#endif
 }
 
 void* lymarrt_callback_get_userdata(int64_t handle) {
     if (handle <= 0) return NULL;
+#if !LYMAR_HAS_LIBFFI
+    return NULL;
+#else
     std::lock_guard<std::mutex> lock(g_lymarrt_cb_mutex);
     auto it = g_lymarrt_callbacks.find(handle);
     if (it != g_lymarrt_callbacks.end()) {
         return it->second->userdata;
     }
     return NULL;
+#endif
 }
 
 void lymarrt_callback_destroy(int64_t handle) {
     if (handle <= 0) return;
+#if LYMAR_HAS_LIBFFI
     LymarrtTrampolineContext* ctx = NULL;
     {
         std::lock_guard<std::mutex> lock(g_lymarrt_cb_mutex);
@@ -332,6 +359,7 @@ void lymarrt_callback_destroy(int64_t handle) {
         if (ctx->closure) ffi_closure_free(ctx->closure);
         delete ctx;
     }
+#endif
 }
 
 } // extern "C"

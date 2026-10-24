@@ -17,14 +17,14 @@ import time
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tests"))
-from run_tests import tests, lymar_path
+from run_tests import tests, lymar_path, slow_tests
 
 
-def execute(command, env):
+def execute(command, env, timeout=30):
     started = time.monotonic()
     try:
         result = subprocess.run(command, cwd=ROOT, env=env, capture_output=True,
-                                text=True, timeout=30)
+                                text=True, timeout=timeout)
         return dict(code=result.returncode, out=result.stdout, err=result.stderr,
                     seconds=time.monotonic() - started)
     except subprocess.TimeoutExpired as error:
@@ -45,10 +45,14 @@ def main():
     parser.add_argument("--report", type=Path, help="Write stage results to this JSON path after every case")
     args = parser.parse_args()
     env = dict(os.environ)
+    if "WINEDEBUG" not in env:
+        env["WINEDEBUG"] = "-all"
     records = []
     with tempfile.TemporaryDirectory(prefix="lymar-fyra-parity-") as directory:
         for number, source in enumerate(args.tests or tests):
-            vm = execute([lymar_path, "run", source], env)
+            source_norm = os.path.normpath(source).replace("\\", "/")
+            timeout = (25.0 if source in slow_tests or source_norm in slow_tests else 3.0) * float(os.environ.get("LYMAR_TEST_TIMEOUT_SCALE", "1"))
+            vm = execute([lymar_path, "run", source], env, timeout=timeout)
             for level in args.levels:
                 record = dict(source=source, level=level, vm=vm)
                 if vm["code"] != 0:
@@ -56,12 +60,16 @@ def main():
                 else:
                     output = str(Path(directory) / (f"program-{number}-{level}" + (".exe" if args.target == "windows" else "")))
                     build = execute([lymar_path, "build", "-target", args.target,
-                                     "-O", str(level), "-o", output, source], env)
+                                     "-O", str(level), "-o", output, source], env, timeout=30)
                     record["build"] = build
                     if build["code"] != 0 or not Path(output).is_file():
                         record["status"] = "build_failure"
                     else:
-                        native = execute([output], env)
+                        if args.target == "windows" and os.name != "nt":
+                            exec_cmd = ["wine", output]
+                        else:
+                            exec_cmd = [output]
+                        native = execute(exec_cmd, env, timeout=timeout)
                         record["native"] = native
                         expected = (vm["code"], vm["out"], vm["err"])
                         actual = (native["code"], native["out"], native["err"])
