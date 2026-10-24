@@ -70,7 +70,7 @@
         "compiler": "Register VM",
         "flags": "-O2",
         "build_time_ms": 0.0,
-        "runtime_ms": 18292.8,
+        "runtime_ms": 17000.95,
         "rss_kb": 164336
       },
       {
@@ -78,8 +78,8 @@
         "compiler": "Fyra AOT",
         "flags": "-O2",
         "build_time_ms": 311.68,
-        "runtime_ms": 69183.6,
-        "rss_kb": 258680,
+        "runtime_ms": 58845.5,
+        "rss_kb": 258532,
         "status": "pass"
       }
     ]

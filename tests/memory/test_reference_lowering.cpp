@@ -171,18 +171,21 @@ int main(int argc, char** argv) {
 
     // Multi-threaded shadow tracking regression test
     {
-        std::atomic<bool> done{false};
-        std::thread worker([&]() {
-            for (int i = 0; i < 1000; ++i) {
-                lymar_aot_global_edge(0x1000 + i * 8, 0x5000, 1);
-                assert(lymar_aot_slot_pointer(0x1000 + i * 8) == 1);
-                lymar_aot_global_edge(0x1000 + i * 8, 0, 0);
-                assert(lymar_aot_slot_pointer(0x1000 + i * 8) == 0);
+        std::thread worker1([&]() {
+            for (int i = 0; i < 2000; ++i) {
+                lymar_aot_global_edge(0x1000 + (i % 100) * 8, 0x5000, 1);
+                assert(lymar_aot_slot_pointer(0x1000 + (i % 100) * 8) == 1);
             }
-            done.store(true);
+        });
+        std::thread worker2([&]() {
+            for (int i = 0; i < 2000; ++i) {
+                lymar_aot_global_edge(0x2000 + (i % 100) * 8, 0, 0);
+                assert(lymar_aot_slot_pointer(0x2000 + (i % 100) * 8) == 0);
+            }
         });
 
-        worker.join();
+        worker1.join();
+        worker2.join();
         lymar_aot_reset();
     }
 

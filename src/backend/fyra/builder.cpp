@@ -520,11 +520,62 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
         }
         for (auto arg : inst.call_args) max_reg = std::max(max_reg, (size_t)arg);
     }
+    std::unordered_set<uint32_t> pointer_assigned_regs;
+    for (const auto& inst : lir_func.instructions) {
+        if (inst.dst == UINT32_MAX) continue;
+        switch (inst.op) {
+            case LIR::LIR_Op::ListCreate:
+            case LIR::LIR_Op::TupleCreate:
+            case LIR::LIR_Op::DictCreate:
+            case LIR::LIR_Op::RefCreate:
+            case LIR::LIR_Op::RefResolve:
+            case LIR::LIR_Op::RefMove:
+            case LIR::LIR_Op::NewFrame:
+            case LIR::LIR_Op::MakeEnum:
+            case LIR::LIR_Op::ToString:
+            case LIR::LIR_Op::STR_CONCAT:
+            case LIR::LIR_Op::STR_FORMAT:
+            case LIR::LIR_Op::StringIndex:
+            case LIR::LIR_Op::ConstructError:
+            case LIR::LIR_Op::ConstructOk:
+            case LIR::LIR_Op::Unwrap:
+            case LIR::LIR_Op::UnwrapOr:
+            case LIR::LIR_Op::DictItems:
+            case LIR::LIR_Op::ResourceCreate:
+            case LIR::LIR_Op::ChannelAlloc:
+            case LIR::LIR_Op::MemoryAlloc:
+            case LIR::LIR_Op::MemoryResize:
+            case LIR::LIR_Op::LibraryLoad:
+            case LIR::LIR_Op::LibrarySymbol:
+            case LIR::LIR_Op::ForeignCall:
+            case LIR::LIR_Op::CallbackCreate:
+                pointer_assigned_regs.insert(inst.dst);
+                break;
+            case LIR::LIR_Op::LoadConst:
+                if (IS_PTR(inst.const_val)) pointer_assigned_regs.insert(inst.dst);
+                break;
+            case LIR::LIR_Op::Cast:
+                if (inst.result_type == LIR::Type::Ptr) pointer_assigned_regs.insert(inst.dst);
+                break;
+            default:
+                if (inst.result_type == LIR::Type::Ptr) pointer_assigned_regs.insert(inst.dst);
+                break;
+        }
+    }
+
     std::unordered_map<uint32_t, ir::Instruction*> reg_slots;
     const bool scalar_registers = Memory::runtime_regions_proven_unnecessary(lir_func) && Memory::proven_scalar_leaf(lir_func);
     for (size_t r = 0; !scalar_registers && r <= max_reg + 10; ++r) {
         reg_slots[r] = builder_->createAlloc(context_->getConstantInt(context_->getIntegerType(64), 8), context_->getIntegerType(64));
-        reg_slots[r]->setName("slot_r" + std::to_string(r));
+        bool is_proven_scalar = (r >= lir_func.param_count) &&
+                                (pointer_assigned_regs.count(r) == 0) &&
+                                (lir_func.register_types.count(r) &&
+                                 (lir_func.register_types.at(r) == LIR::Type::I64 || lir_func.register_types.at(r) == LIR::Type::F64));
+        if (is_proven_scalar) {
+            reg_slots[r]->setName("scalar_slot_r" + std::to_string(r));
+        } else {
+            reg_slots[r]->setName("slot_r" + std::to_string(r));
+        }
         builder_->createStore(context_->getConstantInt(context_->getIntegerType(64), 0), reg_slots[r]);
     }
 

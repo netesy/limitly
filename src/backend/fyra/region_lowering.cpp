@@ -351,7 +351,13 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                         if (!inst->getType()->isVoidTy()) flags[inst] = emit(block, after, "lymar_aot_return_pointer", {});
                     }
                 } else if ((inst->getOpcode() == ir::Instruction::Load || inst->getOpcode() == ir::Instruction::Loadl) && !current_operands.empty()) {
-                    flags[inst] = emit(block, after, "lymar_aot_slot_pointer", {current_operands[0]->get()});
+                    auto* address = current_operands[0]->get();
+                    auto* addr_inst = dynamic_cast<ir::Instruction*>(address);
+                    if (addr_inst && addr_inst->getName().starts_with("scalar_slot_")) {
+                        flags[inst] = zero;
+                    } else {
+                        flags[inst] = emit(block, after, "lymar_aot_slot_pointer", {address});
+                    }
                 } else if (inst->getOpcode() == ir::Instruction::Store || inst->getOpcode() == ir::Instruction::Stored) {
                     auto* value = current_operands[0]->get();
                     auto* address = current_operands[1]->get();
