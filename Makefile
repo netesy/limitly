@@ -566,8 +566,8 @@ aot-region-tests: $(PLATFORM) $(BIN_DIR)/test_aot_regions$(EXE_EXT)
 $(BIN_DIR)/test_memory_contracts$(EXE_EXT): tests/memory/test_memory_contracts.cpp src/memory/memory.hh src/memory/contracts.hh src/memory/model.hh | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< -o $@ $(LIBS)
 
-$(BIN_DIR)/test_reference_lowering$(EXE_EXT): tests/memory/test_reference_lowering.cpp $(OBJ_DIR)/liblymar.a $(FYRA_LIB) | $(BIN_DIR)
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $@ $(LIBS) -lpthread
+$(BIN_DIR)/test_reference_lowering$(EXE_EXT): tests/memory/test_reference_lowering.cpp $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(BIN_DIR)/liblymar_aot.a | $(BIN_DIR)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(BIN_DIR)/liblymar_aot.a -o $@ $(LIBS) -lpthread
 
 $(BIN_DIR)/test_source_ownership$(EXE_EXT): tests/memory/test_source_ownership.cpp $(OBJ_DIR)/liblymar.a $(FYRA_LIB) | $(BIN_DIR)
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) $< $(OBJ_DIR)/liblymar.a $(FYRA_LIB) -o $@ $(LIBS) -lpthread

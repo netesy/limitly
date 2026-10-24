@@ -361,9 +361,14 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                 } else if (inst->getOpcode() == ir::Instruction::Store || inst->getOpcode() == ir::Instruction::Stored) {
                     auto* value = current_operands[0]->get();
                     auto* address = current_operands[1]->get();
-                    emit(block, after, dynamic_cast<ir::GlobalVariable*>(address) ? "lymar_aot_global_edge" : "lymar_aot_edge",
-                         {address, value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : value,
-                          value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : flag(value)});
+                    auto* addr_inst = dynamic_cast<ir::Instruction*>(address);
+                    if (addr_inst && addr_inst->getName().starts_with("scalar_slot_")) {
+                        // Scalar slot allocations need no region GC edge.
+                    } else {
+                        emit(block, after, dynamic_cast<ir::GlobalVariable*>(address) ? "lymar_aot_global_edge" : "lymar_aot_edge",
+                             {address, value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : value,
+                              value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : flag(value)});
+                    }
                 } else if (inst->getOpcode() == ir::Instruction::Ret) {
                     if (!current_operands.empty()) {
                         auto* value = current_operands[0]->get();
