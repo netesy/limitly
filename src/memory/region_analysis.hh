@@ -90,6 +90,8 @@ inline std::optional<AOTValueKind> scalar_return_kind(const LIR::LIR_Function& f
         switch (inst.op) {
         case Op::LoadConst: if (!IS_BOOL(inst.const_val) && !IS_INT(inst.const_val)) return {}; break;
         case Op::Nop: case Op::Label: case Op::Mov:
+        case Op::Add: case Op::Sub: case Op::Mul: case Op::Div: case Op::Mod:
+        case Op::Shl: case Op::Shr: case Op::And: case Op::Or: case Op::Xor:
         case Op::CmpEQ: case Op::CmpNEQ: case Op::CmpLT: case Op::CmpLE: case Op::CmpGT: case Op::CmpGE:
         case Op::Jump: case Op::JumpIf: case Op::JumpIfFalse:
         case Op::RegionEnter: case Op::RegionExit: case Op::RegionMove:
@@ -116,6 +118,7 @@ inline std::optional<AOTValueKind> scalar_return_kind(const LIR::LIR_Function& f
             if (inst.op == Op::LoadConst) state[inst.dst] = IS_BOOL(inst.const_val) ? boolean : integer;
             else if (inst.op == Op::Mov) state[inst.dst] = kind(state, inst.a);
             else if (inst.op >= Op::CmpEQ && inst.op <= Op::CmpGE) state[inst.dst] = boolean;
+            else if (inst.op >= Op::Add && inst.op <= Op::Xor) state[inst.dst] = integer;
         }
         for (auto next : block.successors) {
             bool changed = false;
@@ -186,6 +189,8 @@ inline bool proven_scalar_leaf(const LIR::LIR_Function& function) {
             break;
         case Op::Return: case Op::Ret: break;
         case Op::Nop: case Op::Label: case Op::Mov:
+        case Op::Add: case Op::Sub: case Op::Mul: case Op::Div: case Op::Mod:
+        case Op::Shl: case Op::Shr: case Op::And: case Op::Or: case Op::Xor:
         case Op::CmpEQ: case Op::CmpNEQ: case Op::CmpLT: case Op::CmpLE:
         case Op::CmpGT: case Op::CmpGE:
         case Op::Jump: case Op::JumpIf: case Op::JumpIfFalse:
