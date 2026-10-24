@@ -30,11 +30,44 @@
 #include <condition_variable>
 #include <chrono>
 #include <functional>
+#if defined(_WIN32)
+#if !defined(WIN32_LEAN_AND_MEAN)
+#define WIN32_LEAN_AND_MEAN
+#endif
+#if !defined(NOMINMAX)
+#define NOMINMAX
+#endif
+#include <windows.h>
+#endif
 
 namespace {
 using Word = uint64_t;
 constexpr Word object_kind = static_cast<Word>(LM::Memory::AOTValueKind::Object);
 constexpr Word boolean_kind = static_cast<Word>(LM::Memory::AOTValueKind::Boolean);
+
+// Standalone-AOT stdout writer. The self-contained PE entry point (_start) calls
+// main directly and never runs the C-runtime startup, so on Windows the UCRT
+// `stdout` FILE* is left NULL and std::fwrite silently writes nothing. Writing
+// through the OS console handle keeps print/output working without depending on
+// CRT stdio initialization. POSIX keeps the normal buffered stream.
+void lymar_stdout_write(const void* data, size_t len) {
+    if (!data || len == 0) return;
+#if defined(_WIN32)
+    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    if (!handle || handle == INVALID_HANDLE_VALUE) return;
+    const char* bytes = static_cast<const char*>(data);
+    size_t offset = 0;
+    while (offset < len) {
+        DWORD chunk = static_cast<DWORD>(len - offset);
+        DWORD written = 0;
+        if (!WriteFile(handle, bytes + offset, chunk, &written, nullptr) || written == 0) break;
+        offset += written;
+    }
+#else
+    std::fwrite(data, 1, len, stdout);
+    std::fflush(stdout);
+#endif
+}
 #if !defined(__wasi__)
 struct GraphicsValue {Word word,kind;};
 struct GraphicsBase {
@@ -678,13 +711,12 @@ void lymar_aot_print_integer(uint64_t value, uint64_t kind) {
     if (lymar_aot_is_nil(value, kind)) { output = "nil"; length = 3; }
     else if (kind == boolean_kind) { output = value ? "true" : "false"; length = value ? 4 : 5; }
     else if (auto integer = integer_number(value, kind)) {
-        auto number = integer_text(*integer); std::fwrite(number.data(), 1, number.size(), stdout); std::fflush(stdout); return;
+        auto number = integer_text(*integer); lymar_stdout_write(number.data(), number.size()); return;
     }
     else if (kind == object_kind && (read_word(value) & 0xffffffff) == 9)
         length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%.6g", lymar_aot_to_float(value, kind)));
     else length = static_cast<size_t>(std::snprintf(text, sizeof(text), "%lld", static_cast<long long>(value)));
-    std::fwrite(output, 1, length, stdout);
-    std::fflush(stdout);
+    lymar_stdout_write(output, length);
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth || !heap().worker) throw;
@@ -698,8 +730,7 @@ void lymar_aot_print_float(double value) {
 
     char text[64];
     const auto length = std::snprintf(text, sizeof(text), "%.6g", value);
-    std::fwrite(text, 1, static_cast<size_t>(length), stdout);
-    std::fflush(stdout);
+    lymar_stdout_write(text, static_cast<size_t>(length));
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth || !heap().worker) throw;
@@ -969,7 +1000,8 @@ uint64_t lymar_aot_slot_pointer(uint64_t address) {
 
     auto& flags = heap().shadow;
     auto found = flags.find(address);
-    return found != flags.end() ? found->second : 0;
+    auto result = found != flags.end() ? found->second : 0;
+    return result;
 
     } catch (const std::exception& failure) {
         if (runtime_lock_depth || !heap().worker) throw;
@@ -1239,8 +1271,7 @@ uint64_t lymar_aot_mark_dictionary(uint64_t pointer) {
 void lymar_aot_print_value(uint64_t value, uint64_t kind) {
     RuntimeGuard guard;
     auto string = format_argument(value, kind, true);
-    std::fwrite(reinterpret_cast<void*>(string + 24), 1, read_word(string, 8), stdout);
-    std::fflush(stdout);
+    lymar_stdout_write(reinterpret_cast<const void*>(string + 24), read_word(string, 8));
 }
 uint64_t lymar_aot_float_to_string(double value) {
     try {

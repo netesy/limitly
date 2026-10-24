@@ -623,6 +623,25 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
     }
 
     auto load_reg = [&](uint32_t r, LIR::Type t) -> ir::Value* {
+        // The stack slot is the authoritative, control-flow-correct home for a
+        // register's value whenever one exists: every store writes the slot and
+        // every read reloads it, so a value carried across a loop back-edge or a
+        // CFG join (e.g. an outer accumulator mutated in a nested loop, or a
+        // counter reassigned in a `for` body reached through a `continue`) is
+        // always observed correctly. It also fixes reused virtual registers that
+        // hold pointers to heap allocations (string literals): the cached SSA
+        // value can be the copy_constant result of an EARLIER assignment to the
+        // same vreg, so a later `print` would hand the runtime a stale (and
+        // possibly collected) pointer. Registers with no slot are true
+        // straight-line SSA temporaries (scalar-leaf mode, loop-free by
+        // construction) and keep the cached-value fast path.
+        if (reg_slots.count(r)) {
+            const auto actual = reg_types.count(r) ? reg_types[r] : t;
+            auto* load = (actual == LIR::Type::F64 || actual == LIR::Type::F32)
+                ? builder_->createLoadd(reg_slots[r]) : builder_->createLoadl(reg_slots[r]);
+            load->setName("load_r" + std::to_string(r) + "_" + std::to_string(label_counter_++));
+            return load;
+        }
         // Use a dominating SSA value within its defining block. This also avoids
         // redundant store/load pairs for immutable parameters and straight-line
         // expressions. Mutable parameters need their slot at CFG joins/loops;
@@ -631,13 +650,6 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
             ((!register_definitions[r] && !reassigned_parameters.count(r)) ||
              register_definitions[r] == builder_->getInsertPoint())) {
             return regs[r];
-        }
-        if (reg_slots.count(r)) {
-            const auto actual = reg_types.count(r) ? reg_types[r] : t;
-            auto* load = (actual == LIR::Type::F64 || actual == LIR::Type::F32)
-                ? builder_->createLoadd(reg_slots[r]) : builder_->createLoadl(reg_slots[r]);
-            load->setName("load_r" + std::to_string(r) + "_" + std::to_string(label_counter_++));
-            return load;
         }
         if (regs.count(r)) return regs[r];
         ir::Type* fty = lir_type_to_fyra_type(t);

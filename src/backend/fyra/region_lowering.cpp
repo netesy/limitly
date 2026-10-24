@@ -395,6 +395,35 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
             }
         }
     }
+
+    // Eliminate provably-scalar region bookkeeping. A lymar_aot_region_move
+    // whose is_pointer operand is a static constant 0 carries no heap
+    // ownership: the runtime only promotes when is_pointer == object_kind, so
+    // the call has no observable effect for a compiler-proven scalar. Removing
+    // it drops a full RuntimeGuard acquisition per redundant move while leaving
+    // every dynamic-flag and pointer-bearing move on the existing safe path.
+    for (auto& fn : module.getFunctions()) {
+        for (auto& block_owner : fn->getBasicBlocks()) {
+            auto* block = block_owner.get();
+            std::vector<ir::Instruction*> dead;
+            for (auto& inst_owner : block->getInstructions()) {
+                auto* inst = inst_owner.get();
+                if (inst->getOpcode() != ir::Instruction::Call) continue;
+                auto& operands = inst->getOperands();
+                if (operands.size() < 5) continue;
+                auto* callee = dynamic_cast<ir::Function*>(operands[0]->get());
+                if (!callee || callee->getName() != "lymar_aot_region_move") continue;
+                auto* flag = dynamic_cast<ir::ConstantInt*>(operands[4]->get());
+                if (flag && flag->getValue() == 0) dead.push_back(inst);
+            }
+            for (auto* inst : dead) {
+                auto& instructions = block->getInstructions();
+                auto where = std::find_if(instructions.begin(), instructions.end(),
+                    [inst](auto& item) { return item.get() == inst; });
+                if (where != instructions.end()) instructions.erase(where);
+            }
+        }
+    }
 }
 
 // AOT workers propagate failures explicitly: no C++ unwinding across machine

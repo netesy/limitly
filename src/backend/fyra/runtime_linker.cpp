@@ -1,4 +1,5 @@
 #include "runtime_linker.hh"
+#include <algorithm>
 #include <chrono>
 #include <cerrno>
 #include <cstdlib>
@@ -84,6 +85,61 @@ int run_driver(const std::vector<std::string>& arguments) {
     return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
 #endif
 }
+// Locate the target C/C++ runtime archives that a self-contained Windows image
+// needs. The Fyra internal linker never calls an external driver, but the Lymar
+// runtime archive is compiled against the standard C++ library and the MinGW C
+// runtime, so those archives must be contributed to the link for the produced
+// image to resolve without falling back to a host toolchain. The search root is
+// configurable through LYMAR_AOT_WINLIB so a cross sysroot can be supplied.
+std::vector<std::string> windows_runtime_libraries() {
+    namespace fs = std::filesystem;
+    std::vector<fs::path> roots;
+    if (const char* env = std::getenv("LYMAR_AOT_WINLIB"); env && *env) roots.emplace_back(env);
+    const auto compiler = compiler_directory();
+    roots.push_back(compiler);
+    if (compiler.has_parent_path()) roots.push_back(compiler.parent_path());
+    roots.emplace_back("C:/msys64/mingw64/lib");
+    // Keep the archive order stable and independent of the caller environment.
+    const std::vector<std::string> wanted{"libstdc++.a", "libstdc++fs.a", "libwinpthread.a",
+        "libmingwex.a", "libmsvcrt.a", "libmingw32.a"};
+    std::vector<std::string> found;
+    std::vector<std::string> seen;
+    auto consider = [&](const fs::path& candidate) {
+        std::error_code check;
+        if (!fs::exists(candidate, check)) return;
+        const std::string absolute = fs::weakly_canonical(candidate, check).string();
+        if (std::find(seen.begin(), seen.end(), absolute) == seen.end()) {
+            seen.push_back(absolute);
+            found.push_back(absolute);
+        }
+    };
+    for (const auto& root : roots) {
+        std::error_code ec;
+        if (!fs::is_directory(root, ec)) continue;
+        for (const auto& name : wanted) consider(root / name);
+    }
+    // The static GCC runtime (unwinder, __emutls, __floattidf, ___chkstk_ms) is
+    // not in the top-level lib directory; it lives under lib/gcc/<triple>/<ver>/.
+    // A self-contained link needs these static members because there is no
+    // external driver to add them implicitly the way the compiler driver would.
+    const std::vector<std::string> gccStatics{"libgcc.a", "libgcc_eh.a"};
+    for (const auto& libRoot : {compiler.parent_path() / "lib", fs::path("C:/msys64/mingw64/lib")}) {
+        std::error_code ec;
+        if (!fs::is_directory(libRoot, ec)) continue;
+        const auto gccDir = libRoot / "gcc";
+        if (!fs::is_directory(gccDir, ec)) continue;
+        std::error_code itec;
+        for (auto rit = fs::recursive_directory_iterator(gccDir, fs::directory_options::skip_permission_denied, itec);
+             !itec && rit != fs::recursive_directory_iterator(); rit.increment(itec)) {
+            std::error_code isf;
+            if (!rit->is_regular_file(isf) || isf) continue;
+            const std::string fname = rit->path().filename().string();
+            if (std::find(gccStatics.begin(), gccStatics.end(), fname) != gccStatics.end())
+                consider(rit->path());
+        }
+    }
+    return found;
+}
 }
 
 ::fyra::BuildResult link_standalone_runtime(::fyra::BackendBuilder& backend,
@@ -113,6 +169,10 @@ int run_driver(const std::vector<std::string>& arguments) {
     }
     if (linker != "driver") {
         backend.addStaticLibrary(runtime.string());
+        // Contribute the target C/C++ runtime archives so the self-contained
+        // Fyra image links without an external driver on Windows.
+        if (target.os == target::OS::Windows)
+            for (const auto& syslib : windows_runtime_libraries()) backend.addStaticLibrary(syslib);
         auto internal = backend.emitExecutable(options.output_file);
         if (internal.success || linker == "fyra") return internal;
         std::string reason;
@@ -142,6 +202,13 @@ int run_driver(const std::vector<std::string>& arguments) {
         command.push_back("-lffi");
         if(target.os!=target::OS::Windows && target.os!=target::OS::MacOS) command.push_back("-ldl");
     }
+    // The standalone runtime archive bundles the sokol application member on
+    // demand; when a program reaches it, the Windows system libraries that
+    // supply its GDI/user-interface symbols must be linked explicitly. The
+    // interpreter build obtains these through the host link, but the
+    // target-driver path only receives program and runtime archives.
+    if (target.os == target::OS::Windows)
+        command.insert(command.end(), {"-lws2_32", "-lgdi32", "-luser32", "-lshell32", "-lopengl32"});
     command.insert(command.end(), {"-o", options.output_file});
     auto status = run_driver(command);
     result.success = status == 0;
