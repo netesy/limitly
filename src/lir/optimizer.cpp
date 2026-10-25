@@ -7,6 +7,7 @@
 #include "functions.hh"
 #include "analysis.hh"
 #include "backend/vm/vm_value.hh"
+#include "backend/vm/vm_string.hh"
 #include <unordered_set>
 #include <unordered_map>
 #include <algorithm>
@@ -291,6 +292,24 @@ bool Optimizer::redundant_memory_elimination() {
                     }
                 }
                 continue;
+            }
+        }
+
+        // Chained string concatenation peephole optimization:
+        // STR_CONCAT dst, a, b where a is an empty string
+        if (inst.op == LIR_Op::STR_CONCAT && inst.a != UINT32_MAX && inst.b != UINT32_MAX) {
+            if (i > 0) {
+                auto& prev = func_.instructions[i - 1];
+                if (prev.op == LIR_Op::LoadConst && prev.dst == inst.a && IS_PTR(prev.const_val) && UNBOX_PTR(prev.const_val)) {
+                    auto* lm_str = reinterpret_cast<LmStringHeader*>(UNBOX_PTR(prev.const_val));
+                    if (lm_str && lm_str->len == 0) {
+                        inst.op = LIR_Op::Mov;
+                        inst.a = inst.b;
+                        inst.b = UINT32_MAX;
+                        changed = true;
+                        continue;
+                    }
+                }
             }
         }
 

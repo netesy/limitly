@@ -91,6 +91,10 @@ private:
     void lower_frame_deinit_method(const std::string& frame_name, LM::Frontend::AST::FrameMethod& deinit_method);
     std::string find_frame_or_trait_method(const std::string& frame_name, const std::string& method_name);
     std::string resolve_qualified_frame_name(const std::string& name);
+        // Disambiguate frames that share a short name across modules by preferring the
+        // candidate that actually declares the requested method (receiver type only
+        // carries the short name, so plain suffix matching can select the wrong module).
+        std::string resolve_frame_name_for_method(const std::string& name, const std::string& method_name);
     TypePtr resolve_underlying_type(TypePtr type);
     void lower_task_body(LM::Frontend::AST::TaskStatement& stmt);
     void lower_worker_body(LM::Frontend::AST::WorkerStatement& stmt);

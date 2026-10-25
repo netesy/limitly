@@ -1857,7 +1857,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         if (resolved_object_type && resolved_object_type->tag == TypeTag::Frame) {
             auto ft = std::get_if<FrameType>(&resolved_object_type->extra);
             if (ft) {
-                std::string resolved_frame_name = resolve_qualified_frame_name(ft->name);
+                std::string resolved_frame_name = resolve_frame_name_for_method(ft->name, method_name);
                 std::string concrete_method = find_frame_or_trait_method(resolved_frame_name, method_name);
                 if (!concrete_method.empty()) {
                     if (expr.inferred_type) {
@@ -1914,7 +1914,7 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
         if (resolved_object_type && resolved_object_type->tag == TypeTag::Frame) {
             auto ft = std::get_if<FrameType>(&resolved_object_type->extra);
             if (ft) {
-                std::string resolved_frame_name = resolve_qualified_frame_name(ft->name);
+                std::string resolved_frame_name = resolve_frame_name_for_method(ft->name, method_name);
                 
                 // Check if this is a field access (function pointer stored in a field)
                 // rather than a method call

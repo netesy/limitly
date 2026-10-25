@@ -622,6 +622,36 @@ std::string Generator::resolve_qualified_frame_name(const std::string& name) {
 }
 
 
+std::string Generator::resolve_frame_name_for_method(const std::string& name, const std::string& method_name) {
+    // The receiver type only carries the frame's short name (e.g. "Rect"), which can
+    // collide across modules (std.game.types.Rect vs std.graphics.rect.Rect).
+    // resolve_qualified_frame_name's suffix fallback is unordered and may bind the
+    // wrong module. Prefer whichever candidate actually declares the requested
+    // method, mirroring the type checker's method-based resolution.
+    std::string primary = resolve_qualified_frame_name(name);
+    if (!find_frame_or_trait_method(primary, method_name).empty()) {
+        return primary;
+    }
+
+    std::string short_name = name;
+    size_t dot = short_name.rfind('.');
+    if (dot != std::string::npos) short_name = short_name.substr(dot + 1);
+
+    for (const auto& [frame_key, frame_info] : frame_table_) {
+        std::string key_short = frame_key;
+        size_t key_dot = key_short.rfind('.');
+        if (key_dot != std::string::npos) key_short = key_short.substr(key_dot + 1);
+        if (key_short != short_name) continue;
+        if (frame_key == primary) continue;
+        if (!find_frame_or_trait_method(frame_key, method_name).empty()) {
+            return frame_key;
+        }
+    }
+
+    return primary;
+}
+
+
 TypePtr Generator::resolve_underlying_type(TypePtr type) {
     if (!type) return nullptr;
     if (type->tag == ::TypeTag::UserDefined) {

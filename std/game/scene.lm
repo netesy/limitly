@@ -105,8 +105,12 @@ frame Scene {
     pub fn draw_gui(gui: any): nil {
         if (not self.is_visible) return;
         if (self.draw_gui_cb != nil) {
-            var cb = self.draw_gui_cb as fn(any): nil;
-            cb(gui);
+            // The callback is stored as an opaque `any`, so invoking it with a
+            // managed argument has no provable ownership contract (E003).
+            // Mirror draw()'s nullary delegate: GUI-draw callbacks capture the
+            // gui themselves instead of receiving it through the opaque call.
+            var cb = self.draw_gui_cb as fn(): nil;
+            cb();
         }
     }
 

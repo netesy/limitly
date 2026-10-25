@@ -143,6 +143,10 @@ struct SharedHeap {
     std::unordered_map<Word, Allocation> allocations;
     std::unordered_map<Word, std::vector<Word>> page_map;
     ConcurrentRegions regions;
+    // Ordered map: value-kind shadow needs range queries (forget_kinds, copy
+    // snapshot) which are O(log n + k) via lower_bound. unordered_map forced
+    // full O(n) scans and was more fragile under memory corruption (a corrupted
+    // bucket_count turned its internal hash % bucket_count into a div-by-zero).
     std::map<Word,Word> shadow;
     std::map<Word,ReferenceOwner> reference_owners;
     Files files;
@@ -188,9 +192,14 @@ struct Heap {
 
     void forget_kinds(Word address, Word size, bool overlapping = false) {
         if (!size) return;
-        auto first = shadow.lower_bound(overlapping && address >= sizeof(Word) - 1 ? address - (sizeof(Word) - 1) : address);
-        while (first != shadow.end() && (first->first < address || first->first - address < size))
-            first = shadow.erase(first);
+        // An entry at key p spans [p, p+8); it overlaps the target range when
+        // p + 8 > address, i.e. p >= address - 7. Only widen the lower bound
+        // when the caller explicitly wants partial-overlap removal.
+        Word lo = (overlapping && address >= sizeof(Word) - 1) ? address - (sizeof(Word) - 1) : address;
+        Word hi = address + size;
+        auto it = shadow.lower_bound(lo);
+        while (it != shadow.end() && it->first < hi)
+            it = shadow.erase(it);
     }
     auto containing(Word address) {
         auto exact = allocations.find(address);
@@ -350,7 +359,7 @@ uint64_t lymar_aot_frame_field_address(uint64_t pointer, uint64_t index) {
     return fields + index * sizeof(Word);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -379,7 +388,7 @@ uint64_t lymar_aot_atomic_load(uint64_t pointer, uint64_t index) {
     return result;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -395,7 +404,7 @@ void lymar_aot_atomic_store(uint64_t pointer, uint64_t index, uint64_t value, ui
     std::atomic_ref<Word>(*reinterpret_cast<Word*>(address)).store(value, std::memory_order_seq_cst);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -439,7 +448,7 @@ void lymar_aot_atomic_update(uint64_t pointer, uint64_t index, uint64_t value, u
     });
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -449,7 +458,7 @@ void lymar_aot_builtin_arity_error() {
     RuntimeGuard runtime_guard;
  throw std::runtime_error("Builtin argument count mismatch");
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -470,7 +479,7 @@ uint64_t lymar_aot_ref_create(uint64_t pointer, uint64_t writable) {
     return token;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -482,7 +491,7 @@ uint64_t lymar_aot_nil() {
     RuntimeGuard runtime_guard;
  return 2;
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -494,7 +503,7 @@ uint64_t lymar_aot_is_nil(uint64_t value, uint64_t is_pointer) {
     return is_pointer == object_kind && (value == 0 || value == 2);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -506,7 +515,7 @@ uint64_t lymar_aot_is_object(uint64_t value, uint64_t is_pointer) {
     return is_pointer == object_kind && value != 0 && value != 2;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -521,7 +530,7 @@ uint64_t lymar_aot_string_receiver(uint64_t value, uint64_t kind) {
     return (read_word(value) & 0xffffffff) == 11 ? value : 0;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -546,7 +555,7 @@ uint64_t lymar_aot_callable_receiver(uint64_t value, uint64_t kind) {
     return value;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -567,7 +576,7 @@ uint64_t lymar_aot_string_index(uint64_t value, uint64_t kind) {
     return 0; // as_i64 does not parse strings or convert booleans.
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -577,7 +586,7 @@ uint64_t lymar_aot_boolean(uint64_t value) {
     RuntimeGuard runtime_guard;
  return value;
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -589,7 +598,7 @@ uint64_t lymar_aot_is_print_object(uint64_t value, uint64_t kind) {
     return lymar_aot_is_object(value, kind) && (read_word(value) & 0xffffffff) != 9;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -610,7 +619,7 @@ double lymar_aot_to_float(uint64_t value, uint64_t kind) {
     return 0.0;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0.0;
     }
@@ -629,7 +638,7 @@ uint64_t lymar_aot_to_integer(uint64_t value, uint64_t kind) {
     return static_cast<uint64_t>(LM::Memory::truncate_i64(lymar_aot_to_float(value, kind)));
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -641,7 +650,7 @@ uint64_t lymar_aot_float_to_integer(double number) {
     return static_cast<uint64_t>(LM::Memory::truncate_i64(number));
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -656,7 +665,7 @@ uint64_t lymar_aot_to_boolean(uint64_t value, uint64_t kind) {
     return 1;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -719,7 +728,7 @@ void lymar_aot_print_integer(uint64_t value, uint64_t kind) {
     lymar_stdout_write(output, length);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -733,7 +742,7 @@ void lymar_aot_print_float(double value) {
     lymar_stdout_write(text, static_cast<size_t>(length));
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -768,7 +777,7 @@ uint64_t lymar_aot_value_equal(uint64_t left, uint64_t right, uint64_t left_kind
     return 0;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -781,7 +790,7 @@ uint64_t lymar_aot_ref_create_checked(uint64_t pointer, uint64_t mode, uint64_t 
     return lymar_aot_ref_create(pointer, mode);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -799,7 +808,7 @@ uint64_t lymar_aot_ref_resolve(uint64_t token, uint64_t writable) {
     return h.lifetimes.resolve(token, (writable & LM::Memory::ReferenceWritable) != 0);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -834,7 +843,7 @@ uint64_t lymar_aot_ref_move(uint64_t token, uint64_t lexical, uint64_t caller) {
     return moved;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -846,7 +855,7 @@ void lymar_aot_ref_release(uint64_t token) {
      throw std::runtime_error("Worker cannot release a captured reference");
  heap().lifetimes.end_borrow(token); shared_heap().reference_owners.erase(token);
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -858,7 +867,7 @@ void lymar_aot_ref_release_nullable(uint64_t token) {
     if (token) lymar_aot_ref_release(token);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -873,7 +882,7 @@ void lymar_aot_consume(uint64_t pointer) {
     h.lifetimes.consume(pointer);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -889,7 +898,7 @@ uint64_t lymar_aot_call_enter() {
     return h.active;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -903,7 +912,7 @@ void lymar_aot_arg_set(uint64_t index, uint64_t pointer) {
     args[index] = pointer;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -916,7 +925,7 @@ uint64_t lymar_aot_arg_kind(uint64_t index, uint64_t fallback) {
     return h.invocations.empty() || index >= h.invocations.back().args.size() ? fallback : h.invocations.back().args[index];
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -929,7 +938,7 @@ uint64_t lymar_aot_arg_get(uint64_t index) {
     return h.invocations.empty() || index >= h.invocations.back().args.size() ? 0 : h.invocations.back().args[index];
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -945,7 +954,7 @@ void lymar_aot_call_leave(uint64_t pointer) {
     h.return_pointer = pointer;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -955,7 +964,7 @@ uint64_t lymar_aot_return_pointer() {
     RuntimeGuard runtime_guard;
  return heap().return_pointer;
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -969,7 +978,7 @@ void lymar_aot_param_push(uint64_t value, uint64_t is_pointer) {
     h.invocations.back().staged_params.emplace_back(value, is_pointer);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -989,7 +998,7 @@ uint64_t lymar_aot_param_pop(uint64_t fallback, uint64_t is_pointer) {
     return value;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1004,7 +1013,7 @@ uint64_t lymar_aot_slot_pointer(uint64_t address) {
     return result;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1014,7 +1023,7 @@ uint64_t lymar_aot_region_current() {
     RuntimeGuard runtime_guard;
  return heap().active;
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1030,7 +1039,7 @@ void lymar_aot_region_enter(uint64_t lexical) {
     h.active = id;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1049,7 +1058,7 @@ void lymar_aot_region_exit(uint64_t lexical) {
     h.regions.erase(id);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1070,7 +1079,7 @@ void lymar_aot_region_move(uint64_t value, uint64_t lexical, uint64_t caller, ui
     if (is_pointer == object_kind) h.promote(value, target);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1101,7 +1110,7 @@ uint64_t lymar_aot_alloc(uint64_t size) {
     return pointer;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1118,7 +1127,7 @@ uint64_t lymar_aot_box_float(double number) {
     return pointer;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1146,7 +1155,7 @@ uint64_t lymar_aot_scalar_to_string(uint64_t value, uint64_t kind) {
     return pointer;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1252,7 +1261,7 @@ static uint64_t format_argument(uint64_t value, uint64_t kind, bool printable) {
         std::memcpy(reinterpret_cast<void*>(pointer + 24), text.c_str(), text.size() + 1);
         return pointer;
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1284,7 +1293,7 @@ uint64_t lymar_aot_float_to_string(double value) {
         std::memcpy(reinterpret_cast<void*>(pointer + 24), text, length + 1);
         return pointer;
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1346,7 +1355,7 @@ uint64_t lymar_aot_tuple_length(uint64_t pointer, uint64_t kind) {
             throw std::runtime_error("Invalid or expired tuple receiver");
         return !record->second.dictionary && (read_word(pointer) & 0xffffffff) == 3 ? read_word(pointer, 16) : 0;
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1361,7 +1370,7 @@ uint64_t lymar_aot_string_hash(uint64_t value, uint64_t kind) {
         for (Word index = 0; index < length; ++index) hash = (hash * 33 + bytes[index]) % 2147483647;
         return hash;
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1403,7 +1412,7 @@ uint64_t lymar_aot_list_slice(uint64_t value, uint64_t start, uint64_t end,
         h.return_pointer = object_kind;
         return pointer;
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1419,7 +1428,7 @@ uint64_t lymar_aot_copy_constant(uint64_t source, uint64_t size) {
     return pointer;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1429,7 +1438,7 @@ void lymar_aot_free(uint64_t pointer) {
     RuntimeGuard runtime_guard;
     if (pointer && pointer != 2 && heap().allocations.count(pointer)) heap().release(pointer);
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1455,7 +1464,7 @@ void lymar_aot_edge(uint64_t address, uint64_t child, uint64_t is_pointer) {
     }
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1475,7 +1484,7 @@ uint64_t lymar_aot_channel_length(uint64_t value, uint64_t kind) {
     return read_word(value, 16);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1494,7 +1503,7 @@ uint64_t lymar_aot_memory_load_kind(uint64_t pointer, uint64_t element, uint64_t
     return 0;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1521,7 +1530,7 @@ uint64_t lymar_aot_memory_load(uint64_t pointer, uint64_t element, uint64_t poin
     throw std::runtime_error("Invalid raw memory element kind");
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1551,7 +1560,7 @@ uint64_t lymar_aot_raw_alloc(uint64_t size, uint64_t kind) {
     return pointer;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1565,7 +1574,7 @@ void lymar_aot_raw_free(uint64_t pointer, uint64_t kind) {
     if (found != heap().allocations.end() && found->second.raw_memory) heap().release(pointer);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1609,7 +1618,7 @@ void lymar_aot_memory_store(uint64_t pointer, uint64_t value, uint64_t element, 
     // separately through lymar_aot_edge. Preserve destructor scope/order.
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1623,7 +1632,7 @@ void lymar_aot_global_edge(uint64_t address, uint64_t child, uint64_t is_pointer
     else h.shadow.erase(address);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1634,10 +1643,12 @@ void lymar_aot_copy(uint64_t destination, uint64_t source, uint64_t size) {
 
     auto& h = heap();
     // Snapshot every value kind before memmove, including overlapping ranges.
+    // std::map lower_bound gives an O(log n + k) range walk over only the
+    // entries that actually live in [source, source + size).
     std::vector<std::pair<Word, Word>> kinds;
-    for (auto entry = h.shadow.lower_bound(source); entry != h.shadow.end() && entry->first - source < size; ++entry)
-        if (size - (entry->first - source) >= sizeof(Word))
-            kinds.emplace_back(destination + entry->first - source, entry->second);
+    Word src_end = source + size;
+    for (auto it = h.shadow.lower_bound(source); it != h.shadow.end() && it->first + sizeof(Word) <= src_end; ++it)
+        kinds.emplace_back(destination + (it->first - source), it->second);
     std::memmove(reinterpret_cast<void*>(destination), reinterpret_cast<void*>(source), size);
     h.forget_kinds(destination, size, true);
     auto dst = h.containing(destination);
@@ -1648,7 +1659,7 @@ void lymar_aot_copy(uint64_t destination, uint64_t source, uint64_t size) {
     for (auto [address, kind] : kinds) lymar_aot_edge(address, read_word(address), kind);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1672,7 +1683,7 @@ void lymar_aot_raw_copy(uint64_t destination, uint64_t source, uint64_t size) {
     std::memmove(reinterpret_cast<void*>(destination), reinterpret_cast<void*>(source), size);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1696,7 +1707,7 @@ void lymar_aot_raw_fill(uint64_t destination, uint64_t value, uint64_t size) {
     std::memset(reinterpret_cast<void*>(destination), static_cast<unsigned char>(value), size);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1709,7 +1720,7 @@ uint64_t lymar_aot_raw_compare(uint64_t left, uint64_t right, uint64_t size) {
     return static_cast<int64_t>(std::memcmp(reinterpret_cast<void*>(left), reinterpret_cast<void*>(right), size));
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1735,7 +1746,7 @@ uint64_t lymar_aot_resize(uint64_t pointer, uint64_t size) {
     return replacement;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1754,7 +1765,7 @@ uint64_t lymar_aot_raw_resize(uint64_t pointer, uint64_t size, uint64_t pointer_
     return lymar_aot_resize(pointer, size);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1767,7 +1778,7 @@ void lymar_aot_raw_copy_checked(uint64_t destination, uint64_t source, uint64_t 
     lymar_aot_raw_copy(raw_address(destination, destination_kind), raw_address(source, source_kind), raw_integer_value(size, size_kind));
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1780,7 +1791,7 @@ void lymar_aot_raw_fill_checked(uint64_t destination, uint64_t value, uint64_t s
     lymar_aot_raw_fill(raw_address(destination, destination_kind), raw_integer_value(value, value_kind), raw_integer_value(size, size_kind));
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1793,7 +1804,7 @@ uint64_t lymar_aot_raw_compare_checked(uint64_t left, uint64_t right, uint64_t s
     return lymar_aot_raw_compare(raw_address(left, left_kind), raw_address(right, right_kind), raw_integer_value(size, size_kind));
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1805,7 +1816,7 @@ void lymar_aot_set_finalizer(uint64_t pointer, void (*callback)(uint64_t)) {
     heap().allocations.at(pointer).finalizer = callback;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1815,7 +1826,7 @@ void lymar_aot_finalize(uint64_t pointer) {
     RuntimeGuard runtime_guard;
  heap().finalize(pointer);
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -1875,7 +1886,7 @@ uint64_t lymar_aot_resource_create(uint64_t type, uint64_t) {
     return id;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -1895,7 +1906,7 @@ void lymar_aot_resource_destroy(uint64_t id) {
     f.handles.erase(found);
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -2004,7 +2015,7 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
     throw std::runtime_error("Standalone file operation is not implemented: " + std::to_string(operation));
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -2015,7 +2026,7 @@ uint64_t lymar_aot_live_allocations() {
     RuntimeGuard runtime_guard;
  return heap().allocations.size();
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return 0;
     }
@@ -2034,7 +2045,7 @@ void lymar_aot_reset() {
     h.return_pointer = 0;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error, sizeof(heap().worker_error), "%s", failure.what());
         return;
     }
@@ -2099,7 +2110,7 @@ uint64_t lymar_aot_channel_new() {
     return pointer;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error,sizeof(heap().worker_error),"%s",failure.what());
         return 0;
     }
@@ -2122,7 +2133,7 @@ void lymar_aot_channel_push(uint64_t pointer, uint64_t value, uint64_t kind) {
         *reinterpret_cast<Word*>(pointer+16) = length + 1;
         shared_heap().work_available.notify_all();
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error,sizeof(heap().worker_error),"%s",failure.what());
     }
 }
@@ -2144,7 +2155,7 @@ uint64_t lymar_aot_channel_pop(uint64_t pointer) {
         heap().return_pointer = kind;
         return value;
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error,sizeof(heap().worker_error),"%s",failure.what());
         return 0;
     }
@@ -2152,7 +2163,7 @@ uint64_t lymar_aot_channel_pop(uint64_t pointer) {
 uint64_t lymar_aot_channel_has_data(uint64_t pointer) {
     try { RuntimeGuard guard; checked_queue(pointer); heap().return_pointer=0; return read_word(pointer,16)!=0; }
     catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error,sizeof(heap().worker_error),"%s",failure.what());
         return 0;
     }
@@ -2160,7 +2171,7 @@ uint64_t lymar_aot_channel_has_data(uint64_t pointer) {
 void lymar_aot_channel_close(uint64_t pointer) {
     try { RuntimeGuard guard; checked_queue(pointer); shared_heap().closed_channels.insert(pointer); shared_heap().work_available.notify_all(); }
     catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error,sizeof(heap().worker_error),"%s",failure.what());
     }
 }
@@ -2172,7 +2183,7 @@ uint64_t lymar_aot_scheduler_new(uint64_t cores, uint64_t timeout, uint64_t conf
     return pointer;
 
     } catch (const std::exception& failure) {
-        if (runtime_lock_depth || !heap().worker) throw;
+        if (runtime_lock_depth && heap().worker) throw;
         if (!heap().worker_error[0]) std::snprintf(heap().worker_error,sizeof(heap().worker_error),"%s",failure.what());
         return 0;
     }
