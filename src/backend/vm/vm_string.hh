@@ -22,6 +22,12 @@ typedef struct {
     char data[];        // Contiguous UTF-8 byte payload + '\0' at data[len]
 } LmStringHeader;
 
+// Exclusive-ownership flag stored in header.metadata for VM-managed strings.
+// Only freshly allocated concat results are marked; every site that duplicates
+// a string pointer (Mov, container stores, call args, channel sends) clears it.
+// Over-clearing only loses the in-place-append optimization, never correctness.
+#define LM_STR_EXCLUSIVE (1u << 0)
+
 // Native String Allocation & Management Primitives
 RUNTIME_API LmStringHeader* lm_str_alloc(uint64_t cap);
 RUNTIME_API LmStringHeader* lm_str_char(uint8_t c);
@@ -31,6 +37,9 @@ RUNTIME_API void lm_str_free(LmStringHeader* str);
 
 // Native String Operation Primitives
 RUNTIME_API LmStringHeader* lm_str_concat(const LmStringHeader* a, const LmStringHeader* b);
+// In-place append into an exclusively-owned string `a`. Grows capacity by
+// doubling via realloc. Returns the (possibly moved) pointer, or NULL on OOM.
+RUNTIME_API LmStringHeader* lm_str_append(LmStringHeader* a, const LmStringHeader* b);
 RUNTIME_API LmStringHeader* lm_str_substring(const LmStringHeader* str, int64_t start, int64_t end);
 RUNTIME_API uint8_t lm_str_byte_at(const LmStringHeader* str, uint64_t index);
 RUNTIME_API int64_t lm_str_index_of(const LmStringHeader* str, const LmStringHeader* needle);

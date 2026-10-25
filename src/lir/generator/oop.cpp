@@ -40,6 +40,7 @@ void Generator::lower_trait_method(const std::string& trait_name, LM::Frontend::
     next_label_ = 0;
     scope_stack_.clear();
     generator_region_stack_.clear();
+    generator_dirty_regs_.clear();
     generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
@@ -162,6 +163,7 @@ void Generator::lower_frame_method(const std::string& frame_name, LM::Frontend::
     next_label_ = 0;
     scope_stack_.clear();
     generator_region_stack_.clear();
+    generator_dirty_regs_.clear();
     generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
@@ -310,6 +312,7 @@ void Generator::lower_frame_init_method(const std::string& frame_name, LM::Front
     next_label_ = 0;
     scope_stack_.clear();
     generator_region_stack_.clear();
+    generator_dirty_regs_.clear();
     generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();
@@ -452,6 +455,7 @@ void Generator::lower_frame_deinit_method(const std::string& frame_name, LM::Fro
     next_label_ = 0;
     scope_stack_.clear();
     generator_region_stack_.clear();
+    generator_dirty_regs_.clear();
     generator_region_counter_ = 0;
     loop_stack_.clear();
     register_types_.clear();

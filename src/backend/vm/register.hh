@@ -97,6 +97,20 @@ public:
 private:
     RegisterValue call_interpreted(const std::string& name,
                                    const std::vector<RegisterValue>& args);
+    RegisterValue call_interpreted(const LIR::LIR_Function* function,
+                                   const std::vector<RegisterValue>& args);
+    // Per-call-site resolution cache: skips repeated string-hash registry
+    // lookups for interpreted calls inside hot loops.
+    struct CachedCallSite {
+        const LIR::LIR_Function* function = nullptr;
+        size_t parameter_count = 0;
+    };
+    std::unordered_map<const void*, CachedCallSite> call_site_cache_;
+    // Conservative ownership: a duplicated string pointer loses its exclusive
+    // flag so destructive in-place appends never mutate shared data.
+    void share_value(RegisterValue value);
+    // Track a realloc-moved allocation across the region ownership maps.
+    void relocate_allocation(uintptr_t old_ptr, uintptr_t new_ptr);
     // Reuse register storage across calls; caller values remain isolated.
     std::vector<std::vector<RegisterValue>> spare_register_files_;
 
@@ -210,7 +224,10 @@ private:
     };
     uint64_t active_region_id = 0;
     uint64_t next_region_id = 1;
-    std::vector<uint64_t> vm_region_stack;
+    // Stack entries carry the lexical id inline so ancestor scans (hot in
+    // RegionMove) never touch region_instances.
+    struct RegionStackEntry { uint64_t id; uint32_t lexical; };
+    std::vector<RegionStackEntry> vm_region_stack;
     std::vector<size_t> region_depth_table;
     inline size_t get_region_depth(uint64_t id) const {
         return (id < region_depth_table.size()) ? region_depth_table[id] : 0;

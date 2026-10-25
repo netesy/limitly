@@ -113,6 +113,7 @@ void RegisterVM::reset() {
     error_table.clear();
     frame_instances.clear();
     spare_register_files_.clear();
+    call_site_cache_.clear();
     registers.assign(registers.size(), VAL_NIL);
     argument_stack.clear();
     task_contexts.clear();
@@ -193,6 +194,8 @@ RegisterValue unbox_register_value(void* boxed_value) {
 void RegisterVM::execute(const LIR::LIR_Function& function) { execute_function(function); }
 
 void RegisterVM::execute_function(const LIR::LIR_Function& function) {
+    // Instruction pointers are only valid for the currently loaded program.
+    call_site_cache_.clear();
     current_function_ = &function;
     size_t depth = vm_region_stack.size();
     invocation_parents.push_back(active_region_id);
@@ -222,14 +225,61 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
         }
         switch (pc->op) {
             case LIR::LIR_Op::LoadConst:
-                registers[pc->dst] = load_constant(pc->const_val);
+                registers[pc->dst] = IS_PTR(pc->const_val) ? load_constant(pc->const_val) : pc->const_val;
                 break;
-            case LIR::LIR_Op::Add: case LIR::LIR_Op::Sub: case LIR::LIR_Op::Mul: case LIR::LIR_Op::Div:
-            case LIR::LIR_Op::Mod: case LIR::LIR_Op::Neg: case LIR::LIR_Op::DecAdd: case LIR::LIR_Op::DecSub:
+            case LIR::LIR_Op::Add: case LIR::LIR_Op::Sub: case LIR::LIR_Op::Mul: {
+                // Inline SMI fast path: hottest arithmetic in scalar loops.
+                RegisterValue va = registers[pc->a];
+                RegisterValue vb = registers[pc->b];
+                if (IS_INT(va) && IS_INT(vb)) {
+                    int64_t ia = UNBOX_INT(va);
+                    int64_t ib = UNBOX_INT(vb);
+                    int64_t res;
+                    bool ok = pc->op == LIR::LIR_Op::Add ? !__builtin_add_overflow(ia, ib, &res)
+                              : pc->op == LIR::LIR_Op::Sub ? !__builtin_sub_overflow(ia, ib, &res)
+                              : !__builtin_mul_overflow(ia, ib, &res);
+                    if (ok && fits_smi_i64(res)) { registers[pc->dst] = BOX_INT(res); break; }
+                }
+                execute_arithmetic(pc);
+                break;
+            }
+            case LIR::LIR_Op::Div: case LIR::LIR_Op::Mod: {
+                RegisterValue va = registers[pc->a];
+                RegisterValue vb = registers[pc->b];
+                if (IS_INT(va) && IS_INT(vb)) {
+                    int64_t ia = UNBOX_INT(va);
+                    int64_t ib = UNBOX_INT(vb);
+                    if (ib != 0 && (ia != INT64_MIN || ib != -1)) {
+                        registers[pc->dst] = BOX_INT(pc->op == LIR::LIR_Op::Div ? ia / ib : ia % ib);
+                        break;
+                    }
+                }
+                execute_arithmetic(pc);
+                break;
+            }
+            case LIR::LIR_Op::DecAdd: case LIR::LIR_Op::DecSub:
             case LIR::LIR_Op::DecMul: case LIR::LIR_Op::DecDiv: case LIR::LIR_Op::DecMod: case LIR::LIR_Op::DecNeg:
-            case LIR::LIR_Op::DecRescale: execute_arithmetic(pc); break;
+            case LIR::LIR_Op::DecRescale: case LIR::LIR_Op::Neg: execute_arithmetic(pc); break;
             case LIR::LIR_Op::CmpEQ: case LIR::LIR_Op::CmpNEQ: case LIR::LIR_Op::CmpLT: case LIR::LIR_Op::CmpLE:
-            case LIR::LIR_Op::CmpGT: case LIR::LIR_Op::CmpGE: execute_comparison(pc); break;
+            case LIR::LIR_Op::CmpGT: case LIR::LIR_Op::CmpGE: {
+                // Inline SMI comparison: loop conditions and counters.
+                RegisterValue va = registers[pc->a];
+                RegisterValue vb = registers[pc->b];
+                if (IS_INT(va) && IS_INT(vb)) {
+                    int64_t ia = UNBOX_INT(va);
+                    int64_t ib = UNBOX_INT(vb);
+                    bool res = pc->op == LIR::LIR_Op::CmpEQ ? ia == ib
+                               : pc->op == LIR::LIR_Op::CmpNEQ ? ia != ib
+                               : pc->op == LIR::LIR_Op::CmpLT ? ia < ib
+                               : pc->op == LIR::LIR_Op::CmpLE ? ia <= ib
+                               : pc->op == LIR::LIR_Op::CmpGT ? ia > ib
+                               : ia >= ib;
+                    registers[pc->dst] = res ? VAL_TRUE : VAL_FALSE;
+                    break;
+                }
+                execute_comparison(pc);
+                break;
+            }
             case LIR::LIR_Op::ListCreate: case LIR::LIR_Op::ListAppend: case LIR::LIR_Op::ListLen: case LIR::LIR_Op::ListIndex: case LIR::LIR_Op::ListSet:
             case LIR::LIR_Op::DictCreate: case LIR::LIR_Op::DictSet: case LIR::LIR_Op::DictGet: case LIR::LIR_Op::DictHas:
             case LIR::LIR_Op::DictLen: case LIR::LIR_Op::DictItems: case LIR::LIR_Op::TupleCreate: case LIR::LIR_Op::TupleSet:
@@ -241,9 +291,33 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::FrameCallMethod: case LIR::LIR_Op::FrameCallInit: case LIR::LIR_Op::FrameCallDeinit:
             case LIR::LIR_Op::TraitCallMethod: case LIR::LIR_Op::MakeTraitObject:
                 execute_frames(pc); break;
-            case LIR::LIR_Op::Jump: case LIR::LIR_Op::JumpIf: case LIR::LIR_Op::JumpIfFalse:
-                execute_control_flow(pc, function); break;
-            case LIR::LIR_Op::And: case LIR::LIR_Op::Or: case LIR::LIR_Op::Xor: case LIR::LIR_Op::Shl: case LIR::LIR_Op::Shr: execute_bitwise(pc); break;
+            case LIR::LIR_Op::Jump:
+                // -1 because the loop tail increments pc.
+                pc = instructions_ptr + pc->imm - 1;
+                break;
+            case LIR::LIR_Op::JumpIf: case LIR::LIR_Op::JumpIfFalse: {
+                RegisterValue cond = registers[pc->a];
+                bool taken = IS_BOOL(cond) ? UNBOX_BOOL(cond) : to_bool(cond);
+                if (pc->op == LIR::LIR_Op::JumpIfFalse) taken = !taken;
+                if (taken) pc = instructions_ptr + pc->imm - 1;
+                break;
+            }
+            case LIR::LIR_Op::And: case LIR::LIR_Op::Or: case LIR::LIR_Op::Xor: case LIR::LIR_Op::Shl: case LIR::LIR_Op::Shr: {
+                RegisterValue va = registers[pc->a];
+                RegisterValue vb = registers[pc->b];
+                if (IS_INT(va) && IS_INT(vb)) {
+                    int64_t ia = UNBOX_INT(va);
+                    int64_t ib = UNBOX_INT(vb);
+                    registers[pc->dst] = BOX_INT(pc->op == LIR::LIR_Op::And ? ia & ib
+                                          : pc->op == LIR::LIR_Op::Or ? ia | ib
+                                          : pc->op == LIR::LIR_Op::Xor ? ia ^ ib
+                                          : pc->op == LIR::LIR_Op::Shl ? (ib >= 0 && ib < 64 ? ia << ib : 0)
+                                          : (ib >= 0 && ib < 64 ? ia >> ib : (ia < 0 ? -1 : 0)));
+                    break;
+                }
+                execute_bitwise(pc);
+                break;
+            }
             case LIR::LIR_Op::ChannelAlloc: case LIR::LIR_Op::ChannelSend: case LIR::LIR_Op::ChannelOffer:
             case LIR::LIR_Op::ChannelRecv: case LIR::LIR_Op::ChannelPoll: case LIR::LIR_Op::ChannelClose:
             case LIR::LIR_Op::ChannelHasData: case LIR::LIR_Op::ChannelPush: case LIR::LIR_Op::ChannelPop:
@@ -293,8 +367,13 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                 ReferenceOperations::release(*this, as_u64(registers[pc->a]), pc->imm); break;
             case LIR::LIR_Op::OwnershipConsume:
                 consume_memory(registers[pc->a]); break;
-            case LIR::LIR_Op::RegionEnter: case LIR::LIR_Op::RegionExit: case LIR::LIR_Op::RegionMove:
+            case LIR::LIR_Op::RegionEnter: case LIR::LIR_Op::RegionExit:
                 execute_regions(pc); break;
+            case LIR::LIR_Op::RegionMove:
+                // Scalar loops emit region moves for every live outer binding;
+                // non-pointer payloads need no promotion work at all.
+                if (pc->a < registers.size() && IS_PTR(registers[pc->a])) execute_regions(pc);
+                break;
             case LIR::LIR_Op::Mov: registers[pc->dst] = registers[pc->a]; break;
             case LIR::LIR_Op::Label: case LIR::LIR_Op::Nop: break;
             case LIR::LIR_Op::Return: case LIR::LIR_Op::Ret: registers[0] = pc->a != UINT32_MAX ? registers[pc->a] : VAL_NIL; return;
@@ -307,9 +386,45 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                     " at pc=" + std::to_string(static_cast<uint64_t>(pc - instructions_ptr)) +
                     " (" + LIR::lir_op_to_string(pc->op) + ")");
         }
-        auto_register_output(pc);
+        // Ownership bookkeeping tail: only pointer results need registration,
+        // and any duplicated pointer conservatively loses exclusive status.
+        // STR_CONCAT results are freshly owned by dst and keep their flag.
+        if (pc->dst != UINT32_MAX && pc->dst < registers.size()) {
+            RegisterValue out = registers[pc->dst];
+            if (IS_PTR(out)) {
+                if (pc->op != LIR::LIR_Op::STR_CONCAT) share_value(out);
+                auto_register_output(pc);
+            }
+        }
         pc++;
     }
+}
+
+void RegisterVM::share_value(RegisterValue value) {
+    if (!IS_PTR(value)) return;
+    auto* header = reinterpret_cast<ObjHeader*>(UNBOX_PTR(value));
+    if (header->type_id != TYPE_STRING || !(header->metadata & LM_STR_EXCLUSIVE)) return;
+    // Confirm the candidate is a tracked string before mutating objects whose
+    // layout could coincidentally match the tag pattern (opaque native data).
+    auto kind = vm_allocation_types.find(reinterpret_cast<uintptr_t>(header));
+    if (kind == vm_allocation_types.end() || kind->second != TYPE_STRING) return;
+    header->metadata &= ~LM_STR_EXCLUSIVE;
+}
+
+void RegisterVM::relocate_allocation(uintptr_t old_ptr, uintptr_t new_ptr) {
+    if (old_ptr == new_ptr) return;
+    auto type_it = vm_allocation_types.find(old_ptr);
+    if (type_it == vm_allocation_types.end()) return;
+    uint32_t kind = type_it->second;
+    auto region_it = vm_allocation_regions.find(old_ptr);
+    uint64_t region = region_it != vm_allocation_regions.end() ? region_it->second : active_region_id;
+    region_allocations[region].erase(old_ptr);
+    vm_allocation_types.erase(type_it);
+    if (region_it != vm_allocation_regions.end()) vm_allocation_regions.erase(region_it);
+    memory_lifetimes_.revoke(old_ptr);
+    vm_allocation_types[new_ptr] = kind;
+    vm_allocation_regions[new_ptr] = region;
+    region_allocations[region].insert(new_ptr);
 }
 
 RegisterValue RegisterVM::load_constant(RegisterValue value) {
@@ -402,7 +517,7 @@ uint64_t RegisterVM::move_memory_reference(uint64_t token, uint32_t lexical) {
     if (lexical) {
         bool found = false;
         for (auto it = vm_region_stack.rbegin(); it != vm_region_stack.rend(); ++it)
-            if (region_instances.at(*it).lexical_id == lexical) { target = *it; found = true; break; }
+            if (it->lexical == lexical) { target = it->id; found = true; break; }
         if (!found) throw std::runtime_error("Reference move target is not active");
     }
     auto depth = [&](uint64_t region) { return region ? region_instances.at(region).depth : size_t(0); };
@@ -478,6 +593,7 @@ RegisterValue RegisterVM::get_global(const std::string& name) const {
 }
 
 void RegisterVM::set_global(const std::string& name, RegisterValue value) {
+    share_value(value);
     register_native_allocation(value);
     promote_graph(value, 0);
     globals_[name] = value;
@@ -577,11 +693,12 @@ void RegisterVM::promote_graph(RegisterValue value, uint64_t target) {
 
 void RegisterVM::exit_region() {
     if (vm_region_stack.empty()) throw std::runtime_error("Unbalanced RegionExit");
-    auto id = vm_region_stack.back();
+    auto id = vm_region_stack.back().id;
     finalize_owned_frames(id);
     memory_lifetimes_.end_region(id);
     vm_region_stack.pop_back();
-    active_region_id = region_instances.at(id).parent;
+    // The region stack is strictly LIFO, so the parent is the new stack top.
+    active_region_id = vm_region_stack.empty() ? 0 : vm_region_stack.back().id;
     if (auto members = region_allocations.find(id); members != region_allocations.end()) {
         auto& objects = members->second;
         while (!objects.empty()) {
@@ -614,7 +731,7 @@ void RegisterVM::native_region(LIR::LIR_Op op, uint32_t lexical, RegisterValue v
         if (lexical) {
             bool found = false;
             for (auto it = vm_region_stack.rbegin(); it != vm_region_stack.rend(); ++it)
-                if (region_instances.at(*it).lexical_id == lexical) { target = *it; found = true; break; }
+                if (it->lexical == lexical) { target = it->id; found = true; break; }
             if (!found) throw std::runtime_error("Native RegionMove target is not active");
         }
         register_native_allocation(value);
@@ -634,10 +751,10 @@ void RegisterVM::execute_regions(const LIR::LIR_Inst* pc) {
         if (id >= region_depth_table.size()) region_depth_table.resize(id + 1024, 0);
         region_depth_table[id] = depth;
         active_region_id = id;
-        vm_region_stack.push_back(id);
+        vm_region_stack.push_back({id, static_cast<uint32_t>(pc->imm)});
     } else if (pc->op == LIR::LIR_Op::RegionExit) {
-        if (vm_region_stack.empty() || region_instances.at(vm_region_stack.back()).lexical_id != pc->imm)
-            throw std::runtime_error("RegionExit mismatch in " + (current_function_ ? current_function_->name : std::string("native")) + ": expected " + std::to_string(pc->imm) + ", active " + (vm_region_stack.empty() ? std::string("none") : std::to_string(region_instances.at(vm_region_stack.back()).lexical_id)));
+        if (vm_region_stack.empty() || vm_region_stack.back().lexical != static_cast<uint32_t>(pc->imm))
+            throw std::runtime_error("RegionExit mismatch in " + (current_function_ ? current_function_->name : std::string("native")) + ": expected " + std::to_string(pc->imm) + ", active " + (vm_region_stack.empty() ? std::string("none") : std::to_string(vm_region_stack.back().lexical)));
         exit_region();
     } else if (pc->op == LIR::LIR_Op::RegionMove && pc->a < registers.size()) {
         RegisterValue val = registers[pc->a];
@@ -646,7 +763,7 @@ void RegisterVM::execute_regions(const LIR::LIR_Inst* pc) {
         if (pc->imm != 0) {
             bool found = false;
             for (auto it = vm_region_stack.rbegin(); it != vm_region_stack.rend(); ++it) {
-                if (region_instances.at(*it).lexical_id == pc->imm) { target = *it; found = true; break; }
+                if (it->lexical == static_cast<uint32_t>(pc->imm)) { target = it->id; found = true; break; }
             }
             if (!found) throw std::runtime_error("RegionMove target is not an active ancestor");
         }

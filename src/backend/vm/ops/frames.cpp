@@ -43,6 +43,7 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = checked_frame(registers[pc->a], pc->b)->fields[pc->b];
             break;
         case LIR::LIR_Op::FrameSetField:
+            share_value(registers[pc->b]);
             checked_frame(registers[pc->dst], pc->a)->fields[pc->a] = registers[pc->b];
             transfer_ownership(registers[pc->b], registers[pc->dst]);
             break;
@@ -51,6 +52,7 @@ void RegisterVM::execute_frames(const LIR::LIR_Inst* pc) {
             break;
         case LIR::LIR_Op::FrameSetFieldAtomic: {
             auto* frame = checked_frame(registers[pc->dst], pc->a);
+            share_value(registers[pc->b]);
             transfer_ownership(registers[pc->b], registers[pc->dst]);
             lm_frame_set_field_atomic(frame, static_cast<int>(pc->a), registers[pc->b]);
             break;

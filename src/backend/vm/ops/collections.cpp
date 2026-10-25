@@ -22,6 +22,9 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
         }
         case LIR::LIR_Op::ListAppend:
             if (auto* list = reinterpret_cast<LmList*>(header_if_type(registers[pc->a], TYPE_LIST))) {
+                // Stored elements are reachable from the container: duplication
+                // of the pointer removes exclusive string ownership.
+                share_value(registers[pc->b]);
                 if (list->size < list->capacity) {
                     list->data[list->size++] = registers[pc->b];
                 } else {
@@ -74,11 +77,14 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
             if (IS_PTR(registers[pc->dst])) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->dst]);
                 if (h->type_id == TYPE_DICT) {
+                    share_value(registers[pc->a]);
+                    share_value(registers[pc->b]);
                     lm_dict_set((LmDict*)h, registers[pc->a], registers[pc->b]);
                     transfer_ownership(registers[pc->a], registers[pc->dst]);
                     transfer_ownership(registers[pc->b], registers[pc->dst]);
                 } else if (h->type_id == TYPE_LIST) {
                     auto* list = (LmList*)h;
+                    share_value(registers[pc->b]);
                     RegisterValue idx_val = registers[pc->a];
                     int64_t idx_smi = IS_INT(idx_val) ? UNBOX_INT(idx_val) : as_i64(idx_val);
                     if (idx_smi >= 0) {
@@ -94,6 +100,7 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
                     }
                 } else if (h->type_id == TYPE_TUPLE) {
                     uint64_t index = IS_INT(registers[pc->a]) ? static_cast<uint64_t>(UNBOX_INT(registers[pc->a])) : static_cast<uint64_t>(as_i64(registers[pc->a]));
+                    share_value(registers[pc->b]);
                     lm_tuple_set((LmTuple*)h, index, registers[pc->b]);
                     if (IS_PTR(registers[pc->b])) {
                         transfer_ownership(registers[pc->b], registers[pc->dst]);
@@ -139,6 +146,9 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
                 LmValue* items = lm_dict_items(dict, &count);
                 LmList* list = lm_list_new();
                 for (uint64_t i = 0; items && i < count; ++i) {
+                    // Entries expose the dict's keys and values to new holders.
+                    share_value(items[i * 2]);
+                    share_value(items[i * 2 + 1]);
                     LmTuple* entry = lm_tuple_new(2);
                     lm_tuple_set(entry, 0, items[i * 2]);
                     lm_tuple_set(entry, 1, items[i * 2 + 1]);
@@ -159,6 +169,7 @@ void RegisterVM::execute_collections(const LIR::LIR_Inst* pc) {
         }
         case LIR::LIR_Op::TupleSet:
             if (auto* tuple = reinterpret_cast<LmTuple*>(header_if_type(registers[pc->dst], TYPE_TUPLE))) {
+                share_value(registers[pc->b]);
                 lm_tuple_set(tuple, static_cast<uint64_t>(as_i64(registers[pc->a])), registers[pc->b]);
                 transfer_ownership(registers[pc->b], registers[pc->dst]);
             }

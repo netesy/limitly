@@ -21,8 +21,18 @@ RegisterValue RegisterVM::call_interpreted(const std::string& name,
                                             const std::vector<RegisterValue>& args) {
     auto* function = LIR::FunctionRegistry::getInstance().getFunction(name);
     if (!function) throw std::runtime_error("Missing interpreted function: " + name);
+    return call_interpreted(function, args);
+}
 
-    for (auto value : args) register_native_allocation(value);
+RegisterValue RegisterVM::call_interpreted(const LIR::LIR_Function* function,
+                                            const std::vector<RegisterValue>& args) {
+    if (!function) throw std::runtime_error("Missing interpreted function");
+
+    for (auto value : args) {
+        // The callee may retain arguments; duplication loses exclusivity.
+        share_value(value);
+        register_native_allocation(value);
+    }
     size_t caller_depth = vm_region_stack.size();
     uint64_t caller_region = active_region_id;
     invocation_parents.push_back(caller_region);
@@ -35,7 +45,8 @@ RegisterValue RegisterVM::call_interpreted(const std::string& name,
         spare_register_files_.pop_back();
     }
     size_t reg_count = std::max({(size_t)function->register_count, args.size(), (size_t)1});
-    registers.assign(reg_count, VAL_NIL);
+    registers.resize(reg_count, VAL_NIL);
+    std::fill(registers.begin(), registers.end(), VAL_NIL);
     std::copy(args.begin(), args.end(), registers.begin());
     current_function_ = function;
     try {
@@ -82,6 +93,23 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
     }
 
     ResourceManager::getInstance().setCurrentFiber(get_current_fiber());
+    // Call-site cache: hot loops re-enter the same interpreted function at the
+    // same instruction; skip the repeated string-hash registry resolutions.
+    if (pc->op == LIR::LIR_Op::Call) {
+        auto cached = call_site_cache_.find(pc);
+        if (cached != call_site_cache_.end()) {
+            std::vector<RegisterValue> arg_vals;
+            arg_vals.reserve(std::max((size_t)pc->call_args.size(), cached->second.parameter_count));
+            for (auto arg_reg : pc->call_args) {
+                if (arg_reg < registers.size()) arg_vals.push_back(registers[arg_reg]);
+                else arg_vals.push_back(VAL_NIL);
+            }
+            while (arg_vals.size() < cached->second.parameter_count) arg_vals.push_back(VAL_NIL);
+            auto return_value = call_interpreted(cached->second.function, arg_vals);
+            if (pc->dst != UINT32_MAX) registers[pc->dst] = return_value;
+            return;
+        }
+    }
     if (pc->op == LIR::LIR_Op::Call || pc->op == LIR::LIR_Op::CallBuiltin) {
         auto builtin = LIR::LIRBuiltinFunctions::getInstance().getFunction(pc->func_name);
         if (builtin && !builtin->acceptsArgumentCount(pc->call_args.size()))
@@ -229,14 +257,28 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 break;
             }
 
+            // Native resolvers receive raw register pointers; any retained
+            // string loses exclusive ownership conservatively.
+            if (!is_builtin_target) {
+                for (auto arg_reg : pc->call_args)
+                    if (arg_reg < registers.size()) share_value(registers[arg_reg]);
+            }
+
             if (CompiledResolver::getInstance().dispatch(pc->func_name, *pc, registers, this)) {
                 break;
             }
 
             if (func_manager.hasFunction(pc->func_name)) {
                 auto func = func_manager.getFunction(pc->func_name);
-                std::vector<RegisterValue> arg_vals;
                 size_t expected_total = func->getParameters().size();
+                // Cache pure interpreted Call sites (registry pointer is stable
+                // for the lifetime of the compiled function).
+                const LIR::LIR_Function* cacheable = nullptr;
+                if (pc->op == LIR::LIR_Op::Call) {
+                    cacheable = LIR::FunctionRegistry::getInstance().getFunction(pc->func_name);
+                    if (cacheable) call_site_cache_[pc] = CachedCallSite{cacheable, expected_total};
+                }
+                std::vector<RegisterValue> arg_vals;
                 arg_vals.reserve(std::max((size_t)pc->call_args.size(), expected_total));
                 for (auto arg_reg : pc->call_args) {
                     if (arg_reg < registers.size()) {
@@ -249,7 +291,8 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     arg_vals.push_back(VAL_NIL);
                 }
 
-                auto return_value = call_interpreted(pc->func_name, arg_vals);
+                auto return_value = cacheable ? call_interpreted(cacheable, arg_vals)
+                                              : call_interpreted(pc->func_name, arg_vals);
                 if (pc->dst != UINT32_MAX) registers[pc->dst] = return_value;
             } else if (pc->func_name == "channel") {
                 // Allocate a real runtime Channel pointer boxed as a pointer!

@@ -2005,6 +2005,34 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
 
 
 Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
+    // Destructive string-concat rewrite: `x = x + rhs` lowers to the same
+    // destructive form as `x += rhs` (STR_CONCAT dst, dst, rhs) so the VM can
+    // append in place when x is exclusively owned. Only applies to plain
+    // variable assignment of an already-bound String local that is neither
+    // atomic nor closure-captured.
+    if (!expr.name.empty() && !expr.object &&
+        expr.op == LM::Frontend::TokenType::EQUAL && !is_atomic_binding(expr) &&
+        (env_register_ == UINT32_MAX ||
+         std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(),
+                   expr.name) == current_lambda_captures_.end())) {
+        auto binary = std::dynamic_pointer_cast<LM::Frontend::AST::BinaryExpr>(expr.value);
+        if (binary && binary->op == LM::Frontend::TokenType::PLUS && binary->left) {
+            auto lhs = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(binary->left);
+            if (lhs && lhs->name == expr.name) {
+                Reg dst = resolve_variable(expr.name);
+                TypePtr dst_type = dst != UINT32_MAX ? get_register_type(dst) : nullptr;
+                if (dst_type && dst_type->tag == TypeTag::String) {
+                    Reg value = emit_expr(*binary->right);
+                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                    emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, dst, dst, value));
+                    set_register_type(dst, string_type);
+                    mark_binding_dirty(dst);
+                    return dst;
+                }
+            }
+        }
+    }
+
     Reg value = emit_expr(*expr.value);
     if (!expr.name.empty() && !expr.object && is_atomic_binding(expr)) {
         Reg cell = atomic_cell(expr.name);
@@ -2090,6 +2118,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                     auto string_type = std::make_shared<::Type>(::TypeTag::String);
                     emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, dst, dst, value));
                     set_register_type(dst, string_type);
+                    mark_binding_dirty(dst);
                     return dst;
                 }
             }
@@ -2125,6 +2154,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
             emit_instruction(LIR_Inst(LIR_Op::Mov, abi_type, dst, value, 0));
         }
         // No need to update binding since we're using the existing register
+        mark_binding_dirty(dst);
         return dst;
     } else if (expr.object) {
         // For member or index assignment

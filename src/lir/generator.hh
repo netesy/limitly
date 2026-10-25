@@ -340,6 +340,14 @@ private:
     std::unordered_map<LIR_Function*, LinearLabelState> linear_label_states_;
     uint32_t generator_region_counter_ = 0;
     std::vector<uint32_t> generator_region_stack_;
+    // Parallel to generator_region_stack_: bindings rebound by assignment while
+    // a region is open. At region exit only these (still-live) bindings need
+    // promotion; the old blanket RegionMove of every live binding made scalar
+    // loops pay per-iteration ownership traffic for values that never change.
+    std::vector<std::unordered_set<Reg>> generator_dirty_regs_;
+    void mark_binding_dirty(Reg reg) {
+        if (!generator_dirty_regs_.empty()) generator_dirty_regs_.back().insert(reg);
+    }
     std::map<std::string, TypePtr> variable_types_;
     std::shared_ptr<TypeSystem> type_system_;
     std::string current_function_name_;

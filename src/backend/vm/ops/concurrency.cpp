@@ -101,6 +101,8 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             RegisterValue value = (pc->b != UINT32_MAX) ? registers[pc->b] : VAL_NIL;
             if (IS_PTR(registers[pc->a])) {
                 auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
+                // Cross-thread handoff duplicates the pointer: drop exclusivity.
+                share_value(value);
                 export_graph(value);
                 channel->send(value, get_current_fiber());
             }
@@ -110,6 +112,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             if (IS_PTR(registers[pc->a])) {
                 auto* channel = (LM::Backend::Channel*)UNBOX_PTR(registers[pc->a]);
                 RegisterValue value = (pc->b != UINT32_MAX) ? registers[pc->b] : VAL_NIL;
+                share_value(value);
                 export_graph(value);
                 registers[pc->dst] = channel->offer(value) ? VAL_TRUE : VAL_FALSE;
             } else {
@@ -221,6 +224,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
                 } else {
                     value = VAL_NIL;
                 }
+                share_value(value);
                 ((TaskContext*)UNBOX_PTR(registers[pc->a]))
                     ->fields[static_cast<int>(pc->imm)] = value;
             }

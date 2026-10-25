@@ -88,7 +88,10 @@ RUNTIME_API LmStringHeader* lm_str_concat(const LmStringHeader* a, const LmStrin
     uint64_t len_b = b ? b->len : 0;
     uint64_t total_len = len_a + len_b;
 
-    LmStringHeader* res = lm_str_alloc(total_len);
+    // Over-allocate slack so repeated in-place appends amortize to O(1)
+    // instead of reallocating on every growth step.
+    uint64_t cap = total_len > 32 ? total_len + (total_len >> 2) : 32;
+    LmStringHeader* res = lm_str_alloc(cap);
     if (!res) return NULL;
 
     if (len_a > 0 && a) memcpy(res->data, a->data, len_a);
@@ -97,6 +100,25 @@ RUNTIME_API LmStringHeader* lm_str_concat(const LmStringHeader* a, const LmStrin
     res->len = total_len;
     res->data[total_len] = '\0';
     return res;
+}
+
+RUNTIME_API LmStringHeader* lm_str_append(LmStringHeader* a, const LmStringHeader* b) {
+    if (!a) return lm_str_concat(a, b);
+    uint64_t len_b = b ? b->len : 0;
+    if (len_b == 0) return a;
+    uint64_t total = a->len + len_b;
+    if (total > a->cap) {
+        uint64_t new_cap = a->cap ? a->cap : 32;
+        while (new_cap < total) new_cap *= 2;
+        LmStringHeader* grown = (LmStringHeader*)realloc(a, sizeof(LmStringHeader) + new_cap + 1);
+        if (!grown) return NULL;
+        a = grown;
+        a->cap = new_cap;
+    }
+    memcpy(a->data + a->len, b->data, len_b);
+    a->len = total;
+    a->data[total] = '\0';
+    return a;
 }
 
 RUNTIME_API LmStringHeader* lm_str_substring(const LmStringHeader* str, int64_t start, int64_t end) {

@@ -97,11 +97,32 @@ void RegisterVM::execute_strings(const LIR::LIR_Inst* pc) {
                 }
             }
 
+            // Destructive form (dst == a): append in place while str_a is
+            // exclusively owned by the destination register. Any pointer
+            // duplication site (Mov, stores, call args) clears the flag, so a
+            // set flag guarantees no other live alias exists.
+            if (pc->a == pc->dst && !free_a && str_a && str_b && str_b != str_a &&
+                (str_a->header.metadata & LM_STR_EXCLUSIVE)) {
+                uintptr_t old_ptr = reinterpret_cast<uintptr_t>(str_a);
+                LmStringHeader* grown = lm_str_append(str_a, str_b);
+                if (free_b) lm_str_free(str_b);
+                if (grown) {
+                    if (reinterpret_cast<uintptr_t>(grown) != old_ptr)
+                        relocate_allocation(old_ptr, reinterpret_cast<uintptr_t>(grown));
+                    grown->header.metadata |= LM_STR_EXCLUSIVE;
+                    registers[pc->dst] = BOX_PTR(grown);
+                    break;
+                }
+                // OOM: fall through to the copying path.
+            }
+
             LmStringHeader* res = lm_str_concat(str_a, str_b);
             if (free_a) lm_str_free(str_a);
             if (free_b) lm_str_free(str_b);
 
             registers[pc->dst] = BOX_PTR(res);
+            // Freshly allocated result is exclusively owned by dst.
+            if (res) res->header.metadata |= LM_STR_EXCLUSIVE;
             register_native_allocation(registers[pc->dst]);
             break;
         }

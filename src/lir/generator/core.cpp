@@ -173,10 +173,12 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     Reg saved_this_register = this_register_;
     uint32_t saved_region_counter = generator_region_counter_;
     auto saved_region_stack = std::move(generator_region_stack_);
+    auto saved_dirty_regs = std::move(generator_dirty_regs_);
     bool saved_is_terminated = m_is_terminated;
     
     generator_region_counter_ = 0;
     generator_region_stack_.clear();
+    generator_dirty_regs_.clear();
 
     // Create function with parameters (including optional parameters)
     size_t total_params = fn.params.size() + fn.optionalParams.size();
@@ -329,6 +331,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     this_register_ = saved_this_register;
     generator_region_counter_ = saved_region_counter;
     generator_region_stack_ = std::move(saved_region_stack);
+    generator_dirty_regs_ = std::move(saved_dirty_regs);
     m_is_terminated = saved_is_terminated;
 }
 
@@ -348,6 +351,7 @@ void Generator::enter_scope() {
     
     uint32_t region = ++generator_region_counter_;
     generator_region_stack_.push_back(region);
+    generator_dirty_regs_.push_back({});
     emit_instruction(LIR_Inst(LIR_Op::RegionEnter, Type::Void, 0, 0, 0, region));
 }
 
@@ -363,10 +367,24 @@ void Generator::exit_scope() {
         uint32_t region = generator_region_stack_.back();
         generator_region_stack_.pop_back();
         uint32_t parent = generator_region_stack_.empty() ? 0 : generator_region_stack_.back();
-        // Surviving bindings can receive newly allocated values by assignment.
-        for (const auto& scope : scope_stack_) {
-            for (const auto& [name, reg] : scope.vars)
+        std::unordered_set<Reg> dirty;
+        if (!generator_dirty_regs_.empty()) {
+            dirty = std::move(generator_dirty_regs_.back());
+            generator_dirty_regs_.pop_back();
+        }
+        if (!dirty.empty()) {
+            // Only bindings that survive this exit and were rebound since the
+            // region opened can hold a value allocated inside the region.
+            std::unordered_set<Reg> live;
+            for (const auto& scope : scope_stack_)
+                for (const auto& [name, reg] : scope.vars) live.insert(reg);
+            for (const auto& reg : dirty) {
+                if (!live.count(reg)) continue;
                 emit_instruction(LIR_Inst(LIR_Op::RegionMove, Type::Void, 0, reg, 0, parent));
+                // The promoted value now lives in the parent region; keep the
+                // mark alive so the parent exit promotes it further if needed.
+                if (!generator_dirty_regs_.empty()) generator_dirty_regs_.back().insert(reg);
+            }
         }
         emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, region));
     }
