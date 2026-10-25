@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Iterator Module
 
-import std.iterator.index as iter;
+import std.iterator as iter;
 
 fn square(x: any): any {
     var val_int = x as int;

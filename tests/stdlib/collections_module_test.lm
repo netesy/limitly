@@ -13,7 +13,7 @@ import std.collections.stack as stack_col;
 import std.collections.priority_queue as pq_col;
 import std.collections.bitset as bitset_col;
 import std.collections.bloom_filter as bloom_col;
-import std.collections.index as collections;
+import std.collections as collections;
 
 fn test_list(): int {
     print("Testing List...");

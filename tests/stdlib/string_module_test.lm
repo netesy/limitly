@@ -1,6 +1,6 @@
 // Test Suite for Standard Library String Module
 
-import std.string.index as s;
+import std.string as s;
 
 fn test_string_frame(): int {
     print("Testing String Frame...");

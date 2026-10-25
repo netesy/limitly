@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Regex Module
 
-import std.regex.index as r;
+import std.regex as r;
 import std.regex.regex as regex_mod;
 
 fn test_regex_frame(): int {

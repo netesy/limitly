@@ -6,7 +6,7 @@
 //
 // No FFI in this file — everything goes through std.font.
 
-import std.font.index as font;
+import std.font as font;
 
 fn run_benchmark() {
     val ITER = 1000;

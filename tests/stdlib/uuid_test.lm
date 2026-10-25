@@ -1,4 +1,4 @@
-import std.uuid.index as uuid;
+import std.uuid as uuid;
 import std.uuid.uuid as uuid_mod;
 
 fn test_parsing(): int {

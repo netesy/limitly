@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Process Module
 
-import std.process.index as process;
+import std.process as process;
 
 fn test_process_frame(): int {
     print("Testing Process Frame...");

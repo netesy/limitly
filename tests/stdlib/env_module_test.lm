@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Environment Module
 
-import std.env.index as env;
+import std.env as env;
 
 fn test_env_frame(): int {
     print("Testing Env Frame...");

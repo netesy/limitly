@@ -1,4 +1,4 @@
-import std.io.index as io;
+import std.io as io;
 import std.io.file as file_mod;
 
 fn main(): int {

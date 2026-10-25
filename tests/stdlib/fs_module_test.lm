@@ -1,7 +1,7 @@
 // Test Suite for Standard Library Filesystem Module
 
-import std.fs.index as fs;
-import std.path.index as path;
+import std.fs as fs;
+import std.path as path;
 
 fn test_fs_operations(): int {
     print("Testing FS Operations...");

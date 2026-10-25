@@ -1,6 +1,6 @@
 // Test Suite for Standard Library I/O Module
 
-import std.io.index as io;
+import std.io as io;
 import std.io.file as file_mod;
 
 fn test_console(): int {

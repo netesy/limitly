@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Random Module
 
-import std.random.index as r;
+import std.random as r;
 
 fn test_random_frame(): int {
     print("Testing Random Frame...");

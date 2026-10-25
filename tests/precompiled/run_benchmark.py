@@ -129,8 +129,8 @@ def main():
         literal = str(font).replace("\\", "\\\\").replace('"', '\\"')
         for kind in ("pure", "stb"):
             source = (ROOT / "tests" / "precompiled" / f"benchmark_workload_{kind}.lm").read_text()
-            start = source.index("var font_path =")
-            end = source.index("assert(font_path !=", start)
+            start = source("var font_path =")
+            end = source("assert(font_path !=", start)
             source = source[:start] + f'var font_path = "{literal}";\n' + source[end:]
             source = source.replace('i < 50;', f'i < {args.iterations};')
             path = tmp / f"{kind}.lm"

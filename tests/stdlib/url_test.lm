@@ -1,4 +1,4 @@
-import std.url.index as url;
+import std.url as url;
 import std.url.url as url_mod;
 import std.url.query as query_mod;
 import std.url.builder as builder_mod;

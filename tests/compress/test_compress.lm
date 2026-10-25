@@ -1,7 +1,7 @@
 // tests/compress/test_compress.lm
 // Test suite for Lymar std.compress (zlib compression round-trips & decompression limits)
 
-import std.compress.index as compress;
+import std.compress as compress;
 
 fn test_round_trip() {
  print("=== Testing Compression Round Trip ===");

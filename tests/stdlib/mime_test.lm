@@ -1,4 +1,4 @@
-import std.mime.index as mime;
+import std.mime as mime;
 import std.mime.types as types_mod;
 
 fn test_parsing(): int {

@@ -1,6 +1,6 @@
-import std.graphics.index as graphics;
-import std.scene.index as scene;
-import std.ui.index as ui;
+import std.graphics as graphics;
+import std.scene as scene;
+import std.ui as ui;
 
 print("Testing Simplified UI/Scene/Graphics...");
 

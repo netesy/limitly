@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Algorithm Module
 
-import std.algorithm.index as algo;
+import std.algorithm as algo;
 
 fn is_even(x: any): bool {
     var val_int = x as int;

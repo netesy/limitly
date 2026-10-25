@@ -3,7 +3,7 @@ import std.search as search;
 import std.algorithm as algorithm;
 import std.iterator as iterator;
 import std.range as range;
-import std.collections.index as collections;
+import std.collections as collections;
 
 fn descending_compare(a: any, b: any): int {
     if (a > b) {

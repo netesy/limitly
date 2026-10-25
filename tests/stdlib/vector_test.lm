@@ -1,4 +1,4 @@
-import std.collections.index as collections;
+import std.collections as collections;
 
 fn main(): int {
     var v = collections.Vector();

@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Parse Module
 
-import std.parse.index as parse;
+import std.parse as parse;
 import std.time.datetime as dt_mod;
 
 fn test_parse_frame(): int {

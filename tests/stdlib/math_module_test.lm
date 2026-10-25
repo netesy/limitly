@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Math Module
 
-import std.math.index as math;
+import std.math as math;
 
 fn nearly_equal(a: float, b: float): bool {
     var diff = a - b;

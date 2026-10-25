@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Format Module
 
-import std.format.index as f;
+import std.format as f;
 
 fn test_format_frame(): int {
     print("Testing Format Frame...");

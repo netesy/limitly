@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Unicode Module
 
-import std.unicode.index as u;
+import std.unicode as u;
 
 fn test_rune(): int {
     print("Testing Rune...");

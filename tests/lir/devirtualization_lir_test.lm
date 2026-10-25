@@ -1,7 +1,7 @@
 // Regression test asserting LIR devirtualization and basic block termination tracking
 
 import std.ffi as ffi;
-import std.io.index as io;
+import std.io as io;
 import std.io.file as file_mod;
 
 frame ListWrapper {

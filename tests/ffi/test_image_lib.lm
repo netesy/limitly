@@ -10,7 +10,7 @@
 // Run:          make stb-image-test
 //               lymar run tests/ffi/test_image_lib.lm
 
-import std.image.index as image;
+import std.image as image;
 import std.image.png   as png;
 import std.image.jpg   as jpg;
 import std.image.bmp   as bmp;

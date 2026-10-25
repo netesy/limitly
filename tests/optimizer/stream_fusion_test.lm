@@ -1,7 +1,7 @@
 // Regression test for AST Stream Fusion optimization pass
 
 import std.ffi as ffi;
-import std.io.index as io;
+import std.io as io;
 import std.io.file as file_mod;
 
 fn execute_sys_cmd(cmd: str): int {

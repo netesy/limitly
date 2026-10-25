@@ -7,7 +7,7 @@ import std.core.comparable as comparable;
 import std.core.disposable as disposable;
 import std.core.cloneable as cloneable;
 import std.core.hashable as hashable;
-import std.core.index as core;
+import std.core as core;
 
 // Frame implementing Comparable
 frame DummyComparable: comparable.Comparable {

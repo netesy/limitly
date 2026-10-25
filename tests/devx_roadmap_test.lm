@@ -1,7 +1,7 @@
 // DevX Roadmap Unit Test Suite
 import std.string.builder as sb;
 import std.http.router as http_router;
-import std.json.index as json;
+import std.json as json;
 import std.collections.deque as deque;
 import std.collections.btreemap as btreemap;
 

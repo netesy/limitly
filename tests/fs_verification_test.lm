@@ -1,6 +1,6 @@
 // Filesystem System Real Verification Test using std.fs and std.path
-import std.fs.index as fs;
-import std.path.index as path;
+import std.fs as fs;
+import std.path as path;
 
 fn main(): int {
     print("=== Filesystem System Real Verification Test ===\n");

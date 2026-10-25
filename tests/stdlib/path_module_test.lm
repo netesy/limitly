@@ -1,6 +1,6 @@
 // Test Suite for Standard Library Path Module
 
-import std.path.index as path;
+import std.path as path;
 
 fn test_path_frame(): int {
     print("Testing Path Frame...");
