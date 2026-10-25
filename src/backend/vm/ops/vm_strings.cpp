@@ -57,44 +57,41 @@ void RegisterVM::execute_strings(const LIR::LIR_Inst* pc) {
 
             if (IS_PTR(registers[pc->a])) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->a]);
-                if (h && h->type_id == TYPE_STRING) {
-                    str_a = (LmStringHeader*)h;
-                }
+                if (h && h->type_id == TYPE_STRING) str_a = (LmStringHeader*)h;
             }
             if (IS_PTR(registers[pc->b])) {
                 ObjHeader* h = (ObjHeader*)UNBOX_PTR(registers[pc->b]);
-                if (h && h->type_id == TYPE_STRING) {
-                    str_b = (LmStringHeader*)h;
-                }
+                if (h && h->type_id == TYPE_STRING) str_b = (LmStringHeader*)h;
             }
 
             if (!str_a) {
-                if (is_integer(registers[pc->a]) && str_b != nullptr) {
-                    int64_t byte_val = as_i64(registers[pc->a]);
-                    if (byte_val >= 0 && byte_val <= 255) {
-                        str_a = lm_str_char((uint8_t)byte_val);
-                    } else {
-                        str_a = lm_value_to_string(registers[pc->a]);
-                        free_a = true;
-                    }
-                } else {
-                    str_a = lm_value_to_string(registers[pc->a]);
-                    free_a = true;
-                }
+                str_a = lm_value_to_string(registers[pc->a]);
+                free_a = true;
             }
             if (!str_b) {
-                if (is_integer(registers[pc->b]) && str_a != nullptr) {
-                    int64_t byte_val = as_i64(registers[pc->b]);
-                    if (byte_val >= 0 && byte_val <= 255) {
-                        str_b = lm_str_char((uint8_t)byte_val);
-                    } else {
-                        str_b = lm_value_to_string(registers[pc->b]);
-                        free_b = true;
-                    }
-                } else {
-                    str_b = lm_value_to_string(registers[pc->b]);
-                    free_b = true;
-                }
+                str_b = lm_value_to_string(registers[pc->b]);
+                free_b = true;
+            }
+
+            if (str_a && str_a->len == 0 && !free_b) {
+                registers[pc->dst] = registers[pc->b];
+                if (free_a) lm_str_free(str_a);
+                break;
+            }
+            if (str_b && str_b->len == 0 && !free_a) {
+                registers[pc->dst] = registers[pc->a];
+                if (free_b) lm_str_free(str_b);
+                break;
+            }
+
+            // In-place buffer growth if str_a is a mutable string with capacity
+            if (str_a && !free_a && free_b && str_a->len + str_b->len <= str_a->cap) {
+                memcpy(str_a->data + str_a->len, str_b->data, str_b->len);
+                str_a->len += str_b->len;
+                str_a->data[str_a->len] = '\0';
+                registers[pc->dst] = registers[pc->a];
+                lm_str_free(str_b);
+                break;
             }
 
             LmStringHeader* res = lm_str_concat(str_a, str_b);
