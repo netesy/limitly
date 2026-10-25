@@ -10,15 +10,15 @@ frame ListIterator: Iterator {
 
     pub init(items: [any]) {
         self.items = items;
-        self = 0;
+        self.index = 0;
     }
 
     pub fn next(): any {
-        if (self >= len(self.items)) {
+        if (self.index >= len(self.items)) {
             return nil;
         }
-        var item = self.items[self];
-        self = self + 1;
+        var item = self.items[self.index];
+        self.index = self.index + 1;
         return item;
     }
 }

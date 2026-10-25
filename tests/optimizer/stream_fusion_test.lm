@@ -4,13 +4,25 @@ import std.ffi as ffi;
 import std.io as io;
 import std.io.file as file_mod;
 
+fn host_is_windows(): bool {
+    unsafe {
+        var h = ffi.library_load("msvcrt.dll");
+        if (h != nil and h != 0) {
+            ffi.library_unload(h);
+            return true;
+        }
+    }
+    return false;
+}
+
 fn execute_sys_cmd(cmd: str): int {
     unsafe {
-        var h = ffi.library_load("libc.so.6");
-        if (h == nil) {
-            h = ffi.library_load("libc.so");
-        }
-        if (h != nil) {
+        var candidates: [str] = ["libc.so.6", "libc.so", "msvcrt.dll", "libSystem.dylib"];
+        for (var i = 0; i < len(candidates); i = i + 1) {
+            var h = ffi.library_load(candidates[i]);
+            if (h == nil or h == 0) {
+                continue;
+            }
             var sys_ptr = ffi.library_get_symbol(h, "system");
             if (sys_ptr != nil and sys_ptr != 0) {
                 var cs = ffi.string_to_cstring(cmd);
@@ -19,6 +31,7 @@ fn execute_sys_cmd(cmd: str): int {
                 ffi.library_unload(h);
                 return res;
             }
+            ffi.library_unload(h);
         }
     }
     return -1;
@@ -64,7 +77,11 @@ fn main(): int {
 
     // LIR Output Inspection
     var tmp_file = "stream_fusion_lir.tmp";
-    var cmd = "./bin/lymar -lir tests/optimizer/stream_fusion_test.lm > " + tmp_file + " 2>&1";
+    var lymar_bin = "./bin/lymar";
+    if (host_is_windows()) {
+        lymar_bin = "bin\\lymar.exe";
+    }
+    var cmd = lymar_bin + " -lir tests/optimizer/stream_fusion_test.lm > " + tmp_file + " 2>&1";
     var res = execute_sys_cmd(cmd);
     assert(res == 0, "LIR compilation execution failed");
     assert(io.exists(tmp_file), "LIR temporary output file should exist");
