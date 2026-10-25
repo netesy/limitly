@@ -84,16 +84,6 @@ void RegisterVM::execute_strings(const LIR::LIR_Inst* pc) {
                 break;
             }
 
-            // In-place buffer growth if str_a is a mutable string with capacity
-            if (str_a && !free_a && free_b && str_a->len + str_b->len <= str_a->cap) {
-                memcpy(str_a->data + str_a->len, str_b->data, str_b->len);
-                str_a->len += str_b->len;
-                str_a->data[str_a->len] = '\0';
-                registers[pc->dst] = registers[pc->a];
-                lm_str_free(str_b);
-                break;
-            }
-
             LmStringHeader* res = lm_str_concat(str_a, str_b);
             if (free_a) lm_str_free(str_a);
             if (free_b) lm_str_free(str_b);

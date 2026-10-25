@@ -301,13 +301,16 @@ bool Optimizer::redundant_memory_elimination() {
             if (i > 0) {
                 auto& prev = func_.instructions[i - 1];
                 if (prev.op == LIR_Op::LoadConst && prev.dst == inst.a && IS_PTR(prev.const_val) && UNBOX_PTR(prev.const_val)) {
-                    auto* lm_str = reinterpret_cast<LmStringHeader*>(UNBOX_PTR(prev.const_val));
-                    if (lm_str && lm_str->len == 0) {
-                        inst.op = LIR_Op::Mov;
-                        inst.a = inst.b;
-                        inst.b = UINT32_MAX;
-                        changed = true;
-                        continue;
+                    auto* obj = reinterpret_cast<ObjHeader*>(UNBOX_PTR(prev.const_val));
+                    if (obj && obj->type_id == TYPE_STRING) {
+                        auto* lm_str = reinterpret_cast<LmStringHeader*>(obj);
+                        if (lm_str && lm_str->len == 0) {
+                            inst.op = LIR_Op::Mov;
+                            inst.a = inst.b;
+                            inst.b = UINT32_MAX;
+                            changed = true;
+                            continue;
+                        }
                     }
                 }
             }
