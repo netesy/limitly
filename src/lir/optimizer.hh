@@ -110,6 +110,12 @@ public:
      */
     bool algebraic_simplification();
 
+    /**
+     * @brief Loop unrolling for tight integer loops
+     * @return true if loops were unrolled
+     */
+    bool loop_unroll();
+
 private:
     LIR_Function& func_;
     OptimizationReport report_;

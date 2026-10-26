@@ -242,6 +242,32 @@ void RegisterVM::execute_arithmetic(const LIR::LIR_Inst* pc) {
             }
             break;
         }
+        // Unchecked integer operations for optimized hot loops
+        // These assume operands are SMIs and bypass type checks
+        case LIR::LIR_Op::IAdd_Unchecked: {
+            int64_t ia = UNBOX_INT(registers[pc->a]);
+            int64_t ib = UNBOX_INT(registers[pc->b]);
+            registers[pc->dst] = BOX_INT(ia + ib);
+            break;
+        }
+        case LIR::LIR_Op::IXor_Unchecked: {
+            int64_t ia = UNBOX_INT(registers[pc->a]);
+            int64_t ib = UNBOX_INT(registers[pc->b]);
+            registers[pc->dst] = BOX_INT(ia ^ ib);
+            break;
+        }
+        case LIR::LIR_Op::IAnd_Unchecked: {
+            int64_t ia = UNBOX_INT(registers[pc->a]);
+            int64_t ib = UNBOX_INT(registers[pc->b]);
+            registers[pc->dst] = BOX_INT(ia & ib);
+            break;
+        }
+        case LIR::LIR_Op::IOr_Unchecked: {
+            int64_t ia = UNBOX_INT(registers[pc->a]);
+            int64_t ib = UNBOX_INT(registers[pc->b]);
+            registers[pc->dst] = BOX_INT(ia | ib);
+            break;
+        }
         default:
             throw std::runtime_error(
                 "VM: execute_arithmetic: unsupported opcode " +

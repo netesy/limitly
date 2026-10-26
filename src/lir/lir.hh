@@ -111,7 +111,10 @@ enum class LIR_Op : uint8_t {
     Call, CallVoid, CallIndirect, CallBuiltin, CallVariadic,
     Return, FuncDef, Param, Ret, VaStart, VaArg, VaEnd, Copy,
     Nop, Load, Store, Cast, ToString, STR_CONCAT, STR_FORMAT,
-    
+
+    // === Unchecked Integer Operations (for optimized hot loops) ===
+    IAdd_Unchecked, IXor_Unchecked, IAnd_Unchecked, IOr_Unchecked,
+
     // === Decimal Operations ===
     DecAdd, DecSub, DecMul, DecDiv, DecMod, DecNeg, DecRescale,
     
@@ -223,6 +226,8 @@ enum class LIR_Op : uint8_t {
     X(Return) X(FuncDef) X(Param) X(Ret) \
     X(VaStart) X(VaArg) X(VaEnd) X(Copy) \
     X(Nop) X(Load) X(Store) X(Cast) X(ToString) X(STR_CONCAT) X(STR_FORMAT) \
+    /* === Unchecked Integer Operations === */ \
+    X(IAdd_Unchecked) X(IXor_Unchecked) X(IAnd_Unchecked) X(IOr_Unchecked) \
     /* === Decimal Operations === */ \
     X(DecAdd) X(DecSub) X(DecMul) X(DecDiv) X(DecMod) X(DecNeg) X(DecRescale) \
     /* === Error Handling === */ \

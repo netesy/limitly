@@ -23,6 +23,12 @@ void RegisterVM::execute_bitwise(const LIR::LIR_Inst* pc) {
         case LIR::LIR_Op::Shr:
             registers[pc->dst] = make_i64(to_int(registers[pc->a]) >> to_int(registers[pc->b]));
             break;
+        // Unchecked operations handled in arithmetic.cpp
+        case LIR::LIR_Op::IAdd_Unchecked:
+        case LIR::LIR_Op::IXor_Unchecked:
+        case LIR::LIR_Op::IAnd_Unchecked:
+        case LIR::LIR_Op::IOr_Unchecked:
+            break;
         default:
             break;
     }

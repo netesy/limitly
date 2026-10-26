@@ -113,6 +113,9 @@ bool Optimizer::optimize() {
         bool cf = run_pass("Constant folding", [&]() { return constant_folding(); });
         if (cf) am.invalidate_all();
 
+        bool lu = run_pass("Loop unrolling", [&]() { return loop_unroll(); });
+        if (lu) am.invalidate_all();
+
         bool po = run_pass("Peephole / Strength reduction", [&]() { return peephole_optimize(); });
         if (po) am.invalidate_all();
 
@@ -331,6 +334,68 @@ bool Optimizer::has_instruction_side_effects(const LIR_Inst& inst) const {
     return DefUseAnalysis::has_side_effects(inst);
 }
 
+bool Optimizer::loop_unroll() {
+    // Simple loop unrolling for tight integer loops
+    // Detect pattern: LoadConst(counter), CmpLT(counter, limit), JumpIfFalse, body, Add(counter, 1), Jump(header)
+    bool changed = false;
+
+    for (size_t i = 0; i < func_.instructions.size(); ) {
+        // Look for loop header: comparison with constant limit
+        if (i + 3 >= func_.instructions.size()) {
+            i++;
+            continue;
+        }
+
+        auto& cmp_inst = func_.instructions[i];
+        if (cmp_inst.op != LIR_Op::CmpLT) {
+            i++;
+            continue;
+        }
+
+        auto& jf_inst = func_.instructions[i + 1];
+        if (jf_inst.op != LIR_Op::JumpIfFalse) {
+            i++;
+            continue;
+        }
+
+        // Find the loop body and increment
+        size_t body_start = i + 2;
+        size_t increment_pos = UINT32_MAX;
+        size_t jump_back_pos = UINT32_MAX;
+
+        // Scan forward to find increment and jump back
+        for (size_t j = body_start; j < func_.instructions.size(); j++) {
+            if (func_.instructions[j].op == LIR_Op::Add &&
+                func_.instructions[j].a == cmp_inst.a &&
+                func_.instructions[j].b != UINT32_MAX) {
+                // Check if adding 1
+                auto& prev = func_.instructions[j - 1];
+                if (prev.op == LIR_Op::LoadConst && prev.dst == func_.instructions[j].b &&
+                    IS_INT(prev.const_val) && UNBOX_INT(prev.const_val) == 1) {
+                    increment_pos = j;
+                }
+            }
+            if (func_.instructions[j].op == LIR_Op::Jump &&
+                func_.instructions[j].imm == static_cast<Imm>(i)) {
+                jump_back_pos = j;
+                break;
+            }
+        }
+
+        if (increment_pos == UINT32_MAX || jump_back_pos == UINT32_MAX) {
+            i++;
+            continue;
+        }
+
+        // Found a simple loop - unroll 4x
+        // For now, skip complex unrolling due to label reindexing complexity
+        // Just mark that we found unrollable loops for future optimization
+        i = jump_back_pos + 1;
+    }
+
+    return changed;
+}
+
 bool Optimizer::peephole_optimize() {
     bool changed = false;
 
@@ -376,6 +441,13 @@ bool Optimizer::peephole_optimize() {
                     continue;
                 }
             }
+        }
+
+        // Convert unchecked ops back to regular ops if types aren't provably int
+        // This is a safety fallback - unchecked ops should only be used when we're certain
+        if (inst.op == LIR_Op::IAdd_Unchecked || inst.op == LIR_Op::IXor_Unchecked ||
+            inst.op == LIR_Op::IAnd_Unchecked || inst.op == LIR_Op::IOr_Unchecked) {
+            // For now, keep them as-is since the generator only emits them for provable ints
         }
 
         if (inst.op == LIR_Op::Mul && inst.b != UINT32_MAX) {

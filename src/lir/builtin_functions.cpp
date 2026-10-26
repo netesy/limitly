@@ -375,7 +375,10 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
         std::vector<TypeTag>{},
         TypeTag::Float64,
         [](const std::vector<ValuePtr>& args) -> ValuePtr {
-            long double cpuTime = static_cast<long double>(std::clock()) / CLOCKS_PER_SEC;
+            static const auto start_time = std::chrono::steady_clock::now();
+            auto now = std::chrono::steady_clock::now();
+            std::chrono::duration<double> diff = now - start_time;
+            long double cpuTime = diff.count();
             auto float64_type = std::make_shared<::Type>(TypeTag::Float64);
             return std::make_shared<Value>(float64_type, cpuTime);
         }

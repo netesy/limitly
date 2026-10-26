@@ -259,7 +259,9 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             }
             case LIR::LIR_Op::DecAdd: case LIR::LIR_Op::DecSub:
             case LIR::LIR_Op::DecMul: case LIR::LIR_Op::DecDiv: case LIR::LIR_Op::DecMod: case LIR::LIR_Op::DecNeg:
-            case LIR::LIR_Op::DecRescale: case LIR::LIR_Op::Neg: execute_arithmetic(pc); break;
+            case LIR::LIR_Op::DecRescale: case LIR::LIR_Op::Neg:
+            case LIR::LIR_Op::IAdd_Unchecked: case LIR::LIR_Op::IXor_Unchecked:
+            case LIR::LIR_Op::IAnd_Unchecked: case LIR::LIR_Op::IOr_Unchecked: execute_arithmetic(pc); break;
             case LIR::LIR_Op::CmpEQ: case LIR::LIR_Op::CmpNEQ: case LIR::LIR_Op::CmpLT: case LIR::LIR_Op::CmpLE:
             case LIR::LIR_Op::CmpGT: case LIR::LIR_Op::CmpGE: {
                 // Inline SMI comparison: loop conditions and counters.
@@ -303,6 +305,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                 break;
             }
             case LIR::LIR_Op::And: case LIR::LIR_Op::Or: case LIR::LIR_Op::Xor: case LIR::LIR_Op::Shl: case LIR::LIR_Op::Shr: {
+                // Inline SMI bitwise operations: critical for numeric loops
                 RegisterValue va = registers[pc->a];
                 RegisterValue vb = registers[pc->b];
                 if (IS_INT(va) && IS_INT(vb)) {

@@ -931,11 +931,11 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     if (expr.op == LM::Frontend::TokenType::PLUS) {
         TypePtr left_type = get_register_type(left);
         TypePtr right_type = get_register_type(right);
-        
+
         // Check if EITHER operand is a string type
         bool left_is_string = (left_type && left_type->tag == ::TypeTag::String);
         bool right_is_string = (right_type && right_type->tag == ::TypeTag::String);
-        
+
         if (left_is_string || right_is_string) {
             // Convert non-string operand to string using ToString
             if (!left_is_string) {
@@ -952,7 +952,7 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
                 set_register_language_type(str_right, string_type);
                 right = str_right;
             }
-            
+
             // Perform string concatenation
             Reg dst = allocate_register();
             auto string_type = std::make_shared<::Type>(::TypeTag::String);
@@ -961,34 +961,39 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
             return dst;
         }
     }
-    
+
     // Handle as arithmetic operation
     Reg dst = allocate_register();
-    
+
+    // Check if both operands are provably integers for unchecked operations
+    TypePtr left_type = get_register_type(left);
+    TypePtr right_type = get_register_type(right);
+
+    bool left_is_int = left_type &&
+        (left_type->tag == ::TypeTag::Int || left_type->tag == ::TypeTag::Int64 ||
+         left_type->tag == ::TypeTag::Int32 || left_type->tag == ::TypeTag::Int16 ||
+         left_type->tag == ::TypeTag::Int8 || left_type->tag == ::TypeTag::UInt ||
+         left_type->tag == ::TypeTag::UInt64 || left_type->tag == ::TypeTag::UInt32 ||
+         left_type->tag == ::TypeTag::UInt16 || left_type->tag == ::TypeTag::UInt8);
+
+    bool right_is_int = right_type &&
+        (right_type->tag == ::TypeTag::Int || right_type->tag == ::TypeTag::Int64 ||
+         right_type->tag == ::TypeTag::Int32 || right_type->tag == ::TypeTag::Int16 ||
+         right_type->tag == ::TypeTag::Int8 || right_type->tag == ::TypeTag::UInt ||
+         right_type->tag == ::TypeTag::UInt64 || right_type->tag == ::TypeTag::UInt32 ||
+         right_type->tag == ::TypeTag::UInt16 || right_type->tag == ::TypeTag::UInt8);
+
+    bool use_unchecked = left_is_int && right_is_int;
+
     // Map operator to LIR operation
     LIR_Op op;
-    if (expr.op == LM::Frontend::TokenType::PLUS) op = LIR_Op::Add;
+    if (expr.op == LM::Frontend::TokenType::PLUS) op = use_unchecked ? LIR_Op::IAdd_Unchecked : LIR_Op::Add;
     else if (expr.op == LM::Frontend::TokenType::MINUS) op = LIR_Op::Sub;
     else if (expr.op == LM::Frontend::TokenType::STAR) op = LIR_Op::Mul;
     else if (expr.op == LM::Frontend::TokenType::SLASH) {
         // Handle division with proper type checking
-        TypePtr left_type = get_register_type(left);
-        TypePtr right_type = get_register_type(right);
-        
-        bool left_is_int = left_type && 
-            (left_type->tag == ::TypeTag::Int || left_type->tag == ::TypeTag::Int64 ||
-             left_type->tag == ::TypeTag::Int32 || left_type->tag == ::TypeTag::Int16 ||
-             left_type->tag == ::TypeTag::Int8 || left_type->tag == ::TypeTag::UInt ||
-             left_type->tag == ::TypeTag::UInt64 || left_type->tag == ::TypeTag::UInt32 ||
-             left_type->tag == ::TypeTag::UInt16 || left_type->tag == ::TypeTag::UInt8);
-        
-        bool right_is_int = right_type && 
-            (right_type->tag == ::TypeTag::Int || right_type->tag == ::TypeTag::Int64 ||
-             right_type->tag == ::TypeTag::Int32 || right_type->tag == ::TypeTag::Int16 ||
-             right_type->tag == ::TypeTag::Int8 || right_type->tag == ::TypeTag::UInt ||
-             right_type->tag == ::TypeTag::UInt64 || right_type->tag == ::TypeTag::UInt32 ||
-             right_type->tag == ::TypeTag::UInt16 || right_type->tag == ::TypeTag::UInt8);
-        
+        // Use already-declared left_type and right_type from above
+
         if (left_is_int && right_is_int) {
             // INTEGER DIVISION: 284/4 = 71 (no decimal)
             op = LIR_Op::Div;
@@ -1035,9 +1040,9 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     else if (expr.op == LM::Frontend::TokenType::LESS_EQUAL) op = LIR_Op::CmpLE;
     else if (expr.op == LM::Frontend::TokenType::GREATER) op = LIR_Op::CmpGT;
     else if (expr.op == LM::Frontend::TokenType::GREATER_EQUAL) op = LIR_Op::CmpGE;
-    else if (expr.op == LM::Frontend::TokenType::AMPERSAND) op = LIR_Op::And;
-    else if (expr.op == LM::Frontend::TokenType::PIPE) op = LIR_Op::Or;
-    else if (expr.op == LM::Frontend::TokenType::CARET) op = LIR_Op::Xor;
+    else if (expr.op == LM::Frontend::TokenType::AMPERSAND) op = use_unchecked ? LIR_Op::IAnd_Unchecked : LIR_Op::And;
+    else if (expr.op == LM::Frontend::TokenType::PIPE) op = use_unchecked ? LIR_Op::IOr_Unchecked : LIR_Op::Or;
+    else if (expr.op == LM::Frontend::TokenType::CARET) op = use_unchecked ? LIR_Op::IXor_Unchecked : LIR_Op::Xor;
     else if (expr.op == LM::Frontend::TokenType::LESS_LESS) op = LIR_Op::Shl;
     else if (expr.op == LM::Frontend::TokenType::GREATER_GREATER) op = LIR_Op::Shr;
     else {
@@ -1047,11 +1052,11 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
     
     // Infer result type based on operands and operation
     TypePtr result_type = nullptr;
-    TypePtr left_type = get_register_type(left);
-    TypePtr right_type = get_register_type(right);
-    
+    // Use already-declared left_type and right_type from above
+
     // For arithmetic operations, determine result type
-    if (op == LIR_Op::Add || op == LIR_Op::Sub || op == LIR_Op::Mul || op == LIR_Op::Div || op == LIR_Op::Mod) {
+    if (op == LIR_Op::Add || op == LIR_Op::Sub || op == LIR_Op::Mul || op == LIR_Op::Div || op == LIR_Op::Mod ||
+        op == LIR_Op::IAdd_Unchecked || op == LIR_Op::IXor_Unchecked || op == LIR_Op::IAnd_Unchecked || op == LIR_Op::IOr_Unchecked) {
         if (is_decimal_type(left_type) || is_decimal_type(right_type)) {
             // Decimal arithmetic
             int left_scale = get_decimal_scale(left_type);
@@ -1192,7 +1197,7 @@ Reg Generator::emit_binary_expr(LM::Frontend::AST::BinaryExpr& expr) {
         } else {
             result_type = get_promoted_numeric_type(left_type, right_type);
         }
-    } else if (op == LIR_Op::Xor || op == LIR_Op::Shl || op == LIR_Op::Shr) {
+    } else if (op == LIR_Op::Xor || op == LIR_Op::IXor_Unchecked || op == LIR_Op::Shl || op == LIR_Op::Shr) {
         result_type = get_promoted_numeric_type(left_type, right_type);
     }
     
