@@ -1,9 +1,9 @@
 frame Range {
-    var start: int;
-    var stop: int;
-    var step: int;
-    var inclusive: bool;
-    var infinite: bool;
+    pub var start: int;
+    pub var stop: int;
+    pub var step: int;
+    pub var inclusive: bool;
+    pub var infinite: bool;
 
     pub init(start: int = 0, stop: int = 0, step: int = 1, inclusive: bool = false, infinite: bool = false) {
         self.start = start;

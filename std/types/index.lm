@@ -27,7 +27,7 @@ type PatternNotFound = { pattern: str, text: str };
 type InvalidFormat = { expected: str, actual: str };
 
 // Math error variants
-type DomainError = { function: str, value: float };
+type DomainError = { func_name: str, value: float };
 type OverflowError = { operation: str };
 type UnderflowError = { operation: str };
 type DivisionByZero = { numerator: float };

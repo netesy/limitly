@@ -1,0 +1,7 @@
+import std.text.controller as controller;
+import std.text.cursor as cursor;
+import std.text.document as document;
+
+pub import std.text.controller show EditorController;
+pub import std.text.cursor show Cursor, Selection;
+pub import std.text.document show TextDocument;

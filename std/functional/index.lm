@@ -10,7 +10,7 @@ frame FunctionInt {
     }
 
     pub fn compose(other: FunctionInt): FunctionInt {
-        return FunctionInt(fn=fn(x: int): int {
+        return FunctionInt(fn_ref=fn(x: int): int {
             return self.call(other.call(x));
         });
     }
@@ -22,7 +22,7 @@ frame FunctionInt {
     pub fn memoize(): FunctionInt {
         var cache: {int: int} = {};
         
-        return FunctionInt(fn=fn(x: int): int {
+        return FunctionInt(fn_ref=fn(x: int): int {
             if (cache[x] != nil) {
                 return cache[x];
             }
@@ -34,7 +34,7 @@ frame FunctionInt {
     }
 
     pub fn repeat(n: int): FunctionInt {
-        return FunctionInt(fn=fn(x: int): int {
+        return FunctionInt(fn_ref=fn(x: int): int {
             var result = x;
             var i: int = 0;
             while (i < n) {
@@ -57,20 +57,20 @@ frame FunctionIntBool {
         return self.fn_ref(value);
     }
 
-    pub fn not(): FunctionIntBool {
-        return FunctionIntBool(fn=fn(x: int): bool {
+    pub fn negate(): FunctionIntBool {
+        return FunctionIntBool(fn_ref=fn(x: int): bool {
             return !self.call(x);
         });
     }
 
-    pub fn and(other: FunctionIntBool): FunctionIntBool {
-        return FunctionIntBool(fn=fn(x: int): bool {
+    pub fn and_fn(other: FunctionIntBool): FunctionIntBool {
+        return FunctionIntBool(fn_ref=fn(x: int): bool {
             return self.call(x) and other.call(x);
         });
     }
 
-    pub fn or(other: FunctionIntBool): FunctionIntBool {
-        return FunctionIntBool(fn=fn(x: int): bool {
+    pub fn or_fn(other: FunctionIntBool): FunctionIntBool {
+        return FunctionIntBool(fn_ref=fn(x: int): bool {
             return self.call(x) or other.call(x);
         });
     }
@@ -88,7 +88,7 @@ frame FunctionStrStr {
     }
 
     pub fn compose(other: FunctionStrStr): FunctionStrStr {
-        return FunctionStrStr(fn=fn(x: str): str {
+        return FunctionStrStr(fn_ref=fn(x: str): str {
             return self.call(other.call(x));
         });
     }
@@ -96,7 +96,7 @@ frame FunctionStrStr {
     pub fn memoize(): FunctionStrStr {
         var cache: {str: str} = {};
         
-        return FunctionStrStr(fn=fn(x: str): str {
+        return FunctionStrStr(fn_ref=fn(x: str): str {
             if (cache[x] != nil) {
                 return cache[x];
             }

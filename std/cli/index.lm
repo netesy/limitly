@@ -1,4 +1,4 @@
-import std.string as str;
+import std.string as string;
 import std.collections.hash as hash;
 
 frame ArgParser {
@@ -15,7 +15,7 @@ frame ArgParser {
     pub fn parse(argv: [str]) {
         for (var i = 1; i < len(argv); i = i + 1) {
             var arg = argv[i];
-            if (str.String(arg).starts_with("-")) {
+            if (string.String(arg).starts_with("-")) {
                 self.options[arg] = true;
             } else {
                 self.args = self.args + [arg];

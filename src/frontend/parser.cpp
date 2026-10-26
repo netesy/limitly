@@ -131,6 +131,7 @@ Token Parser::consume(TokenType type, const std::string &message) {
 }
 
 void Parser::synchronize() {
+    inBrokenState = false;
     advance();
 
     int max_iterations = 1000;  // Prevent infinite loops
