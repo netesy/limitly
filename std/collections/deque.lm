@@ -87,8 +87,6 @@ frame Deque {
     }
 }
 
-pub type DoubleEndedQueue = Deque;
-
 pub fn DoubleEndedQueue(): Deque {
     return Deque();
 }

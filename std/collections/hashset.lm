@@ -48,8 +48,6 @@ frame HashSet {
     }
 }
 
-pub type HashSetWrapper = HashSet;
-
 pub fn HashSetWrapper(): HashSet {
     return HashSet();
 }

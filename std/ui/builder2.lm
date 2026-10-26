@@ -7,8 +7,7 @@ import std.ui.types as ui;
 import std.ui.draw_list as dl_mod;
 import std.ui.theme as theme_mod;
 
-pub type ThemeSnap = b.ThemeSnap;
-pub type LayoutCtx = b.LayoutCtx;
+pub import std.ui.builder show ThemeSnap, LayoutCtx;
 
 pub fn default_theme_snap(): b.ThemeSnap {
     return b.default_theme_snap();

@@ -103,8 +103,6 @@ frame BitSet {
     pub fn iterator(): BitSetIterator { return BitSetIterator(self); }
 }
 
-pub type BitSetWrapper = BitSet;
-
 pub fn BitSetWrapper(size: int = 64): BitSet {
     return BitSet(size);
 }

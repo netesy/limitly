@@ -11,12 +11,8 @@
 pub import std.wss.client as client;
 pub import std.wss.server as server;
 
-pub type WebSocketClient = client.WebSocketClient;
-pub type WebSocketServer = client.WebSocketServer;
-pub type WSFrame = client.WSFrame;
-pub type WSSServer = server.WSSServer;
-pub type WSConnection = server.WSConnection;
-pub type WSRoom = server.WSRoom;
+pub import std.wss.client show WebSocketClient, WebSocketServer, WSFrame;
+pub import std.wss.server show WSSServer, WSConnection, WSRoom;
 
 // Re-export WebSocket close code constants
 pub var WS_CLOSE_NORMAL: int = client.WS_CLOSE_NORMAL;

@@ -112,8 +112,6 @@ frame PriorityQueue {
     }
 }
 
-pub type PriorityQueueWrapper = PriorityQueue;
-
 pub fn PriorityQueueWrapper(comparator: any): PriorityQueue {
     return PriorityQueue(comparator);
 }

@@ -7,7 +7,7 @@ import std.font.glyph as g;
 import std.font.rasterizer as rast;
 import std.io.file as _iof;
 
-pub type GlyphBitmap = rast.GlyphBitmap;
+pub import std.font.rasterizer show GlyphBitmap;
 
 frame FontMetrics {
     pub var ascent: float;

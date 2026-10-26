@@ -40,7 +40,7 @@ fn test_list(): int {
 
 fn test_deque(): int {
     print("Testing Deque...");
-    var deque_val = collections.Deque() as deque_col.DoubleEndedQueue;
+    var deque_val = collections.Deque() as deque_col.Deque;
     assert(deque_val.length() == 0, "Deque should be empty initially");
 
     deque_val.push_back("back1");
@@ -61,7 +61,7 @@ fn test_deque(): int {
 
 fn test_linked_list(): int {
     print("Testing LinkedList...");
-    var ll_val = collections.LinkedList() as linked_list_col.DLL;
+    var ll_val = collections.LinkedList() as linked_list_col.LinkedList;
     print("LinkedList instantiated");
     assert(ll_val.length() == 0, "LinkedList should be empty");
 
@@ -116,7 +116,7 @@ fn test_maps(): int {
 
 fn test_sets(): int {
     print("Testing Sets...");
-    var hs_val = collections.HashSet() as hashset_col.HashSetWrapper;
+    var hs_val = collections.HashSet() as hashset_col.HashSet;
     hs_val.add("item1");
     assert(hs_val.contains("item1") == true, "HashSet contains incorrect");
     hs_val.remove("item1");
@@ -152,7 +152,7 @@ fn compare_ints(left: any, right: any): int {
 
 fn test_priority_queue(): int {
     print("Testing PriorityQueue...");
-    var pq_val = collections.PriorityQueue(compare_ints) as pq_col.PriorityQueueWrapper;
+    var pq_val = collections.PriorityQueue(compare_ints) as pq_col.PriorityQueue;
     pq_val.push(5);
     pq_val.push(3);
     pq_val.push(10);
@@ -166,7 +166,7 @@ fn test_priority_queue(): int {
 
 fn test_bitset(): int {
     print("Testing BitSet...");
-    var bs_val = collections.BitSet(128) as bitset_col.BitSetWrapper;
+    var bs_val = collections.BitSet(128) as bitset_col.BitSet;
     assert(bs_val.get_size() == 128, "BitSet size should be 128");
 
     bs_val.set(10);

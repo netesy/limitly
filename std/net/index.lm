@@ -13,18 +13,16 @@ pub import std.net.tls as tls;
 
 // Re-export key frames and functions at the net namespace level
 // TCP
-pub type TCPClient = tcp.TCPClient;
-pub type TCPServer = tcp.TCPServer;
+pub import std.net.tcp show TCPClient, TCPServer;
 
 // UDP
-pub type UDP = udp.UDP;
+pub import std.net.udp show UDP;
 
 // DNS
-pub type DNS = dns.DNS;
+pub import std.net.dns show DNS;
 
 // TLS
-pub type TLSConfig = tls.TLSConfig;
-pub type TLSSocket = tls.TLSSocket;
+pub import std.net.tls show TLSConfig, TLSSocket;
 pub fn TLSConfig(): tls.TLSConfig { return tls.TLSConfig(); }
 pub fn connect_tls(host: str, port: int, cfg: any = nil): any { return tls.connect(host, port, cfg); }
 

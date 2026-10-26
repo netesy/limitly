@@ -4,8 +4,7 @@ import std.math.trigonometry as trigonometry_mod;
 import std.math.statistics as statistics_mod;
 import std.math.random as random_mod;
 
-pub type Random = random_mod.Random;
-pub type SecureRandom = random_mod.SecureRandom;
+pub import std.math.random show Random, SecureRandom;
 
 frame Vector2 {
     pub x: float;

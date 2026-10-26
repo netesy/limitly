@@ -108,8 +108,6 @@ frame LinkedList {
     }
 }
 
-pub type DLL = LinkedList;
-
 pub fn DLL(): LinkedList {
     return LinkedList();
 }
