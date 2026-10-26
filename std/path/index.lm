@@ -1,5 +1,8 @@
 // Path module - Cross-platform path manipulation
 import std.io as io;
+import std.env as env;
+
+pub var SEPARATOR: str = "/";
 
 frame Path {
     pub value: str;

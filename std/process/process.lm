@@ -1,7 +1,13 @@
 // Standard Library Process Submodule
+import std.resource as res;
 
 pub fn exit(code: int): nil {
-    return nil;
+    match (res.create_os_resource()) {
+        val r => {
+            res._call(h=r.handle, op=res.OP_CLOSE, args=[code]);
+        },
+        err e => {}
+    }
 }
 
 pub fn run(command: str): int {
@@ -9,5 +15,37 @@ pub fn run(command: str): int {
 }
 
 pub fn id(): int {
-    return 0;
+    match (res.create_process_resource()) {
+        val r => {
+            var result = res._call(h=r.handle, op=res.OP_GET_STATE, args=[]);
+            r.close();
+            if (result == nil) return 0;
+            return result as int;
+        },
+        err e => return 0
+    }
+}
+
+pub fn peak_rss(): int {
+    match (res.create_process_resource()) {
+        val r => {
+            var result = res._call(h=r.handle, op=res.OP_PEAK_RSS, args=[]);
+            r.close();
+            if (result == nil) return 0;
+            return result as int;
+        },
+        err e => return 0
+    }
+}
+
+pub fn current_rss(): int {
+    match (res.create_process_resource()) {
+        val r => {
+            var result = res._call(h=r.handle, op=res.OP_CURRENT_RSS, args=[]);
+            r.close();
+            if (result == nil) return 0;
+            return result as int;
+        },
+        err e => return 0
+    }
 }

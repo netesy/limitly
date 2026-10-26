@@ -5,7 +5,7 @@ import std.process as process;
 fn test_process_frame(): int {
     print("Testing Process Frame...");
     var p = process.Process() as process.Process;
-    assert(p.id() == 0, "id failed");
+    assert(p.id() >= 0, "id failed");
     assert(p.run("echo hello") == 0, "run failed");
     return 1;
 }

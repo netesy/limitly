@@ -8,6 +8,8 @@ frame Process {
     pub fn exit(code: int): nil { return process_mod.exit(code); }
     pub fn run(cmd_str: str): int { return process_mod.run(cmd_str); }
     pub fn id(): int { return process_mod.id(); }
+    pub fn peak_rss(): int { return process_mod.peak_rss(); }
+    pub fn current_rss(): int { return process_mod.current_rss(); }
 }
 
 pub fn exit(code: int): nil {
@@ -20,4 +22,12 @@ pub fn run(cmd_str: str): int {
 
 pub fn id(): int {
     return process_mod.id();
+}
+
+pub fn peak_rss(): int {
+    return process_mod.peak_rss();
+}
+
+pub fn current_rss(): int {
+    return process_mod.current_rss();
 }

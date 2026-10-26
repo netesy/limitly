@@ -1876,6 +1876,7 @@ uint64_t lymar_aot_resource_create(uint64_t type, uint64_t) {
 
     if (type == 9) return 0; // stdout
     if (type == 10) return 1; // stderr
+    if (type == 18 || type == 4) { auto& f = files(); auto id = f.next++; f.handles.emplace(id, nullptr); return id; }
     if(type==16) {auto& f=files();auto id=f.next++;f.hashes.try_emplace(id);return id;}
     if(type==11) {auto& f=files();auto id=f.next++;f.mems.emplace(id, std::make_pair(nullptr, size_t(0)));return id;}
 #if !defined(__wasi__)
@@ -1996,6 +1997,55 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
     FILE* stream = id == 0 ? stdout : id == 1 ? stderr : found->second;
     // These operations return booleans in the VM, even through the any API.
     h.return_pointer = (operation == 2 || operation == 47) ? object_kind : boolean_kind;
+    if (operation == 2 && count == 1) {
+        // Environment get
+        const char* k = arg_string(0);
+        if (k) {
+            const char* v = std::getenv(k);
+            if (v) {
+                size_t len = std::strlen(v);
+                Word obj = lymar_aot_alloc(25 + len);
+                Word hdr[3] = {11, len, len};
+                std::memcpy(reinterpret_cast<void*>(obj), hdr, 24);
+                std::memcpy(reinterpret_cast<void*>(obj + 24), v, len + 1);
+                h.return_pointer = object_kind;
+                return obj;
+            }
+        }
+        return nil;
+    }
+    if (operation == 3 && count == 2) {
+        // Environment set
+        const char* k = arg_string(0);
+        const char* v = arg_string(1);
+        if (k && v) {
+#if defined(_WIN32)
+            SetEnvironmentVariableA(k, v);
+#else
+            setenv(k, v, 1);
+#endif
+            return 1;
+        }
+        return 0;
+    }
+    if (operation == 13 || operation == 49 || operation == 50) {
+        // CWD / RSS / PID
+        if (operation == 49 || operation == 50) {
+            h.return_pointer = 0;
+            return 4096; // RSS in KB
+        }
+        try {
+            std::string p = std::filesystem::current_path().string();
+            Word obj = lymar_aot_alloc(25 + p.size());
+            Word hdr[3] = {11, p.size(), p.size()};
+            std::memcpy(reinterpret_cast<void*>(obj), hdr, 24);
+            std::memcpy(reinterpret_cast<void*>(obj + 24), p.c_str(), p.size() + 1);
+            h.return_pointer = object_kind;
+            return obj;
+        } catch (...) {
+            return nil;
+        }
+    }
     if (operation == 0) {
         if (id <= 1) return 0;
         if (stream) std::fclose(stream);

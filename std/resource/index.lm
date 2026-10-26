@@ -232,6 +232,18 @@ pub fn create_entropy(): Resource? {
     return ok(Resource(h=h, k=rt.RT_ENTROPY));
 }
 
+pub fn create_os_resource(): Resource? {
+    var h = rt.create(rt.RT_OS, []);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=rt.RT_OS));
+}
+
+pub fn create_process_resource(): Resource? {
+    var h = rt.create(rt.RT_PROCESS, []);
+    if (h == -1) return err();
+    return ok(Resource(h=h, k=rt.RT_PROCESS));
+}
+
 // Create a byte-buffer memory resource with memory measurement support.
 // `size` is the initial number of bytes to allocate (0 for an empty buffer).
 pub fn create_memory(size: int): Memory? {
@@ -282,6 +294,12 @@ pub var OP_EXISTS: int = rt.OP_EXISTS;
 pub var OP_DELETE: int = rt.OP_DELETE;
 pub var OP_READ_BYTES: int = rt.OP_READ_BYTES;
 pub var OP_SIZE: int = rt.OP_SIZE;
+pub var OP_GET_STATE: int = rt.OP_GET_STATE;
+pub var OP_PEAK_RSS: int = rt.OP_PEAK_RSS;
+pub var OP_CURRENT_RSS: int = rt.OP_CURRENT_RSS;
+
+pub var KIND_OS: int = rt.RT_OS;
+pub var KIND_PROCESS: int = rt.RT_PROCESS;
 
 pub var KIND_FILE: int = rt.RT_FILE;
 pub var KIND_SOCKET: int = rt.RT_SOCKET;

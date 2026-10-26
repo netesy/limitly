@@ -1,10 +1,24 @@
 // Standard Library Environment Variables Submodule
+import std.resource as res;
 
 pub fn get(key: str): str? {
-    var fallback: str? = nil;
-    return fallback;
+    var r = res.create_os_resource()? else {
+        var fallback: str? = nil;
+        return fallback;
+    };
+    var result = res._call(h=r.handle, op=res.OP_READ, args=[key]);
+    r.close();
+    if (result == nil) {
+        var fallback: str? = nil;
+        return fallback;
+    }
+    return result as str;
 }
 
 pub fn set(key: str, value: str): nil {
-    return nil;
+    var r = res.create_os_resource()? else {
+        return nil;
+    };
+    res._call(h=r.handle, op=res.OP_WRITE, args=[key, value]);
+    r.close();
 }

@@ -26,7 +26,8 @@ enum class ResourceType : uint32_t {
     UDP_SOCKET = 14,
     WEBSOCKET = 15,
     HASH_ENGINE = 16,
-    GRAPHICS = 17
+    GRAPHICS = 17,
+    OS = 18
 };
 
 enum class ResourceOperation : uint32_t {
@@ -78,7 +79,9 @@ enum class ResourceOperation : uint32_t {
     MEASURE_TEXT = 45,
     GET_FONT_METRICS = 46,
     READ_BYTES = 47,
-    SIZE = 48
+    SIZE = 48,
+    PEAK_RSS = 49,
+    CURRENT_RSS = 50
 };
 
 } // namespace VM

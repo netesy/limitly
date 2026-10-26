@@ -5,17 +5,18 @@ import std.env as env;
 fn test_env_frame(): int {
     print("Testing Env Frame...");
     var e = env.Env() as env.Env;
-    assert(e.cwd() == ".", "cwd failed");
+    assert(e.cwd() != "", "cwd failed");
     assert(len(e.args()) == 0, "args failed");
 
     e.set("TEST_KEY", "test_value");
-    assert(e.get("TEST_KEY") == nil, "get failed");
+    var res_val = e.get("TEST_KEY")?;
+    assert(res_val == "test_value", "get failed");
     return 1;
 }
 
 fn test_env_helpers(): int {
     print("Testing Env Helpers...");
-    assert(env.cwd() == ".", "cwd helper failed");
+    assert(env.cwd() != "", "cwd helper failed");
     assert(len(env.args()) == 0, "args helper failed");
     return 1;
 }
