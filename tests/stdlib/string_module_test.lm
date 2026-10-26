@@ -17,6 +17,21 @@ fn test_string_frame(): int {
     assert(str_val.repeat(2) == "hellohello", "repeat failed");
     assert(str_val.pad_left(8, "-") == "---hello", "pad_left failed");
     assert(str_val.pad_right(8, "-") == "hello---", "pad_right failed");
+    // Methods that are not reachable from the free-function helpers, kept here so
+    // the std.string facade re-exports stay covered.
+    var halves = str_val.split(" ");
+    assert(len(halves) == 1, "split single-token count failed");
+    assert(halves[0] == "hello", "split 0 failed");
+    var words = s.String("hello world") as s.String;
+    var pair = words.split(" ");
+    assert(len(pair) == 2, "split count failed");
+    assert(pair[1] == "world", "split 1 failed");
+    assert(words.index_of("world") == 6, "index_of failed");
+    assert(words.last_index_of("l") == 9, "last_index_of failed");
+    assert(words.last_index_of("xyz") == -1, "last_index_of miss failed");
+    assert(words.byte_at(0) == 104, "byte_at failed");
+    assert(words.replace("world", "there") == "hello there", "replace failed");
+    assert(words.to_upper() == "HELLO WORLD", "to_upper failed");
     return 1;
 }
 

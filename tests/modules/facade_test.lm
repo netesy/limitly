@@ -53,7 +53,6 @@ import std.serialization as serialization;
 import std.sort as sort;
 import std.statistics as statistics;
 import std.string as string;
-import std.strings as strings;
 import std.text as text;
 import std.time as time;
 import std.toml as toml;
@@ -75,7 +74,7 @@ fn main() {
     assert(range.exclusive(0, 5).start == 0, "std.range facade failed");
     assert(search.linear_search([10, 20, 30], 20) == 1, "std.search facade failed");
     assert(semver.parse("1.2.3") != nil, "std.semver facade failed");
-    assert(strings.length("hello") == 5, "std.strings facade failed");
+    assert(string.length("hello") == 5, "std.string facade failed");
     assert(bytes.ByteBuffer([1, 2, 3]).len() == 3, "std.bytes facade failed");
     assert(geometry.Rect(0.0, 0.0, 10.0, 10.0).area() == 100.0, "std.geometry facade failed");
 

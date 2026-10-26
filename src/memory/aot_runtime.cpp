@@ -116,10 +116,11 @@ struct Files {
     uint64_t next = 2;
     std::unordered_map<uint64_t, FILE*> handles;
     std::map<Word,LM::Runtime::HashEngine> hashes;
+    std::map<Word, std::pair<void*, size_t>> mems;
 #if !defined(__wasi__)
     std::map<Word,std::unique_ptr<NativeGraphics>> graphics;
 #endif
-    ~Files() { for (auto [id, file] : handles) if (file) std::fclose(file); }
+    ~Files() { for (auto [id, file] : handles) if (file) std::fclose(file); for (auto [id, buf] : mems) if (buf.first) std::free(buf.first); }
 };
 // Shared metadata is synchronized; invocation state and the active region are
 // thread-local. Region identities remain unique across recursive workers.
@@ -1876,6 +1877,7 @@ uint64_t lymar_aot_resource_create(uint64_t type, uint64_t) {
     if (type == 9) return 0; // stdout
     if (type == 10) return 1; // stderr
     if(type==16) {auto& f=files();auto id=f.next++;f.hashes.try_emplace(id);return id;}
+    if(type==11) {auto& f=files();auto id=f.next++;f.mems.emplace(id, std::make_pair(nullptr, size_t(0)));return id;}
 #if !defined(__wasi__)
     if(type==17) {auto& f=files();auto id=f.next++;f.graphics.emplace(id,std::make_unique<NativeGraphics>());return id;}
 #endif
@@ -1897,6 +1899,7 @@ void lymar_aot_resource_destroy(uint64_t id) {
 
     auto& f = files();
     if(f.hashes.erase(id)) return;
+    if(auto mem=f.mems.find(id);mem!=f.mems.end()) { if(mem->second.first) std::free(mem->second.first); f.mems.erase(mem); return; }
 #if !defined(__wasi__)
     if(f.graphics.erase(id)) return;
 #endif
@@ -1950,6 +1953,43 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
         if(operation==35) {auto* algorithm=args.empty()?"sha256":arg_string(0);auto* key=arg_string(1);auto* bytes=arg_string(2);if(!algorithm || !key || !bytes) return nil;return text(LM::Runtime::compute_hmac(algorithm,key,bytes));}
         if(operation==1) return truth(true);
         return nil;
+    }
+    if(auto mem=f.mems.find(id);mem!=f.mems.end()) {
+        auto& buf = mem->second;
+        auto truth=[&](bool yes) {h.return_pointer=boolean_kind;return yes?Word(1):Word(0);};
+        if(operation==0) { // OPEN: allocate / resize the byte buffer to the requested size.
+            size_t n = buf.second;
+            if (!args.empty()) { auto v = integer_number(args[0], pointers[0]); if (v) n = static_cast<size_t>(*v); }
+            if (buf.first) std::free(buf.first);
+            buf.first = n ? std::malloc(n) : nullptr;
+            buf.second = buf.first ? n : 0;
+            return truth(n == 0 || buf.first != nullptr);
+        }
+        if(operation==3) { // WRITE: copy string bytes into the buffer (bounded by capacity).
+            auto* d = arg_string(0);
+            if (!d || !buf.first) return truth(false);
+            size_t l = std::min(std::strlen(d), buf.second);
+            std::memcpy(buf.first, d, l);
+            return truth(true);
+        }
+        if(operation==2) { // READ: return the buffer contents as a string.
+            if (!buf.first || buf.second == 0) { h.return_pointer=object_kind; return nil; }
+            auto object=lymar_aot_alloc(25+buf.second);
+            Word header[3]={11,buf.second,buf.second};
+            std::memcpy(reinterpret_cast<void*>(object),header,24);
+            std::memcpy(reinterpret_cast<void*>(object+24),buf.first,buf.second);
+            reinterpret_cast<char*>(object)[24+buf.second]='\0';
+            h.return_pointer=object_kind;return object;
+        }
+        if(operation==1) { // CLOSE: release the buffer, keep the resource handle alive.
+            if (buf.first) std::free(buf.first);
+            buf = {nullptr, 0};
+            return truth(true);
+        }
+        if(operation==48) { // SIZE: memory measurement - report allocated byte count.
+            h.return_pointer=0;return static_cast<Word>(buf.second);
+        }
+        h.return_pointer=object_kind;return nil;
     }
     auto found = f.handles.find(id);
     if (id > 1 && found == f.handles.end()) return nil;

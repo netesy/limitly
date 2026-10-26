@@ -77,7 +77,8 @@ enum class ResourceOperation : uint32_t {
     END_PASS = 44,
     MEASURE_TEXT = 45,
     GET_FONT_METRICS = 46,
-    READ_BYTES = 47
+    READ_BYTES = 47,
+    SIZE = 48
 };
 
 } // namespace VM

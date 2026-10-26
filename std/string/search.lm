@@ -1,0 +1,14 @@
+// std/string/search.lm
+// Containment and prefix/suffix tests.
+
+pub fn contains(value: str, needle: str): bool {
+    return _builtin_string_contains(value, needle);
+}
+
+pub fn starts_with(value: str, prefix: str): bool {
+    return _builtin_string_starts_with(value, prefix);
+}
+
+pub fn ends_with(value: str, suffix: str): bool {
+    return _builtin_string_ends_with(value, suffix);
+}

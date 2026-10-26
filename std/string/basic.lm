@@ -1,0 +1,39 @@
+// std/string/basic.lm
+// Length, positional byte/substring access and byte-wise ordering.
+
+pub fn length(value: str): int {
+    return len(value);
+}
+
+pub fn byte_at(value: str, index: int): int {
+    return _builtin_string_byte_at(value, index);
+}
+
+pub fn substr(value: str, start: int, end: int): str {
+    return _builtin_substring(value, start, end);
+}
+
+pub fn substring(value: str, start: int, end: int): str {
+    return _builtin_substring(value, start, end);
+}
+
+pub fn compare(left: str, right: str): int {
+    if (left == right) return 0;
+    var len_l = len(left);
+    var len_r = len(right);
+    var min_len = len_l;
+    if (len_r < min_len) min_len = len_r;
+
+    var i = 0;
+    while (i < min_len) {
+        var b_l = _builtin_string_byte_at(left, i);
+        var b_r = _builtin_string_byte_at(right, i);
+        if (b_l != b_r) {
+            if (b_l < b_r) return -1;
+            return 1;
+        }
+        i = i + 1;
+    }
+    if (len_l < len_r) return -1;
+    return 1;
+}

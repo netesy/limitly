@@ -1,0 +1,46 @@
+// Memory measurement via std.resource (RT_MEMORY byte buffer).
+import std.resource as res;
+
+fn main(): int {
+    // 1. Allocate a 64-byte buffer and measure its size.
+    var m = res.create_memory(64)? else {
+        print("create_memory failed");
+        return 1;
+    };
+
+    assert(m.size() == 64, "initial measurement should be 64 bytes");
+    assert(m.capacity() == 64, "capacity alias should equal size");
+
+    // 2. Resize and re-measure.
+    var grew = m.resize(256);
+    assert(grew == true, "resize should succeed");
+    assert(m.size() == 256, "measurement after resize should be 256 bytes");
+
+    // 3. Round-trip bytes within a buffer sized to the content.
+    var packed = m.resize(5);
+    assert(packed == true, "resize to content size should succeed");
+    assert(m.size() == 5, "measurement should track the resize to 5 bytes");
+    var wrote = m.write("hello");
+    assert(wrote == true, "write within capacity should succeed");
+    assert(m.read() == "hello", "read should return written bytes");
+
+    // 4. Release the buffer; measurement drops to zero.
+    var released = m.release();
+    assert(released == true, "release should succeed");
+    assert(m.size() == 0, "measurement after release should be 0 bytes");
+
+    m.close();
+    print("create_memory measurement OK");
+
+    // 5. Empty buffer (size 0) is valid and measures 0.
+    var e = res.create_memory(0)? else {
+        print("empty create_memory failed");
+        return 1;
+    };
+    assert(e.size() == 0, "empty buffer measures 0 bytes");
+    e.close();
+    print("empty memory measurement OK");
+
+    print("All memory measurement tests passed");
+    return 0;
+}

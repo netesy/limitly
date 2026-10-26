@@ -850,9 +850,9 @@ public:
             case ResourceOperation::OPEN: {
                 size_t n = (size_t)register_value_to_i64(args.empty() ? make_i64(sz_) : args[0]);
                 if (ptr_) std::free(ptr_);
-                ptr_ = std::malloc(n);
+                ptr_ = n ? std::malloc(n) : nullptr;
                 sz_ = ptr_ ? n : 0;
-                return ptr_ ? VAL_TRUE : VAL_FALSE;
+                return (n == 0 || ptr_) ? VAL_TRUE : VAL_FALSE;
             }
             case ResourceOperation::WRITE: {
                 const char* d = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
@@ -870,6 +870,10 @@ public:
             case ResourceOperation::CLOSE: {
                 if (ptr_) { std::free(ptr_); ptr_ = nullptr; sz_ = 0; }
                 return VAL_TRUE;
+            }
+            case ResourceOperation::SIZE: {
+                // Memory measurement: report the number of allocated bytes held by this buffer.
+                return make_i64(static_cast<int64_t>(sz_));
             }
             default:
                 return VAL_NIL;

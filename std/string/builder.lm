@@ -5,25 +5,25 @@ frame StringBuilder {
         self.parts = [] as [str];
     }
 
-    pub fn append(s: str): StringBuilder {
+    // Append a fragment. Returns nil (not the builder) on purpose: returning a
+    // `StringBuilder` by value deep-copies the growing `parts` list on every call,
+    // which made repeated appends quadratic. Callers use these as statements.
+    pub fn append(s: str): nil {
         self.parts.append(s);
-        return self;
     }
 
-    pub fn append_str(s: str): StringBuilder {
-        return self.append(s);
+    pub fn append_str(s: str): nil {
+        self.append(s);
     }
 
-    pub fn append_line(s: str): StringBuilder {
+    pub fn append_line(s: str): nil {
         self.parts.append(s);
         self.parts.append("\n");
-        return self;
     }
 
-    pub fn append_char(cp: int): StringBuilder {
+    pub fn append_char(cp: int): nil {
         var ch = _builtin_string_from_bytes([cp]);
         self.parts.append(ch);
-        return self;
     }
 
     pub fn clear(): nil {

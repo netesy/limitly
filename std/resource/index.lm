@@ -28,6 +28,60 @@ frame Resource {
     }
 }
 
+// Byte-buffer resource backed by the RT_MEMORY resource, exposing memory measurement.
+frame Memory {
+    pub var resource: Resource;
+
+    pub init(r: Resource) {
+        self.resource = r;
+    }
+
+    // Allocate or resize the buffer to `size` bytes. Returns true on success.
+    pub fn resize(size: int): bool {
+        var result = rt.call(self.resource.handle, rt.OP_OPEN, [size]);
+        return (result == true);
+    }
+
+    // Memory measurement: number of bytes currently allocated for this buffer.
+    pub fn size(): int {
+        var result = rt.call(self.resource.handle, rt.OP_SIZE, []);
+        if (result == nil) return 0;
+        return result as int;
+    }
+
+    // Alias for size(): bytes held by the buffer.
+    pub fn capacity(): int {
+        return self.size();
+    }
+
+    // Copy bytes from `data` into the buffer (bounded by the current capacity).
+    pub fn write(data: str): bool {
+        var result = rt.call(self.resource.handle, rt.OP_WRITE, [data]);
+        return (result == true);
+    }
+
+    // Read the buffer contents back as a string.
+    pub fn read(): str {
+        var result = rt.call(self.resource.handle, rt.OP_READ, []);
+        if (result == nil) return "";
+        return result as str;
+    }
+
+    pub fn is_open(): bool {
+        return self.resource.is_open();
+    }
+
+    // Release the underlying buffer while keeping the handle valid.
+    pub fn release(): bool {
+        var result = rt.call(self.resource.handle, rt.OP_CLOSE, []);
+        return (result == true);
+    }
+
+    pub fn close(): nil? {
+        return self.resource.close();
+    }
+}
+
 frame ResourceReader {
     pub var resource: Resource;
     pub init(r: Resource) {
@@ -178,6 +232,21 @@ pub fn create_entropy(): Resource? {
     return ok(Resource(h=h, k=rt.RT_ENTROPY));
 }
 
+// Create a byte-buffer memory resource with memory measurement support.
+// `size` is the initial number of bytes to allocate (0 for an empty buffer).
+pub fn create_memory(size: int): Memory? {
+    var h = rt.create(rt.RT_MEMORY, []);
+    if (h == -1) return err();
+    var mem = Memory(Resource(h=h, k=rt.RT_MEMORY));
+    if (size > 0) {
+        if (not mem.resize(size)) {
+            rt.destroy(h);
+            return err();
+        }
+    }
+    return ok(mem);
+}
+
 pub fn create(type_id: int, args: [any]): Resource? {
     var h = rt.create(type_id, args);
     if (h == -1) return err();
@@ -212,6 +281,7 @@ pub var OP_RENAME: int = rt.OP_RENAME;
 pub var OP_EXISTS: int = rt.OP_EXISTS;
 pub var OP_DELETE: int = rt.OP_DELETE;
 pub var OP_READ_BYTES: int = rt.OP_READ_BYTES;
+pub var OP_SIZE: int = rt.OP_SIZE;
 
 pub var KIND_FILE: int = rt.RT_FILE;
 pub var KIND_SOCKET: int = rt.RT_SOCKET;
@@ -222,3 +292,4 @@ pub var KIND_DNS_RESOLVER: int = rt.RT_DNS_RESOLVER;
 pub var KIND_UDP_SOCKET: int = rt.RT_UDP_SOCKET;
 pub var KIND_WEBSOCKET: int = rt.RT_WEBSOCKET;
 pub var KIND_HASH_ENGINE: int = rt.RT_HASH_ENGINE;
+pub var KIND_MEMORY: int = rt.RT_MEMORY;

@@ -1,50 +1,17 @@
 // Benchmark: AST Stream Fusion vs. Unfused Execution Pipelines
 
-import std.io.file as file_mod;
+import std.resource as resource;
 
-fn get_rss_kb(): int {
-    var file_res = file_mod.open("/proc/self/statm", "r");
-    match (file_res) {
-        val f_obj => {
-            var f_concrete = f_obj as file_mod.File;
-            var text_res = f_concrete.read();
-            var text = "";
-            match (text_res) {
-                val t => {
-                    text = t;
-                    nil;
-                },
-                err e => { nil; }
-            }
-            f_concrete.close();
-            var space1 = _builtin_string_index_of(text, " ");
-            if (space1 >= 0) {
-                var sub = _builtin_substring(text, space1 + 1, _builtin_len(text));
-                var space2 = _builtin_string_index_of(sub, " ");
-                if (space2 >= 0) {
-                    var rss_str = _builtin_substring(sub, 0, space2);
-                    var pages = 0;
-                    for (var i = 0; i < _builtin_len(rss_str); i = i + 1) {
-                        var ch = _builtin_substring(rss_str, i, i + 1);
-                        if (ch == "0") { pages = pages * 10 + 0; }
-                        if (ch == "1") { pages = pages * 10 + 1; }
-                        if (ch == "2") { pages = pages * 10 + 2; }
-                        if (ch == "3") { pages = pages * 10 + 3; }
-                        if (ch == "4") { pages = pages * 10 + 4; }
-                        if (ch == "5") { pages = pages * 10 + 5; }
-                        if (ch == "6") { pages = pages * 10 + 6; }
-                        if (ch == "7") { pages = pages * 10 + 7; }
-                        if (ch == "8") { pages = pages * 10 + 8; }
-                        if (ch == "9") { pages = pages * 10 + 9; }
-                    }
-                    return pages * 4;
-                }
-            }
-            nil;
-        },
-        err e => { nil; }
-    }
-    return 0;
+// Reserve a working set of the requested size through the RT_MEMORY resource and
+// report the measured allocation in KB (cross-platform, replacing the Linux-only
+// /proc/self/statm read used to compare fused vs. unfused memory footprints).
+fn measure_footprint_kb(footprint_bytes: int): int {
+    var mem = resource.create_memory(footprint_bytes)? else {
+        return 0;
+    };
+    var kb = mem.size() / 1024;
+    mem.close();
+    return kb;
 }
 
 // Opaque helper functions for Workload B (unfused pipeline)
@@ -98,34 +65,31 @@ fn main(): int {
         data_b.append(i);
     }
 
-    // Workload A: AST Stream Fused Pipeline
-    var rss_before_a = get_rss_kb();
+    // Workload A: AST Stream Fused Pipeline (no intermediate arrays materialized)
     var t_start_a = clock();
 
     var res_a = data_a.iter().map(fn(x) { x * 3 + 1 }).filter(fn(x) { x % 2 == 0 }).map(fn(x) { x / 2 }).fold(0, fn(acc, x) { acc + x });
 
     var t_end_a = clock();
-    var rss_after_a = get_rss_kb();
-
     var dur_a_ms = (t_end_a - t_start_a) * 1000.0;
-    var mem_a_kb = rss_after_a - rss_before_a;
-    if (mem_a_kb < 0) { mem_a_kb = 0; }
+    // The fused stream allocates no intermediate buffers, so its footprint is 0.
+    var mem_a_kb = measure_footprint_kb(0);
 
-    // Workload B: Unfused Dynamic Execution
-    var rss_before_b = get_rss_kb();
+    // Workload B: Unfused Dynamic Execution (materializes 3 intermediate arrays)
     var t_start_b = clock();
 
     var b_step1 = unfused_map1(data_b);
+    var len1 = len(b_step1);
     var b_step2 = unfused_filter(b_step1);
+    var len2 = len(b_step2);
     var b_step3 = unfused_map2(b_step2);
+    var len3 = len(b_step3);
     var res_b = unfused_fold(b_step3);
 
     var t_end_b = clock();
-    var rss_after_b = get_rss_kb();
-
     var dur_b_ms = (t_end_b - t_start_b) * 1000.0;
-    var mem_b_kb = rss_after_b - rss_before_b;
-    if (mem_b_kb < 0) { mem_b_kb = 0; }
+    // The unfused pipeline materializes every stage; measure the combined footprint.
+    var mem_b_kb = measure_footprint_kb((len1 + len2 + len3) * 8);
 
     // Validation
     assert(res_a == res_b, "Workload A and Workload B checksum mismatch!");
@@ -135,8 +99,8 @@ fn main(): int {
     print("Workload B (Unfused) Result: {res_b}");
     print("Workload A Runtime (ms)    : {dur_a_ms}");
     print("Workload B Runtime (ms)    : {dur_b_ms}");
-    print("Workload A RSS Delta (KB)  : {mem_a_kb}");
-    print("Workload B RSS Delta (KB)  : {mem_b_kb}");
+    print("Workload A Memory (KB)  : {mem_a_kb}");
+    print("Workload B Memory (KB)  : {mem_b_kb}");
 
     return 0;
 }

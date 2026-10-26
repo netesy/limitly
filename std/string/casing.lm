@@ -1,0 +1,19 @@
+// std/string/casing.lm
+// Case conversion helpers.
+
+pub fn to_lower(value: str): str {
+    return _builtin_string_to_lower(value);
+}
+
+pub fn to_upper(value: str): str {
+    return _builtin_string_to_upper(value);
+}
+
+// Alias kept for callers that prefer the word "uppercase".
+pub fn uppercase(value: str): str {
+    return _builtin_string_to_upper(value);
+}
+
+pub fn lowercase(value: str): str {
+    return _builtin_string_to_lower(value);
+}

@@ -4,7 +4,7 @@ import std.sort as sort;
 import std.search as search;
 import std.collections as collections;
 import std.algorithm as algorithm;
-import std.strings as strings;
+import std.string as string;
 import std.bytes as bytes;
 import std.encoding as encoding;
 import std.iterator as it;

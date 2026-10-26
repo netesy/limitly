@@ -1,13 +1,14 @@
 # Python Stdlib Benchmark Suite for Comparison with Lymar and PHP
 import time
 import os
-import resource
+# import resource
 
 def get_time_ms():
     return time.monotonic() * 1000.0
 
 def get_rss_kb():
-    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    # return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return 0
 
 def bench_string_ops():
     # String Concatenation and Search

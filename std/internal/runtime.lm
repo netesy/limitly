@@ -4,6 +4,7 @@ pub var RT_FILE: int = 0;
 pub var RT_SOCKET: int = 1;
 pub var RT_STDOUT: int = 9;
 pub var RT_STDERR: int = 10;
+pub var RT_MEMORY: int = 11;
 pub var RT_ENTROPY: int = 12;
 pub var RT_DNS_RESOLVER: int = 13;
 pub var RT_UDP_SOCKET: int = 14;
@@ -51,6 +52,7 @@ pub var OP_END_PASS: int = 44;
 pub var OP_MEASURE_TEXT: int = 45;
 pub var OP_GET_FONT_METRICS: int = 46;
 pub var OP_READ_BYTES: int = 47;
+pub var OP_SIZE: int = 48;
 
 pub fn create(type_id: int, args: any): int {
     unsafe {

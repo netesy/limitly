@@ -3,8 +3,10 @@ import std.collections.index as collections;
 import std.iter as iter;
 import std.functional as functional;
 import std.math as math;
-import std.strings as strings;
-import std.string as string;
+// std.strings was removed: its `pub type String = s.String` alias collided with
+// std.string's own `String` frame and broke method dispatch for callers importing
+// both. std.string is the single string module and re-exports via `pub import`.
+pub import std.string show String;
 import std.option as option;
 import std.result as result;
 import std.sort as sort;
@@ -49,7 +51,6 @@ var List = collections.List;
 var Error = core.Error;
 var OptionInt = core.OptionInt;
 var ResultInt = core.ResultInt;
-var String = strings.String;
 var Int = math.Int;
 var Float = math.Float;
 var Iterator = iter.Iterator;
