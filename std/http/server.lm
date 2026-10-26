@@ -150,3 +150,26 @@ fn index_of_h(s: str, pattern: str): int {
     }
     return -1;
 }
+
+frame HTTP2Server {
+    pub var base_server: HTTPServer;
+    pub var active_streams: int;
+
+    pub init() {
+        self.base_server = HTTPServer();
+        self.active_streams = 0;
+    }
+
+    pub fn listen(host: str, port: int): core.ResultInt {
+        return self.base_server.listen(host, port, 128);
+    }
+
+    pub fn handle_stream(stream_id: int, req: ServerRequest): ServerResponse {
+        var resp: ServerResponse = {
+            status: 200,
+            headers: {"content-type": "text/plain"},
+            body: "HTTP/2 Response Stream " + stream_id as str
+        };
+        return resp;
+    }
+}

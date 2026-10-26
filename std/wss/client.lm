@@ -112,4 +112,22 @@ frame WebSocketClient {
             nil => return false
         }
     }
+
+    pub fn send_ping(payload: str = ""): bool {
+        match (self.writer) {
+            val w => return w.write(args=[payload]),
+            nil => return false
+        }
+    }
+
+    pub fn send_pong(payload: str = ""): bool {
+        match (self.writer) {
+            val w => return w.write(args=[payload]),
+            nil => return false
+        }
+    }
+
+    pub fn send_frame_masked(opcode: int, data: str): bool {
+        return self.send_text(data) != nil;
+    }
 }

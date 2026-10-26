@@ -7,6 +7,11 @@ frame Env {
     pub fn set(key: str, value: str): nil { return variables_mod.set(key, value); }
     pub fn args(): [str] { return platform_mod.args(); }
     pub fn cwd(): str { return platform_mod.cwd(); }
+    pub fn os_name(): str { return platform_mod.os_name(); }
+    pub fn arch(): str { return platform_mod.arch(); }
+    pub fn is_windows(): bool { return platform_mod.is_windows(); }
+    pub fn is_linux(): bool { return platform_mod.is_linux(); }
+    pub fn is_macos(): bool { return platform_mod.is_macos(); }
 }
 
 pub fn get(key: str): str? {
@@ -23,4 +28,24 @@ pub fn args(): [str] {
 
 pub fn cwd(): str {
     return platform_mod.cwd();
+}
+
+pub fn os_name(): str {
+    return platform_mod.os_name();
+}
+
+pub fn arch(): str {
+    return platform_mod.arch();
+}
+
+pub fn is_windows(): bool {
+    return platform_mod.is_windows();
+}
+
+pub fn is_linux(): bool {
+    return platform_mod.is_linux();
+}
+
+pub fn is_macos(): bool {
+    return platform_mod.is_macos();
 }

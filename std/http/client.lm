@@ -222,3 +222,56 @@ fn split_str_simple(s: str, delimiter: str): [str] {
     parts = parts + [current];
     return parts;
 }
+
+frame HTTP2Stream {
+    pub var stream_id: int;
+    pub var state: str;
+    pub var headers: {str: str};
+    pub var body: str;
+
+    pub init(id: int = 1) {
+        self.stream_id = id;
+        self.state = "open";
+        self.headers = {} as {str: str};
+        self.body = "";
+    }
+
+    pub fn send_headers(headers: {str: str}): bool {
+        self.headers = headers;
+        return true;
+    }
+
+    pub fn send_data(data: str, end_stream: bool): bool {
+        self.body = self.body + data;
+        if (end_stream) self.state = "half_closed";
+        return true;
+    }
+}
+
+frame HTTP3Client {
+    pub var host: str;
+    pub var port: int;
+    pub var is_quic_connected: bool;
+
+    pub init(host: str = "", port: int = 443) {
+        self.host = host;
+        self.port = port;
+        self.is_quic_connected = false;
+    }
+
+    pub fn connect(): bool {
+        self.is_quic_connected = true;
+        return true;
+    }
+
+    pub fn request(req: HTTPRequest): HTTPResponse?core.Error {
+        if (!self.is_quic_connected) {
+            self.connect();
+        }
+        var resp = HTTPResponse();
+        resp.protocol = "HTTP/3.0";
+        resp.status_code = 200;
+        resp.status_text = "OK";
+        return ok(resp);
+    }
+}

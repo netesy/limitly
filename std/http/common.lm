@@ -61,6 +61,22 @@ var MIME_APPLICATION_FORM = "application/x-www-form-urlencoded";
 var MIME_MULTIPART_FORM = "multipart/form-data";
 var MIME_OCTET_STREAM = "application/octet-stream";
 
+// --- HTTP Version constants ---
+var HTTP_1_1 = "HTTP/1.1";
+var HTTP_2_0 = "HTTP/2.0";
+var HTTP_3_0 = "HTTP/3.0";
+
+// --- HTTP/2 Frame Type constants ---
+var FRAME_DATA = 0;
+var FRAME_HEADERS = 1;
+var FRAME_PRIORITY = 2;
+var FRAME_RST_STREAM = 3;
+var FRAME_SETTINGS = 4;
+var FRAME_PUSH_PROMISE = 5;
+var FRAME_PING = 6;
+var FRAME_GOAWAY = 7;
+var FRAME_WINDOW_UPDATE = 8;
+
 // --- Default User-Agent string ---
 var DEFAULT_USER_AGENT = "Lymar/1.0";
 

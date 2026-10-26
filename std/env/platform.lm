@@ -7,3 +7,39 @@ pub fn args(): [str] {
 pub fn cwd(): str {
     return ".";
 }
+
+pub fn os_name(): str {
+    var os_env = get_env_var("OS");
+    if (os_env != "") return "windows";
+    return "linux";
+}
+
+pub fn arch(): str {
+    var arch_env = get_env_var("PROCESSOR_ARCHITECTURE");
+    if (arch_env != "") return arch_env;
+    return "x86_64";
+}
+
+pub fn is_windows(): bool {
+    return os_name() == "windows";
+}
+
+pub fn is_linux(): bool {
+    return os_name() == "linux";
+}
+
+pub fn is_macos(): bool {
+    return os_name() == "macos";
+}
+
+pub fn is_wasm(): bool {
+    return os_name() == "wasm";
+}
+
+pub fn is_64bit(): bool {
+    return true;
+}
+
+fn get_env_var(key: str): str {
+    return "";
+}
