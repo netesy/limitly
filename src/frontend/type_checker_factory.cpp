@@ -9,6 +9,7 @@
 #include <set>
 #include <filesystem>
 #include <algorithm>
+#include <chrono>
 
 namespace fs = std::filesystem;
 
@@ -48,10 +49,14 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     TypeChecker::failed_modules.clear();
     TypeChecker::failed_frames.clear();
 
+    auto t_start = std::chrono::steady_clock::now();
+
     // Resolve all modules once at the beginning
     auto& manager = ModuleManager::getInstance();
     manager.clear();
     manager.resolve_all(program, "root");
+
+    auto t_resolve = std::chrono::steady_clock::now();
 
     // Build dependency graph and detect cycles
     ModuleGraph graph(manager.get_all_modules());
@@ -117,6 +122,8 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     DeclarationResolver decl_resolver(symbol_db);
     decl_resolver.resolve_all(manager);
 
+    auto t_decl = std::chrono::steady_clock::now();
+
     // Detect unreachable modules (not reachable from root)
     std::set<std::string> visited;
     std::vector<std::string> stack;
@@ -157,6 +164,8 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     checker->set_verification_policy(policy);
     checker->set_source_context(source, file_path);
     bool success = checker->check_program(program);
+    auto t_check = std::chrono::steady_clock::now();
+
     TypeCheckResult result(program, type_system, success, checker->get_errors());
     result.import_aliases = checker->get_import_aliases();
     result.registered_modules = checker->get_registered_modules();
@@ -164,6 +173,10 @@ TypeCheckResult check_program(std::shared_ptr<LM::Frontend::AST::Program> progra
     result.frame_declarations = checker->get_frame_declarations();
     result.trait_declarations = checker->get_trait_declarations();
     result.variable_types = checker->get_variable_types();
+    result.loaded_modules_count = all_modules.size();
+    result.resolve_all_ms = std::chrono::duration<double, std::milli>(t_resolve - t_start).count();
+    result.decl_resolve_ms = std::chrono::duration<double, std::milli>(t_decl - t_resolve).count();
+    result.typecheck_ms = std::chrono::duration<double, std::milli>(t_check - t_decl).count();
     return result;
 }
 

@@ -19,6 +19,8 @@ typedef SOCKET socket_t;
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 typedef int socket_t;
 #define CLOSE_SOCKET(s) close(s)
 #define INVALID_SOCKET (-1)
@@ -609,9 +611,65 @@ EXPORT void* tls_client_connect(const char* host, int port,
         sock_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         if (sock_fd == INVALID_SOCKET) continue;
 
-        if (connect(sock_fd, rp->ai_addr, (int)rp->ai_addrlen) == 0) {
-            break; // Successfully connected!
+        if (timeout_ms > 0) {
+#ifdef _WIN32
+            u_long non_blocking = 1;
+            ioctlsocket(sock_fd, FIONBIO, &non_blocking);
+#else
+            int flags = fcntl(sock_fd, F_GETFL, 0);
+            if (flags >= 0) fcntl(sock_fd, F_SETFL, flags | O_NONBLOCK);
+#endif
+            int rc = connect(sock_fd, rp->ai_addr, (int)rp->ai_addrlen);
+            if (rc == 0) {
+#ifdef _WIN32
+                non_blocking = 0;
+                ioctlsocket(sock_fd, FIONBIO, &non_blocking);
+#else
+                if (flags >= 0) fcntl(sock_fd, F_SETFL, flags);
+#endif
+                break; // Connected immediately!
+            }
+
+            int in_progress = 0;
+#ifdef _WIN32
+            int err = WSAGetLastError();
+            in_progress = (err == WSAEWOULDBLOCK || err == WSAEINPROGRESS);
+#else
+            int err = errno;
+            in_progress = (err == EINPROGRESS || err == EWOULDBLOCK);
+#endif
+            if (in_progress) {
+                fd_set write_fds, err_fds;
+                FD_ZERO(&write_fds);
+                FD_ZERO(&err_fds);
+                FD_SET(sock_fd, &write_fds);
+                FD_SET(sock_fd, &err_fds);
+
+                struct timeval tv;
+                tv.tv_sec  = timeout_ms / 1000;
+                tv.tv_usec = (timeout_ms % 1000) * 1000;
+
+                int sel = select((int)(sock_fd + 1), NULL, &write_fds, &err_fds, &tv);
+                if (sel > 0 && FD_ISSET(sock_fd, &write_fds) && !FD_ISSET(sock_fd, &err_fds)) {
+                    int sock_err = 0;
+                    socklen_t optlen = sizeof(sock_err);
+                    if (getsockopt(sock_fd, SOL_SOCKET, SO_ERROR, (char*)&sock_err, &optlen) == 0 && sock_err == 0) {
+#ifdef _WIN32
+                        non_blocking = 0;
+                        ioctlsocket(sock_fd, FIONBIO, &non_blocking);
+#else
+                        if (flags >= 0) fcntl(sock_fd, F_SETFL, flags);
+#endif
+                        break; // Successfully connected within timeout!
+                    }
+                }
+            }
+        } else {
+            if (connect(sock_fd, rp->ai_addr, (int)rp->ai_addrlen) == 0) {
+                break; // Successfully connected!
+            }
         }
+
         CLOSE_SOCKET(sock_fd);
         sock_fd = INVALID_SOCKET;
     }

@@ -431,10 +431,17 @@ CompiledModuleMeta ModuleManager::generate_metadata(
 void ModuleManager::set_include_dirs(const std::vector<std::string>& dirs) {
     std::lock_guard<std::mutex> lock(modules_mutex_);
     include_dirs_ = dirs;
+    file_cache_.clear();
     if (const char* home = std::getenv("LYMAR_HOME")) include_dirs_.push_back(home);
 }
 
 std::string ModuleManager::find_module_file(const std::string& module_path) {
+    {
+        std::lock_guard<std::mutex> lock(modules_mutex_);
+        auto it = file_cache_.find(module_path);
+        if (it != file_cache_.end()) return it->second;
+    }
+
     std::string relPath = module_path;
     std::replace(relPath.begin(), relPath.end(), '.', '/');
 
@@ -451,6 +458,8 @@ std::string ModuleManager::find_module_file(const std::string& module_path) {
     // Check directly relative to current directory
     std::string found = check_path(relPath);
     if (!found.empty()) {
+        std::lock_guard<std::mutex> lock(modules_mutex_);
+        file_cache_[module_path] = found;
         return found;
     }
 
@@ -464,11 +473,18 @@ std::string ModuleManager::find_module_file(const std::string& module_path) {
         std::string candidate = (fs::path(dir) / relPath).string();
         found = check_path(candidate);
         if (!found.empty()) {
+            std::lock_guard<std::mutex> lock(modules_mutex_);
+            file_cache_[module_path] = found;
             return found;
         }
     }
 
-    return relPath + ".lm";
+    std::string fallback = relPath + ".lm";
+    {
+        std::lock_guard<std::mutex> lock(modules_mutex_);
+        file_cache_[module_path] = fallback;
+    }
+    return fallback;
 }
 
 std::shared_ptr<Module> ModuleManager::get_module(const std::string& name) {
@@ -553,31 +569,28 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
     size_t dot_pos = mod_leaf.rfind('.');
     if (dot_pos != std::string::npos) mod_leaf = mod_leaf.substr(dot_pos + 1);
 
-    std::vector<std::string> candidate_paths = {
-        "bin/lib" + mod_leaf + ".so",
-        "bin/" + mod_leaf + ".so",
-        "bin/lib" + mod_leaf + ".a",
-        "bin/" + mod_leaf + ".a",
-        filePath + ".so",
-        filePath + ".a",
-        (fs::path(filePath).parent_path() / ("lib" + mod_leaf + ".so")).string(),
-        (fs::path(filePath).parent_path() / (mod_leaf + ".so")).string(),
-        (fs::path(filePath).parent_path() / ("lib" + mod_leaf + ".a")).string(),
-        (fs::path(filePath).parent_path() / (mod_leaf + ".a")).string()
-    };
+#if defined(_WIN32)
+    static const char* const host_extensions[] = {".dll", ".a"};
+#elif defined(__APPLE__)
+    static const char* const host_extensions[] = {".dylib", ".a"};
+#else
+    static const char* const host_extensions[] = {".so", ".a"};
+#endif
 
-    // Discover the native artifact extensions on each supported host.
-    const auto linux_candidates = candidate_paths;
-    for (const auto& path : linux_candidates) {
-        fs::path candidate(path);
-        for (const char* extension : {".dll", ".dylib", ".lib"}) {
-            candidate.replace_extension(extension);
-            candidate_paths.push_back(candidate.string());
+    std::vector<std::string> candidate_paths;
+    auto parent_p = fs::path(filePath).parent_path();
+    std::string parent_dir = parent_p.string();
+
+    for (const char* ext : host_extensions) {
+        candidate_paths.push_back("bin/lib" + mod_leaf + ext);
+        candidate_paths.push_back("bin/" + mod_leaf + ext);
+        candidate_paths.push_back(filePath + ext);
+        if (!parent_dir.empty()) {
+            candidate_paths.push_back((parent_p / ("lib" + mod_leaf + ext)).string());
+            candidate_paths.push_back((parent_p / (mod_leaf + ext)).string());
         }
-    }
-    for (const auto& dir : include_dirs_) {
-        for (const char* extension : {".so", ".dll", ".dylib", ".a", ".lib"}) {
-            candidate_paths.push_back((fs::path(dir) / "bin" / ("lib" + mod_leaf + extension)).string());
+        for (const auto& dir : include_dirs_) {
+            candidate_paths.push_back((fs::path(dir) / "bin" / ("lib" + mod_leaf + ext)).string());
         }
     }
 
@@ -586,13 +599,34 @@ std::shared_ptr<Module> ModuleManager::load_module(const std::string& module_pat
     while (parent.find_last_of('.') != std::string::npos) {
         parent.resize(parent.find_last_of('.'));
         const auto leaf = parent.substr(parent.find_last_of('.') == std::string::npos ? 0 : parent.find_last_of('.') + 1);
-        for (const char* extension : {".so", ".dll", ".dylib", ".a", ".lib"}) {
+        for (const char* extension : host_extensions) {
             candidate_paths.push_back((fs::path("bin") / ("lib" + leaf + extension)).string());
             for (const auto& dir : include_dirs_) candidate_paths.push_back((fs::path(dir) / "bin" / ("lib" + leaf + extension)).string());
         }
     }
 
+    auto dir_has_meta = [](const std::string& path_str) -> bool {
+        static std::unordered_map<std::string, bool> dir_meta_cache;
+        auto p = fs::path(path_str).parent_path().string();
+        if (p.empty()) p = ".";
+        auto it = dir_meta_cache.find(p);
+        if (it != dir_meta_cache.end()) return it->second;
+        bool has_meta = false;
+        std::error_code ec;
+        if (fs::exists(p, ec) && fs::is_directory(p, ec)) {
+            for (const auto& entry : fs::directory_iterator(p, ec)) {
+                if (entry.path().extension() == ".meta") {
+                    has_meta = true;
+                    break;
+                }
+            }
+        }
+        dir_meta_cache[p] = has_meta;
+        return has_meta;
+    };
+
     for (const auto& cp : candidate_paths) {
+        if (!dir_has_meta(cp)) continue;
         std::string meta_p = cp + ".meta";
         if (fs::exists(meta_p) && fs::exists(cp)) {
             std::ifstream mf(meta_p);
@@ -697,18 +731,19 @@ void ModuleManager::expand_reexports(std::shared_ptr<Module> module) {
     static thread_local std::set<std::string> expanding;
     if (!expanding.insert(module->name).second) return;
 
-    auto declared_name = [](const std::shared_ptr<AST::Statement>& stmt) -> std::string {
-        if (auto f = std::dynamic_pointer_cast<AST::FunctionDeclaration>(stmt)) return f->name;
-        if (auto v = std::dynamic_pointer_cast<AST::VarDeclaration>(stmt)) return v->name;
-        if (auto fr = std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt)) return fr->name;
-        if (auto t = std::dynamic_pointer_cast<AST::TraitDeclaration>(stmt)) return t->name;
-        if (auto e = std::dynamic_pointer_cast<AST::EnumDeclaration>(stmt)) return e->name;
-        if (auto td = std::dynamic_pointer_cast<AST::TypeDeclaration>(stmt)) return td->name;
+    auto declared_name = [](const AST::Statement* stmt) -> std::string {
+        if (!stmt) return "";
+        if (auto f = dynamic_cast<const AST::FunctionDeclaration*>(stmt)) return f->name;
+        if (auto v = dynamic_cast<const AST::VarDeclaration*>(stmt)) return v->name;
+        if (auto fr = dynamic_cast<const AST::FrameDeclaration*>(stmt)) return fr->name;
+        if (auto t = dynamic_cast<const AST::TraitDeclaration*>(stmt)) return t->name;
+        if (auto e = dynamic_cast<const AST::EnumDeclaration*>(stmt)) return e->name;
+        if (auto td = dynamic_cast<const AST::TypeDeclaration*>(stmt)) return td->name;
         return "";
     };
 
     for (const auto& stmt : module->ast->statements) {
-        auto imp = std::dynamic_pointer_cast<AST::ImportStatement>(stmt);
+        auto imp = dynamic_cast<AST::ImportStatement*>(stmt.get());
         if (!imp || imp->visibility != AST::VisibilityLevel::Public) continue;
         // Re-exports must name their symbols explicitly (`show A, B`); there is no
         // wildcard re-export, so a module cannot widen its API by accident.
@@ -725,11 +760,11 @@ void ModuleManager::expand_reexports(std::shared_ptr<Module> module) {
 
             std::shared_ptr<AST::Statement> found;
             for (const auto& s : source->ast->statements) {
-                if (declared_name(s) == id) { found = s; break; }
+                if (declared_name(s.get()) == id) { found = s; break; }
             }
             if (!found) {
                 for (const auto& s : source->reexports) {
-                    if (declared_name(s) == id) { found = s; break; }
+                    if (declared_name(s.get()) == id) { found = s; break; }
                 }
             }
             if (!found) continue;

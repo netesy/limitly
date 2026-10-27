@@ -24,7 +24,7 @@ fn test_tls_config() {
 }
 
 fn test_tls_connect_unreachable() {
- var cfg = tls.TLSConfig().with_timeout(500);
+ var cfg = tls.TLSConfig().with_timeout(50);
  var res = tls.connect("127.0.0.1", 1, cfg);
  match (res) {
  val sock => {

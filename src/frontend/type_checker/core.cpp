@@ -133,25 +133,25 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                     }
                 }
 
-                std::set<std::string> module_declared_names;
+                std::unordered_set<std::string> module_declared_names;
                 if (module && module->ast) {
                     for (const auto& stmt : module->ast->statements) {
-                        if (auto f = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) module_declared_names.insert(f->name);
-                        else if (auto fr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) module_declared_names.insert(fr->name);
-                        else if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) module_declared_names.insert(v->name);
-                        else if (auto t = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) module_declared_names.insert(t->name);
-                        else if (auto e = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(stmt)) module_declared_names.insert(e->name);
-                        else if (auto td = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) module_declared_names.insert(td->name);
+                        if (auto f = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) module_declared_names.insert(f->name);
+                        else if (auto fr = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) module_declared_names.insert(fr->name);
+                        else if (auto v = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(stmt.get())) module_declared_names.insert(v->name);
+                        else if (auto t = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) module_declared_names.insert(t->name);
+                        else if (auto e = dynamic_cast<LM::Frontend::AST::EnumDeclaration*>(stmt.get())) module_declared_names.insert(e->name);
+                        else if (auto td = dynamic_cast<LM::Frontend::AST::TypeDeclaration*>(stmt.get())) module_declared_names.insert(td->name);
                     }
                 }
                 if (module) {
                     for (const auto& reexp : module->reexports) {
-                        if (auto f = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(reexp)) module_declared_names.insert(f->name);
-                        else if (auto fr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(reexp)) module_declared_names.insert(fr->name);
-                        else if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(reexp)) module_declared_names.insert(v->name);
-                        else if (auto t = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(reexp)) module_declared_names.insert(t->name);
-                        else if (auto e = std::dynamic_pointer_cast<LM::Frontend::AST::EnumDeclaration>(reexp)) module_declared_names.insert(e->name);
-                        else if (auto td = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(reexp)) module_declared_names.insert(td->name);
+                        if (auto f = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(reexp.get())) module_declared_names.insert(f->name);
+                        else if (auto fr = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(reexp.get())) module_declared_names.insert(fr->name);
+                        else if (auto v = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(reexp.get())) module_declared_names.insert(v->name);
+                        else if (auto t = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(reexp.get())) module_declared_names.insert(t->name);
+                        else if (auto e = dynamic_cast<LM::Frontend::AST::EnumDeclaration*>(reexp.get())) module_declared_names.insert(e->name);
+                        else if (auto td = dynamic_cast<LM::Frontend::AST::TypeDeclaration*>(reexp.get())) module_declared_names.insert(td->name);
                     }
                 }
 
@@ -163,11 +163,14 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 };
 
                 for (const auto& [name, info] : checker.frame_declarations) {
-                    this->frame_declarations[name] = info;
-                    TypePtr existing_t = checker.type_system.getType(name);
-                    TypePtr ft = (existing_t && existing_t->tag == TypeTag::Frame) ? existing_t : this->type_system.createFrameType(name);
-                    this->type_system.addUserDefinedType(name, ft);
-                    if (is_declared_symbol(name)) {
+                    bool decl = is_declared_symbol(name);
+                    if (decl || name.starts_with(path + ".")) {
+                        this->frame_declarations[name] = info;
+                        TypePtr existing_t = checker.type_system.getType(name);
+                        TypePtr ft = (existing_t && existing_t->tag == TypeTag::Frame) ? existing_t : this->type_system.createFrameType(name);
+                        this->type_system.addUserDefinedType(name, ft);
+                    }
+                    if (decl) {
                         FrameInfo info_copy = info;
                         info_copy.name = path + "." + name;
                         this->frame_declarations[path + "." + name] = info_copy;
@@ -177,10 +180,13 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                     }
                 }
                 for (const auto& [name, info] : checker.trait_declarations) {
-                    this->trait_declarations[name] = info;
-                    TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait, TraitType{name, {}, {}});
-                    this->type_system.addUserDefinedType(name, trait_type);
-                    if (is_declared_symbol(name)) {
+                    bool decl = is_declared_symbol(name);
+                    if (decl || name.starts_with(path + ".")) {
+                        this->trait_declarations[name] = info;
+                        TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait, TraitType{name, {}, {}});
+                        this->type_system.addUserDefinedType(name, trait_type);
+                    }
+                    if (decl) {
                         TraitInfo info_copy = info;
                         info_copy.name = path + "." + name;
                         this->trait_declarations[path + "." + name] = info_copy;
@@ -189,8 +195,11 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                     }
                 }
                 for (const auto& [name, sig] : checker.function_signatures) {
-                    this->function_signatures[name] = sig;
-                    if (is_declared_symbol(name)) {
+                    bool decl = is_declared_symbol(name);
+                    if (decl || name.starts_with(path + ".")) {
+                        this->function_signatures[name] = sig;
+                    }
+                    if (decl) {
                         FunctionSignature sig_copy = sig;
                         sig_copy.name = path + "." + name;
                         this->function_signatures[path + "." + name] = sig_copy;
@@ -198,24 +207,33 @@ bool TypeChecker::check_program(std::shared_ptr<LM::Frontend::AST::Program> prog
                 }
                 for (const auto& [name, type] : checker.variable_types) {
                     if (type != nullptr) {
-                        this->variable_types[name] = type;
-                        if (is_declared_symbol(name)) {
+                        bool decl = is_declared_symbol(name);
+                        if (decl || name.starts_with(path + ".")) {
+                            this->variable_types[name] = type;
+                        }
+                        if (decl) {
                             this->variable_types[path + "." + name] = type;
                         }
                     }
                 }
                 for (const auto& [name, type] : checker.type_system.getUserDefinedTypes()) {
                     if (type && type->tag != TypeTag::Any && type->tag != TypeTag::Nil) {
-                        this->type_system.addUserDefinedType(name, type);
-                        if (is_declared_symbol(name)) {
+                        bool decl = is_declared_symbol(name);
+                        if (decl || name.starts_with(path + ".")) {
+                            this->type_system.addUserDefinedType(name, type);
+                        }
+                        if (decl) {
                             this->type_system.addUserDefinedType(path + "." + name, type);
                         }
                     }
                 }
                 for (const auto& [name, type] : checker.type_system.getTypeAliases()) {
                     if (type && type->tag != TypeTag::Any && type->tag != TypeTag::Nil) {
-                        this->type_system.registerTypeAlias(name, type);
-                        if (is_declared_symbol(name)) {
+                        bool decl = is_declared_symbol(name);
+                        if (decl || name.starts_with(path + ".")) {
+                            this->type_system.registerTypeAlias(name, type);
+                        }
+                        if (decl) {
                             this->type_system.registerTypeAlias(path + "." + name, type);
                         }
                     }

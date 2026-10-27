@@ -69,6 +69,7 @@ void RegisterVM::execute_concurrency(const LIR::LIR_Inst* pc) {
             }
             
             std::vector<RegisterValue> args;
+            args.reserve(8);
             // Unpack arguments from call_args registers
             for (size_t i = 2; i < pc->call_args.size(); ++i) {
                 size_t reg_idx = pc->call_args[i];

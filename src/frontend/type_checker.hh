@@ -385,6 +385,10 @@ struct TypeCheckResult {
     std::unordered_map<std::string, TypeChecker::FrameInfo> frame_declarations;
     std::unordered_map<std::string, TypeChecker::TraitInfo> trait_declarations;
     std::unordered_map<std::string, TypePtr> variable_types;
+    double resolve_all_ms = 0.0;
+    double decl_resolve_ms = 0.0;
+    double typecheck_ms = 0.0;
+    size_t loaded_modules_count = 0;
     
     TypeCheckResult(std::shared_ptr<LM::Frontend::AST::Program> prog, std::shared_ptr<TypeSystem> ts, bool succ, 
                     const std::vector<std::string>& errs)

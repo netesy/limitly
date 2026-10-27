@@ -3,6 +3,16 @@
 
 import std.app as app;
 import std.gg as gg;
+
+var EVENT_QUIT: int = 0;
+var EVENT_RESIZE: int = 1;
+var EVENT_KEY_DOWN: int = 2;
+var EVENT_KEY_UP: int = 3;
+var EVENT_MOUSE_DOWN: int = 4;
+var EVENT_MOUSE_UP: int = 5;
+var EVENT_MOUSE_MOVE: int = 6;
+var EVENT_CHAR: int = 7;
+var EVENT_MOUSE_WHEEL: int = 8;
 import std.time as time;
 import std.time.timer show Timer;
 import std.math as math;
@@ -153,24 +163,24 @@ frame Game {
                 var ev_y: int = native_events[i + 2];
                 var ev_k: int = native_events[i + 3];
 
-                if (ev_type == app.EVENT_QUIT) {
+                if (ev_type == EVENT_QUIT) {
                     self.is_running = false;
-                } elif (ev_type == app.EVENT_RESIZE) {
+                } elif (ev_type == EVENT_RESIZE) {
                     self.width = ev_x;
                     self.height = ev_y;
-                } elif (ev_type == app.EVENT_MOUSE_MOVE) {
+                } elif (ev_type == EVENT_MOUSE_MOVE) {
                     self.input.on_mouse_move(ev_x as float, ev_y as float);
-                } elif (ev_type == app.EVENT_MOUSE_DOWN) {
+                } elif (ev_type == EVENT_MOUSE_DOWN) {
                     self.input.on_mouse_down(ev_k, ev_x as float, ev_y as float);
-                } elif (ev_type == app.EVENT_MOUSE_UP) {
+                } elif (ev_type == EVENT_MOUSE_UP) {
                     self.input.on_mouse_up(ev_k, ev_x as float, ev_y as float);
-                } elif (ev_type == app.EVENT_MOUSE_WHEEL) {
+                } elif (ev_type == EVENT_MOUSE_WHEEL) {
                     self.input.on_mouse_wheel(ev_y as float);
-                } elif (ev_type == app.EVENT_KEY_DOWN) {
+                } elif (ev_type == EVENT_KEY_DOWN) {
                     self.input.on_key_down(ev_k);
-                } elif (ev_type == app.EVENT_KEY_UP) {
+                } elif (ev_type == EVENT_KEY_UP) {
                     self.input.on_key_up(ev_k);
-                } elif (ev_type == app.EVENT_CHAR) {
+                } elif (ev_type == EVENT_CHAR) {
                     self.input.on_char(ev_k);
                 }
                 i = i + 4;
@@ -260,7 +270,7 @@ frame Game {
     pub fn set_resolution(w: int, h: int): nil {
         self.width = w;
         self.height = h;
-        app.set_window_size(w, h);
+        gg.set_window_size(w, h);
     }
 
     pub fn set_size(w: int, h: int): nil {
@@ -273,6 +283,6 @@ frame Game {
 
     pub fn shutdown(): nil {
         self.is_running = false;
-        app.app_shutdown();
+        gg.shutdown();
     }
 }

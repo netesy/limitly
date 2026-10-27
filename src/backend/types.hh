@@ -600,6 +600,30 @@ public:
     const std::string TIMEOUT_ERROR_STR = "TimeoutError";
 
     TypePtr getType(const std::string& name) {
+        // Fast-path for common primitive built-ins (avoids 4 map lookups for every primitive type)
+        if (name == "int" || name == "i64") return INT64_TYPE;
+        if (name == "str" || name == "string") return STRING_TYPE;
+        if (name == "float" || name == "f64") return FLOAT64_TYPE;
+        if (name == "bool") return BOOL_TYPE;
+        if (name == "any") return ANY_TYPE;
+        if (name == "nil") return NIL_TYPE;
+        if (name == "f32") return FLOAT32_TYPE;
+        if (name == "i32") return INT32_TYPE;
+        if (name == "u32") return UINT32_TYPE;
+        if (name == "u64" || name == "uint") return UINT64_TYPE;
+        if (name == "i8") return INT8_TYPE;
+        if (name == "u8") return UINT8_TYPE;
+        if (name == "i16") return INT16_TYPE;
+        if (name == "u16") return UINT16_TYPE;
+        if (name == "i128" || name == "bigint") return INT128_TYPE;
+        if (name == "u128") return UINT128_TYPE;
+        if (name == "d2") return D2_TYPE;
+        if (name == "d4" || name == "decimal") return D4_TYPE;
+        if (name == "d6") return D6_TYPE;
+        if (name == "list") return LIST_TYPE;
+        if (name == "dict") return DICT_TYPE;
+        if (name == "tuple") return TUPLE_TYPE;
+
         // 1. Check contextual scopes (inner to outer)
         for (auto it = scopeStack.rbegin(); it != scopeStack.rend(); ++it) {
             auto found = it->find(name);

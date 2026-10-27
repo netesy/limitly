@@ -1022,378 +1022,428 @@ TypePtr TypeChecker::check_import_statement(std::shared_ptr<LM::Frontend::AST::I
     declare_variable(alias, type_system.createFrameType(alias));
     
     // Register all symbols from the module
-    std::vector<std::shared_ptr<LM::Frontend::AST::Statement>> module_declarations(
-        module->ast->statements.begin(), module->ast->statements.end());
-    module_declarations.insert(module_declarations.end(), module->reexports.begin(), module->reexports.end());
-    for (const auto& stmt : module_declarations) {
+    auto import_statement_decl = [&](const std::shared_ptr<LM::Frontend::AST::Statement>& stmt) {
+        if (!stmt) return;
+        auto f = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get());
+        auto fr = (!f) ? dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get()) : nullptr;
+        auto v = (!f && !fr) ? dynamic_cast<LM::Frontend::AST::VarDeclaration*>(stmt.get()) : nullptr;
+        auto t = (!f && !fr && !v) ? dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get()) : nullptr;
+        auto td = (!f && !fr && !v && !t) ? dynamic_cast<LM::Frontend::AST::TypeDeclaration*>(stmt.get()) : nullptr;
+
         std::string name;
-        if (auto f = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) name = f->name;
-        else if (auto fr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) name = fr->name;
-        else if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) name = v->name;
-        else if (auto t = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) name = t->name;
-        else if (auto td = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) name = td->name;
-        
-        // Import all public symbols if no filter, or only filtered symbols
+        if (f) name = f->name;
+        else if (fr) name = fr->name;
+        else if (v) name = v->name;
+        else if (t) name = t->name;
+        else if (td) name = td->name;
+
         bool should_import = symbols_to_import.empty() || symbols_to_import.count(name);
-        if (!name.empty() && should_import) {
-            std::vector<std::pair<std::string, bool>> target_names;
-            // Qualified name: alias.name
-            target_names.push_back({alias + "." + name, true});
-            // Unqualified name: name (if no filter or explicit show)
-            if (!import_stmt->filter.has_value() || (import_stmt->filter->type == LM::Frontend::AST::ImportFilterType::Show && symbols_to_import.count(name))) {
-                target_names.push_back({name, true});
+        if (name.empty() || !should_import) return;
+
+        std::vector<std::string> targets;
+        targets.push_back(alias + "." + name);
+        if (!import_stmt->filter.has_value() || (import_stmt->filter->type == LM::Frontend::AST::ImportFilterType::Show && symbols_to_import.count(name))) {
+            targets.push_back(name);
+        }
+        std::string full_path_base = import_stmt->modulePath + "." + name;
+        if (std::find(targets.begin(), targets.end(), full_path_base) == targets.end()) {
+            targets.push_back(full_path_base);
+        }
+
+        if (f) {
+            FunctionSignature base_sig;
+            if (function_signatures.count(full_path_base)) {
+                base_sig = function_signatures[full_path_base];
+                base_sig.declaration = stmt;
+            } else {
+                base_sig.name = full_path_base;
+                base_sig.declaration = stmt;
+                TypePtr ret_t = nullptr;
+                if (f->returnType.has_value()) {
+                    ret_t = resolve_type_annotation(f->returnType.value());
+                    if (!ret_t || ret_t->tag == TypeTag::Nil) {
+                        ret_t = type_system.getType(import_stmt->modulePath + "." + f->returnType.value()->typeName);
+                    }
+                    if (!ret_t || ret_t->tag == TypeTag::Nil) {
+                        ret_t = type_system.getType(alias + "." + f->returnType.value()->typeName);
+                    }
+                }
+                base_sig.return_type = (f->name == "main") ? type_system.INT64_TYPE : (ret_t ? ret_t : type_system.ANY_TYPE);
+                base_sig.can_fail = f->canFail || f->throws;
+                base_sig.error_types = f->declaredErrorTypes;
+
+                for (const auto& p : f->params) {
+                    TypePtr pt = p.second ? resolve_type_annotation(p.second) : nullptr;
+                    if (!pt || pt->tag == TypeTag::Nil) {
+                        if (p.second) pt = type_system.getType(import_stmt->modulePath + "." + p.second->typeName);
+                    }
+                    base_sig.param_types.push_back(pt ? pt : type_system.ANY_TYPE);
+                    base_sig.optional_params.push_back(false);
+                    base_sig.has_default_values.push_back(false);
+                }
+                for (const auto& op : f->optionalParams) {
+                    TypePtr pt = op.second.first ? resolve_type_annotation(op.second.first) : nullptr;
+                    if (!pt || pt->tag == TypeTag::Nil) {
+                        if (op.second.first) pt = type_system.getType(import_stmt->modulePath + "." + op.second.first->typeName);
+                    }
+                    base_sig.param_types.push_back(pt ? pt : type_system.ANY_TYPE);
+                    base_sig.optional_params.push_back(true);
+                    base_sig.has_default_values.push_back(op.second.second != nullptr);
+                }
             }
 
-            std::string full_path_base = import_stmt->modulePath + "." + name;
+            std::vector<std::string> param_names;
+            for (size_t pi = 0; pi < base_sig.param_types.size(); ++pi) {
+                if (pi < f->params.size()) param_names.push_back(f->params[pi].first);
+                else if (pi - f->params.size() < f->optionalParams.size()) param_names.push_back(f->optionalParams[pi - f->params.size()].first);
+                else param_names.push_back("");
+            }
+            TypePtr func_type = type_system.createFunctionType(param_names, base_sig.param_types, base_sig.return_type, base_sig.has_default_values);
 
-            // Always include full module path in targets for unified lookup
-            bool already_has_full = false;
-            for(auto& t : target_names) if(t.first == full_path_base) already_has_full = true;
-            if(!already_has_full) target_names.push_back({full_path_base, true});
-
-            for (const auto& target : target_names) {
-                const std::string& qname = target.first;
-                
-                if (auto f = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
-                    FunctionSignature sig; 
-                    if (function_signatures.count(full_path_base)) {
-                        sig = function_signatures[full_path_base];
-                        sig.name = qname;
-                        sig.declaration = f;
-                    } else {
-                        sig.name = qname; 
-                        sig.declaration = f;
-                        TypePtr ret_t = nullptr;
-                        if (f->returnType.has_value()) {
-                            ret_t = resolve_type_annotation(f->returnType.value());
-                            if (!ret_t || ret_t->tag == TypeTag::Nil) {
-                                ret_t = type_system.getType(import_stmt->modulePath + "." + f->returnType.value()->typeName);
-                            }
-                            if (!ret_t || ret_t->tag == TypeTag::Nil) {
-                                ret_t = type_system.getType(alias + "." + f->returnType.value()->typeName);
-                            }
-                        }
-                        sig.return_type = (f->name == "main") ? type_system.INT64_TYPE : (ret_t ? ret_t : type_system.ANY_TYPE);
-                        sig.can_fail = f->canFail || f->throws;
-                        sig.error_types = f->declaredErrorTypes;
-                        
-                        for (const auto& p : f->params) {
-                            TypePtr pt = p.second ? resolve_type_annotation(p.second) : nullptr;
-                            if (!pt || pt->tag == TypeTag::Nil) {
-                                if (p.second) pt = type_system.getType(import_stmt->modulePath + "." + p.second->typeName);
-                            }
-                            sig.param_types.push_back(pt ? pt : type_system.ANY_TYPE);
-                            sig.optional_params.push_back(false);
-                            sig.has_default_values.push_back(false);
-                        }
-                        for (const auto& op : f->optionalParams) {
-                            TypePtr pt = op.second.first ? resolve_type_annotation(op.second.first) : nullptr;
-                            if (!pt || pt->tag == TypeTag::Nil) {
-                                if (op.second.first) pt = type_system.getType(import_stmt->modulePath + "." + op.second.first->typeName);
-                            }
-                            sig.param_types.push_back(pt ? pt : type_system.ANY_TYPE);
-                            sig.optional_params.push_back(true);
-                            sig.has_default_values.push_back(op.second.second != nullptr);
-                        }
-                    }
-
-                    std::vector<std::string> param_names;
-                    for (size_t pi = 0; pi < sig.param_types.size(); ++pi) {
-                        if (pi < f->params.size()) param_names.push_back(f->params[pi].first);
-                        else if (pi - f->params.size() < f->optionalParams.size()) param_names.push_back(f->optionalParams[pi - f->params.size()].first);
-                        else param_names.push_back("");
-                    }
-                    
-                    function_signatures[qname] = sig;
-                    declare_variable(qname, type_system.createFunctionType(param_names, sig.param_types, sig.return_type, sig.has_default_values));
-                    
-                    // Register in imported symbols so LIR generator can find it
-                    current_program_->imported_symbols[qname] = f;
-                } else if (auto td = std::dynamic_pointer_cast<LM::Frontend::AST::TypeDeclaration>(stmt)) {
-                    TypePtr underlying = td->inferred_type;
-                    if (!underlying || underlying->tag == TypeTag::Nil) {
-                        underlying = type_system.getType(full_path_base);
-                    }
-                    if (!underlying || underlying->tag == TypeTag::Nil) {
-                        underlying = resolve_type_annotation(td->type);
-                    }
-                    if (!underlying || underlying->tag == TypeTag::Nil) {
-                        underlying = type_system.getType(import_stmt->modulePath + "." + td->type->typeName);
-                    }
-                    if (underlying && underlying->tag != TypeTag::Nil) {
-                        try {
-                            type_system.registerTypeAlias(qname, underlying);
-                        } catch (...) {}
-                        type_system.addUserDefinedType(qname, underlying);
-                        if (underlying->tag == TypeTag::Frame) {
-                            if (auto* fd = std::get_if<FrameType>(&underlying->extra)) {
-                                auto it = frame_declarations.find(fd->name);
-                                if (it != frame_declarations.end()) {
-                                    frame_declarations[qname] = it->second;
-                                }
+            for (const auto& qname : targets) {
+                FunctionSignature sig = base_sig;
+                sig.name = qname;
+                function_signatures[qname] = sig;
+                declare_variable(qname, func_type);
+                current_program_->imported_symbols[qname] = stmt;
+            }
+        } else if (td) {
+            TypePtr underlying = td->inferred_type;
+            if (!underlying || underlying->tag == TypeTag::Nil) {
+                underlying = type_system.getType(full_path_base);
+            }
+            if (!underlying || underlying->tag == TypeTag::Nil) {
+                underlying = resolve_type_annotation(td->type);
+            }
+            if (!underlying || underlying->tag == TypeTag::Nil) {
+                underlying = type_system.getType(import_stmt->modulePath + "." + td->type->typeName);
+            }
+            if (underlying && underlying->tag != TypeTag::Nil) {
+                for (const auto& qname : targets) {
+                    try {
+                        type_system.registerTypeAlias(qname, underlying);
+                    } catch (...) {}
+                    type_system.addUserDefinedType(qname, underlying);
+                    if (underlying->tag == TypeTag::Frame) {
+                        if (auto* ftype = std::get_if<FrameType>(&underlying->extra)) {
+                            auto it = frame_declarations.find(ftype->name);
+                            if (it != frame_declarations.end()) {
+                                frame_declarations[qname] = it->second;
                             }
                         }
-                    }
-                } else if (auto v = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
-                    std::string reexported_mod_path;
-                    if (v->initializer) {
-                        if (auto var_init = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(v->initializer)) {
-                            for (const auto& s : module->ast->statements) {
-                                if (auto imp = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(s)) {
-                                    std::string imp_alias = imp->alias ? imp->alias.value() : "";
-                                    if (imp_alias.empty()) {
-                                        size_t dot = imp->modulePath.find_last_of('.');
-                                        imp_alias = (dot != std::string::npos) ? imp->modulePath.substr(dot + 1) : imp->modulePath;
-                                    }
-                                    if (imp_alias == var_init->name) {
-                                        reexported_mod_path = imp->modulePath;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (!reexported_mod_path.empty()) {
-                        import_aliases[qname] = reexported_mod_path;
-                        FrameInfo alias_info;
-                        alias_info.name = qname;
-                        frame_declarations[qname] = alias_info;
-                        TypePtr frame_type = type_system.createFrameType(qname);
-                        type_system.addUserDefinedType(qname, frame_type);
-                        declare_variable(qname, frame_type);
-                        variable_types[qname] = frame_type;
-                        current_program_->imported_symbols[qname] = v;
-
-                        auto reexp_mod = manager.load_module(reexported_mod_path);
-                        if (reexp_mod && reexp_mod->ast) {
-                            for (const auto& rstmt : reexp_mod->ast->statements) {
-                                if (auto rf = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(rstmt)) {
-                                    if (rf->visibility == LM::Frontend::AST::VisibilityLevel::Public) {
-                                        std::string sub_qname = qname + "." + rf->name;
-                                        FunctionSignature sig;
-                                        sig.name = sub_qname;
-                                        sig.declaration = rf;
-                                        sig.return_type = (rf->name == "main") ? type_system.INT64_TYPE : (rf->returnType.has_value() 
-                                            ? resolve_type_annotation(rf->returnType.value()) 
-                                            : type_system.ANY_TYPE);
-                                        sig.can_fail = rf->canFail || rf->throws;
-                                        sig.error_types = rf->declaredErrorTypes;
-                                        std::vector<std::string> param_names;
-                                        std::vector<bool> has_defaults;
-                                        for (const auto& p : rf->params) {
-                                            sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
-                                            sig.optional_params.push_back(false);
-                                            sig.has_default_values.push_back(false);
-                                            param_names.push_back(p.first);
-                                            has_defaults.push_back(false);
-                                        }
-                                        for (const auto& op : rf->optionalParams) {
-                                            sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
-                                            sig.optional_params.push_back(true);
-                                            sig.has_default_values.push_back(op.second.second != nullptr);
-                                            param_names.push_back(op.first);
-                                            has_defaults.push_back(op.second.second != nullptr);
-                                        }
-                                        function_signatures[sub_qname] = sig;
-                                        declare_variable(sub_qname, type_system.createFunctionType(param_names, sig.param_types, sig.return_type, has_defaults));
-                                        current_program_->imported_symbols[sub_qname] = rf;
-                                    }
-                                } else if (auto rv = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(rstmt)) {
-                                    if (rv->visibility == LM::Frontend::AST::VisibilityLevel::Public || rv->isConst) {
-                                        std::string sub_qname = qname + "." + rv->name;
-                                        std::string orig_full = reexported_mod_path + "." + rv->name;
-                                        TypePtr var_type = type_system.ANY_TYPE;
-                                        if (rv->type.has_value()) {
-                                            var_type = resolve_type_annotation(rv->type.value());
-                                        } else if (variable_types.count(orig_full)) {
-                                            var_type = variable_types[orig_full];
-                                        }
-                                        declare_variable(sub_qname, var_type);
-                                        variable_types[sub_qname] = var_type;
-                                        current_program_->imported_symbols[sub_qname] = rv;
-                                    }
-                                } else if (auto rfr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(rstmt)) {
-                                    if (rfr->visibility == LM::Frontend::AST::VisibilityLevel::Public) {
-                                        std::string sub_qname = qname + "." + rfr->name;
-                                        FrameInfo fi;
-                                        fi.name = sub_qname;
-                                        fi.declaration = rfr;
-                                        for (const auto& field : rfr->fields) {
-                                            fi.fields.push_back({field->name, resolve_type_annotation(field->type)});
-                                        }
-                                        frame_declarations[sub_qname] = fi;
-                                        TypePtr frame_type = type_system.createFrameType(sub_qname);
-                                        type_system.addUserDefinedType(sub_qname, frame_type);
-                                        declare_variable(sub_qname, frame_type);
-                                        current_program_->imported_symbols[sub_qname] = rfr;
-                                        for (const auto& method : rfr->methods) {
-                                            std::string m_name = sub_qname + "." + method->name;
-                                            FunctionSignature sig;
-                                            sig.name = m_name;
-                                            sig.declaration = method;
-                                            sig.return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
-                                            sig.param_types.push_back(type_system.createFrameType(sub_qname));
-                                            sig.optional_params.push_back(false);
-                                            sig.has_default_values.push_back(false);
-                                            for (const auto& p : method->parameters) {
-                                                sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
-                                                sig.optional_params.push_back(false);
-                                                sig.has_default_values.push_back(false);
-                                            }
-                                            for (const auto& op : method->optionalParams) {
-                                                sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
-                                                sig.optional_params.push_back(true);
-                                                sig.has_default_values.push_back(op.second.second != nullptr);
-                                            }
-                                            function_signatures[m_name] = sig;
-                                        }
-                                        if (rfr->init) {
-                                            std::string init_name = sub_qname + ".init";
-                                            FunctionSignature sig;
-                                            sig.name = init_name;
-                                            sig.declaration = rfr->init;
-                                            sig.return_type = type_system.createFrameType(sub_qname);
-                                            sig.param_types.push_back(type_system.createFrameType(sub_qname));
-                                            sig.optional_params.push_back(false);
-                                            sig.has_default_values.push_back(false);
-                                            for (const auto& p : rfr->init->parameters) {
-                                                sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
-                                                sig.optional_params.push_back(false);
-                                                sig.has_default_values.push_back(false);
-                                            }
-                                            for (const auto& op : rfr->init->optionalParams) {
-                                                sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
-                                                sig.optional_params.push_back(true);
-                                                sig.has_default_values.push_back(op.second.second != nullptr);
-                                            }
-                                            function_signatures[init_name] = sig;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    } else {
-                        TypePtr var_type = type_system.ANY_TYPE;
-                        if (v->type.has_value()) {
-                            var_type = resolve_type_annotation(v->type.value());
-                        } else if (variable_types.count(full_path_base)) {
-                            var_type = variable_types[full_path_base];
-                        }
-                        declare_variable(qname, var_type);
-                        current_program_->imported_symbols[qname] = v;
-                    }
-                } else if (auto fr = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
-                    FrameInfo fi; 
-                    fi.name = qname; 
-                    fi.declaration = fr;
-                    for (const auto& field : fr->fields) {
-                        fi.fields.push_back({field->name, resolve_type_annotation(field->type)});
-                    }
-                    frame_declarations[qname] = fi;
-                    
-                    // Create and register the frame type
-                    TypePtr frame_type = type_system.createFrameType(qname);
-                    type_system.addUserDefinedType(qname, frame_type);
-                    type_system.addUserDefinedType(full_path_base, frame_type);
-                    type_system.addUserDefinedType(alias + "." + name, frame_type);
-                    declare_variable(qname, frame_type);
-                    
-                    // Register in imported symbols so LIR generator can find it
-                    current_program_->imported_symbols[qname] = fr;
-                    
-                    // Register frame methods (e.g. io.File.read)
-                    for (const auto& method : fr->methods) {
-                        std::string m_name = qname + "." + method->name;
-                        FunctionSignature sig; 
-                        sig.name = m_name; 
-                        sig.declaration = method;
-                        sig.return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
-                        sig.param_types.push_back(type_system.createFrameType(qname)); // 'this'
-                        sig.optional_params.push_back(false);
-                        sig.has_default_values.push_back(false);
-                        
-                        for (const auto& p : method->parameters) {
-                             sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
-                             sig.optional_params.push_back(false);
-                             sig.has_default_values.push_back(false);
-                        }
-                        for (const auto& op : method->optionalParams) {
-                             sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
-                             sig.optional_params.push_back(true);
-                             sig.has_default_values.push_back(op.second.second != nullptr);
-                        }
-                        function_signatures[m_name] = sig;
-                    }
-                    if (fr->init) {
-                        std::string init_name = qname + ".init";
-                        FunctionSignature sig; 
-                        sig.name = init_name; 
-                        sig.declaration = fr->init;
-                        sig.return_type = type_system.createFrameType(qname);
-                        sig.param_types.push_back(type_system.createFrameType(qname)); // 'this'
-                        sig.optional_params.push_back(false);
-                        sig.has_default_values.push_back(false);
-                        
-                        for (const auto& p : fr->init->parameters) {
-                             sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
-                             sig.optional_params.push_back(false);
-                             sig.has_default_values.push_back(false);
-                        }
-                        for (const auto& op : fr->init->optionalParams) {
-                             sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
-                             sig.optional_params.push_back(true);
-                             sig.has_default_values.push_back(op.second.second != nullptr);
-                        }
-                        function_signatures[init_name] = sig;
-                    }
-                } else if (auto t = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
-                    TraitInfo ti;
-                    ti.name = qname;
-                    ti.declaration = t;
-                    ti.extends = t->extends;
-                    trait_declarations[qname] = ti;
-                    
-                    // Create and register the trait type
-                    TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait);
-                    TraitType trait_extra;
-                    trait_extra.name = qname;
-                    trait_extra.extends = t->extends;
-                    for (const auto& method : t->methods) {
-                        TypePtr ret_type = method->returnType ? resolve_type_annotation(method->returnType.value()) : type_system.NIL_TYPE;
-                        trait_extra.methodSignatures.push_back({method->name, ret_type});
-                    }
-                    trait_type->extra = trait_extra;
-                    type_system.addUserDefinedType(qname, trait_type);
-                    type_system.addUserDefinedType(full_path_base, trait_type);
-                    type_system.addUserDefinedType(alias + "." + name, trait_type);
-                    declare_variable(qname, trait_type);
-                    
-                    current_program_->imported_symbols[qname] = t;
-
-                    // Register trait methods
-                    for (const auto& method : t->methods) {
-                        std::string m_name = qname + "." + method->name;
-                        FunctionSignature sig; 
-                        sig.name = m_name; 
-                        sig.declaration = method;
-                        sig.return_type = method->returnType ? resolve_type_annotation(method->returnType.value()) : type_system.ANY_TYPE;
-                        sig.param_types.push_back(type_system.ANY_TYPE); // 'this' (polymorphic)
-                        sig.optional_params.push_back(false);
-                        sig.has_default_values.push_back(false);
-                        
-                        for (const auto& p : method->params) {
-                             sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
-                             sig.optional_params.push_back(false);
-                             sig.has_default_values.push_back(false);
-                        }
-                        // Trait methods don't support optionalParams in AST yet, but we're ready
-                        function_signatures[m_name] = sig;
                     }
                 }
             }
+        } else if (v) {
+            std::string reexported_mod_path;
+            if (v->initializer) {
+                if (auto var_init = dynamic_cast<LM::Frontend::AST::VariableExpr*>(v->initializer.get())) {
+                    for (const auto& s : module->ast->statements) {
+                        if (auto imp = dynamic_cast<LM::Frontend::AST::ImportStatement*>(s.get())) {
+                            std::string imp_alias = imp->alias ? imp->alias.value() : "";
+                            if (imp_alias.empty()) {
+                                size_t dot = imp->modulePath.find_last_of('.');
+                                imp_alias = (dot != std::string::npos) ? imp->modulePath.substr(dot + 1) : imp->modulePath;
+                            }
+                            if (imp_alias == var_init->name) {
+                                reexported_mod_path = imp->modulePath;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (!reexported_mod_path.empty()) {
+                for (const auto& qname : targets) {
+                    import_aliases[qname] = reexported_mod_path;
+                    FrameInfo alias_info;
+                    alias_info.name = qname;
+                    frame_declarations[qname] = alias_info;
+                    TypePtr frame_type = type_system.createFrameType(qname);
+                    type_system.addUserDefinedType(qname, frame_type);
+                    declare_variable(qname, frame_type);
+                    variable_types[qname] = frame_type;
+                    current_program_->imported_symbols[qname] = stmt;
+
+                    auto reexp_mod = manager.load_module(reexported_mod_path);
+                    if (reexp_mod && reexp_mod->ast) {
+                        for (const auto& rstmt : reexp_mod->ast->statements) {
+                            if (auto rf = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(rstmt.get())) {
+                                if (rf->visibility == LM::Frontend::AST::VisibilityLevel::Public) {
+                                    std::string sub_qname = qname + "." + rf->name;
+                                    FunctionSignature sig;
+                                    sig.name = sub_qname;
+                                    sig.declaration = rstmt;
+                                    sig.return_type = (rf->name == "main") ? type_system.INT64_TYPE : (rf->returnType.has_value() 
+                                        ? resolve_type_annotation(rf->returnType.value()) 
+                                        : type_system.ANY_TYPE);
+                                    sig.can_fail = rf->canFail || rf->throws;
+                                    sig.error_types = rf->declaredErrorTypes;
+                                    std::vector<std::string> param_names;
+                                    std::vector<bool> has_defaults;
+                                    for (const auto& p : rf->params) {
+                                        sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                                        sig.optional_params.push_back(false);
+                                        sig.has_default_values.push_back(false);
+                                        param_names.push_back(p.first);
+                                        has_defaults.push_back(false);
+                                    }
+                                    for (const auto& op : rf->optionalParams) {
+                                        sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
+                                        sig.optional_params.push_back(true);
+                                        sig.has_default_values.push_back(op.second.second != nullptr);
+                                        param_names.push_back(op.first);
+                                        has_defaults.push_back(op.second.second != nullptr);
+                                    }
+                                    function_signatures[sub_qname] = sig;
+                                    declare_variable(sub_qname, type_system.createFunctionType(param_names, sig.param_types, sig.return_type, has_defaults));
+                                    current_program_->imported_symbols[sub_qname] = rstmt;
+                                }
+                            } else if (auto rv = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(rstmt.get())) {
+                                if (rv->visibility == LM::Frontend::AST::VisibilityLevel::Public || rv->isConst) {
+                                    std::string sub_qname = qname + "." + rv->name;
+                                    std::string orig_full = reexported_mod_path + "." + rv->name;
+                                    TypePtr var_type = type_system.ANY_TYPE;
+                                    if (rv->type.has_value()) {
+                                        var_type = resolve_type_annotation(rv->type.value());
+                                    } else if (variable_types.count(orig_full)) {
+                                        var_type = variable_types[orig_full];
+                                    }
+                                    declare_variable(sub_qname, var_type);
+                                    variable_types[sub_qname] = var_type;
+                                    current_program_->imported_symbols[sub_qname] = rstmt;
+                                }
+                            } else if (auto rfr = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(rstmt.get())) {
+                                if (rfr->visibility == LM::Frontend::AST::VisibilityLevel::Public) {
+                                    std::string sub_qname = qname + "." + rfr->name;
+                                    FrameInfo fi;
+                                    fi.name = sub_qname;
+                                    fi.declaration = std::dynamic_pointer_cast<AST::FrameDeclaration>(rstmt);
+                                    for (const auto& field : rfr->fields) {
+                                        fi.fields.push_back({field->name, resolve_type_annotation(field->type)});
+                                    }
+                                    frame_declarations[sub_qname] = fi;
+                                    TypePtr sub_frame_type = type_system.createFrameType(sub_qname);
+                                    type_system.addUserDefinedType(sub_qname, sub_frame_type);
+                                    declare_variable(sub_qname, sub_frame_type);
+                                    current_program_->imported_symbols[sub_qname] = rstmt;
+                                    for (const auto& method : rfr->methods) {
+                                        std::string m_name = sub_qname + "." + method->name;
+                                        FunctionSignature sig;
+                                        sig.name = m_name;
+                                        sig.declaration = method;
+                                        sig.return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
+                                        sig.param_types.push_back(sub_frame_type);
+                                        sig.optional_params.push_back(false);
+                                        sig.has_default_values.push_back(false);
+                                        for (const auto& p : method->parameters) {
+                                            sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                                            sig.optional_params.push_back(false);
+                                            sig.has_default_values.push_back(false);
+                                        }
+                                        for (const auto& op : method->optionalParams) {
+                                            sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
+                                            sig.optional_params.push_back(true);
+                                            sig.has_default_values.push_back(op.second.second != nullptr);
+                                        }
+                                        function_signatures[m_name] = sig;
+                                    }
+                                    if (rfr->init) {
+                                        std::string init_name = sub_qname + ".init";
+                                        FunctionSignature sig;
+                                        sig.name = init_name;
+                                        sig.declaration = rfr->init;
+                                        sig.return_type = sub_frame_type;
+                                        sig.param_types.push_back(sub_frame_type);
+                                        sig.optional_params.push_back(false);
+                                        sig.has_default_values.push_back(false);
+                                        for (const auto& p : rfr->init->parameters) {
+                                            sig.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                                            sig.optional_params.push_back(false);
+                                            sig.has_default_values.push_back(false);
+                                        }
+                                        for (const auto& op : rfr->init->optionalParams) {
+                                            sig.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
+                                            sig.optional_params.push_back(true);
+                                            sig.has_default_values.push_back(op.second.second != nullptr);
+                                        }
+                                        function_signatures[init_name] = sig;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                TypePtr var_type = type_system.ANY_TYPE;
+                if (v->type.has_value()) {
+                    var_type = resolve_type_annotation(v->type.value());
+                } else if (variable_types.count(full_path_base)) {
+                    var_type = variable_types[full_path_base];
+                }
+                for (const auto& qname : targets) {
+                    declare_variable(qname, var_type);
+                    current_program_->imported_symbols[qname] = stmt;
+                }
+            }
+        } else if (fr) {
+            std::vector<std::pair<std::string, TypePtr>> resolved_fields;
+            resolved_fields.reserve(fr->fields.size());
+            for (const auto& field : fr->fields) {
+                resolved_fields.push_back({field->name, resolve_type_annotation(field->type)});
+            }
+
+            struct ResolvedMethod {
+                std::string name;
+                std::shared_ptr<AST::Statement> decl;
+                TypePtr return_type;
+                std::vector<TypePtr> param_types;
+                std::vector<bool> optional_params;
+                std::vector<bool> has_default_values;
+            };
+            std::vector<ResolvedMethod> resolved_methods;
+            for (const auto& method : fr->methods) {
+                ResolvedMethod rm;
+                rm.name = method->name;
+                rm.decl = method;
+                rm.return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
+                for (const auto& p : method->parameters) {
+                    rm.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                    rm.optional_params.push_back(false);
+                    rm.has_default_values.push_back(false);
+                }
+                for (const auto& op : method->optionalParams) {
+                    rm.param_types.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
+                    rm.optional_params.push_back(true);
+                    rm.has_default_values.push_back(op.second.second != nullptr);
+                }
+                resolved_methods.push_back(std::move(rm));
+            }
+
+            std::vector<TypePtr> init_params;
+            std::vector<bool> init_opt;
+            std::vector<bool> init_defaults;
+            if (fr->init) {
+                for (const auto& p : fr->init->parameters) {
+                    init_params.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                    init_opt.push_back(false);
+                    init_defaults.push_back(false);
+                }
+                for (const auto& op : fr->init->optionalParams) {
+                    init_params.push_back(op.second.first ? resolve_type_annotation(op.second.first) : type_system.ANY_TYPE);
+                    init_opt.push_back(true);
+                    init_defaults.push_back(op.second.second != nullptr);
+                }
+            }
+
+            auto fr_shared = std::dynamic_pointer_cast<AST::FrameDeclaration>(stmt);
+            for (const auto& qname : targets) {
+                FrameInfo fi;
+                fi.name = qname;
+                fi.declaration = fr_shared;
+                fi.fields = resolved_fields;
+                frame_declarations[qname] = fi;
+
+                TypePtr frame_type = type_system.createFrameType(qname);
+                type_system.addUserDefinedType(qname, frame_type);
+                type_system.addUserDefinedType(full_path_base, frame_type);
+                type_system.addUserDefinedType(alias + "." + name, frame_type);
+                declare_variable(qname, frame_type);
+
+                current_program_->imported_symbols[qname] = stmt;
+
+                for (const auto& rm : resolved_methods) {
+                    std::string m_name = qname + "." + rm.name;
+                    FunctionSignature sig;
+                    sig.name = m_name;
+                    sig.declaration = rm.decl;
+                    sig.return_type = rm.return_type;
+                    sig.param_types.push_back(frame_type);
+                    sig.param_types.insert(sig.param_types.end(), rm.param_types.begin(), rm.param_types.end());
+                    sig.optional_params.push_back(false);
+                    sig.optional_params.insert(sig.optional_params.end(), rm.optional_params.begin(), rm.optional_params.end());
+                    sig.has_default_values.push_back(false);
+                    sig.has_default_values.insert(sig.has_default_values.end(), rm.has_default_values.begin(), rm.has_default_values.end());
+                    function_signatures[m_name] = sig;
+                }
+
+                if (fr->init) {
+                    std::string init_name = qname + ".init";
+                    FunctionSignature sig;
+                    sig.name = init_name;
+                    sig.declaration = fr->init;
+                    sig.return_type = frame_type;
+                    sig.param_types.push_back(frame_type);
+                    sig.param_types.insert(sig.param_types.end(), init_params.begin(), init_params.end());
+                    sig.optional_params.push_back(false);
+                    sig.optional_params.insert(sig.optional_params.end(), init_opt.begin(), init_opt.end());
+                    sig.has_default_values.push_back(false);
+                    sig.has_default_values.insert(sig.has_default_values.end(), init_defaults.begin(), init_defaults.end());
+                    function_signatures[init_name] = sig;
+                }
+            }
+        } else if (t) {
+            TraitType trait_extra;
+            trait_extra.name = full_path_base;
+            trait_extra.extends = t->extends;
+
+            struct ResolvedTraitMethod {
+                std::string name;
+                std::shared_ptr<AST::Statement> decl;
+                TypePtr return_type;
+                std::vector<TypePtr> param_types;
+            };
+            std::vector<ResolvedTraitMethod> resolved_methods;
+            for (const auto& method : t->methods) {
+                ResolvedTraitMethod rtm;
+                rtm.name = method->name;
+                rtm.decl = method;
+                rtm.return_type = method->returnType ? resolve_type_annotation(method->returnType.value()) : type_system.ANY_TYPE;
+                for (const auto& p : method->params) {
+                    rtm.param_types.push_back(p.second ? resolve_type_annotation(p.second) : type_system.ANY_TYPE);
+                }
+                trait_extra.methodSignatures.push_back({method->name, rtm.return_type});
+                resolved_methods.push_back(std::move(rtm));
+            }
+
+            auto t_shared = std::dynamic_pointer_cast<AST::TraitDeclaration>(stmt);
+            for (const auto& qname : targets) {
+                TraitInfo ti;
+                ti.name = qname;
+                ti.declaration = t_shared;
+                ti.extends = t->extends;
+                trait_declarations[qname] = ti;
+
+                TypePtr trait_type = std::make_shared<::Type>(TypeTag::Trait);
+                TraitType te = trait_extra;
+                te.name = qname;
+                trait_type->extra = te;
+                type_system.addUserDefinedType(qname, trait_type);
+                type_system.addUserDefinedType(full_path_base, trait_type);
+                type_system.addUserDefinedType(alias + "." + name, trait_type);
+                declare_variable(qname, trait_type);
+
+                current_program_->imported_symbols[qname] = stmt;
+
+                for (const auto& rtm : resolved_methods) {
+                    std::string m_name = qname + "." + rtm.name;
+                    FunctionSignature sig;
+                    sig.name = m_name;
+                    sig.declaration = rtm.decl;
+                    sig.return_type = rtm.return_type;
+                    sig.param_types.push_back(type_system.ANY_TYPE);
+                    sig.param_types.insert(sig.param_types.end(), rtm.param_types.begin(), rtm.param_types.end());
+                    sig.optional_params.assign(sig.param_types.size(), false);
+                    sig.has_default_values.assign(sig.param_types.size(), false);
+                    function_signatures[m_name] = sig;
+                }
+            }
         }
-    }
+    };
+
+    for (const auto& s : module->ast->statements) import_statement_decl(s);
+    for (const auto& s : module->reexports) import_statement_decl(s);
 
     import_stmt->inferred_type = type_system.NIL_TYPE;
     return type_system.NIL_TYPE;

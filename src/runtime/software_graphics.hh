@@ -323,12 +323,11 @@ public:
                 uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
                 uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
 
-                for (size_t i = 0; i < pixels_.size(); i += 4) {
-                    pixels_[i]     = ru;
-                    pixels_[i + 1] = gu;
-                    pixels_[i + 2] = bu;
-                    pixels_[i + 3] = au;
-                }
+                uint32_t pixel32 = ru | (static_cast<uint32_t>(gu) << 8) |
+                                   (static_cast<uint32_t>(bu) << 16) |
+                                   (static_cast<uint32_t>(au) << 24);
+                auto* p32 = reinterpret_cast<uint32_t*>(pixels_.data());
+                std::fill_n(p32, pixels_.size() / 4, pixel32);
                 return value_true;
             }
             case ResourceOperation::END_PASS: {
@@ -421,13 +420,14 @@ public:
                     uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
                     uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
 
-                    for (int py = y0; py < y1; ++py) {
-                        for (int px = x0; px < x1; ++px) {
-                            size_t idx = static_cast<size_t>(py * width_ + px) * 4;
-                            pixels_[idx]     = ru;
-                            pixels_[idx + 1] = gu;
-                            pixels_[idx + 2] = bu;
-                            pixels_[idx + 3] = au;
+                    uint32_t pixel32 = ru | (static_cast<uint32_t>(gu) << 8) |
+                                       (static_cast<uint32_t>(bu) << 16) |
+                                       (static_cast<uint32_t>(au) << 24);
+                    auto* p32 = reinterpret_cast<uint32_t*>(pixels_.data());
+                    int span = x1 - x0;
+                    if (span > 0) {
+                        for (int py = y0; py < y1; ++py) {
+                            std::fill_n(p32 + (py * width_ + x0), span, pixel32);
                         }
                     }
                 }
@@ -469,13 +469,14 @@ public:
                 uint8_t bu = static_cast<uint8_t>(std::clamp(b * 255.0, 0.0, 255.0));
                 uint8_t au = static_cast<uint8_t>(std::clamp(a * 255.0, 0.0, 255.0));
 
-                for (int py = y0; py < y1; ++py) {
-                    for (int px = x0; px < x1; ++px) {
-                        size_t idx = static_cast<size_t>(py * width_ + px) * 4;
-                        pixels_[idx]     = ru;
-                        pixels_[idx + 1] = gu;
-                        pixels_[idx + 2] = bu;
-                        pixels_[idx + 3] = au;
+                uint32_t pixel32 = ru | (static_cast<uint32_t>(gu) << 8) |
+                                   (static_cast<uint32_t>(bu) << 16) |
+                                   (static_cast<uint32_t>(au) << 24);
+                auto* p32 = reinterpret_cast<uint32_t*>(pixels_.data());
+                int span = x1 - x0;
+                if (span > 0) {
+                    for (int py = y0; py < y1; ++py) {
+                        std::fill_n(p32 + (py * width_ + x0), span, pixel32);
                     }
                 }
                 return value_true;

@@ -66,7 +66,8 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
         current_module_ = path;
         import_aliases_.clear();
         for (const auto& stmt : module->ast->statements) {
-            if (auto import_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::ImportStatement>(stmt)) {
+            if (!stmt) continue;
+            if (auto import_stmt = dynamic_cast<LM::Frontend::AST::ImportStatement*>(stmt.get())) {
                 std::string alias;
                 if (import_stmt->alias.has_value()) {
                     alias = import_stmt->alias.value();
@@ -77,9 +78,9 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
                         : import_stmt->modulePath;
                 }
                 import_aliases_[alias] = import_stmt->modulePath;
-            } else if (auto var_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::VarDeclaration>(stmt)) {
+            } else if (auto var_stmt = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(stmt.get())) {
                 if (var_stmt->initializer) {
-                    if (auto var_init = std::dynamic_pointer_cast<LM::Frontend::AST::VariableExpr>(var_stmt->initializer)) {
+                    if (auto var_init = dynamic_cast<LM::Frontend::AST::VariableExpr*>(var_stmt->initializer.get())) {
                         auto it = import_aliases_.find(var_init->name);
                         if (it != import_aliases_.end()) {
                             import_aliases_[var_stmt->name] = it->second;
@@ -91,7 +92,8 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
 
         // 1a. First pass: Collect all function signatures in the module
         for (const auto& stmt : module->ast->statements) {
-            if (auto func_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+            if (!stmt) continue;
+            if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
                 std::string original_name = func_stmt->name;
                 std::string qname = path + "." + original_name;
                 if (!function_table_.count(qname)) {
@@ -109,13 +111,14 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
 
         // 1b. Second pass: Lower all module symbols
         for (const auto& stmt : module->ast->statements) {
-            if (auto func_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FunctionDeclaration>(stmt)) {
+            if (!stmt) continue;
+            if (auto func_stmt = dynamic_cast<LM::Frontend::AST::FunctionDeclaration*>(stmt.get())) {
                 std::string original_name = func_stmt->name;
                 std::string qname = path + "." + original_name;
                 func_stmt->name = qname;
                 generate_function(*func_stmt);
                 func_stmt->name = original_name;
-            } else if (auto frame_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(stmt)) {
+            } else if (auto frame_stmt = dynamic_cast<LM::Frontend::AST::FrameDeclaration*>(stmt.get())) {
                 std::string original_name = frame_stmt->name;
                 std::string qname = path + "." + original_name;
                 if (lowered_frames_.count(qname)) continue;
@@ -123,7 +126,7 @@ void Generator::lower_function_bodies(const LM::Frontend::TypeCheckResult& type_
                 frame_stmt->name = qname;
                 lower_frame_methods(*frame_stmt);
                 frame_stmt->name = original_name;
-            } else if (auto trait_stmt = std::dynamic_pointer_cast<LM::Frontend::AST::TraitDeclaration>(stmt)) {
+            } else if (auto trait_stmt = dynamic_cast<LM::Frontend::AST::TraitDeclaration*>(stmt.get())) {
                 std::string original_name = trait_stmt->name;
                 std::string qname = path + "." + original_name;
                 trait_stmt->name = qname;

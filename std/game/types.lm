@@ -226,7 +226,7 @@ pub fn hex(c: int, a: float = 1.0): Color {
     var r = (c >> 16) & 255;
     var g = (c >> 8) & 255;
     var b = c & 255;
-    return rgba(r, g, b, a);
+    return Color(r=(r as float) / 255.0, g=(g as float) / 255.0, b=(b as float) / 255.0, a=a);
 }
 
 // Built-in standard game palette
@@ -268,6 +268,29 @@ pub var VAR_SPACING: int = 1;
 pub var VAR_ITEM_HEIGHT: int = 2;
 pub var VAR_ROUNDING: int = 3;
 
+var _th_bg_window: Color          = hex(0x181a1f, 0.95);
+var _th_bg_window_title: Color    = hex(0x21252b, 1.0);
+var _th_bg_panel: Color           = hex(0x282c34, 0.90);
+var _th_text: Color               = hex(0xabb2bf, 1.0);
+var _th_text_muted: Color         = hex(0x5c6370, 1.0);
+var _th_accent: Color             = hex(0x61afef, 1.0);
+var _th_btn_normal: Color         = hex(0x2c313a, 1.0);
+var _th_btn_hover: Color          = hex(0x3e4451, 1.0);
+var _th_btn_active: Color         = hex(0x4b5263, 1.0);
+var _th_slider_track: Color       = hex(0x1e2227, 1.0);
+var _th_slider_thumb: Color       = hex(0x61afef, 1.0);
+var _th_slider_thumb_hover: Color = hex(0x98c379, 1.0);
+var _th_checkbox_border: Color    = hex(0x4b5263, 1.0);
+var _th_checkbox_check: Color     = hex(0x98c379, 1.0);
+var _th_separator: Color          = hex(0x3e4451, 0.6);
+var _th_frame_bg: Color           = hex(0x21252b, 1.0);
+var _th_frame_bg_hover: Color     = hex(0x2c313a, 1.0);
+var _th_frame_bg_active: Color    = hex(0x3e4451, 1.0);
+var _th_tab_normal: Color         = hex(0x21252b, 1.0);
+var _th_tab_active: Color         = hex(0x61afef, 1.0);
+var _th_plot_lines: Color         = hex(0x98c379, 1.0);
+var _th_plot_histogram: Color     = hex(0xe5c07b, 1.0);
+
 frame GUITheme {
     pub var bg_window: Color;
     pub var bg_window_title: Color;
@@ -306,28 +329,28 @@ frame GUITheme {
 
     pub init() {
         // Modern game engine slate/dark palette
-        self.bg_window          = hex(0x181a1f, 0.95);
-        self.bg_window_title    = hex(0x21252b, 1.0);
-        self.bg_panel           = hex(0x282c34, 0.90);
-        self.text               = hex(0xabb2bf, 1.0);
-        self.text_muted         = hex(0x5c6370, 1.0);
-        self.accent             = hex(0x61afef, 1.0);
-        self.btn_normal         = hex(0x2c313a, 1.0);
-        self.btn_hover          = hex(0x3e4451, 1.0);
-        self.btn_active         = hex(0x4b5263, 1.0);
-        self.slider_track       = hex(0x1e2227, 1.0);
-        self.slider_thumb       = hex(0x61afef, 1.0);
-        self.slider_thumb_hover = hex(0x98c379, 1.0);
-        self.checkbox_border    = hex(0x4b5263, 1.0);
-        self.checkbox_check     = hex(0x98c379, 1.0);
-        self.separator          = hex(0x3e4451, 0.6);
-        self.frame_bg           = hex(0x21252b, 1.0);
-        self.frame_bg_hover     = hex(0x2c313a, 1.0);
-        self.frame_bg_active    = hex(0x3e4451, 1.0);
-        self.tab_normal         = hex(0x21252b, 1.0);
-        self.tab_active         = hex(0x61afef, 1.0);
-        self.plot_lines         = hex(0x98c379, 1.0);
-        self.plot_histogram     = hex(0xe5c07b, 1.0);
+        self.bg_window          = _th_bg_window;
+        self.bg_window_title    = _th_bg_window_title;
+        self.bg_panel           = _th_bg_panel;
+        self.text               = _th_text;
+        self.text_muted         = _th_text_muted;
+        self.accent             = _th_accent;
+        self.btn_normal         = _th_btn_normal;
+        self.btn_hover          = _th_btn_hover;
+        self.btn_active         = _th_btn_active;
+        self.slider_track       = _th_slider_track;
+        self.slider_thumb       = _th_slider_thumb;
+        self.slider_thumb_hover = _th_slider_thumb_hover;
+        self.checkbox_border    = _th_checkbox_border;
+        self.checkbox_check     = _th_checkbox_check;
+        self.separator          = _th_separator;
+        self.frame_bg           = _th_frame_bg;
+        self.frame_bg_hover     = _th_frame_bg_hover;
+        self.frame_bg_active    = _th_frame_bg_active;
+        self.tab_normal         = _th_tab_normal;
+        self.tab_active         = _th_tab_active;
+        self.plot_lines         = _th_plot_lines;
+        self.plot_histogram     = _th_plot_histogram;
         self.padding            = 10.0;
         self.spacing            = 6.0;
         self.item_height        = 24.0;

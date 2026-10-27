@@ -288,10 +288,16 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     handled = true;
                 } else if (fname == "print") {
                     for (size_t i = 0; i < pc->call_args.size(); ++i) {
-                        if (i > 0) std::cout << " ";
-                        std::cout << to_string(registers[pc->call_args[i]]);
+                        if (i > 0) std::cout << ' ';
+                        LmStringHeader* s = lm_value_to_string(registers[pc->call_args[i]]);
+                        if (s) {
+                            std::cout.write(s->data, s->len);
+                            lm_str_free(s);
+                        } else {
+                            std::cout << "nil";
+                        }
                     }
-                    std::cout << std::endl;
+                    std::cout << '\n';
                     registers[pc->dst] = VAL_NIL;
                     handled = true;
                 }
@@ -358,18 +364,33 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 opaque_runtime_pointers.insert(reinterpret_cast<uintptr_t>(channels.back().get()));
             } else if (LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
                 ProfileScope prof_scope(pc->func_name);
-                // Handle builtin functions (print, input, etc.)
-                std::vector<ValuePtr> args;
-                args.reserve(pc->call_args.size());
-                for (auto arg_reg : pc->call_args) {
-                    args.push_back(register_to_value_ptr(registers[arg_reg], get_register_language_type(arg_reg)));
-                }
-                try {
-                    ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(pc->func_name, args);
-                    // Builtin functions return ValuePtr, convert to RegisterValue
-                    registers[pc->dst] = LM::Backend::VM::compiler_value_to_backend_value(result);
-                } catch (const std::exception& e) {
-                    throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
+                if (pc->func_name == "print") {
+                    for (size_t i = 0; i < pc->call_args.size(); ++i) {
+                        if (i > 0) std::cout << ' ';
+                        LmStringHeader* s = lm_value_to_string(registers[pc->call_args[i]]);
+                        if (s) {
+                            std::cout.write(s->data, s->len);
+                            lm_str_free(s);
+                        } else {
+                            std::cout << "nil";
+                        }
+                    }
+                    std::cout << '\n';
+                    if (pc->dst != UINT32_MAX) registers[pc->dst] = VAL_NIL;
+                } else {
+                    // Handle builtin functions (input, etc.)
+                    std::vector<ValuePtr> args;
+                    args.reserve(pc->call_args.size());
+                    for (auto arg_reg : pc->call_args) {
+                        args.push_back(register_to_value_ptr(registers[arg_reg], get_register_language_type(arg_reg)));
+                    }
+                    try {
+                        ValuePtr result = LIR::BuiltinUtils::callBuiltinFunction(pc->func_name, args);
+                        // Builtin functions return ValuePtr, convert to RegisterValue
+                        registers[pc->dst] = LM::Backend::VM::compiler_value_to_backend_value(result);
+                    } catch (const std::exception& e) {
+                        throw std::runtime_error("Builtin function '" + pc->func_name + "' error: " + e.what());
+                    }
                 }
             } else if (pc->func_name == "assert") {
                 bool condition = (registers[pc->call_args[0]] == VAL_TRUE);

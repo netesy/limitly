@@ -101,6 +101,7 @@ public:
         std::lock_guard<std::mutex> lock(modules_mutex_);
         modules_.clear();
         compiled_modules_.clear();
+        file_cache_.clear();
         compiled_modules_revision_counter().fetch_add(1, std::memory_order_release);
         // Type checking reloads modules after resolution; keep the configured
         // search paths so -I and installed LYMAR_HOME modules remain available.
@@ -111,6 +112,7 @@ private:
 
     std::unordered_map<std::string, std::shared_ptr<Module>> modules_;
     std::vector<std::string> include_dirs_;
+    std::unordered_map<std::string, std::string> file_cache_;
     std::unordered_map<std::string, std::vector<CompiledModuleMeta>> compiled_modules_;
     static std::atomic<uint64_t>& compiled_modules_revision_counter() {
         static std::atomic<uint64_t> revision{0};

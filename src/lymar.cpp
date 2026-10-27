@@ -75,16 +75,19 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             return 0;
         }
 
+        auto t_start = std::chrono::steady_clock::now();
         LM::Frontend::Parser parser(scanner, options.print_cst);
         std::shared_ptr<LM::Frontend::AST::Program> ast = parser.parse();
         if (LM::Error::Debugger::hasError()) {
             std::cerr << "Parser hasError is true! reportedErrors size: " << LM::Error::Debugger::hasError() << std::endl;
             return 1;
         }
+        auto t_parse = std::chrono::steady_clock::now();
 
         LM::Frontend::ModuleManager::getInstance().set_include_dirs(options.include_dirs);
 
         ast = LM::Frontend::AST::StreamFusionVisitor::optimizeProgram(ast);
+        auto t_opt = std::chrono::steady_clock::now();
 
         const auto verification_policy = options.strict_verification
             ? LM::Frontend::VerificationPolicy::Strict
@@ -96,6 +99,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             }
             return 1;
         }
+        auto t_typecheck = std::chrono::steady_clock::now();
 
         auto memory_check_result = LM::Frontend::MemoryCheckerFactory::check_program(type_check_result.program, source, filename);
         if (!memory_check_result.success) {
@@ -106,6 +110,7 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
             return 1;
         }
         ast = memory_check_result.program;
+        auto t_memcheck = std::chrono::steady_clock::now();
 
         if (options.print_cst) {
             std::cout << "=== CST ===\n";
@@ -137,6 +142,23 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
         if (!lir_function) {
             std::cerr << "[ERROR] LIR generation failed" << std::endl;
             return 1;
+        }
+        auto t_lir = std::chrono::steady_clock::now();
+
+        if (options.profile) {
+            auto ms = [](auto d) { return std::chrono::duration<double, std::milli>(d).count(); };
+            std::cout << "\n========================================================================================\n"
+                      << "Lymar Compilation Profile: " << filename << "\n"
+                      << "----------------------------------------------------------------------------------------\n"
+                      << "Parse: " << ms(t_parse - t_start) << " ms\n"
+                      << "Stream Fusion: " << ms(t_opt - t_parse) << " ms\n"
+                      << "Type Check & Imports: " << ms(t_typecheck - t_opt) << " ms (" << type_check_result.loaded_modules_count << " modules)\n"
+                      << "  - Module Resolution: " << type_check_result.resolve_all_ms << " ms\n"
+                      << "  - Decl Resolution:   " << type_check_result.decl_resolve_ms << " ms\n"
+                      << "  - Type Checking:     " << type_check_result.typecheck_ms << " ms\n"
+                      << "Memory Check: " << ms(t_memcheck - t_typecheck) << " ms\n"
+                      << "LIR Gen: " << ms(t_lir - t_memcheck) << " ms\n"
+                      << "========================================================================================\n\n";
         }
 
         if (options.print_lir) {
