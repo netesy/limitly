@@ -218,6 +218,10 @@ void bind_all_vars(Generator* gen, std::shared_ptr<LM::Frontend::AST::Expression
 }
 
 void Generator::emit_stmt(LM::Frontend::AST::Statement& stmt) {
+    if (stmt.line > 0) {
+        current_source_loc_.line = stmt.line;
+        current_source_loc_.file = current_module_;
+    }
     emit_stmt_impl(stmt);
     if (ownership_facts_ && current_function_) {
         auto found = ownership_facts_->nodes.find(stmt.memory_info.semantic_id);

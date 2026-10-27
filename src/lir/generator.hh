@@ -448,6 +448,9 @@ private:
 
     // Channel context for concurrent blocks
     Reg channel_context_ = UINT32_MAX;
+
+    // Source location tracking for fine-grained DAP / debugger instruction line mapping
+    LIR_SourceLoc current_source_loc_;
     
    
     // Variable capture analysis for concurrent statements

@@ -109,6 +109,10 @@ std::string get_expr_qualified_path(const LM::Frontend::AST::Expression* e) {
 }
 
 Reg Generator::emit_expr(LM::Frontend::AST::Expression& expr) {
+    if (expr.line > 0) {
+        current_source_loc_.line = expr.line;
+        current_source_loc_.file = current_module_;
+    }
     auto result = emit_expr_impl(expr);
     if (ownership_facts_ && current_function_) {
         auto found = ownership_facts_->nodes.find(expr.memory_info.semantic_id);

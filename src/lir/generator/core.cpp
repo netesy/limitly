@@ -575,6 +575,10 @@ void Generator::emit_instruction(const LIR_Inst& inst) {
     if (m_is_terminated) {
         return;
     }
+    LIR_Inst contracted = inst;
+    if (contracted.loc.line == 0 && current_source_loc_.line > 0) {
+        contracted.loc = current_source_loc_;
+    }
     if (current_function_ && inst.isReturn() && !generator_region_stack_.empty()) {
         // All explicit and implicit returns use the same lifetime cleanup,
         // including frame methods and synthesized work-item functions.
@@ -583,7 +587,6 @@ void Generator::emit_instruction(const LIR_Inst& inst) {
         for (auto it = generator_region_stack_.rbegin(); it != generator_region_stack_.rend(); ++it)
             emit_instruction(LIR_Inst(LIR_Op::RegionExit, Type::Void, 0, 0, 0, *it));
     }
-    LIR_Inst contracted = inst;
     std::set<Reg> task_captures;
     if (inst.op == LIR_Op::TaskContextAlloc) {
         for (const auto& scope : scope_stack_)

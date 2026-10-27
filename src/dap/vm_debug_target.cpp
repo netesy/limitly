@@ -479,5 +479,23 @@ void VmDebugTarget::disconnect(bool terminateDebuggee) {
     }
 }
 
+void VmDebugTarget::onInstructionStep(const LIR::LIR_Function& function, uint64_t pc) {
+    if (pc < function.instructions.size()) {
+        const auto& inst = function.instructions[pc];
+        if (inst.loc.line > 0) {
+            current_pc_line_ = inst.loc.line;
+        }
+    }
+    if (shouldStopOnInstruction(source_path_, current_pc_line_, current_call_depth_)) {
+        std::string reason = "breakpoint";
+        if (state_ == ExecutionState::SteppingOver ||
+            state_ == ExecutionState::SteppingInto ||
+            state_ == ExecutionState::SteppingOut) {
+            reason = "step";
+        }
+        pauseAndNotify(reason);
+    }
+}
+
 } // namespace DAP
 } // namespace LM

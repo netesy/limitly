@@ -83,6 +83,8 @@ public:
     Fiber* get_current_fiber();
     
     void set_current_function(const LIR::LIR_Function* func) { current_function_ = func; }
+    const std::vector<RegisterValue>& get_registers() const { return registers; }
+    CallStack& get_call_stack() { return call_stack; }
 
     ValuePtr createErrorValue(const std::string& errorType, const std::string& message);
     ValuePtr createSuccessValue(const RegisterValue& value);
