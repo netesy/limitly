@@ -1847,6 +1847,17 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
                 }
                 return result;
             }
+            if (method_name == "reserve") {
+                if (arg_regs.size() > 1) {
+                    LIR_Inst inst;
+                    inst.op = LIR_Op::CallBuiltin; inst.dst = result; inst.func_name = "_builtin_list_reserve";
+                    inst.call_args.push_back(object_reg);
+                    inst.call_args.push_back(arg_regs[1]);
+                    inst.result_type = Type::Void;
+                    emit_instruction(inst);
+                }
+                return result;
+            }
             if (method_name == "len" || method_name == "length") {
                 LIR_Inst inst;
                 inst.op = LIR_Op::CallBuiltin; inst.dst = result; inst.func_name = "len";
@@ -2465,8 +2476,8 @@ Reg Generator::emit_list_expr(LM::Frontend::AST::ListExpr& expr) {
     Reg list_reg = allocate_register();
     Type abi_type = language_type_to_abi_type(expr.inferred_type);
     
-    // Emit ListCreate instruction
-    emit_instruction(LIR_Inst(LIR_Op::ListCreate, abi_type, list_reg, 0, 0));
+    // Emit ListCreate instruction with initial capacity hint
+    emit_instruction(LIR_Inst(LIR_Op::ListCreate, abi_type, list_reg, 0, 0, static_cast<Imm>(expr.elements.size())));
     set_register_type(list_reg, expr.inferred_type);
     set_register_language_type(list_reg, expr.inferred_type);
     

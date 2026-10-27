@@ -697,6 +697,20 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
             return std::make_shared<Value>(type, result);
         }
     ));
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_list_reserve", std::vector<TypeTag>{TypeTag::List, TypeTag::Int}, TypeTag::Nil,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            return std::make_shared<Value>(std::make_shared<::Type>(TypeTag::Nil), nullptr);
+        }
+    ));
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_list_with_capacity", std::vector<TypeTag>{TypeTag::Int}, TypeTag::List,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            ListValue result;
+            auto type = std::make_shared<::Type>(TypeTag::List, ListType(std::make_shared<::Type>(TypeTag::Any)));
+            return std::make_shared<Value>(type, result);
+        }
+    ));
 
     registerFunction(std::make_shared<LIRBuiltinFunction>(
         "_builtin_string_byte_len",

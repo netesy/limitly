@@ -1919,6 +1919,9 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         if (object_type->tag == TypeTag::List && member_name == "append") {
             return wrap_result(type_system.createFunctionType({type_system.ANY_TYPE}, type_system.NIL_TYPE));
         }
+        if (object_type->tag == TypeTag::List && member_name == "reserve") {
+            return wrap_result(type_system.createFunctionType({type_system.INT_TYPE}, type_system.NIL_TYPE));
+        }
         if (object_type->tag == TypeTag::List && member_name == "pop") {
             return wrap_result(type_system.createFunctionType({}, type_system.ANY_TYPE));
         }
@@ -2221,7 +2224,10 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         if (member_name == "upper" || member_name == "lower") return type_system.FUNCTION_TYPE;
     } else if (object_type->tag == TypeTag::List) {
         if (member_name == "len" || member_name == "length") return type_system.INT_TYPE;
-        if (member_name == "append" || member_name == "pop") {
+        if (member_name == "append" || member_name == "pop" || member_name == "reserve") {
+            if (member_name == "reserve") {
+                return type_system.createFunctionType({type_system.INT_TYPE}, type_system.NIL_TYPE);
+            }
             // Create a specific function type for list methods if possible
             if (member_name == "append") {
                 if (auto* lt = std::get_if<ListType>(&object_type->extra)) {

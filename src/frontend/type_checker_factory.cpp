@@ -185,6 +185,8 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("_builtin_string_hash_bytes", {ts.STRING_TYPE}, ts.INT_TYPE);
     checker.register_builtin_function("_builtin_string_join", {ts.createTypedListType(ts.STRING_TYPE), ts.STRING_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("_builtin_list_slice", {ts.createTypedListType(ts.ANY_TYPE), ts.INT_TYPE, ts.INT_TYPE}, ts.createTypedListType(ts.ANY_TYPE));
+    checker.register_builtin_function("_builtin_list_reserve", {ts.createTypedListType(ts.ANY_TYPE), ts.INT_TYPE}, ts.NIL_TYPE);
+    checker.register_builtin_function("_builtin_list_with_capacity", {ts.INT_TYPE}, ts.createTypedListType(ts.ANY_TYPE));
     // String functions
     checker.register_builtin_function("concat", {ts.STRING_TYPE, ts.STRING_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("length", {ts.STRING_TYPE}, ts.INT_TYPE);

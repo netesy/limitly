@@ -296,6 +296,8 @@ struct LIR_SourceLoc {
     uint32_t column;
 };
 
+class LIR_Function;
+
 struct LIR_Inst {
     Memory::OwnershipEvent ownership;
     LIR_Op op;
@@ -314,6 +316,8 @@ struct LIR_Inst {
     std::vector<Memory::Ownership> call_arg_ownership;
     std::string comment;
     LIR_SourceLoc loc;
+    mutable const LIR_Function* cached_function = nullptr;
+    mutable uint32_t cached_param_count = 0;
     
     LIR_Inst() : op(LIR_Op::Nop), result_type(Type::Void), type_a(Type::Void), type_b(Type::Void),
                 dst(UINT32_MAX), a(UINT32_MAX), b(UINT32_MAX), imm(0), const_val(VAL_NIL) {}

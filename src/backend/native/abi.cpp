@@ -434,6 +434,20 @@ LmValue helper(void *context, uint32_t operation, LmValue a, LmValue b,
       }
       return value;
     }
+    if (name == "_builtin_list_reserve") {
+      auto *list = object<LmList>(arg(0), TYPE_LIST);
+      if (list) {
+        int64_t cap = as_i64(arg(1));
+        if (cap > 0) lm_list_reserve(list, static_cast<uint64_t>(cap));
+      }
+      return VAL_NIL;
+    }
+    if (name == "_builtin_list_with_capacity") {
+      int64_t cap = as_i64(arg(0));
+      if (cap < 0) cap = 0;
+      auto *result = lm_list_new_with_capacity(static_cast<uint64_t>(cap));
+      return own(BOX_PTR(result));
+    }
     if (name == "_builtin_string_join") {
       auto view = [&](LmValue value) -> std::string_view {
         if (value == VAL_NIL) return {};
