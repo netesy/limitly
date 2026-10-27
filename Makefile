@@ -278,7 +278,7 @@ $(OBJ_DIR)/liblymar.a: $(LIB_LYMAR_OBJS) $(FYRA_LIB) $(LYRA_LIB)
 	@rm -f $@
 	$(AR) rcs $@ $(LIB_LYMAR_OBJS) $(LYRA_LIB_OBJS)
 
-windows: $(BIN_DIR) $(MAIN_RSP) liblymar $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a
+windows: $(BIN_DIR) $(MAIN_RSP) liblymar ssl-lib $(LYRA_BIN) $(BIN_DIR)/liblymar_aot.a
 	@echo "[BUILD] Linking lymar.exe ..."
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) @$(MAIN_RSP) $(OBJ_DIR)/liblymar.a $(FYRA_LIB) $(LYRA_LIB) -o $(BIN_DIR)/lymar$(EXE_EXT) $(LIBS) -lssl -lcrypto
 	@echo "[OK] lymar.exe built."
