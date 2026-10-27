@@ -95,6 +95,9 @@ public:
     
     // Get the maximum depth reached
     size_t get_max_depth() const;
+
+    // Get all call frames
+    const std::vector<std::unique_ptr<CallFrame>>& get_frames() const { return frames; }
     
 private:
     std::vector<std::unique_ptr<CallFrame>> frames;

@@ -328,14 +328,34 @@ std::vector<DapThread> VmDebugTarget::getThreads() {
 std::vector<DapStackFrame> VmDebugTarget::getStackTrace(int threadId, int startFrame, int levels) {
     std::vector<DapStackFrame> frames;
 
-    DapStackFrame top;
-    top.id = 1000;
-    top.name = (compiled_function_ && !compiled_function_->name.empty()) ? compiled_function_->name : "main";
-    top.source.path = source_path_;
-    top.source.name = std::filesystem::path(source_path_).filename().string();
-    top.line = current_pc_line_ > 0 ? current_pc_line_ : 1;
-    top.column = 1;
-    frames.push_back(top);
+    if (vm_) {
+        const auto& cs = vm_->get_call_stack();
+        const auto& cs_frames = cs.get_frames();
+        if (!cs_frames.empty()) {
+            for (auto it = cs_frames.rbegin(); it != cs_frames.rend(); ++it) {
+                if (frames.size() >= static_cast<size_t>(levels)) break;
+                DapStackFrame frame;
+                frame.id = static_cast<int>((*it)->frame_id);
+                frame.name = (*it)->function_name.empty() ? "anonymous" : (*it)->function_name;
+                frame.source.path = source_path_;
+                frame.source.name = std::filesystem::path(source_path_).filename().string();
+                frame.line = current_pc_line_ > 0 ? current_pc_line_ : 1;
+                frame.column = 1;
+                frames.push_back(frame);
+            }
+        }
+    }
+
+    if (frames.empty()) {
+        DapStackFrame top;
+        top.id = 1000;
+        top.name = (compiled_function_ && !compiled_function_->name.empty()) ? compiled_function_->name : "main";
+        top.source.path = source_path_;
+        top.source.name = std::filesystem::path(source_path_).filename().string();
+        top.line = current_pc_line_ > 0 ? current_pc_line_ : 1;
+        top.column = 1;
+        frames.push_back(top);
+    }
 
     return frames;
 }
@@ -398,17 +418,57 @@ std::vector<DapVariable> VmDebugTarget::getVariables(int variablesReference) {
 
     // 1. Local scope variables
     if (variablesReference >= 1000 && variablesReference < 2000) {
-        DapVariable status_var;
-        status_var.name = "status";
-        status_var.value = "running";
-        status_var.type = "str";
-        vars.push_back(status_var);
+        int frame_id = variablesReference - 1000;
+        LM::Backend::VM::Register::CallFrame* call_frame = nullptr;
+        if (vm_) {
+            call_frame = vm_->get_call_stack().get_frame(frame_id);
+        }
 
-        DapVariable file_var;
-        file_var.name = "file";
-        file_var.value = std::filesystem::path(source_path_).filename().string();
-        file_var.type = "str";
-        vars.push_back(file_var);
+        if (compiled_function_ && vm_) {
+            const auto& vm_regs = vm_->get_registers();
+            for (const auto& [var_name, reg] : compiled_function_->variable_to_reg) {
+                LmValue val = VAL_NIL;
+                if (call_frame) {
+                    val = call_frame->get_local_register(reg);
+                } else if (reg < vm_regs.size()) {
+                    val = vm_regs[reg];
+                }
+
+                DapVariable v;
+                v.name = var_name;
+                v.value = formatLmValue(val);
+                v.type = getLmValueTypeName(val);
+                if (IS_PTR(val) && ((ObjHeader*)UNBOX_PTR(val))->type_id >= TYPE_LIST) {
+                    v.variablesReference = registerStructuredVariable(val);
+                }
+                vars.push_back(v);
+            }
+
+            for (const auto& [reg, var_name] : compiled_function_->debug_info.var_names) {
+                bool exists = false;
+                for (const auto& existing : vars) {
+                    if (existing.name == var_name) { exists = true; break; }
+                }
+                if (!exists) {
+                    LmValue val = call_frame ? call_frame->get_local_register(reg) : (reg < vm_regs.size() ? vm_regs[reg] : VAL_NIL);
+                    DapVariable v;
+                    v.name = var_name;
+                    v.value = formatLmValue(val);
+                    v.type = getLmValueTypeName(val);
+                    if (IS_PTR(val) && ((ObjHeader*)UNBOX_PTR(val))->type_id >= TYPE_LIST) {
+                        v.variablesReference = registerStructuredVariable(val);
+                    }
+                    vars.push_back(v);
+                }
+            }
+        }
+        if (vars.empty()) {
+            DapVariable status_var;
+            status_var.name = "status";
+            status_var.value = "running";
+            status_var.type = "str";
+            vars.push_back(status_var);
+        }
     }
     // 2. Global scope variables
     else if (variablesReference >= 2000 && variablesReference < 3000) {

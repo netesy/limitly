@@ -17,6 +17,23 @@ bool LldbDapTarget::buildFyraAotBinary(const std::string& sourcePath, std::strin
     options.use_aot = true;
     options.debug = true; // Emit debug info for DWARF/LLDB debugging
 
+    // Explicitly auto-detect host target platform and architecture
+#ifdef _WIN32
+    options.target = "windows";
+#elif defined(__APPLE__)
+    options.target = "macos";
+#else
+    options.target = "linux";
+#endif
+
+#if defined(__aarch64__) || defined(_M_ARM64)
+    options.arch = "aarch64";
+#elif defined(__riscv) && (__riscv_xlen == 64)
+    options.arch = "riscv64";
+#else
+    options.arch = "x86_64";
+#endif
+
     std::string out_name = sourcePath;
     size_t dot = out_name.rfind(".lm");
     if (dot != std::string::npos) {
