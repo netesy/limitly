@@ -1,6 +1,7 @@
 // Standard Library Collections Index
 // Re-exports all collection types and constructors
 
+pub import std.collections.traits show Collection, Indexable, Mutable;
 pub import std.collections.list show List;
 pub import std.collections.vector show Vector, ArrayList;
 pub import std.collections.deque show DoubleEndedQueue, Deque;

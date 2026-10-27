@@ -1,8 +1,8 @@
-import std.fs.directory as directory;
-import std.fs.permissions as permissions;
+import std.fs.directory;
+import std.fs.permissions;
 import std.path.index as path;
-import std.io as io;
-import std.io.file as file;
+import std.io;
+import std.io.file;
 
 pub import std.fs.directory show create_dir, list_dir;
 pub import std.fs.permissions show Permissions;

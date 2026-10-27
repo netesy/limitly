@@ -1,9 +1,9 @@
 // Standard Library I/O Entrypoint Module
 
-import std.io.console as console;
-import std.io.file as file;
-import std.io.reader as reader;
-import std.io.writer as writer;
+import std.io.console;
+import std.io.file;
+import std.io.reader;
+import std.io.writer;
 import std.resource as res;
 
 // Re-exports

@@ -1,12 +1,12 @@
 // std/game/index.lm
 // Clean unified standard library facade for std.game
 
-import std.game.types as types;
-import std.game.math as math;
-import std.game.input as input;
-import std.game.camera as camera;
-import std.game.sprite as sprite;
-import std.game.particles as particles;
+import std.game.types;
+import std.game.math;
+import std.game.input;
+import std.game.camera;
+import std.game.sprite;
+import std.game.particles;
 pub import std.game.gui show GUI, default_gui;
 pub import std.game.scene show Scene, SceneManager, default_scene_manager, TRANSITION_NONE, TRANSITION_FADE;
 pub import std.game.app show GameConfig, Game;
@@ -71,8 +71,6 @@ pub fn rgba(r: int, g: int, b: int, a: float): types.Color {
 pub fn hex(c: int, a: float = 1.0): types.Color {
     return types.hex(c, a);
 }
-
-
 
 pub fn GUITheme(): types.GUITheme {
     return types.GUITheme();

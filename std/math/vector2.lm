@@ -1,6 +1,7 @@
 import std.math.arithmetic as arith;
+import std.math show Addable, Scalable, Normalizable;
 
-frame Vector2 {
+frame Vector2 : Addable, Scalable, Normalizable {
     pub x: float;
     pub y: float;
 

@@ -1,0 +1,17 @@
+// Standard Library Collections Traits
+
+trait Collection {
+    fn len(): int;
+    fn is_empty(): bool;
+    fn clear(): nil;
+}
+
+trait Indexable : Collection {
+    fn get(index: int): any;
+    fn set(index: int, item: any): bool;
+}
+
+trait Mutable : Collection {
+    fn append(item: any): nil;
+    fn remove(index: int): any;
+}
