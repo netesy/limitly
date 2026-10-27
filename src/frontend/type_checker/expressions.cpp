@@ -243,7 +243,15 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
     if (!expr) return nullptr;
 
     // Check for module alias access (e.g., math in math.add), but allow local variables to shadow it
-    if (import_aliases.count(expr->name) && (!current_scope || !current_scope->lookup(expr->name))) {
+    bool is_local_shadow = false;
+    for (Scope* s = current_scope.get(); s && s->parent; s = s->parent.get()) {
+        if (s->variables.count(expr->name)) {
+            is_local_shadow = true;
+            break;
+        }
+    }
+
+    if (import_aliases.count(expr->name) && !is_local_shadow) {
         TypePtr type = type_system.createFrameType(expr->name);
         expr->inferred_type = type;
         return type;
@@ -251,7 +259,7 @@ TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::Vari
 
     // Check if it's an imported frame or function name (without prefix), but allow local variables to shadow it
     auto it = current_program_->imported_symbols.find(expr->name);
-    if (it != current_program_->imported_symbols.end() && (!current_scope || !current_scope->lookup(expr->name))) {
+    if (it != current_program_->imported_symbols.end() && !is_local_shadow) {
         if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(it->second)) {
             TypePtr type = type_system.createFrameType(expr->name);
             expr->inferred_type = type;
@@ -928,7 +936,16 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             return "";
         };
         std::string obj_path = get_callee_obj_path(member_expr->object);
+        bool is_local_shadow = false;
         if (!obj_path.empty()) {
+            for (Scope* s = current_scope.get(); s && s->parent; s = s->parent.get()) {
+                if (s->variables.count(obj_path)) {
+                    is_local_shadow = true;
+                    break;
+                }
+            }
+        }
+        if (!obj_path.empty() && !is_local_shadow) {
             auto alias_it = import_aliases.find(obj_path);
             if (alias_it != import_aliases.end()) {
                 std::string qualified = alias_it->second + "." + member_expr->name;
@@ -1061,7 +1078,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             }
         }
 
-        if (frame_it != frame_declarations.end()) {
+        if (frame_it != frame_declarations.end() && (frame_it->second.declaration != nullptr || function_signatures.find(var_expr->name) == function_signatures.end())) {
             const FrameInfo& frame_info = frame_it->second;
             std::string init_name = var_expr->name + ".init";
             auto sig_it = function_signatures.find(init_name);
@@ -1188,7 +1205,16 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             return "";
         };
         std::string obj_path = get_callee_obj_path(member_expr->object);
-        auto alias_it = obj_path.empty() ? import_aliases.end() : import_aliases.find(obj_path);
+        bool is_local_shadow = false;
+        if (!obj_path.empty()) {
+            for (Scope* s = current_scope.get(); s && s->parent; s = s->parent.get()) {
+                if (s->variables.count(obj_path)) {
+                    is_local_shadow = true;
+                    break;
+                }
+            }
+        }
+        auto alias_it = (obj_path.empty() || is_local_shadow) ? import_aliases.end() : import_aliases.find(obj_path);
         if (alias_it != import_aliases.end()) {
             // Resolve alias to full module path
             std::string module_path = alias_it->second;

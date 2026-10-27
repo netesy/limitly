@@ -1,6 +1,6 @@
 // Lymar Stdlib Benchmark Suite - Optimized Version
 
-import std.string.builder as builder_mod;
+import std.string.builder show StringBuilder;
 import std.resource as res;
 
 // Back the benchmark's working set with a real RT_MEMORY resource and report
@@ -25,7 +25,7 @@ fn main(): int {
     // 1. String Ops - Using StringBuilder (append returns nil, so no per-call
     // frame copy; to_string uses the single-pass builtin join).
     var t0 = clock();
-    var builder = builder_mod.StringBuilder();
+    var builder = StringBuilder();
     for (var i = 0; i < STR_N; i = i + 1) {
         builder.append("a");
     }

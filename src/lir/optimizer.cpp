@@ -599,11 +599,27 @@ bool Optimizer::peephole_optimize() {
             }
         }
 
-        // Convert unchecked ops back to regular ops if types aren't provably int
-        // This is a safety fallback - unchecked ops should only be used when we're certain
+        // Safety net: unchecked integer ops are only valid when the result really is
+        // an integer. The generator emits them from a static integer-type test, but a
+        // mis-inferred or later-refined type could leave an I*_Unchecked carrying a
+        // float/pointer result, which the unchecked VM fast paths would mis-decode.
+        // Demote anything that is not a provable integer to its checked equivalent.
         if (inst.op == LIR_Op::IAdd_Unchecked || inst.op == LIR_Op::IXor_Unchecked ||
             inst.op == LIR_Op::IAnd_Unchecked || inst.op == LIR_Op::IOr_Unchecked) {
-            // For now, keep them as-is since the generator only emits them for provable ints
+            bool result_is_int = inst.result_type == Type::I8  || inst.result_type == Type::U8  ||
+                                 inst.result_type == Type::I16 || inst.result_type == Type::U16 ||
+                                 inst.result_type == Type::I32 || inst.result_type == Type::U32 ||
+                                 inst.result_type == Type::I64 || inst.result_type == Type::U64;
+            if (!result_is_int) {
+                switch (inst.op) {
+                    case LIR_Op::IAdd_Unchecked: inst.op = LIR_Op::Add; break;
+                    case LIR_Op::IXor_Unchecked: inst.op = LIR_Op::Xor; break;
+                    case LIR_Op::IAnd_Unchecked: inst.op = LIR_Op::And; break;
+                    case LIR_Op::IOr_Unchecked:  inst.op = LIR_Op::Or;  break;
+                    default: break;
+                }
+                changed = true;
+            }
         }
 
         if (inst.op == LIR_Op::Mul && inst.b != UINT32_MAX) {

@@ -14,8 +14,11 @@ LmValue entry(const Api*, void* vm_context, const LmValue* arguments, size_t cou
 
 `LmValue` is a 64-bit tagged value. Low bits distinguish pointers, immediate
 integers, and nil/booleans. Immediate integers occupy the signed 61-bit range;
-larger integers and floats use heap representations where required. See
-`src/backend/vm/vm_value_base.hh` and `vm_value.hh`, not an assumed C integer ABI.
+values outside that range are transparently heap-promoted, so the language's
+`int` type still offers the full signed 64-bit range and no operation is limited
+to 61 bits. Larger integers and floats use heap representations where required.
+See `src/backend/vm/vm_value_base.hh` and `vm_value.hh`, not an assumed C
+integer ABI.
 
 The host table carries version/size, generic helper dispatch, numeric conversion,
 comparison, truthiness, and string access. Modules export

@@ -1014,6 +1014,13 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 }
                 break;
             }
+            // IAdd_Unchecked / IAnd_Unchecked / IOr_Unchecked / IXor_Unchecked are the
+            // generator's statically-typed-integer variants. "Unchecked" only removes
+            // the VM's runtime representation/trap checks; numerically they are identical
+            // to their checked counterparts. AOT integers are raw 64-bit values, so the
+            // correct lowering is the exact same instruction -- fall through to the
+            // checked case to guarantee cross-backend equivalence (AGENTS.md conformance).
+            case LIR::LIR_Op::IAdd_Unchecked:
             case LIR::LIR_Op::Add:
                 if (is_float_op(inst)) {
                     store_float_reg(inst.dst, builder_->createFAdd(load_float_reg(inst.a, inst.type_a), load_float_reg(inst.b, inst.type_b)));
@@ -1146,8 +1153,11 @@ void LIRToFyraIRBuilder::build_function_body(ir::Function* main_fn, const LIR::L
                 break;
             case LIR::LIR_Op::Shl: store_reg(inst.dst, builder_->createShl(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::Shr: store_reg(inst.dst, builder_->createShr(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::IAnd_Unchecked:
             case LIR::LIR_Op::And: store_reg(inst.dst, builder_->createAnd(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::IOr_Unchecked:
             case LIR::LIR_Op::Or:  store_reg(inst.dst, builder_->createOr(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
+            case LIR::LIR_Op::IXor_Unchecked:
             case LIR::LIR_Op::Xor: store_reg(inst.dst, builder_->createXor(load_reg(inst.a, inst.type_a), load_reg(inst.b, inst.type_b)), inst.result_type); break;
             case LIR::LIR_Op::CmpEQ:
             case LIR::LIR_Op::CmpNEQ: {

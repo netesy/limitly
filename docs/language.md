@@ -66,7 +66,10 @@ So `flags & READ == READ` parses as `(flags & READ) == READ`, and `flags << 1 ==
 ## 2. Type System
 
 ### 2.1 Primitive Types
-- `int`: Signed integer (platform-dependent size, usually 64-bit)
+- `int`: Signed 64-bit integer (`i64` range). The VM stores small values as an
+  unboxed 61-bit immediate and transparently heap-promotes any value outside that
+  range, so the observable range is the full signed 64-bit space. This is a storage
+  detail invisible to the language; see [abi.md](abi.md).
 - `uint`: Unsigned integer
 - `float`: Floating-point number (64-bit)
 - `bool`: Boolean value (`true` or `false`)

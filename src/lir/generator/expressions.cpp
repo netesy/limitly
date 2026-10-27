@@ -2314,10 +2314,24 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 object_type = expr.object->inferred_type;
             }
 
+            // Pick the container-specific read/write opcodes up front. The RegisterVM
+            // happens to dispatch ListSet/DictSet on the runtime type_id, so emitting
+            // DictSet for a tuple would work there, but other backends must implement
+            // the exact instruction the LIR names (AGENTS.md backend conformance), so
+            // the generator has to be truthful about which container it is targeting.
+            bool is_tuple = object_type &&
+                (object_type->tag == ::TypeTag::Tuple || object_type->tag == ::TypeTag::Frame);
+            bool is_dict = object_type && object_type->tag == ::TypeTag::Dict;
             bool is_list = object_type && object_type->tag == ::TypeTag::List;
 
+            // Unknown/`any` containers keep the historical fallback (read via
+            // ListIndex, write via DictSet); only a proven list/tuple is dispatched
+            // to its dedicated opcode.
+            LIR_Op get_op = is_dict ? LIR_Op::DictGet : (is_tuple ? LIR_Op::TupleGet : LIR_Op::ListIndex);
+            LIR_Op set_op = is_list ? LIR_Op::ListSet : (is_tuple ? LIR_Op::TupleSet : LIR_Op::DictSet);
+
             // `coll[i] op= rhs` is a read-modify-write too, exactly like the field
-            // case above: ListSet/DictSet store precisely the value they are given,
+            // case above: the Set opcodes store precisely the value they are given,
             // and `value` is only the right-hand side. Reading the current element
             // and folding in the operator is what makes `l[0] += 5` yield 10 rather
             // than 5.
@@ -2335,11 +2349,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 Type abi_type = language_type_to_abi_type(result_type);
 
                 Reg current = allocate_register();
-                if (object_type && object_type->tag == ::TypeTag::Dict) {
-                    emit_instruction(LIR_Inst(LIR_Op::DictGet, abi_type, current, object_reg, index_reg));
-                } else {
-                    emit_instruction(LIR_Inst(LIR_Op::ListIndex, abi_type, current, object_reg, index_reg));
-                }
+                emit_instruction(LIR_Inst(get_op, abi_type, current, object_reg, index_reg));
                 set_register_language_type(current, result_type);
                 set_register_abi_type(current, abi_type);
                 set_register_type(current, result_type);
@@ -2357,14 +2367,7 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 stored = current;
             }
 
-            if (is_list) {
-                emit_instruction(LIR_Inst(LIR_Op::ListSet, Type::Void, object_reg, index_reg, stored));
-            } else {
-                // Use DictSet operation for dictionary assignment
-                Reg result = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::DictSet, Type::Ptr, object_reg, index_reg, stored));
-                set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
-            }
+            emit_instruction(LIR_Inst(set_op, Type::Void, object_reg, index_reg, stored));
             return stored;
         }
     } else {
