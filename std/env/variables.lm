@@ -1,24 +1,81 @@
-// Standard Library Environment Variables Submodule
-import std.resource as res;
+// std/env/variables.lm
+//
+// Environment variables, delegated to std.os (which owns the RT_OS resource).
+//
+// std.env is deliberately narrow: variables only. Program arguments moved to
+// std.process.args() and the working directory to std.os.cwd(), because they are
+// not environment variables in the `KEY=VALUE` sense.
 
+import std.os as os;
+
+// Returns nil when the variable is unset. Unwrap the payload with `?` or with
+// `match (value) { val v => ... }`; `value as str` does NOT unwrap, it produces
+// the text "ok(...)". Use get_or() when a default is acceptable - it returns a
+// plain str. Windows reports a variable set to "" as unset, because its
+// environment block cannot store an empty value.
 pub fn get(key: str): str? {
-    var r = res.create_os_resource()? else {
-        var fallback: str? = nil;
-        return fallback;
-    };
-    var result = res._call(h=r.handle, op=res.OP_READ, args=[key]);
-    r.close();
-    if (result == nil) {
-        var fallback: str? = nil;
-        return fallback;
-    }
-    return result as str;
+    return os.getenv(key);
 }
 
-pub fn set(key: str, value: str): nil {
-    var r = res.create_os_resource()? else {
-        return nil;
-    };
-    res._call(h=r.handle, op=res.OP_WRITE, args=[key, value]);
-    r.close();
+// Look up a variable with a default, returning a plain str.
+pub fn get_or(key: str, fallback: str): str {
+    return os.getenv_or(key, fallback);
+}
+
+pub fn set(key: str, value: str): bool {
+    return os.setenv(key, value);
+}
+
+pub fn unset(key: str): bool {
+    return os.unsetenv(key);
+}
+
+// Every variable as a list of "KEY=VALUE" strings.
+pub fn vars(): [str] {
+    return os.env_vars();
+}
+
+frame Env {
+    pub init() {}
+
+    pub fn get(key: str): str? {
+        return os.getenv(key);
+    }
+
+    pub fn get_or(key: str, fallback: str): str {
+        return os.getenv_or(key, fallback);
+    }
+
+    pub fn set(key: str, value: str): bool {
+        return os.setenv(key, value);
+    }
+
+    pub fn unset(key: str): bool {
+        return os.unsetenv(key);
+    }
+
+    pub fn vars(): [str] {
+        return os.env_vars();
+    }
+
+    pub fn home(): str {
+        return os.home_dir();
+    }
+
+    pub fn temp_dir(): str {
+        return os.temp_dir();
+    }
+
+    // Read PATH, or fallback when it is unset.
+    pub fn path(fallback: str): str {
+        return os.getenv_or("PATH", fallback);
+    }
+
+    pub fn platform(): str {
+        return os.platform();
+    }
+
+    pub fn arch(): str {
+        return os.arch();
+    }
 }

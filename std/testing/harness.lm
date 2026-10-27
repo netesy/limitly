@@ -1,0 +1,164 @@
+// std/testing/harness.lm
+//
+// A counting test harness.
+//
+// Lymar does not retain module-level state (a var written inside a function is
+// not visible to the next call), so the counters live in a Testing frame
+// instance that the caller creates and owns - the same explicit-ownership style
+// std.resource uses for handles. Frame field updates do persist across method
+// calls on the same instance, which is what makes the tally reliable.
+
+import std.process as process;
+
+frame Testing {
+    pub var passed: int;
+    pub var failed: int;
+    pub var section_name: str;
+    pub var label: str;
+
+    pub init() {
+        self.passed = 0;
+        self.failed = 0;
+        self.section_name = "";
+        self.label = "test";
+    }
+
+    // Clear the tally and relabel the suite, for running several suites through
+    // one instance.
+    pub fn reset(name: str) {
+        self.passed = 0;
+        self.failed = 0;
+        self.section_name = "";
+        self.label = name;
+    }
+
+    // Group the checks that follow. Purely cosmetic: it appears in failures.
+    pub fn section(name: str) {
+        self.section_name = name;
+        print("[ ] {name}");
+    }
+
+    // Record a boolean check and return it, so callers can also branch on it.
+    pub fn check(condition: bool, message: str): bool {
+        if (condition) {
+            self.passed = self.passed + 1;
+        } else {
+            self.failed = self.failed + 1;
+            print("    FAIL [{self.section_name}] {message}");
+        }
+        return condition;
+    }
+
+    pub fn check_true(condition: bool, message: str): bool {
+        return self.check(condition, message);
+    }
+
+    pub fn check_false(condition: bool, message: str): bool {
+        return self.check(not condition, message);
+    }
+
+    pub fn check_int(actual: int, expected: int, message: str): bool {
+        if (actual == expected) return self.check(true, message);
+        print("      expected {expected}, found {actual}");
+        return self.check(false, message);
+    }
+
+    pub fn check_str(actual: str, expected: str, message: str): bool {
+        if (actual == expected) return self.check(true, message);
+        print("      expected [{expected}], found [{actual}]");
+        return self.check(false, message);
+    }
+
+    // Two values that must be equal, whatever their type.
+    pub fn check_equal(actual: any, expected: any, message: str): bool {
+        return self.check(actual == expected, message);
+    }
+
+    // Record a failure that has no condition to test, such as a fallible call
+    // that was expected to succeed.
+    pub fn fail(message: str): bool {
+        return self.check(false, message);
+    }
+
+    pub fn count_passed(): int {
+        return self.passed;
+    }
+
+    pub fn count_failed(): int {
+        return self.failed;
+    }
+
+    pub fn total(): int {
+        return self.passed + self.failed;
+    }
+
+    pub fn all_passed(): bool {
+        return self.failed == 0 and self.passed > 0;
+    }
+
+    // Print the tally and report whether everything passed.
+    pub fn report(): bool {
+        var verdict = "ok";
+        if (self.failed > 0) { verdict = "FAILED"; }
+        print("{self.label}: {self.passed}/{self.total()} passed [{verdict}]");
+        return self.all_passed();
+    }
+
+    // Print the tally, then end the process with 0 on success and 1 on failure
+    // or when nothing was checked at all (an empty suite is not a pass).
+    pub fn finish(): nil {
+        self.report();
+        var code = 0;
+        if (self.failed > 0 or self.passed == 0) {
+            code = 1;
+        }
+        return process.exit(code);
+    }
+}
+
+// One-shot check with no tally: prints a line and returns the condition.
+pub fn verify(condition: bool, message: str): bool {
+    if (condition) {
+        print("  ok - {message}");
+    } else {
+        print("  FAIL - {message}");
+    }
+    return condition;
+}
+
+// Abort-on-first-failure helpers. These stop the process on the first failed
+// check, so they suit small scripts; prefer a Testing frame when you want a
+// full tally. Strings are interpolated rather than concatenated, because Lymar
+// does not support the + operator on strings.
+pub fn assert_true(condition: bool, message: str = "Assertion failed"): nil {
+    if (not condition) {
+        print(message);
+        process.exit(1);
+    }
+}
+
+pub fn assert_eq(actual: any, expected: any, message: str = "Assertion failed: values not equal"): nil {
+    if (actual != expected) {
+        print("{message} - expected {expected}, got {actual}");
+        process.exit(1);
+    }
+}
+
+pub fn assert_ne(actual: any, expected: any, message: str = "Assertion failed: values are equal"): nil {
+    if (actual == expected) {
+        print("{message} - both are {actual}");
+        process.exit(1);
+    }
+}
+
+// Run one callable check and report its result without ending the process.
+pub fn run_test(name: str, test_func: fn(): bool): bool {
+    print("Running test: {name}");
+    var outcome = test_func();
+    if (outcome) {
+        print("  PASS: {name}");
+    } else {
+        print("  FAIL: {name}");
+    }
+    return outcome;
+}

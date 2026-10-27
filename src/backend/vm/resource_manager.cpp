@@ -1,5 +1,6 @@
 #include "resource_manager.hh"
 #include "../../runtime/hash_engine.hh"
+#include "../../runtime/os_info.hh"
 #include "register.hh"
 #include "vm_list.hh"
 #include "vm_runtime.hh"
@@ -901,59 +902,119 @@ public:
     }
 };
 
+namespace os = LM::Runtime::OS;
+
+// Turn a native string vector into an owned [str] list value.
+static RegisterValue make_string_list(const std::vector<std::string>& items) {
+    LmList* list = lm_list_new();
+    if (!list) return VAL_NIL;
+    for (const auto& item : items) lm_list_append(list, make_string_value(item.c_str()));
+    return BOX_PTR(list);
+}
+
+// Read every argument as a string. resource_call flattens a [any] argument
+// list into individual values, so an argv arrives as one string per element.
+static std::vector<std::string> read_argument_strings(const std::vector<RegisterValue>& args) {
+    std::vector<std::string> items;
+    for (const auto& value : args) {
+        const char* text = register_value_to_cstr(value);
+        if (text) items.emplace_back(text);
+    }
+    return items;
+}
+
+// Ambient machine and environment services. Backs std.os and std.env.
 class OsResource : public Resource {
 public:
     ResourceType getType() const override { return ResourceType::OS; }
+
+    RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
+        auto text = [](const std::string& value) { return make_string_value(value.c_str()); };
+        auto truth = [](bool yes) { return yes ? VAL_TRUE : VAL_FALSE; };
+        switch (op) {
+            case ResourceOperation::ENV_GET: {
+                const char* key = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
+                if (!key) return VAL_NIL;
+                std::string value;
+                // nil means the variable is unset, so std.env.get can return str?.
+                if (!os::env_lookup(key, value)) return VAL_NIL;
+                return text(value);
+            }
+            case ResourceOperation::ENV_SET: {
+                const char* key = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
+                const char* value = args.size() > 1 ? register_value_to_cstr(args[1]) : nullptr;
+                if (!key || !value) return VAL_FALSE;
+                return truth(os::env_set(key, value));
+            }
+            case ResourceOperation::ENV_UNSET: {
+                const char* key = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
+                if (!key) return VAL_FALSE;
+                return truth(os::env_unset(key));
+            }
+            case ResourceOperation::ENV_LIST:
+                return make_string_list(os::env_list());
+            case ResourceOperation::CWD: {
+                auto path = os::cwd();
+                if (path.empty()) return VAL_NIL;
+                return text(path);
+            }
+            case ResourceOperation::CHDIR: {
+                const char* path = args.size() > 0 ? register_value_to_cstr(args[0]) : nullptr;
+                if (!path) return VAL_FALSE;
+                return truth(os::chdir_to(path));
+            }
+            case ResourceOperation::HOME_DIR:
+                return text(os::home_dir());
+            case ResourceOperation::TEMP_DIR:
+                return text(os::temp_dir());
+            case ResourceOperation::EXE_PATH:
+                return text(os::exe_path());
+            case ResourceOperation::OS_NAME:
+                return text(os::os_name());
+            case ResourceOperation::ARCH:
+                return text(os::arch());
+            case ResourceOperation::HOSTNAME:
+                return text(os::hostname());
+            case ResourceOperation::NUM_CPU:
+                return make_i64(os::num_cpu());
+            default:
+                return VAL_NIL;
+        }
+    }
+};
+
+// This process's identity, memory and lifecycle, plus child processes.
+// Backs std.process.
+class ProcessResource : public Resource {
+public:
+    ResourceType getType() const override { return ResourceType::PROCESS; }
+
     RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
         switch (op) {
-            case ResourceOperation::READ: {
-                // Environment get
-                const char* k = nullptr;
-                if (args.size() > 0) {
-                    if (check_header_type(args[0], TYPE_LIST)) {
-                        LmList* list = (LmList*)UNBOX_PTR(args[0]);
-                        if (lm_list_len(list) > 0) k = register_value_to_cstr(lm_list_get(list, 0));
-                    } else {
-                        k = register_value_to_cstr(args[0]);
-                    }
-                }
-                if (!k) return VAL_NIL;
-                const char* v = std::getenv(k);
-                return v ? make_string_value(v) : VAL_NIL;
+            case ResourceOperation::PROC_ARGS:
+                return make_string_list(os::program_arguments());
+            case ResourceOperation::PROC_COMMAND:
+                return make_string_value(os::command_name().c_str());
+            case ResourceOperation::PROC_ID:
+                return make_i64(os::pid());
+            case ResourceOperation::PROC_RSS:
+                // Kilobytes of current resident set, or -1 when the platform
+                // cannot report it. Never an estimate.
+                return make_i64(os::rss_kb());
+            case ResourceOperation::PROC_PEAK_RSS:
+                return make_i64(os::peak_rss_kb());
+            case ResourceOperation::PROC_EXIT: {
+                int64_t code = args.size() > 0 ? register_value_to_i64(args[0]) : 0;
+                os::terminate(static_cast<int>(code));  // does not return
+                return VAL_NIL;
             }
-            case ResourceOperation::WRITE: {
-                // Environment set
-                const char* k = nullptr;
-                const char* v = nullptr;
-                if (args.size() > 0 && check_header_type(args[0], TYPE_LIST)) {
-                    LmList* list = (LmList*)UNBOX_PTR(args[0]);
-                    if (lm_list_len(list) > 0) k = register_value_to_cstr(lm_list_get(list, 0));
-                    if (lm_list_len(list) > 1) v = register_value_to_cstr(lm_list_get(list, 1));
-                } else {
-                    if (args.size() > 0) k = register_value_to_cstr(args[0]);
-                    if (args.size() > 1) v = register_value_to_cstr(args[1]);
-                }
-                if (!k) return VAL_FALSE;
-                if (!v) v = "";
-#if defined(_WIN32)
-                SetEnvironmentVariableA(k, v);
-#else
-                setenv(k, v, 1);
-#endif
-                return VAL_TRUE;
-            }
-            case ResourceOperation::GET_STATE: {
-                // CWD
-                try {
-                    return make_string_value(std::filesystem::current_path().string().c_str());
-                } catch (...) {
-                    return make_string_value(".");
-                }
-            }
-            case ResourceOperation::CLOSE: {
-                // Exit
-                int code = args.size() > 0 ? (int)register_value_to_i64(args[0]) : 0;
-                std::exit(code);
+            case ResourceOperation::SPAWN: {
+                // The argv arrives flattened: element 0 is the program, the rest
+                // its arguments. The child runs directly (no shell) and this call
+                // blocks until it exits, returning the child's exit code.
+                auto argv = read_argument_strings(args);
+                if (argv.empty()) return make_i64(-1);
+                return make_i64(os::spawn_wait(argv));
             }
             default:
                 return VAL_NIL;
@@ -961,40 +1022,7 @@ public:
     }
 };
 
-class ProcessResource : public Resource {
-public:
-    ResourceType getType() const override { return ResourceType::PROCESS; }
-    RegisterValue call(ResourceOperation op, const std::vector<RegisterValue>& args, void*) override {
-        if (op == ResourceOperation::GET_STATE) {
-            // PID
-#if defined(_WIN32)
-            return make_i64((int64_t)GetCurrentProcessId());
-#else
-            return make_i64((int64_t)getpid());
-#endif
-        }
-        if (op == ResourceOperation::PEAK_RSS || op == ResourceOperation::CURRENT_RSS || op == ResourceOperation::SIZE) {
-            int64_t kb = 0;
-#if defined(__linux__)
-            FILE* f = std::fopen("/proc/self/statm", "r");
-            if (f) {
-                long pages = 0, rss = 0;
-                if (std::fscanf(f, "%ld %ld", &pages, &rss) == 2) {
-                    long page_size = sysconf(_SC_PAGESIZE);
-                    kb = (rss * page_size) / 1024;
-                }
-                std::fclose(f);
-            }
-#endif
-            if (kb == 0) kb = 4096; // Fallback
-            return make_i64(kb);
-        }
-        return VAL_NIL;
-    }
-};
-
 // ===================== ResourceManager Core =====================
-
 ResourceManager& ResourceManager::getInstance() {
     static ResourceManager instance;
     return instance;

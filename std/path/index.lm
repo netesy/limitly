@@ -1,8 +1,10 @@
 // Path module - Cross-platform path manipulation
+//
+// The separator that gets written is the platform one (std.os.path_separator);
+// both "/" and "\" are always accepted when reading, so a POSIX path can be
+// manipulated on Windows and vice versa.
 import std.io as io;
-import std.env as env;
-
-pub var SEPARATOR: str = "/";
+import std.os as os;
 
 frame Path {
     pub value: str;
@@ -20,12 +22,14 @@ frame Path {
         if (self.value == "") return Path(other);
         if (other == "") return Path(self.value);
         
-        // Handle path separators
-        var separator = "/";
-        if (ends_with(self.value, separator) or starts_with(other, separator)) {
+        // Handle path separators: emit the platform separator, but never
+        // duplicate one that is already present on either side.
+        var separator = os.path_separator();
+        if (ends_with_separator(self.value) or starts_with_separator(other)) {
             return Path(self.value + other);
         }
-        return Path(self.value + separator + other);
+        var joined = self.value + separator;
+        return Path(joined + other);
     }
 
     pub fn join_multiple(parts: [str]): Path {
@@ -40,26 +44,26 @@ frame Path {
 
     // Path components
     pub fn parent(): Path? {
-        if (self.value == "" or self.value == "/") {
+        if (len(self.value) == 0 or is_root_text(self.value)) {
             var fallback: Path? = nil;
             return fallback;
         }
         
-        var last_sep = last_index_of(self.value, "/");
+        var last_sep = last_separator_index(self.value);
         if (last_sep == -1) return ok(Path(""));
         
         var parent_path = substring(self.value, 0, last_sep);
         if (parent_path != "") {
             return ok(Path(parent_path));
         } else {
-            return ok(Path("/"));
+            return ok(Path(os.path_separator()));
         }
     }
 
     pub fn basename(): str {
-        if (self.value == "" or self.value == "/") return self.value;
+        if (len(self.value) == 0 or is_root_text(self.value)) return self.value;
         
-        var last_sep = last_index_of(self.value, "/");
+        var last_sep = last_separator_index(self.value);
         if (last_sep == -1) return self.value;
         
         if (last_sep + 1 < len(self.value)) {
@@ -85,10 +89,68 @@ frame Path {
         return substring(base, last_dot + 1, len(base));
     }
 
-    // Path normalization
+    // Path normalization: collapse repeated separators, resolve "." and "..",
+    // drop the trailing separator and rewrite the result with the platform
+    // separator. UNC prefixes are not special-cased.
     pub fn normalize(): Path {
-        // Simplified normalization
-        return Path(self.value);
+        var text = self.value;
+        if (len(text) == 0) return Path("");
+
+        var separator = os.path_separator();
+        var absolute = is_absolute_text(text);
+
+        var result = "";
+        if (absolute and has_drive_prefix(text)) {
+            result = substring(text, 0, 2);
+            text = substring(text, 2, len(text));
+        } elif (absolute) {
+            result = separator;
+        }
+
+        var parts = [] as [str];
+        var depth: int = 0;
+        var i: int = 0;
+        var n: int = len(text);
+        while (i < n) {
+            var start: int = i;
+            while (i < n and not is_separator(substring(text, i, i + 1))) {
+                i = i + 1;
+            }
+            var part = substring(text, start, i);
+            if (part != "" and part != ".") {
+                if (part == "..") {
+                    if (depth > 0 and parts[depth - 1] != "..") {
+                        // Discard the pending component by shrinking the live
+                        // depth; the slot is reused by the next assignment.
+                        depth = depth - 1;
+                    } elif (not absolute) {
+                        parts[depth] = part;
+                        depth = depth + 1;
+                    }
+                } else {
+                    parts[depth] = part;
+                    depth = depth + 1;
+                }
+            }
+            i = i + 1;
+        }
+
+        var k: int = 0;
+        while (k < depth) {
+            if (result == "" or ends_with_separator(result)) {
+                result = result + parts[k];
+            } else {
+                var with_sep = result + separator;
+                result = with_sep + parts[k];
+            }
+            k = k + 1;
+        }
+
+        if (result == "") {
+            if (absolute) return Path(separator);
+            return Path(".");
+        }
+        return Path(result);
     }
 
     pub fn resolve(): Path {
@@ -97,7 +159,7 @@ frame Path {
 
     // Path properties
     pub fn is_absolute(): bool {
-        return starts_with(self.value, "/") or starts_with(self.value, "C:") or starts_with(self.value, "D:");
+        return is_absolute_text(self.value);
     }
 
     pub fn is_relative(): bool {
@@ -200,4 +262,73 @@ fn last_index_of(s: str, pattern: str): int {
         i = i - 1;
     }
     return -1;
+}
+
+// Separator helpers. Parsing accepts both separators on every platform; writing
+// always uses the platform separator. Indexing a string yields its character
+// code, so characters are extracted with substring() to stay in the str type.
+fn is_separator(c: str): bool {
+    return c == "/" or c == "\\";
+}
+
+fn ends_with_separator(s: str): bool {
+    var n: int = len(s);
+    if (n == 0) return false;
+    return is_separator(substring(s, n - 1, n));
+}
+
+fn starts_with_separator(s: str): bool {
+    if (len(s) == 0) return false;
+    return is_separator(substring(s, 0, 1));
+}
+
+// Index of the final separator in s, counting either separator, or -1.
+fn last_separator_index(s: str): int {
+    var i: int = len(s) - 1;
+    while (i >= 0) {
+        if (is_separator(substring(s, i, i + 1))) return i;
+        i = i - 1;
+    }
+    return -1;
+}
+
+// A path that is nothing but separators is a root ("/", "\\", "//").
+fn is_root_text(s: str): bool {
+    var n: int = len(s);
+    if (n == 0) return false;
+    var i: int = 0;
+    while (i < n) {
+        if (not is_separator(substring(s, i, i + 1))) return false;
+        i = i + 1;
+    }
+    return true;
+}
+
+// Windows drive prefix, e.g. the "C:" of "C:/Users".
+fn has_drive_prefix(s: str): bool {
+    if (len(s) < 2) return false;
+    if (substring(s, 1, 2) != ":") return false;
+    return not is_separator(substring(s, 0, 1));
+}
+
+fn is_absolute_text(s: str): bool {
+    if (len(s) == 0) return false;
+    if (is_separator(substring(s, 0, 1))) return true;
+    return has_drive_prefix(s);
+}
+
+// The separator this platform writes paths with.
+pub fn separator(): str {
+    return os.path_separator();
+}
+
+// The separator between entries of a search-path variable such as PATH.
+pub fn list_separator(): str {
+    return os.path_list_separator();
+}
+
+// Absolute path of the current working directory joined with `parts`.
+pub fn absolute(parts: [str]): Path {
+    var base = Path(os.cwd());
+    return base.join_multiple(parts);
 }

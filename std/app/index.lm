@@ -4,6 +4,7 @@
 import std.ui.context as ui_context;
 import std.ui.types as ui_types;
 import std.gg as gg;
+import std.os as os;
 
 // Event type constants
 pub var EVENT_QUIT: int = 0;
@@ -438,5 +439,7 @@ pub fn get_mouse_button_state(button: int): int { return 0; }
 pub fn get_key_state(key: int): int { return 0; }
 pub fn get_modifier_state(): int { return 0; }
 pub fn create_app_data_directory(): str { return ""; }
-pub fn get_executable_path(): str { return ""; }
-pub fn get_home_directory(): str { return ""; }
+// These two are answered by std.os: they are facts about the machine and the
+// location of the program, not about the application loop.
+pub fn get_executable_path(): str { return os.exe_path(); }
+pub fn get_home_directory(): str { return os.home_dir(); }

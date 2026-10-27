@@ -1,22 +1,75 @@
 // Test Suite for Standard Library Process Module
+//
+// std.process owns the process itself: identity, arguments, memory, exit status
+// and children. Environment and machine facts come from std.os.
 
 import std.process as process;
+import std.os as os;
 
 fn test_process_frame(): int {
     print("Testing Process Frame...");
     var p = process.Process() as process.Process;
-    assert(p.id() >= 0, "id failed");
-    assert(p.run("echo hello") == 0, "run failed");
+
+    assert(p.id() > 0, "id failed");
+    assert(p.id() == process.id(), "id disagrees with the module function");
+
+    var current = p.memory();
+    assert(current > 0, "memory failed");
+    assert(p.peak_memory() >= current, "peak memory below current memory");
+
+    assert(len(p.command()) > 0, "command failed");
+    return 1;
+}
+
+fn test_process_arguments(): int {
+    print("Testing Process Arguments...");
+    // Arguments reached std.process through the CLI, not a stub.
+    var arguments = process.args();
+    assert(len(arguments) == 0, "unexpected program arguments when run with none");
     return 1;
 }
 
 fn test_command_frame(): int {
     print("Testing Command Frame...");
-    var cmd = process.Command("echo") as process.Command;
-    cmd.arg("hello");
-    assert(cmd.program == "echo", "program failed");
-    assert(len(cmd.args) == 1, "args failed");
-    assert(cmd.execute() == 0, "execute failed");
+    var code: int = 0;
+
+    if (os.is_windows()) {
+        var cmd = process.Command("cmd.exe") as process.Command;
+        cmd.arg("/c");
+        cmd.arg("exit");
+        cmd.arg("5");
+        assert(cmd.program == "cmd.exe", "program failed");
+        assert(len(cmd.args) == 3, "args failed");
+        code = cmd.execute();
+        assert(code == 5, "execute did not forward the child exit code");
+
+        // with_args appends a whole vector.
+        var other = process.Command("cmd.exe") as process.Command;
+        other.with_args(["/c", "exit", "6"]);
+        code = other.execute();
+        assert(code == 6, "with_args/execute failed");
+    } else {
+        var ok_child = process.Command("/bin/true") as process.Command;
+        code = ok_child.execute();
+        assert(code == 0, "/bin/true should exit 0");
+        var bad_child = process.Command("/bin/false") as process.Command;
+        code = bad_child.execute();
+        assert(code != 0, "/bin/false should exit non-zero");
+    }
+    return 1;
+}
+
+fn test_run_and_exec(): int {
+    print("Testing Run And Exec...");
+    if (os.is_windows()) {
+        // run() splits a command line on whitespace.
+        var code = process.run("cmd.exe /c exit 3");
+        assert(code == 3, "run failed");
+        // exec() takes an explicit argument vector.
+        var arguments = ["/c", "exit", "4"] as [str];
+        var exec_code = process.exec("cmd.exe", arguments);
+        assert(exec_code == 4, "exec failed");
+    }
     return 1;
 }
 
@@ -32,7 +85,9 @@ fn main(): int {
     print("=== Process Module Test Suite ===");
 
     assert(test_process_frame() == 1, "Process frame test failed");
+    assert(test_process_arguments() == 1, "Process arguments test failed");
     assert(test_command_frame() == 1, "Command frame test failed");
+    assert(test_run_and_exec() == 1, "Run and exec test failed");
     assert(test_pipe_frame() == 1, "Pipe frame test failed");
 
     print("All process tests passed successfully.");

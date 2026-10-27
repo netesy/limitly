@@ -26,9 +26,45 @@ policy, validation rules, and migration order for native-backed system modules.
 - `file_delete(path: str): bool`: Deletes a file.
 
 ### 1.3 Resource System
-- `resource_create(type_id: int): int64`: Creates a resource handle of the given type. Types: `0`=FILE, `1`=SOCKET (TCP), `5`=CHANNEL, `9`=STDOUT, `10`=STDERR, `11`=MEMORY, `12`=ENTROPY, `13`=DNS_RESOLVER, `14`=UDP_SOCKET, `15`=WEBSOCKET, `16`=HASH_ENGINE.
-- `resource_call(handle: int64, op: int [, data: any]): any`: Invokes an operation on a resource. The 3-arg form passes `data` as the operation argument.
+- `resource_create(type_id: int, args: any): int64`: Creates a resource handle of the given type. Returns `-1` when the type is unknown or creation fails.
+- `resource_call(handle: int64, op: int [, data: any]): any`: Invokes an operation on a resource. Passing a list in `data` **flattens** it into individual arguments: `resource_call(h, op, [a, b])` reaches the handler as `args[0] = a, args[1] = b`. The RegisterVM and the standalone AOT backends flatten identically, so an operation that takes several values must be called with one list of them, not with a nested list.
 - `resource_destroy(handle: int64): nil`: Releases a resource handle.
+
+All resource access is gated behind `unsafe`; the standard library exposes it through `std/internal/runtime.lm`, which mirrors the C++ enum. `src/backend/vm/resource_types.hh` is the source of truth, and `src/lir/lir.hh` carries the same numbering.
+
+Resource type ids: `0`=FILE, `1`=SOCKET (TCP), `4`=PROCESS, `5`=CHANNEL, `9`=STDOUT, `10`=STDERR, `11`=MEMORY, `12`=ENTROPY, `13`=DNS_RESOLVER, `14`=UDP_SOCKET, `15`=WEBSOCKET, `16`=HASH_ENGINE, `17`=GRAPHICS, `18`=OS.
+
+`OS` (18) operations, answered by the shared `LM::Runtime::OS` layer, so both backends behave identically:
+
+| Op | Code | Returns |
+|---|---|---|
+| `OP_ENV_GET` | 49 | `str` value, or `nil` when the variable is unset |
+| `OP_ENV_SET` | 50 | `bool` |
+| `OP_ENV_UNSET` | 51 | `bool` |
+| `OP_ENV_LIST` | 52 | `[str]` of `KEY=VALUE` |
+| `OP_CWD` | 53 | `str` |
+| `OP_CHDIR` | 54 | `bool` |
+| `OP_HOME_DIR` | 55 | `str` |
+| `OP_TEMP_DIR` | 56 | `str` |
+| `OP_EXE_PATH` | 57 | `str` |
+| `OP_OS_NAME` | 58 | `str`: `windows`, `linux`, `darwin`, `android`, `freebsd`, `wasi`, `unknown` |
+| `OP_ARCH` | 59 | `str`: `x86_64`, `aarch64`, `riscv64`, `i686`, `arm`, `wasm32`, `unknown` |
+| `OP_HOSTNAME` | 60 | `str` |
+| `OP_NUM_CPU` | 61 | `int`, at least 1 |
+
+`PROCESS` (4) operations:
+
+| Op | Code | Returns |
+|---|---|---|
+| `OP_PROC_ARGS` | 62 | `[str]` program arguments, excluding the program name |
+| `OP_PROC_EXIT` | 63 | does not return: flushes streams and exits with `code & 0xff` |
+| `OP_PROC_ID` | 64 | `int` |
+| `OP_PROC_RSS` | 65 | `int` kilobytes of resident memory |
+| `OP_PROC_PEAK_RSS` | 66 | `int` kilobytes of peak resident memory |
+| `OP_PROC_COMMAND` | 67 | `str` program name (argv[0]) |
+| `OP_SPAWN` | 9 | `int` child exit code, or `-1` if it could not start. Arguments are the flattened argv, so `resource_call(h, OP_SPAWN, ["cmd.exe", "/c", "exit", "3"])` returns 3 |
+
+The `MEMORY` (11) resource is a byte buffer with measurement: `OP_OPEN` (0) allocates or resizes to a byte count, `OP_WRITE` (3) and `OP_READ` (2) move bytes in and out, `OP_CLOSE` (1) releases the buffer while keeping the handle valid, and `OP_SIZE` (48) reports the bytes currently allocated. `std.resource.create_memory(size)` returns a `Memory` frame that owns the handle.
 
 ### 1.4 Utilities
 - `assert(condition: bool, message: str)`: Throws a runtime error if the condition is false.

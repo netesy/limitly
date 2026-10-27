@@ -1,0 +1,35 @@
+// std/os/directories.lm
+// Working directory and well-known locations, backed by the RT_OS resource.
+
+import std.os.service as service;
+import std.internal.runtime as rt;
+
+// Current working directory. Empty string when unavailable.
+pub fn cwd(): str {
+    var result = service.request(rt.OP_CWD);
+    if (result == nil) return "";
+    return result as str;
+}
+
+pub fn chdir(path: str): bool {
+    return service.request_with(rt.OP_CHDIR, [path]) == true;
+}
+
+pub fn home_dir(): str {
+    var result = service.request(rt.OP_HOME_DIR);
+    if (result == nil) return "";
+    return result as str;
+}
+
+pub fn temp_dir(): str {
+    var result = service.request(rt.OP_TEMP_DIR);
+    if (result == nil) return "";
+    return result as str;
+}
+
+// Path of the running executable (or of the compiler for `lymar run`).
+pub fn exe_path(): str {
+    var result = service.request(rt.OP_EXE_PATH);
+    if (result == nil) return "";
+    return result as str;
+}

@@ -1,0 +1,86 @@
+// Test Suite for Standard Library OS Module
+//
+// std.os covers the ambient machine: environment variables, well-known
+// directories and platform identity. Process facts are tested in
+// process_module_test.lm.
+
+import std.os as os;
+
+fn test_identity(): int {
+    print("Testing OS Identity...");
+
+    var platform = os.platform();
+    assert(platform == "windows" or platform == "linux" or platform == "darwin" or platform == "freebsd" or platform == "android", "platform detection failed");
+    assert(os.os_name() == platform, "platform() and os_name() disagree");
+    assert(len(os.arch()) > 0, "arch is empty");
+    assert(os.is_windows() == (platform == "windows"), "is_windows disagrees with platform");
+
+    var separator = os.path_separator();
+    assert(separator == "/" or separator == "\\", "path_separator failed");
+    var list_separator = os.path_list_separator();
+    assert(list_separator == ":" or list_separator == ";", "path_list_separator failed");
+    // The two separators must come from the same platform answer.
+    assert((separator == "\\") == (list_separator == ";"), "separator pair disagrees");
+
+    assert(os.num_cpu() >= 1, "num_cpu below 1");
+    return 1;
+}
+
+fn test_directories(): int {
+    print("Testing OS Directories...");
+
+    var before = os.cwd();
+    assert(len(before) > 0, "cwd is empty");
+
+    var home = os.home_dir();
+    assert(len(home) > 0, "home_dir is empty");
+
+    var temp = os.temp_dir();
+    assert(len(temp) > 0, "temp_dir is empty");
+
+    var program = os.exe_path();
+    assert(len(program) > 0, "exe_path is empty");
+
+    // chdir is observable through cwd, and reversible.
+    assert(os.chdir(home) == true, "chdir to home failed");
+    assert(os.cwd() == home, "cwd did not follow chdir");
+    assert(os.chdir(before) == true, "chdir back failed");
+    assert(os.cwd() == before, "cwd did not restore");
+    return 1;
+}
+
+fn test_environment(): int {
+    print("Testing OS Environment...");
+
+    assert(os.setenv("LYMAR_OS_TEST", "os_value") == true, "setenv failed");
+    // `?` unwraps the optional; comparing an optional with == does not.
+    var present = os.getenv("LYMAR_OS_TEST")? else {
+        return 0;
+    };
+    assert(present == "os_value", "getenv returned the wrong value");
+
+    assert(os.unsetenv("LYMAR_OS_TEST") == true, "unsetenv failed");
+    assert(os.getenv("LYMAR_OS_TEST") == nil, "unsetenv left the variable set");
+    assert(os.getenv("LYMAR_OS_TEST_ABSENT") == nil, "unknown variable is not nil");
+
+    // getenv_or returns a plain str, so it needs no unwrapping.
+    assert(os.setenv("LYMAR_OS_TEST", "os_value") == true, "setenv for getenv_or failed");
+    assert(os.getenv_or("LYMAR_OS_TEST", "wrong") == "os_value", "getenv_or returned the wrong value");
+    assert(os.getenv_or("LYMAR_OS_TEST_ABSENT", "fallback") == "fallback", "getenv_or ignored its fallback");
+    os.unsetenv("LYMAR_OS_TEST");
+
+    var entries = os.env_vars();
+    assert(len(entries) > 0, "env_vars returned nothing");
+    return 1;
+}
+
+fn main(): int {
+    print("=== OS Module Test Suite ===");
+
+    assert(test_identity() == 1, "OS identity test failed");
+    assert(test_directories() == 1, "OS directories test failed");
+    assert(test_environment() == 1, "OS environment test failed");
+
+    print("All os tests passed successfully.");
+    return 0;
+}

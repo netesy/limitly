@@ -1,0 +1,19 @@
+// std/os/index.lm
+// Public facade for std.os: ambient machine and environment facts.
+//
+// This file deliberately contains NO implementation. Every symbol is defined in
+// an implementation submodule and re-exported here, organised by concern:
+//
+//   service.lm     - private RT_OS handle plumbing (not exported)
+//   environment.lm - getenv, setenv, unsetenv, env_vars
+//   directories.lm - cwd, chdir, home_dir, temp_dir, exe_path
+//   identity.lm    - platform, os_name, arch, hostname, num_cpu, is_windows,
+//                    path_separator, path_list_separator
+//
+// std.os answers questions about the machine and the environment this process
+// runs in. Facts about the process itself - its id, its arguments, its memory,
+// its exit status and its child processes - belong to std.process.
+
+pub import std.os.environment show getenv, getenv_or, setenv, unsetenv, env_vars;
+pub import std.os.directories show cwd, chdir, home_dir, temp_dir, exe_path;
+pub import std.os.identity show platform, os_name, arch, hostname, num_cpu, is_windows, is_linux, is_macos, is_wasm, is_64bit, path_separator, path_list_separator;

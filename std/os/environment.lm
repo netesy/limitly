@@ -1,0 +1,48 @@
+// std/os/environment.lm
+// Process environment variables, backed by the RT_OS resource.
+
+import std.os.service as service;
+import std.internal.runtime as rt;
+
+// Look up one variable. nil means the variable is not set.
+//
+// The payload of the returned optional must be unwrapped with `?` or with
+// `match (value) { val v => ... }`. Casting it with `as str` does NOT unwrap -
+// it yields the wrapper's own text, "ok(...)". When a default is acceptable,
+// prefer getenv_or(), which returns a plain str.
+//
+// On Windows a variable cannot exist with an empty value - setenv(key, "")
+// removes it - so nil is the only "absent" state. On POSIX an empty value is
+// representable: getenv returns "" for a variable set to "" and nil only when
+// the variable is absent.
+pub fn getenv(key: str): str? {
+    var result = service.request_with(rt.OP_ENV_GET, [key]);
+    if (result == nil) {
+        var missing: str? = nil;
+        return missing;
+    }
+    return ok(result as str);
+}
+
+// Look up one variable with a default. Returns a plain str, so no unwrapping is
+// needed - the ergonomic choice when an absent variable is not interesting.
+pub fn getenv_or(key: str, fallback: str): str {
+    var result = service.request_with(rt.OP_ENV_GET, [key]);
+    if (result == nil) return fallback;
+    return result as str;
+}
+
+pub fn setenv(key: str, value: str): bool {
+    return service.request_with(rt.OP_ENV_SET, [key, value]) == true;
+}
+
+pub fn unsetenv(key: str): bool {
+    return service.request_with(rt.OP_ENV_UNSET, [key]) == true;
+}
+
+// Every variable as "NAME=VALUE" entries.
+pub fn env_vars(): [str] {
+    var result = service.request(rt.OP_ENV_LIST);
+    if (result == nil) { return [] as [str]; }
+    return result as [str];
+}

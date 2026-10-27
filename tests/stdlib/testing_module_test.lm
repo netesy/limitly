@@ -1,0 +1,82 @@
+// Test Suite for Standard Library Testing Module
+//
+// The harness is exercised by a suite that deliberately fails one check, so the
+// failure path is covered without making this suite fail: the recorded failure
+// is asserted, and the suite's own verdict is still success.
+
+import std.testing as testing;
+
+fn test_tally(): int {
+    print("Testing Tally...");
+    var t = testing.Testing() as testing.Testing;
+
+    t.section("basics");
+    t.check((1 + 1) == 2, "condition holds");
+    t.check_int(3, 3, "equal ints");
+    t.check_str("abc", "abc", "equal strings");
+    t.check_false((1 > 2), "comparison is false");
+
+    assert(t.count_passed() == 4, "passed tally is wrong");
+    assert(t.count_failed() == 0, "a passing check was recorded as failed");
+
+    // A failing check is recorded, not fatal. The print below is expected.
+    t.check_int(1, 2, "deliberate mismatch");
+    assert(t.count_failed() == 1, "failure was not recorded");
+    assert(t.total() == 5, "total is wrong");
+    assert(t.all_passed() == false, "all_passed is true despite a failure");
+    assert(t.report() == false, "report should report failure");
+    return 1;
+}
+
+fn test_reset(): int {
+    print("Testing Reset...");
+    var t = testing.Testing() as testing.Testing;
+
+    t.check(true, "first check");
+    assert(t.count_passed() == 1, "initial tally failed");
+
+    t.reset("suite-name");
+    assert(t.count_passed() == 0, "reset did not clear the passed tally");
+
+    t.check(true, "one check");
+    assert(t.count_passed() == 1, "tally after reset failed");
+    assert(t.all_passed() == true, "all_passed should be true");
+    assert(t.report() == true, "report should report success");
+    return 1;
+}
+
+fn test_instances_are_independent(): int {
+    print("Testing Instance Independence...");
+    var a = testing.Testing() as testing.Testing;
+    var b = testing.Testing() as testing.Testing;
+
+    a.check(true, "counted only by a");
+    assert(a.count_passed() == 1, "a tally is wrong");
+    assert(b.count_passed() == 0, "state leaked between instances");
+
+    b.check(false, "counted only by b");
+    assert(a.count_failed() == 0, "failure leaked into a");
+    assert(b.count_failed() == 1, "b did not record its failure");
+    return 1;
+}
+
+fn test_verify_helper(): int {
+    print("Testing Verify Helper...");
+    var passed = testing.verify(true, "verify returns its condition");
+    assert(passed == true, "verify returned false for a true condition");
+    var failed = testing.verify(false, "verify reports a false condition");
+    assert(failed == false, "verify returned true for a false condition");
+    return 1;
+}
+
+fn main(): int {
+    print("=== Testing Module Test Suite ===");
+
+    assert(test_tally() == 1, "Tally test failed");
+    assert(test_reset() == 1, "Reset test failed");
+    assert(test_instances_are_independent() == 1, "Instance independence test failed");
+    assert(test_verify_helper() == 1, "Verify helper test failed");
+
+    print("All testing tests passed successfully.");
+    return 0;
+}

@@ -1,0 +1,29 @@
+// std/process/service.lm
+//
+// Private plumbing between std.process and the RT_PROCESS resource. Not
+// re-exported from the facade.
+//
+// Like std.os/service.lm, no handle is cached: module-level state is not
+// retained between calls in Lymar, so each request creates the resource, uses
+// it and releases it within one function.
+//
+// resource_call flattens a list argument into individual values, so
+// request_with(op, [a, b]) delivers args[0]=a, args[1]=b.
+
+import std.internal.runtime as rt;
+
+pub fn request(op: int): any {
+    var handle = rt.create(rt.RT_PROCESS, []);
+    if (handle == -1) return nil;
+    var result = rt.call(handle, op, []);
+    rt.destroy(handle);
+    return result;
+}
+
+pub fn request_with(op: int, args: [any]): any {
+    var handle = rt.create(rt.RT_PROCESS, []);
+    if (handle == -1) return nil;
+    var result = rt.call(handle, op, args);
+    rt.destroy(handle);
+    return result;
+}

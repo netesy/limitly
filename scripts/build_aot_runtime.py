@@ -33,7 +33,7 @@ def main():
     output.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.TemporaryDirectory(prefix="lymar-aot-runtime-", dir=output.parent) as temporary:
         archive = Path(temporary) / "liblymar_aot.a"
-        sources = ["src/memory/aot_runtime.cpp"]
+        sources = ["src/memory/aot_runtime.cpp", "src/runtime/os_info.cpp"]
         # FFI components remain separate archive members, pulled only if used.
         if system != "wasi":
             sources += ["src/memory/aot_ffi.cpp", "src/runtime/lymarrt/lymarrt.cpp", "src/runtime/sokol/sokol_app_runtime.cpp", "src/runtime/truetype.cpp"]

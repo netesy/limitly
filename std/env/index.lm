@@ -1,51 +1,9 @@
-import std.env.variables as variables_mod;
-import std.env.platform as platform_mod;
+// std/env/index.lm
+// Public facade for std.env: environment variables only.
+//
+// No implementation lives here. Program arguments are std.process.args(); the
+// working directory is std.os.cwd(); the raw getenv/setenv surface is std.os.
+// This module exists as the conventional `KEY=VALUE` variable API and as the
+// frame-style accessor used by std.config.
 
-frame Env {
-    pub init() {}
-    pub fn get(key: str): str? { return variables_mod.get(key); }
-    pub fn set(key: str, value: str): nil { return variables_mod.set(key, value); }
-    pub fn args(): [str] { return platform_mod.args(); }
-    pub fn cwd(): str { return platform_mod.cwd(); }
-    pub fn os_name(): str { return platform_mod.os_name(); }
-    pub fn arch(): str { return platform_mod.arch(); }
-    pub fn is_windows(): bool { return platform_mod.is_windows(); }
-    pub fn is_linux(): bool { return platform_mod.is_linux(); }
-    pub fn is_macos(): bool { return platform_mod.is_macos(); }
-}
-
-pub fn get(key: str): str? {
-    return variables_mod.get(key);
-}
-
-pub fn set(key: str, value: str): nil {
-    return variables_mod.set(key, value);
-}
-
-pub fn args(): [str] {
-    return platform_mod.args();
-}
-
-pub fn cwd(): str {
-    return platform_mod.cwd();
-}
-
-pub fn os_name(): str {
-    return platform_mod.os_name();
-}
-
-pub fn arch(): str {
-    return platform_mod.arch();
-}
-
-pub fn is_windows(): bool {
-    return platform_mod.is_windows();
-}
-
-pub fn is_linux(): bool {
-    return platform_mod.is_linux();
-}
-
-pub fn is_macos(): bool {
-    return platform_mod.is_macos();
-}
+pub import std.env.variables show Env, get, get_or, set, unset, vars;

@@ -52,6 +52,7 @@ set(BACKEND_COMMON_SOURCES
     src/backend/symbol_table.cpp
     src/backend/value.cpp
     src/backend/vm/resource_manager.cpp
+    src/runtime/os_info.cpp
     src/runtime/sokol/sokol_app_runtime.cpp
     src/runtime/lymarrt/lymarrt.cpp
     src/backend/vm/register.cpp
@@ -144,7 +145,7 @@ add_library(lymar_runtime STATIC ${RUNTIME_SOURCES})
 target_include_directories(lymar_runtime PUBLIC src)
 
 add_executable(lymar ${MAIN_SOURCES})
-add_library(lymar_aot STATIC src/memory/aot_runtime.cpp)
+add_library(lymar_aot STATIC src/memory/aot_runtime.cpp src/runtime/os_info.cpp)
 add_dependencies(lymar lymar_aot)
 target_link_libraries(lymar 
     PRIVATE 

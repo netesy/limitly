@@ -1,51 +1,115 @@
-// Standard Library Process Submodule
-import std.resource as res;
+// std/process/process.lm
+//
+// Facts about the running process itself: identity, arguments, memory and
+// termination. Anything about the machine or the environment around the process
+// lives in std.os instead.
 
+import std.process.service as service;
+import std.internal.runtime as rt;
+
+// Exit the process immediately with `code`.
+//
+// This does NOT return. It flushes standard streams and exits at the OS level,
+// so frame deinitializers and pending cleanup do not run - the same trade-off
+// as Go's os.Exit. Return a value from main() instead when cleanup matters.
 pub fn exit(code: int): nil {
-    match (res.create_os_resource()) {
-        val r => {
-            res._call(h=r.handle, op=res.OP_CLOSE, args=[code]);
-        },
-        err e => {}
-    }
+    service.request_with(rt.OP_PROC_EXIT, [code]);
+    return nil;
 }
 
-pub fn run(command: str): int {
-    return 0;
-}
-
+// Operating-system process id. 0 when unavailable.
 pub fn id(): int {
-    match (res.create_process_resource()) {
-        val r => {
-            var result = res._call(h=r.handle, op=res.OP_GET_STATE, args=[]);
-            r.close();
-            if (result == nil) return 0;
-            return result as int;
-        },
-        err e => return 0
-    }
+    var result = service.request(rt.OP_PROC_ID);
+    if (result == nil) return 0;
+    return result as int;
+}
+
+// Arguments passed to the program, excluding the program name.
+pub fn args(): [str] {
+    var result = service.request(rt.OP_PROC_ARGS);
+    if (result == nil) return [] as [str];
+    return result as [str];
+}
+
+// The program name as invoked (argv[0]).
+pub fn command(): str {
+    var result = service.request(rt.OP_PROC_COMMAND);
+    if (result == nil) return "";
+    return result as str;
+}
+
+// Current resident set size in kilobytes. 0 when the platform cannot report it.
+pub fn memory(): int {
+    var result = service.request(rt.OP_PROC_RSS);
+    if (result == nil) return 0;
+    return result as int;
+}
+
+// Peak resident set size in kilobytes since the process started.
+pub fn peak_memory(): int {
+    var result = service.request(rt.OP_PROC_PEAK_RSS);
+    if (result == nil) return 0;
+    return result as int;
+}
+
+// The names this API shipped under before the OS layer was shared: kept as
+// aliases so existing callers still resolve. memory() and peak_memory() are the
+// preferred spellings. Both now report a measured value; on Linux-only builds
+// of the old backend the figure was an estimate when it could not be read.
+pub fn current_rss(): int {
+    return memory();
 }
 
 pub fn peak_rss(): int {
-    match (res.create_process_resource()) {
-        val r => {
-            var result = res._call(h=r.handle, op=res.OP_PEAK_RSS, args=[]);
-            r.close();
-            if (result == nil) return 0;
-            return result as int;
-        },
-        err e => return 0
-    }
+    return peak_memory();
 }
 
-pub fn current_rss(): int {
-    match (res.create_process_resource()) {
-        val r => {
-            var result = res._call(h=r.handle, op=res.OP_CURRENT_RSS, args=[]);
-            r.close();
-            if (result == nil) return 0;
-            return result as int;
-        },
-        err e => return 0
+// True when the single character at `index` of `text` separates words.
+// Indexing a string yields its character code, so the character is taken as a
+// substring to stay in the str type.
+fn is_space_at(text: str, index: int): bool {
+    var character = substring(text, index, index + 1);
+    return character == " " or character == "\t";
+}
+
+// Split a command line into words on single spaces.
+// Quoting is not honoured - use Command for arguments that contain spaces.
+fn to_argv(command_line: str): [any] {
+    var argv = [] as [any];
+    var i: int = 0;
+    var n: int = len(command_line);
+    while (i < n) {
+        while (i < n and is_space_at(command_line, i)) {
+            i = i + 1;
+        }
+        if (i >= n) break;
+        var start: int = i;
+        while (i < n and not is_space_at(command_line, i)) {
+            i = i + 1;
+        }
+        argv.append(substring(command_line, start, i));
     }
+    return argv;
+}
+
+// Run a program to completion and return its exit code.
+//
+// The argument is a command line split on whitespace. A non-zero return is the
+// child's exit status; -1 means the child could not be started at all.
+pub fn run(command_line: str): int {
+    var result = service.request_with(rt.OP_SPAWN, to_argv(command_line));
+    if (result == nil) return -1;
+    return result as int;
+}
+
+// Run an explicit program plus argument vector and return its exit code.
+pub fn exec(program: str, arguments: [str]): int {
+    var argv = [] as [any];
+    argv.append(program);
+    iter (argument in arguments) {
+        argv.append(argument);
+    }
+    var result = service.request_with(rt.OP_SPAWN, argv);
+    if (result == nil) return -1;
+    return result as int;
 }

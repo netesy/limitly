@@ -56,8 +56,35 @@ pub var OP_MEASURE_TEXT: int = 45;
 pub var OP_GET_FONT_METRICS: int = 46;
 pub var OP_READ_BYTES: int = 47;
 pub var OP_SIZE: int = 48;
-pub var OP_PEAK_RSS: int = 49;
-pub var OP_CURRENT_RSS: int = 50;
+
+// Deprecated aliases. These once addressed ad-hoc RSS ops that occupied 49/50
+// on the PROCESS resource; those slots now belong to the OS resource, so the
+// aliases point at the dedicated PROC ops and callers keep working.
+pub var OP_PEAK_RSS: int = 66;   // OP_PROC_PEAK_RSS
+pub var OP_CURRENT_RSS: int = 65; // OP_PROC_RSS
+
+// RT_OS operations (see src/backend/vm/resource_types.hh).
+pub var OP_ENV_GET: int = 49;
+pub var OP_ENV_SET: int = 50;
+pub var OP_ENV_UNSET: int = 51;
+pub var OP_ENV_LIST: int = 52;
+pub var OP_CWD: int = 53;
+pub var OP_CHDIR: int = 54;
+pub var OP_HOME_DIR: int = 55;
+pub var OP_TEMP_DIR: int = 56;
+pub var OP_EXE_PATH: int = 57;
+pub var OP_OS_NAME: int = 58;
+pub var OP_ARCH: int = 59;
+pub var OP_HOSTNAME: int = 60;
+pub var OP_NUM_CPU: int = 61;
+
+// RT_PROCESS operations. Child processes reuse OP_SPAWN (9).
+pub var OP_PROC_ARGS: int = 62;
+pub var OP_PROC_EXIT: int = 63;
+pub var OP_PROC_ID: int = 64;
+pub var OP_PROC_RSS: int = 65;
+pub var OP_PROC_PEAK_RSS: int = 66;
+pub var OP_PROC_COMMAND: int = 67;
 
 pub fn create(type_id: int, args: any): int {
     unsafe {

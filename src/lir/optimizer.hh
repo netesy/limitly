@@ -116,6 +116,12 @@ public:
      */
     bool loop_unroll();
 
+    /**
+     * @brief Remove unnecessary region operations from tight scalar loops
+     * @return true if region operations were removed
+     */
+    bool remove_loop_region_ops();
+
 private:
     LIR_Function& func_;
     OptimizationReport report_;

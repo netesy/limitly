@@ -12,6 +12,7 @@
 #include "lir/functions.hh"
 #include "backend/vm/register.hh"
 #include "error/debugger.hh"
+#include "runtime/os_info.hh"
 
 // Fyra backend - conditionally compiled if available
 #ifdef FYRA_AVAILABLE
@@ -40,6 +41,10 @@ static std::string readFile(const std::string& filename) {
 }
 
 int Compiler::executeFile(const std::string& filename, const CompileOptions& options) {
+    // Hand the script's own arguments to the PROCESS resource so
+    // std.process.args()/command_name() report them. A standalone AOT
+    // executable never reaches here and reads its native argv instead.
+    LM::Runtime::OS::set_program_arguments(filename, options.program_args);
     try {
         std::string source = readFile(filename);
         std::string exported_module;

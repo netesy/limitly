@@ -36,6 +36,9 @@ namespace LM {
         bool strip = false;
         bool strict_verification = false;
         std::vector<std::string> include_dirs;
+        // Arguments written after the script path (`lymar run app.lm -- --x`),
+        // reported to the program by std.process.args().
+        std::vector<std::string> program_args;
     };
 
     class Compiler {

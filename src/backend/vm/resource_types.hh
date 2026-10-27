@@ -7,7 +7,7 @@ namespace LM {
 namespace Backend {
 namespace VM {
 
-// NOTE: This enum matches the legacy LIR values and adds GRAPHICS = 17 for VM runtime graphics
+// NOTE: This enum must stay in sync with the mirror in src/lir/lir.hh
 enum class ResourceType : uint32_t {
     FILE = 0,
     SOCKET = 1,
@@ -27,6 +27,8 @@ enum class ResourceType : uint32_t {
     WEBSOCKET = 15,
     HASH_ENGINE = 16,
     GRAPHICS = 17,
+    // Ambient machine/environment services: variables, working directory,
+    // well-known directories, platform identity. See src/runtime/os_info.hh.
     OS = 18
 };
 
@@ -80,8 +82,27 @@ enum class ResourceOperation : uint32_t {
     GET_FONT_METRICS = 46,
     READ_BYTES = 47,
     SIZE = 48,
-    PEAK_RSS = 49,
-    CURRENT_RSS = 50
+    // ResourceType::OS operations.
+    ENV_GET = 49,
+    ENV_SET = 50,
+    ENV_UNSET = 51,
+    ENV_LIST = 52,
+    CWD = 53,
+    CHDIR = 54,
+    HOME_DIR = 55,
+    TEMP_DIR = 56,
+    EXE_PATH = 57,
+    OS_NAME = 58,
+    ARCH = 59,
+    HOSTNAME = 60,
+    NUM_CPU = 61,
+    // ResourceType::PROCESS operations. Child processes reuse SPAWN = 9.
+    PROC_ARGS = 62,
+    PROC_EXIT = 63,
+    PROC_ID = 64,
+    PROC_RSS = 65,
+    PROC_PEAK_RSS = 66,
+    PROC_COMMAND = 67
 };
 
 } // namespace VM

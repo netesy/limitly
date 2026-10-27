@@ -1,4 +1,11 @@
-// Standard Library Process Command Submodule
+// std/process/command.lm
+//
+// Builder for one child process invocation. Arguments are kept as a vector, so
+// values containing spaces survive intact - unlike process.run(), which splits a
+// command line on whitespace.
+
+import std.process.service as service;
+import std.internal.runtime as rt;
 
 frame Command {
     pub var program: str;
@@ -13,7 +20,28 @@ frame Command {
         self.args.append(s);
     }
 
+    pub fn with_args(values: [str]) {
+        // while, not iter: iter over a list-typed parameter inside a frame
+        // method is not supported by the compiler.
+        var i: int = 0;
+        while (i < len(values)) {
+            self.args.append(values[i]);
+            i = i + 1;
+        }
+    }
+
+    // Run to completion and return the child's exit code, or -1 if it could not
+    // be started.
     pub fn execute(): int {
-        return 0;
+        var argv = [] as [any];
+        argv.append(self.program);
+        var i: int = 0;
+        while (i < len(self.args)) {
+            argv.append(self.args[i]);
+            i = i + 1;
+        }
+        var result = service.request_with(rt.OP_SPAWN, argv);
+        if (result == nil) return -1;
+        return result as int;
     }
 }

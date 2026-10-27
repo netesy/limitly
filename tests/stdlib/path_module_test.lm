@@ -1,9 +1,16 @@
 // Test Suite for Standard Library Path Module
+//
+// std.path writes the platform separator and reads both "/" and "\" on every
+// platform, so expectations are built from path.separator() rather than a
+// hard-coded slash.
 
 import std.path as path;
 
 fn test_path_frame(): int {
     print("Testing Path Frame...");
+    var separator = path.separator();
+    assert(separator == "/" or separator == "\\", "separator failed");
+
     var p = path.Path("src/main.lm") as path.Path;
     assert(p.to_string() == "src/main.lm", "to_string failed");
     assert(p.basename() == "main.lm", "basename failed");
@@ -11,7 +18,10 @@ fn test_path_frame(): int {
     assert(p.extension() == "lm", "extension failed");
 
     var p_joined = p.join("test") as path.Path;
-    assert(p_joined.to_string() == "src/main.lm/test", "join failed");
+    var head = p.to_string();
+    var joined_expected = head + separator;
+    joined_expected = joined_expected + "test";
+    assert(p_joined.to_string() == joined_expected, "join failed");
 
     var p_parent = p.parent();
     match (p_parent) {
@@ -29,13 +39,68 @@ fn test_path_frame(): int {
 
 fn test_path_helpers(): int {
     print("Testing Path Helpers...");
+    var separator = path.separator();
     var p = path.join(["src", "main.lm"]) as path.Path;
-    assert(p.to_string() == "src/main.lm", "join helper failed");
+    var expected = "src" + separator;
+    expected = expected + "main.lm";
+    assert(p.to_string() == expected, "join helper failed");
 
     var p_norm = path.normalize("src/main.lm") as path.Path;
-    assert(p_norm.to_string() == "src/main.lm", "normalize helper failed");
+    assert(p_norm.to_string() == expected, "normalize helper failed");
 
     assert(path.is_relative("src/main.lm") == true, "is_relative helper failed");
+    return 1;
+}
+
+fn test_both_separators_are_read(): int {
+    print("Testing Separator Parsing...");
+    var windows = path.Path("C:\\Users\\lymar\\file.txt") as path.Path;
+    assert(windows.is_absolute() == true, "windows drive not absolute");
+    assert(windows.basename() == "file.txt", "windows basename failed");
+    assert(windows.extension() == "txt", "windows extension failed");
+    var parent_value = windows.parent()? else {
+        assert(false, "windows parent nil");
+        return 0;
+    };
+    var expected_parent = "C:\\Users\\lymar";
+    assert(parent_value.to_string() == expected_parent, "windows parent failed");
+
+    var posix = path.Path("/usr/local/bin") as path.Path;
+    assert(posix.is_absolute() == true, "posix path not absolute");
+    assert(posix.basename() == "bin", "posix basename failed");
+    return 1;
+}
+
+fn test_normalize(): int {
+    print("Testing Normalize...");
+    var separator = path.separator();
+
+    var messy = path.Path("a//b/./c/../d.txt") as path.Path;
+    var cleaned = messy.normalize() as path.Path;
+    var expected = "a" + separator;
+    expected = expected + "b";
+    expected = expected + separator;
+    expected = expected + "d.txt";
+    assert(cleaned.to_string() == expected, "normalize failed");
+
+    // Trailing separators are dropped, roots are kept.
+    var trailing = path.Path("a/b/") as path.Path;
+    var trailing_expected = "a" + separator;
+    trailing_expected = trailing_expected + "b";
+    assert(trailing.normalize().to_string() == trailing_expected, "trailing separator failed");
+
+    var root = path.Path(separator) as path.Path;
+    assert(root.normalize().to_string() == separator, "root normalization failed");
+
+    // ".." above a relative root is preserved, above an absolute root is not.
+    var escape = path.Path("a/../../b") as path.Path;
+    var escape_expected = ".." + separator;
+    escape_expected = escape_expected + "b";
+    assert(escape.normalize().to_string() == escape_expected, "relative .. escape failed");
+
+    var absolute_escape = path.Path("/a/../b") as path.Path;
+    var absolute_expected = separator + "b";
+    assert(absolute_escape.normalize().to_string() == absolute_expected, "absolute .. failed");
     return 1;
 }
 
@@ -44,6 +109,8 @@ fn main(): int {
 
     assert(test_path_frame() == 1, "Path frame test failed");
     assert(test_path_helpers() == 1, "Path helpers test failed");
+    assert(test_both_separators_are_read() == 1, "Separator parsing test failed");
+    assert(test_normalize() == 1, "Normalize test failed");
 
     print("All Path tests passed successfully.");
     return 0;

@@ -1,0 +1,28 @@
+// std/os/service.lm
+//
+// Private plumbing between std.os and the RT_OS resource. Not re-exported from
+// the facade: callers use the typed helpers in the sibling submodules.
+//
+// The OS resource holds no per-handle state (the facts come from the process
+// itself), so a handle is cheap and short-lived: it is created, asked one
+// question and released inside a single request. It is deliberately NOT cached
+// in a module-level var, because module state is not retained between calls -
+// a var written inside a function is not visible to the next one.
+
+import std.internal.runtime as rt;
+
+pub fn request(op: int): any {
+    var handle = rt.create(rt.RT_OS, []);
+    if (handle == -1) return nil;
+    var result = rt.call(handle, op, []);
+    rt.destroy(handle);
+    return result;
+}
+
+pub fn request_with(op: int, args: [any]): any {
+    var handle = rt.create(rt.RT_OS, []);
+    if (handle == -1) return nil;
+    var result = rt.call(handle, op, args);
+    rt.destroy(handle);
+    return result;
+}

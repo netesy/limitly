@@ -8,9 +8,12 @@ pub fn load_from_env(keys: [str]): {str: str} {
     var i: int = 0;
     while (i < len(keys)) {
         var key = keys[i];
-        var val_opt = e.get(key);
-        if (val_opt != nil) {
-            result[key] = val_opt as str;
+        // get_or yields a plain str. Env.get yields an optional whose payload
+        // needs `?` or a match to unwrap, and casting it with `as str` gives the
+        // text "ok(...)" instead of the value.
+        var value = e.get_or(key, "");
+        if (value != "") {
+            result[key] = value;
         }
         i = i + 1;
     }

@@ -113,9 +113,6 @@ bool Optimizer::optimize() {
         bool cf = run_pass("Constant folding", [&]() { return constant_folding(); });
         if (cf) am.invalidate_all();
 
-        bool lu = run_pass("Loop unrolling", [&]() { return loop_unroll(); });
-        if (lu) am.invalidate_all();
-
         bool po = run_pass("Peephole / Strength reduction", [&]() { return peephole_optimize(); });
         if (po) am.invalidate_all();
 
@@ -152,7 +149,15 @@ bool Optimizer::optimize() {
         bool alg_simp = run_pass("Algebraic simplification", [&]() { return algebraic_simplification(); });
         if (alg_simp) am.invalidate_all();
 
+        bool rlr = run_pass("Remove loop region ops", [&]() { return remove_loop_region_ops(); });
+        if (rlr) am.invalidate_all();
+
+        bool lu = run_pass("Loop unrolling", [&]() { return loop_unroll(); });
+        if (lu) am.invalidate_all();
+
         pass_changed |= ur;
+        pass_changed |= rlr;
+        pass_changed |= lu;
         pass_changed |= cf;
         pass_changed |= po;
         pass_changed |= rm;
@@ -166,6 +171,7 @@ bool Optimizer::optimize() {
         pass_changed |= tco;
         pass_changed |= licm;
         pass_changed |= alg_simp;
+        pass_changed |= rlr;
 
         changed |= pass_changed;
         pass_count++;
@@ -335,7 +341,7 @@ bool Optimizer::has_instruction_side_effects(const LIR_Inst& inst) const {
 }
 
 bool Optimizer::loop_unroll() {
-    // Simple loop unrolling for tight integer loops
+    // Simple loop unrolling for tight integer loops (4x unroll)
     // Detect pattern: LoadConst(counter), CmpLT(counter, limit), JumpIfFalse, body, Add(counter, 1), Jump(header)
     bool changed = false;
 
@@ -362,9 +368,16 @@ bool Optimizer::loop_unroll() {
         size_t body_start = i + 2;
         size_t increment_pos = UINT32_MAX;
         size_t jump_back_pos = UINT32_MAX;
+        bool has_region_ops = false;
 
         // Scan forward to find increment and jump back
         for (size_t j = body_start; j < func_.instructions.size(); j++) {
+            // Check for region operations (prevent unrolling if present)
+            if (func_.instructions[j].op == LIR_Op::RegionEnter ||
+                func_.instructions[j].op == LIR_Op::RegionExit ||
+                func_.instructions[j].op == LIR_Op::RegionMove) {
+                has_region_ops = true;
+            }
             if (func_.instructions[j].op == LIR_Op::Add &&
                 func_.instructions[j].a == cmp_inst.a &&
                 func_.instructions[j].b != UINT32_MAX) {
@@ -387,10 +400,153 @@ bool Optimizer::loop_unroll() {
             continue;
         }
 
-        // Found a simple loop - unroll 4x
-        // For now, skip complex unrolling due to label reindexing complexity
-        // Just mark that we found unrollable loops for future optimization
-        i = jump_back_pos + 1;
+        // Skip unrolling if loop has region operations (complex ownership semantics)
+        if (has_region_ops) {
+            i = jump_back_pos + 1;
+            continue;
+        }
+
+        // Check if loop body is small enough to unroll (max 10 instructions for tight loops)
+        size_t body_size = increment_pos - body_start;
+        if (body_size > 10 || body_size < 2) {
+            i = jump_back_pos + 1;
+            continue;
+        }
+
+        // Unroll 4x: duplicate body 4 times and adjust increment
+        // Extract body instructions
+        std::vector<LIR_Inst> body_body;
+        for (size_t j = body_start; j < increment_pos; j++) {
+            body_body.push_back(func_.instructions[j]);
+        }
+
+        // Create new instructions: duplicate body 4 times
+        std::vector<LIR_Inst> new_instructions;
+        
+        // Add 4 copies of the body
+        for (int unroll = 0; unroll < 4; unroll++) {
+            for (const auto& inst : body_body) {
+                new_instructions.push_back(inst);
+            }
+        }
+
+        // Replace increment: change +1 to +4
+        auto& increment_inst = func_.instructions[increment_pos];
+        auto& const_inst = func_.instructions[increment_pos - 1];
+        const_inst.const_val = make_i64(4);
+
+        // Replace old body with unrolled version
+        func_.instructions.erase(func_.instructions.begin() + body_start, 
+                                    func_.instructions.begin() + increment_pos);
+        func_.instructions.insert(func_.instructions.begin() + body_start, 
+                                 new_instructions.begin(), new_instructions.end());
+
+        // Reindex labels
+        std::unordered_map<Imm, Imm> label_remap;
+        for (size_t j = 0; j < func_.instructions.size(); ++j) {
+            auto& inst = func_.instructions[j];
+            if (inst.op == LIR_Op::Label) {
+                label_remap[inst.imm] = static_cast<Imm>(j);
+                inst.imm = static_cast<Imm>(j);
+            }
+        }
+        for (auto& inst : func_.instructions) {
+            if (inst.op == LIR_Op::Jump || inst.op == LIR_Op::JumpIf || inst.op == LIR_Op::JumpIfFalse) {
+                auto it = label_remap.find(inst.imm);
+                if (it != label_remap.end()) {
+                    inst.imm = it->second;
+                }
+            }
+        }
+
+        changed = true;
+        i = increment_pos + 1;
+    }
+
+    return changed;
+}
+
+bool Optimizer::remove_loop_region_ops() {
+    // Remove unnecessary region operations from tight scalar loops
+    // A loop is "scalar" if it only uses local registers and no pointers/objects
+    bool changed = false;
+
+    // Always remove Nop instructions with ownership comments - they're metadata
+    for (size_t i = 0; i < func_.instructions.size(); ) {
+        if (func_.instructions[i].op == LIR_Op::Nop) {
+            func_.instructions.erase(func_.instructions.begin() + i);
+            changed = true;
+        } else {
+            i++;
+        }
+    }
+
+    for (size_t i = 0; i < func_.instructions.size(); ) {
+        // Find RegionEnter
+        if (func_.instructions[i].op != LIR_Op::RegionEnter) {
+            i++;
+            continue;
+        }
+
+        size_t region_start = i;
+        size_t region_end = UINT32_MAX;
+        uint32_t region_id = func_.instructions[i].imm;
+
+        // Find matching RegionExit
+        for (size_t j = i + 1; j < func_.instructions.size(); j++) {
+            if (func_.instructions[j].op == LIR_Op::RegionExit && func_.instructions[j].imm == region_id) {
+                region_end = j;
+                break;
+            }
+        }
+
+        if (region_end == UINT32_MAX) {
+            i++;
+            continue;
+        }
+
+        // Check if region contains only scalar operations (no memory ops, no calls, no pointer ops)
+        bool has_non_scalar = false;
+        for (size_t j = region_start + 1; j < region_end; j++) {
+            auto& inst = func_.instructions[j];
+            if (inst.op == LIR_Op::RegionEnter || inst.op == LIR_Op::RegionExit ||
+                inst.op == LIR_Op::RegionMove) {
+                continue; // Nested regions
+            }
+            // Check for non-scalar operations
+            if (inst.op == LIR_Op::Call || inst.op == LIR_Op::CallIndirect ||
+                inst.op == LIR_Op::MemoryLoad || inst.op == LIR_Op::MemoryStore ||
+                inst.op == LIR_Op::MemoryAlloc || inst.op == LIR_Op::MemoryFree ||
+                inst.op == LIR_Op::ListCreate || inst.op == LIR_Op::ListIndex ||
+                inst.op == LIR_Op::ListSet || inst.op == LIR_Op::ListAppend ||
+                inst.op == LIR_Op::DictCreate || inst.op == LIR_Op::DictGet ||
+                inst.op == LIR_Op::DictSet || inst.op == LIR_Op::STR_CONCAT ||
+                inst.op == LIR_Op::STR_FORMAT || inst.op == LIR_Op::StringIndex) {
+                has_non_scalar = true;
+                break;
+            }
+        }
+
+        if (has_non_scalar) {
+            i = region_end + 1;
+            continue;
+        }
+
+        // Remove scalar region operations (RegionEnter, RegionExit, RegionMove, Nop ownership)
+        size_t j = region_start;
+        while (j <= region_end && j < func_.instructions.size()) {
+            auto& inst = func_.instructions[j];
+            if (inst.op == LIR_Op::RegionEnter || inst.op == LIR_Op::RegionExit ||
+                inst.op == LIR_Op::RegionMove || inst.op == LIR_Op::Nop) {
+                func_.instructions.erase(func_.instructions.begin() + j);
+                changed = true;
+                // Don't increment j, we're removing
+            } else {
+                j++;
+            }
+        }
+
+        i = j;
     }
 
     return changed;

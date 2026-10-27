@@ -7,6 +7,7 @@
 #include "numeric_semantics.hh"
 #include "atomic_field.hh"
 #include "../runtime/hash_engine.hh"
+#include "../runtime/os_info.hh"
 #include "aot_ffi_values.hh"
 #if !defined(__wasi__)
 #include "../runtime/software_graphics.hh"
@@ -115,6 +116,9 @@ struct Region {
 struct Files {
     uint64_t next = 2;
     std::unordered_map<uint64_t, FILE*> handles;
+    // Stateless service handles (ResourceType::OS, ResourceType::PROCESS) mapped
+    // to their resource type. They own nothing, so only the kind is recorded.
+    std::unordered_map<uint64_t, uint64_t> services;
     std::map<Word,LM::Runtime::HashEngine> hashes;
     std::map<Word, std::pair<void*, size_t>> mems;
 #if !defined(__wasi__)
@@ -1879,6 +1883,9 @@ uint64_t lymar_aot_resource_create(uint64_t type, uint64_t) {
     if (type == 18 || type == 4) { auto& f = files(); auto id = f.next++; f.handles.emplace(id, nullptr); return id; }
     if(type==16) {auto& f=files();auto id=f.next++;f.hashes.try_emplace(id);return id;}
     if(type==11) {auto& f=files();auto id=f.next++;f.mems.emplace(id, std::make_pair(nullptr, size_t(0)));return id;}
+    // OS (18) and PROCESS (4) are stateless service handles. The facts they
+    // report come from the process itself, so nothing is stored per handle.
+    if(type==18||type==4) {auto& f=files();auto id=f.next++;f.services.emplace(id,type);return id;}
 #if !defined(__wasi__)
     if(type==17) {auto& f=files();auto id=f.next++;f.graphics.emplace(id,std::make_unique<NativeGraphics>());return id;}
 #endif
@@ -1900,6 +1907,7 @@ void lymar_aot_resource_destroy(uint64_t id) {
 
     auto& f = files();
     if(f.hashes.erase(id)) return;
+    if(f.services.erase(id)) return;
     if(auto mem=f.mems.find(id);mem!=f.mems.end()) { if(mem->second.first) std::free(mem->second.first); f.mems.erase(mem); return; }
 #if !defined(__wasi__)
     if(f.graphics.erase(id)) return;
@@ -1937,6 +1945,88 @@ uint64_t lymar_aot_resource_call(uint64_t id, uint64_t operation, uint64_t count
     }
     auto arg_string = [&](size_t n) { return n < args.size() && pointers[n] == object_kind ? string_data(args[n]) : nullptr; };
     auto& f = files();
+    auto service = f.services.find(id);
+    if (service != f.services.end()) {
+        // Shares LM::Runtime::OS with the RegisterVM resource handlers, so both
+        // backends report identical values for the same operation.
+        namespace os = LM::Runtime::OS;
+        auto truth=[&](bool yes) {h.return_pointer=boolean_kind;return Word(yes?1:0);};
+        auto number=[&](int64_t value) {h.return_pointer=0;return static_cast<Word>(value);};
+        auto string_object=[&](const std::string& bytes) {
+            auto object=lymar_aot_alloc(25+bytes.size());
+            Word header[3]={11,bytes.size(),bytes.size()};
+            std::memcpy(reinterpret_cast<void*>(object),header,24);
+            std::memcpy(reinterpret_cast<void*>(object+24),bytes.c_str(),bytes.size()+1);
+            return object;
+        };
+        auto text=[&](const std::string& bytes) {h.return_pointer=object_kind;return string_object(bytes);};
+        auto absent=[&]() {h.return_pointer=object_kind;return nil;};
+        auto strings=[&](const std::vector<std::string>& items) {
+            // Same [str] layout the graphics event list uses: a 32-byte header
+            // of {TYPE_LIST, data, count, capacity} plus the element slots.
+            auto pointer=lymar_aot_alloc(32);
+            auto capacity=std::max<Word>(1,items.size());
+            auto data=lymar_aot_alloc(capacity*8);
+            Word header[4]={1,data,0,capacity};
+            std::memcpy(reinterpret_cast<void*>(pointer),header,32);
+            lymar_aot_edge(pointer+8,data,object_kind);
+            for (const auto& item : items) {
+                auto object=string_object(item);
+                // Elements are written back through the header: an allocation
+                // above can relocate the payload, so no cached address is reused.
+                auto slot_data=read_word(pointer,8);
+                auto count=read_word(pointer,16);
+                if (count>=capacity) break;
+                std::memcpy(reinterpret_cast<void*>(slot_data+count*8),&object,8);
+                lymar_aot_edge(slot_data+count*8,object,object_kind);
+                ++count;
+                std::memcpy(reinterpret_cast<void*>(pointer+16),&count,8);
+            }
+            h.return_pointer=object_kind;return pointer;
+        };
+        auto arg_text=[&](size_t n) { return n < args.size() && pointers[n] == object_kind ? std::string(arg_string(n)) : std::string(); };
+        if (service->second == 18) {  // ResourceType::OS
+            if (operation == 49) {  // ENV_GET: nil when the variable is unset.
+                std::string value;
+                if (!os::env_lookup(arg_text(0), value)) return absent();
+                return text(value);
+            }
+            if (operation == 50) return truth(!arg_text(0).empty() && os::env_set(arg_text(0), arg_text(1)));  // ENV_SET
+            if (operation == 51) return truth(!arg_text(0).empty() && os::env_unset(arg_text(0)));  // ENV_UNSET
+            if (operation == 52) return strings(os::env_list());  // ENV_LIST
+            if (operation == 53) { auto path=os::cwd(); return path.empty()?absent():text(path); }  // CWD
+            if (operation == 54) return truth(!arg_text(0).empty() && os::chdir_to(arg_text(0)));  // CHDIR
+            if (operation == 55) return text(os::home_dir());  // HOME_DIR
+            if (operation == 56) return text(os::temp_dir());  // TEMP_DIR
+            if (operation == 57) return text(os::exe_path());  // EXE_PATH
+            if (operation == 58) return text(os::os_name());  // OS_NAME
+            if (operation == 59) return text(os::arch());  // ARCH
+            if (operation == 60) return text(os::hostname());  // HOSTNAME
+            if (operation == 61) return number(os::num_cpu());  // NUM_CPU
+            return absent();
+        }
+        if (service->second == 4) {  // ResourceType::PROCESS
+            if (operation == 62) return strings(os::program_arguments());  // PROC_ARGS
+            if (operation == 67) return text(os::command_name());  // PROC_COMMAND
+            if (operation == 64) return number(os::pid());  // PROC_ID
+            if (operation == 65) return number(os::rss_kb());  // PROC_RSS (kB, -1 unsupported)
+            if (operation == 66) return number(os::peak_rss_kb());  // PROC_PEAK_RSS
+            if (operation == 63) {  // PROC_EXIT: never returns.
+                int64_t code = 0;
+                if (!args.empty()) { auto value = integer_number(args[0], pointers[0]); if (value) code = *value; }
+                os::terminate(static_cast<int>(code));
+                return number(code);
+            }
+            if (operation == 9) {  // SPAWN: flattened argv, blocks, returns exit code.
+                std::vector<std::string> argv;
+                for (size_t n = 0; n < args.size(); ++n) { auto* text_value = arg_string(n); if (text_value) argv.emplace_back(text_value); }
+                if (argv.empty()) return number(-1);
+                return number(os::spawn_wait(argv));
+            }
+            return absent();
+        }
+        return absent();
+    }
 #if !defined(__wasi__)
     if(auto graphics=f.graphics.find(id);graphics!=f.graphics.end()) {
         std::vector<GraphicsValue> values;

@@ -1,0 +1,81 @@
+// std/os/identity.lm
+// Platform, architecture and machine identity, backed by the RT_OS resource.
+//
+// This is the single source of platform detection in the standard library:
+// std.path's separators and std.process's shell selection both derive from
+// os_name() rather than testing the platform themselves.
+
+import std.os.service as service;
+import std.internal.runtime as rt;
+
+// "windows" | "linux" | "darwin" | "android" | "freebsd" | "wasi" | "unknown"
+pub fn os_name(): str {
+    var result = service.request(rt.OP_OS_NAME);
+    if (result == nil) return "unknown";
+    return result as str;
+}
+
+// "x86_64" | "aarch64" | "riscv64" | "i686" | "arm" | "wasm32" | "unknown"
+pub fn arch(): str {
+    var result = service.request(rt.OP_ARCH);
+    if (result == nil) return "unknown";
+    return result as str;
+}
+
+pub fn hostname(): str {
+    var result = service.request(rt.OP_HOSTNAME);
+    if (result == nil) return "";
+    return result as str;
+}
+
+// Logical processors available to the machine. At least 1.
+pub fn num_cpu(): int {
+    var result = service.request(rt.OP_NUM_CPU);
+    if (result == nil) return 1;
+    return result as int;
+}
+
+pub fn is_windows(): bool {
+    return os_name() == "windows";
+}
+
+// Platform predicates. These replace the old std.env.platform checks, which
+// guessed the OS from the presence of the OS and PROCESSOR_ARCHITECTURE
+// variables; every one of them now reads the real detected identity.
+pub fn is_linux(): bool {
+    return os_name() == "linux";
+}
+
+pub fn is_macos(): bool {
+    return os_name() == "darwin";
+}
+
+// True on WebAssembly targets, whether reported as the WASI OS or the wasm arch.
+pub fn is_wasm(): bool {
+    var name = os_name();
+    var machine = arch();
+    return name == "wasi" or machine == "wasm32";
+}
+
+// True when the architecture has 64-bit registers.
+pub fn is_64bit(): bool {
+    var machine = arch();
+    return machine == "x86_64" or machine == "aarch64" or machine == "riscv64";
+}
+
+// Alias for os_name(), named the way most platform-detection APIs are called.
+pub fn platform(): str {
+    return os_name();
+}
+
+// Directory separator used when building paths.
+pub fn path_separator(): str {
+    if (is_windows()) return "\\";
+    return "/";
+}
+
+// Separator between entries of a search-path style variable (PATH).
+pub fn path_list_separator(): str {
+    if (is_windows()) return ";";
+    return ":";
+}

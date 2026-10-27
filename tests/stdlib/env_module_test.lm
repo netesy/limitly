@@ -1,23 +1,97 @@
 // Test Suite for Standard Library Environment Module
+//
+// std.env owns environment variables only. Program arguments moved to
+// std.process.args() and the working directory to std.os.cwd().
 
 import std.env as env;
+import std.os as os;
 
 fn test_env_frame(): int {
     print("Testing Env Frame...");
     var e = env.Env() as env.Env;
-    assert(e.cwd() != "", "cwd failed");
-    assert(len(e.args()) == 0, "args failed");
 
-    e.set("TEST_KEY", "test_value");
-    var res_val = e.get("TEST_KEY")?;
-    assert(res_val == "test_value", "get failed");
+    assert(e.set("LYMAR_TEST_VAR", "frame_value") == true, "set failed");
+    // `?` unwraps the optional value; `== nil` tests for absence.
+    var value = e.get("LYMAR_TEST_VAR")? else {
+        return 0;
+    };
+    assert(value == "frame_value", "get returned the wrong value");
+
+    assert(e.unset("LYMAR_TEST_VAR") == true, "unset failed");
+    assert(e.get("LYMAR_TEST_VAR") == nil, "unset left the variable visible");
+
+    assert(len(e.home()) > 0, "home failed");
+    assert(len(e.temp_dir()) > 0, "temp_dir failed");
+    assert(len(e.platform()) > 0, "platform failed");
+    assert(len(e.arch()) > 0, "arch failed");
+    assert(len(e.path("")) > 0, "path failed");
     return 1;
 }
 
 fn test_env_helpers(): int {
     print("Testing Env Helpers...");
-    assert(env.cwd() != "", "cwd helper failed");
-    assert(len(env.args()) == 0, "args helper failed");
+
+    assert(env.set("LYMAR_TEST_VAR", "helper_value") == true, "set helper failed");
+    var value = env.get("LYMAR_TEST_VAR")? else {
+        return 0;
+    };
+    assert(value == "helper_value", "get helper returned the wrong value");
+
+    assert(env.unset("LYMAR_TEST_VAR") == true, "unset helper failed");
+    assert(env.get("LYMAR_TEST_VAR") == nil, "unset helper left the variable visible");
+
+    var all = env.vars();
+    assert(len(all) > 0, "vars helper returned nothing");
+    return 1;
+}
+
+fn test_empty_value_behavior(): int {
+    print("Testing Empty Value Behavior...");
+    // Whether a variable set to "" stays present is platform-defined: POSIX
+    // environments store the empty value, Win32 removes the variable. Only the
+    // return codes are asserted here, so the test holds on both.
+    assert(env.set("LYMAR_TEST_EMPTY", "") == true, "empty set failed");
+    assert(env.unset("LYMAR_TEST_EMPTY") == true, "unset empty failed");
+    assert(env.get("LYMAR_TEST_EMPTY") == nil, "variable survived unset");
+    return 1;
+}
+
+fn test_optional_unwrapping(): int {
+    print("Testing Optional Unwrapping...");
+    assert(env.set("LYMAR_TEST_OPT", "opt_value") == true, "set for unwrap failed");
+
+    // `?` unwraps the payload of a present optional.
+    var via_propagator = env.get("LYMAR_TEST_OPT")? else {
+        return 0;
+    };
+    assert(via_propagator == "opt_value", "? did not unwrap the payload");
+
+    // match on a val pattern unwraps too.
+    var raw = env.get("LYMAR_TEST_OPT");
+    match (raw) {
+        val payload => {
+            assert(payload == "opt_value", "match val did not unwrap the payload");
+        },
+        nil => {
+            assert(false, "present variable matched as nil");
+        }
+    }
+
+    // get_or needs no unwrapping: it returns a plain str.
+    assert(env.get_or("LYMAR_TEST_OPT", "wrong") == "opt_value", "get_or returned the wrong value");
+    assert(env.get_or("LYMAR_TEST_OPT_ABSENT", "fallback") == "fallback", "get_or ignored its fallback");
+    var e = env.Env() as env.Env;
+    assert(e.get_or("LYMAR_TEST_OPT", "wrong") == "opt_value", "Env.get_or returned the wrong value");
+
+    assert(env.unset("LYMAR_TEST_OPT") == true, "unset after unwrap failed");
+    return 1;
+}
+
+fn test_surfaces_moved_out_of_env(): int {
+    print("Testing Moved Surfaces...");
+    // cwd belongs to std.os, program arguments to std.process.
+    var working = os.cwd();
+    assert(len(working) > 0, "os.cwd failed after the move out of std.env");
     return 1;
 }
 
@@ -26,6 +100,9 @@ fn main(): int {
 
     assert(test_env_frame() == 1, "Env frame test failed");
     assert(test_env_helpers() == 1, "Env helpers test failed");
+    assert(test_empty_value_behavior() == 1, "Empty value test failed");
+    assert(test_optional_unwrapping() == 1, "Optional unwrapping test failed");
+    assert(test_surfaces_moved_out_of_env() == 1, "Moved surfaces test failed");
 
     print("All env tests passed successfully.");
     return 0;

@@ -21,7 +21,11 @@ import std.log as log;
 import std.path as path;
 import std.fs as fs;
 import std.env as env;
+// std.os answers the machine itself (environment, directories, platform); std.env
+// is the variable API on top of it, and std.process is the process as an entity.
+import std.os as os;
 import std.process as process;
+import std.testing as testing;
 import std.random as random;
 import std.parse as parse;
 import std.format as format;
@@ -65,6 +69,7 @@ var Path = path.Path;
 var FS = fs.FS;
 var Env = env.Env;
 var Process = process.Process;
+var Testing = testing.Testing;
 var Random = random.Random;
 var Parse = parse.Parse;
 var Format = format.Format;

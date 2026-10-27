@@ -129,8 +129,15 @@ int main(int argc, char* argv[]) {
     }
 
     if (command == "run") {
+        // Anything after `--` belongs to the program, so a script can receive
+        // arguments that look like compiler flags. Before `--`, the first
+        // non-flag token is the script and later ones are program arguments.
+        bool passthrough = false;
+        std::vector<std::string> trailing;
         for (int i = 2; i < argc; i++) {
             std::string arg = argv[i];
+            if (passthrough) { options.program_args.push_back(arg); continue; }
+            if (arg == "--") { passthrough = true; continue; }
             if (arg == "-I" && i + 1 < argc) options.include_dirs.push_back(argv[++i]);
             else if (arg == "--features" && i + 1 < argc) {
                 std::stringstream input(argv[++i]);
@@ -140,8 +147,9 @@ int main(int argc, char* argv[]) {
             else if (arg == "-debug") options.debug = true;
             else if (arg == "--verify=strict") options.strict_verification = true;
             else if (arg == "--verify=hybrid") options.strict_verification = false;
-            else if (arg[0] != '-') source_file = arg;
+            else if (arg[0] != '-') { if (source_file.empty()) source_file = arg; else trailing.push_back(arg); }
         }
+        options.program_args.insert(options.program_args.begin(), trailing.begin(), trailing.end());
         if (source_file.empty() && std::filesystem::exists("lymar.nol")) source_file = "src/main.lm";
         if (source_file.empty()) return 1;
         // In-process Lyra dependency resolution
@@ -285,7 +293,11 @@ int main(int argc, char* argv[]) {
 #endif
     }
 
-    if (command[0] != '-') return LM::Compiler::executeFile(command, options);
+    // Legacy form: `lymar app.lm [args...]` runs the script directly.
+    if (command[0] != '-') {
+        for (int i = 2; i < argc; i++) options.program_args.push_back(argv[i]);
+        return LM::Compiler::executeFile(command, options);
+    }
 
     return 0;
 }
