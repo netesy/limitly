@@ -101,6 +101,11 @@ private:
                                    const std::vector<RegisterValue>& args);
     RegisterValue call_interpreted(const LIR::LIR_Function* function,
                                    const std::vector<RegisterValue>& args);
+    RegisterValue call_interpreted(const LIR::LIR_Function* function,
+                                   const RegisterValue* args,
+                                   size_t arg_count);
+    // Scratch buffer for call arguments to avoid heap vector allocations
+    std::vector<RegisterValue> call_args_scratch_;
     // Per-call-site resolution cache: skips repeated string-hash registry
     // lookups for interpreted calls inside hot loops.
     struct CachedCallSite {

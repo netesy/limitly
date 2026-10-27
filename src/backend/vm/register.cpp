@@ -220,7 +220,7 @@ void RegisterVM::execute_function(const LIR::LIR_Function& function) {
 }
 
 void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_t start_pc, uint64_t end_pc) {
-    size_t needed_registers = required_register_count(function);
+    size_t needed_registers = function.register_count > 0 ? function.register_count : required_register_count(function);
     if (registers.size() < needed_registers) registers.resize(needed_registers, VAL_NIL);
 
     const LIR::LIR_Inst* instructions_ptr = function.instructions.data();
@@ -330,7 +330,72 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                 execute_comparison(pc);
                 break;
             }
-            case LIR::LIR_Op::ListCreate: case LIR::LIR_Op::ListAppend: case LIR::LIR_Op::ListLen: case LIR::LIR_Op::ListIndex: case LIR::LIR_Op::ListSet:
+            case LIR::LIR_Op::ListIndex: {
+                RegisterValue list_val = registers[pc->a];
+                RegisterValue idx_val = registers[pc->b];
+                if (IS_PTR(list_val) && IS_INT(idx_val)) {
+                    ObjHeader* h = reinterpret_cast<ObjHeader*>(UNBOX_PTR(list_val));
+                    if (h && h->type_id == TYPE_LIST) {
+                        LmList* list = reinterpret_cast<LmList*>(h);
+                        int64_t idx = UNBOX_INT(idx_val);
+                        if (idx >= 0 && static_cast<uint64_t>(idx) < list->size) {
+                            registers[pc->dst] = list->data[idx];
+                            break;
+                        }
+                    }
+                }
+                execute_collections(pc);
+                break;
+            }
+            case LIR::LIR_Op::ListSet: {
+                RegisterValue list_val = registers[pc->dst];
+                RegisterValue idx_val = registers[pc->a];
+                RegisterValue val = registers[pc->b];
+                if (IS_PTR(list_val) && IS_INT(idx_val)) {
+                    ObjHeader* h = reinterpret_cast<ObjHeader*>(UNBOX_PTR(list_val));
+                    if (h && h->type_id == TYPE_LIST) {
+                        LmList* list = reinterpret_cast<LmList*>(h);
+                        int64_t idx = UNBOX_INT(idx_val);
+                        if (idx >= 0 && static_cast<uint64_t>(idx) < list->size) {
+                            if (!IS_PTR(val)) {
+                                list->data[idx] = val;
+                                break;
+                            }
+                        }
+                    }
+                }
+                execute_collections(pc);
+                break;
+            }
+            case LIR::LIR_Op::ListLen: {
+                RegisterValue list_val = registers[pc->a];
+                if (IS_PTR(list_val)) {
+                    ObjHeader* h = reinterpret_cast<ObjHeader*>(UNBOX_PTR(list_val));
+                    if (h && h->type_id == TYPE_LIST) {
+                        registers[pc->dst] = BOX_INT(reinterpret_cast<LmList*>(h)->size);
+                        break;
+                    }
+                }
+                execute_collections(pc);
+                break;
+            }
+            case LIR::LIR_Op::ListAppend: {
+                RegisterValue list_val = registers[pc->dst];
+                RegisterValue val = registers[pc->b];
+                if (IS_PTR(list_val) && !IS_PTR(val)) {
+                    ObjHeader* h = reinterpret_cast<ObjHeader*>(UNBOX_PTR(list_val));
+                    if (h && h->type_id == TYPE_LIST) {
+                        LmList* list = reinterpret_cast<LmList*>(h);
+                        if (list->size < list->capacity) {
+                            list->data[list->size++] = val;
+                            break;
+                        }
+                    }
+                }
+                execute_collections(pc);
+                break;
+            }
+            case LIR::LIR_Op::ListCreate:
             case LIR::LIR_Op::DictCreate: case LIR::LIR_Op::DictSet: case LIR::LIR_Op::DictGet: case LIR::LIR_Op::DictHas:
             case LIR::LIR_Op::DictLen: case LIR::LIR_Op::DictItems: case LIR::LIR_Op::TupleCreate: case LIR::LIR_Op::TupleSet:
             case LIR::LIR_Op::TupleGet: case LIR::LIR_Op::TupleLen: execute_collections(pc); break;

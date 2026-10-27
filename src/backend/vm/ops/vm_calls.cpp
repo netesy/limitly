@@ -27,6 +27,12 @@ RegisterValue RegisterVM::call_interpreted(const std::string& name,
 
 RegisterValue RegisterVM::call_interpreted(const LIR::LIR_Function* function,
                                             const std::vector<RegisterValue>& args) {
+    return call_interpreted(function, args.data(), args.size());
+}
+
+RegisterValue RegisterVM::call_interpreted(const LIR::LIR_Function* function,
+                                            const RegisterValue* args,
+                                            size_t arg_count) {
     if (!function) throw std::runtime_error("Missing interpreted function");
     if (function->name.size() >= 9 && function->name.compare(function->name.size() - 9, 9, ".__init__") == 0) {
         if (initialized_modules_.count(function->name)) {
@@ -36,10 +42,13 @@ RegisterValue RegisterVM::call_interpreted(const LIR::LIR_Function* function,
     }
     ProfileScope prof_scope(function->name);
 
-    for (auto value : args) {
-        // The callee may retain arguments; duplication loses exclusivity.
-        share_value(value);
-        register_native_allocation(value);
+    for (size_t i = 0; i < arg_count; ++i) {
+        RegisterValue value = args[i];
+        if (IS_PTR(value)) {
+            // The callee may retain arguments; duplication loses exclusivity.
+            share_value(value);
+            register_native_allocation(value);
+        }
     }
     size_t caller_depth = vm_region_stack.size();
     uint64_t caller_region = active_region_id;
@@ -52,17 +61,21 @@ RegisterValue RegisterVM::call_interpreted(const LIR::LIR_Function* function,
         registers = std::move(spare_register_files_.back());
         spare_register_files_.pop_back();
     }
-    size_t reg_count = std::max({(size_t)function->register_count, args.size(), (size_t)1});
+    size_t reg_count = std::max({(size_t)function->register_count, arg_count, (size_t)1});
     registers.resize(reg_count, VAL_NIL);
     std::fill(registers.begin(), registers.end(), VAL_NIL);
-    std::copy(args.begin(), args.end(), registers.begin());
+    for (size_t i = 0; i < arg_count; ++i) {
+        registers[i] = args[i];
+    }
     current_function_ = function;
     try {
         // The registry already owns the immutable instructions and type maps.
         execute_instructions(*function, 0, function->instructions.size());
         auto result = registers[0];
-        register_native_allocation(result);
-        promote_graph(result, caller_region);
+        if (IS_PTR(result)) {
+            register_native_allocation(result);
+            promote_graph(result, caller_region);
+        }
         while (vm_region_stack.size() > caller_depth) exit_region();
         invocation_parents.pop_back();
         argument_stack = std::move(caller_arguments);
@@ -106,14 +119,13 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
     if (pc->op == LIR::LIR_Op::Call) {
         auto cached = call_site_cache_.find(pc);
         if (cached != call_site_cache_.end()) {
-            std::vector<RegisterValue> arg_vals;
-            arg_vals.reserve(std::max((size_t)pc->call_args.size(), cached->second.parameter_count));
+            call_args_scratch_.clear();
             for (auto arg_reg : pc->call_args) {
-                if (arg_reg < registers.size()) arg_vals.push_back(registers[arg_reg]);
-                else arg_vals.push_back(VAL_NIL);
+                if (arg_reg < registers.size()) call_args_scratch_.push_back(registers[arg_reg]);
+                else call_args_scratch_.push_back(VAL_NIL);
             }
-            while (arg_vals.size() < cached->second.parameter_count) arg_vals.push_back(VAL_NIL);
-            auto return_value = call_interpreted(cached->second.function, arg_vals);
+            while (call_args_scratch_.size() < cached->second.parameter_count) call_args_scratch_.push_back(VAL_NIL);
+            auto return_value = call_interpreted(cached->second.function, call_args_scratch_.data(), call_args_scratch_.size());
             if (pc->dst != UINT32_MAX) registers[pc->dst] = return_value;
             return;
         }
@@ -340,21 +352,20 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     cacheable = LIR::FunctionRegistry::getInstance().getFunction(pc->func_name);
                     if (cacheable) call_site_cache_[pc] = CachedCallSite{cacheable, expected_total};
                 }
-                std::vector<RegisterValue> arg_vals;
-                arg_vals.reserve(std::max((size_t)pc->call_args.size(), expected_total));
+                call_args_scratch_.clear();
                 for (auto arg_reg : pc->call_args) {
                     if (arg_reg < registers.size()) {
-                        arg_vals.push_back(registers[arg_reg]);
+                        call_args_scratch_.push_back(registers[arg_reg]);
                     } else {
-                        arg_vals.push_back(VAL_NIL);
+                        call_args_scratch_.push_back(VAL_NIL);
                     }
                 }
-                while (arg_vals.size() < expected_total) {
-                    arg_vals.push_back(VAL_NIL);
+                while (call_args_scratch_.size() < expected_total) {
+                    call_args_scratch_.push_back(VAL_NIL);
                 }
 
-                auto return_value = cacheable ? call_interpreted(cacheable, arg_vals)
-                                              : call_interpreted(pc->func_name, arg_vals);
+                auto return_value = cacheable ? call_interpreted(cacheable, call_args_scratch_.data(), call_args_scratch_.size())
+                                              : call_interpreted(pc->func_name, call_args_scratch_);
                 if (pc->dst != UINT32_MAX) registers[pc->dst] = return_value;
             } else if (pc->func_name == "channel") {
                 // Allocate a real runtime Channel pointer boxed as a pointer!
