@@ -1,0 +1,29 @@
+// tests/lint_robustness_test.lm
+// Test suite covering robust linter rules
+
+import std.crypto.hash as unused_hash;
+
+fn bad_conventions(BadParam: int, x: any): int {
+    if (true) {
+        // empty block
+    }
+
+    var a = 10;
+    if (a == 10) {
+        var a = 20; // variable shadowing
+    }
+
+    var list1 = [1, 2];
+    var list2 = [3, 4];
+    var bad_concat = list1 + list2; // list concatenation with +
+
+    if (a == a) { // self-comparison
+        var is_ok = true;
+        if (is_ok == true) { // redundant bool
+            return 1;
+        }
+    }
+
+    return 0;
+    var unreachable_var = 123; // dead code
+}

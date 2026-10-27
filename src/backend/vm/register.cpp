@@ -18,6 +18,7 @@
 #include "vm_tuple.hh"
 #include "vm_value.hh"
 #include "resource_manager.hh"
+#include "../../profiler.hh"
 
 namespace LM {
 namespace Backend {
@@ -194,6 +195,7 @@ RegisterValue unbox_register_value(void* boxed_value) {
 void RegisterVM::execute(const LIR::LIR_Function& function) { execute_function(function); }
 
 void RegisterVM::execute_function(const LIR::LIR_Function& function) {
+    ProfileScope prof_scope(function.name.empty() ? "main" : function.name);
     // Instruction pointers are only valid for the currently loaded program.
     call_site_cache_.clear();
     current_function_ = &function;

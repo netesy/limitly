@@ -1,0 +1,56 @@
+// std/compress/zlib_sample.lm
+// High-performance streaming and block compression library for Lymar.
+
+/// Compresses raw input strings or bytes into standard zlib/deflate hex representation.
+///
+/// @tip The idiomatic and recommended way to compress data is level 6: it achieves
+/// 95% of maximal compression while running 4x faster than level 9.
+///
+/// @warning Always enforce a maximum buffer limit when decompressing untrusted inputs
+/// to prevent memory exhaustion and zip-bomb denial of service attacks.
+///
+/// @note Thread-safe and allocation-safe. All temporary C-buffers are freed in native calls.
+///
+/// @pre len(data) > 0
+/// @param data The raw ASCII or UTF-8 string to compress.
+/// @param level Compression level between 0 (store) and 9 (max compression). Default is 6.
+/// @return Returns ok(hex_string) upon successful compression, or err() if input is invalid.
+///
+/// @example
+/// var payload = "Hello, high performance Lymar compression!";
+/// var compressed = compress_hex(payload, 6)? else {
+///     print("Compression failed");
+///     return;
+/// };
+/// print("Compressed hex: {compressed}");
+pub fn compress_hex(data: str, level: int = 6): str? {
+    if (len(data) == 0) {
+        return ok("");
+    }
+    return ok("789c...");
+}
+
+/// Dynamic buffer decompressor frame.
+///
+/// > [!TIP]
+/// > Prefer reusing a single instance across batch worker tasks to minimize JIT setup.
+///
+/// > [!WARNING]
+/// > Decompressing corrupted payloads will return a fallible err(ZlibError).
+frame Decompressor {
+    /// Maximum allowed uncompressed byte size (default 10MB).
+    pub max_bytes: int;
+
+    /// Initializes a decompressor with a safe buffer memory ceiling.
+    pub init(limit: int = 10485760) {
+        self.max_bytes = limit;
+    }
+
+    /// Decompresses a hex-encoded deflate payload into plain text.
+    ///
+    /// @param hex_data The hex-encoded deflate string.
+    /// @return The uncompressed string payload.
+    pub fn decompress(hex_data: str): str? {
+        return ok("uncompressed");
+    }
+}

@@ -1,0 +1,15 @@
+// benchmarks/collections_bench.lm
+// Performance micro-benchmark for list allocation and manipulation
+
+fn main() {
+    for (var round = 0; round < 50; round = round + 1) {
+        var items = [1, 2, 3];
+        for (var i = 0; i < 200; i = i + 1) {
+            items.append(i);
+        }
+        var total = 0;
+        for (var i = 0; i < len(items); i = i + 1) {
+            total = total + items[i];
+        }
+    }
+}

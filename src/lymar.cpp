@@ -13,6 +13,7 @@
 #include "backend/vm/register.hh"
 #include "error/debugger.hh"
 #include "runtime/os_info.hh"
+#include "profiler.hh"
 
 // Fyra backend - conditionally compiled if available
 #ifdef FYRA_AVAILABLE
@@ -220,7 +221,20 @@ int Compiler::executeFile(const std::string& filename, const CompileOptions& opt
 #endif
         } else {
             LM::Backend::VM::Register::RegisterVM register_vm;
+            if (options.profile) {
+                LM::Profiler::getInstance().start();
+            }
             register_vm.execute_function(*lir_function);
+            if (options.profile) {
+                LM::Profiler::getInstance().stop();
+                LM::Profiler::getInstance().report(
+                    filename,
+                    options.profile_flamegraph,
+                    options.profile_json,
+                    options.profile_sort,
+                    options.profile_top
+                );
+            }
         }
     } catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";

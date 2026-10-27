@@ -2,6 +2,10 @@
 #include "frontend/module_manager.hh"
 #include "lyra_api.hh"
 #include "cli_update.hh"
+#include "linter.hh"
+#include "doc_generator.hh"
+#include "benchmark_runner.hh"
+#include "profiler.hh"
 #include <filesystem>
 #include <iostream>
 #include <fstream>
@@ -48,6 +52,11 @@ void printUsage(const char* programName) {
     std::cout << "    " << programName << " deps / tree / why   Display dependency analysis\n";
     std::cout << "    " << programName << " doctor / env / audit Diagnostics and audit\n";
     std::cout << "\n  Tooling:\n";
+    std::cout << "    " << programName << " test [options] [filter] Run project tests (parallel, filtered)\n";
+    std::cout << "    " << programName << " lint [options] [files]  Run linter & static analysis\n";
+    std::cout << "    " << programName << " doc [options] [files]   Generate documentation from docstrings\n";
+    std::cout << "    " << programName << " bench [options] [files] Run performance benchmarks\n";
+    std::cout << "    " << programName << " profile [options] <file> Profile runtime execution and hotspots\n";
     std::cout << "    " << programName << " up [--check] [--version TAG] [--prefix DIR] Update compiler from GitHub releases\n";
     std::cout << "    " << programName << " -lsp                 Start LSP server\n";
     std::cout << "    " << programName << " -dap [--port PORT]   Start DAP server\n";
@@ -117,6 +126,12 @@ int main(int argc, char* argv[]) {
     if (command == "-fyra-ir" && argc >= 3) { options.print_fyra_ir = true; return LM::Compiler::executeFile(argv[2], options); }
 #endif
 
+    if (command == "test") return Lyra::handle_test(argc, argv);
+    if (command == "lint" || command == "-lint") return LM::Linter::run(argc, argv);
+    if (command == "doc" || command == "-doc") return LM::DocGenerator::run(argc, argv);
+    if (command == "bench" || command == "-bench") return LM::BenchmarkRunner::run(argc, argv);
+    if (command == "profile" || command == "-profile") return LM::Profiler::run(argc, argv);
+
     try {
     // Package management subcommands forwarded in-process to Lyra
     if (command == "init") return Lyra::handle_init();
@@ -158,6 +173,20 @@ int main(int argc, char* argv[]) {
                 while (std::getline(input, feature, ',')) package_features.push_back(feature);
             }
             else if (arg == "-debug") options.debug = true;
+            else if (arg == "--profile" || arg == "-profile") options.profile = true;
+            else if (arg.rfind("--flamegraph=", 0) == 0) {
+                options.profile = true;
+                options.profile_flamegraph = arg.substr(13);
+            }
+            else if (arg.rfind("--sort=", 0) == 0) {
+                options.profile_sort = arg.substr(7);
+            }
+            else if (arg.rfind("--top=", 0) == 0) {
+                options.profile_top = std::stoul(arg.substr(6));
+            }
+            else if (arg == "--json") {
+                options.profile_json = true;
+            }
             else if (arg == "--verify=strict") options.strict_verification = true;
             else if (arg == "--verify=hybrid") options.strict_verification = false;
             else if (arg[0] != '-') { if (source_file.empty()) source_file = arg; else trailing.push_back(arg); }

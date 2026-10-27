@@ -11,6 +11,7 @@
 #include "../vm_dict.hh"
 #include "../constant_utils.hh"
 #include "../compiled_resolver.hh"
+#include "../../../profiler.hh"
 
 namespace LM {
 namespace Backend {
@@ -27,6 +28,7 @@ RegisterValue RegisterVM::call_interpreted(const std::string& name,
 RegisterValue RegisterVM::call_interpreted(const LIR::LIR_Function* function,
                                             const std::vector<RegisterValue>& args) {
     if (!function) throw std::runtime_error("Missing interpreted function");
+    ProfileScope prof_scope(function->name);
 
     for (auto value : args) {
         // The callee may retain arguments; duplication loses exclusivity.
@@ -150,6 +152,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                                      (pc->func_name.rfind("_builtin_", 0) == 0);
 
             if (is_builtin_target && LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
+                ProfileScope prof_scope(pc->func_name);
                 // Native fast-path for LmStringHeader string builtins
                 auto get_hdr = [this](uint32_t r) -> LmStringHeader* {
                     RegisterValue val = registers[r];
@@ -301,6 +304,7 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                 registers[pc->dst] = BOX_PTR(channels.back().get());
                 opaque_runtime_pointers.insert(reinterpret_cast<uintptr_t>(channels.back().get()));
             } else if (LIR::BuiltinUtils::isBuiltinFunction(pc->func_name)) {
+                ProfileScope prof_scope(pc->func_name);
                 // Handle builtin functions (print, input, etc.)
                 std::vector<ValuePtr> args;
                 args.reserve(pc->call_args.size());

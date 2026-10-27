@@ -139,7 +139,7 @@ ERROR_SRCS := src/error/debugger.cpp
 
 DAP_SRCS := src/dap/dap.cpp src/dap/dap_server.cpp src/dap/vm_debug_target.cpp src/dap/lldb_dap_target.cpp
 
-LIB_LYMAR_SRCS := src/lymar.cpp src/formatter.cpp src/lsp.cpp $(DAP_SRCS) $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
+LIB_LYMAR_SRCS := src/lymar.cpp src/formatter.cpp src/linter.cpp src/doc_generator.cpp src/benchmark_runner.cpp src/profiler.cpp src/lsp.cpp $(DAP_SRCS) $(BACKEND_COMMON_SRCS) $(BACK_SRCS) $(ERROR_SRCS) \
              $(FRONT_SRCS) $(REGISTER_SRCS) $(LIR_CORE_SRCS)
 
 MAIN_SRCS := src/main.cpp

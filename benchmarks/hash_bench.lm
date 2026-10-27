@@ -1,0 +1,12 @@
+// benchmarks/hash_bench.lm
+// Performance micro-benchmark for standard crypto hashing
+
+import std.crypto.hash as hash;
+
+fn main() {
+    var payload = "The quick brown fox jumps over the lazy dog";
+    for (var i = 0; i < 100; i = i + 1) {
+        var h1 = hash.sha256(payload);
+        var h2 = hash.md5(payload);
+    }
+}

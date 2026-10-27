@@ -35,6 +35,11 @@ namespace LM {
         bool disable_opt = false;
         bool strip = false;
         bool strict_verification = false;
+        bool profile = false;
+        std::string profile_flamegraph;
+        std::string profile_sort = "self";
+        size_t profile_top = 25;
+        bool profile_json = false;
         std::vector<std::string> include_dirs;
         // Arguments written after the script path (`lymar run app.lm -- --x`),
         // reported to the program by std.process.args().
