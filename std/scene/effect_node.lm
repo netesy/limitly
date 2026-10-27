@@ -1,11 +1,12 @@
 import std.scene.node as node;
+import std.graphics.transform as transform; // required: promoted apply_base body resolves in host scope
 
 frame EffectNode {
-    pub var base_node: node.Node;
+    embed node.Node;
     pub var effect_type: int; // 0 = blur, 1 = shadow, 2 = grayscale
 
-    pub init(b: node.Node = node.Node(), t: int = 0) {
-        self.base_node = b;
+    pub init(b: node.Node? = nil, t: int = 0) {
+        self.apply_base(b);
         self.effect_type = t;
     }
 }

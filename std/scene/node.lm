@@ -32,4 +32,21 @@ frame Node : NodeTrait {
     pub fn add_child(child: Node): nil {
         self.children.append(child);
     }
+
+    // Shared base-field initializer, promoted to frames that `embed node.Node`.
+    // Copies id/children/transform/visible from `b`, or applies Node defaults.
+    pub fn apply_base(b: Node?): nil {
+        if (b != nil) {
+            var bn = b as Node;
+            self.id = bn.id;
+            self.children = bn.children;
+            self.transform_val = bn.transform_val;
+            self.visible = bn.visible;
+        } else {
+            self.id = 0;
+            self.children = [] as [Node];
+            self.transform_val = transform.Transform();
+            self.visible = true;
+        }
+    }
 }

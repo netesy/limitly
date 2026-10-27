@@ -4,8 +4,9 @@
 import std.math as math;
 import std.gg as gg;
 import std.game.types as types;
+import std.game.traits as gtraits;
 
-frame Camera2D {
+frame Camera2D: gtraits.Updatable {
     pub var target: types.Vec2;
     pub var offset: types.Vec2;
     pub var rotation: float;

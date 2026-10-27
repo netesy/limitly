@@ -6,18 +6,7 @@ frame TransformNode {
     pub var local_transform: transform.Transform;
 
     pub init(b: node.Node? = nil, t: transform.Transform? = nil) {
-        if (b != nil) {
-            var bn = b as node.Node;
-            self.id = bn.id;
-            self.children = bn.children;
-            self.transform_val = bn.transform_val;
-            self.visible = bn.visible;
-        } else {
-            self.id = 0;
-            self.children = [] as [node.Node];
-            self.transform_val = transform.Transform();
-            self.visible = true;
-        }
+        self.apply_base(b);
         if (t != nil) {
             self.local_transform = t as transform.Transform;
         } else {

@@ -1,5 +1,5 @@
 import std.scene.node as node;
-import std.graphics.transform as transform;
+import std.graphics.transform as transform; // required: promoted apply_base body resolves in host scope
 import std.graphics.rect as rect;
 
 frame ClipNode {
@@ -7,18 +7,7 @@ frame ClipNode {
     pub var clip_rect: rect.Rect;
 
     pub init(b: node.Node? = nil, r: rect.Rect? = nil) {
-        if (b != nil) {
-            var bn = b as node.Node;
-            self.id = bn.id;
-            self.children = bn.children;
-            self.transform_val = bn.transform_val;
-            self.visible = bn.visible;
-        } else {
-            self.id = 0;
-            self.children = [] as [node.Node];
-            self.transform_val = transform.Transform();
-            self.visible = true;
-        }
+        self.apply_base(b);
         if (r != nil) {
             self.clip_rect = r as rect.Rect;
         } else {

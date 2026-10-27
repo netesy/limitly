@@ -4,6 +4,7 @@
 import std.math as math;
 import std.gg as gg;
 import std.game.types as types;
+import std.game.traits as gtraits;
 
 // Transition modes
 pub var TRANSITION_NONE: int = 0;
@@ -11,7 +12,7 @@ pub var TRANSITION_FADE: int = 1;
 
 // ── Scene Base ────────────────────────────────────────────────────────────────
 
-frame Scene {
+frame Scene: gtraits.Updatable {
     pub var name: str;
     pub var is_active: bool;
     pub var is_paused: bool;
@@ -130,7 +131,7 @@ pub fn scene(name: str = "Scene"): Scene {
 
 // ── Scene Manager ─────────────────────────────────────────────────────────────
 
-frame SceneManager {
+frame SceneManager: gtraits.Updatable {
     pub var scenes: {str: any};
     pub var stack: [any];
     pub var current_name: str;

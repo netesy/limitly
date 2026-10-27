@@ -2,6 +2,7 @@
 #include "../module_manager.hh"
 #include <filesystem>
 #include <algorithm>
+#include <unordered_set>
 
 namespace fs = std::filesystem;
 
@@ -506,6 +507,50 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
             } else {
                 add_error("Unknown type '" + embed_stmt->typeName + "' in embed statement", frame->line);
             }
+        }
+    }
+
+    // Layout alignment: mixin/embed-injected fields must occupy the same field
+    // indices in every host frame as they do in their source frame. Promoted
+    // method bodies are shared AST nodes between source and host; the checker
+    // annotates receiver types per last-checked context, so baked offsets must
+    // agree across all layouts. Keep host-declared fields behind the injected
+    // region (injection order preserved).
+    {
+        std::unordered_set<LM::Frontend::AST::FrameField*> injected;
+        for (const auto& mixin_name : frame->mixins) {
+            auto mixin_it = mixin_declarations.find(mixin_name);
+            if (mixin_it != mixin_declarations.end()) {
+                for (const auto& field : mixin_it->second->fields) {
+                    if (field) injected.insert(field.get());
+                }
+            }
+        }
+        for (const auto& embed_stmt : frame->embeds) {
+            const FrameInfo* p_embedded_info = lookup_frame_info(embed_stmt->typeName);
+            if (p_embedded_info && p_embedded_info->declaration) {
+                for (const auto& efield : p_embedded_info->declaration->fields) {
+                    if (efield) injected.insert(efield.get());
+                }
+            } else {
+                auto mixin_it = mixin_declarations.find(embed_stmt->typeName);
+                if (mixin_it != mixin_declarations.end()) {
+                    for (const auto& field : mixin_it->second->fields) {
+                        if (field) injected.insert(field.get());
+                    }
+                }
+            }
+        }
+        if (!injected.empty()) {
+            std::vector<std::shared_ptr<LM::Frontend::AST::FrameField>> ordered;
+            ordered.reserve(frame->fields.size());
+            for (const auto& f : frame->fields) {
+                if (f && injected.count(f.get())) ordered.push_back(f);
+            }
+            for (const auto& f : frame->fields) {
+                if (f && !injected.count(f.get())) ordered.push_back(f);
+            }
+            frame->fields = std::move(ordered);
         }
     }
 

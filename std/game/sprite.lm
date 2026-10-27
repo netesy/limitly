@@ -5,6 +5,7 @@ import std.math as math;
 import std.gg as gg;
 import std.game.types as types;
 import std.game.camera show Camera2D;
+import std.game.traits as gtraits;
 
 frame Texture2D {
     pub var id: int;
@@ -22,7 +23,7 @@ pub fn texture2d(id: int, w: int, h: int): Texture2D {
     return Texture2D(id=id, width=w, height=h);
 }
 
-frame Sprite {
+frame Sprite: gtraits.Drawable {
     pub var texture: Texture2D;
     pub var position: types.Vec2;
     pub var src_rect: types.Rect;
@@ -207,15 +208,13 @@ frame AnimationClip {
 
 // ── Animated Sprite ───────────────────────────────────────────────────────────
 
-frame AnimatedSprite {
-    pub var texture: Texture2D;
-    pub var position: types.Vec2;
-    pub var origin: types.Vec2;
-    pub var scale: types.Vec2;
-    pub var rotation: float;
-    pub var tint: types.Color;
-    pub var flip_x: bool;
-    pub var flip_y: bool;
+// AnimatedSprite composes Sprite via `embed`: the sprite fields (texture,
+// position, origin, scale, rotation, tint, flip_x, flip_y) are promoted from
+// Sprite rather than duplicated, and `src_rect` comes along for free. Sprite's
+// `draw` is promoted too but immediately shadowed by the own `draw` below
+// (name-based dedupe), so animation-aware painting wins.
+frame AnimatedSprite: gtraits.Updatable, gtraits.Drawable {
+    embed Sprite;
 
     pub var clips: {str: AnimationClip};
     pub var current_clip: str;
