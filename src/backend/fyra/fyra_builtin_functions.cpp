@@ -754,8 +754,10 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
     if (!fn_len) fn_len = builder->createFunction("lm_list_len", i64, {i64});
     if (fn_len->getBasicBlocks().empty()) {
         builder->setInsertPoint(builder->createBasicBlock("entry", fn_len));
-        builder->createRet(builder->createExternCall("lymar_aot_length",
-            {fn_len->getParameters().front().get(), ctx->getConstantInt(i64, 0)}, i64));
+        ir::Value* raw_ptr = fn_len->getParameters().front().get();
+        ir::Value* list_ptr = builder->createAnd(raw_ptr, ctx->getConstantInt(i64, ~7ULL));
+        ir::Value* len = builder->createLoadl(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
+        builder->createRet(len);
     }
 
     // 3. lm_list_get(list_ptr: i64, index: i64) -> i64
@@ -765,10 +767,11 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
         ir::BasicBlock* b_entry = builder->createBasicBlock("entry", fn_get);
         builder->setInsertPoint(b_entry);
         auto it = fn_get->getParameters().begin();
-        ir::Value* list_ptr = it->get();
+        ir::Value* raw_list_ptr = it->get();
         it++;
         ir::Value* index = it->get();
 
+        ir::Value* list_ptr = builder->createAnd(raw_list_ptr, ctx->getConstantInt(i64, ~7ULL));
         ir::Value* data_ptr_slot = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 8));
         ir::Value* data = builder->createLoadl(data_ptr_slot);
         ir::Value* kind = builder->createAnd(builder->createLoadl(list_ptr), ctx->getConstantInt(i64, 0xFFFFFFFF));
@@ -805,10 +808,11 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
 
         builder->setInsertPoint(b_entry);
         auto it = fn_set->getParameters().begin();
-        ir::Value* list_ptr = it->get(); it++;
+        ir::Value* raw_list_ptr = it->get(); it++;
         ir::Value* index = it->get(); it++;
         ir::Value* val = it->get();
 
+        ir::Value* list_ptr = builder->createAnd(raw_list_ptr, ctx->getConstantInt(i64, ~7ULL));
         ir::Value* len = builder->createLoadl(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
         ir::Value* cap_ptr = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 24));
         ir::Value* cap = builder->createLoadl(cap_ptr);
@@ -903,10 +907,11 @@ void FyraBuiltinFunctions::emit_list_ir(ir::Module* module, ir::IRBuilder* build
 
         builder->setInsertPoint(b_entry);
         auto it = fn_app->getParameters().begin();
-        ir::Value* list_ptr = it->get();
+        ir::Value* raw_list_ptr = it->get();
         it++;
         ir::Value* val = it->get();
 
+        ir::Value* list_ptr = builder->createAnd(raw_list_ptr, ctx->getConstantInt(i64, ~7ULL));
         ir::Value* len = builder->createLoadl(builder->createAdd(list_ptr, ctx->getConstantInt(i64, 16)));
         ir::Value* cap_ptr = builder->createAdd(list_ptr, ctx->getConstantInt(i64, 24));
         ir::Value* cap = builder->createLoadl(cap_ptr);
@@ -1910,12 +1915,13 @@ void FyraBuiltinFunctions::emit_str_format_ir(ir::Module* module, ir::IRBuilder*
     ir::BasicBlock* b_slen_prep = builder->createBasicBlock("fmt_slen_prep", fn);
 
     ir::Value* is_large_enough = builder->createCuge(arg_val, ctx->getConstantInt(i64, 65536));
-    ir::Value* high_bits = builder->createShr(arg_val, ctx->getConstantInt(i64, 48));
-    ir::Value* high_is_zero = builder->createCeq(high_bits, ctx->getConstantInt(i64, 0));
-    ir::Value* is_valid_ptr = builder->createAnd(is_large_enough, high_is_zero);
+    ir::Value* sign_bit = builder->createShr(arg_val, ctx->getConstantInt(i64, 63));
+    ir::Value* sign_is_zero = builder->createCeq(sign_bit, ctx->getConstantInt(i64, 0));
+    ir::Value* is_valid_ptr = builder->createAnd(is_large_enough, sign_is_zero);
     builder->createBr(is_valid_ptr, b_is_str, b_is_num);
 
     builder->setInsertPoint(b_is_num);
+    ir::Value* high_bits = builder->createShr(arg_val, ctx->getConstantInt(i64, 48));
     ir::Value* is_ffff = builder->createCeq(high_bits, ctx->getConstantInt(i64, 0xFFFF));
     ir::Value* is_zero_hb = builder->createCeq(high_bits, ctx->getConstantInt(i64, 0));
     ir::Value* is_int_hb = builder->createOr(is_ffff, is_zero_hb);

@@ -355,6 +355,10 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                     auto* addr_inst = dynamic_cast<ir::Instruction*>(address);
                     if (addr_inst && addr_inst->getName().starts_with("scalar_slot_")) {
                         flags[inst] = zero;
+                    } else if (addr_inst && addr_inst->getName().starts_with("slot_")) {
+                        flags[inst] = one;
+                    } else if (inst->getName().starts_with("lidx_elem_")) {
+                        flags[inst] = zero;
                     } else {
                         flags[inst] = emit(block, after, "lymar_aot_slot_pointer", {address});
                     }
@@ -364,6 +368,10 @@ void lower_region_ownership(ir::Module& module, const std::unordered_map<std::st
                     auto* addr_inst = dynamic_cast<ir::Instruction*>(address);
                     if (addr_inst && addr_inst->getName().starts_with("scalar_slot_")) {
                         // Scalar slot allocations need no region GC edge.
+                    } else if (addr_inst && addr_inst->getName().starts_with("slot_")) {
+                        emit(block, after, dynamic_cast<ir::GlobalVariable*>(address) ? "lymar_aot_global_edge" : "lymar_aot_edge",
+                             {address, value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : value,
+                              value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : one});
                     } else {
                         emit(block, after, dynamic_cast<ir::GlobalVariable*>(address) ? "lymar_aot_global_edge" : "lymar_aot_edge",
                              {address, value->getType()->isFloatingPoint() ? static_cast<ir::Value*>(zero) : value,
