@@ -4,8 +4,17 @@ import std.graphics.vector2 as vector2;
 frame HitTest {
     pub init() {}
 
-    pub fn test(root: node.Node, point: vector2.Vector2): node.Node {
-        // Simple hit test stub
+    pub fn test(root: node.Node, point: vector2.Vector2): node.Node? {
+        if (not root.visible) return nil;
+
+        var i = len(root.children) - 1;
+        while (i >= 0) {
+            var child = root.children[i];
+            var hit = self.test(child, point);
+            if (hit != nil) return hit;
+            i = i - 1;
+        }
+
         return root;
     }
 }

@@ -3,21 +3,67 @@ frame Path {
     pub var points: [float];
 
     pub init() {
-        self.commands = [0];
-        self.points = [0.0];
+        self.commands = [] as [int];
+        self.points = [] as [float];
     }
 
     pub fn move_to(x: float, y: float): nil {
-        self.commands = self.commands + [0];
-        self.points = self.points + [x, y];
+        self.commands.append(0);
+        self.points.append(x);
+        self.points.append(y);
     }
 
     pub fn line_to(x: float, y: float): nil {
-        self.commands = self.commands + [1];
-        self.points = self.points + [x, y];
+        self.commands.append(1);
+        self.points.append(x);
+        self.points.append(y);
+    }
+
+    pub fn quadratic_curve_to(cx: float, cy: float, x: float, y: float): nil {
+        self.commands.append(2);
+        self.points.append(cx);
+        self.points.append(cy);
+        self.points.append(x);
+        self.points.append(y);
+    }
+
+    pub fn cubic_bezier_to(c1x: float, c1y: float, c2x: float, c2y: float, x: float, y: float): nil {
+        self.commands.append(3);
+        self.points.append(c1x);
+        self.points.append(c1y);
+        self.points.append(c2x);
+        self.points.append(c2y);
+        self.points.append(x);
+        self.points.append(y);
+    }
+
+    pub fn arc(cx: float, cy: float, radius: float, start_angle: float, end_angle: float): nil {
+        self.commands.append(5);
+        self.points.append(cx);
+        self.points.append(cy);
+        self.points.append(radius);
+        self.points.append(start_angle);
+        self.points.append(end_angle);
+    }
+
+    pub fn rect(x: float, y: float, w: float, h: float): nil {
+        self.move_to(x, y);
+        self.line_to(x + w, y);
+        self.line_to(x + w, y + h);
+        self.line_to(x, y + h);
+        self.close();
     }
 
     pub fn close(): nil {
-        self.commands = self.commands + [4];
+        self.commands.append(4);
+    }
+
+    pub fn command_count(): int {
+        return len(self.commands);
+    }
+
+    pub fn clear(): nil {
+        self.commands = [] as [int];
+        self.points = [] as [float];
     }
 }

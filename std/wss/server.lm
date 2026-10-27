@@ -198,9 +198,41 @@ frame WSSServer {
 frame WSRoom {
     var name: str;
     var connections: {str: WSConnection};
-    pub fn init(name: str) { self.name = name; self.connections = {}; }
-    pub fn join(id: str, conn: WSConnection): core.ResultInt { self.connections[id] = conn; return core.ok_int(len(self.connections)); }
-    pub fn leave(id: str): core.ResultInt { return core.ok_int(0); }
-    pub fn member_count(): int { return len(self.connections); }
-    pub fn broadcast(message: str): core.ResultInt { return core.ok_int(0); }
+
+    pub fn init(name: str) {
+        self.name = name;
+        self.connections = {} as {str: WSConnection};
+    }
+
+    pub fn join(id: str, conn: WSConnection): core.ResultInt {
+        self.connections[id] = conn;
+        return core.ok_int(len(self.connections));
+    }
+
+    pub fn leave(id: str): core.ResultInt {
+        var new_conns: {str: WSConnection} = {};
+        iter (k in self.connections) {
+            if (k != id) {
+                new_conns[k] = self.connections[k];
+            }
+        }
+        self.connections = new_conns;
+        return core.ok_int(len(self.connections));
+    }
+
+    pub fn member_count(): int {
+        return len(self.connections);
+    }
+
+    pub fn broadcast(message: str): core.ResultInt {
+        var count = 0;
+        iter (k in self.connections) {
+            var conn = self.connections[k];
+            if (conn.connected) {
+                conn.send(message);
+                count = count + 1;
+            }
+        }
+        return core.ok_int(count);
+    }
 }

@@ -164,8 +164,94 @@ frame HTTPServer {
 }
 
 fn parse_server_request(raw: str): ServerRequest {
-    var h: {str: str} = {};
-    return ServerRequest(method="", path="", query_string="", version="", headers=h, body="", remote_addr="", client_resource=nil);
+    if (len(raw) == 0) {
+        var empty_h: {str: str} = {};
+        return ServerRequest(method="", path="", query_string="", version="", headers=empty_h, body="", remote_addr="", client_resource=nil);
+    }
+
+    var header_end = index_of_h(raw, "\r\n\r\n");
+    var body_str = "";
+    var header_str = raw;
+    if (header_end != -1) {
+        header_str = substring(raw, 0, header_end);
+        body_str = substring(raw, header_end + 4, len(raw));
+    }
+
+    var lines: [str] = [];
+    var curr = "";
+    var i = 0;
+    while (i < len(header_str)) {
+        if (i <= len(header_str) - 2 and substring(header_str, i, i + 2) == "\r\n") {
+            lines.append(curr);
+            curr = "";
+            i = i + 2;
+        } else {
+            curr = curr + substring(header_str, i, i + 1);
+            i = i + 1;
+        }
+    }
+    if (len(curr) > 0) lines.append(curr);
+
+    var method_val = "GET";
+    var path_val = "/";
+    var query_val = "";
+    var version_val = "HTTP/1.1";
+    var req_headers: {str: str} = {};
+
+    if (len(lines) > 0) {
+        var req_line = lines[0];
+        var parts: [str] = [];
+        var pcurr = "";
+        var j = 0;
+        while (j < len(req_line)) {
+            var ch = substring(req_line, j, j + 1);
+            if (ch == " ") {
+                if (len(pcurr) > 0) parts.append(pcurr);
+                pcurr = "";
+            } else {
+                pcurr = pcurr + ch;
+            }
+            j = j + 1;
+        }
+        if (len(pcurr) > 0) parts.append(pcurr);
+
+        if (len(parts) >= 1) method_val = parts[0];
+        if (len(parts) >= 2) {
+            var full_path = parts[1];
+            var q_idx = index_of_h(full_path, "?");
+            if (q_idx != -1) {
+                path_val = substring(full_path, 0, q_idx);
+                query_val = substring(full_path, q_idx + 1, len(full_path));
+            } else {
+                path_val = full_path;
+            }
+        }
+        if (len(parts) >= 3) version_val = parts[2];
+
+        for (var k = 1; k < len(lines); k = k + 1) {
+            var hline = lines[k];
+            var colon = index_of_h(hline, ":");
+            if (colon != -1) {
+                var hkey = substring(hline, 0, colon);
+                var hval = substring(hline, colon + 1, len(hline));
+                while (len(hval) > 0 and substring(hval, 0, 1) == " ") {
+                    hval = substring(hval, 1, len(hval));
+                }
+                req_headers[hkey] = hval;
+            }
+        }
+    }
+
+    return ServerRequest(
+        method=method_val,
+        path=path_val,
+        query_string=query_val,
+        version=version_val,
+        headers=req_headers,
+        body=body_str,
+        remote_addr="",
+        client_resource=nil
+    );
 }
 
 fn index_of_h(s: str, pattern: str): int {
