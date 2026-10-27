@@ -26,6 +26,13 @@ void Generator::collect_module_signatures(LM::Frontend::AST::Program& program) {
         init_info.visibility = LM::Frontend::AST::VisibilityLevel::Public;
         function_table_[init_func_name] = std::move(init_info);
     }
+    global_variables_.clear();
+    for (const auto& stmt : program.statements) {
+        if (!stmt) continue;
+        if (auto var_decl = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(stmt.get())) {
+            global_variables_.insert(var_decl->name);
+        }
+    }
 }
 
 

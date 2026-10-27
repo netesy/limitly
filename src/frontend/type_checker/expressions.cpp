@@ -20,6 +20,11 @@ TypePtr TypeChecker::check_expression(std::shared_ptr<LM::Frontend::AST::Express
         // Handle 'this' reference in frame methods
         if (current_frame) {
             type = type_system.createFrameType(current_frame->name);
+            for (auto& captures : lambda_captures_stack) {
+                if (std::find(captures.begin(), captures.end(), "self") == captures.end()) {
+                    captures.push_back("self");
+                }
+            }
         } else {
             add_error("'this' can only be used inside frame methods", expr->line);
             type = type_system.ANY_TYPE;

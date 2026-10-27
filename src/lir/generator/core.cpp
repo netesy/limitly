@@ -198,6 +198,7 @@ void Generator::generate_function(LM::Frontend::AST::FunctionDeclaration& fn) {
     } else {
         env_register_ = UINT32_MAX;
     }
+    this_register_ = UINT32_MAX;
     next_label_ = 0;
     scope_stack_.clear();
     loop_stack_.clear();

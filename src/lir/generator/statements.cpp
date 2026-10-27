@@ -350,11 +350,18 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
         emit_instruction(create);
         emit_instruction(LIR_Inst(LIR_Op::FrameSetFieldAtomic, Type::Void, cell, 0, initial));
         set_register_abi_type(cell, Type::Ptr);
-        if (current_function_ && current_function_->name == current_module_ + ".__init__") {
+        bool is_top_level = (current_function_ == nullptr) || 
+                            (current_function_->name == current_module_ + ".__init__") ||
+                            (current_function_->name == "__top_level_wrapper__");
+        if (is_top_level) {
+            std::string qualified_name = (!current_module_.empty() && current_module_ != "root") ? (current_module_ + "." + stmt.name) : stmt.name;
+            global_variables_.insert(qualified_name);
+            global_variables_.insert(stmt.name);
             LIR_Inst store(LIR_Op::StoreGlobal, Type::Void, 0, cell, 0);
-            store.func_name = current_module_ + "." + stmt.name;
+            store.func_name = qualified_name;
             emit_instruction(store);
-        } else bind_variable(stmt.name, cell);
+        }
+        bind_variable(stmt.name, cell);
         return;
     }
 
@@ -407,8 +414,13 @@ void Generator::emit_var_stmt(LM::Frontend::AST::VarDeclaration& stmt) {
 
     // Check if this is a module-level variable (global)
     // Treat as global if: we're not inside a function (or inside __init__ function)
-    if (current_function_ == nullptr || (current_function_ && current_function_->name == current_module_ + ".__init__")) {
-        std::string qualified_name = current_module_ + "." + stmt.name;
+    bool is_top_level = (current_function_ == nullptr) || 
+                        (current_function_ && current_function_->name == current_module_ + ".__init__") ||
+                        (current_function_ && current_function_->name == "__top_level_wrapper__");
+    if (is_top_level) {
+        std::string qualified_name = (!current_module_.empty() && current_module_ != "root") ? (current_module_ + "." + stmt.name) : stmt.name;
+        global_variables_.insert(qualified_name);
+        global_variables_.insert(stmt.name);
         Reg val_reg = 0;
         if (stmt.initializer) {
             if (auto literal = dynamic_cast<LM::Frontend::AST::LiteralExpr*>(stmt.initializer.get())) {

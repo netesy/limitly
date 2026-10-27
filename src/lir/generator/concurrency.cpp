@@ -1117,6 +1117,30 @@ void Generator::find_accessed_variables_recursive(const std::vector<std::shared_
                     find_accessed_variables_recursive(else_block->statements, accessed_variables);
                 }
             }
+        } else if (auto while_stmt = dynamic_cast<LM::Frontend::AST::WhileStatement*>(stmt.get())) {
+            if (while_stmt->condition) find_accessed_variables_in_expr(*while_stmt->condition, accessed_variables);
+            if (while_stmt->body) {
+                if (auto block = dynamic_cast<LM::Frontend::AST::BlockStatement*>(while_stmt->body.get())) {
+                    find_accessed_variables_recursive(block->statements, accessed_variables);
+                }
+            }
+        } else if (auto for_stmt = dynamic_cast<LM::Frontend::AST::ForStatement*>(stmt.get())) {
+            if (for_stmt->condition) find_accessed_variables_in_expr(*for_stmt->condition, accessed_variables);
+            if (for_stmt->increment) find_accessed_variables_in_expr(*for_stmt->increment, accessed_variables);
+            if (for_stmt->body) {
+                if (auto block = dynamic_cast<LM::Frontend::AST::BlockStatement*>(for_stmt->body.get())) {
+                    find_accessed_variables_recursive(block->statements, accessed_variables);
+                }
+            }
+        } else if (auto iter_stmt = dynamic_cast<LM::Frontend::AST::IterStatement*>(stmt.get())) {
+            if (iter_stmt->iterable) find_accessed_variables_in_expr(*iter_stmt->iterable, accessed_variables);
+            if (iter_stmt->body) {
+                if (auto block = dynamic_cast<LM::Frontend::AST::BlockStatement*>(iter_stmt->body.get())) {
+                    find_accessed_variables_recursive(block->statements, accessed_variables);
+                }
+            }
+        } else if (auto var_stmt = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(stmt.get())) {
+            if (var_stmt->initializer) find_accessed_variables_in_expr(*var_stmt->initializer, accessed_variables);
         } else {
            // std::cout << "[DEBUG] Statement type not handled: " << typeid(*stmt.get()).name() << std::endl;
         }
@@ -1133,9 +1157,31 @@ void Generator::find_accessed_variables_in_expr(const LM::Frontend::AST::Express
         // Check if this variable is defined in the current scope or outer scope
         // For now, we'll capture all variable expressions
         accessed_variables.insert(var_expr->name);
+    } else if (dynamic_cast<const LM::Frontend::AST::ThisExpr*>(&expr)) {
+        accessed_variables.insert("self");
+        accessed_variables.insert("this");
+    } else if (auto member_expr = dynamic_cast<const LM::Frontend::AST::MemberExpr*>(&expr)) {
+        if (member_expr->object) find_accessed_variables_in_expr(*member_expr->object, accessed_variables);
+    } else if (auto index_expr = dynamic_cast<const LM::Frontend::AST::IndexExpr*>(&expr)) {
+        if (index_expr->object) find_accessed_variables_in_expr(*index_expr->object, accessed_variables);
+        if (index_expr->index) find_accessed_variables_in_expr(*index_expr->index, accessed_variables);
+    } else if (auto unary_expr = dynamic_cast<const LM::Frontend::AST::UnaryExpr*>(&expr)) {
+        if (unary_expr->right) find_accessed_variables_in_expr(*unary_expr->right, accessed_variables);
+    } else if (auto cast_expr = dynamic_cast<const LM::Frontend::AST::CastExpr*>(&expr)) {
+        if (cast_expr->expression) find_accessed_variables_in_expr(*cast_expr->expression, accessed_variables);
+    } else if (auto list_expr = dynamic_cast<const LM::Frontend::AST::ListExpr*>(&expr)) {
+        for (const auto& elem : list_expr->elements) if (elem) find_accessed_variables_in_expr(*elem, accessed_variables);
+    } else if (auto tuple_expr = dynamic_cast<const LM::Frontend::AST::TupleExpr*>(&expr)) {
+        for (const auto& elem : tuple_expr->elements) if (elem) find_accessed_variables_in_expr(*elem, accessed_variables);
+    } else if (auto dict_expr = dynamic_cast<const LM::Frontend::AST::DictExpr*>(&expr)) {
+        for (const auto& [k, v] : dict_expr->entries) {
+            if (k) find_accessed_variables_in_expr(*k, accessed_variables);
+            if (v) find_accessed_variables_in_expr(*v, accessed_variables);
+        }
     } else if (auto assign_expr = dynamic_cast<const LM::Frontend::AST::AssignExpr*>(&expr)) {
         // Capture both the target variable and the right-hand side expression
-        accessed_variables.insert(assign_expr->name);
+        if (!assign_expr->name.empty()) accessed_variables.insert(assign_expr->name);
+        if (assign_expr->object) find_accessed_variables_in_expr(*assign_expr->object, accessed_variables);
         if (assign_expr->value) {
             find_accessed_variables_in_expr(*assign_expr->value, accessed_variables);
         }

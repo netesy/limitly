@@ -2124,6 +2124,24 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
         // Get the existing register for this variable
         Reg dst = resolve_variable(expr.name);
         if (dst == UINT32_MAX) {
+            std::string global_name = (!current_module_.empty() && current_module_ != "root") ? (current_module_ + "." + expr.name) : expr.name;
+            if (global_variables_.count(global_name) || global_variables_.count(expr.name)) {
+                std::string target_name = global_variables_.count(global_name) ? global_name : expr.name;
+                if (expr.op != LM::Frontend::TokenType::EQUAL) {
+                    Reg cur_val = allocate_register();
+                    LIR_Inst load_inst(LIR_Op::LoadGlobal, Type::Ptr, cur_val, 0, 0);
+                    load_inst.func_name = target_name;
+                    emit_instruction(load_inst);
+                    Type abi_type = language_type_to_abi_type(expr.inferred_type);
+                    LIR_Op bin_op = compound_binary_op(expr.op);
+                    emit_instruction(LIR_Inst(bin_op, abi_type, cur_val, cur_val, value));
+                    value = cur_val;
+                }
+                LIR_Inst store_inst(LIR_Op::StoreGlobal, Type::Void, 0, value, 0);
+                store_inst.func_name = target_name;
+                emit_instruction(store_inst);
+                return value;
+            }
             // Variable doesn't exist, allocate a new one
             dst = allocate_register();
             bind_variable(expr.name, dst);
@@ -2950,7 +2968,14 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
             for (const auto& param : expr.params) {
                 if (param.first == used_name) { is_param = true; break; }
             }
-            if (!is_param && resolve_variable(used_name) != UINT32_MAX &&
+            bool is_available = resolve_variable(used_name) != UINT32_MAX;
+            if (!is_available && (used_name == "self" || used_name == "this")) {
+                is_available = (this_register_ != UINT32_MAX) ||
+                               (env_register_ != UINT32_MAX &&
+                                (std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), "self") != current_lambda_captures_.end() ||
+                                 std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), "this") != current_lambda_captures_.end()));
+            }
+            if (!is_param && is_available &&
                 std::find(effective_captures.begin(), effective_captures.end(), used_name) == effective_captures.end()) {
                 effective_captures.push_back(used_name);
             }
@@ -2989,6 +3014,9 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
         // Set captured variables
         for (size_t i = 0; i < effective_captures.size(); ++i) {
             Reg val_reg = resolve_variable(effective_captures[i]);
+            if (val_reg == UINT32_MAX && (effective_captures[i] == "self" || effective_captures[i] == "this") && this_register_ != UINT32_MAX) {
+                val_reg = this_register_;
+            }
             if (val_reg == UINT32_MAX) {
                 // If not found in local scope, it might be in current lambda's env
                 if (env_register_ != UINT32_MAX) {
@@ -2999,7 +3027,7 @@ Reg Generator::emit_lambda_expr(LM::Frontend::AST::LambdaExpr& expr) {
                         emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, inner_idx_reg, make_i64((int64_t)(inner_idx + 1))));
                         
                         val_reg = allocate_register();
-                        emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::I64, val_reg, env_register_, inner_idx_reg));
+                        emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, val_reg, env_register_, inner_idx_reg));
                     }
                 }
             }
@@ -3210,6 +3238,24 @@ Reg Generator::emit_fallible_expr(LM::Frontend::AST::FallibleExpr& expr) {
 
 
 Reg Generator::emit_this_expr(LM::Frontend::AST::ThisExpr& expr) {
+    if (env_register_ != UINT32_MAX) {
+        auto it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), "self");
+        if (it == current_lambda_captures_.end()) {
+            it = std::find(current_lambda_captures_.begin(), current_lambda_captures_.end(), "this");
+        }
+        if (it != current_lambda_captures_.end()) {
+            size_t index = std::distance(current_lambda_captures_.begin(), it);
+            Reg result = allocate_register();
+            Reg idx_reg = allocate_register();
+            emit_instruction(LIR_Inst(LIR_Op::LoadConst, Type::I64, idx_reg, make_i64(static_cast<int64_t>(index + 1))));
+            emit_instruction(LIR_Inst(LIR_Op::TupleGet, Type::Ptr, result, env_register_, idx_reg));
+            set_register_abi_type(result, Type::Ptr);
+            if (expr.inferred_type) {
+                set_register_language_type(result, expr.inferred_type);
+            }
+            return result;
+        }
+    }
     if (this_register_ == UINT32_MAX) {
         report_error("'this' used outside of method context");
         return 0;

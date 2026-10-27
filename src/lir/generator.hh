@@ -406,6 +406,7 @@ private:
     std::unordered_map<std::string, std::string> import_aliases_;
     std::unordered_map<std::string, LM::Frontend::ModuleInfo> registered_modules_;
     std::string current_module_ = "";  // Current module context
+    std::unordered_set<std::string> global_variables_; // Global variables in entry script / modules
     
     Reg this_register_ = UINT32_MAX;  // Register holding 'this' pointer in methods
     Reg env_register_ = UINT32_MAX;   // Register holding the closure environment
