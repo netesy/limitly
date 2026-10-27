@@ -1,3 +1,5 @@
+import std.core show Disposable;
+
 // ── State Management with Batch Updates ──────────────────────────────────────
 // Dirty notification callback — set by context.lm at startup via register_dirty_notifier()
 pub var _dirty_notifier: fn(): nil = nil;
@@ -79,7 +81,7 @@ frame ComputedSignal {
     }
 }
 
-frame Effect {
+frame Effect : Disposable {
     pub var effect_fn: fn(): nil;
     pub var dependencies: [Signal];
     pub var cleanup_fn: fn(): nil;

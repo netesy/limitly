@@ -1,7 +1,7 @@
 import std.scene.node as node;
 import std.graphics.transform as transform; // required: promoted apply_base body resolves in host scope
 
-frame EffectNode {
+frame EffectNode : node.NodeTrait {
     embed node.Node;
     pub var effect_type: int; // 0 = blur, 1 = shadow, 2 = grayscale
 

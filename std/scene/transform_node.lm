@@ -1,7 +1,7 @@
 import std.scene.node as node;
 import std.graphics.transform as transform;
 
-frame TransformNode {
+frame TransformNode : node.NodeTrait {
     embed node.Node;
     pub var local_transform: transform.Transform;
 

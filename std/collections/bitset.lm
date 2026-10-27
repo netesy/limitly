@@ -1,6 +1,8 @@
 // Standard Library BitSet Collection
 
-frame BitSetIterator {
+import std.traits show Iterator;
+
+frame BitSetIterator : Iterator {
     var bitset: BitSet;
     var current: int;
     var yielded: int;

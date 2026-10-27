@@ -1,5 +1,7 @@
 // Standard Library LinkedList Collection
 
+import std.traits show Iterator;
+
 frame Node {
     pub var value: any;
     pub var next: any;
@@ -10,7 +12,7 @@ frame Node {
     }
 }
 
-frame LinkedListIterator {
+frame LinkedListIterator : Iterator {
     var current: any;
 
     pub init(head: any) {

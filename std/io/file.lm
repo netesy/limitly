@@ -13,36 +13,40 @@ frame UnknownError { pub var message: str; }
 
 pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
 
-frame File {
-    embed Reader;
-    embed Writer;
+frame File : Reader, Writer {
+    embed res.ResourceReader;
+    embed res.ResourceWriter;
 
     pub var path: str;
-    var resource: res.Resource;
+    pub var resource: res.Resource;
 
     pub init(p: str, r: res.Resource) {
         self.path = p;
         self.resource = r;
-        self.r = res.ResourceReader(r);
-        self.w = res.ResourceWriter(r);
     }
 
-    pub fn read(): str?IOError {
-        var res_data = self.r.read([]);
-        if (res_data == nil) return err(UnknownError(message="fail"));
-        return ok(res_data as str);
+    pub fn read(args: [any] = [] as [any]): any {
+        if (len(args) == 0) {
+            var res_data = rt.call(self.resource.handle, res.OP_READ, []);
+            if (res_data == nil) return err(UnknownError(message="fail"));
+            return ok(res_data as str);
+        }
+        return rt.call(self.resource.handle, res.OP_READ, args);
     }
 
     pub fn read_bytes(): [int]?IOError {
-        var res_data = self.r.read_bytes();
-        if (len(res_data) == 0) return err(UnknownError(message="empty"));
-        return ok(res_data);
+        var res_data = rt.call(self.resource.handle, res.OP_READ_BYTES, []);
+        if (res_data == nil or len(res_data as [int]) == 0) return err(UnknownError(message="empty"));
+        return ok(res_data as [int]);
     }
 
-    pub fn write(content: str): nil?IOError {
-        var success = self.w.write([content]);
-        if (success == nil) return err(UnknownError(message="fail"));
-        return ok(nil);
+    pub fn write(args: [any]): any {
+        if (len(args) > 0 and (args[0] as str) != nil) {
+            var success = rt.call(self.resource.handle, res.OP_WRITE, args);
+            if (success == nil) return err(UnknownError(message="fail"));
+            return ok(nil);
+        }
+        return rt.call(self.resource.handle, res.OP_WRITE, args);
     }
 
     pub fn close(): nil?IOError {

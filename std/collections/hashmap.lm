@@ -28,11 +28,14 @@ frame HashMap {
         }
     }
 
-    fn _hash(key: str): int {
-        return _builtin_string_hash_bytes(key) % self.capacity;
+    pub fn _hash(key: str): int {
+        var h = _builtin_string_hash_bytes(key);
+        var idx = h % self.capacity;
+        if (idx < 0) { idx = idx + self.capacity; }
+        return idx;
     }
 
-    fn _grow() {
+    pub fn _grow() {
         var old_buckets = self.buckets;
         self.capacity = self.capacity * 2;
         self.buckets = [] as [[HashEntry]];

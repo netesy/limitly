@@ -2,7 +2,11 @@
 
 import std.resource show Resource, ResourceReader;
 
-frame Reader {
+trait Reader {
+    fn read(args: [any]): any;
+}
+
+frame StreamReader : Reader {
     pub var r: ResourceReader;
 
     pub init(resource: Resource) {

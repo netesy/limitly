@@ -2,7 +2,7 @@ import std.scene.node as node;
 import std.graphics.transform as transform; // required: promoted apply_base body resolves in host scope
 import std.graphics.rect as rect;
 
-frame ClipNode {
+frame ClipNode : node.NodeTrait {
     embed node.Node;
     pub var clip_rect: rect.Rect;
 

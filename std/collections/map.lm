@@ -6,8 +6,8 @@ pub import std.collections.hashmap show HashMap, hashmap;
 frame HashMapWrapper {
     pub impl: hashmap.HashMap;
 
-    pub init() {
-        self.impl = hashmap.hashmap(16);
+    pub init(initial_cap: int = 16) {
+        self.impl = hashmap.hashmap(initial_cap);
     }
 
     pub fn put(key: str, value: any) {

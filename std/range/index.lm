@@ -1,3 +1,5 @@
+import std.traits show Iterator;
+
 frame Range {
     pub var start: int;
     pub var stop: int;
@@ -18,7 +20,7 @@ frame Range {
     }
 }
 
-frame RangeIterator {
+frame RangeIterator : Iterator {
     var current: int;
     var stop: int;
     var step: int;
