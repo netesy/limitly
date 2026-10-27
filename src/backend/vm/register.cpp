@@ -380,7 +380,7 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                 break;
             }
             case LIR::LIR_Op::ListAppend: {
-                RegisterValue list_val = registers[pc->dst];
+                RegisterValue list_val = registers[pc->a];
                 RegisterValue val = registers[pc->b];
                 if (IS_PTR(list_val) && !IS_PTR(val)) {
                     ObjHeader* h = reinterpret_cast<ObjHeader*>(UNBOX_PTR(list_val));
@@ -388,8 +388,10 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                         LmList* list = reinterpret_cast<LmList*>(h);
                         if (list->size < list->capacity) {
                             list->data[list->size++] = val;
-                            break;
+                        } else {
+                            lm_list_append(list, val);
                         }
+                        break;
                     }
                 }
                 execute_collections(pc);
@@ -461,7 +463,47 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::ConstructError: case LIR::LIR_Op::ConstructOk:
             case LIR::LIR_Op::IsError: case LIR::LIR_Op::Unwrap:
             case LIR::LIR_Op::UnwrapOr: execute_objects(pc); break;
-            case LIR::LIR_Op::StringIndex: case LIR::LIR_Op::ToString: case LIR::LIR_Op::STR_CONCAT:
+            case LIR::LIR_Op::STR_CONCAT: {
+                // Destructive in-place string append fast-path (dst == a)
+                if (pc->a == pc->dst) {
+                    RegisterValue va = registers[pc->a];
+                    RegisterValue vb = registers[pc->b];
+                    if (IS_PTR(va) && IS_PTR(vb) && va != vb) {
+                        ObjHeader* ha = reinterpret_cast<ObjHeader*>(UNBOX_PTR(va));
+                        ObjHeader* hb = reinterpret_cast<ObjHeader*>(UNBOX_PTR(vb));
+                        if (ha && hb && ha->type_id == TYPE_STRING && hb->type_id == TYPE_STRING &&
+                            (ha->metadata & LM_STR_EXCLUSIVE)) {
+                            LmStringHeader* str_a = reinterpret_cast<LmStringHeader*>(ha);
+                            LmStringHeader* str_b = reinterpret_cast<LmStringHeader*>(hb);
+                            uint64_t len_b = str_b->len;
+                            uint64_t total = str_a->len + len_b;
+                            if (total <= str_a->cap) {
+                                if (len_b == 1) {
+                                    str_a->data[str_a->len] = str_b->data[0];
+                                } else if (len_b > 0) {
+                                    memcpy(str_a->data + str_a->len, str_b->data, len_b);
+                                }
+                                str_a->len = total;
+                                str_a->data[total] = '\0';
+                                break;
+                            }
+                            uintptr_t old_ptr = reinterpret_cast<uintptr_t>(str_a);
+                            LmStringHeader* grown = lm_str_append(str_a, str_b);
+                            if (grown) {
+                                if (reinterpret_cast<uintptr_t>(grown) != old_ptr) {
+                                    relocate_allocation(old_ptr, reinterpret_cast<uintptr_t>(grown));
+                                }
+                                grown->header.metadata |= LM_STR_EXCLUSIVE;
+                                registers[pc->dst] = BOX_PTR(grown);
+                                break;
+                            }
+                        }
+                    }
+                }
+                execute_strings(pc);
+                break;
+            }
+            case LIR::LIR_Op::StringIndex: case LIR::LIR_Op::ToString:
             case LIR::LIR_Op::STR_FORMAT: execute_strings(pc); break;
             case LIR::LIR_Op::Cast: execute_cast(pc); break;
             case LIR::LIR_Op::Param: argument_stack.push_back(registers[pc->dst]); break;
@@ -518,8 +560,13 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
         if (pc->dst != UINT32_MAX && pc->dst < registers.size()) {
             RegisterValue out = registers[pc->dst];
             if (IS_PTR(out)) {
-                if (pc->op != LIR::LIR_Op::STR_CONCAT) share_value(out);
-                auto_register_output(pc);
+                if (pc->op != LIR::LIR_Op::STR_CONCAT &&
+                    pc->op != LIR::LIR_Op::ListAppend &&
+                    pc->op != LIR::LIR_Op::ListSet &&
+                    pc->op != LIR::LIR_Op::DictSet) {
+                    share_value(out);
+                    auto_register_output(pc);
+                }
             }
         }
         pc++;

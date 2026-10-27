@@ -22,8 +22,7 @@ fn main(): int {
     var PIPE_N = 5000000;
     var NUM_N = 10000000;
 
-    // 1. String Ops - Using StringBuilder (append returns nil, so no per-call
-    // frame copy; to_string uses the single-pass builtin join).
+    // 1. String Ops (in-place exclusive concat)
     var t0 = clock();
     var builder = StringBuilder();
     for (var i = 0; i < STR_N; i = i + 1) {
