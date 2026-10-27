@@ -2,6 +2,17 @@
 #include "lymar.hh"
 #include <iostream>
 #include <filesystem>
+#include <cstring>
+
+#ifndef _WIN32
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <fcntl.h>
+#else
+#include <windows.h>
+#endif
 
 namespace LM {
 namespace DAP {
@@ -55,6 +66,63 @@ bool LldbDapTarget::buildFyraAotBinary(const std::string& sourcePath, std::strin
     return true;
 }
 
+bool LldbDapTarget::spawnLldbDapProcess(std::string& error) {
+#ifndef _WIN32
+    if (pipe(pipe_in_) < 0 || pipe(pipe_out_) < 0) {
+        error = "Failed to create pipes for lldb-dap process";
+        return false;
+    }
+
+    pid_t p = fork();
+    if (p < 0) {
+        error = "Failed to fork lldb-dap process";
+        return false;
+    }
+
+    if (p == 0) {
+        // Child
+        close(pipe_in_[1]);
+        close(pipe_out_[0]);
+
+        dup2(pipe_in_[0], STDIN_FILENO);
+        dup2(pipe_out_[1], STDOUT_FILENO);
+
+        close(pipe_in_[0]);
+        close(pipe_out_[1]);
+
+        std::string script_arg = "scripts/lldb_formatters.py";
+        const char* args[] = {
+            lldb_dap_path_.c_str(),
+            "--source",
+            script_arg.c_str(),
+            nullptr
+        };
+
+        execvp(lldb_dap_path_.c_str(), const_cast<char* const*>(args));
+        // Fallback: try lldb-vscode
+        const char* fallback_args[] = {
+            "lldb-vscode",
+            "--source",
+            script_arg.c_str(),
+            nullptr
+        };
+        execvp("lldb-vscode", const_cast<char* const*>(fallback_args));
+        _exit(127);
+    } else {
+        // Parent
+        pid_ = p;
+        close(pipe_in_[0]);
+        close(pipe_out_[1]);
+
+        is_running_ = true;
+        return true;
+    }
+#else
+    is_running_ = true;
+    return true;
+#endif
+}
+
 bool LldbDapTarget::launch(const DapJson::Value& launchArgs, std::string& error) {
     if (!launchArgs.has("program")) {
         error = "Missing 'program' parameter in launch arguments for LLDB DAP";
@@ -72,6 +140,13 @@ bool LldbDapTarget::launch(const DapJson::Value& launchArgs, std::string& error)
         }
     } else {
         binary_path_ = source_path_;
+    }
+
+    if (!spawnLldbDapProcess(error)) {
+        // Fallback to standalone mode if lldb-dap binary is not installed on system PATH
+        if (listener_) {
+            listener_->onOutput("console", "Notice: lldb-dap executable not found on host system PATH. Falling back to internal native DAP session handler.\n");
+        }
     }
 
     if (listener_) {
@@ -202,6 +277,16 @@ std::vector<DapVariable> LldbDapTarget::getVariables(int variablesReference) {
 
 void LldbDapTarget::disconnect(bool terminateDebuggee) {
     is_running_ = false;
+#ifndef _WIN32
+    if (pid_ > 0) {
+        kill(pid_, SIGTERM);
+        int status;
+        waitpid(pid_, &status, WNOHANG);
+        pid_ = -1;
+    }
+    if (pipe_in_[1] >= 0) { close(pipe_in_[1]); pipe_in_[1] = -1; }
+    if (pipe_out_[0] >= 0) { close(pipe_out_[0]); pipe_out_[0] = -1; }
+#endif
 }
 
 } // namespace DAP

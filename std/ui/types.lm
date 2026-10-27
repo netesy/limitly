@@ -6,6 +6,83 @@ import std.graphics.shadow as shadow;
 import std.ui.state as state;
 pub import std.graphics.shadow show Shadow, shadow;
 
+trait WidgetTrait {
+    fn mark_for_removal(): nil;
+}
+
+mixin WidgetState {
+    pub var kind: int;
+    pub var text_val: str;
+    pub var on_click_action: any;
+
+    pub var foreground_color: Color;
+    pub var background_color: Color;
+    pub var font_size_val: float;
+    pub var font_weight_val: int;
+    pub var padding_left: float;
+    pub var padding_top: float;
+    pub var padding_right: float;
+    pub var padding_bottom: float;
+    pub var corner_radius_val: float;
+    pub var spacing_val: float;
+    pub var is_vertical: int;
+    pub var align_val: int;
+    pub var flex_val: float;
+    pub var is_enabled: int;
+    pub var is_pressed: int;
+    pub var is_hovered: int;
+    pub var click_count: int;
+    pub var width_val: float;
+    pub var height_val: float;
+    pub var pressed_style_val: Style;
+    pub var hover_style_val: Style;
+    pub var is_checked: int;
+    pub var slider_val: float;
+    pub var slider_min: float;
+    pub var slider_max: float;
+    pub var is_focused: int;
+    pub var active_tab: int;
+    pub var hovered_tab: int;
+    pub var tab_titles: [str];
+    pub var on_change_action: any;
+    pub var select_options: [str];
+    pub var selected_idx: int;
+    pub var is_open: int;
+    pub var opacity_val: float;
+    pub var scale_val: float;
+    pub var shadow_val: shadow.Shadow;
+    pub var lifecycle_state: int;
+    pub var enter_transition: anim.Transition;
+    pub var exit_transition: anim.Transition;
+    pub var anim_property: anim.PropertyAnimation;
+    pub var active_transition: anim.Transition;
+
+    pub var text_editor_state: any;
+    pub var scroll_x: float;
+    pub var scroll_y: float;
+    pub var max_scroll_x: float;
+    pub var max_scroll_y: float;
+    pub var placeholder_val: str;
+    pub var focus_key: str;
+
+    // ── Layout Constraints ────────────────────────────────────────────────
+    pub var min_width: float;
+    pub var max_width: float;
+    pub var min_height: float;
+    pub var max_height: float;
+    pub var grow: float;
+    pub var shrink: float;
+    pub var aspect_ratio: float;
+
+    // ── Accessibility ─────────────────────────────────────────────────────
+    pub var a11y_role: str;
+    pub var a11y_label: str;
+    pub var a11y_hint: str;
+    pub var a11y_live: str;
+    pub var tab_index: int;
+    pub var is_a11y_hidden: bool;
+}
+
 // ── Canonical Retained UI Color ──────────────────────────────────────────────
 frame Color {
     pub var r: float;
@@ -54,13 +131,6 @@ pub var LIFECYCLE_ENTERING: int = 0;
 pub var LIFECYCLE_ACTIVE: int = 1;
 pub var LIFECYCLE_EXITING: int = 2;
 pub var LIFECYCLE_REMOVED: int = 3;
-
-
-
-
-
-
-
 
 frame Point {
     pub var x: float;
@@ -308,78 +378,10 @@ pub var _shared_empty_trans: anim.Transition = anim.Transition();
 pub var _shared_empty_anim: anim.PropertyAnimation = anim.PropertyAnimation();
 
 // Unified Retained UI Node with Fluent Modifiers
-frame Widget {
-    pub var kind: int;
-    pub var text_val: str;
-    pub var on_click_action: any;
+frame Widget : WidgetTrait {
+    mixin WidgetState;
+
     pub var children: [Widget];
-
-    pub var foreground_color: Color;
-    pub var background_color: Color;
-    pub var font_size_val: float;
-    pub var font_weight_val: int;
-    pub var padding_left: float;
-    pub var padding_top: float;
-    pub var padding_right: float;
-    pub var padding_bottom: float;
-    pub var corner_radius_val: float;
-    pub var spacing_val: float;
-    pub var is_vertical: int;
-    pub var align_val: int;
-    pub var flex_val: float;
-    pub var is_enabled: int;
-    pub var is_pressed: int;
-    pub var is_hovered: int;
-    pub var click_count: int;
-    pub var width_val: float;
-    pub var height_val: float;
-    pub var pressed_style_val: Style;
-    pub var hover_style_val: Style;
-    pub var is_checked: int;
-    pub var slider_val: float;
-    pub var slider_min: float;
-    pub var slider_max: float;
-    pub var is_focused: int;
-    pub var active_tab: int;
-    pub var hovered_tab: int;
-    pub var tab_titles: [str];
-    pub var on_change_action: any;
-    pub var select_options: [str];
-    pub var selected_idx: int;
-    pub var is_open: int;
-    pub var opacity_val: float;
-    pub var scale_val: float;
-    pub var shadow_val: shadow.Shadow;
-    pub var lifecycle_state: int;
-    pub var enter_transition: anim.Transition;
-    pub var exit_transition: anim.Transition;
-    pub var anim_property: anim.PropertyAnimation;
-    pub var active_transition: anim.Transition;
-
-    pub var text_editor_state: any;
-    pub var scroll_x: float;
-    pub var scroll_y: float;
-    pub var max_scroll_x: float;
-    pub var max_scroll_y: float;
-    pub var placeholder_val: str;
-    pub var focus_key: str;
-
-    // ── Layout Constraints ────────────────────────────────────────────────
-    pub var min_width: float;    // 0.0 = unconstrained
-    pub var max_width: float;    // 0.0 = unconstrained
-    pub var min_height: float;
-    pub var max_height: float;
-    pub var grow: float;         // flex-grow factor (0.0 = fixed, 1.0 = fill)
-    pub var shrink: float;       // flex-shrink factor
-    pub var aspect_ratio: float; // 0.0 = no constraint; w/h ratio
-
-    // ── Accessibility ─────────────────────────────────────────────────────
-    pub var a11y_role: str;      // e.g. "button", "heading", "checkbox", "img", "link", "status"
-    pub var a11y_label: str;     // screen-reader label (overrides text_val)
-    pub var a11y_hint: str;      // additional description / usage hint
-    pub var a11y_live: str;      // "" | "polite" | "assertive" (for dynamic regions)
-    pub var tab_index: int;      // -1 = not focusable, 0 = natural order, >0 = explicit order
-    pub var is_a11y_hidden: bool; // true = hidden from assistive tech
 
     pub init(k: int) {
         self.kind = k;
@@ -630,7 +632,6 @@ frame Widget {
     }
 
     // ── Signal Binding Modifiers ───────────────────────────────────────────
-    // Bind a signal to this widget's text property
     pub fn bind_text(sig: any): Widget {
         var s = sig as state.Signal;
         if (s != nil) {
@@ -642,7 +643,6 @@ frame Widget {
         return self;
     }
 
-    // Bind a signal to this widget's checked property
     pub fn bind_checked(sig: any): Widget {
         var s = sig as state.Signal;
         if (s != nil) {
@@ -658,7 +658,6 @@ frame Widget {
         return self;
     }
 
-    // Bind a signal to this widget's slider_val property
     pub fn bind_value(sig: any): Widget {
         var s = sig as state.Signal;
         if (s != nil) {
@@ -670,7 +669,6 @@ frame Widget {
         return self;
     }
 
-    // Bind a signal to this widget's enabled state
     pub fn bind_enabled(sig: any): Widget {
         var s = sig as state.Signal;
         if (s != nil) {
@@ -956,10 +954,6 @@ pub fn alert(message: str, type_val: str = "info"): Widget {
     return w;
 }
 
-pub fn color_rgb(r: float, g: float, b: float): Color {
-    return Color(r=r, g=g, b=b, a=1.0);
-}
-
 pub fn accordion(title: str, content: Widget, default_open: bool = false): Widget {
     var w = Widget(KIND_ACCORDION);
     w.text_val = title;
@@ -1028,7 +1022,7 @@ pub fn range_slider(low: float = 20.0, high: float = 80.0, min_val: float = 0.0,
     w.slider_min = min_val;
     w.slider_max = max_val;
     w.slider_val = low;
-    w.padding_left = high; // store high value in padding_left
+    w.padding_left = high;
     w.height_val = 24.0;
     w.width_val = 160.0;
     w.background_color = rgb(35, 38, 48);
@@ -1151,10 +1145,6 @@ pub fn radar_chart(label: str, values: [float], labels: [str] = [] as [str]): Wi
     w.foreground_color = rgb(100, 200, 255);
     w.text_editor_state = values;
     return w;
-}
-
-pub fn color_rgba(r: float, g: float, b: float, a: float): Color {
-    return Color(r=r, g=g, b=b, a=a);
 }
 
 pub fn list(items: [Widget]): Widget {

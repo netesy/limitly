@@ -43,6 +43,7 @@ public:
 
 private:
     bool buildFyraAotBinary(const std::string& sourcePath, std::string& binaryPath, std::string& error);
+    bool spawnLldbDapProcess(std::string& error);
 
     IDebugEventListener* listener_ = nullptr;
     std::string source_path_;
@@ -50,6 +51,20 @@ private:
     std::string lldb_dap_path_ = "lldb-dap";
     bool is_running_ = false;
     bool built_via_fyra_ = false;
+
+    // Subprocess handles
+#ifndef _WIN32
+    int pid_ = -1;
+    int pipe_in_[2] = {-1, -1};
+    int pipe_out_[2] = {-1, -1};
+#else
+    void* h_process_ = nullptr;
+    void* h_in_write_ = nullptr;
+    void* h_out_read_ = nullptr;
+#endif
+
+    std::thread io_thread_;
+    std::atomic<bool> stop_io_{false};
 
     // Recorded breakpoints and frames for proxy mode
     std::vector<DapBreakpoint> active_breakpoints_;

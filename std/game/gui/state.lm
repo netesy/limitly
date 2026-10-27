@@ -3,6 +3,24 @@
 
 import std.game.types as types;
 
+trait GUIComponent {
+    fn is_occluded(x: float, y: float, w: float, h: float): bool;
+}
+
+mixin GUIState {
+    pub var theme: types.GUITheme;
+
+    // Input snapshot for current frame
+    pub var mouse_x: float;
+    pub var mouse_y: float;
+    pub var mouse_down: bool;
+    pub var mouse_pressed: bool;
+    pub var mouse_released: bool;
+    pub var mouse_wheel: float;
+    pub var prev_mouse_down: bool;
+    pub var dt: float;
+}
+
 frame WindowState {
     pub var x: float;
     pub var y: float;

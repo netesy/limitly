@@ -2,32 +2,60 @@
 
 import std.internal.runtime as rt;
 
-frame Buffer {
+trait ResourceTrait {
+    fn is_valid(): bool;
+}
+
+mixin ResourceHandle {
     pub var id: int;
+}
+
+frame Buffer : ResourceTrait {
+    mixin ResourceHandle;
     pub var size: int;
     pub var is_index: bool;
+
+    pub fn is_valid(): bool {
+        return self.id > 0;
+    }
 }
 
-frame Image {
-    pub var id: int;
+frame Image : ResourceTrait {
+    mixin ResourceHandle;
     pub var width: int;
     pub var height: int;
+
+    pub fn is_valid(): bool {
+        return self.id > 0;
+    }
 }
 
-frame Sampler {
-    pub var id: int;
+frame Sampler : ResourceTrait {
+    mixin ResourceHandle;
+
+    pub fn is_valid(): bool {
+        return self.id > 0;
+    }
 }
 
-frame Shader {
-    pub var id: int;
+frame Shader : ResourceTrait {
+    mixin ResourceHandle;
     pub var vs_src: str;
     pub var fs_src: str;
+
+    pub fn is_valid(): bool {
+        return self.id > 0;
+    }
 }
 
-frame Pipeline {
-    pub var id: int;
+frame Pipeline : ResourceTrait {
+    mixin ResourceHandle;
     pub var shader_id: int;
     pub var primitive_type: int;
+
+    pub fn is_valid(): bool {
+        return self.id > 0;
+    }
 }
 
 frame Bindings {

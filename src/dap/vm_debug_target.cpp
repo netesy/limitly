@@ -23,6 +23,13 @@ namespace DAP {
 
 namespace {
 
+bool isTruthy(LmValue val) {
+    if (IS_NIL(val)) return false;
+    if (IS_BOOL(val)) return UNBOX_BOOL(val);
+    if (IS_INT(val)) return UNBOX_INT(val) != 0;
+    return true;
+}
+
 std::string normalizePath(const std::string& path) {
     if (path.empty()) return "";
     try {
@@ -141,7 +148,7 @@ void VmDebugTarget::runVmThread() {
 
     try {
         if (compiled_function_) {
-            // Execution loop with debug hook
+            // Execution loop with debug hook and jump target resolution
             const auto& insts = compiled_function_->instructions;
             size_t pc = 0;
             size_t end_pc = insts.size();
@@ -151,6 +158,8 @@ void VmDebugTarget::runVmThread() {
                 if (inst.loc.line > 0) {
                     current_pc_line_ = inst.loc.line;
                 }
+
+                current_call_depth_ = vm_ ? vm_->get_call_stack().get_depth() : 0;
 
                 if (shouldStopOnInstruction(source_path_, current_pc_line_, current_call_depth_)) {
                     std::string reason = "breakpoint";
@@ -162,9 +171,23 @@ void VmDebugTarget::runVmThread() {
                     pauseAndNotify(reason);
                 }
 
+                size_t next_pc = pc + 1;
+                if (inst.op == LIR::LIR_Op::Jump) {
+                    next_pc = inst.imm;
+                } else if (inst.op == LIR::LIR_Op::JumpIf) {
+                    bool cond = (inst.a < vm_->get_registers().size()) ? isTruthy(vm_->get_registers()[inst.a]) : false;
+                    if (cond) next_pc = inst.imm;
+                } else if (inst.op == LIR::LIR_Op::JumpIfFalse) {
+                    bool cond = (inst.a < vm_->get_registers().size()) ? isTruthy(vm_->get_registers()[inst.a]) : false;
+                    if (!cond) next_pc = inst.imm;
+                } else if (inst.op == LIR::LIR_Op::Return || inst.op == LIR::LIR_Op::Ret) {
+                    vm_->execute_instructions(*compiled_function_, pc, pc + 1);
+                    break;
+                }
+
                 // Execute single step
                 vm_->execute_instructions(*compiled_function_, pc, pc + 1);
-                pc++;
+                pc = next_pc;
             }
         }
     } catch (const std::exception& e) {
@@ -332,6 +355,7 @@ std::vector<DapStackFrame> VmDebugTarget::getStackTrace(int threadId, int startF
         const auto& cs = vm_->get_call_stack();
         const auto& cs_frames = cs.get_frames();
         if (!cs_frames.empty()) {
+            bool is_top = true;
             for (auto it = cs_frames.rbegin(); it != cs_frames.rend(); ++it) {
                 if (frames.size() >= static_cast<size_t>(levels)) break;
                 DapStackFrame frame;
@@ -339,7 +363,18 @@ std::vector<DapStackFrame> VmDebugTarget::getStackTrace(int threadId, int startF
                 frame.name = (*it)->function_name.empty() ? "anonymous" : (*it)->function_name;
                 frame.source.path = source_path_;
                 frame.source.name = std::filesystem::path(source_path_).filename().string();
-                frame.line = current_pc_line_ > 0 ? current_pc_line_ : 1;
+                if (is_top) {
+                    frame.line = current_pc_line_ > 0 ? current_pc_line_ : 1;
+                    is_top = false;
+                } else {
+                    uint64_t ret_addr = (*it)->return_address;
+                    int frame_line = 1;
+                    if (compiled_function_ && ret_addr < compiled_function_->instructions.size()) {
+                        int l = compiled_function_->instructions[ret_addr].loc.line;
+                        if (l > 0) frame_line = l;
+                    }
+                    frame.line = frame_line;
+                }
                 frame.column = 1;
                 frames.push_back(frame);
             }

@@ -1,10 +1,18 @@
 import std.graphics.transform as transform;
 
-frame Node {
+trait NodeTrait {
+    fn add_child(child: Node): nil;
+}
+
+mixin NodeState {
     pub var id: int;
     pub var children: [Node];
     pub var transform_val: transform.Transform;
     pub var visible: bool;
+}
+
+frame Node : NodeTrait {
+    mixin NodeState;
 
     pub init(id: int = 0, ch: [Node]? = nil, t: transform.Transform? = nil, vis: bool = true) {
         self.id = id;
