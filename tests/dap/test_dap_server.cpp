@@ -86,12 +86,19 @@ void test_vm_debug_target() {
 }
 
 void test_lldb_dap_target() {
-    std::cout << "Testing LldbDapTarget pass-through abstraction..." << std::endl;
+    std::cout << "Testing LldbDapTarget pass-through abstraction & Fyra AOT integration..." << std::endl;
+
+    std::string temp_file = "temp_lldb_dap_test.lm";
+    {
+        std::ofstream out(temp_file);
+        out << "var a = 100;\n";
+        out << "print(a);\n";
+    }
 
     LM::DAP::LldbDapTarget target;
 
     LM::DAP::DapJson::Value launch_args = LM::DAP::DapJson::Value::object();
-    launch_args["program"] = "sample_app";
+    launch_args["program"] = temp_file;
 
     std::string err;
     bool ok = target.launch(launch_args, err);
@@ -110,6 +117,17 @@ void test_lldb_dap_target() {
     assert(!vars.empty());
 
     target.disconnect(true);
+
+    if (std::filesystem::exists(temp_file)) {
+        std::filesystem::remove(temp_file);
+    }
+    std::string bin_file = "temp_lldb_dap_test";
+#ifdef _WIN32
+    bin_file += ".exe";
+#endif
+    if (std::filesystem::exists(bin_file)) {
+        std::filesystem::remove(bin_file);
+    }
 
     std::cout << "[PASS] LldbDapTarget test passed." << std::endl;
 }

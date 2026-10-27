@@ -42,10 +42,14 @@ public:
     void disconnect(bool terminateDebuggee) override;
 
 private:
+    bool buildFyraAotBinary(const std::string& sourcePath, std::string& binaryPath, std::string& error);
+
     IDebugEventListener* listener_ = nullptr;
-    std::string program_path_;
+    std::string source_path_;
+    std::string binary_path_;
     std::string lldb_dap_path_ = "lldb-dap";
     bool is_running_ = false;
+    bool built_via_fyra_ = false;
 
     // Recorded breakpoints and frames for proxy mode
     std::vector<DapBreakpoint> active_breakpoints_;
