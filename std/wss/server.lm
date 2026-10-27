@@ -192,6 +192,16 @@ frame WSSServer {
         return core.ok_int(0);
     }
 
+    pub fn select_subprotocol(requested: str, supported: [str]): str {
+        var i = 0;
+        while (i < len(supported)) {
+            if (supported[i] == requested) return supported[i];
+            i = i + 1;
+        }
+        if (len(supported) > 0) return supported[0];
+        return "";
+    }
+
     pub fn is_running(): bool { return self.running; }
 }
 

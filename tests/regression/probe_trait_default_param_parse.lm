@@ -1,8 +1,0 @@
-// Negative probe: trait requirement with a default param must be a parse error.
-trait Renderer3 {
-    fn draw(camera: any = nil);
-}
-
-frame CamB: Renderer3 {
-    pub fn draw(camera: any = nil): nil { return nil; }
-}

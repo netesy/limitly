@@ -19,6 +19,12 @@ frame XMLParser {
         }
     }
 
+    pub fn peek_char(): str {
+        self.skip_whitespace();
+        if (self.idx >= len(self.text)) return "";
+        return _builtin_substring(self.text, self.idx, self.idx + 1);
+    }
+
     pub fn parse_node(): any {
         self.skip_whitespace();
         var length = len(self.text);

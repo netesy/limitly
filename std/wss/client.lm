@@ -128,6 +128,21 @@ frame WebSocketClient {
     }
 
     pub fn send_frame_masked(opcode: int, data: str): bool {
-        return self.send_text(data) != nil;
+        if (not self.is_connected()) return false;
+        var mask_key = [0x12, 0x34, 0x56, 0x78];
+        var masked_data = mask_payload(data, mask_key);
+        return self.send_text(masked_data) != nil;
     }
+}
+
+fn mask_payload(data: str, mask_key: [int]): str {
+    if (len(mask_key) < 4) return data;
+    var res = "";
+    for (var i = 0; i < len(data); i = i + 1) {
+        var b = _builtin_string_byte_at(data, i);
+        var k = mask_key[i % 4];
+        var masked_b = b ^ k;
+        res = res + _builtin_string_from_bytes([masked_b]);
+    }
+    return res;
 }

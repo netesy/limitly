@@ -62,6 +62,10 @@ frame Path {
         return len(self.commands);
     }
 
+    pub fn point_count(): int {
+        return len(self.points);
+    }
+
     pub fn clear(): nil {
         self.commands = [] as [int];
         self.points = [] as [float];

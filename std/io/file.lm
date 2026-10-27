@@ -40,13 +40,16 @@ frame File : Reader, Writer {
         return ok(res_data as [int]);
     }
 
-    pub fn write(args: [any]): any {
-        if (len(args) > 0 and (args[0] as str) != nil) {
-            var success = rt.call(self.resource.handle, res.OP_WRITE, args);
-            if (success == nil) return err(UnknownError(message="fail"));
-            return ok(nil);
+    pub fn write(arg: any): any {
+        var args_list: [any] = [];
+        if (arg as [any] != nil) {
+            args_list = arg as [any];
+        } else {
+            args_list.append(arg);
         }
-        return rt.call(self.resource.handle, res.OP_WRITE, args);
+        var success = rt.call(self.resource.handle, res.OP_WRITE, args_list);
+        if (success == nil) return err(UnknownError(message="fail"));
+        return ok(nil);
     }
 
     pub fn close(): nil?IOError {

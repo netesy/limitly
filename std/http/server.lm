@@ -242,6 +242,34 @@ fn parse_server_request(raw: str): ServerRequest {
         }
     }
 
+    if (req_headers["Transfer-Encoding"] == "chunked" or req_headers["transfer-encoding"] == "chunked") {
+        var unchunked = "";
+        var pos = 0;
+        var b_len = len(body_str);
+        while (pos < b_len) {
+            var crlf = index_of_h(substring(body_str, pos, b_len), "\r\n");
+            if (crlf == -1) {
+                pos = b_len;
+            } else {
+                var chunk_head = substring(body_str, pos, pos + crlf);
+                pos = pos + crlf + 2;
+                var chunk_size = parse_hex(chunk_head);
+                if (chunk_size <= 0) {
+                    pos = b_len;
+                } else {
+                    if (pos + chunk_size <= b_len) {
+                        unchunked = unchunked + substring(body_str, pos, pos + chunk_size);
+                        pos = pos + chunk_size + 2;
+                    } else {
+                        unchunked = unchunked + substring(body_str, pos, b_len);
+                        pos = b_len;
+                    }
+                }
+            }
+        }
+        body_str = unchunked;
+    }
+
     return ServerRequest(
         method=method_val,
         path=path_val,
@@ -252,6 +280,44 @@ fn parse_server_request(raw: str): ServerRequest {
         remote_addr="",
         client_resource=nil
     );
+}
+
+fn hex_digit_val(ch: str): int {
+    if (ch == "0") return 0;
+    if (ch == "1") return 1;
+    if (ch == "2") return 2;
+    if (ch == "3") return 3;
+    if (ch == "4") return 4;
+    if (ch == "5") return 5;
+    if (ch == "6") return 6;
+    if (ch == "7") return 7;
+    if (ch == "8") return 8;
+    if (ch == "9") return 9;
+    if (ch == "a" or ch == "A") return 10;
+    if (ch == "b" or ch == "B") return 11;
+    if (ch == "c" or ch == "C") return 12;
+    if (ch == "d" or ch == "D") return 13;
+    if (ch == "e" or ch == "E") return 14;
+    if (ch == "f" or ch == "F") return 15;
+    return 0;
+}
+
+fn parse_hex(s: str): int {
+    var val = 0;
+    var i = 0;
+    while (i < len(s)) {
+        var ch = substring(s, i, i + 1);
+        if (ch == ";" or ch == " " or ch == "\r" or ch == "\n") {
+            return val;
+        }
+        val = val * 16 + hex_digit_val(ch);
+        i = i + 1;
+    }
+    return val;
+}
+
+fn substring(s: str, start: int, end: int): str {
+    return _builtin_substring(s, start, end);
 }
 
 fn index_of_h(s: str, pattern: str): int {

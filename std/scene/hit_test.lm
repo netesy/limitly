@@ -10,7 +10,7 @@ frame HitTest {
         var i = len(root.children) - 1;
         while (i >= 0) {
             var child = root.children[i];
-            var hit = self.test(child, point);
+            var hit = self.test(child as node.Node, point);
             if (hit != nil) return hit;
             i = i - 1;
         }
