@@ -28,6 +28,12 @@ RegisterValue RegisterVM::call_interpreted(const std::string& name,
 RegisterValue RegisterVM::call_interpreted(const LIR::LIR_Function* function,
                                             const std::vector<RegisterValue>& args) {
     if (!function) throw std::runtime_error("Missing interpreted function");
+    if (function->name.size() >= 9 && function->name.compare(function->name.size() - 9, 9, ".__init__") == 0) {
+        if (initialized_modules_.count(function->name)) {
+            return VAL_NIL;
+        }
+        initialized_modules_.insert(function->name);
+    }
     ProfileScope prof_scope(function->name);
 
     for (auto value : args) {
@@ -176,6 +182,45 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                         static_cast<uint32_t>(Backend::Native::Helper::Builtin),
                         VAL_NIL, VAL_NIL, VAL_NIL, fname.c_str(), args.data(), args.size());
                     handled = true;
+                } else if (fname == "_builtin_string_from_cstr" && pc->call_args.size() >= 1) {
+                    RegisterValue arg = registers[pc->call_args[0]];
+                    const char* cstr = nullptr;
+                    if (IS_PTR(arg)) {
+                        ObjHeader* h = (ObjHeader*)UNBOX_PTR(arg);
+                        if (h->type_id == TYPE_FOREIGN_PTR) cstr = (const char*)((ObjForeignPtr*)h)->ptr;
+                        else if (h->type_id == TYPE_STRING) cstr = (const char*)((LmStringHeader*)h)->data;
+                        else if (h->type_id == TYPE_BOX && ((LmBox*)h)->type == LM_BOX_STRING) {
+                            cstr = (const char*)((LmBox*)h)->value.as_ptr;
+                        }
+                    } else if (is_integer(arg)) {
+                        cstr = (const char*)(uintptr_t)as_i64(arg);
+                    }
+                    if (!cstr) {
+                        registers[pc->dst] = BOX_PTR(lm_str_from_bytes("", 0));
+                    } else {
+                        registers[pc->dst] = BOX_PTR(lm_str_from_bytes(cstr, strlen(cstr)));
+                    }
+                    register_native_allocation(registers[pc->dst]);
+                    handled = true;
+                } else if (fname == "_builtin_string_to_cstr" && pc->call_args.size() >= 1) {
+                    LmStringHeader* str = get_hdr(pc->call_args[0]);
+                    if (!str || !str->data) {
+                        auto result = allocate_raw_memory(1);
+                        if (IS_PTR(result)) {
+                            auto* raw = static_cast<ObjForeignPtr*>(UNBOX_PTR(result));
+                            static_cast<char*>(raw->ptr)[0] = '\0';
+                        }
+                        registers[pc->dst] = result;
+                    } else {
+                        auto result = allocate_raw_memory(str->len + 1);
+                        if (IS_PTR(result)) {
+                            auto* raw = static_cast<ObjForeignPtr*>(UNBOX_PTR(result));
+                            if (str->len) std::memcpy(raw->ptr, str->data, str->len);
+                            static_cast<char*>(raw->ptr)[str->len] = '\0';
+                        }
+                        registers[pc->dst] = result;
+                    }
+                    handled = true;
                 } else if (fname == "_builtin_substring" && pc->call_args.size() >= 3) {
                     LmStringHeader* str = get_hdr(pc->call_args[0]);
                     int64_t start = as_i64(registers[pc->call_args[1]]);
@@ -240,6 +285,14 @@ void RegisterVM::execute_calls(const LIR::LIR_Inst* pc) {
                     int64_t offset = as_i64(registers[pc->call_args[1]]);
                     uint64_t res = lm_str_decode_next(str, offset >= 0 ? (uint64_t)offset : 0);
                     registers[pc->dst] = make_i64((int64_t)res);
+                    handled = true;
+                } else if (fname == "print") {
+                    for (size_t i = 0; i < pc->call_args.size(); ++i) {
+                        if (i > 0) std::cout << " ";
+                        std::cout << to_string(registers[pc->call_args[i]]);
+                    }
+                    std::cout << std::endl;
+                    registers[pc->dst] = VAL_NIL;
                     handled = true;
                 }
 

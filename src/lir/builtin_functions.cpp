@@ -729,6 +729,48 @@ void LIRBuiltinFunctions::registerUtilityFunctions() {
     ));
 
     registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_from_cstr",
+        std::vector<TypeTag>{TypeTag::Int},
+        TypeTag::String,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            std::string res = "";
+            if (!args.empty() && args[0]) {
+                if (args[0]->type && args[0]->type->tag == TypeTag::String) {
+                    res = args[0]->as<std::string>();
+                    auto string_type = std::make_shared<::Type>(TypeTag::String);
+                    return std::make_shared<Value>(string_type, res);
+                }
+                int64_t ptr_val = args[0]->as<int64_t>();
+                if (ptr_val != 0) {
+                    const char* cstr = reinterpret_cast<const char*>(ptr_val);
+                    if (cstr) res = std::string(cstr);
+                }
+            }
+            auto string_type = std::make_shared<::Type>(TypeTag::String);
+            return std::make_shared<Value>(string_type, res);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
+        "_builtin_string_to_cstr",
+        std::vector<TypeTag>{TypeTag::String},
+        TypeTag::Int,
+        [](const std::vector<ValuePtr>& args) -> ValuePtr {
+            int64_t ptr_val = 0;
+            if (!args.empty() && args[0]) {
+                std::string s = args[0]->as<std::string>();
+                char* copy = (char*)malloc(s.length() + 1);
+                if (copy) {
+                    memcpy(copy, s.c_str(), s.length() + 1);
+                    ptr_val = reinterpret_cast<int64_t>(copy);
+                }
+            }
+            auto int_type = std::make_shared<::Type>(TypeTag::Int);
+            return std::make_shared<Value>(int_type, ptr_val);
+        }
+    ));
+
+    registerFunction(std::make_shared<LIRBuiltinFunction>(
         "_builtin_string_codepoints",
         std::vector<TypeTag>{TypeTag::String},
         TypeTag::List,

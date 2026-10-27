@@ -179,6 +179,10 @@ void register_builtin_functions(TypeChecker& checker) {
     checker.register_builtin_function("_builtin_substring", {ts.STRING_TYPE, ts.INT_TYPE, ts.INT_TYPE}, ts.STRING_TYPE);
     checker.register_builtin_function("_builtin_string_from_bytes", {ts.createTypedListType(ts.INT_TYPE)}, ts.STRING_TYPE);
     checker.register_builtin_function("_builtin_string_from_bytes", {ts.ANY_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("_builtin_string_from_cstr", {ts.INT_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("_builtin_string_from_cstr", {ts.ANY_TYPE}, ts.STRING_TYPE);
+    checker.register_builtin_function("_builtin_string_to_cstr", {ts.STRING_TYPE}, ts.INT_TYPE);
+    checker.register_builtin_function("_builtin_string_to_cstr", {ts.ANY_TYPE}, ts.INT_TYPE);
     checker.register_builtin_function("_builtin_string_byte_len", {ts.STRING_TYPE}, ts.INT_TYPE);
     checker.register_builtin_function("_builtin_string_decode_next", {ts.STRING_TYPE, ts.INT_TYPE}, ts.INT_TYPE);
     checker.register_builtin_function("_builtin_string_byte_at", {ts.STRING_TYPE, ts.INT_TYPE}, ts.INT_TYPE);

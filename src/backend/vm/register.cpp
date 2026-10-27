@@ -111,6 +111,7 @@ void RegisterVM::reset() {
     active_region_id = 0;
     next_region_id = 1;
     globals_.clear();
+    initialized_modules_.clear();
     error_table.clear();
     frame_instances.clear();
     spare_register_files_.clear();
@@ -195,6 +196,12 @@ RegisterValue unbox_register_value(void* boxed_value) {
 void RegisterVM::execute(const LIR::LIR_Function& function) { execute_function(function); }
 
 void RegisterVM::execute_function(const LIR::LIR_Function& function) {
+    if (function.name.size() >= 9 && function.name.compare(function.name.size() - 9, 9, ".__init__") == 0) {
+        if (initialized_modules_.count(function.name)) {
+            return;
+        }
+        initialized_modules_.insert(function.name);
+    }
     ProfileScope prof_scope(function.name.empty() ? "main" : function.name);
     // Instruction pointers are only valid for the currently loaded program.
     call_site_cache_.clear();

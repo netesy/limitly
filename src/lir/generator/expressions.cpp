@@ -1855,6 +1855,19 @@ Reg Generator::emit_call_expr(LM::Frontend::AST::CallExpr& expr) {
             }
         }
         
+        if (object_type && object_type->tag == TypeTag::Dict) {
+            if (method_name == "items") {
+                emit_instruction(LIR_Inst(LIR_Op::DictItems, Type::Ptr, result, object_reg));
+                set_register_language_type(result, std::make_shared<::Type>(::TypeTag::List));
+                return result;
+            }
+            if (method_name == "len" || method_name == "length") {
+                emit_instruction(LIR_Inst(LIR_Op::DictLen, Type::I64, result, object_reg));
+                set_register_language_type(result, std::make_shared<::Type>(::TypeTag::Int64));
+                return result;
+            }
+        }
+        
         if (object_type && object_type->tag == TypeTag::Channel) {
             LIR_Op op = LIR_Op::Call; 
             if (method_name == "send" || method_name == "push") op = LIR_Op::ChannelSend;

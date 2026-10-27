@@ -19,7 +19,7 @@ struct StreamSource {
     int line = 0;
 };
 
-enum class TransformerKind { Map, Filter, Take, Skip };
+enum class TransformerKind { Map, Filter, Take, Skip, FlatMap };
 
 struct StreamTransformer {
     TransformerKind kind;
@@ -27,12 +27,13 @@ struct StreamTransformer {
     int line = 0;
 };
 
-enum class TerminalKind { Fold, ForEach, Collect, Count };
+enum class TerminalKind { Fold, ForEach, Collect, Count, CollectDict, ToDict };
 
 struct StreamTerminal {
     TerminalKind kind;
     std::shared_ptr<Expression> init;
     std::shared_ptr<Expression> func;
+    std::shared_ptr<Expression> val_func;
     int line = 0;
 };
 
@@ -73,6 +74,23 @@ static std::shared_ptr<ListExpr> makeLiteralList(int line) {
     l->line = line;
     l->inferred_type = std::make_shared<::Type>(::TypeTag::List);
     return l;
+}
+
+static std::shared_ptr<DictExpr> makeLiteralDict(int line) {
+    auto d = std::make_shared<DictExpr>();
+    d->line = line;
+    d->inferred_type = std::make_shared<::Type>(::TypeTag::Dict);
+    return d;
+}
+
+static std::shared_ptr<AssignExpr> makeIndexAssign(std::shared_ptr<Expression> obj, std::shared_ptr<Expression> idx, std::shared_ptr<Expression> val, int line) {
+    auto assign = std::make_shared<AssignExpr>();
+    assign->object = obj;
+    assign->index = idx;
+    assign->value = val;
+    assign->op = TokenType::EQUAL;
+    assign->line = line;
+    return assign;
 }
 
 static std::shared_ptr<VarDeclaration> makeVarDecl(const std::string& name, std::shared_ptr<Expression> init, int line) {
@@ -416,6 +434,39 @@ static std::shared_ptr<Statement> substituteStmt(std::shared_ptr<Statement> stmt
     return stmt;
 }
 
+static std::shared_ptr<Expression> inlineUnaryLambdaOrCall(
+    std::shared_ptr<Expression> fn,
+    const std::string& arg_var_name,
+    std::shared_ptr<BlockStatement> target_body,
+    int line)
+{
+    if (auto lambda = std::dynamic_pointer_cast<LambdaExpr>(fn)) {
+        std::unordered_map<std::string, std::shared_ptr<Expression>> sub;
+        if (!lambda->params.empty()) {
+            sub[lambda->params[0].first] = makeVarExpr(arg_var_name, line);
+        }
+        if (lambda->body && !lambda->body->statements.empty()) {
+            for (size_t i = 0; i < lambda->body->statements.size(); ++i) {
+                auto substituted = substituteStmt(lambda->body->statements[i], sub);
+                if (i == lambda->body->statements.size() - 1) {
+                    if (auto exprStmt = std::dynamic_pointer_cast<ExprStatement>(substituted)) {
+                        return exprStmt->expression;
+                    } else if (auto retStmt = std::dynamic_pointer_cast<ReturnStatement>(substituted)) {
+                        return retStmt->value;
+                    } else {
+                        target_body->statements.push_back(substituted);
+                        return makeLiteralNil(line);
+                    }
+                } else {
+                    target_body->statements.push_back(substituted);
+                }
+            }
+        }
+        return makeLiteralNil(line);
+    }
+    return makeCall(fn, {makeVarExpr(arg_var_name, line)}, line);
+}
+
 // Main optimization function
 std::shared_ptr<Program> StreamFusionVisitor::optimizeProgram(std::shared_ptr<Program> program) {
     if (!program) return nullptr;
@@ -509,13 +560,25 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
 
     std::string term_name = mem_callee->name;
     if (term_name == "fold" && terminal_call->arguments.size() == 2) {
-        pipeline.terminal = {TerminalKind::Fold, terminal_call->arguments[0], terminal_call->arguments[1], line};
+        pipeline.terminal = {TerminalKind::Fold, terminal_call->arguments[0], terminal_call->arguments[1], nullptr, line};
     } else if (term_name == "for_each" && terminal_call->arguments.size() == 1) {
-        pipeline.terminal = {TerminalKind::ForEach, nullptr, terminal_call->arguments[0], line};
+        pipeline.terminal = {TerminalKind::ForEach, nullptr, terminal_call->arguments[0], nullptr, line};
     } else if (term_name == "collect" && terminal_call->arguments.size() == 0) {
-        pipeline.terminal = {TerminalKind::Collect, nullptr, nullptr, line};
+        pipeline.terminal = {TerminalKind::Collect, nullptr, nullptr, nullptr, line};
     } else if (term_name == "count" && terminal_call->arguments.size() == 0) {
-        pipeline.terminal = {TerminalKind::Count, nullptr, nullptr, line};
+        pipeline.terminal = {TerminalKind::Count, nullptr, nullptr, nullptr, line};
+    } else if (term_name == "collect_dict" && terminal_call->arguments.size() == 0) {
+        pipeline.terminal = {TerminalKind::CollectDict, nullptr, nullptr, nullptr, line};
+    } else if (term_name == "to_dict") {
+        if (terminal_call->arguments.size() == 0) {
+            pipeline.terminal = {TerminalKind::ToDict, nullptr, nullptr, nullptr, line};
+        } else if (terminal_call->arguments.size() == 1) {
+            pipeline.terminal = {TerminalKind::ToDict, nullptr, terminal_call->arguments[0], nullptr, line};
+        } else if (terminal_call->arguments.size() == 2) {
+            pipeline.terminal = {TerminalKind::ToDict, nullptr, terminal_call->arguments[0], terminal_call->arguments[1], line};
+        } else {
+            return nullptr;
+        }
     } else {
         return nullptr; // Not a recognized terminal consumer
     }
@@ -543,8 +606,33 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
                 } else if (mem->name == "skip" && call->arguments.size() == 1) {
                     pipeline.transformers.push_back({TransformerKind::Skip, call->arguments[0], call->line});
                     current = mem->object;
+                } else if (mem->name == "flat_map" && call->arguments.size() == 1) {
+                    pipeline.transformers.push_back({TransformerKind::FlatMap, call->arguments[0], call->line});
+                    current = mem->object;
+                } else if (mem->name == "flatten" && call->arguments.size() == 0) {
+                    auto id_lambda = std::make_shared<LambdaExpr>();
+                    id_lambda->line = call->line;
+                    id_lambda->params = {{"__flat_elem", nullptr}};
+                    auto ret_stmt = std::make_shared<ReturnStatement>();
+                    ret_stmt->line = call->line;
+                    ret_stmt->value = makeVarExpr("__flat_elem", call->line);
+                    auto body_block = std::make_shared<BlockStatement>();
+                    body_block->line = call->line;
+                    body_block->statements.push_back(ret_stmt);
+                    id_lambda->body = body_block;
+                    pipeline.transformers.push_back({TransformerKind::FlatMap, id_lambda, call->line});
+                    current = mem->object;
                 } else if (mem->name == "iter" && call->arguments.size() == 0) {
-                    pipeline.source = {SourceKind::Iter, mem->object, nullptr, nullptr, call->line};
+                    std::shared_ptr<Expression> src_coll = mem->object;
+                    if (std::dynamic_pointer_cast<DictExpr>(src_coll) ||
+                        (src_coll && src_coll->inferred_type && src_coll->inferred_type->tag == TypeTag::Dict)) {
+                        src_coll = makeCall(makeMember(src_coll, "items", call->line), {}, call->line);
+                    }
+                    pipeline.source = {SourceKind::Iter, src_coll, nullptr, nullptr, call->line};
+                    source_found = true;
+                    break;
+                } else if (mem->name == "items" && call->arguments.size() == 0) {
+                    pipeline.source = {SourceKind::Iter, current, nullptr, nullptr, call->line};
                     source_found = true;
                     break;
                 } else if (mem->name == "range" && call->arguments.size() == 2) {
@@ -581,11 +669,12 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
 
     // 3. Check for unsupported control flow in closure arguments
     for (auto& t : pipeline.transformers) {
-        if (t.kind == TransformerKind::Map || t.kind == TransformerKind::Filter) {
+        if (t.kind == TransformerKind::Map || t.kind == TransformerKind::Filter || t.kind == TransformerKind::FlatMap) {
             if (hasUnsupportedControlFlow(t.arg)) return nullptr;
         }
     }
     if (pipeline.terminal.func && hasUnsupportedControlFlow(pipeline.terminal.func)) return nullptr;
+    if (pipeline.terminal.val_func && hasUnsupportedControlFlow(pipeline.terminal.val_func)) return nullptr;
 
     // 4. Synthesize Flat While Loop AST
     uint64_t id = stream_id_counter++;
@@ -627,6 +716,8 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
         staged_block->statements.push_back(makeVarDecl(cnt_var_name, makeLiteralInt(0, line), line));
     } else if (pipeline.terminal.kind == TerminalKind::Collect) {
         staged_block->statements.push_back(makeVarDecl(res_var_name, makeLiteralList(line), line));
+    } else if (pipeline.terminal.kind == TerminalKind::CollectDict || pipeline.terminal.kind == TerminalKind::ToDict) {
+        staged_block->statements.push_back(makeVarDecl(res_var_name, makeLiteralDict(line), line));
     }
 
     // Loop Body
@@ -646,72 +737,19 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
     auto inc_idx = makeAssign(idx_var_name, makeBinary(makeVarExpr(idx_var_name, line), TokenType::PLUS, makeLiteralInt(1, line), line), line);
     while_body->statements.push_back(makeExprStmt(inc_idx, line));
 
+    auto current_body = while_body;
+
     // Transformer processing
     int trans_step = 1;
     for (const auto& t : pipeline.transformers) {
         std::string next_item_name = "__stream_item" + id_str + "_" + std::to_string(trans_step++);
 
         if (t.kind == TransformerKind::Map) {
-            std::shared_ptr<Expression> map_eval;
-            if (auto lambda = std::dynamic_pointer_cast<LambdaExpr>(t.arg)) {
-                std::unordered_map<std::string, std::shared_ptr<Expression>> sub;
-                if (!lambda->params.empty()) {
-                    sub[lambda->params[0].first] = makeVarExpr(curr_item_name, line);
-                }
-                if (lambda->body && !lambda->body->statements.empty()) {
-                    for (size_t i = 0; i < lambda->body->statements.size(); ++i) {
-                        auto substituted = substituteStmt(lambda->body->statements[i], sub);
-                        if (i == lambda->body->statements.size() - 1) {
-                            if (auto exprStmt = std::dynamic_pointer_cast<ExprStatement>(substituted)) {
-                                map_eval = exprStmt->expression;
-                            } else if (auto retStmt = std::dynamic_pointer_cast<ReturnStatement>(substituted)) {
-                                map_eval = retStmt->value;
-                            } else {
-                                while_body->statements.push_back(substituted);
-                                map_eval = makeLiteralNil(line);
-                            }
-                        } else {
-                            while_body->statements.push_back(substituted);
-                        }
-                    }
-                } else {
-                    map_eval = makeLiteralNil(line);
-                }
-            } else {
-                map_eval = makeCall(t.arg, {makeVarExpr(curr_item_name, line)}, line);
-            }
-            while_body->statements.push_back(makeVarDecl(next_item_name, map_eval, line));
+            auto map_eval = inlineUnaryLambdaOrCall(t.arg, curr_item_name, current_body, line);
+            current_body->statements.push_back(makeVarDecl(next_item_name, map_eval, line));
             curr_item_name = next_item_name;
         } else if (t.kind == TransformerKind::Filter) {
-            std::shared_ptr<Expression> filter_eval;
-            if (auto lambda = std::dynamic_pointer_cast<LambdaExpr>(t.arg)) {
-                std::unordered_map<std::string, std::shared_ptr<Expression>> sub;
-                if (!lambda->params.empty()) {
-                    sub[lambda->params[0].first] = makeVarExpr(curr_item_name, line);
-                }
-                if (lambda->body && !lambda->body->statements.empty()) {
-                    for (size_t i = 0; i < lambda->body->statements.size(); ++i) {
-                        auto substituted = substituteStmt(lambda->body->statements[i], sub);
-                        if (i == lambda->body->statements.size() - 1) {
-                            if (auto exprStmt = std::dynamic_pointer_cast<ExprStatement>(substituted)) {
-                                filter_eval = exprStmt->expression;
-                            } else if (auto retStmt = std::dynamic_pointer_cast<ReturnStatement>(substituted)) {
-                                filter_eval = retStmt->value;
-                            } else {
-                                while_body->statements.push_back(substituted);
-                                filter_eval = makeLiteralNil(line);
-                            }
-                        } else {
-                            while_body->statements.push_back(substituted);
-                        }
-                    }
-                } else {
-                    filter_eval = makeLiteralNil(line);
-                }
-            } else {
-                filter_eval = makeCall(t.arg, {makeVarExpr(curr_item_name, line)}, line);
-            }
-
+            auto filter_eval = inlineUnaryLambdaOrCall(t.arg, curr_item_name, current_body, line);
             auto not_filter = makeUnary(TokenType::BANG, filter_eval, line);
             auto cont_stmt = std::make_shared<ContinueStatement>();
             cont_stmt->line = line;
@@ -721,7 +759,7 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
             if_not->thenBranch = cont_stmt;
             if_not->line = line;
 
-            while_body->statements.push_back(if_not);
+            current_body->statements.push_back(if_not);
         } else if (t.kind == TransformerKind::Take) {
             std::string take_cnt_name = "__stream_take_cnt" + id_str + "_" + std::to_string(trans_step);
             staged_block->statements.push_back(makeVarDecl(take_cnt_name, makeLiteralInt(0, line), line));
@@ -736,11 +774,11 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
             if_take->thenBranch = brk_stmt;
             if_take->line = line;
 
-            while_body->statements.push_back(if_take);
+            current_body->statements.push_back(if_take);
 
             // take_cnt = take_cnt + 1;
             auto inc_take = makeAssign(take_cnt_name, makeBinary(makeVarExpr(take_cnt_name, line), TokenType::PLUS, makeLiteralInt(1, line), line), line);
-            while_body->statements.push_back(makeExprStmt(inc_take, line));
+            current_body->statements.push_back(makeExprStmt(inc_take, line));
         } else if (t.kind == TransformerKind::Skip) {
             std::string skip_cnt_name = "__stream_skip_cnt" + id_str + "_" + std::to_string(trans_step);
             staged_block->statements.push_back(makeVarDecl(skip_cnt_name, makeLiteralInt(0, line), line));
@@ -762,7 +800,55 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
             if_skip->thenBranch = skip_block;
             if_skip->line = line;
 
-            while_body->statements.push_back(if_skip);
+            current_body->statements.push_back(if_skip);
+        } else if (t.kind == TransformerKind::FlatMap) {
+            auto inner_eval = inlineUnaryLambdaOrCall(t.arg, curr_item_name, current_body, line);
+
+            std::string inner_id_str = id_str + "_inner_" + std::to_string(trans_step);
+            std::string inner_src_name = "__stream_inner_src" + inner_id_str;
+            std::string inner_idx_name = "__stream_inner_idx" + inner_id_str;
+            std::string inner_len_name = "__stream_inner_len" + inner_id_str;
+            std::string inner_end_name = "__stream_inner_end" + inner_id_str;
+            std::string inner_elem_name = "__stream_inner_elem" + inner_id_str;
+
+            auto inner_while_body = std::make_shared<BlockStatement>();
+            inner_while_body->line = line;
+
+            auto unwrapped_inner = inner_eval;
+            while (auto g = std::dynamic_pointer_cast<GroupingExpr>(unwrapped_inner)) {
+                unwrapped_inner = g->expression;
+            }
+
+            std::shared_ptr<Expression> inner_loop_cond;
+
+            if (auto range = std::dynamic_pointer_cast<RangeExpr>(unwrapped_inner)) {
+                current_body->statements.push_back(makeVarDecl(inner_idx_name, range->start, line));
+                current_body->statements.push_back(makeVarDecl(inner_end_name, range->end, line));
+                inner_loop_cond = makeBinary(makeVarExpr(inner_idx_name, line), TokenType::LESS, makeVarExpr(inner_end_name, line), line);
+
+                inner_while_body->statements.push_back(makeVarDecl(inner_elem_name, makeVarExpr(inner_idx_name, line), line));
+            } else {
+                current_body->statements.push_back(makeVarDecl(inner_src_name, inner_eval, line));
+                current_body->statements.push_back(makeVarDecl(inner_idx_name, makeLiteralInt(0, line), line));
+                auto len_call = makeCall(makeMember(makeVarExpr(inner_src_name, line), "len", line), {}, line);
+                current_body->statements.push_back(makeVarDecl(inner_len_name, len_call, line));
+                inner_loop_cond = makeBinary(makeVarExpr(inner_idx_name, line), TokenType::LESS, makeVarExpr(inner_len_name, line), line);
+
+                auto fetch_idx = makeIndex(makeVarExpr(inner_src_name, line), makeVarExpr(inner_idx_name, line), line);
+                inner_while_body->statements.push_back(makeVarDecl(inner_elem_name, fetch_idx, line));
+            }
+
+            auto inc_inner_idx = makeAssign(inner_idx_name, makeBinary(makeVarExpr(inner_idx_name, line), TokenType::PLUS, makeLiteralInt(1, line), line), line);
+            inner_while_body->statements.push_back(makeExprStmt(inc_inner_idx, line));
+
+            auto inner_while = std::make_shared<WhileStatement>();
+            inner_while->condition = inner_loop_cond;
+            inner_while->body = inner_while_body;
+            inner_while->line = line;
+
+            current_body->statements.push_back(inner_while);
+            current_body = inner_while_body;
+            curr_item_name = inner_elem_name;
         }
     }
 
@@ -783,11 +869,11 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
                         } else if (auto retStmt = std::dynamic_pointer_cast<ReturnStatement>(substituted)) {
                             fold_eval = retStmt->value;
                         } else {
-                            while_body->statements.push_back(substituted);
+                            current_body->statements.push_back(substituted);
                             fold_eval = makeLiteralNil(line);
                         }
                     } else {
-                        while_body->statements.push_back(substituted);
+                        current_body->statements.push_back(substituted);
                     }
                 }
             } else {
@@ -798,26 +884,57 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
         }
 
         auto update_acc = makeAssign(acc_var_name, fold_eval, line);
-        while_body->statements.push_back(makeExprStmt(update_acc, line));
+        current_body->statements.push_back(makeExprStmt(update_acc, line));
     } else if (pipeline.terminal.kind == TerminalKind::ForEach) {
         if (auto lambda = std::dynamic_pointer_cast<LambdaExpr>(pipeline.terminal.func)) {
             std::unordered_map<std::string, std::shared_ptr<Expression>> sub;
             if (!lambda->params.empty()) sub[lambda->params[0].first] = makeVarExpr(curr_item_name, line);
             if (lambda->body) {
                 for (auto& s : lambda->body->statements) {
-                    while_body->statements.push_back(substituteStmt(s, sub));
+                    current_body->statements.push_back(substituteStmt(s, sub));
                 }
             }
         } else {
             auto foreach_call = makeCall(pipeline.terminal.func, {makeVarExpr(curr_item_name, line)}, line);
-            while_body->statements.push_back(makeExprStmt(foreach_call, line));
+            current_body->statements.push_back(makeExprStmt(foreach_call, line));
         }
     } else if (pipeline.terminal.kind == TerminalKind::Collect) {
         auto append_call = makeCall(makeMember(makeVarExpr(res_var_name, line), "append", line), {makeVarExpr(curr_item_name, line)}, line);
-        while_body->statements.push_back(makeExprStmt(append_call, line));
+        current_body->statements.push_back(makeExprStmt(append_call, line));
     } else if (pipeline.terminal.kind == TerminalKind::Count) {
         auto inc_cnt = makeAssign(cnt_var_name, makeBinary(makeVarExpr(cnt_var_name, line), TokenType::PLUS, makeLiteralInt(1, line), line), line);
-        while_body->statements.push_back(makeExprStmt(inc_cnt, line));
+        current_body->statements.push_back(makeExprStmt(inc_cnt, line));
+    } else if (pipeline.terminal.kind == TerminalKind::CollectDict) {
+        auto key_expr = makeIndex(makeVarExpr(curr_item_name, line), makeLiteralInt(0, line), line);
+        auto val_expr = makeIndex(makeVarExpr(curr_item_name, line), makeLiteralInt(1, line), line);
+        auto assign = makeIndexAssign(makeVarExpr(res_var_name, line), key_expr, val_expr, line);
+        current_body->statements.push_back(makeExprStmt(assign, line));
+    } else if (pipeline.terminal.kind == TerminalKind::ToDict) {
+        if (!pipeline.terminal.func) {
+            auto key_expr = makeIndex(makeVarExpr(curr_item_name, line), makeLiteralInt(0, line), line);
+            auto val_expr = makeIndex(makeVarExpr(curr_item_name, line), makeLiteralInt(1, line), line);
+            auto assign = makeIndexAssign(makeVarExpr(res_var_name, line), key_expr, val_expr, line);
+            current_body->statements.push_back(makeExprStmt(assign, line));
+        } else if (!pipeline.terminal.val_func) {
+            std::string kv_name = "__stream_kv" + id_str + "_" + std::to_string(trans_step++);
+            auto kv_eval = inlineUnaryLambdaOrCall(pipeline.terminal.func, curr_item_name, current_body, line);
+            current_body->statements.push_back(makeVarDecl(kv_name, kv_eval, line));
+            auto key_expr = makeIndex(makeVarExpr(kv_name, line), makeLiteralInt(0, line), line);
+            auto val_expr = makeIndex(makeVarExpr(kv_name, line), makeLiteralInt(1, line), line);
+            auto assign = makeIndexAssign(makeVarExpr(res_var_name, line), key_expr, val_expr, line);
+            current_body->statements.push_back(makeExprStmt(assign, line));
+        } else {
+            std::string k_name = "__stream_k" + id_str + "_" + std::to_string(trans_step++);
+            auto k_eval = inlineUnaryLambdaOrCall(pipeline.terminal.func, curr_item_name, current_body, line);
+            current_body->statements.push_back(makeVarDecl(k_name, k_eval, line));
+
+            std::string v_name = "__stream_v" + id_str + "_" + std::to_string(trans_step++);
+            auto v_eval = inlineUnaryLambdaOrCall(pipeline.terminal.val_func, curr_item_name, current_body, line);
+            current_body->statements.push_back(makeVarDecl(v_name, v_eval, line));
+
+            auto assign = makeIndexAssign(makeVarExpr(res_var_name, line), makeVarExpr(k_name, line), makeVarExpr(v_name, line), line);
+            current_body->statements.push_back(makeExprStmt(assign, line));
+        }
     }
 
     // Assemble while statement
@@ -834,7 +951,9 @@ std::shared_ptr<Expression> StreamFusionVisitor::tryFusePipeline(std::shared_ptr
         res_expr = makeVarExpr(acc_var_name, line);
     } else if (pipeline.terminal.kind == TerminalKind::Count) {
         res_expr = makeVarExpr(cnt_var_name, line);
-    } else if (pipeline.terminal.kind == TerminalKind::Collect) {
+    } else if (pipeline.terminal.kind == TerminalKind::Collect ||
+               pipeline.terminal.kind == TerminalKind::CollectDict ||
+               pipeline.terminal.kind == TerminalKind::ToDict) {
         res_expr = makeVarExpr(res_var_name, line);
     } else {
         res_expr = makeLiteralNil(line);

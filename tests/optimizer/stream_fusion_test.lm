@@ -75,6 +75,33 @@ fn main(): int {
     var filter_all = list_all.iter().filter(fn(x) { x > 0 }).collect();
     assert(len(filter_all) == 5, "Filter-all should match all 5 elements");
 
+    // Pipeline 8: Fused dictionary comprehension (to_dict with key and val funcs)
+    var names = ["alice", "bob", "charlie"];
+    var name_lengths = names.iter().to_dict(fn(n) { n }, fn(n) { len(n) });
+    assert(name_lengths["alice"] == 5, "name_lengths['alice'] should be 5");
+    assert(name_lengths["bob"] == 3, "name_lengths['bob'] should be 3");
+    assert(name_lengths["charlie"] == 7, "name_lengths['charlie'] should be 7");
+
+    // Pipeline 9: Fused dictionary comprehension via collect_dict
+    var pairs = (1..4).map(fn(x) { (x * 10, x * 100) }).collect_dict();
+    assert(pairs[10] == 100, "pairs[10] should be 100");
+    assert(pairs[20] == 200, "pairs[20] should be 200");
+    assert(pairs[30] == 300, "pairs[30] should be 300");
+
+    // Pipeline 10: Fused nested iterators via flat_map
+    var outer_list = [1, 2, 3];
+    var nested_flat = outer_list.iter().flat_map(fn(x) { (1..(x + 1)) }).collect();
+    // 1 -> [1], 2 -> [1, 2], 3 -> [1, 2, 3] => [1, 1, 2, 1, 2, 3]
+    assert(len(nested_flat) == 6, "nested_flat length should be 6");
+    assert(nested_flat[0] == 1 and nested_flat[1] == 1 and nested_flat[2] == 2, "nested_flat prefix mismatch");
+    assert(nested_flat[3] == 1 and nested_flat[4] == 2 and nested_flat[5] == 3, "nested_flat suffix mismatch");
+
+    // Pipeline 11: Fused nested iterators via flatten
+    var matrix = [[10, 20], [30, 40], [50]];
+    var flattened = matrix.iter().flatten().map(fn(x) { x + 1 }).collect();
+    assert(len(flattened) == 5, "flattened length should be 5");
+    assert(flattened[0] == 11 and flattened[1] == 21 and flattened[2] == 31, "flattened content mismatch");
+
     // LIR Output Inspection
     var tmp_file = "stream_fusion_lir.tmp";
     var lymar_bin = "./bin/lymar";

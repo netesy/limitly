@@ -1,0 +1,51 @@
+// Standard Library FlatMap Iterator
+import std.iterator.iterator as it;
+
+frame FlatMapIterator: it.Iterator {
+    pub source: it.Iterator;
+    pub f: fn(any): any;
+    pub inner_iter: any;
+
+    pub init(source: it.Iterator, f: fn(any): any) {
+        self.source = source;
+        self.f = f;
+        self.inner_iter = nil;
+    }
+
+    pub fn next(): any {
+        while (true) {
+            if (self.inner_iter != nil) {
+                var inner_it = self.inner_iter as it.Iterator;
+                var item = inner_it.next();
+                if (item != nil) {
+                    return item;
+                }
+                self.inner_iter = nil;
+            }
+
+            var next_outer = self.source.next();
+            if (next_outer == nil) {
+                return nil;
+            }
+
+            var inner_obj = self.f(next_outer);
+            if (inner_obj == nil) {
+                // Skip nil inner
+            } elif (inner_obj as it.Iterator != nil) {
+                self.inner_iter = inner_obj;
+            } else {
+                // If list of elements
+                self.inner_iter = it.iterator(inner_obj as [any]);
+            }
+        }
+        return nil;
+    }
+}
+
+pub fn flat_map(source: it.Iterator, f: fn(any): any): it.Iterator {
+    return FlatMapIterator(source, f);
+}
+
+pub fn flatten(source: it.Iterator): it.Iterator {
+    return FlatMapIterator(source, fn(x: any): any { return x; });
+}

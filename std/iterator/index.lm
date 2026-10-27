@@ -7,10 +7,12 @@ import std.iterator.skip as skip;
 import std.iterator.zip as zip;
 import std.iterator.chain as chain;
 import std.iterator.enumerate as enumerate;
+import std.iterator.flat_map as flat_map;
 
 // Types
 pub import std.iterator.iterator show Iterator, PeekableIterator;
 pub import std.iterator.iterable show Iterable;
+pub import std.iterator.flat_map show FlatMapIterator;
 
 // Common iterator helpers
 pub fn iterator(items: [any]): Iterator {
@@ -21,9 +23,25 @@ pub fn collect(source: Iterator): [any] {
     return it.collect(source);
 }
 
+pub fn collect_dict(source: Iterator): {any: any} {
+    return it.collect_dict(source);
+}
+
+pub fn to_dict(source: Iterator, key_fn: fn(any): any = nil, val_fn: fn(any): any = nil): {any: any} {
+    return it.to_dict(source, key_fn, val_fn);
+}
+
 // Submodule functions
 pub fn map(source: Iterator, f: fn(any): any): Iterator {
     return map.map(source, f);
+}
+
+pub fn flat_map(source: Iterator, f: fn(any): any): Iterator {
+    return flat_map.flat_map(source, f);
+}
+
+pub fn flatten(source: Iterator): Iterator {
+    return flat_map.flatten(source);
 }
 
 pub fn filter(source: Iterator, p: fn(any): bool): Iterator {

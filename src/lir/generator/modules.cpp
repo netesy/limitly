@@ -16,6 +16,7 @@ namespace LIR {
 
 void Generator::collect_module_signatures(LM::Frontend::AST::Program& program) {
     auto& manager = LM::Frontend::ModuleManager::getInstance();
+    global_variables_.clear();
     for (const auto& [path, module] : manager.get_all_modules()) {
         if (path == "root") continue;
 
@@ -25,8 +26,17 @@ void Generator::collect_module_signatures(LM::Frontend::AST::Program& program) {
         init_info.param_count = 0;
         init_info.visibility = LM::Frontend::AST::VisibilityLevel::Public;
         function_table_[init_func_name] = std::move(init_info);
+
+        if (module && module->ast) {
+            for (const auto& stmt : module->ast->statements) {
+                if (!stmt) continue;
+                if (auto var_decl = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(stmt.get())) {
+                    global_variables_.insert(path + "." + var_decl->name);
+                    global_variables_.insert(var_decl->name);
+                }
+            }
+        }
     }
-    global_variables_.clear();
     for (const auto& stmt : program.statements) {
         if (!stmt) continue;
         if (auto var_decl = dynamic_cast<LM::Frontend::AST::VarDeclaration*>(stmt.get())) {

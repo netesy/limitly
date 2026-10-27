@@ -283,6 +283,7 @@ private:
     
     const LIR::LIR_Function* current_function_ = nullptr;
     std::unordered_map<std::string, RegisterValue> globals_;
+    std::unordered_set<std::string> initialized_modules_;
     std::unique_ptr<TypeSystem> type_system;
     
     std::vector<std::unique_ptr<TaskContext>> task_contexts;

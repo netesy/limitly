@@ -63,6 +63,33 @@ pub fn collect(it: Iterator): [any] {
     return res;
 }
 
+pub fn collect_dict(it: Iterator): {any: any} {
+    var res: {any: any} = {};
+    var item = it.next();
+    while (item != nil) {
+        res[item.0] = item.1;
+        item = it.next();
+    }
+    return res;
+}
+
+pub fn to_dict(it: Iterator, key_fn: fn(any): any = nil, val_fn: fn(any): any = nil): {any: any} {
+    var res: {any: any} = {};
+    var item = it.next();
+    while (item != nil) {
+        if (key_fn != nil and val_fn != nil) {
+            res[key_fn(item)] = val_fn(item);
+        } elif (key_fn != nil) {
+            var kv = key_fn(item);
+            res[kv.0] = kv.1;
+        } else {
+            res[item.0] = item.1;
+        }
+        item = it.next();
+    }
+    return res;
+}
+
 frame ChunkIterator: Iterator {
     pub size: int;
     pub source: Iterator;

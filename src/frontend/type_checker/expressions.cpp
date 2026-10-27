@@ -1022,6 +1022,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
         }
         if (var_callee->name == "_builtin_substring" ||
             var_callee->name == "_builtin_string_from_bytes" ||
+            var_callee->name == "_builtin_string_from_cstr" ||
             var_callee->name == "_builtin_string_replace" ||
             var_callee->name == "_builtin_string_trim" ||
             var_callee->name == "_builtin_string_to_lower" ||
@@ -1031,6 +1032,7 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             return type_system.STRING_TYPE;
         }
         if (var_callee->name == "_builtin_string_byte_at" ||
+            var_callee->name == "_builtin_string_to_cstr" ||
             var_callee->name == "_builtin_string_index_of") {
             for (auto& arg : expr->arguments) check_expression(arg, type_system.ANY_TYPE);
             expr->inferred_type = type_system.INT64_TYPE;
@@ -1910,7 +1912,7 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
 
     std::string member_name = expr->name;
     
-    if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::Range || object_type->tag == TypeTag::String)) {
+    if (object_type && (object_type->tag == TypeTag::List || object_type->tag == TypeTag::Range || object_type->tag == TypeTag::String || object_type->tag == TypeTag::Dict)) {
         if (member_name == "len" || member_name == "length") {
             return wrap_result(type_system.createFunctionType({}, type_system.INT64_TYPE));
         }
@@ -1920,7 +1922,8 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         if (object_type->tag == TypeTag::List && member_name == "pop") {
             return wrap_result(type_system.createFunctionType({}, type_system.ANY_TYPE));
         }
-        if ((object_type->tag == TypeTag::List || object_type->tag == TypeTag::Range) && member_name == "iter") {
+        if ((object_type->tag == TypeTag::List || object_type->tag == TypeTag::Range || object_type->tag == TypeTag::Dict) &&
+            (member_name == "iter" || member_name == "items")) {
             return wrap_result(type_system.createFunctionType({}, type_system.ANY_TYPE));
         }
     }
@@ -2228,8 +2231,8 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
             return type_system.FUNCTION_TYPE;
         }
     } else if (object_type->tag == TypeTag::Dict) {
-        if (member_name == "len") return type_system.INT_TYPE;
-        if (member_name == "keys" || member_name == "values") return type_system.FUNCTION_TYPE;
+        if (member_name == "len" || member_name == "length") return type_system.INT_TYPE;
+        if (member_name == "keys" || member_name == "values" || member_name == "items" || member_name == "iter") return type_system.FUNCTION_TYPE;
     }
 
     std::string type_str = object_type->toString();
@@ -2252,6 +2255,10 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
     
     if (!object_type || !index_type) return type_system.ANY_TYPE;
 
+    if (object_type->tag == TypeTag::Any) {
+        return type_system.ANY_TYPE;
+    }
+
     if (object_type->tag == TypeTag::List) {
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
              add_error("List index must be an integer, got " + index_type->toString(), expr->line);
@@ -2261,11 +2268,12 @@ TypePtr TypeChecker::check_index_expr(std::shared_ptr<LM::Frontend::AST::IndexEx
         }
     } else if (object_type->tag == TypeTag::Dict) {
         if (auto dt = std::get_if<DictType>(&object_type->extra)) {
-            if (!is_type_compatible(dt->keyType, index_type)) {
+            if (dt->keyType && dt->keyType->tag != TypeTag::Nil && dt->keyType->tag != TypeTag::Any &&
+                !is_type_compatible(dt->keyType, index_type)) {
                 add_error("Dictionary key type mismatch: expected " + dt->keyType->toString() +
                          ", got " + index_type->toString(), expr->line);
             }
-            return dt->valueType;
+            return dt->valueType ? dt->valueType : type_system.ANY_TYPE;
         }
     } else if (object_type->tag == TypeTag::String) {
         if (index_type->tag != TypeTag::Int && index_type->tag != TypeTag::Int64) {
@@ -2320,10 +2328,13 @@ TypePtr TypeChecker::check_list_expr(std::shared_ptr<LM::Frontend::AST::ListExpr
     if (expr->elements.empty()) {
         // Empty list - use expected type if available and it's a list type
         if (expected_type && expected_type->tag == TypeTag::List) {
+            expr->inferred_type = expected_type;
             return expected_type;
         }
         // Otherwise return generic list type
-        return type_system.createTypedListType(type_system.ANY_TYPE);
+        TypePtr genericList = type_system.createTypedListType(type_system.ANY_TYPE);
+        expr->inferred_type = genericList;
+        return genericList;
     }
     
     // Check all elements and infer common element type
@@ -2374,7 +2385,9 @@ TypePtr TypeChecker::check_dict_expr(std::shared_ptr<LM::Frontend::AST::DictExpr
     
     if (expr->entries.empty()) {
         // Empty dictionary - return generic dict type
-        return type_system.createTypedDictType(type_system.NIL_TYPE, type_system.ANY_TYPE);
+        TypePtr genericDict = type_system.createTypedDictType(type_system.ANY_TYPE, type_system.ANY_TYPE);
+        expr->inferred_type = genericDict;
+        return genericDict;
     }
     
     // Check all entries and infer common key and value types

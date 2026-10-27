@@ -156,41 +156,16 @@ pub fn string_to_cstring(s: str): CString {
     var len_val: int = len(s);
     var p: pubptr = 0;
     unsafe {
-        p = _ffi_alloc(len_val + 1);
-        if (p != 0 and len_val > 0) {
-            var i: int = 0;
-            while (i < len_val) {
-                _ffi_store_i8(_ffi_ptr_add(p, i), s[i]);
-                i = i + 1;
-            }
-        }
-        if (p != 0) {
-            _ffi_store_i8(_ffi_ptr_add(p, len_val), 0);
-        }
+        p = _builtin_string_to_cstr(s);
     }
     return CString(ptr=p, length=len_val, is_owned=1);
 }
 
 pub fn cstring_to_string(p: pubptr): str {
     if (p == 0) { return ""; }
-    var len_val: int = 0;
-    var bytes: [int] = [];
     unsafe {
-        var current: pubptr = p;
-        while (_ffi_load_i8(current) != 0) {
-            len_val = len_val + 1;
-            current = _ffi_ptr_add(current, 1);
-        }
-        if (len_val > 0) {
-            var i: int = 0;
-            while (i < len_val) {
-                var b: int = _ffi_load_i8(_ffi_ptr_add(p, i));
-                bytes.append(b);
-                i = i + 1;
-            }
-        }
+        return _builtin_string_from_cstr(p);
     }
-    return _builtin_string_from_bytes(bytes);
 }
 
 // Convert a foreign C string without scanning beyond caller-owned memory.
