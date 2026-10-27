@@ -829,9 +829,9 @@ bool Optimizer::constant_folding() {
                         int64_t res = 0;
                         bool valid = true;
 
-                        if (inst.op == LIR_Op::Add) res = a + b;
-                        else if (inst.op == LIR_Op::Sub) res = a - b;
-                        else if (inst.op == LIR_Op::Mul) res = a * b;
+                        if (inst.op == LIR_Op::Add) valid = !__builtin_add_overflow(a, b, &res);
+                        else if (inst.op == LIR_Op::Sub) valid = !__builtin_sub_overflow(a, b, &res);
+                        else if (inst.op == LIR_Op::Mul) valid = !__builtin_mul_overflow(a, b, &res);
                         else if (inst.op == LIR_Op::Div) {
                             if (b == 0) valid = false;
                             else res = a / b;

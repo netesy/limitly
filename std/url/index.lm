@@ -1,27 +1,31 @@
-import std.url.url as url_mod;
-import std.url.builder as builder_mod;
-import std.url.query as query_mod;
+import std.url.url as url;
+import std.url.builder as builder;
+import std.url.query as query;
 
-pub fn URL(url_str: str): any {
-    return url_mod.URL(url_str);
+pub import std.url.url show URL;
+pub import std.url.builder show URLBuilder;
+pub import std.url.query show QueryParams;
+
+pub fn URL(url_str: str): url.URL {
+    return url.URL(url_str);
 }
 
-pub fn URLBuilder(): any {
-    return builder_mod.URLBuilder();
+pub fn URLBuilder(): builder.URLBuilder {
+    return builder.URLBuilder();
 }
 
-pub fn QueryParams(): any {
-    return query_mod.QueryParams();
+pub fn QueryParams(): query.QueryParams {
+    return query.QueryParams();
 }
 
-pub fn parse(url_str: str): any {
-    return url_mod.URL(url_str);
+pub fn parse(url_str: str): url.URL {
+    return url.URL(url_str);
 }
 
-pub fn parse_query(qs: str): any {
-    return query_mod.parse(qs);
+pub fn parse_query(qs: str): query.QueryParams {
+    return query.parse(qs);
 }
 
-pub fn build(scheme: str, host: str, port: int, path: str, query: str, fragment: str): any {
-    return url_mod.build(scheme, host, port, path, query, fragment);
+pub fn build(scheme: str, host: str, port: int, path: str, query: str, fragment: str): url.URL {
+    return url.build(scheme, host, port, path, query, fragment);
 }

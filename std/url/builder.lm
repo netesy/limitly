@@ -1,4 +1,4 @@
-import std.url.url as url_mod;
+import std.url.url as url;
 
 frame URLBuilder {
     pub fragment: str;
@@ -61,8 +61,8 @@ frame URLBuilder {
         return self;
     }
 
-    pub fn build(): url_mod.URL {
-        var u = url_mod.URL("") as url_mod.URL;
+    pub fn build(): url.URL {
+        var u = url.URL("");
         u.scheme = self.scheme;
         u.host = self.host;
         u.port = self.port;

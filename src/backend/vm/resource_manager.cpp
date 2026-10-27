@@ -214,7 +214,9 @@ struct VMGraphicsAccess {
     static List* new_list() {return lm_list_new();}
     static void append(List* list,Value value) {lm_list_append(list,value);}
     static Value pointer(List* value) {return BOX_PTR(value);}
-    static Value number(int64_t value) {return BOX_INT(value);}
+    // make_i64, not BOX_INT: it keeps the immediate encoding when the value fits and
+    // heap-promotes when it does not, matching make_integer below.
+    static Value number(int64_t value) {return make_i64(value);}
     static Value make_integer(int64_t value) {return make_i64(value);}
 };
 using SoftwareGraphicsResource=LM::Runtime::SoftwareGraphicsResource<VMGraphicsAccess>;

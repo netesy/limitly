@@ -693,8 +693,8 @@ print(Counter.count); // Output: 1
 
 Lymar is a **pure composition** language. Frame inheritance (`frame A : B` where B is a frame) is eliminated. The colon `:` is reserved **exclusively** for trait conformance.
 
-* **Data Mixins (`mixin`)**: Define reusable blocks of state fields that inject directly into a host frame.
-* **Anonymous Field Embedding (`embed`)**: Embeds another component frame inside a host frame with automatic field and method promotion.
+* **Data Mixins (`mixin`)**: Define reusable blocks of state fields that inject directly into a host frame. Methods are allowed so a mixin can expose accessors over its own fields, but a mixin is *not* an interface — it never dispatches dynamically and cannot be instantiated on its own.
+* **Anonymous Field Embedding (`embed`)**: Flattens another component frame into the host at compile time — the component's fields become the host's own storage and its methods are promoted onto the host. There is no wrapper object and no accessor name, so `embed Engine;` gives you `car.rpm`, never `car.engine.rpm`. The component's `deinit()` is not promoted and does not run when the host is destroyed; forward it yourself if cleanup is required.
 
 ```lymar
 mixin Timestamped {
@@ -734,6 +734,9 @@ my_car.shift_up();        // Shifted gear up (promoted from embedded Transmissio
 #### Strict Trait Conformance (`:`)
 
 The colon `:` is used strictly to declare that a frame conforms to a `trait`.
+Conformance is checked against the whole signature, not just the method name: the
+implementing member must match the requirement's parameter count, parameter types and
+return type. A method that merely shares a name is rejected.
 
 ```lymar
 trait Identifiable {
@@ -757,6 +760,22 @@ frame User: Identifiable {
 var user = User(1, "Alice");
 print(user.name); // Output: Alice
 ```
+
+A trait method may carry a body, which acts as a **default implementation** — the
+conforming frame can call it without declaring it at all:
+
+```lymar
+trait Named {
+ fn label(): str { return "unnamed"; }
+}
+
+frame Slot: Named {}
+
+print(Slot().label()); // Output: unnamed
+```
+
+`any` is accepted on either side of a requirement, and a trait may require other
+traits (`trait Cached: Named, Identifiable { ... }`), which are all verified.
 
 ### Fields and Methods
 

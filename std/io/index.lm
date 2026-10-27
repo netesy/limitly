@@ -1,9 +1,9 @@
 // Standard Library I/O Entrypoint Module
 
-import std.io.console as console_mod;
-import std.io.file as file_mod;
-import std.io.reader as reader_mod;
-import std.io.writer as writer_mod;
+import std.io.console as console;
+import std.io.file as file;
+import std.io.reader as reader;
+import std.io.writer as writer;
 import std.resource as res;
 
 // Re-exports
@@ -12,16 +12,16 @@ pub import std.io.file show File;
 pub import std.io.reader show Reader;
 pub import std.io.writer show Writer;
 
-pub fn create_file_resource(p: str, r: res.Resource): any {
-    return file_mod.File(p, r);
+pub fn create_file_resource(p: str, r: res.Resource): file.File {
+    return file.File(p, r);
 }
 
 // Global Variables
-pub var out: Console = console_mod.Console();
+pub var out: Console = console.Console();
 
 // Functions Re-exports
 pub fn open(path: str, mode: str): any {
-    return file_mod.open(path, mode);
+    return file.open(path, mode);
 }
 
 pub fn print(msg: any): nil {
@@ -96,11 +96,11 @@ pub fn create_directory(path: str): any {
             var result = fs.mkdir(path);
             r.close();
             if (result) return ok(nil);
-            var unknown_e = file_mod.UnknownError(message="fail");
+            var unknown_e = file.UnknownError(message="fail");
             return err(unknown_e);
         },
         err e => {
-            var unknown_e2 = file_mod.UnknownError(message="fail");
+            var unknown_e2 = file.UnknownError(message="fail");
             return err(unknown_e2);
         }
     }
@@ -114,7 +114,7 @@ pub fn list_directory(path: str): any {
             var result = fs.readdir(path);
             r.close();
             if (result == nil) {
-                var unknown_e = file_mod.UnknownError(message="fail");
+                var unknown_e = file.UnknownError(message="fail");
                 final_result = err(unknown_e);
             } else {
                 var s = result as str;
@@ -134,7 +134,7 @@ pub fn list_directory(path: str): any {
             }
         },
         err e => {
-            var unknown_e2 = file_mod.UnknownError(message="fail");
+            var unknown_e2 = file.UnknownError(message="fail");
             final_result = err(unknown_e2);
         }
     }

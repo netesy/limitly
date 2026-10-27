@@ -46,12 +46,12 @@ class NegativeTest:
  description: str = ""
  
  def __hash__(self):
- return hash(self.path)
+  return hash(self.path)
  
  def __eq__(self, other):
- if not isinstance(other, NegativeTest):
- return False
- return self.path == other.path
+  if not isinstance(other, NegativeTest):
+   return False
+  return self.path == other.path
 
 
 @dataclass

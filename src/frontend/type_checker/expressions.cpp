@@ -242,16 +242,16 @@ TypePtr TypeChecker::check_literal_expr_with_expected_type(std::shared_ptr<LM::F
 TypePtr TypeChecker::check_variable_expr(std::shared_ptr<LM::Frontend::AST::VariableExpr> expr, TypePtr expected_type) {
     if (!expr) return nullptr;
 
-    // Check for module alias access (e.g., math in math.add)
-    if (import_aliases.count(expr->name)) {
+    // Check for module alias access (e.g., math in math.add), but allow local variables to shadow it
+    if (import_aliases.count(expr->name) && (!current_scope || !current_scope->lookup(expr->name))) {
         TypePtr type = type_system.createFrameType(expr->name);
         expr->inferred_type = type;
         return type;
     }
 
-    // Check if it's an imported frame or function name (without prefix)
+    // Check if it's an imported frame or function name (without prefix), but allow local variables to shadow it
     auto it = current_program_->imported_symbols.find(expr->name);
-    if (it != current_program_->imported_symbols.end()) {
+    if (it != current_program_->imported_symbols.end() && (!current_scope || !current_scope->lookup(expr->name))) {
         if (auto frame = std::dynamic_pointer_cast<LM::Frontend::AST::FrameDeclaration>(it->second)) {
             TypePtr type = type_system.createFrameType(expr->name);
             expr->inferred_type = type;
@@ -1383,37 +1383,39 @@ TypePtr TypeChecker::check_call_expr(std::shared_ptr<LM::Frontend::AST::CallExpr
             std::string method_name = member_expr->name;
             
             // Look up the frame declaration
-            auto frame_it = frame_declarations.find(frame_name);
-            if (frame_it == frame_declarations.end()) {
+            const FrameInfo* p_frame_info = lookup_frame_info(frame_name);
+            if (!p_frame_info) {
                 add_error("Unknown frame type: " + frame_name, expr->line);
                 return type_system.ANY_TYPE;
             }
             
-            const FrameInfo& frame_info = frame_it->second;
+            const FrameInfo& frame_info = *p_frame_info;
             
             // Find the method in the frame
             std::shared_ptr<LM::Frontend::AST::FrameMethod> method = nullptr;
-            for (const auto& m : frame_info.declaration->methods) {
-                if (m->name == method_name) {
-                    method = m;
-                    break;
+            if (frame_info.declaration) {
+                for (const auto& m : frame_info.declaration->methods) {
+                    if (m->name == method_name) {
+                        method = m;
+                        break;
+                    }
                 }
             }
             
             // Check init and deinit methods
-            if (!method && method_name == "init") {
+            if (!method && method_name == "init" && frame_info.declaration) {
                 method = frame_info.declaration->init;
             }
-            if (!method && method_name == "deinit") {
+            if (!method && method_name == "deinit" && frame_info.declaration) {
                 method = frame_info.declaration->deinit;
             }
 
             // Check promoted methods from embedded components (frames and mixins)
             if (!method && frame_info.declaration) {
                 for (const auto& embed_stmt : frame_info.declaration->embeds) {
-                    auto embedded_it = frame_declarations.find(embed_stmt->typeName);
-                    if (embedded_it != frame_declarations.end() && embedded_it->second.declaration) {
-                        for (const auto& em : embedded_it->second.declaration->methods) {
+                    const FrameInfo* p_embedded_info = lookup_frame_info(embed_stmt->typeName);
+                    if (p_embedded_info && p_embedded_info->declaration) {
+                        for (const auto& em : p_embedded_info->declaration->methods) {
                             if (em->name == method_name) {
                                 method = em;
                                 break;
@@ -1732,14 +1734,14 @@ TypePtr TypeChecker::check_assign_expr(std::shared_ptr<LM::Frontend::AST::Assign
             std::string field_name = *expr->member;
             
             // Look up the frame declaration
-            auto frame_it = frame_declarations.find(frame_name);
-            if (frame_it == frame_declarations.end()) {
+            const FrameInfo* p_frame_info = lookup_frame_info(frame_name);
+            if (!p_frame_info) {
                 add_error("Unknown frame type: " + frame_name, expr->line);
                 TypePtr value_type = check_expression(expr->value);
                 return value_type;
             }
             
-            const FrameInfo& frame_info = frame_it->second;
+            const FrameInfo& frame_info = *p_frame_info;
             
             // Find the field and get its type as expected type
             TypePtr field_type = nullptr;
@@ -1974,13 +1976,14 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         std::string frame_name = frameTypeData->name;
         
         // Look up the frame declaration
-        auto frame_it = frame_declarations.find(frame_name);
-        if (frame_it == frame_declarations.end()) {
+        const FrameInfo* p_frame_info = lookup_frame_info(frame_name);
+        if (!p_frame_info && !import_aliases.count(frame_name)) {
             add_error("Unknown frame type: " + frame_name, expr->line);
             return type_system.ANY_TYPE;
         }
         
-        const FrameInfo& frame_info = frame_it->second;
+        FrameInfo dummy_info;
+        const FrameInfo& frame_info = p_frame_info ? *p_frame_info : dummy_info;
         
         // Check if this is a module alias access
         if (import_aliases.count(frame_name)) {
@@ -2089,28 +2092,30 @@ TypePtr TypeChecker::check_member_expr(std::shared_ptr<LM::Frontend::AST::Member
         }
 
         // Check promoted methods from embedded components (frames and mixins)
-        for (const auto& embed_stmt : frame_info.declaration->embeds) {
-            auto embedded_it = frame_declarations.find(embed_stmt->typeName);
-            if (embedded_it != frame_declarations.end() && embedded_it->second.declaration) {
-                for (const auto& method : embedded_it->second.declaration->methods) {
-                    if (method->name == member_name) {
-                        std::vector<TypePtr> param_types;
-                        for (const auto& p : method->parameters) param_types.push_back(resolve_type_annotation(p.second));
-                        TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
-                        TypePtr func_type = type_system.createFunctionType(param_types, return_type);
-                        return wrap_result(func_type);
-                    }
-                }
-            } else {
-                auto mixin_it = mixin_declarations.find(embed_stmt->typeName);
-                if (mixin_it != mixin_declarations.end()) {
-                    for (const auto& method : mixin_it->second->methods) {
+        if (frame_info.declaration) {
+            for (const auto& embed_stmt : frame_info.declaration->embeds) {
+                const FrameInfo* p_embedded_info = lookup_frame_info(embed_stmt->typeName);
+                if (p_embedded_info && p_embedded_info->declaration) {
+                    for (const auto& method : p_embedded_info->declaration->methods) {
                         if (method->name == member_name) {
                             std::vector<TypePtr> param_types;
                             for (const auto& p : method->parameters) param_types.push_back(resolve_type_annotation(p.second));
                             TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
                             TypePtr func_type = type_system.createFunctionType(param_types, return_type);
                             return wrap_result(func_type);
+                        }
+                    }
+                } else {
+                    auto mixin_it = mixin_declarations.find(embed_stmt->typeName);
+                    if (mixin_it != mixin_declarations.end()) {
+                        for (const auto& method : mixin_it->second->methods) {
+                            if (method->name == member_name) {
+                                std::vector<TypePtr> param_types;
+                                for (const auto& p : method->parameters) param_types.push_back(resolve_type_annotation(p.second));
+                                TypePtr return_type = method->returnType ? resolve_type_annotation(method->returnType) : type_system.NIL_TYPE;
+                                TypePtr func_type = type_system.createFunctionType(param_types, return_type);
+                                return wrap_result(func_type);
+                            }
                         }
                     }
                 }

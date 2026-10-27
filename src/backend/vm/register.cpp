@@ -250,8 +250,10 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                     int64_t ia = UNBOX_INT(va);
                     int64_t ib = UNBOX_INT(vb);
                     if (ib != 0 && (ia != INT64_MIN || ib != -1)) {
-                        registers[pc->dst] = BOX_INT(pc->op == LIR::LIR_Op::Div ? ia / ib : ia % ib);
-                        break;
+                        int64_t res = pc->op == LIR::LIR_Op::Div ? ia / ib : ia % ib;
+                        // MIN_SMI / -1 == 2^60 is one past MAX_SMI, so the quotient
+                        // still needs the range check before it can be an immediate.
+                        if (fits_smi_i64(res)) { registers[pc->dst] = BOX_INT(res); break; }
                     }
                 }
                 execute_arithmetic(pc);
@@ -260,29 +262,43 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
             case LIR::LIR_Op::DecAdd: case LIR::LIR_Op::DecSub:
             case LIR::LIR_Op::DecMul: case LIR::LIR_Op::DecDiv: case LIR::LIR_Op::DecMod: case LIR::LIR_Op::DecNeg:
             case LIR::LIR_Op::DecRescale: case LIR::LIR_Op::Neg: execute_arithmetic(pc); break;
-            // Inline unchecked operations for maximum performance in hot loops
+            // Inline unchecked operations for maximum performance in hot loops.
+            // "Unchecked" removes the error/trap checks, not the representation
+            // requirement: `int` is a 64-bit language type while an SMI immediate
+            // carries only 61 signed bits. The immediate fast path is therefore
+            // taken only when both operands really are immediates and the result
+            // still fits; anything else falls through to the generic path, which
+            // decodes heap integers via as_i64 and re-boxes with make_i64.
+            // Unconditionally calling UNBOX_INT read a heap pointer as if it were
+            // an immediate, and BOX_INT shifted the top bits out of the encoding,
+            // so every value at or beyond 2^60 was silently corrupted.
             case LIR::LIR_Op::IAdd_Unchecked: {
-                int64_t ia = UNBOX_INT(registers[pc->a]);
-                int64_t ib = UNBOX_INT(registers[pc->b]);
-                registers[pc->dst] = BOX_INT(ia + ib);
+                RegisterValue va = registers[pc->a];
+                RegisterValue vb = registers[pc->b];
+                if (IS_INT(va) && IS_INT(vb)) {
+                    int64_t ia = UNBOX_INT(va);
+                    int64_t ib = UNBOX_INT(vb);
+                    int64_t res;
+                    if (!__builtin_add_overflow(ia, ib, &res) && fits_smi_i64(res)) {
+                        registers[pc->dst] = BOX_INT(res);
+                        break;
+                    }
+                }
+                execute_arithmetic(pc);
                 break;
             }
-            case LIR::LIR_Op::IXor_Unchecked: {
-                int64_t ia = UNBOX_INT(registers[pc->a]);
-                int64_t ib = UNBOX_INT(registers[pc->b]);
-                registers[pc->dst] = BOX_INT(ia ^ ib);
-                break;
-            }
-            case LIR::LIR_Op::IAnd_Unchecked: {
-                int64_t ia = UNBOX_INT(registers[pc->a]);
-                int64_t ib = UNBOX_INT(registers[pc->b]);
-                registers[pc->dst] = BOX_INT(ia & ib);
-                break;
-            }
-            case LIR::LIR_Op::IOr_Unchecked: {
-                int64_t ia = UNBOX_INT(registers[pc->a]);
-                int64_t ib = UNBOX_INT(registers[pc->b]);
-                registers[pc->dst] = BOX_INT(ia | ib);
+            case LIR::LIR_Op::IXor_Unchecked: case LIR::LIR_Op::IAnd_Unchecked: case LIR::LIR_Op::IOr_Unchecked: {
+                RegisterValue va = registers[pc->a];
+                RegisterValue vb = registers[pc->b];
+                if (IS_INT(va) && IS_INT(vb)) {
+                    int64_t ia = UNBOX_INT(va);
+                    int64_t ib = UNBOX_INT(vb);
+                    int64_t res = pc->op == LIR::LIR_Op::IXor_Unchecked ? ia ^ ib
+                              : pc->op == LIR::LIR_Op::IAnd_Unchecked ? ia & ib
+                              : ia | ib;
+                    if (fits_smi_i64(res)) { registers[pc->dst] = BOX_INT(res); break; }
+                }
+                execute_bitwise(pc);
                 break;
             }
             case LIR::LIR_Op::CmpEQ: case LIR::LIR_Op::CmpNEQ: case LIR::LIR_Op::CmpLT: case LIR::LIR_Op::CmpLE:
@@ -328,18 +344,28 @@ void RegisterVM::execute_instructions(const LIR::LIR_Function& function, uint64_
                 break;
             }
             case LIR::LIR_Op::And: case LIR::LIR_Op::Or: case LIR::LIR_Op::Xor: case LIR::LIR_Op::Shl: case LIR::LIR_Op::Shr: {
-                // Inline SMI bitwise operations: critical for numeric loops
+                // Inline SMI bitwise operations: critical for numeric loops. Same
+                // rule as above: `1 << 62` is a valid int whose value no longer fits
+                // an immediate, so an out-of-range result must not be BOX_INT'ed.
                 RegisterValue va = registers[pc->a];
                 RegisterValue vb = registers[pc->b];
                 if (IS_INT(va) && IS_INT(vb)) {
                     int64_t ia = UNBOX_INT(va);
                     int64_t ib = UNBOX_INT(vb);
-                    registers[pc->dst] = BOX_INT(pc->op == LIR::LIR_Op::And ? ia & ib
-                                          : pc->op == LIR::LIR_Op::Or ? ia | ib
-                                          : pc->op == LIR::LIR_Op::Xor ? ia ^ ib
-                                          : pc->op == LIR::LIR_Op::Shl ? (ib >= 0 && ib < 64 ? ia << ib : 0)
-                                          : (ib >= 0 && ib < 64 ? ia >> ib : (ia < 0 ? -1 : 0)));
-                    break;
+                    int64_t res;
+                    if (pc->op == LIR::LIR_Op::Shl || pc->op == LIR::LIR_Op::Shr) {
+                        if (ib < 0 || ib >= 64) { res = 0; }
+                        else if (pc->op == LIR::LIR_Op::Shl) {
+                            res = static_cast<int64_t>(static_cast<uint64_t>(ia) << ib);
+                        } else {
+                            res = ia >> ib;
+                        }
+                    } else {
+                        res = pc->op == LIR::LIR_Op::And ? ia & ib
+                            : pc->op == LIR::LIR_Op::Or ? ia | ib
+                            : ia ^ ib;
+                    }
+                    if (fits_smi_i64(res)) { registers[pc->dst] = BOX_INT(res); break; }
                 }
                 execute_bitwise(pc);
                 break;

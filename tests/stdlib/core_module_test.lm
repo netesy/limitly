@@ -1,8 +1,8 @@
 // Test Suite for Standard Library Core Module
 
 import std.core.error as error;
-import std.core.option as opt_mod;
-import std.core.result as res_mod;
+import std.core.option as option;
+import std.core.result as result;
 import std.core.comparable as comparable;
 import std.core.disposable as disposable;
 import std.core.cloneable as cloneable;
@@ -96,14 +96,14 @@ fn test_option(): int {
     print("Testing Option frame...");
 
     // Test direct Option - Some
-    var opt_some = opt_mod.Some("hello");
+    var opt_some = option.Some("hello");
     assert(opt_some.is_some() == true, "opt_some should be Some");
     assert(opt_some.is_none() == false, "opt_some should not be None");
     assert(opt_some.unwrap() == "hello", "opt_some unwrap failed");
     assert(opt_some.unwrap_or("fallback") == "hello", "opt_some unwrap_or failed");
 
     // Test direct Option - None
-    var opt_none = opt_mod.None();
+    var opt_none = option.None();
     assert(opt_none.is_some() == false, "opt_none should not be Some");
     assert(opt_none.is_none() == true, "opt_none should be None");
     assert(opt_none.unwrap_or("fallback") == "fallback", "opt_none unwrap_or fallback failed");
@@ -117,12 +117,12 @@ fn test_option(): int {
     assert(opt_none_mapped.is_none() == true, "mapped opt_none should be None");
 
     // Test Option.filter
-    var opt_int_some = opt_mod.Some(10);
+    var opt_int_some = option.Some(10);
     var opt_filtered_true = opt_int_some.filter(is_positive_int);
     assert(opt_filtered_true.is_some() == true, "opt_filtered_true should be Some");
     assert(opt_filtered_true.unwrap() == 10, "opt_filtered_true value incorrect");
 
-    var opt_int_neg = opt_mod.Some(-5);
+    var opt_int_neg = option.Some(-5);
     var opt_filtered_false = opt_int_neg.filter(is_positive_int);
     assert(opt_filtered_false.is_none() == true, "opt_filtered_false should be None");
 
@@ -146,7 +146,7 @@ fn test_result(): int {
     print("Testing Result frame...");
 
     // Test direct Result - Ok
-    var res_ok_val = res_mod.Ok(100);
+    var res_ok_val = result.Ok(100);
     assert(res_ok_val.is_ok() == true, "res_ok_val should be Ok");
     assert(res_ok_val.is_err() == false, "res_ok_val should not be Err");
     assert(res_ok_val.unwrap() == 100, "res_ok_val unwrap failed");
@@ -154,12 +154,12 @@ fn test_result(): int {
 
     // Test direct Result - Err
     var error_obj = error.Error("E500", "Server Timeout");
-    var res_err_val = res_mod.Err(error_obj);
+    var res_err_val = result.Err(error_obj);
     assert(res_err_val.is_ok() == false, "res_err_val should not be Ok");
     assert(res_err_val.is_err() == true, "res_err_val should be Err");
     assert(res_err_val.unwrap_or(200) == 200, "res_err_val unwrap_or fallback failed");
 
-    var unwrapped_error = res_err_val.unwrap_err();
+    var unwrapped_error = res_err_val.unwrap_err() as error.Error;
     assert(unwrapped_error.code == "E500", "res_err_val unwrap_err code incorrect");
 
     // Test Result.map

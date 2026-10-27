@@ -288,6 +288,10 @@ private:
             auto fromDictType = std::get_if<DictType>(&from->extra);
             auto toDictType = std::get_if<DictType>(&to->extra);
             if (fromDictType && toDictType) {
+                if ((fromDictType->keyType->tag == TypeTag::Nil || fromDictType->keyType->tag == TypeTag::Any) &&
+                    (fromDictType->valueType->tag == TypeTag::Any || fromDictType->valueType->tag == TypeTag::Nil)) {
+                    return true;
+                }
                 return canConvert(fromDictType->keyType, toDictType->keyType) &&
                        canConvert(fromDictType->valueType, toDictType->valueType);
             }

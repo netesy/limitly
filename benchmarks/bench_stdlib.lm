@@ -1,7 +1,8 @@
 // Lymar Stdlib Benchmark Suite
+import std.process as process;
 
 fn get_rss_kb(): int {
-    return 0;
+    return process.peak_rss();
 }
 
 fn main(): int {

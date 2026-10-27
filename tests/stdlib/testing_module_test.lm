@@ -69,6 +69,35 @@ fn test_verify_helper(): int {
     return 1;
 }
 
+fn test_abort_helpers(): int {
+    print("Testing Abort Helpers...");
+    // Carried over from the earlier std.testing surface. Only the success paths
+    // are exercised here: on a failed check these helpers end the process, which
+    // is their documented behaviour.
+    testing.assert_true(1 == 1, "assert_true accepts a true condition");
+    testing.assert_eq(2 + 2, 4, "assert_eq accepts equal integers");
+    testing.assert_eq("text", "text", "assert_eq accepts equal strings");
+    testing.assert_ne(1, 2, "assert_ne accepts unequal integers");
+    testing.assert_ne("a", "b", "assert_ne accepts unequal strings");
+    return 1;
+}
+
+fn checked_ok(): bool {
+    return true;
+}
+
+fn checked_fail(): bool {
+    return false;
+}
+
+fn test_run_test(): int {
+    print("Testing Run Test...");
+    // The FAIL line below is expected output: run_test reports, it does not abort.
+    assert(testing.run_test("passing case", checked_ok) == true, "run_test lost a pass");
+    assert(testing.run_test("failing case", checked_fail) == false, "run_test hid a failure");
+    return 1;
+}
+
 fn main(): int {
     print("=== Testing Module Test Suite ===");
 
@@ -76,6 +105,8 @@ fn main(): int {
     assert(test_reset() == 1, "Reset test failed");
     assert(test_instances_are_independent() == 1, "Instance independence test failed");
     assert(test_verify_helper() == 1, "Verify helper test failed");
+    assert(test_abort_helpers() == 1, "Abort helper test failed");
+    assert(test_run_test() == 1, "Run test helper test failed");
 
     print("All testing tests passed successfully.");
     return 0;

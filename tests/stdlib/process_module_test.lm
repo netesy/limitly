@@ -17,6 +17,16 @@ fn test_process_frame(): int {
     assert(current > 0, "memory failed");
     assert(p.peak_memory() >= current, "peak memory below current memory");
 
+    // Aliases kept from the earlier std.process surface, so old call sites still
+    // resolve. Read back-to-back with the canonical call they must agree; the
+    // tolerance absorbs the resident set growing between the two reads.
+    var via_alias = p.current_rss();
+    assert(via_alias > 0, "current_rss alias failed");
+    assert(via_alias - current < 256 and current - via_alias < 256, "current_rss diverges from memory()");
+    assert(p.peak_rss() >= via_alias, "peak_rss alias is below current_rss");
+    assert(process.current_rss() > 0, "module current_rss failed");
+    assert(process.peak_rss() >= process.current_rss(), "module peak_rss is below current_rss");
+
     assert(len(p.command()) > 0, "command failed");
     return 1;
 }

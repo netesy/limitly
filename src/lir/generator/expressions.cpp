@@ -18,6 +18,27 @@ namespace LM {
 namespace LIR {
 
 namespace {
+
+// Map a compound-assignment operator (`+=`, `-=`, `&=`, ...) onto the binary
+// LIR opcode it stands for. Returns LIR_Op::Nop for anything that is not a
+// compound operator (plain `=` or an unsupported one), letting each assignment
+// target decide how to report the error in its own context.
+LIR_Op compound_binary_op(LM::Frontend::TokenType op) {
+    switch (op) {
+        case LM::Frontend::TokenType::PLUS_EQUAL:     return LIR_Op::Add;
+        case LM::Frontend::TokenType::MINUS_EQUAL:    return LIR_Op::Sub;
+        case LM::Frontend::TokenType::STAR_EQUAL:     return LIR_Op::Mul;
+        case LM::Frontend::TokenType::SLASH_EQUAL:    return LIR_Op::Div;
+        case LM::Frontend::TokenType::MODULUS_EQUAL:  return LIR_Op::Mod;
+        case LM::Frontend::TokenType::AMPERSAND_EQUAL: return LIR_Op::And;
+        case LM::Frontend::TokenType::PIPE_EQUAL:      return LIR_Op::Or;
+        case LM::Frontend::TokenType::CARET_EQUAL:     return LIR_Op::Xor;
+        case LM::Frontend::TokenType::LESS_LESS_EQUAL: return LIR_Op::Shl;
+        case LM::Frontend::TokenType::GREATER_GREATER_EQUAL: return LIR_Op::Shr;
+        default:                                      return LIR_Op::Nop;
+    }
+}
+
 bool resolve_enum_variant_info(TypeSystem* type_system,
                                TypePtr enum_type_hint,
                                const std::string& variant_ref,
@@ -2128,26 +2149,12 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 }
             }
             
-            switch (expr.op) {
-                case LM::Frontend::TokenType::PLUS_EQUAL:
-                    emit_instruction(LIR_Inst(LIR_Op::Add, abi_type, dst, dst, value));
-                    break;
-                case LM::Frontend::TokenType::MINUS_EQUAL:
-                    emit_instruction(LIR_Inst(LIR_Op::Sub, abi_type, dst, dst, value));
-                    break;
-                case LM::Frontend::TokenType::STAR_EQUAL:
-                    emit_instruction(LIR_Inst(LIR_Op::Mul, abi_type, dst, dst, value));
-                    break;
-                case LM::Frontend::TokenType::SLASH_EQUAL:
-                    emit_instruction(LIR_Inst(LIR_Op::Div, abi_type, dst, dst, value));
-                    break;
-                case LM::Frontend::TokenType::MODULUS_EQUAL:
-                    emit_instruction(LIR_Inst(LIR_Op::Mod, abi_type, dst, dst, value));
-                    break;
-                default:
-                    report_error("Unsupported compound assignment operator");
-                    return 0;
+            LIR_Op bin_op = compound_binary_op(expr.op);
+            if (bin_op == LIR_Op::Nop) {
+                report_error("Unsupported compound assignment operator");
+                return value;
             }
+            emit_instruction(LIR_Inst(bin_op, abi_type, dst, dst, value));
         } else {
             // Simple assignment - just move the value
             // Set type BEFORE emitting so it's available during emit_instruction
@@ -2201,8 +2208,50 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                                 }
                             }
 
-                            emit_instruction(LIR_Inst(set_op, Type::Void, object_reg, static_cast<uint32_t>(offset_it->second), value));
-                            return value;
+                            // `obj.field op= rhs` is a read-modify-write. The atomic
+                            // opcodes selected above fold the current value in, but a
+                            // plain FrameSetField stores exactly what it is handed, and
+                            // `value` here is only the right-hand side. Storing it
+                            // directly discarded the field's previous contents, so
+                            // `x = 5; x.field += 1` yielded 1 instead of 6.
+                            Reg stored = value;
+                            if (!is_in_concurrency_context() &&
+                                expr.op != LM::Frontend::TokenType::EQUAL) {
+                                LIR_Op bin_op = compound_binary_op(expr.op);
+                                if (bin_op == LIR_Op::Nop) {
+                                    report_error("Unsupported compound assignment operator on field");
+                                    return value;
+                                }
+
+                                size_t field_index = static_cast<size_t>(offset_it->second);
+                                TypePtr field_lang_type =
+                                    (field_index < it->second.fields.size())
+                                        ? it->second.fields[field_index].second
+                                        : expr.inferred_type;
+                                Type field_abi_type = language_type_to_abi_type(field_lang_type);
+
+                                Reg current = allocate_register();
+                                emit_instruction(LIR_Inst(LIR_Op::FrameGetField, field_abi_type, current,
+                                                          object_reg, static_cast<uint32_t>(offset_it->second)));
+                                set_register_language_type(current, field_lang_type);
+                                set_register_abi_type(current, field_abi_type);
+                                set_register_type(current, field_lang_type);
+
+                                if (expr.op == LM::Frontend::TokenType::PLUS_EQUAL && field_lang_type &&
+                                    field_lang_type->tag == TypeTag::String) {
+                                    // `field += str` concatenates rather than adds.
+                                    emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, current, current, value));
+                                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                                    set_register_language_type(current, string_type);
+                                    set_register_type(current, string_type);
+                                } else {
+                                    emit_instruction(LIR_Inst(bin_op, field_abi_type, current, current, value));
+                                }
+                                stored = current;
+                            }
+
+                            emit_instruction(LIR_Inst(set_op, Type::Void, object_reg, static_cast<uint32_t>(offset_it->second), stored));
+                            return stored;
                         }
                     }
                 }
@@ -2211,9 +2260,44 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 for (const auto& [frame_name, frame_info] : frame_table_) {
                     auto offset_it = frame_info.field_offsets.find(field_name);
                     if (offset_it != frame_info.field_offsets.end()) {
-                        // Found the field - emit FrameSetField
-                        emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, object_reg, static_cast<uint32_t>(offset_it->second), value));
-                        return value;
+                        // Same read-modify-write contract as the resolved path above:
+                        // a plain FrameSetField stores exactly what it is handed, so a
+                        // compound operator must fold in the field's current value.
+                        Reg stored = value;
+                        if (expr.op != LM::Frontend::TokenType::EQUAL) {
+                            LIR_Op bin_op = compound_binary_op(expr.op);
+                            if (bin_op == LIR_Op::Nop) {
+                                report_error("Unsupported compound assignment operator on field");
+                                return value;
+                            }
+                            size_t field_index = static_cast<size_t>(offset_it->second);
+                            TypePtr field_lang_type =
+                                (field_index < frame_info.fields.size())
+                                    ? frame_info.fields[field_index].second
+                                    : expr.inferred_type;
+                            Type field_abi_type = language_type_to_abi_type(field_lang_type);
+
+                            Reg current = allocate_register();
+                            emit_instruction(LIR_Inst(LIR_Op::FrameGetField, field_abi_type, current,
+                                                      object_reg, static_cast<uint32_t>(offset_it->second)));
+                            set_register_language_type(current, field_lang_type);
+                            set_register_abi_type(current, field_abi_type);
+                            set_register_type(current, field_lang_type);
+
+                            if (expr.op == LM::Frontend::TokenType::PLUS_EQUAL && field_lang_type &&
+                                field_lang_type->tag == TypeTag::String) {
+                                emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, current, current, value));
+                                auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                                set_register_language_type(current, string_type);
+                                set_register_type(current, string_type);
+                            } else {
+                                emit_instruction(LIR_Inst(bin_op, field_abi_type, current, current, value));
+                            }
+                            stored = current;
+                        }
+                        emit_instruction(LIR_Inst(LIR_Op::FrameSetField, Type::Void, object_reg,
+                                                  static_cast<uint32_t>(offset_it->second), stored));
+                        return stored;
                     }
                 }
             }
@@ -2230,15 +2314,58 @@ Reg Generator::emit_assign_expr(LM::Frontend::AST::AssignExpr& expr) {
                 object_type = expr.object->inferred_type;
             }
 
-            if (object_type && object_type->tag == ::TypeTag::List) {
-                emit_instruction(LIR_Inst(LIR_Op::ListSet, Type::Void, object_reg, index_reg, value));
+            bool is_list = object_type && object_type->tag == ::TypeTag::List;
+
+            // `coll[i] op= rhs` is a read-modify-write too, exactly like the field
+            // case above: ListSet/DictSet store precisely the value they are given,
+            // and `value` is only the right-hand side. Reading the current element
+            // and folding in the operator is what makes `l[0] += 5` yield 10 rather
+            // than 5.
+            Reg stored = value;
+            if (expr.op != LM::Frontend::TokenType::EQUAL) {
+                LIR_Op bin_op = compound_binary_op(expr.op);
+                if (bin_op == LIR_Op::Nop) {
+                    report_error("Unsupported compound assignment operator on index");
+                    return value;
+                }
+
+                TypePtr result_type = expr.inferred_type
+                    ? expr.inferred_type
+                    : std::make_shared<::Type>(::TypeTag::Any);
+                Type abi_type = language_type_to_abi_type(result_type);
+
+                Reg current = allocate_register();
+                if (object_type && object_type->tag == ::TypeTag::Dict) {
+                    emit_instruction(LIR_Inst(LIR_Op::DictGet, abi_type, current, object_reg, index_reg));
+                } else {
+                    emit_instruction(LIR_Inst(LIR_Op::ListIndex, abi_type, current, object_reg, index_reg));
+                }
+                set_register_language_type(current, result_type);
+                set_register_abi_type(current, abi_type);
+                set_register_type(current, result_type);
+
+                if (expr.op == LM::Frontend::TokenType::PLUS_EQUAL && result_type &&
+                    result_type->tag == TypeTag::String) {
+                    // Element-wise string concatenation, not arithmetic addition.
+                    emit_instruction(LIR_Inst(LIR_Op::STR_CONCAT, Type::Ptr, current, current, value));
+                    auto string_type = std::make_shared<::Type>(::TypeTag::String);
+                    set_register_language_type(current, string_type);
+                    set_register_type(current, string_type);
+                } else {
+                    emit_instruction(LIR_Inst(bin_op, abi_type, current, current, value));
+                }
+                stored = current;
+            }
+
+            if (is_list) {
+                emit_instruction(LIR_Inst(LIR_Op::ListSet, Type::Void, object_reg, index_reg, stored));
             } else {
                 // Use DictSet operation for dictionary assignment
                 Reg result = allocate_register();
-                emit_instruction(LIR_Inst(LIR_Op::DictSet, Type::Ptr, object_reg, index_reg, value));
+                emit_instruction(LIR_Inst(LIR_Op::DictSet, Type::Ptr, object_reg, index_reg, stored));
                 set_register_type(result, std::make_shared<::Type>(::TypeTag::Nil)); // Void return
             }
-            return value;
+            return stored;
         }
     } else {
         report_error("Invalid assignment target");

@@ -60,8 +60,10 @@ void RegisterVM::execute_memory_load(const LIR::LIR_Inst* pc) {
         case LIR::Type::U16: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(uint16_t*)ptr)); break;
         case LIR::Type::I32: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(int32_t*)ptr)); break;
         case LIR::Type::U32: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(uint32_t*)ptr)); break;
-        case LIR::Type::I64: registers[pc->dst] = BOX_INT(*(int64_t*)ptr); break;
-        case LIR::Type::U64: registers[pc->dst] = BOX_INT(static_cast<int64_t>(*(uint64_t*)ptr)); break;
+        // A 64-bit load can return a magnitude wider than the 61-bit immediate
+        // payload, so these must go through make_i64/make_u64 rather than BOX_INT.
+        case LIR::Type::I64: registers[pc->dst] = make_i64(*(int64_t*)ptr); break;
+        case LIR::Type::U64: registers[pc->dst] = make_u64(*(uint64_t*)ptr); break;
         case LIR::Type::F32: registers[pc->dst] = make_float(static_cast<double>(*(float*)ptr)); break;
         case LIR::Type::F64: registers[pc->dst] = make_float(*(double*)ptr); break;
         case LIR::Type::Bool: registers[pc->dst] = *(bool*)ptr ? VAL_TRUE : VAL_FALSE; break;
@@ -358,7 +360,7 @@ void RegisterVM::execute_ptr_diff(const LIR::LIR_Inst* pc) {
     void* p1 = value_to_ptr(registers[pc->a]);
     void* p2 = value_to_ptr(registers[pc->b]);
     if (!p1 || !p2) { registers[pc->dst] = BOX_INT(0); return; }
-    registers[pc->dst] = BOX_INT(static_cast<int64_t>((uint8_t*)p1 - (uint8_t*)p2));
+    registers[pc->dst] = make_i64(static_cast<int64_t>((uint8_t*)p1 - (uint8_t*)p2));
 }
 
 void RegisterVM::execute_ptr_align(const LIR::LIR_Inst* pc) {

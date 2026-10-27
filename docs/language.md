@@ -139,6 +139,99 @@ Frames are the primary unit of data encapsulation and behavior.
 - `prot`: Accessible within the frame and subframes.
 - `pub`: Accessible from any scope.
 
+### 3.4 Composition: Traits, Mixins, Embedding
+
+Lymar has **no inheritance between frames**. `frame A : B` where `B` is a frame is a
+compile error. The colon `:` is reserved exclusively for trait conformance. The three
+composition mechanisms are disjoint — each answers a different question.
+
+| Mechanism | Question it answers | Runtime cost | Dispatch |
+|---|---|---|---|
+| `trait` | *What behaviour can this call?* | zero (no storage) | dynamic, by trait |
+| `mixin` | *Which fields does this share?* | zero (flattened) | static, always concrete |
+| `embed` | *Which component's fields and methods does this host own?* | zero (flattened) | static, always concrete |
+
+#### 3.4.1 Traits — behavioural contracts
+
+```lymar
+trait Reader {
+    fn read(buffer: str, size: int): int;      // requirement: must be implemented
+    fn name(): str { return "reader"; }        // default implementation
+}
+
+frame File: Reader {
+    pub fn read(buffer: str, size: int): int { ... }
+}
+```
+
+- A trait body contains **methods only**. A field in a trait is a parse error
+  (`Expected method declaration in trait.`) — shared state belongs in a mixin.
+- `fn sig;` (semicolon) is a requirement. `fn sig { ... }` is a **default
+  implementation**: the conforming frame need not redeclare it and may call it
+  directly.
+- Conformance is declared with `:` and is **strictly checked**: the member must match
+  the requirement's name, arity, parameter types and return type. A member that
+  merely shares the name does not satisfy the contract. `any` is accepted on either
+  side, and a refined type compares equal to its base type.
+- Traits may require other traits: `trait Cached: Reader, Disposable { ... }`. Every
+  requirement in the graph is verified.
+- Traits are public by default; `pub trait` is an error.
+- Use traits when a caller needs to accept *any* frame that can do something.
+
+#### 3.4.2 Mixins — shared data fields
+
+```lymar
+mixin Identifiable {
+    pub id: int;
+    pub fn set_id(value: int) { self.id = value; }
+}
+
+frame User {
+    mixin Identifiable;          // fields and methods are injected, flattened
+    pub name: str;
+}
+
+var u = User();
+u.id = 7;                        // no `u.identifiable` qualifier — there is no sub-object
+u.set_id(8);
+```
+
+- A mixin is a reusable block of **state**, primarily fields. Methods are permitted so
+  a mixin can expose accessors over its own fields, but a mixin is not a contract:
+  it never dispatches dynamically.
+- Members are copied into the host frame at compile time. A mixin is not a value and
+  cannot be instantiated, stored, or passed.
+- An unknown mixin name is an error at the including frame.
+
+#### 3.4.3 Embedding — flattened component inlining
+
+```lymar
+frame Engine {
+    pub rpm: int;
+    pub fn start(): str { self.rpm = 1000; return "started"; }
+}
+
+frame Car {
+    embed Engine;                // anonymous, compile-time flattening
+    pub fn drive(): str { self.start(); return "{self.rpm}"; }
+}
+```
+
+- `embed Type;` inlines another frame's fields into the host and **promotes its
+  methods** onto the host. There is no wrapper object, no indirection and no vtable:
+  the promoted field is the host's own storage, so `car.rpm` and the `rpm` that
+  `Engine.start()` writes are the same slot.
+- Embedding is **anonymous**. `embed Engine;` creates no `self.engine` accessor — if
+  you need to name the component, declare a field (`pub engine: Engine;`) instead.
+- Name collisions are resolved first-wins: a member the host already declares is never
+  overwritten by a promoted one.
+- `embed` accepts a mixin name as well as a frame name; an unknown name is an error.
+- Promoted members count as real members, so an embedded component's method can
+  satisfy a trait requirement declared on the host.
+- **`deinit` is not promoted and is not synthesised.** Because flattening leaves no
+  embedded sub-object, the embedded frame's `deinit()` does not run when the host is
+  destroyed. Forward it explicitly from the host if cleanup is required.
+
 ## 4. Control Flow
 
 ### 4.1 Match Statement

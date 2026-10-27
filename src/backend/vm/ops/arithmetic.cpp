@@ -242,32 +242,24 @@ void RegisterVM::execute_arithmetic(const LIR::LIR_Inst* pc) {
             }
             break;
         }
-        // Unchecked integer operations for optimized hot loops
-        // These assume operands are SMIs and bypass type checks
-        case LIR::LIR_Op::IAdd_Unchecked: {
-            int64_t ia = UNBOX_INT(registers[pc->a]);
-            int64_t ib = UNBOX_INT(registers[pc->b]);
-            registers[pc->dst] = BOX_INT(ia + ib);
+        // Unchecked integer operations for optimized hot loops.
+        // register.cpp only takes its immediate fast path when both operands are
+        // SMIs and the result still fits, so this is where control lands for values
+        // outside the 61-bit payload. It has to produce exactly what the checked
+        // operations do: read through as_i64 (which understands heap integers) and
+        // re-box with make_i64 (which allocates when the value will not fit).
+        case LIR::LIR_Op::IAdd_Unchecked:
+            registers[pc->dst] = lm_add(registers[pc->a], registers[pc->b]);
             break;
-        }
-        case LIR::LIR_Op::IXor_Unchecked: {
-            int64_t ia = UNBOX_INT(registers[pc->a]);
-            int64_t ib = UNBOX_INT(registers[pc->b]);
-            registers[pc->dst] = BOX_INT(ia ^ ib);
+        case LIR::LIR_Op::IXor_Unchecked:
+            registers[pc->dst] = make_i64(to_int(registers[pc->a]) ^ to_int(registers[pc->b]));
             break;
-        }
-        case LIR::LIR_Op::IAnd_Unchecked: {
-            int64_t ia = UNBOX_INT(registers[pc->a]);
-            int64_t ib = UNBOX_INT(registers[pc->b]);
-            registers[pc->dst] = BOX_INT(ia & ib);
+        case LIR::LIR_Op::IAnd_Unchecked:
+            registers[pc->dst] = make_i64(to_int(registers[pc->a]) & to_int(registers[pc->b]));
             break;
-        }
-        case LIR::LIR_Op::IOr_Unchecked: {
-            int64_t ia = UNBOX_INT(registers[pc->a]);
-            int64_t ib = UNBOX_INT(registers[pc->b]);
-            registers[pc->dst] = BOX_INT(ia | ib);
+        case LIR::LIR_Op::IOr_Unchecked:
+            registers[pc->dst] = make_i64(to_int(registers[pc->a]) | to_int(registers[pc->b]));
             break;
-        }
         default:
             throw std::runtime_error(
                 "VM: execute_arithmetic: unsupported opcode " +

@@ -801,10 +801,14 @@ std::shared_ptr<LM::Frontend::AST::FrameDeclaration> Parser::frameDeclaration() 
             else frameDecl->methods.push_back(frameMethod);
         } else if (match({TokenType::EMBED})) {
             Token embedTypeTok = consume(TokenType::IDENTIFIER, "Expected type name after 'embed'.");
+            std::string embedTypeName = embedTypeTok.lexeme;
+            while (match({TokenType::DOT})) {
+                embedTypeName += "." + consume(TokenType::IDENTIFIER, "Expected identifier after '.' in embed type.").lexeme;
+            }
             consume(TokenType::SEMICOLON, "Expected ';' after embed statement.");
             auto embedStmt = std::make_shared<LM::Frontend::AST::EmbedStatement>();
             embedStmt->line = embedTypeTok.line;
-            embedStmt->typeName = embedTypeTok.lexeme;
+            embedStmt->typeName = embedTypeName;
             frameDecl->embeds.push_back(embedStmt);
         } else if (match({TokenType::MIXIN})) {
             Token mixinTok = consume(TokenType::IDENTIFIER, "Expected mixin name after 'mixin'.");

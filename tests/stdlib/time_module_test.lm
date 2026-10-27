@@ -3,8 +3,8 @@
 import std.time.duration as dur;
 import std.time.timezone as tz;
 import std.time.datetime as dt;
-import std.time.instant as inst_mod;
-import std.time.timer as timer_mod;
+import std.time.instant as instant;
+import std.time.timer as timer;
 
 fn test_duration(): int {
     print("Testing Duration...");
@@ -40,13 +40,13 @@ fn test_time(): int {
 
 fn test_instant_and_timer(): int {
     print("Testing Instant and Timer...");
-    var inst = inst_mod.Instant(0.0) as inst_mod.Instant; // Construct via inst_mod.Instant(0.0)
+    var inst = instant.Instant(0.0) as instant.Instant;
     var elapsed = inst.elapsed() as dur.TimeDuration;
     assert(elapsed.seconds >= 0, "instant elapsed failed");
 
-    var timer = timer_mod.Timer() as timer_mod.Timer;
-    timer.reset();
-    var timer_elapsed = timer.elapsed() as dur.TimeDuration;
+    var timer_obj = timer.Timer() as timer.Timer;
+    timer_obj.reset();
+    var timer_elapsed = timer_obj.elapsed() as dur.TimeDuration;
     assert(timer_elapsed.seconds >= 0, "timer elapsed failed");
     return 1;
 }

@@ -1,5 +1,5 @@
 import std.encoding.percent as percent;
-import std.url.query as query_mod;
+import std.url.query as query;
 
 frame URL {
     pub fragment: str;
@@ -171,8 +171,8 @@ frame URL {
     }
 
     // Parse the query string into key-value pairs
-    pub fn query_params(): query_mod.QueryParams {
-        return query_mod.parse(self.query);
+    pub fn query_params(): query.QueryParams {
+        return query.parse(self.query);
     }
 
     // Get the origin (scheme + host + port)

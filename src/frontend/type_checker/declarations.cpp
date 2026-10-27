@@ -275,6 +275,77 @@ void TypeChecker::register_builtin_function(const std::string& name,
 // FRAME DECLARATION AND INSTANTIATION TYPE CHECKING
 // =============================================================================
 
+namespace {
+
+using ASTTypeAnnotation = std::shared_ptr<LM::Frontend::AST::TypeAnnotation>;
+using RequiredParams = std::vector<std::pair<std::string, ASTTypeAnnotation>>;
+using OptionalParams = std::vector<
+    std::pair<std::string, std::pair<ASTTypeAnnotation, std::shared_ptr<LM::Frontend::AST::Expression>>>>;
+
+// Semantic spelling of a type annotation, used to decide whether a frame member
+// satisfies a trait requirement. Deliberately not a reuse of
+// ASTPrinter::typeToString: that output is display formatting and is free to
+// drift for cosmetic reasons, whereas this one is a conformance rule.
+std::string signature_spelling(const ASTTypeAnnotation& annotation) {
+    if (!annotation) return "nil";
+
+    std::string result;
+    if (annotation->isList) {
+        result = "[" + signature_spelling(annotation->elementType) + "]";
+    } else if (annotation->isDict) {
+        result = "{" + signature_spelling(annotation->keyType) + ": " +
+                 signature_spelling(annotation->valueType) + "}";
+    } else if (annotation->isTuple) {
+        result = "(";
+        for (size_t i = 0; i < annotation->tupleTypes.size(); ++i) {
+            if (i > 0) result += ", ";
+            result += signature_spelling(annotation->tupleTypes[i]);
+        }
+        result += ")";
+    } else if (annotation->isUnion && !annotation->unionTypes.empty()) {
+        result = "(";
+        for (size_t i = 0; i < annotation->unionTypes.size(); ++i) {
+            if (i > 0) result += " | ";
+            result += signature_spelling(annotation->unionTypes[i]);
+        }
+        result += ")";
+    } else if (annotation->isFunction) {
+        result = "fn(";
+        for (size_t i = 0; i < annotation->functionParams.size(); ++i) {
+            if (i > 0) result += ", ";
+            result += signature_spelling(annotation->functionParams[i]);
+        }
+        result += ")";
+        if (annotation->returnType) result += ": " + signature_spelling(annotation->returnType);
+    } else {
+        result = annotation->typeName.empty() ? std::string("any") : annotation->typeName;
+    }
+
+    if (annotation->isOptional) result += "?";
+    return result;
+}
+
+// Required parameters followed by defaulted ones. Frame methods keep the two in
+// separate vectors, so reconstructing full arity needs both.
+std::vector<std::string> signature_parameters(const RequiredParams& required,
+                                             const OptionalParams& optional) {
+    std::vector<std::string> spelled;
+    spelled.reserve(required.size() + optional.size());
+    for (const auto& param : required) spelled.push_back(signature_spelling(param.second));
+    for (const auto& param : optional) spelled.push_back(signature_spelling(param.second.first));
+    return spelled;
+}
+
+// `any` is the language's dynamic escape hatch, so it is accepted on either side
+// of a requirement rather than demanding an identical spelling. Refined types
+// spell as their base type, which keeps `int where x > 0` interchangeable with
+// `int` instead of rejecting a comparison the runtime cannot distinguish.
+bool signature_compatible(const std::string& required, const std::string& offered) {
+    return required == offered || required == "any" || offered == "any";
+}
+
+} // namespace
+
 TypePtr TypeChecker::check_trait_declaration(std::shared_ptr<LM::Frontend::AST::TraitDeclaration> trait) {
     if (!trait) return nullptr;
 
@@ -379,57 +450,18 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
     FrameInfo frame_info;
     frame_info.name = name;
     frame_info.declaration = frame;
-    
-    // Verify trait implementations recursively
-    std::vector<std::string> trait_worklist = frame->implements;
-    std::unordered_set<std::string> visited_traits;
-
-    while (!trait_worklist.empty()) {
-        std::string trait_name = trait_worklist.back();
-        trait_worklist.pop_back();
-
-        if (visited_traits.count(trait_name)) continue;
-        visited_traits.insert(trait_name);
-
-        auto it = trait_declarations.find(trait_name);
-        if (it == trait_declarations.end()) {
-            add_error("Frame '" + frame->name + "' implements unknown trait: " + trait_name, frame->line);
-            continue;
-        }
-
-        const auto& trait_info = it->second;
-        for (const auto& trait_method : trait_info.declaration->methods) {
-            // Check if frame implements this method
-            bool implemented = false;
-            for (const auto& frame_method : frame->methods) {
-                if (frame_method->name == trait_method->name) {
-                    implemented = true;
-                    break;
-                }
-            }
-            
-            if (!implemented) {
-                // Check if trait has default implementation
-                if (trait_method->body && !trait_method->body->statements.empty()) {
-                    // It has a default implementation, we're good
-                } else {
-                    add_error("Frame '" + frame->name + "' does not implement required trait method: " + trait_method->name, frame->line);
-                }
-            }
-        }
-
-        // Add parent traits to verify them too
-        trait_worklist.reserve(trait_worklist.size() + trait_info.extends.size());
-        for (const auto& parent : trait_info.extends) {
-            trait_worklist.push_back(parent);
-        }
-    }
 
     // Process anonymous field embedding (`embed TypeName;`)
+    //
+    // Promotion has to happen before trait conformance is verified. A member
+    // gained through `embed` is a real member of the frame, so it must count when
+    // deciding whether the frame satisfies `:`. Mixins are already injected above,
+    // and running embeds after the check made the two composition mechanisms
+    // disagree about who can honour a contract.
     for (const auto& embed_stmt : frame->embeds) {
-        auto embedded_it = frame_declarations.find(embed_stmt->typeName);
-        if (embedded_it != frame_declarations.end()) {
-            const auto& embedded_info = embedded_it->second;
+        const FrameInfo* p_embedded_info = lookup_frame_info(embed_stmt->typeName);
+        if (p_embedded_info) {
+            const auto& embedded_info = *p_embedded_info;
             for (const auto& [efield_name, efield_type] : embedded_info.fields) {
                 frame_info.fields.push_back({efield_name, efield_type});
                 frame_info.field_has_default.push_back({efield_name, true});
@@ -441,6 +473,13 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
                         if (existing->name == efield->name) { exists = true; break; }
                     }
                     if (!exists) frame->fields.push_back(efield);
+                }
+                for (const auto& emethod : embedded_info.declaration->methods) {
+                    bool exists = false;
+                    for (const auto& existing : frame->methods) {
+                        if (existing->name == emethod->name) { exists = true; break; }
+                    }
+                    if (!exists) frame->methods.push_back(emethod);
                 }
             }
         } else {
@@ -467,6 +506,82 @@ TypePtr TypeChecker::check_frame_declaration_with_name(const std::string& name, 
             } else {
                 add_error("Unknown type '" + embed_stmt->typeName + "' in embed statement", frame->line);
             }
+        }
+    }
+
+    // Verify trait implementations recursively
+    std::vector<std::string> trait_worklist = frame->implements;
+    std::unordered_set<std::string> visited_traits;
+
+    while (!trait_worklist.empty()) {
+        std::string trait_name = trait_worklist.back();
+        trait_worklist.pop_back();
+
+        if (visited_traits.count(trait_name)) continue;
+        visited_traits.insert(trait_name);
+
+        auto it = trait_declarations.find(trait_name);
+        if (it == trait_declarations.end()) {
+            add_error("Frame '" + frame->name + "' implements unknown trait: " + trait_name, frame->line);
+            continue;
+        }
+
+        const auto& trait_info = it->second;
+        for (const auto& trait_method : trait_info.declaration->methods) {
+            // Find the frame member that claims to satisfy this requirement.
+            std::shared_ptr<LM::Frontend::AST::FrameMethod> offered_method;
+            for (const auto& frame_method : frame->methods) {
+                if (frame_method->name == trait_method->name) {
+                    offered_method = frame_method;
+                    break;
+                }
+            }
+
+            if (!offered_method) {
+                // A trait body counts as a default implementation, except for the
+                // empty placeholder the parser emits for a `fn f();` requirement.
+                if (trait_method->body && !trait_method->body->statements.empty()) {
+                    continue;
+                }
+                add_error("Frame '" + frame->name + "' does not implement required trait method: " + trait_method->name, frame->line);
+                continue;
+            }
+
+            // Conformance is signature equality, not name equality. A member that
+            // merely shares the name must not be allowed to satisfy the contract,
+            // otherwise `:` stops being a behavioural guarantee.
+            std::vector<std::string> required_params = signature_parameters(trait_method->params, trait_method->optionalParams);
+            std::vector<std::string> offered_params = signature_parameters(offered_method->parameters, offered_method->optionalParams);
+
+            if (required_params.size() != offered_params.size()) {
+                add_error("Frame '" + frame->name + "' method '" + trait_method->name + "' takes " +
+                              std::to_string(offered_params.size()) + " parameter(s) but trait '" + trait_name +
+                              "' requires " + std::to_string(required_params.size()),
+                          frame->line);
+            } else {
+                for (size_t i = 0; i < required_params.size(); ++i) {
+                    if (!signature_compatible(required_params[i], offered_params[i])) {
+                        add_error("Frame '" + frame->name + "' method '" + trait_method->name + "' parameter " +
+                                      std::to_string(i + 1) + " is '" + offered_params[i] + "' but trait '" +
+                                      trait_name + "' requires '" + required_params[i] + "'",
+                                  frame->line);
+                    }
+                }
+            }
+
+            std::string required_return = trait_method->returnType ? signature_spelling(trait_method->returnType.value()) : "nil";
+            std::string offered_return = offered_method->returnType ? signature_spelling(offered_method->returnType) : "nil";
+            if (!signature_compatible(required_return, offered_return)) {
+                add_error("Frame '" + frame->name + "' method '" + trait_method->name + "' returns '" + offered_return +
+                              "' but trait '" + trait_name + "' requires '" + required_return + "'",
+                          frame->line);
+            }
+        }
+
+        // Add parent traits to verify them too
+        trait_worklist.reserve(trait_worklist.size() + trait_info.extends.size());
+        for (const auto& parent : trait_info.extends) {
+            trait_worklist.push_back(parent);
         }
     }
 
@@ -620,13 +735,13 @@ TypePtr TypeChecker::check_frame_instantiation_expr(std::shared_ptr<LM::Frontend
     if (!expr) return nullptr;
     
     // Look up the frame declaration
-    auto frame_it = frame_declarations.find(expr->frameName);
-    if (frame_it == frame_declarations.end()) {
+    const FrameInfo* p_frame_info = lookup_frame_info(expr->frameName);
+    if (!p_frame_info) {
         add_error("Unknown frame type: " + expr->frameName, expr->line);
         return type_system.ANY_TYPE;
     }
     
-    const FrameInfo& frame_info = frame_it->second;
+    const FrameInfo& frame_info = *p_frame_info;
     
 
     // Use the qualified name from frame_declarations (which is the actual registered name)

@@ -32,7 +32,7 @@ void RegisterVM::execute_marshal(const LIR::LIR_Inst* pc) {
             registers[pc->dst] = make_float(static_cast<double>(to_int(registers[pc->a])));
             break;
         case MT::FloatToInt:
-            registers[pc->dst] = BOX_INT(static_cast<int64_t>(to_float(registers[pc->a])));
+            registers[pc->dst] = make_i64(static_cast<int64_t>(to_float(registers[pc->a])));
             break;
         default:
             registers[pc->dst] = VAL_NIL;
@@ -63,7 +63,7 @@ void RegisterVM::execute_unmarshal(const LIR::LIR_Inst* pc) {
             break;
         case MT::IntToFloat:
             // Reverse: Float to Int
-            registers[pc->dst] = BOX_INT(static_cast<int64_t>(to_float(registers[pc->a])));
+            registers[pc->dst] = make_i64(static_cast<int64_t>(to_float(registers[pc->a])));
             break;
         case MT::FloatToInt:
             // Reverse: Int to Float

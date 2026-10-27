@@ -117,10 +117,11 @@ frame Rectangle {
 ```
 
 #### **Traits**
-Traits define interface requirements that frames can implement.
+Traits define **behavioural contracts** (interfaces) that frames conform to. A trait body contains methods only -- never fields. Every method must end in `;` (a requirement) or carry a `{ ... }` body (a default implementation). Omitting both is a parse error.
 ```lymar
 trait Shape {
- fn area(): int
+ fn area(): int;          // requirement: semicolon is mandatory
+ fn name(): str { return "shape"; }   // default implementation
 }
 
 frame Square: Shape {
@@ -130,6 +131,48 @@ frame Square: Shape {
  }
 }
 ```
+- Conformance is checked **strictly**: the implementing method must match the requirement's name, parameter count, parameter types and return type. A same-named method with a different signature is rejected.
+- A trait may require other traits: `trait Cached: Shape, Comparable { ... }`.
+- `frame A : B` where `B` is a **frame** is illegal -- there is no frame inheritance.
+
+#### **Mixins**
+Mixins supply **shared data fields**. Members are flattened into the including frame at compile time, so the frame gains the fields directly -- there is no mixin sub-object, and a mixin cannot be instantiated on its own.
+```lymar
+mixin Identifiable {
+ pub id: int;
+}
+
+frame User {
+ mixin Identifiable;      // User now has its own `id` field
+ pub name: str;
+}
+
+var u = User();
+u.id = 7;                 // no `u.identifiable` qualifier
+```
+- Use a mixin for shared **state**. Use a trait for shared **behaviour**. A mixin is not an interface and never dispatches dynamically (methods are permitted only as accessors over its own fields).
+
+#### **Frame Embedding**
+`embed` flattens a component frame into its host at compile time: the component's fields become the host's own storage and the component's methods are **promoted** onto the host. Zero overhead -- no wrapper object, no indirection, no vtable.
+```lymar
+frame Engine {
+ pub rpm: int;
+ pub fn start() { self.rpm = 1000; }
+}
+
+frame Car {
+ embed Engine;            // anonymous: creates no `self.engine`
+ pub model: str;
+}
+
+var c = Car();
+c.start();                // promoted method
+c.rpm = 3000;             // promoted field, same storage the method reads
+```
+- Embedding is anonymous and introduces no accessor name; to name the component, declare a field (`pub engine: Engine;`).
+- On a name collision the host's own member wins; promoted members never overwrite an existing one.
+- Promoted members count as real members, so `frame Car: Drivable { embed Engine; }` satisfies `Drivable`.
+- The component's `deinit()` is **not** called when the host is destroyed. Forward cleanup explicitly from the host's `deinit()`.
 
 ---
 

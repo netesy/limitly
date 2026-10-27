@@ -1,18 +1,17 @@
 import std.mime as mime;
-import std.mime.types as types_mod;
 
 fn test_parsing(): int {
     print("Running MIME parsing tests...");
 
     // Simple parsing
-    var m1 = mime.parse("text/html") as types_mod.MIMEType;
+    var m1 = mime.parse("text/html");
     assert(m1.is_valid == true, "m1 should be valid");
     assert(m1.main_type == "text", "m1.main_type should be text");
     assert(m1.subtype == "html", "m1.subtype should be html");
     assert(m1.to_string() == "text/html", "m1.to_string() failed");
 
     // Case normalization and whitespace trimming
-    var m2 = mime.parse("  TEXT/Html; charset=utf-8; Boundary=some-boundary  ") as types_mod.MIMEType;
+    var m2 = mime.parse("  TEXT/Html; charset=utf-8; Boundary=some-boundary  ");
     assert(m2.is_valid == true, "m2 should be valid");
     assert(m2.main_type == "text", "m2.main_type should be text");
     assert(m2.subtype == "html", "m2.subtype should be html");
@@ -20,13 +19,13 @@ fn test_parsing(): int {
     assert(m2.params.get("boundary") == "some-boundary", "boundary failed");
 
     // Invalid MIME
-    var m3 = mime.parse("invalid-mime-no-slash") as types_mod.MIMEType;
+    var m3 = mime.parse("invalid-mime-no-slash");
     assert(m3.is_valid == false, "m3 should be invalid");
 
-    var m4 = mime.parse("text/") as types_mod.MIMEType;
+    var m4 = mime.parse("text/");
     assert(m4.is_valid == false, "m4 should be invalid");
 
-    var m5 = mime.parse("/html") as types_mod.MIMEType;
+    var m5 = mime.parse("/html");
     assert(m5.is_valid == false, "m5 should be invalid");
 
     print("Parsing tests passed!");
@@ -36,11 +35,11 @@ fn test_parsing(): int {
 fn test_classification(): int {
     print("Running MIME classification tests...");
 
-    var text = mime.parse("text/plain") as types_mod.MIMEType;
-    var image = mime.parse("image/png") as types_mod.MIMEType;
-    var audio = mime.parse("audio/mpeg") as types_mod.MIMEType;
-    var video = mime.parse("video/mp4") as types_mod.MIMEType;
-    var app = mime.parse("application/json") as types_mod.MIMEType;
+    var text = mime.parse("text/plain");
+    var image = mime.parse("image/png");
+    var audio = mime.parse("audio/mpeg");
+    var video = mime.parse("video/mp4");
+    var app = mime.parse("application/json");
 
     assert(text.is_text() == true, "text should be text");
     assert(text.is_image() == false, "text should not be image");
@@ -57,7 +56,7 @@ fn test_classification(): int {
 fn test_parameters(): int {
     print("Running MIME parameters tests...");
 
-    var params = mime.MIMEParams() as types_mod.MIMEParams;
+    var params = mime.MIMEParams();
     params.set("charset", "utf-8");
     params.set("boundary", "xyz");
 

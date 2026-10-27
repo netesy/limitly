@@ -2,6 +2,8 @@
 
 import std.resource as res;
 import std.internal.runtime as rt;
+import std.io.reader show Reader;
+import std.io.writer show Writer;
 
 frame FileNotFound { pub var path: str; }
 frame PermissionDenied { pub var path: str; pub var operation: str; }
@@ -12,32 +14,33 @@ frame UnknownError { pub var message: str; }
 pub type IOError = FileNotFound | PermissionDenied | DiskFull | NetworkError | UnknownError;
 
 frame File {
+    embed Reader;
+    embed Writer;
+
     pub var path: str;
     var resource: res.Resource;
-    var reader: res.ResourceReader;
-    var writer: res.ResourceWriter;
 
     pub init(p: str, r: res.Resource) {
         self.path = p;
         self.resource = r;
-        self.reader = res.ResourceReader(r);
-        self.writer = res.ResourceWriter(r);
+        self.r = res.ResourceReader(r);
+        self.w = res.ResourceWriter(r);
     }
 
     pub fn read(): str?IOError {
-        var r = self.reader.read([]);
-        if (r == nil) return err(UnknownError(message="fail"));
-        return ok(r as str);
+        var res_data = self.r.read([]);
+        if (res_data == nil) return err(UnknownError(message="fail"));
+        return ok(res_data as str);
     }
 
     pub fn read_bytes(): [int]?IOError {
-        var r = self.reader.read_bytes();
-        if (len(r) == 0) return err(UnknownError(message="empty"));
-        return ok(r);
+        var res_data = self.r.read_bytes();
+        if (len(res_data) == 0) return err(UnknownError(message="empty"));
+        return ok(res_data);
     }
 
     pub fn write(content: str): nil?IOError {
-        var success = self.writer.write([content]);
+        var success = self.w.write([content]);
         if (success == nil) return err(UnknownError(message="fail"));
         return ok(nil);
     }

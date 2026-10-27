@@ -1,69 +1,69 @@
 // std/crypto/index.lm
 // Clean, unified Cryptography standard library facade powered by OpenSSL
 
-import std.crypto.hash as hash_mod;
-import std.crypto.hmac as hmac_mod;
-import std.crypto.cipher as cipher_mod;
-import std.crypto.random as random_mod;
+import std.crypto.hash as hash;
+import std.crypto.hmac as hmac;
+import std.crypto.cipher as cipher;
+import std.crypto.random as random;
 
 // ── Re-exports: Hashing ────────────────────────────────────────────────────
-pub fn Hasher(algo: str = "sha256"): hash_mod.Hasher {
-    return hash_mod.Hasher(algo);
+pub fn Hasher(algo: str = "sha256"): hash.Hasher {
+    return hash.Hasher(algo);
 }
 
 pub fn hash(algo: str, data: str): str {
-    return hash_mod.hash(algo, data);
+    return hash.hash(algo, data);
 }
 
-pub fn sha256(data: str): str { return hash_mod.sha256(data); }
-pub fn sha512(data: str): str { return hash_mod.sha512(data); }
-pub fn sha384(data: str): str { return hash_mod.sha384(data); }
-pub fn sha1(data: str): str   { return hash_mod.sha1(data); }
-pub fn md5(data: str): str    { return hash_mod.md5(data); }
+pub fn sha256(data: str): str { return hash.sha256(data); }
+pub fn sha512(data: str): str { return hash.sha512(data); }
+pub fn sha384(data: str): str { return hash.sha384(data); }
+pub fn sha1(data: str): str   { return hash.sha1(data); }
+pub fn md5(data: str): str    { return hash.md5(data); }
 
 // ── Re-exports: HMAC ───────────────────────────────────────────────────────
 pub fn hmac(algo: str, key: str, data: str): str {
-    return hmac_mod.hmac(algo, key, data);
+    return hmac.hmac(algo, key, data);
 }
 
 pub fn hmac_sha256(key: str, data: str): str {
-    return hmac_mod.sha256(key, data);
+    return hmac.sha256(key, data);
 }
 
 pub fn hmac_sha512(key: str, data: str): str {
-    return hmac_mod.sha512(key, data);
+    return hmac.sha512(key, data);
 }
 
 // ── Re-exports: AES Ciphers (AEAD GCM & CBC) ──────────────────────────────
-pub fn encrypt_gcm(key: str, iv: str, plaintext: str, aad: str = ""): cipher_mod.GcmCipher? {
-    return cipher_mod.encrypt_gcm(key, iv, plaintext, aad);
+pub fn encrypt_gcm(key: str, iv: str, plaintext: str, aad: str = ""): cipher.GcmCipher? {
+    return cipher.encrypt_gcm(key, iv, plaintext, aad);
 }
 
 pub fn decrypt_gcm(key: str, iv: str, ciphertext: str, tag: str, aad: str = ""): str? {
-    return cipher_mod.decrypt_gcm(key, iv, ciphertext, tag, aad);
+    return cipher.decrypt_gcm(key, iv, ciphertext, tag, aad);
 }
 
 pub fn encrypt_cbc(key: str, iv: str, plaintext: str): str? {
-    return cipher_mod.encrypt_cbc(key, iv, plaintext);
+    return cipher.encrypt_cbc(key, iv, plaintext);
 }
 
 pub fn decrypt_cbc(key: str, iv: str, ciphertext: str): str? {
-    return cipher_mod.decrypt_cbc(key, iv, ciphertext);
+    return cipher.decrypt_cbc(key, iv, ciphertext);
 }
 
 // ── Re-exports: Secure Random ──────────────────────────────────────────────
 pub fn random_hex(num_bytes: int): str {
-    return random_mod.random_hex(num_bytes);
+    return random.random_hex(num_bytes);
 }
 
 pub fn uuid(): str {
-    return random_mod.uuid();
+    return random.uuid();
 }
 
 pub fn random_int(min: int, max: int): int {
-    return random_mod.random_int(min, max);
+    return random.random_int(min, max);
 }
 
 pub fn random_string(length: int, alphabet: str = ""): str {
-    return random_mod.random_string(length, alphabet);
+    return random.random_string(length, alphabet);
 }

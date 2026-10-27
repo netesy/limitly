@@ -15,6 +15,16 @@ fn test_identity(): int {
     assert(len(os.arch()) > 0, "arch is empty");
     assert(os.is_windows() == (platform == "windows"), "is_windows disagrees with platform");
 
+    // Predicates carried over from the old std.env.platform checks, which guessed
+    // from environment variables. Each one must now agree with os_name()/arch().
+    var machine = os.arch();
+    assert(os.is_linux() == (platform == "linux"), "is_linux disagrees with platform");
+    assert(os.is_macos() == (platform == "darwin"), "is_macos disagrees with platform");
+    assert((os.is_windows() and os.is_linux()) == false, "windows and linux are both true");
+    assert((os.is_linux() and os.is_macos()) == false, "linux and macos are both true");
+    assert(os.is_wasm() == (platform == "wasi" or machine == "wasm32"), "is_wasm disagrees with the detected target");
+    assert(os.is_64bit() == (machine == "x86_64" or machine == "aarch64" or machine == "riscv64"), "is_64bit disagrees with arch");
+
     var separator = os.path_separator();
     assert(separator == "/" or separator == "\\", "path_separator failed");
     var list_separator = os.path_list_separator();

@@ -137,8 +137,10 @@ namespace {
             case LYMARRT_TYPE_U16: return BOX_INT((int64_t)v.val.u16);
             case LYMARRT_TYPE_I32: return BOX_INT((int64_t)v.val.i32);
             case LYMARRT_TYPE_U32: return BOX_INT((int64_t)v.val.u32);
-            case LYMARRT_TYPE_I64: return BOX_INT(v.val.i64);
-            case LYMARRT_TYPE_U64: return BOX_INT((int64_t)v.val.u64);
+            // i64/u64 from C can exceed the 61-bit immediate payload; BOX_INT would
+            // shift those bits away and hand back a silently wrong number.
+            case LYMARRT_TYPE_I64: return make_i64(v.val.i64);
+            case LYMARRT_TYPE_U64: return make_u64(v.val.u64);
             case LYMARRT_TYPE_F32: return make_float((double)v.val.f32);
             case LYMARRT_TYPE_F64: return make_float(v.val.f64);
             case LYMARRT_TYPE_PTR:
@@ -480,7 +482,7 @@ void RegisterVM::execute_extern_ccall_frame_get_stack_arg(const LIR::LIR_Inst* p
     std::lock_guard<std::mutex> lock(g_callframe_mutex);
     auto it = g_callframe_stack.find(id);
     if (it != g_callframe_stack.end() && off >= 0 && off + 8 <= (int64_t)it->second.size()) {
-        int64_t val; std::memcpy(&val, &it->second[off], 8); registers[pc->dst] = BOX_INT(val);
+        int64_t val; std::memcpy(&val, &it->second[off], 8); registers[pc->dst] = make_i64(val);
     } else registers[pc->dst] = BOX_INT(0);
 }
 void RegisterVM::execute_extern_vm_save(const LIR::LIR_Inst* pc) { registers[pc->dst] = VAL_NIL; }

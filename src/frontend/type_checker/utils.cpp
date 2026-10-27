@@ -549,6 +549,40 @@ bool TypeChecker::is_visible(const std::string& frame_name, LM::Frontend::AST::V
     return false;
 }
 
+const TypeChecker::FrameInfo* TypeChecker::lookup_frame_info(const std::string& name) const {
+    auto it = frame_declarations.find(name);
+    if (it != frame_declarations.end() && it->second.declaration != nullptr) {
+        return &it->second;
+    }
+    auto get_base = [](const std::string& s) {
+        size_t dot = s.find_last_of(".");
+        return (dot != std::string::npos) ? s.substr(dot + 1) : s;
+    };
+    std::string base = get_base(name);
+    size_t dot_pos = name.find('.');
+    if (dot_pos != std::string::npos) {
+        std::string mod_alias = name.substr(0, dot_pos);
+        std::string sub_name = name.substr(dot_pos + 1);
+        auto a_it = import_aliases.find(mod_alias);
+        if (a_it != import_aliases.end()) {
+            std::string full_target = a_it->second + "." + sub_name;
+            auto f_it = frame_declarations.find(full_target);
+            if (f_it != frame_declarations.end() && f_it->second.declaration != nullptr) {
+                return &f_it->second;
+            }
+        }
+    }
+    for (const auto& [k, v] : frame_declarations) {
+        if (get_base(k) == base && v.declaration != nullptr) {
+            return &v;
+        }
+    }
+    if (it != frame_declarations.end()) {
+        return &it->second;
+    }
+    return nullptr;
+}
+
 // =============================================================================
 // ERROR TYPE INFERENCE & LAMBDA/LITERAL TYPE INFERENCE
 //

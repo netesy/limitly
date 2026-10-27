@@ -318,39 +318,53 @@ frame DataProcessor : Processor, Logger {
 
 ```lymar
 frame Engine {
- pub var rpm: int = 0
- pub fn start() { rpm = 1000 }
- pub deinit() { print("Engine stopped") }
+    pub var rpm: int = 0;
+
+    pub fn start() {
+        self.rpm = 1000;
+    }
+
+    pub deinit() {
+        print("Engine stopped");
+    }
 }
 
 frame Transmission {
- pub var gear: int = 1
- pub fn shift_up() { gear += 1 }
+    pub var gear: int = 1;
+
+    pub fn shift_up() {
+        self.gear = self.gear + 1;
+    }
 }
 
 frame Car {
- // Composition: embed frames directly
- embed Engine;
- embed Transmission;
- pub var speed: int = 0
- 
- pub fn drive() {
- self.start() // promoted method from embedded Engine
- self.shift_up() // promoted method from embedded Transmission
- self.speed = self.rpm / 100
- }
- 
- pub deinit() {
- print("Car destroyed")
- }
+    // Composition: embed components directly. Each embed is flattened into Car --
+    // there is no `self.engine` or `self.transmission` sub-object.
+    embed Engine;
+    embed Transmission;
+
+    pub var speed: int = 0;
+
+    pub fn drive() {
+        self.start();      // promoted method from embedded Engine
+        self.shift_up();   // promoted method from embedded Transmission
+        self.speed = self.rpm / 100;  // promoted field, shared storage
+    }
+
+    pub deinit() {
+        print("Car destroyed");
+    }
 }
 ```
 
 **Composition Rules**:
-- [x] Frames can embed other frames as fields
-- [x] Embedded frames auto-destroyed when parent destroyed
-- [x] Destruction order: children first, then parent
-- [x] Cross-mode composition allowed (sequential <-> parallel <-> concurrent)
+- [x] `embed` inlines the component's fields into the host and promotes its methods onto the host
+- [x] Promoted fields are the host's own storage -- host and component method see and write the same slot
+- [x] Embedding is anonymous: no accessor name is introduced. Declare a field (`pub engine: Engine;`) when you need to name the component
+- [x] On a name collision the host's own member wins; a promoted member never overwrites it
+- [x] Promoted members count as real members, so they can satisfy a trait the host conforms to
+- [ ] Embedded components are **not** auto-destroyed: the component's `deinit()` is neither promoted nor called when the host is destroyed. Forward it from the host's own `deinit()` if cleanup is required.
+- [x] A host may embed several components, and may embed a mixin as well as a frame
 
 ---
 

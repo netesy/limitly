@@ -154,6 +154,12 @@ TypePtr TypeChecker::resolve_type_annotation(std::shared_ptr<LM::Frontend::AST::
                 TypePtr custom_type = type_system.getType(annotation->typeName);
                 if (custom_type && custom_type->tag != TypeTag::Nil) {
                     base_type = custom_type;
+                } else if (const FrameInfo* fi = lookup_frame_info(type_name)) {
+                    base_type = type_system.createFrameType(fi->name);
+                    type_system.addUserDefinedType(annotation->typeName, base_type);
+                } else if (const FrameInfo* fi2 = lookup_frame_info(annotation->typeName)) {
+                    base_type = type_system.createFrameType(fi2->name);
+                    type_system.addUserDefinedType(annotation->typeName, base_type);
                 } else {
                     std::vector<std::string> candidates = get_visible_types();
                     std::string suggestion = find_similar_name(annotation->typeName, candidates);
@@ -274,6 +280,16 @@ bool TypeChecker::is_type_compatible(TypePtr expected, TypePtr actual) {
     }
     if (actual->tag == TypeTag::Refined) {
         if (const auto* refined = std::get_if<RefinedType>(&actual->extra)) return is_type_compatible(expected, refined->baseType);
+    }
+    if (actual->tag == TypeTag::Dict && expected->tag == TypeTag::Dict) {
+        auto* actualDict = std::get_if<DictType>(&actual->extra);
+        auto* expectedDict = std::get_if<DictType>(&expected->extra);
+        if (actualDict && expectedDict) {
+            if ((actualDict->keyType->tag == TypeTag::Nil || actualDict->keyType->tag == TypeTag::Any) &&
+                (actualDict->valueType->tag == TypeTag::Any || actualDict->valueType->tag == TypeTag::Nil)) {
+                return true;
+            }
+        }
     }
     return type_system.isCompatible(actual, expected);
 }

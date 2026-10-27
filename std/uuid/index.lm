@@ -1,14 +1,16 @@
-import std.uuid.uuid as uuid_mod;
-import std.uuid.generator as generator_mod;
+import std.uuid.uuid as uuid;
+import std.uuid.generator as generator;
 
-pub fn UUID(bytes: [int], is_valid: bool): any {
-    return uuid_mod.UUID(bytes, is_valid);
+pub import std.uuid.uuid show UUID;
+
+pub fn UUID(bytes: [int], is_valid: bool): uuid.UUID {
+    return uuid.UUID(bytes, is_valid);
 }
 
-pub fn parse(uuid_str: str): any {
-    return uuid_mod.parse(uuid_str);
+pub fn parse(uuid_str: str): uuid.UUID {
+    return uuid.parse(uuid_str);
 }
 
-pub fn generate_v4(): any {
-    return generator_mod.generate_v4();
+pub fn generate_v4(): uuid.UUID {
+    return generator.generate_v4();
 }

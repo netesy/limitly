@@ -1,7 +1,7 @@
 // Test Suite for Standard Library I/O Module
 
 import std.io as io;
-import std.io.file as file_mod;
+import std.io.file as file;
 
 fn test_console(): int {
     print("Testing Console...");
@@ -17,10 +17,10 @@ fn test_file_ops(): int {
     var non_existent = io.exists("non_existent_file_xyz.txt");
     assert(!non_existent, "io.exists fail for non-existent file");
 
-    var f_res = file_mod.open("test_io_temp.txt", "w");
+    var f_res = file.open("test_io_temp.txt", "w");
     match (f_res) {
         val f_obj => {
-            var f_obj_concrete = f_obj as file_mod.File;
+            var f_obj_concrete = f_obj as file.File;
             f_obj_concrete.write("Hello Lymar");
             f_obj_concrete.close();
         }
@@ -29,10 +29,10 @@ fn test_file_ops(): int {
         }
     }
 
-    var f_read_res = file_mod.open("test_io_temp.txt", "r");
+    var f_read_res = file.open("test_io_temp.txt", "r");
     match (f_read_res) {
         val f_obj => {
-            var f_obj_concrete = f_obj as file_mod.File;
+            var f_obj_concrete = f_obj as file.File;
             var content_res = f_obj_concrete.read();
             match (content_res) {
                 val content => {
