@@ -17,6 +17,7 @@
 #include <unordered_map>
 #include <filesystem>
 #include <mutex>
+#include <cstring>
 
 namespace LM {
 namespace LIR {
